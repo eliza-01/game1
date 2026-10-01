@@ -1,0 +1,1 @@
+& (Join-Path $PSScriptRoot 'control-center.ps1')

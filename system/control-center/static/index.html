@@ -1,0 +1,11 @@
+<!doctype html><html><head><meta charset="utf-8"><title>game1 Asset Manager</title><style>
+body{font:14px system-ui;margin:0;background:#11151b;color:#e7edf5}header{padding:18px 24px;background:#1a2029;border-bottom:1px solid #303846}main{padding:24px;max-width:1000px}.badge{padding:3px 8px;border:1px solid #485568;border-radius:999px}.card{background:#171d25;border:1px solid #303846;border-radius:10px;padding:18px;margin:16px 0}input{background:#0e1217;color:#fff;border:1px solid #3b4655;padding:9px;margin:4px;width:210px}button{padding:9px 14px;margin:4px}table{width:100%;border-collapse:collapse}td,th{border-bottom:1px solid #303846;padding:9px;text-align:left}.muted{color:#95a1b2}</style></head><body>
+<header><b>GAME1 · ASSET MANAGER</b> <span class="badge">Characters only · M1</span></header><main>
+<p class="muted">Clean project database. FFighter bootstrap placeholder is intentionally not registered here.</p>
+<div class="card"><h2>Register Character Archetype</h2><input id="id" placeholder="archetype id: default"><input id="name" placeholder="Display name"><input id="asset" placeholder="Roblox Model Asset ID"><br><input id="source" placeholder="optional source path"><button onclick="save()">Save</button><span id="msg"></span></div>
+<div class="card"><h2>Characters</h2><table><thead><tr><th>ID</th><th>Name</th><th>Asset ID</th><th>Status</th><th>Revision</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+<script>
+async function load(){let r=await fetch('/api/characters');let d=await r.json();rows.innerHTML='';for(let x of d.items){let tr=document.createElement('tr');tr.innerHTML=`<td>${x.id}</td><td>${x.display_name}</td><td>${x.model_asset_id||''}</td><td>${x.status}</td><td>${x.revision}</td><td><button onclick="del('${x.id}')">Delete</button></td>`;rows.appendChild(tr)}}
+async function save(){let body={id:id.value,displayName:name.value,modelAssetId:asset.value,sourcePath:source.value};let r=await fetch('/api/characters',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});let d=await r.json();msg.textContent=r.ok?' saved':' '+d.error;load()}
+async function del(x){await fetch('/api/characters/'+encodeURIComponent(x),{method:'DELETE'});load()}load();
+</script></main></body></html>

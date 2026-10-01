@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "name": "game1",
+  "slug": "game1",
+  "namespaces": {
+    "shared": "Game1Shared",
+    "server": "Game1Server",
+    "client": "Game1Client",
+    "remotes": "Game1Remotes"
+  },
+  "ports": {
+    "controlCenter": 43820,
+    "controlAgent": 43821,
+    "rojo": 34882,
+    "studioBridge": 43137
+  },
+  "bootstrap": {
+    "characterModelAssetId": "99674249877653",
+    "label": "FFighter temporary bootstrap placeholder",
+    "externalDependency": true
+  }
+}

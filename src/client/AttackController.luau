@@ -1,0 +1,53 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+
+local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
+local CharacterConfig = require(Shared:WaitForChild("CharacterConfig"))
+local AttackConfig = require(Shared:WaitForChild("AttackConfig"))
+local AttackController = {}
+local started = false
+local lastAttack = 0
+local movementController: any = nil
+
+local function aimPosition(): Vector3?
+    local camera = Workspace.CurrentCamera
+    if not camera then return nil end
+    local mouse = UserInputService:GetMouseLocation()
+    local ray = camera:ViewportPointToRay(mouse.X, mouse.Y)
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    local player = Players.LocalPlayer
+    params.FilterDescendantsInstances = player.Character and { player.Character } or {}
+    local hit = Workspace:Raycast(ray.Origin, ray.Direction * AttackConfig.MaxAimDistance, params)
+    return if hit then hit.Position else ray.Origin + ray.Direction * AttackConfig.MaxAimDistance
+end
+
+function AttackController.Start(movement: any?)
+    movementController = movement
+    if started then return end
+    started = true
+    local remotes = ReplicatedStorage:WaitForChild("Game1Remotes")
+    local attack = remotes:WaitForChild("AttackIntent")
+    UserInputService.InputBegan:Connect(function(input, processed)
+        if processed or input.UserInputType ~= CharacterConfig.InputBindings.AttackPrimary[1] then return end
+        local now = os.clock()
+        if now - lastAttack < AttackConfig.CooldownSeconds * 0.75 then return end
+        lastAttack = now
+        local target = aimPosition()
+        if target then
+            local player = Players.LocalPlayer
+            local root = player.Character and player.Character:FindFirstChild("RootCollider")
+            if movementController and root and root:IsA("BasePart") then
+                local direction = Vector3.new(target.X - root.Position.X, 0, target.Z - root.Position.Z)
+                if direction.Magnitude > 0.001 then
+                    movementController.LockFacing(direction.Unit, 0.28)
+                    movementController.LockMovement(0.22)
+                end
+            end
+            attack:FireServer(target)
+        end
+    end)
+end
+return AttackController

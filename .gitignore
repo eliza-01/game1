@@ -1,0 +1,8 @@
+.control-center/*.log
+.control-center/*.pid
+.control-center/*.db
+.control-center/*.db-*
+.env.local
+place/snapshots/*.rbxl
+__pycache__/
+*.pyc

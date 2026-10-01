@@ -1,0 +1,17 @@
+name: game1-control
+services:
+  control-center:
+    build: .
+    container_name: game1-control-center
+    restart: unless-stopped
+    environment:
+      CONTROL_AGENT_URL: http://host.docker.internal:43821
+      CONTROL_TOKEN: Game1LocalControlV1
+    ports:
+      - "127.0.0.1:43820:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks: [game1-control-net]
+networks:
+  game1-control-net:
+    name: game1-control-net

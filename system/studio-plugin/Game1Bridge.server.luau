@@ -1,0 +1,33 @@
+local HttpService = game:GetService("HttpService")
+local StudioService = game:GetService("StudioService")
+
+local toolbar = plugin:CreateToolbar("game1")
+local button = toolbar:CreateButton("Control Center", "Check the game1 local Control Center host agent", "")
+button.ClickableWhenViewportHidden = true
+
+local URL = "http://127.0.0.1:43821/api/agent/info"
+local TOKEN = "Game1LocalControlV1"
+
+local function checkAgent()
+    local ok, response = pcall(HttpService.RequestAsync, HttpService, {
+        Url = URL,
+        Method = "GET",
+        Headers = { ["X-Control-Token"] = TOKEN },
+    })
+    if not ok then
+        warn("[game1 Plugin] Control Center agent is unavailable: " .. tostring(response))
+        return
+    end
+    if not response.Success then
+        warn(("[game1 Plugin] Agent HTTP %d: %s"):format(response.StatusCode, response.Body))
+        return
+    end
+    local decodedOk, data = pcall(HttpService.JSONDecode, HttpService, response.Body)
+    if decodedOk then
+        print(("[game1 Plugin] Connected · %s · %s"):format(tostring(data.project), tostring(data.build)))
+    else
+        print("[game1 Plugin] Connected")
+    end
+end
+button.Click:Connect(checkAgent)
+print("[game1 Plugin] loaded")

@@ -1,0 +1,9 @@
+{
+  "name": "Game1Bridge",
+  "tree": {
+    "$className": "DataModel",
+    "Game1Bridge": {
+      "$path": "Game1Bridge.server.luau"
+    }
+  }
+}

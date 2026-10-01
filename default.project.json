@@ -1,0 +1,82 @@
+{
+  "name": "game1",
+  "serveAddress": "127.0.0.1",
+  "servePort": 34882,
+  "tree": {
+    "$className": "DataModel",
+    "Workspace": {
+      "$className": "Workspace",
+      "$properties": {
+        "PlayerScriptsUseInputActionSystem": {
+          "Enum": 2
+        }
+      },
+      "Baseplate": {
+        "$className": "Part",
+        "$properties": {
+          "Anchored": true,
+          "CanCollide": true,
+          "Locked": true,
+          "Position": [
+            0,
+            -0.5,
+            0
+          ],
+          "Size": [
+            256,
+            1,
+            256
+          ]
+        }
+      },
+      "SpawnLocation": {
+        "$className": "SpawnLocation",
+        "$properties": {
+          "Anchored": true,
+          "CanCollide": true,
+          "Neutral": true,
+          "Position": [
+            0,
+            0.5,
+            0
+          ],
+          "Size": [
+            6,
+            1,
+            6
+          ]
+        }
+      }
+    },
+    "Players": {
+      "$className": "Players",
+      "$properties": {
+        "CharacterAutoLoads": false
+      }
+    },
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "Game1Shared": {
+        "$path": "src/shared"
+      }
+    },
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "Game1Server": {
+        "$path": "src/server"
+      }
+    },
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "$properties": {
+        "CreateDefaultPlayerModule": false
+      },
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "Game1Client": {
+          "$path": "src/client"
+        }
+      }
+    }
+  }
+}

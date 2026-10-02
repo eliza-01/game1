@@ -4,4 +4,5 @@ return table.freeze({
     BoxWidth = 5,
     BoxHeight = 5,
     MaxAimDistance = 420,
+    DebugLogs = true,
 })

@@ -1,5 +1,19 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "project": "game1",
-  "archetypes": []
+  "activeArchetypeId": "default",
+  "archetypes": [
+    {
+      "id": "default",
+      "displayName": "default character",
+      "status": "ARCHETYPE_ONLY",
+      "revision": 1,
+      "model": {
+        "sourcePath": "",
+        "preparedPath": "",
+        "sha256": "",
+        "assetId": null
+      }
+    }
+  ]
 }

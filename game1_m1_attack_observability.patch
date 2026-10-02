@@ -1,0 +1,329 @@
+diff --git a/src/server/AttackService.luau b/src/server/AttackService.luau
+index f1df140..a74ce1c 100644
+--- a/src/server/AttackService.luau
++++ b/src/server/AttackService.luau
+@@ -1,37 +1,123 @@
+ local Players = game:GetService("Players")
+ local ReplicatedStorage = game:GetService("ReplicatedStorage")
+ local Workspace = game:GetService("Workspace")
++
+ local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
+ local Config = require(Shared:WaitForChild("AttackConfig"))
+ local DamageService = require(script.Parent:WaitForChild("DamageService"))
++
+ local Service = {}
+ local cooldowns = {}
++
+ local function modelFromPart(part: Instance): Model?
+     local current = part
+     while current and current ~= Workspace do
+-        if current:IsA("Model") and current:GetAttribute("Damageable") == true then return current end
++        if current:IsA("Model") and current:GetAttribute("Damageable") == true then
++            return current
++        end
+         current = current.Parent
+     end
+     return nil
+ end
++
+ local function attack(player: Player, aim: any)
+-    if typeof(aim) ~= "Vector3" then return end
+-    local c=player.Character; local root=c and c:FindFirstChild("RootCollider"); if not (c and root and root:IsA("BasePart")) or c:GetAttribute("LifeState")~="Alive" then return end
+-    local now=os.clock(); if now-(cooldowns[player] or 0)<Config.CooldownSeconds then return end; cooldowns[player]=now
+-    local flat=Vector3.new(aim.X-root.Position.X,0,aim.Z-root.Position.Z); if flat.Magnitude<0.001 then flat=root.CFrame.LookVector end; local dir=flat.Unit
+-    local center=root.Position + dir*(Config.Range*.5)
+-    local boxCf=CFrame.lookAt(center, center+dir)
+-    local params=OverlapParams.new(); params.FilterType=Enum.RaycastFilterType.Exclude; params.FilterDescendantsInstances={c}
+-    local parts=Workspace:GetPartBoundsInBox(boxCf,Vector3.new(Config.BoxWidth,Config.BoxHeight,Config.Range),params)
+-    local seen={}
+-    local best,bestDist=nil,math.huge
+-    for _,part in ipairs(parts) do local m=modelFromPart(part); if m and not seen[m] then seen[m]=true; local r=m:FindFirstChild("RootCollider") or m.PrimaryPart; if r and r:IsA("BasePart") then local d=(r.Position-root.Position).Magnitude; if d<=Config.Range+1 and d<bestDist then best=m; bestDist=d end end end end
+-    c:SetAttribute("AttackSerial",(c:GetAttribute("AttackSerial") or 0)+1)
+-    if best then DamageService.Apply(c,best,tonumber(c:GetAttribute("Damage")) or 0) end
++    if typeof(aim) ~= "Vector3" then
++        if Config.DebugLogs then
++            print(("[game1][ATTACK] REJECT player=%s reason=invalid_aim"):format(player.Name))
++        end
++        return
++    end
++
++    local character = player.Character
++    local root = character and character:FindFirstChild("RootCollider")
++    if not (character and root and root:IsA("BasePart")) or character:GetAttribute("LifeState") ~= "Alive" then
++        if Config.DebugLogs then
++            print(("[game1][ATTACK] REJECT player=%s reason=character_not_ready"):format(player.Name))
++        end
++        return
++    end
++
++    local now = os.clock()
++    if now - (cooldowns[player] or 0) < Config.CooldownSeconds then
++        if Config.DebugLogs then
++            print(("[game1][ATTACK] REJECT player=%s reason=cooldown"):format(player.Name))
++        end
++        return
++    end
++    cooldowns[player] = now
++
++    local flat = Vector3.new(aim.X - root.Position.X, 0, aim.Z - root.Position.Z)
++    if flat.Magnitude < 0.001 then
++        flat = root.CFrame.LookVector
++    end
++    local direction = flat.Unit
++
++    local center = root.Position + direction * (Config.Range * 0.5)
++    local boxCf = CFrame.lookAt(center, center + direction)
++    local params = OverlapParams.new()
++    params.FilterType = Enum.RaycastFilterType.Exclude
++    params.FilterDescendantsInstances = { character }
++
++    local parts = Workspace:GetPartBoundsInBox(
++        boxCf,
++        Vector3.new(Config.BoxWidth, Config.BoxHeight, Config.Range),
++        params
++    )
++
++    local seen = {}
++    local best, bestDistance = nil, math.huge
++    for _, part in ipairs(parts) do
++        local model = modelFromPart(part)
++        if model and not seen[model] then
++            seen[model] = true
++            local targetRoot = model:FindFirstChild("RootCollider") or model.PrimaryPart
++            if targetRoot and targetRoot:IsA("BasePart") then
++                local distance = (targetRoot.Position - root.Position).Magnitude
++                if distance <= Config.Range + 1 and distance < bestDistance then
++                    best = model
++                    bestDistance = distance
++                end
++            end
++        end
++    end
++
++    character:SetAttribute("AttackSerial", (character:GetAttribute("AttackSerial") or 0) + 1)
++
++    if not best then
++        if Config.DebugLogs then
++            print(("[game1][ATTACK] MISS player=%s range=%.1f"):format(player.Name, Config.Range))
++        end
++        return
++    end
++
++    local rawDamage = tonumber(character:GetAttribute("Damage")) or 0
++    local finalDamage, killed = DamageService.Apply(character, best, rawDamage)
++
++    if Config.DebugLogs then
++        print(("[game1][ATTACK] HIT player=%s target=%s distance=%.2f damage=%d targetHP=%s killed=%s"):format(
++            player.Name,
++            best.Name,
++            bestDistance,
++            finalDamage,
++            tostring(best:GetAttribute("HP")),
++            tostring(killed)
++        ))
++    end
+ end
++
+ function Service.Start()
+-    local remotes=ReplicatedStorage:FindFirstChild("Game1Remotes") or Instance.new("Folder"); remotes.Name="Game1Remotes"; remotes.Parent=ReplicatedStorage
+-    local event=remotes:FindFirstChild("AttackIntent") or Instance.new("RemoteEvent"); event.Name="AttackIntent"; event.Parent=remotes; event.OnServerEvent:Connect(attack)
+-    Players.PlayerRemoving:Connect(function(p) cooldowns[p]=nil end)
++    local remotes = ReplicatedStorage:FindFirstChild("Game1Remotes") or Instance.new("Folder")
++    remotes.Name = "Game1Remotes"
++    remotes.Parent = ReplicatedStorage
++
++    local event = remotes:FindFirstChild("AttackIntent") or Instance.new("RemoteEvent")
++    event.Name = "AttackIntent"
++    event.Parent = remotes
++    event.OnServerEvent:Connect(attack)
++
++    Players.PlayerRemoving:Connect(function(player)
++        cooldowns[player] = nil
++    end)
+ end
++
+ return Service
+diff --git a/src/server/DamageService.luau b/src/server/DamageService.luau
+index 4a193aa..481cf9a 100644
+--- a/src/server/DamageService.luau
++++ b/src/server/DamageService.luau
+@@ -1,14 +1,50 @@
++local ReplicatedStorage = game:GetService("ReplicatedStorage")
++
++local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
++local AttackConfig = require(Shared:WaitForChild("AttackConfig"))
++
+ local DamageService = {}
++
+ function DamageService.Apply(attacker: Model?, target: Model, rawDamage: number): (number, boolean)
+-    if target:GetAttribute("Damageable") ~= true or target:GetAttribute("LifeState") ~= "Alive" then return 0, false end
++    if target:GetAttribute("Damageable") ~= true or target:GetAttribute("LifeState") ~= "Alive" then
++        if AttackConfig.DebugLogs then
++            print(("[game1][DAMAGE] REJECT target=%s damageable=%s lifeState=%s"):format(
++                target:GetFullName(),
++                tostring(target:GetAttribute("Damageable")),
++                tostring(target:GetAttribute("LifeState"))
++            ))
++        end
++        return 0, false
++    end
++
+     local defense = math.max(0, tonumber(target:GetAttribute("Defense")) or 0)
+-    local finalDamage = math.max(0, math.floor((tonumber(rawDamage) or 0) - defense))
++    local normalizedRawDamage = math.max(0, tonumber(rawDamage) or 0)
++    local finalDamage = math.max(0, math.floor(normalizedRawDamage - defense))
+     local hp = math.max(0, tonumber(target:GetAttribute("HP")) or 0)
+     local newHP = math.max(0, hp - finalDamage)
++
+     target:SetAttribute("HP", newHP)
+     target:SetAttribute("LastDamage", finalDamage)
+     target:SetAttribute("LastAttackerUserId", attacker and attacker:GetAttribute("CharacterOwnerUserId") or 0)
+-    if newHP <= 0 then target:SetAttribute("LifeState", "Dead") end
+-    return finalDamage, newHP <= 0
++
++    local killed = newHP <= 0
++    if killed then
++        target:SetAttribute("LifeState", "Dead")
++    end
++
++    if AttackConfig.DebugLogs then
++        print(("[game1][DAMAGE] target=%s raw=%d defense=%d final=%d hp=%d->%d killed=%s"):format(
++            target.Name,
++            normalizedRawDamage,
++            defense,
++            finalDamage,
++            hp,
++            newHP,
++            tostring(killed)
++        ))
++    end
++
++    return finalDamage, killed
+ end
++
+ return DamageService
+diff --git a/src/server/TrainingDummyService.luau b/src/server/TrainingDummyService.luau
+index a22430d..ccf7214 100644
+--- a/src/server/TrainingDummyService.luau
++++ b/src/server/TrainingDummyService.luau
+@@ -1,11 +1,83 @@
+ local RunService = game:GetService("RunService")
+ local Workspace = game:GetService("Workspace")
++
+ local Service = {}
++
++local function createStatusGui(root: BasePart, model: Model)
++    local billboard = Instance.new("BillboardGui")
++    billboard.Name = "StatusGui"
++    billboard.Adornee = root
++    billboard.AlwaysOnTop = true
++    billboard.Size = UDim2.fromOffset(240, 70)
++    billboard.StudsOffset = Vector3.new(0, 4.25, 0)
++    billboard.Parent = model
++
++    local label = Instance.new("TextLabel")
++    label.Name = "StatusText"
++    label.Size = UDim2.fromScale(1, 1)
++    label.BackgroundTransparency = 0.2
++    label.TextScaled = true
++    label.TextWrapped = true
++    label.Parent = billboard
++
++    local function render()
++        local hp = tonumber(model:GetAttribute("HP")) or 0
++        local maxHP = tonumber(model:GetAttribute("MaxHP")) or 0
++        local defense = tonumber(model:GetAttribute("Defense")) or 0
++        label.Text = ("TRAINING DUMMY\nHP %d/%d   DEF %d"):format(hp, maxHP, defense)
++    end
++
++    model:GetAttributeChangedSignal("HP"):Connect(render)
++    model:GetAttributeChangedSignal("MaxHP"):Connect(render)
++    model:GetAttributeChangedSignal("Defense"):Connect(render)
++    render()
++end
++
+ function Service.Start()
+-    if not RunService:IsStudio() or Workspace:FindFirstChild("game1TrainingDummy") then return end
++    if not RunService:IsStudio() or Workspace:FindFirstChild("game1TrainingDummy") then
++        return
++    end
++
+     local spawn = Workspace:FindFirstChildWhichIsA("SpawnLocation", true)
+-    local m=Instance.new("Model"); m.Name="game1TrainingDummy"; m:SetAttribute("Damageable",true); m:SetAttribute("Level",1); m:SetAttribute("MaxHP",100); m:SetAttribute("HP",100); m:SetAttribute("Damage",0); m:SetAttribute("Defense",0); m:SetAttribute("LifeState","Alive")
+-    local p=Instance.new("Part"); p.Name="RootCollider"; p.Size=Vector3.new(3,5,3); p.Anchored=true; p.Position=(spawn and spawn.Position or Vector3.zero)+Vector3.new(0,2.5,-6); p.Parent=m; m.PrimaryPart=p; m.Parent=Workspace
+-    m:GetAttributeChangedSignal("HP"):Connect(function() if (m:GetAttribute("HP") or 0)<=0 then task.delay(2,function() if m.Parent then m:SetAttribute("HP",100);m:SetAttribute("LifeState","Alive") end end) end end)
++
++    local model = Instance.new("Model")
++    model.Name = "game1TrainingDummy"
++    model:SetAttribute("Damageable", true)
++    model:SetAttribute("Level", 1)
++    model:SetAttribute("MaxHP", 100)
++    model:SetAttribute("HP", 100)
++    model:SetAttribute("Damage", 0)
++    model:SetAttribute("Defense", 0)
++    model:SetAttribute("LifeState", "Alive")
++
++    local root = Instance.new("Part")
++    root.Name = "RootCollider"
++    root.Size = Vector3.new(3, 5, 3)
++    root.Anchored = true
++    root.Position = (spawn and spawn.Position or Vector3.zero) + Vector3.new(0, 2.5, -6)
++    root.Parent = model
++
++    model.PrimaryPart = root
++    model.Parent = Workspace
++
++    createStatusGui(root, model)
++
++    if RunService:IsStudio() then
++        print("[game1][DUMMY] spawned · HP=100/100 DEF=0 · attack with LMB inside melee range")
++    end
++
++    model:GetAttributeChangedSignal("HP"):Connect(function()
++        if (model:GetAttribute("HP") or 0) <= 0 then
++            print("[game1][DUMMY] dead · respawning HP in 2s")
++            task.delay(2, function()
++                if model.Parent then
++                    model:SetAttribute("HP", 100)
++                    model:SetAttribute("LifeState", "Alive")
++                    print("[game1][DUMMY] reset · HP=100/100")
++                end
++            end)
++        end
++    end)
+ end
++
+ return Service
+diff --git a/src/shared/AttackConfig.luau b/src/shared/AttackConfig.luau
+index 4a51a0c..90d9f7a 100644
+--- a/src/shared/AttackConfig.luau
++++ b/src/shared/AttackConfig.luau
+@@ -4,4 +4,5 @@ return table.freeze({
+     BoxWidth = 5,
+     BoxHeight = 5,
+     MaxAimDistance = 420,
++    DebugLogs = true,
+ })
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index d14a0a4..24cbaf8 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -70,9 +70,17 @@ if old & set(ports.values()):
+ if ports.get('rojo') != 34882:
+     err('game1 Rojo port must be 34882 for M1')
+ 
+-if 'max(0, math.floor((tonumber(rawDamage) or 0) - defense))' not in (ROOT / 'src/server/DamageService.luau').read_text(encoding='utf-8'):
++damage_text = (ROOT / 'src/server/DamageService.luau').read_text(encoding='utf-8')
++if 'math.max(0, math.floor(normalizedRawDamage - defense))' not in damage_text:
+     err('damage formula contract missing')
+ 
++attack_text = (ROOT / 'src/server/AttackService.luau').read_text(encoding='utf-8')
++dummy_text = (ROOT / 'src/server/TrainingDummyService.luau').read_text(encoding='utf-8')
++if '[game1][ATTACK] HIT' not in attack_text or '[game1][ATTACK] MISS' not in attack_text:
++    err('attack smoke-test logging contract missing')
++if 'BillboardGui' not in dummy_text or 'HP %d/%d' not in dummy_text:
++    err('training dummy visible HP contract missing')
++
+ if errors:
+     print('VERIFY FAILED')
+     for item in errors:

@@ -1,11 +1,115 @@
-<!doctype html><html><head><meta charset="utf-8"><title>game1 Asset Manager</title><style>
-body{font:14px system-ui;margin:0;background:#11151b;color:#e7edf5}header{padding:18px 24px;background:#1a2029;border-bottom:1px solid #303846}main{padding:24px;max-width:1000px}.badge{padding:3px 8px;border:1px solid #485568;border-radius:999px}.card{background:#171d25;border:1px solid #303846;border-radius:10px;padding:18px;margin:16px 0}input{background:#0e1217;color:#fff;border:1px solid #3b4655;padding:9px;margin:4px;width:210px}button{padding:9px 14px;margin:4px}table{width:100%;border-collapse:collapse}td,th{border-bottom:1px solid #303846;padding:9px;text-align:left}.muted{color:#95a1b2}</style></head><body>
-<header><b>GAME1 · ASSET MANAGER</b> <span class="badge">Characters only · M1</span></header><main>
-<p class="muted">Clean project database. FFighter bootstrap placeholder is intentionally not registered here.</p>
-<div class="card"><h2>Register Character Archetype</h2><input id="id" placeholder="archetype id: default"><input id="name" placeholder="Display name"><input id="asset" placeholder="Roblox Model Asset ID"><br><input id="source" placeholder="optional source path"><button onclick="save()">Save</button><span id="msg"></span></div>
-<div class="card"><h2>Characters</h2><table><thead><tr><th>ID</th><th>Name</th><th>Asset ID</th><th>Status</th><th>Revision</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>game1 asset manager</title>
+<style>
+body{font:14px system-ui;margin:0;background:#11151b;color:#e7edf5}header{padding:18px 24px;background:#1a2029;border-bottom:1px solid #303846}main{padding:24px;max-width:1100px}.badge{padding:3px 8px;border:1px solid #485568;border-radius:999px}.card{background:#171d25;border:1px solid #303846;border-radius:10px;padding:18px;margin:16px 0}input{background:#0e1217;color:#fff;border:1px solid #3b4655;padding:9px;margin:4px;width:220px}button{padding:9px 14px;margin:4px}table{width:100%;border-collapse:collapse}td,th{border-bottom:1px solid #303846;padding:9px;text-align:left}.muted{color:#95a1b2}.ok{color:#86d98b}.warn{color:#f3c96b}.runtime{font-size:16px}.active{font-weight:700}.actions{white-space:nowrap}</style>
+</head>
+<body>
+<header><b>game1 · asset manager</b> <span class="badge">characters · m2</span></header>
+<main>
+<p class="muted">clean project database. the ffighter bootstrap visual is external and is not registered as game1 content.</p>
+
+<div class="card">
+<h2>runtime character source</h2>
+<div id="runtime" class="runtime">loading...</div>
+<p class="muted">an archetype becomes the runtime visual only after it is active and has a roblox model asset id. otherwise runtime stays on the bootstrap placeholder.</p>
+</div>
+
+<div class="card">
+<h2>create or update archetype</h2>
+<input id="character_id" placeholder="archetype id: default">
+<input id="display_name" placeholder="display name">
+<br>
+<input id="asset_id" placeholder="optional roblox model asset id">
+<input id="source_path" placeholder="optional local model path">
+<button onclick="save_character()">save</button>
+<span id="message"></span>
+</div>
+
+<div class="card">
+<h2>characters</h2>
+<table>
+<thead><tr><th>active</th><th>id</th><th>name</th><th>model asset id</th><th>status</th><th>revision</th><th></th></tr></thead>
+<tbody id="rows"></tbody>
+</table>
+</div>
+
 <script>
-async function load(){let r=await fetch('/api/characters');let d=await r.json();rows.innerHTML='';for(let x of d.items){let tr=document.createElement('tr');tr.innerHTML=`<td>${x.id}</td><td>${x.display_name}</td><td>${x.model_asset_id||''}</td><td>${x.status}</td><td>${x.revision}</td><td><button onclick="del('${x.id}')">Delete</button></td>`;rows.appendChild(tr)}}
-async function save(){let body={id:id.value,displayName:name.value,modelAssetId:asset.value,sourcePath:source.value};let r=await fetch('/api/characters',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});let d=await r.json();msg.textContent=r.ok?' saved':' '+d.error;load()}
-async function del(x){await fetch('/api/characters/'+encodeURIComponent(x),{method:'DELETE'});load()}load();
-</script></main></body></html>
+const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+async function request(url, options){
+  const response = await fetch(url, options);
+  const data = await response.json();
+  if(!response.ok) throw new Error(data.error || `http ${response.status}`);
+  return data;
+}
+
+async function load(){
+  try{
+    const data = await request('/api/characters');
+    rows.innerHTML = '';
+    for(const item of data.items){
+      const active = data.activeArchetypeId === item.id;
+      const tr = document.createElement('tr');
+      tr.className = active ? 'active' : '';
+      tr.innerHTML = `<td>${active ? 'yes' : ''}</td><td>${esc(item.id)}</td><td>${esc(item.display_name)}</td><td>${esc(item.model_asset_id || '')}</td><td>${esc(item.status)}</td><td>${esc(item.revision)}</td><td class="actions"><button data-action="activate">activate</button><button data-action="delete">delete</button></td>`;
+      tr.querySelector('[data-action="activate"]').onclick = () => activate_character(item.id);
+      tr.querySelector('[data-action="delete"]').onclick = () => delete_character(item.id);
+      rows.appendChild(tr);
+    }
+    const r = data.runtime;
+    if(r.mode === 'registered'){
+      runtime.className = 'runtime ok';
+      runtime.textContent = `registered · ${r.activeArchetypeId} · asset ${r.modelAssetId}`;
+    } else {
+      runtime.className = 'runtime warn';
+      runtime.textContent = `bootstrap · ${r.reason}${r.activeArchetypeId ? ' · selected '+r.activeArchetypeId : ''}`;
+    }
+  } catch(error){
+    runtime.className = 'runtime warn';
+    runtime.textContent = error.message;
+  }
+}
+
+async function save_character(){
+  message.textContent = '';
+  try{
+    await request('/api/characters', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        id:character_id.value,
+        displayName:display_name.value,
+        modelAssetId:asset_id.value,
+        sourcePath:source_path.value
+      })
+    });
+    message.textContent = ' saved';
+    await load();
+  } catch(error){
+    message.textContent = ' ' + error.message;
+  }
+}
+
+async function activate_character(id){
+  try{
+    await request('/api/characters/'+encodeURIComponent(id)+'/activate',{method:'POST'});
+    await load();
+  } catch(error){ alert(error.message); }
+}
+
+async function delete_character(id){
+  if(!confirm('delete archetype '+id+'?')) return;
+  try{
+    await request('/api/characters/'+encodeURIComponent(id),{method:'DELETE'});
+    await load();
+  } catch(error){ alert(error.message); }
+}
+
+load();
+</script>
+</main>
+</body>
+</html>

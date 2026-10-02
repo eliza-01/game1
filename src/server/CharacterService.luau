@@ -14,16 +14,26 @@ local started = false
 local cache = ServerStorage:FindFirstChild("game1CharacterCache") or Instance.new("Folder")
 cache.Name = "game1CharacterCache"; cache.Parent = ServerStorage
 
-local function selectedAsset(): (number?, string, string)
-    local rows = CharacterRegistry.archetypes or {}
-    if #rows > 0 then
-        local row = rows[1]
-        local id = tonumber(row.modelAssetId) or tonumber(BootstrapConfig.CharacterModelAssetId)
-        local archetype = tostring(row.id or "default")
-        local label = tostring(row.displayName or row.id or "Character")
-        return id, archetype, label
+local function findArchetype(archetypeId: string?): any?
+    if not archetypeId or archetypeId == "" then return nil end
+    for _, row in ipairs(CharacterRegistry.archetypes or {}) do
+        if tostring(row.id) == archetypeId then return row end
     end
-    return tonumber(BootstrapConfig.CharacterModelAssetId), "bootstrap", BootstrapConfig.CharacterLabel
+    return nil
+end
+local function registeredAssetId(row: any?): number?
+    if not row then return nil end
+    if type(row.model) == "table" then return tonumber(row.model.assetId) end
+    return tonumber(row.modelAssetId) -- m1 compatibility during live sync
+end
+local function selectedAsset(): (number?, string, string, string?)
+    local requestedId = tostring(CharacterRegistry.activeArchetypeId or "")
+    local row = findArchetype(requestedId)
+    local id = registeredAssetId(row)
+    if row and id then
+        return id, tostring(row.id), tostring(row.displayName or row.id), requestedId
+    end
+    return tonumber(BootstrapConfig.CharacterModelAssetId), "bootstrap", BootstrapConfig.CharacterLabel, requestedId ~= "" and requestedId or nil
 end
 local function getTemplate(assetId: number): Model?
     local key = tostring(assetId)
@@ -90,9 +100,9 @@ local function attachVisual(character, root, template)
 end
 local function spawn(player)
     if player.Character then player.Character:Destroy() end
-    local assetId, archetype, label = selectedAsset(); if not assetId then return end
+    local assetId, archetype, label, requestedArchetype = selectedAsset(); if not assetId then return end
     local template=getTemplate(assetId); if not template then return end
-    local c=Instance.new("Model"); c.Name=player.Name; c:SetAttribute("CharacterArchetype",archetype); c:SetAttribute("CharacterDisplayName",label); c:SetAttribute("CharacterOwnerUserId",player.UserId); c:SetAttribute("CustomCharacter",true); c:SetAttribute("MoveSpeed",CharacterMovementConfig.DefaultRunSpeed); c:SetAttribute("AnimationMovementMode","Run"); c:SetAttribute("AnimationMovementDirection","Forward"); c:SetAttribute("MovementState","Idle")
+    local c=Instance.new("Model"); c.Name=player.Name; c:SetAttribute("CharacterArchetype",archetype); c:SetAttribute("CharacterDisplayName",label); c:SetAttribute("RequestedCharacterArchetype",requestedArchetype or ""); c:SetAttribute("UsingBootstrapVisual",archetype=="bootstrap"); c:SetAttribute("CharacterOwnerUserId",player.UserId); c:SetAttribute("CustomCharacter",true); c:SetAttribute("MoveSpeed",CharacterMovementConfig.DefaultRunSpeed); c:SetAttribute("AnimationMovementMode","Run"); c:SetAttribute("AnimationMovementDirection","Forward"); c:SetAttribute("MovementState","Idle")
     CharacterStatsService.Initialize(c)
     local root=createRoot(c,spawnCFrame(player)); local nav=createNavigation(c,root); local manager,sensorPart=createController(c,nav)
     if not attachVisual(c,root,template) then c:Destroy(); return end

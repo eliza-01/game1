@@ -1,11 +1,83 @@
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
+
 local Service = {}
-function Service.Start()
-    if not RunService:IsStudio() or Workspace:FindFirstChild("game1TrainingDummy") then return end
-    local spawn = Workspace:FindFirstChildWhichIsA("SpawnLocation", true)
-    local m=Instance.new("Model"); m.Name="game1TrainingDummy"; m:SetAttribute("Damageable",true); m:SetAttribute("Level",1); m:SetAttribute("MaxHP",100); m:SetAttribute("HP",100); m:SetAttribute("Damage",0); m:SetAttribute("Defense",0); m:SetAttribute("LifeState","Alive")
-    local p=Instance.new("Part"); p.Name="RootCollider"; p.Size=Vector3.new(3,5,3); p.Anchored=true; p.Position=(spawn and spawn.Position or Vector3.zero)+Vector3.new(0,2.5,-6); p.Parent=m; m.PrimaryPart=p; m.Parent=Workspace
-    m:GetAttributeChangedSignal("HP"):Connect(function() if (m:GetAttribute("HP") or 0)<=0 then task.delay(2,function() if m.Parent then m:SetAttribute("HP",100);m:SetAttribute("LifeState","Alive") end end) end end)
+
+local function createStatusGui(root: BasePart, model: Model)
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "StatusGui"
+    billboard.Adornee = root
+    billboard.AlwaysOnTop = true
+    billboard.Size = UDim2.fromOffset(240, 70)
+    billboard.StudsOffset = Vector3.new(0, 4.25, 0)
+    billboard.Parent = model
+
+    local label = Instance.new("TextLabel")
+    label.Name = "StatusText"
+    label.Size = UDim2.fromScale(1, 1)
+    label.BackgroundTransparency = 0.2
+    label.TextScaled = true
+    label.TextWrapped = true
+    label.Parent = billboard
+
+    local function render()
+        local hp = tonumber(model:GetAttribute("HP")) or 0
+        local maxHP = tonumber(model:GetAttribute("MaxHP")) or 0
+        local defense = tonumber(model:GetAttribute("Defense")) or 0
+        label.Text = ("TRAINING DUMMY\nHP %d/%d   DEF %d"):format(hp, maxHP, defense)
+    end
+
+    model:GetAttributeChangedSignal("HP"):Connect(render)
+    model:GetAttributeChangedSignal("MaxHP"):Connect(render)
+    model:GetAttributeChangedSignal("Defense"):Connect(render)
+    render()
 end
+
+function Service.Start()
+    if not RunService:IsStudio() or Workspace:FindFirstChild("game1TrainingDummy") then
+        return
+    end
+
+    local spawn = Workspace:FindFirstChildWhichIsA("SpawnLocation", true)
+
+    local model = Instance.new("Model")
+    model.Name = "game1TrainingDummy"
+    model:SetAttribute("Damageable", true)
+    model:SetAttribute("Level", 1)
+    model:SetAttribute("MaxHP", 100)
+    model:SetAttribute("HP", 100)
+    model:SetAttribute("Damage", 0)
+    model:SetAttribute("Defense", 0)
+    model:SetAttribute("LifeState", "Alive")
+
+    local root = Instance.new("Part")
+    root.Name = "RootCollider"
+    root.Size = Vector3.new(3, 5, 3)
+    root.Anchored = true
+    root.Position = (spawn and spawn.Position or Vector3.zero) + Vector3.new(0, 2.5, -6)
+    root.Parent = model
+
+    model.PrimaryPart = root
+    model.Parent = Workspace
+
+    createStatusGui(root, model)
+
+    if RunService:IsStudio() then
+        print("[game1][DUMMY] spawned · HP=100/100 DEF=0 · attack with LMB inside melee range")
+    end
+
+    model:GetAttributeChangedSignal("HP"):Connect(function()
+        if (model:GetAttribute("HP") or 0) <= 0 then
+            print("[game1][DUMMY] dead · respawning HP in 2s")
+            task.delay(2, function()
+                if model.Parent then
+                    model:SetAttribute("HP", 100)
+                    model:SetAttribute("LifeState", "Alive")
+                    print("[game1][DUMMY] reset · HP=100/100")
+                end
+            end)
+        end
+    end)
+end
+
 return Service

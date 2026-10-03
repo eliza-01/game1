@@ -3,14 +3,15 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
-local Config = require(Shared:WaitForChild("AttackConfig"))
+local CombatShared = Shared:WaitForChild("combat")
+local Config = require(CombatShared:WaitForChild("AttackConfig"))
 local DamageService = require(script.Parent:WaitForChild("DamageService"))
 
-local Service = {}
+local AttackService = {}
 local cooldowns = {}
 
 local function modelFromPart(part: Instance): Model?
-    local current = part
+    local current: Instance? = part
     while current and current ~= Workspace do
         if current:IsA("Model") and current:GetAttribute("Damageable") == true then
             return current
@@ -20,10 +21,18 @@ local function modelFromPart(part: Instance): Model?
     return nil
 end
 
+local function isValidCombatPart(model: Model, part: BasePart): boolean
+    local poseHitboxes = model:FindFirstChild("CombatPoseHitboxes")
+    if poseHitboxes then
+        return part:IsDescendantOf(poseHitboxes)
+    end
+    return true
+end
+
 local function attack(player: Player, aim: any)
     if typeof(aim) ~= "Vector3" then
         if Config.DebugLogs then
-            print(("[game1][ATTACK] REJECT player=%s reason=invalid_aim"):format(player.Name))
+            print(("[game1][attack] reject player=%s reason=invalid_aim"):format(player.Name))
         end
         return
     end
@@ -32,16 +41,13 @@ local function attack(player: Player, aim: any)
     local root = character and character:FindFirstChild("RootCollider")
     if not (character and root and root:IsA("BasePart")) or character:GetAttribute("LifeState") ~= "Alive" then
         if Config.DebugLogs then
-            print(("[game1][ATTACK] REJECT player=%s reason=character_not_ready"):format(player.Name))
+            print(("[game1][attack] reject player=%s reason=character_not_ready"):format(player.Name))
         end
         return
     end
 
     local now = os.clock()
     if now - (cooldowns[player] or 0) < Config.CooldownSeconds then
-        if Config.DebugLogs then
-            print(("[game1][ATTACK] REJECT player=%s reason=cooldown"):format(player.Name))
-        end
         return
     end
     cooldowns[player] = now
@@ -51,9 +57,9 @@ local function attack(player: Player, aim: any)
         flat = root.CFrame.LookVector
     end
     local direction = flat.Unit
-
     local center = root.Position + direction * (Config.Range * 0.5)
     local boxCf = CFrame.lookAt(center, center + direction)
+
     local params = OverlapParams.new()
     params.FilterType = Enum.RaycastFilterType.Exclude
     params.FilterDescendantsInstances = { character }
@@ -65,16 +71,19 @@ local function attack(player: Player, aim: any)
     )
 
     local seen = {}
-    local best, bestDistance = nil, math.huge
-    for _, part in ipairs(parts) do
+    local best: Model? = nil
+    local bestPart: BasePart? = nil
+    local bestDistance = math.huge
+    for _, part in parts do
         local model = modelFromPart(part)
-        if model and not seen[model] then
+        if model and not seen[model] and isValidCombatPart(model, part) then
             seen[model] = true
             local targetRoot = model:FindFirstChild("RootCollider") or model.PrimaryPart
             if targetRoot and targetRoot:IsA("BasePart") then
                 local distance = (targetRoot.Position - root.Position).Magnitude
                 if distance <= Config.Range + 1 and distance < bestDistance then
                     best = model
+                    bestPart = part
                     bestDistance = distance
                 end
             end
@@ -85,27 +94,28 @@ local function attack(player: Player, aim: any)
 
     if not best then
         if Config.DebugLogs then
-            print(("[game1][ATTACK] MISS player=%s range=%.1f"):format(player.Name, Config.Range))
+            print(("[game1][attack] miss player=%s range=%.1f"):format(player.Name, Config.Range))
         end
         return
     end
 
     local rawDamage = tonumber(character:GetAttribute("Damage")) or 0
     local finalDamage, killed = DamageService.Apply(character, best, rawDamage)
-
     if Config.DebugLogs then
-        print(("[game1][ATTACK] HIT player=%s target=%s distance=%.2f damage=%d targetHP=%s killed=%s"):format(
-            player.Name,
-            best.Name,
-            bestDistance,
-            finalDamage,
-            tostring(best:GetAttribute("HP")),
-            tostring(killed)
-        ))
+        print(("[game1][attack] hit player=%s target=%s zone=%s distance=%.2f damage=%d targethp=%s killed=%s")
+            :format(
+                player.Name,
+                best.Name,
+                tostring(bestPart and bestPart:GetAttribute("HitZone") or "root"),
+                bestDistance,
+                finalDamage,
+                tostring(best:GetAttribute("HP")),
+                tostring(killed)
+            ))
     end
 end
 
-function Service.Start()
+function AttackService.Start()
     local remotes = ReplicatedStorage:FindFirstChild("Game1Remotes") or Instance.new("Folder")
     remotes.Name = "Game1Remotes"
     remotes.Parent = ReplicatedStorage
@@ -120,4 +130,4 @@ function Service.Start()
     end)
 end
 
-return Service
+return table.freeze(AttackService)

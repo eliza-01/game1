@@ -1,9 +1,15 @@
 {
   "name": "Game1Bridge",
   "tree": {
-    "$className": "DataModel",
-    "Game1Bridge": {
+    "$className": "Folder",
+    "Main": {
       "$path": "Game1Bridge.server.luau"
+    },
+    "modules": {
+      "$className": "Folder",
+      "CharacterTemplate": {
+        "$path": "modules/CharacterTemplate.luau"
+      }
     }
   }
 }

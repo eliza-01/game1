@@ -1,7 +1,8 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
-local AttackConfig = require(Shared:WaitForChild("AttackConfig"))
+local CombatShared = Shared:WaitForChild("combat")
+local AttackConfig = require(CombatShared:WaitForChild("AttackConfig"))
 
 local DamageService = {}
 

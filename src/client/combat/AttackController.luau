@@ -4,8 +4,10 @@ local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
-local CharacterConfig = require(Shared:WaitForChild("CharacterConfig"))
-local AttackConfig = require(Shared:WaitForChild("AttackConfig"))
+local CharacterShared = Shared:WaitForChild("character")
+local CombatShared = Shared:WaitForChild("combat")
+local CharacterConfig = require(CharacterShared:WaitForChild("CharacterConfig"))
+local AttackConfig = require(CombatShared:WaitForChild("AttackConfig"))
 local AttackController = {}
 local started = false
 local lastAttack = 0

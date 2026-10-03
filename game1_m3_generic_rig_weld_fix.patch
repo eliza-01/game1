@@ -1,0 +1,25 @@
+diff --git a/src/server/CharacterService.luau b/src/server/CharacterService.luau
+index 80f2464..5172084 100644
+--- a/src/server/CharacterService.luau
++++ b/src/server/CharacterService.luau
+@@ -189,7 +189,19 @@ local function attachVisual(character, root, template)
+         local correction = Vector3.new(root.Position.X-boxCf.Position.X, fy+CharacterConfig.VisualGroundClearance-bottomY, root.Position.Z-boxCf.Position.Z)
+         visual:PivotTo(visual:GetPivot() + correction)
+     end
+-    local weld=Instance.new("WeldConstraint"); weld.Name="VisualRootWeld"; weld.Part0=root; weld.Part1=vr; weld.Parent=root
++    if authoredRoot then
++        local weld=Instance.new("WeldConstraint"); weld.Name="VisualRootWeld"; weld.Part0=root; weld.Part1=vr; weld.Parent=root
++    else
++        -- A generic skinned MeshPart is rendered geometry, not an authored root helper.
++        -- Preserve its exact Studio transform explicitly when attaching it to the gameplay root.
++        local weld=Instance.new("Weld")
++        weld.Name="VisualRootWeld"
++        weld.Part0=root
++        weld.Part1=vr
++        weld.C0=root.CFrame:ToObjectSpace(vr.CFrame)
++        weld.C1=CFrame.identity
++        weld.Parent=root
++    end
+     return true
+ end
+ local function spawn(player)

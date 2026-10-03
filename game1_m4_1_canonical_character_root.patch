@@ -1,0 +1,504 @@
+diff --git a/src/server/character/CharacterRigService.luau b/src/server/character/CharacterRigService.luau
+index 8525560..bef26b9 100644
+--- a/src/server/character/CharacterRigService.luau
++++ b/src/server/character/CharacterRigService.luau
+@@ -220,7 +220,7 @@ local function normalizeTemplate(template: Model): (Model, Model)
+     return visual, importedRig
+ end
+ 
+-local function createCompatibilityRoot(importedRig: Model): BasePart
++local function createBootstrapCompatibilityRoot(importedRig: Model): BasePart
+     local boxCFrame, boxSize = importedRig:GetBoundingBox()
+     local root = Instance.new("Part")
+     root.Name = "RootPart"
+@@ -237,13 +237,13 @@ local function createCompatibilityRoot(importedRig: Model): BasePart
+     root.CanTouch = false
+     root.CanQuery = false
+     root.Massless = true
+-    root:SetAttribute("Game1RuntimeCompatibilityRoot", true)
++    root:SetAttribute("Game1BootstrapCompatibilityRoot", true)
+     root.Parent = importedRig
+ 
+     for _, object in importedRig:GetDescendants() do
+         if object:IsA("BasePart") and object ~= root then
+             local weld = Instance.new("WeldConstraint")
+-            weld.Name = "CompatibilityRootWeld"
++            weld.Name = "BootstrapCompatibilityRootWeld"
+             weld.Part0 = root
+             weld.Part1 = object
+             weld.Parent = root
+@@ -252,13 +252,17 @@ local function createCompatibilityRoot(importedRig: Model): BasePart
+     return root
+ end
+ 
+-local function visualRoot(importedRig: Model): (BasePart, boolean)
++local function visualRoot(importedRig: Model, allowBootstrapCompatibility: boolean): (BasePart?, boolean)
+     local root = importedRig:FindFirstChild("RootPart", true)
+     if root and root:IsA("BasePart") then
+         root.Size = CharacterConfig.VisualRootAnchorSize
+         return root, true
+     end
+-    return createCompatibilityRoot(importedRig), false
++    if allowBootstrapCompatibility then
++        return createBootstrapCompatibilityRoot(importedRig), false
++    end
++    warn("[game1] registered character template is missing ImportedRig/RootPart; sync it through the game1 Studio bridge")
++    return nil, false
+ end
+ 
+ local function placeAuthoredVisual(visual: Model, visualRootPart: BasePart, root: BasePart, floorY: number)
+@@ -292,11 +296,20 @@ local function placeCompatibilityVisual(visual: Model, visualRootPart: BasePart,
+     visual:PivotTo(delta * visual:GetPivot())
+ end
+ 
+-local function attachVisual(character: Model, root: BasePart, template: Model): (Model?, BasePart?)
++local function attachVisual(
++    character: Model,
++    root: BasePart,
++    template: Model,
++    allowBootstrapCompatibility: boolean
++): (Model?, BasePart?)
+     local visual, importedRig = normalizeTemplate(template)
+     visual.Parent = character
+ 
+-    local visualRootPart, authoredRoot = visualRoot(importedRig)
++    local visualRootPart, authoredRoot = visualRoot(importedRig, allowBootstrapCompatibility)
++    if not visualRootPart then
++        visual:Destroy()
++        return nil, nil
++    end
+     local floorY, floorSource = sensedFloorY(character, root)
+     if authoredRoot then
+         placeAuthoredVisual(visual, visualRootPart, root, floorY)
+@@ -304,7 +317,7 @@ local function attachVisual(character: Model, root: BasePart, template: Model):
+         placeCompatibilityVisual(visual, visualRootPart, root, floorY)
+     end
+ 
+-    character:SetAttribute("VisualRootSource", if authoredRoot then "authored" else "runtime_compatibility")
++    character:SetAttribute("VisualRootSource", if authoredRoot then "authored" else "bootstrap_compatibility")
+     character:SetAttribute("VisualGroundFloorY", floorY)
+     character:SetAttribute("VisualGroundSource", floorSource)
+     character:SetAttribute("VisualRootAnchorSize", tostring(CharacterConfig.VisualRootAnchorSize))
+@@ -321,11 +334,16 @@ local function attachVisual(character: Model, root: BasePart, template: Model):
+     return visual, visualRootPart
+ end
+ 
+-function CharacterRigService.Build(character: Model, spawnCFrame: CFrame, template: Model): any?
++function CharacterRigService.Build(
++    character: Model,
++    spawnCFrame: CFrame,
++    template: Model,
++    allowBootstrapCompatibility: boolean
++): any?
+     local root = createRoot(character, spawnCFrame)
+     local navigationRoot = createNavigationRoot(character, root)
+     local controllerManager, groundSensorPart = createPhysicsController(character, navigationRoot)
+-    local visual, visualRootPart = attachVisual(character, root, template)
++    local visual, visualRootPart = attachVisual(character, root, template, allowBootstrapCompatibility)
+     if not visual or not visualRootPart then
+         return nil
+     end
+diff --git a/src/server/character/CharacterService.luau b/src/server/character/CharacterService.luau
+index 120c653..642c38b 100644
+--- a/src/server/character/CharacterService.luau
++++ b/src/server/character/CharacterService.luau
+@@ -211,7 +211,7 @@ local function createCharacter(player: Player): Model?
+     character:SetAttribute("VisualController", "AnimationController")
+     CharacterStatsService.Initialize(character)
+ 
+-    local rig = CharacterRigService.Build(character, CharacterRigService.SpawnCFrame(player), template)
++    local rig = CharacterRigService.Build(character, CharacterRigService.SpawnCFrame(player), template, row == nil)
+     if not rig then
+         character:Destroy()
+         spawning[player] = nil
+diff --git a/system/asset-manager/prepare_character_fbx.py b/system/asset-manager/prepare_character_fbx.py
+index 3ca3b76..315331d 100644
+--- a/system/asset-manager/prepare_character_fbx.py
++++ b/system/asset-manager/prepare_character_fbx.py
+@@ -1,99 +1,27 @@
+-"""blender background entry point for game1 character fbx canonicalization."""
++"""compatibility entry point: game1 prepared character FBX preserves source bytes."""
+ 
+-import bpy
+ import json
+-import math
++import shutil
+ import sys
+ from pathlib import Path
+ 
+ 
+-def clean_scene():
+-    bpy.ops.object.select_all(action="SELECT")
+-    bpy.ops.object.delete(use_global=False)
+-    for collection in (bpy.data.armatures, bpy.data.meshes, bpy.data.materials):
+-        for item in list(collection):
+-            collection.remove(item)
+-
+-
+-def vec3(value):
+-    return [round(float(value.x), 7), round(float(value.y), 7), round(float(value.z), 7)]
+-
+-
+-def linked_meshes(armature):
+-    result = []
+-    for obj in bpy.context.scene.objects:
+-        if obj.type != "MESH":
+-            continue
+-        linked = obj.parent == armature
+-        if not linked:
+-            linked = any(mod.type == "ARMATURE" and getattr(mod, "object", None) == armature for mod in obj.modifiers)
+-        if linked:
+-            result.append(obj)
+-    return sorted(result, key=lambda obj: obj.name.casefold())
+-
+-
+ def main(source: Path, output: Path, report_path: Path):
+-    clean_scene()
+-    bpy.ops.import_scene.fbx(filepath=str(source), use_anim=False)
+-
+-    armatures = sorted((obj for obj in bpy.context.scene.objects if obj.type == "ARMATURE"), key=lambda obj: obj.name.casefold())
+-    if not armatures:
+-        raise RuntimeError("FBX contains no armature.")
+-    armature = max(armatures, key=lambda obj: len(obj.data.bones))
+-    meshes = linked_meshes(armature)
+-    if not meshes:
+-        raise RuntimeError("FBX armature has no linked skinned mesh.")
+-
+-    targets = [armature, *meshes]
+-    before = {
+-        obj.name: {
+-            "rotationDegrees": [round(math.degrees(float(v)), 7) for v in obj.rotation_euler],
+-            "scale": vec3(obj.scale),
+-        }
+-        for obj in targets
+-    }
+-
+-    bpy.ops.object.select_all(action="DESELECT")
+-    for obj in targets:
+-        obj.select_set(True)
+-    bpy.context.view_layer.objects.active = armature
+-    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+-
+-    after = {
+-        obj.name: {
+-            "rotationDegrees": [round(math.degrees(float(v)), 7) for v in obj.rotation_euler],
+-            "scale": vec3(obj.scale),
+-        }
+-        for obj in targets
+-    }
+-
+-    bpy.ops.object.select_all(action="SELECT")
++    source = source.resolve()
++    output = output.resolve()
++    report_path = report_path.resolve()
++    if not source.is_file() or source.suffix.lower() != ".fbx":
++        raise RuntimeError("character preparation requires an FBX file")
+     output.parent.mkdir(parents=True, exist_ok=True)
+-    bpy.ops.export_scene.fbx(
+-        filepath=str(output),
+-        use_selection=True,
+-        use_anim=False,
+-        add_leaf_bones=False,
+-        axis_forward="-Z",
+-        axis_up="Y",
+-        apply_unit_scale=True,
+-        use_space_transform=True,
+-        bake_space_transform=False,
++    shutil.copy2(source, output)
++    report_path.write_text(
++        json.dumps({"schemaVersion": 2, "mode": "preserve-source-bytes"}, indent=2) + "\n",
++        encoding="utf-8",
+     )
+-    if not output.is_file() or output.stat().st_size <= 0:
+-        raise RuntimeError("prepared FBX was not written")
+-
+-    report_path.write_text(json.dumps({
+-        "schemaVersion": 1,
+-        "armature": armature.name,
+-        "meshNames": [obj.name for obj in meshes],
+-        "before": before,
+-        "after": after,
+-    }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+ 
+ 
+ args = sys.argv[sys.argv.index("--") + 1:]
+ if len(args) != 3:
+-    raise RuntimeError("usage: blender --background --python prepare_character_fbx.py -- input.fbx output.fbx report.json")
++    raise RuntimeError("usage: prepare_character_fbx.py -- input.fbx output.fbx report.json")
+ source, output, report = map(Path, args)
+-main(source.resolve(), output.resolve(), report.resolve())
++main(source, output, report)
+diff --git a/system/control-center/character_analysis.py b/system/control-center/character_analysis.py
+index 956205c..22ef5bf 100644
+--- a/system/control-center/character_analysis.py
++++ b/system/control-center/character_analysis.py
+@@ -58,33 +58,15 @@ def prepare_character_fbx(project_root: Path, source: Path, output: Path) -> dic
+     if not source.is_file() or source.suffix.lower() != ".fbx":
+         raise CharacterAnalysisError("character preparation requires an FBX file")
+ 
+-    preparer = project_root / "system" / "asset-manager" / "prepare_character_fbx.py"
+-    if not preparer.is_file():
+-        raise CharacterAnalysisError(f"character preparer is missing: {preparer}")
+-
+-    blender = blender_executable()
++    # The published FBX is already authored in the correct Roblox orientation.
++    # Registration must not rebake rotation/scale: Studio builds the stable
++    # character wrapper and canonical RootPart without touching mesh transforms.
+     output.parent.mkdir(parents=True, exist_ok=True)
+-    with tempfile.TemporaryDirectory(prefix="game1-character-prepare-report-") as tmp:
+-        report = Path(tmp) / "prepare.json"
+-        command = [
+-            str(blender),
+-            "--background",
+-            "--factory-startup",
+-            "--python",
+-            str(preparer),
+-            "--",
+-            str(source),
+-            str(output),
+-            str(report),
+-        ]
+-        completed = subprocess.run(command, capture_output=True, text=True, timeout=240)
+-        if completed.returncode != 0 or not output.is_file():
+-            detail = (completed.stderr or completed.stdout or "blender character preparation failed").strip()
+-            raise CharacterAnalysisError(detail[-5000:])
+-        value = json.loads(report.read_text(encoding="utf-8")) if report.is_file() else {}
+-    if not isinstance(value, dict):
+-        raise CharacterAnalysisError("character preparer returned invalid output")
+-    return value
++    shutil.copy2(source, output)
++    return {
++        "schemaVersion": 2,
++        "mode": "preserve-source-bytes",
++    }
+ 
+ def analyze_character_fbx(project_root: Path, source: Path) -> dict:
+     source = source.resolve()
+diff --git a/system/control-center/host_agent.py b/system/control-center/host_agent.py
+index de35db3..1e672d7 100644
+--- a/system/control-center/host_agent.py
++++ b/system/control-center/host_agent.py
+@@ -29,7 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
+ from character_store import CharacterStore
+ from studio_bridge import run_model_load_bridge
+ 
+-control_agent_build = "game1-m3-character-rig-fix-001"
++control_agent_build = "game1-m4-canonical-character-root-001"
+ port = int(os.environ.get("CONTROL_AGENT_PORT", "43821"))
+ token = os.environ.get("CONTROL_TOKEN", "Game1LocalControlV1")
+ store = CharacterStore(ROOT)
+diff --git a/system/control-center/static/index.html b/system/control-center/static/index.html
+index 198e2e4..04133ab 100644
+--- a/system/control-center/static/index.html
++++ b/system/control-center/static/index.html
+@@ -4,12 +4,12 @@
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width,initial-scale=1">
+ <title>game1 · asset manager</title>
+-<link rel="stylesheet" href="asset-manager.css?v=3">
++<link rel="stylesheet" href="asset-manager.css?v=4">
+ </head>
+ <body>
+ <header>
+ <div><span class="eyebrow">game1 · control center</span><h1>asset manager</h1></div>
+-<div class="header-actions"><span class="pill">characters · m3</span><button id="theme" class="icon" type="button" title="theme">◐</button></div>
++<div class="header-actions"><span class="pill">characters · m4</span><button id="theme" class="icon" type="button" title="theme">◐</button></div>
+ </header>
+ <main>
+ <aside class="panel rail">
+@@ -34,7 +34,7 @@
+ <div id="model-status" class="status-box"><strong>not registered</strong><span>select a character row or choose an fbx.</span></div>
+ <div class="actions"><button id="register-character" class="primary wide" type="button">register character</button><button id="clear-form" class="wide" type="button">clear form</button></div>
+ <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
+-<span class="eyebrow">02 · publication</span><h3 style="margin-top:4px">roblox model asset</h3><p>first publish creates a permanent model asset id. later source revisions update the same id.</p>
++<span class="eyebrow">02 · publication</span><h3 style="margin-top:4px">roblox model asset</h3><p>first publish creates a permanent model asset id. later source revisions update the same id. studio sync refreshes the local canonical rig without republishing.</p>
+ <label>description<input id="publication-description" value="game1 character model"></label>
+ <div class="actions"><button id="publish-character" class="primary" type="button" disabled>publish model</button><button id="sync-character" type="button" disabled>sync studio</button><button id="activate-character" type="button" disabled>activate</button></div>
+ <small id="publication-hint" style="display:block;color:var(--muted);margin-top:10px">select a registered character.</small>
+@@ -48,6 +48,6 @@
+ </section>
+ </main>
+ <div id="toast" class="toast"></div>
+-<script src="character-assets.js?v=3"></script>
++<script src="character-assets.js?v=4"></script>
+ </body>
+ </html>
+diff --git a/system/studio-plugin/Game1Bridge.server.luau b/system/studio-plugin/Game1Bridge.server.luau
+index 61dbe74..0453ac3 100644
+--- a/system/studio-plugin/Game1Bridge.server.luau
++++ b/system/studio-plugin/Game1Bridge.server.luau
+@@ -99,6 +99,77 @@ local function validateCharacterRig(root: Instance): any
+     return stats
+ end
+ 
++local function canonicalRigModel(imported: Instance): Model
++    if imported:IsA("Model") then
++        return imported
++    end
++    local model = Instance.new("Model")
++    model.Name = "ImportedRig"
++    imported.Parent = model
++    return model
++end
++
++local function chooseRigAnchor(importedRig: Model): BasePart?
++    local fallback: BasePart? = nil
++    for _, descendant in importedRig:GetDescendants() do
++        if descendant:IsA("BasePart") then
++            fallback = fallback or descendant
++            if descendant:IsA("MeshPart") and descendant:FindFirstChildWhichIsA("Bone", true) then
++                return descendant
++            end
++        end
++    end
++    return fallback
++end
++
++local function ensureCanonicalRoot(wrapper: Model, importedRig: Model): BasePart
++    local existing = importedRig:FindFirstChild("RootPart", true)
++    if existing and existing:IsA("BasePart") then
++        wrapper.PrimaryPart = existing
++        importedRig.PrimaryPart = existing
++        wrapper:SetAttribute("Game1CharacterRootSource", "asset")
++        return existing
++    end
++
++    local anchor = chooseRigAnchor(importedRig)
++    if not anchor then
++        error("character rig has no BasePart anchor")
++    end
++
++    -- Build the authored gameplay helper once while the imported asset is still
++    -- in its correct Studio orientation. Runtime never derives character pitch
++    -- or roll from MeshPart bounds.
++    local boxCFrame, boxSize = importedRig:GetBoundingBox()
++    local root = Instance.new("Part")
++    root.Name = "RootPart"
++    root.Size = Vector3.new(0.35, 0.03, 0.35)
++    root.CFrame = CFrame.new(
++        boxCFrame.Position.X,
++        boxCFrame.Position.Y - boxSize.Y * 0.5,
++        boxCFrame.Position.Z
++    )
++    root.Transparency = 1
++    root.CastShadow = false
++    root.Anchored = false
++    root.CanCollide = false
++    root.CanTouch = false
++    root.CanQuery = false
++    root.Massless = true
++    root:SetAttribute("Game1GeneratedCharacterRoot", true)
++    root.Parent = importedRig
++
++    local weld = Instance.new("WeldConstraint")
++    weld.Name = "ImportedRigRootWeld"
++    weld.Part0 = root
++    weld.Part1 = anchor
++    weld.Parent = root
++
++    importedRig.PrimaryPart = root
++    wrapper.PrimaryPart = root
++    wrapper:SetAttribute("Game1CharacterRootSource", "generated")
++    return root
++end
++
+ local function ensureCharacterHost(wrapper: Model, importedRig: Instance): Animator
+     local host = wrapper:FindFirstChildOfClass("AnimationController")
+     if host == nil then
+@@ -140,7 +211,7 @@ local function ensureCharacterHost(wrapper: Model, importedRig: Instance): Anima
+     return animator :: Animator
+ end
+ 
+-local function placeCharacterRig(importedRig: Instance, destination: Instance, wrapperName: string, assetId: number): (Model, any)
++local function placeCharacterRig(importedRig: Model, destination: Instance, wrapperName: string, assetId: number): (Model, any)
+     wrapperName = validSegment(wrapperName)
+     local stats = validateCharacterRig(importedRig)
+     local existing = destination:FindFirstChild(wrapperName)
+@@ -181,6 +252,9 @@ local function placeCharacterRig(importedRig: Instance, destination: Instance, w
+         previousRig:Destroy()
+     end
+ 
++    ensureCanonicalRoot(wrapper :: Model, importedRig)
++    stats = modelRigStats(importedRig)
++
+     wrapper:SetAttribute("Game1CharacterRig", true)
+     wrapper:SetAttribute("Game1PlacementMode", "character-controller")
+     wrapper:SetAttribute("Game1ModelAssetId", tostring(assetId))
+@@ -246,8 +320,9 @@ local function handleModelLoad(data: any)
+         end
+ 
+         local destination = modelLoadDestination(data.destinationFolders or {})
++        local normalizedRig = canonicalRigModel(importedRig)
+         local wrapper, stats = placeCharacterRig(
+-            importedRig,
++            normalizedRig,
+             destination,
+             tostring(data.wrapperName or ""),
+             assetId
+@@ -295,4 +370,4 @@ task.spawn(function()
+     end
+ end)
+ 
+-print("[game1 plugin] loaded · model load bridge v1")
++print("[game1 plugin] loaded · character model bridge v2 · canonical root")
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index c296f5f..a6307c5 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -175,17 +175,18 @@ for required in [
+     'sensorPart.Name = "GroundSensorPart"',
+     'sensor.Name = "GroundSensor"',
+     'cloned.Name = "ImportedRig"',
+-    'root.Name = "RootPart"',
+     'weld.Name = "VisualRootWeld"',
+ ]:
+     if required not in rig_text:
+         err(f"canonical character rig contract missing: {required}")
+ if 'object:IsA("MeshPart") and object:FindFirstChildWhichIsA("Bone"' in rig_text:
+     err("skinned MeshPart must not be selected as the character root anchor")
+-if "CompatibilityRootWeld" not in rig_text or "Game1RuntimeCompatibilityRoot" not in rig_text:
+-    err("rootless imported rigs need an isolated compatibility RootPart adapter")
+-if "targetRootCFrame * visualRootPart.CFrame:Inverse()" not in rig_text:
+-    err("generic rig placement must preserve the imported ServerStorage orientation")
++if "Game1BootstrapCompatibilityRoot" not in rig_text:
++    err("bootstrap placeholder compatibility must stay isolated from registered characters")
++if "registered character template is missing ImportedRig/RootPart" not in rig_text:
++    err("registered characters must require the canonical Studio-authored RootPart")
++if "row == nil" not in character_service_text:
++    err("runtime compatibility root must be allowed only for the bootstrap placeholder")
+ if "findRegisteredTemplate" not in character_service_text or '"characters"' not in character_service_text:
+     err("registered character runtime must resolve managed ServerStorage templates")
+ if "getAssetTemplate" not in character_service_text:
+@@ -202,7 +203,7 @@ plugin = ROOT / "system/studio-plugin/Game1Bridge.server.luau"
+ if not bridge.is_file() or "run_model_load_bridge" not in bridge.read_text(encoding="utf-8"):
+     err("reference-style Studio model load bridge is missing")
+ plugin_text = plugin.read_text(encoding="utf-8") if plugin.is_file() else ""
+-for required in ["AssetService:LoadAssetAsync", "ImportedRig", "AnimationController", "Game1CharacterRig", "RootPart"]:
++for required in ["AssetService:LoadAssetAsync", "ImportedRig", "AnimationController", "Game1CharacterRig", "ensureCanonicalRoot", "ImportedRigRootWeld", "Game1GeneratedCharacterRoot"]:
+     if required not in plugin_text:
+         err(f"game1 Studio character bridge missing {required}")
+ if 'BRIDGE_URL = "http://127.0.0.1:43137"' not in plugin_text:
+@@ -247,9 +248,12 @@ if 'id="race"' not in ui or 'id="gender"' not in ui or 'id="publish-character"'
+ analyzer = ROOT / "system/asset-manager/analyze_character_fbx.py"
+ if not analyzer.is_file() or "FBX contains no armature" not in analyzer.read_text(encoding="utf-8"):
+     err("deterministic character fbx armature analyzer is missing")
++analysis_text = (ROOT / "system/control-center/character_analysis.py").read_text(encoding="utf-8")
++if "shutil.copy2(source, output)" not in analysis_text or "preserve-source-bytes" not in analysis_text:
++    err("character prepared FBX must preserve authored source bytes")
+ preparer = ROOT / "system/asset-manager/prepare_character_fbx.py"
+-if not preparer.is_file() or "transform_apply" not in preparer.read_text(encoding="utf-8"):
+-    err("character prepared-FBX transform canonicalizer is missing")
++if preparer.is_file() and "transform_apply" in preparer.read_text(encoding="utf-8"):
++    err("character FBX preparer must not rebake authored rotation/scale")
+ 
+ if errors:
+     print("verify failed")
+@@ -257,7 +261,7 @@ if errors:
+         print(" -", item)
+     sys.exit(1)
+ 
+-print("verify ok · game1 m4 canonical character runtime contracts passed")
++print("verify ok · game1 m4.1 canonical character root contracts passed")
+ print("registered character archetypes:", len(archetypes))
+ print("active character archetype:", active_id or "none")
+ print("race pool: human")

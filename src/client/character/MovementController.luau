@@ -6,8 +6,9 @@ local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
 local Game1Shared = ReplicatedStorage:WaitForChild("Game1Shared")
-local CharacterConfig = require(Game1Shared:WaitForChild("CharacterConfig"))
-local CharacterMovementConfig = require(Game1Shared:WaitForChild("CharacterMovementConfig"))
+local CharacterShared = Game1Shared:WaitForChild("character")
+local CharacterConfig = require(CharacterShared:WaitForChild("CharacterConfig"))
+local CharacterMovementConfig = require(CharacterShared:WaitForChild("CharacterMovementConfig"))
 
 local MovementController = {}
 

@@ -1,12 +1,19 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local ProjectInfo = require(Shared:WaitForChild("ProjectInfo"))
 local RuntimeVersion = require(Shared:WaitForChild("RuntimeVersion"))
-local MovementController = require(script:WaitForChild("MovementController"))
-local CameraController = require(script:WaitForChild("CameraController"))
-local AttackController = require(script:WaitForChild("AttackController"))
-local PlayerStatusController = require(script:WaitForChild("PlayerStatusController"))
-print(("[game1][CLIENT] %s v%s · runtime %s"):format(ProjectInfo.Name, ProjectInfo.Version, RuntimeVersion.Version))
+
+local CharacterRoot = script:WaitForChild("character")
+local CombatRoot = script:WaitForChild("combat")
+local MovementController = require(CharacterRoot:WaitForChild("MovementController"))
+local CameraController = require(CharacterRoot:WaitForChild("CameraController"))
+local PlayerStatusController = require(CharacterRoot:WaitForChild("PlayerStatusController"))
+local AttackController = require(CombatRoot:WaitForChild("AttackController"))
+
+print(("[game1][client] %s v%s · runtime %s")
+    :format(ProjectInfo.Name, ProjectInfo.Version, RuntimeVersion.Version))
+
 MovementController.Start()
 CameraController.Start()
 AttackController.Start(MovementController)

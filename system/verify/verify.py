@@ -130,10 +130,14 @@ required_runtime = [
     "src/client/character/MovementController.luau",
     "src/client/character/CameraController.luau",
     "src/client/character/PlayerStatusController.luau",
+    "src/client/character/animation/AnimationResolver.luau",
+    "src/client/character/animation/AnimationTrackCache.luau",
+    "src/client/character/animation/CharacterAnimationController.luau",
     "src/client/combat/AttackController.luau",
     "src/shared/character/CharacterConfig.luau",
     "src/shared/character/CharacterMovementConfig.luau",
     "src/shared/character/CharacterRegistry.luau",
+    "src/shared/character/CharacterAnimationRegistry.luau",
     "src/shared/character/CharacterStatsConfig.luau",
     "src/shared/combat/AttackConfig.luau",
 ]
@@ -185,6 +189,10 @@ if "Game1BootstrapCompatibilityRoot" not in rig_text:
     err("bootstrap placeholder compatibility must stay isolated from registered characters")
 if "registered character template is missing ImportedRig/RootPart" not in rig_text:
     err("registered characters must require the canonical Studio-authored RootPart")
+if "lowestVisibleGeometryY" not in rig_text or 'object ~= visualRootPart' not in rig_text:
+    err("registered character visual must ground-align from visible geometry, excluding RootPart")
+if 'VisualFootContactSource' not in rig_text or '"visible_geometry"' not in rig_text:
+    err("character visual ground-contact diagnostics are missing")
 if "row == nil" not in character_service_text:
     err("runtime compatibility root must be allowed only for the bootstrap placeholder")
 if "findRegisteredTemplate" not in character_service_text or '"characters"' not in character_service_text:
@@ -266,13 +274,115 @@ preparer = ROOT / "system/asset-manager/prepare_character_fbx.py"
 if preparer.is_file() and "transform_apply" in preparer.read_text(encoding="utf-8"):
     err("character FBX preparer must not rebake authored rotation/scale")
 
+# m5.1 character animation contract
+animation_manifest_path = ROOT / "assets/manifests/character-animations.json"
+if not animation_manifest_path.is_file():
+    err(r"character animation manifest is missing; run python .\system\control-center\migrate.py")
+    animation_manifest = {}
+else:
+    animation_manifest = json.loads(animation_manifest_path.read_text(encoding="utf-8"))
+if animation_manifest.get("schemaVersion") != 2 or animation_manifest.get("project") != "game1":
+    err("character animation manifest must be game1 schema 2")
+if animation_manifest.get("weaponSets") != ["hands", "1hs", "bow"]:
+    err("m5.1 character animation weapon sets must be hands, 1hs and bow")
+
+animation_store_path = ROOT / "system/control-center/animation_store.py"
+animation_core_dir = ROOT / "system/control-center/animation_core"
+animation_store_text = animation_store_path.read_text(encoding="utf-8") if animation_store_path.is_file() else ""
+if animation_core_dir.is_dir():
+    for core_file in sorted(animation_core_dir.glob("*.py")):
+        animation_store_text += "\n" + core_file.read_text(encoding="utf-8")
+for required in [
+    "class AnimationStore",
+    "def scan_folder",
+    "def classify_animation",
+    'WEAPON_SETS = ("hands", "1hs", "bow")',
+    "def assign_file",
+    "normalize_manual_binding",
+    "_strip_character_prefix",
+    '"seated.enter"',
+    '"seated.loop"',
+    '"seated.exit"',
+    '"attack"',
+    '"variant"',
+]:
+    if required not in animation_store_text:
+        err(f"character animation store missing {required}")
+if 'queue = [row for row in rows if row["status"] == "LOCAL_ONLY"]' not in animation_store_text:
+    err("publish-missing must never create duplicate assets for changed published animations")
+if "update it through the studio animation-version bridge" not in animation_store_text:
+    err("changed animation assets must preserve their permanent id")
+
+animation_registry_path = ROOT / "src/shared/character/CharacterAnimationRegistry.luau"
+animation_registry_text = animation_registry_path.read_text(encoding="utf-8") if animation_registry_path.is_file() else ""
+if "profiles = table.freeze" not in animation_registry_text:
+    err("generated character animation runtime registry is missing")
+
+resolver_path = ROOT / "src/client/character/animation/AnimationResolver.luau"
+controller_path = ROOT / "src/client/character/animation/CharacterAnimationController.luau"
+resolver_runtime = resolver_path.read_text(encoding="utf-8") if resolver_path.is_file() else ""
+controller_runtime = controller_path.read_text(encoding="utf-8") if controller_path.is_file() else ""
+for required in ["ResolveLocomotion", "ResolveAction", "AnimationWeaponSet", "skeletonSignature"]:
+    if required not in resolver_runtime:
+        err(f"animation resolver missing {required}")
+for required in ["MovementState", "PlayAction", "AnimationResolvedClip", "AnimationTrackCache"]:
+    if required not in controller_runtime:
+        err(f"character animation controller missing {required}")
+client_init_text = (ROOT / "src/client/init.client.luau").read_text(encoding="utf-8")
+if "CharacterAnimationController.Start()" not in client_init_text:
+    err("character animation controller is not started by the client runtime")
+attack_controller_text = (ROOT / "src/client/combat/AttackController.luau").read_text(encoding="utf-8")
+if 'animationController.PlayAction("attack")' not in attack_controller_text:
+    err("combat attack input is not connected to the semantic attack animation slot")
+if 'character:SetAttribute("AnimationProfileId", archetype)' not in character_service_text:
+    err("character runtime does not expose animation profile identity")
+if 'character:SetAttribute("CharacterSkeletonSignature"' not in character_service_text:
+    err("character runtime does not expose skeleton signature to animation resolver")
+if 'character:SetAttribute("AnimationWeaponSet", "hands")' not in character_service_text:
+    err("character runtime must default to the canonical hands animation context")
+
+for required in ["animation_profiles", "animation_clips", "animation_bindings", "animation_publications"]:
+    if required not in schema_text:
+        err(f"control center schema missing {required}")
+if 'id="nav-animations"' not in ui or 'id="scan-animations"' not in ui or 'id="publish-missing-animations"' not in ui:
+    err("asset manager character animation section is missing")
+js_text = js.read_text(encoding="utf-8") if js.is_file() else ""
+for required in ["chooseAnimationFolder", "scanAnimations", "publishMissingAnimations", "animationFilter", "assignUnassignedAnimation", "manualSlotCatalog"]:
+    if required not in js_text:
+        err(f"asset manager animation ui missing {required}")
+if 'create_animation_asset' not in (ROOT / "system/control-center/opencloud_assets.py").read_text(encoding="utf-8"):
+    err("open cloud animation publication helper is missing")
+
+# m5.2 archetype identity editing contract
+identity_service = ROOT / "system/control-center/character_core/identity.py"
+identity_text = identity_service.read_text(encoding="utf-8") if identity_service.is_file() else ""
+for required in [
+    "class CharacterIdentityService",
+    "def update",
+    "UPDATE character_publications SET character_id",
+    "UPDATE animation_profiles SET character_id",
+    "UPDATE animation_publications SET clip_id",
+    "UPDATE animation_clips",
+    "UPDATE animation_bindings",
+    "migratedAnimationClips",
+]:
+    if required not in identity_text:
+        err(f"archetype identity migration missing {required}")
+if 'identity_suffix = "/identity"' not in host_agent_text or "character_identity.update" not in host_agent_text:
+    err("host agent does not expose archetype identity editing")
+if 'id="save-archetype"' not in ui or 'id="character-id" autocomplete="off"' not in ui:
+    err("asset manager archetype edit controls are missing")
+for required in ["saveArchetype", "save archetype identity first", "/identity"]:
+    if required not in js_text:
+        err(f"asset manager archetype editing ui missing {required}")
+
 if errors:
     print("verify failed")
     for item in errors:
         print(" -", item)
     sys.exit(1)
 
-print("verify ok · game1 m4.3 canonical character template contracts passed")
+print("verify ok · game1 m5.2 archetype edit + character animation contracts passed")
 print("registered character archetypes:", len(archetypes))
 print("active character archetype:", active_id or "none")
 print("race pool: human")

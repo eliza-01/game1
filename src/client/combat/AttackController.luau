@@ -12,6 +12,7 @@ local AttackController = {}
 local started = false
 local lastAttack = 0
 local movementController: any = nil
+local animationController: any = nil
 
 local function aimPosition(): Vector3?
     local camera = Workspace.CurrentCamera
@@ -26,8 +27,9 @@ local function aimPosition(): Vector3?
     return if hit then hit.Position else ray.Origin + ray.Direction * AttackConfig.MaxAimDistance
 end
 
-function AttackController.Start(movement: any?)
+function AttackController.Start(movement: any?, animation: any?)
     movementController = movement
+    animationController = animation
     if started then return end
     started = true
     local remotes = ReplicatedStorage:WaitForChild("Game1Remotes")
@@ -47,6 +49,9 @@ function AttackController.Start(movement: any?)
                     movementController.LockFacing(direction.Unit, 0.28)
                     movementController.LockMovement(0.22)
                 end
+            end
+            if animationController then
+                animationController.PlayAction("attack")
             end
             attack:FireServer(target)
         end

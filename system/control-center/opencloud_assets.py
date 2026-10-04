@@ -46,7 +46,7 @@ def _creator_payload(creator_type: str, creator_id: str) -> dict:
     raise OpenCloudAssetError("ROBLOX_CREATOR_TYPE must be user or group")
 
 
-def _multipart(metadata: dict, file_path: Path) -> tuple[bytes, str]:
+def _multipart(metadata: dict, file_path: Path, content_type: str) -> tuple[bytes, str]:
     boundary = f"----game1assetmanager{uuid.uuid4().hex}"
     marker = boundary.encode("ascii")
     request_json = json.dumps(metadata, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
@@ -61,7 +61,7 @@ def _multipart(metadata: dict, file_path: Path) -> tuple[bytes, str]:
             + b"\r\n",
             b"--" + marker + b"\r\n"
             + f'Content-Disposition: form-data; name="fileContent"; filename="{safe_name}"\r\n'.encode("utf-8")
-            + b"Content-Type: model/fbx\r\n\r\n"
+            + f"Content-Type: {content_type}\r\n\r\n".encode("ascii")
             + file_bytes
             + b"\r\n",
             b"--" + marker + b"--\r\n",
@@ -117,7 +117,7 @@ def create_model_asset(
         "description": description,
         "creationContext": {"creator": _creator_payload(creator_type, creator_id)},
     }
-    body, boundary = _multipart(metadata, file_path)
+    body, boundary = _multipart(metadata, file_path, "model/fbx")
     req = request.Request(
         CREATE_ASSET_URL,
         data=body,
@@ -158,7 +158,7 @@ def update_model_asset(
         "description": description,
         "creationContext": {"creator": _creator_payload(creator_type, creator_id)},
     }
-    body, boundary = _multipart(metadata, file_path)
+    body, boundary = _multipart(metadata, file_path, "model/fbx")
     req = request.Request(
         UPDATE_ASSET_URL_TEMPLATE.format(asset_id=asset_id),
         data=body,
@@ -175,6 +175,56 @@ def update_model_asset(
     operation = str(response.get("path") or "").strip()
     if not operation.startswith("operations/"):
         raise OpenCloudAssetError("update asset returned no operation path")
+    return operation
+
+
+
+def _validate_animation_upload(file_path: Path, api_key: str):
+    file_path = file_path.resolve()
+    if not file_path.is_file() or file_path.suffix.lower() not in {".rbxm", ".rbxmx"}:
+        raise OpenCloudAssetError("animation publication requires a Studio-exported RBXM or RBXMX")
+    size = file_path.stat().st_size
+    if size <= 0:
+        raise OpenCloudAssetError("animation file is empty")
+    if size > MAX_UPLOAD_BYTES:
+        raise OpenCloudAssetError(f"animation file is larger than 20 MB: {size} bytes")
+    if not api_key.strip():
+        raise OpenCloudAssetError("ROBLOX_OPEN_CLOUD_API_KEY is not configured in .env.local")
+
+
+def create_animation_asset(
+    file_path: Path,
+    *,
+    display_name: str,
+    description: str,
+    creator_type: str,
+    creator_id: str,
+    api_key: str,
+) -> str:
+    _validate_animation_upload(file_path, api_key)
+    metadata = {
+        "assetType": "Animation",
+        "displayName": display_name.strip(),
+        "description": description,
+        "creationContext": {"creator": _creator_payload(creator_type, creator_id)},
+    }
+    body, boundary = _multipart(metadata, file_path, "model/x-rbxm")
+    req = request.Request(
+        CREATE_ASSET_URL,
+        data=body,
+        headers={
+            "x-api-key": api_key.strip(),
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+            "Content-Length": str(len(body)),
+            "Accept": "application/json",
+            "User-Agent": "game1-asset-manager/0.5",
+        },
+        method="POST",
+    )
+    response = _json_http(req, 120.0)
+    operation = str(response.get("path") or "").strip()
+    if not operation.startswith("operations/"):
+        raise OpenCloudAssetError("create animation asset returned no operation path")
     return operation
 
 
@@ -200,7 +250,7 @@ def wait_for_operation(operation_path: str, *, api_key: str, timeout_seconds: fl
         operation = get_operation(operation_path, api_key=api_key)
         if operation.get("done") is True:
             if operation.get("error"):
-                raise OpenCloudAssetError("roblox rejected the model: " + json.dumps(operation["error"], ensure_ascii=False))
+                raise OpenCloudAssetError("roblox rejected the asset: " + json.dumps(operation["error"], ensure_ascii=False))
             response = operation.get("response") or {}
             asset_id = str(response.get("assetId") or "").strip()
             if not asset_id.isdigit():

@@ -1,0 +1,453 @@
+diff --git a/system/control-center/character_core/__init__.py b/system/control-center/character_core/__init__.py
+new file mode 100644
+index 0000000..777f756
+--- /dev/null
++++ b/system/control-center/character_core/__init__.py
+@@ -0,0 +1 @@
++"""character-domain control-center services for game1."""
+diff --git a/system/control-center/character_core/identity.py b/system/control-center/character_core/identity.py
+new file mode 100644
+index 0000000..d8b0d19
+--- /dev/null
++++ b/system/control-center/character_core/identity.py
+@@ -0,0 +1,303 @@
++from __future__ import annotations
++
++from pathlib import Path
++import hashlib
++import re
++import shutil
++import time
++
++from animation_core.common import _binding_id, _canonical_file_stem, _clip_id
++
++ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
++ACTIVE_KEY = "active_character_archetype_id"
++
++
++class CharacterIdentityService:
++    """Rename/reclassify a character archetype without losing published asset ids.
++
++    This migration owns the cross-domain identity change: character metadata,
++    canonical model/animation paths, animation ids/bindings/publication history,
++    and the active-character setting move together as one operation.
++    """
++
++    def __init__(self, root: Path, characters, animations):
++        self.root = root.resolve()
++        self.characters = characters
++        self.animations = animations
++
++    @staticmethod
++    def _sha256(path: Path) -> str:
++        digest = hashlib.sha256()
++        with path.open("rb") as stream:
++            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
++                digest.update(chunk)
++        return digest.hexdigest()
++
++    @staticmethod
++    def _relative(root: Path, path: Path) -> str:
++        return path.resolve().relative_to(root).as_posix()
++
++    @staticmethod
++    def _animation_relative(race: str, gender: str, character_id: str, row: dict, suffix: str) -> Path:
++        stem = _canonical_file_stem(
++            str(row.get("scope") or ""),
++            str(row.get("weapon_set") or ""),
++            str(row.get("slot") or ""),
++            int(row.get("variant") or 0),
++        )
++        if str(row.get("scope") or "") == "base":
++            return Path("characters") / race / gender / character_id / "animations" / "base" / f"{stem}{suffix}"
++        return (
++            Path("characters")
++            / race
++            / gender
++            / character_id
++            / "animations"
++            / "weapons"
++            / str(row.get("weapon_set") or "")
++            / f"{stem}{suffix}"
++        )
++
++    def _managed_file(self, stored_path: str, expected_root: Path) -> Path | None:
++        value = str(stored_path or "").strip()
++        if not value:
++            return None
++        path = (self.root / value).resolve()
++        try:
++            path.relative_to(expected_root.resolve())
++        except ValueError as error:
++            raise ValueError(f"managed asset path escaped the game1 project: {value}") from error
++        return path
++
++    def _copy_plan(self, moves: list[tuple[Path, Path]]) -> list[tuple[Path, Path, bool]]:
++        copied: list[tuple[Path, Path, bool]] = []
++        for source, target in moves:
++            if source.resolve() == target.resolve():
++                continue
++            if not source.is_file():
++                raise ValueError(f"cannot migrate missing canonical asset: {source.relative_to(self.root)}")
++            target.parent.mkdir(parents=True, exist_ok=True)
++            created = False
++            if target.exists():
++                if self._sha256(source) != self._sha256(target):
++                    raise ValueError(f"identity migration target already contains different data: {target.relative_to(self.root)}")
++            else:
++                shutil.copy2(source, target)
++                created = True
++            copied.append((source, target, created))
++        return copied
++
++    @staticmethod
++    def _rollback_copies(copied: list[tuple[Path, Path, bool]]) -> None:
++        for _source, target, created in reversed(copied):
++            if created:
++                try:
++                    target.unlink(missing_ok=True)
++                except Exception:
++                    pass
++
++    @staticmethod
++    def _cleanup_empty(path: Path, stop: Path) -> None:
++        current = path.parent
++        stop = stop.resolve()
++        while current != stop and stop in current.parents:
++            try:
++                current.rmdir()
++            except OSError:
++                break
++            current = current.parent
++
++    def update(self, old_character_id: str, payload: dict) -> dict:
++        old_id = str(old_character_id or "").strip().lower()
++        old = self.characters.get(old_id)
++        if not old:
++            raise ValueError(f"unknown character archetype: {old_id}")
++
++        options = self.characters.options()
++        race = str(payload.get("race", old.get("race") or "") or "").strip().lower()
++        gender = str(payload.get("gender", old.get("gender") or "") or "").strip().lower()
++        new_id = str(payload.get("id", old_id) or old_id).strip().lower()
++        display_name = str(payload.get("displayName", old.get("display_name") or "") or "").strip()
++
++        if race not in set(options.get("races") or []):
++            raise ValueError("race must be selected from the registered race pool: " + ", ".join(options.get("races") or []))
++        if gender not in set(options.get("genders") or []):
++            raise ValueError("gender must be male or female")
++        if not ID_RE.fullmatch(new_id):
++            raise ValueError("id must match [a-z0-9][a-z0-9_-]{0,63}")
++        if not display_name:
++            display_name = f"{race.title()} {gender.title()}"
++
++        source_root = self.root / "assets/source/characters"
++        prepared_root = self.root / "assets/prepared/characters"
++        old_source = self._managed_file(str(old.get("source_path") or ""), source_root)
++        old_prepared = self._managed_file(str(old.get("prepared_path") or ""), prepared_root)
++        new_source = (
++            self.root / "assets/source/characters" / race / gender / new_id / "model" / old_source.name
++            if old_source else None
++        )
++        new_prepared = (
++            self.root / "assets/prepared/characters" / race / gender / new_id / "model" / old_prepared.name
++            if old_prepared else None
++        )
++
++        with self.characters.connect() as connection:
++            id_conflict = connection.execute(
++                "SELECT id FROM characters WHERE id=? AND id<>?",
++                (new_id, old_id),
++            ).fetchone()
++            if id_conflict:
++                raise ValueError(f"archetype id is already registered: {new_id}")
++            identity_conflict = connection.execute(
++                "SELECT id FROM characters WHERE race=? AND gender=? AND id<>?",
++                (race, gender, old_id),
++            ).fetchone()
++            if identity_conflict:
++                raise ValueError(f"{race}/{gender} is already registered as {identity_conflict['id']}")
++
++            animation_rows = [
++                dict(row)
++                for row in connection.execute(
++                    """SELECT c.id AS old_clip_id,c.source_path,c.prepared_path,
++                              b.id AS old_binding_id,b.scope,b.weapon_set,b.slot,b.variant
++                       FROM animation_clips c
++                       JOIN animation_bindings b ON b.clip_id=c.id
++                       WHERE c.character_id=? AND b.character_id=?
++                       ORDER BY b.scope,b.weapon_set,b.slot,b.variant""",
++                    (old_id, old_id),
++                )
++            ]
++
++        moves: list[tuple[Path, Path]] = []
++        if old_source and new_source:
++            moves.append((old_source, new_source))
++        if old_prepared and new_prepared:
++            moves.append((old_prepared, new_prepared))
++
++        animation_migrations: list[dict] = []
++        for row in animation_rows:
++            old_animation_source = self._managed_file(str(row.get("source_path") or ""), source_root)
++            old_animation_prepared = self._managed_file(str(row.get("prepared_path") or ""), prepared_root)
++            source_suffix = old_animation_source.suffix.lower() if old_animation_source else ".rbxm"
++            prepared_suffix = old_animation_prepared.suffix.lower() if old_animation_prepared else source_suffix
++            source_relative = self._animation_relative(race, gender, new_id, row, source_suffix)
++            prepared_relative = self._animation_relative(race, gender, new_id, row, prepared_suffix)
++            target_source = self.root / "assets/source" / source_relative
++            target_prepared = self.root / "assets/prepared" / prepared_relative
++            if old_animation_source:
++                moves.append((old_animation_source, target_source))
++            if old_animation_prepared:
++                moves.append((old_animation_prepared, target_prepared))
++            new_clip_id = _clip_id(new_id, row["scope"], row["weapon_set"], row["slot"], int(row["variant"]))
++            new_binding_id = _binding_id(new_id, row["scope"], row["weapon_set"], row["slot"], int(row["variant"]))
++            animation_migrations.append(
++                {
++                    **row,
++                    "new_clip_id": new_clip_id,
++                    "new_binding_id": new_binding_id,
++                    "new_source_path": target_source.relative_to(self.root).as_posix(),
++                    "new_prepared_path": target_prepared.relative_to(self.root).as_posix(),
++                }
++            )
++
++        copied = self._copy_plan(moves)
++        now = time.time()
++        try:
++            with self.characters.connect() as connection:
++                for row in animation_migrations:
++                    if row["new_clip_id"] != row["old_clip_id"]:
++                        collision = connection.execute(
++                            "SELECT id FROM animation_clips WHERE id=? AND id<>?",
++                            (row["new_clip_id"], row["old_clip_id"]),
++                        ).fetchone()
++                        if collision:
++                            raise ValueError(f"animation clip id collision during archetype edit: {row['new_clip_id']}")
++                    if row["new_binding_id"] != row["old_binding_id"]:
++                        collision = connection.execute(
++                            "SELECT id FROM animation_bindings WHERE id=? AND id<>?",
++                            (row["new_binding_id"], row["old_binding_id"]),
++                        ).fetchone()
++                        if collision:
++                            raise ValueError(f"animation binding id collision during archetype edit: {row['new_binding_id']}")
++
++                connection.execute(
++                    """UPDATE characters
++                       SET id=?,display_name=?,race=?,gender=?,source_path=?,prepared_path=?,revision=revision+1,updated_at=?
++                       WHERE id=?""",
++                    (
++                        new_id,
++                        display_name,
++                        race,
++                        gender,
++                        self._relative(self.root, new_source) if new_source else str(old.get("source_path") or ""),
++                        self._relative(self.root, new_prepared) if new_prepared else str(old.get("prepared_path") or ""),
++                        now,
++                        old_id,
++                    ),
++                )
++                connection.execute("UPDATE character_publications SET character_id=? WHERE character_id=?", (new_id, old_id))
++                connection.execute("UPDATE project_settings SET value=? WHERE key=? AND value=?", (new_id, ACTIVE_KEY, old_id))
++                connection.execute("UPDATE animation_profiles SET character_id=?,updated_at=? WHERE character_id=?", (new_id, now, old_id))
++
++                for row in animation_migrations:
++                    connection.execute(
++                        "UPDATE animation_publications SET clip_id=? WHERE clip_id=?",
++                        (row["new_clip_id"], row["old_clip_id"]),
++                    )
++                    connection.execute(
++                        """UPDATE animation_clips
++                           SET id=?,character_id=?,source_path=?,prepared_path=?,updated_at=?
++                           WHERE id=?""",
++                        (
++                            row["new_clip_id"],
++                            new_id,
++                            row["new_source_path"],
++                            row["new_prepared_path"],
++                            now,
++                            row["old_clip_id"],
++                        ),
++                    )
++                    connection.execute(
++                        """UPDATE animation_bindings
++                           SET id=?,character_id=?,clip_id=?,updated_at=?
++                           WHERE id=?""",
++                        (
++                            row["new_binding_id"],
++                            new_id,
++                            row["new_clip_id"],
++                            now,
++                            row["old_binding_id"],
++                        ),
++                    )
++        except Exception:
++            self._rollback_copies(copied)
++            raise
++
++        for source, target, _created in copied:
++            if source.resolve() == target.resolve():
++                continue
++            try:
++                source.unlink(missing_ok=True)
++                stop = source_root if source_root in source.parents else prepared_root
++                self._cleanup_empty(source, stop)
++            except Exception:
++                pass
++
++        self.characters.export()
++        self.animations.export()
++        updated = self.characters.get(new_id)
++        return {
++            "character": updated,
++            "oldId": old_id,
++            "newId": new_id,
++            "identityChanged": any(
++                [
++                    old_id != new_id,
++                    str(old.get("race") or "") != race,
++                    str(old.get("gender") or "") != gender,
++                ]
++            ),
++            "migratedAnimationClips": len(animation_migrations),
++            "migratedFiles": len(copied),
++            "studioSyncRequired": bool(updated and updated.get("model_asset_id")),
++        }
+diff --git a/system/control-center/host_agent.py b/system/control-center/host_agent.py
+index 48a6766..d251b20 100644
+--- a/system/control-center/host_agent.py
++++ b/system/control-center/host_agent.py
+@@ -28,13 +28,15 @@ load_local_env(ROOT / ".env.local")
+ sys.path.insert(0, str(Path(__file__).resolve().parent))
+ from character_store import CharacterStore
+ from animation_store import AnimationStore
++from character_core.identity import CharacterIdentityService
+ from studio_bridge import run_model_load_bridge
+ 
+-control_agent_build = "game1-m5-1-animation-manual-binding-001"
++control_agent_build = "game1-m5-2-archetype-edit-001"
+ port = int(os.environ.get("CONTROL_AGENT_PORT", "43821"))
+ token = os.environ.get("CONTROL_TOKEN", "Game1LocalControlV1")
+ store = CharacterStore(ROOT)
+ animations = AnimationStore(ROOT)
++character_identity = CharacterIdentityService(ROOT, store, animations)
+ 
+ 
+ def publication_config():
+@@ -220,9 +222,16 @@ class Handler(BaseHTTPRequestHandler):
+                 return self.out(400, {"error": str(error)})
+ 
+         prefix = "/api/characters/"
++        identity_suffix = "/identity"
+         activate_suffix = "/activate"
+         publish_suffix = "/publish"
+         sync_suffix = "/sync"
++        if path.startswith(prefix) and path.endswith(identity_suffix):
++            character_id = unquote(path[len(prefix):-len(identity_suffix)].strip("/"))
++            try:
++                return self.out(200, character_identity.update(character_id, self.body()))
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
+         if path.startswith(prefix) and path.endswith(activate_suffix):
+             character_id = unquote(path[len(prefix):-len(activate_suffix)].strip("/"))
+             try:
+diff --git a/system/control-center/static/character-assets.js b/system/control-center/static/character-assets.js
+index 477add9..0fc4c40 100644
+--- a/system/control-center/static/character-assets.js
++++ b/system/control-center/static/character-assets.js
+@@ -24,13 +24,14 @@ function setForm(row){state.selected=row?.id||null;state.sourcePath='';if(row){$
+ 
+ function renderRuntime(){const r=state.data.runtime;const host=$('runtime-state');if(r.mode==='registered'){host.className='runtime-state registered';host.innerHTML=`<strong>registered · ${esc(r.activeArchetypeId)}</strong><span>${esc(r.race)} / ${esc(r.gender)} · model asset ${esc(r.modelAssetId)}</span>`}else{host.className='runtime-state bootstrap';host.innerHTML=`<strong>bootstrap placeholder</strong><span>${esc(r.reason)}${r.activeArchetypeId?' · selected '+esc(r.activeArchetypeId):''}</span>`}const pub=state.data.publication||{};$('publication-state').className=pub.configured?'publication-ready':'publication-missing';$('publication-state').textContent=pub.configured?`open cloud: ${pub.creatorType} ${pub.creatorId}`:'open cloud: not configured'}
+ function renderTree(){const host=$('character-tree');host.innerHTML='';for(const item of state.data.items){const button=document.createElement('button');button.className=item.id===state.selected?'active':'';button.innerHTML=`<span>${esc(item.display_name||item.id)}<small>${esc(item.race||'?')} · ${esc(item.gender||'?')}</small></span><small>${esc(item.status)}</small>`;button.onclick=()=>setForm(item);host.appendChild(button)}if(!state.data.items.length)host.innerHTML='<small class="muted">no registered characters.</small>';$('rail-count').textContent=state.data.items.length}
+-function renderRows(){const body=$('rows');body.innerHTML='';for(const item of state.data.items){const active=state.data.activeArchetypeId===item.id;const tr=document.createElement('tr');tr.className=item.id===state.selected?'active':'';tr.innerHTML=`<td>${active?'yes':''}</td><td><b>${esc(item.race||'?')} / ${esc(item.gender||'?')}</b><br><small>${esc(item.id)}</small></td><td>${item.model_asset_id?`asset ${esc(item.model_asset_id)}`:'local only'}<br><small>${esc(item.sha256||'').slice(0,12)}</small></td><td>${esc(item.armature_name||'—')}<br><small>${esc(item.bone_count||0)} bones · ${esc(item.mesh_count||0)} mesh</small></td><td>${statusTag(item.status)}</td><td>${esc(item.revision)}</td><td><div class="row-actions"><button data-open>open</button><button data-publish>publish</button><button data-sync>sync studio</button><button data-active>activate</button><button data-delete class="danger">delete</button></div></td>`;tr.querySelector('[data-open]').onclick=()=>setForm(item);tr.querySelector('[data-publish]').onclick=()=>publishCharacter(item.id);tr.querySelector('[data-sync]').onclick=()=>syncStudio(item.id);tr.querySelector('[data-active]').onclick=()=>activate(item.id);tr.querySelector('[data-delete]').onclick=()=>removeCharacter(item.id);body.appendChild(tr)}}
++function renderRows(){const body=$('rows');body.innerHTML='';for(const item of state.data.items){const active=state.data.activeArchetypeId===item.id;const tr=document.createElement('tr');tr.className=item.id===state.selected?'active':'';tr.innerHTML=`<td>${active?'yes':''}</td><td><b>${esc(item.race||'?')} / ${esc(item.gender||'?')}</b><br><small>${esc(item.id)}</small></td><td>${item.model_asset_id?`asset ${esc(item.model_asset_id)}`:'local only'}<br><small>${esc(item.sha256||'').slice(0,12)}</small></td><td>${esc(item.armature_name||'—')}<br><small>${esc(item.bone_count||0)} bones · ${esc(item.mesh_count||0)} mesh</small></td><td>${statusTag(item.status)}</td><td>${esc(item.revision)}</td><td><div class="row-actions"><button data-open>edit</button><button data-publish>publish</button><button data-sync>sync studio</button><button data-active>activate</button><button data-delete class="danger">delete</button></div></td>`;tr.querySelector('[data-open]').onclick=()=>setForm(item);tr.querySelector('[data-publish]').onclick=()=>publishCharacter(item.id);tr.querySelector('[data-sync]').onclick=()=>syncStudio(item.id);tr.querySelector('[data-active]').onclick=()=>activate(item.id);tr.querySelector('[data-delete]').onclick=()=>removeCharacter(item.id);body.appendChild(tr)}}
+ function renderDetails(row){const host=$('selected-details');if(!row){host.innerHTML='<span class="muted">select a character.</span>';return}host.innerHTML=`<div class="section-title"><div><span>selected</span><h3>${esc(row.display_name)}</h3></div>${statusTag(row.status)}</div><div class="details-grid"><div><b>canonical source</b><span>${esc(row.source_path||'—')}</span></div><div><b>prepared</b><span>${esc(row.prepared_path||'—')}</span></div><div><b>model asset id</b><span>${esc(row.model_asset_id||'not published')}</span></div><div><b>publication</b><span>${esc(row.moderation_state||'—')}</span></div><div><b>armature</b><span>${esc(row.armature_name||'—')} · ${esc(row.bone_count||0)} bones</span></div><div><b>skeleton signature</b><span>${esc(row.skeleton_signature||'—')}</span></div></div>`}
+-function renderForm(row){if(row){$('model-status').innerHTML=`<strong>${esc(row.display_name)} · ${esc(row.status)}</strong><span>${esc(row.source_path||'no source')} · ${esc(row.armature_name||'no armature metadata')} · ${esc(row.bone_count||0)} bones</span>`;$('register-character').textContent=state.sourcePath?'register new revision':'save metadata';}else{$('model-status').innerHTML='<strong>not registered</strong><span>choose an fbx with a skinned armature.</span>';$('register-character').textContent='register character'}const has=row&&row.source_path;const configured=!!state.data?.publication?.configured;$('publish-character').disabled=!has||!configured;$('sync-character').disabled=!row?.model_asset_id;$('activate-character').disabled=!row?.model_asset_id;$('publication-hint').textContent=!row?'select a registered character.':!configured?'configure open cloud in .env.local before publishing.':row.model_asset_id?`publish updates permanent asset ${row.model_asset_id}.`:'publish creates a new permanent model asset id.'}
++function renderForm(row){if(row){$('model-status').innerHTML=`<strong>${esc(row.display_name)} · ${esc(row.status)}</strong><span>${esc(row.source_path||'no source')} · ${esc(row.armature_name||'no armature metadata')} · ${esc(row.bone_count||0)} bones</span>`;$('register-character').textContent=state.sourcePath?'register new revision':'choose fbx for revision';$('register-character').disabled=!state.sourcePath;$('save-archetype').disabled=false;}else{$('model-status').innerHTML='<strong>not registered</strong><span>choose an fbx with a skinned armature.</span>';$('register-character').textContent='register character';$('register-character').disabled=!state.sourcePath;$('save-archetype').disabled=true;}const has=row&&row.source_path;const configured=!!state.data?.publication?.configured;$('publish-character').disabled=!has||!configured;$('sync-character').disabled=!row?.model_asset_id;$('activate-character').disabled=!row?.model_asset_id;$('publication-hint').textContent=!row?'select a registered character.':!configured?'configure open cloud in .env.local before publishing.':row.model_asset_id?`publish updates permanent asset ${row.model_asset_id}.`:'publish creates a new permanent model asset id.'}
+ function renderCharacters(){if(!state.data)return;const row=selectedRow();const published=state.data.items.filter(x=>x.status==='PUBLISHED').length;$('metric-total').textContent=state.data.items.length;$('metric-published').textContent=published;$('metric-active').textContent=state.data.activeArchetypeId?'1':'0';renderRuntime();renderTree();renderRows();renderDetails(row);renderForm(row)}
+ async function loadCharacters(){try{state.data=await request('/api/characters');const races=state.data.options?.races||['human'];const genders=state.data.options?.genders||['male','female'];$('race').innerHTML=races.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');$('gender').innerHTML=genders.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');if(state.selected&&!state.data.items.some(x=>x.id===state.selected))state.selected=null;if(!state.selected)syncIdentity();renderCharacters();populateAnimationCharacters()}catch(error){toast(error.message,true)}}
+ async function chooseModel(){try{const result=await request('/api/files/choose-character-model',{method:'POST'});if(!result.path)return;state.sourcePath=result.path;$('picked-model').textContent=result.path;renderForm(selectedRow())}catch(error){toast(error.message,true)}}
+-async function registerCharacter(){try{const row=selectedRow();if(!row&&!state.sourcePath)throw Error('choose an fbx first');$('register-character').disabled=true;toast('analyzing and registering character…');const result=await request('/api/characters',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:$('character-id').value,displayName:$('display-name').value,race:$('race').value,gender:$('gender').value,sourcePath:state.sourcePath})});state.selected=result.id;state.sourcePath='';await loadCharacters();toast(`registered ${result.id} · ${result.bone_count} bones`)}catch(error){toast(error.message,true)}finally{$('register-character').disabled=false}}
++async function registerCharacter(){try{const row=selectedRow();if(!state.sourcePath)throw Error('choose an fbx first');if(row){const identityChanged=$('character-id').value.trim().toLowerCase()!==row.id||$('race').value!==row.race||$('gender').value!==row.gender||$('display-name').value.trim()!==(row.display_name||'');if(identityChanged)throw Error('save archetype identity first, then register the model revision');}$('register-character').disabled=true;toast('analyzing and registering character…');const result=await request('/api/characters',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:$('character-id').value,displayName:$('display-name').value,race:$('race').value,gender:$('gender').value,sourcePath:state.sourcePath})});state.selected=result.id;state.sourcePath='';await loadCharacters();toast(`registered ${result.id} · ${result.bone_count} bones`)}catch(error){toast(error.message,true)}finally{renderForm(selectedRow())}}
++async function saveArchetype(){const row=selectedRow();if(!row)return;try{const oldId=row.id;const nextId=$('character-id').value.trim().toLowerCase();const nextRace=$('race').value;const nextGender=$('gender').value;const identityChanged=oldId!==nextId||row.race!==nextRace||row.gender!==nextGender;if(identityChanged&&!confirm(`change archetype ${oldId} → ${nextId}? canonical model/animation paths will be migrated and existing roblox asset ids will be preserved.`))return;$('save-archetype').disabled=true;toast('saving archetype identity…');const result=await request('/api/characters/'+encodeURIComponent(oldId)+'/identity',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:nextId,displayName:$('display-name').value,race:nextRace,gender:nextGender})});state.selected=result.newId;state.animationCharacter=result.newId;await loadCharacters();const syncHint=result.studioSyncRequired&&result.identityChanged?' · sync studio before play':'';toast(`saved ${result.newId} · ${result.migratedAnimationClips} animation clips migrated${syncHint}`)}catch(error){toast(error.message,true)}finally{renderForm(selectedRow())}}
+ async function publishCharacter(id=state.selected){try{if(!id)throw Error('select a character');toast('publishing character model to roblox…');await request('/api/characters/'+encodeURIComponent(id)+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:$('publication-description').value})});state.selected=id;await loadCharacters();toast(`published ${id}`)}catch(error){toast(error.message,true)}}
+ async function syncStudio(id=state.selected){try{if(!id)throw Error('select a character');toast('syncing published character into studio…');const result=await request('/api/characters/'+encodeURIComponent(id)+'/sync',{method:'POST'});toast(`studio synced ${id} · ${result.studio?.destination||''}`)}catch(error){toast(error.message,true)}}
+ async function activate(id=state.selected){try{if(!id)throw Error('select a character');await request('/api/characters/'+encodeURIComponent(id)+'/activate',{method:'POST'});state.selected=id;await loadCharacters();toast(`active character: ${id}`)}catch(error){toast(error.message,true)}}
+@@ -92,6 +93,6 @@ async function publishMissingAnimations(){if(state.animationPublishing)return;le
+ async function setAnimationWeight(bindingId,weight){try{state.animations=await request('/api/animation-bindings/'+encodeURIComponent(bindingId)+'/weight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({weight:Number(weight)})});state.animations.publication=state.data?.publication||{};renderAnimations()}catch(error){toast(error.message,true)}}
+ async function removeAnimationBinding(bindingId){if(!confirm('remove this semantic animation binding from game1? canonical source files are preserved.'))return;try{state.animations=await request('/api/animation-bindings/'+encodeURIComponent(bindingId),{method:'DELETE'});state.animations.publication=state.data?.publication||{};if(state.animationSelected===bindingId)state.animationSelected=null;renderAnimations();toast('animation binding removed')}catch(error){toast(error.message,true)}}
+ 
+-$('nav-characters').onclick=()=>setView('characters');$('nav-animations').onclick=()=>setView('animations');$('race').onchange=syncIdentity;$('gender').onchange=syncIdentity;$('choose-model').onclick=chooseModel;$('register-character').onclick=registerCharacter;$('publish-character').onclick=()=>publishCharacter();$('sync-character').onclick=()=>syncStudio();$('activate-character').onclick=()=>activate();$('new-character').onclick=()=>setForm(null);$('clear-form').onclick=()=>setForm(null);$('refresh').onclick=loadCharacters;$('validate-view').onclick=loadCharacters;$('theme').onclick=()=>document.body.classList.toggle('light');
++$('nav-characters').onclick=()=>setView('characters');$('nav-animations').onclick=()=>setView('animations');$('race').onchange=syncIdentity;$('gender').onchange=syncIdentity;$('choose-model').onclick=chooseModel;$('save-archetype').onclick=saveArchetype;$('register-character').onclick=registerCharacter;$('publish-character').onclick=()=>publishCharacter();$('sync-character').onclick=()=>syncStudio();$('activate-character').onclick=()=>activate();$('new-character').onclick=()=>setForm(null);$('clear-form').onclick=()=>setForm(null);$('refresh').onclick=loadCharacters;$('validate-view').onclick=loadCharacters;$('theme').onclick=()=>document.body.classList.toggle('light');
+ $('animation-character').onchange=()=>{state.animationCharacter=$('animation-character').value;state.animationSelected=null;state.lastScan=null;loadAnimations()};$('choose-animation-folder').onclick=chooseAnimationFolder;$('scan-animations').onclick=scanAnimations;$('publish-missing-animations').onclick=publishMissingAnimations;$('refresh-animations').onclick=loadAnimations;
+ loadCharacters();
+diff --git a/system/control-center/static/index.html b/system/control-center/static/index.html
+index 125e8e7..ab75fb5 100644
+--- a/system/control-center/static/index.html
++++ b/system/control-center/static/index.html
+@@ -43,11 +43,12 @@
+ <span class="eyebrow">01 · character archetype</span><h3>register model</h3>
+ <p>choose identity, then select an fbx. registration validates the armature in blender and writes canonical source/prepared copies plus skeleton metadata.</p>
+ <div class="character-grid"><label>race<select id="race"></select></label><label>gender<select id="gender"></select></label></div>
+-<label>archetype id<input id="character-id" readonly></label>
++<label>archetype id<input id="character-id" autocomplete="off" pattern="[a-z0-9][a-z0-9_-]{0,63}"></label>
++<small class="hint">editing identity migrates canonical model/animation paths and keeps existing roblox asset ids.</small>
+ <label>display name<input id="display-name" autocomplete="off"></label>
+ <div class="picker"><button id="choose-model" type="button">choose fbx</button><small id="picked-model">fbx not selected</small></div>
+ <div id="model-status" class="status-box"><strong>not registered</strong><span>select a character row or choose an fbx.</span></div>
+-<div class="actions"><button id="register-character" class="primary wide" type="button">register character</button><button id="clear-form" class="wide" type="button">clear form</button></div>
++<div class="actions"><button id="save-archetype" type="button" disabled>save archetype</button><button id="register-character" class="primary" type="button">register character</button><button id="clear-form" type="button">clear form</button></div>
+ <hr class="card-separator">
+ <span class="eyebrow">02 · publication</span><h3 class="subheading">roblox model asset</h3><p>first publish creates a permanent model asset id. later source revisions update the same id. studio sync refreshes the local canonical rig without republishing.</p>
+ <label>description<input id="publication-description" value="game1 character model"></label>
+@@ -106,6 +107,6 @@
+ </section>
+ </main>
+ <div id="toast" class="toast"></div>
+-<script src="character-assets.js?v=6"></script>
++<script src="character-assets.js?v=7"></script>
+ </body>
+ </html>
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index 9a65535..f06f8fe 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -353,13 +353,36 @@ for required in ["chooseAnimationFolder", "scanAnimations", "publishMissingAnima
+ if 'create_animation_asset' not in (ROOT / "system/control-center/opencloud_assets.py").read_text(encoding="utf-8"):
+     err("open cloud animation publication helper is missing")
+ 
++# m5.2 archetype identity editing contract
++identity_service = ROOT / "system/control-center/character_core/identity.py"
++identity_text = identity_service.read_text(encoding="utf-8") if identity_service.is_file() else ""
++for required in [
++    "class CharacterIdentityService",
++    "def update",
++    "UPDATE character_publications SET character_id",
++    "UPDATE animation_profiles SET character_id",
++    "UPDATE animation_publications SET clip_id",
++    "UPDATE animation_clips",
++    "UPDATE animation_bindings",
++    "migratedAnimationClips",
++]:
++    if required not in identity_text:
++        err(f"archetype identity migration missing {required}")
++if 'identity_suffix = "/identity"' not in host_agent_text or "character_identity.update" not in host_agent_text:
++    err("host agent does not expose archetype identity editing")
++if 'id="save-archetype"' not in ui or 'id="character-id" autocomplete="off"' not in ui:
++    err("asset manager archetype edit controls are missing")
++for required in ["saveArchetype", "save archetype identity first", "/identity"]:
++    if required not in js_text:
++        err(f"asset manager archetype editing ui missing {required}")
++
+ if errors:
+     print("verify failed")
+     for item in errors:
+         print(" -", item)
+     sys.exit(1)
+ 
+-print("verify ok · game1 m5.1 character animation contracts passed")
++print("verify ok · game1 m5.2 archetype edit + character animation contracts passed")
+ print("registered character archetypes:", len(archetypes))
+ print("active character archetype:", active_id or "none")
+ print("race pool: human")

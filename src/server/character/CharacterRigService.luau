@@ -265,7 +265,43 @@ local function visualRoot(importedRig: Model, allowBootstrapCompatibility: boole
     return nil, false
 end
 
-local function placeAuthoredVisual(visual: Model, visualRootPart: BasePart, root: BasePart, floorY: number)
+local function partLowestWorldY(part: BasePart): number
+    local half = part.Size * 0.5
+    local lowest = math.huge
+    for x = -1, 1, 2 do
+        for y = -1, 1, 2 do
+            for z = -1, 1, 2 do
+                local corner = part.CFrame:PointToWorldSpace(Vector3.new(
+                    half.X * x,
+                    half.Y * y,
+                    half.Z * z
+                ))
+                lowest = math.min(lowest, corner.Y)
+            end
+        end
+    end
+    return lowest
+end
+
+local function lowestVisibleGeometryY(visual: Model, visualRootPart: BasePart): (number?, number)
+    local lowest = math.huge
+    local count = 0
+    for _, object in visual:GetDescendants() do
+        if object:IsA("BasePart")
+            and object ~= visualRootPart
+            and object.Transparency < 1
+        then
+            lowest = math.min(lowest, partLowestWorldY(object))
+            count += 1
+        end
+    end
+    if count == 0 then
+        return nil, 0
+    end
+    return lowest, count
+end
+
+local function placeAuthoredVisual(visual: Model, visualRootPart: BasePart, root: BasePart, floorY: number): (number, number)
     local _, rootYaw, _ = root.CFrame:ToOrientation()
     local sourcePivotRotation = visual:GetPivot().Rotation
     visual:PivotTo(
@@ -274,12 +310,17 @@ local function placeAuthoredVisual(visual: Model, visualRootPart: BasePart, root
         * sourcePivotRotation
     )
 
-    local targetVisualRootPosition = Vector3.new(
-        root.Position.X,
-        floorY + CharacterConfig.VisualGroundClearance,
-        root.Position.Z
-    )
-    visual:PivotTo(visual:GetPivot() + (targetVisualRootPosition - visualRootPart.Position))
+    -- RootPart is a rig helper, not the foot-contact plane. Generic skinned FBX
+    -- assets can have a perfectly valid RootPart/pivot while the rendered mesh
+    -- extends below it. Match the reference runtime contract: align the lowest
+    -- visible geometry to the measured world floor, then weld the authored root.
+    local lowestY, visibleParts = lowestVisibleGeometryY(visual, visualRootPart)
+    if lowestY == nil then
+        lowestY = visualRootPart.Position.Y
+    end
+    local correctionY = floorY + CharacterConfig.VisualGroundClearance - lowestY
+    visual:PivotTo(visual:GetPivot() + Vector3.new(0, correctionY, 0))
+    return correctionY, visibleParts
 end
 
 local function placeCompatibilityVisual(visual: Model, visualRootPart: BasePart, root: BasePart, floorY: number)
@@ -311,13 +352,18 @@ local function attachVisual(
         return nil, nil
     end
     local floorY, floorSource = sensedFloorY(character, root)
+    local groundCorrectionY = 0
+    local groundParts = 0
     if authoredRoot then
-        placeAuthoredVisual(visual, visualRootPart, root, floorY)
+        groundCorrectionY, groundParts = placeAuthoredVisual(visual, visualRootPart, root, floorY)
     else
         placeCompatibilityVisual(visual, visualRootPart, root, floorY)
     end
 
     character:SetAttribute("VisualRootSource", if authoredRoot then "authored" else "bootstrap_compatibility")
+    character:SetAttribute("VisualGroundCorrectionY", groundCorrectionY)
+    character:SetAttribute("VisualGroundParts", groundParts)
+    character:SetAttribute("VisualFootContactSource", if authoredRoot then "visible_geometry" else "bootstrap_root")
     character:SetAttribute("VisualGroundFloorY", floorY)
     character:SetAttribute("VisualGroundSource", floorSource)
     character:SetAttribute("VisualRootAnchorSize", tostring(CharacterConfig.VisualRootAnchorSize))

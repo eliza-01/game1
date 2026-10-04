@@ -37,3 +37,54 @@ create table if not exists character_publications (
     moderation_state text,
     published_at real not null
 );
+
+create table if not exists animation_profiles (
+    character_id text primary key,
+    skeleton_signature text not null default '',
+    scan_root text not null default '',
+    created_at real not null,
+    updated_at real not null
+);
+
+create table if not exists animation_clips (
+    id text primary key,
+    character_id text not null,
+    name text not null,
+    source_path text not null,
+    prepared_path text not null,
+    sha256 text not null,
+    asset_id text,
+    published_sha256 text not null default '',
+    moderation_state text not null default '',
+    revision integer not null default 1,
+    created_at real not null,
+    updated_at real not null,
+    published_at real
+);
+
+create table if not exists animation_bindings (
+    id text primary key,
+    character_id text not null,
+    scope text not null,
+    weapon_set text not null default '',
+    slot text not null,
+    variant integer not null default 0,
+    clip_id text not null,
+    weight integer not null default 100,
+    looped integer not null default 0,
+    priority text not null default 'Movement',
+    created_at real not null,
+    updated_at real not null,
+    unique(character_id, scope, weapon_set, slot, variant)
+);
+
+create table if not exists animation_publications (
+    id integer primary key autoincrement,
+    clip_id text not null,
+    clip_revision integer not null,
+    asset_id text not null,
+    operation_path text not null,
+    sha256 text not null,
+    moderation_state text,
+    published_at real not null
+);

@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 2,
+  "project": "game1",
+  "weaponSets": [
+    "hands",
+    "1hs",
+    "bow"
+  ],
+  "profiles": [
+    {
+      "characterId": "human_female",
+      "skeletonSignature": "7b5c4592b9c96bd3f4706598f175257ecfacfa7b42b39bc7f96f82db3cb8cac4"
+    }
+  ],
+  "clips": [
+    {
+      "id": "human_female__weapon__hands__attack__01",
+      "characterId": "human_female",
+      "name": "hands_attack_01",
+      "sourcePath": "assets/source/characters/human/female/human_female/animations/weapons/hands/hands_attack_01.rbxm",
+      "preparedPath": "assets/prepared/characters/human/female/human_female/animations/weapons/hands/hands_attack_01.rbxm",
+      "sha256": "54337c4d029fdd2718cec79814f431aeccef66ad16ad65eb13ed2c2eeaeee360",
+      "assetId": "125909511806522",
+      "publishedSha256": "54337c4d029fdd2718cec79814f431aeccef66ad16ad65eb13ed2c2eeaeee360",
+      "moderationState": "Approved",
+      "revision": 1,
+      "status": "PUBLISHED"
+    },
+    {
+      "id": "human_female__weapon__hands__idle__00",
+      "characterId": "human_female",
+      "name": "hands_idle",
+      "sourcePath": "assets/source/characters/human/female/human_female/animations/weapons/hands/hands_idle.rbxm",
+      "preparedPath": "assets/prepared/characters/human/female/human_female/animations/weapons/hands/hands_idle.rbxm",
+      "sha256": "b1899ba4d76ab8b188c55b54f342ebc48746cf44b97d49b826dc93f00c40bb61",
+      "assetId": "128422112456172",
+      "publishedSha256": "b1899ba4d76ab8b188c55b54f342ebc48746cf44b97d49b826dc93f00c40bb61",
+      "moderationState": "Approved",
+      "revision": 1,
+      "status": "PUBLISHED"
+    },
+    {
+      "id": "human_female__weapon__hands__run__00",
+      "characterId": "human_female",
+      "name": "hands_run",
+      "sourcePath": "assets/source/characters/human/female/human_female/animations/weapons/hands/hands_run.rbxm",
+      "preparedPath": "assets/prepared/characters/human/female/human_female/animations/weapons/hands/hands_run.rbxm",
+      "sha256": "5a7e9dc50b978f81f96119b28756cab2b39fe014abe8afdcb09b52bca5d26c50",
+      "assetId": "101528780146582",
+      "publishedSha256": "5a7e9dc50b978f81f96119b28756cab2b39fe014abe8afdcb09b52bca5d26c50",
+      "moderationState": "Approved",
+      "revision": 1,
+      "status": "PUBLISHED"
+    }
+  ],
+  "bindings": [
+    {
+      "id": "binding__human_female__weapon__hands__attack__01",
+      "characterId": "human_female",
+      "scope": "weapon",
+      "weaponSet": "hands",
+      "slot": "attack",
+      "variant": 1,
+      "clipId": "human_female__weapon__hands__attack__01",
+      "weight": 100,
+      "looped": false,
+      "priority": "Action"
+    },
+    {
+      "id": "binding__human_female__weapon__hands__idle__00",
+      "characterId": "human_female",
+      "scope": "weapon",
+      "weaponSet": "hands",
+      "slot": "idle",
+      "variant": 0,
+      "clipId": "human_female__weapon__hands__idle__00",
+      "weight": 100,
+      "looped": true,
+      "priority": "Idle"
+    },
+    {
+      "id": "binding__human_female__weapon__hands__run__00",
+      "characterId": "human_female",
+      "scope": "weapon",
+      "weaponSet": "hands",
+      "slot": "run",
+      "variant": 0,
+      "clipId": "human_female__weapon__hands__run__00",
+      "weight": 100,
+      "looped": true,
+      "priority": "Movement"
+    }
+  ]
+}

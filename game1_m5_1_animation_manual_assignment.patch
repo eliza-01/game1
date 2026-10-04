@@ -1,0 +1,636 @@
+diff --git a/docs/character-animation-system.md b/docs/character-animation-system.md
+index 98d4f9f..5a13ebd 100644
+--- a/docs/character-animation-system.md
++++ b/docs/character-animation-system.md
+@@ -18,7 +18,7 @@ base scope is character-wide and independent of equipped weapon:
+ - `jump_start`, `jump_loop`, `fall`, `land`
+ - `seated.enter`, `seated.loop`, `seated.exit`
+ 
+-weapon scope is a context overlay. m5 starts with `1hs` and `bow`:
++weapon scope is a context overlay. m5.1 starts with `hands`, `1hs` and `bow`:
+ 
+ - `idle`, `combat_idle`, `walk`, `run`
+ - `attack` with variants `01..n`
+@@ -26,6 +26,8 @@ weapon scope is a context overlay. m5 starts with `1hs` and `bow`:
+ - `equip`, `unequip`
+ - `bow` additionally supports `aim`
+ 
++`hands` is the canonical unarmed weapon context. newly spawned characters request `hands` first and fall back to base slots when a hands-specific clip is absent.
++
+ variants are alternate visuals of the same gameplay action. for example `1hs_attack_01` and `1hs_attack_02` both bind to slot `attack`; the resolver chooses by weight.
+ 
+ ## canonical files
+@@ -45,15 +47,20 @@ examples:
+ 
+ ## scan naming
+ 
+-preferred new-project names:
++preferred new-project names may include the selected character prefix or omit it:
++
++- `human_female_idle.rbxm` or `idle.rbxm`
++- `human_female_hands_idle.rbxm` or `hands_idle.rbxm`
++- `human_female_hands_attack_01.rbxm`
++- `human_female_1hs_attack_01.rbxm`, `human_female_1hs_attack_02.rbxm`
++- `human_female_bow_run.rbxm`, `human_female_bow_aim.rbxm`
+ 
+-- `idle.rbxm`, `base_idle.rbxm`, `sitdown.rbxm`, `sit.rbxm`, `situp.rbxm`
+-- `1hs_idle.rbxm`, `1hs_walk.rbxm`, `1hs_run.rbxm`
+-- `1hs_attack_01.rbxm`, `1hs_attack_02.rbxm`
+-- `bow_idle.rbxm`, `bow_run.rbxm`, `bow_attack_01.rbxm`, `bow_aim.rbxm`
++canonical pattern: `[character_]context_slot[_variant]`. the character prefix is stripped only when it matches the selected animation profile.
+ 
+ scanner also accepts the proven reference naming forms such as `Wait_1HS_*`, `AtkWait_1HS_*`, `Atk01_1HS_*`, `Run_Bow_*`, and `SpAtk02_Bow_*` without importing the old game's taxonomy into runtime.
+ 
++unrecognized filenames are not discarded. the asset manager shows them under `unassigned`, where context (`base`, `hands`, `1hs`, `bow`), semantic slot and variant can be selected manually. manual assignment uses the same canonical source/prepared storage and registry path as automatic scan classification.
++
+ ## publication
+ 
+ `publish missing` publishes local-only clips sequentially. already-published clips keep their permanent asset id. if their local bytes change, status becomes `changed`; m5 does not create a duplicate id. animation content-version updates remain a separate studio-bridge operation because open cloud content update does not currently support animation rbxm content.
+diff --git a/src/server/character/CharacterService.luau b/src/server/character/CharacterService.luau
+index 800afbe..65e4918 100644
+--- a/src/server/character/CharacterService.luau
++++ b/src/server/character/CharacterService.luau
+@@ -201,7 +201,7 @@ local function createCharacter(player: Player): Model?
+     character:SetAttribute("CharacterGender", gender or "")
+     character:SetAttribute("CharacterSkeletonSignature", if row and row.skeleton then tostring(row.skeleton.signature or "") else "")
+     character:SetAttribute("AnimationProfileId", archetype)
+-    character:SetAttribute("AnimationWeaponSet", "")
++    character:SetAttribute("AnimationWeaponSet", "hands")
+     character:SetAttribute("RequestedCharacterArchetype", requestedArchetype or "")
+     character:SetAttribute("UsingBootstrapVisual", archetype == "bootstrap")
+     character:SetAttribute("CharacterOwnerUserId", player.UserId)
+diff --git a/src/shared/ProjectInfo.luau b/src/shared/ProjectInfo.luau
+index 5d4c846..99a086a 100644
+--- a/src/shared/ProjectInfo.luau
++++ b/src/shared/ProjectInfo.luau
+@@ -1,5 +1,5 @@
+ return table.freeze({
+     Name = "game1",
+-    Version = "0.3.0-m5",
++    Version = "0.3.1-m5.1",
+     ProjectSlug = "game1",
+ })
+diff --git a/src/shared/RuntimeVersion.luau b/src/shared/RuntimeVersion.luau
+index d60b744..7099e8d 100644
+--- a/src/shared/RuntimeVersion.luau
++++ b/src/shared/RuntimeVersion.luau
+@@ -1 +1 @@
+-return table.freeze({ Version = "2026.10.04.001", SourceDigest = "game1-m5-character-animation-profiles" })
++return table.freeze({ Version = "2026.10.04.002", SourceDigest = "game1-m5-1-animation-manual-binding" })
+diff --git a/system/control-center/animation_core/common.py b/system/control-center/animation_core/common.py
+index 462358c..e8b8a52 100644
+--- a/system/control-center/animation_core/common.py
++++ b/system/control-center/animation_core/common.py
+@@ -4,11 +4,11 @@ from pathlib import Path
+ import re
+ import time
+ 
+-SCHEMA_VERSION = 1
++SCHEMA_VERSION = 2
+ PROJECT = "game1"
+ MAX_SCAN_FILES = 5000
+ ANIMATION_EXTENSIONS = {".rbxm", ".rbxmx"}
+-WEAPON_SETS = ("1hs", "bow")
++WEAPON_SETS = ("hands", "1hs", "bow")
+ 
+ BASE_SLOT_CATALOG = [
+     {"group": "locomotion", "slot": "idle", "label": "idle", "looped": True, "priority": "Idle"},
+@@ -42,13 +42,25 @@ SLOT_BY_BASE = {row["slot"]: row for row in BASE_SLOT_CATALOG}
+ SLOT_BY_WEAPON = {row["slot"]: row for row in WEAPON_SLOT_CATALOG}
+ SLOT_BY_BOW = {**SLOT_BY_WEAPON, **{row["slot"]: row for row in BOW_EXTRA_SLOTS}}
+ 
++NAMING_EXAMPLES = [
++    "human_female_hands_idle.rbxm -> hands / idle",
++    "human_female_hands_attack_01.rbxm -> hands / attack / 01",
++    "human_female_1hs_attack_02.rbxm -> 1hs / attack / 02",
++    "human_female_bow_aim.rbxm -> bow / aim",
++    "human_female_idle.rbxm -> base / idle",
++    "Atk02_1HS_FFighter.rbxm -> 1hs / attack / 02 (reference form)",
++]
++
++
+ def _now() -> float:
+     return time.time()
+ 
++
+ def _safe_token(value: str) -> str:
+     value = re.sub(r"[^a-z0-9_]+", "_", value.lower()).strip("_")
+     return re.sub(r"_+", "_", value)
+ 
++
+ def _canonical_file_stem(scope: str, weapon_set: str, slot: str, variant: int) -> str:
+     slot_token = slot.replace(".", "_")
+     if scope == "base":
+@@ -56,6 +68,7 @@ def _canonical_file_stem(scope: str, weapon_set: str, slot: str, variant: int) -
+     suffix = f"_{variant:02d}" if variant > 0 else ""
+     return f"{weapon_set}_{slot_token}{suffix}"
+ 
++
+ def _clip_id(character_id: str, scope: str, weapon_set: str, slot: str, variant: int) -> str:
+     parts = [character_id, scope]
+     if weapon_set:
+@@ -63,12 +76,15 @@ def _clip_id(character_id: str, scope: str, weapon_set: str, slot: str, variant:
+     parts.extend([slot.replace(".", "_"), f"{variant:02d}"])
+     return "__".join(parts)
+ 
++
+ def _binding_id(character_id: str, scope: str, weapon_set: str, slot: str, variant: int) -> str:
+     return "binding__" + _clip_id(character_id, scope, weapon_set, slot, variant)
+ 
++
+ def _normalize_stem(path: Path) -> str:
+     return _safe_token(path.stem)
+ 
++
+ def _parse_variant(value: str) -> tuple[str, int]:
+     match = re.match(r"^(.*?)(?:_([0-9]{1,3}))?$", value)
+     if not match:
+@@ -77,9 +93,52 @@ def _parse_variant(value: str) -> tuple[str, int]:
+     raw = match.group(2)
+     return base, int(raw) if raw else 0
+ 
+-def classify_animation(path: Path) -> dict | None:
++
++def _catalog_for_weapon(weapon_set: str) -> dict[str, dict]:
++    return SLOT_BY_BOW if weapon_set == "bow" else SLOT_BY_WEAPON
++
++
++def _strip_character_prefix(stem: str, character_id: str | None) -> str:
++    character = _safe_token(str(character_id or ""))
++    prefix = character + "_" if character else ""
++    if prefix and stem.startswith(prefix):
++        return stem[len(prefix):]
++    return stem
++
++
++def normalize_manual_binding(scope: str, weapon_set: str, slot: str, variant: int | str = 0) -> dict:
++    scope = _safe_token(str(scope or ""))
++    weapon_set = _safe_token(str(weapon_set or ""))
++    slot = _safe_token(str(slot or "")).replace("seated_enter", "seated.enter").replace("seated_loop", "seated.loop").replace("seated_exit", "seated.exit")
++    try:
++        variant_number = max(0, int(variant or 0))
++    except (TypeError, ValueError):
++        variant_number = 0
++
++    if scope == "base":
++        if slot not in SLOT_BY_BASE:
++            raise ValueError(f"unknown base animation slot: {slot}")
++        definition = SLOT_BY_BASE[slot]
++        return {"scope": "base", "weaponSet": "", "slot": slot, "variant": 0, **definition}
++
++    if scope != "weapon":
++        raise ValueError("animation scope must be base or weapon")
++    if weapon_set not in WEAPON_SETS:
++        raise ValueError(f"unknown weapon animation set: {weapon_set}")
++    catalog = _catalog_for_weapon(weapon_set)
++    if slot not in catalog:
++        raise ValueError(f"slot {slot} is not available for {weapon_set}")
++    definition = catalog[slot]
++    if definition.get("variants"):
++        variant_number = max(1, variant_number)
++    else:
++        variant_number = 0
++    return {"scope": "weapon", "weaponSet": weapon_set, "slot": slot, "variant": variant_number, **definition}
++
++
++def classify_animation(path: Path, character_id: str | None = None) -> dict | None:
+     """Map a Studio-exported clip filename to the canonical game1 semantic coordinate."""
+-    stem = _normalize_stem(path)
++    stem = _strip_character_prefix(_normalize_stem(path), character_id)
+     if not stem:
+         return None
+ 
+@@ -111,7 +170,7 @@ def classify_animation(path: Path) -> dict | None:
+             "special_attack": "special_attack", "equip": "equip", "unequip": "unequip",
+             "aim": "aim",
+         }.get(body)
+-        catalog = SLOT_BY_BOW if weapon_set == "bow" else SLOT_BY_WEAPON
++        catalog = _catalog_for_weapon(weapon_set)
+         if slot in catalog:
+             if not catalog[slot].get("variants"):
+                 variant = 0
+@@ -139,7 +198,7 @@ def classify_animation(path: Path) -> dict | None:
+         elif special_match:
+             slot = "special_attack"
+             variant = max(1, int(special_match.group(1)))
+-    catalog = SLOT_BY_BOW if weapon_set == "bow" else SLOT_BY_WEAPON
++    catalog = _catalog_for_weapon(weapon_set)
+     if slot in catalog:
+         return {"scope": "weapon", "weaponSet": weapon_set, "slot": slot, "variant": variant, **catalog[slot]}
+     return None
+diff --git a/system/control-center/animation_core/storage.py b/system/control-center/animation_core/storage.py
+index acdd3c7..ad19d47 100644
+--- a/system/control-center/animation_core/storage.py
++++ b/system/control-center/animation_core/storage.py
+@@ -6,9 +6,9 @@ import shutil
+ import sqlite3
+ 
+ from .common import (
+-    ANIMATION_EXTENSIONS, BASE_SLOT_CATALOG, BOW_EXTRA_SLOTS, MAX_SCAN_FILES, PROJECT,
++    ANIMATION_EXTENSIONS, BASE_SLOT_CATALOG, BOW_EXTRA_SLOTS, MAX_SCAN_FILES, NAMING_EXAMPLES, PROJECT,
+     SCHEMA_VERSION, WEAPON_SETS, WEAPON_SLOT_CATALOG, _binding_id, _canonical_file_stem,
+-    _clip_id, _now, classify_animation,
++    _catalog_for_weapon, _clip_id, _now, classify_animation, normalize_manual_binding,
+ )
+ 
+ 
+@@ -175,6 +175,97 @@ class AnimationStorageMixin:
+             relative = Path("characters") / race / gender / character_id / "animations" / "weapons" / weapon_set / f"{stem}{suffix}"
+         return self.root / "assets/source" / relative, self.root / "assets/prepared" / relative
+ 
++    def _register_source(self, connection, character: dict, source: Path, binding: dict, now: float) -> tuple[str, dict]:
++        character_id = str(character.get("id") or "")
++        clip_id = _clip_id(character_id, binding["scope"], binding["weaponSet"], binding["slot"], int(binding["variant"]))
++        binding_id = _binding_id(character_id, binding["scope"], binding["weaponSet"], binding["slot"], int(binding["variant"]))
++        source_path, prepared_path = self._canonical_paths(character, binding, source.suffix.lower())
++        source_path.parent.mkdir(parents=True, exist_ok=True)
++        prepared_path.parent.mkdir(parents=True, exist_ok=True)
++        sha = self._sha256(source)
++        old = connection.execute("SELECT * FROM animation_clips WHERE id=?", (clip_id,)).fetchone()
++        old_dict = dict(old) if old else None
++        same = bool(old_dict and str(old_dict.get("sha256") or "") == sha)
++
++        if not same:
++            shutil.copy2(source, source_path)
++            shutil.copy2(source, prepared_path)
++        elif not source_path.is_file() or not prepared_path.is_file():
++            shutil.copy2(source, source_path)
++            shutil.copy2(source, prepared_path)
++
++        relative_source = source_path.relative_to(self.root).as_posix()
++        relative_prepared = prepared_path.relative_to(self.root).as_posix()
++        clip_name = _canonical_file_stem(binding["scope"], binding["weaponSet"], binding["slot"], int(binding["variant"]))
++        if old_dict is None:
++            connection.execute(
++                """INSERT INTO animation_clips(
++                    id,character_id,name,source_path,prepared_path,sha256,asset_id,published_sha256,
++                    moderation_state,revision,created_at,updated_at,published_at
++                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
++                (clip_id, character_id, clip_name, relative_source, relative_prepared, sha, None, "", "", 1, now, now, None),
++            )
++            outcome = "created"
++        else:
++            revision = int(old_dict.get("revision") or 1) + (0 if same else 1)
++            connection.execute(
++                """UPDATE animation_clips SET name=?,source_path=?,prepared_path=?,sha256=?,revision=?,updated_at=? WHERE id=?""",
++                (clip_name, relative_source, relative_prepared, sha, revision, now, clip_id),
++            )
++            outcome = "unchanged" if same else "changed"
++
++        connection.execute(
++            """INSERT INTO animation_bindings(
++                id,character_id,scope,weapon_set,slot,variant,clip_id,weight,looped,priority,created_at,updated_at
++            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
++            ON CONFLICT(character_id,scope,weapon_set,slot,variant) DO UPDATE SET
++                clip_id=excluded.clip_id,
++                looped=excluded.looped,
++                priority=excluded.priority,
++                updated_at=excluded.updated_at""",
++            (
++                binding_id,
++                character_id,
++                binding["scope"],
++                binding["weaponSet"],
++                binding["slot"],
++                int(binding["variant"]),
++                clip_id,
++                100,
++                1 if binding["looped"] else 0,
++                binding["priority"],
++                now,
++                now,
++            ),
++        )
++        return outcome, {"filename": source.name, "clipId": clip_id, **binding}
++
++    def assign_file(self, character_id: str, source_path: str, scope: str, weapon_set: str, slot: str, variant: int = 0) -> dict:
++        character = self._character(character_id)
++        profile = self._profile(character_id)
++        source = Path(str(source_path or "")).expanduser().resolve()
++        if not source.is_file() or source.suffix.lower() not in ANIMATION_EXTENSIONS:
++            raise ValueError("choose an existing .rbxm/.rbxmx animation file")
++        if self._is_managed_animation_path(source):
++            raise ValueError("managed animation files cannot be manually re-imported")
++        scan_root = str(profile.get("scan_root") or "").strip()
++        if scan_root:
++            try:
++                source.relative_to(Path(scan_root).resolve())
++            except ValueError as error:
++                raise ValueError("manual assignment must use a file from the current scan folder") from error
++
++        binding = normalize_manual_binding(scope, weapon_set, slot, variant)
++        now = _now()
++        with self.connect() as connection:
++            outcome, imported = self._register_source(connection, character, source, binding, now)
++            connection.execute(
++                "UPDATE animation_profiles SET skeleton_signature=?,updated_at=? WHERE character_id=?",
++                (str(character.get("skeleton_signature") or ""), now, character_id),
++            )
++        self.export()
++        return {"characterId": character_id, "outcome": outcome, "item": imported}
++
+     def scan_folder(self, character_id: str, folder: str) -> dict:
+         character = self._character(character_id)
+         self._profile(character_id)
+@@ -199,7 +290,7 @@ class AnimationStorageMixin:
+         unassigned = []
+         coordinate_sources: dict[tuple, Path] = {}
+         for path in files:
+-            classification = classify_animation(path)
++            classification = classify_animation(path, character_id)
+             if classification is None:
+                 unassigned.append({"path": str(path), "filename": path.name, "reason": "name does not match a registered semantic slot"})
+                 continue
+@@ -225,71 +316,14 @@ class AnimationStorageMixin:
+         now = _now()
+         with self.connect() as connection:
+             for source, binding in recognized:
+-                clip_id = _clip_id(character_id, binding["scope"], binding["weaponSet"], binding["slot"], int(binding["variant"]))
+-                binding_id = _binding_id(character_id, binding["scope"], binding["weaponSet"], binding["slot"], int(binding["variant"]))
+-                source_path, prepared_path = self._canonical_paths(character, binding, source.suffix.lower())
+-                source_path.parent.mkdir(parents=True, exist_ok=True)
+-                prepared_path.parent.mkdir(parents=True, exist_ok=True)
+-                sha = self._sha256(source)
+-                old = connection.execute("SELECT * FROM animation_clips WHERE id=?", (clip_id,)).fetchone()
+-                old_dict = dict(old) if old else None
+-                same = bool(old_dict and str(old_dict.get("sha256") or "") == sha)
+-
+-                if not same:
+-                    shutil.copy2(source, source_path)
+-                    shutil.copy2(source, prepared_path)
+-                elif not source_path.is_file() or not prepared_path.is_file():
+-                    shutil.copy2(source, source_path)
+-                    shutil.copy2(source, prepared_path)
+-
+-                relative_source = source_path.relative_to(self.root).as_posix()
+-                relative_prepared = prepared_path.relative_to(self.root).as_posix()
+-                clip_name = _canonical_file_stem(binding["scope"], binding["weaponSet"], binding["slot"], int(binding["variant"]))
+-                if old_dict is None:
+-                    connection.execute(
+-                        """INSERT INTO animation_clips(
+-                            id,character_id,name,source_path,prepared_path,sha256,asset_id,published_sha256,
+-                            moderation_state,revision,created_at,updated_at,published_at
+-                        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+-                        (clip_id, character_id, clip_name, relative_source, relative_prepared, sha, None, "", "", 1, now, now, None),
+-                    )
++                outcome, item = self._register_source(connection, character, source, binding, now)
++                if outcome == "created":
+                     created += 1
++                elif outcome == "changed":
++                    changed += 1
+                 else:
+-                    revision = int(old_dict.get("revision") or 1) + (0 if same else 1)
+-                    connection.execute(
+-                        """UPDATE animation_clips SET name=?,source_path=?,prepared_path=?,sha256=?,revision=?,updated_at=? WHERE id=?""",
+-                        (clip_name, relative_source, relative_prepared, sha, revision, now, clip_id),
+-                    )
+-                    if same:
+-                        unchanged += 1
+-                    else:
+-                        changed += 1
+-
+-                connection.execute(
+-                    """INSERT INTO animation_bindings(
+-                        id,character_id,scope,weapon_set,slot,variant,clip_id,weight,looped,priority,created_at,updated_at
+-                    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
+-                    ON CONFLICT(character_id,scope,weapon_set,slot,variant) DO UPDATE SET
+-                        clip_id=excluded.clip_id,
+-                        looped=excluded.looped,
+-                        priority=excluded.priority,
+-                        updated_at=excluded.updated_at""",
+-                    (
+-                        binding_id,
+-                        character_id,
+-                        binding["scope"],
+-                        binding["weaponSet"],
+-                        binding["slot"],
+-                        int(binding["variant"]),
+-                        clip_id,
+-                        100,
+-                        1 if binding["looped"] else 0,
+-                        binding["priority"],
+-                        now,
+-                        now,
+-                    ),
+-                )
+-                imported.append({"filename": source.name, "clipId": clip_id, **binding})
++                    unchanged += 1
++                imported.append(item)
+ 
+             connection.execute(
+                 "UPDATE animation_profiles SET scan_root=?,skeleton_signature=?,updated_at=? WHERE character_id=?",
+@@ -360,9 +394,10 @@ class AnimationStorageMixin:
+             "profile": profile,
+             "skeletonCompatible": compatible,
+             "weaponSets": list(WEAPON_SETS),
++            "namingExamples": list(NAMING_EXAMPLES),
+             "slotCatalog": {
+                 "base": BASE_SLOT_CATALOG,
+-                "weapon": {"1hs": WEAPON_SLOT_CATALOG, "bow": WEAPON_SLOT_CATALOG + BOW_EXTRA_SLOTS},
++                "weapon": {weapon_set: list(_catalog_for_weapon(weapon_set).values()) for weapon_set in WEAPON_SETS},
+             },
+             "items": items,
+             "summary": {
+diff --git a/system/control-center/host_agent.py b/system/control-center/host_agent.py
+index 0359d97..48a6766 100644
+--- a/system/control-center/host_agent.py
++++ b/system/control-center/host_agent.py
+@@ -30,7 +30,7 @@ from character_store import CharacterStore
+ from animation_store import AnimationStore
+ from studio_bridge import run_model_load_bridge
+ 
+-control_agent_build = "game1-m5-character-animations-001"
++control_agent_build = "game1-m5-1-animation-manual-binding-001"
+ port = int(os.environ.get("CONTROL_AGENT_PORT", "43821"))
+ token = os.environ.get("CONTROL_TOKEN", "Game1LocalControlV1")
+ store = CharacterStore(ROOT)
+@@ -205,6 +205,20 @@ class Handler(BaseHTTPRequestHandler):
+             except Exception as error:
+                 return self.out(400, {"error": str(error)})
+ 
++        if path == "/api/animations/assign":
++            try:
++                payload = self.body()
++                return self.out(200, animations.assign_file(
++                    str(payload.get("characterId") or ""),
++                    str(payload.get("sourcePath") or ""),
++                    str(payload.get("scope") or ""),
++                    str(payload.get("weaponSet") or ""),
++                    str(payload.get("slot") or ""),
++                    int(payload.get("variant") or 0),
++                ))
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
++
+         prefix = "/api/characters/"
+         activate_suffix = "/activate"
+         publish_suffix = "/publish"
+diff --git a/system/control-center/static/asset-manager.css b/system/control-center/static/asset-manager.css
+index e8b597f..3aa09fa 100644
+--- a/system/control-center/static/asset-manager.css
++++ b/system/control-center/static/asset-manager.css
+@@ -2,3 +2,4 @@
+ .asset-sections{display:flex;flex-direction:column;gap:6px}.asset-section{display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left;background:transparent}.asset-section b{font-size:14px}.asset-section small{color:var(--muted);font-size:11px}.asset-section.active{border-color:var(--mint);background:#42d6b112;color:var(--mint)}.rail-separator,.card-separator{border:0;border-top:1px solid var(--line);margin:16px 0}.subheading{margin-top:4px}.hint,.muted{display:block;color:var(--muted);font-size:12px;margin-top:10px}.rail-label{display:block;color:var(--muted);font-size:12px;margin:8px 0 14px}.rail-label select{display:block;width:100%;margin-top:5px}.animation-tree{display:flex;flex-direction:column;gap:5px}.animation-tree button{display:flex;justify-content:space-between;gap:8px;width:100%;text-align:left;background:transparent;color:var(--muted);border-color:transparent}.animation-tree button.active{background:#42d6b112;color:var(--mint);border-color:#42d6b133}.animation-tree small{color:var(--muted)}.animation-workflow{display:grid;grid-template-columns:minmax(330px,.75fr) minmax(620px,1.55fr);gap:14px;margin-top:14px}.animation-legend{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}.animation-legend span{border:1px solid var(--line);border-radius:9px;padding:7px 9px;color:var(--muted);font-size:11px}.animation-legend b{color:var(--text)}.animation-table-wrap{max-height:650px}.unassigned{margin-top:12px}.unassigned details{border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--panel2)}.unassigned summary{cursor:pointer;color:var(--orange)}.unassigned ul{margin:8px 0 0;padding-left:18px;color:var(--muted);font-size:11px;overflow-wrap:anywhere}.weight-input{width:72px;padding:6px 7px}.context-chip{display:inline-block;border:1px solid var(--line);border-radius:8px;padding:3px 6px;font-size:10px}.context-chip.weapon{border-color:#42d6b155;color:var(--mint)}.context-chip.base{color:var(--muted)}code{font-family:"cascadia code",consolas,monospace;color:var(--mint);font-size:.92em}@media(max-width:1150px){.animation-workflow{grid-template-columns:1fr}}
+ 
+ .queue-progress{display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:center;margin-top:12px;padding:11px;border:1px solid var(--line);border-radius:11px;background:var(--panel2)}.queue-progress[hidden]{display:none}.queue-progress span{color:var(--muted);font-size:11px}.queue-progress progress{grid-column:1/-1;width:100%;height:8px;accent-color:var(--mint)}
++.naming-guide{margin:12px 0;border:1px solid var(--line);border-radius:12px;background:var(--panel2);padding:10px 12px}.naming-guide summary{cursor:pointer;color:var(--mint);font-weight:700}.naming-examples{display:grid;gap:5px;margin-top:9px}.naming-examples code{display:block;overflow-wrap:anywhere}.unassigned-list{display:grid;gap:8px;margin-top:10px}.unassigned-row{display:grid;grid-template-columns:minmax(220px,1.4fr) minmax(100px,.55fr) minmax(130px,.7fr) 82px auto;gap:8px;align-items:end;padding:9px;border:1px solid var(--line);border-radius:10px}.unassigned-file{min-width:0;align-self:center}.unassigned-file b,.unassigned-file small{display:block;overflow-wrap:anywhere}.unassigned-file small{color:var(--muted);font-size:10px;margin-top:3px}.unassigned-row label{margin:0;font-size:10px}.unassigned-row select,.unassigned-row input{width:100%;margin-top:4px;padding:7px 8px}.unassigned-row button{padding:8px 10px}@media(max-width:950px){.unassigned-row{grid-template-columns:1fr 1fr}.unassigned-file{grid-column:1/-1}}
+diff --git a/system/control-center/static/character-assets.js b/system/control-center/static/character-assets.js
+index 975f486..477add9 100644
+--- a/system/control-center/static/character-assets.js
++++ b/system/control-center/static/character-assets.js
+@@ -47,8 +47,9 @@ function populateAnimationCharacters(){
+ function animationContext(row){return row.scope==='weapon'?`${row.weapon_set}`:'base'}
+ function animationFilterMatch(row){if(state.animationFilter==='all')return true;if(state.animationFilter==='base')return row.scope==='base';return row.scope==='weapon'&&row.weapon_set===state.animationFilter.replace('weapon:','')}
+ function renderAnimationTree(){
+-  const host=$('animation-tree');host.innerHTML='';const items=state.animations?.items||[];const catalog=state.animations?.slotCatalog||{};
+-  const defs=[['all','all clips'],['base','base'],['weapon:1hs','1hs'],['weapon:bow','bow']];
++  const host=$('animation-tree');host.innerHTML='';const data=state.animations||{};const items=data.items||[];const catalog=data.slotCatalog||{};
++  const defs=[['all','all clips'],['base','base'],...(data.weaponSets||[]).map(weapon=>[`weapon:${weapon}`,weapon])];
++  if(!defs.some(([id])=>id===state.animationFilter))state.animationFilter='all';
+   for(const [id,label] of defs){const rows=id==='all'?items:items.filter(row=>id==='base'?row.scope==='base':row.scope==='weapon'&&row.weapon_set===id.split(':')[1]);let meta=`${rows.length} clips`;if(id!=='all'){const expected=id==='base'?(catalog.base||[]):((catalog.weapon||{})[id.split(':')[1]]||[]);const filled=new Set(rows.map(row=>row.slot)).size;meta=`${filled}/${expected.length} slots · ${rows.length} clips`;}const b=document.createElement('button');b.className=id===state.animationFilter?'active':'';b.innerHTML=`<span>${esc(label)}</span><small>${esc(meta)}</small>`;b.onclick=()=>{state.animationFilter=id;renderAnimations()};host.appendChild(b)}
+ }
+ function renderAnimationProfile(){
+@@ -69,7 +70,19 @@ function renderAnimationRows(){
+   if(!items.length)body.innerHTML='<tr><td colspan="8" class="muted">no registered clips in this section.</td></tr>';
+ }
+ function renderAnimationDetails(){const host=$('animation-details');const row=(state.animations?.items||[]).find(x=>x.binding_id===state.animationSelected);if(!row){host.innerHTML='<span class="muted">select a clip.</span>';return}host.innerHTML=`<div class="section-title"><div><span>selected clip</span><h3>${esc(row.name)}</h3></div>${statusTag(row.status)}</div><div class="details-grid"><div><b>semantic binding</b><span>${esc(row.scope)} · ${esc(row.weapon_set||'base')} · ${esc(row.slot)} · variant ${esc(row.variant||0)}</span></div><div><b>runtime</b><span>looped ${row.looped?'yes':'no'} · priority ${esc(row.priority)}</span></div><div><b>canonical source</b><span>${esc(row.source_path)}</span></div><div><b>prepared</b><span>${esc(row.prepared_path)}</span></div><div><b>asset id</b><span>${esc(row.asset_id||'not published')}</span></div><div><b>sha256</b><span>${esc(row.sha256||'')}</span></div></div>`}
+-function renderUnassigned(){const host=$('animation-unassigned');const rows=state.lastScan?.unassigned||[];if(!rows.length){host.innerHTML='';return}host.innerHTML=`<details><summary>unassigned files · ${rows.length}</summary><ul>${rows.slice(0,100).map(row=>`<li>${esc(row.filename)} · ${esc(row.reason)}</li>`).join('')}</ul></details>`}
++function manualSlotCatalog(context){const catalog=state.animations?.slotCatalog||{};return context==='base'?(catalog.base||[]):((catalog.weapon||{})[context]||[])}
++function updateManualBindingControls(rowHost){
++  const context=rowHost.querySelector('[data-manual-context]');const slot=rowHost.querySelector('[data-manual-slot]');const variant=rowHost.querySelector('[data-manual-variant]');
++  const defs=manualSlotCatalog(context.value);const previous=slot.value;slot.innerHTML=defs.map(def=>`<option value="${esc(def.slot)}">${esc(def.label||def.slot)}</option>`).join('');if(defs.some(def=>def.slot===previous))slot.value=previous;
++  const selected=defs.find(def=>def.slot===slot.value)||defs[0];const hasVariants=!!selected?.variants;variant.disabled=!hasVariants;if(hasVariants&&Number(variant.value)<=0)variant.value='1';if(!hasVariants)variant.value='0';
++}
++function renderUnassigned(){
++  const host=$('animation-unassigned');const rows=state.lastScan?.unassigned||[];if(!rows.length){host.innerHTML='';return}
++  const contexts=['base',...(state.animations?.weaponSets||[])];host.innerHTML=`<details open><summary>unassigned files · ${rows.length} · assign manually</summary><div class="unassigned-list">${rows.slice(0,100).map((row,index)=>`<div class="unassigned-row" data-unassigned-index="${index}"><div class="unassigned-file"><b>${esc(row.filename)}</b><small>${esc(row.reason)}</small></div><label>context<select data-manual-context>${contexts.map(value=>`<option value="${esc(value)}">${esc(value)}</option>`).join('')}</select></label><label>slot<select data-manual-slot></select></label><label>variant<input data-manual-variant type="number" min="0" max="999" value="0"></label><button data-manual-assign class="primary" type="button">assign</button></div>`).join('')}</div></details>`;
++  for(const rowHost of host.querySelectorAll('[data-unassigned-index]')){const index=Number(rowHost.dataset.unassignedIndex);const row=rows[index];const context=rowHost.querySelector('[data-manual-context]');const stem=String(row.filename||'').toLowerCase();for(const candidate of contexts){if(candidate!=='base'&&stem.includes(`_${candidate}_`)){context.value=candidate;break}}updateManualBindingControls(rowHost);context.onchange=()=>updateManualBindingControls(rowHost);rowHost.querySelector('[data-manual-slot]').onchange=()=>updateManualBindingControls(rowHost);rowHost.querySelector('[data-manual-assign]').onclick=()=>assignUnassignedAnimation(row,rowHost)}
++}
++async function assignUnassignedAnimation(row,rowHost){
++  try{const context=rowHost.querySelector('[data-manual-context]').value;const slot=rowHost.querySelector('[data-manual-slot]').value;const variant=Number(rowHost.querySelector('[data-manual-variant]').value||0);rowHost.querySelector('[data-manual-assign]').disabled=true;await request('/api/animations/assign',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({characterId:state.animationCharacter,sourcePath:row.path,scope:context==='base'?'base':'weapon',weaponSet:context==='base'?'':context,slot,variant})});state.lastScan.unassigned=(state.lastScan.unassigned||[]).filter(item=>item.path!==row.path);state.lastScan.recognized=(state.lastScan.recognized||0)+1;await loadAnimations();$('animation-scan-status').innerHTML=`<strong>scan complete · ${state.lastScan.recognized}/${state.lastScan.filesScanned} assigned</strong><span>${state.lastScan.created} new · ${state.lastScan.changed} changed · ${state.lastScan.unchanged} unchanged · ${state.lastScan.unassigned.length} unassigned</span>`;renderUnassigned();toast(`assigned ${row.filename} → ${context} / ${slot}${variant?` / ${String(variant).padStart(2,'0')}`:''}`)}catch(error){toast(error.message,true);rowHost.querySelector('[data-manual-assign]').disabled=false}}
+ function renderAnimations(){if(!state.animations)return;renderAnimationProfile();renderAnimationTree();renderAnimationRows();renderAnimationDetails();renderUnassigned();const pub=!!state.animations.publication?.configured;const missing=(state.animations.items||[]).some(row=>row.status==='LOCAL_ONLY');$('publish-missing-animations').disabled=state.animationPublishing||!pub||!missing;$('scan-animations').disabled=state.animationPublishing||!state.animationCharacter||!state.animationFolder;$('refresh-animations').disabled=state.animationPublishing;$('animation-table-title').textContent=`${state.animationCharacter||'character'} · registered clips`}
+ async function loadAnimations(){try{populateAnimationCharacters();const character=state.animationCharacter||$('animation-character').value||'';state.animations=await request('/api/animations?character='+encodeURIComponent(character));state.animationCharacter=state.animations.characterId||character;if($('animation-character').value!==state.animationCharacter)$('animation-character').value=state.animationCharacter;renderAnimations()}catch(error){toast(error.message,true)}}
+ async function chooseAnimationFolder(){try{const result=await request('/api/files/choose-animation-folder',{method:'POST'});if(!result.path)return;state.animationFolder=result.path;$('animation-folder').textContent=result.path;renderAnimations()}catch(error){toast(error.message,true)}}
+diff --git a/system/control-center/static/index.html b/system/control-center/static/index.html
+index f9e8315..125e8e7 100644
+--- a/system/control-center/static/index.html
++++ b/system/control-center/static/index.html
+@@ -4,12 +4,12 @@
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width,initial-scale=1">
+ <title>game1 · asset manager</title>
+-<link rel="stylesheet" href="asset-manager.css?v=5">
++<link rel="stylesheet" href="asset-manager.css?v=6">
+ </head>
+ <body>
+ <header>
+ <div><span class="eyebrow">game1 · control center</span><h1>asset manager</h1></div>
+-<div class="header-actions"><span class="pill">characters + animations · m5</span><button id="theme" class="icon" type="button" title="theme">◐</button></div>
++<div class="header-actions"><span class="pill">characters + animations · m5.1</span><button id="theme" class="icon" type="button" title="theme">◐</button></div>
+ </header>
+ <main>
+ <aside class="panel rail">
+@@ -71,7 +71,19 @@
+ <div class="animation-workflow">
+ <div class="panel character-card">
+ <span class="eyebrow">01 · scan and register</span><h3>character animation folder</h3>
+-<p>scan any folder containing studio-exported <code>.rbxm</code>/<code>.rbxmx</code>. canonical names such as <code>1hs_attack_01</code> and <code>bow_run</code> are recognized, along with the proven reference forms such as <code>Atk01_1HS_*</code>.</p>
++<p>scan any folder containing studio-exported <code>.rbxm</code>/<code>.rbxmx</code>. the selected character prefix is optional, so <code>human_female_hands_idle</code> and <code>hands_idle</code> resolve identically. files that do not match a rule can be assigned manually after the scan.</p>
++<details class="naming-guide" open>
++<summary>filename rules</summary>
++<div class="naming-examples">
++<code>human_female_hands_idle.rbxm → hands / idle</code>
++<code>human_female_hands_attack_01.rbxm → hands / attack / 01</code>
++<code>human_female_1hs_attack_02.rbxm → 1hs / attack / 02</code>
++<code>human_female_bow_aim.rbxm → bow / aim</code>
++<code>human_female_idle.rbxm → base / idle</code>
++<code>Atk02_1HS_FFighter.rbxm → 1hs / attack / 02</code>
++</div>
++<small class="hint">pattern: <code>[character_]context_slot[_variant]</code>. context is <code>base</code>, <code>hands</code>, <code>1hs</code> or <code>bow</code>. unassigned files can be bound manually without renaming them.</small>
++</details>
+ <div class="picker"><button id="choose-animation-folder" type="button">choose folder</button><small id="animation-folder">folder not selected</small></div>
+ <div class="actions"><button id="scan-animations" class="primary wide" type="button" disabled>scan folder</button></div>
+ <div id="animation-scan-status" class="status-box"><strong>nothing scanned yet</strong><span>unrecognized files stay outside the registry and are listed after the scan.</span></div>
+@@ -85,7 +97,7 @@
+ </div>
+ <div class="panel character-card">
+ <div class="section-title"><div><span>semantic animation profile</span><h3 id="animation-table-title">registered clips</h3></div><span id="animation-filter-label" class="pill">all</span></div>
+-<div class="animation-legend"><span><b>base</b> locomotion / posture</span><span><b>weapon</b> 1hs / bow contexts</span><span><b>variant</b> alternate visuals of the same action</span></div>
++<div class="animation-legend"><span><b>base</b> locomotion / posture</span><span><b>weapon</b> hands / 1hs / bow contexts</span><span><b>variant</b> alternate visuals of the same action</span></div>
+ <div class="table-wrap animation-table-wrap"><table><thead><tr><th>context</th><th>slot</th><th>variant</th><th>clip</th><th>asset</th><th>status</th><th>weight</th><th>actions</th></tr></thead><tbody id="animation-rows"></tbody></table></div>
+ <div id="animation-details" class="details"><span class="muted">select a clip.</span></div>
+ </div>
+@@ -94,6 +106,6 @@
+ </section>
+ </main>
+ <div id="toast" class="toast"></div>
+-<script src="character-assets.js?v=5"></script>
++<script src="character-assets.js?v=6"></script>
+ </body>
+ </html>
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index be76f1d..9a65535 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -274,17 +274,17 @@ preparer = ROOT / "system/asset-manager/prepare_character_fbx.py"
+ if preparer.is_file() and "transform_apply" in preparer.read_text(encoding="utf-8"):
+     err("character FBX preparer must not rebake authored rotation/scale")
+ 
+-# m5 character animation contract
++# m5.1 character animation contract
+ animation_manifest_path = ROOT / "assets/manifests/character-animations.json"
+ if not animation_manifest_path.is_file():
+     err(r"character animation manifest is missing; run python .\system\control-center\migrate.py")
+     animation_manifest = {}
+ else:
+     animation_manifest = json.loads(animation_manifest_path.read_text(encoding="utf-8"))
+-if animation_manifest.get("schemaVersion") != 1 or animation_manifest.get("project") != "game1":
+-    err("character animation manifest must be game1 schema 1")
+-if animation_manifest.get("weaponSets") != ["1hs", "bow"]:
+-    err("m5 character animation weapon sets must start with 1hs and bow")
++if animation_manifest.get("schemaVersion") != 2 or animation_manifest.get("project") != "game1":
++    err("character animation manifest must be game1 schema 2")
++if animation_manifest.get("weaponSets") != ["hands", "1hs", "bow"]:
++    err("m5.1 character animation weapon sets must be hands, 1hs and bow")
+ 
+ animation_store_path = ROOT / "system/control-center/animation_store.py"
+ animation_core_dir = ROOT / "system/control-center/animation_core"
+@@ -296,7 +296,10 @@ for required in [
+     "class AnimationStore",
+     "def scan_folder",
+     "def classify_animation",
+-    'WEAPON_SETS = ("1hs", "bow")',
++    'WEAPON_SETS = ("hands", "1hs", "bow")',
++    "def assign_file",
++    "normalize_manual_binding",
++    "_strip_character_prefix",
+     '"seated.enter"',
+     '"seated.loop"',
+     '"seated.exit"',
+@@ -335,6 +338,8 @@ if 'character:SetAttribute("AnimationProfileId", archetype)' not in character_se
+     err("character runtime does not expose animation profile identity")
+ if 'character:SetAttribute("CharacterSkeletonSignature"' not in character_service_text:
+     err("character runtime does not expose skeleton signature to animation resolver")
++if 'character:SetAttribute("AnimationWeaponSet", "hands")' not in character_service_text:
++    err("character runtime must default to the canonical hands animation context")
+ 
+ for required in ["animation_profiles", "animation_clips", "animation_bindings", "animation_publications"]:
+     if required not in schema_text:
+@@ -342,7 +347,7 @@ for required in ["animation_profiles", "animation_clips", "animation_bindings",
+ if 'id="nav-animations"' not in ui or 'id="scan-animations"' not in ui or 'id="publish-missing-animations"' not in ui:
+     err("asset manager character animation section is missing")
+ js_text = js.read_text(encoding="utf-8") if js.is_file() else ""
+-for required in ["chooseAnimationFolder", "scanAnimations", "publishMissingAnimations", "animationFilter"]:
++for required in ["chooseAnimationFolder", "scanAnimations", "publishMissingAnimations", "animationFilter", "assignUnassignedAnimation", "manualSlotCatalog"]:
+     if required not in js_text:
+         err(f"asset manager animation ui missing {required}")
+ if 'create_animation_asset' not in (ROOT / "system/control-center/opencloud_assets.py").read_text(encoding="utf-8"):
+@@ -354,7 +359,7 @@ if errors:
+         print(" -", item)
+     sys.exit(1)
+ 
+-print("verify ok · game1 m5 character animation contracts passed")
++print("verify ok · game1 m5.1 character animation contracts passed")
+ print("registered character archetypes:", len(archetypes))
+ print("active character archetype:", active_id or "none")
+ print("race pool: human")

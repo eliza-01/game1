@@ -134,6 +134,7 @@ required_runtime = [
     "src/client/character/animation/AnimationTrackCache.luau",
     "src/client/character/animation/CharacterAnimationController.luau",
     "src/client/combat/AttackController.luau",
+    "src/client/combat/AimPoseController.luau",
     "src/shared/character/CharacterConfig.luau",
     "src/shared/character/CharacterMovementConfig.luau",
     "src/shared/character/CharacterRegistry.luau",
@@ -368,6 +369,19 @@ if "CharacterAnimationController.Start()" not in client_init_text:
 attack_controller_text = (ROOT / "src/client/combat/AttackController.luau").read_text(encoding="utf-8")
 if 'animationController.PlayAction("attack")' not in attack_controller_text:
     err("combat attack input is not connected to the semantic attack animation slot")
+for required in ["BeginAimFacingCompensation", "TorsoYawLimit", "aimPoseController.BeginAttack"]:
+    if required not in attack_controller_text:
+        err(f"robloxlineage attack/aim integration missing {required}")
+aim_pose_text = (ROOT / "src/client/combat/AimPoseController.luau").read_text(encoding="utf-8")
+for required in ["RunService.PreSimulation", "spine.001", "AimTorsoYawDegrees", "bone.Transform = delta * bone.Transform", "ViewportPointToRay", "Game1AimReticle"]:
+    if required not in aim_pose_text:
+        err(f"procedural torso aim controller missing {required}")
+movement_runtime = (ROOT / "src/client/character/MovementController.luau").read_text(encoding="utf-8")
+for required in ["BeginAimFacingCompensation", "UpdateAimFacingCompensation", "applyAimFacingCompensation"]:
+    if required not in movement_runtime:
+        err(f"movement aim-facing compensation missing {required}")
+if "AimPoseController.Start()" not in client_init_text:
+    err("procedural torso aim controller is not started by the client runtime")
 if 'character:SetAttribute("AnimationProfileId", archetype)' not in character_service_text:
     err("character runtime does not expose animation profile identity")
 if 'character:SetAttribute("CharacterSkeletonSignature"' not in character_service_text:

@@ -1,0 +1,467 @@
+diff --git a/src/client/combat/AimPoseController.luau b/src/client/combat/AimPoseController.luau
+new file mode 100644
+index 0000000..8bb8589
+--- /dev/null
++++ b/src/client/combat/AimPoseController.luau
+@@ -0,0 +1,288 @@
++local Players = game:GetService("Players")
++local ReplicatedStorage = game:GetService("ReplicatedStorage")
++local RunService = game:GetService("RunService")
++local Workspace = game:GetService("Workspace")
++
++local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
++local CombatShared = Shared:WaitForChild("combat")
++local AttackConfig = require(CombatShared:WaitForChild("AttackConfig"))
++
++local AimPoseController = {}
++
++local localPlayer = Players.LocalPlayer
++local started = false
++local character: Model? = nil
++local root: BasePart? = nil
++local torsoBones: { Bone } = {}
++local previousProcedural: { [Bone]: CFrame } = {}
++local targetPosition: Vector3? = nil
++local activeUntil = 0
++local renderedYaw = 0
++
++local PREFERRED_SPINE_NAMES = {
++    "spine.001",
++    "spine.002",
++    "spine.003",
++}
++
++local RETICLE_GUI_NAME = "Game1AimReticle"
++
++local function ensureReticle()
++    local playerGui = localPlayer:WaitForChild("PlayerGui")
++    local existing = playerGui:FindFirstChild(RETICLE_GUI_NAME)
++    if existing then
++        return
++    end
++
++    local gui = Instance.new("ScreenGui")
++    gui.Name = RETICLE_GUI_NAME
++    gui.IgnoreGuiInset = true
++    gui.ResetOnSpawn = false
++    gui.DisplayOrder = 50
++
++    local dot = Instance.new("Frame")
++    dot.Name = "Dot"
++    dot.AnchorPoint = Vector2.new(0.5, 0.5)
++    dot.Position = UDim2.fromScale(0.5, 0.5)
++    dot.Size = UDim2.fromOffset(5, 5)
++    dot.BackgroundColor3 = Color3.fromRGB(245, 245, 245)
++    dot.BorderSizePixel = 0
++    dot.Parent = gui
++
++    local corner = Instance.new("UICorner")
++    corner.CornerRadius = UDim.new(1, 0)
++    corner.Parent = dot
++
++    local stroke = Instance.new("UIStroke")
++    stroke.Color = Color3.fromRGB(20, 20, 20)
++    stroke.Thickness = 1
++    stroke.Transparency = 0.15
++    stroke.Parent = dot
++
++    gui.Parent = playerGui
++end
++
++local function flatUnit(direction: Vector3): Vector3?
++    local flat = Vector3.new(direction.X, 0, direction.Z)
++    if flat.Magnitude <= 0.001 then
++        return nil
++    end
++    return flat.Unit
++end
++
++local function signedYaw(fromDirection: Vector3, toDirection: Vector3): number
++    local from = flatUnit(fromDirection)
++    local to = flatUnit(toDirection)
++    if not from or not to then
++        return 0
++    end
++    return math.atan2(from:Cross(to).Y, math.clamp(from:Dot(to), -1, 1))
++end
++
++local function spineOrder(name: string): number?
++    local lower = string.lower(name)
++    if lower == "spine" then
++        return 0
++    end
++    local suffix = string.match(lower, "^spine%.(%d+)$")
++    if suffix then
++        return tonumber(suffix)
++    end
++    return nil
++end
++
++local function findTorsoBones(model: Model): { Bone }
++    local visual = model:FindFirstChild("Visual")
++    if not visual then
++        return {}
++    end
++
++    local preferred = {}
++    for _, name in ipairs(PREFERRED_SPINE_NAMES) do
++        local found = visual:FindFirstChild(name, true)
++        if found and found:IsA("Bone") then
++            table.insert(preferred, found)
++        end
++    end
++    if #preferred == #PREFERRED_SPINE_NAMES then
++        return preferred
++    end
++
++    local candidates = {}
++    for _, descendant in visual:GetDescendants() do
++        if descendant:IsA("Bone") then
++            local order = spineOrder(descendant.Name)
++            if order ~= nil then
++                table.insert(candidates, { bone = descendant, order = order })
++            end
++        end
++    end
++    table.sort(candidates, function(left, right)
++        return left.order < right.order
++    end)
++
++    -- Keep the pelvis/root spine untouched. The first three descendants above it
++    -- form the universal upper-body twist chain for the imported Lineage rigs.
++    local result = {}
++    for _, candidate in ipairs(candidates) do
++        if candidate.order >= 1 then
++            table.insert(result, candidate.bone)
++            if #result >= 3 then
++                break
++            end
++        end
++    end
++    return result
++end
++
++local function clearCharacter()
++    character = nil
++    root = nil
++    torsoBones = {}
++    targetPosition = nil
++    activeUntil = 0
++    renderedYaw = 0
++    table.clear(previousProcedural)
++end
++
++local function bindCharacter(newCharacter: Model)
++    clearCharacter()
++    character = newCharacter
++    local newRoot = newCharacter:WaitForChild("RootCollider", 10)
++    if not newRoot or not newRoot:IsA("BasePart") then
++        warn("[game1][aim] RootCollider is missing")
++        return
++    end
++    root = newRoot
++    torsoBones = findTorsoBones(newCharacter)
++    if #torsoBones == 0 then
++        warn("[game1][aim] no compatible spine chain; root facing still works")
++    else
++        local names = {}
++        for _, bone in ipairs(torsoBones) do
++            table.insert(names, bone.Name)
++        end
++        print(("[game1][aim] torso chain ready: %s"):format(table.concat(names, " -> ")))
++    end
++end
++
++local function restorePreviousProcedural()
++    for bone, delta in pairs(previousProcedural) do
++        if bone.Parent then
++            -- Procedural rotation is layered as delta * animationTransform below.
++            -- Remove exactly our previous layer before Animator evaluates again.
++            bone.Transform = delta:Inverse() * bone.Transform
++        end
++    end
++    table.clear(previousProcedural)
++end
++
++local function desiredTorsoYaw(now: number): number
++    local currentRoot = root
++    local target = targetPosition
++    if not currentRoot or not currentRoot.Parent or not target or now > activeUntil then
++        return 0
++    end
++
++    local aim = flatUnit(target - currentRoot.Position)
++    local forward = flatUnit(currentRoot.CFrame.LookVector)
++    if not aim or not forward then
++        return 0
++    end
++
++    return math.clamp(
++        signedYaw(forward, aim),
++        -AttackConfig.TorsoYawLimit,
++        AttackConfig.TorsoYawLimit
++    )
++end
++
++local function applyPose(deltaTime: number)
++    local now = os.clock()
++    local desired = desiredTorsoYaw(now)
++    local response = math.max(1, AttackConfig.TorsoAimResponse)
++    local blend = 1 - math.exp(-response * math.max(0, deltaTime))
++    renderedYaw += (desired - renderedYaw) * blend
++    if math.abs(renderedYaw) < 0.0001 and desired == 0 then
++        renderedYaw = 0
++    end
++
++    local count = #torsoBones
++    if count > 0 and math.abs(renderedYaw) > 0.00001 then
++        local perBoneYaw = renderedYaw / count
++        for _, bone in ipairs(torsoBones) do
++            if bone.Parent then
++                local delta = CFrame.Angles(0, perBoneYaw, 0)
++                -- PreSimulation runs after Animator has produced this frame's pose,
++                -- so the procedural twist layers on top instead of replacing attack
++                -- animation transforms.
++                bone.Transform = delta * bone.Transform
++                previousProcedural[bone] = delta
++            end
++        end
++    end
++
++    if character then
++        character:SetAttribute("AimTorsoYawDegrees", math.deg(renderedYaw))
++        character:SetAttribute("AimPoseActive", targetPosition ~= nil and now <= activeUntil)
++    end
++end
++
++function AimPoseController.GetAimPosition(): Vector3?
++    local camera = Workspace.CurrentCamera
++    if not camera then
++        return nil
++    end
++
++    -- RobloxLineage uses one center-screen reticle for both presentation and the
++    -- attack intent. Never derive body facing from a second cursor-space ray.
++    local viewport = camera.ViewportSize
++    local ray = camera:ViewportPointToRay(viewport.X * 0.5, viewport.Y * 0.5)
++    local params = RaycastParams.new()
++    params.FilterType = Enum.RaycastFilterType.Exclude
++    params.FilterDescendantsInstances = character and { character } or {}
++    local hit = Workspace:Raycast(ray.Origin, ray.Direction * AttackConfig.MaxAimDistance, params)
++    return if hit then hit.Position else ray.Origin + ray.Direction * AttackConfig.MaxAimDistance
++end
++
++function AimPoseController.BeginAttack(target: Vector3, duration: number)
++    if typeof(target) ~= "Vector3" then
++        return
++    end
++    targetPosition = target
++    activeUntil = os.clock() + math.max(0.05, tonumber(duration) or 0.05)
++end
++
++function AimPoseController.UpdateTarget(target: Vector3)
++    if typeof(target) == "Vector3" and os.clock() <= activeUntil then
++        targetPosition = target
++    end
++end
++
++function AimPoseController.EndAttack()
++    targetPosition = nil
++    activeUntil = 0
++end
++
++function AimPoseController.Start()
++    if started then
++        return
++    end
++    started = true
++    task.spawn(ensureReticle)
++
++    localPlayer.CharacterAdded:Connect(bindCharacter)
++    localPlayer.CharacterRemoving:Connect(function(removing)
++        if removing == character then
++            clearCharacter()
++        end
++    end)
++    if localPlayer.Character then
++        task.spawn(bindCharacter, localPlayer.Character)
++    end
++
++    RunService.PreAnimation:Connect(restorePreviousProcedural)
++    RunService.PreSimulation:Connect(applyPose)
++end
++
++return AimPoseController
+diff --git a/src/client/combat/AttackController.luau b/src/client/combat/AttackController.luau
+index ce20cee..256f26a 100644
+--- a/src/client/combat/AttackController.luau
++++ b/src/client/combat/AttackController.luau
+@@ -1,7 +1,6 @@
+ local Players = game:GetService("Players")
+ local ReplicatedStorage = game:GetService("ReplicatedStorage")
+ local UserInputService = game:GetService("UserInputService")
+-local Workspace = game:GetService("Workspace")
+ 
+ local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
+ local CharacterShared = Shared:WaitForChild("character")
+@@ -13,23 +12,14 @@ local started = false
+ local lastAttack = 0
+ local movementController: any = nil
+ local animationController: any = nil
++local aimPoseController: any = nil
++local attackSequence = 0
+ 
+-local function aimPosition(): Vector3?
+-    local camera = Workspace.CurrentCamera
+-    if not camera then return nil end
+-    local mouse = UserInputService:GetMouseLocation()
+-    local ray = camera:ViewportPointToRay(mouse.X, mouse.Y)
+-    local params = RaycastParams.new()
+-    params.FilterType = Enum.RaycastFilterType.Exclude
+-    local player = Players.LocalPlayer
+-    params.FilterDescendantsInstances = player.Character and { player.Character } or {}
+-    local hit = Workspace:Raycast(ray.Origin, ray.Direction * AttackConfig.MaxAimDistance, params)
+-    return if hit then hit.Position else ray.Origin + ray.Direction * AttackConfig.MaxAimDistance
+-end
+ 
+-function AttackController.Start(movement: any?, animation: any?)
++function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
+     movementController = movement
+     animationController = animation
++    aimPoseController = aimPose
+     if started then return end
+     started = true
+     local remotes = ReplicatedStorage:WaitForChild("Game1Remotes")
+@@ -43,19 +33,48 @@ function AttackController.Start(movement: any?, animation: any?)
+         local localCooldown = AttackConfig.CooldownSeconds * (100 / attackSpeed) * 0.75
+         if now - lastAttack < localCooldown then return end
+         lastAttack = now
+-        local target = aimPosition()
++        local target = aimPoseController and aimPoseController.GetAimPosition and aimPoseController.GetAimPosition() or nil
+         if target then
+             local root = player.Character and player.Character:FindFirstChild("RootCollider")
+-            if movementController and root and root:IsA("BasePart") then
++            if root and root:IsA("BasePart") then
+                 local direction = Vector3.new(target.X - root.Position.X, 0, target.Z - root.Position.Z)
+                 if direction.Magnitude > 0.001 then
+-                    movementController.LockFacing(direction.Unit, 0.28)
+-                    movementController.LockMovement(0.22)
++                    local speedScale = 100 / attackSpeed
++                    local facingDuration = AttackConfig.FacingTurnSeconds * speedScale
++                    local movementDuration = AttackConfig.MovementLockSeconds * speedScale
++                    local poseDuration = AttackConfig.AimPoseSeconds * speedScale
++
++                    attackSequence += 1
++                    local sequence = attackSequence
++                    if movementController then
++                        movementController.LockMovement(movementDuration)
++                        if movementController.BeginAimFacingCompensation then
++                            movementController.BeginAimFacingCompensation(
++                                facingDuration,
++                                AttackConfig.TorsoYawLimit
++                            )
++                            movementController.UpdateAimFacingCompensation(direction.Unit)
++                            task.delay(facingDuration, function()
++                                if sequence == attackSequence and movementController then
++                                    movementController.EndAimFacingCompensation()
++                                end
++                            end)
++                        else
++                            -- Compatibility fallback for an older MovementController.
++                            movementController.LockFacing(direction.Unit, facingDuration)
++                        end
++                    end
++                    if aimPoseController then
++                        aimPoseController.BeginAttack(target, poseDuration)
++                    end
+                 end
+             end
+             if animationController then
+                 animationController.PlayAction("attack")
+             end
++            -- One aim point owns presentation and server intent. The server remains
++            -- authoritative for range/hit/damage, while the client only poses toward
++            -- the exact same point that was sent with this attack.
+             attack:FireServer(target)
+         end
+     end)
+diff --git a/src/client/init.client.luau b/src/client/init.client.luau
+index 35341d1..aa233ca 100644
+--- a/src/client/init.client.luau
++++ b/src/client/init.client.luau
+@@ -13,6 +13,7 @@ local PlayerStatusController = require(CharacterRoot:WaitForChild("PlayerStatusC
+ local AnimationRoot = CharacterRoot:WaitForChild("animation")
+ local CharacterAnimationController = require(AnimationRoot:WaitForChild("CharacterAnimationController"))
+ local AttackController = require(CombatRoot:WaitForChild("AttackController"))
++local AimPoseController = require(CombatRoot:WaitForChild("AimPoseController"))
+ local WeaponRoot = script:WaitForChild("weapon")
+ local WeaponAttachmentController = require(WeaponRoot:WaitForChild("WeaponAttachmentController"))
+ local TestLoadoutController = require(DevRoot:WaitForChild("TestLoadoutController"))
+@@ -23,7 +24,8 @@ print(("[game1][client] %s v%s · runtime %s")
+ MovementController.Start()
+ CharacterAnimationController.Start()
+ WeaponAttachmentController.Start()
++AimPoseController.Start()
+ CameraController.Start()
+-AttackController.Start(MovementController, CharacterAnimationController)
++AttackController.Start(MovementController, CharacterAnimationController, AimPoseController)
+ PlayerStatusController.Start()
+ TestLoadoutController.Start()
+diff --git a/src/shared/RuntimeVersion.luau b/src/shared/RuntimeVersion.luau
+index 5c08b5c..a19c7a9 100644
+--- a/src/shared/RuntimeVersion.luau
++++ b/src/shared/RuntimeVersion.luau
+@@ -1 +1 @@
+-return table.freeze({ Version = "2026.10.05.006", SourceDigest = "game1-m6.2-unified-runtime-weapon-grip" })
++return table.freeze({ Version = "2026.10.05.007", SourceDigest = "game1-m6.2-robloxlineage-attack-aim-facing" })
+diff --git a/src/shared/combat/AttackConfig.luau b/src/shared/combat/AttackConfig.luau
+index 90d9f7a..0f99540 100644
+--- a/src/shared/combat/AttackConfig.luau
++++ b/src/shared/combat/AttackConfig.luau
+@@ -4,5 +4,14 @@ return table.freeze({
+     BoxWidth = 5,
+     BoxHeight = 5,
+     MaxAimDistance = 420,
++
++    -- RobloxLineage attack-facing contract. A planted attack can twist the upper
++    -- body up to this yaw. Only the overflow is assigned to whole-character yaw.
++    TorsoYawLimit = math.rad(70),
++    TorsoAimResponse = 26,
++    FacingTurnSeconds = 0.28,
++    MovementLockSeconds = 0.22,
++    AimPoseSeconds = 0.34,
++
+     DebugLogs = true,
+ })
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index 15ef615..b300b9f 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -134,6 +134,7 @@ required_runtime = [
+     "src/client/character/animation/AnimationTrackCache.luau",
+     "src/client/character/animation/CharacterAnimationController.luau",
+     "src/client/combat/AttackController.luau",
++    "src/client/combat/AimPoseController.luau",
+     "src/shared/character/CharacterConfig.luau",
+     "src/shared/character/CharacterMovementConfig.luau",
+     "src/shared/character/CharacterRegistry.luau",
+@@ -368,6 +369,19 @@ if "CharacterAnimationController.Start()" not in client_init_text:
+ attack_controller_text = (ROOT / "src/client/combat/AttackController.luau").read_text(encoding="utf-8")
+ if 'animationController.PlayAction("attack")' not in attack_controller_text:
+     err("combat attack input is not connected to the semantic attack animation slot")
++for required in ["BeginAimFacingCompensation", "TorsoYawLimit", "aimPoseController.BeginAttack"]:
++    if required not in attack_controller_text:
++        err(f"robloxlineage attack/aim integration missing {required}")
++aim_pose_text = (ROOT / "src/client/combat/AimPoseController.luau").read_text(encoding="utf-8")
++for required in ["RunService.PreSimulation", "spine.001", "AimTorsoYawDegrees", "bone.Transform = delta * bone.Transform", "ViewportPointToRay", "Game1AimReticle"]:
++    if required not in aim_pose_text:
++        err(f"procedural torso aim controller missing {required}")
++movement_runtime = (ROOT / "src/client/character/MovementController.luau").read_text(encoding="utf-8")
++for required in ["BeginAimFacingCompensation", "UpdateAimFacingCompensation", "applyAimFacingCompensation"]:
++    if required not in movement_runtime:
++        err(f"movement aim-facing compensation missing {required}")
++if "AimPoseController.Start()" not in client_init_text:
++    err("procedural torso aim controller is not started by the client runtime")
+ if 'character:SetAttribute("AnimationProfileId", archetype)' not in character_service_text:
+     err("character runtime does not expose animation profile identity")
+ if 'character:SetAttribute("CharacterSkeletonSignature"' not in character_service_text:

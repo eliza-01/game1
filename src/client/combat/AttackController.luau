@@ -1,7 +1,6 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
-local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local CharacterShared = Shared:WaitForChild("character")
@@ -13,23 +12,14 @@ local started = false
 local lastAttack = 0
 local movementController: any = nil
 local animationController: any = nil
+local aimPoseController: any = nil
+local attackSequence = 0
 
-local function aimPosition(): Vector3?
-    local camera = Workspace.CurrentCamera
-    if not camera then return nil end
-    local mouse = UserInputService:GetMouseLocation()
-    local ray = camera:ViewportPointToRay(mouse.X, mouse.Y)
-    local params = RaycastParams.new()
-    params.FilterType = Enum.RaycastFilterType.Exclude
-    local player = Players.LocalPlayer
-    params.FilterDescendantsInstances = player.Character and { player.Character } or {}
-    local hit = Workspace:Raycast(ray.Origin, ray.Direction * AttackConfig.MaxAimDistance, params)
-    return if hit then hit.Position else ray.Origin + ray.Direction * AttackConfig.MaxAimDistance
-end
 
-function AttackController.Start(movement: any?, animation: any?)
+function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
     movementController = movement
     animationController = animation
+    aimPoseController = aimPose
     if started then return end
     started = true
     local remotes = ReplicatedStorage:WaitForChild("Game1Remotes")
@@ -43,19 +33,48 @@ function AttackController.Start(movement: any?, animation: any?)
         local localCooldown = AttackConfig.CooldownSeconds * (100 / attackSpeed) * 0.75
         if now - lastAttack < localCooldown then return end
         lastAttack = now
-        local target = aimPosition()
+        local target = aimPoseController and aimPoseController.GetAimPosition and aimPoseController.GetAimPosition() or nil
         if target then
             local root = player.Character and player.Character:FindFirstChild("RootCollider")
-            if movementController and root and root:IsA("BasePart") then
+            if root and root:IsA("BasePart") then
                 local direction = Vector3.new(target.X - root.Position.X, 0, target.Z - root.Position.Z)
                 if direction.Magnitude > 0.001 then
-                    movementController.LockFacing(direction.Unit, 0.28)
-                    movementController.LockMovement(0.22)
+                    local speedScale = 100 / attackSpeed
+                    local facingDuration = AttackConfig.FacingTurnSeconds * speedScale
+                    local movementDuration = AttackConfig.MovementLockSeconds * speedScale
+                    local poseDuration = AttackConfig.AimPoseSeconds * speedScale
+
+                    attackSequence += 1
+                    local sequence = attackSequence
+                    if movementController then
+                        movementController.LockMovement(movementDuration)
+                        if movementController.BeginAimFacingCompensation then
+                            movementController.BeginAimFacingCompensation(
+                                facingDuration,
+                                AttackConfig.TorsoYawLimit
+                            )
+                            movementController.UpdateAimFacingCompensation(direction.Unit)
+                            task.delay(facingDuration, function()
+                                if sequence == attackSequence and movementController then
+                                    movementController.EndAimFacingCompensation()
+                                end
+                            end)
+                        else
+                            -- Compatibility fallback for an older MovementController.
+                            movementController.LockFacing(direction.Unit, facingDuration)
+                        end
+                    end
+                    if aimPoseController then
+                        aimPoseController.BeginAttack(target, poseDuration)
+                    end
                 end
             end
             if animationController then
                 animationController.PlayAction("attack")
             end
+            -- One aim point owns presentation and server intent. The server remains
+            -- authoritative for range/hit/damage, while the client only poses toward
+            -- the exact same point that was sent with this attack.
             attack:FireServer(target)
         end
     end)

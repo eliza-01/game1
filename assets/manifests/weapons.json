@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "project": "game1",
+  "activeWeaponSlug": null,
+  "options": {
+    "weaponTypes": [
+      "1hs",
+      "2hs",
+      "bow"
+    ],
+    "rarities": [
+      "common",
+      "uncommon",
+      "rare",
+      "mythical",
+      "legendary",
+      "immortal"
+    ],
+    "statKeys": [
+      "Damage",
+      "AttackSpeed"
+    ]
+  },
+  "items": [
+    {
+      "slug": "newbie_axe",
+      "name_en": "Newbie Axe",
+      "name_ru": "Топор Новичка",
+      "weapon_type": "1hs",
+      "rarity": "common",
+      "model_source_path": "assets/source/weapons/1hs/newbie_axe/model/newbie_axe.fbx",
+      "model_prepared_path": "assets/prepared/weapons/1hs/newbie_axe/model/newbie_axe.fbx",
+      "model_sha256": "64e106884acc7b985dca48e960d4999d959dd62e3b78aa169fa16f096df585d8",
+      "model_asset_id": "98087242454283",
+      "model_published_sha256": "64e106884acc7b985dca48e960d4999d959dd62e3b78aa169fa16f096df585d8",
+      "moderation_state": "Approved",
+      "revision": 1,
+      "created_at": 1791159719.983613,
+      "updated_at": 1791159752.6252778,
+      "published_at": 1791159752.6252778,
+      "textures": [
+        {
+          "id": "newbie_axe__starter_axe_01",
+          "weapon_slug": "newbie_axe",
+          "slot": "starter_axe_01",
+          "source_path": "assets/source/weapons/1hs/newbie_axe/textures/starter_axe_01.png",
+          "prepared_path": "assets/prepared/weapons/1hs/newbie_axe/textures/starter_axe_01.png",
+          "sha256": "697f198b97b642a92552dd6da2525250e01a55ee445461bd2016734e6cc8f7dd",
+          "asset_id": "114414624522732",
+          "published_sha256": "697f198b97b642a92552dd6da2525250e01a55ee445461bd2016734e6cc8f7dd",
+          "moderation_state": "Reviewing",
+          "revision": 1,
+          "created_at": 1791159719.983613,
+          "updated_at": 1791159756.1325212,
+          "published_at": 1791159756.1325212
+        }
+      ],
+      "stat_modifiers": {
+        "AttackSpeed": 50,
+        "Damage": 10
+      },
+      "status": "PUBLISHED",
+      "server_storage_path": "ServerStorage.weapons.1hs.newbie_axe.model.newbie_axe"
+    }
+  ],
+  "summary": {
+    "registered": 1,
+    "published": 1,
+    "active": 0
+  }
+}

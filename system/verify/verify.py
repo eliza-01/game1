@@ -283,8 +283,8 @@ else:
     animation_manifest = json.loads(animation_manifest_path.read_text(encoding="utf-8"))
 if animation_manifest.get("schemaVersion") != 2 or animation_manifest.get("project") != "game1":
     err("character animation manifest must be game1 schema 2")
-if animation_manifest.get("weaponSets") != ["hands", "1hs", "bow"]:
-    err("m5.1 character animation weapon sets must be hands, 1hs and bow")
+if animation_manifest.get("weaponSets") != ["hands", "1hs", "2hs", "bow"]:
+    err("character animation weapon sets must be hands, 1hs, 2hs and bow")
 
 animation_store_path = ROOT / "system/control-center/animation_store.py"
 animation_core_dir = ROOT / "system/control-center/animation_core"
@@ -296,7 +296,7 @@ for required in [
     "class AnimationStore",
     "def scan_folder",
     "def classify_animation",
-    'WEAPON_SETS = ("hands", "1hs", "bow")',
+    'WEAPON_SETS = ("hands", "1hs", "2hs", "bow")',
     "def assign_file",
     "normalize_manual_binding",
     "_strip_character_prefix",
@@ -376,13 +376,151 @@ for required in ["saveArchetype", "save archetype identity first", "/identity"]:
     if required not in js_text:
         err(f"asset manager archetype editing ui missing {required}")
 
+# m6.2 archetype registration safety + registered model reassignment
+character_store_text = (ROOT / "system/control-center/character_store.py").read_text(encoding="utf-8")
+for required in ["existingId", "archetype {character_id} already exists", "def assign_model", "character_model_assignments"]:
+    if required not in character_store_text:
+        err(f"character registration/model reassignment contract missing {required}")
+if "character_model_assignments" not in schema_text:
+    err("control center schema missing character_model_assignments audit table")
+if 'model_suffix = "/model"' not in host_agent_text or "store.assign_model" not in host_agent_text:
+    err("host agent does not expose registered character model reassignment")
+if 'id="character-model-source"' not in ui:
+    err("asset manager registered-model selector is missing")
+for required in ["modelSourceId", "sourceCharacterId", "existingId:row?.id||''"]:
+    if required not in js_text:
+        err(f"asset manager archetype model reassignment ui missing {required}")
+
+
+# m6 weapon registry / stats / attachment contract
+weapon_manifest_path = ROOT / "assets/manifests/weapons.json"
+if not weapon_manifest_path.is_file():
+    err(r"weapon manifest is missing; run python .\system\control-center\migrate.py")
+    weapon_manifest = {}
+else:
+    weapon_manifest = json.loads(weapon_manifest_path.read_text(encoding="utf-8"))
+if weapon_manifest.get("schemaVersion") != 1 or weapon_manifest.get("project") != "game1":
+    err("weapon manifest must be game1 schema 1")
+weapon_options = weapon_manifest.get("options") or {}
+if weapon_options.get("weaponTypes") != ["1hs", "2hs", "bow"]:
+    err("weapon type pool must be 1hs, 2hs, bow")
+if weapon_options.get("rarities") != ["common", "uncommon", "rare", "mythical", "legendary", "immortal"]:
+    err("weapon rarity pool must be common through immortal")
+
+weapon_store_path = ROOT / "system/control-center/weapon_store.py"
+weapon_store_text = weapon_store_path.read_text(encoding="utf-8") if weapon_store_path.is_file() else ""
+for required in [
+    "class WeaponStore",
+    "def slugify_english",
+    'WEAPON_TYPES = ("1hs", "2hs", "bow")',
+    'RARITIES = ("common", "uncommon", "rare", "mythical", "legendary", "immortal")',
+    'STAT_KEYS = ("Damage", "AttackSpeed")',
+    "weapon_stat_modifiers",
+    "weapon_textures",
+    "create_model_asset",
+    "create_image_asset",
+    "update_model_asset",
+    "update_image_asset",
+    'src/shared/weapon/WeaponRegistry.luau',
+]:
+    if required not in weapon_store_text:
+        err(f"weapon store missing {required}")
+
+for required in ["weapons", "weapon_textures", "weapon_stat_modifiers", "weapon_publications"]:
+    if required not in schema_text:
+        err(f"control center schema missing {required}")
+
+opencloud_text = (ROOT / "system/control-center/opencloud_assets.py").read_text(encoding="utf-8")
+for required in ["create_image_asset", "update_image_asset", '"assetType": "Image"']:
+    if required not in opencloud_text:
+        err(f"open cloud weapon texture publication missing {required}")
+
+weapon_registry_path = ROOT / "src/shared/weapon/WeaponRegistry.luau"
+weapon_registry_text = weapon_registry_path.read_text(encoding="utf-8") if weapon_registry_path.is_file() else ""
+for required in ["activeWeaponSlug", "weapons = table.freeze"]:
+    if required not in weapon_registry_text:
+        err(f"generated weapon registry missing {required}")
+
+weapon_equip_path = ROOT / "src/server/weapon/WeaponEquipService.luau"
+weapon_attach_path = ROOT / "src/client/weapon/WeaponAttachmentController.luau"
+weapon_equip_text = weapon_equip_path.read_text(encoding="utf-8") if weapon_equip_path.is_file() else ""
+weapon_attach_text = weapon_attach_path.read_text(encoding="utf-8") if weapon_attach_path.is_file() else ""
+for required in ["Weapon_R_Bone", "weapon_r", "Weapon_L_Bone", "weapon_l", "AnimationWeaponSet", "statModifiers", "EquipStartup", "GetAvailable", "ListAvailable", "WeaponLoadoutSource"]:
+    if required not in weapon_equip_text:
+        err(f"weapon equip runtime missing {required}")
+for required in ["Game1WeaponAttachment", "parent.TransformedWorldCFrame * targetBone.CFrame", "weapon:PivotTo"]:
+    if required not in weapon_attach_text:
+        err(f"weapon attachment runtime missing {required}")
+if "WeaponEquipService.EquipStartup(character)" not in character_service_text:
+    err("character spawn does not apply the startup weapon")
+if "WeaponAttachmentController.Start()" not in client_init_text:
+    err("weapon attachment controller is not started by the client runtime")
+
+stats_config_text = (ROOT / "src/shared/character/CharacterStatsConfig.luau").read_text(encoding="utf-8")
+stats_service_text = (ROOT / "src/server/character/CharacterStatsService.luau").read_text(encoding="utf-8")
+movement_config_text = (ROOT / "src/shared/character/CharacterMovementConfig.luau").read_text(encoding="utf-8")
+for required in ["AttackSpeed = 100", "RunSpeed = 50"]:
+    if required not in stats_config_text:
+        err(f"character baseline stat missing {required}")
+for required in ["SetModifierSource", "modifierSources", 'Service.SetModifierSource(character, "weapon", modifiers)']:
+    if required not in stats_service_text:
+        err(f"composable stat modifier service missing {required}")
+if "DefaultRunStat = 50" not in movement_config_text or "currentRunSpeed" not in movement_config_text:
+    err("movement runtime must derive Roblox speed from RunSpeed=50 baseline")
+if 'character:GetAttribute("AttackSpeed")' not in attack_text:
+    err("server attack cooldown does not use AttackSpeed")
+if 'character:GetAttribute("AttackSpeed")' not in attack_controller_text:
+    err("client attack debounce does not use AttackSpeed")
+
+if 'id="nav-weapons"' not in ui or 'id="register-weapon"' not in ui or 'id="weapon-stat-attack-speed"' not in ui:
+    err("asset manager weapon registration section is missing")
+if 'id="weapon-test-loadout"' in ui or 'id="save-weapon-test-loadout"' in ui:
+    err("studio test loadout must not live in the web asset manager")
+weapon_js_path = ROOT / "system/control-center/static/weapon-assets.js"
+weapon_js_text = weapon_js_path.read_text(encoding="utf-8") if weapon_js_path.is_file() else ""
+for required in ["weaponSlugify", "weaponRegister", "weaponPublish", "weaponSync", "weaponActivate"]:
+    if required not in weapon_js_text:
+        err(f"asset manager weapon ui missing {required}")
+if "weaponSaveTestLoadout" in weapon_js_text:
+    err("obsolete asset-manager test loadout javascript is still present")
+
+for required in ["WeaponStore", "sync_weapon_to_studio", 'placement_mode="weapon-pivot"', '"/api/weapons"']:
+    if required not in host_agent_text:
+        err(f"host agent weapon api missing {required}")
+if '"/api/weapons/test-loadout"' in host_agent_text or "def set_test_loadout" in weapon_store_text or "TEST_LOADOUT_KEY" in weapon_store_text:
+    err("obsolete web/control-center test loadout path is still active")
+if 'placementMode ~= "weapon-pivot"' not in plugin_text or "placeWeaponModel" not in plugin_text:
+    err("studio bridge weapon-pivot placement is missing")
+
+# m6.2 Studio-native Test Loadout (ported from the reference architecture)
+test_loadout_server_path = ROOT / "src/server/dev/TestLoadoutService.luau"
+test_loadout_client_path = ROOT / "src/client/dev/TestLoadoutController.luau"
+test_loadout_server = test_loadout_server_path.read_text(encoding="utf-8") if test_loadout_server_path.is_file() else ""
+test_loadout_client = test_loadout_client_path.read_text(encoding="utf-8") if test_loadout_client_path.is_file() else ""
+for required in ["GetTestLoadoutCatalog", "ApplyTestLoadout", "CharacterService.Respawn", "WeaponEquipService.Equip", "Game1TestLoadoutActive"]:
+    if required not in test_loadout_server:
+        err(f"Studio Test Loadout server missing {required}")
+for required in ["TEST LOADOUT", "createDropdown", "createCategorySelector", "LastLoadoutArchetype", "LastLoadoutWeaponSlug", "ACCEPT LOADOUT", "RunService:IsStudio()"]:
+    if required not in test_loadout_client:
+        err(f"Studio Test Loadout client missing {required}")
+server_init_text = (ROOT / "src/server/init.server.luau").read_text(encoding="utf-8")
+if "TestLoadoutService.Start()" not in server_init_text:
+    err("Studio Test Loadout service is not started by the server runtime")
+if "TestLoadoutController.Start()" not in client_init_text:
+    err("Studio Test Loadout controller is not started by the client runtime")
+for required in ["Game1StudioDebugPreferences_v1", "Game1StudioPreferences", "plugin:GetSetting", "plugin:SetSetting", "LastLoadoutArchetype", "LastLoadoutWeaponSlug", "ClientPreferencesReady"]:
+    if required not in plugin_text:
+        err(f"game1 Studio plugin loadout preference bridge missing {required}")
+if (ROOT / "src/shared/dev/TestLoadoutConfig.luau").exists():
+    err("obsolete generated TestLoadoutConfig must be removed")
+
 if errors:
     print("verify failed")
     for item in errors:
         print(" -", item)
     sys.exit(1)
 
-print("verify ok · game1 m5.2 archetype edit + character animation contracts passed")
+print("verify ok · game1 m6.2 archetype safety + Studio-native test loadout contracts passed")
 print("registered character archetypes:", len(archetypes))
 print("active character archetype:", active_id or "none")
 print("race pool: human")

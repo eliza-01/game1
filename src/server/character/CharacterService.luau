@@ -14,6 +14,7 @@ local CharacterRigService = require(script.Parent:WaitForChild("CharacterRigServ
 local CharacterStatsService = require(script.Parent:WaitForChild("CharacterStatsService"))
 local CombatRoot = script.Parent.Parent:WaitForChild("combat")
 local EntityHitboxService = require(CombatRoot:WaitForChild("EntityHitboxService"))
+local WeaponEquipService = require(script.Parent.Parent:WaitForChild("weapon"):WaitForChild("WeaponEquipService"))
 
 local CharacterService = {}
 local started = false
@@ -45,8 +46,11 @@ local function registeredAssetId(row: any?): number?
     return tonumber(row.modelAssetId)
 end
 
-local function selectedCharacter(): (any?, number?, string, string, string?, string?, string?)
-    local requestedId = tostring(CharacterRegistry.activeArchetypeId or "")
+local function selectedCharacter(requestedOverride: string?): (any?, number?, string, string, string?, string?, string?)
+    local requestedId = tostring(requestedOverride or "")
+    if requestedId == "" then
+        requestedId = tostring(CharacterRegistry.activeArchetypeId or "")
+    end
     local row = findArchetype(requestedId)
     local assetId = registeredAssetId(row)
     if row and assetId then
@@ -165,13 +169,13 @@ local function destroyPreviousCharacter(player: Player)
     end
 end
 
-local function createCharacter(player: Player): Model?
+local function createCharacter(player: Player, requestedArchetypeId: string?): Model?
     if spawning[player] then
         return nil
     end
     spawning[player] = true
 
-    local row, assetId, archetype, label, requestedArchetype, race, gender = selectedCharacter()
+    local row, assetId, archetype, label, requestedArchetype, race, gender = selectedCharacter(requestedArchetypeId)
     if not assetId then
         spawning[player] = nil
         return nil
@@ -196,6 +200,7 @@ local function createCharacter(player: Player): Model?
     local character = Instance.new("Model")
     character.Name = player.Name
     character:SetAttribute("CharacterArchetype", archetype)
+    player:SetAttribute("SelectedCharacterArchetype", if archetype ~= "bootstrap" then archetype else "")
     character:SetAttribute("CharacterDisplayName", label)
     character:SetAttribute("CharacterRace", race or "")
     character:SetAttribute("CharacterGender", gender or "")
@@ -206,7 +211,6 @@ local function createCharacter(player: Player): Model?
     character:SetAttribute("UsingBootstrapVisual", archetype == "bootstrap")
     character:SetAttribute("CharacterOwnerUserId", player.UserId)
     character:SetAttribute("CustomCharacter", true)
-    character:SetAttribute("MoveSpeed", CharacterMovementConfig.DefaultRunSpeed)
     character:SetAttribute("AnimationMovementMode", "Run")
     character:SetAttribute("AnimationMovementDirection", "Forward")
     character:SetAttribute("MovementState", "Idle")
@@ -224,6 +228,7 @@ local function createCharacter(player: Player): Model?
     character.Parent = Workspace
     CharacterRigService.Finish(rig)
     player.Character = character
+    WeaponEquipService.EquipStartup(character)
 
     local hitboxes = EntityHitboxService.Attach(character, rig.visual)
     character:SetAttribute("CombatHitboxCount", hitboxes.count)
@@ -245,7 +250,7 @@ local function createCharacter(player: Player): Model?
         rig.navigationRoot.Anchored = true
         task.delay(3, function()
             if player.Parent == Players and player.Character == character then
-                createCharacter(player)
+                createCharacter(player, tostring(player:GetAttribute("SelectedCharacterArchetype") or ""))
             end
         end)
     end)
@@ -266,11 +271,30 @@ local function createCharacter(player: Player): Model?
     return character
 end
 
-function CharacterService.Respawn(player: Player): Model?
+function CharacterService.IsAvailable(archetypeId: string): boolean
+    local row = findArchetype(tostring(archetypeId or ""))
+    return row ~= nil and registeredAssetId(row) ~= nil
+end
+
+function CharacterService.ListAvailable(): { any }
+    local rows = {}
+    for _, row in ipairs(CharacterRegistry.archetypes or {}) do
+        if registeredAssetId(row) then
+            table.insert(rows, row)
+        end
+    end
+    return rows
+end
+
+function CharacterService.Respawn(player: Player, archetypeId: string?): Model?
     if player.Parent ~= Players then
         return nil
     end
-    return createCharacter(player)
+    local requested = tostring(archetypeId or "")
+    if requested ~= "" and not CharacterService.IsAvailable(requested) then
+        return nil
+    end
+    return createCharacter(player, requested)
 end
 
 function CharacterService.Start()

@@ -1,0 +1,2040 @@
+diff --git a/assets/manifests/character-animations.json b/assets/manifests/character-animations.json
+index 3d077d5..00eeaf2 100644
+--- a/assets/manifests/character-animations.json
++++ b/assets/manifests/character-animations.json
+@@ -4,6 +4,7 @@
+   "weaponSets": [
+     "hands",
+     "1hs",
++    "2hs",
+     "bow"
+   ],
+   "profiles": [
+diff --git a/assets/manifests/weapons.json b/assets/manifests/weapons.json
+new file mode 100644
+index 0000000..c02c7f9
+--- /dev/null
++++ b/assets/manifests/weapons.json
+@@ -0,0 +1,30 @@
++{
++  "schemaVersion": 1,
++  "project": "game1",
++  "activeWeaponSlug": null,
++  "options": {
++    "weaponTypes": [
++      "1hs",
++      "2hs",
++      "bow"
++    ],
++    "rarities": [
++      "common",
++      "uncommon",
++      "rare",
++      "mythical",
++      "legendary",
++      "immortal"
++    ],
++    "statKeys": [
++      "Damage",
++      "AttackSpeed"
++    ]
++  },
++  "items": [],
++  "summary": {
++    "registered": 0,
++    "published": 0,
++    "active": 0
++  }
++}
+diff --git a/docs/weapon-system.md b/docs/weapon-system.md
+new file mode 100644
+index 0000000..abf1ce2
+--- /dev/null
++++ b/docs/weapon-system.md
+@@ -0,0 +1,18 @@
++# game1 weapon system
++
++canonical identity is the weapon `slug`. new weapons derive it from the english name as lowercase snake_case; existing slugs stay stable across revisions.
++
++source layout:
++
++```text
++assets/source/weapons/<type>/<slug>/model/<slug>.fbx
++assets/source/weapons/<type>/<slug>/textures/<texture-slot>.<ext>
++```
++
++prepared assets mirror the same tree under `assets/prepared/weapons`. roblox publication ids are stored in sqlite, `assets/manifests/weapons.json`, and the generated runtime `src/shared/weapon/WeaponRegistry.luau`.
++
++weapon stats are additive modifier sources. the first exposed modifiers are `Damage` and `AttackSpeed`; zero means no change and negative values subtract. character baselines are Damage 10, AttackSpeed 100, RunSpeed 50. the stat service composes modifiers by source so future armor/buffs do not need to overwrite weapon math.
++
++weapon types are also animation contexts: `1hs`, `2hs`, `bow`. unarmed uses `hands`.
++
++attachment follows the reference project contract: the imported weapon model pivot is the grip reference. melee uses the right weapon socket and bow uses the left weapon socket. the client follows the animated parent hand while keeping the weapon helper socket bind transform static.
+diff --git a/src/client/character/MovementController.luau b/src/client/character/MovementController.luau
+index a7ed069..63068aa 100644
+--- a/src/client/character/MovementController.luau
++++ b/src/client/character/MovementController.luau
+@@ -114,13 +114,22 @@ local function bindCharacter(newCharacter: Model)
+ 	movementDirectionMode = "Forward"
+ 	newManager.BaseMoveSpeed = CharacterMovementConfig.RobloxSpeed(
+ 		newCharacter:GetAttribute("CharacterArchetype"),
+-		newCharacter:GetAttribute("MoveSpeed"),
++		newCharacter:GetAttribute("RunSpeed"),
+ 		"Run"
+ 	)
+ 	newCharacter:SetAttribute("AnimationMovementMode", movementMode)
+ 	newCharacter:SetAttribute("AnimationMovementDirection", movementDirectionMode)
+ 	newCharacter:SetAttribute("MovementState", "Idle")
+ 	newCharacter:SetAttribute("MovementStateAuthority", "ClientDerivedPresentation")
++	newCharacter:GetAttributeChangedSignal("RunSpeed"):Connect(function()
++		if character == newCharacter and controllerManager then
++			controllerManager.BaseMoveSpeed = CharacterMovementConfig.RobloxSpeed(
++				newCharacter:GetAttribute("CharacterArchetype"),
++				newCharacter:GetAttribute("RunSpeed"),
++				movementMode
++			)
++		end
++	end)
+ 
+ 	print("[game1] Custom movement bound")
+ end
+@@ -307,7 +316,7 @@ local function applyMovementMode(walkModifierActive: boolean, backwardActive: bo
+ 	if controllerManager and character then
+ 		controllerManager.BaseMoveSpeed = CharacterMovementConfig.RobloxSpeed(
+ 			character:GetAttribute("CharacterArchetype"),
+-			character:GetAttribute("MoveSpeed"),
++			character:GetAttribute("RunSpeed"),
+ 			nextMode
+ 		)
+ 	end
+diff --git a/src/client/character/PlayerStatusController.luau b/src/client/character/PlayerStatusController.luau
+index 8a8db65..972feef 100644
+--- a/src/client/character/PlayerStatusController.luau
++++ b/src/client/character/PlayerStatusController.luau
+@@ -7,22 +7,23 @@ local function clearConnections() for _, c in ipairs(connections) do c:Disconnec
+ local function render(character)
+     if not label then return end
+     if not character then label.Text = "NO CHARACTER" return end
+-    label.Text = ("LV %d   HP %d/%d   DMG %d   DEF %d"):format(
++    label.Text = ("LV %d   HP %d/%d   DMG %d   DEF %d   ASPD %d   RUN %d   %s"):format(
+         character:GetAttribute("Level") or 1, character:GetAttribute("HP") or 0,
+         character:GetAttribute("MaxHP") or 0, character:GetAttribute("Damage") or 0,
+-        character:GetAttribute("Defense") or 0)
++        character:GetAttribute("Defense") or 0, character:GetAttribute("AttackSpeed") or 100,
++        character:GetAttribute("RunSpeed") or 50, tostring(character:GetAttribute("EquippedWeaponSlug") or "hands"))
+ end
+ local function bind(character)
+     clearConnections(); render(character)
+     if not character then return end
+-    for _, name in ipairs({"Level","HP","MaxHP","Damage","Defense"}) do
++    for _, name in ipairs({"Level","HP","MaxHP","Damage","Defense","AttackSpeed","RunSpeed","EquippedWeaponSlug"}) do
+         table.insert(connections, character:GetAttributeChangedSignal(name):Connect(function() render(character) end))
+     end
+ end
+ function PlayerStatusController.Start()
+     local player = Players.LocalPlayer
+     gui = Instance.new("ScreenGui"); gui.Name="game1Status"; gui.ResetOnSpawn=false; gui.Parent=player:WaitForChild("PlayerGui")
+-    label=Instance.new("TextLabel"); label.Size=UDim2.fromOffset(420,36); label.Position=UDim2.fromOffset(18,18); label.BackgroundTransparency=0.3; label.TextScaled=true; label.TextXAlignment=Enum.TextXAlignment.Left; label.Parent=gui
++    label=Instance.new("TextLabel"); label.Size=UDim2.fromOffset(720,36); label.Position=UDim2.fromOffset(18,18); label.BackgroundTransparency=0.3; label.TextScaled=true; label.TextXAlignment=Enum.TextXAlignment.Left; label.Parent=gui
+     player.CharacterAdded:Connect(bind); bind(player.Character)
+ end
+ return PlayerStatusController
+diff --git a/src/client/character/animation/CharacterAnimationController.luau b/src/client/character/animation/CharacterAnimationController.luau
+index 1022264..7826fe7 100644
+--- a/src/client/character/animation/CharacterAnimationController.luau
++++ b/src/client/character/animation/CharacterAnimationController.luau
+@@ -160,7 +160,11 @@ function CharacterAnimationController.PlayAction(slot: string)
+ 		currentAction:Stop(0.06)
+ 	end
+ 	currentAction = track
+-	track:Play(0.06, 1, 1)
++	local playbackSpeed = 1
++	if slot == "attack" then
++		playbackSpeed = math.max(0.01, (tonumber(character:GetAttribute("AttackSpeed")) or 100) / 100)
++	end
++	track:Play(0.06, 1, playbackSpeed)
+ 	character:SetAttribute("AnimationActionSlot", slot)
+ 	character:SetAttribute("AnimationActionClip", tostring(descriptor.clipId or ""))
+ 	return track
+diff --git a/src/client/combat/AttackController.luau b/src/client/combat/AttackController.luau
+index c1eaa94..ce20cee 100644
+--- a/src/client/combat/AttackController.luau
++++ b/src/client/combat/AttackController.luau
+@@ -37,11 +37,14 @@ function AttackController.Start(movement: any?, animation: any?)
+     UserInputService.InputBegan:Connect(function(input, processed)
+         if processed or input.UserInputType ~= CharacterConfig.InputBindings.AttackPrimary[1] then return end
+         local now = os.clock()
+-        if now - lastAttack < AttackConfig.CooldownSeconds * 0.75 then return end
++        local player = Players.LocalPlayer
++        local character = player.Character
++        local attackSpeed = math.max(1, tonumber(character and character:GetAttribute("AttackSpeed")) or 100)
++        local localCooldown = AttackConfig.CooldownSeconds * (100 / attackSpeed) * 0.75
++        if now - lastAttack < localCooldown then return end
+         lastAttack = now
+         local target = aimPosition()
+         if target then
+-            local player = Players.LocalPlayer
+             local root = player.Character and player.Character:FindFirstChild("RootCollider")
+             if movementController and root and root:IsA("BasePart") then
+                 local direction = Vector3.new(target.X - root.Position.X, 0, target.Z - root.Position.Z)
+diff --git a/src/client/init.client.luau b/src/client/init.client.luau
+index dc5429c..dab0b3d 100644
+--- a/src/client/init.client.luau
++++ b/src/client/init.client.luau
+@@ -12,12 +12,15 @@ local PlayerStatusController = require(CharacterRoot:WaitForChild("PlayerStatusC
+ local AnimationRoot = CharacterRoot:WaitForChild("animation")
+ local CharacterAnimationController = require(AnimationRoot:WaitForChild("CharacterAnimationController"))
+ local AttackController = require(CombatRoot:WaitForChild("AttackController"))
++local WeaponRoot = script:WaitForChild("weapon")
++local WeaponAttachmentController = require(WeaponRoot:WaitForChild("WeaponAttachmentController"))
+ 
+ print(("[game1][client] %s v%s · runtime %s")
+     :format(ProjectInfo.Name, ProjectInfo.Version, RuntimeVersion.Version))
+ 
+ MovementController.Start()
+ CharacterAnimationController.Start()
++WeaponAttachmentController.Start()
+ CameraController.Start()
+ AttackController.Start(MovementController, CharacterAnimationController)
+ PlayerStatusController.Start()
+diff --git a/src/client/weapon/WeaponAttachmentController.luau b/src/client/weapon/WeaponAttachmentController.luau
+new file mode 100644
+index 0000000..33aa30c
+--- /dev/null
++++ b/src/client/weapon/WeaponAttachmentController.luau
+@@ -0,0 +1,74 @@
++local Players = game:GetService("Players")
++local RunService = game:GetService("RunService")
++
++local WeaponAttachmentController = {}
++local started = false
++local cache = setmetatable({}, { __mode = "k" })
++
++local function findNamedBone(root: Instance, name: string): Bone?
++    if name == "" then
++        return nil
++    end
++    local found = root:FindFirstChild(name, true)
++    return if found and found:IsA("Bone") then found else nil
++end
++
++local function targetSocketCFrame(targetBone: Bone): CFrame
++    local parent = targetBone.Parent
++    if parent and parent:IsA("Bone") then
++        return parent.TransformedWorldCFrame * targetBone.CFrame
++    end
++    return targetBone.WorldCFrame
++end
++
++local function buildState(character: Model, weapon: Model)
++    local visual = character:FindFirstChild("Visual")
++    if not visual then
++        return nil
++    end
++    local targetName = tostring(weapon:GetAttribute("WeaponTargetBoneName") or "")
++    local targetBone = findNamedBone(visual, targetName)
++    if not targetBone then
++        return nil
++    end
++    return {
++        character = character,
++        weapon = weapon,
++        targetName = targetName,
++        targetBone = targetBone,
++    }
++end
++
++local function updateWeapon(character: Model, weapon: Model)
++    local requestedName = tostring(weapon:GetAttribute("WeaponTargetBoneName") or "")
++    local state = cache[weapon]
++    if not state or state.character ~= character or not state.targetBone.Parent or state.targetName ~= requestedName then
++        state = buildState(character, weapon)
++        cache[weapon] = state
++    end
++    if state then
++        weapon:PivotTo(targetSocketCFrame(state.targetBone))
++    end
++end
++
++local function update()
++    for _, player in Players:GetPlayers() do
++        local character = player.Character
++        if character then
++            local weapon = character:FindFirstChild("EquippedWeapon")
++            if weapon and weapon:IsA("Model") and weapon:GetAttribute("Game1WeaponAttachment") == true then
++                updateWeapon(character, weapon)
++            end
++        end
++    end
++end
++
++function WeaponAttachmentController.Start()
++    if started then
++        return
++    end
++    started = true
++    RunService.RenderStepped:Connect(update)
++end
++
++return WeaponAttachmentController
+diff --git a/src/server/character/CharacterService.luau b/src/server/character/CharacterService.luau
+index 65e4918..ef3c5d4 100644
+--- a/src/server/character/CharacterService.luau
++++ b/src/server/character/CharacterService.luau
+@@ -14,6 +14,7 @@ local CharacterRigService = require(script.Parent:WaitForChild("CharacterRigServ
+ local CharacterStatsService = require(script.Parent:WaitForChild("CharacterStatsService"))
+ local CombatRoot = script.Parent.Parent:WaitForChild("combat")
+ local EntityHitboxService = require(CombatRoot:WaitForChild("EntityHitboxService"))
++local WeaponEquipService = require(script.Parent.Parent:WaitForChild("weapon"):WaitForChild("WeaponEquipService"))
+ 
+ local CharacterService = {}
+ local started = false
+@@ -206,7 +207,6 @@ local function createCharacter(player: Player): Model?
+     character:SetAttribute("UsingBootstrapVisual", archetype == "bootstrap")
+     character:SetAttribute("CharacterOwnerUserId", player.UserId)
+     character:SetAttribute("CustomCharacter", true)
+-    character:SetAttribute("MoveSpeed", CharacterMovementConfig.DefaultRunSpeed)
+     character:SetAttribute("AnimationMovementMode", "Run")
+     character:SetAttribute("AnimationMovementDirection", "Forward")
+     character:SetAttribute("MovementState", "Idle")
+@@ -224,6 +224,7 @@ local function createCharacter(player: Player): Model?
+     character.Parent = Workspace
+     CharacterRigService.Finish(rig)
+     player.Character = character
++    WeaponEquipService.EquipStartup(character)
+ 
+     local hitboxes = EntityHitboxService.Attach(character, rig.visual)
+     character:SetAttribute("CombatHitboxCount", hitboxes.count)
+diff --git a/src/server/character/CharacterStatsService.luau b/src/server/character/CharacterStatsService.luau
+index 83a6c96..d729216 100644
+--- a/src/server/character/CharacterStatsService.luau
++++ b/src/server/character/CharacterStatsService.luau
+@@ -2,15 +2,80 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
+ local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
+ local CharacterShared = Shared:WaitForChild("character")
+ local Config = require(CharacterShared:WaitForChild("CharacterStatsConfig"))
++
+ local Service = {}
++local BASE_PREFIX = "Base"
++local modifierSources = setmetatable({}, { __mode = "k" })
++
++local function baseName(stat: string): string
++    return BASE_PREFIX .. stat
++end
++
++local function setBase(character: Model, stat: string, value: number)
++    character:SetAttribute(baseName(stat), value)
++    character:SetAttribute(stat, value)
++end
++
++local function recompute(character: Model)
++    local previousMaxHP = tonumber(character:GetAttribute("MaxHP")) or Config.Default.MaxHP
++    local previousHP = tonumber(character:GetAttribute("HP")) or previousMaxHP
++    local sources = modifierSources[character] or {}
++
++    for stat, defaultValue in pairs(Config.Default) do
++        local base = tonumber(character:GetAttribute(baseName(stat)))
++        if base == nil then
++            base = tonumber(defaultValue) or 0
++            character:SetAttribute(baseName(stat), base)
++        end
++        local delta = 0
++        for _, modifiers in pairs(sources) do
++            delta += tonumber(modifiers[stat]) or 0
++        end
++        character:SetAttribute(stat, base + delta)
++    end
++
++    local newMaxHP = tonumber(character:GetAttribute("MaxHP")) or Config.Default.MaxHP
++    if newMaxHP ~= previousMaxHP then
++        character:SetAttribute("HP", math.clamp(previousHP, 0, math.max(0, newMaxHP)))
++    end
++    character:SetAttribute("MoveSpeed", tonumber(character:GetAttribute("RunSpeed")) or Config.Default.RunSpeed)
++end
++
+ function Service.Initialize(character: Model)
+     local d = Config.Default
+-    character:SetAttribute("Level", d.Level)
+-    character:SetAttribute("MaxHP", d.MaxHP)
++    modifierSources[character] = {}
++    setBase(character, "Level", d.Level)
++    setBase(character, "MaxHP", d.MaxHP)
++    setBase(character, "Damage", d.Damage)
++    setBase(character, "Defense", d.Defense)
++    setBase(character, "AttackSpeed", d.AttackSpeed)
++    setBase(character, "RunSpeed", d.RunSpeed)
++    character:SetAttribute("MoveSpeed", d.RunSpeed)
+     character:SetAttribute("HP", d.MaxHP)
+-    character:SetAttribute("Damage", d.Damage)
+-    character:SetAttribute("Defense", d.Defense)
+     character:SetAttribute("Damageable", true)
+     character:SetAttribute("LifeState", "Alive")
+ end
++
++function Service.SetModifierSource(character: Model, sourceId: string, modifiers: any)
++    local sources = modifierSources[character]
++    if not sources then
++        sources = {}
++        modifierSources[character] = sources
++    end
++    sources[sourceId] = if type(modifiers) == "table" then modifiers else {}
++    recompute(character)
++end
++
++function Service.ClearModifierSource(character: Model, sourceId: string)
++    local sources = modifierSources[character]
++    if sources then
++        sources[sourceId] = nil
++    end
++    recompute(character)
++end
++
++function Service.ApplyModifiers(character: Model, modifiers: any)
++    Service.SetModifierSource(character, "weapon", modifiers)
++end
++
+ return Service
+diff --git a/src/server/combat/AttackService.luau b/src/server/combat/AttackService.luau
+index b78be17..301eb03 100644
+--- a/src/server/combat/AttackService.luau
++++ b/src/server/combat/AttackService.luau
+@@ -47,7 +47,9 @@ local function attack(player: Player, aim: any)
+     end
+ 
+     local now = os.clock()
+-    if now - (cooldowns[player] or 0) < Config.CooldownSeconds then
++    local attackSpeed = math.max(1, tonumber(character:GetAttribute("AttackSpeed")) or 100)
++    local cooldownSeconds = Config.CooldownSeconds * (100 / attackSpeed)
++    if now - (cooldowns[player] or 0) < cooldownSeconds then
+         return
+     end
+     cooldowns[player] = now
+diff --git a/src/server/weapon/WeaponEquipService.luau b/src/server/weapon/WeaponEquipService.luau
+new file mode 100644
+index 0000000..377d06e
+--- /dev/null
++++ b/src/server/weapon/WeaponEquipService.luau
+@@ -0,0 +1,133 @@
++local ReplicatedStorage = game:GetService("ReplicatedStorage")
++local ServerStorage = game:GetService("ServerStorage")
++
++local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
++local WeaponShared = Shared:WaitForChild("weapon")
++local WeaponRegistry = require(WeaponShared:WaitForChild("WeaponRegistry"))
++local CharacterStatsService = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CharacterStatsService"))
++
++local WeaponEquipService = {}
++local EQUIPPED_NAME = "EquippedWeapon"
++
++local RIGHT_SOCKET_NAMES = { "Weapon_R_Bone", "weapon_r", "Weapon_R", "WeaponR" }
++local LEFT_SOCKET_NAMES = { "Weapon_L_Bone", "weapon_l", "Weapon_L", "WeaponL" }
++
++local function findByStudioPath(studioPath: string): Instance?
++    if string.sub(studioPath, 1, 14) ~= "ServerStorage." then
++        return nil
++    end
++    local node: Instance = ServerStorage
++    for segment in string.gmatch(string.sub(studioPath, 15), "[^%.]+") do
++        local child = node:FindFirstChild(segment)
++        if not child then
++            return nil
++        end
++        node = child
++    end
++    return node
++end
++
++local function findCharacterBone(character: Model, names: { string }): Bone?
++    local visual = character:FindFirstChild("Visual")
++    if not visual then
++        return nil
++    end
++    for _, name in ipairs(names) do
++        local found = visual:FindFirstChild(name, true)
++        if found and found:IsA("Bone") then
++            return found
++        end
++    end
++    return nil
++end
++
++local function socketNames(weaponType: string): { string }
++    return if string.lower(weaponType) == "bow" then LEFT_SOCKET_NAMES else RIGHT_SOCKET_NAMES
++end
++
++local function prepareWeapon(model: Model)
++    for _, descendant in model:GetDescendants() do
++        if descendant:IsA("Humanoid") or descendant:IsA("AnimationController") then
++            descendant:Destroy()
++        elseif descendant:IsA("BasePart") then
++            descendant.Anchored = true
++            descendant.CanCollide = false
++            descendant.CanTouch = false
++            descendant.CanQuery = false
++            descendant.Massless = true
++        end
++    end
++end
++
++local function clearWeapon(character: Model)
++    local old = character:FindFirstChild(EQUIPPED_NAME)
++    if old then
++        old:Destroy()
++    end
++end
++
++function WeaponEquipService.Unequip(character: Model)
++    clearWeapon(character)
++    character:SetAttribute("EquippedWeaponSlug", "")
++    character:SetAttribute("EquippedWeaponType", "")
++    character:SetAttribute("EquippedWeaponRarity", "")
++    character:SetAttribute("AnimationWeaponSet", "hands")
++    CharacterStatsService.ApplyModifiers(character, {})
++end
++
++function WeaponEquipService.Equip(character: Model, slugValue: any): (boolean, string?)
++    local slug = string.lower(tostring(slugValue or ""))
++    local row = WeaponRegistry.weapons and WeaponRegistry.weapons[slug]
++    if not row then
++        WeaponEquipService.Unequip(character)
++        return false, "weapon is not registered: " .. slug
++    end
++
++    local template = findByStudioPath(tostring(row.serverStoragePath or ""))
++    if not template or not template:IsA("Model") then
++        WeaponEquipService.Unequip(character)
++        return false, "weapon template is not synced into ServerStorage: " .. slug
++    end
++
++    local targetBone = findCharacterBone(character, socketNames(tostring(row.weaponType or "")))
++    if not targetBone then
++        WeaponEquipService.Unequip(character)
++        return false, "character has no compatible weapon socket bone"
++    end
++
++    clearWeapon(character)
++    local weapon = template:Clone()
++    weapon.Name = EQUIPPED_NAME
++    prepareWeapon(weapon)
++    weapon:SetAttribute("Game1WeaponAttachment", true)
++    weapon:SetAttribute("WeaponTargetBoneName", targetBone.Name)
++    weapon:SetAttribute("WeaponSlug", slug)
++    weapon:SetAttribute("WeaponType", tostring(row.weaponType or ""))
++    weapon:SetAttribute("WeaponRarity", tostring(row.rarity or ""))
++    weapon:SetAttribute("WeaponAttachmentMode", "pivot")
++    weapon:PivotTo(targetBone.WorldCFrame)
++    weapon.Parent = character
++
++    character:SetAttribute("EquippedWeaponSlug", slug)
++    character:SetAttribute("EquippedWeaponType", tostring(row.weaponType or ""))
++    character:SetAttribute("EquippedWeaponRarity", tostring(row.rarity or ""))
++    character:SetAttribute("AnimationWeaponSet", tostring(row.weaponType or "hands"))
++    CharacterStatsService.ApplyModifiers(character, row.statModifiers or {})
++    return true, nil
++end
++
++function WeaponEquipService.EquipStartup(character: Model)
++    local slug = tostring(WeaponRegistry.activeWeaponSlug or "")
++    if slug == "" then
++        WeaponEquipService.Unequip(character)
++        return
++    end
++    local ok, reason = WeaponEquipService.Equip(character, slug)
++    if not ok then
++        warn("[game1][weapon] " .. tostring(reason))
++    else
++        print(("[game1][weapon] equipped %s"):format(slug))
++    end
++end
++
++return table.freeze(WeaponEquipService)
+diff --git a/src/shared/ProjectInfo.luau b/src/shared/ProjectInfo.luau
+index 99a086a..1088438 100644
+--- a/src/shared/ProjectInfo.luau
++++ b/src/shared/ProjectInfo.luau
+@@ -1,5 +1,5 @@
+ return table.freeze({
+     Name = "game1",
+-    Version = "0.3.1-m5.1",
++    Version = "0.4.0-m6",
+     ProjectSlug = "game1",
+ })
+diff --git a/src/shared/RuntimeVersion.luau b/src/shared/RuntimeVersion.luau
+index 7099e8d..40ca6d4 100644
+--- a/src/shared/RuntimeVersion.luau
++++ b/src/shared/RuntimeVersion.luau
+@@ -1 +1 @@
+-return table.freeze({ Version = "2026.10.04.002", SourceDigest = "game1-m5-1-animation-manual-binding" })
++return table.freeze({ Version = "2026.10.05.001", SourceDigest = "game1-m6-weapon-registry-stats-attachment" })
+diff --git a/src/shared/character/CharacterMovementConfig.luau b/src/shared/character/CharacterMovementConfig.luau
+index c7f969a..586473e 100644
+--- a/src/shared/character/CharacterMovementConfig.luau
++++ b/src/shared/character/CharacterMovementConfig.luau
+@@ -1,14 +1,31 @@
+ local CharacterMovementConfig = {}
+-CharacterMovementConfig.DefaultRunSpeed = 16
+-CharacterMovementConfig.DefaultWalkSpeed = 9
++
++-- gameplay movement stat. 50 preserves the current game1 baseline movement feel.
++CharacterMovementConfig.DefaultRunStat = 50
++CharacterMovementConfig.DefaultRobloxRunSpeed = 16
++CharacterMovementConfig.DefaultRobloxWalkSpeed = 9
++
+ function CharacterMovementConfig.Resolve(_archetype: any): any
+-    return { groundWalk = CharacterMovementConfig.DefaultWalkSpeed, groundRun = CharacterMovementConfig.DefaultRunSpeed }
++    return {
++        groundWalk = CharacterMovementConfig.DefaultRobloxWalkSpeed,
++        groundRun = CharacterMovementConfig.DefaultRobloxRunSpeed,
++    }
+ end
+-function CharacterMovementConfig.MovementMultiplier(_archetype: any, _currentMoveSpeed: any): number return 1 end
+-function CharacterMovementConfig.ResolveSpeed(_archetype: any, _currentMoveSpeed: any, movementMode: any): number
+-    return if tostring(movementMode) == "Walk" then CharacterMovementConfig.DefaultWalkSpeed else CharacterMovementConfig.DefaultRunSpeed
++
++function CharacterMovementConfig.MovementMultiplier(_archetype: any, currentRunSpeed: any): number
++    local value = math.max(0, tonumber(currentRunSpeed) or CharacterMovementConfig.DefaultRunStat)
++    return value / CharacterMovementConfig.DefaultRunStat
+ end
+-function CharacterMovementConfig.RobloxSpeed(archetype: any, currentMoveSpeed: any, movementMode: any): number
+-    return CharacterMovementConfig.ResolveSpeed(archetype, currentMoveSpeed, movementMode)
++
++function CharacterMovementConfig.ResolveSpeed(archetype: any, currentRunSpeed: any, movementMode: any): number
++    local base = if tostring(movementMode) == "Walk"
++        then CharacterMovementConfig.DefaultRobloxWalkSpeed
++        else CharacterMovementConfig.DefaultRobloxRunSpeed
++    return base * CharacterMovementConfig.MovementMultiplier(archetype, currentRunSpeed)
+ end
++
++function CharacterMovementConfig.RobloxSpeed(archetype: any, currentRunSpeed: any, movementMode: any): number
++    return CharacterMovementConfig.ResolveSpeed(archetype, currentRunSpeed, movementMode)
++end
++
+ return table.freeze(CharacterMovementConfig)
+diff --git a/src/shared/character/CharacterStatsConfig.luau b/src/shared/character/CharacterStatsConfig.luau
+index 9e34c4b..3d9cc31 100644
+--- a/src/shared/character/CharacterStatsConfig.luau
++++ b/src/shared/character/CharacterStatsConfig.luau
+@@ -4,5 +4,7 @@ CharacterStatsConfig.Default = table.freeze({
+     MaxHP = 100,
+     Damage = 10,
+     Defense = 0,
++    AttackSpeed = 100,
++    RunSpeed = 50,
+ })
+ return table.freeze(CharacterStatsConfig)
+diff --git a/src/shared/weapon/WeaponRegistry.luau b/src/shared/weapon/WeaponRegistry.luau
+new file mode 100644
+index 0000000..f1184ad
+--- /dev/null
++++ b/src/shared/weapon/WeaponRegistry.luau
+@@ -0,0 +1,8 @@
++-- generated. do not edit by hand.
++return table.freeze({
++	schemaVersion = 1,
++	project = "game1",
++	activeWeaponSlug = "",
++	weapons = table.freeze({
++	}),
++})
+diff --git a/system/control-center/animation_core/common.py b/system/control-center/animation_core/common.py
+index e8b8a52..1ffe5d9 100644
+--- a/system/control-center/animation_core/common.py
++++ b/system/control-center/animation_core/common.py
+@@ -8,7 +8,7 @@ SCHEMA_VERSION = 2
+ PROJECT = "game1"
+ MAX_SCAN_FILES = 5000
+ ANIMATION_EXTENSIONS = {".rbxm", ".rbxmx"}
+-WEAPON_SETS = ("hands", "1hs", "bow")
++WEAPON_SETS = ("hands", "1hs", "2hs", "bow")
+ 
+ BASE_SLOT_CATALOG = [
+     {"group": "locomotion", "slot": "idle", "label": "idle", "looped": True, "priority": "Idle"},
+diff --git a/system/control-center/host_agent.py b/system/control-center/host_agent.py
+index d251b20..e5a99cf 100644
+--- a/system/control-center/host_agent.py
++++ b/system/control-center/host_agent.py
+@@ -28,14 +28,16 @@ load_local_env(ROOT / ".env.local")
+ sys.path.insert(0, str(Path(__file__).resolve().parent))
+ from character_store import CharacterStore
+ from animation_store import AnimationStore
++from weapon_store import WeaponStore
+ from character_core.identity import CharacterIdentityService
+ from studio_bridge import run_model_load_bridge
+ 
+-control_agent_build = "game1-m5-2-archetype-edit-001"
++control_agent_build = "game1-m6-weapons-001"
+ port = int(os.environ.get("CONTROL_AGENT_PORT", "43821"))
+ token = os.environ.get("CONTROL_TOKEN", "Game1LocalControlV1")
+ store = CharacterStore(ROOT)
+ animations = AnimationStore(ROOT)
++weapons = WeaponStore(ROOT)
+ character_identity = CharacterIdentityService(ROOT, store, animations)
+ 
+ 
+@@ -86,6 +88,34 @@ def sync_character_to_studio(character_id: str):
+     return {"character": row, "studio": result}
+ 
+ 
++
++def sync_weapon_to_studio(slug: str):
++    row = weapons.get(slug)
++    if not row:
++        raise ValueError(f"unknown weapon: {slug}")
++    asset_id = str(row.get("model_asset_id") or "").strip()
++    if not asset_id:
++        raise ValueError("publish the weapon model before syncing it to Studio")
++    texture_assets = [
++        {"slot": str(item.get("slot") or ""), "assetId": str(item.get("asset_id") or "")}
++        for item in (row.get("textures") or [])
++        if str(item.get("asset_id") or "").isdigit()
++    ]
++    destination = ["weapons", str(row.get("weapon_type") or ""), str(row.get("slug") or ""), "model"]
++    result = run_model_load_bridge(
++        asset_id,
++        destination,
++        wrapper_name=str(row.get("slug") or ""),
++        placement_mode="weapon-pivot",
++        metadata={
++            "weaponSlug": str(row.get("slug") or ""),
++            "weaponType": str(row.get("weapon_type") or ""),
++            "rarity": str(row.get("rarity") or ""),
++            "textures": texture_assets,
++        },
++    )
++    return {"weapon": row, "studio": result}
++
+ def _powershell_picker(script: str) -> str:
+     powershell = shutil.which("powershell.exe") or shutil.which("powershell")
+     if not powershell:
+@@ -118,6 +148,39 @@ if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+     )
+ 
+ 
++
++def choose_weapon_fbx() -> str:
++    return _powershell_picker(
++        r'''
++Add-Type -AssemblyName System.Windows.Forms
++$dialog = New-Object System.Windows.Forms.OpenFileDialog
++$dialog.Title = 'game1 · choose weapon fbx'
++$dialog.Filter = 'fbx weapon model (*.fbx)|*.fbx'
++$dialog.Multiselect = $false
++if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
++    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
++    Write-Output $dialog.FileName
++}
++'''
++    )
++
++
++def choose_weapon_textures() -> list[str]:
++    raw = _powershell_picker(
++        r'''
++Add-Type -AssemblyName System.Windows.Forms
++$dialog = New-Object System.Windows.Forms.OpenFileDialog
++$dialog.Title = 'game1 · choose weapon textures'
++$dialog.Filter = 'weapon textures (*.png;*.jpg;*.jpeg;*.webp)|*.png;*.jpg;*.jpeg;*.webp'
++$dialog.Multiselect = $true
++if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
++    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
++    Write-Output ($dialog.FileNames -join [char]31)
++}
++'''
++    )
++    return [item for item in raw.split(chr(31)) if item]
++
+ def choose_animation_folder() -> str:
+     return _powershell_picker(
+         r'''
+@@ -174,6 +237,15 @@ class Handler(BaseHTTPRequestHandler):
+             snapshot = animations.snapshot(character_id or store.active_id())
+             snapshot["publication"] = publication_config()
+             return self.out(200, snapshot)
++        if path == "/api/weapons":
++            snapshot = weapons.snapshot()
++            snapshot["publication"] = publication_config()
++            return self.out(200, snapshot)
++        weapon_prefix = "/api/weapons/"
++        publications_suffix = "/publications"
++        if path.startswith(weapon_prefix) and path.endswith(publications_suffix):
++            slug = unquote(path[len(weapon_prefix):-len(publications_suffix)].strip("/"))
++            return self.out(200, {"items": weapons.publications(slug)})
+         prefix = "/api/characters/"
+         suffix = "/publications"
+         if path.startswith(prefix) and path.endswith(suffix):
+@@ -195,11 +267,26 @@ class Handler(BaseHTTPRequestHandler):
+                 return self.out(200, {"path": choose_animation_folder()})
+             except Exception as error:
+                 return self.out(400, {"error": str(error)})
++        if path == "/api/files/choose-weapon-model":
++            try:
++                return self.out(200, {"path": choose_weapon_fbx()})
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
++        if path == "/api/files/choose-weapon-textures":
++            try:
++                return self.out(200, {"paths": choose_weapon_textures()})
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
+         if path == "/api/characters":
+             try:
+                 return self.out(200, store.register(self.body()))
+             except Exception as error:
+                 return self.out(400, {"error": str(error)})
++        if path == "/api/weapons":
++            try:
++                return self.out(200, weapons.register(self.body()))
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
+         if path == "/api/animations/scan":
+             try:
+                 payload = self.body()
+@@ -256,6 +343,33 @@ class Handler(BaseHTTPRequestHandler):
+         if path == "/api/characters/active/clear":
+             return self.out(200, store.clear_active())
+ 
++        weapon_prefix = "/api/weapons/"
++        weapon_publish_suffix = "/publish"
++        weapon_sync_suffix = "/sync"
++        weapon_activate_suffix = "/activate"
++        if path.startswith(weapon_prefix) and path.endswith(weapon_publish_suffix):
++            slug = unquote(path[len(weapon_prefix):-len(weapon_publish_suffix)].strip("/"))
++            try:
++                payload = self.body()
++                credentials = publication_credentials(str(payload.get("description") or "game1 weapon"))
++                return self.out(200, weapons.publish(slug, credentials))
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
++        if path.startswith(weapon_prefix) and path.endswith(weapon_sync_suffix):
++            slug = unquote(path[len(weapon_prefix):-len(weapon_sync_suffix)].strip("/"))
++            try:
++                return self.out(200, sync_weapon_to_studio(slug))
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
++        if path.startswith(weapon_prefix) and path.endswith(weapon_activate_suffix):
++            slug = unquote(path[len(weapon_prefix):-len(weapon_activate_suffix)].strip("/"))
++            try:
++                return self.out(200, weapons.set_active(slug))
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
++        if path == "/api/weapons/active/clear":
++            return self.out(200, weapons.clear_active())
++
+         animation_prefix = "/api/animations/"
+         publish_missing_suffix = "/publish-missing"
+         publish_animation_suffix = "/publish"
+@@ -298,6 +412,14 @@ class Handler(BaseHTTPRequestHandler):
+                 return self.out(200, animations.delete_binding(unquote(path[len(binding_prefix):])))
+             except Exception as error:
+                 return self.out(400, {"error": str(error)})
++        weapon_prefix = "/api/weapons/"
++        if path.startswith(weapon_prefix):
++            slug = unquote(path[len(weapon_prefix):])
++            try:
++                weapons.delete(slug)
++                return self.out(200, {"ok": True})
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
+         prefix = "/api/characters/"
+         if path.startswith(prefix):
+             character_id = unquote(path[len(prefix):])
+diff --git a/system/control-center/migrate.py b/system/control-center/migrate.py
+index 8602e29..e6fdac0 100644
+--- a/system/control-center/migrate.py
++++ b/system/control-center/migrate.py
+@@ -5,14 +5,21 @@ ROOT = Path(__file__).resolve().parents[2]
+ sys.path.insert(0, str(Path(__file__).resolve().parent))
+ from character_store import CharacterStore
+ from animation_store import AnimationStore
++from weapon_store import WeaponStore
+ 
+ characters = CharacterStore(ROOT)
+ animations = AnimationStore(ROOT)
++weapons = WeaponStore(ROOT)
+ character_snapshot = characters.snapshot()
+ animation_snapshot = animations.snapshot(character_snapshot.get("activeArchetypeId"))
++weapon_snapshot = weapons.snapshot()
+ print("game1 data migrated")
+ print("character schema:", character_snapshot["schemaVersion"])
+ print("registered characters:", len(character_snapshot["items"]))
+ print("active character:", character_snapshot["activeArchetypeId"] or "none")
+ print("animation schema:", animation_snapshot["schemaVersion"])
+ print("registered animations:", animation_snapshot["summary"]["registered"])
++
++print("weapon schema:", weapon_snapshot["schemaVersion"])
++print("registered weapons:", weapon_snapshot["summary"]["registered"])
++print("active weapon:", weapon_snapshot["activeWeaponSlug"] or "none")
+diff --git a/system/control-center/opencloud_assets.py b/system/control-center/opencloud_assets.py
+index 9b815f6..51629c8 100644
+--- a/system/control-center/opencloud_assets.py
++++ b/system/control-center/opencloud_assets.py
+@@ -228,6 +228,104 @@ def create_animation_asset(
+     return operation
+ 
+ 
++def _validate_image_upload(file_path: Path, api_key: str):
++    file_path = file_path.resolve()
++    content_types = {
++        ".png": "image/png",
++        ".jpg": "image/jpeg",
++        ".jpeg": "image/jpeg",
++        ".webp": "image/webp",
++    }
++    content_type = content_types.get(file_path.suffix.lower())
++    if not file_path.is_file() or content_type is None:
++        raise OpenCloudAssetError("texture publication requires png, jpg, jpeg or webp")
++    size = file_path.stat().st_size
++    if size <= 0:
++        raise OpenCloudAssetError("texture file is empty")
++    if size > MAX_UPLOAD_BYTES:
++        raise OpenCloudAssetError(f"texture file is larger than 20 MB: {size} bytes")
++    if not api_key.strip():
++        raise OpenCloudAssetError("ROBLOX_OPEN_CLOUD_API_KEY is not configured in .env.local")
++    return content_type
++
++
++def create_image_asset(
++    file_path: Path,
++    *,
++    display_name: str,
++    description: str,
++    creator_type: str,
++    creator_id: str,
++    api_key: str,
++) -> str:
++    content_type = _validate_image_upload(file_path, api_key)
++    metadata = {
++        "assetType": "Image",
++        "displayName": display_name.strip(),
++        "description": description,
++        "creationContext": {"creator": _creator_payload(creator_type, creator_id)},
++    }
++    body, boundary = _multipart(metadata, file_path, content_type)
++    req = request.Request(
++        CREATE_ASSET_URL,
++        data=body,
++        headers={
++            "x-api-key": api_key.strip(),
++            "Content-Type": f"multipart/form-data; boundary={boundary}",
++            "Content-Length": str(len(body)),
++            "Accept": "application/json",
++            "User-Agent": "game1-asset-manager/0.6",
++        },
++        method="POST",
++    )
++    response = _json_http(req, 120.0)
++    operation = str(response.get("path") or "").strip()
++    if not operation.startswith("operations/"):
++        raise OpenCloudAssetError("create image asset returned no operation path")
++    return operation
++
++
++def update_image_asset(
++    file_path: Path,
++    *,
++    asset_id: str,
++    display_name: str,
++    description: str,
++    creator_type: str,
++    creator_id: str,
++    api_key: str,
++) -> str:
++    content_type = _validate_image_upload(file_path, api_key)
++    asset_id = str(asset_id or "").strip()
++    if not asset_id.isdigit() or int(asset_id) <= 0:
++        raise OpenCloudAssetError("image asset id must be numeric before update")
++    metadata = {
++        "assetType": "Image",
++        "assetId": asset_id,
++        "displayName": display_name.strip(),
++        "description": description,
++        "creationContext": {"creator": _creator_payload(creator_type, creator_id)},
++    }
++    body, boundary = _multipart(metadata, file_path, content_type)
++    req = request.Request(
++        UPDATE_ASSET_URL_TEMPLATE.format(asset_id=asset_id),
++        data=body,
++        headers={
++            "x-api-key": api_key.strip(),
++            "Content-Type": f"multipart/form-data; boundary={boundary}",
++            "Content-Length": str(len(body)),
++            "Accept": "application/json",
++            "User-Agent": "game1-asset-manager/0.6",
++        },
++        method="PATCH",
++    )
++    response = _json_http(req, 120.0)
++    operation = str(response.get("path") or "").strip()
++    if not operation.startswith("operations/"):
++        raise OpenCloudAssetError("update image asset returned no operation path")
++    return operation
++
++
+ def get_operation(operation_path: str, *, api_key: str) -> dict:
+     operation_id = operation_path.rstrip("/").split("/")[-1].strip()
+     if not operation_id:
+diff --git a/system/control-center/schema.sql b/system/control-center/schema.sql
+index d4f0675..b4f9ccc 100644
+--- a/system/control-center/schema.sql
++++ b/system/control-center/schema.sql
+@@ -88,3 +88,58 @@ create table if not exists animation_publications (
+     moderation_state text,
+     published_at real not null
+ );
++
++create table if not exists weapons (
++    slug text primary key,
++    name_en text not null,
++    name_ru text not null default '',
++    weapon_type text not null,
++    rarity text not null,
++    model_source_path text not null default '',
++    model_prepared_path text not null default '',
++    model_sha256 text not null default '',
++    model_asset_id text,
++    model_published_sha256 text not null default '',
++    moderation_state text not null default '',
++    revision integer not null default 1,
++    created_at real not null,
++    updated_at real not null,
++    published_at real
++);
++
++create table if not exists weapon_textures (
++    id text primary key,
++    weapon_slug text not null,
++    slot text not null,
++    source_path text not null,
++    prepared_path text not null,
++    sha256 text not null,
++    asset_id text,
++    published_sha256 text not null default '',
++    moderation_state text not null default '',
++    revision integer not null default 1,
++    created_at real not null,
++    updated_at real not null,
++    published_at real,
++    unique(weapon_slug, slot)
++);
++
++create table if not exists weapon_stat_modifiers (
++    weapon_slug text not null,
++    stat_key text not null,
++    delta real not null default 0,
++    primary key(weapon_slug, stat_key)
++);
++
++create table if not exists weapon_publications (
++    id integer primary key autoincrement,
++    weapon_slug text not null,
++    kind text not null,
++    slot text not null default '',
++    weapon_revision integer not null,
++    asset_id text not null,
++    operation_path text not null,
++    sha256 text not null,
++    moderation_state text,
++    published_at real not null
++);
+diff --git a/system/control-center/static/asset-manager.css b/system/control-center/static/asset-manager.css
+index 3aa09fa..7df7fb3 100644
+--- a/system/control-center/static/asset-manager.css
++++ b/system/control-center/static/asset-manager.css
+@@ -3,3 +3,4 @@
+ 
+ .queue-progress{display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:center;margin-top:12px;padding:11px;border:1px solid var(--line);border-radius:11px;background:var(--panel2)}.queue-progress[hidden]{display:none}.queue-progress span{color:var(--muted);font-size:11px}.queue-progress progress{grid-column:1/-1;width:100%;height:8px;accent-color:var(--mint)}
+ .naming-guide{margin:12px 0;border:1px solid var(--line);border-radius:12px;background:var(--panel2);padding:10px 12px}.naming-guide summary{cursor:pointer;color:var(--mint);font-weight:700}.naming-examples{display:grid;gap:5px;margin-top:9px}.naming-examples code{display:block;overflow-wrap:anywhere}.unassigned-list{display:grid;gap:8px;margin-top:10px}.unassigned-row{display:grid;grid-template-columns:minmax(220px,1.4fr) minmax(100px,.55fr) minmax(130px,.7fr) 82px auto;gap:8px;align-items:end;padding:9px;border:1px solid var(--line);border-radius:10px}.unassigned-file{min-width:0;align-self:center}.unassigned-file b,.unassigned-file small{display:block;overflow-wrap:anywhere}.unassigned-file small{color:var(--muted);font-size:10px;margin-top:3px}.unassigned-row label{margin:0;font-size:10px}.unassigned-row select,.unassigned-row input{width:100%;margin-top:4px;padding:7px 8px}.unassigned-row button{padding:8px 10px}@media(max-width:950px){.unassigned-row{grid-template-columns:1fr 1fr}.unassigned-file{grid-column:1/-1}}
++.weapon-workflow{display:grid;grid-template-columns:minmax(340px,.82fr) minmax(620px,1.5fr);gap:14px;margin-top:14px}.weapon-stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.weapon-table-wrap{max-height:650px}.rarity-common{color:var(--muted)}.rarity-uncommon{color:#7bd88f}.rarity-rare{color:#67a8ff}.rarity-mythical{color:#b38cff}.rarity-legendary{color:#ffb15a}.rarity-immortal{color:#ff6577}.texture-list{display:grid;gap:6px;margin-top:8px}.texture-list div{display:grid;grid-template-columns:minmax(120px,.6fr) minmax(220px,1fr) auto;gap:8px;padding:7px 9px;border:1px solid var(--line);border-radius:9px;background:var(--panel2);font-size:11px}.texture-list span{overflow-wrap:anywhere}@media(max-width:1150px){.weapon-workflow{grid-template-columns:1fr}}@media(max-width:650px){.weapon-stats-grid{grid-template-columns:1fr}}
+diff --git a/system/control-center/static/character-assets.js b/system/control-center/static/character-assets.js
+index 0fc4c40..5af371d 100644
+--- a/system/control-center/static/character-assets.js
++++ b/system/control-center/static/character-assets.js
+@@ -14,10 +14,10 @@ function statusTag(status){return `<span class="tag ${String(status||'').toLower
+ 
+ function setView(view){
+   state.view=view;
+-  $('characters-view').hidden=view!=='characters';$('animations-view').hidden=view!=='animations';
+-  $('character-rail').hidden=view!=='characters';$('animation-rail').hidden=view!=='animations';
+-  $('nav-characters').classList.toggle('active',view==='characters');$('nav-animations').classList.toggle('active',view==='animations');
+-  if(view==='animations')loadAnimations();
++  $('characters-view').hidden=view!=='characters';$('animations-view').hidden=view!=='animations';$('weapons-view').hidden=view!=='weapons';
++  $('character-rail').hidden=view!=='characters';$('animation-rail').hidden=view!=='animations';$('weapon-rail').hidden=view!=='weapons';
++  $('nav-characters').classList.toggle('active',view==='characters');$('nav-animations').classList.toggle('active',view==='animations');$('nav-weapons').classList.toggle('active',view==='weapons');
++  if(view==='animations')loadAnimations();if(view==='weapons'&&window.game1WeaponsLoad)window.game1WeaponsLoad();
+ }
+ 
+ function setForm(row){state.selected=row?.id||null;state.sourcePath='';if(row){$('race').value=row.race||'human';$('gender').value=row.gender||'female';$('character-id').value=row.id;$('display-name').value=row.display_name||'';$('picked-model').textContent='keep current fbx or choose a replacement';}else{$('race').value=state.data?.options?.races?.[0]||'human';$('gender').value=state.data?.options?.genders?.[0]||'female';$('display-name').value='';$('picked-model').textContent='fbx not selected';syncIdentity()}renderCharacters()}
+@@ -93,6 +93,6 @@ async function publishMissingAnimations(){if(state.animationPublishing)return;le
+ async function setAnimationWeight(bindingId,weight){try{state.animations=await request('/api/animation-bindings/'+encodeURIComponent(bindingId)+'/weight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({weight:Number(weight)})});state.animations.publication=state.data?.publication||{};renderAnimations()}catch(error){toast(error.message,true)}}
+ async function removeAnimationBinding(bindingId){if(!confirm('remove this semantic animation binding from game1? canonical source files are preserved.'))return;try{state.animations=await request('/api/animation-bindings/'+encodeURIComponent(bindingId),{method:'DELETE'});state.animations.publication=state.data?.publication||{};if(state.animationSelected===bindingId)state.animationSelected=null;renderAnimations();toast('animation binding removed')}catch(error){toast(error.message,true)}}
+ 
+-$('nav-characters').onclick=()=>setView('characters');$('nav-animations').onclick=()=>setView('animations');$('race').onchange=syncIdentity;$('gender').onchange=syncIdentity;$('choose-model').onclick=chooseModel;$('save-archetype').onclick=saveArchetype;$('register-character').onclick=registerCharacter;$('publish-character').onclick=()=>publishCharacter();$('sync-character').onclick=()=>syncStudio();$('activate-character').onclick=()=>activate();$('new-character').onclick=()=>setForm(null);$('clear-form').onclick=()=>setForm(null);$('refresh').onclick=loadCharacters;$('validate-view').onclick=loadCharacters;$('theme').onclick=()=>document.body.classList.toggle('light');
++$('nav-characters').onclick=()=>setView('characters');$('nav-animations').onclick=()=>setView('animations');$('nav-weapons').onclick=()=>setView('weapons');$('race').onchange=syncIdentity;$('gender').onchange=syncIdentity;$('choose-model').onclick=chooseModel;$('save-archetype').onclick=saveArchetype;$('register-character').onclick=registerCharacter;$('publish-character').onclick=()=>publishCharacter();$('sync-character').onclick=()=>syncStudio();$('activate-character').onclick=()=>activate();$('new-character').onclick=()=>setForm(null);$('clear-form').onclick=()=>setForm(null);$('refresh').onclick=loadCharacters;$('validate-view').onclick=loadCharacters;$('theme').onclick=()=>document.body.classList.toggle('light');
+ $('animation-character').onchange=()=>{state.animationCharacter=$('animation-character').value;state.animationSelected=null;state.lastScan=null;loadAnimations()};$('choose-animation-folder').onclick=chooseAnimationFolder;$('scan-animations').onclick=scanAnimations;$('publish-missing-animations').onclick=publishMissingAnimations;$('refresh-animations').onclick=loadAnimations;
+ loadCharacters();
+diff --git a/system/control-center/static/index.html b/system/control-center/static/index.html
+index ab75fb5..2c8998a 100644
+--- a/system/control-center/static/index.html
++++ b/system/control-center/static/index.html
+@@ -9,7 +9,7 @@
+ <body>
+ <header>
+ <div><span class="eyebrow">game1 · control center</span><h1>asset manager</h1></div>
+-<div class="header-actions"><span class="pill">characters + animations · m5.1</span><button id="theme" class="icon" type="button" title="theme">◐</button></div>
++<div class="header-actions"><span class="pill">characters + animations + weapons · m6</span><button id="theme" class="icon" type="button" title="theme">◐</button></div>
+ </header>
+ <main>
+ <aside class="panel rail">
+@@ -17,6 +17,7 @@
+ <div class="asset-sections">
+ <button id="nav-characters" class="asset-section active" type="button"><b>characters</b><small>models · rigs</small></button>
+ <button id="nav-animations" class="asset-section" type="button"><b>animations</b><small>profiles · clips</small></button>
++<button id="nav-weapons" class="asset-section" type="button"><b>weapons</b><small>models · textures · stats</small></button>
+ </div>
+ <div id="character-rail">
+ <hr class="rail-separator">
+@@ -30,6 +31,12 @@
+ <label class="rail-label">character<select id="animation-character"></select></label>
+ <div id="animation-tree" class="animation-tree"></div>
+ </div>
++<div id="weapon-rail" hidden>
++<hr class="rail-separator">
++<div class="section-title"><div><span>weapon registry</span><h3>weapons</h3></div><span id="weapon-rail-count">0</span></div>
++<div class="tree-actions"><button id="new-weapon" class="primary" type="button">new</button><button id="refresh-weapons" type="button">refresh</button></div>
++<div id="weapon-tree" class="tree"></div>
++</div>
+ </aside>
+ <section class="content">
+ <div id="characters-view">
+@@ -83,7 +90,7 @@
+ <code>human_female_idle.rbxm → base / idle</code>
+ <code>Atk02_1HS_FFighter.rbxm → 1hs / attack / 02</code>
+ </div>
+-<small class="hint">pattern: <code>[character_]context_slot[_variant]</code>. context is <code>base</code>, <code>hands</code>, <code>1hs</code> or <code>bow</code>. unassigned files can be bound manually without renaming them.</small>
++<small class="hint">pattern: <code>[character_]context_slot[_variant]</code>. context is <code>base</code>, <code>hands</code>, <code>1hs</code>, <code>2hs</code> or <code>bow</code>. unassigned files can be bound manually without renaming them.</small>
+ </details>
+ <div class="picker"><button id="choose-animation-folder" type="button">choose folder</button><small id="animation-folder">folder not selected</small></div>
+ <div class="actions"><button id="scan-animations" class="primary wide" type="button" disabled>scan folder</button></div>
+@@ -104,9 +111,44 @@
+ </div>
+ </div>
+ </div>
++
++<div id="weapons-view" hidden>
++<div class="panel hero">
++<div><span class="eyebrow">weapon assets · canonical game1 registry</span><h2>weapons</h2><p>one weapon owns one canonical fbx, zero or more textures, one animation context, additive stat modifiers and stable roblox asset ids. the imported model pivot is the grip reference, matching the reference project attachment contract.</p></div>
++<div class="metrics"><div><b id="weapon-metric-total">0</b><span>registered</span></div><div><b id="weapon-metric-published">0</b><span>published</span></div><div><b id="weapon-metric-active">0</b><span>startup</span></div></div>
++</div>
++<div class="panel runtime-card"><div id="weapon-runtime-state" class="runtime-state bootstrap"><strong>unarmed</strong><span>no startup weapon selected.</span></div><div id="weapon-publication-state" class="publication-missing">open cloud: checking…</div></div>
++<div class="weapon-workflow">
++<div class="panel character-card">
++<span class="eyebrow">01 · identity and stats</span><h3>register weapon</h3>
++<div class="character-grid"><label>name en<input id="weapon-name-en" autocomplete="off"></label><label>name ru<input id="weapon-name-ru" autocomplete="off"></label></div>
++<label>slug<input id="weapon-slug" readonly><small class="hint">generated from english name as lowercase snake_case. existing registered slugs stay stable.</small></label>
++<div class="character-grid"><label>type<select id="weapon-type"></select></label><label>rarity<select id="weapon-rarity"></select></label></div>
++<div class="weapon-stats-grid"><label>attack delta<input id="weapon-stat-damage" type="number" step="1" value="0"></label><label>attack speed delta<input id="weapon-stat-attack-speed" type="number" step="1" value="0"></label></div>
++<small class="hint">modifiers are additive to the current character stat. negative values subtract. 0 means no change. base character: damage 10 · attack speed 100 · run speed 50.</small>
++<hr class="card-separator">
++<span class="eyebrow">02 · source assets</span>
++<div class="picker"><button id="choose-weapon-model" type="button">choose fbx</button><small id="picked-weapon-model">fbx not selected</small></div>
++<div class="picker"><button id="choose-weapon-textures" type="button">choose textures</button><small id="picked-weapon-textures">textures not selected</small></div>
++<div id="weapon-model-status" class="status-box"><strong>not registered</strong><span>choose a weapon model. textures are optional.</span></div>
++<div class="actions"><button id="register-weapon" class="primary" type="button">register weapon</button><button id="clear-weapon-form" type="button">clear form</button></div>
++<hr class="card-separator">
++<span class="eyebrow">03 · publication and studio</span><h3 class="subheading">roblox assets</h3>
++<label>description<input id="weapon-publication-description" value="game1 weapon"></label>
++<div class="actions"><button id="publish-weapon" class="primary" type="button" disabled>publish all changed</button><button id="sync-weapon" type="button" disabled>sync studio</button><button id="activate-weapon" type="button" disabled>set startup</button><button id="clear-active-weapon" type="button">unarmed startup</button></div>
++<small id="weapon-publication-hint" class="hint">select a registered weapon.</small>
++</div>
++<div class="panel character-card">
++<div class="section-title"><div><span>versioned registry</span><h3>registered weapons</h3></div><button id="validate-weapons" type="button">refresh</button></div>
++<div class="table-wrap weapon-table-wrap"><table><thead><tr><th>active</th><th>weapon</th><th>type</th><th>rarity</th><th>stats</th><th>assets</th><th>status</th><th>actions</th></tr></thead><tbody id="weapon-rows"></tbody></table></div>
++<div id="weapon-details" class="details"><span class="muted">select a weapon.</span></div>
++</div>
++</div>
++</div>
+ </section>
+ </main>
+ <div id="toast" class="toast"></div>
+-<script src="character-assets.js?v=7"></script>
++<script src="character-assets.js?v=8"></script>
++<script src="weapon-assets.js?v=1"></script>
+ </body>
+ </html>
+diff --git a/system/control-center/static/weapon-assets.js b/system/control-center/static/weapon-assets.js
+new file mode 100644
+index 0000000..6ce539f
+--- /dev/null
++++ b/system/control-center/static/weapon-assets.js
+@@ -0,0 +1,24 @@
++const weaponState={data:null,selected:null,modelPath:'',texturePaths:[]};
++function weaponSelected(){return weaponState.data?.items?.find(row=>row.slug===weaponState.selected)||null}
++function weaponSlugify(value){return String(value||'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').replace(/_+/g,'_').slice(0,64)}
++function weaponStatusTag(status){return `<span class="tag ${String(status||'').toLowerCase()}">${esc(status||'')}</span>`}
++function weaponRarity(value){return `<span class="rarity-${esc(value)}">${esc(value)}</span>`}
++function weaponSyncSlug(){if(!weaponState.selected)$('weapon-slug').value=weaponSlugify($('weapon-name-en').value)}
++function weaponSetForm(row){weaponState.selected=row?.slug||null;weaponState.modelPath='';weaponState.texturePaths=[];if(row){$('weapon-name-en').value=row.name_en||'';$('weapon-name-ru').value=row.name_ru||'';$('weapon-slug').value=row.slug;$('weapon-type').value=row.weapon_type;$('weapon-rarity').value=row.rarity;$('weapon-stat-damage').value=row.stat_modifiers?.Damage??0;$('weapon-stat-attack-speed').value=row.stat_modifiers?.AttackSpeed??0;$('picked-weapon-model').textContent='keep current fbx or choose a replacement';$('picked-weapon-textures').textContent='keep current textures or choose replacements';}else{$('weapon-name-en').value='';$('weapon-name-ru').value='';$('weapon-slug').value='';$('weapon-type').value=weaponState.data?.options?.weaponTypes?.[0]||'1hs';$('weapon-rarity').value=weaponState.data?.options?.rarities?.[0]||'common';$('weapon-stat-damage').value='0';$('weapon-stat-attack-speed').value='0';$('picked-weapon-model').textContent='fbx not selected';$('picked-weapon-textures').textContent='textures not selected';}weaponRender()}
++function weaponRenderTree(){const host=$('weapon-tree');host.innerHTML='';for(const row of weaponState.data.items){const button=document.createElement('button');button.className=row.slug===weaponState.selected?'active':'';button.innerHTML=`<span>${esc(row.name_en)}<small>${esc(row.weapon_type)} · ${esc(row.rarity)}</small></span><small>${esc(row.status)}</small>`;button.onclick=()=>weaponSetForm(row);host.appendChild(button)}if(!weaponState.data.items.length)host.innerHTML='<small class="muted">no registered weapons.</small>';$('weapon-rail-count').textContent=weaponState.data.items.length}
++function weaponRenderRows(){const body=$('weapon-rows');body.innerHTML='';for(const row of weaponState.data.items){const active=weaponState.data.activeWeaponSlug===row.slug;const mods=row.stat_modifiers||{};const textures=row.textures||[];const tr=document.createElement('tr');tr.className=row.slug===weaponState.selected?'active':'';tr.innerHTML=`<td>${active?'yes':''}</td><td><b>${esc(row.name_en)}</b><br><small>${esc(row.name_ru||'—')} · ${esc(row.slug)}</small></td><td>${esc(row.weapon_type)}</td><td>${weaponRarity(row.rarity)}</td><td><small>atk ${Number(mods.Damage||0)>=0?'+':''}${esc(mods.Damage||0)}<br>aspd ${Number(mods.AttackSpeed||0)>=0?'+':''}${esc(mods.AttackSpeed||0)}</small></td><td>${row.model_asset_id?`model ${esc(row.model_asset_id)}`:'model local'}<br><small>${textures.length} texture${textures.length===1?'':'s'}</small></td><td>${weaponStatusTag(row.status)}</td><td><div class="row-actions"><button data-open>edit</button><button data-publish>publish</button><button data-sync>sync studio</button><button data-active>startup</button><button data-delete class="danger">delete</button></div></td>`;tr.querySelector('[data-open]').onclick=()=>weaponSetForm(row);tr.querySelector('[data-publish]').onclick=()=>weaponPublish(row.slug);tr.querySelector('[data-sync]').onclick=()=>weaponSync(row.slug);tr.querySelector('[data-active]').onclick=()=>weaponActivate(row.slug);tr.querySelector('[data-delete]').onclick=()=>weaponDelete(row.slug);body.appendChild(tr)}}
++function weaponRenderDetails(row){const host=$('weapon-details');if(!row){host.innerHTML='<span class="muted">select a weapon.</span>';return}const textureHtml=(row.textures||[]).map(tex=>`<div><b>${esc(tex.slot)}</b><span>${esc(tex.source_path)}</span><span>${esc(tex.asset_id||'local')}</span></div>`).join('');host.innerHTML=`<div class="section-title"><div><span>selected weapon</span><h3>${esc(row.name_en)}</h3></div>${weaponStatusTag(row.status)}</div><div class="details-grid"><div><b>slug</b><span>${esc(row.slug)}</span></div><div><b>type / rarity</b><span>${esc(row.weapon_type)} · ${esc(row.rarity)}</span></div><div><b>model source</b><span>${esc(row.model_source_path||'—')}</span></div><div><b>model asset id</b><span>${esc(row.model_asset_id||'not published')}</span></div><div><b>serverstorage</b><span>${esc(row.server_storage_path||'—')}</span></div><div><b>revision</b><span>${esc(row.revision)}</span></div></div>${textureHtml?`<div class="texture-list">${textureHtml}</div>`:''}`}
++function weaponRenderForm(row){const configured=!!weaponState.data?.publication?.configured;if(row){$('weapon-model-status').innerHTML=`<strong>${esc(row.name_en)} · ${esc(row.status)}</strong><span>${esc(row.model_source_path||'no model')} · ${(row.textures||[]).length} registered texture(s)</span>`;$('register-weapon').textContent=(weaponState.modelPath||weaponState.texturePaths.length)?'register new revision':'save metadata';}else{$('weapon-model-status').innerHTML='<strong>not registered</strong><span>choose a weapon fbx. textures are optional.</span>';$('register-weapon').textContent='register weapon'}$('register-weapon').disabled=!row&&!weaponState.modelPath;$('publish-weapon').disabled=!row||!configured||!row.model_source_path;$('sync-weapon').disabled=!row?.model_asset_id;$('activate-weapon').disabled=!row?.model_asset_id;$('weapon-publication-hint').textContent=!row?'select a registered weapon.':!configured?'configure open cloud before publishing.':row.model_asset_id?`publish updates model ${row.model_asset_id} and changed textures.`:'publish creates the permanent model/texture asset ids.'}
++function weaponRenderRuntime(){const active=weaponState.data.activeWeaponSlug;const host=$('weapon-runtime-state');if(active){const row=weaponState.data.items.find(item=>item.slug===active);host.className='runtime-state registered';host.innerHTML=`<strong>startup weapon · ${esc(active)}</strong><span>${esc(row?.weapon_type||'')} · ${esc(row?.rarity||'')}</span>`}else{host.className='runtime-state bootstrap';host.innerHTML='<strong>unarmed startup</strong><span>animation context: hands</span>'}const pub=weaponState.data.publication||{};$('weapon-publication-state').className=pub.configured?'publication-ready':'publication-missing';$('weapon-publication-state').textContent=pub.configured?`open cloud: ${pub.creatorType} ${pub.creatorId}`:'open cloud: not configured'}
++function weaponRender(){if(!weaponState.data)return;const row=weaponSelected();$('weapon-metric-total').textContent=weaponState.data.summary?.registered||0;$('weapon-metric-published').textContent=weaponState.data.summary?.published||0;$('weapon-metric-active').textContent=weaponState.data.summary?.active||0;weaponRenderRuntime();weaponRenderTree();weaponRenderRows();weaponRenderDetails(row);weaponRenderForm(row)}
++async function weaponLoad(){try{weaponState.data=await request('/api/weapons');const types=weaponState.data.options?.weaponTypes||['1hs','2hs','bow'];const rarities=weaponState.data.options?.rarities||['common','uncommon','rare','mythical','legendary','immortal'];$('weapon-type').innerHTML=types.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');$('weapon-rarity').innerHTML=rarities.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');if(weaponState.selected&&!weaponState.data.items.some(x=>x.slug===weaponState.selected))weaponState.selected=null;weaponRender()}catch(error){toast(error.message,true)}}
++async function weaponChooseModel(){try{const result=await request('/api/files/choose-weapon-model',{method:'POST'});if(!result.path)return;weaponState.modelPath=result.path;$('picked-weapon-model').textContent=result.path;weaponRenderForm(weaponSelected())}catch(error){toast(error.message,true)}}
++async function weaponChooseTextures(){try{const result=await request('/api/files/choose-weapon-textures',{method:'POST'});weaponState.texturePaths=result.paths||[];$('picked-weapon-textures').textContent=weaponState.texturePaths.length?weaponState.texturePaths.join(' · '):'textures not selected';weaponRenderForm(weaponSelected())}catch(error){toast(error.message,true)}}
++async function weaponRegister(){try{const row=weaponSelected();const nameEn=$('weapon-name-en').value.trim();if(!nameEn)throw Error('name en is required');const slug=row?.slug||weaponSlugify(nameEn);if(!slug)throw Error('english name cannot generate a slug');if(!row&&!weaponState.modelPath)throw Error('choose a weapon fbx first');$('register-weapon').disabled=true;const result=await request('/api/weapons',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug,nameEn,nameRu:$('weapon-name-ru').value.trim(),weaponType:$('weapon-type').value,rarity:$('weapon-rarity').value,modelSourcePath:weaponState.modelPath,texturePaths:weaponState.texturePaths,statModifiers:{Damage:Number($('weapon-stat-damage').value||0),AttackSpeed:Number($('weapon-stat-attack-speed').value||0)}})});weaponState.selected=result.slug;weaponState.modelPath='';weaponState.texturePaths=[];await weaponLoad();weaponSetForm(weaponSelected());toast(`registered weapon ${result.slug}`)}catch(error){toast(error.message,true)}finally{weaponRenderForm(weaponSelected())}}
++async function weaponPublish(slug){try{toast('publishing weapon model and changed textures…');await request('/api/weapons/'+encodeURIComponent(slug)+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:$('weapon-publication-description').value})});await weaponLoad();toast('weapon publication complete')}catch(error){toast(error.message,true)}}
++async function weaponSync(slug){try{toast('syncing weapon into serverstorage…');const result=await request('/api/weapons/'+encodeURIComponent(slug)+'/sync',{method:'POST'});await weaponLoad();toast(`studio synced: ${result.studio?.destination||slug}`)}catch(error){toast(error.message,true)}}
++async function weaponActivate(slug){try{weaponState.data=await request('/api/weapons/'+encodeURIComponent(slug)+'/activate',{method:'POST'});weaponState.data.publication=(await request('/api/weapons')).publication;weaponRender();toast(`startup weapon: ${slug}`)}catch(error){toast(error.message,true)}}
++async function weaponClearActive(){try{await request('/api/weapons/active/clear',{method:'POST'});await weaponLoad();toast('startup weapon: unarmed')}catch(error){toast(error.message,true)}}
++async function weaponDelete(slug){if(!confirm(`delete weapon ${slug} from game1 registry? roblox cloud assets are not deleted.`))return;try{await request('/api/weapons/'+encodeURIComponent(slug),{method:'DELETE'});if(weaponState.selected===slug)weaponState.selected=null;await weaponLoad();weaponSetForm(null);toast('weapon registry row deleted')}catch(error){toast(error.message,true)}}
++window.game1WeaponsLoad=weaponLoad;
++$('weapon-name-en').oninput=weaponSyncSlug;$('new-weapon').onclick=()=>weaponSetForm(null);$('refresh-weapons').onclick=weaponLoad;$('validate-weapons').onclick=weaponLoad;$('choose-weapon-model').onclick=weaponChooseModel;$('choose-weapon-textures').onclick=weaponChooseTextures;$('register-weapon').onclick=weaponRegister;$('clear-weapon-form').onclick=()=>weaponSetForm(null);$('publish-weapon').onclick=()=>weaponSelected()&&weaponPublish(weaponSelected().slug);$('sync-weapon').onclick=()=>weaponSelected()&&weaponSync(weaponSelected().slug);$('activate-weapon').onclick=()=>weaponSelected()&&weaponActivate(weaponSelected().slug);$('clear-active-weapon').onclick=weaponClearActive;
+diff --git a/system/control-center/studio_bridge.py b/system/control-center/studio_bridge.py
+index f70d270..32f3ecf 100644
+--- a/system/control-center/studio_bridge.py
++++ b/system/control-center/studio_bridge.py
+@@ -18,6 +18,8 @@ def run_model_load_bridge(
+     destination_folders: list[str],
+     *,
+     wrapper_name: str,
++    placement_mode: str = "character-controller",
++    metadata: dict | None = None,
+     timeout_seconds: float = 75.0,
+ ) -> dict:
+     command = {
+@@ -27,8 +29,9 @@ def run_model_load_bridge(
+         "assetId": str(asset_id),
+         "destinationFolders": [str(part) for part in destination_folders],
+         "replaceExisting": True,
+-        "placementMode": "character-controller",
++        "placementMode": str(placement_mode),
+         "wrapperName": str(wrapper_name),
++        "metadata": dict(metadata or {}),
+     }
+     result: dict | None = None
+     command_claimed = False
+diff --git a/system/control-center/weapon_store.py b/system/control-center/weapon_store.py
+new file mode 100644
+index 0000000..cb4a906
+--- /dev/null
++++ b/system/control-center/weapon_store.py
+@@ -0,0 +1,509 @@
++from __future__ import annotations
++
++from pathlib import Path
++import hashlib
++import json
++import re
++import shutil
++import sqlite3
++import time
++
++from opencloud_assets import (
++    create_image_asset,
++    create_model_asset,
++    update_image_asset,
++    update_model_asset,
++    wait_for_operation,
++)
++
++SCHEMA_VERSION = 1
++PROJECT = "game1"
++ACTIVE_KEY = "active_weapon_slug"
++WEAPON_TYPES = ("1hs", "2hs", "bow")
++RARITIES = ("common", "uncommon", "rare", "mythical", "legendary", "immortal")
++TEXTURE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
++STAT_KEYS = ("Damage", "AttackSpeed")
++SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_]{0,63}$")
++
++
++def slugify_english(value: str) -> str:
++    text = str(value or "").strip().lower()
++    text = re.sub(r"[^a-z0-9]+", "_", text).strip("_")
++    text = re.sub(r"_+", "_", text)
++    if not text:
++        raise ValueError("english name must contain latin letters or digits so a slug can be generated")
++    if len(text) > 64:
++        text = text[:64].rstrip("_")
++    if not SLUG_RE.fullmatch(text):
++        raise ValueError("generated weapon slug is invalid")
++    return text
++
++
++def _safe_texture_slot(path: Path) -> str:
++    value = re.sub(r"[^a-z0-9]+", "_", path.stem.lower()).strip("_")
++    return (value or "texture")[:64]
++
++
++class WeaponStore:
++    def __init__(self, root: Path):
++        self.root = root.resolve()
++        self.runtime = self.root / ".control-center"
++        self.runtime.mkdir(parents=True, exist_ok=True)
++        self.db = self.runtime / "game1.db"
++        self._init()
++        self.export()
++
++    def connect(self):
++        connection = sqlite3.connect(self.db)
++        connection.row_factory = sqlite3.Row
++        return connection
++
++    def _init(self):
++        with self.connect() as connection:
++            connection.execute(
++                """CREATE TABLE IF NOT EXISTS weapons(
++                    slug TEXT PRIMARY KEY,
++                    name_en TEXT NOT NULL,
++                    name_ru TEXT NOT NULL DEFAULT '',
++                    weapon_type TEXT NOT NULL,
++                    rarity TEXT NOT NULL,
++                    model_source_path TEXT NOT NULL DEFAULT '',
++                    model_prepared_path TEXT NOT NULL DEFAULT '',
++                    model_sha256 TEXT NOT NULL DEFAULT '',
++                    model_asset_id TEXT,
++                    model_published_sha256 TEXT NOT NULL DEFAULT '',
++                    moderation_state TEXT NOT NULL DEFAULT '',
++                    revision INTEGER NOT NULL DEFAULT 1,
++                    created_at REAL NOT NULL,
++                    updated_at REAL NOT NULL,
++                    published_at REAL
++                )"""
++            )
++            connection.execute(
++                """CREATE TABLE IF NOT EXISTS weapon_textures(
++                    id TEXT PRIMARY KEY,
++                    weapon_slug TEXT NOT NULL,
++                    slot TEXT NOT NULL,
++                    source_path TEXT NOT NULL,
++                    prepared_path TEXT NOT NULL,
++                    sha256 TEXT NOT NULL,
++                    asset_id TEXT,
++                    published_sha256 TEXT NOT NULL DEFAULT '',
++                    moderation_state TEXT NOT NULL DEFAULT '',
++                    revision INTEGER NOT NULL DEFAULT 1,
++                    created_at REAL NOT NULL,
++                    updated_at REAL NOT NULL,
++                    published_at REAL,
++                    UNIQUE(weapon_slug, slot)
++                )"""
++            )
++            connection.execute(
++                """CREATE TABLE IF NOT EXISTS weapon_stat_modifiers(
++                    weapon_slug TEXT NOT NULL,
++                    stat_key TEXT NOT NULL,
++                    delta REAL NOT NULL DEFAULT 0,
++                    PRIMARY KEY(weapon_slug, stat_key)
++                )"""
++            )
++            connection.execute(
++                """CREATE TABLE IF NOT EXISTS weapon_publications(
++                    id INTEGER PRIMARY KEY AUTOINCREMENT,
++                    weapon_slug TEXT NOT NULL,
++                    kind TEXT NOT NULL,
++                    slot TEXT NOT NULL DEFAULT '',
++                    weapon_revision INTEGER NOT NULL,
++                    asset_id TEXT NOT NULL,
++                    operation_path TEXT NOT NULL,
++                    sha256 TEXT NOT NULL,
++                    moderation_state TEXT,
++                    published_at REAL NOT NULL
++                )"""
++            )
++            connection.execute(
++                """CREATE TABLE IF NOT EXISTS project_settings(
++                    key TEXT PRIMARY KEY,
++                    value TEXT NOT NULL DEFAULT ''
++                )"""
++            )
++
++    @staticmethod
++    def _sha256(path: Path) -> str:
++        digest = hashlib.sha256()
++        with path.open("rb") as stream:
++            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
++                digest.update(chunk)
++        return digest.hexdigest()
++
++    def options(self):
++        return {
++            "weaponTypes": list(WEAPON_TYPES),
++            "rarities": list(RARITIES),
++            "statKeys": list(STAT_KEYS),
++        }
++
++    def active_slug(self) -> str | None:
++        with self.connect() as connection:
++            row = connection.execute("SELECT value FROM project_settings WHERE key=?", (ACTIVE_KEY,)).fetchone()
++        value = str(row["value"] if row else "").strip()
++        return value or None
++
++    def set_active(self, slug: str):
++        slug = str(slug or "").strip().lower()
++        row = self.get(slug)
++        if not row:
++            raise ValueError(f"unknown weapon: {slug}")
++        if not str(row.get("model_asset_id") or "").isdigit():
++            raise ValueError("publish the weapon model before setting it as the startup weapon")
++        with self.connect() as connection:
++            connection.execute("INSERT OR REPLACE INTO project_settings(key,value) VALUES(?,?)", (ACTIVE_KEY, slug))
++        self.export()
++        return self.snapshot()
++
++    def clear_active(self):
++        with self.connect() as connection:
++            connection.execute("DELETE FROM project_settings WHERE key=?", (ACTIVE_KEY,))
++        self.export()
++        return self.snapshot()
++
++    def _modifiers(self, connection, slug: str) -> dict[str, float]:
++        rows = connection.execute(
++            "SELECT stat_key,delta FROM weapon_stat_modifiers WHERE weapon_slug=? ORDER BY stat_key", (slug,)
++        ).fetchall()
++        result = {}
++        for row in rows:
++            value = float(row["delta"])
++            if value.is_integer():
++                value = int(value)
++            result[str(row["stat_key"])] = value
++        return result
++
++    def _textures(self, connection, slug: str) -> list[dict]:
++        return [dict(row) for row in connection.execute(
++            "SELECT * FROM weapon_textures WHERE weapon_slug=? ORDER BY slot", (slug,)
++        )]
++
++    def _status(self, row: dict, textures: list[dict]) -> str:
++        if not str(row.get("model_source_path") or ""):
++            return "INCOMPLETE"
++        model_asset = str(row.get("model_asset_id") or "")
++        model_current = bool(model_asset and str(row.get("model_published_sha256") or "") == str(row.get("model_sha256") or ""))
++        textures_current = all(
++            str(item.get("asset_id") or "")
++            and str(item.get("published_sha256") or "") == str(item.get("sha256") or "")
++            for item in textures
++        )
++        if model_current and textures_current:
++            return "PUBLISHED"
++        any_published = bool(model_asset or any(str(item.get("asset_id") or "") for item in textures))
++        return "UPDATE_AVAILABLE" if any_published else "LOCAL_ONLY"
++
++    def _decorate(self, connection, row) -> dict:
++        result = dict(row)
++        result["textures"] = self._textures(connection, result["slug"])
++        result["stat_modifiers"] = self._modifiers(connection, result["slug"])
++        result["status"] = self._status(result, result["textures"])
++        result["server_storage_path"] = (
++            f"ServerStorage.weapons.{result['weapon_type']}.{result['slug']}.model.{result['slug']}"
++        )
++        return result
++
++    def list(self) -> list[dict]:
++        with self.connect() as connection:
++            rows = connection.execute("SELECT * FROM weapons ORDER BY weapon_type,rarity,name_en,slug").fetchall()
++            return [self._decorate(connection, row) for row in rows]
++
++    def get(self, slug: str) -> dict | None:
++        with self.connect() as connection:
++            row = connection.execute("SELECT * FROM weapons WHERE slug=?", (str(slug or "").strip().lower(),)).fetchone()
++            return self._decorate(connection, row) if row else None
++
++    def _validate_identity(self, payload: dict, old: dict | None = None) -> tuple[str, str, str, str, str]:
++        name_en = str(payload.get("nameEn", old.get("name_en") if old else "") or "").strip()
++        name_ru = str(payload.get("nameRu", old.get("name_ru") if old else "") or "").strip()
++        if not name_en:
++            raise ValueError("english weapon name is required")
++        slug = str(payload.get("slug") or (old.get("slug") if old else "") or "").strip().lower()
++        if not slug:
++            slug = slugify_english(name_en)
++        if not SLUG_RE.fullmatch(slug):
++            raise ValueError("weapon slug must be lowercase snake_case")
++        weapon_type = str(payload.get("weaponType", old.get("weapon_type") if old else "") or "").strip().lower()
++        rarity = str(payload.get("rarity", old.get("rarity") if old else "") or "").strip().lower()
++        if weapon_type not in WEAPON_TYPES:
++            raise ValueError("weapon type must be 1hs, 2hs or bow")
++        if rarity not in RARITIES:
++            raise ValueError("rarity must be common, uncommon, rare, mythical, legendary or immortal")
++        return slug, name_en, name_ru, weapon_type, rarity
++
++    def _archive_existing(self, path: Path, slug: str, revision: int):
++        if not path.is_file():
++            return
++        relative = path.resolve().relative_to(self.root)
++        tail = relative.parts[-2:]
++        destination = self.root / "assets/reimported/weapons" / slug / f"r{revision:04d}" / Path(*tail)
++        destination.parent.mkdir(parents=True, exist_ok=True)
++        if not destination.exists():
++            shutil.copy2(path, destination)
++
++    def register(self, payload: dict) -> dict:
++        incoming_slug = str(payload.get("slug") or "").strip().lower()
++        old = self.get(incoming_slug) if incoming_slug else None
++        slug, name_en, name_ru, weapon_type, rarity = self._validate_identity(payload, old)
++        if not old:
++            old = self.get(slug)
++        model_source = str(payload.get("modelSourcePath") or "").strip()
++        texture_paths = [str(value).strip() for value in (payload.get("texturePaths") or []) if str(value).strip()]
++        if not old and not model_source:
++            raise ValueError("choose a weapon FBX before registration")
++
++        now = time.time()
++        revision = int(old.get("revision") or 0) + 1 if old else 1
++        model_source_path = str(old.get("model_source_path") or "") if old else ""
++        model_prepared_path = str(old.get("model_prepared_path") or "") if old else ""
++        model_sha256 = str(old.get("model_sha256") or "") if old else ""
++
++        if model_source:
++            source = Path(model_source).expanduser().resolve()
++            if not source.is_file() or source.suffix.lower() != ".fbx":
++                raise ValueError("weapon model must be an FBX file")
++            source_target = self.root / "assets/source/weapons" / weapon_type / slug / "model" / f"{slug}.fbx"
++            prepared_target = self.root / "assets/prepared/weapons" / weapon_type / slug / "model" / f"{slug}.fbx"
++            for target in (source_target, prepared_target):
++                target.parent.mkdir(parents=True, exist_ok=True)
++                if old:
++                    self._archive_existing(target, slug, int(old.get("revision") or 1))
++                shutil.copy2(source, target)
++            model_source_path = source_target.relative_to(self.root).as_posix()
++            model_prepared_path = prepared_target.relative_to(self.root).as_posix()
++            model_sha256 = self._sha256(prepared_target)
++
++        with self.connect() as connection:
++            connection.execute(
++                """INSERT OR REPLACE INTO weapons(
++                    slug,name_en,name_ru,weapon_type,rarity,model_source_path,model_prepared_path,model_sha256,
++                    model_asset_id,model_published_sha256,moderation_state,revision,created_at,updated_at,published_at
++                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
++                (
++                    slug, name_en, name_ru, weapon_type, rarity, model_source_path, model_prepared_path, model_sha256,
++                    old.get("model_asset_id") if old else None,
++                    str(old.get("model_published_sha256") or "") if old else "",
++                    str(old.get("moderation_state") or "") if old else "",
++                    revision,
++                    old.get("created_at") if old else now,
++                    now,
++                    old.get("published_at") if old else None,
++                ),
++            )
++
++            modifiers = payload.get("statModifiers") or {}
++            for key in STAT_KEYS:
++                if key in modifiers or not old:
++                    delta = float(modifiers.get(key) or 0)
++                    connection.execute(
++                        "INSERT OR REPLACE INTO weapon_stat_modifiers(weapon_slug,stat_key,delta) VALUES(?,?,?)",
++                        (slug, key, delta),
++                    )
++
++            for raw in texture_paths:
++                source = Path(raw).expanduser().resolve()
++                if not source.is_file() or source.suffix.lower() not in TEXTURE_EXTENSIONS:
++                    raise ValueError(f"weapon texture must be png/jpg/jpeg/webp: {source.name}")
++                slot = _safe_texture_slot(source)
++                texture_id = f"{slug}__{slot}"
++                previous = connection.execute("SELECT * FROM weapon_textures WHERE id=?", (texture_id,)).fetchone()
++                canonical_name = f"{slot}{source.suffix.lower()}"
++                source_target = self.root / "assets/source/weapons" / weapon_type / slug / "textures" / canonical_name
++                prepared_target = self.root / "assets/prepared/weapons" / weapon_type / slug / "textures" / canonical_name
++                source_target.parent.mkdir(parents=True, exist_ok=True)
++                prepared_target.parent.mkdir(parents=True, exist_ok=True)
++                if previous:
++                    self._archive_existing(source_target, slug, int(previous["revision"] or 1))
++                    self._archive_existing(prepared_target, slug, int(previous["revision"] or 1))
++                shutil.copy2(source, source_target)
++                shutil.copy2(source, prepared_target)
++                digest = self._sha256(prepared_target)
++                texture_revision = int(previous["revision"] or 0) + 1 if previous else 1
++                connection.execute(
++                    """INSERT OR REPLACE INTO weapon_textures(
++                        id,weapon_slug,slot,source_path,prepared_path,sha256,asset_id,published_sha256,
++                        moderation_state,revision,created_at,updated_at,published_at
++                    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
++                    (
++                        texture_id, slug, slot,
++                        source_target.relative_to(self.root).as_posix(),
++                        prepared_target.relative_to(self.root).as_posix(),
++                        digest,
++                        previous["asset_id"] if previous else None,
++                        str(previous["published_sha256"] or "") if previous else "",
++                        str(previous["moderation_state"] or "") if previous else "",
++                        texture_revision,
++                        previous["created_at"] if previous else now,
++                        now,
++                        previous["published_at"] if previous else None,
++                    ),
++                )
++
++        self.export()
++        return self.get(slug)
++
++    def publish(self, slug: str, credentials: dict) -> dict:
++        row = self.get(slug)
++        if not row:
++            raise ValueError(f"unknown weapon: {slug}")
++        model = self.root / str(row.get("model_prepared_path") or "")
++        if not model.is_file():
++            raise ValueError("canonical prepared weapon FBX is missing")
++        api_key = str(credentials.get("apiKey") or "")
++        creator_type = str(credentials.get("creatorType") or "")
++        creator_id = str(credentials.get("creatorId") or "")
++        description = str(credentials.get("description") or "game1 weapon").strip()
++
++        current_asset_id = str(row.get("model_asset_id") or "").strip()
++        if current_asset_id:
++            operation = update_model_asset(
++                model, asset_id=current_asset_id, display_name=row["name_en"], description=description,
++                creator_type=creator_type, creator_id=creator_id, api_key=api_key,
++            )
++        else:
++            operation = create_model_asset(
++                model, display_name=row["name_en"], description=description,
++                creator_type=creator_type, creator_id=creator_id, api_key=api_key,
++            )
++        result = wait_for_operation(operation, api_key=api_key)
++        now = time.time()
++        with self.connect() as connection:
++            connection.execute(
++                """UPDATE weapons SET model_asset_id=?,model_published_sha256=?,moderation_state=?,published_at=?,updated_at=?
++                   WHERE slug=?""",
++                (result.asset_id, row["model_sha256"], result.moderation_state or "", now, now, slug),
++            )
++            connection.execute(
++                """INSERT INTO weapon_publications(
++                    weapon_slug,kind,slot,weapon_revision,asset_id,operation_path,sha256,moderation_state,published_at
++                ) VALUES(?,?,?,?,?,?,?,?,?)""",
++                (slug, "model", "", int(row["revision"]), result.asset_id, result.operation_path,
++                 row["model_sha256"], result.moderation_state or "", now),
++            )
++
++        row = self.get(slug)
++        for texture in row.get("textures") or []:
++            if str(texture.get("asset_id") or "") and str(texture.get("published_sha256") or "") == str(texture.get("sha256") or ""):
++                continue
++            file_path = self.root / str(texture.get("prepared_path") or "")
++            texture_asset = str(texture.get("asset_id") or "").strip()
++            display_name = f"{row['name_en']} {texture['slot']}"
++            if texture_asset:
++                operation = update_image_asset(
++                    file_path, asset_id=texture_asset, display_name=display_name, description=description,
++                    creator_type=creator_type, creator_id=creator_id, api_key=api_key,
++                )
++            else:
++                operation = create_image_asset(
++                    file_path, display_name=display_name, description=description,
++                    creator_type=creator_type, creator_id=creator_id, api_key=api_key,
++                )
++            result = wait_for_operation(operation, api_key=api_key)
++            now = time.time()
++            with self.connect() as connection:
++                connection.execute(
++                    """UPDATE weapon_textures SET asset_id=?,published_sha256=?,moderation_state=?,published_at=?,updated_at=? WHERE id=?""",
++                    (result.asset_id, texture["sha256"], result.moderation_state or "", now, now, texture["id"]),
++                )
++                connection.execute(
++                    """INSERT INTO weapon_publications(
++                        weapon_slug,kind,slot,weapon_revision,asset_id,operation_path,sha256,moderation_state,published_at
++                    ) VALUES(?,?,?,?,?,?,?,?,?)""",
++                    (slug, "texture", texture["slot"], int(row["revision"]), result.asset_id,
++                     result.operation_path, texture["sha256"], result.moderation_state or "", now),
++                )
++
++        self.export()
++        return self.get(slug)
++
++    def delete(self, slug: str):
++        slug = str(slug or "").strip().lower()
++        if not self.get(slug):
++            return
++        with self.connect() as connection:
++            connection.execute("DELETE FROM weapon_stat_modifiers WHERE weapon_slug=?", (slug,))
++            connection.execute("DELETE FROM weapon_textures WHERE weapon_slug=?", (slug,))
++            connection.execute("DELETE FROM weapon_publications WHERE weapon_slug=?", (slug,))
++            connection.execute("DELETE FROM weapons WHERE slug=?", (slug,))
++            current = connection.execute("SELECT value FROM project_settings WHERE key=?", (ACTIVE_KEY,)).fetchone()
++            if current and str(current["value"]) == slug:
++                connection.execute("DELETE FROM project_settings WHERE key=?", (ACTIVE_KEY,))
++        self.export()
++
++    def publications(self, slug: str) -> list[dict]:
++        with self.connect() as connection:
++            return [dict(row) for row in connection.execute(
++                "SELECT * FROM weapon_publications WHERE weapon_slug=? ORDER BY id DESC", (slug,)
++            )]
++
++    def snapshot(self) -> dict:
++        items = self.list()
++        active = self.active_slug()
++        return {
++            "schemaVersion": SCHEMA_VERSION,
++            "project": PROJECT,
++            "activeWeaponSlug": active,
++            "options": self.options(),
++            "items": items,
++            "summary": {
++                "registered": len(items),
++                "published": sum(1 for item in items if item["status"] == "PUBLISHED"),
++                "active": 1 if active else 0,
++            },
++        }
++
++    @staticmethod
++    def _lua_string(value: str) -> str:
++        return json.dumps(str(value), ensure_ascii=False)
++
++    @staticmethod
++    def _lua_number(value) -> str:
++        number = float(value or 0)
++        return str(int(number)) if number.is_integer() else repr(number)
++
++    def export(self):
++        snapshot = self.snapshot()
++        manifest_path = self.root / "assets/manifests/weapons.json"
++        manifest_path.parent.mkdir(parents=True, exist_ok=True)
++        manifest_path.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
++
++        registry_path = self.root / "src/shared/weapon/WeaponRegistry.luau"
++        registry_path.parent.mkdir(parents=True, exist_ok=True)
++        lines = [
++            "-- generated. do not edit by hand.",
++            "return table.freeze({",
++            f"\tschemaVersion = {SCHEMA_VERSION},",
++            '\tproject = "game1",',
++            f"\tactiveWeaponSlug = {self._lua_string(snapshot.get('activeWeaponSlug') or '')},",
++            "\tweapons = table.freeze({",
++        ]
++        for row in snapshot["items"]:
++            lines.extend([
++                f"\t\t[{self._lua_string(row['slug'])}] = table.freeze({{",
++                f"\t\t\tslug = {self._lua_string(row['slug'])},",
++                f"\t\t\tnameEn = {self._lua_string(row['name_en'])},",
++                f"\t\t\tnameRu = {self._lua_string(row['name_ru'])},",
++                f"\t\t\tweaponType = {self._lua_string(row['weapon_type'])},",
++                f"\t\t\trarity = {self._lua_string(row['rarity'])},",
++                f"\t\t\tstatus = {self._lua_string(row['status'])},",
++                f"\t\t\tmodelAssetId = {self._lua_string(row.get('model_asset_id') or '')},",
++                f"\t\t\tserverStoragePath = {self._lua_string(row['server_storage_path'])},",
++                "\t\t\tstatModifiers = table.freeze({",
++            ])
++            for key, value in sorted((row.get("stat_modifiers") or {}).items()):
++                lines.append(f"\t\t\t\t[{self._lua_string(key)}] = {self._lua_number(value)},")
++            lines.extend(["\t\t\t}),", "\t\t\ttextures = table.freeze({"])
++            for texture in row.get("textures") or []:
++                lines.extend([
++                    f"\t\t\t\t[{self._lua_string(texture['slot'])}] = table.freeze({{",
++                    f"\t\t\t\t\tassetId = {self._lua_string(texture.get('asset_id') or '')},",
++                    f"\t\t\t\t\tsha256 = {self._lua_string(texture.get('sha256') or '')},",
++                    "\t\t\t\t}),",
++                ])
++            lines.extend(["\t\t\t}),", "\t\t}),"])
++        lines.extend(["\t}),", "})", ""])
++        registry_path.write_text("\n".join(lines), encoding="utf-8")
+diff --git a/system/studio-plugin/Game1Bridge.server.luau b/system/studio-plugin/Game1Bridge.server.luau
+index e9f97a4..a30bc51 100644
+--- a/system/studio-plugin/Game1Bridge.server.luau
++++ b/system/studio-plugin/Game1Bridge.server.luau
+@@ -202,6 +202,103 @@ local function placeCharacterRig(importedRig: Model, destination: Instance, wrap
+     return wrapper :: Model, stats, templateInfo
+ end
+ 
++local function prepareWeaponModel(model: Model)
++    for _, descendant in model:GetDescendants() do
++        if descendant:IsA("Humanoid") or descendant:IsA("AnimationController") then
++            descendant:Destroy()
++        elseif descendant:IsA("BasePart") then
++            descendant.Anchored = true
++            descendant.CanCollide = false
++            descendant.CanTouch = false
++            descendant.CanQuery = false
++            descendant.Massless = true
++        end
++    end
++end
++
++local function applyWeaponTextures(model: Model, textures: { any }): any
++    local meshParts = {}
++    for _, descendant in model:GetDescendants() do
++        if descendant:IsA("MeshPart") then
++            table.insert(meshParts, descendant)
++        end
++    end
++    table.sort(meshParts, function(left, right)
++        return left:GetFullName() < right:GetFullName()
++    end)
++
++    local validTextures = {}
++    for _, row in ipairs(textures or {}) do
++        local assetId = tonumber(row.assetId)
++        if assetId and assetId > 0 then
++            table.insert(validTextures, {
++                slot = string.lower(tostring(row.slot or "")),
++                assetId = tostring(math.floor(assetId)),
++            })
++        end
++    end
++
++    local applied = 0
++    local unmatched = 0
++    if #validTextures == 1 then
++        local uri = "rbxassetid://" .. validTextures[1].assetId
++        for _, mesh in ipairs(meshParts) do
++            mesh.TextureID = uri
++            applied += 1
++        end
++    elseif #validTextures > 1 then
++        for index, texture in ipairs(validTextures) do
++            local matched = false
++            for _, mesh in ipairs(meshParts) do
++                local meshName = string.lower(mesh.Name)
++                if texture.slot ~= "" and string.find(meshName, texture.slot, 1, true) then
++                    mesh.TextureID = "rbxassetid://" .. texture.assetId
++                    matched = true
++                    applied += 1
++                end
++            end
++            if not matched and #validTextures == #meshParts and meshParts[index] then
++                meshParts[index].TextureID = "rbxassetid://" .. texture.assetId
++                matched = true
++                applied += 1
++            end
++            if not matched then
++                unmatched += 1
++            end
++        end
++    end
++
++    return {
++        meshParts = #meshParts,
++        textureAssets = #validTextures,
++        applied = applied,
++        unmatched = unmatched,
++    }
++end
++
++local function placeWeaponModel(imported: Model, destination: Instance, wrapperName: string, assetId: number, metadata: any): (Model, any)
++    wrapperName = validSegment(wrapperName)
++    local existing = destination:FindFirstChild(wrapperName)
++    if existing ~= nil and (not existing:IsA("Model") or existing:GetAttribute("Game1WeaponTemplate") ~= true) then
++        error("refusing to replace unmanaged weapon instance named " .. wrapperName)
++    end
++    if existing then
++        existing:Destroy()
++    end
++
++    imported.Name = wrapperName
++    prepareWeaponModel(imported)
++    imported:SetAttribute("Game1WeaponTemplate", true)
++    imported:SetAttribute("Game1ModelAssetId", tostring(assetId))
++    imported:SetAttribute("WeaponSlug", tostring(metadata.weaponSlug or wrapperName))
++    imported:SetAttribute("WeaponType", tostring(metadata.weaponType or ""))
++    imported:SetAttribute("WeaponRarity", tostring(metadata.rarity or ""))
++    imported.Parent = destination
++
++    local textureStats = applyWeaponTextures(imported, metadata.textures or {})
++    return imported, textureStats
++end
++
+ local function postModelLoadResult(payload: any)
+     HttpService:RequestAsync({
+         Url = BRIDGE_URL .. "/model-load-result",
+@@ -225,8 +322,9 @@ local function handleModelLoad(data: any)
+         if tostring(data.project or "") ~= "game1" or tonumber(data.schemaVersion) ~= 1 then
+             error("invalid game1 model load command")
+         end
+-        if tostring(data.placementMode or "") ~= "character-controller" then
+-            error("unsupported game1 character placement mode")
++        local placementMode = tostring(data.placementMode or "")
++        if placementMode ~= "character-controller" and placementMode ~= "weapon-pivot" then
++            error("unsupported game1 model placement mode")
+         end
+         local assetId = tonumber(data.assetId)
+         if assetId == nil or assetId <= 0 then
+@@ -261,18 +359,35 @@ local function handleModelLoad(data: any)
+         end
+ 
+         local destination = modelLoadDestination(data.destinationFolders or {})
+-        local normalizedRig = canonicalRigModel(importedRig)
+-        local wrapper, stats, templateInfo = placeCharacterRig(
+-            normalizedRig,
+-            destination,
+-            tostring(data.wrapperName or ""),
+-            assetId
+-        )
+-        result.destination = wrapper:GetFullName()
+-        result.wrapperName = wrapper.Name
+-        result.rigStats = stats
+-        result.template = templateInfo
+-        result.importedCount = #wrapper:GetDescendants()
++        local normalizedModel = canonicalRigModel(importedRig)
++        if placementMode == "weapon-pivot" then
++            local wrapper, textureStats = placeWeaponModel(
++                normalizedModel,
++                destination,
++                tostring(data.wrapperName or ""),
++                assetId,
++                data.metadata or {}
++            )
++            result.destination = wrapper:GetFullName()
++            result.wrapperName = wrapper.Name
++            result.weaponStats = {
++                baseParts = modelRigStats(wrapper).baseParts,
++                textures = textureStats,
++            }
++            result.importedCount = #wrapper:GetDescendants()
++        else
++            local wrapper, stats, templateInfo = placeCharacterRig(
++                normalizedModel,
++                destination,
++                tostring(data.wrapperName or ""),
++                assetId
++            )
++            result.destination = wrapper:GetFullName()
++            result.wrapperName = wrapper.Name
++            result.rigStats = stats
++            result.template = templateInfo
++            result.importedCount = #wrapper:GetDescendants()
++        end
+     end, debug.traceback)
+ 
+     if not ok then
+@@ -312,4 +427,4 @@ task.spawn(function()
+     end
+ end)
+ 
+-print("[game1 plugin] loaded · character model bridge v3 · canonical template")
++print("[game1 plugin] loaded · model bridge v4 · character + weapon templates")
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index f06f8fe..ec3e7e4 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -283,8 +283,8 @@ else:
+     animation_manifest = json.loads(animation_manifest_path.read_text(encoding="utf-8"))
+ if animation_manifest.get("schemaVersion") != 2 or animation_manifest.get("project") != "game1":
+     err("character animation manifest must be game1 schema 2")
+-if animation_manifest.get("weaponSets") != ["hands", "1hs", "bow"]:
+-    err("m5.1 character animation weapon sets must be hands, 1hs and bow")
++if animation_manifest.get("weaponSets") != ["hands", "1hs", "2hs", "bow"]:
++    err("character animation weapon sets must be hands, 1hs, 2hs and bow")
+ 
+ animation_store_path = ROOT / "system/control-center/animation_store.py"
+ animation_core_dir = ROOT / "system/control-center/animation_core"
+@@ -296,7 +296,7 @@ for required in [
+     "class AnimationStore",
+     "def scan_folder",
+     "def classify_animation",
+-    'WEAPON_SETS = ("hands", "1hs", "bow")',
++    'WEAPON_SETS = ("hands", "1hs", "2hs", "bow")',
+     "def assign_file",
+     "normalize_manual_binding",
+     "_strip_character_prefix",
+@@ -376,13 +376,108 @@ for required in ["saveArchetype", "save archetype identity first", "/identity"]:
+     if required not in js_text:
+         err(f"asset manager archetype editing ui missing {required}")
+ 
++
++# m6 weapon registry / stats / attachment contract
++weapon_manifest_path = ROOT / "assets/manifests/weapons.json"
++if not weapon_manifest_path.is_file():
++    err(r"weapon manifest is missing; run python .\system\control-center\migrate.py")
++    weapon_manifest = {}
++else:
++    weapon_manifest = json.loads(weapon_manifest_path.read_text(encoding="utf-8"))
++if weapon_manifest.get("schemaVersion") != 1 or weapon_manifest.get("project") != "game1":
++    err("weapon manifest must be game1 schema 1")
++weapon_options = weapon_manifest.get("options") or {}
++if weapon_options.get("weaponTypes") != ["1hs", "2hs", "bow"]:
++    err("weapon type pool must be 1hs, 2hs, bow")
++if weapon_options.get("rarities") != ["common", "uncommon", "rare", "mythical", "legendary", "immortal"]:
++    err("weapon rarity pool must be common through immortal")
++
++weapon_store_path = ROOT / "system/control-center/weapon_store.py"
++weapon_store_text = weapon_store_path.read_text(encoding="utf-8") if weapon_store_path.is_file() else ""
++for required in [
++    "class WeaponStore",
++    "def slugify_english",
++    'WEAPON_TYPES = ("1hs", "2hs", "bow")',
++    'RARITIES = ("common", "uncommon", "rare", "mythical", "legendary", "immortal")',
++    'STAT_KEYS = ("Damage", "AttackSpeed")',
++    "weapon_stat_modifiers",
++    "weapon_textures",
++    "create_model_asset",
++    "create_image_asset",
++    "update_model_asset",
++    "update_image_asset",
++    'src/shared/weapon/WeaponRegistry.luau',
++]:
++    if required not in weapon_store_text:
++        err(f"weapon store missing {required}")
++
++for required in ["weapons", "weapon_textures", "weapon_stat_modifiers", "weapon_publications"]:
++    if required not in schema_text:
++        err(f"control center schema missing {required}")
++
++opencloud_text = (ROOT / "system/control-center/opencloud_assets.py").read_text(encoding="utf-8")
++for required in ["create_image_asset", "update_image_asset", '"assetType": "Image"']:
++    if required not in opencloud_text:
++        err(f"open cloud weapon texture publication missing {required}")
++
++weapon_registry_path = ROOT / "src/shared/weapon/WeaponRegistry.luau"
++weapon_registry_text = weapon_registry_path.read_text(encoding="utf-8") if weapon_registry_path.is_file() else ""
++for required in ["activeWeaponSlug", "weapons = table.freeze"]:
++    if required not in weapon_registry_text:
++        err(f"generated weapon registry missing {required}")
++
++weapon_equip_path = ROOT / "src/server/weapon/WeaponEquipService.luau"
++weapon_attach_path = ROOT / "src/client/weapon/WeaponAttachmentController.luau"
++weapon_equip_text = weapon_equip_path.read_text(encoding="utf-8") if weapon_equip_path.is_file() else ""
++weapon_attach_text = weapon_attach_path.read_text(encoding="utf-8") if weapon_attach_path.is_file() else ""
++for required in ["Weapon_R_Bone", "weapon_r", "Weapon_L_Bone", "weapon_l", "AnimationWeaponSet", "statModifiers", "EquipStartup"]:
++    if required not in weapon_equip_text:
++        err(f"weapon equip runtime missing {required}")
++for required in ["Game1WeaponAttachment", "parent.TransformedWorldCFrame * targetBone.CFrame", "weapon:PivotTo"]:
++    if required not in weapon_attach_text:
++        err(f"weapon attachment runtime missing {required}")
++if "WeaponEquipService.EquipStartup(character)" not in character_service_text:
++    err("character spawn does not apply the startup weapon")
++if "WeaponAttachmentController.Start()" not in client_init_text:
++    err("weapon attachment controller is not started by the client runtime")
++
++stats_config_text = (ROOT / "src/shared/character/CharacterStatsConfig.luau").read_text(encoding="utf-8")
++stats_service_text = (ROOT / "src/server/character/CharacterStatsService.luau").read_text(encoding="utf-8")
++movement_config_text = (ROOT / "src/shared/character/CharacterMovementConfig.luau").read_text(encoding="utf-8")
++for required in ["AttackSpeed = 100", "RunSpeed = 50"]:
++    if required not in stats_config_text:
++        err(f"character baseline stat missing {required}")
++for required in ["SetModifierSource", "modifierSources", 'Service.SetModifierSource(character, "weapon", modifiers)']:
++    if required not in stats_service_text:
++        err(f"composable stat modifier service missing {required}")
++if "DefaultRunStat = 50" not in movement_config_text or "currentRunSpeed" not in movement_config_text:
++    err("movement runtime must derive Roblox speed from RunSpeed=50 baseline")
++if 'character:GetAttribute("AttackSpeed")' not in attack_text:
++    err("server attack cooldown does not use AttackSpeed")
++if 'character:GetAttribute("AttackSpeed")' not in attack_controller_text:
++    err("client attack debounce does not use AttackSpeed")
++
++if 'id="nav-weapons"' not in ui or 'id="register-weapon"' not in ui or 'id="weapon-stat-attack-speed"' not in ui:
++    err("asset manager weapon registration section is missing")
++weapon_js_path = ROOT / "system/control-center/static/weapon-assets.js"
++weapon_js_text = weapon_js_path.read_text(encoding="utf-8") if weapon_js_path.is_file() else ""
++for required in ["weaponSlugify", "weaponRegister", "weaponPublish", "weaponSync", "weaponActivate"]:
++    if required not in weapon_js_text:
++        err(f"asset manager weapon ui missing {required}")
++
++for required in ["WeaponStore", "sync_weapon_to_studio", 'placement_mode="weapon-pivot"', '"/api/weapons"']:
++    if required not in host_agent_text:
++        err(f"host agent weapon api missing {required}")
++if 'placementMode ~= "weapon-pivot"' not in plugin_text or "placeWeaponModel" not in plugin_text:
++    err("studio bridge weapon-pivot placement is missing")
++
+ if errors:
+     print("verify failed")
+     for item in errors:
+         print(" -", item)
+     sys.exit(1)
+ 
+-print("verify ok · game1 m5.2 archetype edit + character animation contracts passed")
++print("verify ok · game1 m6 weapon registry + character animation contracts passed")
+ print("registered character archetypes:", len(archetypes))
+ print("active character archetype:", active_id or "none")
+ print("race pool: human")

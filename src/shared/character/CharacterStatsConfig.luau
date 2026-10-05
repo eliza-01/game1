@@ -4,5 +4,7 @@ CharacterStatsConfig.Default = table.freeze({
     MaxHP = 100,
     Damage = 10,
     Defense = 0,
+    AttackSpeed = 100,
+    RunSpeed = 50,
 })
 return table.freeze(CharacterStatsConfig)

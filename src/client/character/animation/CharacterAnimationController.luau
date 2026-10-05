@@ -160,7 +160,11 @@ function CharacterAnimationController.PlayAction(slot: string)
 		currentAction:Stop(0.06)
 	end
 	currentAction = track
-	track:Play(0.06, 1, 1)
+	local playbackSpeed = 1
+	if slot == "attack" then
+		playbackSpeed = math.max(0.01, (tonumber(character:GetAttribute("AttackSpeed")) or 100) / 100)
+	end
+	track:Play(0.06, 1, playbackSpeed)
 	character:SetAttribute("AnimationActionSlot", slot)
 	character:SetAttribute("AnimationActionClip", tostring(descriptor.clipId or ""))
 	return track

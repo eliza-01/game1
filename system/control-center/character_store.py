@@ -77,6 +77,15 @@ class CharacterStore:
                   published_at REAL NOT NULL
                 )"""
             )
+            connection.execute(
+                """CREATE TABLE IF NOT EXISTS character_model_assignments(
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  target_character_id TEXT NOT NULL,
+                  source_character_id TEXT NOT NULL,
+                  asset_id TEXT NOT NULL DEFAULT '',
+                  assigned_at REAL NOT NULL
+                )"""
+            )
             self._ensure_column(connection, "characters", "race", "TEXT NOT NULL DEFAULT ''")
             self._ensure_column(connection, "characters", "gender", "TEXT NOT NULL DEFAULT ''")
             self._ensure_column(connection, "characters", "armature_name", "TEXT NOT NULL DEFAULT ''")
@@ -169,10 +178,23 @@ class CharacterStore:
         return "CHANGED"
 
     def register(self, data):
-        requested_id = str(data.get("id") or "").strip().lower()
-        old = self.get(requested_id) if requested_id else None
-        character_id, display_name, race, gender = self._identity(data, old)
-        old = self.get(character_id)
+        expected_existing_id = str(data.get("existingId") or "").strip().lower()
+        seed_old = self.get(expected_existing_id) if expected_existing_id else None
+        character_id, display_name, race, gender = self._identity(data, seed_old)
+
+        if expected_existing_id:
+            if not seed_old:
+                raise ValueError(f"unknown archetype revision target: {expected_existing_id}")
+            if character_id != expected_existing_id:
+                raise ValueError("save archetype identity before registering a model revision")
+            old = seed_old
+        else:
+            old = self.get(character_id)
+            if old:
+                raise ValueError(
+                    f"archetype {character_id} already exists; select that row to register a new model revision"
+                )
+
         self._identity_conflict(character_id, race, gender)
 
         raw_source = str(data.get("sourcePath", "")).strip()
@@ -283,6 +305,134 @@ class CharacterStore:
         self.export()
         return self.get(character_id)
 
+    def assign_model(self, target_character_id: str, source_character_id: str):
+        target_id = str(target_character_id or "").strip().lower()
+        source_id = str(source_character_id or "").strip().lower()
+        target = self.get(target_id)
+        source = self.get(source_id)
+        if not target:
+            raise ValueError(f"unknown target archetype: {target_id}")
+        if not source:
+            raise ValueError(f"unknown source archetype: {source_id}")
+        if target_id == source_id:
+            return target
+
+        source_path = self.root / str(source.get("source_path") or "")
+        prepared_path = self.root / str(source.get("prepared_path") or "")
+        if not source_path.is_file() or not prepared_path.is_file():
+            raise ValueError("selected registered model is missing its canonical source/prepared files")
+
+        race = str(target.get("race") or "")
+        gender = str(target.get("gender") or "")
+        target_source = self.root / "assets/source/characters" / race / gender / target_id / "model" / source_path.name
+        target_prepared = self.root / "assets/prepared/characters" / race / gender / target_id / "model" / prepared_path.name
+        revision_stamp = time.strftime("%Y%m%dT%H%M%S", time.gmtime())
+
+        def archive_old(stored_path: str, label: str):
+            value = str(stored_path or "").strip()
+            if not value:
+                return
+            old_path = (self.root / value).resolve()
+            if not old_path.is_file():
+                return
+            if old_path in {source_path.resolve(), prepared_path.resolve()}:
+                return
+            archive = (
+                self.root
+                / "assets/reimported/characters"
+                / race
+                / gender
+                / target_id
+                / revision_stamp
+                / "model-reassignment"
+                / label
+                / old_path.name
+            )
+            archive.parent.mkdir(parents=True, exist_ok=True)
+            if not archive.exists():
+                shutil.copy2(old_path, archive)
+
+        archive_old(str(target.get("source_path") or ""), "source")
+        archive_old(str(target.get("prepared_path") or ""), "prepared")
+
+        for incoming, destination in ((source_path, target_source), (prepared_path, target_prepared)):
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            if incoming.resolve() == destination.resolve():
+                continue
+            if destination.exists():
+                incoming_sha = hashlib.sha256(incoming.read_bytes()).hexdigest()
+                destination_sha = hashlib.sha256(destination.read_bytes()).hexdigest()
+                if incoming_sha != destination_sha:
+                    archive = (
+                        self.root
+                        / "assets/reimported/characters"
+                        / race
+                        / gender
+                        / target_id
+                        / revision_stamp
+                        / "model-reassignment"
+                        / "replaced"
+                        / destination.name
+                    )
+                    archive.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(destination, archive)
+            shutil.copy2(incoming, destination)
+
+        now = time.time()
+        values = {
+            "source_path": target_source.relative_to(self.root).as_posix(),
+            "prepared_path": target_prepared.relative_to(self.root).as_posix(),
+            "sha256": str(source.get("sha256") or ""),
+            "model_asset_id": source.get("model_asset_id"),
+            "published_sha256": str(source.get("published_sha256") or ""),
+            "moderation_state": str(source.get("moderation_state") or ""),
+            "published_at": source.get("published_at"),
+            "armature_name": str(source.get("armature_name") or ""),
+            "bone_count": int(source.get("bone_count") or 0),
+            "mesh_count": int(source.get("mesh_count") or 0),
+            "skeleton_signature": str(source.get("skeleton_signature") or ""),
+            "skeleton_structure_signature": str(source.get("skeleton_structure_signature") or ""),
+            "skeleton_json": str(source.get("skeleton_json") or "{}"),
+        }
+        status_probe = {**target, **values}
+        status = self._status(status_probe)
+        with self.connect() as connection:
+            connection.execute(
+                """UPDATE characters SET
+                   source_path=?,prepared_path=?,sha256=?,model_asset_id=?,published_sha256=?,
+                   moderation_state=?,published_at=?,armature_name=?,bone_count=?,mesh_count=?,
+                   skeleton_signature=?,skeleton_structure_signature=?,skeleton_json=?,status=?,
+                   revision=revision+1,updated_at=? WHERE id=?""",
+                (
+                    values["source_path"], values["prepared_path"], values["sha256"], values["model_asset_id"],
+                    values["published_sha256"], values["moderation_state"], values["published_at"],
+                    values["armature_name"], values["bone_count"], values["mesh_count"],
+                    values["skeleton_signature"], values["skeleton_structure_signature"], values["skeleton_json"],
+                    status, now, target_id,
+                ),
+            )
+            connection.execute(
+                "INSERT INTO character_model_assignments(target_character_id,source_character_id,asset_id,assigned_at) VALUES(?,?,?,?)",
+                (target_id, source_id, str(source.get("model_asset_id") or ""), now),
+            )
+
+        for stored_path, replacement in (
+            (str(target.get("source_path") or ""), target_source),
+            (str(target.get("prepared_path") or ""), target_prepared),
+        ):
+            if not stored_path:
+                continue
+            old_path = (self.root / stored_path).resolve()
+            if old_path == replacement.resolve() or old_path in {source_path.resolve(), prepared_path.resolve()}:
+                continue
+            try:
+                old_path.unlink(missing_ok=True)
+            except Exception:
+                pass
+
+        self.export()
+        return self.get(target_id)
+
     def publish(self, character_id: str, publication: dict):
         character_id = str(character_id or "").strip().lower()
         row = self.get(character_id)
@@ -361,6 +511,7 @@ class CharacterStore:
         with self.connect() as connection:
             connection.execute("DELETE FROM characters WHERE id=?", (character_id,))
             connection.execute("DELETE FROM character_publications WHERE character_id=?", (character_id,))
+            connection.execute("DELETE FROM character_model_assignments WHERE target_character_id=? OR source_character_id=?", (character_id, character_id))
             connection.execute("DELETE FROM project_settings WHERE key=? AND value=?", (ACTIVE_KEY, character_id))
         self.export()
 

@@ -114,13 +114,22 @@ local function bindCharacter(newCharacter: Model)
 	movementDirectionMode = "Forward"
 	newManager.BaseMoveSpeed = CharacterMovementConfig.RobloxSpeed(
 		newCharacter:GetAttribute("CharacterArchetype"),
-		newCharacter:GetAttribute("MoveSpeed"),
+		newCharacter:GetAttribute("RunSpeed"),
 		"Run"
 	)
 	newCharacter:SetAttribute("AnimationMovementMode", movementMode)
 	newCharacter:SetAttribute("AnimationMovementDirection", movementDirectionMode)
 	newCharacter:SetAttribute("MovementState", "Idle")
 	newCharacter:SetAttribute("MovementStateAuthority", "ClientDerivedPresentation")
+	newCharacter:GetAttributeChangedSignal("RunSpeed"):Connect(function()
+		if character == newCharacter and controllerManager then
+			controllerManager.BaseMoveSpeed = CharacterMovementConfig.RobloxSpeed(
+				newCharacter:GetAttribute("CharacterArchetype"),
+				newCharacter:GetAttribute("RunSpeed"),
+				movementMode
+			)
+		end
+	end)
 
 	print("[game1] Custom movement bound")
 end
@@ -307,7 +316,7 @@ local function applyMovementMode(walkModifierActive: boolean, backwardActive: bo
 	if controllerManager and character then
 		controllerManager.BaseMoveSpeed = CharacterMovementConfig.RobloxSpeed(
 			character:GetAttribute("CharacterArchetype"),
-			character:GetAttribute("MoveSpeed"),
+			character:GetAttribute("RunSpeed"),
 			nextMode
 		)
 	end

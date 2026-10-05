@@ -37,11 +37,14 @@ function AttackController.Start(movement: any?, animation: any?)
     UserInputService.InputBegan:Connect(function(input, processed)
         if processed or input.UserInputType ~= CharacterConfig.InputBindings.AttackPrimary[1] then return end
         local now = os.clock()
-        if now - lastAttack < AttackConfig.CooldownSeconds * 0.75 then return end
+        local player = Players.LocalPlayer
+        local character = player.Character
+        local attackSpeed = math.max(1, tonumber(character and character:GetAttribute("AttackSpeed")) or 100)
+        local localCooldown = AttackConfig.CooldownSeconds * (100 / attackSpeed) * 0.75
+        if now - lastAttack < localCooldown then return end
         lastAttack = now
         local target = aimPosition()
         if target then
-            local player = Players.LocalPlayer
             local root = player.Character and player.Character:FindFirstChild("RootCollider")
             if movementController and root and root:IsA("BasePart") then
                 local direction = Vector3.new(target.X - root.Position.X, 0, target.Z - root.Position.Z)

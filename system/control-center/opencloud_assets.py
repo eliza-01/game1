@@ -228,6 +228,104 @@ def create_animation_asset(
     return operation
 
 
+def _validate_image_upload(file_path: Path, api_key: str):
+    file_path = file_path.resolve()
+    content_types = {
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".webp": "image/webp",
+    }
+    content_type = content_types.get(file_path.suffix.lower())
+    if not file_path.is_file() or content_type is None:
+        raise OpenCloudAssetError("texture publication requires png, jpg, jpeg or webp")
+    size = file_path.stat().st_size
+    if size <= 0:
+        raise OpenCloudAssetError("texture file is empty")
+    if size > MAX_UPLOAD_BYTES:
+        raise OpenCloudAssetError(f"texture file is larger than 20 MB: {size} bytes")
+    if not api_key.strip():
+        raise OpenCloudAssetError("ROBLOX_OPEN_CLOUD_API_KEY is not configured in .env.local")
+    return content_type
+
+
+def create_image_asset(
+    file_path: Path,
+    *,
+    display_name: str,
+    description: str,
+    creator_type: str,
+    creator_id: str,
+    api_key: str,
+) -> str:
+    content_type = _validate_image_upload(file_path, api_key)
+    metadata = {
+        "assetType": "Image",
+        "displayName": display_name.strip(),
+        "description": description,
+        "creationContext": {"creator": _creator_payload(creator_type, creator_id)},
+    }
+    body, boundary = _multipart(metadata, file_path, content_type)
+    req = request.Request(
+        CREATE_ASSET_URL,
+        data=body,
+        headers={
+            "x-api-key": api_key.strip(),
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+            "Content-Length": str(len(body)),
+            "Accept": "application/json",
+            "User-Agent": "game1-asset-manager/0.6",
+        },
+        method="POST",
+    )
+    response = _json_http(req, 120.0)
+    operation = str(response.get("path") or "").strip()
+    if not operation.startswith("operations/"):
+        raise OpenCloudAssetError("create image asset returned no operation path")
+    return operation
+
+
+def update_image_asset(
+    file_path: Path,
+    *,
+    asset_id: str,
+    display_name: str,
+    description: str,
+    creator_type: str,
+    creator_id: str,
+    api_key: str,
+) -> str:
+    content_type = _validate_image_upload(file_path, api_key)
+    asset_id = str(asset_id or "").strip()
+    if not asset_id.isdigit() or int(asset_id) <= 0:
+        raise OpenCloudAssetError("image asset id must be numeric before update")
+    metadata = {
+        "assetType": "Image",
+        "assetId": asset_id,
+        "displayName": display_name.strip(),
+        "description": description,
+        "creationContext": {"creator": _creator_payload(creator_type, creator_id)},
+    }
+    body, boundary = _multipart(metadata, file_path, content_type)
+    req = request.Request(
+        UPDATE_ASSET_URL_TEMPLATE.format(asset_id=asset_id),
+        data=body,
+        headers={
+            "x-api-key": api_key.strip(),
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+            "Content-Length": str(len(body)),
+            "Accept": "application/json",
+            "User-Agent": "game1-asset-manager/0.6",
+        },
+        method="PATCH",
+    )
+    response = _json_http(req, 120.0)
+    operation = str(response.get("path") or "").strip()
+    if not operation.startswith("operations/"):
+        raise OpenCloudAssetError("update image asset returned no operation path")
+    return operation
+
+
 def get_operation(operation_path: str, *, api_key: str) -> dict:
     operation_id = operation_path.rstrip("/").split("/")[-1].strip()
     if not operation_id:

@@ -47,7 +47,9 @@ local function attack(player: Player, aim: any)
     end
 
     local now = os.clock()
-    if now - (cooldowns[player] or 0) < Config.CooldownSeconds then
+    local attackSpeed = math.max(1, tonumber(character:GetAttribute("AttackSpeed")) or 100)
+    local cooldownSeconds = Config.CooldownSeconds * (100 / attackSpeed)
+    if now - (cooldowns[player] or 0) < cooldownSeconds then
         return
     end
     cooldowns[player] = now

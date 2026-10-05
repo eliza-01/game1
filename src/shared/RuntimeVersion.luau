@@ -1,1 +1,1 @@
-return table.freeze({ Version = "2026.10.04.002", SourceDigest = "game1-m5-1-animation-manual-binding" })
+return table.freeze({ Version = "2026.10.05.003", SourceDigest = "game1-m6.2-studio-loadout-archetype-fix" })

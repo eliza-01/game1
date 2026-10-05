@@ -8,7 +8,7 @@ SCHEMA_VERSION = 2
 PROJECT = "game1"
 MAX_SCAN_FILES = 5000
 ANIMATION_EXTENSIONS = {".rbxm", ".rbxmx"}
-WEAPON_SETS = ("hands", "1hs", "bow")
+WEAPON_SETS = ("hands", "1hs", "2hs", "bow")
 
 BASE_SLOT_CATALOG = [
     {"group": "locomotion", "slot": "idle", "label": "idle", "looped": True, "priority": "Idle"},

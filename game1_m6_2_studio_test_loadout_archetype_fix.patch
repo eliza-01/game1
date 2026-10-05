@@ -1,0 +1,1804 @@
+diff --git a/assets/manifests/weapons.json b/assets/manifests/weapons.json
+index e4db1c6547157af2c10dbc164762d2cf21007a54..775b8f8dc514db64049fc1ed5e77d71bae494c17 100644
+--- a/assets/manifests/weapons.json
++++ b/assets/manifests/weapons.json
+@@ -2,10 +2,6 @@
+   "schemaVersion": 1,
+   "project": "game1",
+   "activeWeaponSlug": null,
+-  "testLoadout": {
+-    "mode": "weapon",
+-    "weaponSlug": "newbie_axe"
+-  },
+   "options": {
+     "weaponTypes": [
+       "1hs",
+diff --git a/src/client/dev/TestLoadoutController.luau b/src/client/dev/TestLoadoutController.luau
+new file mode 100644
+index 0000000000000000000000000000000000000000..f7ddb4ba10f37bbec436bee4801dd71adf96682e
+--- /dev/null
++++ b/src/client/dev/TestLoadoutController.luau
+@@ -0,0 +1,611 @@
++local Players = game:GetService("Players")
++local ReplicatedStorage = game:GetService("ReplicatedStorage")
++local RunService = game:GetService("RunService")
++local TweenService = game:GetService("TweenService")
++
++local TestLoadoutController = {}
++local started = false
++local player = Players.LocalPlayer
++
++local PANEL_WIDTH = 320
++local PANEL_EXPANDED_HEIGHT = 300
++local PANEL_COLLAPSED_SIZE = 44
++local PANEL_X = 16
++local PANEL_Y = 150
++local CONTENT_WIDTH = PANEL_WIDTH - 32
++local DEBUG_PANEL_OPEN_ATTRIBUTE = "Game1DebugPanelOpen"
++local DEBUG_PANEL_ID = "TL"
++local STUDIO_PREFERENCES_FOLDER = "Game1StudioPreferences"
++local STUDIO_PREFERENCES_READY_ATTRIBUTE = "ClientPreferencesReady"
++
++local COLORS = {
++    panel = Color3.fromRGB(15, 20, 27),
++    panelRaised = Color3.fromRGB(20, 27, 36),
++    control = Color3.fromRGB(28, 37, 48),
++    controlHover = Color3.fromRGB(36, 48, 62),
++    controlSelected = Color3.fromRGB(31, 76, 70),
++    accent = Color3.fromRGB(72, 214, 180),
++    accentHover = Color3.fromRGB(91, 229, 195),
++    text = Color3.fromRGB(239, 244, 248),
++    muted = Color3.fromRGB(139, 157, 173),
++    mutedStrong = Color3.fromRGB(172, 187, 200),
++    line = Color3.fromRGB(55, 69, 83),
++    error = Color3.fromRGB(239, 116, 116),
++    disabled = Color3.fromRGB(24, 31, 40),
++}
++
++local function corner(parent: Instance, radius: number)
++    local item = Instance.new("UICorner")
++    item.CornerRadius = UDim.new(0, radius)
++    item.Parent = parent
++end
++
++local function stroke(parent: Instance, transparency: number?)
++    local item = Instance.new("UIStroke")
++    item.Color = COLORS.line
++    item.Transparency = transparency or 0.15
++    item.Thickness = 1
++    item.Parent = parent
++end
++
++local function textLabel(parent: Instance, text: string, size: number, bold: boolean?): TextLabel
++    local label = Instance.new("TextLabel")
++    label.BackgroundTransparency = 1
++    label.Text = text
++    label.TextColor3 = COLORS.text
++    label.TextSize = size
++    label.Font = bold and Enum.Font.GothamSemibold or Enum.Font.Gotham
++    label.TextXAlignment = Enum.TextXAlignment.Left
++    label.TextYAlignment = Enum.TextYAlignment.Center
++    label.Parent = parent
++    return label
++end
++
++local function sectionCaption(parent: Instance, text: string, y: number)
++    local label = textLabel(parent, string.upper(text), 9, true)
++    label.TextColor3 = COLORS.muted
++    label.Position = UDim2.fromOffset(0, y)
++    label.Size = UDim2.new(1, 0, 0, 14)
++end
++
++local function button(parent: Instance, text: string): TextButton
++    local item = Instance.new("TextButton")
++    item.AutoButtonColor = false
++    item.BackgroundColor3 = COLORS.control
++    item.TextColor3 = COLORS.text
++    item.Text = text
++    item.TextSize = 11
++    item.Font = Enum.Font.Gotham
++    item.Parent = parent
++    corner(item, 7)
++    stroke(item, 0.35)
++    return item
++end
++
++local function createDropdown(gui: ScreenGui, parent: Instance, y: number, labelText: string)
++    sectionCaption(parent, labelText, y)
++
++    local control = button(parent, "—")
++    control.Position = UDim2.fromOffset(0, y + 18)
++    control.Size = UDim2.new(1, 0, 0, 34)
++    control.TextSize = 12
++    control.Font = Enum.Font.GothamSemibold
++    control.TextXAlignment = Enum.TextXAlignment.Left
++    control.TextTruncate = Enum.TextTruncate.AtEnd
++    local padding = Instance.new("UIPadding")
++    padding.PaddingLeft = UDim.new(0, 11)
++    padding.PaddingRight = UDim.new(0, 11)
++    padding.Parent = control
++
++    local popup = Instance.new("ScrollingFrame")
++    popup.Visible = false
++    popup.BackgroundColor3 = COLORS.panelRaised
++    popup.BorderSizePixel = 0
++    popup.ScrollBarThickness = 3
++    popup.ScrollBarImageColor3 = COLORS.muted
++    popup.AutomaticCanvasSize = Enum.AutomaticSize.Y
++    popup.CanvasSize = UDim2.new()
++    popup.ZIndex = 50
++    popup.Parent = gui
++    corner(popup, 8)
++    stroke(popup, 0.05)
++
++    local layout = Instance.new("UIListLayout")
++    layout.Padding = UDim.new(0, 3)
++    layout.SortOrder = Enum.SortOrder.LayoutOrder
++    layout.Parent = popup
++    local popupPadding = Instance.new("UIPadding")
++    popupPadding.PaddingTop = UDim.new(0, 5)
++    popupPadding.PaddingBottom = UDim.new(0, 5)
++    popupPadding.PaddingLeft = UDim.new(0, 5)
++    popupPadding.PaddingRight = UDim.new(0, 5)
++    popupPadding.Parent = popup
++
++    local state = { value = "", options = {}, onChanged = nil, enabled = true, buttons = {} }
++
++    local function renderControl()
++        local found = "—"
++        for _, option in ipairs(state.options) do
++            if option.value == state.value then
++                found = option.label
++                break
++            end
++        end
++        control.Text = found .. (popup.Visible and "   ▴" or "   ▾")
++        control.BackgroundColor3 = state.enabled and COLORS.control or COLORS.disabled
++        control.TextColor3 = state.enabled and COLORS.text or COLORS.muted
++    end
++
++    local function renderOptions()
++        for index, optionButton in pairs(state.buttons) do
++            local option = state.options[index]
++            local selected = option and option.value == state.value
++            optionButton.BackgroundColor3 = selected and COLORS.controlSelected or COLORS.control
++            optionButton.TextColor3 = selected and COLORS.accent or COLORS.text
++        end
++    end
++
++    local function close()
++        popup.Visible = false
++        renderControl()
++    end
++
++    local function setValue(value: string, fire: boolean?)
++        state.value = value
++        close()
++        renderControl()
++        renderOptions()
++        if fire and state.onChanged then
++            state.onChanged(value)
++        end
++    end
++
++    local function refresh(options, preferredValue: string?)
++        state.options = options or {}
++        state.buttons = {}
++        for _, child in popup:GetChildren() do
++            if child:IsA("TextButton") then
++                child:Destroy()
++            end
++        end
++        for index, option in ipairs(state.options) do
++            local optionButton = button(popup, option.label)
++            optionButton.Size = UDim2.new(1, 0, 0, 30)
++            optionButton.LayoutOrder = index
++            optionButton.ZIndex = 51
++            optionButton.TextSize = 11
++            optionButton.TextXAlignment = Enum.TextXAlignment.Left
++            optionButton.TextTruncate = Enum.TextTruncate.AtEnd
++            local optionPadding = Instance.new("UIPadding")
++            optionPadding.PaddingLeft = UDim.new(0, 9)
++            optionPadding.PaddingRight = UDim.new(0, 9)
++            optionPadding.Parent = optionButton
++            state.buttons[index] = optionButton
++            optionButton.Activated:Connect(function()
++                if state.enabled then
++                    setValue(option.value, true)
++                end
++            end)
++        end
++        local nextValue = preferredValue or state.value
++        local valid = false
++        for _, option in ipairs(state.options) do
++            if option.value == nextValue then
++                valid = true
++                break
++            end
++        end
++        if not valid then
++            nextValue = state.options[1] and state.options[1].value or ""
++        end
++        setValue(nextValue, false)
++    end
++
++    control.Activated:Connect(function()
++        if not state.enabled or #state.options == 0 then
++            return
++        end
++        if popup.Visible then
++            close()
++            return
++        end
++        popup.Position = UDim2.fromOffset(control.AbsolutePosition.X, control.AbsolutePosition.Y + control.AbsoluteSize.Y + 4)
++        popup.Size = UDim2.fromOffset(control.AbsoluteSize.X, math.min(214, 10 + (#state.options * 33)))
++        popup.Visible = true
++        renderControl()
++    end)
++
++    return {
++        refresh = refresh,
++        setValue = setValue,
++        getValue = function() return state.value end,
++        close = close,
++        setOnChanged = function(callback) state.onChanged = callback end,
++        setEnabled = function(enabled: boolean)
++            state.enabled = enabled
++            control.Active = enabled
++            if not enabled then close() end
++            renderControl()
++        end,
++    }
++end
++
++local function createCategorySelector(parent: Instance, y: number)
++    sectionCaption(parent, "Weapon type", y)
++    local scroller = Instance.new("ScrollingFrame")
++    scroller.BackgroundTransparency = 1
++    scroller.BorderSizePixel = 0
++    scroller.Position = UDim2.fromOffset(0, y + 18)
++    scroller.Size = UDim2.new(1, 0, 0, 32)
++    scroller.ScrollBarThickness = 0
++    scroller.ScrollingDirection = Enum.ScrollingDirection.X
++    scroller.AutomaticCanvasSize = Enum.AutomaticSize.X
++    scroller.CanvasSize = UDim2.new()
++    scroller.Parent = parent
++    local layout = Instance.new("UIListLayout")
++    layout.FillDirection = Enum.FillDirection.Horizontal
++    layout.SortOrder = Enum.SortOrder.LayoutOrder
++    layout.Padding = UDim.new(0, 6)
++    layout.VerticalAlignment = Enum.VerticalAlignment.Center
++    layout.Parent = scroller
++
++    local state = { value = "", options = {}, buttons = {}, onChanged = nil, enabled = true }
++    local function render()
++        for index, chip in pairs(state.buttons) do
++            local option = state.options[index]
++            local selected = option and option.value == state.value
++            chip.BackgroundColor3 = selected and COLORS.controlSelected or (state.enabled and COLORS.control or COLORS.disabled)
++            chip.TextColor3 = selected and COLORS.accent or (state.enabled and COLORS.mutedStrong or COLORS.muted)
++            chip.Active = state.enabled
++        end
++    end
++    local function setValue(value: string, fire: boolean?)
++        state.value = value
++        render()
++        if fire and state.onChanged then state.onChanged(value) end
++    end
++    local function refresh(options, preferredValue: string?)
++        state.options = options or {}
++        state.buttons = {}
++        for _, child in scroller:GetChildren() do
++            if child:IsA("TextButton") then child:Destroy() end
++        end
++        for index, option in ipairs(state.options) do
++            local chip = button(scroller, option.label)
++            chip.AutomaticSize = Enum.AutomaticSize.X
++            chip.Size = UDim2.fromOffset(0, 30)
++            chip.LayoutOrder = index
++            chip.TextSize = 10
++            chip.Font = Enum.Font.GothamSemibold
++            local pad = Instance.new("UIPadding")
++            pad.PaddingLeft = UDim.new(0, 11)
++            pad.PaddingRight = UDim.new(0, 11)
++            pad.Parent = chip
++            state.buttons[index] = chip
++            chip.Activated:Connect(function()
++                if state.enabled then setValue(option.value, true) end
++            end)
++        end
++        local nextValue = preferredValue or state.value
++        local valid = false
++        for _, option in ipairs(state.options) do
++            if option.value == nextValue then valid = true break end
++        end
++        if not valid then nextValue = state.options[1] and state.options[1].value or "" end
++        setValue(nextValue, false)
++    end
++    return {
++        refresh = refresh,
++        setValue = setValue,
++        getValue = function() return state.value end,
++        setOnChanged = function(callback) state.onChanged = callback end,
++        setEnabled = function(enabled: boolean) state.enabled = enabled render() end,
++    }
++end
++
++local function findPreferences(): Folder?
++    local value = ReplicatedStorage:FindFirstChild(STUDIO_PREFERENCES_FOLDER)
++    return if value and value:IsA("Folder") then value else nil
++end
++
++local function waitForPreferences(): Folder?
++    local folder = findPreferences()
++    if not folder then
++        local found = ReplicatedStorage:WaitForChild(STUDIO_PREFERENCES_FOLDER, 5)
++        folder = if found and found:IsA("Folder") then found else nil
++    end
++    if not folder then return nil end
++    while folder.Parent and folder:GetAttribute(STUDIO_PREFERENCES_READY_ATTRIBUTE) ~= true do
++        task.wait(0.05)
++    end
++    return if folder.Parent then folder else nil
++end
++
++local function createGui()
++    local playerGui = player:WaitForChild("PlayerGui")
++    local previous = playerGui:FindFirstChild("Game1TestLoadoutGui")
++    if previous then previous:Destroy() end
++
++    local gui = Instance.new("ScreenGui")
++    gui.Name = "Game1TestLoadoutGui"
++    gui.ResetOnSpawn = false
++    gui.DisplayOrder = 20
++    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
++    gui.Parent = playerGui
++
++    local panel = Instance.new("Frame")
++    panel.BackgroundColor3 = COLORS.panel
++    panel.BackgroundTransparency = 0.025
++    panel.BorderSizePixel = 0
++    panel.Position = UDim2.fromOffset(PANEL_X, PANEL_Y)
++    panel.Size = UDim2.fromOffset(PANEL_COLLAPSED_SIZE, PANEL_COLLAPSED_SIZE)
++    panel.Parent = gui
++    corner(panel, 10)
++    stroke(panel, 0.12)
++
++    local accent = Instance.new("Frame")
++    accent.BackgroundColor3 = COLORS.accent
++    accent.BorderSizePixel = 0
++    accent.Position = UDim2.fromOffset(0, 0)
++    accent.Size = UDim2.fromOffset(3, PANEL_COLLAPSED_SIZE)
++    accent.Parent = panel
++    corner(accent, 2)
++
++    local header = textLabel(panel, "TEST LOADOUT", 11, true)
++    header.Position = UDim2.fromOffset(16, 6)
++    header.Size = UDim2.fromOffset(190, 16)
++    local subtitle = textLabel(panel, "character + weapon sandbox", 9, false)
++    subtitle.TextColor3 = COLORS.muted
++    subtitle.Position = UDim2.fromOffset(16, 22)
++    subtitle.Size = UDim2.fromOffset(220, 14)
++
++    local collapse = button(panel, "TL")
++    collapse.Position = UDim2.fromOffset(0, 0)
++    collapse.Size = UDim2.fromOffset(PANEL_COLLAPSED_SIZE, PANEL_COLLAPSED_SIZE)
++    collapse.Font = Enum.Font.GothamSemibold
++    collapse.TextSize = 11
++
++    local body = Instance.new("Frame")
++    body.BackgroundTransparency = 1
++    body.Position = UDim2.fromOffset(16, 48)
++    body.Size = UDim2.fromOffset(CONTENT_WIDTH, PANEL_EXPANDED_HEIGHT - 58)
++    body.Visible = false
++    body.Parent = panel
++
++    local character = createDropdown(gui, body, 0, "Character")
++    local category = createCategorySelector(body, 61)
++    local weapon = createDropdown(gui, body, 118, "Weapon")
++
++    local meta = textLabel(body, "", 9, false)
++    meta.TextColor3 = COLORS.muted
++    meta.TextTruncate = Enum.TextTruncate.AtEnd
++    meta.Position = UDim2.fromOffset(1, 172)
++    meta.Size = UDim2.new(1, -2, 0, 16)
++
++    local statusDot = Instance.new("Frame")
++    statusDot.BackgroundColor3 = COLORS.muted
++    statusDot.BorderSizePixel = 0
++    statusDot.Position = UDim2.fromOffset(2, 207)
++    statusDot.Size = UDim2.fromOffset(6, 6)
++    statusDot.Parent = body
++    corner(statusDot, 3)
++
++    local status = textLabel(body, "Loading catalog…", 9, false)
++    status.TextColor3 = COLORS.muted
++    status.Position = UDim2.fromOffset(14, 200)
++    status.Size = UDim2.new(1, -14, 0, 20)
++
++    local apply = button(body, "LOADING…")
++    apply.Position = UDim2.fromOffset(0, 226)
++    apply.Size = UDim2.new(1, 0, 0, 34)
++    apply.BackgroundColor3 = COLORS.disabled
++    apply.TextColor3 = COLORS.muted
++    apply.Font = Enum.Font.GothamSemibold
++    apply.TextSize = 10
++    apply.Active = false
++
++    local collapsed = true
++    local function setCollapsed(value: boolean)
++        collapsed = value
++        character.close()
++        weapon.close()
++        body.Visible = not collapsed
++        header.Visible = not collapsed
++        subtitle.Visible = not collapsed
++        accent.Visible = not collapsed
++        if collapsed then
++            collapse.Text = "TL"
++            collapse.Position = UDim2.fromOffset(0, 0)
++            collapse.Size = UDim2.fromOffset(PANEL_COLLAPSED_SIZE, PANEL_COLLAPSED_SIZE)
++        else
++            collapse.Text = "–"
++            collapse.Position = UDim2.fromOffset(PANEL_WIDTH - 42, 7)
++            collapse.Size = UDim2.fromOffset(28, 28)
++        end
++        TweenService:Create(panel, TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
++            Size = UDim2.fromOffset(collapsed and PANEL_COLLAPSED_SIZE or PANEL_WIDTH, collapsed and PANEL_COLLAPSED_SIZE or PANEL_EXPANDED_HEIGHT),
++        }):Play()
++    end
++    collapse.Activated:Connect(function()
++        playerGui:SetAttribute(DEBUG_PANEL_OPEN_ATTRIBUTE, collapsed and DEBUG_PANEL_ID or "")
++    end)
++    playerGui:GetAttributeChangedSignal(DEBUG_PANEL_OPEN_ATTRIBUTE):Connect(function()
++        setCollapsed(playerGui:GetAttribute(DEBUG_PANEL_OPEN_ATTRIBUTE) ~= DEBUG_PANEL_ID)
++    end)
++    setCollapsed(playerGui:GetAttribute(DEBUG_PANEL_OPEN_ATTRIBUTE) ~= DEBUG_PANEL_ID)
++
++    return gui, character, category, weapon, meta, apply, status, statusDot
++end
++
++function TestLoadoutController.Start()
++    if started or not RunService:IsStudio() then return end
++    started = true
++
++    task.spawn(function()
++        local remotes = ReplicatedStorage:WaitForChild("Game1Remotes", 10)
++        if not remotes then
++            warn("[game1][test-loadout] Game1Remotes is missing")
++            return
++        end
++        local catalogRemote = remotes:WaitForChild("GetTestLoadoutCatalog", 10)
++        local applyRemote = remotes:WaitForChild("ApplyTestLoadout", 10)
++        if not catalogRemote or not applyRemote then
++            warn("[game1][test-loadout] remotes are missing")
++            return
++        end
++
++        local gui, characterDropdown, categorySelector, weaponDropdown, meta, applyButton, status, statusDot = createGui()
++        local catalog = catalogRemote:InvokeServer()
++        local weaponRows = catalog.weapons or {}
++        local weaponBySlug = {}
++        for _, row in ipairs(weaponRows) do weaponBySlug[tostring(row.slug or "")] = row end
++
++        local characterOptions = {}
++        for _, row in ipairs(catalog.characters or {}) do
++            table.insert(characterOptions, { value = tostring(row.id or ""), label = tostring(row.label or row.id or "") })
++        end
++        characterDropdown.refresh(characterOptions, tostring(catalog.selectedArchetype or ""))
++
++        local categoryOptions = {}
++        for _, value in ipairs(catalog.categories or {}) do
++            local label = catalog.categoryLabels and catalog.categoryLabels[value] or value
++            table.insert(categoryOptions, { value = tostring(value), label = tostring(label) })
++        end
++        categorySelector.refresh(categoryOptions, nil)
++
++        local function categoryForSlug(slug: string): string
++            local row = weaponBySlug[slug]
++            return row and tostring(row.weaponType or "hands") or "hands"
++        end
++
++        local function rebuildWeapons(category: string, preferred: string?)
++            local options = {}
++            for _, row in ipairs(weaponRows) do
++                if tostring(row.weaponType or "hands") == category then
++                    table.insert(options, { value = tostring(row.slug or ""), label = tostring(row.label or row.slug or "") })
++                end
++            end
++            weaponDropdown.refresh(options, preferred)
++        end
++
++        local initialWeapon = tostring(catalog.selectedWeaponSlug or "")
++        local initialCategory = categoryForSlug(initialWeapon)
++        categorySelector.setValue(initialCategory, false)
++        rebuildWeapons(initialCategory, initialWeapon)
++
++        local appliedArchetype = tostring(catalog.selectedArchetype or "")
++        local appliedWeaponSlug = initialWeapon
++        local applying = false
++
++        local function setStatus(message: string, color: Color3?)
++            status.Text = message
++            status.TextColor3 = color or COLORS.muted
++            statusDot.BackgroundColor3 = color or COLORS.muted
++        end
++
++        local function renderApply()
++            local changed = characterDropdown.getValue() ~= appliedArchetype or weaponDropdown.getValue() ~= appliedWeaponSlug
++            applyButton.Active = not applying and characterDropdown.getValue() ~= ""
++            if applying then
++                applyButton.Text = "APPLYING…"
++                applyButton.BackgroundColor3 = COLORS.disabled
++                applyButton.TextColor3 = COLORS.muted
++            elseif changed then
++                applyButton.Text = "ACCEPT LOADOUT"
++                applyButton.BackgroundColor3 = COLORS.accent
++                applyButton.TextColor3 = COLORS.panel
++            else
++                applyButton.Text = "LOADOUT ACTIVE"
++                applyButton.BackgroundColor3 = COLORS.controlSelected
++                applyButton.TextColor3 = COLORS.accent
++            end
++        end
++
++        local function updateMeta()
++            local row = weaponBySlug[weaponDropdown.getValue()]
++            if not row or tostring(row.slug or "") == "" then
++                meta.Text = "hands · unarmed"
++            else
++                meta.Text = string.format("%s · %s", tostring(row.weaponType or ""), tostring(row.rarity or ""))
++            end
++            renderApply()
++        end
++
++        local preferences = nil
++        local function persistSelection()
++            if not preferences then return end
++            preferences:SetAttribute("LastLoadoutArchetype", characterDropdown.getValue())
++            preferences:SetAttribute("LastLoadoutWeaponSlug", weaponDropdown.getValue())
++        end
++
++        categorySelector.setOnChanged(function(value)
++            rebuildWeapons(value, nil)
++            updateMeta()
++            persistSelection()
++            setStatus("Loadout changed · accept when ready")
++        end)
++        characterDropdown.setOnChanged(function()
++            persistSelection()
++            renderApply()
++            setStatus("Loadout changed · accept when ready")
++        end)
++        weaponDropdown.setOnChanged(function()
++            persistSelection()
++            updateMeta()
++            setStatus("Loadout changed · accept when ready")
++        end)
++
++        local function applyCurrentSelection(silent: boolean?)
++            if applying or characterDropdown.getValue() == "" then return end
++            applying = true
++            renderApply()
++            local ok, result = pcall(function()
++                return applyRemote:InvokeServer(characterDropdown.getValue(), weaponDropdown.getValue())
++            end)
++            applying = false
++            if not ok or type(result) ~= "table" or result.ok ~= true then
++                local message = if ok and type(result) == "table" then tostring(result.error or "loadout failed") else tostring(result)
++                setStatus(message, COLORS.error)
++                renderApply()
++                return
++            end
++            appliedArchetype = tostring(result.archetype or characterDropdown.getValue())
++            appliedWeaponSlug = tostring(result.weaponSlug or weaponDropdown.getValue())
++            persistSelection()
++            setStatus("Loadout active", COLORS.accent)
++            renderApply()
++            if not silent then
++                print(("[game1][test-loadout] %s · %s"):format(appliedArchetype, appliedWeaponSlug ~= "" and appliedWeaponSlug or "unarmed"))
++            end
++        end
++
++        applyButton.Activated:Connect(function() applyCurrentSelection(false) end)
++        updateMeta()
++        setStatus("Studio-only loadout ready", COLORS.accent)
++        renderApply()
++
++        task.spawn(function()
++            preferences = waitForPreferences()
++            if not preferences then return end
++            local storedArchetype = preferences:GetAttribute("LastLoadoutArchetype")
++            if type(storedArchetype) == "string" and storedArchetype ~= "" then
++                characterDropdown.setValue(storedArchetype, false)
++            end
++            local storedWeapon = preferences:GetAttribute("LastLoadoutWeaponSlug")
++            if type(storedWeapon) == "string" then
++                local category = categoryForSlug(storedWeapon)
++                categorySelector.setValue(category, false)
++                rebuildWeapons(category, storedWeapon)
++            end
++            updateMeta()
++            persistSelection()
++            applyCurrentSelection(true)
++        end)
++
++        gui.Destroying:Connect(function()
++            preferences = nil
++        end)
++    end)
++end
++
++return TestLoadoutController
+diff --git a/src/client/init.client.luau b/src/client/init.client.luau
+index dab0b3db7add99262efa6d73125762189e740bbe..35341d1393397acda33177f52deecd813d5a7036 100644
+--- a/src/client/init.client.luau
++++ b/src/client/init.client.luau
+@@ -6,6 +6,7 @@ local RuntimeVersion = require(Shared:WaitForChild("RuntimeVersion"))
+ 
+ local CharacterRoot = script:WaitForChild("character")
+ local CombatRoot = script:WaitForChild("combat")
++local DevRoot = script:WaitForChild("dev")
+ local MovementController = require(CharacterRoot:WaitForChild("MovementController"))
+ local CameraController = require(CharacterRoot:WaitForChild("CameraController"))
+ local PlayerStatusController = require(CharacterRoot:WaitForChild("PlayerStatusController"))
+@@ -14,6 +15,7 @@ local CharacterAnimationController = require(AnimationRoot:WaitForChild("Charact
+ local AttackController = require(CombatRoot:WaitForChild("AttackController"))
+ local WeaponRoot = script:WaitForChild("weapon")
+ local WeaponAttachmentController = require(WeaponRoot:WaitForChild("WeaponAttachmentController"))
++local TestLoadoutController = require(DevRoot:WaitForChild("TestLoadoutController"))
+ 
+ print(("[game1][client] %s v%s · runtime %s")
+     :format(ProjectInfo.Name, ProjectInfo.Version, RuntimeVersion.Version))
+@@ -24,3 +26,4 @@ WeaponAttachmentController.Start()
+ CameraController.Start()
+ AttackController.Start(MovementController, CharacterAnimationController)
+ PlayerStatusController.Start()
++TestLoadoutController.Start()
+diff --git a/src/server/character/CharacterService.luau b/src/server/character/CharacterService.luau
+index ef3c5d4c4db80b276f2b84cb1f4b42bb39ff32cf..b54654b3b4a83612a78ad321f0991cc6e107cce7 100644
+--- a/src/server/character/CharacterService.luau
++++ b/src/server/character/CharacterService.luau
+@@ -46,8 +46,11 @@ local function registeredAssetId(row: any?): number?
+     return tonumber(row.modelAssetId)
+ end
+ 
+-local function selectedCharacter(): (any?, number?, string, string, string?, string?, string?)
+-    local requestedId = tostring(CharacterRegistry.activeArchetypeId or "")
++local function selectedCharacter(requestedOverride: string?): (any?, number?, string, string, string?, string?, string?)
++    local requestedId = tostring(requestedOverride or "")
++    if requestedId == "" then
++        requestedId = tostring(CharacterRegistry.activeArchetypeId or "")
++    end
+     local row = findArchetype(requestedId)
+     local assetId = registeredAssetId(row)
+     if row and assetId then
+@@ -166,13 +169,13 @@ local function destroyPreviousCharacter(player: Player)
+     end
+ end
+ 
+-local function createCharacter(player: Player): Model?
++local function createCharacter(player: Player, requestedArchetypeId: string?): Model?
+     if spawning[player] then
+         return nil
+     end
+     spawning[player] = true
+ 
+-    local row, assetId, archetype, label, requestedArchetype, race, gender = selectedCharacter()
++    local row, assetId, archetype, label, requestedArchetype, race, gender = selectedCharacter(requestedArchetypeId)
+     if not assetId then
+         spawning[player] = nil
+         return nil
+@@ -197,6 +200,7 @@ local function createCharacter(player: Player): Model?
+     local character = Instance.new("Model")
+     character.Name = player.Name
+     character:SetAttribute("CharacterArchetype", archetype)
++    player:SetAttribute("SelectedCharacterArchetype", if archetype ~= "bootstrap" then archetype else "")
+     character:SetAttribute("CharacterDisplayName", label)
+     character:SetAttribute("CharacterRace", race or "")
+     character:SetAttribute("CharacterGender", gender or "")
+@@ -246,7 +250,7 @@ local function createCharacter(player: Player): Model?
+         rig.navigationRoot.Anchored = true
+         task.delay(3, function()
+             if player.Parent == Players and player.Character == character then
+-                createCharacter(player)
++                createCharacter(player, tostring(player:GetAttribute("SelectedCharacterArchetype") or ""))
+             end
+         end)
+     end)
+@@ -267,11 +271,30 @@ local function createCharacter(player: Player): Model?
+     return character
+ end
+ 
+-function CharacterService.Respawn(player: Player): Model?
++function CharacterService.IsAvailable(archetypeId: string): boolean
++    local row = findArchetype(tostring(archetypeId or ""))
++    return row ~= nil and registeredAssetId(row) ~= nil
++end
++
++function CharacterService.ListAvailable(): { any }
++    local rows = {}
++    for _, row in ipairs(CharacterRegistry.archetypes or {}) do
++        if registeredAssetId(row) then
++            table.insert(rows, row)
++        end
++    end
++    return rows
++end
++
++function CharacterService.Respawn(player: Player, archetypeId: string?): Model?
+     if player.Parent ~= Players then
+         return nil
+     end
+-    return createCharacter(player)
++    local requested = tostring(archetypeId or "")
++    if requested ~= "" and not CharacterService.IsAvailable(requested) then
++        return nil
++    end
++    return createCharacter(player, requested)
+ end
+ 
+ function CharacterService.Start()
+diff --git a/src/server/dev/TestLoadoutService.luau b/src/server/dev/TestLoadoutService.luau
+new file mode 100644
+index 0000000000000000000000000000000000000000..e9273e2dc65ec3de13da6c052453b9e613647f92
+--- /dev/null
++++ b/src/server/dev/TestLoadoutService.luau
+@@ -0,0 +1,221 @@
++local Players = game:GetService("Players")
++local ReplicatedStorage = game:GetService("ReplicatedStorage")
++local RunService = game:GetService("RunService")
++
++local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
++local CharacterShared = Shared:WaitForChild("character")
++local CharacterRegistry = require(CharacterShared:WaitForChild("CharacterRegistry"))
++
++local CharacterService = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CharacterService"))
++local WeaponEquipService = require(script.Parent.Parent:WaitForChild("weapon"):WaitForChild("WeaponEquipService"))
++
++local TestLoadoutService = {}
++local started = false
++
++local function ensureRemoteFolder(): Folder
++    local folder = ReplicatedStorage:FindFirstChild("Game1Remotes")
++    if folder and folder:IsA("Folder") then
++        return folder
++    end
++    if folder then
++        folder:Destroy()
++    end
++    folder = Instance.new("Folder")
++    folder.Name = "Game1Remotes"
++    folder.Parent = ReplicatedStorage
++    return folder
++end
++
++local function ensureRemoteFunction(parent: Instance, name: string): RemoteFunction
++    local current = parent:FindFirstChild(name)
++    if current and current:IsA("RemoteFunction") then
++        return current
++    end
++    if current then
++        current:Destroy()
++    end
++    local remote = Instance.new("RemoteFunction")
++    remote.Name = name
++    remote.Parent = parent
++    return remote
++end
++
++local function characterLabel(row: any): string
++    local displayName = tostring(row.displayName or row.id or "")
++    local identity = string.format("%s / %s", tostring(row.race or "?"), tostring(row.gender or "?"))
++    if displayName == "" then
++        return identity
++    end
++    return displayName .. " · " .. identity
++end
++
++local function availableCharacters()
++    local rows = {}
++    for _, row in ipairs(CharacterService.ListAvailable()) do
++        table.insert(rows, {
++            id = tostring(row.id or ""),
++            label = characterLabel(row),
++            race = tostring(row.race or ""),
++            gender = tostring(row.gender or ""),
++        })
++    end
++    table.sort(rows, function(left, right)
++        return left.label < right.label
++    end)
++    return rows
++end
++
++local function availableWeapons()
++    local rows = {
++        {
++            slug = "",
++            label = "Unarmed / Hands",
++            weaponType = "hands",
++            rarity = "",
++            synthetic = true,
++        },
++    }
++    for _, row in ipairs(WeaponEquipService.ListAvailable()) do
++        local label = tostring(row.nameEn or row.slug)
++        local russian = tostring(row.nameRu or "")
++        if russian ~= "" then
++            label ..= " / " .. russian
++        end
++        table.insert(rows, {
++            slug = tostring(row.slug or ""),
++            label = label,
++            weaponType = tostring(row.weaponType or ""),
++            rarity = tostring(row.rarity or ""),
++            synthetic = false,
++        })
++    end
++    return rows
++end
++
++local function buildCatalog(player: Player)
++    local weapons = availableWeapons()
++    local categoriesSeen = { hands = true }
++    for _, row in ipairs(weapons) do
++        categoriesSeen[tostring(row.weaponType or "hands")] = true
++    end
++    local categories = {}
++    for category in pairs(categoriesSeen) do
++        table.insert(categories, category)
++    end
++    table.sort(categories, function(left, right)
++        if left == "hands" then
++            return true
++        end
++        if right == "hands" then
++            return false
++        end
++        return left < right
++    end)
++
++    local selectedArchetype = tostring(player:GetAttribute("SelectedCharacterArchetype") or "")
++    if selectedArchetype == "" then
++        selectedArchetype = tostring(CharacterRegistry.activeArchetypeId or "")
++    end
++    local selectedWeaponSlug = tostring(player:GetAttribute("SelectedWeaponSlug") or "")
++    local character = player.Character
++    if selectedWeaponSlug == "" and character then
++        selectedWeaponSlug = tostring(character:GetAttribute("EquippedWeaponSlug") or "")
++    end
++
++    return {
++        characters = availableCharacters(),
++        categories = categories,
++        categoryLabels = {
++            hands = "Hands",
++            ["1hs"] = "1HS",
++            ["2hs"] = "2HS",
++            bow = "Bow",
++        },
++        weapons = weapons,
++        selectedArchetype = selectedArchetype,
++        selectedWeaponSlug = selectedWeaponSlug,
++    }
++end
++
++local function applyLoadout(player: Player, archetypeValue: any, weaponSlugValue: any)
++    local archetype = string.lower(tostring(archetypeValue or ""))
++    local weaponSlug = string.lower(tostring(weaponSlugValue or ""))
++    if archetype == "" or not CharacterService.IsAvailable(archetype) then
++        return { ok = false, error = "selected character archetype is not available" }
++    end
++    if weaponSlug ~= "" and not WeaponEquipService.GetAvailable(weaponSlug) then
++        return { ok = false, error = "selected weapon is not registered" }
++    end
++
++    player:SetAttribute("SelectedWeaponSlug", weaponSlug)
++    local character = CharacterService.Respawn(player, archetype)
++    if not character then
++        return { ok = false, error = "failed to spawn selected character archetype" }
++    end
++
++    local equipped = true
++    local equipError = nil
++    if weaponSlug == "" then
++        WeaponEquipService.Unequip(character)
++    else
++        equipped, equipError = WeaponEquipService.Equip(character, weaponSlug)
++    end
++    if not equipped then
++        return { ok = false, error = equipError or "failed to equip selected weapon" }
++    end
++
++    character:SetAttribute("WeaponLoadoutSource", "studio-test")
++    player:SetAttribute("Game1TestLoadoutActive", true)
++    return {
++        ok = true,
++        archetype = archetype,
++        weaponSlug = weaponSlug,
++        weaponType = tostring(character:GetAttribute("EquippedWeaponType") or "hands"),
++        animationSet = tostring(character:GetAttribute("AnimationWeaponSet") or "hands"),
++    }
++end
++
++local function bindPlayer(player: Player)
++    player.CharacterAdded:Connect(function(character)
++        task.defer(function()
++            if not RunService:IsStudio() or player.Parent ~= Players or player.Character ~= character then
++                return
++            end
++            if player:GetAttribute("Game1TestLoadoutActive") ~= true then
++                return
++            end
++            local weaponSlug = string.lower(tostring(player:GetAttribute("SelectedWeaponSlug") or ""))
++            if weaponSlug == "" then
++                WeaponEquipService.Unequip(character)
++                character:SetAttribute("WeaponLoadoutSource", "studio-test")
++                return
++            end
++            local ok, reason = WeaponEquipService.Equip(character, weaponSlug)
++            if ok then
++                character:SetAttribute("WeaponLoadoutSource", "studio-test")
++            else
++                warn("[game1][test-loadout] " .. tostring(reason))
++            end
++        end)
++    end)
++end
++
++function TestLoadoutService.Start()
++    if started or not RunService:IsStudio() then
++        return
++    end
++    started = true
++
++    local remotes = ensureRemoteFolder()
++    local catalog = ensureRemoteFunction(remotes, "GetTestLoadoutCatalog")
++    local apply = ensureRemoteFunction(remotes, "ApplyTestLoadout")
++    catalog.OnServerInvoke = buildCatalog
++    apply.OnServerInvoke = applyLoadout
++
++    Players.PlayerAdded:Connect(bindPlayer)
++    for _, player in ipairs(Players:GetPlayers()) do
++        bindPlayer(player)
++    end
++end
++
++return table.freeze(TestLoadoutService)
+diff --git a/src/server/init.server.luau b/src/server/init.server.luau
+index 32d60efc185b7fb9901b2f38c3827e5005c3d021..52f796b09fa3ab6cbc39183d97aa2197e6fe4019 100644
+--- a/src/server/init.server.luau
++++ b/src/server/init.server.luau
+@@ -12,6 +12,7 @@ local CharacterService = require(CharacterRoot:WaitForChild("CharacterService"))
+ local EntityHitboxService = require(CombatRoot:WaitForChild("EntityHitboxService"))
+ local AttackService = require(CombatRoot:WaitForChild("AttackService"))
+ local TrainingDummyService = require(DevRoot:WaitForChild("TrainingDummyService"))
++local TestLoadoutService = require(DevRoot:WaitForChild("TestLoadoutService"))
+ 
+ print(("[game1][server] %s v%s · runtime %s")
+     :format(ProjectInfo.Name, ProjectInfo.Version, RuntimeVersion.Version))
+@@ -19,4 +20,5 @@ print(("[game1][server] %s v%s · runtime %s")
+ EntityHitboxService.Start()
+ AttackService.Start()
+ CharacterService.Start()
++TestLoadoutService.Start()
+ TrainingDummyService.Start()
+diff --git a/src/server/weapon/WeaponEquipService.luau b/src/server/weapon/WeaponEquipService.luau
+index 60c9e68f46182a2da9c29e7a3a5d77e59846a1ff..9a6c66d865904b86bb8486d1da4657333cce2be1 100644
+--- a/src/server/weapon/WeaponEquipService.luau
++++ b/src/server/weapon/WeaponEquipService.luau
+@@ -1,12 +1,9 @@
+ local ReplicatedStorage = game:GetService("ReplicatedStorage")
+ local ServerStorage = game:GetService("ServerStorage")
+-local RunService = game:GetService("RunService")
+ 
+ local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
+ local WeaponShared = Shared:WaitForChild("weapon")
+-local DevShared = Shared:WaitForChild("dev")
+ local WeaponRegistry = require(WeaponShared:WaitForChild("WeaponRegistry"))
+-local TestLoadoutConfig = require(DevShared:WaitForChild("TestLoadoutConfig"))
+ local CharacterStatsService = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CharacterStatsService"))
+ 
+ local WeaponEquipService = {}
+@@ -119,40 +116,49 @@ function WeaponEquipService.Equip(character: Model, slugValue: any): (boolean, s
+     return true, nil
+ end
+ 
+-local function initialWeapon(): (string, string)
+-    local startupSlug = tostring(WeaponRegistry.activeWeaponSlug or "")
+-    if not RunService:IsStudio() then
+-        return startupSlug, "startup"
++function WeaponEquipService.GetAvailable(slugValue: any): any?
++    local slug = string.lower(tostring(slugValue or ""))
++    if slug == "" then
++        return nil
+     end
++    return WeaponRegistry.weapons and WeaponRegistry.weapons[slug] or nil
++end
+ 
+-    local mode = string.lower(tostring(TestLoadoutConfig.WeaponMode or "inherit"))
+-    if mode == "unarmed" then
+-        return "", "test"
+-    end
+-    if mode == "weapon" then
+-        local testSlug = string.lower(tostring(TestLoadoutConfig.WeaponSlug or ""))
+-        if testSlug ~= "" then
+-            return testSlug, "test"
++function WeaponEquipService.ListAvailable(): { any }
++    local rows = {}
++    for slug, row in pairs(WeaponRegistry.weapons or {}) do
++        if tonumber(row.modelAssetId) then
++            table.insert(rows, {
++                slug = tostring(slug),
++                nameEn = tostring(row.nameEn or slug),
++                nameRu = tostring(row.nameRu or ""),
++                weaponType = tostring(row.weaponType or ""),
++                rarity = tostring(row.rarity or ""),
++                modelAssetId = tostring(row.modelAssetId or ""),
++            })
+         end
+     end
+-    return startupSlug, "startup"
++    table.sort(rows, function(left, right)
++        if left.weaponType == right.weaponType then
++            return left.nameEn < right.nameEn
++        end
++        return left.weaponType < right.weaponType
++    end)
++    return rows
+ end
+ 
+ function WeaponEquipService.EquipStartup(character: Model)
+-    local slug, source = initialWeapon()
+-    character:SetAttribute("WeaponLoadoutSource", source)
++    local slug = tostring(WeaponRegistry.activeWeaponSlug or "")
++    character:SetAttribute("WeaponLoadoutSource", "startup")
+     if slug == "" then
+         WeaponEquipService.Unequip(character)
+-        if source == "test" then
+-            print("[game1][weapon] test loadout: unarmed")
+-        end
+         return
+     end
+     local ok, reason = WeaponEquipService.Equip(character, slug)
+     if not ok then
+         warn("[game1][weapon] " .. tostring(reason))
+     else
+-        print(("[game1][weapon] %s loadout equipped %s"):format(source, slug))
++        print(("[game1][weapon] startup loadout equipped %s"):format(slug))
+     end
+ end
+ 
+diff --git a/src/shared/RuntimeVersion.luau b/src/shared/RuntimeVersion.luau
+index 055bcf4c799a2e3d5aee390449c9f495c1fd3efb..352d27656eeb369adbe006a67cd0a74702b65d3e 100644
+--- a/src/shared/RuntimeVersion.luau
++++ b/src/shared/RuntimeVersion.luau
+@@ -1 +1 @@
+-return table.freeze({ Version = "2026.10.05.002", SourceDigest = "game1-m6.1-studio-test-loadout" })
++return table.freeze({ Version = "2026.10.05.003", SourceDigest = "game1-m6.2-studio-loadout-archetype-fix" })
+diff --git a/src/shared/dev/TestLoadoutConfig.luau b/src/shared/dev/TestLoadoutConfig.luau
+deleted file mode 100644
+index d1f959f2a86f80f47492323ea0ee4536f4ccf3f5..0000000000000000000000000000000000000000
+--- a/src/shared/dev/TestLoadoutConfig.luau
++++ /dev/null
+@@ -1,5 +0,0 @@
+--- generated by the game1 control center. studio-only runtime override.
+-return table.freeze({
+-	WeaponMode = "weapon",
+-	WeaponSlug = "newbie_axe",
+-})
+diff --git a/system/control-center/character_store.py b/system/control-center/character_store.py
+index ff3a14a0d060e978344cb5f9ecfac10d784c8c1b..94fa0f180e536aba715a454298305aa03fa365c3 100644
+--- a/system/control-center/character_store.py
++++ b/system/control-center/character_store.py
+@@ -77,6 +77,15 @@ class CharacterStore:
+                   published_at REAL NOT NULL
+                 )"""
+             )
++            connection.execute(
++                """CREATE TABLE IF NOT EXISTS character_model_assignments(
++                  id INTEGER PRIMARY KEY AUTOINCREMENT,
++                  target_character_id TEXT NOT NULL,
++                  source_character_id TEXT NOT NULL,
++                  asset_id TEXT NOT NULL DEFAULT '',
++                  assigned_at REAL NOT NULL
++                )"""
++            )
+             self._ensure_column(connection, "characters", "race", "TEXT NOT NULL DEFAULT ''")
+             self._ensure_column(connection, "characters", "gender", "TEXT NOT NULL DEFAULT ''")
+             self._ensure_column(connection, "characters", "armature_name", "TEXT NOT NULL DEFAULT ''")
+@@ -169,10 +178,23 @@ class CharacterStore:
+         return "CHANGED"
+ 
+     def register(self, data):
+-        requested_id = str(data.get("id") or "").strip().lower()
+-        old = self.get(requested_id) if requested_id else None
+-        character_id, display_name, race, gender = self._identity(data, old)
+-        old = self.get(character_id)
++        expected_existing_id = str(data.get("existingId") or "").strip().lower()
++        seed_old = self.get(expected_existing_id) if expected_existing_id else None
++        character_id, display_name, race, gender = self._identity(data, seed_old)
++
++        if expected_existing_id:
++            if not seed_old:
++                raise ValueError(f"unknown archetype revision target: {expected_existing_id}")
++            if character_id != expected_existing_id:
++                raise ValueError("save archetype identity before registering a model revision")
++            old = seed_old
++        else:
++            old = self.get(character_id)
++            if old:
++                raise ValueError(
++                    f"archetype {character_id} already exists; select that row to register a new model revision"
++                )
++
+         self._identity_conflict(character_id, race, gender)
+ 
+         raw_source = str(data.get("sourcePath", "")).strip()
+@@ -283,6 +305,134 @@ class CharacterStore:
+         self.export()
+         return self.get(character_id)
+ 
++    def assign_model(self, target_character_id: str, source_character_id: str):
++        target_id = str(target_character_id or "").strip().lower()
++        source_id = str(source_character_id or "").strip().lower()
++        target = self.get(target_id)
++        source = self.get(source_id)
++        if not target:
++            raise ValueError(f"unknown target archetype: {target_id}")
++        if not source:
++            raise ValueError(f"unknown source archetype: {source_id}")
++        if target_id == source_id:
++            return target
++
++        source_path = self.root / str(source.get("source_path") or "")
++        prepared_path = self.root / str(source.get("prepared_path") or "")
++        if not source_path.is_file() or not prepared_path.is_file():
++            raise ValueError("selected registered model is missing its canonical source/prepared files")
++
++        race = str(target.get("race") or "")
++        gender = str(target.get("gender") or "")
++        target_source = self.root / "assets/source/characters" / race / gender / target_id / "model" / source_path.name
++        target_prepared = self.root / "assets/prepared/characters" / race / gender / target_id / "model" / prepared_path.name
++        revision_stamp = time.strftime("%Y%m%dT%H%M%S", time.gmtime())
++
++        def archive_old(stored_path: str, label: str):
++            value = str(stored_path or "").strip()
++            if not value:
++                return
++            old_path = (self.root / value).resolve()
++            if not old_path.is_file():
++                return
++            if old_path in {source_path.resolve(), prepared_path.resolve()}:
++                return
++            archive = (
++                self.root
++                / "assets/reimported/characters"
++                / race
++                / gender
++                / target_id
++                / revision_stamp
++                / "model-reassignment"
++                / label
++                / old_path.name
++            )
++            archive.parent.mkdir(parents=True, exist_ok=True)
++            if not archive.exists():
++                shutil.copy2(old_path, archive)
++
++        archive_old(str(target.get("source_path") or ""), "source")
++        archive_old(str(target.get("prepared_path") or ""), "prepared")
++
++        for incoming, destination in ((source_path, target_source), (prepared_path, target_prepared)):
++            destination.parent.mkdir(parents=True, exist_ok=True)
++            if incoming.resolve() == destination.resolve():
++                continue
++            if destination.exists():
++                incoming_sha = hashlib.sha256(incoming.read_bytes()).hexdigest()
++                destination_sha = hashlib.sha256(destination.read_bytes()).hexdigest()
++                if incoming_sha != destination_sha:
++                    archive = (
++                        self.root
++                        / "assets/reimported/characters"
++                        / race
++                        / gender
++                        / target_id
++                        / revision_stamp
++                        / "model-reassignment"
++                        / "replaced"
++                        / destination.name
++                    )
++                    archive.parent.mkdir(parents=True, exist_ok=True)
++                    shutil.copy2(destination, archive)
++            shutil.copy2(incoming, destination)
++
++        now = time.time()
++        values = {
++            "source_path": target_source.relative_to(self.root).as_posix(),
++            "prepared_path": target_prepared.relative_to(self.root).as_posix(),
++            "sha256": str(source.get("sha256") or ""),
++            "model_asset_id": source.get("model_asset_id"),
++            "published_sha256": str(source.get("published_sha256") or ""),
++            "moderation_state": str(source.get("moderation_state") or ""),
++            "published_at": source.get("published_at"),
++            "armature_name": str(source.get("armature_name") or ""),
++            "bone_count": int(source.get("bone_count") or 0),
++            "mesh_count": int(source.get("mesh_count") or 0),
++            "skeleton_signature": str(source.get("skeleton_signature") or ""),
++            "skeleton_structure_signature": str(source.get("skeleton_structure_signature") or ""),
++            "skeleton_json": str(source.get("skeleton_json") or "{}"),
++        }
++        status_probe = {**target, **values}
++        status = self._status(status_probe)
++        with self.connect() as connection:
++            connection.execute(
++                """UPDATE characters SET
++                   source_path=?,prepared_path=?,sha256=?,model_asset_id=?,published_sha256=?,
++                   moderation_state=?,published_at=?,armature_name=?,bone_count=?,mesh_count=?,
++                   skeleton_signature=?,skeleton_structure_signature=?,skeleton_json=?,status=?,
++                   revision=revision+1,updated_at=? WHERE id=?""",
++                (
++                    values["source_path"], values["prepared_path"], values["sha256"], values["model_asset_id"],
++                    values["published_sha256"], values["moderation_state"], values["published_at"],
++                    values["armature_name"], values["bone_count"], values["mesh_count"],
++                    values["skeleton_signature"], values["skeleton_structure_signature"], values["skeleton_json"],
++                    status, now, target_id,
++                ),
++            )
++            connection.execute(
++                "INSERT INTO character_model_assignments(target_character_id,source_character_id,asset_id,assigned_at) VALUES(?,?,?,?)",
++                (target_id, source_id, str(source.get("model_asset_id") or ""), now),
++            )
++
++        for stored_path, replacement in (
++            (str(target.get("source_path") or ""), target_source),
++            (str(target.get("prepared_path") or ""), target_prepared),
++        ):
++            if not stored_path:
++                continue
++            old_path = (self.root / stored_path).resolve()
++            if old_path == replacement.resolve() or old_path in {source_path.resolve(), prepared_path.resolve()}:
++                continue
++            try:
++                old_path.unlink(missing_ok=True)
++            except Exception:
++                pass
++
++        self.export()
++        return self.get(target_id)
++
+     def publish(self, character_id: str, publication: dict):
+         character_id = str(character_id or "").strip().lower()
+         row = self.get(character_id)
+@@ -361,6 +511,7 @@ class CharacterStore:
+         with self.connect() as connection:
+             connection.execute("DELETE FROM characters WHERE id=?", (character_id,))
+             connection.execute("DELETE FROM character_publications WHERE character_id=?", (character_id,))
++            connection.execute("DELETE FROM character_model_assignments WHERE target_character_id=? OR source_character_id=?", (character_id, character_id))
+             connection.execute("DELETE FROM project_settings WHERE key=? AND value=?", (ACTIVE_KEY, character_id))
+         self.export()
+ 
+diff --git a/system/control-center/host_agent.py b/system/control-center/host_agent.py
+index 9e288916b66387571c55bcb98ac2b07784da8f74..e76fa871777b6d3e7cd28d106967c94a5f0f8145 100644
+--- a/system/control-center/host_agent.py
++++ b/system/control-center/host_agent.py
+@@ -32,7 +32,7 @@ from weapon_store import WeaponStore
+ from character_core.identity import CharacterIdentityService
+ from studio_bridge import run_model_load_bridge
+ 
+-control_agent_build = "game1-m6.1-test-loadout-001"
++control_agent_build = "game1-m6.2-studio-loadout-archetype-fix-001"
+ port = int(os.environ.get("CONTROL_AGENT_PORT", "43821"))
+ token = os.environ.get("CONTROL_TOKEN", "Game1LocalControlV1")
+ store = CharacterStore(ROOT)
+@@ -310,6 +310,7 @@ class Handler(BaseHTTPRequestHandler):
+ 
+         prefix = "/api/characters/"
+         identity_suffix = "/identity"
++        model_suffix = "/model"
+         activate_suffix = "/activate"
+         publish_suffix = "/publish"
+         sync_suffix = "/sync"
+@@ -319,6 +320,14 @@ class Handler(BaseHTTPRequestHandler):
+                 return self.out(200, character_identity.update(character_id, self.body()))
+             except Exception as error:
+                 return self.out(400, {"error": str(error)})
++        if path.startswith(prefix) and path.endswith(model_suffix):
++            character_id = unquote(path[len(prefix):-len(model_suffix)].strip("/"))
++            try:
++                payload = self.body()
++                source_character_id = str(payload.get("sourceCharacterId") or "").strip().lower()
++                return self.out(200, store.assign_model(character_id, source_character_id))
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
+         if path.startswith(prefix) and path.endswith(activate_suffix):
+             character_id = unquote(path[len(prefix):-len(activate_suffix)].strip("/"))
+             try:
+@@ -369,12 +378,6 @@ class Handler(BaseHTTPRequestHandler):
+                 return self.out(400, {"error": str(error)})
+         if path == "/api/weapons/active/clear":
+             return self.out(200, weapons.clear_active())
+-        if path == "/api/weapons/test-loadout":
+-            try:
+-                return self.out(200, weapons.set_test_loadout(self.body()))
+-            except Exception as error:
+-                return self.out(400, {"error": str(error)})
+-
+         animation_prefix = "/api/animations/"
+         publish_missing_suffix = "/publish-missing"
+         publish_animation_suffix = "/publish"
+diff --git a/system/control-center/schema.sql b/system/control-center/schema.sql
+index b4f9ccc1b4ffaa241f0ba2669c0b3d4a83bd9a16..cde816096ddefa8324319436ce04028a6916b3d5 100644
+--- a/system/control-center/schema.sql
++++ b/system/control-center/schema.sql
+@@ -38,6 +38,14 @@ create table if not exists character_publications (
+     published_at real not null
+ );
+ 
++create table if not exists character_model_assignments (
++    id integer primary key autoincrement,
++    target_character_id text not null,
++    source_character_id text not null,
++    asset_id text not null default '',
++    assigned_at real not null
++);
++
+ create table if not exists animation_profiles (
+     character_id text primary key,
+     skeleton_signature text not null default '',
+diff --git a/system/control-center/static/asset-manager.css b/system/control-center/static/asset-manager.css
+index 064e3a8e0c2204b88406a30266f42654a28dd91c..7df7fb3bfe2e40973e50ca08fcd36dafc625eea2 100644
+--- a/system/control-center/static/asset-manager.css
++++ b/system/control-center/static/asset-manager.css
+@@ -4,4 +4,3 @@
+ .queue-progress{display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:center;margin-top:12px;padding:11px;border:1px solid var(--line);border-radius:11px;background:var(--panel2)}.queue-progress[hidden]{display:none}.queue-progress span{color:var(--muted);font-size:11px}.queue-progress progress{grid-column:1/-1;width:100%;height:8px;accent-color:var(--mint)}
+ .naming-guide{margin:12px 0;border:1px solid var(--line);border-radius:12px;background:var(--panel2);padding:10px 12px}.naming-guide summary{cursor:pointer;color:var(--mint);font-weight:700}.naming-examples{display:grid;gap:5px;margin-top:9px}.naming-examples code{display:block;overflow-wrap:anywhere}.unassigned-list{display:grid;gap:8px;margin-top:10px}.unassigned-row{display:grid;grid-template-columns:minmax(220px,1.4fr) minmax(100px,.55fr) minmax(130px,.7fr) 82px auto;gap:8px;align-items:end;padding:9px;border:1px solid var(--line);border-radius:10px}.unassigned-file{min-width:0;align-self:center}.unassigned-file b,.unassigned-file small{display:block;overflow-wrap:anywhere}.unassigned-file small{color:var(--muted);font-size:10px;margin-top:3px}.unassigned-row label{margin:0;font-size:10px}.unassigned-row select,.unassigned-row input{width:100%;margin-top:4px;padding:7px 8px}.unassigned-row button{padding:8px 10px}@media(max-width:950px){.unassigned-row{grid-template-columns:1fr 1fr}.unassigned-file{grid-column:1/-1}}
+ .weapon-workflow{display:grid;grid-template-columns:minmax(340px,.82fr) minmax(620px,1.5fr);gap:14px;margin-top:14px}.weapon-stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.weapon-table-wrap{max-height:650px}.rarity-common{color:var(--muted)}.rarity-uncommon{color:#7bd88f}.rarity-rare{color:#67a8ff}.rarity-mythical{color:#b38cff}.rarity-legendary{color:#ffb15a}.rarity-immortal{color:#ff6577}.texture-list{display:grid;gap:6px;margin-top:8px}.texture-list div{display:grid;grid-template-columns:minmax(120px,.6fr) minmax(220px,1fr) auto;gap:8px;padding:7px 9px;border:1px solid var(--line);border-radius:9px;background:var(--panel2);font-size:11px}.texture-list span{overflow-wrap:anywhere}@media(max-width:1150px){.weapon-workflow{grid-template-columns:1fr}}@media(max-width:650px){.weapon-stats-grid{grid-template-columns:1fr}}
+-.test-loadout-card{margin-top:14px;padding:16px 18px;display:flex;justify-content:space-between;align-items:center;gap:18px}.test-loadout-card h3{margin-top:4px}.test-loadout-card p{color:var(--muted);font-size:12px;margin-top:5px;max-width:720px}.test-loadout-controls{display:grid;grid-template-columns:minmax(220px,320px) auto;gap:8px;align-items:center}.test-loadout-controls select{width:100%}@media(max-width:800px){.test-loadout-card{align-items:stretch;flex-direction:column}.test-loadout-controls{grid-template-columns:1fr}}
+diff --git a/system/control-center/static/character-assets.js b/system/control-center/static/character-assets.js
+index 5af371dbcc3142cf915e52e7de62de5ad84b0161..31bff95120d2d01ac89d90cda0550acd886ff1cb 100644
+--- a/system/control-center/static/character-assets.js
++++ b/system/control-center/static/character-assets.js
+@@ -1,6 +1,6 @@
+ const $ = id => document.getElementById(id);
+ const state = {
+-  view:'characters', data:null, selected:null, sourcePath:'',
++  view:'characters', data:null, selected:null, sourcePath:'', modelSourceId:'', autoDisplayName:true,
+   animations:null, animationCharacter:'', animationFolder:'', animationFilter:'all', animationSelected:null, lastScan:null, animationPublishing:false,
+ };
+ const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+@@ -9,7 +9,7 @@ function toast(message,error=false){const el=$('toast');el.textContent=message;e
+ async function request(url,options){const response=await fetch(url,options);let data={};try{data=await response.json()}catch{}if(!response.ok)throw Error(data.error||`http ${response.status}`);return data}
+ function selectedRow(){return state.data?.items?.find(x=>x.id===state.selected)||null}
+ function identityId(){return `${$('race').value}_${$('gender').value}`}
+-function syncIdentity(){if(!state.selected)$('character-id').value=identityId();if(!$('display-name').value.trim()&&!state.selected)$('display-name').value=`${$('race').value} ${$('gender').value}`}
++function syncIdentity(){if(state.selected)return;$('character-id').value=identityId();if(state.autoDisplayName)$('display-name').value=`${$('race').value} ${$('gender').value}`}
+ function statusTag(status){return `<span class="tag ${String(status||'').toLowerCase()}">${esc(status||'')}</span>`}
+ 
+ function setView(view){
+@@ -20,18 +20,19 @@ function setView(view){
+   if(view==='animations')loadAnimations();if(view==='weapons'&&window.game1WeaponsLoad)window.game1WeaponsLoad();
+ }
+ 
+-function setForm(row){state.selected=row?.id||null;state.sourcePath='';if(row){$('race').value=row.race||'human';$('gender').value=row.gender||'female';$('character-id').value=row.id;$('display-name').value=row.display_name||'';$('picked-model').textContent='keep current fbx or choose a replacement';}else{$('race').value=state.data?.options?.races?.[0]||'human';$('gender').value=state.data?.options?.genders?.[0]||'female';$('display-name').value='';$('picked-model').textContent='fbx not selected';syncIdentity()}renderCharacters()}
++function setForm(row){state.selected=row?.id||null;state.sourcePath='';state.modelSourceId=row?.id||'';state.autoDisplayName=!row;if(row){$('race').value=row.race||'human';$('gender').value=row.gender||'female';$('character-id').value=row.id;$('display-name').value=row.display_name||'';$('picked-model').textContent='keep current fbx or choose a replacement';}else{$('race').value=state.data?.options?.races?.[0]||'human';$('gender').value=state.data?.options?.genders?.[0]||'female';$('display-name').value='';$('picked-model').textContent='fbx not selected';syncIdentity()}renderCharacters()}
+ 
+ function renderRuntime(){const r=state.data.runtime;const host=$('runtime-state');if(r.mode==='registered'){host.className='runtime-state registered';host.innerHTML=`<strong>registered · ${esc(r.activeArchetypeId)}</strong><span>${esc(r.race)} / ${esc(r.gender)} · model asset ${esc(r.modelAssetId)}</span>`}else{host.className='runtime-state bootstrap';host.innerHTML=`<strong>bootstrap placeholder</strong><span>${esc(r.reason)}${r.activeArchetypeId?' · selected '+esc(r.activeArchetypeId):''}</span>`}const pub=state.data.publication||{};$('publication-state').className=pub.configured?'publication-ready':'publication-missing';$('publication-state').textContent=pub.configured?`open cloud: ${pub.creatorType} ${pub.creatorId}`:'open cloud: not configured'}
+ function renderTree(){const host=$('character-tree');host.innerHTML='';for(const item of state.data.items){const button=document.createElement('button');button.className=item.id===state.selected?'active':'';button.innerHTML=`<span>${esc(item.display_name||item.id)}<small>${esc(item.race||'?')} · ${esc(item.gender||'?')}</small></span><small>${esc(item.status)}</small>`;button.onclick=()=>setForm(item);host.appendChild(button)}if(!state.data.items.length)host.innerHTML='<small class="muted">no registered characters.</small>';$('rail-count').textContent=state.data.items.length}
+ function renderRows(){const body=$('rows');body.innerHTML='';for(const item of state.data.items){const active=state.data.activeArchetypeId===item.id;const tr=document.createElement('tr');tr.className=item.id===state.selected?'active':'';tr.innerHTML=`<td>${active?'yes':''}</td><td><b>${esc(item.race||'?')} / ${esc(item.gender||'?')}</b><br><small>${esc(item.id)}</small></td><td>${item.model_asset_id?`asset ${esc(item.model_asset_id)}`:'local only'}<br><small>${esc(item.sha256||'').slice(0,12)}</small></td><td>${esc(item.armature_name||'—')}<br><small>${esc(item.bone_count||0)} bones · ${esc(item.mesh_count||0)} mesh</small></td><td>${statusTag(item.status)}</td><td>${esc(item.revision)}</td><td><div class="row-actions"><button data-open>edit</button><button data-publish>publish</button><button data-sync>sync studio</button><button data-active>activate</button><button data-delete class="danger">delete</button></div></td>`;tr.querySelector('[data-open]').onclick=()=>setForm(item);tr.querySelector('[data-publish]').onclick=()=>publishCharacter(item.id);tr.querySelector('[data-sync]').onclick=()=>syncStudio(item.id);tr.querySelector('[data-active]').onclick=()=>activate(item.id);tr.querySelector('[data-delete]').onclick=()=>removeCharacter(item.id);body.appendChild(tr)}}
+ function renderDetails(row){const host=$('selected-details');if(!row){host.innerHTML='<span class="muted">select a character.</span>';return}host.innerHTML=`<div class="section-title"><div><span>selected</span><h3>${esc(row.display_name)}</h3></div>${statusTag(row.status)}</div><div class="details-grid"><div><b>canonical source</b><span>${esc(row.source_path||'—')}</span></div><div><b>prepared</b><span>${esc(row.prepared_path||'—')}</span></div><div><b>model asset id</b><span>${esc(row.model_asset_id||'not published')}</span></div><div><b>publication</b><span>${esc(row.moderation_state||'—')}</span></div><div><b>armature</b><span>${esc(row.armature_name||'—')} · ${esc(row.bone_count||0)} bones</span></div><div><b>skeleton signature</b><span>${esc(row.skeleton_signature||'—')}</span></div></div>`}
+-function renderForm(row){if(row){$('model-status').innerHTML=`<strong>${esc(row.display_name)} · ${esc(row.status)}</strong><span>${esc(row.source_path||'no source')} · ${esc(row.armature_name||'no armature metadata')} · ${esc(row.bone_count||0)} bones</span>`;$('register-character').textContent=state.sourcePath?'register new revision':'choose fbx for revision';$('register-character').disabled=!state.sourcePath;$('save-archetype').disabled=false;}else{$('model-status').innerHTML='<strong>not registered</strong><span>choose an fbx with a skinned armature.</span>';$('register-character').textContent='register character';$('register-character').disabled=!state.sourcePath;$('save-archetype').disabled=true;}const has=row&&row.source_path;const configured=!!state.data?.publication?.configured;$('publish-character').disabled=!has||!configured;$('sync-character').disabled=!row?.model_asset_id;$('activate-character').disabled=!row?.model_asset_id;$('publication-hint').textContent=!row?'select a registered character.':!configured?'configure open cloud in .env.local before publishing.':row.model_asset_id?`publish updates permanent asset ${row.model_asset_id}.`:'publish creates a new permanent model asset id.'}
++function renderModelSource(row){const select=$('character-model-source');if(!select)return;if(!row){select.innerHTML='<option value="">register a new fbx first</option>';select.value='';select.disabled=true;return}const rows=(state.data?.items||[]).filter(item=>item.source_path&&item.prepared_path);const options=[];options.push(`<option value="${esc(row.id)}">current · ${esc(row.id)} · asset ${esc(row.model_asset_id||'local')}</option>`);for(const item of rows){if(item.id===row.id)continue;options.push(`<option value="${esc(item.id)}">${esc(item.race)}/${esc(item.gender)} · ${esc(item.id)} · asset ${esc(item.model_asset_id)}</option>`)}select.innerHTML=options.join('');const desired=state.modelSourceId||row.id;select.value=options.some(html=>html.includes(`value="${desired}"`))?desired:row.id;state.modelSourceId=select.value;select.disabled=false}
++function renderForm(row){renderModelSource(row);if(row){$('model-status').innerHTML=`<strong>${esc(row.display_name)} · ${esc(row.status)}</strong><span>${esc(row.source_path||'no source')} · ${esc(row.armature_name||'no armature metadata')} · ${esc(row.bone_count||0)} bones</span>`;$('register-character').textContent=state.sourcePath?'register new revision':'choose fbx for revision';$('register-character').disabled=!state.sourcePath;$('save-archetype').disabled=false;}else{$('model-status').innerHTML='<strong>not registered</strong><span>choose an fbx with a skinned armature.</span>';$('register-character').textContent='register character';$('register-character').disabled=!state.sourcePath;$('save-archetype').disabled=true;}const has=row&&row.source_path;const configured=!!state.data?.publication?.configured;$('publish-character').disabled=!has||!configured;$('sync-character').disabled=!row?.model_asset_id;$('activate-character').disabled=!row?.model_asset_id;$('publication-hint').textContent=!row?'select a registered character.':!configured?'configure open cloud in .env.local before publishing.':row.model_asset_id?`publish updates permanent asset ${row.model_asset_id}.`:'publish creates a new permanent model asset id.'}
+ function renderCharacters(){if(!state.data)return;const row=selectedRow();const published=state.data.items.filter(x=>x.status==='PUBLISHED').length;$('metric-total').textContent=state.data.items.length;$('metric-published').textContent=published;$('metric-active').textContent=state.data.activeArchetypeId?'1':'0';renderRuntime();renderTree();renderRows();renderDetails(row);renderForm(row)}
+ async function loadCharacters(){try{state.data=await request('/api/characters');const races=state.data.options?.races||['human'];const genders=state.data.options?.genders||['male','female'];$('race').innerHTML=races.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');$('gender').innerHTML=genders.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');if(state.selected&&!state.data.items.some(x=>x.id===state.selected))state.selected=null;if(!state.selected)syncIdentity();renderCharacters();populateAnimationCharacters()}catch(error){toast(error.message,true)}}
+ async function chooseModel(){try{const result=await request('/api/files/choose-character-model',{method:'POST'});if(!result.path)return;state.sourcePath=result.path;$('picked-model').textContent=result.path;renderForm(selectedRow())}catch(error){toast(error.message,true)}}
+-async function registerCharacter(){try{const row=selectedRow();if(!state.sourcePath)throw Error('choose an fbx first');if(row){const identityChanged=$('character-id').value.trim().toLowerCase()!==row.id||$('race').value!==row.race||$('gender').value!==row.gender||$('display-name').value.trim()!==(row.display_name||'');if(identityChanged)throw Error('save archetype identity first, then register the model revision');}$('register-character').disabled=true;toast('analyzing and registering character…');const result=await request('/api/characters',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:$('character-id').value,displayName:$('display-name').value,race:$('race').value,gender:$('gender').value,sourcePath:state.sourcePath})});state.selected=result.id;state.sourcePath='';await loadCharacters();toast(`registered ${result.id} · ${result.bone_count} bones`)}catch(error){toast(error.message,true)}finally{renderForm(selectedRow())}}
+-async function saveArchetype(){const row=selectedRow();if(!row)return;try{const oldId=row.id;const nextId=$('character-id').value.trim().toLowerCase();const nextRace=$('race').value;const nextGender=$('gender').value;const identityChanged=oldId!==nextId||row.race!==nextRace||row.gender!==nextGender;if(identityChanged&&!confirm(`change archetype ${oldId} → ${nextId}? canonical model/animation paths will be migrated and existing roblox asset ids will be preserved.`))return;$('save-archetype').disabled=true;toast('saving archetype identity…');const result=await request('/api/characters/'+encodeURIComponent(oldId)+'/identity',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:nextId,displayName:$('display-name').value,race:nextRace,gender:nextGender})});state.selected=result.newId;state.animationCharacter=result.newId;await loadCharacters();const syncHint=result.studioSyncRequired&&result.identityChanged?' · sync studio before play':'';toast(`saved ${result.newId} · ${result.migratedAnimationClips} animation clips migrated${syncHint}`)}catch(error){toast(error.message,true)}finally{renderForm(selectedRow())}}
++async function registerCharacter(){try{const row=selectedRow();if(!state.sourcePath)throw Error('choose an fbx first');if(row){const identityChanged=$('character-id').value.trim().toLowerCase()!==row.id||$('race').value!==row.race||$('gender').value!==row.gender||$('display-name').value.trim()!==(row.display_name||'');if(identityChanged)throw Error('save archetype identity first, then register the model revision');}$('register-character').disabled=true;toast('analyzing and registering character…');const result=await request('/api/characters',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({existingId:row?.id||'',id:$('character-id').value,displayName:$('display-name').value,race:$('race').value,gender:$('gender').value,sourcePath:state.sourcePath})});state.selected=result.id;state.modelSourceId=result.id;state.sourcePath='';await loadCharacters();toast(`registered ${result.id} · ${result.bone_count} bones`)}catch(error){toast(error.message,true)}finally{renderForm(selectedRow())}}
++async function saveArchetype(){const row=selectedRow();if(!row)return;try{const oldId=row.id;const nextId=$('character-id').value.trim().toLowerCase();const nextRace=$('race').value;const nextGender=$('gender').value;const modelSource=state.modelSourceId||oldId;const identityChanged=oldId!==nextId||row.race!==nextRace||row.gender!==nextGender;const modelChanged=modelSource!==oldId;if((identityChanged||modelChanged)&&!confirm(`save archetype changes for ${oldId}? identity paths will be migrated and an existing registered model asset can be reassigned without republishing.`))return;$('save-archetype').disabled=true;toast('saving archetype…');const result=await request('/api/characters/'+encodeURIComponent(oldId)+'/identity',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:nextId,displayName:$('display-name').value,race:nextRace,gender:nextGender})});let reassigned=false;if(modelChanged){await request('/api/characters/'+encodeURIComponent(result.newId)+'/model',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sourceCharacterId:modelSource})});reassigned=true}state.selected=result.newId;state.modelSourceId=result.newId;state.animationCharacter=result.newId;await loadCharacters();const syncHint=(result.studioSyncRequired||reassigned)?' · sync studio before play':'';toast(`saved ${result.newId}${reassigned?' · model asset reassigned':''}${syncHint}`)}catch(error){toast(error.message,true)}finally{renderForm(selectedRow())}}
+ async function publishCharacter(id=state.selected){try{if(!id)throw Error('select a character');toast('publishing character model to roblox…');await request('/api/characters/'+encodeURIComponent(id)+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:$('publication-description').value})});state.selected=id;await loadCharacters();toast(`published ${id}`)}catch(error){toast(error.message,true)}}
+ async function syncStudio(id=state.selected){try{if(!id)throw Error('select a character');toast('syncing published character into studio…');const result=await request('/api/characters/'+encodeURIComponent(id)+'/sync',{method:'POST'});toast(`studio synced ${id} · ${result.studio?.destination||''}`)}catch(error){toast(error.message,true)}}
+ async function activate(id=state.selected){try{if(!id)throw Error('select a character');await request('/api/characters/'+encodeURIComponent(id)+'/activate',{method:'POST'});state.selected=id;await loadCharacters();toast(`active character: ${id}`)}catch(error){toast(error.message,true)}}
+@@ -93,6 +94,6 @@ async function publishMissingAnimations(){if(state.animationPublishing)return;le
+ async function setAnimationWeight(bindingId,weight){try{state.animations=await request('/api/animation-bindings/'+encodeURIComponent(bindingId)+'/weight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({weight:Number(weight)})});state.animations.publication=state.data?.publication||{};renderAnimations()}catch(error){toast(error.message,true)}}
+ async function removeAnimationBinding(bindingId){if(!confirm('remove this semantic animation binding from game1? canonical source files are preserved.'))return;try{state.animations=await request('/api/animation-bindings/'+encodeURIComponent(bindingId),{method:'DELETE'});state.animations.publication=state.data?.publication||{};if(state.animationSelected===bindingId)state.animationSelected=null;renderAnimations();toast('animation binding removed')}catch(error){toast(error.message,true)}}
+ 
+-$('nav-characters').onclick=()=>setView('characters');$('nav-animations').onclick=()=>setView('animations');$('nav-weapons').onclick=()=>setView('weapons');$('race').onchange=syncIdentity;$('gender').onchange=syncIdentity;$('choose-model').onclick=chooseModel;$('save-archetype').onclick=saveArchetype;$('register-character').onclick=registerCharacter;$('publish-character').onclick=()=>publishCharacter();$('sync-character').onclick=()=>syncStudio();$('activate-character').onclick=()=>activate();$('new-character').onclick=()=>setForm(null);$('clear-form').onclick=()=>setForm(null);$('refresh').onclick=loadCharacters;$('validate-view').onclick=loadCharacters;$('theme').onclick=()=>document.body.classList.toggle('light');
++$('character-model-source').onchange=()=>{state.modelSourceId=$('character-model-source').value};$('display-name').oninput=()=>{if(!state.selected)state.autoDisplayName=false};$('nav-characters').onclick=()=>setView('characters');$('nav-animations').onclick=()=>setView('animations');$('nav-weapons').onclick=()=>setView('weapons');$('race').onchange=syncIdentity;$('gender').onchange=syncIdentity;$('choose-model').onclick=chooseModel;$('save-archetype').onclick=saveArchetype;$('register-character').onclick=registerCharacter;$('publish-character').onclick=()=>publishCharacter();$('sync-character').onclick=()=>syncStudio();$('activate-character').onclick=()=>activate();$('new-character').onclick=()=>setForm(null);$('clear-form').onclick=()=>setForm(null);$('refresh').onclick=loadCharacters;$('validate-view').onclick=loadCharacters;$('theme').onclick=()=>document.body.classList.toggle('light');
+ $('animation-character').onchange=()=>{state.animationCharacter=$('animation-character').value;state.animationSelected=null;state.lastScan=null;loadAnimations()};$('choose-animation-folder').onclick=chooseAnimationFolder;$('scan-animations').onclick=scanAnimations;$('publish-missing-animations').onclick=publishMissingAnimations;$('refresh-animations').onclick=loadAnimations;
+ loadCharacters();
+diff --git a/system/control-center/static/index.html b/system/control-center/static/index.html
+index 9f6e7f1034d8e11002c5c17a4651186922bea438..040c8eb64f98ad9f4b5579910593a34fefe8f571 100644
+--- a/system/control-center/static/index.html
++++ b/system/control-center/static/index.html
+@@ -9,7 +9,7 @@
+ <body>
+ <header>
+ <div><span class="eyebrow">game1 · control center</span><h1>asset manager</h1></div>
+-<div class="header-actions"><span class="pill">characters + animations + weapons · m6</span><button id="theme" class="icon" type="button" title="theme">◐</button></div>
++<div class="header-actions"><span class="pill">characters + animations + weapons · m6.2</span><button id="theme" class="icon" type="button" title="theme">◐</button></div>
+ </header>
+ <main>
+ <aside class="panel rail">
+@@ -53,6 +53,7 @@
+ <label>archetype id<input id="character-id" autocomplete="off" pattern="[a-z0-9][a-z0-9_-]{0,63}"></label>
+ <small class="hint">editing identity migrates canonical model/animation paths and keeps existing roblox asset ids.</small>
+ <label>display name<input id="display-name" autocomplete="off"></label>
++<label>registered model<select id="character-model-source"></select><small class="hint">edit mode only. choose any model already registered on another archetype to repair a wrong assignment. if it already has a roblox asset id, that id is reused without republishing.</small></label>
+ <div class="picker"><button id="choose-model" type="button">choose fbx</button><small id="picked-model">fbx not selected</small></div>
+ <div id="model-status" class="status-box"><strong>not registered</strong><span>select a character row or choose an fbx.</span></div>
+ <div class="actions"><button id="save-archetype" type="button" disabled>save archetype</button><button id="register-character" class="primary" type="button">register character</button><button id="clear-form" type="button">clear form</button></div>
+@@ -118,10 +119,6 @@
+ <div class="metrics"><div><b id="weapon-metric-total">0</b><span>registered</span></div><div><b id="weapon-metric-published">0</b><span>published</span></div><div><b id="weapon-metric-active">0</b><span>startup</span></div></div>
+ </div>
+ <div class="panel runtime-card"><div id="weapon-runtime-state" class="runtime-state bootstrap"><strong>unarmed</strong><span>no startup weapon selected.</span></div><div id="weapon-publication-state" class="publication-missing">open cloud: checking…</div></div>
+-<div class="panel test-loadout-card">
+-<div><span class="eyebrow">studio test loadout</span><h3>weapon override</h3><p>studio only. choose what the character equips on the next spawn without changing the production startup weapon.</p></div>
+-<div class="test-loadout-controls"><select id="weapon-test-loadout"></select><button id="save-weapon-test-loadout" class="primary" type="button">apply test loadout</button></div>
+-</div>
+ <div class="weapon-workflow">
+ <div class="panel character-card">
+ <span class="eyebrow">01 · identity and stats</span><h3>register weapon</h3>
+@@ -152,7 +149,7 @@
+ </section>
+ </main>
+ <div id="toast" class="toast"></div>
+-<script src="character-assets.js?v=8"></script>
+-<script src="weapon-assets.js?v=2"></script>
++<script src="character-assets.js?v=9"></script>
++<script src="weapon-assets.js?v=3"></script>
+ </body>
+ </html>
+diff --git a/system/control-center/static/weapon-assets.js b/system/control-center/static/weapon-assets.js
+index 9c4e2f0d3de47358564f960d9ef39a4f719d02ed..6ce539fc50eef134e2819886e8f95d3cf920146a 100644
+--- a/system/control-center/static/weapon-assets.js
++++ b/system/control-center/static/weapon-assets.js
+@@ -10,8 +10,7 @@ function weaponRenderRows(){const body=$('weapon-rows');body.innerHTML='';for(co
+ function weaponRenderDetails(row){const host=$('weapon-details');if(!row){host.innerHTML='<span class="muted">select a weapon.</span>';return}const textureHtml=(row.textures||[]).map(tex=>`<div><b>${esc(tex.slot)}</b><span>${esc(tex.source_path)}</span><span>${esc(tex.asset_id||'local')}</span></div>`).join('');host.innerHTML=`<div class="section-title"><div><span>selected weapon</span><h3>${esc(row.name_en)}</h3></div>${weaponStatusTag(row.status)}</div><div class="details-grid"><div><b>slug</b><span>${esc(row.slug)}</span></div><div><b>type / rarity</b><span>${esc(row.weapon_type)} · ${esc(row.rarity)}</span></div><div><b>model source</b><span>${esc(row.model_source_path||'—')}</span></div><div><b>model asset id</b><span>${esc(row.model_asset_id||'not published')}</span></div><div><b>serverstorage</b><span>${esc(row.server_storage_path||'—')}</span></div><div><b>revision</b><span>${esc(row.revision)}</span></div></div>${textureHtml?`<div class="texture-list">${textureHtml}</div>`:''}`}
+ function weaponRenderForm(row){const configured=!!weaponState.data?.publication?.configured;if(row){$('weapon-model-status').innerHTML=`<strong>${esc(row.name_en)} · ${esc(row.status)}</strong><span>${esc(row.model_source_path||'no model')} · ${(row.textures||[]).length} registered texture(s)</span>`;$('register-weapon').textContent=(weaponState.modelPath||weaponState.texturePaths.length)?'register new revision':'save metadata';}else{$('weapon-model-status').innerHTML='<strong>not registered</strong><span>choose a weapon fbx. textures are optional.</span>';$('register-weapon').textContent='register weapon'}$('register-weapon').disabled=!row&&!weaponState.modelPath;$('publish-weapon').disabled=!row||!configured||!row.model_source_path;$('sync-weapon').disabled=!row?.model_asset_id;$('activate-weapon').disabled=!row?.model_asset_id;$('weapon-publication-hint').textContent=!row?'select a registered weapon.':!configured?'configure open cloud before publishing.':row.model_asset_id?`publish updates model ${row.model_asset_id} and changed textures.`:'publish creates the permanent model/texture asset ids.'}
+ function weaponRenderRuntime(){const active=weaponState.data.activeWeaponSlug;const host=$('weapon-runtime-state');if(active){const row=weaponState.data.items.find(item=>item.slug===active);host.className='runtime-state registered';host.innerHTML=`<strong>startup weapon · ${esc(active)}</strong><span>${esc(row?.weapon_type||'')} · ${esc(row?.rarity||'')}</span>`}else{host.className='runtime-state bootstrap';host.innerHTML='<strong>unarmed startup</strong><span>animation context: hands</span>'}const pub=weaponState.data.publication||{};$('weapon-publication-state').className=pub.configured?'publication-ready':'publication-missing';$('weapon-publication-state').textContent=pub.configured?`open cloud: ${pub.creatorType} ${pub.creatorId}`:'open cloud: not configured'}
+-function weaponRenderTestLoadout(){const select=$('weapon-test-loadout');if(!select||!weaponState.data)return;const test=weaponState.data.testLoadout||{mode:'inherit',weaponSlug:null};const options=[['inherit','inherit startup'],['unarmed','unarmed']];for(const row of weaponState.data.items||[])options.push([`weapon:${row.slug}`,`${row.name_en} · ${row.weapon_type}`]);select.innerHTML=options.map(([value,label])=>`<option value="${esc(value)}">${esc(label)}</option>`).join('');const selected=test.mode==='weapon'&&test.weaponSlug?`weapon:${test.weaponSlug}`:test.mode||'inherit';select.value=options.some(([value])=>value===selected)?selected:'inherit'}
+-function weaponRender(){if(!weaponState.data)return;const row=weaponSelected();$('weapon-metric-total').textContent=weaponState.data.summary?.registered||0;$('weapon-metric-published').textContent=weaponState.data.summary?.published||0;$('weapon-metric-active').textContent=weaponState.data.summary?.active||0;weaponRenderRuntime();weaponRenderTestLoadout();weaponRenderTree();weaponRenderRows();weaponRenderDetails(row);weaponRenderForm(row)}
++function weaponRender(){if(!weaponState.data)return;const row=weaponSelected();$('weapon-metric-total').textContent=weaponState.data.summary?.registered||0;$('weapon-metric-published').textContent=weaponState.data.summary?.published||0;$('weapon-metric-active').textContent=weaponState.data.summary?.active||0;weaponRenderRuntime();weaponRenderTree();weaponRenderRows();weaponRenderDetails(row);weaponRenderForm(row)}
+ async function weaponLoad(){try{weaponState.data=await request('/api/weapons');const types=weaponState.data.options?.weaponTypes||['1hs','2hs','bow'];const rarities=weaponState.data.options?.rarities||['common','uncommon','rare','mythical','legendary','immortal'];$('weapon-type').innerHTML=types.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');$('weapon-rarity').innerHTML=rarities.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');if(weaponState.selected&&!weaponState.data.items.some(x=>x.slug===weaponState.selected))weaponState.selected=null;weaponRender()}catch(error){toast(error.message,true)}}
+ async function weaponChooseModel(){try{const result=await request('/api/files/choose-weapon-model',{method:'POST'});if(!result.path)return;weaponState.modelPath=result.path;$('picked-weapon-model').textContent=result.path;weaponRenderForm(weaponSelected())}catch(error){toast(error.message,true)}}
+ async function weaponChooseTextures(){try{const result=await request('/api/files/choose-weapon-textures',{method:'POST'});weaponState.texturePaths=result.paths||[];$('picked-weapon-textures').textContent=weaponState.texturePaths.length?weaponState.texturePaths.join(' · '):'textures not selected';weaponRenderForm(weaponSelected())}catch(error){toast(error.message,true)}}
+@@ -20,7 +19,6 @@ async function weaponPublish(slug){try{toast('publishing weapon model and change
+ async function weaponSync(slug){try{toast('syncing weapon into serverstorage…');const result=await request('/api/weapons/'+encodeURIComponent(slug)+'/sync',{method:'POST'});await weaponLoad();toast(`studio synced: ${result.studio?.destination||slug}`)}catch(error){toast(error.message,true)}}
+ async function weaponActivate(slug){try{weaponState.data=await request('/api/weapons/'+encodeURIComponent(slug)+'/activate',{method:'POST'});weaponState.data.publication=(await request('/api/weapons')).publication;weaponRender();toast(`startup weapon: ${slug}`)}catch(error){toast(error.message,true)}}
+ async function weaponClearActive(){try{await request('/api/weapons/active/clear',{method:'POST'});await weaponLoad();toast('startup weapon: unarmed')}catch(error){toast(error.message,true)}}
+-async function weaponSaveTestLoadout(){try{const value=$('weapon-test-loadout').value||'inherit';let payload={mode:value};if(value.startsWith('weapon:'))payload={mode:'weapon',weaponSlug:value.slice(7)};weaponState.data=await request('/api/weapons/test-loadout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});weaponState.data.publication=(await request('/api/weapons')).publication;weaponRender();toast('test loadout saved · restart play or respawn character')}catch(error){toast(error.message,true)}}
+ async function weaponDelete(slug){if(!confirm(`delete weapon ${slug} from game1 registry? roblox cloud assets are not deleted.`))return;try{await request('/api/weapons/'+encodeURIComponent(slug),{method:'DELETE'});if(weaponState.selected===slug)weaponState.selected=null;await weaponLoad();weaponSetForm(null);toast('weapon registry row deleted')}catch(error){toast(error.message,true)}}
+ window.game1WeaponsLoad=weaponLoad;
+-$('save-weapon-test-loadout').onclick=weaponSaveTestLoadout;$('weapon-name-en').oninput=weaponSyncSlug;$('new-weapon').onclick=()=>weaponSetForm(null);$('refresh-weapons').onclick=weaponLoad;$('validate-weapons').onclick=weaponLoad;$('choose-weapon-model').onclick=weaponChooseModel;$('choose-weapon-textures').onclick=weaponChooseTextures;$('register-weapon').onclick=weaponRegister;$('clear-weapon-form').onclick=()=>weaponSetForm(null);$('publish-weapon').onclick=()=>weaponSelected()&&weaponPublish(weaponSelected().slug);$('sync-weapon').onclick=()=>weaponSelected()&&weaponSync(weaponSelected().slug);$('activate-weapon').onclick=()=>weaponSelected()&&weaponActivate(weaponSelected().slug);$('clear-active-weapon').onclick=weaponClearActive;
++$('weapon-name-en').oninput=weaponSyncSlug;$('new-weapon').onclick=()=>weaponSetForm(null);$('refresh-weapons').onclick=weaponLoad;$('validate-weapons').onclick=weaponLoad;$('choose-weapon-model').onclick=weaponChooseModel;$('choose-weapon-textures').onclick=weaponChooseTextures;$('register-weapon').onclick=weaponRegister;$('clear-weapon-form').onclick=()=>weaponSetForm(null);$('publish-weapon').onclick=()=>weaponSelected()&&weaponPublish(weaponSelected().slug);$('sync-weapon').onclick=()=>weaponSelected()&&weaponSync(weaponSelected().slug);$('activate-weapon').onclick=()=>weaponSelected()&&weaponActivate(weaponSelected().slug);$('clear-active-weapon').onclick=weaponClearActive;
+diff --git a/system/control-center/weapon_store.py b/system/control-center/weapon_store.py
+index 55dc8c7d81cb437b2d6efe48623ae6fe37190c54..e77d2001648d530e976f84cf291be3b5726e35d6 100644
+--- a/system/control-center/weapon_store.py
++++ b/system/control-center/weapon_store.py
+@@ -19,8 +19,6 @@ from opencloud_assets import (
+ SCHEMA_VERSION = 1
+ PROJECT = "game1"
+ ACTIVE_KEY = "active_weapon_slug"
+-TEST_LOADOUT_KEY = "test_loadout_weapon"
+-TEST_LOADOUT_MODES = ("inherit", "unarmed", "weapon")
+ WEAPON_TYPES = ("1hs", "2hs", "bow")
+ RARITIES = ("common", "uncommon", "rare", "mythical", "legendary", "immortal")
+ TEXTURE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
+@@ -127,6 +125,7 @@ class WeaponStore:
+                     value TEXT NOT NULL DEFAULT ''
+                 )"""
+             )
++            connection.execute("DELETE FROM project_settings WHERE key='test_loadout_weapon'")
+ 
+     @staticmethod
+     def _sha256(path: Path) -> str:
+@@ -167,38 +166,6 @@ class WeaponStore:
+         self.export()
+         return self.snapshot()
+ 
+-    def test_loadout(self) -> dict:
+-        with self.connect() as connection:
+-            row = connection.execute("SELECT value FROM project_settings WHERE key=?", (TEST_LOADOUT_KEY,)).fetchone()
+-        raw = str(row["value"] if row else "").strip()
+-        if not raw or raw == "inherit":
+-            return {"mode": "inherit", "weaponSlug": None}
+-        if raw == "unarmed":
+-            return {"mode": "unarmed", "weaponSlug": None}
+-        if raw.startswith("weapon:"):
+-            slug = raw.split(":", 1)[1].strip().lower()
+-            if slug and self.get(slug):
+-                return {"mode": "weapon", "weaponSlug": slug}
+-        return {"mode": "inherit", "weaponSlug": None}
+-
+-    def set_test_loadout(self, payload: dict):
+-        mode = str(payload.get("mode") or "inherit").strip().lower()
+-        if mode not in TEST_LOADOUT_MODES:
+-            raise ValueError("test loadout mode must be inherit, unarmed or weapon")
+-        value = mode
+-        if mode == "weapon":
+-            slug = str(payload.get("weaponSlug") or "").strip().lower()
+-            row = self.get(slug)
+-            if not row:
+-                raise ValueError(f"unknown weapon: {slug}")
+-            if not str(row.get("model_asset_id") or "").isdigit():
+-                raise ValueError("publish the weapon model before using it in the test loadout")
+-            value = f"weapon:{slug}"
+-        with self.connect() as connection:
+-            connection.execute("INSERT OR REPLACE INTO project_settings(key,value) VALUES(?,?)", (TEST_LOADOUT_KEY, value))
+-        self.export()
+-        return self.snapshot()
+-
+     def _modifiers(self, connection, slug: str) -> dict[str, float]:
+         rows = connection.execute(
+             "SELECT stat_key,delta FROM weapon_stat_modifiers WHERE weapon_slug=? ORDER BY stat_key", (slug,)
+@@ -466,9 +433,6 @@ class WeaponStore:
+             current = connection.execute("SELECT value FROM project_settings WHERE key=?", (ACTIVE_KEY,)).fetchone()
+             if current and str(current["value"]) == slug:
+                 connection.execute("DELETE FROM project_settings WHERE key=?", (ACTIVE_KEY,))
+-            test_loadout = connection.execute("SELECT value FROM project_settings WHERE key=?", (TEST_LOADOUT_KEY,)).fetchone()
+-            if test_loadout and str(test_loadout["value"]) == f"weapon:{slug}":
+-                connection.execute("DELETE FROM project_settings WHERE key=?", (TEST_LOADOUT_KEY,))
+         self.export()
+ 
+     def publications(self, slug: str) -> list[dict]:
+@@ -480,12 +444,10 @@ class WeaponStore:
+     def snapshot(self) -> dict:
+         items = self.list()
+         active = self.active_slug()
+-        test_loadout = self.test_loadout()
+         return {
+             "schemaVersion": SCHEMA_VERSION,
+             "project": PROJECT,
+             "activeWeaponSlug": active,
+-            "testLoadout": test_loadout,
+             "options": self.options(),
+             "items": items,
+             "summary": {
+@@ -510,18 +472,6 @@ class WeaponStore:
+         manifest_path.parent.mkdir(parents=True, exist_ok=True)
+         manifest_path.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+ 
+-        test_config_path = self.root / "src/shared/dev/TestLoadoutConfig.luau"
+-        test_config_path.parent.mkdir(parents=True, exist_ok=True)
+-        test_loadout = snapshot.get("testLoadout") or {}
+-        test_config_path.write_text(
+-            "-- generated by the game1 control center. studio-only runtime override.\n"
+-            "return table.freeze({\n"
+-            f"\tWeaponMode = {self._lua_string(test_loadout.get('mode') or 'inherit')},\n"
+-            f"\tWeaponSlug = {self._lua_string(test_loadout.get('weaponSlug') or '')},\n"
+-            "})\n",
+-            encoding="utf-8",
+-        )
+-
+         registry_path = self.root / "src/shared/weapon/WeaponRegistry.luau"
+         registry_path.parent.mkdir(parents=True, exist_ok=True)
+         lines = [
+diff --git a/system/studio-plugin/Game1Bridge.server.luau b/system/studio-plugin/Game1Bridge.server.luau
+index a30bc511d7f9ccbdce2e30f232c32f97b2d09b39..6566488f7846b27f21d860e3c3fc2dda6f0218ff 100644
+--- a/system/studio-plugin/Game1Bridge.server.luau
++++ b/system/studio-plugin/Game1Bridge.server.luau
+@@ -1,6 +1,7 @@
+ local AssetService = game:GetService("AssetService")
+ local HttpService = game:GetService("HttpService")
+ local RunService = game:GetService("RunService")
++local ReplicatedStorage = game:GetService("ReplicatedStorage")
+ local ServerStorage = game:GetService("ServerStorage")
+ 
+ local CharacterTemplate = require(script.Parent.modules.CharacterTemplate)
+@@ -14,6 +15,111 @@ local AGENT_TOKEN = "Game1LocalControlV1"
+ local BRIDGE_URL = "http://127.0.0.1:43137"
+ local BRIDGE_TOKEN = "Game1StudioBridgeV1"
+ 
++local STUDIO_DEBUG_PREFERENCES_SETTING = "Game1StudioDebugPreferences_v1"
++local STUDIO_DEBUG_PREFERENCES_FOLDER = "Game1StudioPreferences"
++local STUDIO_DEBUG_PREFERENCE_FIELDS = {
++    LastLoadoutArchetype = { key = "lastLoadoutArchetype", valueType = "string" },
++    LastLoadoutWeaponSlug = { key = "lastLoadoutWeaponSlug", valueType = "string" },
++}
++
++local studioPreferenceFolder: Folder? = nil
++local studioPreferenceConnections: { RBXScriptConnection } = {}
++local applyingStudioPreferences = false
++
++local function readStudioDebugPreferences(): any
++    local ok, value = pcall(function()
++        return plugin:GetSetting(STUDIO_DEBUG_PREFERENCES_SETTING)
++    end)
++    if ok and type(value) == "table" then
++        return value
++    end
++    if not ok then
++        warn("[game1 plugin] could not read Studio debug preferences: " .. tostring(value))
++    end
++    return {}
++end
++
++local function writeStudioDebugPreference(key: string, value: any)
++    local preferences = readStudioDebugPreferences()
++    preferences[key] = value
++    local ok, err = pcall(function()
++        plugin:SetSetting(STUDIO_DEBUG_PREFERENCES_SETTING, preferences)
++    end)
++    if not ok then
++        warn("[game1 plugin] could not save Studio debug preference: " .. tostring(err))
++    end
++end
++
++local function disconnectStudioPreferenceBridge()
++    for _, connection in ipairs(studioPreferenceConnections) do
++        connection:Disconnect()
++    end
++    table.clear(studioPreferenceConnections)
++    studioPreferenceFolder = nil
++end
++
++local function attachStudioPreferenceBridge(folder: Folder)
++    if studioPreferenceFolder == folder then
++        return
++    end
++    disconnectStudioPreferenceBridge()
++    studioPreferenceFolder = folder
++
++    local preferences = readStudioDebugPreferences()
++    applyingStudioPreferences = true
++    for attributeName, field in pairs(STUDIO_DEBUG_PREFERENCE_FIELDS) do
++        local value = preferences[field.key]
++        if type(value) ~= field.valueType then
++            value = ""
++        end
++        folder:SetAttribute(attributeName, value)
++    end
++    applyingStudioPreferences = false
++
++    for attributeName, field in pairs(STUDIO_DEBUG_PREFERENCE_FIELDS) do
++        table.insert(studioPreferenceConnections, folder:GetAttributeChangedSignal(attributeName):Connect(function()
++            if applyingStudioPreferences then
++                return
++            end
++            local value = folder:GetAttribute(attributeName)
++            if type(value) == field.valueType then
++                writeStudioDebugPreference(field.key, value)
++            end
++        end))
++    end
++
++    if RunService:IsClient() then
++        folder:SetAttribute("ClientPreferencesReady", true)
++    end
++end
++
++local function syncStudioPreferenceBridge()
++    if not RunService:IsRunning() then
++        disconnectStudioPreferenceBridge()
++        return
++    end
++
++    local folder = ReplicatedStorage:FindFirstChild(STUDIO_DEBUG_PREFERENCES_FOLDER)
++    if not folder and RunService:IsServer() then
++        folder = Instance.new("Folder")
++        folder.Name = STUDIO_DEBUG_PREFERENCES_FOLDER
++        folder.Parent = ReplicatedStorage
++    end
++    if folder and folder:IsA("Folder") then
++        attachStudioPreferenceBridge(folder)
++    end
++end
++
++ReplicatedStorage.ChildAdded:Connect(function(child)
++    if RunService:IsRunning() and child.Name == STUDIO_DEBUG_PREFERENCES_FOLDER and child:IsA("Folder") then
++        attachStudioPreferenceBridge(child)
++    end
++end)
++RunService:GetPropertyChangedSignal("RunState"):Connect(function()
++    task.defer(syncStudioPreferenceBridge)
++end)
++task.defer(syncStudioPreferenceBridge)
++
+ local function checkAgent()
+     local ok, response = pcall(HttpService.RequestAsync, HttpService, {
+         Url = AGENT_URL,
+@@ -427,4 +533,4 @@ task.spawn(function()
+     end
+ end)
+ 
+-print("[game1 plugin] loaded · model bridge v4 · character + weapon templates")
++print("[game1 plugin] loaded · model bridge v5 · templates + Studio test loadout preferences")
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index e13e3aed8cb8bba05ead7a48dbed74f11c935cc3..0eb1c4797b0cf4ed0983cbbb0ae8caa718648924 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -376,6 +376,21 @@ for required in ["saveArchetype", "save archetype identity first", "/identity"]:
+     if required not in js_text:
+         err(f"asset manager archetype editing ui missing {required}")
+ 
++# m6.2 archetype registration safety + registered model reassignment
++character_store_text = (ROOT / "system/control-center/character_store.py").read_text(encoding="utf-8")
++for required in ["existingId", "archetype {character_id} already exists", "def assign_model", "character_model_assignments"]:
++    if required not in character_store_text:
++        err(f"character registration/model reassignment contract missing {required}")
++if "character_model_assignments" not in schema_text:
++    err("control center schema missing character_model_assignments audit table")
++if 'model_suffix = "/model"' not in host_agent_text or "store.assign_model" not in host_agent_text:
++    err("host agent does not expose registered character model reassignment")
++if 'id="character-model-source"' not in ui:
++    err("asset manager registered-model selector is missing")
++for required in ["modelSourceId", "sourceCharacterId", "existingId:row?.id||''"]:
++    if required not in js_text:
++        err(f"asset manager archetype model reassignment ui missing {required}")
++
+ 
+ # m6 weapon registry / stats / attachment contract
+ weapon_manifest_path = ROOT / "assets/manifests/weapons.json"
+@@ -430,7 +445,7 @@ weapon_equip_path = ROOT / "src/server/weapon/WeaponEquipService.luau"
+ weapon_attach_path = ROOT / "src/client/weapon/WeaponAttachmentController.luau"
+ weapon_equip_text = weapon_equip_path.read_text(encoding="utf-8") if weapon_equip_path.is_file() else ""
+ weapon_attach_text = weapon_attach_path.read_text(encoding="utf-8") if weapon_attach_path.is_file() else ""
+-for required in ["Weapon_R_Bone", "weapon_r", "Weapon_L_Bone", "weapon_l", "AnimationWeaponSet", "statModifiers", "EquipStartup", "TestLoadoutConfig", "RunService:IsStudio()", "WeaponLoadoutSource"]:
++for required in ["Weapon_R_Bone", "weapon_r", "Weapon_L_Bone", "weapon_l", "AnimationWeaponSet", "statModifiers", "EquipStartup", "GetAvailable", "ListAvailable", "WeaponLoadoutSource"]:
+     if required not in weapon_equip_text:
+         err(f"weapon equip runtime missing {required}")
+ for required in ["Game1WeaponAttachment", "parent.TransformedWorldCFrame * targetBone.CFrame", "weapon:PivotTo"]:
+@@ -459,29 +474,53 @@ if 'character:GetAttribute("AttackSpeed")' not in attack_controller_text:
+ 
+ if 'id="nav-weapons"' not in ui or 'id="register-weapon"' not in ui or 'id="weapon-stat-attack-speed"' not in ui:
+     err("asset manager weapon registration section is missing")
+-if 'id="weapon-test-loadout"' not in ui or 'id="save-weapon-test-loadout"' not in ui:
+-    err("asset manager studio test loadout controls are missing")
++if 'id="weapon-test-loadout"' in ui or 'id="save-weapon-test-loadout"' in ui:
++    err("studio test loadout must not live in the web asset manager")
+ weapon_js_path = ROOT / "system/control-center/static/weapon-assets.js"
+ weapon_js_text = weapon_js_path.read_text(encoding="utf-8") if weapon_js_path.is_file() else ""
+-for required in ["weaponSlugify", "weaponRegister", "weaponPublish", "weaponSync", "weaponActivate", "weaponSaveTestLoadout"]:
++for required in ["weaponSlugify", "weaponRegister", "weaponPublish", "weaponSync", "weaponActivate"]:
+     if required not in weapon_js_text:
+         err(f"asset manager weapon ui missing {required}")
++if "weaponSaveTestLoadout" in weapon_js_text:
++    err("obsolete asset-manager test loadout javascript is still present")
+ 
+-for required in ["WeaponStore", "sync_weapon_to_studio", 'placement_mode="weapon-pivot"', '"/api/weapons"', '"/api/weapons/test-loadout"']:
++for required in ["WeaponStore", "sync_weapon_to_studio", 'placement_mode="weapon-pivot"', '"/api/weapons"']:
+     if required not in host_agent_text:
+         err(f"host agent weapon api missing {required}")
+-if "def set_test_loadout" not in weapon_store_text or "TEST_LOADOUT_KEY" not in weapon_store_text or "TestLoadoutConfig.luau" not in weapon_store_text:
+-    err("weapon store studio test loadout contract is missing")
++if '"/api/weapons/test-loadout"' in host_agent_text or "def set_test_loadout" in weapon_store_text or "TEST_LOADOUT_KEY" in weapon_store_text:
++    err("obsolete web/control-center test loadout path is still active")
+ if 'placementMode ~= "weapon-pivot"' not in plugin_text or "placeWeaponModel" not in plugin_text:
+     err("studio bridge weapon-pivot placement is missing")
+ 
++# m6.2 Studio-native Test Loadout (ported from the reference architecture)
++test_loadout_server_path = ROOT / "src/server/dev/TestLoadoutService.luau"
++test_loadout_client_path = ROOT / "src/client/dev/TestLoadoutController.luau"
++test_loadout_server = test_loadout_server_path.read_text(encoding="utf-8") if test_loadout_server_path.is_file() else ""
++test_loadout_client = test_loadout_client_path.read_text(encoding="utf-8") if test_loadout_client_path.is_file() else ""
++for required in ["GetTestLoadoutCatalog", "ApplyTestLoadout", "CharacterService.Respawn", "WeaponEquipService.Equip", "Game1TestLoadoutActive"]:
++    if required not in test_loadout_server:
++        err(f"Studio Test Loadout server missing {required}")
++for required in ["TEST LOADOUT", "createDropdown", "createCategorySelector", "LastLoadoutArchetype", "LastLoadoutWeaponSlug", "ACCEPT LOADOUT", "RunService:IsStudio()"]:
++    if required not in test_loadout_client:
++        err(f"Studio Test Loadout client missing {required}")
++server_init_text = (ROOT / "src/server/init.server.luau").read_text(encoding="utf-8")
++if "TestLoadoutService.Start()" not in server_init_text:
++    err("Studio Test Loadout service is not started by the server runtime")
++if "TestLoadoutController.Start()" not in client_init_text:
++    err("Studio Test Loadout controller is not started by the client runtime")
++for required in ["Game1StudioDebugPreferences_v1", "Game1StudioPreferences", "plugin:GetSetting", "plugin:SetSetting", "LastLoadoutArchetype", "LastLoadoutWeaponSlug", "ClientPreferencesReady"]:
++    if required not in plugin_text:
++        err(f"game1 Studio plugin loadout preference bridge missing {required}")
++if (ROOT / "src/shared/dev/TestLoadoutConfig.luau").exists():
++    err("obsolete generated TestLoadoutConfig must be removed")
++
+ if errors:
+     print("verify failed")
+     for item in errors:
+         print(" -", item)
+     sys.exit(1)
+ 
+-print("verify ok · game1 m6.1 weapon registry + studio test loadout contracts passed")
++print("verify ok · game1 m6.2 archetype safety + Studio-native test loadout contracts passed")
+ print("registered character archetypes:", len(archetypes))
+ print("active character archetype:", active_id or "none")
+ print("race pool: human")

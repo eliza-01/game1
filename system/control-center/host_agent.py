@@ -28,14 +28,16 @@ load_local_env(ROOT / ".env.local")
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from character_store import CharacterStore
 from animation_store import AnimationStore
+from weapon_store import WeaponStore
 from character_core.identity import CharacterIdentityService
 from studio_bridge import run_model_load_bridge
 
-control_agent_build = "game1-m5-2-archetype-edit-001"
+control_agent_build = "game1-m6.2-studio-loadout-archetype-fix-001"
 port = int(os.environ.get("CONTROL_AGENT_PORT", "43821"))
 token = os.environ.get("CONTROL_TOKEN", "Game1LocalControlV1")
 store = CharacterStore(ROOT)
 animations = AnimationStore(ROOT)
+weapons = WeaponStore(ROOT)
 character_identity = CharacterIdentityService(ROOT, store, animations)
 
 
@@ -86,6 +88,34 @@ def sync_character_to_studio(character_id: str):
     return {"character": row, "studio": result}
 
 
+
+def sync_weapon_to_studio(slug: str):
+    row = weapons.get(slug)
+    if not row:
+        raise ValueError(f"unknown weapon: {slug}")
+    asset_id = str(row.get("model_asset_id") or "").strip()
+    if not asset_id:
+        raise ValueError("publish the weapon model before syncing it to Studio")
+    texture_assets = [
+        {"slot": str(item.get("slot") or ""), "assetId": str(item.get("asset_id") or "")}
+        for item in (row.get("textures") or [])
+        if str(item.get("asset_id") or "").isdigit()
+    ]
+    destination = ["weapons", str(row.get("weapon_type") or ""), str(row.get("slug") or ""), "model"]
+    result = run_model_load_bridge(
+        asset_id,
+        destination,
+        wrapper_name=str(row.get("slug") or ""),
+        placement_mode="weapon-pivot",
+        metadata={
+            "weaponSlug": str(row.get("slug") or ""),
+            "weaponType": str(row.get("weapon_type") or ""),
+            "rarity": str(row.get("rarity") or ""),
+            "textures": texture_assets,
+        },
+    )
+    return {"weapon": row, "studio": result}
+
 def _powershell_picker(script: str) -> str:
     powershell = shutil.which("powershell.exe") or shutil.which("powershell")
     if not powershell:
@@ -117,6 +147,39 @@ if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
 '''
     )
 
+
+
+def choose_weapon_fbx() -> str:
+    return _powershell_picker(
+        r'''
+Add-Type -AssemblyName System.Windows.Forms
+$dialog = New-Object System.Windows.Forms.OpenFileDialog
+$dialog.Title = 'game1 · choose weapon fbx'
+$dialog.Filter = 'fbx weapon model (*.fbx)|*.fbx'
+$dialog.Multiselect = $false
+if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    Write-Output $dialog.FileName
+}
+'''
+    )
+
+
+def choose_weapon_textures() -> list[str]:
+    raw = _powershell_picker(
+        r'''
+Add-Type -AssemblyName System.Windows.Forms
+$dialog = New-Object System.Windows.Forms.OpenFileDialog
+$dialog.Title = 'game1 · choose weapon textures'
+$dialog.Filter = 'weapon textures (*.png;*.jpg;*.jpeg;*.webp)|*.png;*.jpg;*.jpeg;*.webp'
+$dialog.Multiselect = $true
+if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    Write-Output ($dialog.FileNames -join [char]31)
+}
+'''
+    )
+    return [item for item in raw.split(chr(31)) if item]
 
 def choose_animation_folder() -> str:
     return _powershell_picker(
@@ -174,6 +237,15 @@ class Handler(BaseHTTPRequestHandler):
             snapshot = animations.snapshot(character_id or store.active_id())
             snapshot["publication"] = publication_config()
             return self.out(200, snapshot)
+        if path == "/api/weapons":
+            snapshot = weapons.snapshot()
+            snapshot["publication"] = publication_config()
+            return self.out(200, snapshot)
+        weapon_prefix = "/api/weapons/"
+        publications_suffix = "/publications"
+        if path.startswith(weapon_prefix) and path.endswith(publications_suffix):
+            slug = unquote(path[len(weapon_prefix):-len(publications_suffix)].strip("/"))
+            return self.out(200, {"items": weapons.publications(slug)})
         prefix = "/api/characters/"
         suffix = "/publications"
         if path.startswith(prefix) and path.endswith(suffix):
@@ -195,9 +267,24 @@ class Handler(BaseHTTPRequestHandler):
                 return self.out(200, {"path": choose_animation_folder()})
             except Exception as error:
                 return self.out(400, {"error": str(error)})
+        if path == "/api/files/choose-weapon-model":
+            try:
+                return self.out(200, {"path": choose_weapon_fbx()})
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path == "/api/files/choose-weapon-textures":
+            try:
+                return self.out(200, {"paths": choose_weapon_textures()})
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
         if path == "/api/characters":
             try:
                 return self.out(200, store.register(self.body()))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path == "/api/weapons":
+            try:
+                return self.out(200, weapons.register(self.body()))
             except Exception as error:
                 return self.out(400, {"error": str(error)})
         if path == "/api/animations/scan":
@@ -223,6 +310,7 @@ class Handler(BaseHTTPRequestHandler):
 
         prefix = "/api/characters/"
         identity_suffix = "/identity"
+        model_suffix = "/model"
         activate_suffix = "/activate"
         publish_suffix = "/publish"
         sync_suffix = "/sync"
@@ -230,6 +318,14 @@ class Handler(BaseHTTPRequestHandler):
             character_id = unquote(path[len(prefix):-len(identity_suffix)].strip("/"))
             try:
                 return self.out(200, character_identity.update(character_id, self.body()))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path.startswith(prefix) and path.endswith(model_suffix):
+            character_id = unquote(path[len(prefix):-len(model_suffix)].strip("/"))
+            try:
+                payload = self.body()
+                source_character_id = str(payload.get("sourceCharacterId") or "").strip().lower()
+                return self.out(200, store.assign_model(character_id, source_character_id))
             except Exception as error:
                 return self.out(400, {"error": str(error)})
         if path.startswith(prefix) and path.endswith(activate_suffix):
@@ -256,6 +352,32 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/characters/active/clear":
             return self.out(200, store.clear_active())
 
+        weapon_prefix = "/api/weapons/"
+        weapon_publish_suffix = "/publish"
+        weapon_sync_suffix = "/sync"
+        weapon_activate_suffix = "/activate"
+        if path.startswith(weapon_prefix) and path.endswith(weapon_publish_suffix):
+            slug = unquote(path[len(weapon_prefix):-len(weapon_publish_suffix)].strip("/"))
+            try:
+                payload = self.body()
+                credentials = publication_credentials(str(payload.get("description") or "game1 weapon"))
+                return self.out(200, weapons.publish(slug, credentials))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path.startswith(weapon_prefix) and path.endswith(weapon_sync_suffix):
+            slug = unquote(path[len(weapon_prefix):-len(weapon_sync_suffix)].strip("/"))
+            try:
+                return self.out(200, sync_weapon_to_studio(slug))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path.startswith(weapon_prefix) and path.endswith(weapon_activate_suffix):
+            slug = unquote(path[len(weapon_prefix):-len(weapon_activate_suffix)].strip("/"))
+            try:
+                return self.out(200, weapons.set_active(slug))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path == "/api/weapons/active/clear":
+            return self.out(200, weapons.clear_active())
         animation_prefix = "/api/animations/"
         publish_missing_suffix = "/publish-missing"
         publish_animation_suffix = "/publish"
@@ -296,6 +418,14 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith(binding_prefix):
             try:
                 return self.out(200, animations.delete_binding(unquote(path[len(binding_prefix):])))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        weapon_prefix = "/api/weapons/"
+        if path.startswith(weapon_prefix):
+            slug = unquote(path[len(weapon_prefix):])
+            try:
+                weapons.delete(slug)
+                return self.out(200, {"ok": True})
             except Exception as error:
                 return self.out(400, {"error": str(error)})
         prefix = "/api/characters/"

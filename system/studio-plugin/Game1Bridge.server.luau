@@ -1,6 +1,7 @@
 local AssetService = game:GetService("AssetService")
 local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 
 local CharacterTemplate = require(script.Parent.modules.CharacterTemplate)
@@ -13,6 +14,111 @@ local AGENT_URL = "http://127.0.0.1:43821/api/agent/info"
 local AGENT_TOKEN = "Game1LocalControlV1"
 local BRIDGE_URL = "http://127.0.0.1:43137"
 local BRIDGE_TOKEN = "Game1StudioBridgeV1"
+
+local STUDIO_DEBUG_PREFERENCES_SETTING = "Game1StudioDebugPreferences_v1"
+local STUDIO_DEBUG_PREFERENCES_FOLDER = "Game1StudioPreferences"
+local STUDIO_DEBUG_PREFERENCE_FIELDS = {
+    LastLoadoutArchetype = { key = "lastLoadoutArchetype", valueType = "string" },
+    LastLoadoutWeaponSlug = { key = "lastLoadoutWeaponSlug", valueType = "string" },
+}
+
+local studioPreferenceFolder: Folder? = nil
+local studioPreferenceConnections: { RBXScriptConnection } = {}
+local applyingStudioPreferences = false
+
+local function readStudioDebugPreferences(): any
+    local ok, value = pcall(function()
+        return plugin:GetSetting(STUDIO_DEBUG_PREFERENCES_SETTING)
+    end)
+    if ok and type(value) == "table" then
+        return value
+    end
+    if not ok then
+        warn("[game1 plugin] could not read Studio debug preferences: " .. tostring(value))
+    end
+    return {}
+end
+
+local function writeStudioDebugPreference(key: string, value: any)
+    local preferences = readStudioDebugPreferences()
+    preferences[key] = value
+    local ok, err = pcall(function()
+        plugin:SetSetting(STUDIO_DEBUG_PREFERENCES_SETTING, preferences)
+    end)
+    if not ok then
+        warn("[game1 plugin] could not save Studio debug preference: " .. tostring(err))
+    end
+end
+
+local function disconnectStudioPreferenceBridge()
+    for _, connection in ipairs(studioPreferenceConnections) do
+        connection:Disconnect()
+    end
+    table.clear(studioPreferenceConnections)
+    studioPreferenceFolder = nil
+end
+
+local function attachStudioPreferenceBridge(folder: Folder)
+    if studioPreferenceFolder == folder then
+        return
+    end
+    disconnectStudioPreferenceBridge()
+    studioPreferenceFolder = folder
+
+    local preferences = readStudioDebugPreferences()
+    applyingStudioPreferences = true
+    for attributeName, field in pairs(STUDIO_DEBUG_PREFERENCE_FIELDS) do
+        local value = preferences[field.key]
+        if type(value) ~= field.valueType then
+            value = ""
+        end
+        folder:SetAttribute(attributeName, value)
+    end
+    applyingStudioPreferences = false
+
+    for attributeName, field in pairs(STUDIO_DEBUG_PREFERENCE_FIELDS) do
+        table.insert(studioPreferenceConnections, folder:GetAttributeChangedSignal(attributeName):Connect(function()
+            if applyingStudioPreferences then
+                return
+            end
+            local value = folder:GetAttribute(attributeName)
+            if type(value) == field.valueType then
+                writeStudioDebugPreference(field.key, value)
+            end
+        end))
+    end
+
+    if RunService:IsClient() then
+        folder:SetAttribute("ClientPreferencesReady", true)
+    end
+end
+
+local function syncStudioPreferenceBridge()
+    if not RunService:IsRunning() then
+        disconnectStudioPreferenceBridge()
+        return
+    end
+
+    local folder = ReplicatedStorage:FindFirstChild(STUDIO_DEBUG_PREFERENCES_FOLDER)
+    if not folder and RunService:IsServer() then
+        folder = Instance.new("Folder")
+        folder.Name = STUDIO_DEBUG_PREFERENCES_FOLDER
+        folder.Parent = ReplicatedStorage
+    end
+    if folder and folder:IsA("Folder") then
+        attachStudioPreferenceBridge(folder)
+    end
+end
+
+ReplicatedStorage.ChildAdded:Connect(function(child)
+    if RunService:IsRunning() and child.Name == STUDIO_DEBUG_PREFERENCES_FOLDER and child:IsA("Folder") then
+        attachStudioPreferenceBridge(child)
+    end
+end)
+RunService:GetPropertyChangedSignal("RunState"):Connect(function()
+    task.defer(syncStudioPreferenceBridge)
+end)
+task.defer(syncStudioPreferenceBridge)
 
 local function checkAgent()
     local ok, response = pcall(HttpService.RequestAsync, HttpService, {
@@ -202,6 +308,103 @@ local function placeCharacterRig(importedRig: Model, destination: Instance, wrap
     return wrapper :: Model, stats, templateInfo
 end
 
+local function prepareWeaponModel(model: Model)
+    for _, descendant in model:GetDescendants() do
+        if descendant:IsA("Humanoid") or descendant:IsA("AnimationController") then
+            descendant:Destroy()
+        elseif descendant:IsA("BasePart") then
+            descendant.Anchored = true
+            descendant.CanCollide = false
+            descendant.CanTouch = false
+            descendant.CanQuery = false
+            descendant.Massless = true
+        end
+    end
+end
+
+local function applyWeaponTextures(model: Model, textures: { any }): any
+    local meshParts = {}
+    for _, descendant in model:GetDescendants() do
+        if descendant:IsA("MeshPart") then
+            table.insert(meshParts, descendant)
+        end
+    end
+    table.sort(meshParts, function(left, right)
+        return left:GetFullName() < right:GetFullName()
+    end)
+
+    local validTextures = {}
+    for _, row in ipairs(textures or {}) do
+        local assetId = tonumber(row.assetId)
+        if assetId and assetId > 0 then
+            table.insert(validTextures, {
+                slot = string.lower(tostring(row.slot or "")),
+                assetId = tostring(math.floor(assetId)),
+            })
+        end
+    end
+
+    local applied = 0
+    local unmatched = 0
+    if #validTextures == 1 then
+        local uri = "rbxassetid://" .. validTextures[1].assetId
+        for _, mesh in ipairs(meshParts) do
+            mesh.TextureID = uri
+            applied += 1
+        end
+    elseif #validTextures > 1 then
+        for index, texture in ipairs(validTextures) do
+            local matched = false
+            for _, mesh in ipairs(meshParts) do
+                local meshName = string.lower(mesh.Name)
+                if texture.slot ~= "" and string.find(meshName, texture.slot, 1, true) then
+                    mesh.TextureID = "rbxassetid://" .. texture.assetId
+                    matched = true
+                    applied += 1
+                end
+            end
+            if not matched and #validTextures == #meshParts and meshParts[index] then
+                meshParts[index].TextureID = "rbxassetid://" .. texture.assetId
+                matched = true
+                applied += 1
+            end
+            if not matched then
+                unmatched += 1
+            end
+        end
+    end
+
+    return {
+        meshParts = #meshParts,
+        textureAssets = #validTextures,
+        applied = applied,
+        unmatched = unmatched,
+    }
+end
+
+local function placeWeaponModel(imported: Model, destination: Instance, wrapperName: string, assetId: number, metadata: any): (Model, any)
+    wrapperName = validSegment(wrapperName)
+    local existing = destination:FindFirstChild(wrapperName)
+    if existing ~= nil and (not existing:IsA("Model") or existing:GetAttribute("Game1WeaponTemplate") ~= true) then
+        error("refusing to replace unmanaged weapon instance named " .. wrapperName)
+    end
+    if existing then
+        existing:Destroy()
+    end
+
+    imported.Name = wrapperName
+    prepareWeaponModel(imported)
+    imported:SetAttribute("Game1WeaponTemplate", true)
+    imported:SetAttribute("Game1ModelAssetId", tostring(assetId))
+    imported:SetAttribute("WeaponSlug", tostring(metadata.weaponSlug or wrapperName))
+    imported:SetAttribute("WeaponType", tostring(metadata.weaponType or ""))
+    imported:SetAttribute("WeaponRarity", tostring(metadata.rarity or ""))
+    imported.Parent = destination
+
+    local textureStats = applyWeaponTextures(imported, metadata.textures or {})
+    return imported, textureStats
+end
+
 local function postModelLoadResult(payload: any)
     HttpService:RequestAsync({
         Url = BRIDGE_URL .. "/model-load-result",
@@ -225,8 +428,9 @@ local function handleModelLoad(data: any)
         if tostring(data.project or "") ~= "game1" or tonumber(data.schemaVersion) ~= 1 then
             error("invalid game1 model load command")
         end
-        if tostring(data.placementMode or "") ~= "character-controller" then
-            error("unsupported game1 character placement mode")
+        local placementMode = tostring(data.placementMode or "")
+        if placementMode ~= "character-controller" and placementMode ~= "weapon-pivot" then
+            error("unsupported game1 model placement mode")
         end
         local assetId = tonumber(data.assetId)
         if assetId == nil or assetId <= 0 then
@@ -261,18 +465,35 @@ local function handleModelLoad(data: any)
         end
 
         local destination = modelLoadDestination(data.destinationFolders or {})
-        local normalizedRig = canonicalRigModel(importedRig)
-        local wrapper, stats, templateInfo = placeCharacterRig(
-            normalizedRig,
-            destination,
-            tostring(data.wrapperName or ""),
-            assetId
-        )
-        result.destination = wrapper:GetFullName()
-        result.wrapperName = wrapper.Name
-        result.rigStats = stats
-        result.template = templateInfo
-        result.importedCount = #wrapper:GetDescendants()
+        local normalizedModel = canonicalRigModel(importedRig)
+        if placementMode == "weapon-pivot" then
+            local wrapper, textureStats = placeWeaponModel(
+                normalizedModel,
+                destination,
+                tostring(data.wrapperName or ""),
+                assetId,
+                data.metadata or {}
+            )
+            result.destination = wrapper:GetFullName()
+            result.wrapperName = wrapper.Name
+            result.weaponStats = {
+                baseParts = modelRigStats(wrapper).baseParts,
+                textures = textureStats,
+            }
+            result.importedCount = #wrapper:GetDescendants()
+        else
+            local wrapper, stats, templateInfo = placeCharacterRig(
+                normalizedModel,
+                destination,
+                tostring(data.wrapperName or ""),
+                assetId
+            )
+            result.destination = wrapper:GetFullName()
+            result.wrapperName = wrapper.Name
+            result.rigStats = stats
+            result.template = templateInfo
+            result.importedCount = #wrapper:GetDescendants()
+        end
     end, debug.traceback)
 
     if not ok then
@@ -312,4 +533,4 @@ task.spawn(function()
     end
 end)
 
-print("[game1 plugin] loaded · character model bridge v3 · canonical template")
+print("[game1 plugin] loaded · model bridge v5 · templates + Studio test loadout preferences")

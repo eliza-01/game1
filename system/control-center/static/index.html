@@ -9,7 +9,7 @@
 <body>
 <header>
 <div><span class="eyebrow">game1 · control center</span><h1>asset manager</h1></div>
-<div class="header-actions"><span class="pill">characters + animations · m5.1</span><button id="theme" class="icon" type="button" title="theme">◐</button></div>
+<div class="header-actions"><span class="pill">characters + animations + weapons · m6.2</span><button id="theme" class="icon" type="button" title="theme">◐</button></div>
 </header>
 <main>
 <aside class="panel rail">
@@ -17,6 +17,7 @@
 <div class="asset-sections">
 <button id="nav-characters" class="asset-section active" type="button"><b>characters</b><small>models · rigs</small></button>
 <button id="nav-animations" class="asset-section" type="button"><b>animations</b><small>profiles · clips</small></button>
+<button id="nav-weapons" class="asset-section" type="button"><b>weapons</b><small>models · textures · stats</small></button>
 </div>
 <div id="character-rail">
 <hr class="rail-separator">
@@ -29,6 +30,12 @@
 <div class="section-title"><div><span>animation profile</span><h3 id="animation-rail-title">character</h3></div></div>
 <label class="rail-label">character<select id="animation-character"></select></label>
 <div id="animation-tree" class="animation-tree"></div>
+</div>
+<div id="weapon-rail" hidden>
+<hr class="rail-separator">
+<div class="section-title"><div><span>weapon registry</span><h3>weapons</h3></div><span id="weapon-rail-count">0</span></div>
+<div class="tree-actions"><button id="new-weapon" class="primary" type="button">new</button><button id="refresh-weapons" type="button">refresh</button></div>
+<div id="weapon-tree" class="tree"></div>
 </div>
 </aside>
 <section class="content">
@@ -46,6 +53,7 @@
 <label>archetype id<input id="character-id" autocomplete="off" pattern="[a-z0-9][a-z0-9_-]{0,63}"></label>
 <small class="hint">editing identity migrates canonical model/animation paths and keeps existing roblox asset ids.</small>
 <label>display name<input id="display-name" autocomplete="off"></label>
+<label>registered model<select id="character-model-source"></select><small class="hint">edit mode only. choose any model already registered on another archetype to repair a wrong assignment. if it already has a roblox asset id, that id is reused without republishing.</small></label>
 <div class="picker"><button id="choose-model" type="button">choose fbx</button><small id="picked-model">fbx not selected</small></div>
 <div id="model-status" class="status-box"><strong>not registered</strong><span>select a character row or choose an fbx.</span></div>
 <div class="actions"><button id="save-archetype" type="button" disabled>save archetype</button><button id="register-character" class="primary" type="button">register character</button><button id="clear-form" type="button">clear form</button></div>
@@ -83,7 +91,7 @@
 <code>human_female_idle.rbxm → base / idle</code>
 <code>Atk02_1HS_FFighter.rbxm → 1hs / attack / 02</code>
 </div>
-<small class="hint">pattern: <code>[character_]context_slot[_variant]</code>. context is <code>base</code>, <code>hands</code>, <code>1hs</code> or <code>bow</code>. unassigned files can be bound manually without renaming them.</small>
+<small class="hint">pattern: <code>[character_]context_slot[_variant]</code>. context is <code>base</code>, <code>hands</code>, <code>1hs</code>, <code>2hs</code> or <code>bow</code>. unassigned files can be bound manually without renaming them.</small>
 </details>
 <div class="picker"><button id="choose-animation-folder" type="button">choose folder</button><small id="animation-folder">folder not selected</small></div>
 <div class="actions"><button id="scan-animations" class="primary wide" type="button" disabled>scan folder</button></div>
@@ -104,9 +112,44 @@
 </div>
 </div>
 </div>
+
+<div id="weapons-view" hidden>
+<div class="panel hero">
+<div><span class="eyebrow">weapon assets · canonical game1 registry</span><h2>weapons</h2><p>one weapon owns one canonical fbx, zero or more textures, one animation context, additive stat modifiers and stable roblox asset ids. the imported model pivot is the grip reference, matching the reference project attachment contract.</p></div>
+<div class="metrics"><div><b id="weapon-metric-total">0</b><span>registered</span></div><div><b id="weapon-metric-published">0</b><span>published</span></div><div><b id="weapon-metric-active">0</b><span>startup</span></div></div>
+</div>
+<div class="panel runtime-card"><div id="weapon-runtime-state" class="runtime-state bootstrap"><strong>unarmed</strong><span>no startup weapon selected.</span></div><div id="weapon-publication-state" class="publication-missing">open cloud: checking…</div></div>
+<div class="weapon-workflow">
+<div class="panel character-card">
+<span class="eyebrow">01 · identity and stats</span><h3>register weapon</h3>
+<div class="character-grid"><label>name en<input id="weapon-name-en" autocomplete="off"></label><label>name ru<input id="weapon-name-ru" autocomplete="off"></label></div>
+<label>slug<input id="weapon-slug" readonly><small class="hint">generated from english name as lowercase snake_case. existing registered slugs stay stable.</small></label>
+<div class="character-grid"><label>type<select id="weapon-type"></select></label><label>rarity<select id="weapon-rarity"></select></label></div>
+<div class="weapon-stats-grid"><label>attack delta<input id="weapon-stat-damage" type="number" step="1" value="0"></label><label>attack speed delta<input id="weapon-stat-attack-speed" type="number" step="1" value="0"></label></div>
+<small class="hint">modifiers are additive to the current character stat. negative values subtract. 0 means no change. base character: damage 10 · attack speed 100 · run speed 50.</small>
+<hr class="card-separator">
+<span class="eyebrow">02 · source assets</span>
+<div class="picker"><button id="choose-weapon-model" type="button">choose fbx</button><small id="picked-weapon-model">fbx not selected</small></div>
+<div class="picker"><button id="choose-weapon-textures" type="button">choose textures</button><small id="picked-weapon-textures">textures not selected</small></div>
+<div id="weapon-model-status" class="status-box"><strong>not registered</strong><span>choose a weapon model. textures are optional.</span></div>
+<div class="actions"><button id="register-weapon" class="primary" type="button">register weapon</button><button id="clear-weapon-form" type="button">clear form</button></div>
+<hr class="card-separator">
+<span class="eyebrow">03 · publication and studio</span><h3 class="subheading">roblox assets</h3>
+<label>description<input id="weapon-publication-description" value="game1 weapon"></label>
+<div class="actions"><button id="publish-weapon" class="primary" type="button" disabled>publish all changed</button><button id="sync-weapon" type="button" disabled>sync studio</button><button id="activate-weapon" type="button" disabled>set startup</button><button id="clear-active-weapon" type="button">unarmed startup</button></div>
+<small id="weapon-publication-hint" class="hint">select a registered weapon.</small>
+</div>
+<div class="panel character-card">
+<div class="section-title"><div><span>versioned registry</span><h3>registered weapons</h3></div><button id="validate-weapons" type="button">refresh</button></div>
+<div class="table-wrap weapon-table-wrap"><table><thead><tr><th>active</th><th>weapon</th><th>type</th><th>rarity</th><th>stats</th><th>assets</th><th>status</th><th>actions</th></tr></thead><tbody id="weapon-rows"></tbody></table></div>
+<div id="weapon-details" class="details"><span class="muted">select a weapon.</span></div>
+</div>
+</div>
+</div>
 </section>
 </main>
 <div id="toast" class="toast"></div>
-<script src="character-assets.js?v=7"></script>
+<script src="character-assets.js?v=9"></script>
+<script src="weapon-assets.js?v=3"></script>
 </body>
 </html>

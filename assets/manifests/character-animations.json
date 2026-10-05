@@ -4,12 +4,13 @@
   "weaponSets": [
     "hands",
     "1hs",
+    "2hs",
     "bow"
   ],
   "profiles": [
     {
       "characterId": "human_female",
-      "skeletonSignature": "7b5c4592b9c96bd3f4706598f175257ecfacfa7b42b39bc7f96f82db3cb8cac4"
+      "skeletonSignature": "6b3a9235a4ecbe2cc30e4fa90e7e44996e4c41370864d65fb12b9f6625b2d746"
     }
   ],
   "clips": [

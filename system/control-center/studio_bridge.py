@@ -18,6 +18,8 @@ def run_model_load_bridge(
     destination_folders: list[str],
     *,
     wrapper_name: str,
+    placement_mode: str = "character-controller",
+    metadata: dict | None = None,
     timeout_seconds: float = 75.0,
 ) -> dict:
     command = {
@@ -27,8 +29,9 @@ def run_model_load_bridge(
         "assetId": str(asset_id),
         "destinationFolders": [str(part) for part in destination_folders],
         "replaceExisting": True,
-        "placementMode": "character-controller",
+        "placementMode": str(placement_mode),
         "wrapperName": str(wrapper_name),
+        "metadata": dict(metadata or {}),
     }
     result: dict | None = None
     command_claimed = False

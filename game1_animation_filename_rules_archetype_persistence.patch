@@ -1,0 +1,116 @@
+diff --git a/system/control-center/animation_core/common.py b/system/control-center/animation_core/common.py
+index a268651..bab5c82 100644
+--- a/system/control-center/animation_core/common.py
++++ b/system/control-center/animation_core/common.py
+@@ -54,13 +54,15 @@ NAMING_EXAMPLES = [
+ 
+ 
+ 
+-def filename_rule_catalog() -> list[dict]:
++def filename_rule_catalog(character_id: str = "") -> list[dict]:
+     """Return every canonical semantic state with the filename scanner expects.
+ 
+     This is the single source of truth for the Control Center filename-rules UI.
+     Variant slots use variant 01 as the canonical example and expose 01..n separately.
+     """
+     rows: list[dict] = []
++    archetype = _safe_token(str(character_id or ""))
++    filename_prefix = archetype + "_" if archetype else ""
+ 
+     for definition in BASE_SLOT_CATALOG:
+         slot = definition["slot"]
+@@ -72,7 +74,7 @@ def filename_rule_catalog() -> list[dict]:
+             "label": definition.get("label", slot),
+             "variants": False,
+             "variantPattern": "",
+-            "canonicalFilename": _canonical_file_stem("base", "", slot, 0) + ".rbxm",
++            "canonicalFilename": filename_prefix + _canonical_file_stem("base", "", slot, 0) + ".rbxm",
+         })
+ 
+     for weapon_set in WEAPON_SETS:
+@@ -88,7 +90,7 @@ def filename_rule_catalog() -> list[dict]:
+                 "label": definition.get("label", slot),
+                 "variants": has_variants,
+                 "variantPattern": "01..n" if has_variants else "",
+-                "canonicalFilename": _canonical_file_stem("weapon", weapon_set, slot, example_variant) + ".rbxm",
++                "canonicalFilename": filename_prefix + _canonical_file_stem("weapon", weapon_set, slot, example_variant) + ".rbxm",
+             })
+ 
+     return rows
+diff --git a/system/control-center/animation_core/storage.py b/system/control-center/animation_core/storage.py
+index 1a5ba34..a854a64 100644
+--- a/system/control-center/animation_core/storage.py
++++ b/system/control-center/animation_core/storage.py
+@@ -395,7 +395,7 @@ class AnimationStorageMixin:
+             "skeletonCompatible": compatible,
+             "weaponSets": list(WEAPON_SETS),
+             "namingExamples": list(NAMING_EXAMPLES),
+-            "filenameRules": filename_rule_catalog(),
++            "filenameRules": filename_rule_catalog(selected),
+             "slotCatalog": {
+                 "base": BASE_SLOT_CATALOG,
+                 "weapon": {weapon_set: list(_catalog_for_weapon(weapon_set).values()) for weapon_set in WEAPON_SETS},
+diff --git a/system/control-center/static/character-assets.js b/system/control-center/static/character-assets.js
+index 5eb2ed7..ed198a5 100644
+--- a/system/control-center/static/character-assets.js
++++ b/system/control-center/static/character-assets.js
+@@ -4,6 +4,12 @@ const state = {
+   animations:null, animationCharacter:'', animationFolder:'', animationFilter:'all', animationSelected:null, lastScan:null, animationPublishing:false,
+ };
+ const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
++const FILENAME_GUIDE_OPEN_KEY='game1.animation.filenameRules.open';
++function initFilenameRulesDisclosure(){
++  const guide=$('animation-filename-guide');if(!guide)return;
++  try{const saved=localStorage.getItem(FILENAME_GUIDE_OPEN_KEY);if(saved!==null)guide.open=saved==='1';}catch{}
++  guide.addEventListener('toggle',()=>{try{localStorage.setItem(FILENAME_GUIDE_OPEN_KEY,guide.open?'1':'0')}catch{}});
++}
+ 
+ function toast(message,error=false){const el=$('toast');el.textContent=message;el.className='toast show'+(error?' error':'');clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.className='toast',5200)}
+ async function request(url,options){const response=await fetch(url,options);let data={};try{data=await response.json()}catch{}if(!response.ok)throw Error(data.error||`http ${response.status}`);return data}
+@@ -102,4 +108,5 @@ async function removeAnimationBinding(bindingId){if(!confirm('remove this semant
+ 
+ $('display-name').oninput=()=>{if(!state.selected)state.autoDisplayName=false};$('nav-characters').onclick=()=>setView('characters');$('nav-animations').onclick=()=>setView('animations');$('nav-weapons').onclick=()=>setView('weapons');$('race').onchange=syncIdentity;$('gender').onchange=syncIdentity;$('choose-model').onclick=chooseModel;$('save-archetype').onclick=saveArchetype;$('register-character').onclick=registerCharacter;$('publish-character').onclick=()=>publishCharacter();$('sync-character').onclick=()=>syncStudio();$('activate-character').onclick=()=>activate();$('new-character').onclick=()=>setForm(null);$('clear-form').onclick=()=>setForm(null);$('refresh').onclick=loadCharacters;$('validate-view').onclick=loadCharacters;$('theme').onclick=()=>document.body.classList.toggle('light');
+ $('animation-character').onchange=()=>{state.animationCharacter=$('animation-character').value;state.animationSelected=null;state.lastScan=null;loadAnimations()};$('choose-animation-folder').onclick=chooseAnimationFolder;$('scan-animations').onclick=scanAnimations;$('publish-missing-animations').onclick=publishMissingAnimations;$('refresh-animations').onclick=loadAnimations;
++initFilenameRulesDisclosure();
+ loadCharacters();
+diff --git a/system/control-center/static/index.html b/system/control-center/static/index.html
+index 8bcb950..e78470b 100644
+--- a/system/control-center/static/index.html
++++ b/system/control-center/static/index.html
+@@ -80,10 +80,10 @@
+ <div class="panel character-card">
+ <span class="eyebrow">01 · scan and register</span><h3>character animation folder</h3>
+ <p>scan any folder containing studio-exported <code>.rbxm</code>/<code>.rbxmx</code>. the selected character prefix is optional, so <code>human_female_hands_idle</code> and <code>hands_idle</code> resolve identically. files that do not match a rule can be assigned manually after the scan.</p>
+-<details class="naming-guide" open>
++<details id="animation-filename-guide" class="naming-guide" open>
+ <summary>filename rules · all registered states</summary>
+ <div id="animation-filename-rules" class="filename-rules"><span class="muted">loading animation state catalog…</span></div>
+-<small class="hint">canonical files omit the character prefix. optional scan prefix: <code>&lt;character&gt;_</code>, for example <code>human_female_1hs_attack_01.rbxm</code>. variant states use <code>_01</code>, <code>_02</code>, …; unassigned files can still be bound manually without renaming them.</small>
++<small class="hint">canonical filename always starts with the selected archetype id, for example <code>human_female_1hs_attack_01.rbxm</code>. the scanner remains backward-compatible with legacy unprefixed files. variant states use <code>_01</code>, <code>_02</code>, ….</small>
+ </details>
+ <div class="picker"><button id="choose-animation-folder" type="button">choose folder</button><small id="animation-folder">folder not selected</small></div>
+ <div class="actions"><button id="scan-animations" class="primary wide" type="button" disabled>scan folder</button></div>
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index 87a1a07..381834c 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -395,14 +395,17 @@ for required in ["animation_profiles", "animation_clips", "animation_bindings",
+ if 'id="nav-animations"' not in ui or 'id="scan-animations"' not in ui or 'id="publish-missing-animations"' not in ui:
+     err("asset manager character animation section is missing")
+ js_text = js.read_text(encoding="utf-8") if js.is_file() else ""
+-for required in ["filename_rule_catalog", "canonicalFilename", "variantPattern"]:
++for required in ["filename_rule_catalog", "canonicalFilename", "variantPattern", "filename_prefix"]:
+     if required not in animation_store_text:
+         err(f"animation filename-rule catalog missing {required}")
+-for required in ['id="animation-filename-rules"', "all registered states"]:
++for required in ['id="animation-filename-rules"', 'id="animation-filename-guide"', "all registered states", "selected archetype id"]:
+     if required not in ui:
+         err(f"animation filename-rules UI missing {required}")
+ if "renderFilenameRules" not in js_text:
+     err("animation filename-rules renderer missing")
++for required in ["FILENAME_GUIDE_OPEN_KEY", "localStorage.getItem", "localStorage.setItem", "initFilenameRulesDisclosure"]:
++    if required not in js_text:
++        err(f"animation filename-rules disclosure persistence missing {required}")
+ for required in ["chooseAnimationFolder", "scanAnimations", "publishMissingAnimations", "animationFilter", "assignUnassignedAnimation", "manualSlotCatalog"]:
+     if required not in js_text:
+         err(f"asset manager animation ui missing {required}")

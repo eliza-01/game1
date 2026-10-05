@@ -395,6 +395,17 @@ for required in ["animation_profiles", "animation_clips", "animation_bindings", 
 if 'id="nav-animations"' not in ui or 'id="scan-animations"' not in ui or 'id="publish-missing-animations"' not in ui:
     err("asset manager character animation section is missing")
 js_text = js.read_text(encoding="utf-8") if js.is_file() else ""
+for required in ["filename_rule_catalog", "canonicalFilename", "variantPattern", "filename_prefix"]:
+    if required not in animation_store_text:
+        err(f"animation filename-rule catalog missing {required}")
+for required in ['id="animation-filename-rules"', 'id="animation-filename-guide"', "all registered states", "selected archetype id"]:
+    if required not in ui:
+        err(f"animation filename-rules UI missing {required}")
+if "renderFilenameRules" not in js_text:
+    err("animation filename-rules renderer missing")
+for required in ["FILENAME_GUIDE_OPEN_KEY", "localStorage.getItem", "localStorage.setItem", "initFilenameRulesDisclosure"]:
+    if required not in js_text:
+        err(f"animation filename-rules disclosure persistence missing {required}")
 for required in ["chooseAnimationFolder", "scanAnimations", "publishMissingAnimations", "animationFilter", "assignUnassignedAnimation", "manualSlotCatalog"]:
     if required not in js_text:
         err(f"asset manager animation ui missing {required}")

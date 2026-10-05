@@ -80,17 +80,10 @@
 <div class="panel character-card">
 <span class="eyebrow">01 · scan and register</span><h3>character animation folder</h3>
 <p>scan any folder containing studio-exported <code>.rbxm</code>/<code>.rbxmx</code>. the selected character prefix is optional, so <code>human_female_hands_idle</code> and <code>hands_idle</code> resolve identically. files that do not match a rule can be assigned manually after the scan.</p>
-<details class="naming-guide" open>
-<summary>filename rules</summary>
-<div class="naming-examples">
-<code>human_female_hands_idle.rbxm → hands / idle</code>
-<code>human_female_hands_attack_01.rbxm → hands / attack / 01</code>
-<code>human_female_1hs_attack_02.rbxm → 1hs / attack / 02</code>
-<code>human_female_bow_aim.rbxm → bow / aim</code>
-<code>human_female_idle.rbxm → base / idle</code>
-<code>Atk02_1HS_FFighter.rbxm → 1hs / attack / 02</code>
-</div>
-<small class="hint">pattern: <code>[character_]context_slot[_variant]</code>. context is <code>base</code>, <code>hands</code>, <code>1hs</code>, <code>2hs</code> or <code>bow</code>. unassigned files can be bound manually without renaming them.</small>
+<details id="animation-filename-guide" class="naming-guide" open>
+<summary>filename rules · all registered states</summary>
+<div id="animation-filename-rules" class="filename-rules"><span class="muted">loading animation state catalog…</span></div>
+<small class="hint">canonical filename always starts with the selected archetype id, for example <code>human_female_1hs_attack_01.rbxm</code>. the scanner remains backward-compatible with legacy unprefixed files. variant states use <code>_01</code>, <code>_02</code>, ….</small>
 </details>
 <div class="picker"><button id="choose-animation-folder" type="button">choose folder</button><small id="animation-folder">folder not selected</small></div>
 <div class="actions"><button id="scan-animations" class="primary wide" type="button" disabled>scan folder</button></div>

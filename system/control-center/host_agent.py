@@ -1,7 +1,9 @@
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import unquote, urlparse, parse_qs
+import base64
 import json
+import re
 import os
 import shutil
 import subprocess
@@ -204,6 +206,54 @@ if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
     )
     return [item for item in raw.split(chr(31)) if item]
 
+def write_animation_export(payload: dict):
+    output_dir = str(payload.get("outputDir") or "").strip()
+    clip_name = str(payload.get("name") or "").strip()
+    encoded = str(payload.get("rbxmBase64") or "").strip()
+
+    if not output_dir:
+        raise ValueError("animation export outputDir is required")
+    if not clip_name:
+        raise ValueError("animation export name is required")
+    if not encoded:
+        raise ValueError("animation export rbxmBase64 is required")
+
+    directory = Path(output_dir).expanduser()
+    if not directory.is_absolute():
+        raise ValueError("animation export directory must be an absolute path")
+
+    # Keep Unicode animation names, but remove characters Windows cannot use
+    # in a filename and normalize trailing dots/spaces.
+    safe_name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '_', clip_name).strip().rstrip('. ')
+    if not safe_name:
+        safe_name = "animation"
+    if not safe_name.lower().endswith(".rbxm"):
+        safe_name += ".rbxm"
+
+    try:
+        raw = base64.b64decode(encoded, validate=True)
+    except Exception as error:
+        raise ValueError(f"invalid animation rbxmBase64: {error}") from error
+    if not raw:
+        raise ValueError("serialized animation is empty")
+    if len(raw) > 64 * 1024 * 1024:
+        raise ValueError("serialized animation exceeds 64 MiB")
+
+    directory.mkdir(parents=True, exist_ok=True)
+    destination = directory / safe_name
+    overwrote = destination.exists()
+    temp = destination.with_suffix(destination.suffix + ".tmp")
+    temp.write_bytes(raw)
+    temp.replace(destination)
+    return {
+        "ok": True,
+        "path": str(destination),
+        "filename": destination.name,
+        "overwrote": overwrote,
+        "bytes": len(raw),
+    }
+
+
 def choose_animation_folder() -> str:
     return _powershell_picker(
         r'''
@@ -280,6 +330,11 @@ class Handler(BaseHTTPRequestHandler):
         if not self.auth():
             return self.out(401, {"error": "unauthorized"})
         path = self.parsed().path
+        if path == "/api/animation-export/write":
+            try:
+                return self.out(200, write_animation_export(self.body()))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
         if path == "/api/files/choose-character-model":
             try:
                 return self.out(200, {"path": choose_character_fbx()})

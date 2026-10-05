@@ -1,0 +1,153 @@
+diff --git a/system/control-center/animation_core/common.py b/system/control-center/animation_core/common.py
+index 1ffe5d9..a268651 100644
+--- a/system/control-center/animation_core/common.py
++++ b/system/control-center/animation_core/common.py
+@@ -52,6 +52,47 @@ NAMING_EXAMPLES = [
+ ]
+ 
+ 
++
++
++def filename_rule_catalog() -> list[dict]:
++    """Return every canonical semantic state with the filename scanner expects.
++
++    This is the single source of truth for the Control Center filename-rules UI.
++    Variant slots use variant 01 as the canonical example and expose 01..n separately.
++    """
++    rows: list[dict] = []
++
++    for definition in BASE_SLOT_CATALOG:
++        slot = definition["slot"]
++        rows.append({
++            "scope": "base",
++            "context": "base",
++            "group": definition.get("group", ""),
++            "state": slot,
++            "label": definition.get("label", slot),
++            "variants": False,
++            "variantPattern": "",
++            "canonicalFilename": _canonical_file_stem("base", "", slot, 0) + ".rbxm",
++        })
++
++    for weapon_set in WEAPON_SETS:
++        for definition in _catalog_for_weapon(weapon_set).values():
++            slot = definition["slot"]
++            has_variants = bool(definition.get("variants"))
++            example_variant = 1 if has_variants else 0
++            rows.append({
++                "scope": "weapon",
++                "context": weapon_set,
++                "group": definition.get("group", ""),
++                "state": slot,
++                "label": definition.get("label", slot),
++                "variants": has_variants,
++                "variantPattern": "01..n" if has_variants else "",
++                "canonicalFilename": _canonical_file_stem("weapon", weapon_set, slot, example_variant) + ".rbxm",
++            })
++
++    return rows
++
+ def _now() -> float:
+     return time.time()
+ 
+diff --git a/system/control-center/animation_core/storage.py b/system/control-center/animation_core/storage.py
+index ad19d47..1a5ba34 100644
+--- a/system/control-center/animation_core/storage.py
++++ b/system/control-center/animation_core/storage.py
+@@ -6,7 +6,7 @@ import shutil
+ import sqlite3
+ 
+ from .common import (
+-    ANIMATION_EXTENSIONS, BASE_SLOT_CATALOG, BOW_EXTRA_SLOTS, MAX_SCAN_FILES, NAMING_EXAMPLES, PROJECT,
++    ANIMATION_EXTENSIONS, BASE_SLOT_CATALOG, BOW_EXTRA_SLOTS, MAX_SCAN_FILES, NAMING_EXAMPLES, PROJECT, filename_rule_catalog,
+     SCHEMA_VERSION, WEAPON_SETS, WEAPON_SLOT_CATALOG, _binding_id, _canonical_file_stem,
+     _catalog_for_weapon, _clip_id, _now, classify_animation, normalize_manual_binding,
+ )
+@@ -395,6 +395,7 @@ class AnimationStorageMixin:
+             "skeletonCompatible": compatible,
+             "weaponSets": list(WEAPON_SETS),
+             "namingExamples": list(NAMING_EXAMPLES),
++            "filenameRules": filename_rule_catalog(),
+             "slotCatalog": {
+                 "base": BASE_SLOT_CATALOG,
+                 "weapon": {weapon_set: list(_catalog_for_weapon(weapon_set).values()) for weapon_set in WEAPON_SETS},
+diff --git a/system/control-center/static/asset-manager.css b/system/control-center/static/asset-manager.css
+index 7df7fb3..5b1d91d 100644
+--- a/system/control-center/static/asset-manager.css
++++ b/system/control-center/static/asset-manager.css
+@@ -4,3 +4,5 @@
+ .queue-progress{display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:center;margin-top:12px;padding:11px;border:1px solid var(--line);border-radius:11px;background:var(--panel2)}.queue-progress[hidden]{display:none}.queue-progress span{color:var(--muted);font-size:11px}.queue-progress progress{grid-column:1/-1;width:100%;height:8px;accent-color:var(--mint)}
+ .naming-guide{margin:12px 0;border:1px solid var(--line);border-radius:12px;background:var(--panel2);padding:10px 12px}.naming-guide summary{cursor:pointer;color:var(--mint);font-weight:700}.naming-examples{display:grid;gap:5px;margin-top:9px}.naming-examples code{display:block;overflow-wrap:anywhere}.unassigned-list{display:grid;gap:8px;margin-top:10px}.unassigned-row{display:grid;grid-template-columns:minmax(220px,1.4fr) minmax(100px,.55fr) minmax(130px,.7fr) 82px auto;gap:8px;align-items:end;padding:9px;border:1px solid var(--line);border-radius:10px}.unassigned-file{min-width:0;align-self:center}.unassigned-file b,.unassigned-file small{display:block;overflow-wrap:anywhere}.unassigned-file small{color:var(--muted);font-size:10px;margin-top:3px}.unassigned-row label{margin:0;font-size:10px}.unassigned-row select,.unassigned-row input{width:100%;margin-top:4px;padding:7px 8px}.unassigned-row button{padding:8px 10px}@media(max-width:950px){.unassigned-row{grid-template-columns:1fr 1fr}.unassigned-file{grid-column:1/-1}}
+ .weapon-workflow{display:grid;grid-template-columns:minmax(340px,.82fr) minmax(620px,1.5fr);gap:14px;margin-top:14px}.weapon-stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.weapon-table-wrap{max-height:650px}.rarity-common{color:var(--muted)}.rarity-uncommon{color:#7bd88f}.rarity-rare{color:#67a8ff}.rarity-mythical{color:#b38cff}.rarity-legendary{color:#ffb15a}.rarity-immortal{color:#ff6577}.texture-list{display:grid;gap:6px;margin-top:8px}.texture-list div{display:grid;grid-template-columns:minmax(120px,.6fr) minmax(220px,1fr) auto;gap:8px;padding:7px 9px;border:1px solid var(--line);border-radius:9px;background:var(--panel2);font-size:11px}.texture-list span{overflow-wrap:anywhere}@media(max-width:1150px){.weapon-workflow{grid-template-columns:1fr}}@media(max-width:650px){.weapon-stats-grid{grid-template-columns:1fr}}
++
++.filename-rules{display:grid;gap:10px;margin-top:10px}.filename-rule-group{display:grid;grid-template-columns:72px minmax(0,1fr);gap:10px;align-items:start}.filename-rule-context{text-transform:uppercase;font-weight:800;color:var(--mint);font-size:11px;letter-spacing:.08em;padding-top:7px}.filename-rule-table{display:grid;border:1px solid var(--line);border-radius:10px;overflow:hidden}.filename-rule-head,.filename-rule-row{display:grid;grid-template-columns:minmax(120px,.8fr) minmax(220px,1.6fr) 72px;gap:10px;align-items:center;padding:7px 9px}.filename-rule-head{background:rgba(255,255,255,.035);color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.06em;font-weight:700}.filename-rule-row{border-top:1px solid var(--line);font-size:12px}.filename-rule-row code{overflow-wrap:anywhere;white-space:normal}.filename-rule-row span{color:var(--muted);font-size:11px}@media(max-width:760px){.filename-rule-group{grid-template-columns:1fr}.filename-rule-context{padding-top:0}.filename-rule-head,.filename-rule-row{grid-template-columns:minmax(90px,.8fr) minmax(150px,1.5fr) 60px;gap:6px}}
+diff --git a/system/control-center/static/character-assets.js b/system/control-center/static/character-assets.js
+index 9c61938..5eb2ed7 100644
+--- a/system/control-center/static/character-assets.js
++++ b/system/control-center/static/character-assets.js
+@@ -71,6 +71,13 @@ function renderAnimationRows(){
+   if(!items.length)body.innerHTML='<tr><td colspan="8" class="muted">no registered clips in this section.</td></tr>';
+ }
+ function renderAnimationDetails(){const host=$('animation-details');const row=(state.animations?.items||[]).find(x=>x.binding_id===state.animationSelected);if(!row){host.innerHTML='<span class="muted">select a clip.</span>';return}host.innerHTML=`<div class="section-title"><div><span>selected clip</span><h3>${esc(row.name)}</h3></div>${statusTag(row.status)}</div><div class="details-grid"><div><b>semantic binding</b><span>${esc(row.scope)} · ${esc(row.weapon_set||'base')} · ${esc(row.slot)} · variant ${esc(row.variant||0)}</span></div><div><b>runtime</b><span>looped ${row.looped?'yes':'no'} · priority ${esc(row.priority)}</span></div><div><b>canonical source</b><span>${esc(row.source_path)}</span></div><div><b>prepared</b><span>${esc(row.prepared_path)}</span></div><div><b>asset id</b><span>${esc(row.asset_id||'not published')}</span></div><div><b>sha256</b><span>${esc(row.sha256||'')}</span></div></div>`}
++function renderFilenameRules(){
++  const host=$('animation-filename-rules');if(!host)return;
++  const rows=state.animations?.filenameRules||[];if(!rows.length){host.innerHTML='<span class="muted">no filename rules returned by backend.</span>';return}
++  const order=['base',...(state.animations?.weaponSets||[])];
++  const groups=order.map(context=>({context,rows:rows.filter(row=>row.context===context)})).filter(group=>group.rows.length);
++  host.innerHTML=groups.map(group=>`<section class="filename-rule-group"><div class="filename-rule-context">${esc(group.context)}</div><div class="filename-rule-table"><div class="filename-rule-head"><span>state</span><span>canonical filename</span><span>variant</span></div>${group.rows.map(row=>`<div class="filename-rule-row"><code>${esc(row.state)}</code><code>${esc(row.canonicalFilename)}</code><span>${row.variants?esc(row.variantPattern||'01..n'):'—'}</span></div>`).join('')}</div></section>`).join('');
++}
+ function manualSlotCatalog(context){const catalog=state.animations?.slotCatalog||{};return context==='base'?(catalog.base||[]):((catalog.weapon||{})[context]||[])}
+ function updateManualBindingControls(rowHost){
+   const context=rowHost.querySelector('[data-manual-context]');const slot=rowHost.querySelector('[data-manual-slot]');const variant=rowHost.querySelector('[data-manual-variant]');
+@@ -84,7 +91,7 @@ function renderUnassigned(){
+ }
+ async function assignUnassignedAnimation(row,rowHost){
+   try{const context=rowHost.querySelector('[data-manual-context]').value;const slot=rowHost.querySelector('[data-manual-slot]').value;const variant=Number(rowHost.querySelector('[data-manual-variant]').value||0);rowHost.querySelector('[data-manual-assign]').disabled=true;await request('/api/animations/assign',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({characterId:state.animationCharacter,sourcePath:row.path,scope:context==='base'?'base':'weapon',weaponSet:context==='base'?'':context,slot,variant})});state.lastScan.unassigned=(state.lastScan.unassigned||[]).filter(item=>item.path!==row.path);state.lastScan.recognized=(state.lastScan.recognized||0)+1;await loadAnimations();$('animation-scan-status').innerHTML=`<strong>scan complete · ${state.lastScan.recognized}/${state.lastScan.filesScanned} assigned</strong><span>${state.lastScan.created} new · ${state.lastScan.changed} changed · ${state.lastScan.unchanged} unchanged · ${state.lastScan.unassigned.length} unassigned</span>`;renderUnassigned();toast(`assigned ${row.filename} → ${context} / ${slot}${variant?` / ${String(variant).padStart(2,'0')}`:''}`)}catch(error){toast(error.message,true);rowHost.querySelector('[data-manual-assign]').disabled=false}}
+-function renderAnimations(){if(!state.animations)return;renderAnimationProfile();renderAnimationTree();renderAnimationRows();renderAnimationDetails();renderUnassigned();const pub=!!state.animations.publication?.configured;const missing=(state.animations.items||[]).some(row=>row.status==='LOCAL_ONLY');$('publish-missing-animations').disabled=state.animationPublishing||!pub||!missing;$('scan-animations').disabled=state.animationPublishing||!state.animationCharacter||!state.animationFolder;$('refresh-animations').disabled=state.animationPublishing;$('animation-table-title').textContent=`${state.animationCharacter||'character'} · registered clips`}
++function renderAnimations(){if(!state.animations)return;renderAnimationProfile();renderFilenameRules();renderAnimationTree();renderAnimationRows();renderAnimationDetails();renderUnassigned();const pub=!!state.animations.publication?.configured;const missing=(state.animations.items||[]).some(row=>row.status==='LOCAL_ONLY');$('publish-missing-animations').disabled=state.animationPublishing||!pub||!missing;$('scan-animations').disabled=state.animationPublishing||!state.animationCharacter||!state.animationFolder;$('refresh-animations').disabled=state.animationPublishing;$('animation-table-title').textContent=`${state.animationCharacter||'character'} · registered clips`}
+ async function loadAnimations(){try{populateAnimationCharacters();const character=state.animationCharacter||$('animation-character').value||'';state.animations=await request('/api/animations?character='+encodeURIComponent(character));state.animationCharacter=state.animations.characterId||character;if($('animation-character').value!==state.animationCharacter)$('animation-character').value=state.animationCharacter;renderAnimations()}catch(error){toast(error.message,true)}}
+ async function chooseAnimationFolder(){try{const result=await request('/api/files/choose-animation-folder',{method:'POST'});if(!result.path)return;state.animationFolder=result.path;$('animation-folder').textContent=result.path;renderAnimations()}catch(error){toast(error.message,true)}}
+ async function scanAnimations(){try{if(!state.animationCharacter)throw Error('select a character');if(!state.animationFolder)throw Error('choose an animation folder');$('scan-animations').disabled=true;toast('scanning and registering animation clips…');state.lastScan=await request('/api/animations/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({characterId:state.animationCharacter,rootPath:state.animationFolder})});await loadAnimations();$('animation-scan-status').innerHTML=`<strong>scan complete · ${state.lastScan.recognized}/${state.lastScan.filesScanned} recognized</strong><span>${state.lastScan.created} new · ${state.lastScan.changed} changed · ${state.lastScan.unchanged} unchanged · ${state.lastScan.unassigned.length} unassigned</span>`;renderUnassigned();toast(`registered ${state.lastScan.recognized} animation clips`)}catch(error){toast(error.message,true)}finally{renderAnimations()}}
+diff --git a/system/control-center/static/index.html b/system/control-center/static/index.html
+index 5c71833..8bcb950 100644
+--- a/system/control-center/static/index.html
++++ b/system/control-center/static/index.html
+@@ -81,16 +81,9 @@
+ <span class="eyebrow">01 · scan and register</span><h3>character animation folder</h3>
+ <p>scan any folder containing studio-exported <code>.rbxm</code>/<code>.rbxmx</code>. the selected character prefix is optional, so <code>human_female_hands_idle</code> and <code>hands_idle</code> resolve identically. files that do not match a rule can be assigned manually after the scan.</p>
+ <details class="naming-guide" open>
+-<summary>filename rules</summary>
+-<div class="naming-examples">
+-<code>human_female_hands_idle.rbxm → hands / idle</code>
+-<code>human_female_hands_attack_01.rbxm → hands / attack / 01</code>
+-<code>human_female_1hs_attack_02.rbxm → 1hs / attack / 02</code>
+-<code>human_female_bow_aim.rbxm → bow / aim</code>
+-<code>human_female_idle.rbxm → base / idle</code>
+-<code>Atk02_1HS_FFighter.rbxm → 1hs / attack / 02</code>
+-</div>
+-<small class="hint">pattern: <code>[character_]context_slot[_variant]</code>. context is <code>base</code>, <code>hands</code>, <code>1hs</code>, <code>2hs</code> or <code>bow</code>. unassigned files can be bound manually without renaming them.</small>
++<summary>filename rules · all registered states</summary>
++<div id="animation-filename-rules" class="filename-rules"><span class="muted">loading animation state catalog…</span></div>
++<small class="hint">canonical files omit the character prefix. optional scan prefix: <code>&lt;character&gt;_</code>, for example <code>human_female_1hs_attack_01.rbxm</code>. variant states use <code>_01</code>, <code>_02</code>, …; unassigned files can still be bound manually without renaming them.</small>
+ </details>
+ <div class="picker"><button id="choose-animation-folder" type="button">choose folder</button><small id="animation-folder">folder not selected</small></div>
+ <div class="actions"><button id="scan-animations" class="primary wide" type="button" disabled>scan folder</button></div>
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index 15ef615..b9956b3 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -381,6 +381,14 @@ for required in ["animation_profiles", "animation_clips", "animation_bindings",
+ if 'id="nav-animations"' not in ui or 'id="scan-animations"' not in ui or 'id="publish-missing-animations"' not in ui:
+     err("asset manager character animation section is missing")
+ js_text = js.read_text(encoding="utf-8") if js.is_file() else ""
++for required in ["filename_rule_catalog", "canonicalFilename", "variantPattern"]:
++    if required not in animation_store_text:
++        err(f"animation filename-rule catalog missing {required}")
++for required in ['id="animation-filename-rules"', "all registered states"]:
++    if required not in ui:
++        err(f"animation filename-rules UI missing {required}")
++if "renderFilenameRules" not in js_text:
++    err("animation filename-rules renderer missing")
+ for required in ["chooseAnimationFolder", "scanAnimations", "publishMissingAnimations", "animationFilter", "assignUnassignedAnimation", "manualSlotCatalog"]:
+     if required not in js_text:
+         err(f"asset manager animation ui missing {required}")

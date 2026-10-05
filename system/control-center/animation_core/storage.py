@@ -6,7 +6,7 @@ import shutil
 import sqlite3
 
 from .common import (
-    ANIMATION_EXTENSIONS, BASE_SLOT_CATALOG, BOW_EXTRA_SLOTS, MAX_SCAN_FILES, NAMING_EXAMPLES, PROJECT,
+    ANIMATION_EXTENSIONS, BASE_SLOT_CATALOG, BOW_EXTRA_SLOTS, MAX_SCAN_FILES, NAMING_EXAMPLES, PROJECT, filename_rule_catalog,
     SCHEMA_VERSION, WEAPON_SETS, WEAPON_SLOT_CATALOG, _binding_id, _canonical_file_stem,
     _catalog_for_weapon, _clip_id, _now, classify_animation, normalize_manual_binding,
 )
@@ -395,6 +395,7 @@ class AnimationStorageMixin:
             "skeletonCompatible": compatible,
             "weaponSets": list(WEAPON_SETS),
             "namingExamples": list(NAMING_EXAMPLES),
+            "filenameRules": filename_rule_catalog(selected),
             "slotCatalog": {
                 "base": BASE_SLOT_CATALOG,
                 "weapon": {weapon_set: list(_catalog_for_weapon(weapon_set).values()) for weapon_set in WEAPON_SETS},

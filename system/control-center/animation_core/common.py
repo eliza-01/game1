@@ -52,6 +52,49 @@ NAMING_EXAMPLES = [
 ]
 
 
+
+
+def filename_rule_catalog(character_id: str = "") -> list[dict]:
+    """Return every canonical semantic state with the filename scanner expects.
+
+    This is the single source of truth for the Control Center filename-rules UI.
+    Variant slots use variant 01 as the canonical example and expose 01..n separately.
+    """
+    rows: list[dict] = []
+    archetype = _safe_token(str(character_id or ""))
+    filename_prefix = archetype + "_" if archetype else ""
+
+    for definition in BASE_SLOT_CATALOG:
+        slot = definition["slot"]
+        rows.append({
+            "scope": "base",
+            "context": "base",
+            "group": definition.get("group", ""),
+            "state": slot,
+            "label": definition.get("label", slot),
+            "variants": False,
+            "variantPattern": "",
+            "canonicalFilename": filename_prefix + _canonical_file_stem("base", "", slot, 0) + ".rbxm",
+        })
+
+    for weapon_set in WEAPON_SETS:
+        for definition in _catalog_for_weapon(weapon_set).values():
+            slot = definition["slot"]
+            has_variants = bool(definition.get("variants"))
+            example_variant = 1 if has_variants else 0
+            rows.append({
+                "scope": "weapon",
+                "context": weapon_set,
+                "group": definition.get("group", ""),
+                "state": slot,
+                "label": definition.get("label", slot),
+                "variants": has_variants,
+                "variantPattern": "01..n" if has_variants else "",
+                "canonicalFilename": filename_prefix + _canonical_file_stem("weapon", weapon_set, slot, example_variant) + ".rbxm",
+            })
+
+    return rows
+
 def _now() -> float:
     return time.time()
 

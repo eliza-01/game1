@@ -24,5 +24,21 @@ return table.freeze({
 				}),
 			}),
 		}),
+		["dragon_divider"] = table.freeze({
+			slug = "dragon_divider",
+			nameEn = "Dragon Divider",
+			nameRu = "Рассекатель Драконов",
+			weaponType = "1hs",
+			rarity = "legendary",
+			status = "PUBLISHED",
+			modelAssetId = "104973757039880",
+			serverStoragePath = "ServerStorage.weapons.1hs.dragon_divider.model.dragon_divider",
+			statModifiers = table.freeze({
+				["AttackSpeed"] = 100,
+				["Damage"] = 50,
+			}),
+			textures = table.freeze({
+			}),
+		}),
 	}),
 })

@@ -15,4 +15,4 @@ weapon stats are additive modifier sources. the first exposed modifiers are `Dam
 
 weapon types are also animation contexts: `1hs`, `2hs`, `bow`. unarmed uses `hands`.
 
-attachment follows the reference project contract: the imported weapon model pivot is the grip reference. melee uses the right weapon socket and bow uses the left weapon socket. the client follows the animated parent hand while keeping the weapon helper socket bind transform static.
+attachment is runtime-canonical. on every equip the server discards any stale `Game1WeaponGrip` orientation from the Studio template (or creates the grip if an old template has none), preserves only its authored grip point, and rebuilds one `Game1WeaponGrip` with canonical world XYZ axes. every weapon therefore uses one solver and never falls back to `Model:PivotTo(socketFrame)`. the target weapon socket is rotated -90 degrees around its local X axis before `desiredSocket * currentGrip^-1` alignment. melee uses the right weapon socket and bow uses the left weapon socket. this global rule is independent of per-asset pivot orientation and cannot accumulate rotation per frame.

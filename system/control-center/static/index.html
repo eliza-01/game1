@@ -41,24 +41,23 @@
 <section class="content">
 <div id="characters-view">
 <div class="panel hero">
-<div><span class="eyebrow">character assets · clean game1 schema</span><h2>characters</h2><p>race and gender are gameplay identity. each registered archetype owns one canonical fbx with a skinned armature. source and prepared copies stay recoverable inside the project; publication creates or updates one roblox model asset id.</p></div>
+<div><span class="eyebrow">character assets · clean game1 schema</span><h2>characters</h2><p>race and gender are gameplay identity. each registered archetype owns one canonical fbx with a skinned armature. character model assets are immutable here: replacing the FBX always publishes a new Roblox asset id and switches the archetype only after that upload succeeds.</p></div>
 <div class="metrics"><div><b id="metric-total">0</b><span>registered</span></div><div><b id="metric-published">0</b><span>published</span></div><div><b id="metric-active">0</b><span>active</span></div></div>
 </div>
 <div class="panel runtime-card"><div id="runtime-state" class="runtime-state bootstrap"><strong>bootstrap</strong><span>loading runtime source…</span></div><div id="publication-state" class="publication-missing">open cloud: checking…</div></div>
 <div class="character-workflow">
 <div class="panel character-card">
 <span class="eyebrow">01 · character archetype</span><h3>register model</h3>
-<p>choose identity, then select an fbx. registration validates the armature in blender and writes canonical source/prepared copies plus skeleton metadata.</p>
+<p>choose identity, then select an fbx. registration validates the armature in blender and writes canonical source/prepared copies plus skeleton metadata. when editing a published archetype, choosing another FBX exposes one replacement action: prepare it, publish a new Roblox asset, then apply the new id.</p>
 <div class="character-grid"><label>race<select id="race"></select></label><label>gender<select id="gender"></select></label></div>
 <label>archetype id<input id="character-id" autocomplete="off" pattern="[a-z0-9][a-z0-9_-]{0,63}"></label>
-<small class="hint">editing identity migrates canonical model/animation paths and keeps existing roblox asset ids.</small>
+<small class="hint">editing identity migrates canonical model/animation paths and keeps the currently assigned Roblox asset id. model replacement is a separate action below.</small>
 <label>display name<input id="display-name" autocomplete="off"></label>
-<label>registered model<select id="character-model-source"></select><small class="hint">edit mode only. choose any model already registered on another archetype to repair a wrong assignment. if it already has a roblox asset id, that id is reused without republishing.</small></label>
 <div class="picker"><button id="choose-model" type="button">choose fbx</button><small id="picked-model">fbx not selected</small></div>
 <div id="model-status" class="status-box"><strong>not registered</strong><span>select a character row or choose an fbx.</span></div>
 <div class="actions"><button id="save-archetype" type="button" disabled>save archetype</button><button id="register-character" class="primary" type="button">register character</button><button id="clear-form" type="button">clear form</button></div>
 <hr class="card-separator">
-<span class="eyebrow">02 · publication</span><h3 class="subheading">roblox model asset</h3><p>first publish creates a permanent model asset id. later source revisions update the same id. studio sync refreshes the local canonical rig without republishing.</p>
+<span class="eyebrow">02 · publication</span><h3 class="subheading">roblox model asset</h3><p>first publish creates a model asset id. existing character model assets are never updated in place. publication builds a temporary bone-safe FBX without moving rest bones, then uploads it as a brand-new asset; the previous id remains assigned until the new upload succeeds.</p>
 <label>description<input id="publication-description" value="game1 character model"></label>
 <div class="actions"><button id="publish-character" class="primary" type="button" disabled>publish model</button><button id="sync-character" type="button" disabled>sync studio</button><button id="activate-character" type="button" disabled>activate</button></div>
 <small id="publication-hint" class="hint">select a registered character.</small>
@@ -149,7 +148,7 @@
 </section>
 </main>
 <div id="toast" class="toast"></div>
-<script src="character-assets.js?v=9"></script>
+<script src="character-assets.js?v=11"></script>
 <script src="weapon-assets.js?v=3"></script>
 </body>
 </html>

@@ -32,7 +32,7 @@ from weapon_store import WeaponStore
 from character_core.identity import CharacterIdentityService
 from studio_bridge import run_model_load_bridge
 
-control_agent_build = "game1-m6.2-studio-loadout-archetype-fix-001"
+control_agent_build = "game1-m6.2-character-bone-publication-001"
 port = int(os.environ.get("CONTROL_AGENT_PORT", "43821"))
 token = os.environ.get("CONTROL_TOKEN", "Game1LocalControlV1")
 store = CharacterStore(ROOT)
@@ -85,6 +85,29 @@ def sync_character_to_studio(character_id: str):
     stats = result.get("rigStats") or {}
     if int(stats.get("baseParts") or 0) <= 0 or int(stats.get("bones") or 0) + int(stats.get("motor6Ds") or 0) <= 0:
         raise ValueError("Studio loaded a character asset without articulated BasePart geometry")
+
+    try:
+        expected_analysis = json.loads(str(row.get("skeleton_json") or "{}"))
+    except Exception:
+        expected_analysis = {}
+    expected_names = {
+        str(item.get("name") or "")
+        for item in (expected_analysis.get("bones") or [])
+        if str(item.get("name") or "")
+    }
+    actual_names = {str(name) for name in (stats.get("boneNames") or []) if str(name)}
+    if expected_names and actual_names:
+        missing = sorted(expected_names - actual_names, key=str.casefold)
+        if missing:
+            preview = ", ".join(missing[:20])
+            suffix = " …" if len(missing) > 20 else ""
+            raise ValueError(
+                f"Roblox publication stripped {len(missing)} of {len(expected_names)} registered bones: {preview}{suffix}"
+            )
+    elif expected_names and int(stats.get("bones") or 0) < len(expected_names):
+        raise ValueError(
+            f"Roblox publication returned only {int(stats.get('bones') or 0)} of {len(expected_names)} registered bones"
+        )
     return {"character": row, "studio": result}
 
 
@@ -310,6 +333,7 @@ class Handler(BaseHTTPRequestHandler):
 
         prefix = "/api/characters/"
         identity_suffix = "/identity"
+        replace_model_suffix = "/replace-model"
         model_suffix = "/model"
         activate_suffix = "/activate"
         publish_suffix = "/publish"
@@ -318,6 +342,48 @@ class Handler(BaseHTTPRequestHandler):
             character_id = unquote(path[len(prefix):-len(identity_suffix)].strip("/"))
             try:
                 return self.out(200, character_identity.update(character_id, self.body()))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path.startswith(prefix) and path.endswith(replace_model_suffix):
+            character_id = unquote(path[len(prefix):-len(replace_model_suffix)].strip("/"))
+            try:
+                payload = self.body()
+                source_path = str(payload.get("sourcePath") or "").strip()
+                if not source_path:
+                    raise ValueError("choose a replacement FBX first")
+                before = store.get(character_id)
+                if not before:
+                    raise ValueError(f"unknown character archetype: {character_id}")
+                previous_asset_id = str(before.get("model_asset_id") or "").strip()
+
+                # Stage/analyze the new canonical FBX while the old Roblox asset
+                # remains assigned. publish() creates a NEW asset for changed
+                # character content and switches the archetype id only on success.
+                store.register({
+                    "existingId": character_id,
+                    "id": character_id,
+                    "displayName": before.get("display_name") or "",
+                    "race": before.get("race") or "",
+                    "gender": before.get("gender") or "",
+                    "sourcePath": source_path,
+                })
+                credentials = publication_credentials(str(payload.get("description") or "game1 character model"))
+                published = store.publish(character_id, credentials)
+                result = {"character": published, "studio": None, "studioError": ""}
+                try:
+                    synced = sync_character_to_studio(character_id)
+                    result["studio"] = synced.get("studio")
+                except Exception as studio_error:
+                    # Publication already succeeded and the new asset id is now
+                    # canonical. Do not report the whole replacement as failed
+                    # merely because Studio refresh needs a retry.
+                    result["studioError"] = str(studio_error)
+                result["previousAssetId"] = previous_asset_id
+                result["newAssetId"] = str(published.get("model_asset_id") or "")
+                result["assetReplaced"] = bool(
+                    result["newAssetId"] and result["newAssetId"] != previous_asset_id
+                )
+                return self.out(200, result)
             except Exception as error:
                 return self.out(400, {"error": str(error)})
         if path.startswith(prefix) and path.endswith(model_suffix):

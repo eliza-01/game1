@@ -18,6 +18,8 @@ create table if not exists characters (
     skeleton_structure_signature text not null default '',
     skeleton_json text not null default '{}',
     published_sha256 text not null default '',
+    publication_pipeline text not null default '',
+    model_replacement_pending integer not null default 0,
     moderation_state text not null default '',
     published_at real
 );

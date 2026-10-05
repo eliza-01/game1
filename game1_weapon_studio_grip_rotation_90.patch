@@ -1,0 +1,297 @@
+diff --git a/docs/weapon-system.md b/docs/weapon-system.md
+index e8b933b..a485556 100644
+--- a/docs/weapon-system.md
++++ b/docs/weapon-system.md
+@@ -15,4 +15,4 @@ weapon stats are additive modifier sources. the first exposed modifiers are `Dam
+ 
+ weapon types are also animation contexts: `1hs`, `2hs`, `bow`. unarmed uses `hands`.
+ 
+-attachment uses a replicated `Game1WeaponGrip` Attachment generated during Studio sync. Its position is taken from the imported model pivot, while its orientation is canonical world XYZ; this removes hidden/non-replicated Model pivot orientation from runtime equip behavior. melee uses the right weapon socket and bow uses the left weapon socket. the client aligns the grip Attachment to the animated helper socket by an explicit world-space delta, so visually equivalent FBX weapons equip consistently even when Roblox imports different Model pivot axes.
++attachment uses a replicated `Game1WeaponGrip` Attachment generated during Studio sync. Its position is taken from the imported model pivot, while its orientation starts from canonical world XYZ plus an explicit per-weapon Studio grip rotation in degrees. This removes hidden/non-replicated Model pivot orientation from runtime equip behavior while allowing a weapon such as `newbie_axe` to roll 90 degrees around its long X axis without editing or republishing the FBX. melee uses the right weapon socket and bow uses the left weapon socket. the client aligns the grip Attachment to the animated helper socket by an explicit world-space delta.
+diff --git a/system/control-center/host_agent.py b/system/control-center/host_agent.py
+index f30db25..bd9f1c9 100644
+--- a/system/control-center/host_agent.py
++++ b/system/control-center/host_agent.py
+@@ -134,6 +134,7 @@ def sync_weapon_to_studio(slug: str):
+             "weaponSlug": str(row.get("slug") or ""),
+             "weaponType": str(row.get("weapon_type") or ""),
+             "rarity": str(row.get("rarity") or ""),
++            "gripRotationDegrees": dict(row.get("grip_rotation") or {"x": 0, "y": 0, "z": 0}),
+             "textures": texture_assets,
+         },
+     )
+diff --git a/system/control-center/schema.sql b/system/control-center/schema.sql
+index 3d65863..8feabd4 100644
+--- a/system/control-center/schema.sql
++++ b/system/control-center/schema.sql
+@@ -111,6 +111,9 @@ create table if not exists weapons (
+     model_asset_id text,
+     model_published_sha256 text not null default '',
+     moderation_state text not null default '',
++    grip_rot_x real not null default 0,
++    grip_rot_y real not null default 0,
++    grip_rot_z real not null default 0,
+     revision integer not null default 1,
+     created_at real not null,
+     updated_at real not null,
+diff --git a/system/control-center/static/index.html b/system/control-center/static/index.html
+index 5c71833..f97ec79 100644
+--- a/system/control-center/static/index.html
++++ b/system/control-center/static/index.html
+@@ -126,6 +126,8 @@
+ <div class="character-grid"><label>type<select id="weapon-type"></select></label><label>rarity<select id="weapon-rarity"></select></label></div>
+ <div class="weapon-stats-grid"><label>attack delta<input id="weapon-stat-damage" type="number" step="1" value="0"></label><label>attack speed delta<input id="weapon-stat-attack-speed" type="number" step="1" value="0"></label></div>
+ <small class="hint">modifiers are additive to the current character stat. negative values subtract. 0 means no change. base character: damage 10 · attack speed 100 · run speed 50.</small>
++<div class="weapon-stats-grid"><label>grip rot X°<input id="weapon-grip-rot-x" type="number" step="1" value="0"></label><label>grip rot Y°<input id="weapon-grip-rot-y" type="number" step="1" value="0"></label><label>grip rot Z°<input id="weapon-grip-rot-z" type="number" step="1" value="0"></label></div>
++<small class="hint">studio-only grip rotation. changes how the replicated Game1WeaponGrip is aligned to the hand; it never edits or republishes the FBX.</small>
+ <hr class="card-separator">
+ <span class="eyebrow">02 · source assets</span>
+ <div class="picker"><button id="choose-weapon-model" type="button">choose fbx</button><small id="picked-weapon-model">fbx not selected</small></div>
+@@ -149,6 +151,6 @@
+ </main>
+ <div id="toast" class="toast"></div>
+ <script src="character-assets.js?v=11"></script>
+-<script src="weapon-assets.js?v=3"></script>
++<script src="weapon-assets.js?v=4"></script>
+ </body>
+ </html>
+diff --git a/system/control-center/static/weapon-assets.js b/system/control-center/static/weapon-assets.js
+index 6ce539f..72ec6bd 100644
+--- a/system/control-center/static/weapon-assets.js
++++ b/system/control-center/static/weapon-assets.js
+@@ -4,17 +4,17 @@ function weaponSlugify(value){return String(value||'').toLowerCase().replace(/[^
+ function weaponStatusTag(status){return `<span class="tag ${String(status||'').toLowerCase()}">${esc(status||'')}</span>`}
+ function weaponRarity(value){return `<span class="rarity-${esc(value)}">${esc(value)}</span>`}
+ function weaponSyncSlug(){if(!weaponState.selected)$('weapon-slug').value=weaponSlugify($('weapon-name-en').value)}
+-function weaponSetForm(row){weaponState.selected=row?.slug||null;weaponState.modelPath='';weaponState.texturePaths=[];if(row){$('weapon-name-en').value=row.name_en||'';$('weapon-name-ru').value=row.name_ru||'';$('weapon-slug').value=row.slug;$('weapon-type').value=row.weapon_type;$('weapon-rarity').value=row.rarity;$('weapon-stat-damage').value=row.stat_modifiers?.Damage??0;$('weapon-stat-attack-speed').value=row.stat_modifiers?.AttackSpeed??0;$('picked-weapon-model').textContent='keep current fbx or choose a replacement';$('picked-weapon-textures').textContent='keep current textures or choose replacements';}else{$('weapon-name-en').value='';$('weapon-name-ru').value='';$('weapon-slug').value='';$('weapon-type').value=weaponState.data?.options?.weaponTypes?.[0]||'1hs';$('weapon-rarity').value=weaponState.data?.options?.rarities?.[0]||'common';$('weapon-stat-damage').value='0';$('weapon-stat-attack-speed').value='0';$('picked-weapon-model').textContent='fbx not selected';$('picked-weapon-textures').textContent='textures not selected';}weaponRender()}
++function weaponSetForm(row){weaponState.selected=row?.slug||null;weaponState.modelPath='';weaponState.texturePaths=[];if(row){const grip=row.grip_rotation||{};$('weapon-name-en').value=row.name_en||'';$('weapon-name-ru').value=row.name_ru||'';$('weapon-slug').value=row.slug;$('weapon-type').value=row.weapon_type;$('weapon-rarity').value=row.rarity;$('weapon-stat-damage').value=row.stat_modifiers?.Damage??0;$('weapon-stat-attack-speed').value=row.stat_modifiers?.AttackSpeed??0;$('weapon-grip-rot-x').value=grip.x??0;$('weapon-grip-rot-y').value=grip.y??0;$('weapon-grip-rot-z').value=grip.z??0;$('picked-weapon-model').textContent='keep current fbx or choose a replacement';$('picked-weapon-textures').textContent='keep current textures or choose replacements';}else{$('weapon-name-en').value='';$('weapon-name-ru').value='';$('weapon-slug').value='';$('weapon-type').value=weaponState.data?.options?.weaponTypes?.[0]||'1hs';$('weapon-rarity').value=weaponState.data?.options?.rarities?.[0]||'common';$('weapon-stat-damage').value='0';$('weapon-stat-attack-speed').value='0';$('weapon-grip-rot-x').value='0';$('weapon-grip-rot-y').value='0';$('weapon-grip-rot-z').value='0';$('picked-weapon-model').textContent='fbx not selected';$('picked-weapon-textures').textContent='textures not selected';}weaponRender()}
+ function weaponRenderTree(){const host=$('weapon-tree');host.innerHTML='';for(const row of weaponState.data.items){const button=document.createElement('button');button.className=row.slug===weaponState.selected?'active':'';button.innerHTML=`<span>${esc(row.name_en)}<small>${esc(row.weapon_type)} · ${esc(row.rarity)}</small></span><small>${esc(row.status)}</small>`;button.onclick=()=>weaponSetForm(row);host.appendChild(button)}if(!weaponState.data.items.length)host.innerHTML='<small class="muted">no registered weapons.</small>';$('weapon-rail-count').textContent=weaponState.data.items.length}
+ function weaponRenderRows(){const body=$('weapon-rows');body.innerHTML='';for(const row of weaponState.data.items){const active=weaponState.data.activeWeaponSlug===row.slug;const mods=row.stat_modifiers||{};const textures=row.textures||[];const tr=document.createElement('tr');tr.className=row.slug===weaponState.selected?'active':'';tr.innerHTML=`<td>${active?'yes':''}</td><td><b>${esc(row.name_en)}</b><br><small>${esc(row.name_ru||'—')} · ${esc(row.slug)}</small></td><td>${esc(row.weapon_type)}</td><td>${weaponRarity(row.rarity)}</td><td><small>atk ${Number(mods.Damage||0)>=0?'+':''}${esc(mods.Damage||0)}<br>aspd ${Number(mods.AttackSpeed||0)>=0?'+':''}${esc(mods.AttackSpeed||0)}</small></td><td>${row.model_asset_id?`model ${esc(row.model_asset_id)}`:'model local'}<br><small>${textures.length} texture${textures.length===1?'':'s'}</small></td><td>${weaponStatusTag(row.status)}</td><td><div class="row-actions"><button data-open>edit</button><button data-publish>publish</button><button data-sync>sync studio</button><button data-active>startup</button><button data-delete class="danger">delete</button></div></td>`;tr.querySelector('[data-open]').onclick=()=>weaponSetForm(row);tr.querySelector('[data-publish]').onclick=()=>weaponPublish(row.slug);tr.querySelector('[data-sync]').onclick=()=>weaponSync(row.slug);tr.querySelector('[data-active]').onclick=()=>weaponActivate(row.slug);tr.querySelector('[data-delete]').onclick=()=>weaponDelete(row.slug);body.appendChild(tr)}}
+-function weaponRenderDetails(row){const host=$('weapon-details');if(!row){host.innerHTML='<span class="muted">select a weapon.</span>';return}const textureHtml=(row.textures||[]).map(tex=>`<div><b>${esc(tex.slot)}</b><span>${esc(tex.source_path)}</span><span>${esc(tex.asset_id||'local')}</span></div>`).join('');host.innerHTML=`<div class="section-title"><div><span>selected weapon</span><h3>${esc(row.name_en)}</h3></div>${weaponStatusTag(row.status)}</div><div class="details-grid"><div><b>slug</b><span>${esc(row.slug)}</span></div><div><b>type / rarity</b><span>${esc(row.weapon_type)} · ${esc(row.rarity)}</span></div><div><b>model source</b><span>${esc(row.model_source_path||'—')}</span></div><div><b>model asset id</b><span>${esc(row.model_asset_id||'not published')}</span></div><div><b>serverstorage</b><span>${esc(row.server_storage_path||'—')}</span></div><div><b>revision</b><span>${esc(row.revision)}</span></div></div>${textureHtml?`<div class="texture-list">${textureHtml}</div>`:''}`}
++function weaponRenderDetails(row){const host=$('weapon-details');if(!row){host.innerHTML='<span class="muted">select a weapon.</span>';return}const textureHtml=(row.textures||[]).map(tex=>`<div><b>${esc(tex.slot)}</b><span>${esc(tex.source_path)}</span><span>${esc(tex.asset_id||'local')}</span></div>`).join('');const grip=row.grip_rotation||{};host.innerHTML=`<div class="section-title"><div><span>selected weapon</span><h3>${esc(row.name_en)}</h3></div>${weaponStatusTag(row.status)}</div><div class="details-grid"><div><b>slug</b><span>${esc(row.slug)}</span></div><div><b>type / rarity</b><span>${esc(row.weapon_type)} · ${esc(row.rarity)}</span></div><div><b>grip rotation</b><span>X ${esc(grip.x??0)}° · Y ${esc(grip.y??0)}° · Z ${esc(grip.z??0)}°</span></div><div><b>model source</b><span>${esc(row.model_source_path||'—')}</span></div><div><b>model asset id</b><span>${esc(row.model_asset_id||'not published')}</span></div><div><b>serverstorage</b><span>${esc(row.server_storage_path||'—')}</span></div><div><b>revision</b><span>${esc(row.revision)}</span></div></div>${textureHtml?`<div class="texture-list">${textureHtml}</div>`:''}`}
+ function weaponRenderForm(row){const configured=!!weaponState.data?.publication?.configured;if(row){$('weapon-model-status').innerHTML=`<strong>${esc(row.name_en)} · ${esc(row.status)}</strong><span>${esc(row.model_source_path||'no model')} · ${(row.textures||[]).length} registered texture(s)</span>`;$('register-weapon').textContent=(weaponState.modelPath||weaponState.texturePaths.length)?'register new revision':'save metadata';}else{$('weapon-model-status').innerHTML='<strong>not registered</strong><span>choose a weapon fbx. textures are optional.</span>';$('register-weapon').textContent='register weapon'}$('register-weapon').disabled=!row&&!weaponState.modelPath;$('publish-weapon').disabled=!row||!configured||!row.model_source_path;$('sync-weapon').disabled=!row?.model_asset_id;$('activate-weapon').disabled=!row?.model_asset_id;$('weapon-publication-hint').textContent=!row?'select a registered weapon.':!configured?'configure open cloud before publishing.':row.model_asset_id?`publish updates model ${row.model_asset_id} and changed textures.`:'publish creates the permanent model/texture asset ids.'}
+ function weaponRenderRuntime(){const active=weaponState.data.activeWeaponSlug;const host=$('weapon-runtime-state');if(active){const row=weaponState.data.items.find(item=>item.slug===active);host.className='runtime-state registered';host.innerHTML=`<strong>startup weapon · ${esc(active)}</strong><span>${esc(row?.weapon_type||'')} · ${esc(row?.rarity||'')}</span>`}else{host.className='runtime-state bootstrap';host.innerHTML='<strong>unarmed startup</strong><span>animation context: hands</span>'}const pub=weaponState.data.publication||{};$('weapon-publication-state').className=pub.configured?'publication-ready':'publication-missing';$('weapon-publication-state').textContent=pub.configured?`open cloud: ${pub.creatorType} ${pub.creatorId}`:'open cloud: not configured'}
+ function weaponRender(){if(!weaponState.data)return;const row=weaponSelected();$('weapon-metric-total').textContent=weaponState.data.summary?.registered||0;$('weapon-metric-published').textContent=weaponState.data.summary?.published||0;$('weapon-metric-active').textContent=weaponState.data.summary?.active||0;weaponRenderRuntime();weaponRenderTree();weaponRenderRows();weaponRenderDetails(row);weaponRenderForm(row)}
+ async function weaponLoad(){try{weaponState.data=await request('/api/weapons');const types=weaponState.data.options?.weaponTypes||['1hs','2hs','bow'];const rarities=weaponState.data.options?.rarities||['common','uncommon','rare','mythical','legendary','immortal'];$('weapon-type').innerHTML=types.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');$('weapon-rarity').innerHTML=rarities.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');if(weaponState.selected&&!weaponState.data.items.some(x=>x.slug===weaponState.selected))weaponState.selected=null;weaponRender()}catch(error){toast(error.message,true)}}
+ async function weaponChooseModel(){try{const result=await request('/api/files/choose-weapon-model',{method:'POST'});if(!result.path)return;weaponState.modelPath=result.path;$('picked-weapon-model').textContent=result.path;weaponRenderForm(weaponSelected())}catch(error){toast(error.message,true)}}
+ async function weaponChooseTextures(){try{const result=await request('/api/files/choose-weapon-textures',{method:'POST'});weaponState.texturePaths=result.paths||[];$('picked-weapon-textures').textContent=weaponState.texturePaths.length?weaponState.texturePaths.join(' · '):'textures not selected';weaponRenderForm(weaponSelected())}catch(error){toast(error.message,true)}}
+-async function weaponRegister(){try{const row=weaponSelected();const nameEn=$('weapon-name-en').value.trim();if(!nameEn)throw Error('name en is required');const slug=row?.slug||weaponSlugify(nameEn);if(!slug)throw Error('english name cannot generate a slug');if(!row&&!weaponState.modelPath)throw Error('choose a weapon fbx first');$('register-weapon').disabled=true;const result=await request('/api/weapons',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug,nameEn,nameRu:$('weapon-name-ru').value.trim(),weaponType:$('weapon-type').value,rarity:$('weapon-rarity').value,modelSourcePath:weaponState.modelPath,texturePaths:weaponState.texturePaths,statModifiers:{Damage:Number($('weapon-stat-damage').value||0),AttackSpeed:Number($('weapon-stat-attack-speed').value||0)}})});weaponState.selected=result.slug;weaponState.modelPath='';weaponState.texturePaths=[];await weaponLoad();weaponSetForm(weaponSelected());toast(`registered weapon ${result.slug}`)}catch(error){toast(error.message,true)}finally{weaponRenderForm(weaponSelected())}}
++async function weaponRegister(){try{const row=weaponSelected();const nameEn=$('weapon-name-en').value.trim();if(!nameEn)throw Error('name en is required');const slug=row?.slug||weaponSlugify(nameEn);if(!slug)throw Error('english name cannot generate a slug');if(!row&&!weaponState.modelPath)throw Error('choose a weapon fbx first');$('register-weapon').disabled=true;const result=await request('/api/weapons',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug,nameEn,nameRu:$('weapon-name-ru').value.trim(),weaponType:$('weapon-type').value,rarity:$('weapon-rarity').value,modelSourcePath:weaponState.modelPath,texturePaths:weaponState.texturePaths,gripRotation:{x:Number($('weapon-grip-rot-x').value||0),y:Number($('weapon-grip-rot-y').value||0),z:Number($('weapon-grip-rot-z').value||0)},statModifiers:{Damage:Number($('weapon-stat-damage').value||0),AttackSpeed:Number($('weapon-stat-attack-speed').value||0)}})});weaponState.selected=result.slug;weaponState.modelPath='';weaponState.texturePaths=[];await weaponLoad();weaponSetForm(weaponSelected());toast(`registered weapon ${result.slug}`)}catch(error){toast(error.message,true)}finally{weaponRenderForm(weaponSelected())}}
+ async function weaponPublish(slug){try{toast('publishing weapon model and changed textures…');await request('/api/weapons/'+encodeURIComponent(slug)+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:$('weapon-publication-description').value})});await weaponLoad();toast('weapon publication complete')}catch(error){toast(error.message,true)}}
+ async function weaponSync(slug){try{toast('syncing weapon into serverstorage…');const result=await request('/api/weapons/'+encodeURIComponent(slug)+'/sync',{method:'POST'});await weaponLoad();toast(`studio synced: ${result.studio?.destination||slug}`)}catch(error){toast(error.message,true)}}
+ async function weaponActivate(slug){try{weaponState.data=await request('/api/weapons/'+encodeURIComponent(slug)+'/activate',{method:'POST'});weaponState.data.publication=(await request('/api/weapons')).publication;weaponRender();toast(`startup weapon: ${slug}`)}catch(error){toast(error.message,true)}}
+diff --git a/system/control-center/weapon_store.py b/system/control-center/weapon_store.py
+index e77d200..7b916e1 100644
+--- a/system/control-center/weapon_store.py
++++ b/system/control-center/weapon_store.py
+@@ -19,6 +19,7 @@ from opencloud_assets import (
+ SCHEMA_VERSION = 1
+ PROJECT = "game1"
+ ACTIVE_KEY = "active_weapon_slug"
++GRIP_ROTATION_MIGRATION_KEY = "weapon_grip_rotation_v1_seeded"
+ WEAPON_TYPES = ("1hs", "2hs", "bow")
+ RARITIES = ("common", "uncommon", "rare", "mythical", "legendary", "immortal")
+ TEXTURE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
+@@ -58,6 +59,15 @@ class WeaponStore:
+         connection.row_factory = sqlite3.Row
+         return connection
+ 
++    @staticmethod
++    def _columns(connection, table: str) -> set[str]:
++        return {str(row[1]) for row in connection.execute(f"PRAGMA table_info({table})")}
++
++    @staticmethod
++    def _ensure_column(connection, table: str, name: str, declaration: str):
++        if name not in WeaponStore._columns(connection, table):
++            connection.execute(f"ALTER TABLE {table} ADD COLUMN {name} {declaration}")
++
+     def _init(self):
+         with self.connect() as connection:
+             connection.execute(
+@@ -73,6 +83,9 @@ class WeaponStore:
+                     model_asset_id TEXT,
+                     model_published_sha256 TEXT NOT NULL DEFAULT '',
+                     moderation_state TEXT NOT NULL DEFAULT '',
++                    grip_rot_x REAL NOT NULL DEFAULT 0,
++                    grip_rot_y REAL NOT NULL DEFAULT 0,
++                    grip_rot_z REAL NOT NULL DEFAULT 0,
+                     revision INTEGER NOT NULL DEFAULT 1,
+                     created_at REAL NOT NULL,
+                     updated_at REAL NOT NULL,
+@@ -125,6 +138,22 @@ class WeaponStore:
+                     value TEXT NOT NULL DEFAULT ''
+                 )"""
+             )
++            self._ensure_column(connection, "weapons", "grip_rot_x", "REAL NOT NULL DEFAULT 0")
++            self._ensure_column(connection, "weapons", "grip_rot_y", "REAL NOT NULL DEFAULT 0")
++            self._ensure_column(connection, "weapons", "grip_rot_z", "REAL NOT NULL DEFAULT 0")
++            seeded = connection.execute(
++                "SELECT value FROM project_settings WHERE key=?", (GRIP_ROTATION_MIGRATION_KEY,)
++            ).fetchone()
++            if not seeded:
++                # Existing Newbie Axe needs a 90-degree roll around its long X axis.
++                # This is Studio grip metadata only; FBX/model geometry is untouched.
++                connection.execute(
++                    "UPDATE weapons SET grip_rot_x=90 WHERE slug='newbie_axe' AND grip_rot_x=0 AND grip_rot_y=0 AND grip_rot_z=0"
++                )
++                connection.execute(
++                    "INSERT OR REPLACE INTO project_settings(key,value) VALUES(?,?)",
++                    (GRIP_ROTATION_MIGRATION_KEY, "1"),
++                )
+             connection.execute("DELETE FROM project_settings WHERE key='test_loadout_weapon'")
+ 
+     @staticmethod
+@@ -202,6 +231,11 @@ class WeaponStore:
+         result = dict(row)
+         result["textures"] = self._textures(connection, result["slug"])
+         result["stat_modifiers"] = self._modifiers(connection, result["slug"])
++        result["grip_rotation"] = {
++            "x": float(result.get("grip_rot_x") or 0),
++            "y": float(result.get("grip_rot_y") or 0),
++            "z": float(result.get("grip_rot_z") or 0),
++        }
+         result["status"] = self._status(result, result["textures"])
+         result["server_storage_path"] = (
+             f"ServerStorage.weapons.{result['weapon_type']}.{result['slug']}.model.{result['slug']}"
+@@ -262,6 +296,15 @@ class WeaponStore:
+         model_source_path = str(old.get("model_source_path") or "") if old else ""
+         model_prepared_path = str(old.get("model_prepared_path") or "") if old else ""
+         model_sha256 = str(old.get("model_sha256") or "") if old else ""
++        incoming_grip = payload.get("gripRotation")
++        if isinstance(incoming_grip, dict):
++            grip_rot_x = float(incoming_grip.get("x") or 0)
++            grip_rot_y = float(incoming_grip.get("y") or 0)
++            grip_rot_z = float(incoming_grip.get("z") or 0)
++        else:
++            grip_rot_x = float(old.get("grip_rot_x") or 0) if old else 0.0
++            grip_rot_y = float(old.get("grip_rot_y") or 0) if old else 0.0
++            grip_rot_z = float(old.get("grip_rot_z") or 0) if old else 0.0
+ 
+         if model_source:
+             source = Path(model_source).expanduser().resolve()
+@@ -282,13 +325,15 @@ class WeaponStore:
+             connection.execute(
+                 """INSERT OR REPLACE INTO weapons(
+                     slug,name_en,name_ru,weapon_type,rarity,model_source_path,model_prepared_path,model_sha256,
+-                    model_asset_id,model_published_sha256,moderation_state,revision,created_at,updated_at,published_at
+-                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
++                    model_asset_id,model_published_sha256,moderation_state,grip_rot_x,grip_rot_y,grip_rot_z,
++                    revision,created_at,updated_at,published_at
++                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                 (
+                     slug, name_en, name_ru, weapon_type, rarity, model_source_path, model_prepared_path, model_sha256,
+                     old.get("model_asset_id") if old else None,
+                     str(old.get("model_published_sha256") or "") if old else "",
+                     str(old.get("moderation_state") or "") if old else "",
++                    grip_rot_x, grip_rot_y, grip_rot_z,
+                     revision,
+                     old.get("created_at") if old else now,
+                     now,
+@@ -493,6 +538,11 @@ class WeaponStore:
+                 f"\t\t\tstatus = {self._lua_string(row['status'])},",
+                 f"\t\t\tmodelAssetId = {self._lua_string(row.get('model_asset_id') or '')},",
+                 f"\t\t\tserverStoragePath = {self._lua_string(row['server_storage_path'])},",
++                "\t\t\tgripRotationDegrees = table.freeze({",
++                f"\t\t\t\tx = {self._lua_number((row.get('grip_rotation') or {}).get('x', 0))},",
++                f"\t\t\t\ty = {self._lua_number((row.get('grip_rotation') or {}).get('y', 0))},",
++                f"\t\t\t\tz = {self._lua_number((row.get('grip_rotation') or {}).get('z', 0))},",
++                "\t\t\t}),",
+                 "\t\t\tstatModifiers = table.freeze({",
+             ])
+             for key, value in sorted((row.get("stat_modifiers") or {}).items()):
+diff --git a/system/studio-plugin/Game1Bridge.server.luau b/system/studio-plugin/Game1Bridge.server.luau
+index c278a7b..889958a 100644
+--- a/system/studio-plugin/Game1Bridge.server.luau
++++ b/system/studio-plugin/Game1Bridge.server.luau
+@@ -329,7 +329,15 @@ local function weaponReferencePart(model: Model): BasePart?
+     return parts[1]
+ end
+ 
+-local function ensureWeaponGrip(model: Model): Attachment
++local function gripRotationCFrame(metadata: any): (CFrame, Vector3)
++    local raw = metadata and metadata.gripRotationDegrees or {}
++    local x = tonumber(raw.x) or 0
++    local y = tonumber(raw.y) or 0
++    local z = tonumber(raw.z) or 0
++    return CFrame.Angles(math.rad(x), math.rad(y), math.rad(z)), Vector3.new(x, y, z)
++end
++
++local function ensureWeaponGrip(model: Model, metadata: any): Attachment
+     local referencePart = weaponReferencePart(model)
+     if not referencePart then
+         error("weapon model contains no BasePart for grip reference")
+@@ -347,17 +355,22 @@ local function ensureWeaponGrip(model: Model): Attachment
+     -- canonical world XYZ so two visually identical FBX weapons cannot equip
+     -- differently only because their hidden Model pivot axes differ.
+     local importedPivot = model:GetPivot()
+-    local canonicalGripWorld = CFrame.new(importedPivot.Position)
++    local gripRotation, gripDegrees = gripRotationCFrame(metadata)
++    local canonicalGripWorld = CFrame.new(importedPivot.Position) * gripRotation
+     local grip = Instance.new("Attachment")
+     grip.Name = WEAPON_GRIP_NAME
+     grip.CFrame = referencePart.CFrame:ToObjectSpace(canonicalGripWorld)
+     grip:SetAttribute("Game1WeaponGrip", true)
++    grip:SetAttribute("RotationX", gripDegrees.X)
++    grip:SetAttribute("RotationY", gripDegrees.Y)
++    grip:SetAttribute("RotationZ", gripDegrees.Z)
+     grip.Parent = referencePart
+-    model:SetAttribute("Game1WeaponGripMode", "attachment-v1")
++    model:SetAttribute("Game1WeaponGripMode", "attachment-v2-rotation")
++    model:SetAttribute("Game1WeaponGripRotation", gripDegrees)
+     return grip
+ end
+ 
+-local function prepareWeaponModel(model: Model)
++local function prepareWeaponModel(model: Model, metadata: any)
+     for _, descendant in model:GetDescendants() do
+         if descendant:IsA("Humanoid") or descendant:IsA("AnimationController") then
+             descendant:Destroy()
+@@ -369,7 +382,7 @@ local function prepareWeaponModel(model: Model)
+             descendant.Massless = true
+         end
+     end
+-    ensureWeaponGrip(model)
++    ensureWeaponGrip(model, metadata)
+ end
+ 
+ local function applyWeaponTextures(model: Model, textures: { any }): any
+@@ -443,7 +456,7 @@ local function placeWeaponModel(imported: Model, destination: Instance, wrapperN
+     end
+ 
+     imported.Name = wrapperName
+-    prepareWeaponModel(imported)
++    prepareWeaponModel(imported, metadata)
+     imported:SetAttribute("Game1WeaponTemplate", true)
+     imported:SetAttribute("Game1ModelAssetId", tostring(assetId))
+     imported:SetAttribute("WeaponSlug", tostring(metadata.weaponSlug or wrapperName))
+@@ -532,6 +545,7 @@ local function handleModelLoad(data: any)
+                 textures = textureStats,
+                 gripAttachment = grip ~= nil and grip:IsA("Attachment"),
+                 gripMode = tostring(wrapper:GetAttribute("Game1WeaponGripMode") or ""),
++                gripRotation = tostring(wrapper:GetAttribute("Game1WeaponGripRotation") or Vector3.zero),
+             }
+             result.importedCount = #wrapper:GetDescendants()
+         else
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index af0ee38..2252c94 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -525,9 +525,17 @@ for required in ["WeaponStore", "sync_weapon_to_studio", 'placement_mode="weapon
+         err(f"host agent weapon api missing {required}")
+ if '"/api/weapons/test-loadout"' in host_agent_text or "def set_test_loadout" in weapon_store_text or "TEST_LOADOUT_KEY" in weapon_store_text:
+     err("obsolete web/control-center test loadout path is still active")
++for required in ["grip_rot_x", "grip_rot_y", "grip_rot_z", "grip_rotation_v1_seeded", "newbie_axe"]:
++    if required not in weapon_store_text:
++        err(f"weapon store Studio grip rotation contract missing {required}")
++for required in ["weapon-grip-rot-x", "weapon-grip-rot-y", "weapon-grip-rot-z", "gripRotation"]:
++    if required not in weapon_js_text:
++        err(f"weapon editor Studio grip rotation controls missing {required}")
++if '"gripRotationDegrees": dict(row.get("grip_rotation")' not in host_agent_text:
++    err("weapon Studio sync does not send per-weapon grip rotation")
+ if 'placementMode ~= "weapon-pivot"' not in plugin_text or "placeWeaponModel" not in plugin_text:
+     err("studio bridge weapon-pivot placement is missing")
+-for required in ["Game1WeaponGrip", "ensureWeaponGrip", "canonicalGripWorld", "referencePart.CFrame:ToObjectSpace"]:
++for required in ["Game1WeaponGrip", "ensureWeaponGrip", "canonicalGripWorld", "referencePart.CFrame:ToObjectSpace", "gripRotationCFrame", "Game1WeaponGripRotation"]:
+     if required not in plugin_text:
+         err(f"studio bridge canonical weapon grip is missing {required}")
+ 

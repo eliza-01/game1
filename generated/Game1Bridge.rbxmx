@@ -181,6 +181,7 @@ local function modelRigStats(root: Instance): any
     local stats = {
         baseParts = 0,
         bones = 0,
+        boneNames = {},
         motor6Ds = 0,
         hasRootPart = false,
         rootPartClass = "",
@@ -198,10 +199,12 @@ local function modelRigStats(root: Instance): any
             end
         elseif instance:IsA("Bone") then
             stats.bones += 1
+            table.insert(stats.boneNames, instance.Name)
         elseif instance:IsA("Motor6D") then
             stats.motor6Ds += 1
         end
     end
+    table.sort(stats.boneNames)
     return stats
 end
 
@@ -317,6 +320,52 @@ local function placeCharacterRig(importedRig: Model, destination: Instance, wrap
     return wrapper :: Model, stats, templateInfo
 end
 
+local WEAPON_GRIP_NAME = "Game1WeaponGrip"
+
+local function weaponReferencePart(model: Model): BasePart?
+    if model.PrimaryPart then
+        return model.PrimaryPart
+    end
+    local parts = {}
+    for _, descendant in model:GetDescendants() do
+        if descendant:IsA("BasePart") then
+            table.insert(parts, descendant)
+        end
+    end
+    table.sort(parts, function(left, right)
+        return left:GetFullName() < right:GetFullName()
+    end)
+    return parts[1]
+end
+
+local function ensureWeaponGrip(model: Model): Attachment
+    local referencePart = weaponReferencePart(model)
+    if not referencePart then
+        error("weapon model contains no BasePart for grip reference")
+    end
+
+    for _, descendant in model:GetDescendants() do
+        if descendant:IsA("Attachment") and descendant.Name == WEAPON_GRIP_NAME then
+            descendant:Destroy()
+        end
+    end
+
+    -- FBX/Model pivots are editor/runtime state and Model.WorldPivot is not
+    -- replicated. Persist the actual grip point as an Attachment instead.
+    -- Position comes from the imported model pivot; orientation is deliberately
+    -- canonical world XYZ so two visually identical FBX weapons cannot equip
+    -- differently only because their hidden Model pivot axes differ.
+    local importedPivot = model:GetPivot()
+    local canonicalGripWorld = CFrame.new(importedPivot.Position)
+    local grip = Instance.new("Attachment")
+    grip.Name = WEAPON_GRIP_NAME
+    grip.CFrame = referencePart.CFrame:ToObjectSpace(canonicalGripWorld)
+    grip:SetAttribute("Game1WeaponGrip", true)
+    grip.Parent = referencePart
+    model:SetAttribute("Game1WeaponGripMode", "attachment-v1")
+    return grip
+end
+
 local function prepareWeaponModel(model: Model)
     for _, descendant in model:GetDescendants() do
         if descendant:IsA("Humanoid") or descendant:IsA("AnimationController") then
@@ -329,6 +378,7 @@ local function prepareWeaponModel(model: Model)
             descendant.Massless = true
         end
     end
+    ensureWeaponGrip(model)
 end
 
 local function applyWeaponTextures(model: Model, textures: { any }): any
@@ -485,9 +535,12 @@ local function handleModelLoad(data: any)
             )
             result.destination = wrapper:GetFullName()
             result.wrapperName = wrapper.Name
+            local grip = wrapper:FindFirstChild(WEAPON_GRIP_NAME, true)
             result.weaponStats = {
                 baseParts = modelRigStats(wrapper).baseParts,
                 textures = textureStats,
+                gripAttachment = grip ~= nil and grip:IsA("Attachment"),
+                gripMode = tostring(wrapper:GetAttribute("Game1WeaponGripMode") or ""),
             }
             result.importedCount = #wrapper:GetDescendants()
         else

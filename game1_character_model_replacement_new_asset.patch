@@ -1,0 +1,352 @@
+--- a/system/control-center/character_store.py
++++ b/system/control-center/character_store.py
+@@ -10,7 +10,7 @@
+ import tempfile
+ 
+ from character_analysis import analyze_character_fbx, prepare_character_fbx
+-from opencloud_assets import create_model_asset, update_model_asset, wait_for_operation
++from opencloud_assets import create_model_asset, wait_for_operation
+ 
+ SCHEMA_VERSION = 4
+ PROJECT = "game1"
+@@ -260,8 +260,9 @@
+             sha = prepared_digest
+ 
+         replacement_pending = int(old.get("model_replacement_pending") or 0) if old else 0
+-        if raw_source and old and str(old.get("model_asset_id") or "").strip() and sha != str(old.get("sha256") or ""):
+-            replacement_pending = 1
++        if raw_source and old and str(old.get("model_asset_id") or "").strip():
++            published_basis = str(old.get("published_sha256") or old.get("sha256") or "")
++            replacement_pending = int(bool(sha and published_basis and sha != published_basis))
+ 
+         now = time.time()
+         revision = (int(old["revision"]) + 1) if old else 1
+@@ -385,15 +386,22 @@
+             shutil.copy2(incoming, destination)
+ 
+         now = time.time()
++        target_asset_id = str(target.get("model_asset_id") or "").strip()
++        source_sha = str(source.get("sha256") or "")
++        target_published_sha = str(target.get("published_sha256") or target.get("sha256") or "")
++        replacement_pending = int(bool(target_asset_id and source_sha and target_published_sha and source_sha != target_published_sha))
+         values = {
+             "source_path": target_source.relative_to(self.root).as_posix(),
+             "prepared_path": target_prepared.relative_to(self.root).as_posix(),
+-            "sha256": str(source.get("sha256") or ""),
+-            "model_asset_id": source.get("model_asset_id"),
+-            "model_replacement_pending": int(source.get("model_replacement_pending") or 0),
+-            "published_sha256": str(source.get("published_sha256") or ""),
+-            "moderation_state": str(source.get("moderation_state") or ""),
+-            "published_at": source.get("published_at"),
++            "sha256": source_sha,
++            # Reassigning source files must never steal/reuse another archetype's
++            # Roblox asset id. Keep the target's currently live asset until the
++            # replacement has been published successfully as a brand-new asset.
++            "model_asset_id": target.get("model_asset_id"),
++            "model_replacement_pending": replacement_pending,
++            "published_sha256": str(target.get("published_sha256") or ""),
++            "moderation_state": str(target.get("moderation_state") or ""),
++            "published_at": target.get("published_at"),
+             "armature_name": str(source.get("armature_name") or ""),
+             "bone_count": int(source.get("bone_count") or 0),
+             "mesh_count": int(source.get("mesh_count") or 0),
+@@ -420,7 +428,7 @@
+             )
+             connection.execute(
+                 "INSERT INTO character_model_assignments(target_character_id,source_character_id,asset_id,assigned_at) VALUES(?,?,?,?)",
+-                (target_id, source_id, str(source.get("model_asset_id") or ""), now),
++                (target_id, source_id, "", now),
+             )
+ 
+         for stored_path, replacement in (
+@@ -454,27 +462,32 @@
+         creator_id = str(publication.get("creatorId") or "").strip()
+         description = str(publication.get("description") or "game1 character model").strip()
+         current_asset_id = str(row.get("model_asset_id") or "").strip()
+-        replacement_pending = bool(int(row.get("model_replacement_pending") or 0))
++        current_sha = str(row.get("sha256") or "")
++        published_sha = str(row.get("published_sha256") or "")
+ 
+-        if current_asset_id and not replacement_pending:
+-            operation = update_model_asset(
+-                prepared,
+-                asset_id=current_asset_id,
+-                display_name=row["display_name"],
+-                description=description,
+-                creator_type=creator_type,
+-                creator_id=creator_id,
+-                api_key=api_key,
+-            )
+-        else:
+-            operation = create_model_asset(
+-                prepared,
+-                display_name=row["display_name"],
+-                description=description,
+-                creator_type=creator_type,
+-                creator_id=creator_id,
+-                api_key=api_key,
+-            )
++        # Character models are immutable from the archetype manager's point of
++        # view. Never PATCH an existing Roblox model asset. If the canonical FBX
++        # changed, publish a brand-new asset and switch the archetype only after
++        # Open Cloud reports success. If nothing changed, publishing is a no-op.
++        if current_asset_id and current_sha and published_sha and current_sha == published_sha:
++            if int(row.get("model_replacement_pending") or 0):
++                with self.connect() as connection:
++                    connection.execute(
++                        "UPDATE characters SET model_replacement_pending=0,status=?,updated_at=? WHERE id=?",
++                        (self._status(row), time.time(), character_id),
++                    )
++                self.export()
++                return self.get(character_id)
++            return row
++
++        operation = create_model_asset(
++            prepared,
++            display_name=row["display_name"],
++            description=description,
++            creator_type=creator_type,
++            creator_id=creator_id,
++            api_key=api_key,
++        )
+ 
+         result = wait_for_operation(operation, api_key=api_key)
+         now = time.time()
+--- a/system/control-center/host_agent.py
++++ b/system/control-center/host_agent.py
+@@ -32,7 +32,7 @@
+ from character_core.identity import CharacterIdentityService
+ from studio_bridge import run_model_load_bridge
+ 
+-control_agent_build = "game1-m6.2-studio-loadout-archetype-fix-001"
++control_agent_build = "game1-m6.2-character-model-replacement-002"
+ port = int(os.environ.get("CONTROL_AGENT_PORT", "43821"))
+ token = os.environ.get("CONTROL_TOKEN", "Game1LocalControlV1")
+ store = CharacterStore(ROOT)
+@@ -310,6 +310,7 @@
+ 
+         prefix = "/api/characters/"
+         identity_suffix = "/identity"
++        replace_model_suffix = "/replace-model"
+         model_suffix = "/model"
+         activate_suffix = "/activate"
+         publish_suffix = "/publish"
+@@ -320,6 +321,48 @@
+                 return self.out(200, character_identity.update(character_id, self.body()))
+             except Exception as error:
+                 return self.out(400, {"error": str(error)})
++        if path.startswith(prefix) and path.endswith(replace_model_suffix):
++            character_id = unquote(path[len(prefix):-len(replace_model_suffix)].strip("/"))
++            try:
++                payload = self.body()
++                source_path = str(payload.get("sourcePath") or "").strip()
++                if not source_path:
++                    raise ValueError("choose a replacement FBX first")
++                before = store.get(character_id)
++                if not before:
++                    raise ValueError(f"unknown character archetype: {character_id}")
++                previous_asset_id = str(before.get("model_asset_id") or "").strip()
++
++                # Stage/analyze the new canonical FBX while the old Roblox asset
++                # remains assigned. publish() creates a NEW asset for changed
++                # character content and switches the archetype id only on success.
++                store.register({
++                    "existingId": character_id,
++                    "id": character_id,
++                    "displayName": before.get("display_name") or "",
++                    "race": before.get("race") or "",
++                    "gender": before.get("gender") or "",
++                    "sourcePath": source_path,
++                })
++                credentials = publication_credentials(str(payload.get("description") or "game1 character model"))
++                published = store.publish(character_id, credentials)
++                result = {"character": published, "studio": None, "studioError": ""}
++                try:
++                    synced = sync_character_to_studio(character_id)
++                    result["studio"] = synced.get("studio")
++                except Exception as studio_error:
++                    # Publication already succeeded and the new asset id is now
++                    # canonical. Do not report the whole replacement as failed
++                    # merely because Studio refresh needs a retry.
++                    result["studioError"] = str(studio_error)
++                result["previousAssetId"] = previous_asset_id
++                result["newAssetId"] = str(published.get("model_asset_id") or "")
++                result["assetReplaced"] = bool(
++                    result["newAssetId"] and result["newAssetId"] != previous_asset_id
++                )
++                return self.out(200, result)
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
+         if path.startswith(prefix) and path.endswith(model_suffix):
+             character_id = unquote(path[len(prefix):-len(model_suffix)].strip("/"))
+             try:
+--- a/system/control-center/static/character-assets.js
++++ b/system/control-center/static/character-assets.js
+@@ -1,6 +1,6 @@
+ const $ = id => document.getElementById(id);
+ const state = {
+-  view:'characters', data:null, selected:null, sourcePath:'', modelSourceId:'', autoDisplayName:true,
++  view:'characters', data:null, selected:null, sourcePath:'', autoDisplayName:true,
+   animations:null, animationCharacter:'', animationFolder:'', animationFilter:'all', animationSelected:null, lastScan:null, animationPublishing:false,
+ };
+ const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+@@ -20,19 +20,18 @@
+   if(view==='animations')loadAnimations();if(view==='weapons'&&window.game1WeaponsLoad)window.game1WeaponsLoad();
+ }
+ 
+-function setForm(row){state.selected=row?.id||null;state.sourcePath='';state.modelSourceId=row?.id||'';state.autoDisplayName=!row;if(row){$('race').value=row.race||'human';$('gender').value=row.gender||'female';$('character-id').value=row.id;$('display-name').value=row.display_name||'';$('picked-model').textContent='keep current fbx or choose a replacement';}else{$('race').value=state.data?.options?.races?.[0]||'human';$('gender').value=state.data?.options?.genders?.[0]||'female';$('display-name').value='';$('picked-model').textContent='fbx not selected';syncIdentity()}renderCharacters()}
++function setForm(row){state.selected=row?.id||null;state.sourcePath='';state.autoDisplayName=!row;if(row){$('race').value=row.race||'human';$('gender').value=row.gender||'female';$('character-id').value=row.id;$('display-name').value=row.display_name||'';$('picked-model').textContent='current model stays active until a replacement is published';}else{$('race').value=state.data?.options?.races?.[0]||'human';$('gender').value=state.data?.options?.genders?.[0]||'female';$('display-name').value='';$('picked-model').textContent='fbx not selected';syncIdentity()}renderCharacters()}
+ 
+ function renderRuntime(){const r=state.data.runtime;const host=$('runtime-state');if(r.mode==='registered'){host.className='runtime-state registered';host.innerHTML=`<strong>registered · ${esc(r.activeArchetypeId)}</strong><span>${esc(r.race)} / ${esc(r.gender)} · model asset ${esc(r.modelAssetId)}</span>`}else{host.className='runtime-state bootstrap';host.innerHTML=`<strong>bootstrap placeholder</strong><span>${esc(r.reason)}${r.activeArchetypeId?' · selected '+esc(r.activeArchetypeId):''}</span>`}const pub=state.data.publication||{};$('publication-state').className=pub.configured?'publication-ready':'publication-missing';$('publication-state').textContent=pub.configured?`open cloud: ${pub.creatorType} ${pub.creatorId}`:'open cloud: not configured'}
+ function renderTree(){const host=$('character-tree');host.innerHTML='';for(const item of state.data.items){const button=document.createElement('button');button.className=item.id===state.selected?'active':'';button.innerHTML=`<span>${esc(item.display_name||item.id)}<small>${esc(item.race||'?')} · ${esc(item.gender||'?')}</small></span><small>${esc(item.status)}</small>`;button.onclick=()=>setForm(item);host.appendChild(button)}if(!state.data.items.length)host.innerHTML='<small class="muted">no registered characters.</small>';$('rail-count').textContent=state.data.items.length}
+-function renderRows(){const body=$('rows');body.innerHTML='';for(const item of state.data.items){const active=state.data.activeArchetypeId===item.id;const tr=document.createElement('tr');tr.className=item.id===state.selected?'active':'';tr.innerHTML=`<td>${active?'yes':''}</td><td><b>${esc(item.race||'?')} / ${esc(item.gender||'?')}</b><br><small>${esc(item.id)}</small></td><td>${item.model_asset_id?`asset ${esc(item.model_asset_id)}`:'local only'}<br><small>${esc(item.sha256||'').slice(0,12)}</small></td><td>${esc(item.armature_name||'—')}<br><small>${esc(item.bone_count||0)} bones · ${esc(item.mesh_count||0)} mesh</small></td><td>${statusTag(item.status)}</td><td>${esc(item.revision)}</td><td><div class="row-actions"><button data-open>edit</button><button data-publish>publish</button><button data-sync>sync studio</button><button data-active>activate</button><button data-delete class="danger">delete</button></div></td>`;tr.querySelector('[data-open]').onclick=()=>setForm(item);tr.querySelector('[data-publish]').onclick=()=>publishCharacter(item.id);tr.querySelector('[data-sync]').onclick=()=>syncStudio(item.id);tr.querySelector('[data-active]').onclick=()=>activate(item.id);tr.querySelector('[data-delete]').onclick=()=>removeCharacter(item.id);body.appendChild(tr)}}
++function renderRows(){const body=$('rows');body.innerHTML='';for(const item of state.data.items){const active=state.data.activeArchetypeId===item.id;const publishLabel=item.model_replacement_pending?'publish replacement':item.model_asset_id?(item.status==='PUBLISHED'?'published':'publish new asset'):'publish';const tr=document.createElement('tr');tr.className=item.id===state.selected?'active':'';tr.innerHTML=`<td>${active?'yes':''}</td><td><b>${esc(item.race||'?')} / ${esc(item.gender||'?')}</b><br><small>${esc(item.id)}</small></td><td>${item.model_asset_id?`asset ${esc(item.model_asset_id)}`:'local only'}<br><small>${esc(item.sha256||'').slice(0,12)}</small></td><td>${esc(item.armature_name||'—')}<br><small>${esc(item.bone_count||0)} bones · ${esc(item.mesh_count||0)} mesh</small></td><td>${statusTag(item.status)}</td><td>${esc(item.revision)}</td><td><div class="row-actions"><button data-open>edit</button><button data-publish>${publishLabel}</button><button data-sync>sync studio</button><button data-active>activate</button><button data-delete class="danger">delete</button></div></td>`;tr.querySelector('[data-open]').onclick=()=>setForm(item);const publishButton=tr.querySelector('[data-publish]');publishButton.disabled=item.status==='PUBLISHED'&&!item.model_replacement_pending;publishButton.onclick=()=>publishCharacter(item.id);tr.querySelector('[data-sync]').onclick=()=>syncStudio(item.id);tr.querySelector('[data-active]').onclick=()=>activate(item.id);tr.querySelector('[data-delete]').onclick=()=>removeCharacter(item.id);body.appendChild(tr)}}
+ function renderDetails(row){const host=$('selected-details');if(!row){host.innerHTML='<span class="muted">select a character.</span>';return}host.innerHTML=`<div class="section-title"><div><span>selected</span><h3>${esc(row.display_name)}</h3></div>${statusTag(row.status)}</div><div class="details-grid"><div><b>canonical source</b><span>${esc(row.source_path||'—')}</span></div><div><b>prepared</b><span>${esc(row.prepared_path||'—')}</span></div><div><b>model asset id</b><span>${esc(row.model_asset_id||'not published')}</span></div><div><b>replacement</b><span>${row.model_replacement_pending?'new asset id on next publish':'no pending replacement'}</span></div><div><b>publication</b><span>${esc(row.moderation_state||'—')}</span></div><div><b>armature</b><span>${esc(row.armature_name||'—')} · ${esc(row.bone_count||0)} bones</span></div><div><b>skeleton signature</b><span>${esc(row.skeleton_signature||'—')}</span></div></div>`}
+-function renderModelSource(row){const select=$('character-model-source');if(!select)return;if(!row){select.innerHTML='<option value="">register a new fbx first</option>';select.value='';select.disabled=true;return}const rows=(state.data?.items||[]).filter(item=>item.source_path&&item.prepared_path);const options=[];options.push(`<option value="${esc(row.id)}">current · ${esc(row.id)} · asset ${esc(row.model_asset_id||'local')}</option>`);for(const item of rows){if(item.id===row.id)continue;options.push(`<option value="${esc(item.id)}">${esc(item.race)}/${esc(item.gender)} · ${esc(item.id)} · asset ${esc(item.model_asset_id)}</option>`)}select.innerHTML=options.join('');const desired=state.modelSourceId||row.id;select.value=options.some(html=>html.includes(`value="${desired}"`))?desired:row.id;state.modelSourceId=select.value;select.disabled=false}
+-function renderForm(row){renderModelSource(row);if(row){$('model-status').innerHTML=`<strong>${esc(row.display_name)} · ${esc(row.status)}</strong><span>${esc(row.source_path||'no source')} · ${esc(row.armature_name||'no armature metadata')} · ${esc(row.bone_count||0)} bones</span>`;$('register-character').textContent=state.sourcePath?'register replacement revision':'choose fbx for revision';$('register-character').disabled=!state.sourcePath;$('save-archetype').disabled=false;}else{$('model-status').innerHTML='<strong>not registered</strong><span>choose an fbx with a skinned armature.</span>';$('register-character').textContent='register character';$('register-character').disabled=!state.sourcePath;$('save-archetype').disabled=true;}const has=row&&row.source_path;const configured=!!state.data?.publication?.configured;const replacement=!!row?.model_replacement_pending;$('publish-character').disabled=!has||!configured;$('publish-character').textContent=replacement?'publish replacement':'publish model';$('sync-character').disabled=!row?.model_asset_id;$('activate-character').disabled=!row?.model_asset_id;$('publication-hint').textContent=!row?'select a registered character.':!configured?'configure open cloud in .env.local before publishing.':replacement?`next publish creates a new roblox model asset id; current asset ${row.model_asset_id} stays assigned until the upload succeeds.`:row.model_asset_id?`publish without a replacement updates the current asset ${row.model_asset_id}.`:'publish creates a new permanent model asset id.'}
++function renderForm(row){const configured=!!state.data?.publication?.configured;const replacement=!!row?.model_replacement_pending;const has=row&&row.source_path;const publishedUnchanged=!!(row?.model_asset_id&&row?.status==='PUBLISHED'&&!replacement);$('choose-model').textContent=row?'choose replacement fbx':'choose fbx';if(row){$('model-status').innerHTML=replacement?`<strong>${esc(row.display_name)} · replacement ready</strong><span>${esc(row.source_path||'no source')} · current Roblox asset ${esc(row.model_asset_id||'—')} stays active until the new upload succeeds.</span>`:`<strong>${esc(row.display_name)} · ${esc(row.status)}</strong><span>${esc(row.source_path||'no source')} · ${esc(row.armature_name||'no armature metadata')} · ${esc(row.bone_count||0)} bones</span>`;$('save-archetype').disabled=false;$('save-archetype').textContent='save identity';if(row.model_asset_id){$('register-character').textContent=state.sourcePath?'replace model · publish new asset':'choose replacement fbx';$('register-character').disabled=!state.sourcePath||!configured;}else{$('register-character').textContent=state.sourcePath?'save model revision':'choose fbx for revision';$('register-character').disabled=!state.sourcePath;}}else{$('model-status').innerHTML='<strong>not registered</strong><span>choose an fbx with a skinned armature.</span>';$('save-archetype').disabled=true;$('save-archetype').textContent='save identity';$('register-character').textContent='register character';$('register-character').disabled=!state.sourcePath;}$('publish-character').disabled=!has||!configured||publishedUnchanged;$('publish-character').textContent=replacement?'publish replacement':row?.model_asset_id?(publishedUnchanged?'published':'publish new asset'):'publish model';$('sync-character').disabled=!row?.model_asset_id;$('activate-character').disabled=!row?.model_asset_id;$('publication-hint').textContent=!row?'select a registered character.':!configured?'configure open cloud in .env.local before publishing.':replacement?`replacement is staged; publishing creates a NEW Roblox asset. current asset ${row.model_asset_id} remains assigned until success.`:row.model_asset_id?`asset ${row.model_asset_id} is immutable here. choose a replacement FBX to publish a new asset id.`:'first publish creates a permanent model asset id.'}
+ function renderCharacters(){if(!state.data)return;const row=selectedRow();const published=state.data.items.filter(x=>x.status==='PUBLISHED').length;$('metric-total').textContent=state.data.items.length;$('metric-published').textContent=published;$('metric-active').textContent=state.data.activeArchetypeId?'1':'0';renderRuntime();renderTree();renderRows();renderDetails(row);renderForm(row)}
+ async function loadCharacters(){try{const formRace=$('race').value;const formGender=$('gender').value;state.data=await request('/api/characters');const races=state.data.options?.races||['human'];const genders=state.data.options?.genders||['male','female'];$('race').innerHTML=races.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');$('gender').innerHTML=genders.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');if(state.selected&&!state.data.items.some(x=>x.id===state.selected))state.selected=null;const row=selectedRow();const wantedRace=formRace||row?.race||races[0]||'';const wantedGender=formGender||row?.gender||genders[0]||'';$('race').value=races.includes(wantedRace)?wantedRace:(row?.race||races[0]||'');$('gender').value=genders.includes(wantedGender)?wantedGender:(row?.gender||genders[0]||'');if(!state.selected)syncIdentity();renderCharacters();populateAnimationCharacters()}catch(error){toast(error.message,true)}}
+ async function chooseModel(){try{const result=await request('/api/files/choose-character-model',{method:'POST'});if(!result.path)return;state.sourcePath=result.path;$('picked-model').textContent=result.path;renderForm(selectedRow())}catch(error){toast(error.message,true)}}
+-async function registerCharacter(){try{const row=selectedRow();if(!state.sourcePath)throw Error('choose an fbx first');if(row){const identityChanged=$('character-id').value.trim().toLowerCase()!==row.id||$('race').value!==row.race||$('gender').value!==row.gender||$('display-name').value.trim()!==(row.display_name||'');if(identityChanged)throw Error('save archetype identity first, then register the model revision');}$('register-character').disabled=true;toast('analyzing and registering character…');const result=await request('/api/characters',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({existingId:row?.id||'',id:$('character-id').value,displayName:$('display-name').value,race:$('race').value,gender:$('gender').value,sourcePath:state.sourcePath})});state.selected=result.id;state.modelSourceId=result.id;state.sourcePath='';await loadCharacters();toast(`registered ${result.id} · ${result.bone_count} bones`)}catch(error){toast(error.message,true)}finally{renderForm(selectedRow())}}
+-async function saveArchetype(){const row=selectedRow();if(!row)return;try{const oldId=row.id;const nextId=$('character-id').value.trim().toLowerCase();const nextRace=$('race').value;const nextGender=$('gender').value;const modelSource=state.modelSourceId||oldId;const identityChanged=oldId!==nextId||row.race!==nextRace||row.gender!==nextGender;const modelChanged=modelSource!==oldId;if((identityChanged||modelChanged)&&!confirm(`save archetype changes for ${oldId}? identity paths will be migrated and an existing registered model asset can be reassigned without republishing.`))return;$('save-archetype').disabled=true;toast('saving archetype…');const result=await request('/api/characters/'+encodeURIComponent(oldId)+'/identity',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:nextId,displayName:$('display-name').value,race:nextRace,gender:nextGender})});let reassigned=false;if(modelChanged){await request('/api/characters/'+encodeURIComponent(result.newId)+'/model',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sourceCharacterId:modelSource})});reassigned=true}state.selected=result.newId;state.modelSourceId=result.newId;state.animationCharacter=result.newId;await loadCharacters();const syncHint=(result.studioSyncRequired||reassigned)?' · sync studio before play':'';toast(`saved ${result.newId}${reassigned?' · model asset reassigned':''}${syncHint}`)}catch(error){toast(error.message,true)}finally{renderForm(selectedRow())}}
++async function registerCharacter(){try{const row=selectedRow();if(!state.sourcePath)throw Error('choose an fbx first');if(row){const identityChanged=$('character-id').value.trim().toLowerCase()!==row.id||$('race').value!==row.race||$('gender').value!==row.gender||$('display-name').value.trim()!==(row.display_name||'');if(identityChanged)throw Error('save archetype identity first, then replace the model');if(row.model_asset_id){if(!state.data?.publication?.configured)throw Error('configure Open Cloud before replacing a published model');if(!confirm(`replace the model for ${row.id}? a NEW Roblox model asset will be published. current asset ${row.model_asset_id} stays assigned until the new upload succeeds.`))return;$('register-character').disabled=true;toast('preparing replacement and publishing a new Roblox asset…');const result=await request('/api/characters/'+encodeURIComponent(row.id)+'/replace-model',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sourcePath:state.sourcePath,description:$('publication-description').value})});state.sourcePath='';state.selected=row.id;await loadCharacters();toast(result.studioError?`model replaced · asset ${result.newAssetId} · Studio sync needs retry: ${result.studioError}`:(result.assetReplaced?`model replaced · new asset ${result.newAssetId}`:`model is unchanged · asset ${result.newAssetId}`),!!result.studioError);return;}}$('register-character').disabled=true;toast('analyzing and registering character…');const result=await request('/api/characters',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({existingId:row?.id||'',id:$('character-id').value,displayName:$('display-name').value,race:$('race').value,gender:$('gender').value,sourcePath:state.sourcePath})});state.selected=result.id;state.sourcePath='';await loadCharacters();toast(`registered ${result.id} · ${result.bone_count} bones`)}catch(error){try{await loadCharacters()}catch{}toast(error.message,true)}finally{renderForm(selectedRow())}}
++async function saveArchetype(){const row=selectedRow();if(!row)return;try{const oldId=row.id;const nextId=$('character-id').value.trim().toLowerCase();const nextRace=$('race').value;const nextGender=$('gender').value;const identityChanged=oldId!==nextId||row.race!==nextRace||row.gender!==nextGender||$('display-name').value.trim()!==(row.display_name||'');if(identityChanged&&!confirm(`save identity changes for ${oldId}? canonical character and animation paths will be migrated; the currently assigned Roblox model asset id is preserved.`))return;$('save-archetype').disabled=true;toast('saving archetype identity…');const result=await request('/api/characters/'+encodeURIComponent(oldId)+'/identity',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:nextId,displayName:$('display-name').value,race:nextRace,gender:nextGender})});state.selected=result.newId;state.animationCharacter=result.newId;await loadCharacters();toast(`saved ${result.newId}${result.studioSyncRequired?' · sync studio before play':''}`)}catch(error){toast(error.message,true)}finally{renderForm(selectedRow())}}
+ async function publishCharacter(id=state.selected){try{if(!id)throw Error('select a character');const before=(state.data?.items||[]).find(row=>row.id===id);toast(before?.model_replacement_pending?'publishing replacement as a new roblox model asset…':'publishing character model to roblox…');await request('/api/characters/'+encodeURIComponent(id)+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:$('publication-description').value})});state.selected=id;await loadCharacters();const row=selectedRow();toast(`published ${id}${row?.model_asset_id?' · asset '+row.model_asset_id:''}`)}catch(error){toast(error.message,true)}}
+ async function syncStudio(id=state.selected){try{if(!id)throw Error('select a character');toast('syncing published character into studio…');const result=await request('/api/characters/'+encodeURIComponent(id)+'/sync',{method:'POST'});toast(`studio synced ${id} · ${result.studio?.destination||''}`)}catch(error){toast(error.message,true)}}
+ async function activate(id=state.selected){try{if(!id)throw Error('select a character');await request('/api/characters/'+encodeURIComponent(id)+'/activate',{method:'POST'});state.selected=id;await loadCharacters();toast(`active character: ${id}`)}catch(error){toast(error.message,true)}}
+@@ -94,6 +93,6 @@
+ async function setAnimationWeight(bindingId,weight){try{state.animations=await request('/api/animation-bindings/'+encodeURIComponent(bindingId)+'/weight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({weight:Number(weight)})});state.animations.publication=state.data?.publication||{};renderAnimations()}catch(error){toast(error.message,true)}}
+ async function removeAnimationBinding(bindingId){if(!confirm('remove this semantic animation binding from game1? canonical source files are preserved.'))return;try{state.animations=await request('/api/animation-bindings/'+encodeURIComponent(bindingId),{method:'DELETE'});state.animations.publication=state.data?.publication||{};if(state.animationSelected===bindingId)state.animationSelected=null;renderAnimations();toast('animation binding removed')}catch(error){toast(error.message,true)}}
+ 
+-$('character-model-source').onchange=()=>{state.modelSourceId=$('character-model-source').value};$('display-name').oninput=()=>{if(!state.selected)state.autoDisplayName=false};$('nav-characters').onclick=()=>setView('characters');$('nav-animations').onclick=()=>setView('animations');$('nav-weapons').onclick=()=>setView('weapons');$('race').onchange=syncIdentity;$('gender').onchange=syncIdentity;$('choose-model').onclick=chooseModel;$('save-archetype').onclick=saveArchetype;$('register-character').onclick=registerCharacter;$('publish-character').onclick=()=>publishCharacter();$('sync-character').onclick=()=>syncStudio();$('activate-character').onclick=()=>activate();$('new-character').onclick=()=>setForm(null);$('clear-form').onclick=()=>setForm(null);$('refresh').onclick=loadCharacters;$('validate-view').onclick=loadCharacters;$('theme').onclick=()=>document.body.classList.toggle('light');
++$('display-name').oninput=()=>{if(!state.selected)state.autoDisplayName=false};$('nav-characters').onclick=()=>setView('characters');$('nav-animations').onclick=()=>setView('animations');$('nav-weapons').onclick=()=>setView('weapons');$('race').onchange=syncIdentity;$('gender').onchange=syncIdentity;$('choose-model').onclick=chooseModel;$('save-archetype').onclick=saveArchetype;$('register-character').onclick=registerCharacter;$('publish-character').onclick=()=>publishCharacter();$('sync-character').onclick=()=>syncStudio();$('activate-character').onclick=()=>activate();$('new-character').onclick=()=>setForm(null);$('clear-form').onclick=()=>setForm(null);$('refresh').onclick=loadCharacters;$('validate-view').onclick=loadCharacters;$('theme').onclick=()=>document.body.classList.toggle('light');
+ $('animation-character').onchange=()=>{state.animationCharacter=$('animation-character').value;state.animationSelected=null;state.lastScan=null;loadAnimations()};$('choose-animation-folder').onclick=chooseAnimationFolder;$('scan-animations').onclick=scanAnimations;$('publish-missing-animations').onclick=publishMissingAnimations;$('refresh-animations').onclick=loadAnimations;
+ loadCharacters();
+--- a/system/control-center/static/index.html
++++ b/system/control-center/static/index.html
+@@ -41,24 +41,23 @@
+ <section class="content">
+ <div id="characters-view">
+ <div class="panel hero">
+-<div><span class="eyebrow">character assets · clean game1 schema</span><h2>characters</h2><p>race and gender are gameplay identity. each registered archetype owns one canonical fbx with a skinned armature. source and prepared copies stay recoverable inside the project; publication creates a roblox model asset id; replacing the canonical FBX publishes a new asset id.</p></div>
++<div><span class="eyebrow">character assets · clean game1 schema</span><h2>characters</h2><p>race and gender are gameplay identity. each registered archetype owns one canonical fbx with a skinned armature. character model assets are immutable here: replacing the FBX always publishes a new Roblox asset id and switches the archetype only after that upload succeeds.</p></div>
+ <div class="metrics"><div><b id="metric-total">0</b><span>registered</span></div><div><b id="metric-published">0</b><span>published</span></div><div><b id="metric-active">0</b><span>active</span></div></div>
+ </div>
+ <div class="panel runtime-card"><div id="runtime-state" class="runtime-state bootstrap"><strong>bootstrap</strong><span>loading runtime source…</span></div><div id="publication-state" class="publication-missing">open cloud: checking…</div></div>
+ <div class="character-workflow">
+ <div class="panel character-card">
+ <span class="eyebrow">01 · character archetype</span><h3>register model</h3>
+-<p>choose identity, then select an fbx. registration validates the armature in blender and writes canonical source/prepared copies plus skeleton metadata.</p>
++<p>choose identity, then select an fbx. registration validates the armature in blender and writes canonical source/prepared copies plus skeleton metadata. when editing a published archetype, choosing another FBX exposes one replacement action: prepare it, publish a new Roblox asset, then apply the new id.</p>
+ <div class="character-grid"><label>race<select id="race"></select></label><label>gender<select id="gender"></select></label></div>
+ <label>archetype id<input id="character-id" autocomplete="off" pattern="[a-z0-9][a-z0-9_-]{0,63}"></label>
+-<small class="hint">editing identity migrates canonical model/animation paths and keeps existing roblox asset ids.</small>
++<small class="hint">editing identity migrates canonical model/animation paths and keeps the currently assigned Roblox asset id. model replacement is a separate action below.</small>
+ <label>display name<input id="display-name" autocomplete="off"></label>
+-<label>registered model<select id="character-model-source"></select><small class="hint">edit mode only. choose any model already registered on another archetype to repair a wrong assignment. if it already has a roblox asset id, that id is reused without republishing.</small></label>
+ <div class="picker"><button id="choose-model" type="button">choose fbx</button><small id="picked-model">fbx not selected</small></div>
+ <div id="model-status" class="status-box"><strong>not registered</strong><span>select a character row or choose an fbx.</span></div>
+ <div class="actions"><button id="save-archetype" type="button" disabled>save archetype</button><button id="register-character" class="primary" type="button">register character</button><button id="clear-form" type="button">clear form</button></div>
+ <hr class="card-separator">
+-<span class="eyebrow">02 · publication</span><h3 class="subheading">roblox model asset</h3><p>first publish creates a model asset id. registering a different FBX marks a replacement; the next publish creates a new model asset id and switches the archetype only after upload succeeds. studio sync then loads that new asset.</p>
++<span class="eyebrow">02 · publication</span><h3 class="subheading">roblox model asset</h3><p>first publish creates a model asset id. existing character model assets are never updated in place. a changed FBX is published as a brand-new asset; the previous id remains assigned until the new upload succeeds, then the archetype and Studio switch to the new id.</p>
+ <label>description<input id="publication-description" value="game1 character model"></label>
+ <div class="actions"><button id="publish-character" class="primary" type="button" disabled>publish model</button><button id="sync-character" type="button" disabled>sync studio</button><button id="activate-character" type="button" disabled>activate</button></div>
+ <small id="publication-hint" class="hint">select a registered character.</small>
+@@ -149,7 +148,7 @@
+ </section>
+ </main>
+ <div id="toast" class="toast"></div>
+-<script src="character-assets.js?v=9"></script>
++<script src="character-assets.js?v=10"></script>
+ <script src="weapon-assets.js?v=3"></script>
+ </body>
+ </html>
+--- a/system/control-center/schema.sql
++++ b/system/control-center/schema.sql
+@@ -18,6 +18,7 @@
+     skeleton_structure_signature text not null default '',
+     skeleton_json text not null default '{}',
+     published_sha256 text not null default '',
++    model_replacement_pending integer not null default 0,
+     moderation_state text not null default '',
+     published_at real
+ );
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -31,8 +31,8 @@
+ manifest = json.loads((ROOT / "assets/manifests/character-archetypes.json").read_text(encoding="utf-8"))
+ if manifest.get("project") != "game1":
+     err("character manifest identity must be game1")
+-if manifest.get("schemaVersion") != 3:
+-    err("character manifest schema must be 3; run python .\\system\\control-center\\migrate.py")
++if manifest.get("schemaVersion") != 4:
++    err("character manifest schema must be 4; run python .\\system\\control-center\\migrate.py")
+ if manifest.get("racePool") != ["human"]:
+     err("character race pool must start with human only")
+ if manifest.get("genderPool") != ["male", "female"]:
+@@ -240,7 +240,7 @@
+     err("generated character registry does not expose race/gender")
+ 
+ schema_text = (ROOT / "system/control-center/schema.sql").read_text(encoding="utf-8")
+-for required in ["project_settings", "character_publications", "race text", "gender text", "skeleton_signature"]:
++for required in ["project_settings", "character_publications", "race text", "gender text", "skeleton_signature", "model_replacement_pending"]:
+     if required not in schema_text:
+         err(f"control center schema missing {required}")
+ 
+@@ -251,8 +251,12 @@
+     err("character armature analysis is not wired into registration")
+ if "prepare_character_fbx" not in store_text:
+     err("character FBX preparation is not wired into registration")
+-if "create_model_asset" not in store_text or "update_model_asset" not in store_text:
++if "create_model_asset" not in store_text:
+     err("character model publication contract is missing")
++if "update_model_asset" in store_text:
++    err("character model publication must create a new asset id instead of updating an existing Roblox model asset")
++if "current_sha == published_sha" not in store_text:
++    err("unchanged character model publication must be a no-op")
+ if 'src/shared/character/CharacterRegistry.luau' not in store_text:
+     err("character registry generator must target the character shared domain")
+ 
+@@ -263,6 +267,10 @@
+     err("character asset manager css/js files are missing")
+ if 'id="race"' not in ui or 'id="gender"' not in ui or 'id="publish-character"' not in ui:
+     err("character asset manager race/gender/publication controls are missing")
++if 'id="character-model-source"' in ui:
++    err("character edit UI must not reassign/reuse another archetype's existing Roblox model asset id")
++if "/replace-model" not in host_agent_text:
++    err("character edit UI needs an explicit replace-model endpoint")
+ 
+ analyzer = ROOT / "system/asset-manager/analyze_character_fbx.py"
+ if not analyzer.is_file() or "FBX contains no armature" not in analyzer.read_text(encoding="utf-8"):
+@@ -376,20 +384,22 @@
+     if required not in js_text:
+         err(f"asset manager archetype editing ui missing {required}")
+ 
+-# m6.2 archetype registration safety + registered model reassignment
++# m6.2 archetype registration safety + immutable character model replacement
+ character_store_text = (ROOT / "system/control-center/character_store.py").read_text(encoding="utf-8")
+ for required in ["existingId", "archetype {character_id} already exists", "def assign_model", "character_model_assignments"]:
+     if required not in character_store_text:
+         err(f"character registration/model reassignment contract missing {required}")
+ if "character_model_assignments" not in schema_text:
+     err("control center schema missing character_model_assignments audit table")
+-if 'model_suffix = "/model"' not in host_agent_text or "store.assign_model" not in host_agent_text:
+-    err("host agent does not expose registered character model reassignment")
+-if 'id="character-model-source"' not in ui:
+-    err("asset manager registered-model selector is missing")
+-for required in ["modelSourceId", "sourceCharacterId", "existingId:row?.id||''"]:
++if 'replace_model_suffix = "/replace-model"' not in host_agent_text or "store.publish(character_id, credentials)" not in host_agent_text:
++    err("host agent does not expose sequential character model replacement")
++if 'id="character-model-source"' in ui:
++    err("asset manager must not offer cross-archetype Roblox asset id reuse")
++for required in ["replace model · publish new asset", "/replace-model", "existingId:row?.id||''"]:
+     if required not in js_text:
+-        err(f"asset manager archetype model reassignment ui missing {required}")
++        err(f"asset manager archetype model replacement ui missing {required}")
++if 'source.get("model_asset_id")' in character_store_text:
++    err("character model reassignment must not copy another archetype's Roblox asset id")
+ 
+ 
+ # m6 weapon registry / stats / attachment contract

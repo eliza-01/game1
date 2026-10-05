@@ -1,6 +1,6 @@
 -- generated. do not edit by hand.
 return table.freeze({
-	schemaVersion = 3,
+	schemaVersion = 4,
 	project = "game1",
 	activeArchetypeId = "human_female",
 	archetypes = {
@@ -10,11 +10,11 @@ return table.freeze({
 			race = "human",
 			gender = "female",
 			status = "PUBLISHED",
-			revision = 8,
+			revision = 22,
 			model = table.freeze({
-				assetId = "131920313928003",
+				assetId = "103187626508299",
 				sourcePath = "assets/source/characters/human/female/human_female/model/human_female_014.fbx",
-				sha256 = "353c68d7951e856a88e54d45b307715374042a8d5799ba041ce2162821b88adb",
+				sha256 = "8a133c2f46481983891f2f4293e2605c0b23f216dda5630eacdff839ab2b5636",
 			}),
 			skeleton = table.freeze({
 				armature = "metarig",

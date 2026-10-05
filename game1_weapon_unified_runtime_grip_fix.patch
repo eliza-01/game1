@@ -1,0 +1,229 @@
+diff --git a/docs/weapon-system.md b/docs/weapon-system.md
+index 29e253c..ed279f7 100644
+--- a/docs/weapon-system.md
++++ b/docs/weapon-system.md
+@@ -15,4 +15,4 @@ weapon stats are additive modifier sources. the first exposed modifiers are `Dam
+ 
+ weapon types are also animation contexts: `1hs`, `2hs`, `bow`. unarmed uses `hands`.
+ 
+-attachment uses a replicated `Game1WeaponGrip` Attachment generated during Studio sync. Its point is taken from the imported model pivot and its frame is canonicalized to world XYZ. every weapon uses the same Studio/runtime equip basis: the target weapon socket is rotated -90 degrees around its local X axis before grip alignment. this is a global weapon-system rule, not per-asset metadata. melee uses the right weapon socket and bow uses the left weapon socket. on each runtime clone the server strips any stale per-weapon grip rotation left by older revisions, then alignment uses the full current grip frame with `desiredSocket * currentGrip^-1`. this produces an absolute rigid delta rather than accumulating rotation every render frame. the client follows the animated socket with the same stable calculation.
++attachment is runtime-canonical. on every equip the server discards any stale `Game1WeaponGrip` orientation from the Studio template (or creates the grip if an old template has none), preserves only its authored grip point, and rebuilds one `Game1WeaponGrip` with canonical world XYZ axes. every weapon therefore uses one solver and never falls back to `Model:PivotTo(socketFrame)`. the target weapon socket is rotated -90 degrees around its local X axis before `desiredSocket * currentGrip^-1` alignment. melee uses the right weapon socket and bow uses the left weapon socket. this global rule is independent of per-asset pivot orientation and cannot accumulate rotation per frame.
+diff --git a/src/client/weapon/WeaponAttachmentController.luau b/src/client/weapon/WeaponAttachmentController.luau
+index d3cec40..01ead3f 100644
+--- a/src/client/weapon/WeaponAttachmentController.luau
++++ b/src/client/weapon/WeaponAttachmentController.luau
+@@ -38,36 +38,37 @@ local function buildState(character: Model, weapon: Model)
+     if not targetBone then
+         return nil
+     end
++    local grip = findWeaponGrip(weapon)
++    if not grip then
++        return nil
++    end
+     return {
+         character = character,
+         weapon = weapon,
+         targetName = targetName,
+         targetBone = targetBone,
+-        grip = findWeaponGrip(weapon),
++        grip = grip,
+     }
+ end
+ 
+ local function updateWeapon(character: Model, weapon: Model)
+     local requestedName = tostring(weapon:GetAttribute("WeaponTargetBoneName") or "")
+     local state = cache[weapon]
+-    if not state or state.character ~= character or not state.targetBone.Parent or state.targetName ~= requestedName then
++    if not state
++        or state.character ~= character
++        or not state.targetBone.Parent
++        or state.targetName ~= requestedName
++        or not state.grip.Parent
++    then
+         state = buildState(character, weapon)
+         cache[weapon] = state
+     end
+     if state then
+         local socketFrame = targetSocketCFrame(state.targetBone) * WEAPON_EQUIP_ROTATION
+-        local grip = state.grip
+-        if grip and grip.Parent then
+-            -- Use the full current grip frame. The server canonicalizes stale
+-            -- per-weapon grip rotations once before parenting the clone. Solving
+-            -- desired * current^-1 makes this an absolute, non-accumulating delta.
+-            local delta = socketFrame * grip.WorldCFrame:Inverse()
+-            weapon:PivotTo(delta * weapon:GetPivot())
+-        else
+-            -- Legacy templates still work, but re-syncing a weapon creates the
+-            -- canonical replicated grip and removes Model.WorldPivot ambiguity.
+-            weapon:PivotTo(socketFrame)
+-        end
++        -- Server creates the same canonical runtime grip for every weapon before
++        -- parenting it to the character. The client has no legacy Model-pivot path.
++        local delta = socketFrame * state.grip.WorldCFrame:Inverse()
++        weapon:PivotTo(delta * weapon:GetPivot())
+     end
+ end
+ 
+diff --git a/src/server/weapon/WeaponEquipService.luau b/src/server/weapon/WeaponEquipService.luau
+index 495b248..9957672 100644
+--- a/src/server/weapon/WeaponEquipService.luau
++++ b/src/server/weapon/WeaponEquipService.luau
+@@ -47,26 +47,58 @@ local function socketNames(weaponType: string): { string }
+     return if string.lower(weaponType) == "bow" then LEFT_SOCKET_NAMES else RIGHT_SOCKET_NAMES
+ end
+ 
+-local function findWeaponGrip(model: Model): Attachment?
+-    local found = model:FindFirstChild(WEAPON_GRIP_NAME, true)
+-    return if found and found:IsA("Attachment") then found else nil
++local function weaponReferencePart(model: Model): BasePart?
++    if model.PrimaryPart then
++        return model.PrimaryPart
++    end
++    local parts = {}
++    for _, descendant in model:GetDescendants() do
++        if descendant:IsA("BasePart") then
++            table.insert(parts, descendant)
++        end
++    end
++    table.sort(parts, function(left, right)
++        return left:GetFullName() < right:GetFullName()
++    end)
++    return parts[1]
+ end
+ 
+-local function canonicalizeWeaponGrip(grip: Attachment)
+-    local parent = grip.Parent
+-    if not parent or not parent:IsA("BasePart") then
+-        return
++local function ensureCanonicalRuntimeGrip(model: Model): Attachment?
++    -- Runtime owns the grip contract. Studio templates may be old, may contain a
++    -- stale per-weapon rotated grip, or may contain no grip at all. Preserve only
++    -- the authored grip POINT; never inherit a template/model pivot orientation.
++    local staleGrips = {}
++    for _, descendant in model:GetDescendants() do
++        if descendant:IsA("Attachment") and descendant.Name == WEAPON_GRIP_NAME then
++            table.insert(staleGrips, descendant)
++        end
++    end
++    table.sort(staleGrips, function(left, right)
++        return left:GetFullName() < right:GetFullName()
++    end)
++
++    local gripPoint = model:GetPivot().Position
++    if staleGrips[1] then
++        gripPoint = staleGrips[1].WorldPosition
++    end
++    for _, grip in staleGrips do
++        grip:Destroy()
++    end
++
++    local referencePart = weaponReferencePart(model)
++    if not referencePart then
++        return nil
+     end
+ 
+-    -- Older Studio-sync revisions could persist a per-weapon grip rotation. Strip
+-    -- that rotation on the runtime clone before the first alignment while keeping
+-    -- the exact grip point. The resulting Attachment has canonical world axes in
+-    -- the untouched template pose and then behaves as a normal rigid frame.
+-    local gripPosition = grip.WorldPosition
+-    grip.CFrame = parent.CFrame:ToObjectSpace(CFrame.new(gripPosition))
+-    grip:SetAttribute("RotationX", nil)
+-    grip:SetAttribute("RotationY", nil)
+-    grip:SetAttribute("RotationZ", nil)
++    -- World XYZ is the one canonical authored basis for every weapon. The local
++    -- Attachment CFrame stores the inverse of whatever hidden part/model basis
++    -- Roblox imported, so all weapons enter the equip solver identically.
++    local grip = Instance.new("Attachment")
++    grip.Name = WEAPON_GRIP_NAME
++    grip.CFrame = referencePart.CFrame:ToObjectSpace(CFrame.new(gripPoint))
++    grip:SetAttribute("Game1WeaponGrip", true)
++    grip.Parent = referencePart
++    return grip
+ end
+ 
+ local function targetSocketCFrame(targetBone: Bone): CFrame
+@@ -77,19 +109,12 @@ local function targetSocketCFrame(targetBone: Bone): CFrame
+     return targetBone.WorldCFrame
+ end
+ 
+-local function alignWeaponToSocket(weapon: Model, socketFrame: CFrame)
+-    local grip = findWeaponGrip(weapon)
+-    if grip then
+-        canonicalizeWeaponGrip(grip)
+-        -- Solve an absolute rigid delta from the CURRENT full grip frame to the
+-        -- desired socket frame. This is idempotent: once aligned, delta is identity
+-        -- until the animated socket moves, so rotation can never accumulate.
+-        local delta = socketFrame * grip.WorldCFrame:Inverse()
+-        weapon:PivotTo(delta * weapon:GetPivot())
+-        return
+-    end
+-    -- Compatibility for old Studio templates without the replicated grip.
+-    weapon:PivotTo(socketFrame)
++local function alignWeaponToSocket(weapon: Model, grip: Attachment, socketFrame: CFrame)
++    -- One solver for every weapon. No Model-pivot fallback is allowed: mixing
++    -- PivotTo(socketFrame) with grip alignment is what made otherwise identical
++    -- weapons acquire different orientations.
++    local delta = socketFrame * grip.WorldCFrame:Inverse()
++    weapon:PivotTo(delta * weapon:GetPivot())
+ end
+ 
+ local function prepareWeapon(model: Model)
+@@ -146,14 +171,20 @@ function WeaponEquipService.Equip(character: Model, slugValue: any): (boolean, s
+     local weapon = template:Clone()
+     weapon.Name = EQUIPPED_NAME
+     prepareWeapon(weapon)
++    local grip = ensureCanonicalRuntimeGrip(weapon)
++    if not grip then
++        WeaponEquipService.Unequip(character)
++        return false, "weapon model contains no BasePart for runtime grip"
++    end
++
+     weapon:SetAttribute("Game1WeaponAttachment", true)
+     weapon:SetAttribute("WeaponTargetBoneName", targetBone.Name)
+     weapon:SetAttribute("WeaponSlug", slug)
+     weapon:SetAttribute("WeaponType", tostring(row.weaponType or ""))
+     weapon:SetAttribute("WeaponRarity", tostring(row.rarity or ""))
+     weapon:SetAttribute("Game1WeaponGripRotation", nil)
+-    weapon:SetAttribute("WeaponAttachmentMode", findWeaponGrip(weapon) and "grip-attachment-stable" or "legacy-pivot")
+-    alignWeaponToSocket(weapon, targetSocketCFrame(targetBone) * WEAPON_EQUIP_ROTATION)
++    weapon:SetAttribute("WeaponAttachmentMode", "runtime-canonical-grip-v2")
++    alignWeaponToSocket(weapon, grip, targetSocketCFrame(targetBone) * WEAPON_EQUIP_ROTATION)
+     weapon.Parent = character
+ 
+     character:SetAttribute("EquippedWeaponSlug", slug)
+diff --git a/src/shared/RuntimeVersion.luau b/src/shared/RuntimeVersion.luau
+index 989e30f..5c08b5c 100644
+--- a/src/shared/RuntimeVersion.luau
++++ b/src/shared/RuntimeVersion.luau
+@@ -1 +1 @@
+-return table.freeze({ Version = "2026.10.05.005", SourceDigest = "game1-m6.2-stable-global-weapon-grip-neg90" })
++return table.freeze({ Version = "2026.10.05.006", SourceDigest = "game1-m6.2-unified-runtime-weapon-grip" })
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index ac05ee3..15ef615 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -481,7 +481,7 @@ weapon_equip_path = ROOT / "src/server/weapon/WeaponEquipService.luau"
+ weapon_attach_path = ROOT / "src/client/weapon/WeaponAttachmentController.luau"
+ weapon_equip_text = weapon_equip_path.read_text(encoding="utf-8") if weapon_equip_path.is_file() else ""
+ weapon_attach_text = weapon_attach_path.read_text(encoding="utf-8") if weapon_attach_path.is_file() else ""
+-for required in ["Weapon_R_Bone", "weapon_r", "Weapon_L_Bone", "weapon_l", "AnimationWeaponSet", "statModifiers", "EquipStartup", "GetAvailable", "ListAvailable", "WeaponLoadoutSource", "Game1WeaponGrip", "grip-attachment-stable", "canonicalizeWeaponGrip", "grip.WorldCFrame:Inverse()"]:
++for required in ["Weapon_R_Bone", "weapon_r", "Weapon_L_Bone", "weapon_l", "AnimationWeaponSet", "statModifiers", "EquipStartup", "GetAvailable", "ListAvailable", "WeaponLoadoutSource", "Game1WeaponGrip", "runtime-canonical-grip-v2", "ensureCanonicalRuntimeGrip", "grip.WorldCFrame:Inverse()"]:
+     if required not in weapon_equip_text:
+         err(f"weapon equip runtime missing {required}")
+ for required in ["Game1WeaponAttachment", "parent.TransformedWorldCFrame * targetBone.CFrame", "weapon:PivotTo", "Game1WeaponGrip", "grip.WorldCFrame:Inverse()"]:
+@@ -536,8 +536,12 @@ for runtime_name, runtime_text in [("client weapon attachment", weapon_attach_te
+             err(f"{runtime_name} stable global -90deg X weapon basis missing {required}")
+     if "CFrame.new(grip.WorldPosition)" in runtime_text and runtime_name == "client weapon attachment":
+         err("client weapon attachment must not rebuild a position-only grip frame every render step")
+-if "canonicalizeWeaponGrip" not in weapon_equip_text or 'grip:SetAttribute("RotationX", nil)' not in weapon_equip_text:
+-    err("server weapon equip must normalize stale per-weapon grip rotations before first alignment")
++if "ensureCanonicalRuntimeGrip" not in weapon_equip_text or "weaponReferencePart" not in weapon_equip_text:
++    err("server weapon equip must rebuild one canonical runtime grip for every weapon")
++if "legacy-pivot" in weapon_equip_text or "weapon:PivotTo(socketFrame)" in weapon_equip_text:
++    err("weapon equip must not keep a legacy Model-pivot alignment path")
++if "weapon:PivotTo(socketFrame)" in weapon_attach_text:
++    err("client weapon attachment must not keep a legacy Model-pivot alignment path")
+ 
+ # m6.2 Studio-native Test Loadout (ported from the reference architecture)
+ test_loadout_server_path = ROOT / "src/server/dev/TestLoadoutService.luau"

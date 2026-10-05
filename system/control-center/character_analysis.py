@@ -105,3 +105,44 @@ def analyze_character_fbx(project_root: Path, source: Path) -> dict:
     if int(value.get("skinnedMeshCount") or 0) <= 0:
         raise CharacterAnalysisError("character FBX mesh is not skinned to its armature")
     return value
+
+
+def prepare_character_publication_fbx(project_root: Path, source: Path, output: Path) -> dict:
+    """Build a temporary FBX for Roblox Open Cloud without moving rest bones.
+
+    Roblox's automated Model FBX import does not expose Studio Importer's
+    "Keep Zero Influence Bones" switch. The Blender preparation script therefore
+    strengthens only weak skin influences, then this function re-analyzes the
+    exported FBX so the caller can verify the skeleton before upload.
+    """
+    source = source.resolve()
+    output = output.resolve()
+    if not source.is_file() or source.suffix.lower() != ".fbx":
+        raise CharacterAnalysisError("character publication preparation requires an FBX file")
+
+    preparer = project_root / "system" / "asset-manager" / "prepare_character_publication_fbx.py"
+    if not preparer.is_file():
+        raise CharacterAnalysisError(f"character publication preparer is missing: {preparer}")
+
+    blender = blender_executable()
+    with tempfile.TemporaryDirectory(prefix="game1-character-publication-") as tmp:
+        report_path = Path(tmp) / "publication-preparation.json"
+        command = [
+            str(blender),
+            "--background",
+            "--factory-startup",
+            "--python",
+            str(preparer),
+            "--",
+            str(source),
+            str(output),
+            str(report_path),
+        ]
+        completed = subprocess.run(command, capture_output=True, text=True, timeout=240)
+        if completed.returncode != 0 or not output.is_file() or not report_path.is_file():
+            detail = (completed.stderr or completed.stdout or "blender publication preparation failed").strip()
+            raise CharacterAnalysisError(detail[-5000:])
+        preparation = json.loads(report_path.read_text(encoding="utf-8"))
+
+    analysis = analyze_character_fbx(project_root, output)
+    return {"preparation": preparation, "analysis": analysis}

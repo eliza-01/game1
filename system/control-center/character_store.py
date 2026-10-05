@@ -9,15 +9,56 @@ import sqlite3
 import time
 import tempfile
 
-from character_analysis import analyze_character_fbx, prepare_character_fbx
-from opencloud_assets import create_model_asset, update_model_asset, wait_for_operation
+from character_analysis import analyze_character_fbx, prepare_character_fbx, prepare_character_publication_fbx
+from opencloud_assets import create_model_asset, wait_for_operation
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 PROJECT = "game1"
 ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 ACTIVE_KEY = "active_character_archetype_id"
 RACES = ("human",)
 GENDERS = ("male", "female")
+CHARACTER_PUBLICATION_PIPELINE = "roblox-open-cloud-bone-survival-v2-scale-safe"
+
+
+def _assert_publication_skeleton_matches(row: dict, analysis: dict):
+    expected_count = int(row.get("bone_count") or 0)
+    actual_count = int(analysis.get("boneCount") or 0)
+    if expected_count <= 0 or actual_count != expected_count:
+        raise ValueError(
+            f"publication FBX skeleton mismatch: expected {expected_count} bones, got {actual_count}"
+        )
+
+    expected_structure = str(row.get("skeleton_structure_signature") or "")
+    actual_structure = str(analysis.get("skeletonStructureSignature") or "")
+    if expected_structure and actual_structure != expected_structure:
+        raise ValueError("publication FBX changed bone names or parent hierarchy; upload cancelled")
+
+    try:
+        expected_analysis = json.loads(str(row.get("skeleton_json") or "{}"))
+    except Exception as exc:
+        raise ValueError("registered character skeleton metadata is invalid") from exc
+
+    expected_bones = {str(item.get("name") or ""): item for item in expected_analysis.get("bones") or []}
+    actual_bones = {str(item.get("name") or ""): item for item in analysis.get("bones") or []}
+    if expected_bones.keys() != actual_bones.keys():
+        missing = sorted(expected_bones.keys() - actual_bones.keys(), key=str.casefold)
+        extra = sorted(actual_bones.keys() - expected_bones.keys(), key=str.casefold)
+        raise ValueError(
+            "publication FBX changed the bone set; upload cancelled"
+            + (f"; missing: {', '.join(missing[:12])}" if missing else "")
+            + (f"; extra: {', '.join(extra[:12])}" if extra else "")
+        )
+
+    tolerance = 1e-4
+    for name, expected in expected_bones.items():
+        actual = actual_bones[name]
+        if str(expected.get("parent") or "") != str(actual.get("parent") or ""):
+            raise ValueError(f"publication FBX changed parent of bone {name!r}; upload cancelled")
+        left = [float(value) for value in expected.get("matrixLocal") or []]
+        right = [float(value) for value in actual.get("matrixLocal") or []]
+        if len(left) != len(right) or any(abs(a - b) > tolerance for a, b in zip(left, right)):
+            raise ValueError(f"publication FBX moved rest bone {name!r}; upload cancelled")
 
 
 class CharacterStore:
@@ -95,6 +136,8 @@ class CharacterStore:
             self._ensure_column(connection, "characters", "skeleton_structure_signature", "TEXT NOT NULL DEFAULT ''")
             self._ensure_column(connection, "characters", "skeleton_json", "TEXT NOT NULL DEFAULT '{}'")
             self._ensure_column(connection, "characters", "published_sha256", "TEXT NOT NULL DEFAULT ''")
+            self._ensure_column(connection, "characters", "publication_pipeline", "TEXT NOT NULL DEFAULT ''")
+            self._ensure_column(connection, "characters", "model_replacement_pending", "INTEGER NOT NULL DEFAULT 0")
             self._ensure_column(connection, "characters", "moderation_state", "TEXT NOT NULL DEFAULT ''")
             self._ensure_column(connection, "characters", "published_at", "REAL")
 
@@ -169,11 +212,17 @@ class CharacterStore:
         asset_id = str(row.get("model_asset_id") or "")
         sha = str(row.get("sha256") or "")
         published_sha = str(row.get("published_sha256") or "")
+        published_pipeline = str(row.get("publication_pipeline") or "")
         if not source or not str(row.get("race") or "") or not str(row.get("gender") or ""):
             return "INCOMPLETE"
         if not asset_id:
             return "REGISTERED"
-        if sha and published_sha and sha == published_sha:
+        if (
+            sha
+            and published_sha
+            and sha == published_sha
+            and published_pipeline == CHARACTER_PUBLICATION_PIPELINE
+        ):
             return "PUBLISHED"
         return "CHANGED"
 
@@ -258,6 +307,11 @@ class CharacterStore:
             prepared = prepared_target.relative_to(self.root).as_posix()
             sha = prepared_digest
 
+        replacement_pending = int(old.get("model_replacement_pending") or 0) if old else 0
+        if raw_source and old and str(old.get("model_asset_id") or "").strip():
+            published_basis = str(old.get("published_sha256") or old.get("sha256") or "")
+            replacement_pending = int(bool(sha and published_basis and sha != published_basis))
+
         now = time.time()
         revision = (int(old["revision"]) + 1) if old else 1
         created_at = old["created_at"] if old else now
@@ -270,7 +324,9 @@ class CharacterStore:
             "prepared_path": prepared,
             "sha256": sha,
             "model_asset_id": old.get("model_asset_id") if old else None,
+            "model_replacement_pending": replacement_pending,
             "published_sha256": str(old.get("published_sha256") or "") if old else "",
+            "publication_pipeline": str(old.get("publication_pipeline") or "") if old else "",
             "moderation_state": str(old.get("moderation_state") or "") if old else "",
             "published_at": old.get("published_at") if old else None,
             "armature_name": str(analysis.get("armature") or ""),
@@ -288,18 +344,18 @@ class CharacterStore:
         with self.connect() as connection:
             connection.execute(
                 """INSERT OR REPLACE INTO characters(
-                  id,display_name,race,gender,source_path,prepared_path,sha256,model_asset_id,
+                  id,display_name,race,gender,source_path,prepared_path,sha256,model_asset_id,model_replacement_pending,
                   status,revision,created_at,updated_at,armature_name,bone_count,mesh_count,
-                  skeleton_signature,skeleton_structure_signature,skeleton_json,published_sha256,
+                  skeleton_signature,skeleton_structure_signature,skeleton_json,published_sha256,publication_pipeline,
                   moderation_state,published_at
-                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     values["id"], values["display_name"], values["race"], values["gender"],
-                    values["source_path"], values["prepared_path"], values["sha256"], values["model_asset_id"],
+                    values["source_path"], values["prepared_path"], values["sha256"], values["model_asset_id"], values["model_replacement_pending"],
                     values["status"], values["revision"], values["created_at"], values["updated_at"],
                     values["armature_name"], values["bone_count"], values["mesh_count"],
                     values["skeleton_signature"], values["skeleton_structure_signature"], values["skeleton_json"],
-                    values["published_sha256"], values["moderation_state"], values["published_at"],
+                    values["published_sha256"], values["publication_pipeline"], values["moderation_state"], values["published_at"],
                 ),
             )
         self.export()
@@ -379,14 +435,22 @@ class CharacterStore:
             shutil.copy2(incoming, destination)
 
         now = time.time()
+        target_asset_id = str(target.get("model_asset_id") or "").strip()
+        source_sha = str(source.get("sha256") or "")
+        target_published_sha = str(target.get("published_sha256") or target.get("sha256") or "")
+        replacement_pending = int(bool(target_asset_id and source_sha and target_published_sha and source_sha != target_published_sha))
         values = {
             "source_path": target_source.relative_to(self.root).as_posix(),
             "prepared_path": target_prepared.relative_to(self.root).as_posix(),
-            "sha256": str(source.get("sha256") or ""),
-            "model_asset_id": source.get("model_asset_id"),
-            "published_sha256": str(source.get("published_sha256") or ""),
-            "moderation_state": str(source.get("moderation_state") or ""),
-            "published_at": source.get("published_at"),
+            "sha256": source_sha,
+            # Reassigning source files must never steal/reuse another archetype's
+            # Roblox asset id. Keep the target's currently live asset until the
+            # replacement has been published successfully as a brand-new asset.
+            "model_asset_id": target.get("model_asset_id"),
+            "model_replacement_pending": replacement_pending,
+            "published_sha256": str(target.get("published_sha256") or ""),
+            "moderation_state": str(target.get("moderation_state") or ""),
+            "published_at": target.get("published_at"),
             "armature_name": str(source.get("armature_name") or ""),
             "bone_count": int(source.get("bone_count") or 0),
             "mesh_count": int(source.get("mesh_count") or 0),
@@ -399,12 +463,12 @@ class CharacterStore:
         with self.connect() as connection:
             connection.execute(
                 """UPDATE characters SET
-                   source_path=?,prepared_path=?,sha256=?,model_asset_id=?,published_sha256=?,
+                   source_path=?,prepared_path=?,sha256=?,model_asset_id=?,model_replacement_pending=?,published_sha256=?,
                    moderation_state=?,published_at=?,armature_name=?,bone_count=?,mesh_count=?,
                    skeleton_signature=?,skeleton_structure_signature=?,skeleton_json=?,status=?,
                    revision=revision+1,updated_at=? WHERE id=?""",
                 (
-                    values["source_path"], values["prepared_path"], values["sha256"], values["model_asset_id"],
+                    values["source_path"], values["prepared_path"], values["sha256"], values["model_asset_id"], values["model_replacement_pending"],
                     values["published_sha256"], values["moderation_state"], values["published_at"],
                     values["armature_name"], values["bone_count"], values["mesh_count"],
                     values["skeleton_signature"], values["skeleton_structure_signature"], values["skeleton_json"],
@@ -413,7 +477,7 @@ class CharacterStore:
             )
             connection.execute(
                 "INSERT INTO character_model_assignments(target_character_id,source_character_id,asset_id,assigned_at) VALUES(?,?,?,?)",
-                (target_id, source_id, str(source.get("model_asset_id") or ""), now),
+                (target_id, source_id, "", now),
             )
 
         for stored_path, replacement in (
@@ -447,34 +511,56 @@ class CharacterStore:
         creator_id = str(publication.get("creatorId") or "").strip()
         description = str(publication.get("description") or "game1 character model").strip()
         current_asset_id = str(row.get("model_asset_id") or "").strip()
+        current_sha = str(row.get("sha256") or "")
+        published_sha = str(row.get("published_sha256") or "")
+        published_pipeline = str(row.get("publication_pipeline") or "")
 
-        if current_asset_id:
-            operation = update_model_asset(
-                prepared,
-                asset_id=current_asset_id,
-                display_name=row["display_name"],
-                description=description,
-                creator_type=creator_type,
-                creator_id=creator_id,
-                api_key=api_key,
+        # Character models are immutable from the archetype manager's point of
+        # view. Never PATCH an existing Roblox model asset. If the canonical FBX
+        # changed, publish a brand-new asset and switch the archetype only after
+        # Open Cloud reports success. If nothing changed, publishing is a no-op.
+        if (
+            current_asset_id
+            and current_sha
+            and published_sha
+            and current_sha == published_sha
+            and published_pipeline == CHARACTER_PUBLICATION_PIPELINE
+        ):
+            if int(row.get("model_replacement_pending") or 0):
+                with self.connect() as connection:
+                    connection.execute(
+                        "UPDATE characters SET model_replacement_pending=0,status=?,updated_at=? WHERE id=?",
+                        (self._status(row), time.time(), character_id),
+                    )
+                self.export()
+                return self.get(character_id)
+            return row
+
+        # Open Cloud's automated FBX Model importer does not expose Studio's
+        # "Keep Zero Influence Bones" option. Build a temporary publication copy
+        # that strengthens only weak influences, then verify that re-exporting did
+        # not move or re-parent a single registered bone before upload.
+        with tempfile.TemporaryDirectory(prefix="game1-character-publish-") as tmp:
+            publication_fbx = Path(tmp) / (prepared.stem + ".publication.fbx")
+            publication_result = prepare_character_publication_fbx(
+                self.root, prepared, publication_fbx
             )
-        else:
+            _assert_publication_skeleton_matches(row, publication_result["analysis"])
             operation = create_model_asset(
-                prepared,
+                publication_fbx,
                 display_name=row["display_name"],
                 description=description,
                 creator_type=creator_type,
                 creator_id=creator_id,
                 api_key=api_key,
             )
-
-        result = wait_for_operation(operation, api_key=api_key)
+            result = wait_for_operation(operation, api_key=api_key)
         now = time.time()
         with self.connect() as connection:
             connection.execute(
-                """UPDATE characters SET model_asset_id=?,published_sha256=?,moderation_state=?,published_at=?,updated_at=?
+                """UPDATE characters SET model_asset_id=?,model_replacement_pending=0,published_sha256=?,publication_pipeline=?,moderation_state=?,published_at=?,updated_at=?
                    WHERE id=?""",
-                (result.asset_id, row["sha256"], result.moderation_state or "", now, now, character_id),
+                (result.asset_id, row["sha256"], CHARACTER_PUBLICATION_PIPELINE, result.moderation_state or "", now, now, character_id),
             )
             connection.execute(
                 """INSERT INTO character_publications(
@@ -567,7 +653,9 @@ class CharacterStore:
                         "preparedPath": row["prepared_path"],
                         "sha256": row["sha256"],
                         "assetId": row["model_asset_id"],
+                        "replacementPending": bool(int(row.get("model_replacement_pending") or 0)),
                         "publishedSha256": row.get("published_sha256") or "",
+                        "publicationPipeline": row.get("publication_pipeline") or "",
                         "moderationState": row.get("moderation_state") or "",
                     },
                     "skeleton": {

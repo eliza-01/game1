@@ -11,6 +11,8 @@ local EQUIPPED_NAME = "EquippedWeapon"
 
 local RIGHT_SOCKET_NAMES = { "Weapon_R_Bone", "weapon_r", "Weapon_R", "WeaponR" }
 local LEFT_SOCKET_NAMES = { "Weapon_L_Bone", "weapon_l", "Weapon_L", "WeaponL" }
+local WEAPON_GRIP_NAME = "Game1WeaponGrip"
+local WEAPON_EQUIP_ROTATION = CFrame.Angles(math.rad(-90), 0, 0)
 
 local function findByStudioPath(studioPath: string): Instance?
     if string.sub(studioPath, 1, 14) ~= "ServerStorage." then
@@ -43,6 +45,76 @@ end
 
 local function socketNames(weaponType: string): { string }
     return if string.lower(weaponType) == "bow" then LEFT_SOCKET_NAMES else RIGHT_SOCKET_NAMES
+end
+
+local function weaponReferencePart(model: Model): BasePart?
+    if model.PrimaryPart then
+        return model.PrimaryPart
+    end
+    local parts = {}
+    for _, descendant in model:GetDescendants() do
+        if descendant:IsA("BasePart") then
+            table.insert(parts, descendant)
+        end
+    end
+    table.sort(parts, function(left, right)
+        return left:GetFullName() < right:GetFullName()
+    end)
+    return parts[1]
+end
+
+local function ensureCanonicalRuntimeGrip(model: Model): Attachment?
+    -- Runtime owns the grip contract. Studio templates may be old, may contain a
+    -- stale per-weapon rotated grip, or may contain no grip at all. Preserve only
+    -- the authored grip POINT; never inherit a template/model pivot orientation.
+    local staleGrips = {}
+    for _, descendant in model:GetDescendants() do
+        if descendant:IsA("Attachment") and descendant.Name == WEAPON_GRIP_NAME then
+            table.insert(staleGrips, descendant)
+        end
+    end
+    table.sort(staleGrips, function(left, right)
+        return left:GetFullName() < right:GetFullName()
+    end)
+
+    local gripPoint = model:GetPivot().Position
+    if staleGrips[1] then
+        gripPoint = staleGrips[1].WorldPosition
+    end
+    for _, grip in staleGrips do
+        grip:Destroy()
+    end
+
+    local referencePart = weaponReferencePart(model)
+    if not referencePart then
+        return nil
+    end
+
+    -- World XYZ is the one canonical authored basis for every weapon. The local
+    -- Attachment CFrame stores the inverse of whatever hidden part/model basis
+    -- Roblox imported, so all weapons enter the equip solver identically.
+    local grip = Instance.new("Attachment")
+    grip.Name = WEAPON_GRIP_NAME
+    grip.CFrame = referencePart.CFrame:ToObjectSpace(CFrame.new(gripPoint))
+    grip:SetAttribute("Game1WeaponGrip", true)
+    grip.Parent = referencePart
+    return grip
+end
+
+local function targetSocketCFrame(targetBone: Bone): CFrame
+    local parent = targetBone.Parent
+    if parent and parent:IsA("Bone") then
+        return parent.TransformedWorldCFrame * targetBone.CFrame
+    end
+    return targetBone.WorldCFrame
+end
+
+local function alignWeaponToSocket(weapon: Model, grip: Attachment, socketFrame: CFrame)
+    -- One solver for every weapon. No Model-pivot fallback is allowed: mixing
+    -- PivotTo(socketFrame) with grip alignment is what made otherwise identical
+    -- weapons acquire different orientations.
+    local delta = socketFrame * grip.WorldCFrame:Inverse()
+    weapon:PivotTo(delta * weapon:GetPivot())
 end
 
 local function prepareWeapon(model: Model)
@@ -99,13 +171,20 @@ function WeaponEquipService.Equip(character: Model, slugValue: any): (boolean, s
     local weapon = template:Clone()
     weapon.Name = EQUIPPED_NAME
     prepareWeapon(weapon)
+    local grip = ensureCanonicalRuntimeGrip(weapon)
+    if not grip then
+        WeaponEquipService.Unequip(character)
+        return false, "weapon model contains no BasePart for runtime grip"
+    end
+
     weapon:SetAttribute("Game1WeaponAttachment", true)
     weapon:SetAttribute("WeaponTargetBoneName", targetBone.Name)
     weapon:SetAttribute("WeaponSlug", slug)
     weapon:SetAttribute("WeaponType", tostring(row.weaponType or ""))
     weapon:SetAttribute("WeaponRarity", tostring(row.rarity or ""))
-    weapon:SetAttribute("WeaponAttachmentMode", "pivot")
-    weapon:PivotTo(targetBone.WorldCFrame)
+    weapon:SetAttribute("Game1WeaponGripRotation", nil)
+    weapon:SetAttribute("WeaponAttachmentMode", "runtime-canonical-grip-v2")
+    alignWeaponToSocket(weapon, grip, targetSocketCFrame(targetBone) * WEAPON_EQUIP_ROTATION)
     weapon.Parent = character
 
     character:SetAttribute("EquippedWeaponSlug", slug)

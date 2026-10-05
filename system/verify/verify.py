@@ -31,8 +31,8 @@ except (KeyError, TypeError):
 manifest = json.loads((ROOT / "assets/manifests/character-archetypes.json").read_text(encoding="utf-8"))
 if manifest.get("project") != "game1":
     err("character manifest identity must be game1")
-if manifest.get("schemaVersion") != 3:
-    err("character manifest schema must be 3; run python .\\system\\control-center\\migrate.py")
+if manifest.get("schemaVersion") != 4:
+    err("character manifest schema must be 4; run python .\\system\\control-center\\migrate.py")
 if manifest.get("racePool") != ["human"]:
     err("character race pool must start with human only")
 if manifest.get("genderPool") != ["male", "female"]:
@@ -240,7 +240,7 @@ if archetypes and ("race =" not in registry_text or "gender =" not in registry_t
     err("generated character registry does not expose race/gender")
 
 schema_text = (ROOT / "system/control-center/schema.sql").read_text(encoding="utf-8")
-for required in ["project_settings", "character_publications", "race text", "gender text", "skeleton_signature"]:
+for required in ["project_settings", "character_publications", "race text", "gender text", "skeleton_signature", "model_replacement_pending", "publication_pipeline"]:
     if required not in schema_text:
         err(f"control center schema missing {required}")
 
@@ -251,8 +251,16 @@ if "analyze_character_fbx" not in store_text:
     err("character armature analysis is not wired into registration")
 if "prepare_character_fbx" not in store_text:
     err("character FBX preparation is not wired into registration")
-if "create_model_asset" not in store_text or "update_model_asset" not in store_text:
+if "create_model_asset" not in store_text:
     err("character model publication contract is missing")
+if "update_model_asset" in store_text:
+    err("character model publication must create a new asset id instead of updating an existing Roblox model asset")
+if "current_sha == published_sha" not in store_text:
+    err("unchanged character model publication must be a no-op")
+if 'CHARACTER_PUBLICATION_PIPELINE = "roblox-open-cloud-bone-survival-v2-scale-safe"' not in store_text:
+    err("character publication pipeline version is missing")
+if "published_pipeline == CHARACTER_PUBLICATION_PIPELINE" not in store_text:
+    err("old character publications must be republished when the bone-safe pipeline changes")
 if 'src/shared/character/CharacterRegistry.luau' not in store_text:
     err("character registry generator must target the character shared domain")
 
@@ -263,6 +271,10 @@ if not css.is_file() or not js.is_file():
     err("character asset manager css/js files are missing")
 if 'id="race"' not in ui or 'id="gender"' not in ui or 'id="publish-character"' not in ui:
     err("character asset manager race/gender/publication controls are missing")
+if 'id="character-model-source"' in ui:
+    err("character edit UI must not reassign/reuse another archetype's existing Roblox model asset id")
+if "/replace-model" not in host_agent_text:
+    err("character edit UI needs an explicit replace-model endpoint")
 
 analyzer = ROOT / "system/asset-manager/analyze_character_fbx.py"
 if not analyzer.is_file() or "FBX contains no armature" not in analyzer.read_text(encoding="utf-8"):
@@ -273,6 +285,28 @@ if "shutil.copy2(source, output)" not in analysis_text or "preserve-source-bytes
 preparer = ROOT / "system/asset-manager/prepare_character_fbx.py"
 if preparer.is_file() and "transform_apply" in preparer.read_text(encoding="utf-8"):
     err("character FBX preparer must not rebake authored rotation/scale")
+
+publication_preparer = ROOT / "system/asset-manager/prepare_character_publication_fbx.py"
+publication_preparer_text = publication_preparer.read_text(encoding="utf-8") if publication_preparer.is_file() else ""
+for required in [
+    "SURVIVAL_WEIGHT = 0.05",
+    "ROBLOX_MAX_INFLUENCES = 4",
+    "assert_rest_unchanged",
+    "use_armature_deform_only=False",
+    "global_scale=1.0",
+    'apply_scale_options="FBX_SCALE_UNITS"',
+    "restTransformsChanged",
+    "fbxScaleMode",
+]:
+    if required not in publication_preparer_text:
+        err(f"Roblox-safe character publication preparer missing {required}")
+if "transform_apply" in publication_preparer_text:
+    err("Roblox-safe publication preparation must never apply/move character bone transforms")
+for required in ["prepare_character_publication_fbx", "_assert_publication_skeleton_matches"]:
+    if required not in analysis_text + store_text:
+        err(f"character publication skeleton safety missing {required}")
+if "boneNames" not in plugin_text or "Roblox publication stripped" not in host_agent_text:
+    err("Studio character sync must report exact bones stripped by Roblox publication")
 
 # m5.1 character animation contract
 animation_manifest_path = ROOT / "assets/manifests/character-animations.json"
@@ -376,20 +410,22 @@ for required in ["saveArchetype", "save archetype identity first", "/identity"]:
     if required not in js_text:
         err(f"asset manager archetype editing ui missing {required}")
 
-# m6.2 archetype registration safety + registered model reassignment
+# m6.2 archetype registration safety + immutable character model replacement
 character_store_text = (ROOT / "system/control-center/character_store.py").read_text(encoding="utf-8")
 for required in ["existingId", "archetype {character_id} already exists", "def assign_model", "character_model_assignments"]:
     if required not in character_store_text:
         err(f"character registration/model reassignment contract missing {required}")
 if "character_model_assignments" not in schema_text:
     err("control center schema missing character_model_assignments audit table")
-if 'model_suffix = "/model"' not in host_agent_text or "store.assign_model" not in host_agent_text:
-    err("host agent does not expose registered character model reassignment")
-if 'id="character-model-source"' not in ui:
-    err("asset manager registered-model selector is missing")
-for required in ["modelSourceId", "sourceCharacterId", "existingId:row?.id||''"]:
+if 'replace_model_suffix = "/replace-model"' not in host_agent_text or "store.publish(character_id, credentials)" not in host_agent_text:
+    err("host agent does not expose sequential character model replacement")
+if 'id="character-model-source"' in ui:
+    err("asset manager must not offer cross-archetype Roblox asset id reuse")
+for required in ["replace model · publish new asset", "/replace-model", "existingId:row?.id||''"]:
     if required not in js_text:
-        err(f"asset manager archetype model reassignment ui missing {required}")
+        err(f"asset manager archetype model replacement ui missing {required}")
+if 'source.get("model_asset_id")' in character_store_text:
+    err("character model reassignment must not copy another archetype's Roblox asset id")
 
 
 # m6 weapon registry / stats / attachment contract
@@ -445,10 +481,10 @@ weapon_equip_path = ROOT / "src/server/weapon/WeaponEquipService.luau"
 weapon_attach_path = ROOT / "src/client/weapon/WeaponAttachmentController.luau"
 weapon_equip_text = weapon_equip_path.read_text(encoding="utf-8") if weapon_equip_path.is_file() else ""
 weapon_attach_text = weapon_attach_path.read_text(encoding="utf-8") if weapon_attach_path.is_file() else ""
-for required in ["Weapon_R_Bone", "weapon_r", "Weapon_L_Bone", "weapon_l", "AnimationWeaponSet", "statModifiers", "EquipStartup", "GetAvailable", "ListAvailable", "WeaponLoadoutSource"]:
+for required in ["Weapon_R_Bone", "weapon_r", "Weapon_L_Bone", "weapon_l", "AnimationWeaponSet", "statModifiers", "EquipStartup", "GetAvailable", "ListAvailable", "WeaponLoadoutSource", "Game1WeaponGrip", "runtime-canonical-grip-v2", "ensureCanonicalRuntimeGrip", "grip.WorldCFrame:Inverse()"]:
     if required not in weapon_equip_text:
         err(f"weapon equip runtime missing {required}")
-for required in ["Game1WeaponAttachment", "parent.TransformedWorldCFrame * targetBone.CFrame", "weapon:PivotTo"]:
+for required in ["Game1WeaponAttachment", "parent.TransformedWorldCFrame * targetBone.CFrame", "weapon:PivotTo", "Game1WeaponGrip", "grip.WorldCFrame:Inverse()"]:
     if required not in weapon_attach_text:
         err(f"weapon attachment runtime missing {required}")
 if "WeaponEquipService.EquipStartup(character)" not in character_service_text:
@@ -491,6 +527,21 @@ if '"/api/weapons/test-loadout"' in host_agent_text or "def set_test_loadout" in
     err("obsolete web/control-center test loadout path is still active")
 if 'placementMode ~= "weapon-pivot"' not in plugin_text or "placeWeaponModel" not in plugin_text:
     err("studio bridge weapon-pivot placement is missing")
+for required in ["Game1WeaponGrip", "ensureWeaponGrip", "canonicalGripWorld", "referencePart.CFrame:ToObjectSpace"]:
+    if required not in plugin_text:
+        err(f"studio bridge canonical weapon grip is missing {required}")
+for runtime_name, runtime_text in [("client weapon attachment", weapon_attach_text), ("server weapon equip", weapon_equip_text)]:
+    for required in ["WEAPON_EQUIP_ROTATION", "CFrame.Angles(math.rad(-90), 0, 0)", "grip.WorldCFrame:Inverse()"]:
+        if required not in runtime_text:
+            err(f"{runtime_name} stable global -90deg X weapon basis missing {required}")
+    if "CFrame.new(grip.WorldPosition)" in runtime_text and runtime_name == "client weapon attachment":
+        err("client weapon attachment must not rebuild a position-only grip frame every render step")
+if "ensureCanonicalRuntimeGrip" not in weapon_equip_text or "weaponReferencePart" not in weapon_equip_text:
+    err("server weapon equip must rebuild one canonical runtime grip for every weapon")
+if "legacy-pivot" in weapon_equip_text or "weapon:PivotTo(socketFrame)" in weapon_equip_text:
+    err("weapon equip must not keep a legacy Model-pivot alignment path")
+if "weapon:PivotTo(socketFrame)" in weapon_attach_text:
+    err("client weapon attachment must not keep a legacy Model-pivot alignment path")
 
 # m6.2 Studio-native Test Loadout (ported from the reference architecture)
 test_loadout_server_path = ROOT / "src/server/dev/TestLoadoutService.luau"

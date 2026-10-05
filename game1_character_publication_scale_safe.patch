@@ -1,0 +1,59 @@
+diff --git a/system/asset-manager/prepare_character_publication_fbx.py b/system/asset-manager/prepare_character_publication_fbx.py
+index cc5ac11..2d6a45d 100644
+--- a/system/asset-manager/prepare_character_publication_fbx.py
++++ b/system/asset-manager/prepare_character_publication_fbx.py
+@@ -217,7 +217,9 @@ def main(source: Path, output: Path, report_path: Path):
+         use_armature_deform_only=False,
+         axis_forward="-Z",
+         axis_up="Y",
++        global_scale=1.0,
+         apply_unit_scale=True,
++        apply_scale_options="FBX_SCALE_UNITS",
+         use_space_transform=True,
+         bake_space_transform=False,
+     )
+@@ -238,6 +240,7 @@ def main(source: Path, output: Path, report_path: Path):
+                 "verticesOverFourBefore": over_limit_before,
+                 "verticesOverFourAfter": over_limit_after,
+                 "restTransformsChanged": False,
++                "fbxScaleMode": "FBX_SCALE_UNITS",
+             },
+             ensure_ascii=False,
+             indent=2,
+diff --git a/system/control-center/character_store.py b/system/control-center/character_store.py
+index 4174119..724ea62 100644
+--- a/system/control-center/character_store.py
++++ b/system/control-center/character_store.py
+@@ -18,7 +18,7 @@ ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
+ ACTIVE_KEY = "active_character_archetype_id"
+ RACES = ("human",)
+ GENDERS = ("male", "female")
+-CHARACTER_PUBLICATION_PIPELINE = "roblox-open-cloud-bone-survival-v1"
++CHARACTER_PUBLICATION_PIPELINE = "roblox-open-cloud-bone-survival-v2-scale-safe"
+ 
+ 
+ def _assert_publication_skeleton_matches(row: dict, analysis: dict):
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index ff6d739..bd4b399 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -257,7 +257,7 @@ if "update_model_asset" in store_text:
+     err("character model publication must create a new asset id instead of updating an existing Roblox model asset")
+ if "current_sha == published_sha" not in store_text:
+     err("unchanged character model publication must be a no-op")
+-if 'CHARACTER_PUBLICATION_PIPELINE = "roblox-open-cloud-bone-survival-v1"' not in store_text:
++if 'CHARACTER_PUBLICATION_PIPELINE = "roblox-open-cloud-bone-survival-v2-scale-safe"' not in store_text:
+     err("character publication pipeline version is missing")
+ if "published_pipeline == CHARACTER_PUBLICATION_PIPELINE" not in store_text:
+     err("old character publications must be republished when the bone-safe pipeline changes")
+@@ -293,7 +293,10 @@ for required in [
+     "ROBLOX_MAX_INFLUENCES = 4",
+     "assert_rest_unchanged",
+     "use_armature_deform_only=False",
++    "global_scale=1.0",
++    'apply_scale_options="FBX_SCALE_UNITS"',
+     "restTransformsChanged",
++    "fbxScaleMode",
+ ]:
+     if required not in publication_preparer_text:
+         err(f"Roblox-safe character publication preparer missing {required}")

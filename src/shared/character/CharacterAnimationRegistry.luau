@@ -4,7 +4,7 @@ return table.freeze({
 	project = "game1",
 	profiles = table.freeze({
 		["human_female"] = table.freeze({
-			skeletonSignature = "6b3a9235a4ecbe2cc30e4fa90e7e44996e4c41370864d65fb12b9f6625b2d746",
+			skeletonSignature = "587cde8efc22c1b5c256abb86f803452db3a7508eb823e758821a4767246f676",
 			base = table.freeze({
 			}),
 			weapons = table.freeze({
@@ -12,8 +12,8 @@ return table.freeze({
 					["attack"] = table.freeze({
 						table.freeze({
 							clipId = "human_female__weapon__1hs__attack__01",
-							assetId = "129386735421875",
-							animationId = "rbxassetid://129386735421875",
+							assetId = "88149431126736",
+							animationId = "rbxassetid://88149431126736",
 							variant = 1,
 							weight = 100,
 							looped = false,
@@ -21,8 +21,8 @@ return table.freeze({
 						}),
 						table.freeze({
 							clipId = "human_female__weapon__1hs__attack__02",
-							assetId = "104417581186099",
-							animationId = "rbxassetid://104417581186099",
+							assetId = "82563321432420",
+							animationId = "rbxassetid://82563321432420",
 							variant = 2,
 							weight = 100,
 							looped = false,
@@ -30,8 +30,8 @@ return table.freeze({
 						}),
 						table.freeze({
 							clipId = "human_female__weapon__1hs__attack__03",
-							assetId = "102989552938406",
-							animationId = "rbxassetid://102989552938406",
+							assetId = "86247398285431",
+							animationId = "rbxassetid://86247398285431",
 							variant = 3,
 							weight = 100,
 							looped = false,
@@ -41,8 +41,8 @@ return table.freeze({
 					["combat_idle"] = table.freeze({
 						table.freeze({
 							clipId = "human_female__weapon__1hs__combat_idle__00",
-							assetId = "108445878965790",
-							animationId = "rbxassetid://108445878965790",
+							assetId = "118675119937740",
+							animationId = "rbxassetid://118675119937740",
 							variant = 0,
 							weight = 100,
 							looped = true,
@@ -52,8 +52,8 @@ return table.freeze({
 					["idle"] = table.freeze({
 						table.freeze({
 							clipId = "human_female__weapon__1hs__idle__00",
-							assetId = "113883419447650",
-							animationId = "rbxassetid://113883419447650",
+							assetId = "128677350129455",
+							animationId = "rbxassetid://128677350129455",
 							variant = 0,
 							weight = 100,
 							looped = true,
@@ -63,8 +63,8 @@ return table.freeze({
 					["run"] = table.freeze({
 						table.freeze({
 							clipId = "human_female__weapon__1hs__run__00",
-							assetId = "90177381213096",
-							animationId = "rbxassetid://90177381213096",
+							assetId = "134065196920987",
+							animationId = "rbxassetid://134065196920987",
 							variant = 0,
 							weight = 100,
 							looped = true,
@@ -74,43 +74,8 @@ return table.freeze({
 					["walk"] = table.freeze({
 						table.freeze({
 							clipId = "human_female__weapon__1hs__walk__00",
-							assetId = "100410821661322",
-							animationId = "rbxassetid://100410821661322",
-							variant = 0,
-							weight = 100,
-							looped = true,
-							priority = "Movement",
-						}),
-					}),
-				}),
-				["hands"] = table.freeze({
-					["attack"] = table.freeze({
-						table.freeze({
-							clipId = "human_female__weapon__hands__attack__01",
-							assetId = "125909511806522",
-							animationId = "rbxassetid://125909511806522",
-							variant = 1,
-							weight = 100,
-							looped = false,
-							priority = "Action",
-						}),
-					}),
-					["idle"] = table.freeze({
-						table.freeze({
-							clipId = "human_female__weapon__hands__idle__00",
-							assetId = "128422112456172",
-							animationId = "rbxassetid://128422112456172",
-							variant = 0,
-							weight = 100,
-							looped = true,
-							priority = "Idle",
-						}),
-					}),
-					["run"] = table.freeze({
-						table.freeze({
-							clipId = "human_female__weapon__hands__run__00",
-							assetId = "101528780146582",
-							animationId = "rbxassetid://101528780146582",
+							assetId = "111055842456450",
+							animationId = "rbxassetid://111055842456450",
 							variant = 0,
 							weight = 100,
 							looped = true,

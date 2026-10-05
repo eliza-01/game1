@@ -421,6 +421,9 @@ class Handler(BaseHTTPRequestHandler):
                     "race": before.get("race") or "",
                     "gender": before.get("gender") or "",
                     "sourcePath": source_path,
+                    # Replace is explicit user intent. Never collapse it into the
+                    # unchanged-content no-op used by ordinary Publish.
+                    "forceReplacement": True,
                 })
                 credentials = publication_credentials(str(payload.get("description") or "game1 character model"))
                 published = store.publish(character_id, credentials)
@@ -438,6 +441,10 @@ class Handler(BaseHTTPRequestHandler):
                 result["assetReplaced"] = bool(
                     result["newAssetId"] and result["newAssetId"] != previous_asset_id
                 )
+                if previous_asset_id and not result["assetReplaced"]:
+                    raise RuntimeError(
+                        "replace model did not create a new Roblox asset id; old asset remains assigned"
+                    )
                 return self.out(200, result)
             except Exception as error:
                 return self.out(400, {"error": str(error)})

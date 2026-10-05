@@ -166,8 +166,8 @@ attack_text = (ROOT / "src/server/combat/AttackService.luau").read_text(encoding
 dummy_text = (ROOT / "src/server/dev/TrainingDummyService.luau").read_text(encoding="utf-8")
 if "[game1][attack] hit" not in attack_text or "[game1][attack] miss" not in attack_text:
     err("attack smoke-test logging contract missing")
-if "CombatPoseHitboxes" not in attack_text:
-    err("attack service must prefer pose-following skeletal hitboxes")
+if "EntityHitboxService.QueryBox" not in attack_text:
+    err("attack service must refine melee candidates against virtual skeletal hit regions")
 if "BillboardGui" not in dummy_text or "HP %d/%d" not in dummy_text:
     err("training dummy visible hp contract missing")
 
@@ -203,9 +203,14 @@ if "getAssetTemplate" not in character_service_text:
 
 hitbox_text = (ROOT / "src/server/combat/EntityHitboxService.luau").read_text(encoding="utf-8")
 resolver_text = (ROOT / "src/server/combat/SkeletonHitRegionResolver.luau").read_text(encoding="utf-8")
-for required in ["CombatPoseHitboxes", "Game1PoseHitbox", "TransformedBoneFrame", "SegmentRadius"]:
+for required in ["virtual_bone_regions", "QueryBox", "capsuleIntersectsBox", "TransformedBoneFrame", "SegmentRadius", "SemanticRole"]:
     if required not in hitbox_text + resolver_text:
-        err(f"skeleton hitbox runtime missing {required}")
+        err(f"virtual skeleton hit-region runtime missing {required}")
+if "RunService.Heartbeat" in hitbox_text or 'Instance.new("Part")' in hitbox_text:
+    err("combat hit regions must be virtual queries, not Heartbeat-following replicated Parts")
+for required in ['"upper_arm"', '"shin"', '"forehead"']:
+    if required not in resolver_text:
+        err(f"semantic skeleton resolver regression: missing {required}")
 
 bridge = ROOT / "system/control-center/studio_bridge.py"
 plugin = ROOT / "system/studio-plugin/Game1Bridge.server.luau"
@@ -444,6 +449,12 @@ if "character_model_assignments" not in schema_text:
     err("control center schema missing character_model_assignments audit table")
 if 'replace_model_suffix = "/replace-model"' not in host_agent_text or "store.publish(character_id, credentials)" not in host_agent_text:
     err("host agent does not expose sequential character model replacement")
+if '"forceReplacement": True' not in host_agent_text:
+    err("explicit character Replace must force a new immutable Roblox asset id")
+if "and not replacement_pending" not in character_store_text:
+    err("unchanged-content no-op must never swallow an explicit character replacement")
+if "replace model did not create a new Roblox asset id" not in host_agent_text:
+    err("replace-model endpoint must reject accidental reuse of the old Roblox asset id")
 if 'id="character-model-source"' in ui:
     err("asset manager must not offer cross-archetype Roblox asset id reuse")
 for required in ["replace model · publish new asset", "/replace-model", "existingId:row?.id||''"]:

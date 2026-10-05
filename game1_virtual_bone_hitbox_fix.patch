@@ -1,0 +1,730 @@
+diff --git a/src/server/combat/AttackService.luau b/src/server/combat/AttackService.luau
+index 301eb03..32db504 100644
+--- a/src/server/combat/AttackService.luau
++++ b/src/server/combat/AttackService.luau
+@@ -6,6 +6,7 @@ local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
+ local CombatShared = Shared:WaitForChild("combat")
+ local Config = require(CombatShared:WaitForChild("AttackConfig"))
+ local DamageService = require(script.Parent:WaitForChild("DamageService"))
++local EntityHitboxService = require(script.Parent:WaitForChild("EntityHitboxService"))
+ 
+ local AttackService = {}
+ local cooldowns = {}
+@@ -21,14 +22,6 @@ local function modelFromPart(part: Instance): Model?
+     return nil
+ end
+ 
+-local function isValidCombatPart(model: Model, part: BasePart): boolean
+-    local poseHitboxes = model:FindFirstChild("CombatPoseHitboxes")
+-    if poseHitboxes then
+-        return part:IsDescendantOf(poseHitboxes)
+-    end
+-    return true
+-end
+-
+ local function attack(player: Player, aim: any)
+     if typeof(aim) ~= "Vector3" then
+         if Config.DebugLogs then
+@@ -74,18 +67,24 @@ local function attack(player: Player, aim: any)
+ 
+     local seen = {}
+     local best: Model? = nil
+-    local bestPart: BasePart? = nil
++    local bestZone = "root"
++    local bestBoneName = ""
+     local bestDistance = math.huge
++    local attackBoxSize = Vector3.new(Config.BoxWidth, Config.BoxHeight, Config.Range)
+     for _, part in parts do
+         local model = modelFromPart(part)
+-        if model and not seen[model] and isValidCombatPart(model, part) then
++        if model and not seen[model] then
+             seen[model] = true
+             local targetRoot = model:FindFirstChild("RootCollider") or model.PrimaryPart
+             if targetRoot and targetRoot:IsA("BasePart") then
+                 local distance = (targetRoot.Position - root.Position).Magnitude
+-                if distance <= Config.Range + 1 and distance < bestDistance then
++                local virtualHit = EntityHitboxService.QueryBox(model, boxCf, attackBoxSize)
++                local hasVirtualRig = EntityHitboxService.HasBinding(model)
++                local intersectsTarget = if hasVirtualRig then virtualHit ~= nil else true
++                if intersectsTarget and distance <= Config.Range + 1 and distance < bestDistance then
+                     best = model
+-                    bestPart = part
++                    bestZone = tostring(virtualHit and virtualHit.hitZone or "root")
++                    bestBoneName = tostring(virtualHit and virtualHit.boneName or "")
+                     bestDistance = distance
+                 end
+             end
+@@ -108,7 +107,7 @@ local function attack(player: Player, aim: any)
+             :format(
+                 player.Name,
+                 best.Name,
+-                tostring(bestPart and bestPart:GetAttribute("HitZone") or "root"),
++                bestZone,
+                 bestDistance,
+                 finalDamage,
+                 tostring(best:GetAttribute("HP")),
+diff --git a/src/server/combat/EntityHitboxService.luau b/src/server/combat/EntityHitboxService.luau
+index e830668..19eb023 100644
+--- a/src/server/combat/EntityHitboxService.luau
++++ b/src/server/combat/EntityHitboxService.luau
+@@ -1,98 +1,75 @@
+-local RunService = game:GetService("RunService")
+-local Workspace = game:GetService("Workspace")
+-
+ local SkeletonHitRegionResolver = require(script.Parent:WaitForChild("SkeletonHitRegionResolver"))
+ 
+ local EntityHitboxService = {}
+ local started = false
+ local bindings: { [Model]: any } = {}
+ 
+-local function damageableModel(instance: Instance): Model?
+-    local current: Instance? = instance
+-    while current and current ~= Workspace do
+-        if current:IsA("Model") and current:GetAttribute("Damageable") == true then
+-            return current
+-        end
+-        current = current.Parent
+-    end
+-    return nil
++local function sphereIntersectsBox(boxCFrame: CFrame, halfSize: Vector3, center: Vector3, radius: number): boolean
++    local localPoint = boxCFrame:PointToObjectSpace(center)
++    local dx = math.max(math.abs(localPoint.X) - halfSize.X, 0)
++    local dy = math.max(math.abs(localPoint.Y) - halfSize.Y, 0)
++    local dz = math.max(math.abs(localPoint.Z) - halfSize.Z, 0)
++    return dx * dx + dy * dy + dz * dz <= radius * radius
+ end
+ 
+-local function segmentFrame(fromPosition: Vector3, toPosition: Vector3): (CFrame, number)
+-    local delta = toPosition - fromPosition
+-    local length = delta.Magnitude
+-    if length <= 0.001 then
+-        return CFrame.new(fromPosition), 0
++local function clipSlab(
++    origin: number,
++    delta: number,
++    extent: number,
++    tMin: number,
++    tMax: number
++): (boolean, number, number)
++    if math.abs(delta) <= 1e-8 then
++        return origin >= -extent and origin <= extent, tMin, tMax
+     end
+-    local xAxis = delta.Unit
+-    local helper = if math.abs(xAxis.Y) < 0.95 then Vector3.yAxis else Vector3.zAxis
+-    local zAxis = xAxis:Cross(helper).Unit
+-    local yAxis = zAxis:Cross(xAxis).Unit
+-    return CFrame.fromMatrix((fromPosition + toPosition) * 0.5, xAxis, yAxis, zAxis), length
+-end
+-
+-local function makePosePart(folder: Folder, name: string, shape: Enum.PartType): Part
+-    local part = Instance.new("Part")
+-    part.Name = name
+-    part.Shape = shape
+-    part.Transparency = 1
+-    part.CastShadow = false
+-    part.Anchored = true
+-    part.CanCollide = false
+-    part.CanTouch = false
+-    part.CanQuery = true
+-    part:SetAttribute("Game1PoseHitbox", true)
+-    part:SetAttribute("HitZone", "body")
+-    part:SetAttribute("DamageMultiplier", 1)
+-    part.Parent = folder
+-    return part
+-end
+-
+-local function updateBinding(binding: any)
+-    for _, record in binding.records do
+-        if record.part.Parent and record.bone.Parent then
+-            if record.kind == "head" then
+-                local headPosition = SkeletonHitRegionResolver.TransformedBoneFrame(record.bone).Position
+-                local center = headPosition
+-                if record.tipBone and record.tipBone.Parent then
+-                    local tipPosition = SkeletonHitRegionResolver.TransformedBoneFrame(record.tipBone).Position
+-                    center = (headPosition + tipPosition) * 0.5
+-                elseif record.parentBone and record.parentBone.Parent then
+-                    local parentPosition = SkeletonHitRegionResolver.TransformedBoneFrame(record.parentBone).Position
+-                    local axis = headPosition - parentPosition
+-                    if axis.Magnitude > 0.001 then
+-                        center = headPosition + axis.Unit * record.diameter * 0.22
+-                    end
+-                end
+-                record.part.CFrame = CFrame.new(center)
+-            else
+-                local fromPosition = SkeletonHitRegionResolver.TransformedBoneFrame(record.parentBone).Position
+-                local toPosition = SkeletonHitRegionResolver.TransformedBoneFrame(record.bone).Position
+-                local frame, length = segmentFrame(fromPosition, toPosition)
+-                record.part.CFrame = frame
+-                record.part.Size = Vector3.new(
+-                    math.max(0.1, length + record.radius * 2),
+-                    record.radius * 2,
+-                    record.radius * 2
+-                )
+-            end
+-        end
++    local inverse = 1 / delta
++    local first = (-extent - origin) * inverse
++    local second = (extent - origin) * inverse
++    if first > second then
++        first, second = second, first
+     end
++    tMin = math.max(tMin, first)
++    tMax = math.min(tMax, second)
++    return tMin <= tMax, tMin, tMax
+ end
+ 
+-local function disableVisualQueries(visual: Model)
+-    for _, descendant in visual:GetDescendants() do
+-        if descendant:IsA("BasePart") then
+-            descendant.CanQuery = false
+-        end
++local function capsuleIntersectsBox(
++    boxCFrame: CFrame,
++    halfSize: Vector3,
++    fromPosition: Vector3,
++    toPosition: Vector3,
++    radius: number
++): boolean
++    -- Minkowski-expand the attack OBB by the capsule radius, then clip the
++    -- animated bone segment against that box. This is conservative only at the
++    -- eight rounded corners and is much tighter than the old physical cylinders.
++    local fromLocal = boxCFrame:PointToObjectSpace(fromPosition)
++    local toLocal = boxCFrame:PointToObjectSpace(toPosition)
++    local delta = toLocal - fromLocal
++    local expanded = halfSize + Vector3.new(radius, radius, radius)
++    local tMin = 0
++    local tMax = 1
++
++    local ok
++    ok, tMin, tMax = clipSlab(fromLocal.X, delta.X, expanded.X, tMin, tMax)
++    if not ok then
++        return false
++    end
++    ok, tMin, tMax = clipSlab(fromLocal.Y, delta.Y, expanded.Y, tMin, tMax)
++    if not ok then
++        return false
+     end
++    ok, tMin, tMax = clipSlab(fromLocal.Z, delta.Z, expanded.Z, tMin, tMax)
++    return ok
+ end
+ 
+ function EntityHitboxService.Detach(entity: Model)
+     bindings[entity] = nil
+-    local folder = entity:FindFirstChild("CombatPoseHitboxes")
+-    if folder then
+-        folder:Destroy()
++    -- Clean up legacy proxy folders if this place was saved while the old
++    -- Heartbeat-following implementation was active.
++    local legacyFolder = entity:FindFirstChild("CombatPoseHitboxes")
++    if legacyFolder then
++        legacyFolder:Destroy()
+     end
+     entity:SetAttribute("PoseHitboxMode", nil)
+     entity:SetAttribute("PoseHitboxCount", nil)
+@@ -102,96 +79,116 @@ end
+ function EntityHitboxService.Attach(entity: Model, visual: Model): any
+     EntityHitboxService.Detach(entity)
+     local resolved = SkeletonHitRegionResolver.Resolve(visual)
+-    local folder = Instance.new("Folder")
+-    folder.Name = "CombatPoseHitboxes"
+-    folder.Parent = entity
+     local records = {}
+ 
+-    for index, candidate in resolved.segments do
+-        local radius = SkeletonHitRegionResolver.SegmentRadius(candidate.bone.Name, candidate.length)
+-        local part = makePosePart(folder, string.format("Segment_%02d", index), Enum.PartType.Cylinder)
+-        part:SetAttribute("BoneName", candidate.bone.Name)
++    for _, candidate in resolved.segments do
+         table.insert(records, {
+             kind = "segment",
+-            part = part,
+             bone = candidate.bone,
+             parentBone = candidate.parentBone,
+-            radius = radius,
++            role = candidate.role,
++            radius = SkeletonHitRegionResolver.SegmentRadius(
++                tostring(candidate.role or "generic"),
++                candidate.length,
++                resolved.skeletonHeight
++            ),
+         })
+     end
+ 
+-    local headBone = resolved.headBone
+-    if headBone then
+-        local tipBone = resolved.headTipBone
+-        local tipDistance = 0
+-        if tipBone then
+-            tipDistance = (
+-                SkeletonHitRegionResolver.TransformedBoneFrame(tipBone).Position
+-                - SkeletonHitRegionResolver.TransformedBoneFrame(headBone).Position
+-            ).Magnitude
+-        end
+-        local diameter = math.clamp(
+-            math.max(1.05, tipDistance * 1.9, (tonumber(resolved.skeletonHeight) or 0) * 0.24),
+-            1.05,
+-            2.8
+-        )
+-        local part = makePosePart(folder, "Head", Enum.PartType.Ball)
+-        part.Size = Vector3.new(diameter, diameter, diameter)
+-        part:SetAttribute("BoneName", headBone.Name)
+-        part:SetAttribute("HitZone", "head")
+-        part:SetAttribute("DamageMultiplier", 2)
++    if resolved.headBone then
+         table.insert(records, {
+             kind = "head",
+-            part = part,
+-            bone = headBone,
+-            parentBone = headBone.Parent,
+-            tipBone = tipBone,
+-            diameter = diameter,
++            bone = resolved.headBone,
++            radius = SkeletonHitRegionResolver.HeadRadius(resolved.skeletonHeight),
+         })
+     end
+ 
+     if #records == 0 then
+-        folder:Destroy()
+         entity:SetAttribute("PoseHitboxMode", "root_fallback")
+         entity:SetAttribute("PoseHitboxCount", 0)
+-        warn(("[game1][hitbox] no usable bone segments for %s; RootCollider remains the fallback target"):format(entity:GetFullName()))
++        warn(("[game1][hitbox] no usable virtual bone regions for %s; RootCollider remains the fallback target")
++            :format(entity:GetFullName()))
+         return { count = 0, probe = nil, headBoneName = "", hasHead = false }
+     end
+ 
+-    disableVisualQueries(visual)
+-    local binding = { entity = entity, folder = folder, records = records }
+-    bindings[entity] = binding
+-    updateBinding(binding)
+-
+-    entity:SetAttribute("PoseHitboxMode", "bone_segments")
++    bindings[entity] = {
++        entity = entity,
++        visual = visual,
++        records = records,
++    }
++    entity:SetAttribute("PoseHitboxMode", "virtual_bone_regions")
+     entity:SetAttribute("PoseHitboxCount", #records)
+-    entity:SetAttribute("HeadHitboxBoneName", headBone and headBone.Name or "")
++    entity:SetAttribute("HeadHitboxBoneName", resolved.headBone and resolved.headBone.Name or "")
+ 
+-    local probe = records[1].part
+-    assert(damageableModel(probe) == entity, ("entity %s has no pose-following damage hitbox"):format(entity:GetFullName()))
+     return {
+         count = #records,
+-        probe = probe,
+-        headBoneName = headBone and headBone.Name or "",
+-        hasHead = headBone ~= nil,
++        probe = nil,
++        headBoneName = resolved.headBone and resolved.headBone.Name or "",
++        hasHead = resolved.headBone ~= nil,
+     }
+ end
+ 
++function EntityHitboxService.HasBinding(entity: Model): boolean
++    local binding = bindings[entity]
++    return binding ~= nil and entity.Parent ~= nil and binding.visual.Parent ~= nil
++end
++
++function EntityHitboxService.QueryBox(entity: Model, boxCFrame: CFrame, boxSize: Vector3): any?
++    local binding = bindings[entity]
++    if not binding or not entity.Parent or not binding.visual.Parent then
++        return nil
++    end
++
++    local halfSize = boxSize * 0.5
++    local headHit = false
++    local headRadius = 0
++    for _, record in binding.records do
++        if record.bone.Parent then
++            if record.kind == "head" then
++                local center = SkeletonHitRegionResolver.TransformedBoneFrame(record.bone).Position
++                if sphereIntersectsBox(boxCFrame, halfSize, center, record.radius) then
++                    headHit = true
++                    headRadius = record.radius
++                end
++            elseif record.parentBone.Parent then
++                local fromPosition = SkeletonHitRegionResolver.TransformedBoneFrame(record.parentBone).Position
++                local toPosition = SkeletonHitRegionResolver.TransformedBoneFrame(record.bone).Position
++                if capsuleIntersectsBox(boxCFrame, halfSize, fromPosition, toPosition, record.radius) then
++                    -- Body wins over head for broad melee boxes, matching the old
++                    -- RobloxLineage rule that a tall sweep must not become a free headshot.
++                    return {
++                        hitZone = "body",
++                        damageMultiplier = 1,
++                        boneName = record.bone.Name,
++                        role = record.role,
++                        radius = record.radius,
++                    }
++                end
++            end
++        end
++    end
++
++    if headHit then
++        return {
++            hitZone = "head",
++            damageMultiplier = 2,
++            boneName = binding.entity:GetAttribute("HeadHitboxBoneName") or "",
++            role = "head",
++            radius = headRadius,
++        }
++    end
++    return nil
++end
++
+ function EntityHitboxService.Start()
+     if started then
+         return
+     end
+     started = true
+-    RunService.Heartbeat:Connect(function()
+-        for entity, binding in bindings do
+-            if entity.Parent and binding.folder.Parent == entity then
+-                updateBinding(binding)
+-            else
+-                bindings[entity] = nil
+-            end
+-        end
+-    end)
+-    print("[game1][hitbox] pose-following combat hitboxes ready")
++    -- No Heartbeat connection and no queryable proxy Parts. Bone regions are
++    -- evaluated directly at the exact combat query time, so there is nothing
++    -- server-replicated that can visually trail the client-owned character.
++    print("[game1][hitbox] virtual bone-region combat queries ready")
+ end
+ 
+ return table.freeze(EntityHitboxService)
+diff --git a/src/server/combat/SkeletonHitRegionResolver.luau b/src/server/combat/SkeletonHitRegionResolver.luau
+index 49eb9b4..76968fe 100644
+--- a/src/server/combat/SkeletonHitRegionResolver.luau
++++ b/src/server/combat/SkeletonHitRegionResolver.luau
+@@ -1,8 +1,41 @@
+ local SkeletonHitRegionResolver = {}
+ 
+-local MAX_GENERIC_POSE_SEGMENTS = 32
+-local POSE_BONE_MARKERS = {
+-    "spine", "neck", "head", "clavicle", "upperarm", "forearm", "hand", "thigh", "calf", "foot",
++-- Hit regions are semantic and virtual. We intentionally do not match body parts
++-- with loose substrings: e.g. "forehead" must never become a "head" segment.
++local MAX_GENERIC_POSE_SEGMENTS = 20
++local SIDE_TOKENS = {
++    l = true,
++    r = true,
++    left = true,
++    right = true,
++}
++local GENERIC_EXCLUDED_TOKENS = {
++    nub = true,
++    finger = true,
++    thumb = true,
++    index = true,
++    middle = true,
++    ring = true,
++    pinky = true,
++    palm = true,
++    ponytail = true,
++    toe = true,
++    heel = true,
++    weapon = true,
++    shield = true,
++    breast = true,
++    brow = true,
++    forehead = true,
++    lid = true,
++    eye = true,
++    ear = true,
++    nose = true,
++    lip = true,
++    jaw = true,
++    chin = true,
++    cheek = true,
++    tongue = true,
++    teeth = true,
+ }
+ 
+ local function transformedBoneFrame(bone: Bone): CFrame
+@@ -15,76 +48,102 @@ local function transformedBoneFrame(bone: Bone): CFrame
+     return bone.WorldCFrame
+ end
+ 
+-local function normalizedBoneName(name: string): string
+-    return string.lower(name)
++local function boneTokens(name: string): { string }
++    local normalized = string.lower(name):gsub("[%._%-]+", " ")
++    local result = {}
++    for token in string.gmatch(normalized, "[%w]+") do
++        if tonumber(token) == nil and SIDE_TOKENS[token] ~= true then
++            table.insert(result, token)
++        end
++    end
++    return result
+ end
+ 
+-local function isExcludedHelperBone(name: string): boolean
+-    local normalized = normalizedBoneName(name)
+-    return string.find(normalized, "nub", 1, true) ~= nil
+-        or string.find(normalized, "finger", 1, true) ~= nil
+-        or string.find(normalized, "ponytail", 1, true) ~= nil
+-        or string.find(normalized, "toe", 1, true) ~= nil
++local function hasToken(tokens: { string }, wanted: string): boolean
++    for _, token in tokens do
++        if token == wanted then
++            return true
++        end
++    end
++    return false
+ end
+ 
+-local function isPoseBone(name: string): boolean
+-    if isExcludedHelperBone(name) then
+-        return false
+-    end
+-    local normalized = normalizedBoneName(name)
+-    for _, marker in POSE_BONE_MARKERS do
+-        if string.find(normalized, marker, 1, true) then
++local function hasPair(tokens: { string }, first: string, second: string): boolean
++    for index = 1, #tokens - 1 do
++        if tokens[index] == first and tokens[index + 1] == second then
+             return true
+         end
+     end
+     return false
+ end
+ 
+-local function isHeadBone(name: string): boolean
+-    local normalized = normalizedBoneName(name)
+-    return string.find(normalized, "head", 1, true) ~= nil
+-        and string.find(normalized, "nub", 1, true) == nil
++local function semanticRole(name: string): string?
++    local tokens = boneTokens(name)
++
++    -- Exact tokens/sequences only. This is the important distinction from the
++    -- old substring resolver where "forehead" matched "head".
++    if hasToken(tokens, "spine") then
++        return "spine"
++    elseif hasToken(tokens, "neck") then
++        return "neck"
++    elseif hasToken(tokens, "head") or hasToken(tokens, "face") then
++        return "head"
++    elseif hasToken(tokens, "clavicle") or hasToken(tokens, "shoulder") then
++        return "shoulder"
++    elseif hasToken(tokens, "upperarm") or hasPair(tokens, "upper", "arm") then
++        return "upper_arm"
++    elseif hasToken(tokens, "forearm") or hasPair(tokens, "lower", "arm") then
++        return "forearm"
++    elseif hasToken(tokens, "hand") then
++        return "hand"
++    elseif hasToken(tokens, "thigh") or hasPair(tokens, "upper", "leg") then
++        return "thigh"
++    elseif hasToken(tokens, "shin") or hasToken(tokens, "calf") or hasPair(tokens, "lower", "leg") then
++        return "shin"
++    elseif hasToken(tokens, "foot") then
++        return "foot"
++    end
++    return nil
+ end
+ 
+-local function headTipBone(headBone: Bone): Bone?
+-    local best: Bone? = nil
+-    local bestDistance = 0
+-    local headPosition = transformedBoneFrame(headBone).Position
+-    for _, child in headBone:GetChildren() do
+-        if child:IsA("Bone") then
+-            local normalized = normalizedBoneName(child.Name)
+-            local semanticTip = string.find(normalized, "nub", 1, true) ~= nil
+-                or string.find(normalized, "head", 1, true) ~= nil
+-            if semanticTip then
+-                local distance = (transformedBoneFrame(child).Position - headPosition).Magnitude
+-                if distance > bestDistance then
+-                    best = child
+-                    bestDistance = distance
+-                end
+-            end
++local function isGenericExcluded(name: string): boolean
++    for _, token in boneTokens(name) do
++        if GENERIC_EXCLUDED_TOKENS[token] == true then
++            return true
+         end
+     end
+-    return best
++    return false
+ end
+ 
+-local function segmentRadius(name: string, length: number): number
+-    local normalized = normalizedBoneName(name)
+-    if string.find(normalized, "spine", 1, true) then
+-        return math.clamp(math.max(0.58, length * 0.58), 0.58, 0.98)
+-    elseif string.find(normalized, "clavicle", 1, true) then
+-        return math.clamp(math.max(0.34, length * 0.3), 0.34, 0.5)
+-    elseif string.find(normalized, "thigh", 1, true) then
+-        return math.clamp(math.max(0.35, length * 0.26), 0.35, 0.55)
+-    elseif string.find(normalized, "upperarm", 1, true) then
+-        return math.clamp(math.max(0.29, length * 0.24), 0.29, 0.46)
+-    elseif string.find(normalized, "calf", 1, true) or string.find(normalized, "forearm", 1, true) then
+-        return math.clamp(math.max(0.24, length * 0.21), 0.24, 0.4)
+-    elseif string.find(normalized, "hand", 1, true) or string.find(normalized, "foot", 1, true) then
+-        return math.clamp(math.max(0.23, length * 0.2), 0.23, 0.36)
+-    elseif string.find(normalized, "neck", 1, true) then
+-        return math.clamp(math.max(0.32, length * 0.3), 0.32, 0.46)
++local function segmentRadius(role: string, length: number, skeletonHeight: number): number
++    -- Scale all widths from the actual skeleton height instead of fixed stud
++    -- minima. Fixed 0.58/0.98 radii were visibly too fat on smaller imported rigs.
++    local height = math.max(0.1, skeletonHeight)
++    local ratio = 0.035
++    if role == "spine" then
++        ratio = 0.075
++    elseif role == "neck" then
++        ratio = 0.045
++    elseif role == "shoulder" then
++        ratio = 0.050
++    elseif role == "upper_arm" then
++        ratio = 0.040
++    elseif role == "forearm" then
++        ratio = 0.034
++    elseif role == "hand" then
++        ratio = 0.038
++    elseif role == "thigh" then
++        ratio = 0.052
++    elseif role == "shin" then
++        ratio = 0.040
++    elseif role == "foot" then
++        ratio = 0.040
+     end
+-    return math.clamp(math.max(0.23, length * 0.2), 0.23, 0.42)
++
++    local byHeight = height * ratio
++    -- Keep pathological rigs bounded without imposing a large universal minimum.
++    local byLengthCap = math.max(0.08, length * 0.42)
++    return math.clamp(math.min(byHeight, byLengthCap), 0.08, height * 0.10)
+ end
+ 
+ function SkeletonHitRegionResolver.Resolve(visual: Model): any
+@@ -96,21 +155,29 @@ function SkeletonHitRegionResolver.Resolve(visual: Model): any
+ 
+     for _, descendant in visual:GetDescendants() do
+         if descendant:IsA("Bone") then
+-            local y = transformedBoneFrame(descendant).Position.Y
+-            minBoneY = math.min(minBoneY, y)
+-            maxBoneY = math.max(maxBoneY, y)
+-        end
+-        if descendant:IsA("Bone") and descendant.Parent and descendant.Parent:IsA("Bone") then
+-            local parentBone = descendant.Parent :: Bone
+-            local length = (transformedBoneFrame(descendant).Position - transformedBoneFrame(parentBone).Position).Magnitude
+-            if length > 0.08 then
+-                local candidate = { bone = descendant, parentBone = parentBone, length = length }
+-                table.insert(candidates, candidate)
+-                if isPoseBone(descendant.Name) then
+-                    table.insert(preferred, candidate)
+-                end
+-                if isHeadBone(descendant.Name) then
+-                    headBone = descendant
++            local position = transformedBoneFrame(descendant).Position
++            minBoneY = math.min(minBoneY, position.Y)
++            maxBoneY = math.max(maxBoneY, position.Y)
++
++            local role = semanticRole(descendant.Name)
++            if role == "head" and headBone == nil then
++                headBone = descendant
++            end
++
++            if descendant.Parent and descendant.Parent:IsA("Bone") then
++                local parentBone = descendant.Parent :: Bone
++                local length = (position - transformedBoneFrame(parentBone).Position).Magnitude
++                if length > 0.04 and not isGenericExcluded(descendant.Name) then
++                    local candidate = {
++                        bone = descendant,
++                        parentBone = parentBone,
++                        length = length,
++                        role = role,
++                    }
++                    table.insert(candidates, candidate)
++                    if role ~= nil and role ~= "head" then
++                        table.insert(preferred, candidate)
++                    end
+                 end
+             end
+         end
+@@ -123,15 +190,20 @@ function SkeletonHitRegionResolver.Resolve(visual: Model): any
+         end)
+         selected = {}
+         for index = 1, math.min(#candidates, MAX_GENERIC_POSE_SEGMENTS) do
+-            table.insert(selected, candidates[index])
++            local candidate = candidates[index]
++            candidate.role = candidate.role or "generic"
++            table.insert(selected, candidate)
+         end
+     end
+ 
++    local skeletonHeight = if minBoneY < math.huge and maxBoneY > -math.huge
++        then math.max(0.1, maxBoneY - minBoneY)
++        else 1
++
+     return {
+         segments = selected,
+         headBone = headBone,
+-        headTipBone = headBone and headTipBone(headBone) or nil,
+-        skeletonHeight = if minBoneY < math.huge and maxBoneY > -math.huge then math.max(0, maxBoneY - minBoneY) else 0,
++        skeletonHeight = skeletonHeight,
+         boneCount = #candidates,
+     }
+ end
+@@ -140,8 +212,16 @@ function SkeletonHitRegionResolver.TransformedBoneFrame(bone: Bone): CFrame
+     return transformedBoneFrame(bone)
+ end
+ 
+-function SkeletonHitRegionResolver.SegmentRadius(name: string, length: number): number
+-    return segmentRadius(name, length)
++function SkeletonHitRegionResolver.SegmentRadius(role: string, length: number, skeletonHeight: number): number
++    return segmentRadius(role, length, skeletonHeight)
++end
++
++function SkeletonHitRegionResolver.HeadRadius(skeletonHeight: number): number
++    return math.clamp(math.max(0.1, skeletonHeight) * 0.085, 0.22, 0.72)
++end
++
++function SkeletonHitRegionResolver.SemanticRole(name: string): string?
++    return semanticRole(name)
+ end
+ 
+ return table.freeze(SkeletonHitRegionResolver)
+diff --git a/src/shared/RuntimeVersion.luau b/src/shared/RuntimeVersion.luau
+index a19c7a9..35ff21a 100644
+--- a/src/shared/RuntimeVersion.luau
++++ b/src/shared/RuntimeVersion.luau
+@@ -1 +1 @@
+-return table.freeze({ Version = "2026.10.05.007", SourceDigest = "game1-m6.2-robloxlineage-attack-aim-facing" })
++return table.freeze({ Version = "2026.10.06.001", SourceDigest = "game1-m6.2-virtual-bone-hit-regions" })
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index 2d72e84..39c66fe 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -166,8 +166,8 @@ attack_text = (ROOT / "src/server/combat/AttackService.luau").read_text(encoding
+ dummy_text = (ROOT / "src/server/dev/TrainingDummyService.luau").read_text(encoding="utf-8")
+ if "[game1][attack] hit" not in attack_text or "[game1][attack] miss" not in attack_text:
+     err("attack smoke-test logging contract missing")
+-if "CombatPoseHitboxes" not in attack_text:
+-    err("attack service must prefer pose-following skeletal hitboxes")
++if "EntityHitboxService.QueryBox" not in attack_text:
++    err("attack service must refine melee candidates against virtual skeletal hit regions")
+ if "BillboardGui" not in dummy_text or "HP %d/%d" not in dummy_text:
+     err("training dummy visible hp contract missing")
+ 
+@@ -203,9 +203,14 @@ if "getAssetTemplate" not in character_service_text:
+ 
+ hitbox_text = (ROOT / "src/server/combat/EntityHitboxService.luau").read_text(encoding="utf-8")
+ resolver_text = (ROOT / "src/server/combat/SkeletonHitRegionResolver.luau").read_text(encoding="utf-8")
+-for required in ["CombatPoseHitboxes", "Game1PoseHitbox", "TransformedBoneFrame", "SegmentRadius"]:
++for required in ["virtual_bone_regions", "QueryBox", "capsuleIntersectsBox", "TransformedBoneFrame", "SegmentRadius", "SemanticRole"]:
+     if required not in hitbox_text + resolver_text:
+-        err(f"skeleton hitbox runtime missing {required}")
++        err(f"virtual skeleton hit-region runtime missing {required}")
++if "RunService.Heartbeat" in hitbox_text or 'Instance.new("Part")' in hitbox_text:
++    err("combat hit regions must be virtual queries, not Heartbeat-following replicated Parts")
++for required in ['"upper_arm"', '"shin"', '"forehead"']:
++    if required not in resolver_text:
++        err(f"semantic skeleton resolver regression: missing {required}")
+ 
+ bridge = ROOT / "system/control-center/studio_bridge.py"
+ plugin = ROOT / "system/studio-plugin/Game1Bridge.server.luau"

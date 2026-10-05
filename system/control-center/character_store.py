@@ -308,9 +308,16 @@ class CharacterStore:
             sha = prepared_digest
 
         replacement_pending = int(old.get("model_replacement_pending") or 0) if old else 0
+        force_replacement = bool(data.get("forceReplacement"))
         if raw_source and old and str(old.get("model_asset_id") or "").strip():
-            published_basis = str(old.get("published_sha256") or old.get("sha256") or "")
-            replacement_pending = int(bool(sha and published_basis and sha != published_basis))
+            if force_replacement:
+                # Explicit Replace is an intent, not a content-diff probe. Even if
+                # the replacement FBX hashes identically to the currently published
+                # source, the user asked for a brand-new immutable Roblox asset id.
+                replacement_pending = 1
+            else:
+                published_basis = str(old.get("published_sha256") or old.get("sha256") or "")
+                replacement_pending = int(bool(sha and published_basis and sha != published_basis))
 
         now = time.time()
         revision = (int(old["revision"]) + 1) if old else 1
@@ -516,24 +523,18 @@ class CharacterStore:
         published_pipeline = str(row.get("publication_pipeline") or "")
 
         # Character models are immutable from the archetype manager's point of
-        # view. Never PATCH an existing Roblox model asset. If the canonical FBX
-        # changed, publish a brand-new asset and switch the archetype only after
-        # Open Cloud reports success. If nothing changed, publishing is a no-op.
+        # view. Never PATCH an existing Roblox model asset. A normal publish of
+        # unchanged content is a no-op, but an explicit Replace request is never
+        # deduplicated: Replace always creates a brand-new asset id.
+        replacement_pending = bool(int(row.get("model_replacement_pending") or 0))
         if (
             current_asset_id
             and current_sha
             and published_sha
             and current_sha == published_sha
             and published_pipeline == CHARACTER_PUBLICATION_PIPELINE
+            and not replacement_pending
         ):
-            if int(row.get("model_replacement_pending") or 0):
-                with self.connect() as connection:
-                    connection.execute(
-                        "UPDATE characters SET model_replacement_pending=0,status=?,updated_at=? WHERE id=?",
-                        (self._status(row), time.time(), character_id),
-                    )
-                self.export()
-                return self.get(character_id)
             return row
 
         # Open Cloud's automated FBX Model importer does not expose Studio's

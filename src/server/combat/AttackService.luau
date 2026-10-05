@@ -6,6 +6,7 @@ local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local CombatShared = Shared:WaitForChild("combat")
 local Config = require(CombatShared:WaitForChild("AttackConfig"))
 local DamageService = require(script.Parent:WaitForChild("DamageService"))
+local EntityHitboxService = require(script.Parent:WaitForChild("EntityHitboxService"))
 
 local AttackService = {}
 local cooldowns = {}
@@ -19,14 +20,6 @@ local function modelFromPart(part: Instance): Model?
         current = current.Parent
     end
     return nil
-end
-
-local function isValidCombatPart(model: Model, part: BasePart): boolean
-    local poseHitboxes = model:FindFirstChild("CombatPoseHitboxes")
-    if poseHitboxes then
-        return part:IsDescendantOf(poseHitboxes)
-    end
-    return true
 end
 
 local function attack(player: Player, aim: any)
@@ -74,18 +67,24 @@ local function attack(player: Player, aim: any)
 
     local seen = {}
     local best: Model? = nil
-    local bestPart: BasePart? = nil
+    local bestZone = "root"
+    local bestBoneName = ""
     local bestDistance = math.huge
+    local attackBoxSize = Vector3.new(Config.BoxWidth, Config.BoxHeight, Config.Range)
     for _, part in parts do
         local model = modelFromPart(part)
-        if model and not seen[model] and isValidCombatPart(model, part) then
+        if model and not seen[model] then
             seen[model] = true
             local targetRoot = model:FindFirstChild("RootCollider") or model.PrimaryPart
             if targetRoot and targetRoot:IsA("BasePart") then
                 local distance = (targetRoot.Position - root.Position).Magnitude
-                if distance <= Config.Range + 1 and distance < bestDistance then
+                local virtualHit = EntityHitboxService.QueryBox(model, boxCf, attackBoxSize)
+                local hasVirtualRig = EntityHitboxService.HasBinding(model)
+                local intersectsTarget = if hasVirtualRig then virtualHit ~= nil else true
+                if intersectsTarget and distance <= Config.Range + 1 and distance < bestDistance then
                     best = model
-                    bestPart = part
+                    bestZone = tostring(virtualHit and virtualHit.hitZone or "root")
+                    bestBoneName = tostring(virtualHit and virtualHit.boneName or "")
                     bestDistance = distance
                 end
             end
@@ -108,7 +107,7 @@ local function attack(player: Player, aim: any)
             :format(
                 player.Name,
                 best.Name,
-                tostring(bestPart and bestPart:GetAttribute("HitZone") or "root"),
+                bestZone,
                 bestDistance,
                 finalDamage,
                 tostring(best:GetAttribute("HP")),

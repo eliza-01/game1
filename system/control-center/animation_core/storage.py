@@ -36,6 +36,8 @@ class AnimationStorageMixin:
                     source_path TEXT NOT NULL,
                     prepared_path TEXT NOT NULL,
                     sha256 TEXT NOT NULL,
+                    source_sha256 TEXT NOT NULL DEFAULT '',
+                    duplicate_first_frame_at_end INTEGER NOT NULL DEFAULT 0,
                     asset_id TEXT,
                     published_sha256 TEXT NOT NULL DEFAULT '',
                     moderation_state TEXT NOT NULL DEFAULT '',
@@ -72,6 +74,12 @@ class AnimationStorageMixin:
                 );
                 """
             )
+            clip_columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(animation_clips)")}
+            if "source_sha256" not in clip_columns:
+                connection.execute("ALTER TABLE animation_clips ADD COLUMN source_sha256 TEXT NOT NULL DEFAULT ''")
+            if "duplicate_first_frame_at_end" not in clip_columns:
+                connection.execute("ALTER TABLE animation_clips ADD COLUMN duplicate_first_frame_at_end INTEGER NOT NULL DEFAULT 0")
+            connection.execute("UPDATE animation_clips SET source_sha256=sha256 WHERE source_sha256='' OR source_sha256 IS NULL")
             binding_columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(animation_bindings)")}
             if "playback_speed_percent" not in binding_columns:
                 connection.execute(
@@ -94,6 +102,32 @@ class AnimationStorageMixin:
                 if still_used is None:
                     connection.execute("DELETE FROM animation_publications WHERE clip_id=?", (clip_id,))
                     connection.execute("DELETE FROM animation_clips WHERE id=?", (clip_id,))
+        self._restore_prepared_files()
+
+    def _restore_prepared_files(self) -> None:
+        """Undo legacy physical seam transforms; prepared animation bytes mirror source."""
+        updates = []
+        with self.connect() as connection:
+            rows = [dict(row) for row in connection.execute(
+                "SELECT id,source_path,prepared_path,sha256,source_sha256 FROM animation_clips"
+            )]
+            for row in rows:
+                source = self.root / str(row.get("source_path") or "")
+                prepared = self.root / str(row.get("prepared_path") or "")
+                if not source.is_file():
+                    continue
+                source_sha = self._sha256(source)
+                prepared_sha = self._sha256(prepared) if prepared.is_file() else ""
+                if prepared_sha != source_sha:
+                    prepared.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(source, prepared)
+                if str(row.get("sha256") or "") != source_sha or str(row.get("source_sha256") or "") != source_sha:
+                    updates.append((source_sha, source_sha, _now(), str(row["id"])))
+            if updates:
+                connection.executemany(
+                    "UPDATE animation_clips SET sha256=?,source_sha256=?,updated_at=? WHERE id=?",
+                    updates,
+                )
 
     @staticmethod
     def _sha256(path: Path) -> str:
@@ -205,17 +239,16 @@ class AnimationStorageMixin:
         source_path, prepared_path = self._canonical_paths(character, binding, source.suffix.lower())
         source_path.parent.mkdir(parents=True, exist_ok=True)
         prepared_path.parent.mkdir(parents=True, exist_ok=True)
-        sha = self._sha256(source)
+        source_sha = self._sha256(source)
         old = connection.execute("SELECT * FROM animation_clips WHERE id=?", (clip_id,)).fetchone()
         old_dict = dict(old) if old else None
-        same = bool(old_dict and str(old_dict.get("sha256") or "") == sha)
-
-        if not same:
+        previous_source_sha = str((old_dict or {}).get("source_sha256") or (old_dict or {}).get("sha256") or "")
+        same_source = bool(old_dict and previous_source_sha == source_sha)
+        if not same_source or not source_path.is_file():
             shutil.copy2(source, source_path)
-            shutil.copy2(source, prepared_path)
-        elif not source_path.is_file() or not prepared_path.is_file():
-            shutil.copy2(source, source_path)
-            shutil.copy2(source, prepared_path)
+        if not same_source or not prepared_path.is_file():
+            shutil.copy2(source_path, prepared_path)
+        prepared_sha = self._sha256(prepared_path)
 
         relative_source = source_path.relative_to(self.root).as_posix()
         relative_prepared = prepared_path.relative_to(self.root).as_posix()
@@ -223,19 +256,20 @@ class AnimationStorageMixin:
         if old_dict is None:
             connection.execute(
                 """INSERT INTO animation_clips(
-                    id,character_id,name,source_path,prepared_path,sha256,asset_id,published_sha256,
-                    moderation_state,revision,created_at,updated_at,published_at
-                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (clip_id, character_id, clip_name, relative_source, relative_prepared, sha, None, "", "", 1, now, now, None),
+                    id,character_id,name,source_path,prepared_path,sha256,source_sha256,duplicate_first_frame_at_end,
+                    asset_id,published_sha256,moderation_state,revision,created_at,updated_at,published_at
+                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (clip_id, character_id, clip_name, relative_source, relative_prepared, prepared_sha, source_sha, 0, None, "", "", 1, now, now, None),
             )
             outcome = "created"
         else:
-            revision = int(old_dict.get("revision") or 1) + (0 if same else 1)
+            content_changed = str(old_dict.get("sha256") or "") != prepared_sha
+            revision = int(old_dict.get("revision") or 1) + (1 if content_changed else 0)
             connection.execute(
-                """UPDATE animation_clips SET name=?,source_path=?,prepared_path=?,sha256=?,revision=?,updated_at=? WHERE id=?""",
-                (clip_name, relative_source, relative_prepared, sha, revision, now, clip_id),
+                """UPDATE animation_clips SET name=?,source_path=?,prepared_path=?,sha256=?,source_sha256=?,revision=?,updated_at=? WHERE id=?""",
+                (clip_name, relative_source, relative_prepared, prepared_sha, source_sha, revision, now, clip_id),
             )
-            outcome = "unchanged" if same else "changed"
+            outcome = "changed" if content_changed else "unchanged"
 
         connection.execute(
             """INSERT INTO animation_bindings(
@@ -247,18 +281,8 @@ class AnimationStorageMixin:
                 priority=excluded.priority,
                 updated_at=excluded.updated_at""",
             (
-                binding_id,
-                character_id,
-                binding["scope"],
-                binding["weaponSet"],
-                binding["slot"],
-                int(binding["variant"]),
-                clip_id,
-                100,
-                1 if binding["looped"] else 0,
-                binding["priority"],
-                now,
-                now,
+                binding_id, character_id, binding["scope"], binding["weaponSet"], binding["slot"], int(binding["variant"]),
+                clip_id, 100, 1 if binding["looped"] else 0, binding["priority"], now, now,
             ),
         )
         return outcome, {"filename": source.name, "clipId": clip_id, **binding}
@@ -383,7 +407,7 @@ class AnimationStorageMixin:
         with self.connect() as connection:
             rows = connection.execute(
                 """SELECT b.id AS binding_id,b.character_id,b.scope,b.weapon_set,b.slot,b.variant,b.clip_id,b.weight,b.looped,b.priority,
-                          c.name,c.source_path,c.prepared_path,c.sha256,c.asset_id,c.published_sha256,
+                          c.name,c.source_path,c.prepared_path,c.sha256,c.source_sha256,c.duplicate_first_frame_at_end,c.asset_id,c.published_sha256,
                           c.moderation_state,c.revision,c.published_at
                    FROM animation_bindings b JOIN animation_clips c ON c.id=b.clip_id
                    WHERE b.character_id=?
@@ -395,6 +419,7 @@ class AnimationStorageMixin:
             row = dict(raw)
             row["status"] = self._status(row)
             row["looped"] = bool(row.get("looped"))
+            row["duplicate_first_frame_at_end"] = bool(row.get("duplicate_first_frame_at_end"))
             row["animationId"] = f"rbxassetid://{row['asset_id']}" if str(row.get("asset_id") or "").isdigit() else ""
             result.append(row)
         return result
@@ -436,7 +461,7 @@ class AnimationStorageMixin:
         with self.connect() as connection:
             row = connection.execute(
                 """SELECT b.id AS binding_id,b.character_id,b.scope,b.weapon_set,b.slot,b.variant,b.clip_id,b.weight,b.looped,b.priority,
-                          c.name,c.source_path,c.prepared_path,c.sha256,c.asset_id,c.published_sha256,
+                          c.name,c.source_path,c.prepared_path,c.sha256,c.source_sha256,c.duplicate_first_frame_at_end,c.asset_id,c.published_sha256,
                           c.moderation_state,c.revision,c.published_at
                    FROM animation_bindings b JOIN animation_clips c ON c.id=b.clip_id WHERE c.id=?""",
                 (clip_id,),
@@ -447,6 +472,21 @@ class AnimationStorageMixin:
         value["status"] = self._status(value)
         value["looped"] = bool(value.get("looped"))
         return value
+
+    def set_duplicate_first_frame(self, clip_id: str, enabled: bool) -> dict:
+        # Runtime presentation flag only. Never mutate source/prepared animation
+        # bytes, publication checksum, revision, or permanent Roblox asset id.
+        with self.connect() as connection:
+            raw = connection.execute("SELECT character_id FROM animation_clips WHERE id=?", (clip_id,)).fetchone()
+            if not raw:
+                raise ValueError(f"unknown animation clip: {clip_id}")
+            connection.execute(
+                "UPDATE animation_clips SET duplicate_first_frame_at_end=?,updated_at=? WHERE id=?",
+                (1 if enabled else 0, _now(), clip_id),
+            )
+            character_id = str(raw["character_id"])
+        self.export()
+        return self.snapshot(character_id)
 
     def set_weight(self, binding_id: str, weight: int) -> dict:
         weight = max(1, min(10000, int(weight)))

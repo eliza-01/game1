@@ -61,6 +61,19 @@
 <label>archetype id<input id="character-id" autocomplete="off" pattern="[a-z0-9][a-z0-9_-]{0,63}"></label>
 <small class="hint">editing identity migrates canonical model/animation paths and keeps the currently assigned Roblox asset id. model replacement is a separate action below.</small>
 <label>display name<input id="display-name" autocomplete="off"></label>
+<hr class="card-separator">
+<span class="eyebrow">starting parameters</span><h3 class="subheading">character stats</h3>
+<small class="hint">base values assigned when this archetype spawns. runtime equipment/modifiers are applied on top.</small>
+<div class="character-stats-grid">
+<label>level<input id="character-stat-level" type="number" min="1" step="1" value="1"></label>
+<label>HP<input id="character-stat-hp" type="number" min="0" step="1" value="100"></label>
+<label>damage<input id="character-stat-damage" type="number" min="0" step="1" value="10"></label>
+<label>defense<input id="character-stat-defense" type="number" min="0" step="1" value="0"></label>
+<label>attack speed<input id="character-stat-attack-speed" type="number" min="0" step="1" value="100"></label>
+<label>run speed<input id="character-stat-run-speed" type="number" min="0" step="1" value="50"></label>
+<label>critical chance %<input id="character-stat-crit-chance" type="number" min="0" max="100" step="0.1" value="0"></label>
+</div>
+<div class="actions"><button id="save-character-stats" type="button" disabled>save starting stats</button></div>
 <div class="picker"><button id="choose-model" type="button">choose fbx</button><small id="picked-model">fbx not selected</small></div>
 <div id="model-status" class="status-box"><strong>not registered</strong><span>select a character row or choose an fbx.</span></div>
 <div class="actions"><button id="save-archetype" type="button" disabled>save archetype</button><button id="register-character" class="primary" type="button">register character</button><button id="clear-form" type="button">clear form</button></div>
@@ -107,7 +120,7 @@
 <div class="panel character-card">
 <div class="section-title"><div><span>semantic animation profile</span><h3 id="animation-table-title">registered clips</h3></div><span id="animation-filter-label" class="pill">all</span></div>
 <div class="animation-legend"><span><b>base</b> locomotion / posture</span><span><b>weapon</b> hands / 1hs / bow contexts</span><span><b>variant</b> alternate visuals of the same action</span></div>
-<div class="table-wrap animation-table-wrap"><table><thead><tr><th>context</th><th>slot</th><th>variant</th><th>clip</th><th>asset</th><th>status</th><th>weight</th><th>actions</th></tr></thead><tbody id="animation-rows"></tbody></table></div>
+<div class="table-wrap animation-table-wrap"><table><thead><tr><th>context</th><th>slot</th><th>variant</th><th>clip</th><th>asset</th><th>status</th><th>weight</th><th>first→end</th><th>actions</th></tr></thead><tbody id="animation-rows"></tbody></table></div>
 <div id="animation-details" class="details"><span class="muted">select a clip.</span></div>
 </div>
 </div>
@@ -215,7 +228,7 @@
 <div class="panel character-card">
 <div class="section-title"><div><span>selected monster animations</span><h3 id="monster-animation-table-title">registered animations</h3></div></div>
 <small class="hint">only animations already registered for the selected monster are listed here. <code>idle_special_01..n</code> are shown as variants of state <code>idle</code>. weight is relative inside one state. playback speed is configured globally in the Animation Speed section.</small>
-<div class="table-wrap animation-table-wrap"><table><thead><tr><th>state</th><th>variant</th><th>clip</th><th>asset</th><th>status</th><th>weight</th><th>actions</th></tr></thead><tbody id="monster-animation-rows"></tbody></table></div>
+<div class="table-wrap animation-table-wrap"><table><thead><tr><th>state</th><th>variant</th><th>clip</th><th>asset</th><th>status</th><th>weight</th><th>first→end</th><th>actions</th></tr></thead><tbody id="monster-animation-rows"></tbody></table></div>
 </div>
 </div>
 

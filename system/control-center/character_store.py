@@ -12,8 +12,18 @@ import tempfile
 from character_analysis import analyze_character_fbx, prepare_character_fbx, prepare_character_publication_fbx
 from opencloud_assets import create_model_asset, wait_for_operation
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 PROJECT = "game1"
+STAT_KEYS = ("Level", "MaxHP", "Damage", "Defense", "AttackSpeed", "RunSpeed", "CritChance")
+DEFAULT_STATS = {
+    "Level": 1,
+    "MaxHP": 100,
+    "Damage": 10,
+    "Defense": 0,
+    "AttackSpeed": 100,
+    "RunSpeed": 50,
+    "CritChance": 0,
+}
 ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 ACTIVE_KEY = "active_character_archetype_id"
 RACES = ("human",)
@@ -119,6 +129,14 @@ class CharacterStore:
                 )"""
             )
             connection.execute(
+                """CREATE TABLE IF NOT EXISTS character_stats(
+                  character_id TEXT NOT NULL,
+                  stat_key TEXT NOT NULL,
+                  value REAL NOT NULL DEFAULT 0,
+                  PRIMARY KEY(character_id, stat_key)
+                )"""
+            )
+            connection.execute(
                 """CREATE TABLE IF NOT EXISTS character_model_assignments(
                   id INTEGER PRIMARY KEY AUTOINCREMENT,
                   target_character_id TEXT NOT NULL,
@@ -142,16 +160,69 @@ class CharacterStore:
             self._ensure_column(connection, "characters", "published_at", "REAL")
 
     def options(self):
-        return {"races": list(RACES), "genders": list(GENDERS)}
+        return {"races": list(RACES), "genders": list(GENDERS), "statKeys": list(STAT_KEYS), "defaultStats": dict(DEFAULT_STATS)}
+
+    @staticmethod
+    def _number(value):
+        number = float(value)
+        return int(number) if number.is_integer() else number
+
+    def _stats(self, connection, character_id: str) -> dict:
+        values = dict(DEFAULT_STATS)
+        for row in connection.execute(
+            "SELECT stat_key,value FROM character_stats WHERE character_id=? ORDER BY stat_key", (character_id,)
+        ):
+            values[str(row["stat_key"])] = self._number(row["value"])
+        return values
+
+    def _decorate(self, connection, row):
+        if row is None:
+            return None
+        result = dict(row)
+        result["stats"] = self._stats(connection, str(result["id"]))
+        return result
 
     def list(self):
         with self.connect() as connection:
-            return [dict(row) for row in connection.execute("SELECT * FROM characters ORDER BY race,gender,id")]
+            return [self._decorate(connection, row) for row in connection.execute("SELECT * FROM characters ORDER BY race,gender,id")]
 
     def get(self, character_id):
         with self.connect() as connection:
             row = connection.execute("SELECT * FROM characters WHERE id=?", (character_id,)).fetchone()
-            return dict(row) if row else None
+            return self._decorate(connection, row)
+
+    @staticmethod
+    def _validate_stats(payload: dict, previous: dict | None = None) -> dict:
+        incoming = payload.get("stats") if isinstance(payload, dict) else None
+        incoming = incoming if isinstance(incoming, dict) else payload if isinstance(payload, dict) else {}
+        old = (previous or {}).get("stats") or {}
+        result = {}
+        for key, default in DEFAULT_STATS.items():
+            raw = incoming[key] if key in incoming else old.get(key, default)
+            value = float(raw)
+            if key == "Level" and value < 1:
+                raise ValueError("character Level must be at least 1")
+            if key in {"MaxHP", "Damage", "Defense", "AttackSpeed", "RunSpeed"} and value < 0:
+                raise ValueError(f"character {key} cannot be negative")
+            if key == "CritChance" and not 0 <= value <= 100:
+                raise ValueError("character CritChance must be between 0 and 100")
+            result[key] = value
+        return result
+
+    def set_stats(self, character_id: str, payload: dict):
+        row = self.get(character_id)
+        if not row:
+            raise ValueError(f"unknown character archetype: {character_id}")
+        stats = self._validate_stats(payload, row)
+        with self.connect() as connection:
+            for key, value in stats.items():
+                connection.execute(
+                    "INSERT OR REPLACE INTO character_stats(character_id,stat_key,value) VALUES(?,?,?)",
+                    (character_id, key, value),
+                )
+            connection.execute("UPDATE characters SET updated_at=? WHERE id=?", (time.time(), character_id))
+        self.export()
+        return self.snapshot()
 
     def active_id(self):
         with self.connect() as connection:
@@ -347,6 +418,7 @@ class CharacterStore:
             "updated_at": now,
         }
         values["status"] = self._status(values)
+        stats = self._validate_stats(data, old)
 
         with self.connect() as connection:
             connection.execute(
@@ -365,6 +437,11 @@ class CharacterStore:
                     values["published_sha256"], values["publication_pipeline"], values["moderation_state"], values["published_at"],
                 ),
             )
+            for key, value in stats.items():
+                connection.execute(
+                    "INSERT OR REPLACE INTO character_stats(character_id,stat_key,value) VALUES(?,?,?)",
+                    (character_id, key, value),
+                )
         self.export()
         return self.get(character_id)
 
@@ -598,6 +675,7 @@ class CharacterStore:
         with self.connect() as connection:
             connection.execute("DELETE FROM characters WHERE id=?", (character_id,))
             connection.execute("DELETE FROM character_publications WHERE character_id=?", (character_id,))
+            connection.execute("DELETE FROM character_stats WHERE character_id=?", (character_id,))
             connection.execute("DELETE FROM character_model_assignments WHERE target_character_id=? OR source_character_id=?", (character_id, character_id))
             connection.execute("DELETE FROM project_settings WHERE key=? AND value=?", (ACTIVE_KEY, character_id))
         self.export()
@@ -649,6 +727,7 @@ class CharacterStore:
                     "gender": row.get("gender") or "",
                     "status": self._status(row),
                     "revision": row["revision"],
+                    "stats": row.get("stats") or dict(DEFAULT_STATS),
                     "model": {
                         "sourcePath": row["source_path"],
                         "preparedPath": row["prepared_path"],
@@ -710,6 +789,9 @@ class CharacterStore:
                 f'\t\t\tgender = {lua(row["gender"])},',
                 f'\t\t\tstatus = {lua(row["status"])},',
                 f'\t\t\trevision = {row["revision"]},',
+                "\t\t\tstats = table.freeze({",
+                *[f'\t\t\t\t{key} = {lua(value)},' for key, value in row["stats"].items()],
+                "\t\t\t}),",
                 "\t\t\tmodel = table.freeze({",
                 f'\t\t\t\tassetId = {lua(model["assetId"])},',
                 f'\t\t\t\tsourcePath = {lua(model["sourcePath"])},',

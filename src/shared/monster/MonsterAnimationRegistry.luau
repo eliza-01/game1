@@ -17,6 +17,7 @@ return table.freeze({
 						weight = 100,
 						looped = false,
 						priority = "Action",
+						duplicateFirstFrameAtEnd = false,
 					}),
 				}),
 				["combat_idle"] = table.freeze({
@@ -30,6 +31,7 @@ return table.freeze({
 						weight = 100,
 						looped = true,
 						priority = "Idle",
+						duplicateFirstFrameAtEnd = false,
 					}),
 				}),
 				["death"] = table.freeze({
@@ -43,6 +45,7 @@ return table.freeze({
 						weight = 100,
 						looped = false,
 						priority = "Action",
+						duplicateFirstFrameAtEnd = false,
 					}),
 				}),
 				["idle"] = table.freeze({
@@ -56,6 +59,7 @@ return table.freeze({
 						weight = 100,
 						looped = true,
 						priority = "Idle",
+						duplicateFirstFrameAtEnd = false,
 					}),
 					table.freeze({
 						clipId = "monster__gremlin__idle_special__01",
@@ -67,6 +71,7 @@ return table.freeze({
 						weight = 100,
 						looped = false,
 						priority = "Idle",
+						duplicateFirstFrameAtEnd = false,
 					}),
 				}),
 				["run"] = table.freeze({
@@ -80,6 +85,7 @@ return table.freeze({
 						weight = 100,
 						looped = true,
 						priority = "Movement",
+						duplicateFirstFrameAtEnd = false,
 					}),
 				}),
 				["walk"] = table.freeze({
@@ -93,6 +99,7 @@ return table.freeze({
 						weight = 100,
 						looped = true,
 						priority = "Movement",
+						duplicateFirstFrameAtEnd = false,
 					}),
 				}),
 			}),

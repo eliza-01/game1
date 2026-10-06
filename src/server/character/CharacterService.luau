@@ -241,7 +241,7 @@ createCharacter = function(player: Player, requestedArchetypeId: string?): Model
     character:SetAttribute("MovementState", "Idle")
     character:SetAttribute("MovementController", "ControllerManager")
     character:SetAttribute("VisualController", "AnimationController")
-    CharacterStatsService.Initialize(character)
+    CharacterStatsService.Initialize(character, if row then row.stats else nil)
 
     local rig = CharacterRigService.Build(character, CharacterRigService.SpawnCFrame(player), template, row == nil)
     if not rig then

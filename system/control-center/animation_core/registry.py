@@ -30,6 +30,8 @@ class AnimationRegistryMixin:
                 "sourcePath": str(row.get("source_path") or ""),
                 "preparedPath": str(row.get("prepared_path") or ""),
                 "sha256": str(row.get("sha256") or ""),
+                "sourceSha256": str(row.get("source_sha256") or ""),
+                "duplicateFirstFrameAtEnd": bool(row.get("duplicate_first_frame_at_end")),
                 "assetId": str(row.get("asset_id") or ""),
                 "publishedSha256": str(row.get("published_sha256") or ""),
                 "moderationState": str(row.get("moderation_state") or ""),
@@ -87,6 +89,7 @@ class AnimationRegistryMixin:
                 "weight": int(binding["weight"]),
                 "looped": bool(binding["looped"]),
                 "priority": str(binding["priority"]),
+                "duplicateFirstFrameAtEnd": bool(clip.get("duplicate_first_frame_at_end")),
             }
             if str(binding["scope"]) == "base":
                 profile["base"].setdefault(str(binding["slot"]), []).append(descriptor)
@@ -114,6 +117,7 @@ class AnimationRegistryMixin:
                 indent + f"\tweight = {int(row['weight'])},",
                 indent + f"\tlooped = {'true' if row['looped'] else 'false'},",
                 indent + f"\tpriority = {lua_string(row['priority'])},",
+                indent + f"\tduplicateFirstFrameAtEnd = {'true' if row['duplicateFirstFrameAtEnd'] else 'false'},",
                 indent + "}),",
             ]
 

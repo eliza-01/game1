@@ -130,6 +130,8 @@ class MonsterAnimationStore:
                     source_path TEXT NOT NULL,
                     prepared_path TEXT NOT NULL,
                     sha256 TEXT NOT NULL,
+                    source_sha256 TEXT NOT NULL DEFAULT '',
+                    duplicate_first_frame_at_end INTEGER NOT NULL DEFAULT 0,
                     asset_id TEXT,
                     published_sha256 TEXT NOT NULL DEFAULT '',
                     moderation_state TEXT NOT NULL DEFAULT '',
@@ -164,12 +166,44 @@ class MonsterAnimationStore:
                 );
                 """
             )
+            clip_columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(monster_animation_clips)")}
+            if "source_sha256" not in clip_columns:
+                connection.execute("ALTER TABLE monster_animation_clips ADD COLUMN source_sha256 TEXT NOT NULL DEFAULT ''")
+            if "duplicate_first_frame_at_end" not in clip_columns:
+                connection.execute("ALTER TABLE monster_animation_clips ADD COLUMN duplicate_first_frame_at_end INTEGER NOT NULL DEFAULT 0")
+            connection.execute("UPDATE monster_animation_clips SET source_sha256=sha256 WHERE source_sha256='' OR source_sha256 IS NULL")
             binding_columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(monster_animation_bindings)")}
             if "playback_speed_percent" not in binding_columns:
                 connection.execute(
                     "ALTER TABLE monster_animation_bindings ADD COLUMN playback_speed_percent INTEGER NOT NULL DEFAULT 100"
                 )
             self._migrate_combat_idle(connection)
+        self._restore_prepared_files()
+
+    def _restore_prepared_files(self) -> None:
+        """Undo legacy physical seam transforms; prepared animation bytes mirror source."""
+        updates = []
+        with self.connect() as connection:
+            rows = [dict(row) for row in connection.execute(
+                "SELECT id,source_path,prepared_path,sha256,source_sha256 FROM monster_animation_clips"
+            )]
+            for row in rows:
+                source = self.root / str(row.get("source_path") or "")
+                prepared = self.root / str(row.get("prepared_path") or "")
+                if not source.is_file():
+                    continue
+                source_sha = self._sha256(source)
+                prepared_sha = self._sha256(prepared) if prepared.is_file() else ""
+                if prepared_sha != source_sha:
+                    prepared.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(source, prepared)
+                if str(row.get("sha256") or "") != source_sha or str(row.get("source_sha256") or "") != source_sha:
+                    updates.append((source_sha, source_sha, time.time(), str(row["id"])))
+            if updates:
+                connection.executemany(
+                    "UPDATE monster_animation_clips SET sha256=?,source_sha256=?,updated_at=? WHERE id=?",
+                    updates,
+                )
 
     def _migrate_combat_idle(self, connection) -> None:
         """Move the old attack_wait storage coordinate to the canonical combat_idle state."""
@@ -281,27 +315,31 @@ class MonsterAnimationStore:
         prepared_target = self.root / "assets/prepared" / relative
         source_target.parent.mkdir(parents=True, exist_ok=True)
         prepared_target.parent.mkdir(parents=True, exist_ok=True)
-        digest = self._sha256(source)
+        source_sha = self._sha256(source)
         old = connection.execute("SELECT * FROM monster_animation_clips WHERE id=?", (clip_id,)).fetchone()
         old_dict = dict(old) if old else None
-        same = bool(old_dict and str(old_dict.get("sha256") or "") == digest)
-        if not same or not source_target.is_file() or not prepared_target.is_file():
+        previous_source_sha = str((old_dict or {}).get("source_sha256") or (old_dict or {}).get("sha256") or "")
+        same_source = bool(old_dict and previous_source_sha == source_sha)
+        if not same_source or not source_target.is_file():
             shutil.copy2(source, source_target)
-            shutil.copy2(source, prepared_target)
+        if not same_source or not prepared_target.is_file():
+            shutil.copy2(source_target, prepared_target)
+        digest = self._sha256(prepared_target)
         if old_dict is None:
             connection.execute(
-                """INSERT INTO monster_animation_clips(id,monster_slug,name,source_path,prepared_path,sha256,asset_id,published_sha256,moderation_state,revision,created_at,updated_at,published_at)
-                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (clip_id, slug, stem, source_target.relative_to(self.root).as_posix(), prepared_target.relative_to(self.root).as_posix(), digest, None, "", "", 1, now, now, None),
+                """INSERT INTO monster_animation_clips(id,monster_slug,name,source_path,prepared_path,sha256,source_sha256,duplicate_first_frame_at_end,asset_id,published_sha256,moderation_state,revision,created_at,updated_at,published_at)
+                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (clip_id, slug, stem, source_target.relative_to(self.root).as_posix(), prepared_target.relative_to(self.root).as_posix(), digest, source_sha, 0, None, "", "", 1, now, now, None),
             )
             outcome = "created"
         else:
-            revision = int(old_dict.get("revision") or 1) + (0 if same else 1)
+            content_changed = str(old_dict.get("sha256") or "") != digest
+            revision = int(old_dict.get("revision") or 1) + (1 if content_changed else 0)
             connection.execute(
-                "UPDATE monster_animation_clips SET name=?,source_path=?,prepared_path=?,sha256=?,revision=?,updated_at=? WHERE id=?",
-                (stem, source_target.relative_to(self.root).as_posix(), prepared_target.relative_to(self.root).as_posix(), digest, revision, now, clip_id),
+                "UPDATE monster_animation_clips SET name=?,source_path=?,prepared_path=?,sha256=?,source_sha256=?,revision=?,updated_at=? WHERE id=?",
+                (stem, source_target.relative_to(self.root).as_posix(), prepared_target.relative_to(self.root).as_posix(), digest, source_sha, revision, now, clip_id),
             )
-            outcome = "unchanged" if same else "changed"
+            outcome = "changed" if content_changed else "unchanged"
         connection.execute(
             """INSERT INTO monster_animation_bindings(id,monster_slug,slot,variant,clip_id,weight,looped,priority,created_at,updated_at)
                VALUES(?,?,?,?,?,?,?,?,?,?)
@@ -391,7 +429,7 @@ class MonsterAnimationStore:
         with self.connect() as connection:
             rows = connection.execute(
                 """SELECT b.id AS binding_id,b.monster_slug,b.slot,b.variant,b.clip_id,b.weight,b.looped,b.priority,
-                          c.name,c.source_path,c.prepared_path,c.sha256,c.asset_id,c.published_sha256,c.moderation_state,c.revision,c.published_at
+                          c.name,c.source_path,c.prepared_path,c.sha256,c.source_sha256,c.duplicate_first_frame_at_end,c.asset_id,c.published_sha256,c.moderation_state,c.revision,c.published_at
                    FROM monster_animation_bindings b JOIN monster_animation_clips c ON c.id=b.clip_id
                    WHERE b.monster_slug=? ORDER BY b.slot,b.variant""",
                 (slug,),
@@ -404,6 +442,7 @@ class MonsterAnimationStore:
             value["role"] = str(definition.get("role") or "base")
             value["status"] = self._status(value)
             value["looped"] = bool(value.get("looped"))
+            value["duplicate_first_frame_at_end"] = bool(value.get("duplicate_first_frame_at_end"))
             result.append(value)
         return result
 
@@ -426,6 +465,21 @@ class MonsterAnimationStore:
                 "localOnly": sum(row["status"] == "LOCAL_ONLY" for row in items), "changed": sum(row["status"] == "CHANGED" for row in items),
             },
         }
+
+    def set_duplicate_first_frame(self, clip_id: str, enabled: bool) -> dict:
+        # Runtime presentation flag only. Never mutate source/prepared animation
+        # bytes, publication checksum, revision, or permanent Roblox asset id.
+        with self.connect() as connection:
+            raw = connection.execute("SELECT monster_slug FROM monster_animation_clips WHERE id=?", (clip_id,)).fetchone()
+            if not raw:
+                raise ValueError(f"unknown monster animation clip: {clip_id}")
+            connection.execute(
+                "UPDATE monster_animation_clips SET duplicate_first_frame_at_end=?,updated_at=? WHERE id=?",
+                (1 if enabled else 0, time.time(), clip_id),
+            )
+            slug = str(raw["monster_slug"])
+        self.export()
+        return self.snapshot(slug)
 
     def set_weight(self, binding_id: str, weight: int) -> dict:
         weight = max(1, min(10000, int(weight)))
@@ -525,6 +579,7 @@ class MonsterAnimationStore:
                 "clipId": str(clip["id"]), "assetId": str(clip["asset_id"]), "animationId": "rbxassetid://" + str(clip["asset_id"]),
                 "sourceSlot": internal_slot, "role": role, "variant": int(binding["variant"]), "weight": int(binding["weight"]),
                 "looped": bool(binding["looped"]), "priority": str(binding["priority"]),
+                "duplicateFirstFrameAtEnd": bool(clip.get("duplicate_first_frame_at_end")),
             })
         for profile in profiles_map.values():
             for rows in profile["slots"].values():
@@ -548,6 +603,7 @@ class MonsterAnimationStore:
                         f"\t\t\t\t\t\tweight = {row['weight']},",
                         f"\t\t\t\t\t\tlooped = {'true' if row['looped'] else 'false'},",
                         f"\t\t\t\t\t\tpriority = {q(row['priority'])},",
+                        f"\t\t\t\t\t\tduplicateFirstFrameAtEnd = {'true' if row['duplicateFirstFrameAtEnd'] else 'false'},",
                         "\t\t\t\t\t}),",
                     ]
                 lines.append("\t\t\t\t}),")

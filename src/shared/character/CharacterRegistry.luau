@@ -1,6 +1,6 @@
 -- generated. do not edit by hand.
 return table.freeze({
-	schemaVersion = 4,
+	schemaVersion = 5,
 	project = "game1",
 	activeArchetypeId = "human_female",
 	archetypes = {
@@ -11,6 +11,15 @@ return table.freeze({
 			gender = "female",
 			status = "PUBLISHED",
 			revision = 31,
+			stats = table.freeze({
+				Level = 1,
+				MaxHP = 100,
+				Damage = 10,
+				Defense = 0,
+				AttackSpeed = 100,
+				RunSpeed = 50,
+				CritChance = 0,
+			}),
 			model = table.freeze({
 				assetId = "100818559287050",
 				sourcePath = "assets/source/characters/human/female/human_female/model/human_female_014.fbx",

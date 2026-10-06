@@ -18,6 +18,7 @@ return table.freeze({
 							weight = 100,
 							looped = false,
 							priority = "Action",
+							duplicateFirstFrameAtEnd = false,
 						}),
 						table.freeze({
 							clipId = "human_female__weapon__1hs__attack__02",
@@ -27,6 +28,7 @@ return table.freeze({
 							weight = 100,
 							looped = false,
 							priority = "Action",
+							duplicateFirstFrameAtEnd = false,
 						}),
 						table.freeze({
 							clipId = "human_female__weapon__1hs__attack__03",
@@ -36,6 +38,7 @@ return table.freeze({
 							weight = 100,
 							looped = false,
 							priority = "Action",
+							duplicateFirstFrameAtEnd = false,
 						}),
 					}),
 					["combat_idle"] = table.freeze({
@@ -47,6 +50,7 @@ return table.freeze({
 							weight = 100,
 							looped = true,
 							priority = "Idle",
+							duplicateFirstFrameAtEnd = false,
 						}),
 					}),
 					["idle"] = table.freeze({
@@ -58,6 +62,7 @@ return table.freeze({
 							weight = 100,
 							looped = true,
 							priority = "Idle",
+							duplicateFirstFrameAtEnd = false,
 						}),
 					}),
 					["run"] = table.freeze({
@@ -69,6 +74,7 @@ return table.freeze({
 							weight = 100,
 							looped = true,
 							priority = "Movement",
+							duplicateFirstFrameAtEnd = true,
 						}),
 					}),
 					["walk"] = table.freeze({
@@ -80,6 +86,7 @@ return table.freeze({
 							weight = 100,
 							looped = true,
 							priority = "Movement",
+							duplicateFirstFrameAtEnd = false,
 						}),
 					}),
 				}),

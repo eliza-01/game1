@@ -48,18 +48,23 @@ local function recompute(character: Model)
     character:SetAttribute("MoveSpeed", tonumber(character:GetAttribute("RunSpeed")) or Config.Default.RunSpeed)
 end
 
-function Service.Initialize(character: Model)
+function Service.Initialize(character: Model, startingStats: any?)
     local d = Config.Default
+    local stats = if type(startingStats) == "table" then startingStats else {}
+    local function value(stat: string): number
+        return tonumber(stats[stat]) or tonumber(d[stat]) or 0
+    end
+
     modifierSources[character] = {}
-    setBase(character, "Level", d.Level)
-    setBase(character, "MaxHP", d.MaxHP)
-    setBase(character, "Damage", d.Damage)
-    setBase(character, "Defense", d.Defense)
-    setBase(character, "AttackSpeed", d.AttackSpeed)
-    setBase(character, "RunSpeed", d.RunSpeed)
-    setBase(character, "CritChance", d.CritChance)
-    character:SetAttribute("MoveSpeed", d.RunSpeed)
-    character:SetAttribute("HP", d.MaxHP)
+    setBase(character, "Level", value("Level"))
+    setBase(character, "MaxHP", value("MaxHP"))
+    setBase(character, "Damage", value("Damage"))
+    setBase(character, "Defense", value("Defense"))
+    setBase(character, "AttackSpeed", value("AttackSpeed"))
+    setBase(character, "RunSpeed", value("RunSpeed"))
+    setBase(character, "CritChance", value("CritChance"))
+    character:SetAttribute("MoveSpeed", value("RunSpeed"))
+    character:SetAttribute("HP", value("MaxHP"))
     character:SetAttribute("Damageable", true)
     character:SetAttribute("LifeState", "Alive")
 end

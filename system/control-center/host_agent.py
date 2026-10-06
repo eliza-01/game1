@@ -588,11 +588,18 @@ class Handler(BaseHTTPRequestHandler):
 
         prefix = "/api/characters/"
         identity_suffix = "/identity"
+        stats_suffix = "/stats"
         replace_model_suffix = "/replace-model"
         model_suffix = "/model"
         activate_suffix = "/activate"
         publish_suffix = "/publish"
         sync_suffix = "/sync"
+        if path.startswith(prefix) and path.endswith(stats_suffix):
+            character_id = unquote(path[len(prefix):-len(stats_suffix)].strip("/"))
+            try:
+                return self.out(200, store.set_stats(character_id, self.body()))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
         if path.startswith(prefix) and path.endswith(identity_suffix):
             character_id = unquote(path[len(prefix):-len(identity_suffix)].strip("/"))
             try:
@@ -699,8 +706,16 @@ class Handler(BaseHTTPRequestHandler):
                 return self.out(400, {"error": str(error)})
 
         monster_animation_prefix = "/api/monster-animations/"
+        monster_duplicate_suffix = "/duplicate-first-frame"
         monster_publish_missing_suffix = "/publish-missing"
         monster_publish_animation_suffix = "/publish"
+        if path.startswith(monster_animation_prefix) and path.endswith(monster_duplicate_suffix):
+            clip_id = unquote(path[len(monster_animation_prefix):-len(monster_duplicate_suffix)].strip("/"))
+            try:
+                payload = self.body()
+                return self.out(200, monster_animations.set_duplicate_first_frame(clip_id, bool(payload.get("enabled"))))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
         if path.startswith(monster_animation_prefix) and path.endswith(monster_publish_missing_suffix):
             slug = unquote(path[len(monster_animation_prefix):-len(monster_publish_missing_suffix)].strip("/"))
             try:
@@ -752,8 +767,16 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/weapons/active/clear":
             return self.out(200, weapons.clear_active())
         animation_prefix = "/api/animations/"
+        duplicate_suffix = "/duplicate-first-frame"
         publish_missing_suffix = "/publish-missing"
         publish_animation_suffix = "/publish"
+        if path.startswith(animation_prefix) and path.endswith(duplicate_suffix):
+            clip_id = unquote(path[len(animation_prefix):-len(duplicate_suffix)].strip("/"))
+            try:
+                payload = self.body()
+                return self.out(200, animations.set_duplicate_first_frame(clip_id, bool(payload.get("enabled"))))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
         if path.startswith(animation_prefix) and path.endswith(publish_missing_suffix):
             character_id = unquote(path[len(animation_prefix):-len(publish_missing_suffix)].strip("/"))
             try:

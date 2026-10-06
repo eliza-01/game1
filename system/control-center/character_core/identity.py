@@ -236,6 +236,7 @@ class CharacterIdentityService:
                     ),
                 )
                 connection.execute("UPDATE character_publications SET character_id=? WHERE character_id=?", (new_id, old_id))
+                connection.execute("UPDATE character_stats SET character_id=? WHERE character_id=?", (new_id, old_id))
                 connection.execute("UPDATE project_settings SET value=? WHERE key=? AND value=?", (new_id, ACTIVE_KEY, old_id))
                 connection.execute("UPDATE animation_profiles SET character_id=?,updated_at=? WHERE character_id=?", (new_id, now, old_id))
 

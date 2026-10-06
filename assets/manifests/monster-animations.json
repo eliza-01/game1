@@ -97,6 +97,8 @@
       "created_at": 1791253058.0950866,
       "updated_at": 1791258572.2218688,
       "published_at": 1791256082.2987773,
+      "source_sha256": "cb6cced731a23b52a29264e3644af0af7a95810b206d5f798ae0cea05cc5f715",
+      "duplicate_first_frame_at_end": 0,
       "status": "PUBLISHED"
     },
     {
@@ -113,6 +115,8 @@
       "created_at": 1791258572.2218688,
       "updated_at": 1791258577.830591,
       "published_at": 1791258577.830591,
+      "source_sha256": "072097c294ae36d47ad08404dac0eb78e5f0771e1ded26611343c12824a78840",
+      "duplicate_first_frame_at_end": 0,
       "status": "PUBLISHED"
     },
     {
@@ -129,6 +133,8 @@
       "created_at": 1791253058.0950866,
       "updated_at": 1791258572.2218688,
       "published_at": 1791256085.5388856,
+      "source_sha256": "631a8b3b567295d9831130916a642c01f7493af71e64d887e6750ecceb387ede",
+      "duplicate_first_frame_at_end": 0,
       "status": "PUBLISHED"
     },
     {
@@ -145,6 +151,8 @@
       "created_at": 1791255435.258515,
       "updated_at": 1791258572.2218688,
       "published_at": 1791256088.776485,
+      "source_sha256": "48be1402bf6ac36fb287a46e85e5512c288bc73da2037ed06b30be86b9267c14",
+      "duplicate_first_frame_at_end": 0,
       "status": "PUBLISHED"
     },
     {
@@ -161,6 +169,8 @@
       "created_at": 1791255435.258515,
       "updated_at": 1791258572.2218688,
       "published_at": 1791256092.0373774,
+      "source_sha256": "f72958550a227f50b8f9d5205458ef84e193f23698e8cfb974a67c9b06424c5e",
+      "duplicate_first_frame_at_end": 0,
       "status": "PUBLISHED"
     },
     {
@@ -177,6 +187,8 @@
       "created_at": 1791253058.0950866,
       "updated_at": 1791258572.2218688,
       "published_at": 1791256095.062003,
+      "source_sha256": "d738335e499683195dacdf154494cb972e423342d814f8dfe165cf5726b955e2",
+      "duplicate_first_frame_at_end": 0,
       "status": "PUBLISHED"
     },
     {
@@ -193,6 +205,8 @@
       "created_at": 1791253058.0950866,
       "updated_at": 1791258572.2218688,
       "published_at": 1791256098.1514924,
+      "source_sha256": "184231f8faa24486146ee7cf6e562dc3744754303996143112fa0fef2fed72ff",
+      "duplicate_first_frame_at_end": 0,
       "status": "PUBLISHED"
     }
   ],

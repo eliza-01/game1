@@ -29,6 +29,13 @@ create table if not exists project_settings (
     value text not null default ''
 );
 
+create table if not exists character_stats (
+    character_id text not null,
+    stat_key text not null,
+    value real not null default 0,
+    primary key(character_id, stat_key)
+);
+
 create table if not exists character_publications (
     id integer primary key autoincrement,
     character_id text not null,
@@ -63,6 +70,8 @@ create table if not exists animation_clips (
     source_path text not null,
     prepared_path text not null,
     sha256 text not null,
+    source_sha256 text not null default '',
+    duplicate_first_frame_at_end integer not null default 0,
     asset_id text,
     published_sha256 text not null default '',
     moderation_state text not null default '',
@@ -230,6 +239,8 @@ create table if not exists monster_animation_clips (
     source_path text not null,
     prepared_path text not null,
     sha256 text not null,
+    source_sha256 text not null default '',
+    duplicate_first_frame_at_end integer not null default 0,
     asset_id text,
     published_sha256 text not null default '',
     moderation_state text not null default '',

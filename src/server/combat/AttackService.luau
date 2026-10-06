@@ -200,7 +200,7 @@ local function attack(player: Player, payload: any)
     end
 
     local animationSpeedPercent = AnimationSpeedScaling.ResolveForModel(character, "attack")
-    local timing = AttackTimelineConfig.ResolveRuntime(clipId, animationSpeedPercent)
+    local timing = AttackTimelineConfig.ResolveRuntime(clipId, animationSpeedPercent, descriptor.duplicateFirstFrameAtEnd == true)
     if not timing then
         if Config.DebugLogs then
             print(("[game1][attack] reject player=%s reason=missing_timeline clip=%s"):format(player.Name, clipId))

@@ -1,27 +1,30 @@
 local CharacterMovementConfig = {}
 
--- gameplay movement stat. 50 preserves the current game1 baseline movement feel.
-CharacterMovementConfig.DefaultRunStat = 50
-CharacterMovementConfig.DefaultRobloxRunSpeed = 16
-CharacterMovementConfig.DefaultRobloxWalkSpeed = 9
+-- RunSpeed is a world-space movement speed in studs/second for every moving
+-- entity. Walking is always exactly half of that stat. Keep the compatibility
+-- method names because both ControllerManager characters and Humanoid monsters
+-- consume this shared contract.
+CharacterMovementConfig.DefaultRunSpeed = 50
+CharacterMovementConfig.WalkSpeedMultiplier = 0.5
 
 function CharacterMovementConfig.Resolve(_archetype: any): any
     return {
-        groundWalk = CharacterMovementConfig.DefaultRobloxWalkSpeed,
-        groundRun = CharacterMovementConfig.DefaultRobloxRunSpeed,
+        groundWalk = CharacterMovementConfig.DefaultRunSpeed * CharacterMovementConfig.WalkSpeedMultiplier,
+        groundRun = CharacterMovementConfig.DefaultRunSpeed,
     }
 end
 
 function CharacterMovementConfig.MovementMultiplier(_archetype: any, currentRunSpeed: any): number
-    local value = math.max(0, tonumber(currentRunSpeed) or CharacterMovementConfig.DefaultRunStat)
-    return value / CharacterMovementConfig.DefaultRunStat
+    local value = math.max(0, tonumber(currentRunSpeed) or CharacterMovementConfig.DefaultRunSpeed)
+    return value / CharacterMovementConfig.DefaultRunSpeed
 end
 
-function CharacterMovementConfig.ResolveSpeed(archetype: any, currentRunSpeed: any, movementMode: any): number
-    local base = if tostring(movementMode) == "Walk"
-        then CharacterMovementConfig.DefaultRobloxWalkSpeed
-        else CharacterMovementConfig.DefaultRobloxRunSpeed
-    return base * CharacterMovementConfig.MovementMultiplier(archetype, currentRunSpeed)
+function CharacterMovementConfig.ResolveSpeed(_archetype: any, currentRunSpeed: any, movementMode: any): number
+    local runSpeed = math.max(0, tonumber(currentRunSpeed) or CharacterMovementConfig.DefaultRunSpeed)
+    if tostring(movementMode) == "Walk" then
+        return runSpeed * CharacterMovementConfig.WalkSpeedMultiplier
+    end
+    return runSpeed
 end
 
 function CharacterMovementConfig.RobloxSpeed(archetype: any, currentRunSpeed: any, movementMode: any): number

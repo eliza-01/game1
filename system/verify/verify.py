@@ -143,6 +143,7 @@ required_runtime = [
     "src/shared/character/CharacterAnimationRegistry.luau",
     "src/shared/character/CharacterStatsConfig.luau",
     "src/shared/combat/AttackConfig.luau",
+    "src/shared/combat/AttackTimelineConfig.luau",
 ]
 for relative in required_runtime:
     if not (ROOT / relative).is_file():
@@ -171,6 +172,29 @@ if "[game1][attack] hit" not in attack_text or "[game1][attack] miss" not in att
     err("attack smoke-test logging contract missing")
 if "EntityHitboxService.QueryBox" not in attack_text:
     err("attack service must refine melee candidates against virtual skeletal hit regions")
+attack_timeline_path = ROOT / "src/shared/combat/AttackTimelineConfig.luau"
+attack_timeline_text = attack_timeline_path.read_text(encoding="utf-8") if attack_timeline_path.is_file() else ""
+for required in [
+    "AttackTimelineConfig.EventNames",
+    'MeleeDamage = "melee_damage"',
+    "function AttackTimelineConfig.ResolveRuntime",
+    "EndGuardSeconds = 0.03",
+    "animationDuration",
+    "normalizedTime",
+    "playbackSpeed",
+]:
+    if required not in attack_timeline_text:
+        err(f"attack animation timeline config missing {required}")
+for required in [
+    "AttackTimelineConfig.ResolveRuntime",
+    "isAllowedAttackClip",
+    "scheduleTimelineResults",
+    "activeUntil",
+    'character:SetAttribute("AttackEndsAt"',
+    "task.delay(delaySeconds",
+]:
+    if required not in attack_text:
+        err(f"server attack timeline contract missing {required}")
 if "BillboardGui" not in dummy_text or "HP %d/%d" not in dummy_text:
     err("training dummy visible hp contract missing")
 
@@ -554,12 +578,18 @@ for required in ["AttackSpeed = 100", "RunSpeed = 50"]:
 for required in ["SetModifierSource", "modifierSources", 'Service.SetModifierSource(character, "weapon", modifiers)']:
     if required not in stats_service_text:
         err(f"composable stat modifier service missing {required}")
-if "DefaultRunStat = 50" not in movement_config_text or "currentRunSpeed" not in movement_config_text:
-    err("movement runtime must derive Roblox speed from RunSpeed=50 baseline")
+for required in ["DefaultRunSpeed = 50", "WalkSpeedMultiplier = 0.5", "return runSpeed", "return runSpeed * CharacterMovementConfig.WalkSpeedMultiplier"]:
+    if required not in movement_config_text:
+        err(f"direct RunSpeed/walk-half movement contract missing {required}")
+if 'character:GetAttribute("RunSpeed")' not in rig_text or 'character:GetAttribute("MoveSpeed")' in rig_text:
+    err("character rig initial movement must use RunSpeed directly")
 if 'character:GetAttribute("AttackSpeed")' not in attack_text:
-    err("server attack cooldown does not use AttackSpeed")
+    err("server attack timeline does not use AttackSpeed")
 if 'character:GetAttribute("AttackSpeed")' not in attack_controller_text:
-    err("client attack debounce does not use AttackSpeed")
+    err("client attack presentation does not use AttackSpeed")
+for required in ['animationController.PlayAction("attack")', "action.durationSeconds", "clipId = action.clipId"]:
+    if required not in attack_controller_text:
+        err(f"client full-animation attack lock missing {required}")
 
 if 'id="nav-weapons"' not in ui or 'id="register-weapon"' not in ui or 'id="weapon-stat-attack-speed"' not in ui:
     err("asset manager weapon registration section is missing")
@@ -771,7 +801,9 @@ for required in ["monster-spawn", "Game1MonsterSpawnMarker", "Game1Authoring", "
 
 monster_spawner_path = ROOT / "src/server/monster/MonsterSpawnerService.luau"
 monster_spawner_text = monster_spawner_path.read_text(encoding="utf-8") if monster_spawner_path.is_file() else ""
-for required in ["MonsterSpawnRegistry", "MonsterRegistry", "MonsterAnimationRegistry", "spawnRadius", "maxAlive", "respawnSeconds", "math.sqrt", "Workspace:Raycast", "EntityHitboxService.Attach", 'GetAttributeChangedSignal("LifeState")', '== "Dead"', 'publishedRows(profile, "idle")', 'weightedIdleChoice', 'MonsterAnimationState', 'MonsterIdleVariant', 'idleTrack.DidLoop', 'choice.track.Ended', 'playBaseIdle']:
+if 'finite(stats.RunSpeed, CharacterMovementConfig.DefaultRunSpeed)' not in monster_spawner_text:
+    err("monster RunSpeed fallback must use the shared direct-speed contract")
+for required in ["MonsterSpawnRegistry", "MonsterRegistry", "MonsterAnimationRegistry", "spawnRadius", "maxAlive", "respawnSeconds", "math.sqrt", "Workspace:Raycast", "EntityHitboxService.Attach", 'GetAttributeChangedSignal("LifeState")', '== "Dying"', 'publishedRows(profile, "idle")', 'weightedIdleChoice', 'MonsterAnimationState', 'MonsterIdleVariant', 'idleTrack.DidLoop', 'choice.track.Ended', 'playBaseIdle']:
     if required not in monster_spawner_text:
         err(f"monster runtime spawner missing {required}")
 for required in ["HumanoidRootPart", 'Instance.new("Humanoid")', "humanoid:MoveTo", "MoveToFinished", "WANDER_PAUSE_MIN_SECONDS", "WANDER_PAUSE_MAX_SECONDS", "WANDER_MOVE_REFRESH_SECONDS", "CharacterMovementConfig.ResolveSpeed", 'firstPublishedTrack(profile, "walk")', "MonsterWanderEnabled"]:
@@ -800,7 +832,7 @@ for required in ["CritChance = 0"]:
         err(f"character critical stat missing {required}")
 if 'setBase(character, "CritChance", d.CritChance)' not in stats_service_text:
     err("character critical chance is not initialized")
-for required in ['"slot": "death"', '"slot": "death_wait"', '"slot": "revive"']:
+for required in ['"slot": "death"', '"slot": "revive"']:
     if required not in animation_store_text:
         err(f"character life animation catalog missing {required}")
 if '"slot": "equip"' in animation_store_text or '"slot": "unequip"' in animation_store_text:
@@ -814,9 +846,130 @@ if character_animation_manifest_path.is_file():
     ]
     if obsolete_character_bindings:
         err("character animation manifest still contains equip/unequip bindings")
-for required in ['return "death_wait"', 'playBaseLifeAction("death"', 'playBaseLifeAction("revive"', 'GetAttributeChangedSignal("LifeState")']:
-    if required not in controller_runtime:
-        err(f"character life animation runtime missing {required}")
+if '"slot": "death_wait"' in animation_store_text:
+    err("character animation catalog must not expose death_wait; DeathIdle holds the final death frame")
+death_policy_path = ROOT / "src/shared/combat/DeathAnimationPolicy.luau"
+death_policy_text = death_policy_path.read_text(encoding="utf-8") if death_policy_path.is_file() else ""
+for required in [
+    "function DeathAnimationPolicy.Start",
+    "function DeathAnimationPolicy.LatchVisibleTerminalPose",
+    "TerminalSafetySeconds = 0.02",
+    "terminalTime = math.max(0, length -",
+    "track.Looped = true",
+    "track.TimePosition = terminalTime",
+    "track:AdjustWeight(1, 0)",
+    "track:AdjustSpeed(0)",
+    "elapsed < terminalTime",
+    "return true, terminalTime",
+]:
+    if required not in death_policy_text:
+        err(f"deterministic death terminal-hold policy missing {required}")
+
+for forbidden in [
+    "AdvanceToFinalKey",
+    "track.TimePosition = finalKeyTime",
+    "EndEpsilonSeconds",
+]:
+    if forbidden in death_policy_text:
+        err(f"death terminal hold contains legacy path: {forbidden}")
+
+for required in [
+    "maintainDeathTerminalPose",
+    "DeathAnimationPolicy.Start",
+    "DeathAnimationPolicy.LatchVisibleTerminalPose",
+    'MonsterAnimationState", "death_idle"',
+    "DeathLifecycleService.BeginDeathIdle",
+    "RunService.PreAnimation:Connect",
+    "deathPoseHeld",
+]:
+    if required not in monster_spawner_text:
+        err(f"monster death terminal-pose lifecycle missing {required}")
+
+for required in [
+    "ensureRuntimeAnimationRoot",
+    'animationRoot.Name = "RootBone"',
+    "animationRoot.CFrame = CFrame.identity",
+    "bone.Parent = animationRoot",
+    "RuntimeAnimationRootBridgeCount",
+]:
+    if required not in monster_spawner_text:
+        err(f"monster root-bone animation bridge missing {required}")
+
+character_animation_text = (ROOT / "src/client/character/animation/CharacterAnimationController.luau").read_text(encoding="utf-8")
+for required in [
+    "playDeath",
+    "maintainDeathTerminalPose",
+    "DeathAnimationPolicy.Start",
+    "DeathAnimationPolicy.LatchVisibleTerminalPose",
+    "DeathTerminalReached",
+    "RunService.PreAnimation:Connect(maintainDeathTerminalPose)",
+    "DeathTerminalPoseHeld",
+]:
+    if required not in character_animation_text:
+        err(f"character death terminal-pose lifecycle missing {required}")
+
+character_service_text = (ROOT / "src/server/character/CharacterService.luau").read_text(encoding="utf-8")
+for required in ["beginPlayerDeathIdle", "DeathTerminalReached", "DeathLifecycleService.BeginDeathIdle"]:
+    if required not in character_service_text:
+        err(f"character death server handoff missing {required}")
+
+legacy_death_tokens = [
+    "playDeathToTerminalPose",
+    "holdDeathTerminalPose",
+    "DeathAnimationNaturalStopObserved",
+    "DeathAnimationStoppedTimePosition",
+    "DeathAnimationFinished",
+    "DeathPlaybackSafetySeconds",
+    "DeathTrackLoadTimeoutSeconds",
+    "CharacterDeathReadyFallbackSeconds",
+    "DeathTerminalFrameEpsilonSeconds",
+    "track:Play(0, 0, 0)",
+]
+if "RobloxBakedAnimationRate = 24" in death_policy_text or "TerminalFrameSeconds" in death_policy_text:
+    err("death playback must not use baked-FPS truncation")
+
+combined_death_runtime = "\n".join([
+    monster_spawner_text,
+    character_animation_text,
+    character_service_text,
+    (ROOT / "src/shared/combat/EntityLifecycleConfig.luau").read_text(encoding="utf-8"),
+])
+for forbidden in legacy_death_tokens:
+    if forbidden in combined_death_runtime:
+        err(f"legacy/fallback death playback path must be removed: found {forbidden}")
+
+damage_service_text = (ROOT / "src/server/combat/DamageService.luau").read_text(encoding="utf-8")
+for required in ['SetAttribute("LifeState", "Dying")', 'SetAttribute("Damageable", false)', 'SetAttribute("DeathStartedAt"']:
+    if required not in damage_service_text:
+        err(f"HP=0 death edge missing {required}")
+
+hit_effect_server = (ROOT / "src/server/combat/HitEffectService.luau").read_text(encoding="utf-8") if (ROOT / "src/server/combat/HitEffectService.luau").is_file() else ""
+hit_effect_client = (ROOT / "src/client/combat/HitEffectController.luau").read_text(encoding="utf-8") if (ROOT / "src/client/combat/HitEffectController.luau").is_file() else ""
+hit_sparks = (ROOT / "src/client/combat/effects/HitSparkBurst.luau").read_text(encoding="utf-8") if (ROOT / "src/client/combat/effects/HitSparkBurst.luau").is_file() else ""
+for required in ["UnreliableRemoteEvent", "ServerReplicationRadius", "FireClient"]:
+    if required not in hit_effect_server:
+        err(f"server hit-effect bridge missing {required}")
+for required in ["HitEffectPool", "BurstCapacity", "OnClientEvent"]:
+    if required not in hit_effect_client:
+        err(f"client hit-effect controller missing {required}")
+for required in ["ImpactSpark", "Beam", "NormalSparkCount", "CriticalSparkCount"]:
+    if required not in hit_sparks:
+        err(f"pooled hit sparks missing {required}")
+if "HitEffectService.Publish" not in (ROOT / "src/server/combat/AttackService.luau").read_text(encoding="utf-8"):
+    err("confirmed melee hits do not publish hit sparks")
+
+# Every registered attack animation is required to have an authoritative timeline.
+for manifest_name in ["character-animations.json", "monster-animations.json"]:
+    manifest_path = ROOT / "assets/manifests" / manifest_name
+    if not manifest_path.is_file():
+        continue
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    for binding in manifest.get("bindings") or []:
+        if str(binding.get("slot") or "") != "attack":
+            continue
+        clip_id = str(binding.get("clipId") or binding.get("clip_id") or "")
+        if clip_id and f'["{clip_id}"]' not in attack_timeline_text:
+            err(f"registered attack clip has no authoritative timeline: {clip_id}")
 
 if errors:
     print("verify failed")
@@ -824,7 +977,7 @@ if errors:
         print(" -", item)
     sys.exit(1)
 
-print("verify ok · game1 m7 monster articulated wander + animation host isolation contracts passed")
+print("verify ok · game1 m8 deterministic death hold + direct movement + attack timelines passed")
 print("registered character archetypes:", len(archetypes))
 print("active character archetype:", active_id or "none")
 print("race pool: human")

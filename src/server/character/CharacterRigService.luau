@@ -87,7 +87,7 @@ local function createPhysicsController(character: Model, navigationRoot: BasePar
     controllerManager.RootPart = navigationRoot
     controllerManager.BaseMoveSpeed = CharacterMovementConfig.RobloxSpeed(
         character:GetAttribute("CharacterArchetype"),
-        character:GetAttribute("MoveSpeed"),
+        character:GetAttribute("RunSpeed"),
         "Run"
     )
     controllerManager.BaseTurnSpeed = CharacterConfig.TurnSpeed

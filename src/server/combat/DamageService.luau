@@ -39,7 +39,11 @@ function DamageService.Apply(attacker: Model?, target: Model, rawDamage: number)
 
     local killed = newHP <= 0
     if killed then
-        target:SetAttribute("LifeState", "Dead")
+        -- HP=0 is the exact death edge. Gameplay leaves Alive immediately; presentation
+        -- services then play the complete authored death clip before entering DeathIdle.
+        target:SetAttribute("Damageable", false)
+        target:SetAttribute("LifeState", "Dying")
+        target:SetAttribute("DeathStartedAt", os.clock())
     end
 
     if AttackConfig.DebugLogs then

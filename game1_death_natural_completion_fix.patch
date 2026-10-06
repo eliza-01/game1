@@ -1,0 +1,413 @@
+diff --git a/src/client/character/animation/CharacterAnimationController.luau b/src/client/character/animation/CharacterAnimationController.luau
+index 2fb2ea3..ddf8eae 100644
+--- a/src/client/character/animation/CharacterAnimationController.luau
++++ b/src/client/character/animation/CharacterAnimationController.luau
+@@ -140,6 +140,28 @@ local function notifyDeathAnimationFinished(boundCharacter: Model)
+ 	end
+ end
+ 
++local function holdDeathTerminalPose(boundCharacter: Model, track: AnimationTrack, length: number): boolean
++	local terminalTime = math.max(0, length - EntityLifecycleConfig.DeathTerminalFrameEpsilonSeconds)
++	local held = pcall(function()
++		-- Death already completed naturally. Re-prime invisibly at zero weight,
++		-- seek to the final playable instant, then expose that frozen pose.
++		track.Looped = false
++		track:Play(0, 0, 0)
++		track.TimePosition = terminalTime
++		track:AdjustSpeed(0)
++		track:AdjustWeight(1, 0)
++	end)
++	if not held then
++		return false
++	end
++	RunService.PreAnimation:Wait()
++	boundCharacter:SetAttribute("DeathAnimationTerminalTime", terminalTime)
++	boundCharacter:SetAttribute("AnimationResolvedSlot", "death_idle")
++	boundCharacter:SetAttribute("DeathTerminalPoseHeld", true)
++	boundCharacter:SetAttribute("DeathTerminalPoseHeldAt", os.clock())
++	return true
++end
++
+ local function playDeathToTerminalPose()
+ 	if not character or not cache then
+ 		return
+@@ -168,84 +190,87 @@ local function playDeathToTerminalPose()
+ 		return
+ 	end
+ 
+-	-- Death is a one-shot Action4 track. Never use DidLoop/Stopped/Ended as the
+-	-- terminal edge: by the time those fire Roblox may already have deactivated the
+-	-- track and left the rig on an earlier evaluated frame. We freeze it from
+-	-- PreAnimation immediately before the next Animator step would cross the end.
++	-- Never freeze or seek Death before it finishes. Let the one-shot track reach
++	-- its documented Stopped completion edge naturally, then hold the final pose
++	-- with a separate zero-speed re-prime of the same track.
++	local stopped = false
++	local stoppedAt = 0
++	local stoppedTimePosition = 0
++	local stopConnection = track.Stopped:Connect(function()
++		stopped = true
++		stoppedAt = os.clock()
++		stoppedTimePosition = tonumber(track.TimePosition) or 0
++	end)
++
+ 	track.Looped = false
+ 	track.Priority = Enum.AnimationPriority.Action4
+ 	track:Play(0, 1, 1)
+ 	track.TimePosition = 0
+ 	track:AdjustWeight(1, 0)
++	boundCharacter:SetAttribute("DeathAnimationStartedAt", os.clock())
++	boundCharacter:SetAttribute("DeathAnimationNaturalStopObserved", false)
++	boundCharacter:SetAttribute("DeathTerminalPoseHeld", false)
++
+ 	task.spawn(function()
+-		local loadDeadline = os.clock() + EntityLifecycleConfig.DeathTrackLoadTimeoutSeconds
+-		while character == boundCharacter and deathSerial == serial and track.Length <= 0.01 and os.clock() < loadDeadline do
+-			RunService.PreAnimation:Wait()
++		local startedAt = os.clock()
++		local loadDeadline = startedAt + EntityLifecycleConfig.DeathTrackLoadTimeoutSeconds
++		while character == boundCharacter
++			and deathSerial == serial
++			and not stopped
++			and track.Length <= 0.01
++			and os.clock() < loadDeadline
++		do
++			RunService.Heartbeat:Wait()
+ 		end
+ 		if character ~= boundCharacter or deathSerial ~= serial then
++			stopConnection:Disconnect()
+ 			return
+ 		end
+ 
+ 		local length = tonumber(track.Length) or 0
+-		if length <= 0.01 then
+-			warn("[game1][animation] death clip length unavailable; continuing lifecycle")
+-			notifyDeathAnimationFinished(boundCharacter)
+-			return
++		if length > 0.01 then
++			boundCharacter:SetAttribute("DeathAnimationLength", length)
++		else
++			warn("[game1][animation] death clip length unavailable; waiting for natural Stopped edge")
+ 		end
+ 
+-		local terminalTime = math.max(0, length - EntityLifecycleConfig.DeathTerminalFrameEpsilonSeconds)
+-		boundCharacter:SetAttribute("DeathAnimationLength", length)
+-		boundCharacter:SetAttribute("DeathAnimationTerminalTime", terminalTime)
+-		boundCharacter:SetAttribute("DeathTerminalPoseHeld", false)
+-		local completionDeadline = os.clock() + length + EntityLifecycleConfig.DeathPlaybackSafetySeconds
+-		local terminalHeld = false
+-
++		local playbackDeadline = startedAt
++			+ (if length > 0.01 then length else EntityLifecycleConfig.CharacterDeathReadyFallbackSeconds)
++			+ EntityLifecycleConfig.DeathPlaybackSafetySeconds
+ 		while character == boundCharacter
+ 			and deathSerial == serial
+ 			and tostring(boundCharacter:GetAttribute("LifeState") or "Alive") ~= "Alive"
+-			and os.clock() < completionDeadline
++			and not stopped
++			and os.clock() < playbackDeadline
+ 		do
+-			local deltaTimeSim = RunService.PreAnimation:Wait()
+-			local speed = math.max(0, tonumber(track.Speed) or 0)
+-			local timePosition = math.max(0, tonumber(track.TimePosition) or 0)
+-			local nextPosition = timePosition + math.max(0, tonumber(deltaTimeSim) or 0) * speed
+-			if timePosition >= terminalTime or nextPosition >= terminalTime then
+-				terminalHeld = pcall(function()
+-					track.TimePosition = terminalTime
+-					track:AdjustWeight(1, 0)
+-					track:AdjustSpeed(0)
+-				end)
+-				if terminalHeld then
+-					break
+-				end
+-			end
++			RunService.Heartbeat:Wait()
+ 		end
++		stopConnection:Disconnect()
+ 
+ 		if character ~= boundCharacter or deathSerial ~= serial then
+ 			return
+ 		end
+ 
+-		if not terminalHeld then
+-			warn(("[game1][animation] death terminal latch safety path · length=%.3f time=%.3f playing=%s"):format(
++		if not stopped then
++			warn(("[game1][animation] death did not reach natural Stopped edge · length=%.3f time=%.3f playing=%s"):format(
+ 				length,
+ 				tonumber(track.TimePosition) or -1,
+ 				tostring(track.IsPlaying)
+ 			))
+-			terminalHeld = pcall(function()
+-				if not track.IsPlaying then
+-					track:Play(0, 1, 0)
+-				end
+-				track.TimePosition = terminalTime
+-				track:AdjustWeight(1, 0)
+-				track:AdjustSpeed(0)
+-			end)
++			notifyDeathAnimationFinished(boundCharacter)
++			return
+ 		end
+ 
+-		if terminalHeld then
+-			RunService.PreAnimation:Wait()
+-			boundCharacter:SetAttribute("AnimationResolvedSlot", "death_idle")
+-			boundCharacter:SetAttribute("DeathTerminalPoseHeld", true)
+-			boundCharacter:SetAttribute("DeathTerminalPoseHeldAt", os.clock())
++		boundCharacter:SetAttribute("DeathAnimationNaturalStopObserved", true)
++		boundCharacter:SetAttribute("DeathAnimationStoppedAt", stoppedAt)
++		boundCharacter:SetAttribute("DeathAnimationStoppedTimePosition", stoppedTimePosition)
++
++		length = tonumber(track.Length) or length
++		if length > 0.01 then
++			boundCharacter:SetAttribute("DeathAnimationLength", length)
++			holdDeathTerminalPose(boundCharacter, track, length)
++		else
++			warn("[game1][animation] death completed but terminal pose length is unavailable")
+ 		end
+ 		notifyDeathAnimationFinished(boundCharacter)
+ 	end)
+diff --git a/src/server/monster/MonsterSpawnerService.luau b/src/server/monster/MonsterSpawnerService.luau
+index 49ba990..f3416da 100644
+--- a/src/server/monster/MonsterSpawnerService.luau
++++ b/src/server/monster/MonsterSpawnerService.luau
+@@ -581,13 +581,48 @@ local function releaseInstance(state: any, model: Model, scheduleRespawn: boolea
+     end
+ end
+ 
++local function holdDeathTerminalPose(model: Model, track: AnimationTrack, length: number): boolean
++    if not model.Parent then
++        return false
++    end
++
++    local terminalTime = math.max(0, length - EntityLifecycleConfig.DeathTerminalFrameEpsilonSeconds)
++    local held = pcall(function()
++        -- The authored Death track has already finished naturally. Re-activate it
++        -- invisibly at zero weight, seek to its final playable instant, then reveal
++        -- that exact pose at zero speed. This never shortens Death playback.
++        track.Looped = false
++        track:Play(0, 0, 0)
++        track.TimePosition = terminalTime
++        track:AdjustSpeed(0)
++        track:AdjustWeight(1, 0)
++    end)
++    if not held then
++        return false
++    end
++
++    RunService.PreAnimation:Wait()
++    model:SetAttribute("DeathAnimationTerminalTime", terminalTime)
++    model:SetAttribute("DeathTerminalPoseHeld", true)
++    model:SetAttribute("DeathTerminalPoseHeldAt", os.clock())
++    return true
++end
++
+ local function playDeathToTerminalPose(model: Model, track: AnimationTrack): boolean
+-    -- Do not wait for Stopped/Ended/DidLoop. Those signals happen on or after the
+-    -- scheduler slice where a non-looped AnimationTrack can already deactivate and
+-    -- lose its terminal pose. Instead, mirror the RobloxLineage handoff: observe
+-    -- TimePosition from PreAnimation and freeze the track immediately BEFORE the
+-    -- next Animator step would cross the final playable instant.
++    -- Death playback itself is never intercepted. Roblox owns the complete
++    -- one-shot 0 -> Length pass; Stopped is the completion edge documented for
++    -- AnimationTrack playback. Only AFTER that edge do we re-prime the same track
++    -- at zero speed on its final pose for DeathIdle.
+     local startedAt = os.clock()
++    local stopped = false
++    local stoppedAt = 0
++    local stoppedTimePosition = 0
++    local stopConnection = track.Stopped:Connect(function()
++        stopped = true
++        stoppedAt = os.clock()
++        stoppedTimePosition = tonumber(track.TimePosition) or 0
++    end)
++
+     local played = pcall(function()
+         track.Looped = false
+         track.Priority = Enum.AnimationPriority.Action4
+@@ -596,80 +631,75 @@ local function playDeathToTerminalPose(model: Model, track: AnimationTrack): boo
+         track:AdjustWeight(1, 0)
+     end)
+     if not played then
++        stopConnection:Disconnect()
+         return false
+     end
+ 
++    model:SetAttribute("DeathAnimationStartedAt", startedAt)
++    model:SetAttribute("DeathAnimationNaturalStopObserved", false)
++    model:SetAttribute("DeathTerminalPoseHeld", false)
++
+     local loadDeadline = startedAt + EntityLifecycleConfig.DeathTrackLoadTimeoutSeconds
+-    while track.Length <= 0.01 and os.clock() < loadDeadline and model.Parent do
+-        RunService.PreAnimation:Wait()
++    while track.Length <= 0.01
++        and not stopped
++        and os.clock() < loadDeadline
++        and model.Parent
++        and tostring(model:GetAttribute("LifeState") or "") == "Dying"
++    do
++        task.wait()
+     end
+-    if not model.Parent then
++
++    if not model.Parent or tostring(model:GetAttribute("LifeState") or "") ~= "Dying" then
++        stopConnection:Disconnect()
+         return false
+     end
+ 
+     local length = tonumber(track.Length) or 0
+-    if length <= 0.01 then
+-        warn("[game1][monster-spawn] death clip length unavailable")
+-        return false
++    if length > 0.01 then
++        model:SetAttribute("DeathAnimationLength", length)
++    else
++        warn("[game1][monster-spawn] death clip length unavailable; waiting for natural Stopped edge")
+     end
+ 
+-    local terminalTime = math.max(0, length - EntityLifecycleConfig.DeathTerminalFrameEpsilonSeconds)
+-    model:SetAttribute("DeathAnimationLength", length)
+-    model:SetAttribute("DeathAnimationTerminalTime", terminalTime)
+-    model:SetAttribute("DeathTerminalPoseHeld", false)
++    local playbackDeadline = startedAt
++        + (if length > 0.01 then length else EntityLifecycleConfig.CharacterDeathReadyFallbackSeconds)
++        + EntityLifecycleConfig.DeathPlaybackSafetySeconds
+ 
+-    local completionDeadline = startedAt + length + EntityLifecycleConfig.DeathPlaybackSafetySeconds
+-    while model.Parent
++    while not stopped
++        and model.Parent
+         and tostring(model:GetAttribute("LifeState") or "") == "Dying"
+-        and os.clock() < completionDeadline
++        and os.clock() < playbackDeadline
+     do
+-        local deltaTimeSim = RunService.PreAnimation:Wait()
+-        local speed = math.max(0, tonumber(track.Speed) or 0)
+-        local timePosition = math.max(0, tonumber(track.TimePosition) or 0)
+-        local nextPosition = timePosition + math.max(0, tonumber(deltaTimeSim) or 0) * speed
+-
+-        if timePosition >= terminalTime or nextPosition >= terminalTime then
+-            local held = pcall(function()
+-                -- Seek first while the track is still live, then stop advancement.
+-                -- AdjustWeight keeps the death pose authoritative over any residual
+-                -- locomotion fade on this Animator.
+-                track.TimePosition = terminalTime
+-                track:AdjustWeight(1, 0)
+-                track:AdjustSpeed(0)
+-            end)
+-            if held then
+-                -- One more PreAnimation slice guarantees the seek is evaluated by
+-                -- Animator before DeathIdle starts and the corpse begins its timer.
+-                RunService.PreAnimation:Wait()
+-                model:SetAttribute("DeathTerminalPoseHeld", true)
+-                model:SetAttribute("DeathTerminalPoseHeldAt", os.clock())
+-                return true
+-            end
+-        end
++        task.wait()
+     end
++    stopConnection:Disconnect()
+ 
+-    -- This is only a safety path. If Roblox stopped the track unexpectedly, prime
+-    -- it at zero speed and explicitly evaluate the terminal pose instead of holding
+-    -- whatever intermediate frame happened to be visible when playback stopped.
+-    warn(("[game1][monster-spawn] death terminal latch safety path · length=%.3f time=%.3f playing=%s"):format(
+-        length,
+-        tonumber(track.TimePosition) or -1,
+-        tostring(track.IsPlaying)
+-    ))
+-    local forced = pcall(function()
+-        if not track.IsPlaying then
+-            track:Play(0, 1, 0)
+-        end
+-        track.TimePosition = terminalTime
+-        track:AdjustWeight(1, 0)
+-        track:AdjustSpeed(0)
+-    end)
+-    if forced then
+-        RunService.PreAnimation:Wait()
+-        model:SetAttribute("DeathTerminalPoseHeld", true)
+-        model:SetAttribute("DeathTerminalPoseHeldAt", os.clock())
++    if not model.Parent or tostring(model:GetAttribute("LifeState") or "") ~= "Dying" then
++        return false
++    end
++
++    if not stopped then
++        warn(("[game1][monster-spawn] death did not reach natural Stopped edge · length=%.3f time=%.3f playing=%s"):format(
++            length,
++            tonumber(track.TimePosition) or -1,
++            tostring(track.IsPlaying)
++        ))
++        return false
++    end
++
++    model:SetAttribute("DeathAnimationNaturalStopObserved", true)
++    model:SetAttribute("DeathAnimationStoppedAt", stoppedAt)
++    model:SetAttribute("DeathAnimationStoppedTimePosition", stoppedTimePosition)
++
++    -- Length should be populated by the natural end even if it was unavailable
++    -- immediately after Play().
++    length = tonumber(track.Length) or length
++    if length <= 0.01 then
++        warn("[game1][monster-spawn] death completed but terminal pose length is unavailable")
++        return true
+     end
+-    return forced
++    model:SetAttribute("DeathAnimationLength", length)
++    return holdDeathTerminalPose(model, track, length)
+ end
+ 
+ local function beginDeath(state: any, model: Model, entry: any)
+diff --git a/src/shared/RuntimeVersion.luau b/src/shared/RuntimeVersion.luau
+index bbc1f6a..ade4beb 100644
+--- a/src/shared/RuntimeVersion.luau
++++ b/src/shared/RuntimeVersion.luau
+@@ -1 +1 @@
+-return table.freeze({ Version = "2026.10.06.011", SourceDigest = "game1-m7-death-preanimation-terminal-handoff" })
++return table.freeze({ Version = "2026.10.06.012", SourceDigest = "game1-m7-death-natural-stop-terminal-reprime" })
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index 201fb10..924cd93 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -825,20 +825,22 @@ death_lifecycle_text = death_lifecycle_path.read_text(encoding="utf-8") if death
+ for required in ["DeathIdleSurfaceSeconds", "DeathIdleSinkSeconds", 'SetAttribute("LifeState", "DeathIdle")', "TweenService:Create", "CorpseSinkPaddingStuds"]:
+     if required not in death_lifecycle_text and required not in (ROOT / "src/shared/combat/EntityLifecycleConfig.luau").read_text(encoding="utf-8"):
+         err(f"shared death-idle lifecycle missing {required}")
+-for required in ["playDeathToTerminalPose", 'MonsterAnimationState", "death_idle"', "DeathLifecycleService.BeginDeathIdle", "DeathTerminalFrameEpsilonSeconds", "DeathPlaybackSafetySeconds", "RunService.PreAnimation"]:
++for required in ["playDeathToTerminalPose", "holdDeathTerminalPose", 'MonsterAnimationState", "death_idle"', "DeathLifecycleService.BeginDeathIdle", "DeathTerminalFrameEpsilonSeconds", "DeathPlaybackSafetySeconds", "track.Stopped:Connect", "DeathAnimationNaturalStopObserved"]:
+     if required not in monster_spawner_text and required not in (ROOT / "src/shared/combat/EntityLifecycleConfig.luau").read_text(encoding="utf-8"):
+-        err(f"monster death terminal-pose lifecycle missing {required}")
+-for required in ["track.Looped = false", "track.Priority = Enum.AnimationPriority.Action4", "nextPosition >= terminalTime", "track.TimePosition = terminalTime", "track:AdjustWeight(1, 0)", "track:AdjustSpeed(0)"]:
++        err(f"monster death natural-completion lifecycle missing {required}")
++for required in ["track.Looped = false", "track.Priority = Enum.AnimationPriority.Action4", "track:Play(0, 0, 0)", "track.TimePosition = terminalTime", "track:AdjustWeight(1, 0)", "track:AdjustSpeed(0)"]:
+     if required not in monster_spawner_text:
+-        err(f"monster death must latch terminal pose before AnimationTrack deactivation: missing {required}")
+-if "track.DidLoop:Connect" in monster_spawner_text:
+-    err("monster death terminal handoff must not depend on DidLoop")
++        err(f"monster death must finish naturally before terminal-pose re-prime: missing {required}")
++for forbidden in ["nextPosition >= terminalTime", "track.DidLoop:Connect"]:
++    if forbidden in monster_spawner_text:
++        err(f"monster death playback must not be intercepted before natural completion: found {forbidden}")
+ character_animation_text = (ROOT / "src/client/character/animation/CharacterAnimationController.luau").read_text(encoding="utf-8")
+-for required in ["track.Looped = false", "track.Priority = Enum.AnimationPriority.Action4", "RunService.PreAnimation:Wait()", "nextPosition >= terminalTime", "DeathPlaybackSafetySeconds", "DeathTerminalPoseHeld"]:
++for required in ["holdDeathTerminalPose", "track.Stopped:Connect", "track.Looped = false", "track.Priority = Enum.AnimationPriority.Action4", "track:Play(0, 0, 0)", "DeathPlaybackSafetySeconds", "DeathAnimationNaturalStopObserved", "DeathTerminalPoseHeld"]:
+     if required not in character_animation_text:
+-        err(f"character death must latch terminal pose before AnimationTrack deactivation: missing {required}")
+-if "track.DidLoop:Connect" in character_animation_text:
+-    err("character death terminal handoff must not depend on DidLoop")
++        err(f"character death must finish naturally before terminal-pose re-prime: missing {required}")
++for forbidden in ["nextPosition >= terminalTime", "track.DidLoop:Connect"]:
++    if forbidden in character_animation_text:
++        err(f"character death playback must not be intercepted before natural completion: found {forbidden}")
+ 
+ damage_service_text = (ROOT / "src/server/combat/DamageService.luau").read_text(encoding="utf-8")
+ for required in ['SetAttribute("LifeState", "Dying")', 'SetAttribute("Damageable", false)', 'SetAttribute("DeathStartedAt"']:
+@@ -866,7 +868,7 @@ if errors:
+         print(" -", item)
+     sys.exit(1)
+ 
+-print("verify ok · game1 m7 pre-animation death terminal handoff + 5s corpse sink + pooled hit sparks contracts passed")
++print("verify ok · game1 m7 natural-stop death completion + terminal re-prime + 5s corpse sink contracts passed")
+ print("registered character archetypes:", len(archetypes))
+ print("active character archetype:", active_id or "none")
+ print("race pool: human")

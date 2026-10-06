@@ -1,4 +1,5 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local ServerStorage = game:GetService("ServerStorage")
 local Workspace = game:GetService("Workspace")
 
@@ -8,7 +9,10 @@ local CharacterShared = Shared:WaitForChild("character")
 local CharacterMovementConfig = require(CharacterShared:WaitForChild("CharacterMovementConfig"))
 local MonsterRegistry = require(MonsterShared:WaitForChild("MonsterRegistry"))
 local MonsterAnimationRegistry = require(MonsterShared:WaitForChild("MonsterAnimationRegistry"))
-local EntityHitboxService = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("EntityHitboxService"))
+local CombatRoot = script.Parent.Parent:WaitForChild("combat")
+local EntityHitboxService = require(CombatRoot:WaitForChild("EntityHitboxService"))
+local DeathLifecycleService = require(CombatRoot:WaitForChild("DeathLifecycleService"))
+local DeathAnimationPolicy = require(Shared:WaitForChild("combat"):WaitForChild("DeathAnimationPolicy"))
 local SpawnRegistry = require(script.Parent:WaitForChild("MonsterSpawnRegistry"))
 
 local MonsterSpawnerService = {}
@@ -17,7 +21,6 @@ local spawnRandom = Random.new()
 local states = {}
 local monstersFolder: Folder? = nil
 
-local DEATH_FALLBACK_SECONDS = 2.5
 local GROUND_RAY_START = 96
 local GROUND_RAY_LENGTH = 384
 local NAVIGATION_ROOT_SIZE = Vector3.new(2, 2, 1)
@@ -276,6 +279,57 @@ local function visibleBounds(model: Model): (CFrame, Vector3)
     end
     local size = maximum - minimum
     return CFrame.new((minimum + maximum) * 0.5), size
+end
+
+local function ensureRuntimeAnimationRoot(visual: Model): number
+    -- Studio's Animation Editor exports skinned FBX clips with a synthetic
+    -- RootBone pose above the authored skeleton root. Runtime Animator ignores
+    -- animation on a Bone that is itself the root of a MeshPart hierarchy.
+    -- Materialize that neutral RootBone in the runtime clone so the authored
+    -- root bone (for example `spine`) becomes an ordinary animated child.
+    --
+    -- The helper is identity-only and is added before tracks are loaded. Existing
+    -- authored Bone world/rest transforms are therefore unchanged. The navigation
+    -- wrapper remains responsible only for world locomotion/yaw; animation owns
+    -- the complete authored bone pose, including root-bone translation/rotation.
+    local bridged = 0
+    for _, descendant in ipairs(visual:GetDescendants()) do
+        if descendant:IsA("MeshPart") then
+            local directBones = {}
+            local animationRoot: Bone? = nil
+            for _, child in ipairs(descendant:GetChildren()) do
+                if child:IsA("Bone") then
+                    if child.Name == "RootBone" then
+                        animationRoot = child
+                    else
+                        table.insert(directBones, child)
+                    end
+                end
+            end
+
+            if #directBones > 0 then
+                if not animationRoot then
+                    animationRoot = Instance.new("Bone")
+                    animationRoot.Name = "RootBone"
+                    animationRoot.CFrame = CFrame.identity
+                    animationRoot.Parent = descendant
+                    animationRoot:SetAttribute("Game1RuntimeAnimationRoot", true)
+                    bridged += 1
+                end
+
+                for _, bone in ipairs(directBones) do
+                    -- Preserve the authored rest/world transform even if a source
+                    -- asset already supplied a non-identity RootBone.
+                    local authoredMeshLocal = bone.CFrame
+                    bone.Parent = animationRoot
+                    bone.CFrame = animationRoot.CFrame:Inverse() * authoredMeshLocal
+                end
+            end
+        end
+    end
+
+    visual:SetAttribute("Game1RuntimeAnimationRootBridgeCount", bridged)
+    return bridged
 end
 
 local function prepareVisual(runtimeModel: Model): (Model, BasePart?)
@@ -549,7 +603,7 @@ local function applyMonsterAttributes(model: Model, definition: any, record: any
     model:SetAttribute("HP", maxHP)
     model:SetAttribute("Damage", math.max(0, finite(stats.Damage, 10)))
     model:SetAttribute("AttackSpeed", math.max(1, finite(stats.AttackSpeed, 100)))
-    model:SetAttribute("RunSpeed", math.max(0, finite(stats.RunSpeed, 16)))
+    model:SetAttribute("RunSpeed", math.max(0, finite(stats.RunSpeed, CharacterMovementConfig.DefaultRunSpeed)))
     model:SetAttribute("CritChance", math.clamp(finite(stats.CritChance, 0), 0, 100))
     model:SetAttribute("Defense", math.max(0, finite(stats.Defense, 0)))
 end
@@ -560,6 +614,7 @@ local function releaseInstance(state: any, model: Model, scheduleRespawn: boolea
         return
     end
     state.instances[model] = nil
+    DeathLifecycleService.Cancel(model)
     stopWanderMovement(entry)
     stopIdleState(entry)
     stopTrack(entry.deathTrack)
@@ -577,14 +632,56 @@ local function releaseInstance(state: any, model: Model, scheduleRespawn: boolea
     end
 end
 
+local function enterDeathIdle(state: any, model: Model, entry: any)
+    if entry.deathPoseHeld or state.instances[model] ~= entry or not model.Parent then
+        return
+    end
+    entry.deathPoseHeld = true
+    model:SetAttribute("MonsterAnimationState", "death_idle")
+    model:SetAttribute("DeathTerminalPoseHeld", true)
+    model:SetAttribute("DeathTerminalPoseHeldAt", os.clock())
+    local started = DeathLifecycleService.BeginDeathIdle(model, entry.navigationRoot, entry.visual, function()
+        releaseInstance(state, model, true)
+    end)
+    assert(started, "DeathIdle lifecycle must start exactly once after the terminal Death pose")
+end
+
+local function maintainDeathTerminalPose(state: any, model: Model, entry: any, deltaTimeSim: number)
+    if not entry.dying
+        or entry.deathPoseHeld
+        or state.instances[model] ~= entry
+        or not model.Parent
+        or tostring(model:GetAttribute("LifeState") or "") ~= "Dying"
+    then
+        return
+    end
+
+    local track = entry.deathTrack
+    if not track then
+        return
+    end
+
+    local reached, terminalTime = DeathAnimationPolicy.LatchVisibleTerminalPose(track, deltaTimeSim)
+    if not reached then
+        return
+    end
+
+    model:SetAttribute("DeathAnimationLength", track.Length)
+    model:SetAttribute("DeathAnimationTerminalTime", terminalTime)
+    enterDeathIdle(state, model, entry)
+end
+
 local function beginDeath(state: any, model: Model, entry: any)
     if entry.dying then
         return
     end
     entry.dying = true
+    entry.deathPoseHeld = false
     model:SetAttribute("Damageable", false)
     model:SetAttribute("MonsterAnimationState", "death")
     model:SetAttribute("MonsterIdleVariant", nil)
+    model:SetAttribute("DeathAnimationStartedAt", os.clock())
+    model:SetAttribute("DeathTerminalPoseHeld", false)
     stopWanderMovement(entry)
     stopIdleState(entry)
     if entry.navigationRoot and entry.navigationRoot.Parent then
@@ -592,23 +689,13 @@ local function beginDeath(state: any, model: Model, entry: any)
         entry.navigationRoot.AssemblyAngularVelocity = Vector3.zero
         entry.navigationRoot.Anchored = true
     end
+
     local track = entry.deathTrack
-    local holdSeconds = DEATH_FALLBACK_SECONDS
-    if track then
-        pcall(function()
-            track:Play(0.08)
-        end)
-        local deadline = os.clock() + 0.75
-        while track.Length <= 0.01 and os.clock() < deadline and model.Parent do
-            task.wait(0.05)
-        end
-        if track.Length > 0.01 then
-            holdSeconds = math.max(0.25, track.Length)
-        end
+    if not track then
+        warn("[game1][monster-spawn] required death animation track is missing; monster remains Dying")
+        return
     end
-    task.delay(holdSeconds, function()
-        releaseInstance(state, model, true)
-    end)
+    DeathAnimationPolicy.Start(track)
 end
 
 local function spawnOne(state: any): Model?
@@ -639,6 +726,8 @@ local function spawnOne(state: any): Model?
         warn("[game1][monster-spawn] monster contains no usable BasePart: " .. slug)
         return nil
     end
+    local animationRootBridgeCount = ensureRuntimeAnimationRoot(visual)
+    model:SetAttribute("RuntimeAnimationRootBridgeCount", animationRootBridgeCount)
     local surface = randomSpawnPoint(record)
     local yaw = spawnRandom:NextNumber(0, math.pi * 2)
     groundAlign(model, surface, yaw)
@@ -675,10 +764,12 @@ local function spawnOne(state: any): Model?
         activeIdleSpecial = nil,
         walkTrack = walkTrack,
         deathTrack = deathTrack,
+        visual = visual,
         navigationRoot = navigationRoot,
         humanoid = humanoid,
         wandering = false,
         dying = false,
+        deathPoseHeld = false,
     }
     state.instances[model] = entry
 
@@ -707,7 +798,7 @@ local function spawnOne(state: any): Model?
         if state.instances[model] ~= entry then
             return
         end
-        if tostring(model:GetAttribute("LifeState") or "") == "Dead" then
+        if tostring(model:GetAttribute("LifeState") or "") == "Dying" then
             beginDeath(state, model, entry)
         end
     end)
@@ -726,7 +817,9 @@ local function stateFill(state: any)
     local target = math.max(1, math.floor(finite(state.record.maxAlive, 1)))
     local alive = 0
     for model in pairs(state.instances) do
-        if model.Parent and tostring(model:GetAttribute("LifeState") or "") ~= "Dead" then
+        -- Dying/DeathIdle still occupies its spawn slot until the corpse is fully
+        -- underground and released. Do not spawn a replacement on the HP=0 frame.
+        if model.Parent then
             alive += 1
         end
     end
@@ -770,6 +863,17 @@ function MonsterSpawnerService.Start()
     started = true
     removeAuthoringVisualsFromSimulation()
     ensureMonstersFolder()
+
+    -- Death runs as a normal one-shot. PreAnimation only catches the step that
+    -- would reach/pass AnimationTrack.Length and freezes the already-evaluated
+    -- visible pose. DeathIdle must never seek into a terminal reset sample.
+    RunService.PreAnimation:Connect(function(deltaTimeSim)
+        for _, state in pairs(states) do
+            for model, entry in pairs(state.instances) do
+                maintainDeathTerminalPose(state, model, entry, deltaTimeSim)
+            end
+        end
+    end)
 
     local count = 0
     for _, record in ipairs(SpawnRegistry.records or {}) do

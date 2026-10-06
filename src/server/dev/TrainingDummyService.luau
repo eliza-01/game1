@@ -1,6 +1,8 @@
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
+local DeathLifecycleService = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("DeathLifecycleService"))
+
 local Service = {}
 
 local function createStatusGui(root: BasePart, model: Model)
@@ -66,17 +68,21 @@ function Service.Start()
         print("[game1][DUMMY] spawned · HP=100/100 DEF=0 · attack with LMB inside melee range")
     end
 
-    model:GetAttributeChangedSignal("HP"):Connect(function()
-        if (model:GetAttribute("HP") or 0) <= 0 then
-            print("[game1][DUMMY] dead · respawning HP in 2s")
-            task.delay(2, function()
-                if model.Parent then
-                    model:SetAttribute("HP", 100)
-                    model:SetAttribute("LifeState", "Alive")
-                    print("[game1][DUMMY] reset · HP=100/100")
-                end
-            end)
+    local spawnCFrame = root.CFrame
+    model:GetAttributeChangedSignal("LifeState"):Connect(function()
+        if tostring(model:GetAttribute("LifeState") or "") ~= "Dying" then
+            return
         end
+        print("[game1][DUMMY] dying · shared 5s DeathIdle presentation")
+        DeathLifecycleService.BeginDeathIdle(model, root, model, function()
+            if model.Parent then
+                root.CFrame = spawnCFrame
+                model:SetAttribute("HP", 100)
+                model:SetAttribute("Damageable", true)
+                model:SetAttribute("LifeState", "Alive")
+                print("[game1][DUMMY] reset · HP=100/100")
+            end
+        end)
     end)
 end
 

@@ -162,6 +162,7 @@ function EntityHitboxService.QueryBox(entity: Model, boxCFrame: CFrame, boxSize:
                         boneName = record.bone.Name,
                         role = record.role,
                         radius = record.radius,
+                        hitPosition = (fromPosition + toPosition) * 0.5,
                     }
                 end
             end
@@ -169,12 +170,21 @@ function EntityHitboxService.QueryBox(entity: Model, boxCFrame: CFrame, boxSize:
     end
 
     if headHit then
+        local headBoneName = binding.entity:GetAttribute("HeadHitboxBoneName") or ""
+        local headPosition = nil
+        for _, record in binding.records do
+            if record.kind == "head" and record.bone.Parent then
+                headPosition = SkeletonHitRegionResolver.TransformedBoneFrame(record.bone).Position
+                break
+            end
+        end
         return {
             hitZone = "head",
             damageMultiplier = 2,
-            boneName = binding.entity:GetAttribute("HeadHitboxBoneName") or "",
+            boneName = headBoneName,
             role = "head",
             radius = headRadius,
+            hitPosition = headPosition,
         }
     end
     return nil

@@ -1,0 +1,1292 @@
+diff --git a/src/client/character/animation/CharacterAnimationController.luau b/src/client/character/animation/CharacterAnimationController.luau
+index a629a8e..a353628 100644
+--- a/src/client/character/animation/CharacterAnimationController.luau
++++ b/src/client/character/animation/CharacterAnimationController.luau
+@@ -1,6 +1,10 @@
+ local Players = game:GetService("Players")
++local ReplicatedStorage = game:GetService("ReplicatedStorage")
+ local RunService = game:GetService("RunService")
+ 
++local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
++local EntityLifecycleConfig = require(Shared:WaitForChild("combat"):WaitForChild("EntityLifecycleConfig"))
++
+ local AnimationResolver = require(script.Parent:WaitForChild("AnimationResolver"))
+ local AnimationTrackCache = require(script.Parent:WaitForChild("AnimationTrackCache"))
+ 
+@@ -17,6 +21,7 @@ local currentAction = nil
+ local connections = {}
+ local lifeTransition = false
+ local lastLifeState = "Alive"
++local deathSerial = 0
+ 
+ local function disconnectAll()
+ 	for _, connection in ipairs(connections) do
+@@ -38,6 +43,7 @@ local function clearCharacter()
+ 	currentAction = nil
+ 	lifeTransition = false
+ 	lastLifeState = "Alive"
++	deathSerial += 1
+ end
+ 
+ local function findAnimator(model: Model): Animator?
+@@ -57,9 +63,6 @@ local function movementSlot(): string
+ 	if not character then
+ 		return "idle"
+ 	end
+-	if tostring(character:GetAttribute("LifeState") or "Alive") == "Dead" then
+-		return "death_wait"
+-	end
+ 	local state = string.lower(tostring(character:GetAttribute("MovementState") or "idle"))
+ 	if state == "walk" then
+ 		return "walk"
+@@ -126,6 +129,88 @@ local function refreshLoop()
+ 	character:SetAttribute("AnimationResolvedClip", clipId)
+ end
+ 
++local function notifyDeathAnimationFinished(boundCharacter: Model)
++	if character ~= boundCharacter or not boundCharacter.Parent then
++		return
++	end
++	local remotes = ReplicatedStorage:FindFirstChild("Game1Remotes")
++	local event = remotes and remotes:FindFirstChild("DeathAnimationFinished")
++	if event and event:IsA("RemoteEvent") then
++		event:FireServer()
++	end
++end
++
++local function playDeathToTerminalPose()
++	if not character or not cache then
++		return
++	end
++	local boundCharacter = character
++	deathSerial += 1
++	local serial = deathSerial
++	local descriptor = AnimationResolver.Resolve(boundCharacter, "base", nil, "death")
++	local track = descriptor and cache:Get(descriptor) or nil
++
++	if currentLoop and currentLoop.IsPlaying then
++		currentLoop:Stop(0)
++	end
++	currentLoop = nil
++	currentLoopClipId = ""
++	if currentAction and currentAction.IsPlaying then
++		currentAction:Stop(0)
++	end
++	currentAction = track
++	boundCharacter:SetAttribute("AnimationActionSlot", "death")
++	boundCharacter:SetAttribute("AnimationActionClip", descriptor and tostring(descriptor.clipId or "") or "")
++
++	if not track then
++		warn("[game1][animation] death clip missing; entering DeathIdle without animated fall")
++		notifyDeathAnimationFinished(boundCharacter)
++		return
++	end
++
++	track.Looped = false
++	track:Play(0, 1, 1)
++	task.spawn(function()
++		local deadline = os.clock() + EntityLifecycleConfig.DeathTrackLoadTimeoutSeconds
++		while character == boundCharacter and deathSerial == serial and track.Length <= 0.01 and os.clock() < deadline do
++			RunService.PreAnimation:Wait()
++		end
++		if character ~= boundCharacter or deathSerial ~= serial then
++			return
++		end
++		local length = tonumber(track.Length) or 0
++		if length <= 0.01 then
++			warn("[game1][animation] death clip length unavailable; continuing lifecycle")
++			notifyDeathAnimationFinished(boundCharacter)
++			return
++		end
++
++		local terminalTime = math.max(0, length - EntityLifecycleConfig.DeathTerminalFrameEpsilonSeconds)
++		while character == boundCharacter
++			and deathSerial == serial
++			and tostring(boundCharacter:GetAttribute("LifeState") or "Alive") ~= "Alive"
++			and track.IsPlaying
++			and track.TimePosition < terminalTime
++		do
++			RunService.PreAnimation:Wait()
++		end
++		if character ~= boundCharacter or deathSerial ~= serial then
++			return
++		end
++
++		pcall(function()
++			if not track.IsPlaying then
++				track:Play(0, 1, 0)
++			end
++			track.TimePosition = terminalTime
++			track:AdjustSpeed(0)
++		end)
++		boundCharacter:SetAttribute("AnimationResolvedSlot", "death_idle")
++		boundCharacter:SetAttribute("DeathTerminalPoseHeld", true)
++		notifyDeathAnimationFinished(boundCharacter)
++	end)
++end
++
+ local function playBaseLifeAction(slot: string, onStopped)
+ 	if not character or not cache then
+ 		if onStopped then onStopped() end
+@@ -168,15 +253,20 @@ local function handleLifeState()
+ 	local current = tostring(character:GetAttribute("LifeState") or "Alive")
+ 	local previous = lastLifeState
+ 	lastLifeState = current
+-	if current == "Dead" and previous ~= "Dead" then
++	if current == "Dying" and previous ~= "Dying" then
+ 		lifeTransition = true
+-		playBaseLifeAction("death", function()
+-			if not character then return end
+-			lifeTransition = false
+-			refreshLoop()
+-		end)
+-	elseif current == "Alive" and previous == "Dead" then
++		playDeathToTerminalPose()
++	elseif current == "DeathIdle" then
++		-- Keep the frozen terminal frame of Death. There is deliberately no
++		-- separate death_wait animation in game1.
+ 		lifeTransition = true
++	elseif current == "Alive" and previous ~= "Alive" then
++		deathSerial += 1
++		lifeTransition = true
++		if currentAction and currentAction.IsPlaying then
++			currentAction:Stop(0)
++		end
++		currentAction = nil
+ 		playBaseLifeAction("revive", function()
+ 			if not character then return end
+ 			lifeTransition = false
+diff --git a/src/client/combat/HitEffectController.luau b/src/client/combat/HitEffectController.luau
+new file mode 100644
+index 0000000..7886438
+--- /dev/null
++++ b/src/client/combat/HitEffectController.luau
+@@ -0,0 +1,58 @@
++local ReplicatedStorage = game:GetService("ReplicatedStorage")
++local Workspace = game:GetService("Workspace")
++
++local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
++local CombatShared = Shared:WaitForChild("combat")
++local HitEffectConfig = require(CombatShared:WaitForChild("HitEffectConfig"))
++local Effects = script.Parent:WaitForChild("effects")
++local HitEffectPool = require(Effects:WaitForChild("HitEffectPool"))
++
++local HitEffectController = {}
++local started = false
++local pool: any = nil
++local tokens = HitEffectConfig.BurstCapacity
++local lastRefillAt = os.clock()
++
++local function consumeBurstBudget(): boolean
++    local now = os.clock()
++    local elapsed = math.max(0, now - lastRefillAt)
++    lastRefillAt = now
++    tokens = math.min(HitEffectConfig.BurstCapacity, tokens + elapsed * HitEffectConfig.MaxBurstsPerSecond)
++    if tokens < 1 then return false end
++    tokens -= 1
++    return true
++end
++
++local function renderCamera(position: Vector3): Camera?
++    local camera = Workspace.CurrentCamera
++    if not camera then return nil end
++    local delta = camera.CFrame.Position - position
++    if delta:Dot(delta) > HitEffectConfig.ClientRenderRadius * HitEffectConfig.ClientRenderRadius then
++        return nil
++    end
++    return camera
++end
++
++local function onHit(position: any, sourcePosition: any, critical: any)
++    if typeof(position) ~= "Vector3" then return end
++    if typeof(sourcePosition) ~= "Vector3" then sourcePosition = position end
++    local camera = renderCamera(position)
++    if not camera or not consumeBurstBudget() then return end
++    pool:Emit(position, sourcePosition, critical == true, camera.CFrame)
++end
++
++function HitEffectController.Start()
++    if started then return end
++    started = true
++    pool = HitEffectPool.new(HitEffectConfig)
++    local remotes = ReplicatedStorage:WaitForChild("Game1Remotes")
++    local remote = remotes:WaitForChild(HitEffectConfig.RemoteName)
++    if not remote:IsA("UnreliableRemoteEvent") then
++        warn("[game1][HIT_FX] CombatHitEffect has wrong class; hit sparks disabled")
++        return
++    end
++    remote.OnClientEvent:Connect(onHit)
++    print(("[game1][HIT_FX] pooled client renderer ready · pool %d"):format(HitEffectConfig.PoolSize))
++end
++
++return table.freeze(HitEffectController)
+diff --git a/src/client/combat/effects/HitEffectPool.luau b/src/client/combat/effects/HitEffectPool.luau
+new file mode 100644
+index 0000000..6ded9da
+--- /dev/null
++++ b/src/client/combat/effects/HitEffectPool.luau
+@@ -0,0 +1,49 @@
++local RunService = game:GetService("RunService")
++local Workspace = game:GetService("Workspace")
++
++local HitSparkBurst = require(script.Parent:WaitForChild("HitSparkBurst"))
++local HitFrontFlash = require(script.Parent:WaitForChild("HitFrontFlash"))
++
++local HitEffectPool = {}
++HitEffectPool.__index = HitEffectPool
++
++local function makeSlot(parent: Instance, config: any, index: number): any
++    return {
++        sparks = HitSparkBurst.Create(parent, config, index),
++        flash = HitFrontFlash.Create(parent, config, index),
++    }
++end
++
++function HitEffectPool.new(config: any): any
++    local folder = Instance.new("Folder")
++    folder.Name = "_Game1LocalHitEffects"
++    folder.Archivable = false
++    folder.Parent = Workspace
++
++    local slots = table.create(config.PoolSize)
++    for index = 1, config.PoolSize do
++        slots[index] = makeSlot(folder, config, index)
++    end
++
++    local self = setmetatable({
++        _config = config,
++        _folder = folder,
++        _slots = slots,
++        _cursor = 0,
++    }, HitEffectPool)
++    RunService.RenderStepped:Connect(function(dt)
++        for _, slot in ipairs(slots) do
++            HitSparkBurst.Step(slot.sparks, dt)
++        end
++    end)
++    return self
++end
++
++function HitEffectPool:Emit(position: Vector3, sourcePosition: Vector3, critical: boolean, cameraCFrame: CFrame)
++    self._cursor = (self._cursor % #self._slots) + 1
++    local slot = self._slots[self._cursor]
++    HitSparkBurst.Emit(slot.sparks, self._config, position, cameraCFrame, critical)
++    HitFrontFlash.Emit(slot.flash, self._config, position, sourcePosition, cameraCFrame, critical)
++end
++
++return HitEffectPool
+diff --git a/src/client/combat/effects/HitFrontFlash.luau b/src/client/combat/effects/HitFrontFlash.luau
+new file mode 100644
+index 0000000..1cb86b4
+--- /dev/null
++++ b/src/client/combat/effects/HitFrontFlash.luau
+@@ -0,0 +1,49 @@
++local HitFrontFlash = {}
++
++function HitFrontFlash.Create(parent: Instance, config: any, index: number): any
++    local part = Instance.new("Part")
++    part.Name = ("HitFrontFlashSlot%02d"):format(index)
++    part.Size = Vector3.new(0.05, 0.05, 0.05)
++    part.Transparency = 1
++    part.Anchored = true
++    part.CanCollide = false
++    part.CanTouch = false
++    part.CanQuery = false
++    part.CastShadow = false
++    part.Parent = parent
++
++    local light = Instance.new("SpotLight")
++    light.Name = "ImpactFrontLight"
++    light.Enabled = false
++    light.Face = Enum.NormalId.Front
++    light.Color = Color3.fromRGB(255, 219, 139)
++    light.Brightness = config.FrontFlashBrightness
++    light.Range = config.FrontFlashRange
++    light.Angle = config.FrontFlashAngle
++    light.Shadows = false
++    light.Parent = part
++
++    return { part = part, light = light, generation = 0 }
++end
++
++function HitFrontFlash.Emit(slot: any, config: any, position: Vector3, sourcePosition: Vector3, cameraCFrame: CFrame, critical: boolean)
++    local incoming = sourcePosition - position
++    if incoming.Magnitude < 0.01 then
++        incoming = cameraCFrame.Position - position
++    end
++    if incoming.Magnitude < 0.01 then return end
++
++    local lightPosition = position + incoming.Unit * config.FrontFlashOffset
++    slot.part.CFrame = CFrame.lookAt(lightPosition, position)
++    slot.light.Brightness = config.FrontFlashBrightness * (if critical then config.FrontFlashCriticalMultiplier else 1)
++    slot.generation += 1
++    local generation = slot.generation
++    slot.light.Enabled = true
++    task.delay(config.FrontFlashDuration, function()
++        if slot.generation == generation and slot.light.Parent then
++            slot.light.Enabled = false
++        end
++    end)
++end
++
++return table.freeze(HitFrontFlash)
+diff --git a/src/client/combat/effects/HitSparkBurst.luau b/src/client/combat/effects/HitSparkBurst.luau
+new file mode 100644
+index 0000000..34ed3ef
+--- /dev/null
++++ b/src/client/combat/effects/HitSparkBurst.luau
+@@ -0,0 +1,150 @@
++local HitSparkBurst = {}
++
++local BASE_ANGLES_DEGREES = table.freeze({ -144, -72, 0, 72, 144, 36, 108, -108 })
++local rng = Random.new()
++
++local function makeBeam(config: any, parent: Instance, index: number): any
++    local tail = Instance.new("Attachment")
++    tail.Name = ("SparkTail%02d"):format(index)
++    tail.Parent = parent
++
++    local head = Instance.new("Attachment")
++    head.Name = ("SparkHead%02d"):format(index)
++    head.Parent = parent
++
++    local beam = Instance.new("Beam")
++    beam.Name = ("ImpactSpark%02d"):format(index)
++    beam.Attachment0 = tail
++    beam.Attachment1 = head
++    beam.Enabled = false
++    beam.FaceCamera = true
++    beam.Segments = 1
++    beam.Width0 = config.SparkWidthTail
++    beam.Width1 = config.SparkWidthHead
++    beam.CurveSize0 = 0
++    beam.CurveSize1 = 0
++    beam.LightEmission = 1
++    beam.LightInfluence = 0
++    beam.Brightness = config.SparkBrightness
++    beam.ZOffset = 0.05
++    beam.Color = ColorSequence.new({
++        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 245, 194)),
++        ColorSequenceKeypoint.new(0.45, Color3.fromRGB(255, 184, 63)),
++        ColorSequenceKeypoint.new(1, Color3.fromRGB(224, 96, 24)),
++    })
++    beam.Transparency = NumberSequence.new({
++        NumberSequenceKeypoint.new(0, 0.03),
++        NumberSequenceKeypoint.new(0.68, 0.10),
++        NumberSequenceKeypoint.new(1, 0.72),
++    })
++    beam.Parent = parent
++
++    return {
++        tail = tail,
++        head = head,
++        beam = beam,
++        origin = Vector3.zero,
++        direction = Vector3.new(1, 0, 0),
++        segmentLength = config.SparkLengthMin,
++        speed = config.SparkTravelSpeedMin,
++        baseWidthTail = config.SparkWidthTail,
++        baseWidthHead = config.SparkWidthHead,
++    }
++end
++
++function HitSparkBurst.Create(parent: Instance, config: any, index: number): any
++    local part = Instance.new("Part")
++    part.Name = ("HitSparkSlot%02d"):format(index)
++    part.Size = Vector3.new(0.05, 0.05, 0.05)
++    part.Transparency = 1
++    part.Anchored = true
++    part.CanCollide = false
++    part.CanTouch = false
++    part.CanQuery = false
++    part.CastShadow = false
++    part.Parent = parent
++
++    local streaks = table.create(config.CriticalSparkCount)
++    for sparkIndex = 1, config.CriticalSparkCount do
++        streaks[sparkIndex] = makeBeam(config, part, sparkIndex)
++    end
++
++    return {
++        part = part,
++        streaks = streaks,
++        age = 0,
++        duration = 0,
++        active = false,
++        activeCount = 0,
++    }
++end
++
++local function configureStreak(streak: any, config: any, sparkIndex: number)
++    local angle = BASE_ANGLES_DEGREES[sparkIndex]
++        + rng:NextNumber(-config.SparkDirectionJitterDegrees, config.SparkDirectionJitterDegrees)
++    local radians = math.rad(angle)
++    local depth = rng:NextNumber(-config.SparkDepthJitter, config.SparkDepthJitter)
++    local direction = Vector3.new(math.cos(radians), math.sin(radians), depth).Unit
++    local origin = Vector3.new(
++        rng:NextNumber(-config.SparkOriginSpreadX, config.SparkOriginSpreadX),
++        rng:NextNumber(-config.SparkOriginSpreadY, config.SparkOriginSpreadY),
++        rng:NextNumber(-config.SparkOriginDepth, config.SparkOriginDepth)
++    )
++    local length = rng:NextNumber(config.SparkLengthMin, config.SparkLengthMax)
++
++    streak.origin = origin
++    streak.direction = direction
++    streak.segmentLength = length
++    streak.speed = rng:NextNumber(config.SparkTravelSpeedMin, config.SparkTravelSpeedMax)
++    streak.tail.Position = origin
++    streak.head.Position = origin + direction * length
++    streak.beam.Width0 = streak.baseWidthTail
++    streak.beam.Width1 = streak.baseWidthHead
++    streak.beam.Enabled = true
++end
++
++function HitSparkBurst.Emit(slot: any, config: any, position: Vector3, cameraCFrame: CFrame, critical: boolean)
++    slot.part.CFrame = CFrame.lookAt(position, position + cameraCFrame.LookVector, cameraCFrame.UpVector)
++    slot.age = 0
++    slot.duration = if critical then config.CriticalSparkDuration else config.NormalSparkDuration
++    slot.activeCount = if critical then config.CriticalSparkCount else config.NormalSparkCount
++    slot.active = true
++
++    for sparkIndex, streak in ipairs(slot.streaks) do
++        if sparkIndex <= slot.activeCount then
++            configureStreak(streak, config, sparkIndex)
++        else
++            streak.beam.Enabled = false
++        end
++    end
++end
++
++function HitSparkBurst.Step(slot: any, dt: number)
++    if not slot.active then return end
++    slot.age += dt
++    if slot.age >= slot.duration then
++        slot.active = false
++        for _, streak in ipairs(slot.streaks) do
++            streak.beam.Enabled = false
++        end
++        return
++    end
++
++    local fadeStart = slot.duration * 0.62
++    local widthScale = 1
++    if slot.age > fadeStart then
++        widthScale = math.max(0.2, 1 - (slot.age - fadeStart) / math.max(0.001, slot.duration - fadeStart))
++    end
++
++    for sparkIndex = 1, slot.activeCount do
++        local streak = slot.streaks[sparkIndex]
++        local travel = streak.speed * slot.age
++        local tail = streak.origin + streak.direction * travel
++        streak.tail.Position = tail
++        streak.head.Position = tail + streak.direction * streak.segmentLength
++        streak.beam.Width0 = math.max(0.012, streak.baseWidthTail * widthScale)
++        streak.beam.Width1 = math.max(0.006, streak.baseWidthHead * widthScale)
++    end
++end
++
++return table.freeze(HitSparkBurst)
+diff --git a/src/client/init.client.luau b/src/client/init.client.luau
+index aa233ca..19e1ff9 100644
+--- a/src/client/init.client.luau
++++ b/src/client/init.client.luau
+@@ -13,6 +13,7 @@ local PlayerStatusController = require(CharacterRoot:WaitForChild("PlayerStatusC
+ local AnimationRoot = CharacterRoot:WaitForChild("animation")
+ local CharacterAnimationController = require(AnimationRoot:WaitForChild("CharacterAnimationController"))
+ local AttackController = require(CombatRoot:WaitForChild("AttackController"))
++local HitEffectController = require(CombatRoot:WaitForChild("HitEffectController"))
+ local AimPoseController = require(CombatRoot:WaitForChild("AimPoseController"))
+ local WeaponRoot = script:WaitForChild("weapon")
+ local WeaponAttachmentController = require(WeaponRoot:WaitForChild("WeaponAttachmentController"))
+@@ -26,6 +27,7 @@ CharacterAnimationController.Start()
+ WeaponAttachmentController.Start()
+ AimPoseController.Start()
+ CameraController.Start()
++HitEffectController.Start()
+ AttackController.Start(MovementController, CharacterAnimationController, AimPoseController)
+ PlayerStatusController.Start()
+ TestLoadoutController.Start()
+diff --git a/src/server/character/CharacterService.luau b/src/server/character/CharacterService.luau
+index b54654b..64a0276 100644
+--- a/src/server/character/CharacterService.luau
++++ b/src/server/character/CharacterService.luau
+@@ -14,11 +14,15 @@ local CharacterRigService = require(script.Parent:WaitForChild("CharacterRigServ
+ local CharacterStatsService = require(script.Parent:WaitForChild("CharacterStatsService"))
+ local CombatRoot = script.Parent.Parent:WaitForChild("combat")
+ local EntityHitboxService = require(CombatRoot:WaitForChild("EntityHitboxService"))
++local DeathLifecycleService = require(CombatRoot:WaitForChild("DeathLifecycleService"))
++local EntityLifecycleConfig = require(Shared:WaitForChild("combat"):WaitForChild("EntityLifecycleConfig"))
+ local WeaponEquipService = require(script.Parent.Parent:WaitForChild("weapon"):WaitForChild("WeaponEquipService"))
+ 
+ local CharacterService = {}
+ local started = false
+ local spawning: { [Player]: boolean } = {}
++local deathContexts: { [Player]: any } = {}
++local createCharacter
+ 
+ local cache = ServerStorage:FindFirstChild("game1CharacterCache") or Instance.new("Folder")
+ cache.Name = "game1CharacterCache"
+@@ -169,7 +173,28 @@ local function destroyPreviousCharacter(player: Player)
+     end
+ end
+ 
+-local function createCharacter(player: Player, requestedArchetypeId: string?): Model?
++local function finishPlayerDeathAnimation(player: Player)
++    local context = deathContexts[player]
++    if not context then
++        return
++    end
++    local character = context.character
++    if not character.Parent or player.Character ~= character or tostring(character:GetAttribute("LifeState") or "") ~= "Dying" then
++        return
++    end
++    if character:GetAttribute("DeathIdleLifecycleStarted") == true then
++        return
++    end
++    character:SetAttribute("DeathIdleLifecycleStarted", true)
++    DeathLifecycleService.BeginDeathIdle(character, context.navigationRoot, context.visual, function(expiredCharacter: Model)
++        if player.Parent == Players and player.Character == expiredCharacter then
++            deathContexts[player] = nil
++            createCharacter(player, tostring(player:GetAttribute("SelectedCharacterArchetype") or ""))
++        end
++    end)
++end
++
++createCharacter = function(player: Player, requestedArchetypeId: string?): Model?
+     if spawning[player] then
+         return nil
+     end
+@@ -238,9 +263,10 @@ local function createCharacter(player: Player, requestedArchetypeId: string?): M
+     end)
+ 
+     character:GetAttributeChangedSignal("LifeState"):Connect(function()
+-        if character:GetAttribute("LifeState") ~= "Dead" then
++        if character:GetAttribute("LifeState") ~= "Dying" or character:GetAttribute("DeathPhysicsLocked") == true then
+             return
+         end
++        character:SetAttribute("DeathPhysicsLocked", true)
+         rig.controllerManager.MovingDirection = Vector3.zero
+         rig.navigationRoot.AssemblyLinearVelocity = Vector3.zero
+         rig.navigationRoot.AssemblyAngularVelocity = Vector3.zero
+@@ -248,15 +274,29 @@ local function createCharacter(player: Player, requestedArchetypeId: string?): M
+             rig.navigationRoot:SetNetworkOwner(nil)
+         end)
+         rig.navigationRoot.Anchored = true
+-        task.delay(3, function()
+-            if player.Parent == Players and player.Character == character then
+-                createCharacter(player, tostring(player:GetAttribute("SelectedCharacterArchetype") or ""))
++        deathContexts[player] = {
++            character = character,
++            navigationRoot = rig.navigationRoot,
++            visual = rig.visual,
++        }
++
++        -- Presentation is owned by the player's Animator. The client reports only
++        -- that the authored death clip reached its terminal pose; the server still
++        -- owns the fixed DeathIdle/sink/respawn timing. Fallback prevents a missing
++        -- or disconnected client from leaving an immortal corpse forever.
++        task.delay(EntityLifecycleConfig.CharacterDeathReadyFallbackSeconds, function()
++            if deathContexts[player] and player.Character == character then
++                finishPlayerDeathAnimation(player)
+             end
+         end)
+     end)
+ 
+     character.Destroying:Connect(function()
+         EntityHitboxService.Detach(character)
++        DeathLifecycleService.Cancel(character)
++        if deathContexts[player] and deathContexts[player].character == character then
++            deathContexts[player] = nil
++        end
+     end)
+ 
+     spawning[player] = nil
+@@ -303,11 +343,21 @@ function CharacterService.Start()
+     end
+     started = true
+     Players.CharacterAutoLoads = false
++
++    local remotes = ReplicatedStorage:FindFirstChild("Game1Remotes") or Instance.new("Folder")
++    remotes.Name = "Game1Remotes"
++    remotes.Parent = ReplicatedStorage
++    local deathReady = remotes:FindFirstChild("DeathAnimationFinished") or Instance.new("RemoteEvent")
++    deathReady.Name = "DeathAnimationFinished"
++    deathReady.Parent = remotes
++    deathReady.OnServerEvent:Connect(finishPlayerDeathAnimation)
++
+     Players.PlayerAdded:Connect(function(player)
+         task.defer(createCharacter, player)
+     end)
+     Players.PlayerRemoving:Connect(function(player)
+         spawning[player] = nil
++        deathContexts[player] = nil
+     end)
+     for _, player in Players:GetPlayers() do
+         task.defer(createCharacter, player)
+diff --git a/src/server/combat/AttackService.luau b/src/server/combat/AttackService.luau
+index fd3554f..a53fc92 100644
+--- a/src/server/combat/AttackService.luau
++++ b/src/server/combat/AttackService.luau
+@@ -6,6 +6,7 @@ local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
+ local CombatShared = Shared:WaitForChild("combat")
+ local Config = require(CombatShared:WaitForChild("AttackConfig"))
+ local DamageService = require(script.Parent:WaitForChild("DamageService"))
++local HitEffectService = require(script.Parent:WaitForChild("HitEffectService"))
+ local EntityHitboxService = require(script.Parent:WaitForChild("EntityHitboxService"))
+ 
+ local AttackService = {}
+@@ -70,6 +71,7 @@ local function attack(player: Player, aim: any)
+     local best: Model? = nil
+     local bestZone = "root"
+     local bestBoneName = ""
++    local bestHitPosition: Vector3? = nil
+     local bestDistance = math.huge
+     local attackBoxSize = Vector3.new(Config.BoxWidth, Config.BoxHeight, attackRange)
+     for _, part in parts do
+@@ -86,6 +88,9 @@ local function attack(player: Player, aim: any)
+                     best = model
+                     bestZone = tostring(virtualHit and virtualHit.hitZone or "root")
+                     bestBoneName = tostring(virtualHit and virtualHit.boneName or "")
++                    bestHitPosition = if virtualHit and typeof(virtualHit.hitPosition) == "Vector3"
++                        then virtualHit.hitPosition
++                        else targetRoot.Position
+                     bestDistance = distance
+                 end
+             end
+@@ -103,6 +108,7 @@ local function attack(player: Player, aim: any)
+ 
+     local rawDamage = tonumber(character:GetAttribute("Damage")) or 0
+     local finalDamage, killed = DamageService.Apply(character, best, rawDamage)
++    HitEffectService.Publish(character, best, best:GetAttribute("LastCritical") == true, bestHitPosition)
+     if Config.DebugLogs then
+         print(("[game1][attack] hit player=%s target=%s zone=%s distance=%.2f damage=%d targethp=%s killed=%s")
+             :format(
+diff --git a/src/server/combat/DamageService.luau b/src/server/combat/DamageService.luau
+index 7536656..d07798b 100644
+--- a/src/server/combat/DamageService.luau
++++ b/src/server/combat/DamageService.luau
+@@ -39,7 +39,11 @@ function DamageService.Apply(attacker: Model?, target: Model, rawDamage: number)
+ 
+     local killed = newHP <= 0
+     if killed then
+-        target:SetAttribute("LifeState", "Dead")
++        -- HP=0 is the exact death edge. Gameplay leaves Alive immediately; presentation
++        -- services then play the complete authored death clip before entering DeathIdle.
++        target:SetAttribute("Damageable", false)
++        target:SetAttribute("LifeState", "Dying")
++        target:SetAttribute("DeathStartedAt", os.clock())
+     end
+ 
+     if AttackConfig.DebugLogs then
+diff --git a/src/server/combat/DeathLifecycleService.luau b/src/server/combat/DeathLifecycleService.luau
+new file mode 100644
+index 0000000..e9d1720
+--- /dev/null
++++ b/src/server/combat/DeathLifecycleService.luau
+@@ -0,0 +1,89 @@
++local TweenService = game:GetService("TweenService")
++
++local ReplicatedStorage = game:GetService("ReplicatedStorage")
++local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
++local CombatShared = Shared:WaitForChild("combat")
++local Config = require(CombatShared:WaitForChild("EntityLifecycleConfig"))
++
++local DeathLifecycleService = {}
++local active: { [Model]: any } = {}
++
++local function sinkDistance(visual: Model?): number
++    if not visual or not visual.Parent then
++        return 2
++    end
++    local ok, _, size = pcall(function()
++        local cf, bounds = visual:GetBoundingBox()
++        return cf, bounds
++    end)
++    if ok and typeof(size) == "Vector3" then
++        return math.max(2, size.Y + Config.CorpseSinkPaddingStuds)
++    end
++    return 2
++end
++
++function DeathLifecycleService.Cancel(entity: Model?)
++    if not entity then
++        return
++    end
++    local record = active[entity]
++    active[entity] = nil
++    if record and record.tween then
++        pcall(function() record.tween:Cancel() end)
++    end
++end
++
++function DeathLifecycleService.BeginDeathIdle(
++    entity: Model,
++    root: BasePart,
++    visual: Model?,
++    onExpired: ((Model) -> ())?
++): boolean
++    if not entity.Parent or not root.Parent or active[entity] then
++        return false
++    end
++
++    local record = {
++        root = root,
++        visual = visual,
++        onExpired = onExpired,
++        generation = os.clock(),
++        tween = nil,
++    }
++    active[entity] = record
++
++    entity:SetAttribute("LifeState", "DeathIdle")
++    entity:SetAttribute("DeathIdleStartedAt", os.clock())
++    entity:SetAttribute("DeathIdleDuration", Config.DeathIdleSeconds)
++    entity:SetAttribute("DeathSinkStartedAt", nil)
++
++    task.delay(Config.DeathIdleSurfaceSeconds, function()
++        if active[entity] ~= record or not entity.Parent or not root.Parent then
++            return
++        end
++
++        entity:SetAttribute("DeathSinkStartedAt", os.clock())
++        local start = root.CFrame
++        local distance = sinkDistance(visual)
++        local tween = TweenService:Create(
++            root,
++            TweenInfo.new(Config.DeathIdleSinkSeconds, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
++            { CFrame = start + Vector3.new(0, -distance, 0) }
++        )
++        record.tween = tween
++        tween:Play()
++        tween.Completed:Wait()
++
++        if active[entity] ~= record then
++            return
++        end
++        active[entity] = nil
++        entity:SetAttribute("DeathIdleExpiredAt", os.clock())
++        if type(onExpired) == "function" then
++            onExpired(entity)
++        end
++    end)
++    return true
++end
++
++return table.freeze(DeathLifecycleService)
+diff --git a/src/server/combat/EntityHitboxService.luau b/src/server/combat/EntityHitboxService.luau
+index 19eb023..b3d3288 100644
+--- a/src/server/combat/EntityHitboxService.luau
++++ b/src/server/combat/EntityHitboxService.luau
+@@ -162,6 +162,7 @@ function EntityHitboxService.QueryBox(entity: Model, boxCFrame: CFrame, boxSize:
+                         boneName = record.bone.Name,
+                         role = record.role,
+                         radius = record.radius,
++                        hitPosition = (fromPosition + toPosition) * 0.5,
+                     }
+                 end
+             end
+@@ -169,12 +170,21 @@ function EntityHitboxService.QueryBox(entity: Model, boxCFrame: CFrame, boxSize:
+     end
+ 
+     if headHit then
++        local headBoneName = binding.entity:GetAttribute("HeadHitboxBoneName") or ""
++        local headPosition = nil
++        for _, record in binding.records do
++            if record.kind == "head" and record.bone.Parent then
++                headPosition = SkeletonHitRegionResolver.TransformedBoneFrame(record.bone).Position
++                break
++            end
++        end
+         return {
+             hitZone = "head",
+             damageMultiplier = 2,
+-            boneName = binding.entity:GetAttribute("HeadHitboxBoneName") or "",
++            boneName = headBoneName,
+             role = "head",
+             radius = headRadius,
++            hitPosition = headPosition,
+         }
+     end
+     return nil
+diff --git a/src/server/combat/HitEffectService.luau b/src/server/combat/HitEffectService.luau
+new file mode 100644
+index 0000000..043e252
+--- /dev/null
++++ b/src/server/combat/HitEffectService.luau
+@@ -0,0 +1,93 @@
++local Players = game:GetService("Players")
++local ReplicatedStorage = game:GetService("ReplicatedStorage")
++
++local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
++local CombatShared = Shared:WaitForChild("combat")
++local HitEffectConfig = require(CombatShared:WaitForChild("HitEffectConfig"))
++
++local HitEffectService = {}
++local started = false
++local remote: UnreliableRemoteEvent? = nil
++local localCenterByTarget = setmetatable({}, { __mode = "k" })
++
++local function ensureRemoteFolder(): Folder
++    local current = ReplicatedStorage:FindFirstChild("Game1Remotes")
++    if current and current:IsA("Folder") then
++        return current
++    end
++    if current then current:Destroy() end
++    local folder = Instance.new("Folder")
++    folder.Name = "Game1Remotes"
++    folder.Parent = ReplicatedStorage
++    return folder
++end
++
++local function ensureRemote(): UnreliableRemoteEvent
++    local folder = ensureRemoteFolder()
++    local current = folder:FindFirstChild(HitEffectConfig.RemoteName)
++    if current and current:IsA("UnreliableRemoteEvent") then
++        return current
++    end
++    if current then current:Destroy() end
++    local created = Instance.new("UnreliableRemoteEvent")
++    created.Name = HitEffectConfig.RemoteName
++    created.Parent = folder
++    return created
++end
++
++local function rootOf(model: Model?): BasePart?
++    if not model then return nil end
++    local root = model:FindFirstChild("RootCollider")
++        or model:FindFirstChild("HumanoidRootPart")
++        or model.PrimaryPart
++    return if root and root:IsA("BasePart") then root else nil
++end
++
++local function targetPosition(target: Model, explicit: any): Vector3?
++    if typeof(explicit) == "Vector3" then
++        return explicit
++    end
++    local root = rootOf(target)
++    if not root then return nil end
++    local localCenter = localCenterByTarget[target]
++    if typeof(localCenter) ~= "Vector3" then
++        local ok, boxCFrame = pcall(function()
++            local cf = target:GetBoundingBox()
++            return cf
++        end)
++        if ok and typeof(boxCFrame) == "CFrame" then
++            localCenter = root.CFrame:PointToObjectSpace(boxCFrame.Position)
++        else
++            localCenter = Vector3.new(0, HitEffectConfig.FallbackTargetOffsetY, 0)
++        end
++        localCenterByTarget[target] = localCenter
++    end
++    return root.CFrame:PointToWorldSpace(localCenter)
++end
++
++function HitEffectService.Publish(attacker: Model, target: Model, critical: boolean, hitPosition: Vector3?)
++    if not started or not remote then return end
++    local position = targetPosition(target, hitPosition)
++    if not position then return end
++    local attackerRoot = rootOf(attacker)
++    local sourcePosition = if attackerRoot then attackerRoot.Position else position
++    local radiusSquared = HitEffectConfig.ServerReplicationRadius * HitEffectConfig.ServerReplicationRadius
++    for _, player in Players:GetPlayers() do
++        local playerRoot = rootOf(player.Character)
++        if playerRoot then
++            local delta = playerRoot.Position - position
++            if delta:Dot(delta) <= radiusSquared then
++                remote:FireClient(player, position, sourcePosition, critical == true)
++            end
++        end
++    end
++end
++
++function HitEffectService.Start()
++    if started then return end
++    started = true
++    remote = ensureRemote()
++    print(("[game1][HIT_FX] pooled client sparks ready · radius %d"):format(HitEffectConfig.ServerReplicationRadius))
++end
++
++return table.freeze(HitEffectService)
+diff --git a/src/server/dev/TrainingDummyService.luau b/src/server/dev/TrainingDummyService.luau
+index ccf7214..93e64b2 100644
+--- a/src/server/dev/TrainingDummyService.luau
++++ b/src/server/dev/TrainingDummyService.luau
+@@ -1,6 +1,8 @@
+ local RunService = game:GetService("RunService")
+ local Workspace = game:GetService("Workspace")
+ 
++local DeathLifecycleService = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("DeathLifecycleService"))
++
+ local Service = {}
+ 
+ local function createStatusGui(root: BasePart, model: Model)
+@@ -66,17 +68,21 @@ function Service.Start()
+         print("[game1][DUMMY] spawned · HP=100/100 DEF=0 · attack with LMB inside melee range")
+     end
+ 
+-    model:GetAttributeChangedSignal("HP"):Connect(function()
+-        if (model:GetAttribute("HP") or 0) <= 0 then
+-            print("[game1][DUMMY] dead · respawning HP in 2s")
+-            task.delay(2, function()
+-                if model.Parent then
+-                    model:SetAttribute("HP", 100)
+-                    model:SetAttribute("LifeState", "Alive")
+-                    print("[game1][DUMMY] reset · HP=100/100")
+-                end
+-            end)
++    local spawnCFrame = root.CFrame
++    model:GetAttributeChangedSignal("LifeState"):Connect(function()
++        if tostring(model:GetAttribute("LifeState") or "") ~= "Dying" then
++            return
+         end
++        print("[game1][DUMMY] dying · shared 5s DeathIdle presentation")
++        DeathLifecycleService.BeginDeathIdle(model, root, model, function()
++            if model.Parent then
++                root.CFrame = spawnCFrame
++                model:SetAttribute("HP", 100)
++                model:SetAttribute("Damageable", true)
++                model:SetAttribute("LifeState", "Alive")
++                print("[game1][DUMMY] reset · HP=100/100")
++            end
++        end)
+     end)
+ end
+ 
+diff --git a/src/server/init.server.luau b/src/server/init.server.luau
+index cd11f0a..2950c6b 100644
+--- a/src/server/init.server.luau
++++ b/src/server/init.server.luau
+@@ -12,6 +12,7 @@ local MonsterRoot = script:WaitForChild("monster")
+ local CharacterService = require(CharacterRoot:WaitForChild("CharacterService"))
+ local EntityHitboxService = require(CombatRoot:WaitForChild("EntityHitboxService"))
+ local AttackService = require(CombatRoot:WaitForChild("AttackService"))
++local HitEffectService = require(CombatRoot:WaitForChild("HitEffectService"))
+ local TrainingDummyService = require(DevRoot:WaitForChild("TrainingDummyService"))
+ local TestLoadoutService = require(DevRoot:WaitForChild("TestLoadoutService"))
+ local MonsterSpawnerService = require(MonsterRoot:WaitForChild("MonsterSpawnerService"))
+@@ -20,6 +21,7 @@ print(("[game1][server] %s v%s · runtime %s")
+     :format(ProjectInfo.Name, ProjectInfo.Version, RuntimeVersion.Version))
+ 
+ EntityHitboxService.Start()
++HitEffectService.Start()
+ AttackService.Start()
+ CharacterService.Start()
+ MonsterSpawnerService.Start()
+diff --git a/src/server/monster/MonsterSpawnerService.luau b/src/server/monster/MonsterSpawnerService.luau
+index 53f3fdd..40e6942 100644
+--- a/src/server/monster/MonsterSpawnerService.luau
++++ b/src/server/monster/MonsterSpawnerService.luau
+@@ -8,7 +8,10 @@ local CharacterShared = Shared:WaitForChild("character")
+ local CharacterMovementConfig = require(CharacterShared:WaitForChild("CharacterMovementConfig"))
+ local MonsterRegistry = require(MonsterShared:WaitForChild("MonsterRegistry"))
+ local MonsterAnimationRegistry = require(MonsterShared:WaitForChild("MonsterAnimationRegistry"))
+-local EntityHitboxService = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("EntityHitboxService"))
++local CombatRoot = script.Parent.Parent:WaitForChild("combat")
++local EntityHitboxService = require(CombatRoot:WaitForChild("EntityHitboxService"))
++local DeathLifecycleService = require(CombatRoot:WaitForChild("DeathLifecycleService"))
++local EntityLifecycleConfig = require(Shared:WaitForChild("combat"):WaitForChild("EntityLifecycleConfig"))
+ local SpawnRegistry = require(script.Parent:WaitForChild("MonsterSpawnRegistry"))
+ 
+ local MonsterSpawnerService = {}
+@@ -17,7 +20,6 @@ local spawnRandom = Random.new()
+ local states = {}
+ local monstersFolder: Folder? = nil
+ 
+-local DEATH_FALLBACK_SECONDS = 2.5
+ local GROUND_RAY_START = 96
+ local GROUND_RAY_LENGTH = 384
+ local NAVIGATION_ROOT_SIZE = Vector3.new(2, 2, 1)
+@@ -560,6 +562,7 @@ local function releaseInstance(state: any, model: Model, scheduleRespawn: boolea
+         return
+     end
+     state.instances[model] = nil
++    DeathLifecycleService.Cancel(model)
+     stopWanderMovement(entry)
+     stopIdleState(entry)
+     stopTrack(entry.deathTrack)
+@@ -577,6 +580,36 @@ local function releaseInstance(state: any, model: Model, scheduleRespawn: boolea
+     end
+ end
+ 
++local function holdDeathTerminalPose(model: Model, track: AnimationTrack): boolean
++    local deadline = os.clock() + EntityLifecycleConfig.DeathTrackLoadTimeoutSeconds
++    while track.Length <= 0.01 and os.clock() < deadline and model.Parent do
++        task.wait(0.02)
++    end
++    local length = tonumber(track.Length) or 0
++    if length <= 0.01 then
++        return false
++    end
++
++    local terminalTime = math.max(0, length - EntityLifecycleConfig.DeathTerminalFrameEpsilonSeconds)
++    while model.Parent and track.IsPlaying and track.TimePosition < terminalTime do
++        task.wait(0.005)
++    end
++    if not model.Parent then
++        return false
++    end
++
++    local ok = pcall(function()
++        -- Re-prime if Roblox naturally stopped on the same scheduler slice, then
++        -- seek to the final authored pose and hold it for the whole DeathIdle state.
++        if not track.IsPlaying then
++            track:Play(0, 1, 0)
++        end
++        track.TimePosition = terminalTime
++        track:AdjustSpeed(0)
++    end)
++    return ok
++end
++
+ local function beginDeath(state: any, model: Model, entry: any)
+     if entry.dying then
+         return
+@@ -592,22 +625,23 @@ local function beginDeath(state: any, model: Model, entry: any)
+         entry.navigationRoot.AssemblyAngularVelocity = Vector3.zero
+         entry.navigationRoot.Anchored = true
+     end
+-    local track = entry.deathTrack
+-    local holdSeconds = DEATH_FALLBACK_SECONDS
+-    if track then
+-        pcall(function()
+-            track:Play(0.08)
+-        end)
+-        local deadline = os.clock() + 0.75
+-        while track.Length <= 0.01 and os.clock() < deadline and model.Parent do
+-            task.wait(0.05)
++
++    task.spawn(function()
++        local track = entry.deathTrack
++        if track then
++            pcall(function()
++                track.Looped = false
++                track:Play(0, 1, 1)
++            end)
++            holdDeathTerminalPose(model, track)
+         end
+-        if track.Length > 0.01 then
+-            holdSeconds = math.max(0.25, track.Length)
++        if state.instances[model] ~= entry or not model.Parent then
++            return
+         end
+-    end
+-    task.delay(holdSeconds, function()
+-        releaseInstance(state, model, true)
++        model:SetAttribute("MonsterAnimationState", "death_idle")
++        DeathLifecycleService.BeginDeathIdle(model, entry.navigationRoot, entry.visual, function()
++            releaseInstance(state, model, true)
++        end)
+     end)
+ end
+ 
+@@ -675,6 +709,7 @@ local function spawnOne(state: any): Model?
+         activeIdleSpecial = nil,
+         walkTrack = walkTrack,
+         deathTrack = deathTrack,
++        visual = visual,
+         navigationRoot = navigationRoot,
+         humanoid = humanoid,
+         wandering = false,
+@@ -707,7 +742,7 @@ local function spawnOne(state: any): Model?
+         if state.instances[model] ~= entry then
+             return
+         end
+-        if tostring(model:GetAttribute("LifeState") or "") == "Dead" then
++        if tostring(model:GetAttribute("LifeState") or "") == "Dying" then
+             beginDeath(state, model, entry)
+         end
+     end)
+@@ -726,7 +761,9 @@ local function stateFill(state: any)
+     local target = math.max(1, math.floor(finite(state.record.maxAlive, 1)))
+     local alive = 0
+     for model in pairs(state.instances) do
+-        if model.Parent and tostring(model:GetAttribute("LifeState") or "") ~= "Dead" then
++        -- Dying/DeathIdle still occupies its spawn slot until the corpse is fully
++        -- underground and released. Do not spawn a replacement on the HP=0 frame.
++        if model.Parent then
+             alive += 1
+         end
+     end
+diff --git a/src/shared/RuntimeVersion.luau b/src/shared/RuntimeVersion.luau
+index 02b3490..3f71566 100644
+--- a/src/shared/RuntimeVersion.luau
++++ b/src/shared/RuntimeVersion.luau
+@@ -1 +1 @@
+-return table.freeze({ Version = "2026.10.06.008", SourceDigest = "game1-m7-monster-articulation-animation-wander-fix" })
++return table.freeze({ Version = "2026.10.06.009", SourceDigest = "game1-m7-death-terminal-corpse-sink-hit-sparks" })
+diff --git a/src/shared/combat/EntityLifecycleConfig.luau b/src/shared/combat/EntityLifecycleConfig.luau
+new file mode 100644
+index 0000000..c62301e
+--- /dev/null
++++ b/src/shared/combat/EntityLifecycleConfig.luau
+@@ -0,0 +1,14 @@
++local EntityLifecycleConfig = {}
++
++-- One corpse presentation contract for characters, monsters and future NPCs.
++-- Death animation duration is NOT included here: every entity plays its authored
++-- death clip to the terminal pose first, then enters this fixed 5 second state.
++EntityLifecycleConfig.DeathIdleSurfaceSeconds = 3
++EntityLifecycleConfig.DeathIdleSinkSeconds = 2
++EntityLifecycleConfig.DeathIdleSeconds = EntityLifecycleConfig.DeathIdleSurfaceSeconds + EntityLifecycleConfig.DeathIdleSinkSeconds
++EntityLifecycleConfig.DeathTerminalFrameEpsilonSeconds = 1 / 240
++EntityLifecycleConfig.DeathTrackLoadTimeoutSeconds = 2
++EntityLifecycleConfig.CharacterDeathReadyFallbackSeconds = 15
++EntityLifecycleConfig.CorpseSinkPaddingStuds = 0.5
++
++return table.freeze(EntityLifecycleConfig)
+diff --git a/src/shared/combat/HitEffectConfig.luau b/src/shared/combat/HitEffectConfig.luau
+new file mode 100644
+index 0000000..d99b219
+--- /dev/null
++++ b/src/shared/combat/HitEffectConfig.luau
+@@ -0,0 +1,35 @@
++local HitEffectConfig = {}
++
++HitEffectConfig.RemoteName = "CombatHitEffect"
++HitEffectConfig.ServerReplicationRadius = 160
++HitEffectConfig.ClientRenderRadius = 120
++HitEffectConfig.PoolSize = 4
++HitEffectConfig.BurstCapacity = 12
++HitEffectConfig.MaxBurstsPerSecond = 36
++
++HitEffectConfig.NormalSparkCount = 5
++HitEffectConfig.CriticalSparkCount = 8
++HitEffectConfig.NormalSparkDuration = 0.10
++HitEffectConfig.CriticalSparkDuration = 0.12
++HitEffectConfig.SparkTravelSpeedMin = 8.5
++HitEffectConfig.SparkTravelSpeedMax = 13.0
++HitEffectConfig.SparkLengthMin = 0.42
++HitEffectConfig.SparkLengthMax = 0.72
++HitEffectConfig.SparkWidthTail = 0.052
++HitEffectConfig.SparkWidthHead = 0.018
++HitEffectConfig.SparkBrightness = 4.0
++HitEffectConfig.SparkOriginSpreadX = 0.30
++HitEffectConfig.SparkOriginSpreadY = 0.42
++HitEffectConfig.SparkOriginDepth = 0.08
++HitEffectConfig.SparkDirectionJitterDegrees = 10
++HitEffectConfig.SparkDepthJitter = 0.12
++
++HitEffectConfig.FrontFlashDuration = 0.085
++HitEffectConfig.FrontFlashOffset = 1.8
++HitEffectConfig.FrontFlashBrightness = 4.0
++HitEffectConfig.FrontFlashCriticalMultiplier = 1.35
++HitEffectConfig.FrontFlashRange = 8
++HitEffectConfig.FrontFlashAngle = 110
++HitEffectConfig.FallbackTargetOffsetY = 2.25
++
++return table.freeze(HitEffectConfig)
+diff --git a/system/control-center/animation_core/common.py b/system/control-center/animation_core/common.py
+index 6e50df0..1813fc7 100644
+--- a/system/control-center/animation_core/common.py
++++ b/system/control-center/animation_core/common.py
+@@ -22,7 +22,6 @@ BASE_SLOT_CATALOG = [
+     {"group": "seated", "slot": "seated.loop", "label": "sit", "looped": True, "priority": "Movement"},
+     {"group": "seated", "slot": "seated.exit", "label": "sit up", "looped": False, "priority": "Action"},
+     {"group": "life", "slot": "death", "label": "death", "looped": False, "priority": "Action"},
+-    {"group": "life", "slot": "death_wait", "label": "wait in death state", "looped": True, "priority": "Action"},
+     {"group": "life", "slot": "revive", "label": "rise after death", "looped": False, "priority": "Action"},
+ ]
+ 
+@@ -199,7 +198,6 @@ def classify_animation(path: Path, character_id: str | None = None) -> dict | No
+         "situp": "seated.exit", "sit_up": "seated.exit", "stand": "seated.exit",
+         "seated_exit": "seated.exit", "base_seated_exit": "seated.exit",
+         "death": "death", "die": "death", "base_death": "death",
+-        "dead": "death_wait", "dead_idle": "death_wait", "death_wait": "death_wait", "dead_wait": "death_wait", "base_dead_idle": "death_wait", "base_death_wait": "death_wait",
+         "revive": "revive", "rise": "revive", "resurrection": "revive", "base_revive": "revive",
+     }
+     if stem in base_aliases:
+diff --git a/system/control-center/animation_core/storage.py b/system/control-center/animation_core/storage.py
+index a20a91d..d907cc6 100644
+--- a/system/control-center/animation_core/storage.py
++++ b/system/control-center/animation_core/storage.py
+@@ -72,13 +72,14 @@ class AnimationStorageMixin:
+                 """
+             )
+             # equip/unequip are runtime weapon operations, not animation states.
+-            # Remove legacy bindings so they disappear from manifests/registries permanently.
++            # death_wait is presentation-only: game1 holds the final frame of death
++            # instead of requiring a second corpse animation clip.
+             obsolete = connection.execute(
+-                "SELECT id,clip_id FROM animation_bindings WHERE scope='weapon' AND slot IN ('equip','unequip')"
++                "SELECT id,clip_id FROM animation_bindings WHERE (scope='weapon' AND slot IN ('equip','unequip')) OR (scope='base' AND slot='death_wait')"
+             ).fetchall()
+             obsolete_clip_ids = {str(row["clip_id"]) for row in obsolete}
+             connection.execute(
+-                "DELETE FROM animation_bindings WHERE scope='weapon' AND slot IN ('equip','unequip')"
++                "DELETE FROM animation_bindings WHERE (scope='weapon' AND slot IN ('equip','unequip')) OR (scope='base' AND slot='death_wait')"
+             )
+             for clip_id in obsolete_clip_ids:
+                 still_used = connection.execute(
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index c25222b..a1accd7 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -771,7 +771,7 @@ for required in ["monster-spawn", "Game1MonsterSpawnMarker", "Game1Authoring", "
+ 
+ monster_spawner_path = ROOT / "src/server/monster/MonsterSpawnerService.luau"
+ monster_spawner_text = monster_spawner_path.read_text(encoding="utf-8") if monster_spawner_path.is_file() else ""
+-for required in ["MonsterSpawnRegistry", "MonsterRegistry", "MonsterAnimationRegistry", "spawnRadius", "maxAlive", "respawnSeconds", "math.sqrt", "Workspace:Raycast", "EntityHitboxService.Attach", 'GetAttributeChangedSignal("LifeState")', '== "Dead"', 'publishedRows(profile, "idle")', 'weightedIdleChoice', 'MonsterAnimationState', 'MonsterIdleVariant', 'idleTrack.DidLoop', 'choice.track.Ended', 'playBaseIdle']:
++for required in ["MonsterSpawnRegistry", "MonsterRegistry", "MonsterAnimationRegistry", "spawnRadius", "maxAlive", "respawnSeconds", "math.sqrt", "Workspace:Raycast", "EntityHitboxService.Attach", 'GetAttributeChangedSignal("LifeState")', '== "Dying"', 'publishedRows(profile, "idle")', 'weightedIdleChoice', 'MonsterAnimationState', 'MonsterIdleVariant', 'idleTrack.DidLoop', 'choice.track.Ended', 'playBaseIdle']:
+     if required not in monster_spawner_text:
+         err(f"monster runtime spawner missing {required}")
+ for required in ["HumanoidRootPart", 'Instance.new("Humanoid")', "humanoid:MoveTo", "MoveToFinished", "WANDER_PAUSE_MIN_SECONDS", "WANDER_PAUSE_MAX_SECONDS", "WANDER_MOVE_REFRESH_SECONDS", "CharacterMovementConfig.ResolveSpeed", 'firstPublishedTrack(profile, "walk")', "MonsterWanderEnabled"]:
+@@ -800,7 +800,7 @@ for required in ["CritChance = 0"]:
+         err(f"character critical stat missing {required}")
+ if 'setBase(character, "CritChance", d.CritChance)' not in stats_service_text:
+     err("character critical chance is not initialized")
+-for required in ['"slot": "death"', '"slot": "death_wait"', '"slot": "revive"']:
++for required in ['"slot": "death"', '"slot": "revive"']:
+     if required not in animation_store_text:
+         err(f"character life animation catalog missing {required}")
+ if '"slot": "equip"' in animation_store_text or '"slot": "unequip"' in animation_store_text:
+@@ -814,17 +814,48 @@ if character_animation_manifest_path.is_file():
+     ]
+     if obsolete_character_bindings:
+         err("character animation manifest still contains equip/unequip bindings")
+-for required in ['return "death_wait"', 'playBaseLifeAction("death"', 'playBaseLifeAction("revive"', 'GetAttributeChangedSignal("LifeState")']:
++if '"slot": "death_wait"' in animation_store_text:
++    err("character animation catalog must not expose death_wait; DeathIdle holds the final death frame")
++for required in ['playDeathToTerminalPose', 'DeathTerminalPoseHeld', 'DeathAnimationFinished', 'current == "Dying"', 'current == "DeathIdle"', 'playBaseLifeAction("revive"', 'GetAttributeChangedSignal("LifeState")']:
+     if required not in controller_runtime:
+         err(f"character life animation runtime missing {required}")
+ 
++death_lifecycle_path = ROOT / "src/server/combat/DeathLifecycleService.luau"
++death_lifecycle_text = death_lifecycle_path.read_text(encoding="utf-8") if death_lifecycle_path.is_file() else ""
++for required in ["DeathIdleSurfaceSeconds", "DeathIdleSinkSeconds", 'SetAttribute("LifeState", "DeathIdle")', "TweenService:Create", "CorpseSinkPaddingStuds"]:
++    if required not in death_lifecycle_text and required not in (ROOT / "src/shared/combat/EntityLifecycleConfig.luau").read_text(encoding="utf-8"):
++        err(f"shared death-idle lifecycle missing {required}")
++for required in ["holdDeathTerminalPose", 'MonsterAnimationState", "death_idle"', "DeathLifecycleService.BeginDeathIdle", "DeathTerminalFrameEpsilonSeconds"]:
++    if required not in monster_spawner_text:
++        err(f"monster death terminal-pose lifecycle missing {required}")
++
++damage_service_text = (ROOT / "src/server/combat/DamageService.luau").read_text(encoding="utf-8")
++for required in ['SetAttribute("LifeState", "Dying")', 'SetAttribute("Damageable", false)', 'SetAttribute("DeathStartedAt"']:
++    if required not in damage_service_text:
++        err(f"HP=0 death edge missing {required}")
++
++hit_effect_server = (ROOT / "src/server/combat/HitEffectService.luau").read_text(encoding="utf-8") if (ROOT / "src/server/combat/HitEffectService.luau").is_file() else ""
++hit_effect_client = (ROOT / "src/client/combat/HitEffectController.luau").read_text(encoding="utf-8") if (ROOT / "src/client/combat/HitEffectController.luau").is_file() else ""
++hit_sparks = (ROOT / "src/client/combat/effects/HitSparkBurst.luau").read_text(encoding="utf-8") if (ROOT / "src/client/combat/effects/HitSparkBurst.luau").is_file() else ""
++for required in ["UnreliableRemoteEvent", "ServerReplicationRadius", "FireClient"]:
++    if required not in hit_effect_server:
++        err(f"server hit-effect bridge missing {required}")
++for required in ["HitEffectPool", "BurstCapacity", "OnClientEvent"]:
++    if required not in hit_effect_client:
++        err(f"client hit-effect controller missing {required}")
++for required in ["ImpactSpark", "Beam", "NormalSparkCount", "CriticalSparkCount"]:
++    if required not in hit_sparks:
++        err(f"pooled hit sparks missing {required}")
++if "HitEffectService.Publish" not in (ROOT / "src/server/combat/AttackService.luau").read_text(encoding="utf-8"):
++    err("confirmed melee hits do not publish hit sparks")
++
+ if errors:
+     print("verify failed")
+     for item in errors:
+         print(" -", item)
+     sys.exit(1)
+ 
+-print("verify ok · game1 m7 monster articulated wander + animation host isolation contracts passed")
++print("verify ok · game1 m7 death terminal-pose + 5s corpse sink + pooled hit sparks contracts passed")
+ print("registered character archetypes:", len(archetypes))
+ print("active character archetype:", active_id or "none")
+ print("race pool: human")

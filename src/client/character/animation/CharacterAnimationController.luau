@@ -1,5 +1,11 @@
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+
+local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
+local CombatShared = Shared:WaitForChild("combat")
+local DeathAnimationPolicy = require(CombatShared:WaitForChild("DeathAnimationPolicy"))
+local AttackTimelineConfig = require(CombatShared:WaitForChild("AttackTimelineConfig"))
 
 local AnimationResolver = require(script.Parent:WaitForChild("AnimationResolver"))
 local AnimationTrackCache = require(script.Parent:WaitForChild("AnimationTrackCache"))
@@ -14,9 +20,14 @@ local cache = nil
 local currentLoop = nil
 local currentLoopClipId = ""
 local currentAction = nil
+local currentActionSlot = ""
+local currentActionLockedUntil = 0
 local connections = {}
 local lifeTransition = false
 local lastLifeState = "Alive"
+local deathTrack: AnimationTrack? = nil
+local deathTerminalPoseHeld = false
+local deathTerminalReported = false
 
 local function disconnectAll()
 	for _, connection in ipairs(connections) do
@@ -36,8 +47,13 @@ local function clearCharacter()
 	currentLoop = nil
 	currentLoopClipId = ""
 	currentAction = nil
+	currentActionSlot = ""
+	currentActionLockedUntil = 0
 	lifeTransition = false
 	lastLifeState = "Alive"
+	deathTrack = nil
+	deathTerminalPoseHeld = false
+	deathTerminalReported = false
 end
 
 local function findAnimator(model: Model): Animator?
@@ -56,9 +72,6 @@ end
 local function movementSlot(): string
 	if not character then
 		return "idle"
-	end
-	if tostring(character:GetAttribute("LifeState") or "Alive") == "Dead" then
-		return "death_wait"
 	end
 	local state = string.lower(tostring(character:GetAttribute("MovementState") or "idle"))
 	if state == "walk" then
@@ -126,6 +139,79 @@ local function refreshLoop()
 	character:SetAttribute("AnimationResolvedClip", clipId)
 end
 
+local function notifyDeathTerminalReached(boundCharacter: Model)
+	if deathTerminalReported or character ~= boundCharacter or not boundCharacter.Parent then
+		return
+	end
+	deathTerminalReported = true
+	local remotes = ReplicatedStorage:FindFirstChild("Game1Remotes")
+	local event = remotes and remotes:FindFirstChild("DeathTerminalReached")
+	if event and event:IsA("RemoteEvent") then
+		event:FireServer()
+	end
+end
+
+local function playDeath()
+	if not character or not cache then
+		return
+	end
+	local boundCharacter = character
+	local descriptor = AnimationResolver.Resolve(boundCharacter, "base", nil, "death")
+	local track = descriptor and cache:Get(descriptor) or nil
+
+	if currentLoop and currentLoop.IsPlaying then
+		currentLoop:Stop(0)
+	end
+	currentLoop = nil
+	currentLoopClipId = ""
+	if currentAction and currentAction.IsPlaying then
+		currentAction:Stop(0)
+	end
+	currentAction = track
+	currentActionSlot = "death"
+	currentActionLockedUntil = 0
+	boundCharacter:SetAttribute("AnimationActionEndsAt", nil)
+	deathTrack = track
+	deathTerminalPoseHeld = false
+	deathTerminalReported = false
+	boundCharacter:SetAttribute("AnimationActionSlot", "death")
+	boundCharacter:SetAttribute("AnimationActionClip", descriptor and tostring(descriptor.clipId or "") or "")
+	boundCharacter:SetAttribute("DeathAnimationStartedAt", os.clock())
+	boundCharacter:SetAttribute("DeathTerminalPoseHeld", false)
+
+	if not track then
+		warn("[game1][animation] required death animation track is missing; character remains Dying")
+		return
+	end
+
+	DeathAnimationPolicy.Start(track)
+end
+
+local function maintainDeathTerminalPose(deltaTimeSim: number)
+	local boundCharacter = character
+	local track = deathTrack
+	if not boundCharacter
+		or not track
+		or deathTerminalPoseHeld
+		or tostring(boundCharacter:GetAttribute("LifeState") or "Alive") ~= "Dying"
+	then
+		return
+	end
+
+	local reached, terminalTime = DeathAnimationPolicy.LatchVisibleTerminalPose(track, deltaTimeSim)
+	if not reached then
+		return
+	end
+
+	deathTerminalPoseHeld = true
+	boundCharacter:SetAttribute("DeathAnimationLength", track.Length)
+	boundCharacter:SetAttribute("DeathAnimationTerminalTime", terminalTime)
+	boundCharacter:SetAttribute("AnimationResolvedSlot", "death_idle")
+	boundCharacter:SetAttribute("DeathTerminalPoseHeld", true)
+	boundCharacter:SetAttribute("DeathTerminalPoseHeldAt", os.clock())
+	notifyDeathTerminalReached(boundCharacter)
+end
+
 local function playBaseLifeAction(slot: string, onStopped)
 	if not character or not cache then
 		if onStopped then onStopped() end
@@ -150,12 +236,16 @@ local function playBaseLifeAction(slot: string, onStopped)
 		currentAction:Stop(0.04)
 	end
 	currentAction = track
+	currentActionSlot = slot
+	currentActionLockedUntil = 0
 	track:Play(0.06, 1, 1)
 	character:SetAttribute("AnimationActionSlot", slot)
 	character:SetAttribute("AnimationActionClip", tostring(descriptor.clipId or ""))
 	track.Stopped:Once(function()
 		if currentAction == track then
 			currentAction = nil
+			currentActionSlot = ""
+			currentActionLockedUntil = 0
 		end
 		if onStopped then onStopped() end
 	end)
@@ -168,15 +258,25 @@ local function handleLifeState()
 	local current = tostring(character:GetAttribute("LifeState") or "Alive")
 	local previous = lastLifeState
 	lastLifeState = current
-	if current == "Dead" and previous ~= "Dead" then
+	if current == "Dying" and previous ~= "Dying" then
 		lifeTransition = true
-		playBaseLifeAction("death", function()
-			if not character then return end
-			lifeTransition = false
-			refreshLoop()
-		end)
-	elseif current == "Alive" and previous == "Dead" then
+		playDeath()
+	elseif current == "DeathIdle" then
+		-- Keep the frozen terminal frame of Death. There is deliberately no
+		-- separate death_wait animation in game1.
 		lifeTransition = true
+	elseif current == "Alive" and previous ~= "Alive" then
+		deathTrack = nil
+		deathTerminalPoseHeld = false
+		deathTerminalReported = false
+		lifeTransition = true
+		if currentAction and currentAction.IsPlaying then
+			currentAction:Stop(0)
+		end
+		currentAction = nil
+		currentActionSlot = ""
+		currentActionLockedUntil = 0
+		character:SetAttribute("AnimationActionEndsAt", nil)
 		playBaseLifeAction("revive", function()
 			if not character then return end
 			lifeTransition = false
@@ -215,9 +315,17 @@ local function bindCharacter(newCharacter: Model)
 end
 
 function CharacterAnimationController.PlayAction(slot: string)
-	if not character or not cache then
+	if not character or not cache or lifeTransition then
 		return nil
 	end
+
+	local now = os.clock()
+	if currentActionSlot == "attack" and now < currentActionLockedUntil then
+		-- An attack owns its complete animation interval. Input/cooldown code may not
+		-- interrupt it before the configured clip timeline reaches its end.
+		return nil
+	end
+
 	local descriptor = AnimationResolver.ResolveAction(character, slot)
 	if not descriptor then
 		return nil
@@ -226,18 +334,55 @@ function CharacterAnimationController.PlayAction(slot: string)
 	if not track then
 		return nil
 	end
+
+	local clipId = tostring(descriptor.clipId or "")
+	local playbackSpeed = 1
+	local timeline = nil
+	local runtimeDuration = 0
+	if slot == "attack" then
+		timeline = AttackTimelineConfig.ResolveRuntime(clipId, character:GetAttribute("AttackSpeed"))
+		if not timeline then
+			warn(("[game1][animation] attack clip has no timeline: %s"):format(clipId))
+			return nil
+		end
+		playbackSpeed = timeline.playbackSpeed
+		runtimeDuration = timeline.duration
+	end
+
 	if currentAction and currentAction.IsPlaying then
 		currentAction:Stop(0.06)
 	end
 	currentAction = track
-	local playbackSpeed = 1
-	if slot == "attack" then
-		playbackSpeed = math.max(0.01, (tonumber(character:GetAttribute("AttackSpeed")) or 100) / 100)
-	end
+	currentActionSlot = slot
+	currentActionLockedUntil = if slot == "attack" then now + runtimeDuration else 0
+	track.Looped = false
 	track:Play(0.06, 1, playbackSpeed)
 	character:SetAttribute("AnimationActionSlot", slot)
-	character:SetAttribute("AnimationActionClip", tostring(descriptor.clipId or ""))
-	return track
+	character:SetAttribute("AnimationActionClip", clipId)
+	if slot == "attack" then
+		character:SetAttribute("AnimationActionEndsAt", currentActionLockedUntil)
+		local boundCharacter = character
+		local boundTrack = track
+		local unlockAt = currentActionLockedUntil
+		task.delay(runtimeDuration, function()
+			if character ~= boundCharacter or currentAction ~= boundTrack or currentActionLockedUntil ~= unlockAt then
+				return
+			end
+			currentActionLockedUntil = 0
+			currentActionSlot = ""
+			currentAction = nil
+			boundCharacter:SetAttribute("AnimationActionEndsAt", nil)
+		end)
+	end
+
+	return {
+		track = track,
+		clipId = clipId,
+		playbackSpeed = playbackSpeed,
+		durationSeconds = runtimeDuration,
+		endsAt = currentActionLockedUntil,
+		timeline = timeline,
+	}
 end
 
 function CharacterAnimationController.SetWeaponSet(weaponSet: string?)
@@ -264,6 +409,7 @@ function CharacterAnimationController.Start()
 	if localPlayer.Character then
 		task.spawn(bindCharacter, localPlayer.Character)
 	end
+	RunService.PreAnimation:Connect(maintainDeathTerminalPose)
 end
 
 return CharacterAnimationController

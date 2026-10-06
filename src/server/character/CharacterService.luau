@@ -14,11 +14,14 @@ local CharacterRigService = require(script.Parent:WaitForChild("CharacterRigServ
 local CharacterStatsService = require(script.Parent:WaitForChild("CharacterStatsService"))
 local CombatRoot = script.Parent.Parent:WaitForChild("combat")
 local EntityHitboxService = require(CombatRoot:WaitForChild("EntityHitboxService"))
+local DeathLifecycleService = require(CombatRoot:WaitForChild("DeathLifecycleService"))
 local WeaponEquipService = require(script.Parent.Parent:WaitForChild("weapon"):WaitForChild("WeaponEquipService"))
 
 local CharacterService = {}
 local started = false
 local spawning: { [Player]: boolean } = {}
+local deathContexts: { [Player]: any } = {}
+local createCharacter
 
 local cache = ServerStorage:FindFirstChild("game1CharacterCache") or Instance.new("Folder")
 cache.Name = "game1CharacterCache"
@@ -169,7 +172,29 @@ local function destroyPreviousCharacter(player: Player)
     end
 end
 
-local function createCharacter(player: Player, requestedArchetypeId: string?): Model?
+local function beginPlayerDeathIdle(player: Player)
+    local context = deathContexts[player]
+    if not context then
+        return
+    end
+    local character = context.character
+    if not character.Parent or player.Character ~= character or tostring(character:GetAttribute("LifeState") or "") ~= "Dying" then
+        return
+    end
+    if character:GetAttribute("DeathIdleLifecycleStarted") == true then
+        return
+    end
+    local lifecycleStarted = DeathLifecycleService.BeginDeathIdle(character, context.navigationRoot, context.visual, function(expiredCharacter: Model)
+        if player.Parent == Players and player.Character == expiredCharacter then
+            deathContexts[player] = nil
+            createCharacter(player, tostring(player:GetAttribute("SelectedCharacterArchetype") or ""))
+        end
+    end)
+    assert(lifecycleStarted, "DeathIdle lifecycle must start exactly once after the player terminal Death pose")
+    character:SetAttribute("DeathIdleLifecycleStarted", true)
+end
+
+createCharacter = function(player: Player, requestedArchetypeId: string?): Model?
     if spawning[player] then
         return nil
     end
@@ -238,9 +263,10 @@ local function createCharacter(player: Player, requestedArchetypeId: string?): M
     end)
 
     character:GetAttributeChangedSignal("LifeState"):Connect(function()
-        if character:GetAttribute("LifeState") ~= "Dead" then
+        if character:GetAttribute("LifeState") ~= "Dying" or character:GetAttribute("DeathPhysicsLocked") == true then
             return
         end
+        character:SetAttribute("DeathPhysicsLocked", true)
         rig.controllerManager.MovingDirection = Vector3.zero
         rig.navigationRoot.AssemblyLinearVelocity = Vector3.zero
         rig.navigationRoot.AssemblyAngularVelocity = Vector3.zero
@@ -248,15 +274,23 @@ local function createCharacter(player: Player, requestedArchetypeId: string?): M
             rig.navigationRoot:SetNetworkOwner(nil)
         end)
         rig.navigationRoot.Anchored = true
-        task.delay(3, function()
-            if player.Parent == Players and player.Character == character then
-                createCharacter(player, tostring(player:GetAttribute("SelectedCharacterArchetype") or ""))
-            end
-        end)
+        deathContexts[player] = {
+            character = character,
+            navigationRoot = rig.navigationRoot,
+            visual = rig.visual,
+        }
+
+        -- The owning client evaluates Player.Character animation. It reports the
+        -- single authoritative presentation edge: Death reached its final authored
+        -- pose and is now frozen. Only then does the server start the 5s DeathIdle.
     end)
 
     character.Destroying:Connect(function()
         EntityHitboxService.Detach(character)
+        DeathLifecycleService.Cancel(character)
+        if deathContexts[player] and deathContexts[player].character == character then
+            deathContexts[player] = nil
+        end
     end)
 
     spawning[player] = nil
@@ -303,11 +337,21 @@ function CharacterService.Start()
     end
     started = true
     Players.CharacterAutoLoads = false
+
+    local remotes = ReplicatedStorage:FindFirstChild("Game1Remotes") or Instance.new("Folder")
+    remotes.Name = "Game1Remotes"
+    remotes.Parent = ReplicatedStorage
+    local deathTerminalReached = remotes:FindFirstChild("DeathTerminalReached") or Instance.new("RemoteEvent")
+    deathTerminalReached.Name = "DeathTerminalReached"
+    deathTerminalReached.Parent = remotes
+    deathTerminalReached.OnServerEvent:Connect(beginPlayerDeathIdle)
+
     Players.PlayerAdded:Connect(function(player)
         task.defer(createCharacter, player)
     end)
     Players.PlayerRemoving:Connect(function(player)
         spawning[player] = nil
+        deathContexts[player] = nil
     end)
     for _, player in Players:GetPlayers() do
         task.defer(createCharacter, player)

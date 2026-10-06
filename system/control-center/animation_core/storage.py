@@ -72,13 +72,14 @@ class AnimationStorageMixin:
                 """
             )
             # equip/unequip are runtime weapon operations, not animation states.
-            # Remove legacy bindings so they disappear from manifests/registries permanently.
+            # death_wait is presentation-only: game1 holds the final frame of death
+            # instead of requiring a second corpse animation clip.
             obsolete = connection.execute(
-                "SELECT id,clip_id FROM animation_bindings WHERE scope='weapon' AND slot IN ('equip','unequip')"
+                "SELECT id,clip_id FROM animation_bindings WHERE (scope='weapon' AND slot IN ('equip','unequip')) OR (scope='base' AND slot='death_wait')"
             ).fetchall()
             obsolete_clip_ids = {str(row["clip_id"]) for row in obsolete}
             connection.execute(
-                "DELETE FROM animation_bindings WHERE scope='weapon' AND slot IN ('equip','unequip')"
+                "DELETE FROM animation_bindings WHERE (scope='weapon' AND slot IN ('equip','unequip')) OR (scope='base' AND slot='death_wait')"
             )
             for clip_id in obsolete_clip_ids:
                 still_used = connection.execute(

@@ -22,7 +22,6 @@ BASE_SLOT_CATALOG = [
     {"group": "seated", "slot": "seated.loop", "label": "sit", "looped": True, "priority": "Movement"},
     {"group": "seated", "slot": "seated.exit", "label": "sit up", "looped": False, "priority": "Action"},
     {"group": "life", "slot": "death", "label": "death", "looped": False, "priority": "Action"},
-    {"group": "life", "slot": "death_wait", "label": "wait in death state", "looped": True, "priority": "Action"},
     {"group": "life", "slot": "revive", "label": "rise after death", "looped": False, "priority": "Action"},
 ]
 
@@ -199,7 +198,6 @@ def classify_animation(path: Path, character_id: str | None = None) -> dict | No
         "situp": "seated.exit", "sit_up": "seated.exit", "stand": "seated.exit",
         "seated_exit": "seated.exit", "base_seated_exit": "seated.exit",
         "death": "death", "die": "death", "base_death": "death",
-        "dead": "death_wait", "dead_idle": "death_wait", "death_wait": "death_wait", "dead_wait": "death_wait", "base_dead_idle": "death_wait", "base_death_wait": "death_wait",
         "revive": "revive", "rise": "revive", "resurrection": "revive", "base_revive": "revive",
     }
     if stem in base_aliases:

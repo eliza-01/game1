@@ -135,6 +135,7 @@ required_runtime = [
     "src/client/character/PlayerStatusController.luau",
     "src/client/character/animation/AnimationResolver.luau",
     "src/client/character/animation/AnimationTrackCache.luau",
+    "src/client/character/animation/AttackUpperBodyComposer.luau",
     "src/client/character/animation/CharacterAnimationController.luau",
     "src/client/combat/AttackController.luau",
     "src/client/combat/AimPoseController.luau",
@@ -425,11 +426,11 @@ if "CharacterAnimationController.Start()" not in client_init_text:
 attack_controller_text = (ROOT / "src/client/combat/AttackController.luau").read_text(encoding="utf-8")
 if 'animationController.PlayAction("attack")' not in attack_controller_text:
     err("combat attack input is not connected to the semantic attack animation slot")
-for required in ["BeginAimFacingCompensation", "TorsoYawLimit", "aimPoseController.BeginAttack"]:
+for required in ["BeginAimFacingCompensation", "TorsoYawLimit", "aimPoseController.BeginAttack", "movementController.LockMovement(attackDuration)", "finishPresentation(sequence)"]:
     if required not in attack_controller_text:
         err(f"robloxlineage attack/aim integration missing {required}")
 aim_pose_text = (ROOT / "src/client/combat/AimPoseController.luau").read_text(encoding="utf-8")
-for required in ["RunService.PreSimulation", "spine.001", "AimTorsoYawDegrees", "bone.Transform = delta * bone.Transform", "ViewportPointToRay", "Game1AimReticle"]:
+for required in ["RunService.PreSimulation", "spine.001", "AimTorsoYawDegrees", "applyWorldAim", "desiredTransform", "ViewportPointToRay", "Game1AimReticle"]:
     if required not in aim_pose_text:
         err(f"procedural torso aim controller missing {required}")
 movement_runtime = (ROOT / "src/client/character/MovementController.luau").read_text(encoding="utf-8")
@@ -438,6 +439,47 @@ for required in ["BeginAimFacingCompensation", "UpdateAimFacingCompensation", "a
         err(f"movement aim-facing compensation missing {required}")
 if "AimPoseController.Start()" not in client_init_text:
     err("procedural torso aim controller is not started by the client runtime")
+
+# m21 RobloxLineage planted-attack presentation contract. Facing/aim are held for
+# the complete attack; the full-body source clip is sampled on a proxy and only
+# the upper-body bridge subtree is composed over combat_idle legs.
+attack_composer_path = ROOT / "src/client/character/animation/AttackUpperBodyComposer.luau"
+attack_composer_text = attack_composer_path.read_text(encoding="utf-8") if attack_composer_path.is_file() else ""
+for required in [
+    "__Game1AttackUpperBodyProxy",
+    'FindFirstChild("spine.001", true)',
+    "buildUpperPairs",
+    "sourceArmature",
+    "mappedAttackWorld",
+    "baseBridgeTransform:Lerp",
+    "RunService.PreSimulation:Connect(step)",
+    "RunService.PreAnimation:Connect(holdSourceTerminalPose)",
+]:
+    if required not in attack_composer_text:
+        err(f"upper-body attack composition missing {required}")
+for required in [
+    "attackLowerBodyActive",
+    'return "combat_idle"',
+    "AttackUpperBodyComposer.Begin(character, descriptor, playbackSpeed)",
+    "AnimationAttackUpperBodyComposed",
+    'AnimationAttackLowerBodySlot", "combat_idle"',
+    "AttackUpperBodyComposer.BeginExitBlend()",
+]:
+    if required not in controller_runtime:
+        err(f"planted attack lower/upper-body contract missing {required}")
+for forbidden in [
+    "task.delay(facingDuration",
+    "AttackConfig.MovementLockSeconds",
+    "AttackConfig.AimPoseSeconds",
+]:
+    if forbidden in attack_controller_text:
+        err(f"attack presentation still releases aim/movement early: {forbidden}")
+if "aimPoseController.BeginAttack(target, attackDuration)" not in attack_controller_text:
+    err("attack aim pose must stay active for the complete attack duration")
+if "movementController.LockMovement(attackDuration)" not in attack_controller_text:
+    err("planted melee movement lock must cover the complete attack duration")
+if "movementController.EndAimFacingCompensation()" not in attack_controller_text.split("local function finishPresentation", 1)[1].split("function AttackController.Start", 1)[0]:
+    err("root aim compensation must release only from full-attack presentation cleanup")
 if 'character:SetAttribute("AnimationProfileId", archetype)' not in character_service_text:
     err("character runtime does not expose animation profile identity")
 if 'character:SetAttribute("CharacterSkeletonSignature"' not in character_service_text:
@@ -1261,7 +1303,7 @@ if errors:
         print(" -", item)
     sys.exit(1)
 
-print("verify ok · game1 m20 Movement Debug runtime tuning + AM ratios passed")
+print("verify ok · game1 m21 held attack aim + upper-body-over-combat-legs passed")
 print("registered character archetypes:", len(archetypes))
 print("active character archetype:", active_id or "none")
 print("race pool: human")

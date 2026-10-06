@@ -1,0 +1,1037 @@
+diff --git a/src/client/character/animation/AttackUpperBodyComposer.luau b/src/client/character/animation/AttackUpperBodyComposer.luau
+new file mode 100644
+index 0000000..cd80373
+--- /dev/null
++++ b/src/client/character/animation/AttackUpperBodyComposer.luau
+@@ -0,0 +1,411 @@
++local RunService = game:GetService("RunService")
++local Workspace = game:GetService("Workspace")
++local ReplicatedStorage = game:GetService("ReplicatedStorage")
++
++local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
++local CombatShared = Shared:WaitForChild("combat")
++local AttackConfig = require(CombatShared:WaitForChild("AttackConfig"))
++local AimPoseController = require(script.Parent.Parent.Parent:WaitForChild("combat"):WaitForChild("AimPoseController"))
++
++local AttackUpperBodyComposer = {}
++
++local started = false
++local active = false
++local activeCharacter: Model? = nil
++local targetBridge: Bone? = nil
++local targetHost: BasePart? = nil
++local sourceProxy: Model? = nil
++local sourceBridge: Bone? = nil
++local sourceHost: BasePart? = nil
++local sourceAnimation: Animation? = nil
++local sourceTrack: AnimationTrack? = nil
++local sourcePlaybackSpeed = 1
++local sourcePoseFrozen = false
++local blendStartedAt = 0
++local exitBlendStartedAt = 0
++local exitBlendRequested = false
++local upperPairs = {}
++
++local function spineOrder(name: string): number?
++	local lower = string.lower(name)
++	if lower == "spine" then
++		return 0
++	end
++	local suffix = string.match(lower, "^spine%.(%d+)$")
++	if suffix then
++		return tonumber(suffix)
++	end
++	return nil
++end
++
++local function findUpperBodyBridge(root: Instance): Bone?
++	local preferred = root:FindFirstChild("spine.001", true)
++	if preferred and preferred:IsA("Bone") then
++		return preferred
++	end
++
++	local candidates = {}
++	for _, object in root:GetDescendants() do
++		if object:IsA("Bone") then
++			local order = spineOrder(object.Name)
++			if order ~= nil and order >= 1 then
++				table.insert(candidates, { bone = object, order = order })
++			end
++		end
++	end
++	table.sort(candidates, function(left, right)
++		return left.order < right.order
++	end)
++	return if candidates[1] then candidates[1].bone else nil
++end
++
++local function findNamedBone(root: Instance, name: string): Bone?
++	local object = root:FindFirstChild(name, true)
++	return if object and object:IsA("Bone") then object else nil
++end
++
++local function nearestBasePart(instance: Instance?): BasePart?
++	local current = instance
++	while current do
++		if current:IsA("BasePart") then
++			return current
++		end
++		current = current.Parent
++	end
++	return nil
++end
++
++local function parentWorldCFrame(bone: Bone): CFrame?
++	local parent = bone.Parent
++	if not parent then
++		return nil
++	end
++	if parent:IsA("Bone") then
++		return parent.TransformedWorldCFrame
++	end
++	if parent:IsA("BasePart") then
++		return parent.CFrame
++	end
++	return nil
++end
++
++local function smoothstep(alpha: number): number
++	local value = math.clamp(alpha, 0, 1)
++	return value * value * (3 - 2 * value)
++end
++
++local function destroyProxy()
++	AimPoseController.SetPoseDrivenExternally(false)
++	upperPairs = {}
++	targetBridge = nil
++	targetHost = nil
++	sourceBridge = nil
++	sourceHost = nil
++	sourcePlaybackSpeed = 1
++	sourcePoseFrozen = false
++	blendStartedAt = 0
++	exitBlendStartedAt = 0
++	exitBlendRequested = false
++	if sourceTrack then
++		pcall(function()
++			sourceTrack:Stop(0)
++			sourceTrack:Destroy()
++		end)
++		sourceTrack = nil
++	end
++	if sourceAnimation then
++		sourceAnimation:Destroy()
++		sourceAnimation = nil
++	end
++	if sourceProxy then
++		sourceProxy:Destroy()
++		sourceProxy = nil
++	end
++	activeCharacter = nil
++	active = false
++end
++
++local function prepareProxy(visual: Model): (Model?, Animator?, string?)
++	local oldArchivable = visual.Archivable
++	visual.Archivable = true
++	local okClone, cloneOrError = pcall(function()
++		return visual:Clone()
++	end)
++	visual.Archivable = oldArchivable
++	if not okClone or not cloneOrError then
++		return nil, nil, "could not clone Visual: " .. tostring(cloneOrError)
++	end
++
++	local proxy = cloneOrError :: Model
++	proxy.Name = "__Game1AttackUpperBodyProxy"
++	for _, object in proxy:GetDescendants() do
++		if object:IsA("Bone") then
++			-- Clone() can capture the currently evaluated locomotion pose. The proxy
++			-- must contain only the source attack animation.
++			object.Transform = CFrame.identity
++		elseif object:IsA("BasePart") then
++			object.Anchored = true
++			object.CanCollide = false
++			object.CanTouch = false
++			object.CanQuery = false
++			object.Transparency = 1
++			object.LocalTransparencyModifier = 1
++		elseif object:IsA("Decal") or object:IsA("Texture") then
++			object.Transparency = 1
++		elseif object:IsA("ParticleEmitter") or object:IsA("Trail") or object:IsA("Beam") then
++			object.Enabled = false
++		elseif object:IsA("Script") or object:IsA("LocalScript") then
++			object:Destroy()
++		end
++	end
++
++	local animationController = proxy:FindFirstChildWhichIsA("AnimationController", true)
++	if not animationController then
++		proxy:Destroy()
++		return nil, nil, "attack source proxy has no AnimationController"
++	end
++	local animator = animationController:FindFirstChildWhichIsA("Animator")
++	if not animator then
++		animator = Instance.new("Animator")
++		animator.Parent = animationController
++	end
++
++	proxy.Parent = Workspace
++	proxy:PivotTo(visual:GetPivot())
++	return proxy, animator, nil
++end
++
++local function buildUpperPairs(proxy: Model, bridge: Bone): ({ any }, string?)
++	local pairs = {}
++	for _, targetObject in bridge:GetDescendants() do
++		if targetObject:IsA("Bone") then
++			local sourceObject = findNamedBone(proxy, targetObject.Name)
++			if sourceObject then
++				table.insert(pairs, {
++					target = targetObject,
++					source = sourceObject,
++				})
++			end
++		end
++	end
++	if #pairs == 0 then
++		return {}, "no upper-body descendant bones matched the source attack"
++	end
++	return pairs, nil
++end
++
++local function blendWeight(now: number): (number, boolean)
++	local entrySeconds = math.max(0, tonumber(AttackConfig.UpperBodyAttackEntryBlendSeconds) or 0.10)
++	local exitSeconds = math.max(0, tonumber(AttackConfig.UpperBodyAttackExitBlendSeconds) or 0.12)
++	local entry = if entrySeconds > 0 then smoothstep((now - blendStartedAt) / entrySeconds) else 1
++	if not exitBlendRequested then
++		return entry, false
++	end
++	local exitLinear = if exitSeconds > 0 then math.clamp((now - exitBlendStartedAt) / exitSeconds, 0, 1) else 1
++	return entry * (1 - smoothstep(exitLinear)), exitLinear >= 1
++end
++
++function AttackUpperBodyComposer.IsActive(): boolean
++	return active
++end
++
++function AttackUpperBodyComposer.GetExitBlendSeconds(): number
++	return math.max(0, tonumber(AttackConfig.UpperBodyAttackExitBlendSeconds) or 0.12)
++end
++
++function AttackUpperBodyComposer.BeginExitBlend()
++	if not active or exitBlendRequested then
++		return
++	end
++	exitBlendRequested = true
++	exitBlendStartedAt = os.clock()
++end
++
++function AttackUpperBodyComposer.Begin(character: Model, descriptor: any, playbackSpeed: number): (AnimationTrack?, string?)
++	local visual = character:FindFirstChild("Visual")
++	if not visual or not visual:IsA("Model") then
++		return nil, "visible character rig is missing"
++	end
++	local bridge = findUpperBodyBridge(visual)
++	if not bridge then
++		return nil, "upper-body bridge bone is missing"
++	end
++	local host = nearestBasePart(bridge)
++	if not host then
++		return nil, "upper-body bridge has no BasePart host"
++	end
++
++	local proxy, animator, proxyError = prepareProxy(visual)
++	if not proxy or not animator then
++		return nil, proxyError or "could not create attack source proxy"
++	end
++	local proxyBridge = findNamedBone(proxy, bridge.Name)
++	if not proxyBridge then
++		proxy:Destroy()
++		return nil, "source proxy bridge bone is missing: " .. bridge.Name
++	end
++	local proxyHost = nearestBasePart(proxyBridge)
++	if not proxyHost then
++		proxy:Destroy()
++		return nil, "source proxy bridge has no BasePart host"
++	end
++	local pairs, pairError = buildUpperPairs(proxy, bridge)
++	if pairError then
++		proxy:Destroy()
++		return nil, pairError
++	end
++
++	local animation = Instance.new("Animation")
++	animation.Name = "AttackUpperBody_" .. tostring(descriptor.clipId or "attack")
++	animation.AnimationId = tostring(descriptor.animationId or "")
++	local okLoad, trackOrError = pcall(function()
++		return animator:LoadAnimation(animation)
++	end)
++	if not okLoad then
++		animation:Destroy()
++		proxy:Destroy()
++		return nil, "could not load source attack: " .. tostring(trackOrError)
++	end
++
++	local track = trackOrError :: AnimationTrack
++	track.Looped = false
++	track.Priority = Enum.AnimationPriority.Action
++	pcall(function()
++		track:Play(0, 0, 0)
++	end)
++	local deadline = os.clock() + math.max(0.1, tonumber(AttackConfig.UpperBodyAttackTrackReadySeconds) or 1)
++	while track.Length <= 0.01 and os.clock() < deadline do
++		RunService.Heartbeat:Wait()
++	end
++	if track.Length <= 0.01 then
++		track:Destroy()
++		animation:Destroy()
++		proxy:Destroy()
++		return nil, "source attack track did not become ready"
++	end
++	track:Stop(0)
++	track.TimePosition = 0
++
++	destroyProxy()
++	active = true
++	activeCharacter = character
++	AimPoseController.SetPoseDrivenExternally(true)
++	targetBridge = bridge
++	targetHost = host
++	sourceProxy = proxy
++	sourceBridge = proxyBridge
++	sourceHost = proxyHost
++	sourceAnimation = animation
++	sourceTrack = track
++	upperPairs = pairs
++	sourcePlaybackSpeed = math.max(0.01, tonumber(playbackSpeed) or 1)
++	sourcePoseFrozen = false
++	blendStartedAt = os.clock()
++	exitBlendStartedAt = 0
++	exitBlendRequested = false
++
++	track:Play(0, 1, sourcePlaybackSpeed)
++	pcall(function()
++		track.TimePosition = 0
++	end)
++	return track, nil
++end
++
++function AttackUpperBodyComposer.End()
++	destroyProxy()
++end
++
++local function holdSourceTerminalPose(deltaTime: number)
++	local track = sourceTrack
++	if not active or not track or sourcePoseFrozen then
++		return
++	end
++	local length = tonumber(track.Length) or 0
++	if length <= 0.05 then
++		return
++	end
++	local terminalLead = math.max(1 / 240, tonumber(AttackConfig.UpperBodyAttackTerminalLeadSeconds) or (1 / 120))
++	local terminalTime = math.max(0, length - terminalLead)
++	local projectedStep = math.max(1 / 240, math.max(0, deltaTime) * sourcePlaybackSpeed * 1.25)
++	if track.TimePosition + projectedStep >= terminalTime then
++		if track.TimePosition < terminalTime then
++			track.TimePosition = terminalTime
++		end
++		track:AdjustSpeed(0)
++		sourcePoseFrozen = true
++	end
++end
++
++local function step(deltaTime: number)
++	if not active then
++		return
++	end
++	local currentCharacter = activeCharacter
++	local target = targetBridge
++	local targetRoot = targetHost
++	local source = sourceBridge
++	local sourceRoot = sourceHost
++	if not currentCharacter or not currentCharacter.Parent
++		or not target or not target.Parent
++		or not targetRoot or not targetRoot.Parent
++		or not source or not source.Parent
++		or not sourceRoot or not sourceRoot.Parent
++	then
++		destroyProxy()
++		return
++	end
++
++	-- Animator has already evaluated the visible lower-body combat stance for this
++	-- frame. Save that upper-body pose before replacing only the bridge subtree.
++	local baseBridgeTransform = target.Transform
++	for _, pair in ipairs(upperPairs) do
++		if pair.target.Parent and pair.source.Parent then
++			pair.baseTransform = pair.target.Transform
++		end
++	end
++
++	-- Map the attack bridge orientation from the invisible source rig into the
++	-- visible rig while preserving the lower-body driven parent chain.
++	target.Transform = source.Transform
++	local parentWorld = parentWorldCFrame(target)
++	if not parentWorld then
++		target.Transform = baseBridgeTransform
++		return
++	end
++	local sourceArmature = sourceRoot.CFrame:ToObjectSpace(source.TransformedWorldCFrame)
++	local mappedAttackWorld = targetRoot.CFrame * sourceArmature
++	local currentWorld = target.TransformedWorldCFrame
++	local desiredWorld = CFrame.new(currentWorld.Position) * mappedAttackWorld.Rotation
++	local currentTransform = target.Transform
++	local currentLocal = parentWorld:ToObjectSpace(currentWorld)
++	local effectiveBase = currentLocal * currentTransform:Inverse()
++	local desiredLocal = parentWorld:ToObjectSpace(desiredWorld)
++	local attackBridgeTransform = effectiveBase:Inverse() * desiredLocal
++
++	local weight, exitComplete = blendWeight(os.clock())
++	target.Transform = baseBridgeTransform:Lerp(attackBridgeTransform, weight)
++	for _, pair in ipairs(upperPairs) do
++		if pair.target.Parent and pair.source.Parent and pair.baseTransform then
++			pair.target.Transform = pair.baseTransform:Lerp(pair.source.Transform, weight)
++		end
++	end
++
++	-- Final owner for this frame, matching RobloxLineage: aim is applied only
++	-- after locomotion + source attack + bridge compensation are complete.
++	AimPoseController.StepAfterExternalPose(deltaTime)
++
++	if exitComplete then
++		destroyProxy()
++	end
++end
++
++function AttackUpperBodyComposer.Start()
++	if started then
++		return
++	end
++	started = true
++	RunService.PreAnimation:Connect(holdSourceTerminalPose)
++	RunService.PreSimulation:Connect(step)
++end
++
++return AttackUpperBodyComposer
+diff --git a/src/client/character/animation/CharacterAnimationController.luau b/src/client/character/animation/CharacterAnimationController.luau
+index 53afcef..167ff19 100644
+--- a/src/client/character/animation/CharacterAnimationController.luau
++++ b/src/client/character/animation/CharacterAnimationController.luau
+@@ -12,6 +12,7 @@ local AnimationFirstFrameSeam = require(AnimationShared:WaitForChild("AnimationF
+ 
+ local AnimationResolver = require(script.Parent:WaitForChild("AnimationResolver"))
+ local AnimationTrackCache = require(script.Parent:WaitForChild("AnimationTrackCache"))
++local AttackUpperBodyComposer = require(script.Parent:WaitForChild("AttackUpperBodyComposer"))
+ 
+ local CharacterAnimationController = {}
+ 
+@@ -28,6 +29,8 @@ local currentActionSeam = nil
+ local currentActionOnComplete = nil
+ local currentActionSlot = ""
+ local currentActionLockedUntil = 0
++local currentActionComposed = false
++local attackLowerBodyActive = false
+ local connections = {}
+ local lifeTransition = false
+ local lastLifeState = "Alive"
+@@ -58,6 +61,9 @@ local function clearCharacter()
+ 	currentActionOnComplete = nil
+ 	currentActionSlot = ""
+ 	currentActionLockedUntil = 0
++	currentActionComposed = false
++	attackLowerBodyActive = false
++	AttackUpperBodyComposer.End()
+ 	lifeTransition = false
+ 	lastLifeState = "Alive"
+ 	deathTrack = nil
+@@ -99,6 +105,11 @@ local function movementSlot(): string
+ 	if not character then
+ 		return "idle"
+ 	end
++	if attackLowerBodyActive then
++		-- RobloxLineage-style planted attack: the visible lower body stays on the
++		-- weapon combat stance while the source attack drives only the upper body.
++		return "combat_idle"
++	end
+ 	local state = string.lower(tostring(character:GetAttribute("MovementState") or "idle"))
+ 	if state == "walk" then
+ 		return "walk"
+@@ -118,13 +129,17 @@ local function stopCurrentLoop(fadeTime: number?)
+ end
+ 
+ local function stopCurrentAction(fadeTime: number?)
+-	if currentActionSeam then
++	if currentActionComposed then
++		AttackUpperBodyComposer.End()
++	elseif currentActionSeam then
+ 		currentActionSeam:Stop(fadeTime or 0)
+ 	elseif currentAction and currentAction.IsPlaying then
+ 		currentAction:Stop(fadeTime or 0)
+ 	end
+ 	currentActionSeam = nil
+ 	currentActionOnComplete = nil
++	currentActionComposed = false
++	attackLowerBodyActive = false
+ end
+ 
+ local function createSeam(descriptor, track: AnimationTrack, looped: boolean)
+@@ -437,8 +452,8 @@ function CharacterAnimationController.PlayAction(slot: string)
+ 	if not descriptor then
+ 		return nil
+ 	end
+-	local track = cache:Get(descriptor)
+-	if not track then
++	local fallbackTrack = cache:Get(descriptor)
++	if not fallbackTrack then
+ 		return nil
+ 	end
+ 
+@@ -458,36 +473,82 @@ function CharacterAnimationController.PlayAction(slot: string)
+ 	end
+ 
+ 	stopCurrentAction(0.06)
+-	currentAction = track
+ 	currentActionSlot = slot
+ 	currentActionLockedUntil = if slot == "attack" then now + runtimeDuration else 0
+-	track.Looped = false
+ 	publishPlaybackPercent(slot)
+-	currentActionSeam = createSeam(descriptor, track, false)
+-	if currentActionSeam then
+-		currentActionSeam:Play(0.06, playbackSpeed)
++
++	local track = fallbackTrack
++	local composed = false
++	if slot == "attack" then
++		-- The original RobloxLineage attack contract keeps the legs on live combat
++		-- locomotion and samples only the upper-body subtree from the attack clip.
++		-- This avoids attack-authored leg/root keys fighting planted movement/facing.
++		attackLowerBodyActive = true
++		refreshLoop()
++		local composedTrack, composeError = AttackUpperBodyComposer.Begin(character, descriptor, playbackSpeed)
++		if composedTrack then
++			track = composedTrack
++			composed = true
++		else
++			warn(("[game1][animation] upper-body attack composition unavailable; using full-body fallback: %s")
++				:format(tostring(composeError)))
++		end
++	end
++
++	currentAction = track
++	currentActionComposed = composed
++	if not composed then
++		track.Looped = false
++		currentActionSeam = createSeam(descriptor, track, false)
++		if currentActionSeam then
++			currentActionSeam:Play(0.06, playbackSpeed)
++		else
++			track:Play(0.06, 1, playbackSpeed)
++		end
+ 	else
+-		track:Play(0.06, 1, playbackSpeed)
++		currentActionSeam = nil
+ 	end
++
+ 	character:SetAttribute("AnimationActionSlot", slot)
+ 	character:SetAttribute("AnimationActionClip", clipId)
+ 	if slot == "attack" then
+ 		character:SetAttribute("AnimationActionEndsAt", currentActionLockedUntil)
++		character:SetAttribute("AnimationAttackUpperBodyComposed", composed)
++		character:SetAttribute("AnimationAttackLowerBodySlot", "combat_idle")
+ 		local boundCharacter = character
+ 		local boundTrack = track
+ 		local unlockAt = currentActionLockedUntil
++		local exitBlend = if composed then AttackUpperBodyComposer.GetExitBlendSeconds() else 0
++		if composed and runtimeDuration > exitBlend + 0.01 then
++			task.delay(runtimeDuration - exitBlend, function()
++				if character == boundCharacter
++					and currentAction == boundTrack
++					and currentActionLockedUntil == unlockAt
++					and currentActionComposed
++				then
++					AttackUpperBodyComposer.BeginExitBlend()
++				end
++			end)
++		end
+ 		task.delay(runtimeDuration, function()
+ 			if character ~= boundCharacter or currentAction ~= boundTrack or currentActionLockedUntil ~= unlockAt then
+ 				return
+ 			end
+ 			currentActionLockedUntil = 0
+ 			currentActionSlot = ""
+-			if currentActionSeam then
++			if currentActionComposed then
++				AttackUpperBodyComposer.End()
++			elseif currentActionSeam then
+ 				currentActionSeam:Stop(0.04)
+ 				currentActionSeam = nil
+ 			end
++			currentActionComposed = false
++			attackLowerBodyActive = false
+ 			currentAction = nil
+ 			boundCharacter:SetAttribute("AnimationActionEndsAt", nil)
++			boundCharacter:SetAttribute("AnimationAttackUpperBodyComposed", false)
++			boundCharacter:SetAttribute("AnimationAttackLowerBodySlot", nil)
++			refreshLoop()
+ 		end)
+ 	end
+ 
+@@ -499,6 +560,8 @@ function CharacterAnimationController.PlayAction(slot: string)
+ 		durationSeconds = runtimeDuration,
+ 		endsAt = currentActionLockedUntil,
+ 		timeline = timeline,
++		upperBodyComposed = composed,
++		lowerBodySlot = if slot == "attack" then "combat_idle" else nil,
+ 	}
+ end
+ 
+@@ -517,6 +580,7 @@ function CharacterAnimationController.Start()
+ 		return
+ 	end
+ 	started = true
++	AttackUpperBodyComposer.Start()
+ 	localPlayer.CharacterAdded:Connect(bindCharacter)
+ 	localPlayer.CharacterRemoving:Connect(function(removing)
+ 		if removing == character then
+diff --git a/src/client/combat/AimPoseController.luau b/src/client/combat/AimPoseController.luau
+index 8bb8589..831ae33 100644
+--- a/src/client/combat/AimPoseController.luau
++++ b/src/client/combat/AimPoseController.luau
+@@ -13,11 +13,13 @@ local localPlayer = Players.LocalPlayer
+ local started = false
+ local character: Model? = nil
+ local root: BasePart? = nil
+-local torsoBones: { Bone } = {}
++local aimBone: Bone? = nil
+ local previousProcedural: { [Bone]: CFrame } = {}
+ local targetPosition: Vector3? = nil
+ local activeUntil = 0
+ local renderedYaw = 0
++local poseDrivenExternally = false
++local skipOwnStepOnce = false
+ 
+ local PREFERRED_SPINE_NAMES = {
+     "spine.001",
+@@ -91,28 +93,24 @@ local function spineOrder(name: string): number?
+     return nil
+ end
+ 
+-local function findTorsoBones(model: Model): { Bone }
++local function findAimBone(model: Model): Bone?
+     local visual = model:FindFirstChild("Visual")
+     if not visual then
+-        return {}
++        return nil
+     end
+ 
+-    local preferred = {}
+     for _, name in ipairs(PREFERRED_SPINE_NAMES) do
+         local found = visual:FindFirstChild(name, true)
+         if found and found:IsA("Bone") then
+-            table.insert(preferred, found)
++            return found
+         end
+     end
+-    if #preferred == #PREFERRED_SPINE_NAMES then
+-        return preferred
+-    end
+ 
+     local candidates = {}
+     for _, descendant in visual:GetDescendants() do
+         if descendant:IsA("Bone") then
+             local order = spineOrder(descendant.Name)
+-            if order ~= nil then
++            if order ~= nil and order >= 1 then
+                 table.insert(candidates, { bone = descendant, order = order })
+             end
+         end
+@@ -120,28 +118,32 @@ local function findTorsoBones(model: Model): { Bone }
+     table.sort(candidates, function(left, right)
+         return left.order < right.order
+     end)
++    return if candidates[1] then candidates[1].bone else nil
++end
+ 
+-    -- Keep the pelvis/root spine untouched. The first three descendants above it
+-    -- form the universal upper-body twist chain for the imported Lineage rigs.
+-    local result = {}
+-    for _, candidate in ipairs(candidates) do
+-        if candidate.order >= 1 then
+-            table.insert(result, candidate.bone)
+-            if #result >= 3 then
+-                break
+-            end
+-        end
++local function parentWorldCFrame(bone: Bone): CFrame?
++    local parent = bone.Parent
++    if not parent then
++        return nil
++    end
++    if parent:IsA("Bone") then
++        return parent.TransformedWorldCFrame
++    end
++    if parent:IsA("BasePart") then
++        return parent.CFrame
+     end
+-    return result
++    return nil
+ end
+ 
+ local function clearCharacter()
+     character = nil
+     root = nil
+-    torsoBones = {}
++    aimBone = nil
+     targetPosition = nil
+     activeUntil = 0
+     renderedYaw = 0
++    poseDrivenExternally = false
++    skipOwnStepOnce = false
+     table.clear(previousProcedural)
+ end
+ 
+@@ -154,23 +156,20 @@ local function bindCharacter(newCharacter: Model)
+         return
+     end
+     root = newRoot
+-    torsoBones = findTorsoBones(newCharacter)
+-    if #torsoBones == 0 then
+-        warn("[game1][aim] no compatible spine chain; root facing still works")
++    aimBone = findAimBone(newCharacter)
++    if not aimBone then
++        warn("[game1][aim] no compatible upper-body aim pivot; root facing still works")
+     else
+-        local names = {}
+-        for _, bone in ipairs(torsoBones) do
+-            table.insert(names, bone.Name)
+-        end
+-        print(("[game1][aim] torso chain ready: %s"):format(table.concat(names, " -> ")))
++        print(("[game1][aim] world-space aim pivot ready: %s"):format(aimBone.Name))
+     end
+ end
+ 
+ local function restorePreviousProcedural()
+     for bone, delta in pairs(previousProcedural) do
+         if bone.Parent then
+-            -- Procedural rotation is layered as delta * animationTransform below.
+-            -- Remove exactly our previous layer before Animator evaluates again.
++            -- Remove exactly the world-space layer written after the previous
++            -- Animator evaluation. The next Animator pass is then free to produce
++            -- the new attack/combat-idle source pose before aim is applied again.
+             bone.Transform = delta:Inverse() * bone.Transform
+         end
+     end
+@@ -197,7 +196,40 @@ local function desiredTorsoYaw(now: number): number
+     )
+ end
+ 
+-local function applyPose(deltaTime: number)
++local function applyWorldAim(bone: Bone, yaw: number)
++    local currentRoot = root
++    if not currentRoot or math.abs(yaw) <= 0.00001 then
++        return
++    end
++
++    -- RobloxLineage applies aim in WORLD space at the first upper-body bridge,
++    -- after Animator/source-attack composition. This avoids relying on imported
++    -- Blender bone-local axes and leaves pelvis + both legs completely untouched.
++    local parentWorld = parentWorldCFrame(bone)
++    if not parentWorld then
++        return
++    end
++    local animatedTransform = bone.Transform
++    local animatedWorld = bone.TransformedWorldCFrame
++    local position = animatedWorld.Position
++    local animatedRotation = animatedWorld - position
++
++    -- signedYaw() follows Roblox world handedness: a target to character-right
++    -- produces negative yaw, which is also the world-Y rotation that turns -Z
++    -- toward +X. Apply it directly; imported bone-local axes never enter the math.
++    local yawRotation = CFrame.fromAxisAngle(Vector3.yAxis, yaw)
++    local desiredWorld = CFrame.new(position) * (yawRotation * animatedRotation)
++
++    local currentLocal = parentWorld:ToObjectSpace(animatedWorld)
++    local effectiveBase = currentLocal * animatedTransform:Inverse()
++    local desiredLocal = parentWorld:ToObjectSpace(desiredWorld)
++    local desiredTransform = effectiveBase:Inverse() * desiredLocal
++    local delta = desiredTransform * animatedTransform:Inverse()
++    bone.Transform = delta * animatedTransform
++    previousProcedural[bone] = delta
++end
++
++local function stepPose(deltaTime: number)
+     local now = os.clock()
+     local desired = desiredTorsoYaw(now)
+     local response = math.max(1, AttackConfig.TorsoAimResponse)
+@@ -207,19 +239,9 @@ local function applyPose(deltaTime: number)
+         renderedYaw = 0
+     end
+ 
+-    local count = #torsoBones
+-    if count > 0 and math.abs(renderedYaw) > 0.00001 then
+-        local perBoneYaw = renderedYaw / count
+-        for _, bone in ipairs(torsoBones) do
+-            if bone.Parent then
+-                local delta = CFrame.Angles(0, perBoneYaw, 0)
+-                -- PreSimulation runs after Animator has produced this frame's pose,
+-                -- so the procedural twist layers on top instead of replacing attack
+-                -- animation transforms.
+-                bone.Transform = delta * bone.Transform
+-                previousProcedural[bone] = delta
+-            end
+-        end
++    local bone = aimBone
++    if bone and bone.Parent then
++        applyWorldAim(bone, renderedYaw)
+     end
+ 
+     if character then
+@@ -228,14 +250,37 @@ local function applyPose(deltaTime: number)
+     end
+ end
+ 
++function AimPoseController.SetPoseDrivenExternally(value: boolean)
++    poseDrivenExternally = value == true
++end
++
++function AimPoseController.StepAfterExternalPose(deltaTime: number)
++    if poseDrivenExternally then
++        stepPose(deltaTime)
++        -- Composer's PreSimulation connection is intentionally registered first.
++        -- Skip the controller's own callback later in this same frame, including
++        -- the exit frame where the composer may release external ownership.
++        skipOwnStepOnce = true
++    end
++end
++
++local function applyPose(deltaTime: number)
++    if skipOwnStepOnce then
++        skipOwnStepOnce = false
++        return
++    end
++    if not poseDrivenExternally then
++        stepPose(deltaTime)
++    end
++end
++
+ function AimPoseController.GetAimPosition(): Vector3?
+     local camera = Workspace.CurrentCamera
+     if not camera then
+         return nil
+     end
+ 
+-    -- RobloxLineage uses one center-screen reticle for both presentation and the
+-    -- attack intent. Never derive body facing from a second cursor-space ray.
++    -- One center-screen reticle owns both attack intent and presentation.
+     local viewport = camera.ViewportSize
+     local ray = camera:ViewportPointToRay(viewport.X * 0.5, viewport.Y * 0.5)
+     local params = RaycastParams.new()
+@@ -250,6 +295,8 @@ function AimPoseController.BeginAttack(target: Vector3, duration: number)
+         return
+     end
+     targetPosition = target
++    -- duration is the COMPLETE attack interval. The aim response controls how
++    -- quickly we reach the angle; it is not a timer that releases the pose early.
+     activeUntil = os.clock() + math.max(0.05, tonumber(duration) or 0.05)
+ end
+ 
+diff --git a/src/client/combat/AttackController.luau b/src/client/combat/AttackController.luau
+index 64fcb1f..7a90166 100644
+--- a/src/client/combat/AttackController.luau
++++ b/src/client/combat/AttackController.luau
+@@ -14,6 +14,26 @@ local animationController: any = nil
+ local aimPoseController: any = nil
+ local attackSequence = 0
+ 
++local function finishPresentation(sequence: number)
++    if sequence ~= attackSequence then
++        return
++    end
++    if movementController then
++        if movementController.EndAimFacingCompensation then
++            movementController.EndAimFacingCompensation()
++        end
++        if movementController.UnlockFacing then
++            movementController.UnlockFacing()
++        end
++        if movementController.UnlockMovement then
++            movementController.UnlockMovement()
++        end
++    end
++    if aimPoseController and aimPoseController.EndAttack then
++        aimPoseController.EndAttack()
++    end
++end
++
+ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
+     movementController = movement
+     animationController = animation
+@@ -44,41 +64,46 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
+             return
+         end
+ 
++        attackSequence += 1
++        local sequence = attackSequence
++        local attackDuration = math.max(0.05, tonumber(action.durationSeconds) or 0.05)
+         local root = character:FindFirstChild("RootCollider")
+         if root and root:IsA("BasePart") then
+             local direction = Vector3.new(target.X - root.Position.X, 0, target.Z - root.Position.Z)
+             if direction.Magnitude > 0.001 then
+                 local playbackSpeed = math.max(0.01, tonumber(action.playbackSpeed) or 1)
+                 local timelineScale = 1 / playbackSpeed
+-                local facingDuration = math.min(action.durationSeconds, AttackConfig.FacingTurnSeconds * timelineScale)
+-                local movementDuration = math.min(action.durationSeconds, AttackConfig.MovementLockSeconds * timelineScale)
+-                local poseDuration = math.min(action.durationSeconds, AttackConfig.AimPoseSeconds * timelineScale)
++                local facingTurnDuration = math.min(attackDuration, AttackConfig.FacingTurnSeconds * timelineScale)
+ 
+-                attackSequence += 1
+-                local sequence = attackSequence
+                 if movementController then
+-                    movementController.LockMovement(movementDuration)
++                    -- RobloxLineage planted-melee contract: legs stay planted for
++                    -- the COMPLETE attack, not only during the initial wind-up.
++                    movementController.LockMovement(attackDuration)
+                     if movementController.BeginAimFacingCompensation then
++                        -- facingTurnDuration controls how quickly root overflow is
++                        -- reached. Do NOT release it at that time; the final facing
++                        -- is held until finishPresentation() at attack end.
+                         movementController.BeginAimFacingCompensation(
+-                            facingDuration,
++                            facingTurnDuration,
+                             AttackConfig.TorsoYawLimit
+                         )
+                         movementController.UpdateAimFacingCompensation(direction.Unit)
+-                        task.delay(facingDuration, function()
+-                            if sequence == attackSequence and movementController then
+-                                movementController.EndAimFacingCompensation()
+-                            end
+-                        end)
+                     else
+-                        movementController.LockFacing(direction.Unit, facingDuration)
++                        movementController.LockFacing(direction.Unit, attackDuration)
+                     end
+                 end
+                 if aimPoseController then
+-                    aimPoseController.BeginAttack(target, poseDuration)
++                    -- Same target and same complete attack lifetime as gameplay.
++                    -- TorsoAimResponse controls interpolation, not early release.
++                    aimPoseController.BeginAttack(target, attackDuration)
+                 end
+             end
+         end
+ 
++        task.delay(attackDuration, function()
++            finishPresentation(sequence)
++        end)
++
+         -- The server validates clipId against the equipped animation profile and
+         -- resolves the same authoritative timeline before scheduling any result.
+         attack:FireServer({
+diff --git a/src/shared/combat/AttackConfig.luau b/src/shared/combat/AttackConfig.luau
+index 80781aa..0fd8ee2 100644
+--- a/src/shared/combat/AttackConfig.luau
++++ b/src/shared/combat/AttackConfig.luau
+@@ -8,9 +8,16 @@ return table.freeze({
+     -- body up to this yaw. Only the overflow is assigned to whole-character yaw.
+     TorsoYawLimit = math.rad(70),
+     TorsoAimResponse = 26,
++    -- Time used to rotate the root overflow toward the attack direction. The
++    -- resulting facing is then held until the complete attack animation ends.
+     FacingTurnSeconds = 0.28,
+-    MovementLockSeconds = 0.22,
+-    AimPoseSeconds = 0.34,
++
++    -- RobloxLineage-style upper-body composition: legs stay on combat locomotion
++    -- while the source attack animation drives only the spine subtree.
++    UpperBodyAttackEntryBlendSeconds = 0.10,
++    UpperBodyAttackExitBlendSeconds = 0.12,
++    UpperBodyAttackTrackReadySeconds = 1.0,
++    UpperBodyAttackTerminalLeadSeconds = 1 / 120,
+ 
+     DebugLogs = true,
+ })
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index f117ab2..03775d7 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -135,6 +135,7 @@ required_runtime = [
+     "src/client/character/PlayerStatusController.luau",
+     "src/client/character/animation/AnimationResolver.luau",
+     "src/client/character/animation/AnimationTrackCache.luau",
++    "src/client/character/animation/AttackUpperBodyComposer.luau",
+     "src/client/character/animation/CharacterAnimationController.luau",
+     "src/client/combat/AttackController.luau",
+     "src/client/combat/AimPoseController.luau",
+@@ -425,11 +426,11 @@ if "CharacterAnimationController.Start()" not in client_init_text:
+ attack_controller_text = (ROOT / "src/client/combat/AttackController.luau").read_text(encoding="utf-8")
+ if 'animationController.PlayAction("attack")' not in attack_controller_text:
+     err("combat attack input is not connected to the semantic attack animation slot")
+-for required in ["BeginAimFacingCompensation", "TorsoYawLimit", "aimPoseController.BeginAttack"]:
++for required in ["BeginAimFacingCompensation", "TorsoYawLimit", "aimPoseController.BeginAttack", "movementController.LockMovement(attackDuration)", "finishPresentation(sequence)"]:
+     if required not in attack_controller_text:
+         err(f"robloxlineage attack/aim integration missing {required}")
+ aim_pose_text = (ROOT / "src/client/combat/AimPoseController.luau").read_text(encoding="utf-8")
+-for required in ["RunService.PreSimulation", "spine.001", "AimTorsoYawDegrees", "bone.Transform = delta * bone.Transform", "ViewportPointToRay", "Game1AimReticle"]:
++for required in ["RunService.PreSimulation", "spine.001", "AimTorsoYawDegrees", "applyWorldAim", "desiredTransform", "ViewportPointToRay", "Game1AimReticle"]:
+     if required not in aim_pose_text:
+         err(f"procedural torso aim controller missing {required}")
+ movement_runtime = (ROOT / "src/client/character/MovementController.luau").read_text(encoding="utf-8")
+@@ -438,6 +439,47 @@ for required in ["BeginAimFacingCompensation", "UpdateAimFacingCompensation", "a
+         err(f"movement aim-facing compensation missing {required}")
+ if "AimPoseController.Start()" not in client_init_text:
+     err("procedural torso aim controller is not started by the client runtime")
++
++# m21 RobloxLineage planted-attack presentation contract. Facing/aim are held for
++# the complete attack; the full-body source clip is sampled on a proxy and only
++# the upper-body bridge subtree is composed over combat_idle legs.
++attack_composer_path = ROOT / "src/client/character/animation/AttackUpperBodyComposer.luau"
++attack_composer_text = attack_composer_path.read_text(encoding="utf-8") if attack_composer_path.is_file() else ""
++for required in [
++    "__Game1AttackUpperBodyProxy",
++    'FindFirstChild("spine.001", true)',
++    "buildUpperPairs",
++    "sourceArmature",
++    "mappedAttackWorld",
++    "baseBridgeTransform:Lerp",
++    "RunService.PreSimulation:Connect(step)",
++    "RunService.PreAnimation:Connect(holdSourceTerminalPose)",
++]:
++    if required not in attack_composer_text:
++        err(f"upper-body attack composition missing {required}")
++for required in [
++    "attackLowerBodyActive",
++    'return "combat_idle"',
++    "AttackUpperBodyComposer.Begin(character, descriptor, playbackSpeed)",
++    "AnimationAttackUpperBodyComposed",
++    'AnimationAttackLowerBodySlot", "combat_idle"',
++    "AttackUpperBodyComposer.BeginExitBlend()",
++]:
++    if required not in controller_runtime:
++        err(f"planted attack lower/upper-body contract missing {required}")
++for forbidden in [
++    "task.delay(facingDuration",
++    "AttackConfig.MovementLockSeconds",
++    "AttackConfig.AimPoseSeconds",
++]:
++    if forbidden in attack_controller_text:
++        err(f"attack presentation still releases aim/movement early: {forbidden}")
++if "aimPoseController.BeginAttack(target, attackDuration)" not in attack_controller_text:
++    err("attack aim pose must stay active for the complete attack duration")
++if "movementController.LockMovement(attackDuration)" not in attack_controller_text:
++    err("planted melee movement lock must cover the complete attack duration")
++if "movementController.EndAimFacingCompensation()" not in attack_controller_text.split("local function finishPresentation", 1)[1].split("function AttackController.Start", 1)[0]:
++    err("root aim compensation must release only from full-attack presentation cleanup")
+ if 'character:SetAttribute("AnimationProfileId", archetype)' not in character_service_text:
+     err("character runtime does not expose animation profile identity")
+ if 'character:SetAttribute("CharacterSkeletonSignature"' not in character_service_text:
+@@ -1261,7 +1303,7 @@ if errors:
+         print(" -", item)
+     sys.exit(1)
+ 
+-print("verify ok · game1 m20 Movement Debug runtime tuning + AM ratios passed")
++print("verify ok · game1 m21 held attack aim + upper-body-over-combat-legs passed")
+ print("registered character archetypes:", len(archetypes))
+ print("active character archetype:", active_id or "none")
+ print("race pool: human")

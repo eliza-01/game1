@@ -13,11 +13,13 @@ local localPlayer = Players.LocalPlayer
 local started = false
 local character: Model? = nil
 local root: BasePart? = nil
-local torsoBones: { Bone } = {}
+local aimBone: Bone? = nil
 local previousProcedural: { [Bone]: CFrame } = {}
 local targetPosition: Vector3? = nil
 local activeUntil = 0
 local renderedYaw = 0
+local poseDrivenExternally = false
+local skipOwnStepOnce = false
 
 local PREFERRED_SPINE_NAMES = {
     "spine.001",
@@ -91,28 +93,24 @@ local function spineOrder(name: string): number?
     return nil
 end
 
-local function findTorsoBones(model: Model): { Bone }
+local function findAimBone(model: Model): Bone?
     local visual = model:FindFirstChild("Visual")
     if not visual then
-        return {}
+        return nil
     end
 
-    local preferred = {}
     for _, name in ipairs(PREFERRED_SPINE_NAMES) do
         local found = visual:FindFirstChild(name, true)
         if found and found:IsA("Bone") then
-            table.insert(preferred, found)
+            return found
         end
-    end
-    if #preferred == #PREFERRED_SPINE_NAMES then
-        return preferred
     end
 
     local candidates = {}
     for _, descendant in visual:GetDescendants() do
         if descendant:IsA("Bone") then
             local order = spineOrder(descendant.Name)
-            if order ~= nil then
+            if order ~= nil and order >= 1 then
                 table.insert(candidates, { bone = descendant, order = order })
             end
         end
@@ -120,28 +118,32 @@ local function findTorsoBones(model: Model): { Bone }
     table.sort(candidates, function(left, right)
         return left.order < right.order
     end)
+    return if candidates[1] then candidates[1].bone else nil
+end
 
-    -- Keep the pelvis/root spine untouched. The first three descendants above it
-    -- form the universal upper-body twist chain for the imported Lineage rigs.
-    local result = {}
-    for _, candidate in ipairs(candidates) do
-        if candidate.order >= 1 then
-            table.insert(result, candidate.bone)
-            if #result >= 3 then
-                break
-            end
-        end
+local function parentWorldCFrame(bone: Bone): CFrame?
+    local parent = bone.Parent
+    if not parent then
+        return nil
     end
-    return result
+    if parent:IsA("Bone") then
+        return parent.TransformedWorldCFrame
+    end
+    if parent:IsA("BasePart") then
+        return parent.CFrame
+    end
+    return nil
 end
 
 local function clearCharacter()
     character = nil
     root = nil
-    torsoBones = {}
+    aimBone = nil
     targetPosition = nil
     activeUntil = 0
     renderedYaw = 0
+    poseDrivenExternally = false
+    skipOwnStepOnce = false
     table.clear(previousProcedural)
 end
 
@@ -154,23 +156,20 @@ local function bindCharacter(newCharacter: Model)
         return
     end
     root = newRoot
-    torsoBones = findTorsoBones(newCharacter)
-    if #torsoBones == 0 then
-        warn("[game1][aim] no compatible spine chain; root facing still works")
+    aimBone = findAimBone(newCharacter)
+    if not aimBone then
+        warn("[game1][aim] no compatible upper-body aim pivot; root facing still works")
     else
-        local names = {}
-        for _, bone in ipairs(torsoBones) do
-            table.insert(names, bone.Name)
-        end
-        print(("[game1][aim] torso chain ready: %s"):format(table.concat(names, " -> ")))
+        print(("[game1][aim] world-space aim pivot ready: %s"):format(aimBone.Name))
     end
 end
 
 local function restorePreviousProcedural()
     for bone, delta in pairs(previousProcedural) do
         if bone.Parent then
-            -- Procedural rotation is layered as delta * animationTransform below.
-            -- Remove exactly our previous layer before Animator evaluates again.
+            -- Remove exactly the world-space layer written after the previous
+            -- Animator evaluation. The next Animator pass is then free to produce
+            -- the new attack/combat-idle source pose before aim is applied again.
             bone.Transform = delta:Inverse() * bone.Transform
         end
     end
@@ -197,7 +196,40 @@ local function desiredTorsoYaw(now: number): number
     )
 end
 
-local function applyPose(deltaTime: number)
+local function applyWorldAim(bone: Bone, yaw: number)
+    local currentRoot = root
+    if not currentRoot or math.abs(yaw) <= 0.00001 then
+        return
+    end
+
+    -- RobloxLineage applies aim in WORLD space at the first upper-body bridge,
+    -- after Animator/source-attack composition. This avoids relying on imported
+    -- Blender bone-local axes and leaves pelvis + both legs completely untouched.
+    local parentWorld = parentWorldCFrame(bone)
+    if not parentWorld then
+        return
+    end
+    local animatedTransform = bone.Transform
+    local animatedWorld = bone.TransformedWorldCFrame
+    local position = animatedWorld.Position
+    local animatedRotation = animatedWorld - position
+
+    -- signedYaw() follows Roblox world handedness: a target to character-right
+    -- produces negative yaw, which is also the world-Y rotation that turns -Z
+    -- toward +X. Apply it directly; imported bone-local axes never enter the math.
+    local yawRotation = CFrame.fromAxisAngle(Vector3.yAxis, yaw)
+    local desiredWorld = CFrame.new(position) * (yawRotation * animatedRotation)
+
+    local currentLocal = parentWorld:ToObjectSpace(animatedWorld)
+    local effectiveBase = currentLocal * animatedTransform:Inverse()
+    local desiredLocal = parentWorld:ToObjectSpace(desiredWorld)
+    local desiredTransform = effectiveBase:Inverse() * desiredLocal
+    local delta = desiredTransform * animatedTransform:Inverse()
+    bone.Transform = delta * animatedTransform
+    previousProcedural[bone] = delta
+end
+
+local function stepPose(deltaTime: number)
     local now = os.clock()
     local desired = desiredTorsoYaw(now)
     local response = math.max(1, AttackConfig.TorsoAimResponse)
@@ -207,24 +239,38 @@ local function applyPose(deltaTime: number)
         renderedYaw = 0
     end
 
-    local count = #torsoBones
-    if count > 0 and math.abs(renderedYaw) > 0.00001 then
-        local perBoneYaw = renderedYaw / count
-        for _, bone in ipairs(torsoBones) do
-            if bone.Parent then
-                local delta = CFrame.Angles(0, perBoneYaw, 0)
-                -- PreSimulation runs after Animator has produced this frame's pose,
-                -- so the procedural twist layers on top instead of replacing attack
-                -- animation transforms.
-                bone.Transform = delta * bone.Transform
-                previousProcedural[bone] = delta
-            end
-        end
+    local bone = aimBone
+    if bone and bone.Parent then
+        applyWorldAim(bone, renderedYaw)
     end
 
     if character then
         character:SetAttribute("AimTorsoYawDegrees", math.deg(renderedYaw))
         character:SetAttribute("AimPoseActive", targetPosition ~= nil and now <= activeUntil)
+    end
+end
+
+function AimPoseController.SetPoseDrivenExternally(value: boolean)
+    poseDrivenExternally = value == true
+end
+
+function AimPoseController.StepAfterExternalPose(deltaTime: number)
+    if poseDrivenExternally then
+        stepPose(deltaTime)
+        -- Composer's PreSimulation connection is intentionally registered first.
+        -- Skip the controller's own callback later in this same frame, including
+        -- the exit frame where the composer may release external ownership.
+        skipOwnStepOnce = true
+    end
+end
+
+local function applyPose(deltaTime: number)
+    if skipOwnStepOnce then
+        skipOwnStepOnce = false
+        return
+    end
+    if not poseDrivenExternally then
+        stepPose(deltaTime)
     end
 end
 
@@ -234,8 +280,7 @@ function AimPoseController.GetAimPosition(): Vector3?
         return nil
     end
 
-    -- RobloxLineage uses one center-screen reticle for both presentation and the
-    -- attack intent. Never derive body facing from a second cursor-space ray.
+    -- One center-screen reticle owns both attack intent and presentation.
     local viewport = camera.ViewportSize
     local ray = camera:ViewportPointToRay(viewport.X * 0.5, viewport.Y * 0.5)
     local params = RaycastParams.new()
@@ -250,6 +295,8 @@ function AimPoseController.BeginAttack(target: Vector3, duration: number)
         return
     end
     targetPosition = target
+    -- duration is the COMPLETE attack interval. The aim response controls how
+    -- quickly we reach the angle; it is not a timer that releases the pose early.
     activeUntil = os.clock() + math.max(0.05, tonumber(duration) or 0.05)
 end
 

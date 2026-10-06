@@ -14,6 +14,26 @@ local animationController: any = nil
 local aimPoseController: any = nil
 local attackSequence = 0
 
+local function finishPresentation(sequence: number)
+    if sequence ~= attackSequence then
+        return
+    end
+    if movementController then
+        if movementController.EndAimFacingCompensation then
+            movementController.EndAimFacingCompensation()
+        end
+        if movementController.UnlockFacing then
+            movementController.UnlockFacing()
+        end
+        if movementController.UnlockMovement then
+            movementController.UnlockMovement()
+        end
+    end
+    if aimPoseController and aimPoseController.EndAttack then
+        aimPoseController.EndAttack()
+    end
+end
+
 function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
     movementController = movement
     animationController = animation
@@ -44,40 +64,45 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
             return
         end
 
+        attackSequence += 1
+        local sequence = attackSequence
+        local attackDuration = math.max(0.05, tonumber(action.durationSeconds) or 0.05)
         local root = character:FindFirstChild("RootCollider")
         if root and root:IsA("BasePart") then
             local direction = Vector3.new(target.X - root.Position.X, 0, target.Z - root.Position.Z)
             if direction.Magnitude > 0.001 then
                 local playbackSpeed = math.max(0.01, tonumber(action.playbackSpeed) or 1)
                 local timelineScale = 1 / playbackSpeed
-                local facingDuration = math.min(action.durationSeconds, AttackConfig.FacingTurnSeconds * timelineScale)
-                local movementDuration = math.min(action.durationSeconds, AttackConfig.MovementLockSeconds * timelineScale)
-                local poseDuration = math.min(action.durationSeconds, AttackConfig.AimPoseSeconds * timelineScale)
+                local facingTurnDuration = math.min(attackDuration, AttackConfig.FacingTurnSeconds * timelineScale)
 
-                attackSequence += 1
-                local sequence = attackSequence
                 if movementController then
-                    movementController.LockMovement(movementDuration)
+                    -- RobloxLineage planted-melee contract: legs stay planted for
+                    -- the COMPLETE attack, not only during the initial wind-up.
+                    movementController.LockMovement(attackDuration)
                     if movementController.BeginAimFacingCompensation then
+                        -- facingTurnDuration controls how quickly root overflow is
+                        -- reached. Do NOT release it at that time; the final facing
+                        -- is held until finishPresentation() at attack end.
                         movementController.BeginAimFacingCompensation(
-                            facingDuration,
+                            facingTurnDuration,
                             AttackConfig.TorsoYawLimit
                         )
                         movementController.UpdateAimFacingCompensation(direction.Unit)
-                        task.delay(facingDuration, function()
-                            if sequence == attackSequence and movementController then
-                                movementController.EndAimFacingCompensation()
-                            end
-                        end)
                     else
-                        movementController.LockFacing(direction.Unit, facingDuration)
+                        movementController.LockFacing(direction.Unit, attackDuration)
                     end
                 end
                 if aimPoseController then
-                    aimPoseController.BeginAttack(target, poseDuration)
+                    -- Same target and same complete attack lifetime as gameplay.
+                    -- TorsoAimResponse controls interpolation, not early release.
+                    aimPoseController.BeginAttack(target, attackDuration)
                 end
             end
         end
+
+        task.delay(attackDuration, function()
+            finishPresentation(sequence)
+        end)
 
         -- The server validates clipId against the equipped animation profile and
         -- resolves the same authoritative timeline before scheduling any result.

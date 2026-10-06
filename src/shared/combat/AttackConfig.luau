@@ -8,9 +8,16 @@ return table.freeze({
     -- body up to this yaw. Only the overflow is assigned to whole-character yaw.
     TorsoYawLimit = math.rad(70),
     TorsoAimResponse = 26,
+    -- Time used to rotate the root overflow toward the attack direction. The
+    -- resulting facing is then held until the complete attack animation ends.
     FacingTurnSeconds = 0.28,
-    MovementLockSeconds = 0.22,
-    AimPoseSeconds = 0.34,
+
+    -- RobloxLineage-style upper-body composition: legs stay on combat locomotion
+    -- while the source attack animation drives only the spine subtree.
+    UpperBodyAttackEntryBlendSeconds = 0.10,
+    UpperBodyAttackExitBlendSeconds = 0.12,
+    UpperBodyAttackTrackReadySeconds = 1.0,
+    UpperBodyAttackTerminalLeadSeconds = 1 / 120,
 
     DebugLogs = true,
 })

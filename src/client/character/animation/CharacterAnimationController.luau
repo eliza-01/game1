@@ -12,6 +12,7 @@ local AnimationFirstFrameSeam = require(AnimationShared:WaitForChild("AnimationF
 
 local AnimationResolver = require(script.Parent:WaitForChild("AnimationResolver"))
 local AnimationTrackCache = require(script.Parent:WaitForChild("AnimationTrackCache"))
+local AttackUpperBodyComposer = require(script.Parent:WaitForChild("AttackUpperBodyComposer"))
 
 local CharacterAnimationController = {}
 
@@ -28,6 +29,8 @@ local currentActionSeam = nil
 local currentActionOnComplete = nil
 local currentActionSlot = ""
 local currentActionLockedUntil = 0
+local currentActionComposed = false
+local attackLowerBodyActive = false
 local connections = {}
 local lifeTransition = false
 local lastLifeState = "Alive"
@@ -58,6 +61,9 @@ local function clearCharacter()
 	currentActionOnComplete = nil
 	currentActionSlot = ""
 	currentActionLockedUntil = 0
+	currentActionComposed = false
+	attackLowerBodyActive = false
+	AttackUpperBodyComposer.End()
 	lifeTransition = false
 	lastLifeState = "Alive"
 	deathTrack = nil
@@ -99,6 +105,11 @@ local function movementSlot(): string
 	if not character then
 		return "idle"
 	end
+	if attackLowerBodyActive then
+		-- RobloxLineage-style planted attack: the visible lower body stays on the
+		-- weapon combat stance while the source attack drives only the upper body.
+		return "combat_idle"
+	end
 	local state = string.lower(tostring(character:GetAttribute("MovementState") or "idle"))
 	if state == "walk" then
 		return "walk"
@@ -118,13 +129,17 @@ local function stopCurrentLoop(fadeTime: number?)
 end
 
 local function stopCurrentAction(fadeTime: number?)
-	if currentActionSeam then
+	if currentActionComposed then
+		AttackUpperBodyComposer.End()
+	elseif currentActionSeam then
 		currentActionSeam:Stop(fadeTime or 0)
 	elseif currentAction and currentAction.IsPlaying then
 		currentAction:Stop(fadeTime or 0)
 	end
 	currentActionSeam = nil
 	currentActionOnComplete = nil
+	currentActionComposed = false
+	attackLowerBodyActive = false
 end
 
 local function createSeam(descriptor, track: AnimationTrack, looped: boolean)
@@ -437,8 +452,8 @@ function CharacterAnimationController.PlayAction(slot: string)
 	if not descriptor then
 		return nil
 	end
-	local track = cache:Get(descriptor)
-	if not track then
+	local fallbackTrack = cache:Get(descriptor)
+	if not fallbackTrack then
 		return nil
 	end
 
@@ -458,36 +473,82 @@ function CharacterAnimationController.PlayAction(slot: string)
 	end
 
 	stopCurrentAction(0.06)
-	currentAction = track
 	currentActionSlot = slot
 	currentActionLockedUntil = if slot == "attack" then now + runtimeDuration else 0
-	track.Looped = false
 	publishPlaybackPercent(slot)
-	currentActionSeam = createSeam(descriptor, track, false)
-	if currentActionSeam then
-		currentActionSeam:Play(0.06, playbackSpeed)
-	else
-		track:Play(0.06, 1, playbackSpeed)
+
+	local track = fallbackTrack
+	local composed = false
+	if slot == "attack" then
+		-- The original RobloxLineage attack contract keeps the legs on live combat
+		-- locomotion and samples only the upper-body subtree from the attack clip.
+		-- This avoids attack-authored leg/root keys fighting planted movement/facing.
+		attackLowerBodyActive = true
+		refreshLoop()
+		local composedTrack, composeError = AttackUpperBodyComposer.Begin(character, descriptor, playbackSpeed)
+		if composedTrack then
+			track = composedTrack
+			composed = true
+		else
+			warn(("[game1][animation] upper-body attack composition unavailable; using full-body fallback: %s")
+				:format(tostring(composeError)))
+		end
 	end
+
+	currentAction = track
+	currentActionComposed = composed
+	if not composed then
+		track.Looped = false
+		currentActionSeam = createSeam(descriptor, track, false)
+		if currentActionSeam then
+			currentActionSeam:Play(0.06, playbackSpeed)
+		else
+			track:Play(0.06, 1, playbackSpeed)
+		end
+	else
+		currentActionSeam = nil
+	end
+
 	character:SetAttribute("AnimationActionSlot", slot)
 	character:SetAttribute("AnimationActionClip", clipId)
 	if slot == "attack" then
 		character:SetAttribute("AnimationActionEndsAt", currentActionLockedUntil)
+		character:SetAttribute("AnimationAttackUpperBodyComposed", composed)
+		character:SetAttribute("AnimationAttackLowerBodySlot", "combat_idle")
 		local boundCharacter = character
 		local boundTrack = track
 		local unlockAt = currentActionLockedUntil
+		local exitBlend = if composed then AttackUpperBodyComposer.GetExitBlendSeconds() else 0
+		if composed and runtimeDuration > exitBlend + 0.01 then
+			task.delay(runtimeDuration - exitBlend, function()
+				if character == boundCharacter
+					and currentAction == boundTrack
+					and currentActionLockedUntil == unlockAt
+					and currentActionComposed
+				then
+					AttackUpperBodyComposer.BeginExitBlend()
+				end
+			end)
+		end
 		task.delay(runtimeDuration, function()
 			if character ~= boundCharacter or currentAction ~= boundTrack or currentActionLockedUntil ~= unlockAt then
 				return
 			end
 			currentActionLockedUntil = 0
 			currentActionSlot = ""
-			if currentActionSeam then
+			if currentActionComposed then
+				AttackUpperBodyComposer.End()
+			elseif currentActionSeam then
 				currentActionSeam:Stop(0.04)
 				currentActionSeam = nil
 			end
+			currentActionComposed = false
+			attackLowerBodyActive = false
 			currentAction = nil
 			boundCharacter:SetAttribute("AnimationActionEndsAt", nil)
+			boundCharacter:SetAttribute("AnimationAttackUpperBodyComposed", false)
+			boundCharacter:SetAttribute("AnimationAttackLowerBodySlot", nil)
+			refreshLoop()
 		end)
 	end
 
@@ -499,6 +560,8 @@ function CharacterAnimationController.PlayAction(slot: string)
 		durationSeconds = runtimeDuration,
 		endsAt = currentActionLockedUntil,
 		timeline = timeline,
+		upperBodyComposed = composed,
+		lowerBodySlot = if slot == "attack" then "combat_idle" else nil,
 	}
 end
 
@@ -517,6 +580,7 @@ function CharacterAnimationController.Start()
 		return
 	end
 	started = true
+	AttackUpperBodyComposer.Start()
 	localPlayer.CharacterAdded:Connect(bindCharacter)
 	localPlayer.CharacterRemoving:Connect(function(removing)
 		if removing == character then

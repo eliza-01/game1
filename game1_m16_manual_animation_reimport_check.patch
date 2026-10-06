@@ -1,0 +1,949 @@
+diff --git a/assets/manifests/animation-speed-scaling.json b/assets/manifests/animation-speed-scaling.json
+index 10e849e..433c698 100644
+--- a/assets/manifests/animation-speed-scaling.json
++++ b/assets/manifests/animation-speed-scaling.json
+@@ -13,6 +13,12 @@
+           "stat": "RunSpeed",
+           "unitsPerPercent": 2.0
+         },
++        {
++          "channel": "walk",
++          "label": "Walk Speed",
++          "stat": "RunSpeed",
++          "unitsPerPercent": 4.0
++        },
+         {
+           "channel": "attack",
+           "label": "Attack Speed",
+diff --git a/src/shared/animation/AnimationSpeedScalingRegistry.luau b/src/shared/animation/AnimationSpeedScalingRegistry.luau
+index 1308e2d..12823af 100644
+--- a/src/shared/animation/AnimationSpeedScalingRegistry.luau
++++ b/src/shared/animation/AnimationSpeedScalingRegistry.luau
+@@ -13,6 +13,10 @@ return table.freeze({
+ 					stat = "RunSpeed",
+ 					unitsPerPercent = 2.0,
+ 				}),
++				["walk"] = table.freeze({
++					stat = "RunSpeed",
++					unitsPerPercent = 4.0,
++				}),
+ 			}),
+ 		}),
+ 		["monster"] = table.freeze({
+diff --git a/system/control-center/animation_core/storage.py b/system/control-center/animation_core/storage.py
+index a6d4990..32b302c 100644
+--- a/system/control-center/animation_core/storage.py
++++ b/system/control-center/animation_core/storage.py
+@@ -473,6 +473,69 @@ class AnimationStorageMixin:
+         value["looped"] = bool(value.get("looped"))
+         return value
+ 
++
++    def roblox_check_items(self) -> list[dict]:
++        from animation_fingerprint import fingerprint_animation
++        with self.connect() as connection:
++            rows = [dict(row) for row in connection.execute(
++                """SELECT id,character_id,name,prepared_path,sha256,asset_id,published_sha256,revision
++                   FROM animation_clips WHERE asset_id IS NOT NULL AND asset_id<>'' ORDER BY character_id,name,id"""
++            )]
++        items = []
++        for row in rows:
++            path = self.root / str(row.get("prepared_path") or "")
++            if not path.is_file():
++                items.append({
++                    "targetType": "character", "targetId": str(row.get("character_id") or ""),
++                    "clipId": str(row.get("id") or ""), "name": str(row.get("name") or ""),
++                    "assetId": str(row.get("asset_id") or ""), "status": "MISSING",
++                    "error": "registered prepared animation file is missing",
++                })
++                continue
++            fingerprint = fingerprint_animation(path)
++            items.append({
++                "targetType": "character", "targetId": str(row.get("character_id") or ""),
++                "clipId": str(row.get("id") or ""), "name": str(row.get("name") or ""),
++                "assetId": str(row.get("asset_id") or ""), "status": self._status(row),
++                "revision": int(row.get("revision") or 1), **fingerprint,
++            })
++        return items
++
++    def apply_roblox_check(self, results: list[dict]) -> dict:
++        from animation_fingerprint import fingerprint_animation
++        matched = mismatched = failed = 0
++        details = []
++        with self.connect() as connection:
++            for incoming in results or []:
++                if str(incoming.get("targetType") or "") != "character":
++                    continue
++                clip_id = str(incoming.get("clipId") or "")
++                raw = connection.execute("SELECT * FROM animation_clips WHERE id=?", (clip_id,)).fetchone()
++                if not raw:
++                    failed += 1; details.append({"clipId": clip_id, "status": "ERROR", "message": "unknown clip"}); continue
++                row = dict(raw)
++                if str(incoming.get("assetId") or "") != str(row.get("asset_id") or ""):
++                    failed += 1; details.append({"clipId": clip_id, "status": "ERROR", "message": "asset id mismatch"}); continue
++                path = self.root / str(row.get("prepared_path") or "")
++                if not path.is_file():
++                    failed += 1; details.append({"clipId": clip_id, "status": "ERROR", "message": "local file missing"}); continue
++                local = fingerprint_animation(path)
++                cloud = str(incoming.get("fingerprint") or "").lower()
++                same = bool(cloud) and cloud == str(local["fingerprint"]).lower()
++                same = same and int(incoming.get("keyframes") or -1) == int(local["keyframes"])
++                same = same and int(incoming.get("poses") or -1) == int(local["poses"])
++                if same:
++                    connection.execute(
++                        "UPDATE animation_clips SET published_sha256=sha256,moderation_state=?,published_at=?,updated_at=? WHERE id=?",
++                        ("STUDIO_VERIFIED", _now(), _now(), clip_id),
++                    )
++                    matched += 1; details.append({"clipId": clip_id, "status": "MATCH"})
++                else:
++                    mismatched += 1; details.append({"clipId": clip_id, "status": "DIFFERENT"})
++        if matched:
++            self.export()
++        return {"matched": matched, "mismatched": mismatched, "failed": failed, "details": details}
++
+     def set_duplicate_first_frame(self, clip_id: str, enabled: bool) -> dict:
+         # Runtime presentation flag only. Never mutate source/prepared animation
+         # bytes, publication checksum, revision, or permanent Roblox asset id.
+diff --git a/system/control-center/animation_fingerprint.py b/system/control-center/animation_fingerprint.py
+new file mode 100644
+index 0000000..75bc360
+--- /dev/null
++++ b/system/control-center/animation_fingerprint.py
+@@ -0,0 +1,409 @@
++from __future__ import annotations
++
++from pathlib import Path
++import math
++import struct
++import xml.etree.ElementTree as ET
++import zlib
++
++BINARY_MAGIC = b"<roblox!\x89\xff\r\n\x1a\n"
++QUANTIZE = 100000
++
++
++def _round_quantized(value: float) -> int:
++    scaled = float(value) * QUANTIZE
++    if scaled >= 0:
++        return math.floor(scaled + 0.5)
++    return math.ceil(scaled - 0.5)
++
++
++class _Fingerprint:
++    def __init__(self):
++        self.crc = 0
++
++    def text(self, value: str):
++        raw = str(value or "").encode("utf-8")
++        self.crc = zlib.crc32(b"s" + str(len(raw)).encode("ascii") + b":" + raw, self.crc)
++
++    def integer(self, value: int):
++        self.crc = zlib.crc32(b"i" + str(int(value)).encode("ascii") + b";", self.crc)
++
++    def number(self, value: float):
++        self.integer(_round_quantized(value))
++
++    def hexdigest(self) -> str:
++        return f"{self.crc & 0xFFFFFFFF:08x}"
++
++
++def _lz4_decompress(block: bytes, expected: int) -> bytes:
++    out = bytearray()
++    i = 0
++    while i < len(block):
++        token = block[i]
++        i += 1
++        literal = token >> 4
++        if literal == 15:
++            while True:
++                value = block[i]
++                i += 1
++                literal += value
++                if value != 255:
++                    break
++        out.extend(block[i:i + literal])
++        i += literal
++        if i >= len(block):
++            break
++        offset = block[i] | (block[i + 1] << 8)
++        i += 2
++        if not offset or offset > len(out):
++            raise ValueError("invalid Roblox LZ4 back-reference")
++        match = token & 15
++        if match == 15:
++            while True:
++                value = block[i]
++                i += 1
++                match += value
++                if value != 255:
++                    break
++        match += 4
++        start = len(out) - offset
++        for n in range(match):
++            out.append(out[start + n])
++    if len(out) != expected:
++        raise ValueError(f"Roblox LZ4 size mismatch: {len(out)} != {expected}")
++    return bytes(out)
++
++
++def _parse_chunks(blob: bytes):
++    if not blob.startswith(BINARY_MAGIC) or len(blob) < 32:
++        raise ValueError("not a Roblox binary model")
++    chunks = []
++    pos = 32
++    while pos < len(blob):
++        if pos + 16 > len(blob):
++            raise ValueError("truncated Roblox chunk header")
++        name = blob[pos:pos + 4]
++        compressed, uncompressed, _reserved = struct.unpack_from("<III", blob, pos + 4)
++        size = compressed or uncompressed
++        end = pos + 16 + size
++        if end > len(blob):
++            raise ValueError("truncated Roblox chunk")
++        stored = blob[pos + 16:end]
++        raw = _lz4_decompress(stored, uncompressed) if compressed else stored
++        chunks.append((name, raw))
++        pos = end
++    return chunks
++
++
++def _deinterleave(data: bytes, count: int, width: int) -> list[bytes]:
++    if len(data) != count * width:
++        raise ValueError("invalid interleaved property length")
++    return [bytes(data[j * count + i] for j in range(width)) for i in range(count)]
++
++
++def _zigzag_decode(value: int) -> int:
++    return (value >> 1) ^ -(value & 1)
++
++
++def _decode_refs(data: bytes, count: int) -> list[int]:
++    current = 0
++    result = []
++    for raw in _deinterleave(data, count, 4):
++        current += _zigzag_decode(int.from_bytes(raw, "big"))
++        result.append(current)
++    return result
++
++
++def _decode_float(raw: bytes) -> float:
++    encoded = int.from_bytes(raw, "big")
++    bits = ((encoded >> 1) | ((encoded & 1) << 31)) & 0xFFFFFFFF
++    return struct.unpack(">f", bits.to_bytes(4, "big"))[0]
++
++
++def _inst_info(raw: bytes):
++    class_id, name_len = struct.unpack_from("<II", raw, 0)
++    name = raw[8:8 + name_len].decode("utf-8")
++    pos = 8 + name_len + 1
++    count = struct.unpack_from("<I", raw, pos)[0]
++    pos += 4
++    refs = _decode_refs(raw[pos:pos + count * 4], count)
++    return class_id, name, count, refs
++
++
++def _prop_info(raw: bytes):
++    class_id, name_len = struct.unpack_from("<II", raw, 0)
++    name = raw[8:8 + name_len].decode("utf-8")
++    pos = 8 + name_len
++    type_id = raw[pos]
++    return class_id, name, type_id, raw[pos + 1:]
++
++
++def _parent_info(raw: bytes):
++    count = struct.unpack_from("<I", raw, 1)[0]
++    pos = 5
++    children = _decode_refs(raw[pos:pos + count * 4], count)
++    pos += count * 4
++    parents = _decode_refs(raw[pos:pos + count * 4], count)
++    return dict(zip(children, parents))
++
++
++def _strings(data: bytes, count: int) -> list[str]:
++    result = []
++    pos = 0
++    for _ in range(count):
++        if pos + 4 > len(data):
++            raise ValueError("truncated Roblox string property")
++        size = struct.unpack_from("<I", data, pos)[0]
++        pos += 4
++        end = pos + size
++        if end > len(data):
++            raise ValueError("truncated Roblox string value")
++        result.append(data[pos:end].decode("utf-8", errors="replace"))
++        pos = end
++    if pos != len(data):
++        raise ValueError("unexpected bytes after Roblox string property")
++    return result
++
++
++def _floats(data: bytes, count: int) -> list[float]:
++    return [_decode_float(raw) for raw in _deinterleave(data, count, 4)]
++
++
++def _enums(data: bytes, count: int) -> list[int]:
++    return [int.from_bytes(raw, "big") for raw in _deinterleave(data, count, 4)]
++
++
++def _bools(data: bytes, count: int) -> list[bool]:
++    if len(data) != count:
++        raise ValueError("invalid Roblox bool property")
++    return [bool(value) for value in data]
++
++
++def _cframes(data: bytes, count: int) -> list[tuple[float, ...]]:
++    rotations: list[tuple[float, ...]] = []
++    pos = 0
++    for _ in range(count):
++        if pos >= len(data):
++            raise ValueError("truncated Roblox CFrame rotation")
++        matrix_id = data[pos]
++        pos += 1
++        if matrix_id == 0:
++            if pos + 36 > len(data):
++                raise ValueError("truncated Roblox CFrame matrix")
++            rotations.append(tuple(float(value) for value in struct.unpack_from("<9f", data, pos)))
++            pos += 36
++        elif matrix_id == 2:
++            rotations.append((1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0))
++        else:
++            raise ValueError(f"unsupported compact Roblox CFrame rotation id {matrix_id}")
++    position_data = data[pos:]
++    raw_positions = _deinterleave(position_data, count, 12)
++    result = []
++    for index, raw in enumerate(raw_positions):
++        xyz = tuple(_decode_float(raw[offset:offset + 4]) for offset in (0, 4, 8))
++        result.append(xyz + rotations[index])
++    return result
++
++
++def _decode_property(type_id: int, data: bytes, count: int):
++    if type_id == 0x01:
++        return _strings(data, count)
++    if type_id == 0x02:
++        return _bools(data, count)
++    if type_id == 0x04:
++        return _floats(data, count)
++    if type_id == 0x10:
++        return _cframes(data, count)
++    if type_id == 0x12:
++        return _enums(data, count)
++    raise ValueError(f"unsupported animation property type 0x{type_id:02x}")
++
++
++def _binary_animation(path: Path) -> dict:
++    chunks = _parse_chunks(path.read_bytes())
++    classes = {}
++    class_by_name = {}
++    for name, raw in chunks:
++        if name != b"INST":
++            continue
++        class_id, class_name, count, refs = _inst_info(raw)
++        classes[class_id] = {"name": class_name, "count": count, "refs": refs, "props": {}}
++        class_by_name[class_name] = class_id
++    required = ["KeyframeSequence", "Keyframe", "Pose"]
++    if any(name not in class_by_name for name in required):
++        raise ValueError("animation model must contain KeyframeSequence, Keyframe, and Pose instances")
++    parent_by_ref = {}
++    for name, raw in chunks:
++        if name == b"PRNT":
++            parent_by_ref = _parent_info(raw)
++        elif name == b"PROP":
++            class_id, prop_name, type_id, data = _prop_info(raw)
++            row = classes.get(class_id)
++            if not row:
++                continue
++            if row["name"] not in required:
++                continue
++            if prop_name not in {"Name", "Time", "Loop", "Priority", "Weight", "EasingStyle", "EasingDirection", "CFrame"}:
++                continue
++            row["props"][prop_name] = _decode_property(type_id, data, int(row["count"]))
++    if not parent_by_ref:
++        raise ValueError("animation model has no parent graph")
++
++    indexes = {name: {ref: index for index, ref in enumerate(classes[class_by_name[name]]["refs"])} for name in required}
++
++    def value(class_name: str, prop_name: str, ref: int, default):
++        row = classes[class_by_name[class_name]]
++        index = indexes[class_name].get(ref)
++        if index is None:
++            return default
++        values = row["props"].get(prop_name)
++        if values is None or index >= len(values):
++            return default
++        return values[index]
++
++    sequence_refs = classes[class_by_name["KeyframeSequence"]]["refs"]
++    if len(sequence_refs) != 1:
++        raise ValueError("animation model must contain exactly one KeyframeSequence")
++    sequence_ref = sequence_refs[0]
++    key_refs = [ref for ref in classes[class_by_name["Keyframe"]]["refs"] if parent_by_ref.get(ref) == sequence_ref]
++    pose_refs = set(classes[class_by_name["Pose"]]["refs"])
++    children_by_parent: dict[int, list[int]] = {}
++    for child in pose_refs:
++        children_by_parent.setdefault(parent_by_ref.get(child, -1), []).append(child)
++
++    def build_pose(ref: int) -> dict:
++        children = children_by_parent.get(ref, [])
++        return {
++            "name": value("Pose", "Name", ref, "Pose"),
++            "weight": float(value("Pose", "Weight", ref, 1.0)),
++            "easingStyle": int(value("Pose", "EasingStyle", ref, 0)),
++            "easingDirection": int(value("Pose", "EasingDirection", ref, 0)),
++            "cframe": tuple(value("Pose", "CFrame", ref, (0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0))),
++            "ref": ref,
++            "children": [build_pose(child) for child in children],
++        }
++
++    keyframes = []
++    for ref in key_refs:
++        top = children_by_parent.get(ref, [])
++        keyframes.append({
++            "name": value("Keyframe", "Name", ref, "Keyframe"),
++            "time": float(value("Keyframe", "Time", ref, 0.0)),
++            "ref": ref,
++            "poses": [build_pose(child) for child in top],
++        })
++    return {
++        "loop": bool(value("KeyframeSequence", "Loop", sequence_ref, False)),
++        "priority": int(value("KeyframeSequence", "Priority", sequence_ref, 2)),
++        "keyframes": keyframes,
++    }
++
++
++def _xml_prop(item: ET.Element, name: str, default=None):
++    props = item.find("Properties")
++    if props is None:
++        return default
++    for prop in props:
++        if prop.attrib.get("name") != name:
++            continue
++        tag = prop.tag.lower()
++        if tag in {"string", "content", "binarystring"}:
++            return prop.text or ""
++        if tag == "bool":
++            return (prop.text or "").strip().lower() == "true"
++        if tag in {"float", "double"}:
++            return float(prop.text or 0)
++        if tag in {"token", "int", "int64"}:
++            return int(prop.text or 0)
++        if tag == "coordinateframe":
++            names = ("X", "Y", "Z", "R00", "R01", "R02", "R10", "R11", "R12", "R20", "R21", "R22")
++            values = {child.tag: float(child.text or 0) for child in prop}
++            return tuple(values.get(field, 0.0 if field in {"X", "Y", "Z"} else (1.0 if field in {"R00", "R11", "R22"} else 0.0)) for field in names)
++    return default
++
++
++def _xml_animation(path: Path) -> dict:
++    root = ET.parse(path).getroot()
++    sequences = [item for item in root.iter("Item") if item.attrib.get("class") == "KeyframeSequence"]
++    if len(sequences) != 1:
++        raise ValueError("animation rbxmx must contain exactly one KeyframeSequence")
++    sequence = sequences[0]
++
++    def pose(item: ET.Element) -> dict:
++        return {
++            "name": _xml_prop(item, "Name", "Pose"),
++            "weight": float(_xml_prop(item, "Weight", 1.0)),
++            "easingStyle": int(_xml_prop(item, "EasingStyle", 0)),
++            "easingDirection": int(_xml_prop(item, "EasingDirection", 0)),
++            "cframe": tuple(_xml_prop(item, "CFrame", (0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0))),
++            "children": [pose(child) for child in item.findall("Item") if child.attrib.get("class") == "Pose"],
++        }
++
++    keyframes = []
++    for item in sequence.findall("Item"):
++        if item.attrib.get("class") != "Keyframe":
++            continue
++        keyframes.append({
++            "name": _xml_prop(item, "Name", "Keyframe"),
++            "time": float(_xml_prop(item, "Time", 0.0)),
++            "poses": [pose(child) for child in item.findall("Item") if child.attrib.get("class") == "Pose"],
++        })
++    return {"loop": bool(_xml_prop(sequence, "Loop", False)), "priority": int(_xml_prop(sequence, "Priority", 2)), "keyframes": keyframes}
++
++
++def _feed_pose(fp: _Fingerprint, pose: dict) -> int:
++    fp.text("pose")
++    fp.text(str(pose.get("name") or ""))
++    fp.number(float(pose.get("weight") or 0))
++    fp.integer(int(pose.get("easingStyle") or 0))
++    fp.integer(int(pose.get("easingDirection") or 0))
++    cframe = tuple(pose.get("cframe") or ())
++    if len(cframe) != 12:
++        raise ValueError("animation pose CFrame must contain 12 components")
++    for component in cframe:
++        fp.number(float(component))
++    children = list(pose.get("children") or [])
++    children.sort(key=lambda row: str(row.get("name") or ""))
++    fp.integer(len(children))
++    count = 1
++    for child in children:
++        count += _feed_pose(fp, child)
++    return count
++
++
++def fingerprint_animation(path: Path) -> dict:
++    path = Path(path)
++    suffix = path.suffix.lower()
++    if suffix == ".rbxm":
++        animation = _binary_animation(path)
++    elif suffix == ".rbxmx":
++        animation = _xml_animation(path)
++    else:
++        raise ValueError("animation fingerprint supports only .rbxm/.rbxmx")
++    fp = _Fingerprint()
++    fp.text("game1-animation-fingerprint-v1")
++    fp.integer(1 if animation.get("loop") else 0)
++    fp.integer(int(animation.get("priority") or 0))
++    keyframes = list(animation.get("keyframes") or [])
++    keyframes.sort(key=lambda row: (float(row.get("time") or 0), str(row.get("name") or "")))
++    fp.integer(len(keyframes))
++    pose_count = 0
++    duration = 0.0
++    for keyframe in keyframes:
++        time_value = float(keyframe.get("time") or 0)
++        duration = max(duration, time_value)
++        fp.text("keyframe")
++        fp.number(time_value)
++        fp.text(str(keyframe.get("name") or ""))
++        poses = list(keyframe.get("poses") or [])
++        poses.sort(key=lambda row: str(row.get("name") or ""))
++        fp.integer(len(poses))
++        for pose in poses:
++            pose_count += _feed_pose(fp, pose)
++    return {
++        "schemaVersion": 1,
++        "fingerprint": fp.hexdigest(),
++        "keyframes": len(keyframes),
++        "poses": pose_count,
++        "duration": round(duration, 6),
++    }
+diff --git a/system/control-center/animation_speed_scaling_store.py b/system/control-center/animation_speed_scaling_store.py
+index d787568..ff7c1fc 100644
+--- a/system/control-center/animation_speed_scaling_store.py
++++ b/system/control-center/animation_speed_scaling_store.py
+@@ -20,6 +20,12 @@ DEFAULT_PAYLOAD = {
+                     "stat": "RunSpeed",
+                     "unitsPerPercent": 2.0,
+                 },
++                {
++                    "channel": "walk",
++                    "label": "Walk Speed",
++                    "stat": "RunSpeed",
++                    "unitsPerPercent": 4.0,
++                },
+                 {
+                     "channel": "attack",
+                     "label": "Attack Speed",
+diff --git a/system/control-center/host_agent.py b/system/control-center/host_agent.py
+index 867b20c..2881f3e 100644
+--- a/system/control-center/host_agent.py
++++ b/system/control-center/host_agent.py
+@@ -38,7 +38,7 @@ from animation_speed_scaling_store import AnimationSpeedScalingStore
+ from character_core.identity import CharacterIdentityService
+ from studio_bridge import run_model_load_bridge, run_monster_spawn_bridge
+ 
+-control_agent_build = "game1-m7-animation-folder-explorer-005"
++control_agent_build = "game1-m16-studio-animation-check-001"
+ port = int(os.environ.get("CONTROL_AGENT_PORT", "43821"))
+ token = os.environ.get("CONTROL_TOKEN", "Game1LocalControlV1")
+ store = CharacterStore(ROOT)
+@@ -440,6 +440,12 @@ class Handler(BaseHTTPRequestHandler):
+                 return self.out(200, animation_speed_scaling.snapshot())
+             except Exception as error:
+                 return self.out(400, {"error": str(error)})
++        if path == "/api/studio/animation-check":
++            try:
++                items = animations.roblox_check_items() + monster_animations.roblox_check_items()
++                return self.out(200, {"schemaVersion": 1, "project": "game1", "items": items})
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
+         monster_prefix = "/api/monsters/"
+         publications_suffix = "/publications"
+         if path.startswith(monster_prefix) and path.endswith(publications_suffix):
+@@ -550,6 +556,25 @@ class Handler(BaseHTTPRequestHandler):
+             except Exception as error:
+                 return self.out(400, {"error": str(error)})
+ 
++        if path == "/api/studio/animation-check":
++            try:
++                payload = self.body()
++                results = payload.get("results") if isinstance(payload, dict) else []
++                results = results if isinstance(results, list) else []
++                character = animations.apply_roblox_check(results)
++                monster = monster_animations.apply_roblox_check(results)
++                return self.out(200, {
++                    "schemaVersion": 1,
++                    "project": "game1",
++                    "matched": int(character.get("matched") or 0) + int(monster.get("matched") or 0),
++                    "mismatched": int(character.get("mismatched") or 0) + int(monster.get("mismatched") or 0),
++                    "failed": int(character.get("failed") or 0) + int(monster.get("failed") or 0),
++                    "character": character,
++                    "monster": monster,
++                })
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
++
+         if path == "/api/monster-animations/scan":
+             try:
+                 payload = self.body()
+diff --git a/system/control-center/monster_animation_store.py b/system/control-center/monster_animation_store.py
+index 7e39bc7..b8807f7 100644
+--- a/system/control-center/monster_animation_store.py
++++ b/system/control-center/monster_animation_store.py
+@@ -466,6 +466,69 @@ class MonsterAnimationStore:
+             },
+         }
+ 
++
++    def roblox_check_items(self) -> list[dict]:
++        from animation_fingerprint import fingerprint_animation
++        with self.connect() as connection:
++            rows = [dict(row) for row in connection.execute(
++                """SELECT id,monster_slug,name,prepared_path,sha256,asset_id,published_sha256,revision
++                   FROM monster_animation_clips WHERE asset_id IS NOT NULL AND asset_id<>'' ORDER BY monster_slug,name,id"""
++            )]
++        items = []
++        for row in rows:
++            path = self.root / str(row.get("prepared_path") or "")
++            if not path.is_file():
++                items.append({
++                    "targetType": "monster", "targetId": str(row.get("monster_slug") or ""),
++                    "clipId": str(row.get("id") or ""), "name": str(row.get("name") or ""),
++                    "assetId": str(row.get("asset_id") or ""), "status": "MISSING",
++                    "error": "registered prepared animation file is missing",
++                })
++                continue
++            fingerprint = fingerprint_animation(path)
++            items.append({
++                "targetType": "monster", "targetId": str(row.get("monster_slug") or ""),
++                "clipId": str(row.get("id") or ""), "name": str(row.get("name") or ""),
++                "assetId": str(row.get("asset_id") or ""), "status": self._status(row),
++                "revision": int(row.get("revision") or 1), **fingerprint,
++            })
++        return items
++
++    def apply_roblox_check(self, results: list[dict]) -> dict:
++        from animation_fingerprint import fingerprint_animation
++        matched = mismatched = failed = 0
++        details = []
++        with self.connect() as connection:
++            for incoming in results or []:
++                if str(incoming.get("targetType") or "") != "monster":
++                    continue
++                clip_id = str(incoming.get("clipId") or "")
++                raw = connection.execute("SELECT * FROM monster_animation_clips WHERE id=?", (clip_id,)).fetchone()
++                if not raw:
++                    failed += 1; details.append({"clipId": clip_id, "status": "ERROR", "message": "unknown clip"}); continue
++                row = dict(raw)
++                if str(incoming.get("assetId") or "") != str(row.get("asset_id") or ""):
++                    failed += 1; details.append({"clipId": clip_id, "status": "ERROR", "message": "asset id mismatch"}); continue
++                path = self.root / str(row.get("prepared_path") or "")
++                if not path.is_file():
++                    failed += 1; details.append({"clipId": clip_id, "status": "ERROR", "message": "local file missing"}); continue
++                local = fingerprint_animation(path)
++                cloud = str(incoming.get("fingerprint") or "").lower()
++                same = bool(cloud) and cloud == str(local["fingerprint"]).lower()
++                same = same and int(incoming.get("keyframes") or -1) == int(local["keyframes"])
++                same = same and int(incoming.get("poses") or -1) == int(local["poses"])
++                if same:
++                    connection.execute(
++                        "UPDATE monster_animation_clips SET published_sha256=sha256,moderation_state=?,published_at=?,updated_at=? WHERE id=?",
++                        ("STUDIO_VERIFIED", time.time(), time.time(), clip_id),
++                    )
++                    matched += 1; details.append({"clipId": clip_id, "status": "MATCH"})
++                else:
++                    mismatched += 1; details.append({"clipId": clip_id, "status": "DIFFERENT"})
++        if matched:
++            self.export()
++        return {"matched": matched, "mismatched": mismatched, "failed": failed, "details": details}
++
+     def set_duplicate_first_frame(self, clip_id: str, enabled: bool) -> dict:
+         # Runtime presentation flag only. Never mutate source/prepared animation
+         # bytes, publication checksum, revision, or permanent Roblox asset id.
+diff --git a/system/control-center/static/character-assets.js b/system/control-center/static/character-assets.js
+index dd1f51e..2672dc5 100644
+--- a/system/control-center/static/character-assets.js
++++ b/system/control-center/static/character-assets.js
+@@ -59,7 +59,7 @@ function renderRows(){const body=$('rows');body.innerHTML='';for(const item of s
+ function renderDetails(row){const host=$('selected-details');if(!row){host.innerHTML='<span class="muted">select a character.</span>';return}host.innerHTML=`<div class="section-title"><div><span>selected</span><h3>${esc(row.display_name)}</h3></div>${statusTag(row.status)}</div><div class="details-grid"><div><b>canonical source</b><span>${esc(row.source_path||'—')}</span></div><div><b>prepared</b><span>${esc(row.prepared_path||'—')}</span></div><div><b>model asset id</b><span>${esc(row.model_asset_id||'not published')}</span></div><div><b>replacement</b><span>${row.model_replacement_pending?'new asset id on next publish':'no pending replacement'}</span></div><div><b>publication</b><span>${esc(row.moderation_state||'—')}</span></div><div><b>armature</b><span>${esc(row.armature_name||'—')} · ${esc(row.bone_count||0)} bones</span></div><div><b>skeleton signature</b><span>${esc(row.skeleton_signature||'—')}</span></div></div>`}
+ function renderForm(row){const configured=!!state.data?.publication?.configured;$('save-character-stats').disabled=!row;const replacement=!!row?.model_replacement_pending;const has=row&&row.source_path;const needsRepublish=!!(row?.model_asset_id&&row?.status==='CHANGED'&&!replacement);const publishedUnchanged=!!(row?.model_asset_id&&row?.status==='PUBLISHED'&&!replacement);$('choose-model').textContent=row?'choose replacement fbx':'choose fbx';if(row){$('model-status').innerHTML=replacement?`<strong>${esc(row.display_name)} · replacement ready</strong><span>${esc(row.source_path||'no source')} · current Roblox asset ${esc(row.model_asset_id||'—')} stays active until the new upload succeeds.</span>`:`<strong>${esc(row.display_name)} · ${esc(row.status)}</strong><span>${esc(row.source_path||'no source')} · ${esc(row.armature_name||'no armature metadata')} · ${esc(row.bone_count||0)} bones</span>`;$('save-archetype').disabled=false;$('save-archetype').textContent='save identity';if(row.model_asset_id){$('register-character').textContent=state.sourcePath?'replace model · publish new asset':'choose replacement fbx';$('register-character').disabled=!state.sourcePath||!configured;}else{$('register-character').textContent=state.sourcePath?'save model revision':'choose fbx for revision';$('register-character').disabled=!state.sourcePath;}}else{$('model-status').innerHTML='<strong>not registered</strong><span>choose an fbx with a skinned armature.</span>';$('save-archetype').disabled=true;$('save-archetype').textContent='save identity';$('register-character').textContent='register character';$('register-character').disabled=!state.sourcePath;}$('publish-character').disabled=!has||!configured||publishedUnchanged;$('publish-character').textContent=replacement?'publish replacement':row?.model_asset_id?(publishedUnchanged?'published':'publish new asset'):'publish model';$('sync-character').disabled=!row?.model_asset_id;$('activate-character').disabled=!row?.model_asset_id;$('publication-hint').textContent=!row?'select a registered character.':!configured?'configure open cloud in .env.local before publishing.':replacement?`replacement is staged; publishing creates a NEW Roblox asset. current asset ${row.model_asset_id} remains assigned until success.`:needsRepublish?`current FBX must be republished through the bone-safe pipeline. publish creates a NEW Roblox asset; asset ${row.model_asset_id} stays assigned until success.`:row.model_asset_id?`asset ${row.model_asset_id} is immutable here. choose a replacement FBX to publish a new asset id.`:'first publish creates a permanent model asset id.'}
+ function renderCharacters(){if(!state.data)return;const row=selectedRow();const published=state.data.items.filter(x=>x.status==='PUBLISHED').length;$('metric-total').textContent=state.data.items.length;$('metric-published').textContent=published;$('metric-active').textContent=state.data.activeArchetypeId?'1':'0';renderRuntime();renderTree();renderRows();renderDetails(row);renderForm(row)}
+-async function loadCharacters(){try{const formRace=$('race').value;const formGender=$('gender').value;state.data=await request('/api/characters');const races=state.data.options?.races||['human'];const genders=state.data.options?.genders||['male','female'];$('race').innerHTML=races.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');$('gender').innerHTML=genders.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');if(state.selected&&!state.data.items.some(x=>x.id===state.selected))state.selected=null;const row=selectedRow();const wantedRace=formRace||row?.race||races[0]||'';const wantedGender=formGender||row?.gender||genders[0]||'';$('race').value=races.includes(wantedRace)?wantedRace:(row?.race||races[0]||'');$('gender').value=genders.includes(wantedGender)?wantedGender:(row?.gender||genders[0]||'');if(!state.selected)syncIdentity();renderCharacters();populateAnimationCharacters()}catch(error){toast(error.message,true)}}
++async function loadCharacters(){try{const formRace=$('race').value;const formGender=$('gender').value;state.data=await request('/api/characters');const races=state.data.options?.races||['human'];const genders=state.data.options?.genders||['male','female'];$('race').innerHTML=races.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');$('gender').innerHTML=genders.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');if(state.selected&&!state.data.items.some(x=>x.id===state.selected))state.selected=null;let autoSelected=false;if(!state.selected&&state.data.items.length){state.selected=state.data.activeArchetypeId&&state.data.items.some(x=>x.id===state.data.activeArchetypeId)?state.data.activeArchetypeId:state.data.items[0].id;autoSelected=true}const row=selectedRow();const wantedRace=autoSelected?(row?.race||races[0]||''):(formRace||row?.race||races[0]||'');const wantedGender=autoSelected?(row?.gender||genders[0]||''):(formGender||row?.gender||genders[0]||'');$('race').value=races.includes(wantedRace)?wantedRace:(row?.race||races[0]||'');$('gender').value=genders.includes(wantedGender)?wantedGender:(row?.gender||genders[0]||'');if(autoSelected&&row){$('character-id').value=row.id;$('display-name').value=row.display_name||'';fillCharacterStats(row);$('picked-model').textContent='current model stays active until a replacement is published'}else if(!state.selected)syncIdentity();renderCharacters();populateAnimationCharacters()}catch(error){toast(error.message,true)}}
+ async function chooseModel(){try{const result=await request('/api/files/choose-character-model',{method:'POST'});if(!result.path)return;state.sourcePath=result.path;$('picked-model').textContent=result.path;renderForm(selectedRow())}catch(error){toast(error.message,true)}}
+ async function registerCharacter(){try{const row=selectedRow();if(!state.sourcePath)throw Error('choose an fbx first');if(row){const identityChanged=$('character-id').value.trim().toLowerCase()!==row.id||$('race').value!==row.race||$('gender').value!==row.gender||$('display-name').value.trim()!==(row.display_name||'');if(identityChanged)throw Error('save archetype identity first, then replace the model');if(row.model_asset_id){if(!state.data?.publication?.configured)throw Error('configure Open Cloud before replacing a published model');if(!confirm(`replace the model for ${row.id}? a NEW Roblox model asset will be published. current asset ${row.model_asset_id} stays assigned until the new upload succeeds.`))return;$('register-character').disabled=true;toast('preparing replacement and publishing a new Roblox asset…');const result=await request('/api/characters/'+encodeURIComponent(row.id)+'/replace-model',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sourcePath:state.sourcePath,description:$('publication-description').value})});state.sourcePath='';state.selected=row.id;await loadCharacters();toast(result.studioError?`model replaced · new asset ${result.newAssetId} · Studio sync needs retry: ${result.studioError}`:`model replaced · new asset ${result.newAssetId}`,!!result.studioError);return;}}$('register-character').disabled=true;toast('analyzing and registering character…');const result=await request('/api/characters',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({existingId:row?.id||'',id:$('character-id').value,displayName:$('display-name').value,race:$('race').value,gender:$('gender').value,sourcePath:state.sourcePath,stats:characterStatsPayload()})});state.selected=result.id;state.sourcePath='';await loadCharacters();toast(`registered ${result.id} · ${result.bone_count} bones`)}catch(error){try{await loadCharacters()}catch{}toast(error.message,true)}finally{renderForm(selectedRow())}}
+ async function saveCharacterStats(){const row=selectedRow();if(!row)return;try{$('save-character-stats').disabled=true;const snapshot=await request('/api/characters/'+encodeURIComponent(row.id)+'/stats',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({stats:characterStatsPayload()})});state.data={...snapshot,publication:state.data?.publication||{}};renderCharacters();toast(`saved starting stats · ${row.id}`)}catch(error){toast(error.message,true)}finally{$('save-character-stats').disabled=!selectedRow()}}
+diff --git a/system/studio-plugin/Game1Bridge.server.luau b/system/studio-plugin/Game1Bridge.server.luau
+index af6467c..87f6fb8 100644
+--- a/system/studio-plugin/Game1Bridge.server.luau
++++ b/system/studio-plugin/Game1Bridge.server.luau
+@@ -1,5 +1,6 @@
+ local AssetService = game:GetService("AssetService")
+ local HttpService = game:GetService("HttpService")
++local KeyframeSequenceProvider = game:GetService("KeyframeSequenceProvider")
+ local RunService = game:GetService("RunService")
+ local ReplicatedStorage = game:GetService("ReplicatedStorage")
+ local ServerStorage = game:GetService("ServerStorage")
+@@ -12,6 +13,8 @@ local CharacterTemplate = require(script.Parent.modules.CharacterTemplate)
+ local toolbar = plugin:CreateToolbar("game1")
+ local button = toolbar:CreateButton("Control Center", "Check the game1 local Control Center host agent", "")
+ button.ClickableWhenViewportHidden = true
++local checkAnimationsButton = toolbar:CreateButton("Check Roblox Assets Animations", "Compare current Roblox animation assets with the local game1 animation files", "")
++checkAnimationsButton.ClickableWhenViewportHidden = true
+ 
+ local AGENT_URL = "http://127.0.0.1:43821/api/agent/info"
+ local AGENT_TOKEN = "Game1LocalControlV1"
+@@ -146,6 +149,202 @@ local function checkAgent()
+ end
+ button.Click:Connect(checkAgent)
+ 
++local CRC32_TABLE = table.create(256)
++for index = 0, 255 do
++    local value = index
++    for _ = 1, 8 do
++        if bit32.band(value, 1) ~= 0 then
++            value = bit32.bxor(bit32.rshift(value, 1), 0xEDB88320)
++        else
++            value = bit32.rshift(value, 1)
++        end
++    end
++    CRC32_TABLE[index + 1] = value
++end
++
++local function fingerprintFeedBytes(state: any, value: string)
++    local crc = state.crc
++    for index = 1, #value do
++        local slot = bit32.band(bit32.bxor(crc, string.byte(value, index)), 0xFF)
++        crc = bit32.bxor(bit32.rshift(crc, 8), CRC32_TABLE[slot + 1])
++    end
++    state.crc = crc
++end
++
++local function fingerprintText(state: any, value: any)
++    local text = tostring(value or "")
++    fingerprintFeedBytes(state, "s" .. tostring(#text) .. ":" .. text)
++end
++
++local function fingerprintInteger(state: any, value: number)
++    fingerprintFeedBytes(state, "i" .. string.format("%.0f", value) .. ";")
++end
++
++local function fingerprintNumber(state: any, value: number)
++    local scaled = value * 100000
++    local quantized = if scaled >= 0 then math.floor(scaled + 0.5) else math.ceil(scaled - 0.5)
++    fingerprintInteger(state, quantized)
++end
++
++local function sortedPoseChildren(parent: Instance): { Pose }
++    local poses = {}
++    for _, child in parent:GetChildren() do
++        if child:IsA("Pose") then
++            table.insert(poses, child)
++        end
++    end
++    table.sort(poses, function(left, right)
++        return left.Name < right.Name
++    end)
++    return poses
++end
++
++local function fingerprintPose(state: any, pose: Pose): number
++    fingerprintText(state, "pose")
++    fingerprintText(state, pose.Name)
++    fingerprintNumber(state, pose.Weight)
++    fingerprintInteger(state, pose.EasingStyle.Value)
++    fingerprintInteger(state, pose.EasingDirection.Value)
++    local x, y, z, r00, r01, r02, r10, r11, r12, r20, r21, r22 = pose.CFrame:GetComponents()
++    for _, component in ipairs({ x, y, z, r00, r01, r02, r10, r11, r12, r20, r21, r22 }) do
++        fingerprintNumber(state, component)
++    end
++    local children = sortedPoseChildren(pose)
++    fingerprintInteger(state, #children)
++    local count = 1
++    for _, child in children do
++        count += fingerprintPose(state, child)
++    end
++    return count
++end
++
++local function fingerprintKeyframeSequence(sequence: KeyframeSequence): any
++    local state = { crc = 0xFFFFFFFF }
++    fingerprintText(state, "game1-animation-fingerprint-v1")
++    fingerprintInteger(state, sequence.Loop and 1 or 0)
++    fingerprintInteger(state, sequence.Priority.Value)
++    local keyframes = sequence:GetKeyframes()
++    table.sort(keyframes, function(left, right)
++        if left.Time ~= right.Time then
++            return left.Time < right.Time
++        end
++        return left.Name < right.Name
++    end)
++    fingerprintInteger(state, #keyframes)
++    local poseCount = 0
++    local duration = 0
++    for _, keyframe in keyframes do
++        duration = math.max(duration, keyframe.Time)
++        fingerprintText(state, "keyframe")
++        fingerprintNumber(state, keyframe.Time)
++        fingerprintText(state, keyframe.Name)
++        local poses = sortedPoseChildren(keyframe)
++        fingerprintInteger(state, #poses)
++        for _, pose in poses do
++            poseCount += fingerprintPose(state, pose)
++        end
++    end
++    local finalCrc = bit32.bxor(state.crc, 0xFFFFFFFF)
++    return {
++        schemaVersion = 1,
++        fingerprint = string.format("%08x", finalCrc),
++        keyframes = #keyframes,
++        poses = poseCount,
++        duration = math.floor(duration * 1000000 + 0.5) / 1000000,
++    }
++end
++
++local function controlAgentRequest(method: string, path: string, payload: any?): any
++    local request = {
++        Url = "http://127.0.0.1:43821" .. path,
++        Method = method,
++        Headers = {
++            ["X-Control-Token"] = AGENT_TOKEN,
++        },
++    }
++    if payload ~= nil then
++        request.Headers["Content-Type"] = "application/json"
++        request.Body = HttpService:JSONEncode(payload)
++    end
++    local response = HttpService:RequestAsync(request)
++    if not response.Success then
++        error(("control agent http %d: %s"):format(response.StatusCode, response.Body))
++    end
++    return HttpService:JSONDecode(response.Body)
++end
++
++local animationCheckBusy = false
++local function checkRobloxAnimationAssets()
++    if animationCheckBusy then
++        return
++    end
++    if RunService:IsRunning() then
++        warn("[game1 plugin] stop Play/Run before checking Roblox animation assets")
++        return
++    end
++    animationCheckBusy = true
++    checkAnimationsButton:SetActive(true)
++    local ok, operationError = xpcall(function()
++        local plan = controlAgentRequest("GET", "/api/studio/animation-check", nil)
++        local rows = typeof(plan.items) == "table" and plan.items or {}
++        local results = {}
++        local loaded = 0
++        print(("[game1 plugin] checking %d Roblox animation assets against local files…"):format(#rows))
++        for index, row in ipairs(rows) do
++            local result = {
++                targetType = tostring(row.targetType or ""),
++                targetId = tostring(row.targetId or ""),
++                clipId = tostring(row.clipId or ""),
++                assetId = tostring(row.assetId or ""),
++            }
++            local assetId = tonumber(row.assetId)
++            if assetId == nil or assetId <= 0 then
++                result.error = "invalid asset id"
++            elseif row.error ~= nil then
++                result.error = tostring(row.error)
++            else
++                local fetchOk, sequenceOrError = pcall(function()
++                    return KeyframeSequenceProvider:GetKeyframeSequenceAsync("rbxassetid://" .. tostring(math.floor(assetId)))
++                end)
++                if fetchOk and sequenceOrError ~= nil and sequenceOrError:IsA("KeyframeSequence") then
++                    local sequence = sequenceOrError :: KeyframeSequence
++                    local fingerprint = fingerprintKeyframeSequence(sequence)
++                    sequence:Destroy()
++                    for key, value in pairs(fingerprint) do
++                        result[key] = value
++                    end
++                    loaded += 1
++                    local expected = tostring(row.fingerprint or "")
++                    local markerText = result.fingerprint == expected and "MATCH" or "DIFFERENT"
++                    print(("[game1 plugin] animation %d/%d · %s · %s · asset %s"):format(index, #rows, markerText, tostring(row.name or row.clipId), tostring(row.assetId)))
++                else
++                    result.error = tostring(sequenceOrError)
++                    warn(("[game1 plugin] animation %d/%d · ERROR · %s · asset %s · %s"):format(index, #rows, tostring(row.name or row.clipId), tostring(row.assetId), result.error))
++                end
++            end
++            table.insert(results, result)
++            task.wait(0.05)
++        end
++        local summary = controlAgentRequest("POST", "/api/studio/animation-check", { results = results })
++        print(("[game1 plugin] Roblox animation check complete · %d loaded · %d match · %d different · %d failed"):format(
++            loaded,
++            tonumber(summary.matched) or 0,
++            tonumber(summary.mismatched) or 0,
++            tonumber(summary.failed) or 0
++        ))
++        if (tonumber(summary.mismatched) or 0) > 0 then
++            warn("[game1 plugin] some Roblox animation assets still differ from local files; reimport those animations manually, then run Check Roblox Assets Animations again")
++        end
++    end, debug.traceback)
++    animationCheckBusy = false
++    checkAnimationsButton:SetActive(false)
++    if not ok then
++        warn("[game1 plugin] Roblox animation check failed: " .. tostring(operationError))
++    end
++end
++
++checkAnimationsButton.Click:Connect(checkRobloxAnimationAssets)
++
+ local function validSegment(value: any): string
+     local segment = tostring(value or "")
+     if segment == "" or segment == "." or segment == ".." or segment:find("[/\\]") then
+@@ -1013,4 +1212,4 @@ task.spawn(function()
+     end
+ end)
+ 
+-print("[game1 plugin] loaded · model bridge v7 · character + weapon + monster templates + spawn authoring")
++print("[game1 plugin] loaded · model bridge v8 · asset animation verification + character + weapon + monster templates + spawn authoring")
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index d636c18..7d09499 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -764,6 +764,7 @@ if animation_scaling_manifest.get("schemaVersion") != 1 or animation_scaling_man
+     err("animation speed scaling manifest must be game1 schema 1")
+ expected_scaling = {
+     ("character", "human_female", "run"): ("RunSpeed", 2.0),
++    ("character", "human_female", "walk"): ("RunSpeed", 4.0),
+     ("character", "human_female", "attack"): ("AttackSpeed", 2.0),
+     ("monster", "gremlin", "run"): ("RunSpeed", 0.6),
+ }
+@@ -1211,13 +1212,29 @@ for registry_name in ["src/shared/character/CharacterAnimationRegistry.luau", "s
+     if "duplicateFirstFrameAtEnd" not in registry_text:
+         err(f"runtime animation registry does not export first-frame seam flag: {registry_name}")
+ 
++# m16 manual Studio animation reimport verification + character stat editor usability.
++fingerprint_path = ROOT / "system/control-center/animation_fingerprint.py"
++fingerprint_text = fingerprint_path.read_text(encoding="utf-8") if fingerprint_path.is_file() else ""
++studio_plugin_text = (ROOT / "system/studio-plugin/Game1Bridge.server.luau").read_text(encoding="utf-8")
++for required in ["game1-animation-fingerprint-v1", "fingerprint_animation", "KeyframeSequence", "Pose", "CFrame"]:
++    if required not in fingerprint_text:
++        err(f"animation content fingerprint contract missing {required}")
++for required in ["/api/studio/animation-check", "roblox_check_items", "apply_roblox_check"]:
++    if required not in (host_agent_text + (ROOT / "system/control-center/animation_core/storage.py").read_text(encoding="utf-8") + (ROOT / "system/control-center/monster_animation_store.py").read_text(encoding="utf-8")):
++        err(f"Studio animation verification API missing {required}")
++for required in ["Check Roblox Assets Animations", "KeyframeSequenceProvider", "fingerprintKeyframeSequence", "/api/studio/animation-check"]:
++    if required not in studio_plugin_text:
++        err(f"Studio animation verification plugin missing {required}")
++if "state.data.activeArchetypeId" not in character_js_text or "autoSelected=true" not in character_js_text:
++    err("character Asset Manager must auto-select the active/first archetype so starting stats can be saved")
++
+ if errors:
+     print("verify failed")
+     for item in errors:
+         print(" -", item)
+     sys.exit(1)
+ 
+-print("verify ok · game1 m15 runtime-only animation first-frame seam passed")
++print("verify ok · game1 m16 Studio animation verification + character stats + walk scaling passed")
+ print("registered character archetypes:", len(archetypes))
+ print("active character archetype:", active_id or "none")
+ print("race pool: human")

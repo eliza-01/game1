@@ -111,9 +111,9 @@
 <div id="animation-scan-status" class="status-box"><strong>nothing scanned yet</strong><span>unrecognized files stay outside the registry and are listed after the scan.</span></div>
 <hr class="card-separator">
 <span class="eyebrow">02 · publication queue</span><h3 class="subheading">roblox animation assets</h3>
-<p><b>publish missing</b> creates one permanent asset id per local clip, sequentially. changed published clips keep their existing id and are never duplicated; content-version update is a separate studio bridge step.</p>
+<p><b>publish missing</b> creates one permanent asset id per local clip. for <b>CHANGED</b>, reimport the animation manually into the existing asset in Roblox Studio, then use <b>Check Roblox Assets Animations</b>; the Asset Manager confirms a newer Approved Roblox version and keeps the same asset id.</p>
 <label>description<input id="animation-publication-description" value="game1 character animation"></label>
-<div class="actions"><button id="publish-missing-animations" class="primary" type="button" disabled>publish missing</button><button id="refresh-animations" type="button">refresh</button></div>
+<div class="actions"><button id="publish-missing-animations" class="primary" type="button" disabled>publish missing</button><button id="check-roblox-animations" type="button">Check Roblox Assets Animations</button><button id="refresh-animations" type="button">refresh</button></div>
 <div id="animation-publish-progress" class="queue-progress" hidden><strong id="animation-publish-current">publication queue</strong><span id="animation-publish-count">0 / 0</span><progress id="animation-publish-bar" value="0" max="1"></progress></div>
 <div id="animation-unassigned" class="unassigned"></div>
 </div>
@@ -221,7 +221,7 @@
 <hr class="card-separator">
 <span class="eyebrow">05 · publication queue</span><h3 class="subheading">roblox animation assets</h3>
 <label>description<input id="monster-animation-publication-description" value="game1 monster animation"></label>
-<div class="actions"><button id="publish-missing-monster-animations" class="primary" type="button" disabled>publish missing</button><button id="refresh-monster-animations" type="button">refresh</button></div>
+<div class="actions"><button id="publish-missing-monster-animations" class="primary" type="button" disabled>publish missing</button><button id="check-roblox-monster-animations" type="button">Check Roblox Assets Animations</button><button id="refresh-monster-animations" type="button">refresh</button></div>
 <div id="monster-animation-publish-progress" class="queue-progress" hidden><strong id="monster-animation-publish-current">publication queue</strong><span id="monster-animation-publish-count">0 / 0</span><progress id="monster-animation-publish-bar" value="0" max="1"></progress></div>
 <div id="monster-animation-unassigned" class="unassigned"></div>
 </div>
@@ -266,10 +266,10 @@
 </section>
 </main>
 <div id="toast" class="toast"></div>
-<script src="character-assets.js?v=13"></script>
+<script src="character-assets.js?v=14"></script>
 <script src="animation-speed.js?v=1"></script>
 <script src="weapon-assets.js?v=3"></script>
-<script src="monster-assets.js?v=3"></script>
+<script src="monster-assets.js?v=4"></script>
 <script src="monster-spawns.js?v=1"></script>
 </body>
 </html>

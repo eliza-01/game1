@@ -18,8 +18,6 @@ local MONSTER_MODE_ATTRIBUTE = "Game1MonsterDebugLocomotionMode"
 local MONSTER_RUNTIME_ATTRIBUTE = "Game1MonsterRuntime"
 local MONSTER_LOCOMOTION_ATTRIBUTE = "MonsterLocomotionMode"
 local RUN_SPEED_OVERRIDE_ATTRIBUTE = "MovementDebugRunSpeedOverride"
-local MIN_ANIMATION_SPEED_PERCENT = AnimationSpeedScaling.MinPercent
-local MAX_ANIMATION_SPEED_PERCENT = AnimationSpeedScaling.MaxPercent
 
 local function finite(value: any, fallback: number): number
     local numeric = tonumber(value)
@@ -31,6 +29,10 @@ end
 
 local function normalizeMonsterMode(value: any): string
     return string.lower(tostring(value or "")) == "run" and "Run" or "Walk"
+end
+
+local function normalizeLocomotionChannel(value: any): string
+    return string.lower(tostring(value or "")) == "walk" and "walk" or "run"
 end
 
 local function ensureRemoteFolder(): Folder
@@ -164,14 +166,14 @@ local function movementModeFor(model: Model): string
     return tostring(model:GetAttribute("AnimationMovementMode") or "Run") == "Walk" and "Walk" or "Run"
 end
 
+local function locomotionTuningChannel(model: Model): string
+    return normalizeLocomotionChannel(movementModeFor(model))
+end
+
 local function applyRuntimeRunSpeed(model: Model, runSpeed: number)
+    -- Runtime-only tuning. BaseRunSpeed remains the Asset Manager authored value so
+    -- Movement Debug can always show authored vs currently tested values separately.
     model:SetAttribute(RUN_SPEED_OVERRIDE_ATTRIBUTE, runSpeed)
-    if model:GetAttribute(MONSTER_RUNTIME_ATTRIBUTE) ~= true then
-        -- Player/NPC stats can be recomputed by CharacterStatsService. Keep the
-        -- debug value as the base too so the current Play-session override does
-        -- not immediately snap back to the authored/default value.
-        model:SetAttribute("BaseRunSpeed", runSpeed)
-    end
     model:SetAttribute("RunSpeed", runSpeed)
     model:SetAttribute("MoveSpeed", runSpeed)
 
@@ -189,39 +191,49 @@ local function applyRuntimeRunSpeed(model: Model, runSpeed: number)
     end
 end
 
-local function animationChannelFor(model: Model): string
-    local action = tostring(model:GetAttribute("AnimationActionSlot") or "")
-    if action ~= "" then
-        return string.lower(action)
+local function animationRuleRow(model: Model, channel: string)
+    local details = AnimationSpeedScaling.ResolveDetailsForModel(model, channel)
+    if details.hasRule ~= true then
+        return {
+            channel = channel,
+            hasRule = false,
+            percent = 100,
+        }
     end
-    local resolved = tostring(model:GetAttribute("AnimationResolvedSlot") or "")
-    if resolved ~= "" then
-        return string.lower(resolved)
-    end
-    local monsterState = tostring(model:GetAttribute("MonsterAnimationState") or "")
-    if monsterState ~= "" then
-        return string.lower(monsterState)
-    end
-    return string.lower(tostring(model:GetAttribute("MovementState") or "idle"))
+    return {
+        channel = channel,
+        hasRule = true,
+        stat = details.stat,
+        statValue = details.statValue,
+        authoredUnitsPerPercent = details.authoredUnitsPerPercent,
+        unitsPerPercent = details.unitsPerPercent,
+        debugOverride = details.debugUnitsPerPercent ~= nil,
+        percent = details.percent,
+    }
 end
 
 local function unitRow(model: Model)
     local runSpeed = math.clamp(finite(model:GetAttribute("RunSpeed"), CharacterMovementConfig.DefaultRunSpeed), MIN_RUN_SPEED, MAX_RUN_SPEED)
-    local animationOverride = tonumber(model:GetAttribute(AnimationSpeedScaling.DebugOverrideAttribute))
-    local animationChannel = animationChannelFor(model)
-    local animationSpeedPercent = AnimationSpeedScaling.ResolveForModel(model, animationChannel)
+    local baseRunSpeed = math.clamp(finite(model:GetAttribute("BaseRunSpeed"), runSpeed), MIN_RUN_SPEED, MAX_RUN_SPEED)
+    local tuningChannel = locomotionTuningChannel(model)
     return {
         id = modelId(model),
         label = modelLabel(model),
         kind = modelKind(model),
         model = model,
         runSpeed = runSpeed,
+        baseRunSpeed = baseRunSpeed,
+        runSpeedOverride = tonumber(model:GetAttribute(RUN_SPEED_OVERRIDE_ATTRIBUTE)) ~= nil,
         walkSpeed = CharacterMovementConfig.ResolveSpeed(model:GetAttribute("CharacterArchetype"), runSpeed, "Walk"),
         runStudsPerSecond = CharacterMovementConfig.RobloxSpeed(model:GetAttribute("CharacterArchetype"), runSpeed, "Run"),
         walkStudsPerSecond = CharacterMovementConfig.RobloxSpeed(model:GetAttribute("CharacterArchetype"), runSpeed, "Walk"),
-        animationSpeedPercent = animationSpeedPercent,
-        animationSpeedOverride = animationOverride ~= nil,
-        animationSlot = animationChannel,
+        tuningChannel = tuningChannel,
+        animationRule = animationRuleRow(model, tuningChannel),
+        animationRules = {
+            run = animationRuleRow(model, "run"),
+            walk = animationRuleRow(model, "walk"),
+        },
+        activeAnimationPlaybackPercent = tonumber(model:GetAttribute("AnimationPlaybackSpeedPercent")),
         animationClip = tostring(model:GetAttribute("AnimationActionClip") or model:GetAttribute("AnimationResolvedClip") or ""),
         movementState = tostring(model:GetAttribute("MovementState") or model:GetAttribute("MonsterAnimationState") or ""),
         lifeState = tostring(model:GetAttribute("LifeState") or "Alive"),
@@ -270,8 +282,8 @@ local function buildCatalog(player: Player)
         minRunSpeed = MIN_RUN_SPEED,
         maxRunSpeed = MAX_RUN_SPEED,
         runSpeedUnitsPerStud = CharacterMovementConfig.RunSpeedUnitsPerStud,
-        minAnimationSpeedPercent = MIN_ANIMATION_SPEED_PERCENT,
-        maxAnimationSpeedPercent = MAX_ANIMATION_SPEED_PERCENT,
+        minAnimationUnitsPerPercent = AnimationSpeedScaling.MinUnitsPerPercent,
+        maxAnimationUnitsPerPercent = AnimationSpeedScaling.MaxUnitsPerPercent,
     }
 end
 
@@ -290,14 +302,19 @@ local function applyUnit(_player: Player, targetId: any, patch: any)
         applyRuntimeRunSpeed(model, runSpeed)
     end
 
-    if patch.animationSpeedPercent ~= nil then
-        local current = finite(model:GetAttribute(AnimationSpeedScaling.DebugOverrideAttribute), AnimationSpeedScaling.ResolveForModel(model, animationChannelFor(model)))
-        local animationSpeedPercent = math.clamp(
-            finite(patch.animationSpeedPercent, current),
-            MIN_ANIMATION_SPEED_PERCENT,
-            MAX_ANIMATION_SPEED_PERCENT
+    if patch.animationUnitsPerPercent ~= nil then
+        local channel = normalizeLocomotionChannel(patch.animationChannel or locomotionTuningChannel(model))
+        local details = AnimationSpeedScaling.ResolveDetailsForModel(model, channel)
+        if details.hasRule ~= true then
+            return { ok = false, error = string.format("no Asset Manager animation scaling rule for %s", channel) }
+        end
+        local authored = finite(details.authoredUnitsPerPercent, 1)
+        local unitsPerPercent = math.clamp(
+            finite(patch.animationUnitsPerPercent, authored),
+            AnimationSpeedScaling.MinUnitsPerPercent,
+            AnimationSpeedScaling.MaxUnitsPerPercent
         )
-        model:SetAttribute(AnimationSpeedScaling.DebugOverrideAttribute, animationSpeedPercent)
+        model:SetAttribute(AnimationSpeedScaling.DebugUnitsPerPercentAttribute(channel), unitsPerPercent)
     end
 
     return {

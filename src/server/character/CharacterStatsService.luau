@@ -6,6 +6,7 @@ local Config = require(CharacterShared:WaitForChild("CharacterStatsConfig"))
 local Service = {}
 local BASE_PREFIX = "Base"
 local modifierSources = setmetatable({}, { __mode = "k" })
+local RUN_SPEED_OVERRIDE_ATTRIBUTE = "MovementDebugRunSpeedOverride"
 
 local function baseName(stat: string): string
     return BASE_PREFIX .. stat
@@ -33,7 +34,7 @@ local function recompute(character: Model)
         end
         local resolved = base + delta
         if stat == "RunSpeed" then
-            local debugOverride = tonumber(character:GetAttribute("MovementDebugRunSpeedOverride"))
+            local debugOverride = tonumber(character:GetAttribute(RUN_SPEED_OVERRIDE_ATTRIBUTE))
             if debugOverride ~= nil then
                 resolved = math.max(0, debugOverride)
             end

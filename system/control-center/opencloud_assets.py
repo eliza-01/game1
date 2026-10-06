@@ -10,6 +10,7 @@ import uuid
 CREATE_ASSET_URL = "https://apis.roblox.com/assets/v1/assets"
 UPDATE_ASSET_URL_TEMPLATE = "https://apis.roblox.com/assets/v1/assets/{asset_id}"
 OPERATION_URL_TEMPLATE = "https://apis.roblox.com/assets/v1/operations/{operation_id}"
+ASSET_VERSIONS_URL_TEMPLATE = "https://apis.roblox.com/assets/v1/assets/{asset_id}/versions"
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 
 
@@ -325,6 +326,28 @@ def update_image_asset(
         raise OpenCloudAssetError("update image asset returned no operation path")
     return operation
 
+
+
+def list_asset_versions(asset_id: str, *, api_key: str, timeout: float = 30.0) -> list[dict]:
+    asset_id = str(asset_id or "").strip()
+    if not asset_id.isdigit() or int(asset_id) <= 0:
+        raise OpenCloudAssetError("asset id must be a positive number")
+    if not str(api_key or "").strip():
+        raise OpenCloudAssetError("ROBLOX_OPEN_CLOUD_API_KEY is not configured in .env.local")
+    req = request.Request(
+        ASSET_VERSIONS_URL_TEMPLATE.format(asset_id=asset_id),
+        headers={
+            "x-api-key": str(api_key).strip(),
+            "Accept": "application/json",
+            "User-Agent": "game1-asset-manager/0.6",
+        },
+        method="GET",
+    )
+    payload = _json_http(req, timeout)
+    rows = payload.get("assetVersions")
+    if not isinstance(rows, list):
+        raise OpenCloudAssetError("roblox open cloud returned no assetVersions array")
+    return [row for row in rows if isinstance(row, dict)]
 
 def get_operation(operation_path: str, *, api_key: str) -> dict:
     operation_id = operation_path.rstrip("/").split("/")[-1].strip()

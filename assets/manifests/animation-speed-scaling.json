@@ -11,6 +11,12 @@
           "channel": "run",
           "label": "Run Speed",
           "stat": "RunSpeed",
+          "unitsPerPercent": 1.9
+        },
+        {
+          "channel": "walk",
+          "label": "Walk Speed",
+          "stat": "RunSpeed",
           "unitsPerPercent": 2.0
         },
         {

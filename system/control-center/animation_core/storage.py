@@ -44,6 +44,7 @@ class AnimationStorageMixin:
                     revision INTEGER NOT NULL DEFAULT 1,
                     created_at REAL NOT NULL,
                     updated_at REAL NOT NULL,
+                    content_updated_at REAL NOT NULL DEFAULT 0,
                     published_at REAL
                 );
                 CREATE TABLE IF NOT EXISTS animation_bindings(
@@ -70,7 +71,10 @@ class AnimationStorageMixin:
                     operation_path TEXT NOT NULL,
                     sha256 TEXT NOT NULL,
                     moderation_state TEXT,
-                    published_at REAL NOT NULL
+                    published_at REAL NOT NULL,
+                    asset_version_id TEXT NOT NULL DEFAULT '',
+                    version_create_time TEXT NOT NULL DEFAULT '',
+                    manual_verified INTEGER NOT NULL DEFAULT 0
                 );
                 """
             )
@@ -79,7 +83,17 @@ class AnimationStorageMixin:
                 connection.execute("ALTER TABLE animation_clips ADD COLUMN source_sha256 TEXT NOT NULL DEFAULT ''")
             if "duplicate_first_frame_at_end" not in clip_columns:
                 connection.execute("ALTER TABLE animation_clips ADD COLUMN duplicate_first_frame_at_end INTEGER NOT NULL DEFAULT 0")
+            if "content_updated_at" not in clip_columns:
+                connection.execute("ALTER TABLE animation_clips ADD COLUMN content_updated_at REAL NOT NULL DEFAULT 0")
             connection.execute("UPDATE animation_clips SET source_sha256=sha256 WHERE source_sha256='' OR source_sha256 IS NULL")
+            connection.execute("UPDATE animation_clips SET content_updated_at=updated_at WHERE content_updated_at<=0")
+            publication_columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(animation_publications)")}
+            if "asset_version_id" not in publication_columns:
+                connection.execute("ALTER TABLE animation_publications ADD COLUMN asset_version_id TEXT NOT NULL DEFAULT ''")
+            if "version_create_time" not in publication_columns:
+                connection.execute("ALTER TABLE animation_publications ADD COLUMN version_create_time TEXT NOT NULL DEFAULT ''")
+            if "manual_verified" not in publication_columns:
+                connection.execute("ALTER TABLE animation_publications ADD COLUMN manual_verified INTEGER NOT NULL DEFAULT 0")
             binding_columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(animation_bindings)")}
             if "playback_speed_percent" not in binding_columns:
                 connection.execute(
@@ -257,18 +271,24 @@ class AnimationStorageMixin:
             connection.execute(
                 """INSERT INTO animation_clips(
                     id,character_id,name,source_path,prepared_path,sha256,source_sha256,duplicate_first_frame_at_end,
-                    asset_id,published_sha256,moderation_state,revision,created_at,updated_at,published_at
-                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (clip_id, character_id, clip_name, relative_source, relative_prepared, prepared_sha, source_sha, 0, None, "", "", 1, now, now, None),
+                    asset_id,published_sha256,moderation_state,revision,created_at,updated_at,content_updated_at,published_at
+                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (clip_id, character_id, clip_name, relative_source, relative_prepared, prepared_sha, source_sha, 0, None, "", "", 1, now, now, now, None),
             )
             outcome = "created"
         else:
             content_changed = str(old_dict.get("sha256") or "") != prepared_sha
             revision = int(old_dict.get("revision") or 1) + (1 if content_changed else 0)
-            connection.execute(
-                """UPDATE animation_clips SET name=?,source_path=?,prepared_path=?,sha256=?,source_sha256=?,revision=?,updated_at=? WHERE id=?""",
-                (clip_name, relative_source, relative_prepared, prepared_sha, source_sha, revision, now, clip_id),
-            )
+            if content_changed:
+                connection.execute(
+                    """UPDATE animation_clips SET name=?,source_path=?,prepared_path=?,sha256=?,source_sha256=?,revision=?,updated_at=?,content_updated_at=? WHERE id=?""",
+                    (clip_name, relative_source, relative_prepared, prepared_sha, source_sha, revision, now, now, clip_id),
+                )
+            else:
+                connection.execute(
+                    """UPDATE animation_clips SET name=?,source_path=?,prepared_path=?,sha256=?,source_sha256=?,revision=?,updated_at=? WHERE id=?""",
+                    (clip_name, relative_source, relative_prepared, prepared_sha, source_sha, revision, now, clip_id),
+                )
             outcome = "changed" if content_changed else "unchanged"
 
         connection.execute(
@@ -472,6 +492,7 @@ class AnimationStorageMixin:
         value["status"] = self._status(value)
         value["looped"] = bool(value.get("looped"))
         return value
+
 
     def set_duplicate_first_frame(self, clip_id: str, enabled: bool) -> dict:
         # Runtime presentation flag only. Never mutate source/prepared animation

@@ -9,6 +9,7 @@ import sqlite3
 import time
 
 from opencloud_assets import create_animation_asset, wait_for_operation
+from animation_reimport_check import find_confirmed_manual_reimport
 
 SCHEMA_VERSION = 1
 PROJECT = "game1"
@@ -138,6 +139,7 @@ class MonsterAnimationStore:
                     revision INTEGER NOT NULL DEFAULT 1,
                     created_at REAL NOT NULL,
                     updated_at REAL NOT NULL,
+                    content_updated_at REAL NOT NULL DEFAULT 0,
                     published_at REAL
                 );
                 CREATE TABLE IF NOT EXISTS monster_animation_bindings(
@@ -162,7 +164,10 @@ class MonsterAnimationStore:
                     operation_path TEXT NOT NULL,
                     sha256 TEXT NOT NULL,
                     moderation_state TEXT,
-                    published_at REAL NOT NULL
+                    published_at REAL NOT NULL,
+                    asset_version_id TEXT NOT NULL DEFAULT '',
+                    version_create_time TEXT NOT NULL DEFAULT '',
+                    manual_verified INTEGER NOT NULL DEFAULT 0
                 );
                 """
             )
@@ -171,7 +176,17 @@ class MonsterAnimationStore:
                 connection.execute("ALTER TABLE monster_animation_clips ADD COLUMN source_sha256 TEXT NOT NULL DEFAULT ''")
             if "duplicate_first_frame_at_end" not in clip_columns:
                 connection.execute("ALTER TABLE monster_animation_clips ADD COLUMN duplicate_first_frame_at_end INTEGER NOT NULL DEFAULT 0")
+            if "content_updated_at" not in clip_columns:
+                connection.execute("ALTER TABLE monster_animation_clips ADD COLUMN content_updated_at REAL NOT NULL DEFAULT 0")
             connection.execute("UPDATE monster_animation_clips SET source_sha256=sha256 WHERE source_sha256='' OR source_sha256 IS NULL")
+            connection.execute("UPDATE monster_animation_clips SET content_updated_at=updated_at WHERE content_updated_at<=0")
+            publication_columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(monster_animation_publications)")}
+            if "asset_version_id" not in publication_columns:
+                connection.execute("ALTER TABLE monster_animation_publications ADD COLUMN asset_version_id TEXT NOT NULL DEFAULT ''")
+            if "version_create_time" not in publication_columns:
+                connection.execute("ALTER TABLE monster_animation_publications ADD COLUMN version_create_time TEXT NOT NULL DEFAULT ''")
+            if "manual_verified" not in publication_columns:
+                connection.execute("ALTER TABLE monster_animation_publications ADD COLUMN manual_verified INTEGER NOT NULL DEFAULT 0")
             binding_columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(monster_animation_bindings)")}
             if "playback_speed_percent" not in binding_columns:
                 connection.execute(
@@ -327,18 +342,24 @@ class MonsterAnimationStore:
         digest = self._sha256(prepared_target)
         if old_dict is None:
             connection.execute(
-                """INSERT INTO monster_animation_clips(id,monster_slug,name,source_path,prepared_path,sha256,source_sha256,duplicate_first_frame_at_end,asset_id,published_sha256,moderation_state,revision,created_at,updated_at,published_at)
-                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (clip_id, slug, stem, source_target.relative_to(self.root).as_posix(), prepared_target.relative_to(self.root).as_posix(), digest, source_sha, 0, None, "", "", 1, now, now, None),
+                """INSERT INTO monster_animation_clips(id,monster_slug,name,source_path,prepared_path,sha256,source_sha256,duplicate_first_frame_at_end,asset_id,published_sha256,moderation_state,revision,created_at,updated_at,content_updated_at,published_at)
+                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (clip_id, slug, stem, source_target.relative_to(self.root).as_posix(), prepared_target.relative_to(self.root).as_posix(), digest, source_sha, 0, None, "", "", 1, now, now, now, None),
             )
             outcome = "created"
         else:
             content_changed = str(old_dict.get("sha256") or "") != digest
             revision = int(old_dict.get("revision") or 1) + (1 if content_changed else 0)
-            connection.execute(
-                "UPDATE monster_animation_clips SET name=?,source_path=?,prepared_path=?,sha256=?,source_sha256=?,revision=?,updated_at=? WHERE id=?",
-                (stem, source_target.relative_to(self.root).as_posix(), prepared_target.relative_to(self.root).as_posix(), digest, source_sha, revision, now, clip_id),
-            )
+            if content_changed:
+                connection.execute(
+                    "UPDATE monster_animation_clips SET name=?,source_path=?,prepared_path=?,sha256=?,source_sha256=?,revision=?,updated_at=?,content_updated_at=? WHERE id=?",
+                    (stem, source_target.relative_to(self.root).as_posix(), prepared_target.relative_to(self.root).as_posix(), digest, source_sha, revision, now, now, clip_id),
+                )
+            else:
+                connection.execute(
+                    "UPDATE monster_animation_clips SET name=?,source_path=?,prepared_path=?,sha256=?,source_sha256=?,revision=?,updated_at=? WHERE id=?",
+                    (stem, source_target.relative_to(self.root).as_posix(), prepared_target.relative_to(self.root).as_posix(), digest, source_sha, revision, now, clip_id),
+                )
             outcome = "changed" if content_changed else "unchanged"
         connection.execute(
             """INSERT INTO monster_animation_bindings(id,monster_slug,slot,variant,clip_id,weight,looped,priority,created_at,updated_at)
@@ -466,6 +487,7 @@ class MonsterAnimationStore:
             },
         }
 
+
     def set_duplicate_first_frame(self, clip_id: str, enabled: bool) -> dict:
         # Runtime presentation flag only. Never mutate source/prepared animation
         # bytes, publication checksum, revision, or permanent Roblox asset id.
@@ -518,7 +540,7 @@ class MonsterAnimationStore:
         if asset_id:
             if str(row.get("published_sha256") or "") == str(row.get("sha256") or ""):
                 return row
-            raise ValueError("monster animation changed after publication; preserve the permanent animation asset id and use a version update workflow")
+            raise ValueError("monster animation changed after publication; preserve the permanent animation asset id, reimport it manually in Roblox Studio, then use Check Roblox Assets Animations")
         operation = create_animation_asset(
             path,
             display_name=str(row.get("name") or clip_id),
@@ -533,12 +555,88 @@ class MonsterAnimationStore:
                 (result.asset_id, row["sha256"], result.moderation_state or "", now, now, clip_id),
             )
             connection.execute(
-                """INSERT INTO monster_animation_publications(clip_id,clip_revision,asset_id,operation_path,sha256,moderation_state,published_at)
-                   VALUES(?,?,?,?,?,?,?)""",
-                (clip_id, int(row.get("revision") or 1), result.asset_id, result.operation_path, row["sha256"], result.moderation_state or "", now),
+                """INSERT INTO monster_animation_publications(
+                       clip_id,clip_revision,asset_id,operation_path,sha256,moderation_state,published_at,asset_version_id,version_create_time,manual_verified
+                   ) VALUES(?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    clip_id, int(row.get("revision") or 1), result.asset_id, result.operation_path, row["sha256"],
+                    result.moderation_state or "", now, str(result.revision_id or ""), "", 0,
+                ),
             )
         self.export()
         return {**row, "asset_id": result.asset_id, "published_sha256": row["sha256"], "status": "PUBLISHED"}
+
+    def check_manual_reimports(self, credentials: dict) -> dict:
+        with self.connect() as connection:
+            changed = [dict(row) for row in connection.execute(
+                """SELECT * FROM monster_animation_clips
+                   WHERE asset_id IS NOT NULL AND asset_id<>'' AND published_sha256<>sha256
+                   ORDER BY monster_slug,name,id"""
+            )]
+        confirmed = pending = failed = 0
+        details = []
+        for row in changed:
+            clip_id = str(row.get("id") or "")
+            asset_id = str(row.get("asset_id") or "")
+            try:
+                with self.connect() as connection:
+                    version_rows = connection.execute(
+                        "SELECT asset_version_id FROM monster_animation_publications WHERE clip_id=? AND asset_id=?",
+                        (clip_id, asset_id),
+                    ).fetchall()
+                known_versions = [str(version["asset_version_id"] or "") for version in version_rows]
+                candidate = find_confirmed_manual_reimport(
+                    asset_id=asset_id,
+                    content_updated_at=float(row.get("content_updated_at") or row.get("updated_at") or 0),
+                    known_version_ids=known_versions,
+                    creator_type=str(credentials.get("creatorType") or ""),
+                    creator_id=str(credentials.get("creatorId") or ""),
+                    api_key=str(credentials.get("apiKey") or ""),
+                )
+                if candidate is None:
+                    pending += 1
+                    details.append({
+                        "targetType": "monster", "targetId": str(row.get("monster_slug") or ""),
+                        "clipId": clip_id, "name": str(row.get("name") or ""), "assetId": asset_id,
+                        "status": "PENDING", "message": "no newer Approved Roblox version found after the local content change",
+                    })
+                    continue
+                now = time.time()
+                version_id = str(candidate.get("versionId") or "")
+                version_create_time = str(candidate.get("versionCreateTime") or "")
+                moderation = str(candidate.get("moderationState") or "Approved")
+                with self.connect() as connection:
+                    connection.execute(
+                        """UPDATE monster_animation_clips
+                           SET published_sha256=sha256,moderation_state=?,published_at=?,updated_at=? WHERE id=?""",
+                        (moderation, now, now, clip_id),
+                    )
+                    connection.execute(
+                        """INSERT INTO monster_animation_publications(
+                               clip_id,clip_revision,asset_id,operation_path,sha256,moderation_state,published_at,asset_version_id,version_create_time,manual_verified
+                           ) VALUES(?,?,?,?,?,?,?,?,?,?)""",
+                        (
+                            clip_id, int(row.get("revision") or 1), asset_id,
+                            f"roblox/manual-version-confirmation/{asset_id}/{version_id or 'unknown'}",
+                            str(row.get("sha256") or ""), moderation, now, version_id, version_create_time, 1,
+                        ),
+                    )
+                confirmed += 1
+                details.append({
+                    "targetType": "monster", "targetId": str(row.get("monster_slug") or ""),
+                    "clipId": clip_id, "name": str(row.get("name") or ""), "assetId": asset_id,
+                    "status": "CONFIRMED", "versionId": version_id, "versionCreateTime": version_create_time,
+                })
+            except Exception as exc:
+                failed += 1
+                details.append({
+                    "targetType": "monster", "targetId": str(row.get("monster_slug") or ""),
+                    "clipId": clip_id, "name": str(row.get("name") or ""), "assetId": asset_id,
+                    "status": "ERROR", "message": str(exc),
+                })
+        if confirmed:
+            self.export()
+        return {"requested": len(changed), "confirmed": confirmed, "pending": pending, "failed": failed, "details": details}
 
     def publish_missing(self, slug: str, credentials: dict) -> dict:
         queue = [row for row in self.list_for_monster(slug) if row["status"] == "LOCAL_ONLY"]

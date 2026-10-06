@@ -19,9 +19,13 @@ local Workspace = game:GetService("Workspace")
 local CharacterTemplate = require(script.Parent.modules.CharacterTemplate)
 
 local toolbar = plugin:CreateToolbar("game1")
-local button = toolbar:CreateButton("Control Center", "Check the game1 local Control Center host agent", "")
+local button = toolbar:CreateButton(
+    "Game1ControlCenter",
+    "Check the game1 local Control Center host agent",
+    "",
+    "Control Center"
+)
 button.ClickableWhenViewportHidden = true
-
 local AGENT_URL = "http://127.0.0.1:43821/api/agent/info"
 local AGENT_TOKEN = "Game1LocalControlV1"
 local BRIDGE_URL = "http://127.0.0.1:43137"
@@ -154,6 +158,7 @@ local function checkAgent()
     end
 end
 button.Click:Connect(checkAgent)
+
 
 local function validSegment(value: any): string
     local segment = tostring(value or "")
@@ -1022,7 +1027,7 @@ task.spawn(function()
     end
 end)
 
-print("[game1 plugin] loaded · model bridge v7 · character + weapon + monster templates + spawn authoring")
+print("[game1 plugin] loaded · model bridge v10 · animation reimport verification moved to Control Center UI")
 ]]></string>
       </Properties>
     </Item>

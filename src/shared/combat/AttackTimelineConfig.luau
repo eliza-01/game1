@@ -14,9 +14,6 @@
 -- controller or server combat code.
 local AttackTimelineConfig = {}
 
-local AnimationShared = script.Parent.Parent:WaitForChild("animation")
-local AnimationFirstFrameSeam = require(AnimationShared:WaitForChild("AnimationFirstFrameSeam"))
-
 AttackTimelineConfig.SchemaVersion = 1
 AttackTimelineConfig.EndGuardSeconds = 0.03
 AttackTimelineConfig.EventNames = table.freeze({
@@ -87,7 +84,7 @@ function AttackTimelineConfig.ResolveBase(clipId: any): any?
     return source
 end
 
-function AttackTimelineConfig.ResolveRuntime(clipId: any, animationSpeedPercent: any, duplicateFirstFrameAtEnd: any?): any?
+function AttackTimelineConfig.ResolveRuntime(clipId: any, animationSpeedPercent: any, _duplicateFirstFrameAtEnd: any?): any?
     local source = AttackTimelineConfig.ResolveBase(clipId)
     if not source then
         return nil
@@ -102,10 +99,10 @@ function AttackTimelineConfig.ResolveRuntime(clipId: any, animationSpeedPercent:
     end
 
     local sourceAnimationDuration = baseDuration / playbackSpeed
-    local runtimeTailDuration = if duplicateFirstFrameAtEnd == true
-        then AnimationFirstFrameSeam.RuntimeTailSeconds(playbackSpeed)
-        else 0
-    local animationDuration = sourceAnimationDuration + runtimeTailDuration
+    -- Runtime first-frame seam is presentation-only. It never extends the
+    -- authored attack timeline or changes when an attack may complete.
+    local runtimeTailDuration = 0
+    local animationDuration = sourceAnimationDuration
     return {
         clipId = tostring(clipId),
         baseDuration = baseDuration,

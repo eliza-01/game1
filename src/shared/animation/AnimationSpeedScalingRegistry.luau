@@ -11,6 +11,10 @@ return table.freeze({
 				}),
 				["run"] = table.freeze({
 					stat = "RunSpeed",
+					unitsPerPercent = 1.9,
+				}),
+				["walk"] = table.freeze({
+					stat = "RunSpeed",
 					unitsPerPercent = 2.0,
 				}),
 			}),

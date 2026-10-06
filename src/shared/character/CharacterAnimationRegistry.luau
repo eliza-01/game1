@@ -74,7 +74,7 @@ return table.freeze({
 							weight = 100,
 							looped = true,
 							priority = "Movement",
-							duplicateFirstFrameAtEnd = true,
+							duplicateFirstFrameAtEnd = false,
 						}),
 					}),
 					["walk"] = table.freeze({

@@ -1,0 +1,1020 @@
+diff --git a/src/client/character/animation/CharacterAnimationController.luau b/src/client/character/animation/CharacterAnimationController.luau
+index 533b0dfb226f0e11586c7062892249e47cac46dc..53afcef19162b250a066fdf6f76201b9449e3eda 100644
+--- a/src/client/character/animation/CharacterAnimationController.luau
++++ b/src/client/character/animation/CharacterAnimationController.luau
+@@ -409,7 +409,11 @@ local function bindCharacter(newCharacter: Model)
+ 		end
+ 		print(("[game1][animation] prewarm %d/%d ready in %.3fs"):format(result.ready, result.total, result.elapsed))
+ 	end)
+-	for _, attribute in ipairs({ "MovementState", "AnimationMovementDirection", "AnimationWeaponSet", "RunSpeed", "AttackSpeed" }) do
++	local refreshAttributes = { "MovementState", "AnimationMovementDirection", "AnimationWeaponSet", "RunSpeed", "AttackSpeed" }
++	for _, channel in ipairs({ "run", "walk" }) do
++		table.insert(refreshAttributes, AnimationSpeedScaling.DebugUnitsPerPercentAttribute(channel))
++	end
++	for _, attribute in ipairs(refreshAttributes) do
+ 		table.insert(connections, newCharacter:GetAttributeChangedSignal(attribute):Connect(refreshLoop))
+ 	end
+ 	table.insert(connections, newCharacter:GetAttributeChangedSignal("LifeState"):Connect(handleLifeState))
+diff --git a/src/client/dev/MovementDebugController.luau b/src/client/dev/MovementDebugController.luau
+index 7fcc48e8e8a6431d43ba201eaddefc99cf9165e7..799671ad4e47b6d71f2b585b09b41eaf1a6a193c 100644
+--- a/src/client/dev/MovementDebugController.luau
++++ b/src/client/dev/MovementDebugController.luau
+@@ -2,10 +2,7 @@ local Players = game:GetService("Players")
+ local ReplicatedStorage = game:GetService("ReplicatedStorage")
+ local RunService = game:GetService("RunService")
+ local TweenService = game:GetService("TweenService")
+-
+-local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
+-local AnimationShared = Shared:WaitForChild("animation")
+-local AnimationSpeedScaling = require(AnimationShared:WaitForChild("AnimationSpeedScaling"))
++local UserInputService = game:GetService("UserInputService")
+ 
+ local MovementDebugController = {}
+ local started = false
+@@ -289,7 +286,7 @@ local function createGui()
+     local header = textLabel(panel, "MOVEMENT DEBUG", 11, true)
+     header.Position = UDim2.fromOffset(16, 6)
+     header.Size = UDim2.fromOffset(210, 16)
+-    local subtitle = textLabel(panel, "runtime stats + Asset Manager scaling", 9, false)
++    local subtitle = textLabel(panel, "runtime tuning · copy final values to Asset Manager", 9, false)
+     subtitle.TextColor3 = COLORS.muted
+     subtitle.Position = UDim2.fromOffset(16, 22)
+     subtitle.Size = UDim2.fromOffset(230, 14)
+@@ -309,7 +306,7 @@ local function createGui()
+ 
+     local unit = createDropdown(gui, body, 0, "Runtime unit")
+ 
+-    sectionCaption(body, "RunSpeed · current runtime", 61)
++    sectionCaption(body, "RunSpeed · runtime test value", 61)
+     local runSpeed = numericBox(body, 79, "50")
+ 
+     local walkHint = textLabel(body, "Walk is always RunSpeed / 2", 9, false)
+@@ -320,13 +317,15 @@ local function createGui()
+     sectionCaption(body, "Run world speed · studs / second", 139)
+     local distance = numericBox(body, 157, "5")
+ 
+-    sectionCaption(body, "Animation playback · current AM-derived %", 201)
+-    local animationSpeed = numericBox(body, 219, "100")
++    sectionCaption(body, "Animation ratio · stat units per 1% playback", 201)
++    local animationSpeed = numericBox(body, 219, "1")
++    animationSpeed.Size = UDim2.new(1, -106, 0, 34)
+ 
+-    for _, box in ipairs({ runSpeed, distance, animationSpeed }) do
+-        box.TextEditable = false
+-        box.BackgroundColor3 = COLORS.disabled
+-    end
++    local animationRuleMode = button(body, "RULE: RUN")
++    animationRuleMode.Position = UDim2.new(1, -98, 0, 219)
++    animationRuleMode.Size = UDim2.fromOffset(98, 34)
++    animationRuleMode.Font = Enum.Font.GothamSemibold
++    animationRuleMode.TextSize = 10
+ 
+     local timing = Instance.new("Frame")
+     timing.BackgroundColor3 = COLORS.panelRaised
+@@ -391,23 +390,7 @@ local function createGui()
+     end)
+     setCollapsed(playerGui:GetAttribute(DEBUG_PANEL_OPEN_ATTRIBUTE) ~= DEBUG_PANEL_ID)
+ 
+-    return gui, unit, runSpeed, distance, animationSpeed, runTiming, walkTiming, measuredTiming, walkHint, monsterMode, live
+-end
+-
+-local function currentAnimationChannel(model: Model): string
+-    local action = tostring(model:GetAttribute("AnimationActionSlot") or "")
+-    if action ~= "" then
+-        return string.lower(action)
+-    end
+-    local resolved = tostring(model:GetAttribute("AnimationResolvedSlot") or "")
+-    if resolved ~= "" then
+-        return string.lower(resolved)
+-    end
+-    local monsterState = tostring(model:GetAttribute("MonsterAnimationState") or "")
+-    if monsterState ~= "" then
+-        return string.lower(monsterState)
+-    end
+-    return string.lower(tostring(model:GetAttribute("MovementState") or "idle"))
++    return gui, unit, runSpeed, distance, animationSpeed, animationRuleMode, runTiming, walkTiming, measuredTiming, walkHint, monsterMode, live
+ end
+ 
+ function MovementDebugController.Start()
+@@ -423,17 +406,29 @@ function MovementDebugController.Start()
+             return
+         end
+         local catalogRemote = remotes:WaitForChild("GetMovementDebugCatalog", 10)
++        local applyRemote = remotes:WaitForChild("ApplyMovementDebug", 10)
+         local monsterModeRemote = remotes:WaitForChild("SetMovementDebugMonsterMode", 10)
+-        if not catalogRemote or not monsterModeRemote then
++        if not catalogRemote or not applyRemote or not monsterModeRemote then
+             warn("[game1][movement-debug] remotes are missing")
+             return
+         end
+ 
+-        local _, unitDropdown, runSpeedBox, distanceBox, animationSpeedBox, runTiming, walkTiming, measuredTiming, walkHint, monsterModeButton, live = createGui()
++        local _, unitDropdown, runSpeedBox, distanceBox, animationRatioBox, animationRuleModeButton, runTiming, walkTiming, measuredTiming, walkHint, monsterModeButton, live = createGui()
+         local unitById = {}
+         local unitCatalogSignature = ""
+         local monsterMode = "Walk"
++        local suppressSpeedText = false
++        local speedTextRevision = 0
++        local draftSpeed = 0
++        local pendingSpeedById = {}
+         local runSpeedUnitsPerStud = DEFAULT_RUN_SPEED_UNITS_PER_STUD
++        local suppressAnimationText = false
++        local animationTextRevision = 0
++        local draftAnimationUnitsPerPercent = 1
++        local pendingAnimationByKey = {}
++        local minAnimationUnitsPerPercent = 0.001
++        local maxAnimationUnitsPerPercent = 1000
++        local tuningChannelById = {}
+ 
+         local trackedModel: Model? = nil
+         local lastTrackedPosition: Vector3? = nil
+@@ -489,6 +484,122 @@ function MovementDebugController.Start()
+             )
+         end
+ 
++        local function syncSpeedBoxes(runSpeedValue: number, source: TextBox?)
++            local runRendered = formatNumber(runSpeedValue)
++            local distanceRendered = formatNumber(runSpeedValue / math.max(0.001, runSpeedUnitsPerStud))
++            suppressSpeedText = true
++            if source ~= runSpeedBox then
++                runSpeedBox.Text = runRendered
++            end
++            if source ~= distanceBox then
++                distanceBox.Text = distanceRendered
++            end
++            suppressSpeedText = false
++        end
++
++        local function syncAnimationBox(value: number)
++            suppressAnimationText = true
++            animationRatioBox.Text = formatNumber(value)
++            suppressAnimationText = false
++        end
++
++        local function tuningChannelForRow(row: any): string
++            local targetId = unitDropdown.getValue()
++            local selected = tuningChannelById[targetId]
++            if selected == "run" or selected == "walk" then
++                return selected
++            end
++            local rules = row and row.animationRules
++            local runtimePreferred = string.lower(tostring(row and row.tuningChannel or "run")) == "walk" and "walk" or "run"
++            if type(rules) == "table" and type(rules[runtimePreferred]) == "table" and rules[runtimePreferred].hasRule == true then
++                tuningChannelById[targetId] = runtimePreferred
++                return runtimePreferred
++            end
++            if type(rules) == "table" and type(rules.run) == "table" and rules.run.hasRule == true then
++                tuningChannelById[targetId] = "run"
++                return "run"
++            end
++            if type(rules) == "table" and type(rules.walk) == "table" and rules.walk.hasRule == true then
++                tuningChannelById[targetId] = "walk"
++                return "walk"
++            end
++            tuningChannelById[targetId] = runtimePreferred
++            return runtimePreferred
++        end
++
++        local function animationRule(row: any, channel: string): any
++            local rules = row and row.animationRules
++            local rule = type(rules) == "table" and rules[channel] or nil
++            if type(rule) == "table" then
++                return rule
++            end
++            if row and tostring(row.tuningChannel or "") == channel and type(row.animationRule) == "table" then
++                return row.animationRule
++            end
++            return { channel = channel, hasRule = false, percent = 100 }
++        end
++
++        local function pendingAnimationKey(targetId: string, channel: string): string
++            return targetId .. ":" .. channel
++        end
++
++        local function ratioForRule(row: any, channel: string): number?
++            local targetId = unitDropdown.getValue()
++            local key = pendingAnimationKey(targetId, channel)
++            local pending = pendingAnimationByKey[key]
++            if pending ~= nil then
++                return pending
++            end
++            local rule = animationRule(row, channel)
++            if rule.hasRule ~= true then
++                return nil
++            end
++            return tonumber(rule.unitsPerPercent) or tonumber(rule.authoredUnitsPerPercent)
++        end
++
++        local function calculatedPlayback(row: any, channel: string, runSpeedValue: number): number
++            local rule = animationRule(row, channel)
++            if rule.hasRule ~= true then
++                return 100
++            end
++            local ratio = ratioForRule(row, channel)
++            if not ratio or ratio <= 0 then
++                return 100
++            end
++            local stat = tostring(rule.stat or "")
++            local statValue = if stat == "RunSpeed" then runSpeedValue else (tonumber(rule.statValue) or 0)
++            return math.clamp(statValue / ratio, 1, 400)
++        end
++
++        local function renderTiming()
++            local row = selectedRow()
++            local runGame = math.max(0, draftSpeed)
++            local walkGame = runGame * 0.5
++            local runWorld = runGame / math.max(0.001, runSpeedUnitsPerStud)
++            local walkWorld = walkGame / math.max(0.001, runSpeedUnitsPerStud)
++            local runAnimation = calculatedPlayback(row, "run", runGame)
++            local walkAnimation = calculatedPlayback(row, "walk", runGame)
++            runTiming.Text = string.format(
++                "RUN  game %s · world %s studs/s · anim %s%%",
++                formatNumber(runGame),
++                formatNumber(runWorld),
++                formatNumber(runAnimation)
++            )
++            walkTiming.Text = string.format(
++                "WALK  game %s · world %s studs/s · anim %s%%",
++                formatNumber(walkGame),
++                formatNumber(walkWorld),
++                formatNumber(walkAnimation)
++            )
++            local base = row and tonumber(row.baseRunSpeed) or nil
++            walkHint.Text = string.format(
++                "AM RunSpeed %s · runtime test %s · Walk = runtime / 2",
++                base and formatNumber(base) or "—",
++                formatNumber(runGame)
++            )
++            renderMeasurement()
++        end
++
+         local function setMonsterModeVisual(mode: string)
+             monsterMode = string.lower(mode) == "run" and "Run" or "Walk"
+             monsterModeButton.Text = "MONSTER BASE: " .. string.upper(monsterMode)
+@@ -496,58 +607,111 @@ function MovementDebugController.Start()
+             monsterModeButton.TextColor3 = monsterMode == "Run" and COLORS.accent or COLORS.text
+         end
+ 
+-        local function renderSelected()
++        local function activePlaybackForRow(row: any): number?
++            local model = row and row.model
++            if model and model.Parent then
++                local value = tonumber(model:GetAttribute("AnimationPlaybackSpeedPercent"))
++                if value ~= nil then
++                    return value
++                end
++            end
++            return row and tonumber(row.activeAnimationPlaybackPercent) or nil
++        end
++
++        local function renderSelected(forceText: boolean?)
+             local row = selectedRow()
+             if not row then
+-                runSpeedBox.Text = "—"
+-                distanceBox.Text = "—"
+-                animationSpeedBox.Text = "—"
+-                runTiming.Text = "RUN —"
+-                walkTiming.Text = "WALK —"
+-                walkHint.Text = "Values are read from runtime / Asset Manager registries"
+                 live.Text = "No movable runtime unit is available"
++                live.TextColor3 = COLORS.muted
++                runSpeedBox.TextEditable = false
++                distanceBox.TextEditable = false
++                animationRatioBox.TextEditable = false
++                runSpeedBox.BackgroundColor3 = COLORS.disabled
++                distanceBox.BackgroundColor3 = COLORS.disabled
++                animationRatioBox.BackgroundColor3 = COLORS.disabled
++                animationRuleModeButton.BackgroundColor3 = COLORS.disabled
++                animationRuleModeButton.TextColor3 = COLORS.muted
++                draftSpeed = 0
++                draftAnimationUnitsPerPercent = 1
++                syncSpeedBoxes(0, nil)
++                animationRatioBox.Text = "—"
+                 resetMeasurement()
++                renderTiming()
+                 return
+             end
+ 
+-            local runSpeed = math.max(0, tonumber(row.runSpeed) or 0)
+-            local baseRunSpeed = math.max(0, tonumber(row.baseRunSpeed) or runSpeed)
+-            local runWorld = math.max(0, tonumber(row.runStudsPerSecond) or (runSpeed / math.max(0.001, runSpeedUnitsPerStud)))
+-            local walkSpeed = math.max(0, tonumber(row.walkSpeed) or (runSpeed * 0.5))
+-            local walkWorld = math.max(0, tonumber(row.walkStudsPerSecond) or (walkSpeed / math.max(0.001, runSpeedUnitsPerStud)))
+-            local model = row.model
+-            local channel = if model and model.Parent then currentAnimationChannel(model) else string.lower(tostring(row.movementState or "idle"))
+-            local details = if model and model.Parent then AnimationSpeedScaling.ResolveDetailsForModel(model, channel) else { percent = 100, hasRule = false }
+-            local calculated = math.max(1, tonumber(details.percent) or 100)
+-            local publishedPercent = if model and model.Parent then tonumber(model:GetAttribute("AnimationPlaybackSpeedPercent")) else nil
+-            local playback = math.max(1, publishedPercent or calculated)
+-
+-            runSpeedBox.Text = formatNumber(runSpeed)
+-            distanceBox.Text = formatNumber(runWorld)
+-            animationSpeedBox.Text = formatNumber(playback)
+-            runTiming.Text = string.format("RUN  game %s  ·  world %s studs/s", formatNumber(runSpeed), formatNumber(runWorld))
+-            walkTiming.Text = string.format("WALK  game %s  ·  world %s studs/s", formatNumber(walkSpeed), formatNumber(walkWorld))
+-            walkHint.Text = string.format("AM base RunSpeed %s · current runtime %s · Walk = current / 2", formatNumber(baseRunSpeed), formatNumber(runSpeed))
+-
+-            if channel == "" then channel = "—" end
+-            if details.hasRule == true then
+-                local stat = tostring(details.stat or "stat")
+-                local statValue = tonumber(details.statValue) or 0
+-                local units = tonumber(details.unitsPerPercent) or 1
++            runSpeedBox.TextEditable = true
++            distanceBox.TextEditable = true
++            runSpeedBox.BackgroundColor3 = COLORS.control
++            distanceBox.BackgroundColor3 = COLORS.control
++            animationRuleModeButton.BackgroundColor3 = COLORS.control
++            animationRuleModeButton.TextColor3 = COLORS.text
++
++            local selectedId = unitDropdown.getValue()
++            local focused = UserInputService:GetFocusedTextBox()
++            local pendingSpeed = pendingSpeedById[selectedId]
++            if pendingSpeed ~= nil then
++                draftSpeed = pendingSpeed
++            elseif forceText or (focused ~= runSpeedBox and focused ~= distanceBox) then
++                draftSpeed = math.max(0, tonumber(row.runSpeed) or 0)
++                syncSpeedBoxes(draftSpeed, nil)
++            end
++
++            local channel = tuningChannelForRow(row)
++            animationRuleModeButton.Text = "RULE: " .. string.upper(channel)
++            animationRuleModeButton.BackgroundColor3 = channel == "run" and COLORS.controlSelected or COLORS.control
++            animationRuleModeButton.TextColor3 = channel == "run" and COLORS.accent or COLORS.text
++            local rule = animationRule(row, channel)
++            local animationKey = pendingAnimationKey(selectedId, channel)
++            local pendingRatio = pendingAnimationByKey[animationKey]
++            if rule.hasRule == true then
++                animationRatioBox.TextEditable = true
++                animationRatioBox.BackgroundColor3 = COLORS.control
++                if pendingRatio ~= nil then
++                    draftAnimationUnitsPerPercent = pendingRatio
++                elseif forceText or focused ~= animationRatioBox then
++                    draftAnimationUnitsPerPercent = math.max(
++                        minAnimationUnitsPerPercent,
++                        tonumber(rule.unitsPerPercent) or tonumber(rule.authoredUnitsPerPercent) or 1
++                    )
++                    syncAnimationBox(draftAnimationUnitsPerPercent)
++                end
++            else
++                animationRatioBox.TextEditable = false
++                animationRatioBox.BackgroundColor3 = COLORS.disabled
++                draftAnimationUnitsPerPercent = 1
++                animationRatioBox.Text = "—"
++            end
++
++            local state = string.upper(tostring(row.movementState or "idle"))
++            local activePlayback = activePlaybackForRow(row)
++            local calculated = calculatedPlayback(row, channel, draftSpeed)
++            if rule.hasRule == true then
++                local authoredRatio = tonumber(rule.authoredUnitsPerPercent) or draftAnimationUnitsPerPercent
++                local statName = tostring(rule.stat or "STAT")
++                local overrideTag = math.abs(draftAnimationUnitsPerPercent - authoredRatio) > 0.0001 and "TEST" or "AM"
+                 live.Text = string.format(
+-                    "AM RULE · %s · %s %s / %s = %s%% · PLAYBACK %s%%",
++                    "TUNE %s · %s · AM %s · %s %s → %s%% · ACTIVE %s %s%%",
+                     string.upper(channel),
+-                    stat,
+-                    formatNumber(statValue),
+-                    formatNumber(units),
++                    statName,
++                    formatNumber(authoredRatio),
++                    overrideTag,
++                    formatNumber(draftAnimationUnitsPerPercent),
+                     formatNumber(calculated),
+-                    formatNumber(playback)
++                    state,
++                    activePlayback and formatNumber(activePlayback) or "—"
+                 )
++                live.TextColor3 = COLORS.muted
+             else
+-                live.Text = string.format("AM RULE · %s · no scaling rule → 100%% · PLAYBACK %s%%", string.upper(channel), formatNumber(playback))
++                live.Text = string.format(
++                    "TUNE %s · no Asset Manager scaling rule · ACTIVE %s %s%%",
++                    string.upper(channel),
++                    state,
++                    activePlayback and formatNumber(activePlayback) or "—"
++                )
++                live.TextColor3 = COLORS.error
+             end
+-            live.TextColor3 = math.abs(playback - calculated) > 0.05 and COLORS.error or COLORS.muted
+-            renderMeasurement()
++            renderTiming()
+         end
+ 
+         local function rebuildCatalog(catalog: any, preserveSelection: boolean)
+@@ -571,11 +735,13 @@ function MovementDebugController.Start()
+                 unitDropdown.setValue(preferred, false)
+             end
+             runSpeedUnitsPerStud = math.max(0.001, tonumber(catalog.runSpeedUnitsPerStud) or DEFAULT_RUN_SPEED_UNITS_PER_STUD)
++            minAnimationUnitsPerPercent = math.max(0.001, tonumber(catalog.minAnimationUnitsPerPercent) or 0.001)
++            maxAnimationUnitsPerPercent = math.max(minAnimationUnitsPerPercent, tonumber(catalog.maxAnimationUnitsPerPercent) or 1000)
+             setMonsterModeVisual(tostring(catalog.monsterMode or monsterMode))
+             if previousSelection ~= unitDropdown.getValue() then
+                 resetMeasurement()
+             end
+-            renderSelected()
++            renderSelected(false)
+         end
+ 
+         local function fetchCatalog(preserveSelection: boolean)
+@@ -590,9 +756,190 @@ function MovementDebugController.Start()
+             end
+         end
+ 
++        local function applyRunSpeed(value: number)
++            local targetId = unitDropdown.getValue()
++            if targetId == "" then
++                return
++            end
++            value = math.clamp(value, 0, 500)
++            draftSpeed = value
++            pendingSpeedById[targetId] = value
++            syncSpeedBoxes(value, nil)
++            renderTiming()
++
++            task.spawn(function()
++                local ok, result = pcall(function()
++                    return applyRemote:InvokeServer(targetId, { runSpeed = value })
++                end)
++                if pendingSpeedById[targetId] == value then
++                    pendingSpeedById[targetId] = nil
++                end
++                if not ok or type(result) ~= "table" or result.ok ~= true then
++                    live.Text = "RunSpeed update failed"
++                    live.TextColor3 = COLORS.error
++                    return
++                end
++                local row = result.unit
++                if type(row) == "table" then
++                    unitById[targetId] = row
++                    if targetId == unitDropdown.getValue() then
++                        draftSpeed = math.max(0, tonumber(row.runSpeed) or value)
++                        syncSpeedBoxes(draftSpeed, nil)
++                    end
++                end
++                renderSelected(false)
++            end)
++        end
++
++        local function stageSpeedText(source: TextBox)
++            if suppressSpeedText then
++                return
++            end
++            local typed = tonumber(source.Text)
++            if typed == nil or typed < 0 then
++                return
++            end
++            local value = if source == distanceBox then typed * runSpeedUnitsPerStud else typed
++            if value > 500 then
++                return
++            end
++            draftSpeed = value
++            syncSpeedBoxes(value, source)
++            renderTiming()
++            speedTextRevision += 1
++            local revision = speedTextRevision
++            task.delay(0.08, function()
++                if revision == speedTextRevision and math.abs(draftSpeed - value) <= 0.0001 then
++                    applyRunSpeed(value)
++                end
++            end)
++        end
++
++        local function commitSpeedBox(source: TextBox)
++            local typed = tonumber(source.Text)
++            local value = if source == distanceBox
++                then (typed or (draftSpeed / runSpeedUnitsPerStud)) * runSpeedUnitsPerStud
++                else (typed or draftSpeed)
++            value = math.clamp(value, 0, 500)
++            speedTextRevision += 1
++            draftSpeed = value
++            syncSpeedBoxes(value, nil)
++            applyRunSpeed(value)
++        end
++
++        local function applyAnimationRatio(value: number)
++            local targetId = unitDropdown.getValue()
++            local row = selectedRow()
++            if targetId == "" or not row then
++                return
++            end
++            local channel = tuningChannelForRow(row)
++            local rule = animationRule(row, channel)
++            if rule.hasRule ~= true then
++                return
++            end
++            value = math.clamp(value, minAnimationUnitsPerPercent, maxAnimationUnitsPerPercent)
++            draftAnimationUnitsPerPercent = value
++            local key = pendingAnimationKey(targetId, channel)
++            pendingAnimationByKey[key] = value
++            syncAnimationBox(value)
++            renderTiming()
++
++            task.spawn(function()
++                local ok, result = pcall(function()
++                    return applyRemote:InvokeServer(targetId, {
++                        animationChannel = channel,
++                        animationUnitsPerPercent = value,
++                    })
++                end)
++                if pendingAnimationByKey[key] == value then
++                    pendingAnimationByKey[key] = nil
++                end
++                if not ok or type(result) ~= "table" or result.ok ~= true then
++                    live.Text = "Animation ratio update failed"
++                    live.TextColor3 = COLORS.error
++                    return
++                end
++                local updated = result.unit
++                if type(updated) == "table" then
++                    unitById[targetId] = updated
++                    if targetId == unitDropdown.getValue() and tuningChannelForRow(updated) == channel then
++                        local updatedRule = animationRule(updated, channel)
++                        draftAnimationUnitsPerPercent = math.max(
++                            minAnimationUnitsPerPercent,
++                            tonumber(updatedRule.unitsPerPercent) or value
++                        )
++                        syncAnimationBox(draftAnimationUnitsPerPercent)
++                    end
++                end
++                renderSelected(false)
++            end)
++        end
++
++        local function stageAnimationText()
++            if suppressAnimationText or not animationRatioBox.TextEditable then
++                return
++            end
++            local value = tonumber(animationRatioBox.Text)
++            if value == nil or value < minAnimationUnitsPerPercent or value > maxAnimationUnitsPerPercent then
++                return
++            end
++            draftAnimationUnitsPerPercent = value
++            renderTiming()
++            animationTextRevision += 1
++            local revision = animationTextRevision
++            task.delay(0.08, function()
++                if revision == animationTextRevision and math.abs(draftAnimationUnitsPerPercent - value) <= 0.0001 then
++                    applyAnimationRatio(value)
++                end
++            end)
++        end
++
++        local function commitAnimationBox()
++            if not animationRatioBox.TextEditable then
++                return
++            end
++            local value = math.clamp(
++                tonumber(animationRatioBox.Text) or draftAnimationUnitsPerPercent,
++                minAnimationUnitsPerPercent,
++                maxAnimationUnitsPerPercent
++            )
++            animationTextRevision += 1
++            draftAnimationUnitsPerPercent = value
++            syncAnimationBox(value)
++            applyAnimationRatio(value)
++        end
++
+         unitDropdown.setOnChanged(function()
+             resetMeasurement()
+-            renderSelected()
++            renderSelected(true)
++        end)
++
++        runSpeedBox:GetPropertyChangedSignal("Text"):Connect(function()
++            stageSpeedText(runSpeedBox)
++        end)
++        distanceBox:GetPropertyChangedSignal("Text"):Connect(function()
++            stageSpeedText(distanceBox)
++        end)
++        runSpeedBox.FocusLost:Connect(function()
++            commitSpeedBox(runSpeedBox)
++        end)
++        distanceBox.FocusLost:Connect(function()
++            commitSpeedBox(distanceBox)
++        end)
++        animationRatioBox:GetPropertyChangedSignal("Text"):Connect(stageAnimationText)
++        animationRatioBox.FocusLost:Connect(commitAnimationBox)
++
++        animationRuleModeButton.Activated:Connect(function()
++            local row = selectedRow()
++            local targetId = unitDropdown.getValue()
++            if not row or targetId == "" then
++                return
++            end
++            local current = tuningChannelForRow(row)
++            tuningChannelById[targetId] = current == "run" and "walk" or "run"
++            animationTextRevision += 1
++            renderSelected(true)
+         end)
+ 
+         monsterModeButton.Activated:Connect(function()
+@@ -633,7 +980,7 @@ function MovementDebugController.Start()
+             local now = os.clock()
+             if previous then
+                 local delta = (flat - previous).Magnitude
+-                local expectedWorldSpeed = math.max(0, tonumber(row and row.runStudsPerSecond) or 0)
++                local expectedWorldSpeed = math.max(0, draftSpeed / math.max(0.001, runSpeedUnitsPerStud))
+                 local teleportGuard = math.max(8, math.max(1, expectedWorldSpeed) * 0.75)
+                 if delta <= teleportGuard then
+                     cumulativeDistance += delta
+diff --git a/src/server/character/CharacterStatsService.luau b/src/server/character/CharacterStatsService.luau
+index 67eb550a8069f3d7ca8a5bb909b27a9dae51918f..0e100b1f300aab6b8776d0057b11edc1610b1abe 100644
+--- a/src/server/character/CharacterStatsService.luau
++++ b/src/server/character/CharacterStatsService.luau
+@@ -6,6 +6,7 @@ local Config = require(CharacterShared:WaitForChild("CharacterStatsConfig"))
+ local Service = {}
+ local BASE_PREFIX = "Base"
+ local modifierSources = setmetatable({}, { __mode = "k" })
++local RUN_SPEED_OVERRIDE_ATTRIBUTE = "MovementDebugRunSpeedOverride"
+ 
+ local function baseName(stat: string): string
+     return BASE_PREFIX .. stat
+@@ -32,6 +33,12 @@ local function recompute(character: Model)
+             delta += tonumber(modifiers[stat]) or 0
+         end
+         local resolved = base + delta
++        if stat == "RunSpeed" then
++            local debugOverride = tonumber(character:GetAttribute(RUN_SPEED_OVERRIDE_ATTRIBUTE))
++            if debugOverride ~= nil then
++                resolved = math.max(0, debugOverride)
++            end
++        end
+         character:SetAttribute(stat, resolved)
+     end
+ 
+diff --git a/src/server/dev/MovementDebugService.luau b/src/server/dev/MovementDebugService.luau
+index 9688263a94ab17d2c566aa891d7b1f8186c66151..c823bc2b852dd29932888d79dc364d3dcec0d0e0 100644
+--- a/src/server/dev/MovementDebugService.luau
++++ b/src/server/dev/MovementDebugService.luau
+@@ -5,7 +5,9 @@ local Workspace = game:GetService("Workspace")
+ 
+ local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
+ local CharacterShared = Shared:WaitForChild("character")
++local AnimationShared = Shared:WaitForChild("animation")
+ local CharacterMovementConfig = require(CharacterShared:WaitForChild("CharacterMovementConfig"))
++local AnimationSpeedScaling = require(AnimationShared:WaitForChild("AnimationSpeedScaling"))
+ 
+ local MovementDebugService = {}
+ local started = false
+@@ -15,6 +17,7 @@ local MAX_RUN_SPEED = 500
+ local MONSTER_MODE_ATTRIBUTE = "Game1MonsterDebugLocomotionMode"
+ local MONSTER_RUNTIME_ATTRIBUTE = "Game1MonsterRuntime"
+ local MONSTER_LOCOMOTION_ATTRIBUTE = "MonsterLocomotionMode"
++local RUN_SPEED_OVERRIDE_ATTRIBUTE = "MovementDebugRunSpeedOverride"
+ 
+ local function finite(value: any, fallback: number): number
+     local numeric = tonumber(value)
+@@ -28,6 +31,10 @@ local function normalizeMonsterMode(value: any): string
+     return string.lower(tostring(value or "")) == "run" and "Run" or "Walk"
+ end
+ 
++local function normalizeLocomotionChannel(value: any): string
++    return string.lower(tostring(value or "")) == "walk" and "walk" or "run"
++end
++
+ local function ensureRemoteFolder(): Folder
+     local folder = ReplicatedStorage:FindFirstChild("Game1Remotes")
+     if folder and folder:IsA("Folder") then
+@@ -139,9 +146,76 @@ local function collectModels(): {Model}
+     return rows
+ end
+ 
++local function findModelById(targetId: any): Model?
++    local wanted = tostring(targetId or "")
++    if wanted == "" then
++        return nil
++    end
++    for _, model in ipairs(collectModels()) do
++        if modelId(model) == wanted then
++            return model
++        end
++    end
++    return nil
++end
++
++local function movementModeFor(model: Model): string
++    if model:GetAttribute(MONSTER_RUNTIME_ATTRIBUTE) == true then
++        return normalizeMonsterMode(model:GetAttribute(MONSTER_LOCOMOTION_ATTRIBUTE))
++    end
++    return tostring(model:GetAttribute("AnimationMovementMode") or "Run") == "Walk" and "Walk" or "Run"
++end
++
++local function locomotionTuningChannel(model: Model): string
++    return normalizeLocomotionChannel(movementModeFor(model))
++end
++
++local function applyRuntimeRunSpeed(model: Model, runSpeed: number)
++    -- Runtime-only tuning. BaseRunSpeed remains the Asset Manager authored value so
++    -- Movement Debug can always show authored vs currently tested values separately.
++    model:SetAttribute(RUN_SPEED_OVERRIDE_ATTRIBUTE, runSpeed)
++    model:SetAttribute("RunSpeed", runSpeed)
++    model:SetAttribute("MoveSpeed", runSpeed)
++
++    local mode = movementModeFor(model)
++    local resolved = CharacterMovementConfig.RobloxSpeed(model:GetAttribute("CharacterArchetype"), runSpeed, mode)
++
++    local controllerManager = model:FindFirstChild("ControllerManager")
++    if controllerManager and controllerManager:IsA("ControllerManager") then
++        controllerManager.BaseMoveSpeed = resolved
++    end
++
++    local humanoid = model:FindFirstChildOfClass("Humanoid")
++    if humanoid then
++        humanoid.WalkSpeed = resolved
++    end
++end
++
++local function animationRuleRow(model: Model, channel: string)
++    local details = AnimationSpeedScaling.ResolveDetailsForModel(model, channel)
++    if details.hasRule ~= true then
++        return {
++            channel = channel,
++            hasRule = false,
++            percent = 100,
++        }
++    end
++    return {
++        channel = channel,
++        hasRule = true,
++        stat = details.stat,
++        statValue = details.statValue,
++        authoredUnitsPerPercent = details.authoredUnitsPerPercent,
++        unitsPerPercent = details.unitsPerPercent,
++        debugOverride = details.debugUnitsPerPercent ~= nil,
++        percent = details.percent,
++    }
++end
++
+ local function unitRow(model: Model)
+     local runSpeed = math.clamp(finite(model:GetAttribute("RunSpeed"), CharacterMovementConfig.DefaultRunSpeed), MIN_RUN_SPEED, MAX_RUN_SPEED)
+     local baseRunSpeed = math.clamp(finite(model:GetAttribute("BaseRunSpeed"), runSpeed), MIN_RUN_SPEED, MAX_RUN_SPEED)
++    local tuningChannel = locomotionTuningChannel(model)
+     return {
+         id = modelId(model),
+         label = modelLabel(model),
+@@ -149,9 +223,17 @@ local function unitRow(model: Model)
+         model = model,
+         runSpeed = runSpeed,
+         baseRunSpeed = baseRunSpeed,
++        runSpeedOverride = tonumber(model:GetAttribute(RUN_SPEED_OVERRIDE_ATTRIBUTE)) ~= nil,
+         walkSpeed = CharacterMovementConfig.ResolveSpeed(model:GetAttribute("CharacterArchetype"), runSpeed, "Walk"),
+         runStudsPerSecond = CharacterMovementConfig.RobloxSpeed(model:GetAttribute("CharacterArchetype"), runSpeed, "Run"),
+         walkStudsPerSecond = CharacterMovementConfig.RobloxSpeed(model:GetAttribute("CharacterArchetype"), runSpeed, "Walk"),
++        tuningChannel = tuningChannel,
++        animationRule = animationRuleRow(model, tuningChannel),
++        animationRules = {
++            run = animationRuleRow(model, "run"),
++            walk = animationRuleRow(model, "walk"),
++        },
++        activeAnimationPlaybackPercent = tonumber(model:GetAttribute("AnimationPlaybackSpeedPercent")),
+         animationClip = tostring(model:GetAttribute("AnimationActionClip") or model:GetAttribute("AnimationResolvedClip") or ""),
+         movementState = tostring(model:GetAttribute("MovementState") or model:GetAttribute("MonsterAnimationState") or ""),
+         lifeState = tostring(model:GetAttribute("LifeState") or "Alive"),
+@@ -200,6 +282,44 @@ local function buildCatalog(player: Player)
+         minRunSpeed = MIN_RUN_SPEED,
+         maxRunSpeed = MAX_RUN_SPEED,
+         runSpeedUnitsPerStud = CharacterMovementConfig.RunSpeedUnitsPerStud,
++        minAnimationUnitsPerPercent = AnimationSpeedScaling.MinUnitsPerPercent,
++        maxAnimationUnitsPerPercent = AnimationSpeedScaling.MaxUnitsPerPercent,
++    }
++end
++
++local function applyUnit(_player: Player, targetId: any, patch: any)
++    local model = findModelById(targetId)
++    if not model then
++        return { ok = false, error = "selected movement unit no longer exists" }
++    end
++    if type(patch) ~= "table" then
++        return { ok = false, error = "movement debug patch must be a table" }
++    end
++
++    if patch.runSpeed ~= nil then
++        local current = finite(model:GetAttribute("RunSpeed"), CharacterMovementConfig.DefaultRunSpeed)
++        local runSpeed = math.clamp(finite(patch.runSpeed, current), MIN_RUN_SPEED, MAX_RUN_SPEED)
++        applyRuntimeRunSpeed(model, runSpeed)
++    end
++
++    if patch.animationUnitsPerPercent ~= nil then
++        local channel = normalizeLocomotionChannel(patch.animationChannel or locomotionTuningChannel(model))
++        local details = AnimationSpeedScaling.ResolveDetailsForModel(model, channel)
++        if details.hasRule ~= true then
++            return { ok = false, error = string.format("no Asset Manager animation scaling rule for %s", channel) }
++        end
++        local authored = finite(details.authoredUnitsPerPercent, 1)
++        local unitsPerPercent = math.clamp(
++            finite(patch.animationUnitsPerPercent, authored),
++            AnimationSpeedScaling.MinUnitsPerPercent,
++            AnimationSpeedScaling.MaxUnitsPerPercent
++        )
++        model:SetAttribute(AnimationSpeedScaling.DebugUnitsPerPercentAttribute(channel), unitsPerPercent)
++    end
++
++    return {
++        ok = true,
++        unit = unitRow(model),
+     }
+ end
+ 
+@@ -232,8 +352,10 @@ function MovementDebugService.Start()
+ 
+     local remotes = ensureRemoteFolder()
+     local catalog = ensureRemoteFunction(remotes, "GetMovementDebugCatalog")
++    local apply = ensureRemoteFunction(remotes, "ApplyMovementDebug")
+     local monsterMode = ensureRemoteFunction(remotes, "SetMovementDebugMonsterMode")
+     catalog.OnServerInvoke = buildCatalog
++    apply.OnServerInvoke = applyUnit
+     monsterMode.OnServerInvoke = setMonsterMode
+ end
+ 
+diff --git a/src/server/monster/MonsterSpawnerService.luau b/src/server/monster/MonsterSpawnerService.luau
+index b3589c7c71bebb0341bf380a0dce0cd14d9c10a6..7b13fad32b19cd9f6bef130bb01e268b345606c0 100644
+--- a/src/server/monster/MonsterSpawnerService.luau
++++ b/src/server/monster/MonsterSpawnerService.luau
+@@ -957,6 +957,13 @@ local function spawnOne(state: any): Model?
+             refreshWanderLocomotion(model, entry)
+         end
+     end)
++    for _, channel in ipairs({ "run", "walk" }) do
++        model:GetAttributeChangedSignal(AnimationSpeedScaling.DebugUnitsPerPercentAttribute(channel)):Connect(function()
++            if state.instances[model] == entry then
++                refreshWanderLocomotion(model, entry)
++            end
++        end)
++    end
+     model:GetAttributeChangedSignal("LifeState"):Connect(function()
+         if state.instances[model] ~= entry then
+             return
+diff --git a/src/shared/animation/AnimationSpeedScaling.luau b/src/shared/animation/AnimationSpeedScaling.luau
+index d3ad6cd5b0fb052c41ef5bb6cf9816478ecc1d61..433cc1c9a21f8178b1ca88bfaaa8d1a300bc1b33 100644
+--- a/src/shared/animation/AnimationSpeedScaling.luau
++++ b/src/shared/animation/AnimationSpeedScaling.luau
+@@ -4,6 +4,9 @@ local AnimationSpeedScaling = {}
+ 
+ AnimationSpeedScaling.MinPercent = 1
+ AnimationSpeedScaling.MaxPercent = 400
++AnimationSpeedScaling.MinUnitsPerPercent = 0.001
++AnimationSpeedScaling.MaxUnitsPerPercent = 1000
++AnimationSpeedScaling.DebugUnitsPerPercentPrefix = "MovementDebugAnimationUnitsPerPercent_"
+ local function finite(value: any, fallback: number): number
+     local numeric = tonumber(value)
+     if numeric == nil or numeric ~= numeric or numeric == math.huge or numeric == -math.huge then
+@@ -12,6 +15,12 @@ local function finite(value: any, fallback: number): number
+     return numeric
+ end
+ 
++
++function AnimationSpeedScaling.DebugUnitsPerPercentAttribute(channel: any): string
++    local normalized = string.lower(tostring(channel or ""))
++    return AnimationSpeedScaling.DebugUnitsPerPercentPrefix .. normalized
++end
++
+ function AnimationSpeedScaling.TargetForModel(model: Model): (string, string)
+     if model:GetAttribute("Game1MonsterRuntime") == true or model:GetAttribute("MonsterSlug") ~= nil then
+         return "monster", string.lower(tostring(model:GetAttribute("MonsterSlug") or ""))
+@@ -60,15 +69,36 @@ function AnimationSpeedScaling.ResolveDetailsForModel(model: Model, channel: any
+ 
+     local stat = tostring(rule.stat or "")
+     local statValue = math.max(0, finite(model:GetAttribute(stat), 0))
+-    local unitsPerPercent = math.max(0.001, finite(rule.unitsPerPercent, 1))
++    local authoredUnitsPerPercent = math.clamp(
++        finite(rule.unitsPerPercent, 1),
++        AnimationSpeedScaling.MinUnitsPerPercent,
++        AnimationSpeedScaling.MaxUnitsPerPercent
++    )
++    local overrideAttribute = AnimationSpeedScaling.DebugUnitsPerPercentAttribute(normalizedChannel)
++    local debugUnitsPerPercent = tonumber(model:GetAttribute(overrideAttribute))
++    local unitsPerPercent = authoredUnitsPerPercent
++    if debugUnitsPerPercent ~= nil then
++        unitsPerPercent = math.clamp(
++            finite(debugUnitsPerPercent, authoredUnitsPerPercent),
++            AnimationSpeedScaling.MinUnitsPerPercent,
++            AnimationSpeedScaling.MaxUnitsPerPercent
++        )
++    end
++    local percent = math.clamp(
++        statValue / unitsPerPercent,
++        AnimationSpeedScaling.MinPercent,
++        AnimationSpeedScaling.MaxPercent
++    )
+     return {
+         targetType = targetType,
+         targetId = targetId,
+         channel = normalizedChannel,
+         stat = stat,
+         statValue = statValue,
++        authoredUnitsPerPercent = authoredUnitsPerPercent,
++        debugUnitsPerPercent = debugUnitsPerPercent,
+         unitsPerPercent = unitsPerPercent,
+-        percent = AnimationSpeedScaling.ResolvePercent(targetType, targetId, normalizedChannel, statValue),
++        percent = percent,
+         hasRule = true,
+     }
+ end
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index bef6ca98ca46f35f363747f36d9af724ab335a72..f117ab2d8f7f590a462dddc0d39cf14b78edd316 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -681,15 +681,22 @@ for required in ["Game1StudioDebugPreferences_v1", "Game1StudioPreferences", "pl
+ if (ROOT / "src/shared/dev/TestLoadoutConfig.luau").exists():
+     err("obsolete generated TestLoadoutConfig must be removed")
+ 
+-# m19 Studio-native movement debugger: read-only runtime mirror of Asset Manager data
++# m20 Studio-native movement debugger: AM-seeded, runtime-editable tuning
+ movement_debug_server_path = ROOT / "src/server/dev/MovementDebugService.luau"
+ movement_debug_client_path = ROOT / "src/client/dev/MovementDebugController.luau"
+ movement_debug_server = movement_debug_server_path.read_text(encoding="utf-8") if movement_debug_server_path.is_file() else ""
+ movement_debug_client = movement_debug_client_path.read_text(encoding="utf-8") if movement_debug_client_path.is_file() else ""
+ for required in [
+     "GetMovementDebugCatalog",
++    "ApplyMovementDebug",
+     "SetMovementDebugMonsterMode",
++    "MovementDebugRunSpeedOverride",
++    "applyRuntimeRunSpeed",
+     "baseRunSpeed",
++    "animationUnitsPerPercent",
++    "animationChannel",
++    "authoredUnitsPerPercent",
++    "animationRules",
+     "runSpeedUnitsPerStud",
+     "CharacterMovementConfig.RobloxSpeed",
+     "model = model",
+@@ -699,20 +706,20 @@ for required in [
+ ]:
+     if required not in movement_debug_server:
+         err(f"Studio movement debugger server missing {required}")
+-for forbidden in ["ApplyMovementDebug", "applyRuntimeRunSpeed", "MovementDebugRunSpeedOverride", "DebugOverrideAttribute"]:
+-    if forbidden in movement_debug_server:
+-        err(f"Studio movement debugger must be read-only for AM/runtime values; found {forbidden}")
+ for required in [
+     "MOVEMENT DEBUG",
+-    "RunSpeed · current runtime",
++    "RunSpeed · runtime test value",
+     "Run world speed · studs / second",
+-    "Animation playback · current AM-derived %",
+-    "AM base RunSpeed",
+-    "AM RULE",
+-    "PLAYBACK",
+-    "AnimationSpeedScaling.ResolveDetailsForModel",
+-    "AnimationPlaybackSpeedPercent",
+-    "currentAnimationChannel",
++    "Animation ratio · stat units per 1% playback",
++    "RULE: RUN",
++    "AM RunSpeed",
++    "runtime test",
++    "ACTIVE",
++    "calculatedPlayback",
++    "animationUnitsPerPercent",
++    "ApplyMovementDebug",
++    "stageSpeedText",
++    "stageAnimationText",
+     "MONSTER BASE: WALK",
+     "MEASURED · last 1.0 s",
+     "modelPosition",
+@@ -724,9 +731,9 @@ for required in [
+ ]:
+     if required not in movement_debug_client:
+         err(f"Studio movement debugger client missing {required}")
+-for forbidden in ["ApplyMovementDebug", "applyAnimationSpeed", "stageSpeedText", "stageAnimationText"]:
+-    if forbidden in movement_debug_client:
+-        err(f"Studio movement debugger must not own editable speed overrides; found {forbidden}")
++for forbidden in ["animationSpeedPercent =", "MovementDebugAnimationSpeedPercentOverride"]:
++    if forbidden in movement_debug_server or forbidden in movement_debug_client:
++        err(f"Movement Debug must tune AM ratio, never own an absolute playback-percent override; found {forbidden}")
+ movement_config_text = (ROOT / "src/shared/character/CharacterMovementConfig.luau").read_text(encoding="utf-8")
+ for required in [
+     "RunSpeedUnitsPerStud = 10",
+@@ -737,8 +744,8 @@ for required in [
+ ]:
+     if required not in movement_config_text:
+         err(f"game-speed/world-distance conversion contract missing {required}")
+-if "MovementDebugRunSpeedOverride" in stats_service_text:
+-    err("character stats must not consume Movement Debug RunSpeed overrides")
++if "MovementDebugRunSpeedOverride" not in stats_service_text:
++    err("character stats must preserve the runtime Movement Debug RunSpeed override across stat recomputes")
+ if "MovementDebugService.Start()" not in server_init_text:
+     err("Studio movement debugger service is not started by the server runtime")
+ if "MovementDebugController.Start()" not in client_init_text:
+@@ -779,11 +786,11 @@ animation_scaling_store = animation_scaling_store_path.read_text(encoding="utf-8
+ animation_scaling_js = animation_scaling_js_path.read_text(encoding="utf-8") if animation_scaling_js_path.is_file() else ""
+ monster_assets_js_early = (ROOT / "system/control-center/static/monster-assets.js").read_text(encoding="utf-8")
+ monster_animation_registry_early = (ROOT / "src/shared/monster/MonsterAnimationRegistry.luau").read_text(encoding="utf-8")
+-for required in ["ResolveForModel", "ResolveDetailsForModel", "TargetForModel", "unitsPerPercent", "value / unitsPerPercent"]:
++for required in ["ResolveForModel", "ResolveDetailsForModel", "TargetForModel", "unitsPerPercent", "value / unitsPerPercent", "DebugUnitsPerPercentAttribute", "authoredUnitsPerPercent", "debugUnitsPerPercent"]:
+     if required not in animation_scaling_runtime:
+         err(f"animation speed scaling runtime missing {required}")
+ if "DebugOverrideAttribute" in animation_scaling_runtime or "MovementDebugAnimationSpeedPercentOverride" in animation_scaling_runtime:
+-    err("animation speed scaling must be sourced only from AM registry + current runtime stats")
++    err("animation speed scaling must not support an absolute playback-percent debug override")
+ for required in ['["human_female"]', 'unitsPerPercent = 2.0', '["gremlin"]', 'unitsPerPercent = 0.6']:
+     if required not in animation_scaling_registry:
+         err(f"generated animation speed scaling registry missing {required}")
+@@ -1254,7 +1261,7 @@ if errors:
+         print(" -", item)
+     sys.exit(1)
+ 
+-print("verify ok · game1 m19 Movement Debug AM/runtime single-source passed")
++print("verify ok · game1 m20 Movement Debug runtime tuning + AM ratios passed")
+ print("registered character archetypes:", len(archetypes))
+ print("active character archetype:", active_id or "none")
+ print("race pool: human")

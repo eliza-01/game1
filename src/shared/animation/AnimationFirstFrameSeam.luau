@@ -1,10 +1,15 @@
--- Runtime-only first-frame tail for published animations.
+-- Runtime-only loop seam for published animations.
 --
--- The authored/published asset is never rewritten. When enabled for a clip,
--- game1 freezes the primary track at its visible terminal pose and crossfades
--- to a second instance of the same asset frozen at TimePosition=0 for one
--- source animation frame. Looped clips then restart from frame zero; one-shot
--- clips remain on that first-frame tail until their owner releases the action.
+-- The authored/published asset is never rewritten. The primary AnimationTrack
+-- remains the timing source at all times: it stays looped when the descriptor
+-- is looped and keeps the exact playback speed supplied by the caller.
+--
+-- When enabled, a second instance of the same asset is frozen on frame zero.
+-- During only the final authored source frame, weights are blended from the
+-- primary terminal pose toward that frozen first pose. At the natural loop
+-- wrap both tracks represent frame zero, so ownership can return to the primary
+-- without stopping, seeking or restarting it. This makes the seam independent
+-- from RunSpeed / Animation Speed % timing.
 local AnimationFirstFrameSeam = {}
 AnimationFirstFrameSeam.__index = AnimationFirstFrameSeam
 
@@ -18,11 +23,6 @@ local function finite(value: any, fallback: number): number
     return numeric
 end
 
-function AnimationFirstFrameSeam.RuntimeTailSeconds(playbackSpeed: any): number
-    local speed = math.max(0.01, math.abs(finite(playbackSpeed, 1)))
-    return AnimationFirstFrameSeam.SourceFrameSeconds / speed
-end
-
 function AnimationFirstFrameSeam.new(primary: AnimationTrack, companion: AnimationTrack, looped: boolean)
     return setmetatable({
         primary = primary,
@@ -30,50 +30,28 @@ function AnimationFirstFrameSeam.new(primary: AnimationTrack, companion: Animati
         looped = looped == true,
         speed = 1,
         phase = "idle",
-        tailElapsed = 0,
-        tailDuration = AnimationFirstFrameSeam.SourceFrameSeconds,
+        previousTime = 0,
+        companionActive = false,
         completedSignaled = false,
     }, AnimationFirstFrameSeam)
 end
 
 function AnimationFirstFrameSeam:IsPlaying(): boolean
-    return self.phase == "playing" or self.phase == "tail"
+    return self.phase == "playing" or self.phase == "blend"
 end
 
-function AnimationFirstFrameSeam:Play(fadeTime: number?, playbackSpeed: number?)
-    self:Stop(0)
-    self.speed = math.max(0.01, finite(playbackSpeed, 1))
-    self.tailDuration = AnimationFirstFrameSeam.RuntimeTailSeconds(self.speed)
-    self.tailElapsed = 0
-    self.completedSignaled = false
-    self.phase = "playing"
-
-    self.primary.Looped = false
-    self.companion.Looped = false
-    self.primary:Play(math.max(0, finite(fadeTime, 0)), 1, self.speed)
-    self.primary.TimePosition = 0
-end
-
-function AnimationFirstFrameSeam:AdjustSpeed(playbackSpeed: number?)
-    self.speed = math.max(0.01, finite(playbackSpeed, self.speed))
-    self.tailDuration = AnimationFirstFrameSeam.RuntimeTailSeconds(self.speed)
-    if self.phase == "playing" and self.primary.IsPlaying then
-        self.primary:AdjustSpeed(self.speed)
+function AnimationFirstFrameSeam:_hideCompanion()
+    if self.companionActive or self.companion.IsPlaying then
+        self.companion:AdjustWeight(0, 0)
+        self.companion:Stop(0)
     end
+    self.companionActive = false
 end
 
-function AnimationFirstFrameSeam:_beginTail()
-    local length = math.max(0, finite(self.primary.Length, 0))
-    if length <= 0 then
+function AnimationFirstFrameSeam:_ensureCompanion()
+    if self.companionActive and self.companion.IsPlaying then
         return
     end
-
-    -- Latch just inside the valid source interval so AnimationTrack never owns
-    -- the natural-stop edge. The companion is the same published animation,
-    -- held on frame zero. Weight interpolation creates the synthetic tail.
-    self.primary.TimePosition = math.max(0, length - 0.001)
-    self.primary:AdjustSpeed(0)
-
     if self.companion.IsPlaying then
         self.companion:Stop(0)
     end
@@ -81,73 +59,110 @@ function AnimationFirstFrameSeam:_beginTail()
     self.companion:Play(0, 0, 1)
     self.companion.TimePosition = 0
     self.companion:AdjustSpeed(0)
+    self.companion:AdjustWeight(0, 0)
+    self.companionActive = true
+end
 
-    self.tailElapsed = 0
-    self.tailDuration = AnimationFirstFrameSeam.RuntimeTailSeconds(self.speed)
-    self.primary:AdjustWeight(0, self.tailDuration)
-    self.companion:AdjustWeight(1, self.tailDuration)
-    self.phase = "tail"
+function AnimationFirstFrameSeam:_setBlend(progress: number)
+    local alpha = math.clamp(progress, 0, 1)
+    self:_ensureCompanion()
+    -- Only pose weights change. The primary clock and playback speed continue
+    -- untouched so the seam cannot stretch or stall the animation cycle.
+    self.primary:AdjustWeight(1 - alpha, 0)
+    self.companion:AdjustWeight(alpha, 0)
+    self.phase = "blend"
+end
+
+function AnimationFirstFrameSeam:_restorePrimary()
+    self.primary:AdjustWeight(1, 0)
+    self:_hideCompanion()
+    self.phase = "playing"
+end
+
+function AnimationFirstFrameSeam:Play(fadeTime: number?, playbackSpeed: number?)
+    self:Stop(0)
+    self.speed = math.max(0.01, finite(playbackSpeed, 1))
+    self.previousTime = 0
+    self.completedSignaled = false
+    self.phase = "playing"
+
+    self.primary.Looped = self.looped
+    self.companion.Looped = false
+    self.primary:Play(math.max(0, finite(fadeTime, 0)), 1, self.speed)
+    self.primary.TimePosition = 0
+    self.primary:AdjustWeight(1, 0)
+end
+
+function AnimationFirstFrameSeam:AdjustSpeed(playbackSpeed: number?)
+    self.speed = math.max(0.01, finite(playbackSpeed, self.speed))
+    if self.primary.IsPlaying then
+        self.primary:AdjustSpeed(self.speed)
+    end
 end
 
 -- Returns: completedOneShot, completedLoopCycle.
-function AnimationFirstFrameSeam:Step(deltaTimeSim: number): (boolean, boolean)
-    if self.phase == "playing" then
-        if not self.primary.IsPlaying then
-            return false, false
-        end
-        local length = math.max(0, finite(self.primary.Length, 0))
-        if length <= 0 then
-            return false, false
-        end
-        local current = math.max(0, finite(self.primary.TimePosition, 0))
-        local dt = math.max(1 / 240, finite(deltaTimeSim, 0))
-        local projected = current + self.speed * dt * 1.5
-        if projected >= length - 0.0005 then
-            self:_beginTail()
-        end
+function AnimationFirstFrameSeam:Step(_deltaTimeSim: number): (boolean, boolean)
+    if self.phase ~= "playing" and self.phase ~= "blend" then
         return false, false
     end
 
-    if self.phase ~= "tail" then
+    local length = math.max(0, finite(self.primary.Length, 0))
+    if length <= 0 then
         return false, false
     end
 
-    self.tailElapsed += math.max(0, finite(deltaTimeSim, 0))
-    if self.tailElapsed + 1e-5 < self.tailDuration then
-        return false, false
-    end
+    local current = math.clamp(finite(self.primary.TimePosition, 0), 0, length)
+    local wrapped = self.looped
+        and self.primary.IsPlaying
+        and current + 1e-5 < self.previousTime
+        and self.previousTime > length * 0.5
 
-    self.primary:Stop(0)
-    if self.looped then
-        -- Companion and restarted primary are both exactly frame zero here, so
-        -- handing weight back to the primary is visually neutral.
-        self.primary.Looped = false
-        self.primary:Play(0, 1, self.speed)
-        self.primary.TimePosition = 0
-        self.companion:Stop(0)
-        self.phase = "playing"
-        self.tailElapsed = 0
+    if wrapped then
+        -- The primary has already looped naturally. At this instant the
+        -- companion and primary are both on frame zero, so restoring weight is
+        -- visually neutral and does not alter the primary timeline.
+        self:_restorePrimary()
+        self.previousTime = current
         return false, true
     end
 
-    self.phase = "complete"
-    if not self.completedSignaled then
-        self.completedSignaled = true
-        return true, false
+    local blendStart = math.max(0, length - AnimationFirstFrameSeam.SourceFrameSeconds)
+    if self.primary.IsPlaying and current >= blendStart then
+        local span = math.max(1e-5, length - blendStart)
+        self:_setBlend((current - blendStart) / span)
+    elseif self.primary.IsPlaying then
+        if self.phase == "blend" or self.companionActive then
+            self:_restorePrimary()
+        end
+    elseif not self.looped then
+        -- A one-shot ends on its own schedule. Holding frame zero after natural
+        -- completion is presentation-only; no synthetic duration is added to
+        -- gameplay/attack timing.
+        self:_setBlend(1)
+        self.phase = "complete"
+        if not self.completedSignaled then
+            self.completedSignaled = true
+            self.previousTime = current
+            return true, false
+        end
     end
+
+    self.previousTime = current
     return false, false
 end
 
 function AnimationFirstFrameSeam:Stop(fadeTime: number?)
     local fade = math.max(0, finite(fadeTime, 0))
     if self.primary.IsPlaying then
+        self.primary:AdjustWeight(1, 0)
         self.primary:Stop(fade)
     end
     if self.companion.IsPlaying then
         self.companion:Stop(fade)
     end
     self.phase = "idle"
-    self.tailElapsed = 0
+    self.previousTime = 0
+    self.companionActive = false
     self.completedSignaled = false
 end
 

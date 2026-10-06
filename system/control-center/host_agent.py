@@ -38,7 +38,7 @@ from animation_speed_scaling_store import AnimationSpeedScalingStore
 from character_core.identity import CharacterIdentityService
 from studio_bridge import run_model_load_bridge, run_monster_spawn_bridge
 
-control_agent_build = "game1-m7-animation-folder-explorer-005"
+control_agent_build = "game1-m18-opencloud-animation-reimport-001"
 port = int(os.environ.get("CONTROL_AGENT_PORT", "43821"))
 token = os.environ.get("CONTROL_TOKEN", "Game1LocalControlV1")
 store = CharacterStore(ROOT)
@@ -547,6 +547,24 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/animation-speed-scaling":
             try:
                 return self.out(200, animation_speed_scaling.update(self.body()))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+
+        if path == "/api/animations/check-roblox-assets":
+            try:
+                credentials = publication_credentials()
+                character = animations.check_manual_reimports(credentials)
+                monster = monster_animations.check_manual_reimports(credentials)
+                return self.out(200, {
+                    "schemaVersion": 1,
+                    "project": "game1",
+                    "requested": int(character.get("requested") or 0) + int(monster.get("requested") or 0),
+                    "confirmed": int(character.get("confirmed") or 0) + int(monster.get("confirmed") or 0),
+                    "pending": int(character.get("pending") or 0) + int(monster.get("pending") or 0),
+                    "failed": int(character.get("failed") or 0) + int(monster.get("failed") or 0),
+                    "character": character,
+                    "monster": monster,
+                })
             except Exception as error:
                 return self.out(400, {"error": str(error)})
 

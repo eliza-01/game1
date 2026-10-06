@@ -409,7 +409,11 @@ local function bindCharacter(newCharacter: Model)
 		end
 		print(("[game1][animation] prewarm %d/%d ready in %.3fs"):format(result.ready, result.total, result.elapsed))
 	end)
-	for _, attribute in ipairs({ "MovementState", "AnimationMovementDirection", "AnimationWeaponSet", "RunSpeed", AnimationSpeedScaling.DebugOverrideAttribute }) do
+	local refreshAttributes = { "MovementState", "AnimationMovementDirection", "AnimationWeaponSet", "RunSpeed", "AttackSpeed" }
+	for _, channel in ipairs({ "run", "walk" }) do
+		table.insert(refreshAttributes, AnimationSpeedScaling.DebugUnitsPerPercentAttribute(channel))
+	end
+	for _, attribute in ipairs(refreshAttributes) do
 		table.insert(connections, newCharacter:GetAttributeChangedSignal(attribute):Connect(refreshLoop))
 	end
 	table.insert(connections, newCharacter:GetAttributeChangedSignal("LifeState"):Connect(handleLifeState))

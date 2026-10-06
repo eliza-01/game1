@@ -21,6 +21,12 @@ DEFAULT_PAYLOAD = {
                     "unitsPerPercent": 2.0,
                 },
                 {
+                    "channel": "walk",
+                    "label": "Walk Speed",
+                    "stat": "RunSpeed",
+                    "unitsPerPercent": 4.0,
+                },
+                {
                     "channel": "attack",
                     "label": "Attack Speed",
                     "stat": "AttackSpeed",

@@ -401,8 +401,8 @@ for required in [
         err(f"character animation store missing {required}")
 if 'queue = [row for row in rows if row["status"] == "LOCAL_ONLY"]' not in animation_store_text:
     err("publish-missing must never create duplicate assets for changed published animations")
-if "update it through the studio animation-version bridge" not in animation_store_text:
-    err("changed animation assets must preserve their permanent id")
+if "reimport it manually in Roblox Studio" not in animation_store_text or "Check Roblox Assets Animations" not in animation_store_text:
+    err("changed animation assets must preserve their permanent id and use manual reimport confirmation")
 
 animation_registry_path = ROOT / "src/shared/character/CharacterAnimationRegistry.luau"
 animation_registry_text = animation_registry_path.read_text(encoding="utf-8") if animation_registry_path.is_file() else ""
@@ -681,7 +681,7 @@ for required in ["Game1StudioDebugPreferences_v1", "Game1StudioPreferences", "pl
 if (ROOT / "src/shared/dev/TestLoadoutConfig.luau").exists():
     err("obsolete generated TestLoadoutConfig must be removed")
 
-# m11 Studio-native movement debugger: game speed/world conversion + animation playback override
+# m20 Studio-native movement debugger: AM-seeded, runtime-editable tuning
 movement_debug_server_path = ROOT / "src/server/dev/MovementDebugService.luau"
 movement_debug_client_path = ROOT / "src/client/dev/MovementDebugController.luau"
 movement_debug_server = movement_debug_server_path.read_text(encoding="utf-8") if movement_debug_server_path.is_file() else ""
@@ -690,17 +690,15 @@ for required in [
     "GetMovementDebugCatalog",
     "ApplyMovementDebug",
     "SetMovementDebugMonsterMode",
-    "applyRuntimeRunSpeed",
     "MovementDebugRunSpeedOverride",
-    "AnimationSpeedScaling.DebugOverrideAttribute",
-    "animationSpeedPercent",
+    "applyRuntimeRunSpeed",
+    "baseRunSpeed",
+    "animationUnitsPerPercent",
+    "animationChannel",
+    "authoredUnitsPerPercent",
+    "animationRules",
     "runSpeedUnitsPerStud",
     "CharacterMovementConfig.RobloxSpeed",
-    'SetAttribute("BaseRunSpeed"',
-    'SetAttribute("RunSpeed"',
-    'SetAttribute("MoveSpeed"',
-    "controllerManager.BaseMoveSpeed = resolved",
-    "humanoid.WalkSpeed = resolved",
     "model = model",
     "Game1MonsterDebugLocomotionMode",
     "MonsterLocomotionMode",
@@ -710,27 +708,32 @@ for required in [
         err(f"Studio movement debugger server missing {required}")
 for required in [
     "MOVEMENT DEBUG",
-    "Run speed · game parameter",
-    "World distance / 1 second · studs",
-    "Animation playback · runtime override %",
-    "Walk = RunSpeed / 2",
-    "game speed = 1 stud/s",
+    "RunSpeed · runtime test value",
+    "Run world speed · studs / second",
+    "Animation ratio · stat units per 1% playback",
+    "RULE: RUN",
+    "AM RunSpeed",
+    "runtime test",
+    "ACTIVE",
+    "calculatedPlayback",
+    "animationUnitsPerPercent",
+    "ApplyMovementDebug",
+    "stageSpeedText",
+    "stageAnimationText",
     "MONSTER BASE: WALK",
     "MEASURED · last 1.0 s",
-    "syncSpeedBoxes",
-    "stageSpeedText(runSpeedBox)",
-    "stageSpeedText(distanceBox)",
-    "applyAnimationSpeed",
     "modelPosition",
     "RunService.Heartbeat:Connect",
     "GetMovementDebugCatalog",
-    "ApplyMovementDebug",
     "SetMovementDebugMonsterMode",
     "CATALOG_POLL_SECONDS",
     "RunService:IsStudio()",
 ]:
     if required not in movement_debug_client:
         err(f"Studio movement debugger client missing {required}")
+for forbidden in ["animationSpeedPercent =", "MovementDebugAnimationSpeedPercentOverride"]:
+    if forbidden in movement_debug_server or forbidden in movement_debug_client:
+        err(f"Movement Debug must tune AM ratio, never own an absolute playback-percent override; found {forbidden}")
 movement_config_text = (ROOT / "src/shared/character/CharacterMovementConfig.luau").read_text(encoding="utf-8")
 for required in [
     "RunSpeedUnitsPerStud = 10",
@@ -742,7 +745,7 @@ for required in [
     if required not in movement_config_text:
         err(f"game-speed/world-distance conversion contract missing {required}")
 if "MovementDebugRunSpeedOverride" not in stats_service_text:
-    err("character stat recompute must preserve the active Studio movement-debug speed override")
+    err("character stats must preserve the runtime Movement Debug RunSpeed override across stat recomputes")
 if "MovementDebugService.Start()" not in server_init_text:
     err("Studio movement debugger service is not started by the server runtime")
 if "MovementDebugController.Start()" not in client_init_text:
@@ -763,28 +766,31 @@ else:
 if animation_scaling_manifest.get("schemaVersion") != 1 or animation_scaling_manifest.get("project") != "game1":
     err("animation speed scaling manifest must be game1 schema 1")
 expected_scaling = {
-    ("character", "human_female", "run"): ("RunSpeed", 2.0),
-    ("character", "human_female", "attack"): ("AttackSpeed", 2.0),
-    ("monster", "gremlin", "run"): ("RunSpeed", 0.6),
+    ("character", "human_female", "run"): "RunSpeed",
+    ("character", "human_female", "walk"): "RunSpeed",
+    ("character", "human_female", "attack"): "AttackSpeed",
+    ("monster", "gremlin", "run"): "RunSpeed",
 }
 actual_scaling = {}
 for profile in animation_scaling_manifest.get("profiles") or []:
     for rule in profile.get("rules") or []:
         key = (str(profile.get("targetType") or ""), str(profile.get("targetId") or ""), str(rule.get("channel") or ""))
         actual_scaling[key] = (str(rule.get("stat") or ""), float(rule.get("unitsPerPercent") or 0))
-for key, expected in expected_scaling.items():
+for key, expected_stat in expected_scaling.items():
     actual = actual_scaling.get(key)
-    if not actual or actual[0] != expected[0] or abs(actual[1] - expected[1]) > 1e-6:
-        err(f"animation speed scaling rule mismatch for {key}: expected {expected}, got {actual}")
+    if not actual or actual[0] != expected_stat or actual[1] <= 0:
+        err(f"animation speed scaling rule mismatch for {key}: expected positive adjustable {expected_stat} ratio, got {actual}")
 animation_scaling_runtime = animation_scaling_runtime_path.read_text(encoding="utf-8") if animation_scaling_runtime_path.is_file() else ""
 animation_scaling_registry = animation_scaling_registry_path.read_text(encoding="utf-8") if animation_scaling_registry_path.is_file() else ""
 animation_scaling_store = animation_scaling_store_path.read_text(encoding="utf-8") if animation_scaling_store_path.is_file() else ""
 animation_scaling_js = animation_scaling_js_path.read_text(encoding="utf-8") if animation_scaling_js_path.is_file() else ""
 monster_assets_js_early = (ROOT / "system/control-center/static/monster-assets.js").read_text(encoding="utf-8")
 monster_animation_registry_early = (ROOT / "src/shared/monster/MonsterAnimationRegistry.luau").read_text(encoding="utf-8")
-for required in ["ResolveForModel", "unitsPerPercent", "DebugOverrideAttribute", "value / unitsPerPercent"]:
+for required in ["ResolveForModel", "ResolveDetailsForModel", "TargetForModel", "unitsPerPercent", "value / unitsPerPercent", "DebugUnitsPerPercentAttribute", "authoredUnitsPerPercent", "debugUnitsPerPercent"]:
     if required not in animation_scaling_runtime:
         err(f"animation speed scaling runtime missing {required}")
+if "DebugOverrideAttribute" in animation_scaling_runtime or "MovementDebugAnimationSpeedPercentOverride" in animation_scaling_runtime:
+    err("animation speed scaling must not support an absolute playback-percent debug override")
 for required in ['["human_female"]', 'unitsPerPercent = 2.0', '["gremlin"]', 'unitsPerPercent = 0.6']:
     if required not in animation_scaling_registry:
         err(f"generated animation speed scaling registry missing {required}")
@@ -962,7 +968,6 @@ for required in [
     "locomotionSpeedFor",
     "runTrack",
     "Game1MonsterDebugLocomotionMode",
-    "AnimationSpeedScaling.DebugOverrideAttribute",
     "AnimationPlaybackSpeedPercent",
     "AnimationSpeedScaling",
 ]:
@@ -1176,9 +1181,12 @@ if "data-duplicate" not in monster_assets_js_early or "monsterSetAnimationDuplic
 
 runtime_seam_path = ROOT / "src/shared/animation/AnimationFirstFrameSeam.luau"
 runtime_seam_text = runtime_seam_path.read_text(encoding="utf-8") if runtime_seam_path.is_file() else ""
-for required in ["SourceFrameSeconds", "RuntimeTailSeconds", "companion", "AdjustWeight", "TimePosition = 0", "completedLoopCycle"]:
+for required in ["SourceFrameSeconds", "companion", "AdjustWeight", "TimePosition = 0", "completedLoopCycle", "self.primary.Looped = self.looped", "self.primary:AdjustSpeed(self.speed)", "self.primary:AdjustWeight(1 - alpha, 0)", "current + 1e-5 < self.previousTime"]:
     if required not in runtime_seam_text:
         err(f"runtime first-frame seam policy missing {required}")
+for forbidden in ["RuntimeTailSeconds", "_beginTail", "projected =", "self.primary:AdjustSpeed(0)"]:
+    if forbidden in runtime_seam_text:
+        err(f"runtime first-frame seam must not stall/restart the primary timeline: {forbidden}")
 character_animation_controller_text = (ROOT / "src/client/character/animation/CharacterAnimationController.luau").read_text(encoding="utf-8")
 character_track_cache_text = (ROOT / "src/client/character/animation/AnimationTrackCache.luau").read_text(encoding="utf-8")
 monster_spawner_text_m15 = (ROOT / "src/server/monster/MonsterSpawnerService.luau").read_text(encoding="utf-8")
@@ -1188,9 +1196,12 @@ for required in ["AnimationFirstFrameSeam", "GetSeamCompanion", "duplicateFirstF
 for required in ["AnimationFirstFrameSeam", "createRuntimeSeam", "maintainRuntimeAnimationSeams", "duplicateFirstFrameAtEnd"]:
     if required not in monster_spawner_text_m15:
         err(f"monster runtime seam integration missing {required}")
-for required in ["runtimeTailDuration", "duplicateFirstFrameAtEnd", "AnimationFirstFrameSeam.RuntimeTailSeconds"]:
-    if required not in attack_timeline_text + (ROOT / "src/server/combat/AttackService.luau").read_text(encoding="utf-8"):
+attack_runtime_text = attack_timeline_text + (ROOT / "src/server/combat/AttackService.luau").read_text(encoding="utf-8")
+for required in ["runtimeTailDuration = 0", "_duplicateFirstFrameAtEnd", "animationDuration = sourceAnimationDuration"]:
+    if required not in attack_runtime_text:
         err(f"attack timeline/runtime seam integration missing {required}")
+if "AnimationFirstFrameSeam.RuntimeTailSeconds" in attack_runtime_text:
+    err("runtime seam must not extend attack duration or event timing")
 
 for animation_manifest_name in ["character-animations.json", "monster-animations.json"]:
     path = ROOT / "assets/manifests" / animation_manifest_name
@@ -1211,13 +1222,46 @@ for registry_name in ["src/shared/character/CharacterAnimationRegistry.luau", "s
     if "duplicateFirstFrameAtEnd" not in registry_text:
         err(f"runtime animation registry does not export first-frame seam flag: {registry_name}")
 
+# m18 manual animation reimport verification lives in Asset Manager and mirrors
+# RobloxLineage: scan detects local SHA changes, Studio reimport remains manual,
+# then Open Cloud asset versions confirm a newer Approved version of the same id.
+fingerprint_path = ROOT / "system/control-center/animation_fingerprint.py"
+if fingerprint_path.exists():
+    err("Studio content fingerprint checker must be removed; reimport confirmation is Open Cloud version based")
+studio_plugin_text = (ROOT / "system/studio-plugin/Game1Bridge.server.luau").read_text(encoding="utf-8")
+generated_plugin_text = (ROOT / "generated/Game1Bridge.rbxmx").read_text(encoding="utf-8") if (ROOT / "generated/Game1Bridge.rbxmx").is_file() else ""
+for forbidden in ["Game1CheckAnimations", "Check Animations", "Game1CheckRobloxAssetsAnimations", "KeyframeSequenceProvider", "fingerprintKeyframeSequence", "/api/studio/animation-check"]:
+    if forbidden in studio_plugin_text or forbidden in generated_plugin_text:
+        err(f"Studio animation-check plugin UI/code must be removed: {forbidden}")
+opencloud_text = (ROOT / "system/control-center/opencloud_assets.py").read_text(encoding="utf-8")
+reimport_check_text = (ROOT / "system/control-center/animation_reimport_check.py").read_text(encoding="utf-8")
+character_publication_text = (ROOT / "system/control-center/animation_core/publication.py").read_text(encoding="utf-8")
+monster_store_text_m18 = (ROOT / "system/control-center/monster_animation_store.py").read_text(encoding="utf-8")
+for required in ["ASSET_VERSIONS_URL_TEMPLATE", "def list_asset_versions", "assetVersions"]:
+    if required not in opencloud_text:
+        err(f"Open Cloud animation-version query missing {required}")
+for required in ["find_confirmed_manual_reimport", "createTime", "published", "Approved", "creationContext", "known_version_ids"]:
+    if required not in reimport_check_text:
+        err(f"manual animation reimport confirmation missing {required}")
+for required in ["content_updated_at", "asset_version_id", "manual_verified", "check_manual_reimports", "roblox/manual-version-confirmation"]:
+    if required not in character_publication_text + animation_store_text + monster_store_text_m18:
+        err(f"manual animation publication history missing {required}")
+for required in ["/api/animations/check-roblox-assets", "check_manual_reimports"]:
+    if required not in host_agent_text:
+        err(f"Asset Manager Roblox animation check API missing {required}")
+for required in ["Check Roblox Assets Animations", "/api/animations/check-roblox-assets", "checkRobloxAnimationAssets"]:
+    if required not in character_js_text + (ROOT / "system/control-center/static/index.html").read_text(encoding="utf-8"):
+        err(f"Asset Manager animation reimport UI missing {required}")
+if "state.data.activeArchetypeId" not in character_js_text or "autoSelected=true" not in character_js_text:
+    err("character Asset Manager must auto-select the active/first archetype so starting stats can be saved")
+
 if errors:
     print("verify failed")
     for item in errors:
         print(" -", item)
     sys.exit(1)
 
-print("verify ok · game1 m15 runtime-only animation first-frame seam passed")
+print("verify ok · game1 m20 Movement Debug runtime tuning + AM ratios passed")
 print("registered character archetypes:", len(archetypes))
 print("active character archetype:", active_id or "none")
 print("race pool: human")

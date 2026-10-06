@@ -957,22 +957,13 @@ local function spawnOne(state: any): Model?
             refreshWanderLocomotion(model, entry)
         end
     end)
-    model:GetAttributeChangedSignal(AnimationSpeedScaling.DebugOverrideAttribute):Connect(function()
-        if state.instances[model] ~= entry or entry.deathPoseHeld then
-            return
-        end
-        if entry.dying then
-            if entry.deathTrack and entry.deathTrack.IsPlaying then
-                entry.deathTrack:AdjustSpeed(animationPlaybackScale(model, "death"))
+    for _, channel in ipairs({ "run", "walk" }) do
+        model:GetAttributeChangedSignal(AnimationSpeedScaling.DebugUnitsPerPercentAttribute(channel)):Connect(function()
+            if state.instances[model] == entry then
+                refreshWanderLocomotion(model, entry)
             end
-        elseif entry.wandering then
-            refreshWanderLocomotion(model, entry)
-        elseif entry.activeIdleSpecial then
-            playTrackAtConfiguredSpeed(model, entry.activeIdleSpecial.track, "idle", 0, entry.activeIdleSpecial.seam)
-        elseif entry.idleTrack then
-            playTrackAtConfiguredSpeed(model, entry.idleTrack, "idle", 0, entry.idleSeam)
-        end
-    end)
+        end)
+    end
     model:GetAttributeChangedSignal("LifeState"):Connect(function()
         if state.instances[model] ~= entry then
             return

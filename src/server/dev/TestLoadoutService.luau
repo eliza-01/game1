@@ -4,6 +4,8 @@ local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local CharacterShared = Shared:WaitForChild("character")
+local CombatShared = Shared:WaitForChild("combat")
+local AttackConfig = require(CombatShared:WaitForChild("AttackConfig"))
 local CharacterRegistry = require(CharacterShared:WaitForChild("CharacterRegistry"))
 
 local CharacterService = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CharacterService"))
@@ -72,6 +74,7 @@ local function availableWeapons()
             label = "Unarmed / Hands",
             weaponType = "hands",
             rarity = "",
+            attackRadiusStuds = AttackConfig.Range,
             synthetic = true,
         },
     }
@@ -86,6 +89,7 @@ local function availableWeapons()
             label = label,
             weaponType = tostring(row.weaponType or ""),
             rarity = tostring(row.rarity or ""),
+            attackRadiusStuds = tonumber(row.attackRadiusStuds) or AttackConfig.Range,
             synthetic = false,
         })
     end
@@ -172,6 +176,7 @@ local function applyLoadout(player: Player, archetypeValue: any, weaponSlugValue
         weaponSlug = weaponSlug,
         weaponType = tostring(character:GetAttribute("EquippedWeaponType") or "hands"),
         animationSet = tostring(character:GetAttribute("AnimationWeaponSet") or "hands"),
+        attackRadiusStuds = tonumber(character:GetAttribute("AttackRadius")) or AttackConfig.Range,
     }
 end
 

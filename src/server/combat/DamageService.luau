@@ -5,6 +5,8 @@ local CombatShared = Shared:WaitForChild("combat")
 local AttackConfig = require(CombatShared:WaitForChild("AttackConfig"))
 
 local DamageService = {}
+local criticalRandom = Random.new()
+local CRITICAL_DAMAGE_MULTIPLIER = 2
 
 function DamageService.Apply(attacker: Model?, target: Model, rawDamage: number): (number, boolean)
     if target:GetAttribute("Damageable") ~= true or target:GetAttribute("LifeState") ~= "Alive" then
@@ -20,13 +22,20 @@ function DamageService.Apply(attacker: Model?, target: Model, rawDamage: number)
 
     local defense = math.max(0, tonumber(target:GetAttribute("Defense")) or 0)
     local normalizedRawDamage = math.max(0, tonumber(rawDamage) or 0)
-    local finalDamage = math.max(0, math.floor(normalizedRawDamage - defense))
+    local criticalChance = if attacker then math.clamp(tonumber(attacker:GetAttribute("CritChance")) or 0, 0, 100) else 0
+    local critical = criticalChance > 0 and criticalRandom:NextNumber(0, 100) < criticalChance
+    local damageBeforeDefense = normalizedRawDamage * (if critical then CRITICAL_DAMAGE_MULTIPLIER else 1)
+    local finalDamage = math.max(0, math.floor(damageBeforeDefense - defense))
     local hp = math.max(0, tonumber(target:GetAttribute("HP")) or 0)
     local newHP = math.max(0, hp - finalDamage)
 
     target:SetAttribute("HP", newHP)
     target:SetAttribute("LastDamage", finalDamage)
+    target:SetAttribute("LastCritical", critical)
     target:SetAttribute("LastAttackerUserId", attacker and attacker:GetAttribute("CharacterOwnerUserId") or 0)
+    if attacker then
+        attacker:SetAttribute("LastAttackCritical", critical)
+    end
 
     local killed = newHP <= 0
     if killed then
@@ -34,9 +43,11 @@ function DamageService.Apply(attacker: Model?, target: Model, rawDamage: number)
     end
 
     if AttackConfig.DebugLogs then
-        print(("[game1][DAMAGE] target=%s raw=%d defense=%d final=%d hp=%d->%d killed=%s"):format(
+        print(("[game1][DAMAGE] target=%s raw=%d crit=%s chance=%.1f defense=%d final=%d hp=%d->%d killed=%s"):format(
             target.Name,
             normalizedRawDamage,
+            tostring(critical),
+            criticalChance,
             defense,
             finalDamage,
             hp,

@@ -71,6 +71,22 @@ class AnimationStorageMixin:
                 );
                 """
             )
+            # equip/unequip are runtime weapon operations, not animation states.
+            # Remove legacy bindings so they disappear from manifests/registries permanently.
+            obsolete = connection.execute(
+                "SELECT id,clip_id FROM animation_bindings WHERE scope='weapon' AND slot IN ('equip','unequip')"
+            ).fetchall()
+            obsolete_clip_ids = {str(row["clip_id"]) for row in obsolete}
+            connection.execute(
+                "DELETE FROM animation_bindings WHERE scope='weapon' AND slot IN ('equip','unequip')"
+            )
+            for clip_id in obsolete_clip_ids:
+                still_used = connection.execute(
+                    "SELECT 1 FROM animation_bindings WHERE clip_id=? LIMIT 1", (clip_id,)
+                ).fetchone()
+                if still_used is None:
+                    connection.execute("DELETE FROM animation_publications WHERE clip_id=?", (clip_id,))
+                    connection.execute("DELETE FROM animation_clips WHERE id=?", (clip_id,))
 
     @staticmethod
     def _sha256(path: Path) -> str:

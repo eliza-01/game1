@@ -15,6 +15,8 @@ local currentLoop = nil
 local currentLoopClipId = ""
 local currentAction = nil
 local connections = {}
+local lifeTransition = false
+local lastLifeState = "Alive"
 
 local function disconnectAll()
 	for _, connection in ipairs(connections) do
@@ -34,6 +36,8 @@ local function clearCharacter()
 	currentLoop = nil
 	currentLoopClipId = ""
 	currentAction = nil
+	lifeTransition = false
+	lastLifeState = "Alive"
 end
 
 local function findAnimator(model: Model): Animator?
@@ -52,6 +56,9 @@ end
 local function movementSlot(): string
 	if not character then
 		return "idle"
+	end
+	if tostring(character:GetAttribute("LifeState") or "Alive") == "Dead" then
+		return "death_wait"
 	end
 	local state = string.lower(tostring(character:GetAttribute("MovementState") or "idle"))
 	if state == "walk" then
@@ -84,7 +91,7 @@ local function applyBackwardPlayback(track: AnimationTrack, slot: string)
 end
 
 local function refreshLoop()
-	if not character or not cache then
+	if not character or not cache or lifeTransition then
 		return
 	end
 	local slot = movementSlot()
@@ -119,6 +126,67 @@ local function refreshLoop()
 	character:SetAttribute("AnimationResolvedClip", clipId)
 end
 
+local function playBaseLifeAction(slot: string, onStopped)
+	if not character or not cache then
+		if onStopped then onStopped() end
+		return
+	end
+	local descriptor = AnimationResolver.Resolve(character, "base", nil, slot)
+	if not descriptor then
+		if onStopped then onStopped() end
+		return
+	end
+	local track = cache:Get(descriptor)
+	if not track then
+		if onStopped then onStopped() end
+		return
+	end
+	if currentLoop and currentLoop.IsPlaying then
+		currentLoop:Stop(0.08)
+	end
+	currentLoop = nil
+	currentLoopClipId = ""
+	if currentAction and currentAction.IsPlaying then
+		currentAction:Stop(0.04)
+	end
+	currentAction = track
+	track:Play(0.06, 1, 1)
+	character:SetAttribute("AnimationActionSlot", slot)
+	character:SetAttribute("AnimationActionClip", tostring(descriptor.clipId or ""))
+	track.Stopped:Once(function()
+		if currentAction == track then
+			currentAction = nil
+		end
+		if onStopped then onStopped() end
+	end)
+end
+
+local function handleLifeState()
+	if not character then
+		return
+	end
+	local current = tostring(character:GetAttribute("LifeState") or "Alive")
+	local previous = lastLifeState
+	lastLifeState = current
+	if current == "Dead" and previous ~= "Dead" then
+		lifeTransition = true
+		playBaseLifeAction("death", function()
+			if not character then return end
+			lifeTransition = false
+			refreshLoop()
+		end)
+	elseif current == "Alive" and previous == "Dead" then
+		lifeTransition = true
+		playBaseLifeAction("revive", function()
+			if not character then return end
+			lifeTransition = false
+			refreshLoop()
+		end)
+	else
+		refreshLoop()
+	end
+end
+
 local function bindCharacter(newCharacter: Model)
 	clearCharacter()
 	character = newCharacter
@@ -128,6 +196,7 @@ local function bindCharacter(newCharacter: Model)
 		return
 	end
 	cache = AnimationTrackCache.new(animator)
+	lastLifeState = tostring(newCharacter:GetAttribute("LifeState") or "Alive")
 	local boundCache = cache
 	local descriptors = AnimationResolver.ListForCharacter(newCharacter)
 	task.spawn(function()
@@ -140,6 +209,7 @@ local function bindCharacter(newCharacter: Model)
 	for _, attribute in ipairs({ "MovementState", "AnimationMovementDirection", "AnimationWeaponSet" }) do
 		table.insert(connections, newCharacter:GetAttributeChangedSignal(attribute):Connect(refreshLoop))
 	end
+	table.insert(connections, newCharacter:GetAttributeChangedSignal("LifeState"):Connect(handleLifeState))
 	refreshLoop()
 	print("[game1][animation] character animation profile bound")
 end

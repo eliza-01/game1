@@ -2,13 +2,14 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
 
 local TestLoadoutController = {}
 local started = false
 local player = Players.LocalPlayer
 
 local PANEL_WIDTH = 320
-local PANEL_EXPANDED_HEIGHT = 300
+local PANEL_EXPANDED_HEIGHT = 344
 local PANEL_COLLAPSED_SIZE = 44
 local PANEL_X = 16
 local PANEL_Y = 150
@@ -321,6 +322,36 @@ local function waitForPreferences(): Folder?
     return if folder.Parent then folder else nil
 end
 
+
+local function formatStuds(value: any): string
+    local numeric = tonumber(value) or 0
+    if math.abs(numeric - math.round(numeric)) < 0.001 then
+        return tostring(math.round(numeric))
+    end
+    return string.format("%.2f", numeric):gsub("0+$", ""):gsub("%.$", "")
+end
+
+local function createAttackRadiusRing()
+    local folder = Instance.new("Folder")
+    folder.Name = "Game1AttackRadiusPreview"
+    local parts = {}
+    for index = 1, 64 do
+        local part = Instance.new("Part")
+        part.Name = ("Segment%02d"):format(index)
+        part.Anchored = true
+        part.CanCollide = false
+        part.CanQuery = false
+        part.CanTouch = false
+        part.CastShadow = false
+        part.Material = Enum.Material.Neon
+        part.Color = COLORS.accent
+        part.Transparency = 0.18
+        part.Parent = folder
+        parts[index] = part
+    end
+    return folder, parts
+end
+
 local function createGui()
     local playerGui = player:WaitForChild("PlayerGui")
     local previous = playerGui:FindFirstChild("Game1TestLoadoutGui")
@@ -382,21 +413,27 @@ local function createGui()
     meta.Position = UDim2.fromOffset(1, 172)
     meta.Size = UDim2.new(1, -2, 0, 16)
 
+    local radiusToggle = button(body, "ATTACK RADIUS: OFF")
+    radiusToggle.Position = UDim2.fromOffset(0, 196)
+    radiusToggle.Size = UDim2.new(1, 0, 0, 28)
+    radiusToggle.TextSize = 10
+    radiusToggle.Font = Enum.Font.GothamSemibold
+
     local statusDot = Instance.new("Frame")
     statusDot.BackgroundColor3 = COLORS.muted
     statusDot.BorderSizePixel = 0
-    statusDot.Position = UDim2.fromOffset(2, 207)
+    statusDot.Position = UDim2.fromOffset(2, 241)
     statusDot.Size = UDim2.fromOffset(6, 6)
     statusDot.Parent = body
     corner(statusDot, 3)
 
     local status = textLabel(body, "Loading catalog…", 9, false)
     status.TextColor3 = COLORS.muted
-    status.Position = UDim2.fromOffset(14, 200)
+    status.Position = UDim2.fromOffset(14, 234)
     status.Size = UDim2.new(1, -14, 0, 20)
 
     local apply = button(body, "LOADING…")
-    apply.Position = UDim2.fromOffset(0, 226)
+    apply.Position = UDim2.fromOffset(0, 260)
     apply.Size = UDim2.new(1, 0, 0, 34)
     apply.BackgroundColor3 = COLORS.disabled
     apply.TextColor3 = COLORS.muted
@@ -434,7 +471,7 @@ local function createGui()
     end)
     setCollapsed(playerGui:GetAttribute(DEBUG_PANEL_OPEN_ATTRIBUTE) ~= DEBUG_PANEL_ID)
 
-    return gui, character, category, weapon, meta, apply, status, statusDot
+    return gui, character, category, weapon, meta, radiusToggle, apply, status, statusDot
 end
 
 function TestLoadoutController.Start()
@@ -454,7 +491,7 @@ function TestLoadoutController.Start()
             return
         end
 
-        local gui, characterDropdown, categorySelector, weaponDropdown, meta, applyButton, status, statusDot = createGui()
+        local gui, characterDropdown, categorySelector, weaponDropdown, meta, radiusToggle, applyButton, status, statusDot = createGui()
         local catalog = catalogRemote:InvokeServer()
         local weaponRows = catalog.weapons or {}
         local weaponBySlug = {}
@@ -497,6 +534,47 @@ function TestLoadoutController.Start()
         local appliedWeaponSlug = initialWeapon
         local applying = false
 
+        local ringFolder, ringParts = createAttackRadiusRing()
+        local ringVisible = false
+        local ringConnection: RBXScriptConnection? = nil
+        local rayParams = RaycastParams.new()
+        rayParams.FilterType = Enum.RaycastFilterType.Exclude
+        rayParams.IgnoreWater = false
+        rayParams.RespectCanCollide = true
+
+        local function setRingVisible(value: boolean)
+            ringVisible = value == true
+            radiusToggle.Text = ringVisible and "ATTACK RADIUS: ON" or "ATTACK RADIUS: OFF"
+            radiusToggle.BackgroundColor3 = ringVisible and COLORS.controlSelected or COLORS.control
+            radiusToggle.TextColor3 = ringVisible and COLORS.accent or COLORS.text
+            ringFolder.Parent = ringVisible and Workspace or nil
+        end
+
+        local function renderAttackRadiusRing()
+            if not ringVisible then return end
+            local currentCharacter = player.Character
+            local root = currentCharacter and currentCharacter:FindFirstChild("RootCollider")
+            if not root or not root:IsA("BasePart") then
+                for _, part in ipairs(ringParts) do part.Transparency = 1 end
+                return
+            end
+            local radius = math.max(1, tonumber(currentCharacter:GetAttribute("AttackRadius")) or 7)
+            rayParams.FilterDescendantsInstances = { currentCharacter }
+            local ground = Workspace:Raycast(root.Position, Vector3.new(0, -64, 0), rayParams)
+            local center = Vector3.new(root.Position.X, ground and (ground.Position.Y + 0.06) or (root.Position.Y - root.Size.Y * 0.5), root.Position.Z)
+            local chord = 2 * radius * math.sin(math.pi / #ringParts) + 0.04
+            for index, part in ipairs(ringParts) do
+                local angle = ((index - 0.5) / #ringParts) * math.pi * 2
+                local position = center + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
+                part.Size = Vector3.new(chord, 0.055, 0.10)
+                part.CFrame = CFrame.new(position) * CFrame.Angles(0, -angle - math.pi * 0.5, 0)
+                part.Transparency = 0.18
+            end
+        end
+        ringConnection = RunService.RenderStepped:Connect(renderAttackRadiusRing)
+        setRingVisible(false)
+        radiusToggle.Activated:Connect(function() setRingVisible(not ringVisible) end)
+
         local function setStatus(message: string, color: Color3?)
             status.Text = message
             status.TextColor3 = color or COLORS.muted
@@ -524,9 +602,9 @@ function TestLoadoutController.Start()
         local function updateMeta()
             local row = weaponBySlug[weaponDropdown.getValue()]
             if not row or tostring(row.slug or "") == "" then
-                meta.Text = "hands · unarmed"
+                meta.Text = string.format("hands · unarmed · radius %s studs", formatStuds(row and row.attackRadiusStuds or 7))
             else
-                meta.Text = string.format("%s · %s", tostring(row.weaponType or ""), tostring(row.rarity or ""))
+                meta.Text = string.format("%s · %s · radius %s studs", tostring(row.weaponType or ""), tostring(row.rarity or ""), formatStuds(row.attackRadiusStuds or 7))
             end
             renderApply()
         end
@@ -604,6 +682,8 @@ function TestLoadoutController.Start()
 
         gui.Destroying:Connect(function()
             preferences = nil
+            if ringConnection then ringConnection:Disconnect() end
+            ringFolder:Destroy()
         end)
     end)
 end

@@ -127,6 +127,8 @@ required_runtime = [
     "src/server/combat/EntityHitboxService.luau",
     "src/server/combat/SkeletonHitRegionResolver.luau",
     "src/server/dev/TrainingDummyService.luau",
+    "src/server/monster/MonsterSpawnerService.luau",
+    "src/server/monster/MonsterSpawnRegistry.luau",
     "src/client/character/MovementController.luau",
     "src/client/character/CameraController.luau",
     "src/client/character/PlayerStatusController.luau",
@@ -159,8 +161,9 @@ for legacy in [
         err(f"legacy flat runtime module must be removed: {legacy}")
 
 damage_text = (ROOT / "src/server/combat/DamageService.luau").read_text(encoding="utf-8")
-if "math.max(0, math.floor(normalizedRawDamage - defense))" not in damage_text:
-    err("damage formula contract missing")
+for required in ["CritChance", "CRITICAL_DAMAGE_MULTIPLIER = 2", "criticalRandom:NextNumber", "damageBeforeDefense"]:
+    if required not in damage_text:
+        err(f"critical damage contract missing {required}")
 
 attack_text = (ROOT / "src/server/combat/AttackService.luau").read_text(encoding="utf-8")
 dummy_text = (ROOT / "src/server/dev/TrainingDummyService.luau").read_text(encoding="utf-8")
@@ -222,11 +225,18 @@ template_text = template_module.read_text(encoding="utf-8") if template_module.i
 for required in ["AssetService:LoadAssetAsync", "ImportedRig", "AnimationController", "Game1CharacterRig", "CharacterTemplate.EnsureCanonicalRoot"]:
     if required not in plugin_text:
         err(f"game1 Studio character bridge missing {required}")
-for required in ["resolveSkeletonUp", "spineRank", "isFootBone", "PivotTo", "ImportedRigRootWeld", "Game1GeneratedCharacterRoot"]:
+for required in ["ImportedRigRootWeld", "Game1GeneratedCharacterRoot", "Game1TemplateBasisMode", "Game1RigBasisMode", "authored_basis"]:
     if required not in template_text:
         err(f"game1 Studio character template module missing {required}")
-if "CFrame.Angles(0, 0, math.rad(90))" in template_text or "CFrame.Angles(math.rad(90)" in template_text:
-    err("character template orientation must be skeleton-derived, not a hard-coded 90-degree fix")
+for forbidden in [
+    "normalizeSkeletonOrientation",
+    "resolveSkeletonUp",
+    "head_to_feet",
+    "spine_to_feet",
+    "importedRig:PivotTo(",
+]:
+    if forbidden in template_text:
+        err(f"Studio rig sync must preserve authored FBX basis; forbidden orientation correction remains: {forbidden}")
 if 'BRIDGE_URL = "http://127.0.0.1:43137"' not in plugin_text:
     err("game1 Studio bridge must use isolated port 43137")
 plugin_project = ROOT / "system/studio-plugin/plugin.project.json"
@@ -279,6 +289,13 @@ if 'id="race"' not in ui or 'id="gender"' not in ui or 'id="publish-character"' 
     err("character asset manager race/gender/publication controls are missing")
 if 'id="character-model-source"' in ui:
     err("character edit UI must not reassign/reuse another archetype's existing Roblox model asset id")
+character_js_text = js.read_text(encoding="utf-8") if js.is_file() else ""
+for required in ['id="animation-folder-path"', 'id="choose-animation-folder"', 'id="scan-animations"']:
+    if required not in ui:
+        err(f"character animation folder explorer missing {required}")
+for required in ["ANIMATION_FOLDER_KEY", "initAnimationFolderExplorer", "initialPath", "localStorage.setItem(ANIMATION_FOLDER_KEY"]:
+    if required not in character_js_text:
+        err(f"character animation folder persistence missing {required}")
 if "/replace-model" not in host_agent_text:
     err("character edit UI needs an explicit replace-model endpoint")
 
@@ -546,13 +563,20 @@ if 'character:GetAttribute("AttackSpeed")' not in attack_controller_text:
 
 if 'id="nav-weapons"' not in ui or 'id="register-weapon"' not in ui or 'id="weapon-stat-attack-speed"' not in ui:
     err("asset manager weapon registration section is missing")
+if 'id="weapon-attack-radius"' not in ui:
+    err("weapon registration must expose attack radius in studs")
 if 'id="weapon-test-loadout"' in ui or 'id="save-weapon-test-loadout"' in ui:
     err("studio test loadout must not live in the web asset manager")
 weapon_js_path = ROOT / "system/control-center/static/weapon-assets.js"
 weapon_js_text = weapon_js_path.read_text(encoding="utf-8") if weapon_js_path.is_file() else ""
-for required in ["weaponSlugify", "weaponRegister", "weaponPublish", "weaponSync", "weaponActivate"]:
+for required in ["weaponSlugify", "weaponRegister", "weaponPublish", "weaponSync", "weaponActivate", "attackRadiusStuds", "weapon-attack-radius"]:
     if required not in weapon_js_text:
         err(f"asset manager weapon ui missing {required}")
+for required in ["attack_radius_studs", "ATTACK_RADIUS_DEFAULT", "attackRadiusStuds"]:
+    if required not in weapon_store_text:
+        err(f"weapon attack-radius storage contract missing {required}")
+if "attack_radius_studs real not null default 7" not in schema_text.lower():
+    err("weapon schema is missing attack_radius_studs")
 if "weaponSaveTestLoadout" in weapon_js_text:
     err("obsolete asset-manager test loadout javascript is still present")
 
@@ -578,6 +602,12 @@ if "legacy-pivot" in weapon_equip_text or "weapon:PivotTo(socketFrame)" in weapo
     err("weapon equip must not keep a legacy Model-pivot alignment path")
 if "weapon:PivotTo(socketFrame)" in weapon_attach_text:
     err("client weapon attachment must not keep a legacy Model-pivot alignment path")
+for required in ['character:SetAttribute("AttackRadius"', "attackRadiusStuds", "AttackConfig.MaxAimDistance"]:
+    if required not in weapon_equip_text:
+        err(f"weapon equip attack-radius runtime missing {required}")
+for required in ['character:GetAttribute("AttackRadius")', "attackRange", "attackBoxSize"]:
+    if required not in attack_text:
+        err(f"server-authoritative weapon attack radius missing {required}")
 
 # m6.2 Studio-native Test Loadout (ported from the reference architecture)
 test_loadout_server_path = ROOT / "src/server/dev/TestLoadoutService.luau"
@@ -590,6 +620,11 @@ for required in ["GetTestLoadoutCatalog", "ApplyTestLoadout", "CharacterService.
 for required in ["TEST LOADOUT", "createDropdown", "createCategorySelector", "LastLoadoutArchetype", "LastLoadoutWeaponSlug", "ACCEPT LOADOUT", "RunService:IsStudio()"]:
     if required not in test_loadout_client:
         err(f"Studio Test Loadout client missing {required}")
+for required in ["ATTACK RADIUS: OFF", "Game1AttackRadiusPreview", "createAttackRadiusRing", 'currentCharacter:GetAttribute("AttackRadius")', "RunService.RenderStepped"]:
+    if required not in test_loadout_client:
+        err(f"Studio Test Loadout attack-radius preview missing {required}")
+if "attackRadiusStuds" not in test_loadout_server:
+    err("Studio Test Loadout catalog must expose the registered weapon attack radius")
 server_init_text = (ROOT / "src/server/init.server.luau").read_text(encoding="utf-8")
 if "TestLoadoutService.Start()" not in server_init_text:
     err("Studio Test Loadout service is not started by the server runtime")
@@ -601,13 +636,195 @@ for required in ["Game1StudioDebugPreferences_v1", "Game1StudioPreferences", "pl
 if (ROOT / "src/shared/dev/TestLoadoutConfig.luau").exists():
     err("obsolete generated TestLoadoutConfig must be removed")
 
+
+# m7 monster registry / animation / character life + critical contract
+monster_manifest_path = ROOT / "assets/manifests/monsters.json"
+if not monster_manifest_path.is_file():
+    err(r"monster manifest is missing; run python .\system\control-center\migrate.py")
+    monster_manifest = {}
+else:
+    monster_manifest = json.loads(monster_manifest_path.read_text(encoding="utf-8"))
+if monster_manifest.get("schemaVersion") != 1 or monster_manifest.get("project") != "game1":
+    err("monster manifest must be game1 schema 1")
+monster_options = monster_manifest.get("options") or {}
+if monster_options.get("statKeys") != ["MaxHP", "Damage", "AttackSpeed", "RunSpeed", "CritChance"]:
+    err("monster stat keys must be HP, attack, attack speed, run speed and crit chance")
+
+monster_store_path = ROOT / "system/control-center/monster_store.py"
+monster_store_text = monster_store_path.read_text(encoding="utf-8") if monster_store_path.is_file() else ""
+for required in [
+    "class MonsterStore",
+    'STAT_KEYS = ("MaxHP", "Damage", "AttackSpeed", "RunSpeed", "CritChance")',
+    "analyze_character_fbx",
+    "prepare_character_publication_fbx",
+    "create_model_asset",
+    "update_model_asset",
+    "create_image_asset",
+    "update_image_asset",
+    'src/shared/monster/MonsterRegistry.luau',
+]:
+    if required not in monster_store_text:
+        err(f"monster store missing {required}")
+for required in ["monsters", "monster_textures", "monster_stats", "monster_publications"]:
+    if required not in schema_text:
+        err(f"control center schema missing {required}")
+
+monster_registry_path = ROOT / "src/shared/monster/MonsterRegistry.luau"
+monster_registry_text = monster_registry_path.read_text(encoding="utf-8") if monster_registry_path.is_file() else ""
+if "monsters = table.freeze" not in monster_registry_text:
+    err("generated monster registry is missing")
+
+monster_animation_manifest_path = ROOT / "assets/manifests/monster-animations.json"
+if not monster_animation_manifest_path.is_file():
+    err(r"monster animation manifest is missing; run python .\system\control-center\migrate.py")
+    monster_animation_manifest = {}
+else:
+    monster_animation_manifest = json.loads(monster_animation_manifest_path.read_text(encoding="utf-8"))
+if monster_animation_manifest.get("schemaVersion") != 1 or monster_animation_manifest.get("project") != "game1":
+    err("monster animation manifest must be game1 schema 1")
+monster_slot_catalog = monster_animation_manifest.get("slotCatalog") or []
+monster_slots = [row.get("slot") for row in monster_slot_catalog]
+if monster_slots != ["idle", "idle_special", "walk", "run", "combat_idle", "attack", "death"]:
+    err("monster animation storage slots must use combat_idle and must not expose attack_wait")
+monster_states = [row.get("state") for row in monster_slot_catalog]
+if monster_states != ["idle", "idle", "walk", "run", "combat_idle", "attack", "death"]:
+    err("monster idle_special must stay inside idle and combat waiting must be combat_idle")
+monster_assets_js_path = ROOT / "system/control-center/static/monster-assets.js"
+monster_assets_js_text = monster_assets_js_path.read_text(encoding="utf-8") if monster_assets_js_path.is_file() else ""
+monster_index_text = (ROOT / "system/control-center/static/index.html").read_text(encoding="utf-8")
+for required in ["animationMonster", "monster-animation-monster", "monsterSelectAnimationTarget", "MONSTER_ANIMATION_TARGET_KEY"]:
+    if required not in monster_assets_js_text and required not in monster_index_text:
+        err(f"monster animation UI missing explicit target selector contract: {required}")
+if "semantic monster profile" in monster_index_text:
+    err("monster animation UI must not expose obsolete semantic monster profile jargon")
+
+monster_animation_store_path = ROOT / "system/control-center/monster_animation_store.py"
+monster_animation_store_text = monster_animation_store_path.read_text(encoding="utf-8") if monster_animation_store_path.is_file() else ""
+for required in [
+    "class MonsterAnimationStore", "def scan_folder", "def assign_file", "def publish_missing",
+    '"slot": "idle"', '"slot": "idle_special"', '"state": "idle"', '"role": "special"', '"slot": "combat_idle"', '"variants": True', "canonicalFilename",
+    '"sourceSlot": internal_slot', 'profile["slots"].setdefault(state', 'src/shared/monster/MonsterAnimationRegistry.luau',
+]:
+    if required not in monster_animation_store_text:
+        err(f"monster animation store missing {required}")
+for required in ["monster_animation_profiles", "monster_animation_clips", "monster_animation_bindings", "monster_animation_publications"]:
+    if required not in schema_text:
+        err(f"control center schema missing {required}")
+monster_animation_registry_path = ROOT / "src/shared/monster/MonsterAnimationRegistry.luau"
+monster_animation_registry_text = monster_animation_registry_path.read_text(encoding="utf-8") if monster_animation_registry_path.is_file() else ""
+if "profiles = table.freeze" not in monster_animation_registry_text:
+    err("generated monster animation registry is missing")
+
+monster_js_path = ROOT / "system/control-center/static/monster-assets.js"
+monster_js_text = monster_js_path.read_text(encoding="utf-8") if monster_js_path.is_file() else ""
+for required in ['id="nav-monsters"', 'id="monsters-view"', 'id="register-monster"', 'id="monster-stat-hp"', 'id="monster-stat-damage"', 'id="monster-stat-attack-speed"', 'id="monster-stat-run-speed"', 'id="monster-stat-crit-chance"', 'id="monster-animation-filename-guide"']:
+    if required not in ui:
+        err(f"asset manager monster UI missing {required}")
+for required in ["monsterRegister", "monsterPublish", "monsterSync", "monsterScanAnimations", "monsterPublishMissingAnimations", "MONSTER_FILENAME_GUIDE_KEY", "MONSTER_ANIMATION_FOLDER_KEY", "initMonsterAnimationFolderExplorer", "row.state||row.slot", "rule.state"]:
+    if required not in monster_js_text:
+        err(f"asset manager monster javascript missing {required}")
+for required in ['id="monster-animation-folder-path"', 'id="choose-monster-animation-folder"', 'id="scan-monster-animations"']:
+    if required not in ui:
+        err(f"monster animation folder explorer missing {required}")
+for required in ["GAME1_ANIMATION_PICKER_INITIAL_PATH", "choose_animation_folder(initial_path", '"initialPath"']:
+    if required not in host_agent_text:
+        err(f"host agent animation folder explorer missing {required}")
+for required in ["MonsterStore", "MonsterAnimationStore", "sync_monster_to_studio", 'placement_mode="monster-rig"', '"/api/monsters"', '"/api/monster-animations"']:
+    if required not in host_agent_text:
+        err(f"host agent monster API missing {required}")
+for required in ["monster-rig", "placeMonsterRig", "Game1MonsterRig", "MonsterSlug", "applyWeaponTextures(importedRig"]:
+    if required not in plugin_text:
+        err(f"studio bridge monster-rig placement missing {required}")
+
+# m7 monster spawn authoring/runtime contract
+monster_spawn_manifest_path = ROOT / "assets/manifests/monster-spawns.json"
+if not monster_spawn_manifest_path.is_file():
+    err("monster spawn manifest is missing")
+    monster_spawn_manifest = {}
+else:
+    monster_spawn_manifest = json.loads(monster_spawn_manifest_path.read_text(encoding="utf-8"))
+if monster_spawn_manifest.get("schemaVersion") != 1 or monster_spawn_manifest.get("project") != "game1":
+    err("monster spawn manifest must be game1 schema 1")
+if not isinstance(monster_spawn_manifest.get("records"), dict):
+    err("monster spawn manifest records must be an object")
+
+spawn_store_path = ROOT / "system/control-center/monster_spawn_store.py"
+spawn_store_text = spawn_store_path.read_text(encoding="utf-8") if spawn_store_path.is_file() else ""
+for required in ["class MonsterSpawnStore", "respawnSeconds", "spawnRadius", "maxAlive", "monster_usage", "MonsterSpawnRegistry.luau"]:
+    if required not in spawn_store_text:
+        err(f"monster spawn store missing {required}")
+
+monster_spawn_js_path = ROOT / "system/control-center/static/monster-spawns.js"
+monster_spawn_js_text = monster_spawn_js_path.read_text(encoding="utf-8") if monster_spawn_js_path.is_file() else ""
+for required in ['id="monster-spawn-monster"', 'id="monster-spawn-place"', 'id="monster-spawn-register"', 'id="monster-spawn-radius"', 'id="monster-spawn-max-alive"']:
+    if required not in ui:
+        err(f"monster spawn UI missing {required}")
+for required in ["/api/monster-spawns/place", "/api/monster-spawns/register", "restore", "validate"]:
+    if required not in monster_spawn_js_text:
+        err(f"monster spawn UI javascript missing {required}")
+for required in ['"/api/monster-spawns"', '"/api/monster-spawns/place"', '"/api/monster-spawns/register"', "MonsterSpawnStore", "run_monster_spawn_bridge"]:
+    if required not in host_agent_text:
+        err(f"host agent monster spawn API missing {required}")
+for required in ["monster-spawn", "Game1MonsterSpawnMarker", "Game1Authoring", "MonsterSpawns", "monsterSpawnPlacementResult", "Selection:Set"]:
+    if required not in plugin_text:
+        err(f"Studio monster spawn authoring missing {required}")
+
+monster_spawner_path = ROOT / "src/server/monster/MonsterSpawnerService.luau"
+monster_spawner_text = monster_spawner_path.read_text(encoding="utf-8") if monster_spawner_path.is_file() else ""
+for required in ["MonsterSpawnRegistry", "MonsterRegistry", "MonsterAnimationRegistry", "spawnRadius", "maxAlive", "respawnSeconds", "math.sqrt", "Workspace:Raycast", "EntityHitboxService.Attach", 'GetAttributeChangedSignal("LifeState")', '== "Dead"', 'publishedRows(profile, "idle")', 'weightedIdleChoice', 'MonsterAnimationState', 'MonsterIdleVariant', 'idleTrack.DidLoop', 'choice.track.Ended', 'playBaseIdle']:
+    if required not in monster_spawner_text:
+        err(f"monster runtime spawner missing {required}")
+for required in ["HumanoidRootPart", 'Instance.new("Humanoid")', "humanoid:MoveTo", "MoveToFinished", "WANDER_PAUSE_MIN_SECONDS", "WANDER_PAUSE_MAX_SECONDS", "WANDER_MOVE_REFRESH_SECONDS", "CharacterMovementConfig.ResolveSpeed", 'firstPublishedTrack(profile, "walk")', "MonsterWanderEnabled"]:
+    if required not in monster_spawner_text:
+        err(f"monster random-wander runtime missing {required}")
+for required in ['VisualRootWeld', 'animatorFor(model, visual)', 'controller.Parent = visual']:
+    if required not in monster_spawner_text:
+        err(f"monster animated-navigation bridge missing {required}")
+if "Game1MonsterVisualWeld" in monster_spawner_text:
+    err("monster navigation must never rigid-weld every visual BasePart; weld only the rig root")
+for required in ['Workspace:FindFirstChild("Game1Authoring")', 'authoring:FindFirstChild("MonsterSpawns")', "monsterSpawns:Destroy()", "removeAuthoringVisualsFromSimulation"]:
+    if required not in monster_spawner_text:
+        err(f"Play/Run monster-spawn authoring-visual cleanup missing {required}")
+if "RunService.Heartbeat" in monster_spawner_text:
+    err("monster spawn/wander runtime must not use a permanent Heartbeat loop")
+if "MonsterSpawnerService.Start()" not in server_init_text:
+    err("monster spawner is not started by the server runtime")
+
+if "unicodedata.normalize" not in monster_store_text or "CYRILLIC_SLUG_MAP" not in monster_store_text:
+    err("monster slug generation must normalize/transliterate English-name input robustly")
+if "normalize('NFKD')" not in monster_js_text:
+    err("monster slug preview must normalize unicode names")
+
+for required in ["CritChance = 0"]:
+    if required not in stats_config_text:
+        err(f"character critical stat missing {required}")
+if 'setBase(character, "CritChance", d.CritChance)' not in stats_service_text:
+    err("character critical chance is not initialized")
+for required in ['"slot": "death"', '"slot": "death_wait"', '"slot": "revive"']:
+    if required not in animation_store_text:
+        err(f"character life animation catalog missing {required}")
+if '"slot": "equip"' in animation_store_text or '"slot": "unequip"' in animation_store_text:
+    err("character animation catalog must not expose equip/unequip states")
+character_animation_manifest_path = ROOT / "assets/manifests/character-animations.json"
+if character_animation_manifest_path.is_file():
+    character_animation_manifest = json.loads(character_animation_manifest_path.read_text(encoding="utf-8"))
+    obsolete_character_bindings = [
+        row for row in (character_animation_manifest.get("bindings") or [])
+        if str(row.get("slot") or "") in {"equip", "unequip"}
+    ]
+    if obsolete_character_bindings:
+        err("character animation manifest still contains equip/unequip bindings")
+for required in ['return "death_wait"', 'playBaseLifeAction("death"', 'playBaseLifeAction("revive"', 'GetAttributeChangedSignal("LifeState")']:
+    if required not in controller_runtime:
+        err(f"character life animation runtime missing {required}")
+
 if errors:
     print("verify failed")
     for item in errors:
         print(" -", item)
     sys.exit(1)
 
-print("verify ok · game1 m6.2 archetype safety + Studio-native test loadout contracts passed")
+print("verify ok · game1 m7 monster articulated wander + animation host isolation contracts passed")
 print("registered character archetypes:", len(archetypes))
 print("active character archetype:", active_id or "none")
 print("race pool: human")

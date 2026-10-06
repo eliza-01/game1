@@ -1,0 +1,449 @@
+diff --git a/assets/manifests/monster-animations.json b/assets/manifests/monster-animations.json
+index 4930bb3..8456f6c 100644
+--- a/assets/manifests/monster-animations.json
++++ b/assets/manifests/monster-animations.json
+@@ -5,7 +5,9 @@
+     {
+       "group": "stance",
+       "slot": "idle",
+-      "label": "idle",
++      "state": "idle",
++      "role": "base",
++      "label": "idle · base",
+       "looped": true,
+       "priority": "Idle",
+       "variants": false
+@@ -13,14 +15,18 @@
+     {
+       "group": "stance",
+       "slot": "idle_special",
+-      "label": "idle special",
++      "state": "idle",
++      "role": "special",
++      "label": "idle · special",
+       "looped": false,
+-      "priority": "Action",
++      "priority": "Idle",
+       "variants": true
+     },
+     {
+       "group": "movement",
+       "slot": "walk",
++      "state": "walk",
++      "role": "base",
+       "label": "walk",
+       "looped": true,
+       "priority": "Movement",
+@@ -29,6 +35,8 @@
+     {
+       "group": "movement",
+       "slot": "run",
++      "state": "run",
++      "role": "base",
+       "label": "run",
+       "looped": true,
+       "priority": "Movement",
+@@ -37,6 +45,8 @@
+     {
+       "group": "combat",
+       "slot": "attack",
++      "state": "attack",
++      "role": "variant",
+       "label": "attack",
+       "looped": false,
+       "priority": "Action",
+@@ -45,6 +55,8 @@
+     {
+       "group": "combat",
+       "slot": "attack_wait",
++      "state": "attack_wait",
++      "role": "base",
+       "label": "attack wait",
+       "looped": true,
+       "priority": "Idle",
+@@ -53,6 +65,8 @@
+     {
+       "group": "life",
+       "slot": "death",
++      "state": "death",
++      "role": "base",
+       "label": "death",
+       "looped": false,
+       "priority": "Action",
+diff --git a/src/server/monster/MonsterSpawnerService.luau b/src/server/monster/MonsterSpawnerService.luau
+index 7f6002d..7a1445a 100644
+--- a/src/server/monster/MonsterSpawnerService.luau
++++ b/src/server/monster/MonsterSpawnerService.luau
+@@ -70,18 +70,23 @@ local function animationProfile(slug: string): any?
+     return profiles and profiles[slug] or nil
+ end
+ 
+-local function firstPublishedTrack(profile: any?, slot: string): any?
++local function publishedRows(profile: any?, slot: string): {any}
+     local slots = profile and profile.slots
+     local rows = slots and slots[slot]
+     if typeof(rows) ~= "table" then
+-        return nil
++        return {}
+     end
++    local result = {}
+     for _, row in ipairs(rows) do
+         if tostring(row.animationId or ""):match("^rbxassetid://%d+$") then
+-            return row
++            table.insert(result, row)
+         end
+     end
+-    return nil
++    return result
++end
++
++local function firstPublishedTrack(profile: any?, slot: string): any?
++    return publishedRows(profile, slot)[1]
+ end
+ 
+ local function animatorFor(model: Model): Animator?
+@@ -148,6 +153,80 @@ local function stopTrack(track: AnimationTrack?)
+     end)
+ end
+ 
++local function idleRole(row: any): string
++    local role = tostring(row.role or "")
++    if role ~= "" then
++        return role
++    end
++    if tostring(row.sourceSlot or "") == "idle_special" or finite(row.variant, 0) > 0 then
++        return "special"
++    end
++    return "base"
++end
++
++local function weightedIdleChoice(choices: {any}): any?
++    local total = 0
++    for _, choice in ipairs(choices) do
++        total += math.max(1, finite(choice.row and choice.row.weight, 100))
++    end
++    if total <= 0 then
++        return nil
++    end
++    local roll = spawnRandom:NextNumber(0, total)
++    local cursor = 0
++    for _, choice in ipairs(choices) do
++        cursor += math.max(1, finite(choice.row and choice.row.weight, 100))
++        if roll <= cursor then
++            return choice
++        end
++    end
++    return choices[#choices]
++end
++
++local function stopIdleState(entry: any)
++    stopTrack(entry.idleTrack)
++    for _, choice in ipairs(entry.idleChoices or {}) do
++        if choice.role == "special" then
++            stopTrack(choice.track)
++        end
++    end
++    entry.activeIdleSpecial = nil
++end
++
++local function playBaseIdle(model: Model, entry: any)
++    if entry.dying then
++        return
++    end
++    model:SetAttribute("MonsterAnimationState", "idle")
++    model:SetAttribute("MonsterIdleVariant", "base")
++    if entry.idleTrack and not entry.idleTrack.IsPlaying then
++        pcall(function()
++            entry.idleTrack:Play(0.12)
++        end)
++    end
++end
++
++local function maybePlayIdleSpecial(model: Model, entry: any)
++    if entry.dying or entry.activeIdleSpecial ~= nil then
++        return
++    end
++    local choice = weightedIdleChoice(entry.idleChoices or {})
++    if not choice or choice.role ~= "special" then
++        return
++    end
++    entry.activeIdleSpecial = choice
++    stopTrack(entry.idleTrack)
++    model:SetAttribute("MonsterAnimationState", "idle")
++    model:SetAttribute("MonsterIdleVariant", ("special_%02d"):format(math.max(1, math.floor(finite(choice.row.variant, 1)))))
++    local ok = pcall(function()
++        choice.track:Play(0.08)
++    end)
++    if not ok then
++        entry.activeIdleSpecial = nil
++        playBaseIdle(model, entry)
++    end
++end
++
+ local function visibleBounds(model: Model): (CFrame, Vector3)
+     local minimum = Vector3.new(math.huge, math.huge, math.huge)
+     local maximum = Vector3.new(-math.huge, -math.huge, -math.huge)
+@@ -276,7 +355,7 @@ local function releaseInstance(state: any, model: Model, scheduleRespawn: boolea
+         return
+     end
+     state.instances[model] = nil
+-    stopTrack(entry.idleTrack)
++    stopIdleState(entry)
+     stopTrack(entry.deathTrack)
+     EntityHitboxService.Detach(model)
+     if model.Parent then
+@@ -299,7 +378,8 @@ local function beginDeath(state: any, model: Model, entry: any)
+     entry.dying = true
+     model:SetAttribute("Damageable", false)
+     model:SetAttribute("MonsterAnimationState", "death")
+-    stopTrack(entry.idleTrack)
++    model:SetAttribute("MonsterIdleVariant", nil)
++    stopIdleState(entry)
+     local track = entry.deathTrack
+     local holdSeconds = DEATH_FALLBACK_SECONDS
+     if track then
+@@ -352,16 +432,48 @@ local function spawnOne(state: any): Model?
+ 
+     local profile = animationProfile(slug)
+     local animator = animatorFor(model)
+-    local idleTrack = loadAnimationTrack(animator, firstPublishedTrack(profile, "idle"), true)
++    local idleTrack: AnimationTrack? = nil
++    local idleChoices = {}
++    for _, row in ipairs(publishedRows(profile, "idle")) do
++        local role = idleRole(row)
++        local track = loadAnimationTrack(animator, row, role == "base")
++        if track then
++            local choice = { row = row, track = track, role = role }
++            table.insert(idleChoices, choice)
++            if role == "base" and not idleTrack then
++                idleTrack = track
++            end
++        end
++    end
+     local deathTrack = loadAnimationTrack(animator, firstPublishedTrack(profile, "death"), false)
+-    local entry = { idleTrack = idleTrack, deathTrack = deathTrack, dying = false }
++    local entry = {
++        idleTrack = idleTrack,
++        idleChoices = idleChoices,
++        activeIdleSpecial = nil,
++        deathTrack = deathTrack,
++        dying = false,
++    }
+     state.instances[model] = entry
+-    model:SetAttribute("MonsterAnimationState", "idle")
++
++    for _, choice in ipairs(idleChoices) do
++        if choice.role == "special" then
++            choice.track.Ended:Connect(function()
++                if state.instances[model] ~= entry or entry.dying or entry.activeIdleSpecial ~= choice then
++                    return
++                end
++                entry.activeIdleSpecial = nil
++                playBaseIdle(model, entry)
++            end)
++        end
++    end
+     if idleTrack then
+-        pcall(function()
+-            idleTrack:Play(0.12)
++        idleTrack.DidLoop:Connect(function()
++            if state.instances[model] == entry then
++                maybePlayIdleSpecial(model, entry)
++            end
+         end)
+     end
++    playBaseIdle(model, entry)
+ 
+     model:GetAttributeChangedSignal("LifeState"):Connect(function()
+         if state.instances[model] ~= entry then
+diff --git a/src/shared/RuntimeVersion.luau b/src/shared/RuntimeVersion.luau
+index 263ea43..c2239aa 100644
+--- a/src/shared/RuntimeVersion.luau
++++ b/src/shared/RuntimeVersion.luau
+@@ -1 +1 @@
+-return table.freeze({ Version = "2026.10.06.004", SourceDigest = "game1-m7-monster-idle-states" })
++return table.freeze({ Version = "2026.10.06.005", SourceDigest = "game1-m7-monster-idle-special-in-idle" })
+diff --git a/system/control-center/monster_animation_store.py b/system/control-center/monster_animation_store.py
+index 0720150..8bc5518 100644
+--- a/system/control-center/monster_animation_store.py
++++ b/system/control-center/monster_animation_store.py
+@@ -15,13 +15,13 @@ PROJECT = "game1"
+ MAX_SCAN_FILES = 5000
+ ANIMATION_EXTENSIONS = {".rbxm", ".rbxmx"}
+ SLOT_CATALOG = [
+-    {"group": "stance", "slot": "idle", "label": "idle", "looped": True, "priority": "Idle", "variants": False},
+-    {"group": "stance", "slot": "idle_special", "label": "idle special", "looped": False, "priority": "Action", "variants": True},
+-    {"group": "movement", "slot": "walk", "label": "walk", "looped": True, "priority": "Movement", "variants": False},
+-    {"group": "movement", "slot": "run", "label": "run", "looped": True, "priority": "Movement", "variants": False},
+-    {"group": "combat", "slot": "attack", "label": "attack", "looped": False, "priority": "Action", "variants": True},
+-    {"group": "combat", "slot": "attack_wait", "label": "attack wait", "looped": True, "priority": "Idle", "variants": False},
+-    {"group": "life", "slot": "death", "label": "death", "looped": False, "priority": "Action", "variants": False},
++    {"group": "stance", "slot": "idle", "state": "idle", "role": "base", "label": "idle · base", "looped": True, "priority": "Idle", "variants": False},
++    {"group": "stance", "slot": "idle_special", "state": "idle", "role": "special", "label": "idle · special", "looped": False, "priority": "Idle", "variants": True},
++    {"group": "movement", "slot": "walk", "state": "walk", "role": "base", "label": "walk", "looped": True, "priority": "Movement", "variants": False},
++    {"group": "movement", "slot": "run", "state": "run", "role": "base", "label": "run", "looped": True, "priority": "Movement", "variants": False},
++    {"group": "combat", "slot": "attack", "state": "attack", "role": "variant", "label": "attack", "looped": False, "priority": "Action", "variants": True},
++    {"group": "combat", "slot": "attack_wait", "state": "attack_wait", "role": "base", "label": "attack wait", "looped": True, "priority": "Idle", "variants": False},
++    {"group": "life", "slot": "death", "state": "death", "role": "base", "label": "death", "looped": False, "priority": "Action", "variants": False},
+ ]
+ SLOT_BY_NAME = {row["slot"]: row for row in SLOT_CATALOG}
+ 
+@@ -91,7 +91,7 @@ def filename_rules(slug: str) -> list[dict]:
+         suffix = f"_{variant:02d}" if variant else ""
+         rows.append({
+             **definition,
+-            "state": definition["slot"],
++            "state": definition.get("state") or definition["slot"],
+             "variantPattern": "01..n" if definition.get("variants") else "",
+             "canonicalFilename": f"{prefix}_{definition['slot']}{suffix}.rbxm" if prefix else f"{definition['slot']}{suffix}.rbxm",
+         })
+@@ -359,6 +359,9 @@ class MonsterAnimationStore:
+         result = []
+         for row in rows:
+             value = dict(row)
++            definition = SLOT_BY_NAME.get(str(value.get("slot") or ""), {})
++            value["state"] = str(definition.get("state") or value.get("slot") or "")
++            value["role"] = str(definition.get("role") or "base")
+             value["status"] = self._status(value)
+             value["looped"] = bool(value.get("looped"))
+             result.append(value)
+@@ -472,10 +475,15 @@ class MonsterAnimationStore:
+             clip = clips_by_id.get(str(binding["clip_id"]))
+             if not clip:
+                 continue
++            internal_slot = str(binding["slot"])
++            definition = SLOT_BY_NAME.get(internal_slot, {})
++            state = str(definition.get("state") or internal_slot)
++            role = str(definition.get("role") or "base")
+             profile = profiles_map.setdefault(str(binding["monster_slug"]), {"skeletonSignature": "", "slots": {}})
+-            profile["slots"].setdefault(str(binding["slot"]), []).append({
++            profile["slots"].setdefault(state, []).append({
+                 "clipId": str(clip["id"]), "assetId": str(clip["asset_id"]), "animationId": "rbxassetid://" + str(clip["asset_id"]),
+-                "variant": int(binding["variant"]), "weight": int(binding["weight"]), "looped": bool(binding["looped"]), "priority": str(binding["priority"]),
++                "sourceSlot": internal_slot, "role": role, "variant": int(binding["variant"]), "weight": int(binding["weight"]),
++                "looped": bool(binding["looped"]), "priority": str(binding["priority"]),
+             })
+         for profile in profiles_map.values():
+             for rows in profile["slots"].values():
+@@ -493,6 +501,8 @@ class MonsterAnimationStore:
+                         f"\t\t\t\t\t\tclipId = {q(row['clipId'])},",
+                         f"\t\t\t\t\t\tassetId = {q(row['assetId'])},",
+                         f"\t\t\t\t\t\tanimationId = {q(row['animationId'])},",
++                        f"\t\t\t\t\t\tsourceSlot = {q(row['sourceSlot'])},",
++                        f"\t\t\t\t\t\trole = {q(row['role'])},",
+                         f"\t\t\t\t\t\tvariant = {row['variant']},",
+                         f"\t\t\t\t\t\tweight = {row['weight']},",
+                         f"\t\t\t\t\t\tlooped = {'true' if row['looped'] else 'false'},",
+diff --git a/system/control-center/static/index.html b/system/control-center/static/index.html
+index e1e0707..4ca0d20 100644
+--- a/system/control-center/static/index.html
++++ b/system/control-center/static/index.html
+@@ -188,7 +188,7 @@
+ <label>monster<select id="monster-animation-monster"></select><small class="hint">this is the monster whose animation files will be scanned, registered and published.</small></label>
+ <hr class="card-separator">
+ <h3 class="subheading">animation folder</h3>
+-<details id="monster-animation-filename-guide" class="naming-guide" open><summary>filename rules · monster states</summary><div id="monster-animation-filename-rules" class="filename-rules"><span class="muted">select a monster.</span></div><small class="hint">canonical names start with the monster slug, for example <code>orc_grunt_attack_01.rbxm</code>. attack supports <code>_01</code>, <code>_02</code>, ….</small></details>
++<details id="monster-animation-filename-guide" class="naming-guide" open><summary>filename rules · monster states</summary><div id="monster-animation-filename-rules" class="filename-rules"><span class="muted">select a monster.</span></div><small class="hint">canonical names start with the monster slug. <code>idle_special_01</code>, <code>idle_special_02</code>, … are variants inside the <code>idle</code> state; <code>attack_01</code>, <code>attack_02</code>, … are variants inside <code>attack</code>.</small></details>
+ <div class="picker folder-picker"><div class="folder-explorer"><input id="monster-animation-folder-path" type="text" autocomplete="off" spellcheck="false" placeholder="C:\path\to\monster-animations"><button id="choose-monster-animation-folder" type="button">explore…</button></div><small>paste a folder path or choose it in Explorer · the last monster animation folder is remembered</small></div>
+ <div class="actions"><button id="scan-monster-animations" class="primary wide" type="button" disabled>scan folder</button></div>
+ <div id="monster-animation-scan-status" class="status-box"><strong>nothing scanned yet</strong><span>unrecognized files can be assigned manually.</span></div>
+@@ -201,7 +201,7 @@
+ </div>
+ <div class="panel character-card">
+ <div class="section-title"><div><span>selected monster animations</span><h3 id="monster-animation-table-title">registered animations</h3></div></div>
+-<small class="hint">only animations already registered for the selected monster are listed here. scan the folder on the left to add matching files.</small>
++<small class="hint">only animations already registered for the selected monster are listed here. <code>idle_special_01..n</code> are shown as variants of state <code>idle</code>. weight is relative inside one state; after each base idle loop, base idle and special idle variants participate in the weighted choice.</small>
+ <div class="table-wrap animation-table-wrap"><table><thead><tr><th>state</th><th>variant</th><th>clip</th><th>asset</th><th>status</th><th>weight</th><th>actions</th></tr></thead><tbody id="monster-animation-rows"></tbody></table></div>
+ </div>
+ </div>
+@@ -242,7 +242,7 @@
+ <div id="toast" class="toast"></div>
+ <script src="character-assets.js?v=12"></script>
+ <script src="weapon-assets.js?v=3"></script>
+-<script src="monster-assets.js?v=2"></script>
++<script src="monster-assets.js?v=3"></script>
+ <script src="monster-spawns.js?v=1"></script>
+ </body>
+ </html>
+diff --git a/system/control-center/static/monster-assets.js b/system/control-center/static/monster-assets.js
+index 420c741..6f7eaa7 100644
+--- a/system/control-center/static/monster-assets.js
++++ b/system/control-center/static/monster-assets.js
+@@ -31,8 +31,8 @@ async function monsterRegister(){try{const row=monsterSelected();const nameEn=$(
+ async function monsterPublish(slug){try{toast('publishing monster model and changed textures…');await request('/api/monsters/'+encodeURIComponent(slug)+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:$('monster-publication-description').value})});await monsterLoad();toast('monster publication complete')}catch(error){toast(error.message,true)}}
+ async function monsterSync(slug){try{toast('syncing monster into serverstorage…');const result=await request('/api/monsters/'+encodeURIComponent(slug)+'/sync',{method:'POST'});await monsterLoad();toast(`studio synced: ${result.studio?.destination||slug}`)}catch(error){toast(error.message,true)}}
+ async function monsterDelete(slug){if(!confirm(`delete monster ${slug} and its animation profile from game1 registry? roblox cloud assets are not deleted.`))return;try{await request('/api/monsters/'+encodeURIComponent(slug),{method:'DELETE'});if(monsterState.selected===slug)monsterState.selected=null;if(monsterState.animationMonster===slug){monsterState.animationMonster=null;monsterRememberAnimationTarget(null);monsterState.animations=null}await monsterLoad();monsterSetForm(null);toast('monster registry row deleted')}catch(error){toast(error.message,true)}}
+-function monsterRenderFilenameRules(){const host=$('monster-animation-filename-rules');if(!host)return;const rules=monsterState.animations?.filenameRules||[];if(!rules.length){host.innerHTML='<span class="muted">select a monster.</span>';return}host.innerHTML=`<div class="filename-rule-group"><div class="filename-rule-context">MONSTER</div><div class="filename-rule-table"><div class="filename-rule-head"><span>state</span><span>canonical filename</span><span>variant</span></div>${rules.map(rule=>`<div class="filename-rule-row"><code>${esc(rule.label||rule.state)}</code><code>${esc(rule.canonicalFilename)}</code><span>${esc(rule.variantPattern||'—')}</span></div>`).join('')}</div></div>`}
+-function monsterRenderAnimationRows(){const body=$('monster-animation-rows');if(!body)return;body.innerHTML='';const rows=monsterState.animations?.items||[];if(!rows.length){body.innerHTML=`<tr><td colspan="7"><span class="muted">no registered animations for ${esc(monsterAnimationSelected()?.slug||'selected monster')}.</span></td></tr>`;return}for(const row of rows){const tr=document.createElement('tr');tr.innerHTML=`<td><b>${esc(row.slot)}</b></td><td>${row.variant?String(row.variant).padStart(2,'0'):'—'}</td><td>${esc(row.name)}</td><td>${esc(row.asset_id||'local')}</td><td>${monsterStatusTag(row.status)}</td><td><input class="weight-input" type="number" min="1" max="10000" value="${esc(row.weight)}"></td><td><div class="row-actions"><button data-publish>publish</button><button data-remove class="danger">remove</button></div></td>`;const weight=tr.querySelector('input');weight.onchange=()=>monsterSetAnimationWeight(row.binding_id,weight.value);tr.querySelector('[data-publish]').disabled=row.status==='PUBLISHED';tr.querySelector('[data-publish]').onclick=()=>monsterPublishAnimation(row.clip_id);tr.querySelector('[data-remove]').onclick=()=>monsterRemoveAnimation(row.binding_id);body.appendChild(tr)}}
++function monsterRenderFilenameRules(){const host=$('monster-animation-filename-rules');if(!host)return;const rules=monsterState.animations?.filenameRules||[];if(!rules.length){host.innerHTML='<span class="muted">select a monster.</span>';return}host.innerHTML=`<div class="filename-rule-group"><div class="filename-rule-context">MONSTER</div><div class="filename-rule-table"><div class="filename-rule-head"><span>state</span><span>canonical filename</span><span>variant</span></div>${rules.map(rule=>`<div class="filename-rule-row"><code>${esc(rule.state)}</code><code>${esc(rule.canonicalFilename)}</code><span>${esc(rule.variantPattern||'—')}</span></div>`).join('')}</div></div>`}
++function monsterRenderAnimationRows(){const body=$('monster-animation-rows');if(!body)return;body.innerHTML='';const rows=monsterState.animations?.items||[];if(!rows.length){body.innerHTML=`<tr><td colspan="7"><span class="muted">no registered animations for ${esc(monsterAnimationSelected()?.slug||'selected monster')}.</span></td></tr>`;return}for(const row of rows){const tr=document.createElement('tr');tr.innerHTML=`<td><b>${esc(row.state||row.slot)}</b></td><td>${row.variant?String(row.variant).padStart(2,'0'):'—'}</td><td>${esc(row.name)}</td><td>${esc(row.asset_id||'local')}</td><td>${monsterStatusTag(row.status)}</td><td><input class="weight-input" type="number" min="1" max="10000" value="${esc(row.weight)}"></td><td><div class="row-actions"><button data-publish>publish</button><button data-remove class="danger">remove</button></div></td>`;const weight=tr.querySelector('input');weight.onchange=()=>monsterSetAnimationWeight(row.binding_id,weight.value);tr.querySelector('[data-publish]').disabled=row.status==='PUBLISHED';tr.querySelector('[data-publish]').onclick=()=>monsterPublishAnimation(row.clip_id);tr.querySelector('[data-remove]').onclick=()=>monsterRemoveAnimation(row.binding_id);body.appendChild(tr)}}
+ function monsterRenderUnassigned(){const host=$('monster-animation-unassigned');if(!host)return;const rows=monsterState.lastScan?.unassigned||[];if(!rows.length){host.innerHTML='';return}const defs=monsterState.animations?.slotCatalog||[];host.innerHTML=`<details open><summary>unassigned files · ${rows.length} · assign manually</summary><div class="unassigned-list">${rows.slice(0,100).map((row,index)=>`<div class="unassigned-row monster-unassigned-row" data-monster-unassigned="${index}"><div class="unassigned-file"><b>${esc(row.filename)}</b><small>${esc(row.reason)}</small></div><label>state<select data-slot>${defs.map(def=>`<option value="${esc(def.slot)}">${esc(def.label||def.slot)}</option>`).join('')}</select></label><label>variant<input data-variant type="number" min="0" max="999" value="0"></label><button data-assign class="primary" type="button">assign</button></div>`).join('')}</div></details>`;for(const node of host.querySelectorAll('[data-monster-unassigned]')){const row=rows[Number(node.dataset.monsterUnassigned)];const slot=node.querySelector('[data-slot]'),variant=node.querySelector('[data-variant]');const update=()=>{const def=defs.find(x=>x.slot===slot.value);variant.disabled=!def?.variants;if(def?.variants&&Number(variant.value)<=0)variant.value='1';if(!def?.variants)variant.value='0'};slot.onchange=update;update();node.querySelector('[data-assign]').onclick=()=>monsterAssignAnimation(row,node)}}
+ function monsterRenderAnimations(){monsterRenderAnimationTarget();monsterRenderAnimationFolderControls();const data=monsterState.animations;if(!data)return;monsterRenderFilenameRules();monsterRenderAnimationRows();monsterRenderUnassigned();const selected=monsterAnimationSelected();$('monster-animation-profile-state').className='runtime-state '+(selected&&data.skeletonCompatible?'registered':'bootstrap');$('monster-animation-profile-state').innerHTML=selected?`<strong>animations · ${esc(selected.name_en)} · ${esc(selected.slug)}</strong><span>${data.skeletonCompatible?'skeleton compatible':'skeleton changed'} · ${esc(data.profile?.skeleton_signature||'no skeleton signature')}</span>`:'<strong>no monster selected</strong><span>choose a registered monster below.</span>';$('publish-missing-monster-animations').disabled=monsterState.animationPublishing||!selected||!data.publication?.configured||!(data.items||[]).some(row=>row.status==='LOCAL_ONLY');$('monster-animation-table-title').textContent=`${selected?.slug||'monster'} · registered animations`;monsterRenderAnimationFolderControls()}
+ async function monsterLoadAnimations(){try{monsterEnsureAnimationTarget();const slug=monsterState.animationMonster||'';monsterState.animations=await request('/api/monster-animations?monster='+encodeURIComponent(slug));const profileRoot=monsterNormalizeAnimationFolderPath(monsterState.animations.profile?.scan_root||'');if(!monsterState.animationFolder&&profileRoot)monsterSetAnimationFolder(profileRoot,true);monsterRenderAnimations()}catch(error){toast(error.message,true)}}
+@@ -40,7 +40,7 @@ async function monsterChooseAnimationFolder(){try{monsterSetAnimationFolder($('m
+ async function monsterScanAnimations(){try{monsterSetAnimationFolder($('monster-animation-folder-path').value,true);if(!monsterState.animationMonster)throw Error('choose a monster in the monster animations section');if(!monsterState.animationFolder)throw Error('choose or paste a monster animation folder');$('scan-monster-animations').disabled=true;monsterState.lastScan=await request('/api/monster-animations/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({monsterSlug:monsterState.animationMonster,rootPath:monsterState.animationFolder})});await monsterLoadAnimations();$('monster-animation-scan-status').innerHTML=`<strong>scan complete · ${monsterState.lastScan.recognized}/${monsterState.lastScan.filesScanned} recognized</strong><span>${monsterState.lastScan.created} new · ${monsterState.lastScan.changed} changed · ${monsterState.lastScan.unchanged} unchanged · ${monsterState.lastScan.unassigned.length} unassigned</span>`;monsterRenderUnassigned();toast(`registered ${monsterState.lastScan.recognized} monster animation clips`)}catch(error){toast(error.message,true)}finally{monsterRenderAnimations()}}
+ async function monsterAssignAnimation(row,node){try{const slot=node.querySelector('[data-slot]').value,variant=Number(node.querySelector('[data-variant]').value||0);await request('/api/monster-animations/assign',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({monsterSlug:monsterState.animationMonster,sourcePath:row.path,slot,variant})});monsterState.lastScan.unassigned=(monsterState.lastScan.unassigned||[]).filter(item=>item.path!==row.path);await monsterLoadAnimations();monsterRenderUnassigned();toast(`assigned ${row.filename} → ${slot}`)}catch(error){toast(error.message,true)}}
+ async function monsterPublishAnimation(clipId){try{await request('/api/monster-animations/'+encodeURIComponent(clipId)+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:$('monster-animation-publication-description').value})});await monsterLoadAnimations();toast('monster animation published')}catch(error){toast(error.message,true)}}
+-async function monsterPublishMissingAnimations(){if(monsterState.animationPublishing)return;let published=0;try{const queue=(monsterState.animations?.items||[]).filter(row=>row.status==='LOCAL_ONLY');if(!queue.length)return;monsterState.animationPublishing=true;monsterRenderAnimations();const host=$('monster-animation-publish-progress'),bar=$('monster-animation-publish-bar'),count=$('monster-animation-publish-count'),current=$('monster-animation-publish-current');host.hidden=false;bar.max=queue.length;bar.value=0;for(let index=0;index<queue.length;index++){const row=queue[index];current.textContent=`${row.name} · ${row.slot}`;count.textContent=`${index} / ${queue.length}`;await request('/api/monster-animations/'+encodeURIComponent(row.clip_id)+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:$('monster-animation-publication-description').value})});published=index+1;bar.value=published;count.textContent=`${published} / ${queue.length}`;}current.textContent='publication queue complete';toast(`published ${published} monster animation assets`)}catch(error){toast(`published ${published}; stopped: ${error.message}`,true)}finally{monsterState.animationPublishing=false;await monsterLoadAnimations();monsterRenderAnimations()}}
++async function monsterPublishMissingAnimations(){if(monsterState.animationPublishing)return;let published=0;try{const queue=(monsterState.animations?.items||[]).filter(row=>row.status==='LOCAL_ONLY');if(!queue.length)return;monsterState.animationPublishing=true;monsterRenderAnimations();const host=$('monster-animation-publish-progress'),bar=$('monster-animation-publish-bar'),count=$('monster-animation-publish-count'),current=$('monster-animation-publish-current');host.hidden=false;bar.max=queue.length;bar.value=0;for(let index=0;index<queue.length;index++){const row=queue[index];current.textContent=`${row.name} · ${row.state||row.slot}`;count.textContent=`${index} / ${queue.length}`;await request('/api/monster-animations/'+encodeURIComponent(row.clip_id)+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:$('monster-animation-publication-description').value})});published=index+1;bar.value=published;count.textContent=`${published} / ${queue.length}`;}current.textContent='publication queue complete';toast(`published ${published} monster animation assets`)}catch(error){toast(`published ${published}; stopped: ${error.message}`,true)}finally{monsterState.animationPublishing=false;await monsterLoadAnimations();monsterRenderAnimations()}}
+ async function monsterSetAnimationWeight(bindingId,weight){try{monsterState.animations=await request('/api/monster-animation-bindings/'+encodeURIComponent(bindingId)+'/weight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({weight:Number(weight)})});monsterState.animations.publication=monsterState.data?.publication||{};monsterRenderAnimations()}catch(error){toast(error.message,true)}}
+ async function monsterRemoveAnimation(bindingId){if(!confirm('remove this monster animation binding? canonical source files are preserved.'))return;try{monsterState.animations=await request('/api/monster-animation-bindings/'+encodeURIComponent(bindingId),{method:'DELETE'});monsterState.animations.publication=monsterState.data?.publication||{};monsterRenderAnimations();toast('monster animation binding removed')}catch(error){toast(error.message,true)}}
+ function initMonsterFilenameDisclosure(){const guide=$('monster-animation-filename-guide');if(!guide)return;try{const saved=localStorage.getItem(MONSTER_FILENAME_GUIDE_KEY);if(saved!==null)guide.open=saved==='1'}catch{}guide.addEventListener('toggle',()=>{try{localStorage.setItem(MONSTER_FILENAME_GUIDE_KEY,guide.open?'1':'0')}catch{}})}
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index b524447..ccf9593 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -657,9 +657,13 @@ else:
+     monster_animation_manifest = json.loads(monster_animation_manifest_path.read_text(encoding="utf-8"))
+ if monster_animation_manifest.get("schemaVersion") != 1 or monster_animation_manifest.get("project") != "game1":
+     err("monster animation manifest must be game1 schema 1")
+-monster_slots = [row.get("slot") for row in (monster_animation_manifest.get("slotCatalog") or [])]
++monster_slot_catalog = monster_animation_manifest.get("slotCatalog") or []
++monster_slots = [row.get("slot") for row in monster_slot_catalog]
+ if monster_slots != ["idle", "idle_special", "walk", "run", "attack", "attack_wait", "death"]:
+-    err("monster animation states must be idle, idle_special, walk, run, attack, attack_wait, death")
++    err("monster animation storage slots must preserve idle/idle_special, movement, combat and death bindings")
++monster_states = [row.get("state") for row in monster_slot_catalog]
++if monster_states != ["idle", "idle", "walk", "run", "attack", "attack_wait", "death"]:
++    err("monster idle_special must be a variant inside the idle state")
+ monster_assets_js_path = ROOT / "system/control-center/static/monster-assets.js"
+ monster_assets_js_text = monster_assets_js_path.read_text(encoding="utf-8") if monster_assets_js_path.is_file() else ""
+ monster_index_text = (ROOT / "system/control-center/static/index.html").read_text(encoding="utf-8")
+@@ -673,8 +677,8 @@ monster_animation_store_path = ROOT / "system/control-center/monster_animation_s
+ monster_animation_store_text = monster_animation_store_path.read_text(encoding="utf-8") if monster_animation_store_path.is_file() else ""
+ for required in [
+     "class MonsterAnimationStore", "def scan_folder", "def assign_file", "def publish_missing",
+-    '"slot": "idle"', '"slot": "idle_special"', '"slot": "attack_wait"', '"variants": True', "canonicalFilename",
+-    'src/shared/monster/MonsterAnimationRegistry.luau',
++    '"slot": "idle"', '"slot": "idle_special"', '"state": "idle"', '"role": "special"', '"slot": "attack_wait"', '"variants": True', "canonicalFilename",
++    '"sourceSlot": internal_slot', 'profile["slots"].setdefault(state', 'src/shared/monster/MonsterAnimationRegistry.luau',
+ ]:
+     if required not in monster_animation_store_text:
+         err(f"monster animation store missing {required}")
+@@ -691,7 +695,7 @@ monster_js_text = monster_js_path.read_text(encoding="utf-8") if monster_js_path
+ for required in ['id="nav-monsters"', 'id="monsters-view"', 'id="register-monster"', 'id="monster-stat-hp"', 'id="monster-stat-damage"', 'id="monster-stat-attack-speed"', 'id="monster-stat-run-speed"', 'id="monster-stat-crit-chance"', 'id="monster-animation-filename-guide"']:
+     if required not in ui:
+         err(f"asset manager monster UI missing {required}")
+-for required in ["monsterRegister", "monsterPublish", "monsterSync", "monsterScanAnimations", "monsterPublishMissingAnimations", "MONSTER_FILENAME_GUIDE_KEY", "MONSTER_ANIMATION_FOLDER_KEY", "initMonsterAnimationFolderExplorer"]:
++for required in ["monsterRegister", "monsterPublish", "monsterSync", "monsterScanAnimations", "monsterPublishMissingAnimations", "MONSTER_FILENAME_GUIDE_KEY", "MONSTER_ANIMATION_FOLDER_KEY", "initMonsterAnimationFolderExplorer", "row.state||row.slot", "rule.state"]:
+     if required not in monster_js_text:
+         err(f"asset manager monster javascript missing {required}")
+ for required in ['id="monster-animation-folder-path"', 'id="choose-monster-animation-folder"', 'id="scan-monster-animations"']:
+@@ -742,7 +746,7 @@ for required in ["monster-spawn", "Game1MonsterSpawnMarker", "Game1Authoring", "
+ 
+ monster_spawner_path = ROOT / "src/server/monster/MonsterSpawnerService.luau"
+ monster_spawner_text = monster_spawner_path.read_text(encoding="utf-8") if monster_spawner_path.is_file() else ""
+-for required in ["MonsterSpawnRegistry", "MonsterRegistry", "MonsterAnimationRegistry", "spawnRadius", "maxAlive", "respawnSeconds", "math.sqrt", "Workspace:Raycast", "EntityHitboxService.Attach", 'GetAttributeChangedSignal("LifeState")', '== "Dead"', 'firstPublishedTrack(profile, "idle")', 'MonsterAnimationState', 'idleTrack:Play']:
++for required in ["MonsterSpawnRegistry", "MonsterRegistry", "MonsterAnimationRegistry", "spawnRadius", "maxAlive", "respawnSeconds", "math.sqrt", "Workspace:Raycast", "EntityHitboxService.Attach", 'GetAttributeChangedSignal("LifeState")', '== "Dead"', 'publishedRows(profile, "idle")', 'weightedIdleChoice', 'MonsterAnimationState', 'MonsterIdleVariant', 'idleTrack.DidLoop', 'choice.track.Ended', 'playBaseIdle']:
+     if required not in monster_spawner_text:
+         err(f"monster runtime spawner missing {required}")
+ if "RunService.Heartbeat" in monster_spawner_text:
+@@ -773,7 +777,7 @@ if errors:
+         print(" -", item)
+     sys.exit(1)
+ 
+-print("verify ok · game1 m7 monster idle/special-idle + assets + spawn + crit/life contracts passed")
++print("verify ok · game1 m7 monster idle-state variants + assets + spawn + crit/life contracts passed")
+ print("registered character archetypes:", len(archetypes))
+ print("active character archetype:", active_id or "none")
+ print("race pool: human")

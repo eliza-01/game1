@@ -1,0 +1,1020 @@
+diff --git a/assets/manifests/weapons.json b/assets/manifests/weapons.json
+index 09fecbf..7919350 100644
+--- a/assets/manifests/weapons.json
++++ b/assets/manifests/weapons.json
+@@ -19,7 +19,13 @@
+     "statKeys": [
+       "Damage",
+       "AttackSpeed"
+-    ]
++    ],
++    "attackRadius": {
++      "default": 7.0,
++      "min": 1.0,
++      "max": 420.0,
++      "step": 0.5
++    }
+   },
+   "items": [
+     {
+@@ -41,6 +47,7 @@
+       "grip_rot_x": 90.0,
+       "grip_rot_y": 0.0,
+       "grip_rot_z": 0.0,
++      "attack_radius_studs": 7.0,
+       "textures": [
+         {
+           "id": "newbie_axe__starter_axe_01",
+@@ -84,6 +91,7 @@
+       "grip_rot_x": 0.0,
+       "grip_rot_y": 0.0,
+       "grip_rot_z": 0.0,
++      "attack_radius_studs": 7.0,
+       "textures": [],
+       "stat_modifiers": {
+         "AttackSpeed": 100,
+diff --git a/src/client/dev/TestLoadoutController.luau b/src/client/dev/TestLoadoutController.luau
+index f7ddb4b..e535d33 100644
+--- a/src/client/dev/TestLoadoutController.luau
++++ b/src/client/dev/TestLoadoutController.luau
+@@ -2,13 +2,14 @@ local Players = game:GetService("Players")
+ local ReplicatedStorage = game:GetService("ReplicatedStorage")
+ local RunService = game:GetService("RunService")
+ local TweenService = game:GetService("TweenService")
++local Workspace = game:GetService("Workspace")
+ 
+ local TestLoadoutController = {}
+ local started = false
+ local player = Players.LocalPlayer
+ 
+ local PANEL_WIDTH = 320
+-local PANEL_EXPANDED_HEIGHT = 300
++local PANEL_EXPANDED_HEIGHT = 344
+ local PANEL_COLLAPSED_SIZE = 44
+ local PANEL_X = 16
+ local PANEL_Y = 150
+@@ -321,6 +322,36 @@ local function waitForPreferences(): Folder?
+     return if folder.Parent then folder else nil
+ end
+ 
++
++local function formatStuds(value: any): string
++    local numeric = tonumber(value) or 0
++    if math.abs(numeric - math.round(numeric)) < 0.001 then
++        return tostring(math.round(numeric))
++    end
++    return string.format("%.2f", numeric):gsub("0+$", ""):gsub("%.$", "")
++end
++
++local function createAttackRadiusRing()
++    local folder = Instance.new("Folder")
++    folder.Name = "Game1AttackRadiusPreview"
++    local parts = {}
++    for index = 1, 64 do
++        local part = Instance.new("Part")
++        part.Name = ("Segment%02d"):format(index)
++        part.Anchored = true
++        part.CanCollide = false
++        part.CanQuery = false
++        part.CanTouch = false
++        part.CastShadow = false
++        part.Material = Enum.Material.Neon
++        part.Color = COLORS.accent
++        part.Transparency = 0.18
++        part.Parent = folder
++        parts[index] = part
++    end
++    return folder, parts
++end
++
+ local function createGui()
+     local playerGui = player:WaitForChild("PlayerGui")
+     local previous = playerGui:FindFirstChild("Game1TestLoadoutGui")
+@@ -382,21 +413,27 @@ local function createGui()
+     meta.Position = UDim2.fromOffset(1, 172)
+     meta.Size = UDim2.new(1, -2, 0, 16)
+ 
++    local radiusToggle = button(body, "ATTACK RADIUS: OFF")
++    radiusToggle.Position = UDim2.fromOffset(0, 196)
++    radiusToggle.Size = UDim2.new(1, 0, 0, 28)
++    radiusToggle.TextSize = 10
++    radiusToggle.Font = Enum.Font.GothamSemibold
++
+     local statusDot = Instance.new("Frame")
+     statusDot.BackgroundColor3 = COLORS.muted
+     statusDot.BorderSizePixel = 0
+-    statusDot.Position = UDim2.fromOffset(2, 207)
++    statusDot.Position = UDim2.fromOffset(2, 241)
+     statusDot.Size = UDim2.fromOffset(6, 6)
+     statusDot.Parent = body
+     corner(statusDot, 3)
+ 
+     local status = textLabel(body, "Loading catalog…", 9, false)
+     status.TextColor3 = COLORS.muted
+-    status.Position = UDim2.fromOffset(14, 200)
++    status.Position = UDim2.fromOffset(14, 234)
+     status.Size = UDim2.new(1, -14, 0, 20)
+ 
+     local apply = button(body, "LOADING…")
+-    apply.Position = UDim2.fromOffset(0, 226)
++    apply.Position = UDim2.fromOffset(0, 260)
+     apply.Size = UDim2.new(1, 0, 0, 34)
+     apply.BackgroundColor3 = COLORS.disabled
+     apply.TextColor3 = COLORS.muted
+@@ -434,7 +471,7 @@ local function createGui()
+     end)
+     setCollapsed(playerGui:GetAttribute(DEBUG_PANEL_OPEN_ATTRIBUTE) ~= DEBUG_PANEL_ID)
+ 
+-    return gui, character, category, weapon, meta, apply, status, statusDot
++    return gui, character, category, weapon, meta, radiusToggle, apply, status, statusDot
+ end
+ 
+ function TestLoadoutController.Start()
+@@ -454,7 +491,7 @@ function TestLoadoutController.Start()
+             return
+         end
+ 
+-        local gui, characterDropdown, categorySelector, weaponDropdown, meta, applyButton, status, statusDot = createGui()
++        local gui, characterDropdown, categorySelector, weaponDropdown, meta, radiusToggle, applyButton, status, statusDot = createGui()
+         local catalog = catalogRemote:InvokeServer()
+         local weaponRows = catalog.weapons or {}
+         local weaponBySlug = {}
+@@ -497,6 +534,47 @@ function TestLoadoutController.Start()
+         local appliedWeaponSlug = initialWeapon
+         local applying = false
+ 
++        local ringFolder, ringParts = createAttackRadiusRing()
++        local ringVisible = false
++        local ringConnection: RBXScriptConnection? = nil
++        local rayParams = RaycastParams.new()
++        rayParams.FilterType = Enum.RaycastFilterType.Exclude
++        rayParams.IgnoreWater = false
++        rayParams.RespectCanCollide = true
++
++        local function setRingVisible(value: boolean)
++            ringVisible = value == true
++            radiusToggle.Text = ringVisible and "ATTACK RADIUS: ON" or "ATTACK RADIUS: OFF"
++            radiusToggle.BackgroundColor3 = ringVisible and COLORS.controlSelected or COLORS.control
++            radiusToggle.TextColor3 = ringVisible and COLORS.accent or COLORS.text
++            ringFolder.Parent = ringVisible and Workspace or nil
++        end
++
++        local function renderAttackRadiusRing()
++            if not ringVisible then return end
++            local currentCharacter = player.Character
++            local root = currentCharacter and currentCharacter:FindFirstChild("RootCollider")
++            if not root or not root:IsA("BasePart") then
++                for _, part in ipairs(ringParts) do part.Transparency = 1 end
++                return
++            end
++            local radius = math.max(1, tonumber(currentCharacter:GetAttribute("AttackRadius")) or 7)
++            rayParams.FilterDescendantsInstances = { currentCharacter }
++            local ground = Workspace:Raycast(root.Position, Vector3.new(0, -64, 0), rayParams)
++            local center = Vector3.new(root.Position.X, ground and (ground.Position.Y + 0.06) or (root.Position.Y - root.Size.Y * 0.5), root.Position.Z)
++            local chord = 2 * radius * math.sin(math.pi / #ringParts) + 0.04
++            for index, part in ipairs(ringParts) do
++                local angle = ((index - 0.5) / #ringParts) * math.pi * 2
++                local position = center + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
++                part.Size = Vector3.new(chord, 0.055, 0.10)
++                part.CFrame = CFrame.new(position) * CFrame.Angles(0, -angle - math.pi * 0.5, 0)
++                part.Transparency = 0.18
++            end
++        end
++        ringConnection = RunService.RenderStepped:Connect(renderAttackRadiusRing)
++        setRingVisible(false)
++        radiusToggle.Activated:Connect(function() setRingVisible(not ringVisible) end)
++
+         local function setStatus(message: string, color: Color3?)
+             status.Text = message
+             status.TextColor3 = color or COLORS.muted
+@@ -524,9 +602,9 @@ function TestLoadoutController.Start()
+         local function updateMeta()
+             local row = weaponBySlug[weaponDropdown.getValue()]
+             if not row or tostring(row.slug or "") == "" then
+-                meta.Text = "hands · unarmed"
++                meta.Text = string.format("hands · unarmed · radius %s studs", formatStuds(row and row.attackRadiusStuds or 7))
+             else
+-                meta.Text = string.format("%s · %s", tostring(row.weaponType or ""), tostring(row.rarity or ""))
++                meta.Text = string.format("%s · %s · radius %s studs", tostring(row.weaponType or ""), tostring(row.rarity or ""), formatStuds(row.attackRadiusStuds or 7))
+             end
+             renderApply()
+         end
+@@ -604,6 +682,8 @@ function TestLoadoutController.Start()
+ 
+         gui.Destroying:Connect(function()
+             preferences = nil
++            if ringConnection then ringConnection:Disconnect() end
++            ringFolder:Destroy()
+         end)
+     end)
+ end
+diff --git a/src/server/combat/AttackService.luau b/src/server/combat/AttackService.luau
+index 32db504..fd3554f 100644
+--- a/src/server/combat/AttackService.luau
++++ b/src/server/combat/AttackService.luau
+@@ -52,7 +52,8 @@ local function attack(player: Player, aim: any)
+         flat = root.CFrame.LookVector
+     end
+     local direction = flat.Unit
+-    local center = root.Position + direction * (Config.Range * 0.5)
++    local attackRange = math.clamp(tonumber(character:GetAttribute("AttackRadius")) or Config.Range, 1, Config.MaxAimDistance)
++    local center = root.Position + direction * (attackRange * 0.5)
+     local boxCf = CFrame.lookAt(center, center + direction)
+ 
+     local params = OverlapParams.new()
+@@ -61,7 +62,7 @@ local function attack(player: Player, aim: any)
+ 
+     local parts = Workspace:GetPartBoundsInBox(
+         boxCf,
+-        Vector3.new(Config.BoxWidth, Config.BoxHeight, Config.Range),
++        Vector3.new(Config.BoxWidth, Config.BoxHeight, attackRange),
+         params
+     )
+ 
+@@ -70,7 +71,7 @@ local function attack(player: Player, aim: any)
+     local bestZone = "root"
+     local bestBoneName = ""
+     local bestDistance = math.huge
+-    local attackBoxSize = Vector3.new(Config.BoxWidth, Config.BoxHeight, Config.Range)
++    local attackBoxSize = Vector3.new(Config.BoxWidth, Config.BoxHeight, attackRange)
+     for _, part in parts do
+         local model = modelFromPart(part)
+         if model and not seen[model] then
+@@ -81,7 +82,7 @@ local function attack(player: Player, aim: any)
+                 local virtualHit = EntityHitboxService.QueryBox(model, boxCf, attackBoxSize)
+                 local hasVirtualRig = EntityHitboxService.HasBinding(model)
+                 local intersectsTarget = if hasVirtualRig then virtualHit ~= nil else true
+-                if intersectsTarget and distance <= Config.Range + 1 and distance < bestDistance then
++                if intersectsTarget and distance <= attackRange + 1 and distance < bestDistance then
+                     best = model
+                     bestZone = tostring(virtualHit and virtualHit.hitZone or "root")
+                     bestBoneName = tostring(virtualHit and virtualHit.boneName or "")
+@@ -95,7 +96,7 @@ local function attack(player: Player, aim: any)
+ 
+     if not best then
+         if Config.DebugLogs then
+-            print(("[game1][attack] miss player=%s range=%.1f"):format(player.Name, Config.Range))
++            print(("[game1][attack] miss player=%s range=%.1f"):format(player.Name, attackRange))
+         end
+         return
+     end
+diff --git a/src/server/dev/TestLoadoutService.luau b/src/server/dev/TestLoadoutService.luau
+index e9273e2..fc560a7 100644
+--- a/src/server/dev/TestLoadoutService.luau
++++ b/src/server/dev/TestLoadoutService.luau
+@@ -4,6 +4,8 @@ local RunService = game:GetService("RunService")
+ 
+ local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
+ local CharacterShared = Shared:WaitForChild("character")
++local CombatShared = Shared:WaitForChild("combat")
++local AttackConfig = require(CombatShared:WaitForChild("AttackConfig"))
+ local CharacterRegistry = require(CharacterShared:WaitForChild("CharacterRegistry"))
+ 
+ local CharacterService = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CharacterService"))
+@@ -72,6 +74,7 @@ local function availableWeapons()
+             label = "Unarmed / Hands",
+             weaponType = "hands",
+             rarity = "",
++            attackRadiusStuds = AttackConfig.Range,
+             synthetic = true,
+         },
+     }
+@@ -86,6 +89,7 @@ local function availableWeapons()
+             label = label,
+             weaponType = tostring(row.weaponType or ""),
+             rarity = tostring(row.rarity or ""),
++            attackRadiusStuds = tonumber(row.attackRadiusStuds) or AttackConfig.Range,
+             synthetic = false,
+         })
+     end
+@@ -172,6 +176,7 @@ local function applyLoadout(player: Player, archetypeValue: any, weaponSlugValue
+         weaponSlug = weaponSlug,
+         weaponType = tostring(character:GetAttribute("EquippedWeaponType") or "hands"),
+         animationSet = tostring(character:GetAttribute("AnimationWeaponSet") or "hands"),
++        attackRadiusStuds = tonumber(character:GetAttribute("AttackRadius")) or AttackConfig.Range,
+     }
+ end
+ 
+diff --git a/src/server/monster/MonsterSpawnerService.luau b/src/server/monster/MonsterSpawnerService.luau
+index 7a1445a..f77ae3e 100644
+--- a/src/server/monster/MonsterSpawnerService.luau
++++ b/src/server/monster/MonsterSpawnerService.luau
+@@ -4,6 +4,8 @@ local Workspace = game:GetService("Workspace")
+ 
+ local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
+ local MonsterShared = Shared:WaitForChild("monster")
++local CharacterShared = Shared:WaitForChild("character")
++local CharacterMovementConfig = require(CharacterShared:WaitForChild("CharacterMovementConfig"))
+ local MonsterRegistry = require(MonsterShared:WaitForChild("MonsterRegistry"))
+ local MonsterAnimationRegistry = require(MonsterShared:WaitForChild("MonsterAnimationRegistry"))
+ local EntityHitboxService = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("EntityHitboxService"))
+@@ -18,6 +20,12 @@ local monstersFolder: Folder? = nil
+ local DEATH_FALLBACK_SECONDS = 2.5
+ local GROUND_RAY_START = 96
+ local GROUND_RAY_LENGTH = 384
++local NAVIGATION_ROOT_SIZE = Vector3.new(2, 2, 1)
++local NAVIGATION_HIP_HEIGHT = 1.8
++local WANDER_PAUSE_MIN_SECONDS = 3
++local WANDER_PAUSE_MAX_SECONDS = 10
++local WANDER_MOVE_REFRESH_SECONDS = 1
++local WANDER_ARRIVAL_TOLERANCE = 1.25
+ 
+ local function finite(value: any, fallback: number): number
+     local number = tonumber(value)
+@@ -197,6 +205,7 @@ local function playBaseIdle(model: Model, entry: any)
+     if entry.dying then
+         return
+     end
++    stopTrack(entry.walkTrack)
+     model:SetAttribute("MonsterAnimationState", "idle")
+     model:SetAttribute("MonsterIdleVariant", "base")
+     if entry.idleTrack and not entry.idleTrack.IsPlaying then
+@@ -253,14 +262,14 @@ local function visibleBounds(model: Model): (CFrame, Vector3)
+     return CFrame.new((minimum + maximum) * 0.5), size
+ end
+ 
+-local function prepareVisual(runtimeModel: Model): Model
++local function prepareVisual(runtimeModel: Model): (Model, BasePart?)
+     local visual = runtimeModel:FindFirstChild("ImportedRig")
+     if not visual or not visual:IsA("Model") then
+         visual = runtimeModel
+     end
+     for _, descendant in ipairs(runtimeModel:GetDescendants()) do
+         if descendant:IsA("BasePart") then
+-            descendant.Anchored = true
++            descendant.Anchored = false
+             descendant.CanCollide = false
+             descendant.CanTouch = false
+             descendant.CanQuery = false
+@@ -269,33 +278,88 @@ local function prepareVisual(runtimeModel: Model): Model
+             descendant:Destroy()
+         end
+     end
+-    return visual :: Model
++    local visualRoot = visual:FindFirstChild("RootPart", true)
++        or visual.PrimaryPart
++        or visual:FindFirstChildWhichIsA("MeshPart", true)
++        or visual:FindFirstChildWhichIsA("BasePart", true)
++    return visual :: Model, if visualRoot and visualRoot:IsA("BasePart") then visualRoot else nil
+ end
+ 
+-local function createRootCollider(runtimeModel: Model, visual: Model): BasePart
+-    local existing = runtimeModel:FindFirstChild("RootCollider")
+-    if existing then
+-        existing:Destroy()
++local function createNavigationRig(runtimeModel: Model, visual: Model, surface: Vector3, yawRadians: number): (BasePart?, Humanoid?)
++    local visualParts = {}
++    for _, descendant in ipairs(visual:GetDescendants()) do
++        if descendant:IsA("BasePart") then
++            table.insert(visualParts, descendant)
++        end
++    end
++    if #visualParts == 0 then
++        return nil, nil
++    end
++
++    local navigationRoot = Instance.new("Part")
++    navigationRoot.Name = "HumanoidRootPart"
++    navigationRoot.Size = NAVIGATION_ROOT_SIZE
++    navigationRoot.CFrame = CFrame.new(
++        surface + Vector3.new(0, NAVIGATION_ROOT_SIZE.Y * 0.5 + NAVIGATION_HIP_HEIGHT, 0)
++    ) * CFrame.Angles(0, yawRadians, 0)
++    navigationRoot.Transparency = 1
++    navigationRoot.CastShadow = false
++    navigationRoot.Anchored = false
++    navigationRoot.CanCollide = true
++    navigationRoot.CanTouch = false
++    navigationRoot.CanQuery = false
++    navigationRoot.Massless = false
++    navigationRoot.Parent = runtimeModel
++
++    for index, part in ipairs(visualParts) do
++        local weld = Instance.new("WeldConstraint")
++        weld.Name = ("Game1MonsterVisualWeld%02d"):format(index)
++        weld.Part0 = navigationRoot
++        weld.Part1 = part
++        weld.Parent = navigationRoot
+     end
++
+     local boxCFrame, boxSize = visibleBounds(visual)
+     local root = Instance.new("Part")
+     root.Name = "RootCollider"
+     -- Broadphase only. Precise combat uses EntityHitboxService's virtual bone regions.
+-    root.Size = Vector3.new(
+-        math.max(0.5, boxSize.X),
+-        math.max(0.5, boxSize.Y),
+-        math.max(0.5, boxSize.Z)
+-    )
++    root.Size = Vector3.new(math.max(0.5, boxSize.X), math.max(0.5, boxSize.Y), math.max(0.5, boxSize.Z))
+     root.CFrame = boxCFrame
+     root.Transparency = 1
+     root.CastShadow = false
+-    root.Anchored = true
++    root.Anchored = false
+     root.CanCollide = false
+     root.CanTouch = false
+     root.CanQuery = true
++    root.Massless = true
+     root.Parent = runtimeModel
+-    runtimeModel.PrimaryPart = root
+-    return root
++    local rootWeld = Instance.new("WeldConstraint")
++    rootWeld.Name = "RootColliderWeld"
++    rootWeld.Part0 = navigationRoot
++    rootWeld.Part1 = root
++    rootWeld.Parent = navigationRoot
++
++    local humanoid = Instance.new("Humanoid")
++    humanoid.Name = "Humanoid"
++    humanoid.RequiresNeck = false
++    humanoid.BreakJointsOnDeath = false
++    humanoid.AutoRotate = true
++    humanoid.HipHeight = NAVIGATION_HIP_HEIGHT
++    humanoid.UseJumpPower = false
++    humanoid.JumpHeight = 0
++    humanoid.MaxSlopeAngle = 89
++    humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
++    humanoid.WalkSpeed = 0
++    humanoid.MaxHealth = 1
++    humanoid.Health = 1
++    humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
++    humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
++    humanoid.NameDisplayDistance = 0
++    humanoid.Parent = runtimeModel
++
++    runtimeModel.PrimaryPart = navigationRoot
++    pcall(function() navigationRoot:SetNetworkOwner(nil) end)
++    return navigationRoot, humanoid
+ end
+ 
+ local function spawnCenter(record: any): Vector3
+@@ -303,6 +367,17 @@ local function spawnCenter(record: any): Vector3
+     return Vector3.new(finite(position.x, 0), finite(position.y, 0), finite(position.z, 0))
+ end
+ 
++local function surfacePoint(candidate: Vector3): Vector3
++    local params = RaycastParams.new()
++    params.FilterType = Enum.RaycastFilterType.Exclude
++    params.FilterDescendantsInstances = { ensureMonstersFolder() }
++    params.IgnoreWater = false
++    params.RespectCanCollide = false
++    local origin = candidate + Vector3.new(0, GROUND_RAY_START, 0)
++    local hit = Workspace:Raycast(origin, Vector3.new(0, -GROUND_RAY_LENGTH, 0), params)
++    return if hit then hit.Position else candidate
++end
++
+ local function randomSpawnPoint(record: any): Vector3
+     local center = spawnCenter(record)
+     local radius = math.max(0, finite(record.spawnRadius, 0))
+@@ -312,14 +387,7 @@ local function randomSpawnPoint(record: any): Vector3
+         local distance = math.sqrt(spawnRandom:NextNumber(0, 1)) * radius
+         candidate = center + Vector3.new(math.cos(angle) * distance, 0, math.sin(angle) * distance)
+     end
+-    local params = RaycastParams.new()
+-    params.FilterType = Enum.RaycastFilterType.Exclude
+-    params.FilterDescendantsInstances = { ensureMonstersFolder() }
+-    params.IgnoreWater = false
+-    params.RespectCanCollide = false
+-    local origin = candidate + Vector3.new(0, GROUND_RAY_START, 0)
+-    local hit = Workspace:Raycast(origin, Vector3.new(0, -GROUND_RAY_LENGTH, 0), params)
+-    return if hit then hit.Position else candidate
++    return surfacePoint(candidate)
+ end
+ 
+ local function groundAlign(model: Model, surface: Vector3, yawRadians: number)
+@@ -331,6 +399,134 @@ local function groundAlign(model: Model, surface: Vector3, yawRadians: number)
+     model:PivotTo(model:GetPivot() + Vector3.new(0, surface.Y - bottomY, 0))
+ end
+ 
++local function horizontalDistance(left: Vector3, right: Vector3): number
++    return Vector3.new(right.X - left.X, 0, right.Z - left.Z).Magnitude
++end
++
++local function walkSpeedFor(model: Model): number
++    return CharacterMovementConfig.ResolveSpeed(nil, model:GetAttribute("RunSpeed"), "Walk")
++end
++
++local function chooseWanderTarget(record: any, current: Vector3): (Vector3?, number, boolean)
++    local center = spawnCenter(record)
++    local radius = math.max(0, finite(record.spawnRadius, 0))
++    if radius <= 0 then
++        return nil, 0, false
++    end
++
++    local toCenter = Vector3.new(center.X - current.X, 0, center.Z - current.Z)
++    local distanceToCenter = toCenter.Magnitude
++    local outsideSpawn = distanceToCenter > radius
++    local maximumLength = radius * 2
++    local direction: Vector3
++    if outsideSpawn and distanceToCenter > 0.001 then
++        -- Same contract as RobloxLineage: if a straight wander route ended outside
++        -- the authored circle, the next route is forced inward and cannot pass the center.
++        direction = toCenter.Unit
++        maximumLength = math.min(maximumLength, distanceToCenter)
++    else
++        local angle = spawnRandom:NextNumber(0, math.pi * 2)
++        direction = Vector3.new(math.cos(angle), 0, math.sin(angle))
++    end
++    if maximumLength <= 0.001 then
++        return nil, 0, outsideSpawn
++    end
++
++    local routeLength = spawnRandom:NextNumber(0, maximumLength)
++    local flatDestination = current + direction * routeLength
++    local destination = surfacePoint(Vector3.new(flatDestination.X, current.Y, flatDestination.Z))
++    return destination, routeLength, outsideSpawn
++end
++
++local function stopWanderMovement(entry: any)
++    entry.wandering = false
++    stopTrack(entry.walkTrack)
++    local humanoid = entry.humanoid
++    local navigationRoot = entry.navigationRoot
++    if humanoid and navigationRoot and navigationRoot.Parent then
++        humanoid.WalkSpeed = 0
++        humanoid.AutoRotate = false
++        humanoid:Move(Vector3.zero, false)
++        humanoid:MoveTo(navigationRoot.Position)
++    end
++end
++
++local function startWanderLoop(state: any, model: Model, entry: any)
++    local radius = math.max(0, finite(state.record.spawnRadius, 0))
++    if radius <= 0 or not entry.humanoid or not entry.navigationRoot then
++        model:SetAttribute("MonsterWanderEnabled", false)
++        return
++    end
++    model:SetAttribute("MonsterWanderEnabled", true)
++    task.spawn(function()
++        task.wait(spawnRandom:NextNumber(0.35, 1.35))
++        while state.instances[model] == entry and model.Parent and not entry.dying do
++            task.wait(spawnRandom:NextNumber(WANDER_PAUSE_MIN_SECONDS, WANDER_PAUSE_MAX_SECONDS))
++            if state.instances[model] ~= entry or not model.Parent or entry.dying then
++                break
++            end
++
++            local navigationRoot = entry.navigationRoot
++            local humanoid = entry.humanoid
++            if not navigationRoot or not navigationRoot.Parent or not humanoid or not humanoid.Parent then
++                break
++            end
++            local destination, routeLength, outsideSpawn = chooseWanderTarget(state.record, navigationRoot.Position)
++            if not destination or routeLength <= WANDER_ARRIVAL_TOLERANCE then
++                continue
++            end
++
++            stopIdleState(entry)
++            entry.wandering = true
++            model:SetAttribute("MonsterAnimationState", "walk")
++            model:SetAttribute("MonsterIdleVariant", nil)
++            model:SetAttribute("MonsterWanderTargetX", destination.X)
++            model:SetAttribute("MonsterWanderTargetZ", destination.Z)
++            model:SetAttribute("MonsterWanderRouteLength", routeLength)
++            model:SetAttribute("MonsterWanderOutsideSpawn", outsideSpawn)
++            if entry.walkTrack then
++                pcall(function() entry.walkTrack:Play(0.1) end)
++            end
++
++            local speed = math.max(0.1, walkSpeedFor(model))
++            humanoid.WalkSpeed = speed
++            humanoid.AutoRotate = true
++            humanoid:MoveTo(destination)
++            local finished = false
++            local moveConnection = humanoid.MoveToFinished:Connect(function()
++                finished = true
++            end)
++            local deadline = os.clock() + math.max(8, routeLength / speed + 4)
++            local nextRefresh = os.clock() + WANDER_MOVE_REFRESH_SECONDS
++            while not finished
++                and state.instances[model] == entry
++                and model.Parent
++                and not entry.dying
++                and os.clock() < deadline
++            do
++                task.wait(0.1)
++                if horizontalDistance(navigationRoot.Position, destination) <= WANDER_ARRIVAL_TOLERANCE then
++                    finished = true
++                    break
++                end
++                if os.clock() >= nextRefresh then
++                    nextRefresh = os.clock() + WANDER_MOVE_REFRESH_SECONDS
++                    -- Same destination is reissued before Humanoid's internal MoveTo timeout.
++                    -- Roblox physics owns the continuous motion; game1 never CFrames the monster per frame.
++                    humanoid:MoveTo(destination)
++                end
++            end
++            moveConnection:Disconnect()
++
++            if state.instances[model] == entry and model.Parent and not entry.dying then
++                stopWanderMovement(entry)
++                model:SetAttribute("MonsterWanderRouteLength", 0)
++                playBaseIdle(model, entry)
++            end
++        end
++    end)
++end
++
+ local function applyMonsterAttributes(model: Model, definition: any, record: any, instanceId: string)
+     local stats = definition.stats or {}
+     local maxHP = math.max(1, finite(stats.MaxHP, 100))
+@@ -355,6 +551,7 @@ local function releaseInstance(state: any, model: Model, scheduleRespawn: boolea
+         return
+     end
+     state.instances[model] = nil
++    stopWanderMovement(entry)
+     stopIdleState(entry)
+     stopTrack(entry.deathTrack)
+     EntityHitboxService.Detach(model)
+@@ -379,7 +576,13 @@ local function beginDeath(state: any, model: Model, entry: any)
+     model:SetAttribute("Damageable", false)
+     model:SetAttribute("MonsterAnimationState", "death")
+     model:SetAttribute("MonsterIdleVariant", nil)
++    stopWanderMovement(entry)
+     stopIdleState(entry)
++    if entry.navigationRoot and entry.navigationRoot.Parent then
++        entry.navigationRoot.AssemblyLinearVelocity = Vector3.zero
++        entry.navigationRoot.AssemblyAngularVelocity = Vector3.zero
++        entry.navigationRoot.Anchored = true
++    end
+     local track = entry.deathTrack
+     local holdSeconds = DEATH_FALLBACK_SECONDS
+     if track then
+@@ -421,12 +624,22 @@ local function spawnOne(state: any): Model?
+     local instanceId = tostring(record.spawnId or "spawn") .. "-" .. tostring(math.floor(os.clock() * 1000)) .. "-" .. tostring(spawnRandom:NextInteger(1000, 9999))
+     model.Name = slug .. "_" .. instanceId:sub(-4)
+     model.Parent = ensureMonstersFolder()
+-    local visual = prepareVisual(model)
++    local visual, visualRoot = prepareVisual(model)
++    if not visualRoot then
++        model:Destroy()
++        warn("[game1][monster-spawn] monster contains no usable BasePart: " .. slug)
++        return nil
++    end
+     local surface = randomSpawnPoint(record)
+     local yaw = spawnRandom:NextNumber(0, math.pi * 2)
+     groundAlign(model, surface, yaw)
+     applyMonsterAttributes(model, definition, record, instanceId)
+-    createRootCollider(model, visual)
++    local navigationRoot, humanoid = createNavigationRig(model, visual, surface, yaw)
++    if not navigationRoot or not humanoid then
++        model:Destroy()
++        warn("[game1][monster-spawn] monster navigation rig could not be created: " .. slug)
++        return nil
++    end
+     local hitbox = EntityHitboxService.Attach(model, visual)
+     model:SetAttribute("PoseHitboxCount", hitbox.count)
+ 
+@@ -445,12 +658,17 @@ local function spawnOne(state: any): Model?
+             end
+         end
+     end
++    local walkTrack = loadAnimationTrack(animator, firstPublishedTrack(profile, "walk") or firstPublishedTrack(profile, "run"), true)
+     local deathTrack = loadAnimationTrack(animator, firstPublishedTrack(profile, "death"), false)
+     local entry = {
+         idleTrack = idleTrack,
+         idleChoices = idleChoices,
+         activeIdleSpecial = nil,
++        walkTrack = walkTrack,
+         deathTrack = deathTrack,
++        navigationRoot = navigationRoot,
++        humanoid = humanoid,
++        wandering = false,
+         dying = false,
+     }
+     state.instances[model] = entry
+@@ -474,6 +692,7 @@ local function spawnOne(state: any): Model?
+         end)
+     end
+     playBaseIdle(model, entry)
++    startWanderLoop(state, model, entry)
+ 
+     model:GetAttributeChangedSignal("LifeState"):Connect(function()
+         if state.instances[model] ~= entry then
+@@ -519,11 +738,28 @@ local function recordAppliesHere(record: any): boolean
+     return placeId == 0 or game.PlaceId == 0 or placeId == game.PlaceId
+ end
+ 
++local function removeAuthoringVisualsFromSimulation()
++    local authoring = Workspace:FindFirstChild("Game1Authoring")
++    if not authoring then
++        return
++    end
++    local monsterSpawns = authoring:FindFirstChild("MonsterSpawns")
++    if monsterSpawns then
++        -- Spawn circles, marker arrows and BillboardGui IDs are editor authoring aids.
++        -- The Play/Run DataModel uses the generated registry and must not render them.
++        monsterSpawns:Destroy()
++    end
++    if #authoring:GetChildren() == 0 then
++        authoring:Destroy()
++    end
++end
++
+ function MonsterSpawnerService.Start()
+     if started then
+         return
+     end
+     started = true
++    removeAuthoringVisualsFromSimulation()
+     ensureMonstersFolder()
+ 
+     local count = 0
+diff --git a/src/server/weapon/WeaponEquipService.luau b/src/server/weapon/WeaponEquipService.luau
+index 9957672..457ce42 100644
+--- a/src/server/weapon/WeaponEquipService.luau
++++ b/src/server/weapon/WeaponEquipService.luau
+@@ -3,6 +3,8 @@ local ServerStorage = game:GetService("ServerStorage")
+ 
+ local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
+ local WeaponShared = Shared:WaitForChild("weapon")
++local CombatShared = Shared:WaitForChild("combat")
++local AttackConfig = require(CombatShared:WaitForChild("AttackConfig"))
+ local WeaponRegistry = require(WeaponShared:WaitForChild("WeaponRegistry"))
+ local CharacterStatsService = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CharacterStatsService"))
+ 
+@@ -138,11 +140,17 @@ local function clearWeapon(character: Model)
+     end
+ end
+ 
++local function attackRadiusFor(row: any?): number
++    local value = tonumber(row and row.attackRadiusStuds) or AttackConfig.Range
++    return math.clamp(value, 1, AttackConfig.MaxAimDistance)
++end
++
+ function WeaponEquipService.Unequip(character: Model)
+     clearWeapon(character)
+     character:SetAttribute("EquippedWeaponSlug", "")
+     character:SetAttribute("EquippedWeaponType", "")
+     character:SetAttribute("EquippedWeaponRarity", "")
++    character:SetAttribute("AttackRadius", attackRadiusFor(nil))
+     character:SetAttribute("AnimationWeaponSet", "hands")
+     CharacterStatsService.ApplyModifiers(character, {})
+ end
+@@ -182,6 +190,7 @@ function WeaponEquipService.Equip(character: Model, slugValue: any): (boolean, s
+     weapon:SetAttribute("WeaponSlug", slug)
+     weapon:SetAttribute("WeaponType", tostring(row.weaponType or ""))
+     weapon:SetAttribute("WeaponRarity", tostring(row.rarity or ""))
++    weapon:SetAttribute("AttackRadius", attackRadiusFor(row))
+     weapon:SetAttribute("Game1WeaponGripRotation", nil)
+     weapon:SetAttribute("WeaponAttachmentMode", "runtime-canonical-grip-v2")
+     alignWeaponToSocket(weapon, grip, targetSocketCFrame(targetBone) * WEAPON_EQUIP_ROTATION)
+@@ -190,6 +199,7 @@ function WeaponEquipService.Equip(character: Model, slugValue: any): (boolean, s
+     character:SetAttribute("EquippedWeaponSlug", slug)
+     character:SetAttribute("EquippedWeaponType", tostring(row.weaponType or ""))
+     character:SetAttribute("EquippedWeaponRarity", tostring(row.rarity or ""))
++    character:SetAttribute("AttackRadius", attackRadiusFor(row))
+     character:SetAttribute("AnimationWeaponSet", tostring(row.weaponType or "hands"))
+     CharacterStatsService.ApplyModifiers(character, row.statModifiers or {})
+     return true, nil
+@@ -213,6 +223,7 @@ function WeaponEquipService.ListAvailable(): { any }
+                 nameRu = tostring(row.nameRu or ""),
+                 weaponType = tostring(row.weaponType or ""),
+                 rarity = tostring(row.rarity or ""),
++                attackRadiusStuds = attackRadiusFor(row),
+                 modelAssetId = tostring(row.modelAssetId or ""),
+             })
+         end
+diff --git a/src/shared/RuntimeVersion.luau b/src/shared/RuntimeVersion.luau
+index 14cd621..566bb65 100644
+--- a/src/shared/RuntimeVersion.luau
++++ b/src/shared/RuntimeVersion.luau
+@@ -1 +1 @@
+-return table.freeze({ Version = "2026.10.06.006", SourceDigest = "game1-m7-unified-combat-idle-no-equip-animations" })
++return table.freeze({ Version = "2026.10.06.007", SourceDigest = "game1-m7-weapon-attack-radius-monster-wander-clean-sim" })
+diff --git a/src/shared/weapon/WeaponRegistry.luau b/src/shared/weapon/WeaponRegistry.luau
+index aa0f23d..6718122 100644
+--- a/src/shared/weapon/WeaponRegistry.luau
++++ b/src/shared/weapon/WeaponRegistry.luau
+@@ -10,6 +10,7 @@ return table.freeze({
+ 			nameRu = "Топор Новичка",
+ 			weaponType = "1hs",
+ 			rarity = "common",
++			attackRadiusStuds = 7,
+ 			status = "PUBLISHED",
+ 			modelAssetId = "98087242454283",
+ 			serverStoragePath = "ServerStorage.weapons.1hs.newbie_axe.model.newbie_axe",
+@@ -30,6 +31,7 @@ return table.freeze({
+ 			nameRu = "Рассекатель Драконов",
+ 			weaponType = "1hs",
+ 			rarity = "legendary",
++			attackRadiusStuds = 7,
+ 			status = "PUBLISHED",
+ 			modelAssetId = "104973757039880",
+ 			serverStoragePath = "ServerStorage.weapons.1hs.dragon_divider.model.dragon_divider",
+diff --git a/system/control-center/schema.sql b/system/control-center/schema.sql
+index 6d5764b..6351c6d 100644
+--- a/system/control-center/schema.sql
++++ b/system/control-center/schema.sql
+@@ -105,6 +105,7 @@ create table if not exists weapons (
+     name_ru text not null default '',
+     weapon_type text not null,
+     rarity text not null,
++    attack_radius_studs real not null default 7,
+     model_source_path text not null default '',
+     model_prepared_path text not null default '',
+     model_sha256 text not null default '',
+diff --git a/system/control-center/static/index.html b/system/control-center/static/index.html
+index 7048100..33f369b 100644
+--- a/system/control-center/static/index.html
++++ b/system/control-center/static/index.html
+@@ -124,8 +124,8 @@
+ <div class="character-grid"><label>name en<input id="weapon-name-en" autocomplete="off"></label><label>name ru<input id="weapon-name-ru" autocomplete="off"></label></div>
+ <label>slug<input id="weapon-slug" readonly><small class="hint">generated from english name as lowercase snake_case. existing registered slugs stay stable.</small></label>
+ <div class="character-grid"><label>type<select id="weapon-type"></select></label><label>rarity<select id="weapon-rarity"></select></label></div>
+-<div class="weapon-stats-grid"><label>attack delta<input id="weapon-stat-damage" type="number" step="1" value="0"></label><label>attack speed delta<input id="weapon-stat-attack-speed" type="number" step="1" value="0"></label></div>
+-<small class="hint">modifiers are additive to the current character stat. negative values subtract. 0 means no change. base character: damage 10 · attack speed 100 · run speed 50.</small>
++<div class="weapon-stats-grid"><label>attack delta<input id="weapon-stat-damage" type="number" step="1" value="0"></label><label>attack speed delta<input id="weapon-stat-attack-speed" type="number" step="1" value="0"></label><label>attack radius · studs<input id="weapon-attack-radius" type="number" min="1" max="420" step="0.5" value="7"></label></div>
++<small class="hint">damage and attack speed are additive modifiers. attack radius is an absolute server-authoritative reach in Roblox studs and is visualized from Studio Test Loadout.</small>
+ <hr class="card-separator">
+ <span class="eyebrow">02 · source assets</span>
+ <div class="picker"><button id="choose-weapon-model" type="button">choose fbx</button><small id="picked-weapon-model">fbx not selected</small></div>
+diff --git a/system/control-center/static/weapon-assets.js b/system/control-center/static/weapon-assets.js
+index 6ce539f..edf0c26 100644
+--- a/system/control-center/static/weapon-assets.js
++++ b/system/control-center/static/weapon-assets.js
+@@ -4,17 +4,17 @@ function weaponSlugify(value){return String(value||'').toLowerCase().replace(/[^
+ function weaponStatusTag(status){return `<span class="tag ${String(status||'').toLowerCase()}">${esc(status||'')}</span>`}
+ function weaponRarity(value){return `<span class="rarity-${esc(value)}">${esc(value)}</span>`}
+ function weaponSyncSlug(){if(!weaponState.selected)$('weapon-slug').value=weaponSlugify($('weapon-name-en').value)}
+-function weaponSetForm(row){weaponState.selected=row?.slug||null;weaponState.modelPath='';weaponState.texturePaths=[];if(row){$('weapon-name-en').value=row.name_en||'';$('weapon-name-ru').value=row.name_ru||'';$('weapon-slug').value=row.slug;$('weapon-type').value=row.weapon_type;$('weapon-rarity').value=row.rarity;$('weapon-stat-damage').value=row.stat_modifiers?.Damage??0;$('weapon-stat-attack-speed').value=row.stat_modifiers?.AttackSpeed??0;$('picked-weapon-model').textContent='keep current fbx or choose a replacement';$('picked-weapon-textures').textContent='keep current textures or choose replacements';}else{$('weapon-name-en').value='';$('weapon-name-ru').value='';$('weapon-slug').value='';$('weapon-type').value=weaponState.data?.options?.weaponTypes?.[0]||'1hs';$('weapon-rarity').value=weaponState.data?.options?.rarities?.[0]||'common';$('weapon-stat-damage').value='0';$('weapon-stat-attack-speed').value='0';$('picked-weapon-model').textContent='fbx not selected';$('picked-weapon-textures').textContent='textures not selected';}weaponRender()}
++function weaponSetForm(row){weaponState.selected=row?.slug||null;weaponState.modelPath='';weaponState.texturePaths=[];if(row){$('weapon-name-en').value=row.name_en||'';$('weapon-name-ru').value=row.name_ru||'';$('weapon-slug').value=row.slug;$('weapon-type').value=row.weapon_type;$('weapon-rarity').value=row.rarity;$('weapon-stat-damage').value=row.stat_modifiers?.Damage??0;$('weapon-stat-attack-speed').value=row.stat_modifiers?.AttackSpeed??0;$('weapon-attack-radius').value=row.attack_radius_studs??7;$('picked-weapon-model').textContent='keep current fbx or choose a replacement';$('picked-weapon-textures').textContent='keep current textures or choose replacements';}else{$('weapon-name-en').value='';$('weapon-name-ru').value='';$('weapon-slug').value='';$('weapon-type').value=weaponState.data?.options?.weaponTypes?.[0]||'1hs';$('weapon-rarity').value=weaponState.data?.options?.rarities?.[0]||'common';$('weapon-stat-damage').value='0';$('weapon-stat-attack-speed').value='0';$('weapon-attack-radius').value=String(weaponState.data?.options?.attackRadius?.default??7);$('picked-weapon-model').textContent='fbx not selected';$('picked-weapon-textures').textContent='textures not selected';}weaponRender()}
+ function weaponRenderTree(){const host=$('weapon-tree');host.innerHTML='';for(const row of weaponState.data.items){const button=document.createElement('button');button.className=row.slug===weaponState.selected?'active':'';button.innerHTML=`<span>${esc(row.name_en)}<small>${esc(row.weapon_type)} · ${esc(row.rarity)}</small></span><small>${esc(row.status)}</small>`;button.onclick=()=>weaponSetForm(row);host.appendChild(button)}if(!weaponState.data.items.length)host.innerHTML='<small class="muted">no registered weapons.</small>';$('weapon-rail-count').textContent=weaponState.data.items.length}
+-function weaponRenderRows(){const body=$('weapon-rows');body.innerHTML='';for(const row of weaponState.data.items){const active=weaponState.data.activeWeaponSlug===row.slug;const mods=row.stat_modifiers||{};const textures=row.textures||[];const tr=document.createElement('tr');tr.className=row.slug===weaponState.selected?'active':'';tr.innerHTML=`<td>${active?'yes':''}</td><td><b>${esc(row.name_en)}</b><br><small>${esc(row.name_ru||'—')} · ${esc(row.slug)}</small></td><td>${esc(row.weapon_type)}</td><td>${weaponRarity(row.rarity)}</td><td><small>atk ${Number(mods.Damage||0)>=0?'+':''}${esc(mods.Damage||0)}<br>aspd ${Number(mods.AttackSpeed||0)>=0?'+':''}${esc(mods.AttackSpeed||0)}</small></td><td>${row.model_asset_id?`model ${esc(row.model_asset_id)}`:'model local'}<br><small>${textures.length} texture${textures.length===1?'':'s'}</small></td><td>${weaponStatusTag(row.status)}</td><td><div class="row-actions"><button data-open>edit</button><button data-publish>publish</button><button data-sync>sync studio</button><button data-active>startup</button><button data-delete class="danger">delete</button></div></td>`;tr.querySelector('[data-open]').onclick=()=>weaponSetForm(row);tr.querySelector('[data-publish]').onclick=()=>weaponPublish(row.slug);tr.querySelector('[data-sync]').onclick=()=>weaponSync(row.slug);tr.querySelector('[data-active]').onclick=()=>weaponActivate(row.slug);tr.querySelector('[data-delete]').onclick=()=>weaponDelete(row.slug);body.appendChild(tr)}}
+-function weaponRenderDetails(row){const host=$('weapon-details');if(!row){host.innerHTML='<span class="muted">select a weapon.</span>';return}const textureHtml=(row.textures||[]).map(tex=>`<div><b>${esc(tex.slot)}</b><span>${esc(tex.source_path)}</span><span>${esc(tex.asset_id||'local')}</span></div>`).join('');host.innerHTML=`<div class="section-title"><div><span>selected weapon</span><h3>${esc(row.name_en)}</h3></div>${weaponStatusTag(row.status)}</div><div class="details-grid"><div><b>slug</b><span>${esc(row.slug)}</span></div><div><b>type / rarity</b><span>${esc(row.weapon_type)} · ${esc(row.rarity)}</span></div><div><b>model source</b><span>${esc(row.model_source_path||'—')}</span></div><div><b>model asset id</b><span>${esc(row.model_asset_id||'not published')}</span></div><div><b>serverstorage</b><span>${esc(row.server_storage_path||'—')}</span></div><div><b>revision</b><span>${esc(row.revision)}</span></div></div>${textureHtml?`<div class="texture-list">${textureHtml}</div>`:''}`}
++function weaponRenderRows(){const body=$('weapon-rows');body.innerHTML='';for(const row of weaponState.data.items){const active=weaponState.data.activeWeaponSlug===row.slug;const mods=row.stat_modifiers||{};const textures=row.textures||[];const tr=document.createElement('tr');tr.className=row.slug===weaponState.selected?'active':'';tr.innerHTML=`<td>${active?'yes':''}</td><td><b>${esc(row.name_en)}</b><br><small>${esc(row.name_ru||'—')} · ${esc(row.slug)}</small></td><td>${esc(row.weapon_type)}</td><td>${weaponRarity(row.rarity)}</td><td><small>atk ${Number(mods.Damage||0)>=0?'+':''}${esc(mods.Damage||0)}<br>aspd ${Number(mods.AttackSpeed||0)>=0?'+':''}${esc(mods.AttackSpeed||0)}<br>radius ${esc(row.attack_radius_studs??7)} studs</small></td><td>${row.model_asset_id?`model ${esc(row.model_asset_id)}`:'model local'}<br><small>${textures.length} texture${textures.length===1?'':'s'}</small></td><td>${weaponStatusTag(row.status)}</td><td><div class="row-actions"><button data-open>edit</button><button data-publish>publish</button><button data-sync>sync studio</button><button data-active>startup</button><button data-delete class="danger">delete</button></div></td>`;tr.querySelector('[data-open]').onclick=()=>weaponSetForm(row);tr.querySelector('[data-publish]').onclick=()=>weaponPublish(row.slug);tr.querySelector('[data-sync]').onclick=()=>weaponSync(row.slug);tr.querySelector('[data-active]').onclick=()=>weaponActivate(row.slug);tr.querySelector('[data-delete]').onclick=()=>weaponDelete(row.slug);body.appendChild(tr)}}
++function weaponRenderDetails(row){const host=$('weapon-details');if(!row){host.innerHTML='<span class="muted">select a weapon.</span>';return}const textureHtml=(row.textures||[]).map(tex=>`<div><b>${esc(tex.slot)}</b><span>${esc(tex.source_path)}</span><span>${esc(tex.asset_id||'local')}</span></div>`).join('');host.innerHTML=`<div class="section-title"><div><span>selected weapon</span><h3>${esc(row.name_en)}</h3></div>${weaponStatusTag(row.status)}</div><div class="details-grid"><div><b>slug</b><span>${esc(row.slug)}</span></div><div><b>type / rarity</b><span>${esc(row.weapon_type)} · ${esc(row.rarity)}</span></div><div><b>attack radius</b><span>${esc(row.attack_radius_studs??7)} studs</span></div><div><b>model source</b><span>${esc(row.model_source_path||'—')}</span></div><div><b>model asset id</b><span>${esc(row.model_asset_id||'not published')}</span></div><div><b>serverstorage</b><span>${esc(row.server_storage_path||'—')}</span></div><div><b>revision</b><span>${esc(row.revision)}</span></div></div>${textureHtml?`<div class="texture-list">${textureHtml}</div>`:''}`}
+ function weaponRenderForm(row){const configured=!!weaponState.data?.publication?.configured;if(row){$('weapon-model-status').innerHTML=`<strong>${esc(row.name_en)} · ${esc(row.status)}</strong><span>${esc(row.model_source_path||'no model')} · ${(row.textures||[]).length} registered texture(s)</span>`;$('register-weapon').textContent=(weaponState.modelPath||weaponState.texturePaths.length)?'register new revision':'save metadata';}else{$('weapon-model-status').innerHTML='<strong>not registered</strong><span>choose a weapon fbx. textures are optional.</span>';$('register-weapon').textContent='register weapon'}$('register-weapon').disabled=!row&&!weaponState.modelPath;$('publish-weapon').disabled=!row||!configured||!row.model_source_path;$('sync-weapon').disabled=!row?.model_asset_id;$('activate-weapon').disabled=!row?.model_asset_id;$('weapon-publication-hint').textContent=!row?'select a registered weapon.':!configured?'configure open cloud before publishing.':row.model_asset_id?`publish updates model ${row.model_asset_id} and changed textures.`:'publish creates the permanent model/texture asset ids.'}
+ function weaponRenderRuntime(){const active=weaponState.data.activeWeaponSlug;const host=$('weapon-runtime-state');if(active){const row=weaponState.data.items.find(item=>item.slug===active);host.className='runtime-state registered';host.innerHTML=`<strong>startup weapon · ${esc(active)}</strong><span>${esc(row?.weapon_type||'')} · ${esc(row?.rarity||'')}</span>`}else{host.className='runtime-state bootstrap';host.innerHTML='<strong>unarmed startup</strong><span>animation context: hands</span>'}const pub=weaponState.data.publication||{};$('weapon-publication-state').className=pub.configured?'publication-ready':'publication-missing';$('weapon-publication-state').textContent=pub.configured?`open cloud: ${pub.creatorType} ${pub.creatorId}`:'open cloud: not configured'}
+ function weaponRender(){if(!weaponState.data)return;const row=weaponSelected();$('weapon-metric-total').textContent=weaponState.data.summary?.registered||0;$('weapon-metric-published').textContent=weaponState.data.summary?.published||0;$('weapon-metric-active').textContent=weaponState.data.summary?.active||0;weaponRenderRuntime();weaponRenderTree();weaponRenderRows();weaponRenderDetails(row);weaponRenderForm(row)}
+ async function weaponLoad(){try{weaponState.data=await request('/api/weapons');const types=weaponState.data.options?.weaponTypes||['1hs','2hs','bow'];const rarities=weaponState.data.options?.rarities||['common','uncommon','rare','mythical','legendary','immortal'];$('weapon-type').innerHTML=types.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');$('weapon-rarity').innerHTML=rarities.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');if(weaponState.selected&&!weaponState.data.items.some(x=>x.slug===weaponState.selected))weaponState.selected=null;weaponRender()}catch(error){toast(error.message,true)}}
+ async function weaponChooseModel(){try{const result=await request('/api/files/choose-weapon-model',{method:'POST'});if(!result.path)return;weaponState.modelPath=result.path;$('picked-weapon-model').textContent=result.path;weaponRenderForm(weaponSelected())}catch(error){toast(error.message,true)}}
+ async function weaponChooseTextures(){try{const result=await request('/api/files/choose-weapon-textures',{method:'POST'});weaponState.texturePaths=result.paths||[];$('picked-weapon-textures').textContent=weaponState.texturePaths.length?weaponState.texturePaths.join(' · '):'textures not selected';weaponRenderForm(weaponSelected())}catch(error){toast(error.message,true)}}
+-async function weaponRegister(){try{const row=weaponSelected();const nameEn=$('weapon-name-en').value.trim();if(!nameEn)throw Error('name en is required');const slug=row?.slug||weaponSlugify(nameEn);if(!slug)throw Error('english name cannot generate a slug');if(!row&&!weaponState.modelPath)throw Error('choose a weapon fbx first');$('register-weapon').disabled=true;const result=await request('/api/weapons',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug,nameEn,nameRu:$('weapon-name-ru').value.trim(),weaponType:$('weapon-type').value,rarity:$('weapon-rarity').value,modelSourcePath:weaponState.modelPath,texturePaths:weaponState.texturePaths,statModifiers:{Damage:Number($('weapon-stat-damage').value||0),AttackSpeed:Number($('weapon-stat-attack-speed').value||0)}})});weaponState.selected=result.slug;weaponState.modelPath='';weaponState.texturePaths=[];await weaponLoad();weaponSetForm(weaponSelected());toast(`registered weapon ${result.slug}`)}catch(error){toast(error.message,true)}finally{weaponRenderForm(weaponSelected())}}
++async function weaponRegister(){try{const row=weaponSelected();const nameEn=$('weapon-name-en').value.trim();if(!nameEn)throw Error('name en is required');const slug=row?.slug||weaponSlugify(nameEn);if(!slug)throw Error('english name cannot generate a slug');if(!row&&!weaponState.modelPath)throw Error('choose a weapon fbx first');$('register-weapon').disabled=true;const result=await request('/api/weapons',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug,nameEn,nameRu:$('weapon-name-ru').value.trim(),weaponType:$('weapon-type').value,rarity:$('weapon-rarity').value,modelSourcePath:weaponState.modelPath,texturePaths:weaponState.texturePaths,attackRadiusStuds:Number($('weapon-attack-radius').value||7),statModifiers:{Damage:Number($('weapon-stat-damage').value||0),AttackSpeed:Number($('weapon-stat-attack-speed').value||0)}})});weaponState.selected=result.slug;weaponState.modelPath='';weaponState.texturePaths=[];await weaponLoad();weaponSetForm(weaponSelected());toast(`registered weapon ${result.slug}`)}catch(error){toast(error.message,true)}finally{weaponRenderForm(weaponSelected())}}
+ async function weaponPublish(slug){try{toast('publishing weapon model and changed textures…');await request('/api/weapons/'+encodeURIComponent(slug)+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:$('weapon-publication-description').value})});await weaponLoad();toast('weapon publication complete')}catch(error){toast(error.message,true)}}
+ async function weaponSync(slug){try{toast('syncing weapon into serverstorage…');const result=await request('/api/weapons/'+encodeURIComponent(slug)+'/sync',{method:'POST'});await weaponLoad();toast(`studio synced: ${result.studio?.destination||slug}`)}catch(error){toast(error.message,true)}}
+ async function weaponActivate(slug){try{weaponState.data=await request('/api/weapons/'+encodeURIComponent(slug)+'/activate',{method:'POST'});weaponState.data.publication=(await request('/api/weapons')).publication;weaponRender();toast(`startup weapon: ${slug}`)}catch(error){toast(error.message,true)}}
+diff --git a/system/control-center/weapon_store.py b/system/control-center/weapon_store.py
+index e77d200..7ebef67 100644
+--- a/system/control-center/weapon_store.py
++++ b/system/control-center/weapon_store.py
+@@ -23,6 +23,10 @@ WEAPON_TYPES = ("1hs", "2hs", "bow")
+ RARITIES = ("common", "uncommon", "rare", "mythical", "legendary", "immortal")
+ TEXTURE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
+ STAT_KEYS = ("Damage", "AttackSpeed")
++ATTACK_RADIUS_DEFAULT = 7.0
++ATTACK_RADIUS_MIN = 1.0
++ATTACK_RADIUS_MAX = 420.0
++ATTACK_RADIUS_STEP = 0.5
+ SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_]{0,63}$")
+ 
+ 
+@@ -67,6 +71,7 @@ class WeaponStore:
+                     name_ru TEXT NOT NULL DEFAULT '',
+                     weapon_type TEXT NOT NULL,
+                     rarity TEXT NOT NULL,
++                    attack_radius_studs REAL NOT NULL DEFAULT 7,
+                     model_source_path TEXT NOT NULL DEFAULT '',
+                     model_prepared_path TEXT NOT NULL DEFAULT '',
+                     model_sha256 TEXT NOT NULL DEFAULT '',
+@@ -125,6 +130,11 @@ class WeaponStore:
+                     value TEXT NOT NULL DEFAULT ''
+                 )"""
+             )
++            columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(weapons)")}
++            if "attack_radius_studs" not in columns:
++                connection.execute(
++                    "ALTER TABLE weapons ADD COLUMN attack_radius_studs REAL NOT NULL DEFAULT 7"
++                )
+             connection.execute("DELETE FROM project_settings WHERE key='test_loadout_weapon'")
+ 
+     @staticmethod
+@@ -140,6 +150,12 @@ class WeaponStore:
+             "weaponTypes": list(WEAPON_TYPES),
+             "rarities": list(RARITIES),
+             "statKeys": list(STAT_KEYS),
++            "attackRadius": {
++                "default": ATTACK_RADIUS_DEFAULT,
++                "min": ATTACK_RADIUS_MIN,
++                "max": ATTACK_RADIUS_MAX,
++                "step": ATTACK_RADIUS_STEP,
++            },
+         }
+ 
+     def active_slug(self) -> str | None:
+@@ -250,6 +266,16 @@ class WeaponStore:
+         incoming_slug = str(payload.get("slug") or "").strip().lower()
+         old = self.get(incoming_slug) if incoming_slug else None
+         slug, name_en, name_ru, weapon_type, rarity = self._validate_identity(payload, old)
++        attack_radius_raw = payload.get("attackRadiusStuds", old.get("attack_radius_studs") if old else ATTACK_RADIUS_DEFAULT)
++        try:
++            attack_radius_studs = float(attack_radius_raw)
++        except (TypeError, ValueError):
++            raise ValueError("attack radius must be a number in Roblox studs")
++        if not (ATTACK_RADIUS_MIN <= attack_radius_studs <= ATTACK_RADIUS_MAX):
++            raise ValueError(
++                f"attack radius must be between {ATTACK_RADIUS_MIN:g} and {ATTACK_RADIUS_MAX:g} studs"
++            )
++        attack_radius_studs = round(attack_radius_studs, 2)
+         if not old:
+             old = self.get(slug)
+         model_source = str(payload.get("modelSourcePath") or "").strip()
+@@ -281,11 +307,11 @@ class WeaponStore:
+         with self.connect() as connection:
+             connection.execute(
+                 """INSERT OR REPLACE INTO weapons(
+-                    slug,name_en,name_ru,weapon_type,rarity,model_source_path,model_prepared_path,model_sha256,
++                    slug,name_en,name_ru,weapon_type,rarity,attack_radius_studs,model_source_path,model_prepared_path,model_sha256,
+                     model_asset_id,model_published_sha256,moderation_state,revision,created_at,updated_at,published_at
+-                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
++                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                 (
+-                    slug, name_en, name_ru, weapon_type, rarity, model_source_path, model_prepared_path, model_sha256,
++                    slug, name_en, name_ru, weapon_type, rarity, attack_radius_studs, model_source_path, model_prepared_path, model_sha256,
+                     old.get("model_asset_id") if old else None,
+                     str(old.get("model_published_sha256") or "") if old else "",
+                     str(old.get("moderation_state") or "") if old else "",
+@@ -490,6 +516,7 @@ class WeaponStore:
+                 f"\t\t\tnameRu = {self._lua_string(row['name_ru'])},",
+                 f"\t\t\tweaponType = {self._lua_string(row['weapon_type'])},",
+                 f"\t\t\trarity = {self._lua_string(row['rarity'])},",
++                f"\t\t\tattackRadiusStuds = {self._lua_number(row.get('attack_radius_studs') or ATTACK_RADIUS_DEFAULT)},",
+                 f"\t\t\tstatus = {self._lua_string(row['status'])},",
+                 f"\t\t\tmodelAssetId = {self._lua_string(row.get('model_asset_id') or '')},",
+                 f"\t\t\tserverStoragePath = {self._lua_string(row['server_storage_path'])},",
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index 090a353..937ce82 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -556,13 +556,20 @@ if 'character:GetAttribute("AttackSpeed")' not in attack_controller_text:
+ 
+ if 'id="nav-weapons"' not in ui or 'id="register-weapon"' not in ui or 'id="weapon-stat-attack-speed"' not in ui:
+     err("asset manager weapon registration section is missing")
++if 'id="weapon-attack-radius"' not in ui:
++    err("weapon registration must expose attack radius in studs")
+ if 'id="weapon-test-loadout"' in ui or 'id="save-weapon-test-loadout"' in ui:
+     err("studio test loadout must not live in the web asset manager")
+ weapon_js_path = ROOT / "system/control-center/static/weapon-assets.js"
+ weapon_js_text = weapon_js_path.read_text(encoding="utf-8") if weapon_js_path.is_file() else ""
+-for required in ["weaponSlugify", "weaponRegister", "weaponPublish", "weaponSync", "weaponActivate"]:
++for required in ["weaponSlugify", "weaponRegister", "weaponPublish", "weaponSync", "weaponActivate", "attackRadiusStuds", "weapon-attack-radius"]:
+     if required not in weapon_js_text:
+         err(f"asset manager weapon ui missing {required}")
++for required in ["attack_radius_studs", "ATTACK_RADIUS_DEFAULT", "attackRadiusStuds"]:
++    if required not in weapon_store_text:
++        err(f"weapon attack-radius storage contract missing {required}")
++if "attack_radius_studs real not null default 7" not in schema_text.lower():
++    err("weapon schema is missing attack_radius_studs")
+ if "weaponSaveTestLoadout" in weapon_js_text:
+     err("obsolete asset-manager test loadout javascript is still present")
+ 
+@@ -588,6 +595,12 @@ if "legacy-pivot" in weapon_equip_text or "weapon:PivotTo(socketFrame)" in weapo
+     err("weapon equip must not keep a legacy Model-pivot alignment path")
+ if "weapon:PivotTo(socketFrame)" in weapon_attach_text:
+     err("client weapon attachment must not keep a legacy Model-pivot alignment path")
++for required in ['character:SetAttribute("AttackRadius"', "attackRadiusStuds", "AttackConfig.MaxAimDistance"]:
++    if required not in weapon_equip_text:
++        err(f"weapon equip attack-radius runtime missing {required}")
++for required in ['character:GetAttribute("AttackRadius")', "attackRange", "attackBoxSize"]:
++    if required not in attack_text:
++        err(f"server-authoritative weapon attack radius missing {required}")
+ 
+ # m6.2 Studio-native Test Loadout (ported from the reference architecture)
+ test_loadout_server_path = ROOT / "src/server/dev/TestLoadoutService.luau"
+@@ -600,6 +613,11 @@ for required in ["GetTestLoadoutCatalog", "ApplyTestLoadout", "CharacterService.
+ for required in ["TEST LOADOUT", "createDropdown", "createCategorySelector", "LastLoadoutArchetype", "LastLoadoutWeaponSlug", "ACCEPT LOADOUT", "RunService:IsStudio()"]:
+     if required not in test_loadout_client:
+         err(f"Studio Test Loadout client missing {required}")
++for required in ["ATTACK RADIUS: OFF", "Game1AttackRadiusPreview", "createAttackRadiusRing", 'currentCharacter:GetAttribute("AttackRadius")', "RunService.RenderStepped"]:
++    if required not in test_loadout_client:
++        err(f"Studio Test Loadout attack-radius preview missing {required}")
++if "attackRadiusStuds" not in test_loadout_server:
++    err("Studio Test Loadout catalog must expose the registered weapon attack radius")
+ server_init_text = (ROOT / "src/server/init.server.luau").read_text(encoding="utf-8")
+ if "TestLoadoutService.Start()" not in server_init_text:
+     err("Studio Test Loadout service is not started by the server runtime")
+@@ -749,8 +767,14 @@ monster_spawner_text = monster_spawner_path.read_text(encoding="utf-8") if monst
+ for required in ["MonsterSpawnRegistry", "MonsterRegistry", "MonsterAnimationRegistry", "spawnRadius", "maxAlive", "respawnSeconds", "math.sqrt", "Workspace:Raycast", "EntityHitboxService.Attach", 'GetAttributeChangedSignal("LifeState")', '== "Dead"', 'publishedRows(profile, "idle")', 'weightedIdleChoice', 'MonsterAnimationState', 'MonsterIdleVariant', 'idleTrack.DidLoop', 'choice.track.Ended', 'playBaseIdle']:
+     if required not in monster_spawner_text:
+         err(f"monster runtime spawner missing {required}")
++for required in ["HumanoidRootPart", 'Instance.new("Humanoid")', "humanoid:MoveTo", "MoveToFinished", "WANDER_PAUSE_MIN_SECONDS", "WANDER_PAUSE_MAX_SECONDS", "WANDER_MOVE_REFRESH_SECONDS", "CharacterMovementConfig.ResolveSpeed", 'firstPublishedTrack(profile, "walk")', "MonsterWanderEnabled"]:
++    if required not in monster_spawner_text:
++        err(f"monster random-wander runtime missing {required}")
++for required in ['Workspace:FindFirstChild("Game1Authoring")', 'authoring:FindFirstChild("MonsterSpawns")', "monsterSpawns:Destroy()", "removeAuthoringVisualsFromSimulation"]:
++    if required not in monster_spawner_text:
++        err(f"Play/Run monster-spawn authoring-visual cleanup missing {required}")
+ if "RunService.Heartbeat" in monster_spawner_text:
+-    err("monster spawn population must not use a permanent Heartbeat loop")
++    err("monster spawn/wander runtime must not use a permanent Heartbeat loop")
+ if "MonsterSpawnerService.Start()" not in server_init_text:
+     err("monster spawner is not started by the server runtime")
+ 
+@@ -788,7 +812,7 @@ if errors:
+         print(" -", item)
+     sys.exit(1)
+ 
+-print("verify ok · game1 m7 unified combat_idle + no equip animation states + monster assets/spawn contracts passed")
++print("verify ok · game1 m7 weapon attack radius + clean simulation authoring + monster wander contracts passed")
+ print("registered character archetypes:", len(archetypes))
+ print("active character archetype:", active_id or "none")
+ print("race pool: human")

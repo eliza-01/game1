@@ -21,6 +21,9 @@ BASE_SLOT_CATALOG = [
     {"group": "seated", "slot": "seated.enter", "label": "sit down", "looped": False, "priority": "Action"},
     {"group": "seated", "slot": "seated.loop", "label": "sit", "looped": True, "priority": "Movement"},
     {"group": "seated", "slot": "seated.exit", "label": "sit up", "looped": False, "priority": "Action"},
+    {"group": "life", "slot": "death", "label": "death", "looped": False, "priority": "Action"},
+    {"group": "life", "slot": "death_wait", "label": "wait in death state", "looped": True, "priority": "Action"},
+    {"group": "life", "slot": "revive", "label": "rise after death", "looped": False, "priority": "Action"},
 ]
 
 WEAPON_SLOT_CATALOG = [
@@ -30,8 +33,6 @@ WEAPON_SLOT_CATALOG = [
     {"group": "movement", "slot": "run", "label": "run", "looped": True, "priority": "Movement", "variants": False},
     {"group": "combat", "slot": "attack", "label": "attack", "looped": False, "priority": "Action", "variants": True},
     {"group": "combat", "slot": "special_attack", "label": "special attack", "looped": False, "priority": "Action", "variants": True},
-    {"group": "transition", "slot": "equip", "label": "equip", "looped": False, "priority": "Action", "variants": False},
-    {"group": "transition", "slot": "unequip", "label": "unequip", "looped": False, "priority": "Action", "variants": False},
 ]
 
 BOW_EXTRA_SLOTS = [
@@ -197,6 +198,9 @@ def classify_animation(path: Path, character_id: str | None = None) -> dict | No
         "seated_loop": "seated.loop", "base_seated_loop": "seated.loop",
         "situp": "seated.exit", "sit_up": "seated.exit", "stand": "seated.exit",
         "seated_exit": "seated.exit", "base_seated_exit": "seated.exit",
+        "death": "death", "die": "death", "base_death": "death",
+        "dead": "death_wait", "dead_idle": "death_wait", "death_wait": "death_wait", "dead_wait": "death_wait", "base_dead_idle": "death_wait", "base_death_wait": "death_wait",
+        "revive": "revive", "rise": "revive", "resurrection": "revive", "base_revive": "revive",
     }
     if stem in base_aliases:
         slot = base_aliases[stem]
@@ -210,8 +214,7 @@ def classify_animation(path: Path, character_id: str | None = None) -> dict | No
         slot = {
             "idle": "idle", "combat_idle": "combat_idle", "attack_wait": "combat_idle",
             "walk": "walk", "run": "run", "attack": "attack",
-            "special_attack": "special_attack", "equip": "equip", "unequip": "unequip",
-            "aim": "aim",
+            "special_attack": "special_attack", "aim": "aim",
         }.get(body)
         catalog = _catalog_for_weapon(weapon_set)
         if slot in catalog:

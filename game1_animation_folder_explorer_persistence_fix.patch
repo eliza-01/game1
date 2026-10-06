@@ -1,0 +1,232 @@
+diff --git a/system/control-center/host_agent.py b/system/control-center/host_agent.py
+index b5765a4..9c40317 100644
+--- a/system/control-center/host_agent.py
++++ b/system/control-center/host_agent.py
+@@ -37,7 +37,7 @@ from monster_spawn_store import MonsterSpawnStore
+ from character_core.identity import CharacterIdentityService
+ from studio_bridge import run_model_load_bridge, run_monster_spawn_bridge
+ 
+-control_agent_build = "game1-m7-monsters-spawns-003"
++control_agent_build = "game1-m7-animation-folder-explorer-005"
+ port = int(os.environ.get("CONTROL_AGENT_PORT", "43821"))
+ token = os.environ.get("CONTROL_TOKEN", "Game1LocalControlV1")
+ store = CharacterStore(ROOT)
+@@ -203,15 +203,19 @@ def sync_monster_to_studio(slug: str):
+         raise ValueError("Studio loaded the monster rig but did not apply any published monster textures")
+     return {"monster": row, "studio": result}
+ 
+-def _powershell_picker(script: str) -> str:
++def _powershell_picker(script: str, extra_env: dict | None = None) -> str:
+     powershell = shutil.which("powershell.exe") or shutil.which("powershell")
+     if not powershell:
+         raise RuntimeError("powershell was not found for the native picker")
++    picker_env = os.environ.copy()
++    if extra_env:
++        picker_env.update({str(key): str(value) for key, value in extra_env.items()})
+     completed = subprocess.run(
+         [powershell, "-NoProfile", "-STA", "-Command", script],
+         capture_output=True,
+         text=True,
+         timeout=120,
++        env=picker_env,
+     )
+     if completed.returncode != 0:
+         raise RuntimeError((completed.stderr or completed.stdout or "picker failed").strip())
+@@ -349,18 +353,24 @@ def write_animation_export(payload: dict):
+     }
+ 
+ 
+-def choose_animation_folder() -> str:
++def choose_animation_folder(initial_path: str = "") -> str:
++    initial_path = str(initial_path or "").strip().strip('"')
+     return _powershell_picker(
+         r'''
+ Add-Type -AssemblyName System.Windows.Forms
+ $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
+-$dialog.Description = 'game1 · choose folder containing exported character animations (.rbxm/.rbxmx)'
++$dialog.Description = 'game1 · choose folder containing exported animations (.rbxm/.rbxmx)'
+ $dialog.ShowNewFolderButton = $false
++$initialPath = $env:GAME1_ANIMATION_PICKER_INITIAL_PATH
++if ($initialPath -and [System.IO.Directory]::Exists($initialPath)) {
++    $dialog.SelectedPath = $initialPath
++}
+ if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+     Write-Output $dialog.SelectedPath
+ }
+ '''
++        , {"GAME1_ANIMATION_PICKER_INITIAL_PATH": initial_path}
+     )
+ 
+ 
+@@ -455,7 +465,8 @@ class Handler(BaseHTTPRequestHandler):
+                 return self.out(400, {"error": str(error)})
+         if path == "/api/files/choose-animation-folder":
+             try:
+-                return self.out(200, {"path": choose_animation_folder()})
++                payload = self.body()
++                return self.out(200, {"path": choose_animation_folder(str(payload.get("initialPath") or ""))})
+             except Exception as error:
+                 return self.out(400, {"error": str(error)})
+         if path == "/api/files/choose-monster-model":
+diff --git a/system/control-center/static/asset-manager.css b/system/control-center/static/asset-manager.css
+index 927dd26..1f6b811 100644
+--- a/system/control-center/static/asset-manager.css
++++ b/system/control-center/static/asset-manager.css
+@@ -9,3 +9,4 @@
+ .monster-stats-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.monster-animation-hero{margin-top:18px}.monster-unassigned-row{grid-template-columns:minmax(240px,1.5fr) minmax(150px,.7fr) 90px auto}@media(max-width:650px){.monster-stats-grid{grid-template-columns:1fr}.monster-unassigned-row{grid-template-columns:1fr}.monster-unassigned-row .unassigned-file{grid-column:auto}}
+ 
+ .monster-spawn-workflow{display:grid;grid-template-columns:minmax(360px,.9fr) minmax(560px,1.35fr);gap:14px;margin-top:14px}.monster-spawn-position-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.monster-spawn-settings-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.spawn-enabled{display:flex!important;align-items:center;gap:8px;margin-top:25px!important}.spawn-enabled input{width:auto!important;margin:0!important}.monster-spawn-records{display:grid;gap:7px}.monster-spawn-record{display:grid;grid-template-columns:minmax(190px,.75fr) minmax(300px,1.3fr) auto;gap:12px;align-items:center;width:100%;text-align:left;background:var(--panel2)}.monster-spawn-record.active{border-color:var(--mint);background:#42d6b112}.monster-spawn-record span{min-width:0}.monster-spawn-record strong,.monster-spawn-record small,.monster-spawn-record b{display:block;overflow-wrap:anywhere}.monster-spawn-record small{margin-top:3px;color:var(--muted);font-size:10px}.monster-spawn-record i{font-style:normal;font-size:10px;letter-spacing:.06em;border:1px solid var(--line);border-radius:999px;padding:4px 7px}.monster-spawn-record i.synced{color:var(--mint);border-color:#42d6b166}.monster-spawn-record i.stale{color:var(--orange);border-color:#ff9f4366}.monster-spawn-record i.error{color:var(--danger);border-color:#ff657766}#monster-spawn-readiness span,#monster-spawn-operation span{display:block}.blocked{color:var(--danger)!important}@media(max-width:1150px){.monster-spawn-workflow{grid-template-columns:1fr}}@media(max-width:700px){.monster-spawn-position-grid,.monster-spawn-settings-grid{grid-template-columns:1fr}.monster-spawn-record{grid-template-columns:1fr}.spawn-enabled{margin-top:5px!important}}
++.folder-picker{text-align:left}.folder-explorer{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}.folder-explorer input{width:100%;min-width:0;font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace}.folder-explorer button{white-space:nowrap}.folder-picker small{margin-top:8px!important;word-break:normal!important;overflow-wrap:anywhere}@media(max-width:650px){.folder-explorer{grid-template-columns:1fr}.folder-explorer button{width:100%}}
+\ No newline at end of file
+diff --git a/system/control-center/static/character-assets.js b/system/control-center/static/character-assets.js
+index b489a5a..e90a023 100644
+--- a/system/control-center/static/character-assets.js
++++ b/system/control-center/static/character-assets.js
+@@ -5,6 +5,29 @@ const state = {
+ };
+ const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const FILENAME_GUIDE_OPEN_KEY='game1.animation.filenameRules.open';
++const ANIMATION_FOLDER_KEY='game1.animation.folder';
++
++function normalizeAnimationFolderPath(value){
++  let path=String(value??'').trim();
++  if(path.length>=2&&((path.startsWith('"')&&path.endsWith('"'))||(path.startsWith("'")&&path.endsWith("'"))))path=path.slice(1,-1).trim();
++  return path;
++}
++function rememberAnimationFolder(path){try{if(path)localStorage.setItem(ANIMATION_FOLDER_KEY,path);else localStorage.removeItem(ANIMATION_FOLDER_KEY)}catch{}}
++function renderAnimationFolderControls(){
++  const input=$('animation-folder-path');
++  if(input&&document.activeElement!==input&&input.value!==state.animationFolder)input.value=state.animationFolder;
++  const scan=$('scan-animations');if(scan)scan.disabled=state.animationPublishing||!state.animationCharacter||!state.animationFolder;
++}
++function setAnimationFolder(path,persist=true){state.animationFolder=normalizeAnimationFolderPath(path);if(persist)rememberAnimationFolder(state.animationFolder);renderAnimationFolderControls()}
++function initAnimationFolderExplorer(){
++  const input=$('animation-folder-path');if(!input)return;
++  try{state.animationFolder=normalizeAnimationFolderPath(localStorage.getItem(ANIMATION_FOLDER_KEY)||'')}catch{}
++  input.value=state.animationFolder;
++  input.addEventListener('input',()=>{state.animationFolder=normalizeAnimationFolderPath(input.value);renderAnimationFolderControls()});
++  input.addEventListener('change',()=>setAnimationFolder(input.value,true));
++  input.addEventListener('keydown',event=>{if(event.key!=='Enter')return;event.preventDefault();setAnimationFolder(input.value,true);if(!$('scan-animations').disabled)scanAnimations()});
++  renderAnimationFolderControls();
++}
+ function initFilenameRulesDisclosure(){
+   const guide=$('animation-filename-guide');if(!guide)return;
+   try{const saved=localStorage.getItem(FILENAME_GUIDE_OPEN_KEY);if(saved!==null)guide.open=saved==='1';}catch{}
+@@ -97,10 +120,10 @@ function renderUnassigned(){
+ }
+ async function assignUnassignedAnimation(row,rowHost){
+   try{const context=rowHost.querySelector('[data-manual-context]').value;const slot=rowHost.querySelector('[data-manual-slot]').value;const variant=Number(rowHost.querySelector('[data-manual-variant]').value||0);rowHost.querySelector('[data-manual-assign]').disabled=true;await request('/api/animations/assign',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({characterId:state.animationCharacter,sourcePath:row.path,scope:context==='base'?'base':'weapon',weaponSet:context==='base'?'':context,slot,variant})});state.lastScan.unassigned=(state.lastScan.unassigned||[]).filter(item=>item.path!==row.path);state.lastScan.recognized=(state.lastScan.recognized||0)+1;await loadAnimations();$('animation-scan-status').innerHTML=`<strong>scan complete · ${state.lastScan.recognized}/${state.lastScan.filesScanned} assigned</strong><span>${state.lastScan.created} new · ${state.lastScan.changed} changed · ${state.lastScan.unchanged} unchanged · ${state.lastScan.unassigned.length} unassigned</span>`;renderUnassigned();toast(`assigned ${row.filename} → ${context} / ${slot}${variant?` / ${String(variant).padStart(2,'0')}`:''}`)}catch(error){toast(error.message,true);rowHost.querySelector('[data-manual-assign]').disabled=false}}
+-function renderAnimations(){if(!state.animations)return;renderAnimationProfile();renderFilenameRules();renderAnimationTree();renderAnimationRows();renderAnimationDetails();renderUnassigned();const pub=!!state.animations.publication?.configured;const missing=(state.animations.items||[]).some(row=>row.status==='LOCAL_ONLY');$('publish-missing-animations').disabled=state.animationPublishing||!pub||!missing;$('scan-animations').disabled=state.animationPublishing||!state.animationCharacter||!state.animationFolder;$('refresh-animations').disabled=state.animationPublishing;$('animation-table-title').textContent=`${state.animationCharacter||'character'} · registered clips`}
+-async function loadAnimations(){try{populateAnimationCharacters();const character=state.animationCharacter||$('animation-character').value||'';state.animations=await request('/api/animations?character='+encodeURIComponent(character));state.animationCharacter=state.animations.characterId||character;if($('animation-character').value!==state.animationCharacter)$('animation-character').value=state.animationCharacter;renderAnimations()}catch(error){toast(error.message,true)}}
+-async function chooseAnimationFolder(){try{const result=await request('/api/files/choose-animation-folder',{method:'POST'});if(!result.path)return;state.animationFolder=result.path;$('animation-folder').textContent=result.path;renderAnimations()}catch(error){toast(error.message,true)}}
+-async function scanAnimations(){try{if(!state.animationCharacter)throw Error('select a character');if(!state.animationFolder)throw Error('choose an animation folder');$('scan-animations').disabled=true;toast('scanning and registering animation clips…');state.lastScan=await request('/api/animations/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({characterId:state.animationCharacter,rootPath:state.animationFolder})});await loadAnimations();$('animation-scan-status').innerHTML=`<strong>scan complete · ${state.lastScan.recognized}/${state.lastScan.filesScanned} recognized</strong><span>${state.lastScan.created} new · ${state.lastScan.changed} changed · ${state.lastScan.unchanged} unchanged · ${state.lastScan.unassigned.length} unassigned</span>`;renderUnassigned();toast(`registered ${state.lastScan.recognized} animation clips`)}catch(error){toast(error.message,true)}finally{renderAnimations()}}
++function renderAnimations(){renderAnimationFolderControls();if(!state.animations)return;renderAnimationProfile();renderFilenameRules();renderAnimationTree();renderAnimationRows();renderAnimationDetails();renderUnassigned();const pub=!!state.animations.publication?.configured;const missing=(state.animations.items||[]).some(row=>row.status==='LOCAL_ONLY');$('publish-missing-animations').disabled=state.animationPublishing||!pub||!missing;$('refresh-animations').disabled=state.animationPublishing;$('animation-table-title').textContent=`${state.animationCharacter||'character'} · registered clips`;renderAnimationFolderControls()}
++async function loadAnimations(){try{populateAnimationCharacters();const character=state.animationCharacter||$('animation-character').value||'';state.animations=await request('/api/animations?character='+encodeURIComponent(character));state.animationCharacter=state.animations.characterId||character;if($('animation-character').value!==state.animationCharacter)$('animation-character').value=state.animationCharacter;const profileRoot=normalizeAnimationFolderPath(state.animations.profile?.scan_root||'');if(!state.animationFolder&&profileRoot)setAnimationFolder(profileRoot,true);renderAnimations()}catch(error){toast(error.message,true)}}
++async function chooseAnimationFolder(){try{setAnimationFolder($('animation-folder-path').value,false);const result=await request('/api/files/choose-animation-folder',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({initialPath:state.animationFolder})});if(!result.path)return;setAnimationFolder(result.path,true);renderAnimations()}catch(error){toast(error.message,true)}}
++async function scanAnimations(){try{setAnimationFolder($('animation-folder-path').value,true);if(!state.animationCharacter)throw Error('select a character');if(!state.animationFolder)throw Error('choose or paste an animation folder');$('scan-animations').disabled=true;toast('scanning and registering animation clips…');state.lastScan=await request('/api/animations/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({characterId:state.animationCharacter,rootPath:state.animationFolder})});await loadAnimations();$('animation-scan-status').innerHTML=`<strong>scan complete · ${state.lastScan.recognized}/${state.lastScan.filesScanned} recognized</strong><span>${state.lastScan.created} new · ${state.lastScan.changed} changed · ${state.lastScan.unchanged} unchanged · ${state.lastScan.unassigned.length} unassigned</span>`;renderUnassigned();toast(`registered ${state.lastScan.recognized} animation clips`)}catch(error){toast(error.message,true)}finally{renderAnimations()}}
+ async function publishAnimation(clipId){try{toast('publishing animation…');await request('/api/animations/'+encodeURIComponent(clipId)+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:$('animation-publication-description').value})});await loadAnimations();toast('animation published')}catch(error){toast(error.message,true)}}
+ async function publishMissingAnimations(){if(state.animationPublishing)return;let published=0;try{if(!state.animationCharacter)throw Error('select a character');const queue=(state.animations?.items||[]).filter(row=>row.status==='LOCAL_ONLY');if(!queue.length)return;state.animationPublishing=true;renderAnimations();const host=$('animation-publish-progress'),bar=$('animation-publish-bar'),count=$('animation-publish-count'),current=$('animation-publish-current');host.hidden=false;bar.max=queue.length;bar.value=0;count.textContent=`0 / ${queue.length}`;for(let index=0;index<queue.length;index++){const row=queue[index];current.textContent=`${row.name} · ${row.scope==='weapon'?row.weapon_set:'base'} / ${row.slot}`;count.textContent=`${index} / ${queue.length}`;await request('/api/animations/'+encodeURIComponent(row.clip_id)+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:$('animation-publication-description').value})});published=index+1;bar.value=published;count.textContent=`${published} / ${queue.length}`;}current.textContent='publication queue complete';toast(`published ${published} animation assets`)}catch(error){toast(`published ${published}; stopped: ${error.message}`,true)}finally{state.animationPublishing=false;await loadAnimations();renderAnimations()}}
+ async function setAnimationWeight(bindingId,weight){try{state.animations=await request('/api/animation-bindings/'+encodeURIComponent(bindingId)+'/weight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({weight:Number(weight)})});state.animations.publication=state.data?.publication||{};renderAnimations()}catch(error){toast(error.message,true)}}
+@@ -108,5 +131,6 @@ async function removeAnimationBinding(bindingId){if(!confirm('remove this semant
+ 
+ $('display-name').oninput=()=>{if(!state.selected)state.autoDisplayName=false};$('nav-characters').onclick=()=>setView('characters');$('nav-animations').onclick=()=>setView('animations');$('nav-weapons').onclick=()=>setView('weapons');$('nav-monsters').onclick=()=>setView('monsters');$('race').onchange=syncIdentity;$('gender').onchange=syncIdentity;$('choose-model').onclick=chooseModel;$('save-archetype').onclick=saveArchetype;$('register-character').onclick=registerCharacter;$('publish-character').onclick=()=>publishCharacter();$('sync-character').onclick=()=>syncStudio();$('activate-character').onclick=()=>activate();$('new-character').onclick=()=>setForm(null);$('clear-form').onclick=()=>setForm(null);$('refresh').onclick=loadCharacters;$('validate-view').onclick=loadCharacters;$('theme').onclick=()=>document.body.classList.toggle('light');
+ $('animation-character').onchange=()=>{state.animationCharacter=$('animation-character').value;state.animationSelected=null;state.lastScan=null;loadAnimations()};$('choose-animation-folder').onclick=chooseAnimationFolder;$('scan-animations').onclick=scanAnimations;$('publish-missing-animations').onclick=publishMissingAnimations;$('refresh-animations').onclick=loadAnimations;
++initAnimationFolderExplorer();
+ initFilenameRulesDisclosure();
+ loadCharacters();
+diff --git a/system/control-center/static/index.html b/system/control-center/static/index.html
+index 7bd9f3b..6aab2f5 100644
+--- a/system/control-center/static/index.html
++++ b/system/control-center/static/index.html
+@@ -92,7 +92,7 @@
+ <div id="animation-filename-rules" class="filename-rules"><span class="muted">loading animation state catalog…</span></div>
+ <small class="hint">canonical filename always starts with the selected archetype id, for example <code>human_female_1hs_attack_01.rbxm</code>. the scanner remains backward-compatible with legacy unprefixed files. variant states use <code>_01</code>, <code>_02</code>, ….</small>
+ </details>
+-<div class="picker"><button id="choose-animation-folder" type="button">choose folder</button><small id="animation-folder">folder not selected</small></div>
++<div class="picker folder-picker"><div class="folder-explorer"><input id="animation-folder-path" type="text" autocomplete="off" spellcheck="false" placeholder="C:\path\to\character-animations"><button id="choose-animation-folder" type="button">explore…</button></div><small>paste a folder path or choose it in Explorer · the last character animation folder is remembered</small></div>
+ <div class="actions"><button id="scan-animations" class="primary wide" type="button" disabled>scan folder</button></div>
+ <div id="animation-scan-status" class="status-box"><strong>nothing scanned yet</strong><span>unrecognized files stay outside the registry and are listed after the scan.</span></div>
+ <hr class="card-separator">
+@@ -186,7 +186,7 @@
+ <div class="panel character-card">
+ <span class="eyebrow">04 · scan and register</span><h3>monster animation folder</h3>
+ <details id="monster-animation-filename-guide" class="naming-guide" open><summary>filename rules · monster states</summary><div id="monster-animation-filename-rules" class="filename-rules"><span class="muted">select a monster.</span></div><small class="hint">canonical names start with the monster slug, for example <code>orc_grunt_attack_01.rbxm</code>. attack supports <code>_01</code>, <code>_02</code>, ….</small></details>
+-<div class="picker"><button id="choose-monster-animation-folder" type="button">choose folder</button><small id="monster-animation-folder">folder not selected</small></div>
++<div class="picker folder-picker"><div class="folder-explorer"><input id="monster-animation-folder-path" type="text" autocomplete="off" spellcheck="false" placeholder="C:\path\to\monster-animations"><button id="choose-monster-animation-folder" type="button">explore…</button></div><small>paste a folder path or choose it in Explorer · the last monster animation folder is remembered</small></div>
+ <div class="actions"><button id="scan-monster-animations" class="primary wide" type="button" disabled>scan folder</button></div>
+ <div id="monster-animation-scan-status" class="status-box"><strong>nothing scanned yet</strong><span>unrecognized files can be assigned manually.</span></div>
+ <hr class="card-separator">
+diff --git a/system/control-center/static/monster-assets.js b/system/control-center/static/monster-assets.js
+index cd58e82..76166f6 100644
+--- a/system/control-center/static/monster-assets.js
++++ b/system/control-center/static/monster-assets.js
+@@ -1,5 +1,12 @@
+ const monsterState={data:null,selected:null,modelPath:'',texturePaths:[],animations:null,animationFolder:'',lastScan:null,animationPublishing:false,animationSelected:null};
+ const MONSTER_FILENAME_GUIDE_KEY='game1.monster.animation.filenameRules.open';
++const MONSTER_ANIMATION_FOLDER_KEY='game1.monster.animation.folder';
++
++function monsterNormalizeAnimationFolderPath(value){let path=String(value??'').trim();if(path.length>=2&&((path.startsWith('"')&&path.endsWith('"'))||(path.startsWith("'")&&path.endsWith("'"))))path=path.slice(1,-1).trim();return path}
++function monsterRememberAnimationFolder(path){try{if(path)localStorage.setItem(MONSTER_ANIMATION_FOLDER_KEY,path);else localStorage.removeItem(MONSTER_ANIMATION_FOLDER_KEY)}catch{}}
++function monsterRenderAnimationFolderControls(){const input=$('monster-animation-folder-path');if(input&&document.activeElement!==input&&input.value!==monsterState.animationFolder)input.value=monsterState.animationFolder;const scan=$('scan-monster-animations');if(scan)scan.disabled=monsterState.animationPublishing||!monsterState.selected||!monsterState.animationFolder}
++function monsterSetAnimationFolder(path,persist=true){monsterState.animationFolder=monsterNormalizeAnimationFolderPath(path);if(persist)monsterRememberAnimationFolder(monsterState.animationFolder);monsterRenderAnimationFolderControls()}
++function initMonsterAnimationFolderExplorer(){const input=$('monster-animation-folder-path');if(!input)return;try{monsterState.animationFolder=monsterNormalizeAnimationFolderPath(localStorage.getItem(MONSTER_ANIMATION_FOLDER_KEY)||'')}catch{}input.value=monsterState.animationFolder;input.addEventListener('input',()=>{monsterState.animationFolder=monsterNormalizeAnimationFolderPath(input.value);monsterRenderAnimationFolderControls()});input.addEventListener('change',()=>monsterSetAnimationFolder(input.value,true));input.addEventListener('keydown',event=>{if(event.key!=='Enter')return;event.preventDefault();monsterSetAnimationFolder(input.value,true);if(!$('scan-monster-animations').disabled)monsterScanAnimations()});monsterRenderAnimationFolderControls()}
+ function monsterSelected(){return monsterState.data?.items?.find(row=>row.slug===monsterState.selected)||null}
+ function monsterSlugify(value){const map={а:'a',б:'b',в:'v',г:'g',д:'d',е:'e',ё:'e',ж:'zh',з:'z',и:'i',й:'y',к:'k',л:'l',м:'m',н:'n',о:'o',п:'p',р:'r',с:'s',т:'t',у:'u',ф:'f',х:'h',ц:'ts',ч:'ch',ш:'sh',щ:'sch',ъ:'',ы:'y',ь:'',э:'e',ю:'yu',я:'ya'};let text=String(value||'').trim().toLowerCase().normalize('NFKD').replace(/[а-яё]/g,ch=>map[ch]??ch).replace(/[\u0300-\u036f]/g,'');return text.replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').replace(/_+/g,'_').slice(0,64).replace(/_+$/,'')}
+ function monsterStatusTag(status){return `<span class="tag ${String(status||'').toLowerCase()}">${esc(status||'')}</span>`}
+@@ -21,10 +28,10 @@ async function monsterDelete(slug){if(!confirm(`delete monster ${slug} and its a
+ function monsterRenderFilenameRules(){const host=$('monster-animation-filename-rules');if(!host)return;const rules=monsterState.animations?.filenameRules||[];if(!rules.length){host.innerHTML='<span class="muted">select a monster.</span>';return}host.innerHTML=`<div class="filename-rule-group"><div class="filename-rule-context">MONSTER</div><div class="filename-rule-table"><div class="filename-rule-head"><span>state</span><span>canonical filename</span><span>variant</span></div>${rules.map(rule=>`<div class="filename-rule-row"><code>${esc(rule.label||rule.state)}</code><code>${esc(rule.canonicalFilename)}</code><span>${esc(rule.variantPattern||'—')}</span></div>`).join('')}</div></div>`}
+ function monsterRenderAnimationRows(){const body=$('monster-animation-rows');if(!body)return;body.innerHTML='';for(const row of monsterState.animations?.items||[]){const tr=document.createElement('tr');tr.innerHTML=`<td><b>${esc(row.slot)}</b></td><td>${row.variant?String(row.variant).padStart(2,'0'):'—'}</td><td>${esc(row.name)}</td><td>${esc(row.asset_id||'local')}</td><td>${monsterStatusTag(row.status)}</td><td><input class="weight-input" type="number" min="1" max="10000" value="${esc(row.weight)}"></td><td><div class="row-actions"><button data-publish>publish</button><button data-remove class="danger">remove</button></div></td>`;const weight=tr.querySelector('input');weight.onchange=()=>monsterSetAnimationWeight(row.binding_id,weight.value);tr.querySelector('[data-publish]').disabled=row.status==='PUBLISHED';tr.querySelector('[data-publish]').onclick=()=>monsterPublishAnimation(row.clip_id);tr.querySelector('[data-remove]').onclick=()=>monsterRemoveAnimation(row.binding_id);body.appendChild(tr)}}
+ function monsterRenderUnassigned(){const host=$('monster-animation-unassigned');if(!host)return;const rows=monsterState.lastScan?.unassigned||[];if(!rows.length){host.innerHTML='';return}const defs=monsterState.animations?.slotCatalog||[];host.innerHTML=`<details open><summary>unassigned files · ${rows.length} · assign manually</summary><div class="unassigned-list">${rows.slice(0,100).map((row,index)=>`<div class="unassigned-row monster-unassigned-row" data-monster-unassigned="${index}"><div class="unassigned-file"><b>${esc(row.filename)}</b><small>${esc(row.reason)}</small></div><label>state<select data-slot>${defs.map(def=>`<option value="${esc(def.slot)}">${esc(def.label||def.slot)}</option>`).join('')}</select></label><label>variant<input data-variant type="number" min="0" max="999" value="0"></label><button data-assign class="primary" type="button">assign</button></div>`).join('')}</div></details>`;for(const node of host.querySelectorAll('[data-monster-unassigned]')){const row=rows[Number(node.dataset.monsterUnassigned)];const slot=node.querySelector('[data-slot]'),variant=node.querySelector('[data-variant]');const update=()=>{const def=defs.find(x=>x.slot===slot.value);variant.disabled=!def?.variants;if(def?.variants&&Number(variant.value)<=0)variant.value='1';if(!def?.variants)variant.value='0'};slot.onchange=update;update();node.querySelector('[data-assign]').onclick=()=>monsterAssignAnimation(row,node)}}
+-function monsterRenderAnimations(){const data=monsterState.animations;if(!data)return;monsterRenderFilenameRules();monsterRenderAnimationRows();monsterRenderUnassigned();const selected=monsterSelected();$('monster-animation-profile-state').className='runtime-state '+(data.skeletonCompatible?'registered':'bootstrap');$('monster-animation-profile-state').innerHTML=selected?`<strong>${esc(selected.slug)} · ${data.skeletonCompatible?'skeleton compatible':'skeleton changed'}</strong><span>${esc(data.profile?.skeleton_signature||'no skeleton signature')}</span>`:'<strong>select monster</strong><span>register a monster first.</span>';$('monster-animation-folder').textContent=monsterState.animationFolder||data.profile?.scan_root||'folder not selected';$('scan-monster-animations').disabled=monsterState.animationPublishing||!selected||!monsterState.animationFolder;$('publish-missing-monster-animations').disabled=monsterState.animationPublishing||!selected||!data.publication?.configured||!(data.items||[]).some(row=>row.status==='LOCAL_ONLY');$('monster-animation-table-title').textContent=`${selected?.slug||'monster'} · registered clips`}
+-async function monsterLoadAnimations(){try{const slug=monsterState.selected||'';monsterState.animations=await request('/api/monster-animations?monster='+encodeURIComponent(slug));monsterRenderAnimations()}catch(error){toast(error.message,true)}}
+-async function monsterChooseAnimationFolder(){try{const result=await request('/api/files/choose-animation-folder',{method:'POST'});if(!result.path)return;monsterState.animationFolder=result.path;$('monster-animation-folder').textContent=result.path;monsterRenderAnimations()}catch(error){toast(error.message,true)}}
+-async function monsterScanAnimations(){try{if(!monsterState.selected)throw Error('select a monster');if(!monsterState.animationFolder)throw Error('choose an animation folder');monsterState.lastScan=await request('/api/monster-animations/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({monsterSlug:monsterState.selected,rootPath:monsterState.animationFolder})});await monsterLoadAnimations();$('monster-animation-scan-status').innerHTML=`<strong>scan complete · ${monsterState.lastScan.recognized}/${monsterState.lastScan.filesScanned} recognized</strong><span>${monsterState.lastScan.created} new · ${monsterState.lastScan.changed} changed · ${monsterState.lastScan.unchanged} unchanged · ${monsterState.lastScan.unassigned.length} unassigned</span>`;monsterRenderUnassigned();toast(`registered ${monsterState.lastScan.recognized} monster animation clips`)}catch(error){toast(error.message,true)}finally{monsterRenderAnimations()}}
++function monsterRenderAnimations(){monsterRenderAnimationFolderControls();const data=monsterState.animations;if(!data)return;monsterRenderFilenameRules();monsterRenderAnimationRows();monsterRenderUnassigned();const selected=monsterSelected();$('monster-animation-profile-state').className='runtime-state '+(data.skeletonCompatible?'registered':'bootstrap');$('monster-animation-profile-state').innerHTML=selected?`<strong>${esc(selected.slug)} · ${data.skeletonCompatible?'skeleton compatible':'skeleton changed'}</strong><span>${esc(data.profile?.skeleton_signature||'no skeleton signature')}</span>`:'<strong>select monster</strong><span>register a monster first.</span>';$('publish-missing-monster-animations').disabled=monsterState.animationPublishing||!selected||!data.publication?.configured||!(data.items||[]).some(row=>row.status==='LOCAL_ONLY');$('monster-animation-table-title').textContent=`${selected?.slug||'monster'} · registered clips`;monsterRenderAnimationFolderControls()}
++async function monsterLoadAnimations(){try{const slug=monsterState.selected||'';monsterState.animations=await request('/api/monster-animations?monster='+encodeURIComponent(slug));const profileRoot=monsterNormalizeAnimationFolderPath(monsterState.animations.profile?.scan_root||'');if(!monsterState.animationFolder&&profileRoot)monsterSetAnimationFolder(profileRoot,true);monsterRenderAnimations()}catch(error){toast(error.message,true)}}
++async function monsterChooseAnimationFolder(){try{monsterSetAnimationFolder($('monster-animation-folder-path').value,false);const result=await request('/api/files/choose-animation-folder',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({initialPath:monsterState.animationFolder})});if(!result.path)return;monsterSetAnimationFolder(result.path,true);monsterRenderAnimations()}catch(error){toast(error.message,true)}}
++async function monsterScanAnimations(){try{monsterSetAnimationFolder($('monster-animation-folder-path').value,true);if(!monsterState.selected)throw Error('select a monster');if(!monsterState.animationFolder)throw Error('choose or paste a monster animation folder');$('scan-monster-animations').disabled=true;monsterState.lastScan=await request('/api/monster-animations/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({monsterSlug:monsterState.selected,rootPath:monsterState.animationFolder})});await monsterLoadAnimations();$('monster-animation-scan-status').innerHTML=`<strong>scan complete · ${monsterState.lastScan.recognized}/${monsterState.lastScan.filesScanned} recognized</strong><span>${monsterState.lastScan.created} new · ${monsterState.lastScan.changed} changed · ${monsterState.lastScan.unchanged} unchanged · ${monsterState.lastScan.unassigned.length} unassigned</span>`;monsterRenderUnassigned();toast(`registered ${monsterState.lastScan.recognized} monster animation clips`)}catch(error){toast(error.message,true)}finally{monsterRenderAnimations()}}
+ async function monsterAssignAnimation(row,node){try{const slot=node.querySelector('[data-slot]').value,variant=Number(node.querySelector('[data-variant]').value||0);await request('/api/monster-animations/assign',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({monsterSlug:monsterState.selected,sourcePath:row.path,slot,variant})});monsterState.lastScan.unassigned=(monsterState.lastScan.unassigned||[]).filter(item=>item.path!==row.path);await monsterLoadAnimations();monsterRenderUnassigned();toast(`assigned ${row.filename} → ${slot}`)}catch(error){toast(error.message,true)}}
+ async function monsterPublishAnimation(clipId){try{await request('/api/monster-animations/'+encodeURIComponent(clipId)+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:$('monster-animation-publication-description').value})});await monsterLoadAnimations();toast('monster animation published')}catch(error){toast(error.message,true)}}
+ async function monsterPublishMissingAnimations(){if(monsterState.animationPublishing)return;let published=0;try{const queue=(monsterState.animations?.items||[]).filter(row=>row.status==='LOCAL_ONLY');if(!queue.length)return;monsterState.animationPublishing=true;monsterRenderAnimations();const host=$('monster-animation-publish-progress'),bar=$('monster-animation-publish-bar'),count=$('monster-animation-publish-count'),current=$('monster-animation-publish-current');host.hidden=false;bar.max=queue.length;bar.value=0;for(let index=0;index<queue.length;index++){const row=queue[index];current.textContent=`${row.name} · ${row.slot}`;count.textContent=`${index} / ${queue.length}`;await request('/api/monster-animations/'+encodeURIComponent(row.clip_id)+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:$('monster-animation-publication-description').value})});published=index+1;bar.value=published;count.textContent=`${published} / ${queue.length}`;}current.textContent='publication queue complete';toast(`published ${published} monster animation assets`)}catch(error){toast(`published ${published}; stopped: ${error.message}`,true)}finally{monsterState.animationPublishing=false;await monsterLoadAnimations();monsterRenderAnimations()}}
+@@ -32,4 +39,5 @@ async function monsterSetAnimationWeight(bindingId,weight){try{monsterState.anim
+ async function monsterRemoveAnimation(bindingId){if(!confirm('remove this monster animation binding? canonical source files are preserved.'))return;try{monsterState.animations=await request('/api/monster-animation-bindings/'+encodeURIComponent(bindingId),{method:'DELETE'});monsterState.animations.publication=monsterState.data?.publication||{};monsterRenderAnimations();toast('monster animation binding removed')}catch(error){toast(error.message,true)}}
+ function initMonsterFilenameDisclosure(){const guide=$('monster-animation-filename-guide');if(!guide)return;try{const saved=localStorage.getItem(MONSTER_FILENAME_GUIDE_KEY);if(saved!==null)guide.open=saved==='1'}catch{}guide.addEventListener('toggle',()=>{try{localStorage.setItem(MONSTER_FILENAME_GUIDE_KEY,guide.open?'1':'0')}catch{}})}
+ window.game1MonstersLoad=monsterLoad;
++initMonsterAnimationFolderExplorer();
+ $('monster-name-en').oninput=monsterSyncSlug;$('new-monster').onclick=()=>monsterSetForm(null);$('refresh-monsters').onclick=monsterLoad;$('validate-monsters').onclick=monsterLoad;$('choose-monster-model').onclick=monsterChooseModel;$('choose-monster-textures').onclick=monsterChooseTextures;$('register-monster').onclick=monsterRegister;$('clear-monster-form').onclick=()=>monsterSetForm(null);$('publish-monster').onclick=()=>monsterSelected()&&monsterPublish(monsterSelected().slug);$('sync-monster').onclick=()=>monsterSelected()&&monsterSync(monsterSelected().slug);$('choose-monster-animation-folder').onclick=monsterChooseAnimationFolder;$('scan-monster-animations').onclick=monsterScanAnimations;$('publish-missing-monster-animations').onclick=monsterPublishMissingAnimations;$('refresh-monster-animations').onclick=monsterLoadAnimations;initMonsterFilenameDisclosure();
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index ef9556d..1058fa5 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -282,6 +282,13 @@ if 'id="race"' not in ui or 'id="gender"' not in ui or 'id="publish-character"'
+     err("character asset manager race/gender/publication controls are missing")
+ if 'id="character-model-source"' in ui:
+     err("character edit UI must not reassign/reuse another archetype's existing Roblox model asset id")
++character_js_text = js.read_text(encoding="utf-8") if js.is_file() else ""
++for required in ['id="animation-folder-path"', 'id="choose-animation-folder"', 'id="scan-animations"']:
++    if required not in ui:
++        err(f"character animation folder explorer missing {required}")
++for required in ["ANIMATION_FOLDER_KEY", "initAnimationFolderExplorer", "initialPath", "localStorage.setItem(ANIMATION_FOLDER_KEY"]:
++    if required not in character_js_text:
++        err(f"character animation folder persistence missing {required}")
+ if "/replace-model" not in host_agent_text:
+     err("character edit UI needs an explicit replace-model endpoint")
+ 
+@@ -675,9 +682,15 @@ monster_js_text = monster_js_path.read_text(encoding="utf-8") if monster_js_path
+ for required in ['id="nav-monsters"', 'id="monsters-view"', 'id="register-monster"', 'id="monster-stat-hp"', 'id="monster-stat-damage"', 'id="monster-stat-attack-speed"', 'id="monster-stat-run-speed"', 'id="monster-stat-crit-chance"', 'id="monster-animation-filename-guide"']:
+     if required not in ui:
+         err(f"asset manager monster UI missing {required}")
+-for required in ["monsterRegister", "monsterPublish", "monsterSync", "monsterScanAnimations", "monsterPublishMissingAnimations", "MONSTER_FILENAME_GUIDE_KEY"]:
++for required in ["monsterRegister", "monsterPublish", "monsterSync", "monsterScanAnimations", "monsterPublishMissingAnimations", "MONSTER_FILENAME_GUIDE_KEY", "MONSTER_ANIMATION_FOLDER_KEY", "initMonsterAnimationFolderExplorer"]:
+     if required not in monster_js_text:
+         err(f"asset manager monster javascript missing {required}")
++for required in ['id="monster-animation-folder-path"', 'id="choose-monster-animation-folder"', 'id="scan-monster-animations"']:
++    if required not in ui:
++        err(f"monster animation folder explorer missing {required}")
++for required in ["GAME1_ANIMATION_PICKER_INITIAL_PATH", "choose_animation_folder(initial_path", '"initialPath"']:
++    if required not in host_agent_text:
++        err(f"host agent animation folder explorer missing {required}")
+ for required in ["MonsterStore", "MonsterAnimationStore", "sync_monster_to_studio", 'placement_mode="monster-rig"', '"/api/monsters"', '"/api/monster-animations"']:
+     if required not in host_agent_text:
+         err(f"host agent monster API missing {required}")

@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>game1 · asset manager</title>
-<link rel="stylesheet" href="asset-manager.css?v=6">
+<link rel="stylesheet" href="asset-manager.css?v=7">
 </head>
 <body>
 <header>
 <div><span class="eyebrow">game1 · control center</span><h1>asset manager</h1></div>
-<div class="header-actions"><span class="pill">characters + animations + weapons · m6.2</span><button id="theme" class="icon" type="button" title="theme">◐</button></div>
+<div class="header-actions"><span class="pill">characters + animations + weapons + monsters · m7</span><button id="theme" class="icon" type="button" title="theme">◐</button></div>
 </header>
 <main>
 <aside class="panel rail">
@@ -18,6 +18,7 @@
 <button id="nav-characters" class="asset-section active" type="button"><b>characters</b><small>models · rigs</small></button>
 <button id="nav-animations" class="asset-section" type="button"><b>animations</b><small>profiles · clips</small></button>
 <button id="nav-weapons" class="asset-section" type="button"><b>weapons</b><small>models · textures · stats</small></button>
+<button id="nav-monsters" class="asset-section" type="button"><b>monsters</b><small>rigs · stats · animations</small></button>
 </div>
 <div id="character-rail">
 <hr class="rail-separator">
@@ -36,6 +37,12 @@
 <div class="section-title"><div><span>weapon registry</span><h3>weapons</h3></div><span id="weapon-rail-count">0</span></div>
 <div class="tree-actions"><button id="new-weapon" class="primary" type="button">new</button><button id="refresh-weapons" type="button">refresh</button></div>
 <div id="weapon-tree" class="tree"></div>
+</div>
+<div id="monster-rail" hidden>
+<hr class="rail-separator">
+<div class="section-title"><div><span>monster registry</span><h3>monsters</h3></div><span id="monster-rail-count">0</span></div>
+<div class="tree-actions"><button id="new-monster" class="primary" type="button">new</button><button id="refresh-monsters" type="button">refresh</button></div>
+<div id="monster-tree" class="tree"></div>
 </div>
 </aside>
 <section class="content">
@@ -85,7 +92,7 @@
 <div id="animation-filename-rules" class="filename-rules"><span class="muted">loading animation state catalog…</span></div>
 <small class="hint">canonical filename always starts with the selected archetype id, for example <code>human_female_1hs_attack_01.rbxm</code>. the scanner remains backward-compatible with legacy unprefixed files. variant states use <code>_01</code>, <code>_02</code>, ….</small>
 </details>
-<div class="picker"><button id="choose-animation-folder" type="button">choose folder</button><small id="animation-folder">folder not selected</small></div>
+<div class="picker folder-picker"><div class="folder-explorer"><input id="animation-folder-path" type="text" autocomplete="off" spellcheck="false" placeholder="C:\path\to\character-animations"><button id="choose-animation-folder" type="button">explore…</button></div><small>paste a folder path or choose it in Explorer · the last character animation folder is remembered</small></div>
 <div class="actions"><button id="scan-animations" class="primary wide" type="button" disabled>scan folder</button></div>
 <div id="animation-scan-status" class="status-box"><strong>nothing scanned yet</strong><span>unrecognized files stay outside the registry and are listed after the scan.</span></div>
 <hr class="card-separator">
@@ -117,8 +124,8 @@
 <div class="character-grid"><label>name en<input id="weapon-name-en" autocomplete="off"></label><label>name ru<input id="weapon-name-ru" autocomplete="off"></label></div>
 <label>slug<input id="weapon-slug" readonly><small class="hint">generated from english name as lowercase snake_case. existing registered slugs stay stable.</small></label>
 <div class="character-grid"><label>type<select id="weapon-type"></select></label><label>rarity<select id="weapon-rarity"></select></label></div>
-<div class="weapon-stats-grid"><label>attack delta<input id="weapon-stat-damage" type="number" step="1" value="0"></label><label>attack speed delta<input id="weapon-stat-attack-speed" type="number" step="1" value="0"></label></div>
-<small class="hint">modifiers are additive to the current character stat. negative values subtract. 0 means no change. base character: damage 10 · attack speed 100 · run speed 50.</small>
+<div class="weapon-stats-grid"><label>attack delta<input id="weapon-stat-damage" type="number" step="1" value="0"></label><label>attack speed delta<input id="weapon-stat-attack-speed" type="number" step="1" value="0"></label><label>attack radius · studs<input id="weapon-attack-radius" type="number" min="1" max="420" step="0.5" value="7"></label></div>
+<small class="hint">damage and attack speed are additive modifiers. attack radius is an absolute server-authoritative reach in Roblox studs and is visualized from Studio Test Loadout.</small>
 <hr class="card-separator">
 <span class="eyebrow">02 · source assets</span>
 <div class="picker"><button id="choose-weapon-model" type="button">choose fbx</button><small id="picked-weapon-model">fbx not selected</small></div>
@@ -138,10 +145,104 @@
 </div>
 </div>
 </div>
+
+<div id="monsters-view" hidden>
+<div class="panel hero">
+<div><span class="eyebrow">monster assets · canonical game1 registry</span><h2>monsters</h2><p>one monster owns one rigged fbx, zero or more textures, absolute combat stats and its animations. monster animations have no weapon-class split: idle, idle special variants, combat idle, walk, run, attack variants and death are bound directly to the monster.</p></div>
+<div class="metrics"><div><b id="monster-metric-total">0</b><span>registered</span></div><div><b id="monster-metric-published">0</b><span>published</span></div><div><b id="monster-metric-changed">0</b><span>changed</span></div></div>
+</div>
+<div class="panel runtime-card"><div id="monster-registry-state" class="runtime-state registered"><strong>monster registry</strong><span>loading…</span></div><div id="monster-publication-state" class="publication-missing">open cloud: checking…</div></div>
+<div class="weapon-workflow monster-workflow">
+<div class="panel character-card">
+<span class="eyebrow">01 · identity and stats</span><h3>register monster</h3>
+<div class="character-grid"><label>name en<input id="monster-name-en" autocomplete="off"></label><label>name ru<input id="monster-name-ru" autocomplete="off"></label></div>
+<label>slug<input id="monster-slug" readonly><small class="hint">generated from english name as lowercase snake_case. existing registered slugs stay stable.</small></label>
+<div class="monster-stats-grid"><label>HP<input id="monster-stat-hp" type="number" min="0" step="1" value="100"></label><label>attack<input id="monster-stat-damage" type="number" min="0" step="1" value="10"></label><label>attack speed<input id="monster-stat-attack-speed" type="number" min="0" step="1" value="100"></label><label>run speed<input id="monster-stat-run-speed" type="number" min="0" step="1" value="50"></label><label>critical chance %<input id="monster-stat-crit-chance" type="number" min="0" max="100" step="0.1" value="0"></label></div>
+<small class="hint">monster stats are absolute runtime values. critical chance is 0..100 percent.</small>
+<hr class="card-separator">
+<span class="eyebrow">02 · source assets</span>
+<div class="picker"><button id="choose-monster-model" type="button">choose fbx</button><small id="picked-monster-model">fbx not selected</small></div>
+<div class="picker"><button id="choose-monster-textures" type="button">choose textures</button><small id="picked-monster-textures">textures not selected</small></div>
+<div id="monster-model-status" class="status-box"><strong>not registered</strong><span>choose a rigged monster fbx. textures are optional.</span></div>
+<div class="actions"><button id="register-monster" class="primary" type="button">register monster</button><button id="clear-monster-form" type="button">clear form</button></div>
+<hr class="card-separator">
+<span class="eyebrow">03 · publication and studio</span><h3 class="subheading">roblox assets</h3>
+<label>description<input id="monster-publication-description" value="game1 monster"></label>
+<div class="actions"><button id="publish-monster" class="primary" type="button" disabled>publish all changed</button><button id="sync-monster" type="button" disabled>sync studio</button></div>
+<small id="monster-publication-hint" class="hint">select a registered monster.</small>
+</div>
+<div class="panel character-card">
+<div class="section-title"><div><span>versioned registry</span><h3>registered monsters</h3></div><button id="validate-monsters" type="button">refresh</button></div>
+<div class="table-wrap weapon-table-wrap"><table><thead><tr><th>monster</th><th>stats</th><th>skeleton</th><th>assets</th><th>status</th><th>actions</th></tr></thead><tbody id="monster-rows"></tbody></table></div>
+<div id="monster-details" class="details"><span class="muted">select a monster.</span></div>
+</div>
+</div>
+
+<div class="panel hero monster-animation-hero">
+<div><span class="eyebrow">monster animation library</span><h2>monster animations</h2><p>same registration and publication flow as character animations, but without weapon classes. choose the target monster here; every scan, assignment and publication below applies only to that monster.</p></div>
+</div>
+<div class="panel runtime-card"><div id="monster-animation-profile-state" class="runtime-state bootstrap"><strong>select monster</strong><span>register a monster first.</span></div></div>
+<div class="animation-workflow">
+<div class="panel character-card">
+<span class="eyebrow">04 · target and scan</span><h3>monster animations</h3>
+<label>monster<select id="monster-animation-monster"></select><small class="hint">this is the monster whose animation files will be scanned, registered and published.</small></label>
+<hr class="card-separator">
+<h3 class="subheading">animation folder</h3>
+<details id="monster-animation-filename-guide" class="naming-guide" open><summary>filename rules · monster states</summary><div id="monster-animation-filename-rules" class="filename-rules"><span class="muted">select a monster.</span></div><small class="hint">canonical names start with the monster slug. <code>idle_special_01</code>, <code>idle_special_02</code>, … are variants inside <code>idle</code>; <code>combat_idle</code> is the waiting pose while already in combat; <code>attack_01</code>, <code>attack_02</code>, … are variants inside <code>attack</code>.</small></details>
+<div class="picker folder-picker"><div class="folder-explorer"><input id="monster-animation-folder-path" type="text" autocomplete="off" spellcheck="false" placeholder="C:\path\to\monster-animations"><button id="choose-monster-animation-folder" type="button">explore…</button></div><small>paste a folder path or choose it in Explorer · the last monster animation folder is remembered</small></div>
+<div class="actions"><button id="scan-monster-animations" class="primary wide" type="button" disabled>scan folder</button></div>
+<div id="monster-animation-scan-status" class="status-box"><strong>nothing scanned yet</strong><span>unrecognized files can be assigned manually.</span></div>
+<hr class="card-separator">
+<span class="eyebrow">05 · publication queue</span><h3 class="subheading">roblox animation assets</h3>
+<label>description<input id="monster-animation-publication-description" value="game1 monster animation"></label>
+<div class="actions"><button id="publish-missing-monster-animations" class="primary" type="button" disabled>publish missing</button><button id="refresh-monster-animations" type="button">refresh</button></div>
+<div id="monster-animation-publish-progress" class="queue-progress" hidden><strong id="monster-animation-publish-current">publication queue</strong><span id="monster-animation-publish-count">0 / 0</span><progress id="monster-animation-publish-bar" value="0" max="1"></progress></div>
+<div id="monster-animation-unassigned" class="unassigned"></div>
+</div>
+<div class="panel character-card">
+<div class="section-title"><div><span>selected monster animations</span><h3 id="monster-animation-table-title">registered animations</h3></div></div>
+<small class="hint">only animations already registered for the selected monster are listed here. <code>idle_special_01..n</code> are shown as variants of state <code>idle</code>. weight is relative inside one state; after each base idle loop, base idle and special idle variants participate in the weighted choice.</small>
+<div class="table-wrap animation-table-wrap"><table><thead><tr><th>state</th><th>variant</th><th>clip</th><th>asset</th><th>status</th><th>weight</th><th>actions</th></tr></thead><tbody id="monster-animation-rows"></tbody></table></div>
+</div>
+</div>
+
+<div class="panel hero monster-spawn-hero">
+<div><span class="eyebrow">monster spawn authoring · studio handshake</span><h2>monster spawns</h2><p>choose a registered monster, place a marker by clicking a surface in Studio, then register population settings. one spawn record owns position, radius, max alive, respawn delay and enabled state.</p></div>
+<div class="metrics"><div><b id="monster-spawn-count">0</b><span>registered spawns</span></div><div><b id="monster-spawn-synced">0</b><span>studio synced</span></div><div><b id="monster-spawn-stale">0</b><span>stale</span></div></div>
+</div>
+<div class="monster-spawn-workflow">
+<div class="panel character-card">
+<span class="eyebrow">06 · monster and readiness</span><h3>spawn monster</h3>
+<label>monster<select id="monster-spawn-monster"></select></label>
+<div id="monster-spawn-readiness" class="status-box"><strong>select monster</strong><span>published model and required animations are required.</span></div>
+<hr class="card-separator">
+<span class="eyebrow">07 · placement</span><h3 class="subheading">point in Studio</h3>
+<div class="character-grid"><label>spawn id<input id="monster-spawn-id" readonly placeholder="created on placement"></label><label>place id<input id="monster-spawn-place-id" type="number" readonly value="0"></label></div>
+<div class="character-grid"><label>map key<input id="monster-spawn-map-key" value="main"></label><label>yaw °<input id="monster-spawn-yaw" type="number" step="0.1" value="0"></label></div>
+<div class="monster-spawn-position-grid"><label>X<input id="monster-spawn-x" type="number" step="0.001"></label><label>Y<input id="monster-spawn-y" type="number" step="0.001"></label><label>Z<input id="monster-spawn-z" type="number" step="0.001"></label></div>
+<div class="actions"><button id="monster-spawn-place" class="primary" type="button">place point in Studio</button><button id="monster-spawn-select" type="button" disabled>select marker</button></div>
+</div>
+<div class="panel character-card">
+<span class="eyebrow">08 · population</span><h3>spawn settings</h3>
+<div class="monster-spawn-settings-grid"><label>respawn sec<input id="monster-spawn-respawn" type="number" min="0" max="86400" step="0.1" value="10"></label><label>spawn radius<input id="monster-spawn-radius" type="number" min="0" max="10000" step="0.1" value="0"></label><label>max alive<input id="monster-spawn-max-alive" type="number" min="1" max="1000" step="1" value="1"></label></div>
+<label class="spawn-enabled"><input id="monster-spawn-enabled" type="checkbox" checked><span>enabled · runtime maintains this population</span></label>
+<small id="monster-spawn-radius-hint" class="hint">radius is the random ground area around the authored point. max alive is the population cap for this record.</small>
+<div class="actions"><button id="monster-spawn-register" class="primary" type="button" disabled>register spawn</button><button id="monster-spawn-new" type="button">new spawn</button><button id="monster-spawn-delete" class="danger" type="button" disabled>delete</button></div>
+<div id="monster-spawn-operation" class="status-box"><strong>ready</strong><span>place a point in Studio.</span></div>
+<hr class="card-separator">
+<div class="section-title"><div><span>versioned spawn registry</span><h3>registered points</h3></div><div class="row-actions"><button id="monster-spawn-restore" type="button">restore markers</button><button id="monster-spawn-validate" type="button">validate</button><button id="monster-spawn-refresh" type="button">refresh</button></div></div>
+<div id="monster-spawn-records" class="monster-spawn-records"><span class="muted">no registered spawns.</span></div>
+<details class="naming-guide"><summary>manifest and runtime rule</summary><div id="monster-spawn-manifest" class="details"></div><small class="hint">each death frees one population slot; after respawn seconds exactly one replacement is created, never above max alive. radius 0 means all instances use the authored point.</small></details>
+</div>
+</div>
+</div>
+
 </section>
 </main>
 <div id="toast" class="toast"></div>
-<script src="character-assets.js?v=11"></script>
+<script src="character-assets.js?v=12"></script>
 <script src="weapon-assets.js?v=3"></script>
+<script src="monster-assets.js?v=3"></script>
+<script src="monster-spawns.js?v=1"></script>
 </body>
 </html>

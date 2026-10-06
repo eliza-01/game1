@@ -105,6 +105,7 @@ create table if not exists weapons (
     name_ru text not null default '',
     weapon_type text not null,
     rarity text not null,
+    attack_radius_studs real not null default 7,
     model_source_path text not null default '',
     model_prepared_path text not null default '',
     model_sha256 text not null default '',
@@ -147,6 +148,114 @@ create table if not exists weapon_publications (
     kind text not null,
     slot text not null default '',
     weapon_revision integer not null,
+    asset_id text not null,
+    operation_path text not null,
+    sha256 text not null,
+    moderation_state text,
+    published_at real not null
+);
+
+create table if not exists monsters (
+    slug text primary key,
+    name_en text not null,
+    name_ru text not null default '',
+    model_source_path text not null default '',
+    model_prepared_path text not null default '',
+    model_sha256 text not null default '',
+    model_asset_id text,
+    model_published_sha256 text not null default '',
+    moderation_state text not null default '',
+    revision integer not null default 1,
+    created_at real not null,
+    updated_at real not null,
+    published_at real,
+    armature_name text not null default '',
+    bone_count integer not null default 0,
+    mesh_count integer not null default 0,
+    skeleton_signature text not null default '',
+    skeleton_structure_signature text not null default '',
+    skeleton_json text not null default '{}'
+);
+
+create table if not exists monster_textures (
+    id text primary key,
+    monster_slug text not null,
+    slot text not null,
+    source_path text not null,
+    prepared_path text not null,
+    sha256 text not null,
+    asset_id text,
+    published_sha256 text not null default '',
+    moderation_state text not null default '',
+    revision integer not null default 1,
+    created_at real not null,
+    updated_at real not null,
+    published_at real,
+    unique(monster_slug, slot)
+);
+
+create table if not exists monster_stats (
+    monster_slug text not null,
+    stat_key text not null,
+    value real not null default 0,
+    primary key(monster_slug, stat_key)
+);
+
+create table if not exists monster_publications (
+    id integer primary key autoincrement,
+    monster_slug text not null,
+    kind text not null,
+    slot text not null default '',
+    monster_revision integer not null,
+    asset_id text not null,
+    operation_path text not null,
+    sha256 text not null,
+    moderation_state text,
+    published_at real not null
+);
+
+create table if not exists monster_animation_profiles (
+    monster_slug text primary key,
+    skeleton_signature text not null default '',
+    scan_root text not null default '',
+    created_at real not null,
+    updated_at real not null
+);
+
+create table if not exists monster_animation_clips (
+    id text primary key,
+    monster_slug text not null,
+    name text not null,
+    source_path text not null,
+    prepared_path text not null,
+    sha256 text not null,
+    asset_id text,
+    published_sha256 text not null default '',
+    moderation_state text not null default '',
+    revision integer not null default 1,
+    created_at real not null,
+    updated_at real not null,
+    published_at real
+);
+
+create table if not exists monster_animation_bindings (
+    id text primary key,
+    monster_slug text not null,
+    slot text not null,
+    variant integer not null default 0,
+    clip_id text not null,
+    weight integer not null default 100,
+    looped integer not null default 0,
+    priority text not null default 'Movement',
+    created_at real not null,
+    updated_at real not null,
+    unique(monster_slug, slot, variant)
+);
+
+create table if not exists monster_animation_publications (
+    id integer primary key autoincrement,
+    clip_id text not null,
+    clip_revision integer not null,
     asset_id text not null,
     operation_path text not null,
     sha256 text not null,

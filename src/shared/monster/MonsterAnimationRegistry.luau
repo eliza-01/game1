@@ -1,0 +1,101 @@
+-- generated. do not edit by hand.
+return table.freeze({
+	schemaVersion = 1,
+	project = "game1",
+	profiles = table.freeze({
+		["gremlin"] = table.freeze({
+			skeletonSignature = "0b019afea76580de533c3d0c986c3a87b50ce925b2267c31af65818be2b24185",
+			slots = table.freeze({
+				["attack"] = table.freeze({
+					table.freeze({
+						clipId = "monster__gremlin__attack__01",
+						assetId = "101898400862842",
+						animationId = "rbxassetid://101898400862842",
+						sourceSlot = "attack",
+						role = "variant",
+						variant = 1,
+						weight = 100,
+						looped = false,
+						priority = "Action",
+					}),
+				}),
+				["combat_idle"] = table.freeze({
+					table.freeze({
+						clipId = "monster__gremlin__combat_idle__00",
+						assetId = "92672041098744",
+						animationId = "rbxassetid://92672041098744",
+						sourceSlot = "combat_idle",
+						role = "base",
+						variant = 0,
+						weight = 100,
+						looped = true,
+						priority = "Idle",
+					}),
+				}),
+				["death"] = table.freeze({
+					table.freeze({
+						clipId = "monster__gremlin__death__00",
+						assetId = "127522409398238",
+						animationId = "rbxassetid://127522409398238",
+						sourceSlot = "death",
+						role = "base",
+						variant = 0,
+						weight = 100,
+						looped = false,
+						priority = "Action",
+					}),
+				}),
+				["idle"] = table.freeze({
+					table.freeze({
+						clipId = "monster__gremlin__idle__00",
+						assetId = "137844363101161",
+						animationId = "rbxassetid://137844363101161",
+						sourceSlot = "idle",
+						role = "base",
+						variant = 0,
+						weight = 100,
+						looped = true,
+						priority = "Idle",
+					}),
+					table.freeze({
+						clipId = "monster__gremlin__idle_special__01",
+						assetId = "126252769665114",
+						animationId = "rbxassetid://126252769665114",
+						sourceSlot = "idle_special",
+						role = "special",
+						variant = 1,
+						weight = 100,
+						looped = false,
+						priority = "Idle",
+					}),
+				}),
+				["run"] = table.freeze({
+					table.freeze({
+						clipId = "monster__gremlin__run__00",
+						assetId = "114060589585488",
+						animationId = "rbxassetid://114060589585488",
+						sourceSlot = "run",
+						role = "base",
+						variant = 0,
+						weight = 100,
+						looped = true,
+						priority = "Movement",
+					}),
+				}),
+				["walk"] = table.freeze({
+					table.freeze({
+						clipId = "monster__gremlin__walk__00",
+						assetId = "80922686042611",
+						animationId = "rbxassetid://80922686042611",
+						sourceSlot = "walk",
+						role = "base",
+						variant = 0,
+						weight = 100,
+						looped = true,
+						priority = "Movement",
+					}),
+				}),
+			}),
+		}),
+	}),
+})

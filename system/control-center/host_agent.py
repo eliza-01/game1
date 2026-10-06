@@ -31,15 +31,21 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from character_store import CharacterStore
 from animation_store import AnimationStore
 from weapon_store import WeaponStore
+from monster_store import MonsterStore
+from monster_animation_store import MonsterAnimationStore
+from monster_spawn_store import MonsterSpawnStore
 from character_core.identity import CharacterIdentityService
-from studio_bridge import run_model_load_bridge
+from studio_bridge import run_model_load_bridge, run_monster_spawn_bridge
 
-control_agent_build = "game1-m6.2-character-bone-publication-001"
+control_agent_build = "game1-m7-animation-folder-explorer-005"
 port = int(os.environ.get("CONTROL_AGENT_PORT", "43821"))
 token = os.environ.get("CONTROL_TOKEN", "Game1LocalControlV1")
 store = CharacterStore(ROOT)
 animations = AnimationStore(ROOT)
 weapons = WeaponStore(ROOT)
+monsters = MonsterStore(ROOT)
+monster_animations = MonsterAnimationStore(ROOT)
+monster_spawns = MonsterSpawnStore(ROOT, monsters, monster_animations, run_monster_spawn_bridge)
 character_identity = CharacterIdentityService(ROOT, store, animations)
 
 
@@ -141,15 +147,75 @@ def sync_weapon_to_studio(slug: str):
     )
     return {"weapon": row, "studio": result}
 
-def _powershell_picker(script: str) -> str:
+
+def sync_monster_to_studio(slug: str):
+    row = monsters.get(slug)
+    if not row:
+        raise ValueError(f"unknown monster: {slug}")
+    asset_id = str(row.get("model_asset_id") or "").strip()
+    if not asset_id:
+        raise ValueError("publish the monster model before syncing it to Studio")
+    texture_assets = [
+        {"slot": str(item.get("slot") or ""), "assetId": str(item.get("asset_id") or "")}
+        for item in (row.get("textures") or [])
+        if str(item.get("asset_id") or "").isdigit()
+    ]
+    destination = ["monsters", str(row.get("slug") or ""), "model"]
+    result = run_model_load_bridge(
+        asset_id,
+        destination,
+        wrapper_name=str(row.get("slug") or ""),
+        placement_mode="monster-rig",
+        metadata={
+            "monsterSlug": str(row.get("slug") or ""),
+            "textures": texture_assets,
+        },
+    )
+    stats = result.get("rigStats") or {}
+    if int(stats.get("baseParts") or 0) <= 0 or int(stats.get("bones") or 0) + int(stats.get("motor6Ds") or 0) <= 0:
+        raise ValueError("Studio loaded a monster asset without an articulated rig")
+
+    try:
+        expected_analysis = json.loads(str(row.get("skeleton_json") or "{}"))
+    except Exception:
+        expected_analysis = {}
+    expected_names = {
+        str(item.get("name") or "")
+        for item in (expected_analysis.get("bones") or [])
+        if str(item.get("name") or "")
+    }
+    actual_names = {str(name) for name in (stats.get("boneNames") or []) if str(name)}
+    if expected_names and actual_names:
+        missing = sorted(expected_names - actual_names, key=str.casefold)
+        if missing:
+            preview = ", ".join(missing[:20])
+            suffix = " …" if len(missing) > 20 else ""
+            raise ValueError(
+                f"Roblox monster publication stripped {len(missing)} of {len(expected_names)} registered bones: {preview}{suffix}"
+            )
+    elif expected_names and int(stats.get("bones") or 0) < len(expected_names):
+        raise ValueError(
+            f"Roblox monster publication returned only {int(stats.get('bones') or 0)} of {len(expected_names)} registered bones"
+        )
+
+    texture_stats = ((result.get("monsterStats") or {}).get("textures") or {})
+    if texture_assets and int(texture_stats.get("applied") or 0) <= 0:
+        raise ValueError("Studio loaded the monster rig but did not apply any published monster textures")
+    return {"monster": row, "studio": result}
+
+def _powershell_picker(script: str, extra_env: dict | None = None) -> str:
     powershell = shutil.which("powershell.exe") or shutil.which("powershell")
     if not powershell:
         raise RuntimeError("powershell was not found for the native picker")
+    picker_env = os.environ.copy()
+    if extra_env:
+        picker_env.update({str(key): str(value) for key, value in extra_env.items()})
     completed = subprocess.run(
         [powershell, "-NoProfile", "-STA", "-Command", script],
         capture_output=True,
         text=True,
         timeout=120,
+        env=picker_env,
     )
     if completed.returncode != 0:
         raise RuntimeError((completed.stderr or completed.stdout or "picker failed").strip())
@@ -188,6 +254,39 @@ if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
 }
 '''
     )
+
+
+def choose_monster_fbx() -> str:
+    return _powershell_picker(
+        r'''
+Add-Type -AssemblyName System.Windows.Forms
+$dialog = New-Object System.Windows.Forms.OpenFileDialog
+$dialog.Title = 'game1 · choose monster fbx'
+$dialog.Filter = 'fbx monster model (*.fbx)|*.fbx'
+$dialog.Multiselect = $false
+if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    Write-Output $dialog.FileName
+}
+'''
+    )
+
+
+def choose_monster_textures() -> list[str]:
+    raw = _powershell_picker(
+        r'''
+Add-Type -AssemblyName System.Windows.Forms
+$dialog = New-Object System.Windows.Forms.OpenFileDialog
+$dialog.Title = 'game1 · choose monster textures'
+$dialog.Filter = 'monster textures (*.png;*.jpg;*.jpeg;*.webp)|*.png;*.jpg;*.jpeg;*.webp'
+$dialog.Multiselect = $true
+if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    Write-Output ($dialog.FileNames -join [char]31)
+}
+'''
+    )
+    return [item for item in raw.split(chr(31)) if item]
 
 
 def choose_weapon_textures() -> list[str]:
@@ -254,18 +353,24 @@ def write_animation_export(payload: dict):
     }
 
 
-def choose_animation_folder() -> str:
+def choose_animation_folder(initial_path: str = "") -> str:
+    initial_path = str(initial_path or "").strip().strip('"')
     return _powershell_picker(
         r'''
 Add-Type -AssemblyName System.Windows.Forms
 $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
-$dialog.Description = 'game1 · choose folder containing exported character animations (.rbxm/.rbxmx)'
+$dialog.Description = 'game1 · choose folder containing exported animations (.rbxm/.rbxmx)'
 $dialog.ShowNewFolderButton = $false
+$initialPath = $env:GAME1_ANIMATION_PICKER_INITIAL_PATH
+if ($initialPath -and [System.IO.Directory]::Exists($initialPath)) {
+    $dialog.SelectedPath = $initialPath
+}
 if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
     Write-Output $dialog.SelectedPath
 }
 '''
+        , {"GAME1_ANIMATION_PICKER_INITIAL_PATH": initial_path}
     )
 
 
@@ -314,8 +419,26 @@ class Handler(BaseHTTPRequestHandler):
             snapshot = weapons.snapshot()
             snapshot["publication"] = publication_config()
             return self.out(200, snapshot)
-        weapon_prefix = "/api/weapons/"
+        if path == "/api/monsters":
+            snapshot = monsters.snapshot()
+            snapshot["publication"] = publication_config()
+            return self.out(200, snapshot)
+        if path == "/api/monster-animations":
+            slug = str((parse_qs(parsed.query).get("monster") or [""])[0]).strip().lower()
+            snapshot = monster_animations.snapshot(slug)
+            snapshot["publication"] = publication_config()
+            return self.out(200, snapshot)
+        if path == "/api/monster-spawns":
+            try:
+                return self.out(200, monster_spawns.snapshot())
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        monster_prefix = "/api/monsters/"
         publications_suffix = "/publications"
+        if path.startswith(monster_prefix) and path.endswith(publications_suffix):
+            slug = unquote(path[len(monster_prefix):-len(publications_suffix)].strip("/"))
+            return self.out(200, {"items": monsters.publications(slug)})
+        weapon_prefix = "/api/weapons/"
         if path.startswith(weapon_prefix) and path.endswith(publications_suffix):
             slug = unquote(path[len(weapon_prefix):-len(publications_suffix)].strip("/"))
             return self.out(200, {"items": weapons.publications(slug)})
@@ -342,7 +465,18 @@ class Handler(BaseHTTPRequestHandler):
                 return self.out(400, {"error": str(error)})
         if path == "/api/files/choose-animation-folder":
             try:
-                return self.out(200, {"path": choose_animation_folder()})
+                payload = self.body()
+                return self.out(200, {"path": choose_animation_folder(str(payload.get("initialPath") or ""))})
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path == "/api/files/choose-monster-model":
+            try:
+                return self.out(200, {"path": choose_monster_fbx()})
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path == "/api/files/choose-monster-textures":
+            try:
+                return self.out(200, {"paths": choose_monster_textures()})
             except Exception as error:
                 return self.out(400, {"error": str(error)})
         if path == "/api/files/choose-weapon-model":
@@ -363,6 +497,60 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/weapons":
             try:
                 return self.out(200, weapons.register(self.body()))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path == "/api/monsters":
+            try:
+                return self.out(200, monsters.register(self.body()))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path == "/api/monster-spawns/place":
+            try:
+                return self.out(200, monster_spawns.place(self.body()))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path == "/api/monster-spawns/register":
+            try:
+                payload = self.body()
+                slug = str(payload.get("monsterSlug") or "").strip().lower()
+                sync_monster_to_studio(slug)
+                return self.out(200, monster_spawns.register(payload))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path == "/api/monster-spawns/select":
+            try:
+                return self.out(200, monster_spawns.select(self.body()))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path == "/api/monster-spawns/delete":
+            try:
+                return self.out(200, monster_spawns.delete(self.body()))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path == "/api/monster-spawns/restore":
+            try:
+                return self.out(200, monster_spawns.restore())
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path == "/api/monster-spawns/validate":
+            try:
+                return self.out(200, monster_spawns.validate())
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+
+        if path == "/api/monster-animations/scan":
+            try:
+                payload = self.body()
+                return self.out(200, monster_animations.scan_folder(str(payload.get("monsterSlug") or ""), str(payload.get("rootPath") or "")))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path == "/api/monster-animations/assign":
+            try:
+                payload = self.body()
+                return self.out(200, monster_animations.assign_file(
+                    str(payload.get("monsterSlug") or ""), str(payload.get("sourcePath") or ""),
+                    str(payload.get("slot") or ""), int(payload.get("variant") or 0),
+                ))
             except Exception as error:
                 return self.out(400, {"error": str(error)})
         if path == "/api/animations/scan":
@@ -480,6 +668,52 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/characters/active/clear":
             return self.out(200, store.clear_active())
 
+        monster_prefix = "/api/monsters/"
+        monster_publish_suffix = "/publish"
+        monster_sync_suffix = "/sync"
+        if path.startswith(monster_prefix) and path.endswith(monster_publish_suffix):
+            slug = unquote(path[len(monster_prefix):-len(monster_publish_suffix)].strip("/"))
+            try:
+                payload = self.body()
+                credentials = publication_credentials(str(payload.get("description") or "game1 monster"))
+                return self.out(200, monsters.publish(slug, credentials))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path.startswith(monster_prefix) and path.endswith(monster_sync_suffix):
+            slug = unquote(path[len(monster_prefix):-len(monster_sync_suffix)].strip("/"))
+            try:
+                return self.out(200, sync_monster_to_studio(slug))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+
+        monster_animation_prefix = "/api/monster-animations/"
+        monster_publish_missing_suffix = "/publish-missing"
+        monster_publish_animation_suffix = "/publish"
+        if path.startswith(monster_animation_prefix) and path.endswith(monster_publish_missing_suffix):
+            slug = unquote(path[len(monster_animation_prefix):-len(monster_publish_missing_suffix)].strip("/"))
+            try:
+                payload = self.body()
+                credentials = publication_credentials(str(payload.get("description") or "game1 monster animation"))
+                return self.out(200, monster_animations.publish_missing(slug, credentials))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path.startswith(monster_animation_prefix) and path.endswith(monster_publish_animation_suffix):
+            clip_id = unquote(path[len(monster_animation_prefix):-len(monster_publish_animation_suffix)].strip("/"))
+            try:
+                payload = self.body()
+                credentials = publication_credentials(str(payload.get("description") or "game1 monster animation"))
+                return self.out(200, monster_animations.publish_clip(clip_id, credentials))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        monster_binding_prefix = "/api/monster-animation-bindings/"
+        if path.startswith(monster_binding_prefix) and path.endswith("/weight"):
+            binding_id = unquote(path[len(monster_binding_prefix):-len("/weight")].strip("/"))
+            try:
+                payload = self.body()
+                return self.out(200, monster_animations.set_weight(binding_id, int(payload.get("weight") or 100)))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+
         weapon_prefix = "/api/weapons/"
         weapon_publish_suffix = "/publish"
         weapon_sync_suffix = "/sync"
@@ -546,6 +780,24 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith(binding_prefix):
             try:
                 return self.out(200, animations.delete_binding(unquote(path[len(binding_prefix):])))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        monster_binding_prefix = "/api/monster-animation-bindings/"
+        if path.startswith(monster_binding_prefix):
+            try:
+                return self.out(200, monster_animations.delete_binding(unquote(path[len(monster_binding_prefix):])))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        monster_prefix = "/api/monsters/"
+        if path.startswith(monster_prefix):
+            slug = unquote(path[len(monster_prefix):])
+            try:
+                spawn_ids = monster_spawns.monster_usage(slug)
+                if spawn_ids:
+                    raise ValueError("delete monster spawns first: " + ", ".join(spawn_ids[:8]))
+                monster_animations.delete_profile(slug)
+                monsters.delete(slug)
+                return self.out(200, {"ok": True})
             except Exception as error:
                 return self.out(400, {"error": str(error)})
         weapon_prefix = "/api/weapons/"

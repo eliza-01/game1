@@ -1,1 +1,1 @@
-return table.freeze({ Version = "2026.10.06.001", SourceDigest = "game1-m6.2-virtual-bone-hit-regions" })
+return table.freeze({ Version = "2026.10.06.008", SourceDigest = "game1-m7-monster-articulation-animation-wander-fix" })

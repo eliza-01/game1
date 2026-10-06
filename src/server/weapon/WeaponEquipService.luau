@@ -3,6 +3,8 @@ local ServerStorage = game:GetService("ServerStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local WeaponShared = Shared:WaitForChild("weapon")
+local CombatShared = Shared:WaitForChild("combat")
+local AttackConfig = require(CombatShared:WaitForChild("AttackConfig"))
 local WeaponRegistry = require(WeaponShared:WaitForChild("WeaponRegistry"))
 local CharacterStatsService = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CharacterStatsService"))
 
@@ -138,11 +140,17 @@ local function clearWeapon(character: Model)
     end
 end
 
+local function attackRadiusFor(row: any?): number
+    local value = tonumber(row and row.attackRadiusStuds) or AttackConfig.Range
+    return math.clamp(value, 1, AttackConfig.MaxAimDistance)
+end
+
 function WeaponEquipService.Unequip(character: Model)
     clearWeapon(character)
     character:SetAttribute("EquippedWeaponSlug", "")
     character:SetAttribute("EquippedWeaponType", "")
     character:SetAttribute("EquippedWeaponRarity", "")
+    character:SetAttribute("AttackRadius", attackRadiusFor(nil))
     character:SetAttribute("AnimationWeaponSet", "hands")
     CharacterStatsService.ApplyModifiers(character, {})
 end
@@ -182,6 +190,7 @@ function WeaponEquipService.Equip(character: Model, slugValue: any): (boolean, s
     weapon:SetAttribute("WeaponSlug", slug)
     weapon:SetAttribute("WeaponType", tostring(row.weaponType or ""))
     weapon:SetAttribute("WeaponRarity", tostring(row.rarity or ""))
+    weapon:SetAttribute("AttackRadius", attackRadiusFor(row))
     weapon:SetAttribute("Game1WeaponGripRotation", nil)
     weapon:SetAttribute("WeaponAttachmentMode", "runtime-canonical-grip-v2")
     alignWeaponToSocket(weapon, grip, targetSocketCFrame(targetBone) * WEAPON_EQUIP_ROTATION)
@@ -190,6 +199,7 @@ function WeaponEquipService.Equip(character: Model, slugValue: any): (boolean, s
     character:SetAttribute("EquippedWeaponSlug", slug)
     character:SetAttribute("EquippedWeaponType", tostring(row.weaponType or ""))
     character:SetAttribute("EquippedWeaponRarity", tostring(row.rarity or ""))
+    character:SetAttribute("AttackRadius", attackRadiusFor(row))
     character:SetAttribute("AnimationWeaponSet", tostring(row.weaponType or "hands"))
     CharacterStatsService.ApplyModifiers(character, row.statModifiers or {})
     return true, nil
@@ -213,6 +223,7 @@ function WeaponEquipService.ListAvailable(): { any }
                 nameRu = tostring(row.nameRu or ""),
                 weaponType = tostring(row.weaponType or ""),
                 rarity = tostring(row.rarity or ""),
+                attackRadiusStuds = attackRadiusFor(row),
                 modelAssetId = tostring(row.modelAssetId or ""),
             })
         end

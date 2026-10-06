@@ -23,7 +23,6 @@ weapon scope is a context overlay. m5.1 starts with `hands`, `1hs` and `bow`:
 - `idle`, `combat_idle`, `walk`, `run`
 - `attack` with variants `01..n`
 - `special_attack` with variants `01..n`
-- `equip`, `unequip`
 - `bow` additionally supports `aim`
 
 `hands` is the canonical unarmed weapon context. newly spawned characters request `hands` first and fall back to base slots when a hands-specific clip is absent.
@@ -80,7 +79,7 @@ registered now but reserved for their gameplay/state owner:
 
 - airborne (`jump_start`, `jump_loop`, `fall`, `land`)
 - seated transitions (`seated.enter`, `seated.loop`, `seated.exit`)
-- combat stance (`combat_idle`), special attack, equip/unequip and bow aim
+- combat stance (`combat_idle`), special attack and bow aim
 
 this keeps the semantic contract stable without pretending that an animation clip itself owns physics, posture or combat state.
 

@@ -52,7 +52,8 @@ local function attack(player: Player, aim: any)
         flat = root.CFrame.LookVector
     end
     local direction = flat.Unit
-    local center = root.Position + direction * (Config.Range * 0.5)
+    local attackRange = math.clamp(tonumber(character:GetAttribute("AttackRadius")) or Config.Range, 1, Config.MaxAimDistance)
+    local center = root.Position + direction * (attackRange * 0.5)
     local boxCf = CFrame.lookAt(center, center + direction)
 
     local params = OverlapParams.new()
@@ -61,7 +62,7 @@ local function attack(player: Player, aim: any)
 
     local parts = Workspace:GetPartBoundsInBox(
         boxCf,
-        Vector3.new(Config.BoxWidth, Config.BoxHeight, Config.Range),
+        Vector3.new(Config.BoxWidth, Config.BoxHeight, attackRange),
         params
     )
 
@@ -70,7 +71,7 @@ local function attack(player: Player, aim: any)
     local bestZone = "root"
     local bestBoneName = ""
     local bestDistance = math.huge
-    local attackBoxSize = Vector3.new(Config.BoxWidth, Config.BoxHeight, Config.Range)
+    local attackBoxSize = Vector3.new(Config.BoxWidth, Config.BoxHeight, attackRange)
     for _, part in parts do
         local model = modelFromPart(part)
         if model and not seen[model] then
@@ -81,7 +82,7 @@ local function attack(player: Player, aim: any)
                 local virtualHit = EntityHitboxService.QueryBox(model, boxCf, attackBoxSize)
                 local hasVirtualRig = EntityHitboxService.HasBinding(model)
                 local intersectsTarget = if hasVirtualRig then virtualHit ~= nil else true
-                if intersectsTarget and distance <= Config.Range + 1 and distance < bestDistance then
+                if intersectsTarget and distance <= attackRange + 1 and distance < bestDistance then
                     best = model
                     bestZone = tostring(virtualHit and virtualHit.hitZone or "root")
                     bestBoneName = tostring(virtualHit and virtualHit.boneName or "")
@@ -95,7 +96,7 @@ local function attack(player: Player, aim: any)
 
     if not best then
         if Config.DebugLogs then
-            print(("[game1][attack] miss player=%s range=%.1f"):format(player.Name, Config.Range))
+            print(("[game1][attack] miss player=%s range=%.1f"):format(player.Name, attackRange))
         end
         return
     end

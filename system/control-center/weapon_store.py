@@ -23,6 +23,10 @@ WEAPON_TYPES = ("1hs", "2hs", "bow")
 RARITIES = ("common", "uncommon", "rare", "mythical", "legendary", "immortal")
 TEXTURE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 STAT_KEYS = ("Damage", "AttackSpeed")
+ATTACK_RADIUS_DEFAULT = 7.0
+ATTACK_RADIUS_MIN = 1.0
+ATTACK_RADIUS_MAX = 420.0
+ATTACK_RADIUS_STEP = 0.5
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_]{0,63}$")
 
 
@@ -67,6 +71,7 @@ class WeaponStore:
                     name_ru TEXT NOT NULL DEFAULT '',
                     weapon_type TEXT NOT NULL,
                     rarity TEXT NOT NULL,
+                    attack_radius_studs REAL NOT NULL DEFAULT 7,
                     model_source_path TEXT NOT NULL DEFAULT '',
                     model_prepared_path TEXT NOT NULL DEFAULT '',
                     model_sha256 TEXT NOT NULL DEFAULT '',
@@ -125,6 +130,11 @@ class WeaponStore:
                     value TEXT NOT NULL DEFAULT ''
                 )"""
             )
+            columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(weapons)")}
+            if "attack_radius_studs" not in columns:
+                connection.execute(
+                    "ALTER TABLE weapons ADD COLUMN attack_radius_studs REAL NOT NULL DEFAULT 7"
+                )
             connection.execute("DELETE FROM project_settings WHERE key='test_loadout_weapon'")
 
     @staticmethod
@@ -140,6 +150,12 @@ class WeaponStore:
             "weaponTypes": list(WEAPON_TYPES),
             "rarities": list(RARITIES),
             "statKeys": list(STAT_KEYS),
+            "attackRadius": {
+                "default": ATTACK_RADIUS_DEFAULT,
+                "min": ATTACK_RADIUS_MIN,
+                "max": ATTACK_RADIUS_MAX,
+                "step": ATTACK_RADIUS_STEP,
+            },
         }
 
     def active_slug(self) -> str | None:
@@ -250,6 +266,16 @@ class WeaponStore:
         incoming_slug = str(payload.get("slug") or "").strip().lower()
         old = self.get(incoming_slug) if incoming_slug else None
         slug, name_en, name_ru, weapon_type, rarity = self._validate_identity(payload, old)
+        attack_radius_raw = payload.get("attackRadiusStuds", old.get("attack_radius_studs") if old else ATTACK_RADIUS_DEFAULT)
+        try:
+            attack_radius_studs = float(attack_radius_raw)
+        except (TypeError, ValueError):
+            raise ValueError("attack radius must be a number in Roblox studs")
+        if not (ATTACK_RADIUS_MIN <= attack_radius_studs <= ATTACK_RADIUS_MAX):
+            raise ValueError(
+                f"attack radius must be between {ATTACK_RADIUS_MIN:g} and {ATTACK_RADIUS_MAX:g} studs"
+            )
+        attack_radius_studs = round(attack_radius_studs, 2)
         if not old:
             old = self.get(slug)
         model_source = str(payload.get("modelSourcePath") or "").strip()
@@ -281,11 +307,11 @@ class WeaponStore:
         with self.connect() as connection:
             connection.execute(
                 """INSERT OR REPLACE INTO weapons(
-                    slug,name_en,name_ru,weapon_type,rarity,model_source_path,model_prepared_path,model_sha256,
+                    slug,name_en,name_ru,weapon_type,rarity,attack_radius_studs,model_source_path,model_prepared_path,model_sha256,
                     model_asset_id,model_published_sha256,moderation_state,revision,created_at,updated_at,published_at
-                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
-                    slug, name_en, name_ru, weapon_type, rarity, model_source_path, model_prepared_path, model_sha256,
+                    slug, name_en, name_ru, weapon_type, rarity, attack_radius_studs, model_source_path, model_prepared_path, model_sha256,
                     old.get("model_asset_id") if old else None,
                     str(old.get("model_published_sha256") or "") if old else "",
                     str(old.get("moderation_state") or "") if old else "",
@@ -490,6 +516,7 @@ class WeaponStore:
                 f"\t\t\tnameRu = {self._lua_string(row['name_ru'])},",
                 f"\t\t\tweaponType = {self._lua_string(row['weapon_type'])},",
                 f"\t\t\trarity = {self._lua_string(row['rarity'])},",
+                f"\t\t\tattackRadiusStuds = {self._lua_number(row.get('attack_radius_studs') or ATTACK_RADIUS_DEFAULT)},",
                 f"\t\t\tstatus = {self._lua_string(row['status'])},",
                 f"\t\t\tmodelAssetId = {self._lua_string(row.get('model_asset_id') or '')},",
                 f"\t\t\tserverStoragePath = {self._lua_string(row['server_storage_path'])},",

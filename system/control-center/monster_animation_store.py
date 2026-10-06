@@ -145,6 +145,7 @@ class MonsterAnimationStore:
                     variant INTEGER NOT NULL DEFAULT 0,
                     clip_id TEXT NOT NULL,
                     weight INTEGER NOT NULL DEFAULT 100,
+                    playback_speed_percent INTEGER NOT NULL DEFAULT 100,
                     looped INTEGER NOT NULL DEFAULT 0,
                     priority TEXT NOT NULL DEFAULT 'Movement',
                     created_at REAL NOT NULL,
@@ -163,6 +164,11 @@ class MonsterAnimationStore:
                 );
                 """
             )
+            binding_columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(monster_animation_bindings)")}
+            if "playback_speed_percent" not in binding_columns:
+                connection.execute(
+                    "ALTER TABLE monster_animation_bindings ADD COLUMN playback_speed_percent INTEGER NOT NULL DEFAULT 100"
+                )
             self._migrate_combat_idle(connection)
 
     def _migrate_combat_idle(self, connection) -> None:
@@ -498,7 +504,8 @@ class MonsterAnimationStore:
             bindings = [dict(row) for row in connection.execute("SELECT * FROM monster_animation_bindings ORDER BY monster_slug,slot,variant")]
         for row in clips:
             row["status"] = self._status(row)
-        payload = {"schemaVersion": SCHEMA_VERSION, "project": PROJECT, "slotCatalog": SLOT_CATALOG, "profiles": profiles, "clips": clips, "bindings": bindings}
+        manifest_bindings = [{key: value for key, value in row.items() if key != "playback_speed_percent"} for row in bindings]
+        payload = {"schemaVersion": SCHEMA_VERSION, "project": PROJECT, "slotCatalog": SLOT_CATALOG, "profiles": profiles, "clips": clips, "bindings": manifest_bindings}
         manifest = self.root / "assets/manifests/monster-animations.json"
         manifest.parent.mkdir(parents=True, exist_ok=True)
         manifest.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

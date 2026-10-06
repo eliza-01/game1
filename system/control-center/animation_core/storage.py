@@ -53,6 +53,7 @@ class AnimationStorageMixin:
                     variant INTEGER NOT NULL DEFAULT 0,
                     clip_id TEXT NOT NULL,
                     weight INTEGER NOT NULL DEFAULT 100,
+                    playback_speed_percent INTEGER NOT NULL DEFAULT 100,
                     looped INTEGER NOT NULL DEFAULT 0,
                     priority TEXT NOT NULL DEFAULT 'Movement',
                     created_at REAL NOT NULL,
@@ -71,6 +72,11 @@ class AnimationStorageMixin:
                 );
                 """
             )
+            binding_columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(animation_bindings)")}
+            if "playback_speed_percent" not in binding_columns:
+                connection.execute(
+                    "ALTER TABLE animation_bindings ADD COLUMN playback_speed_percent INTEGER NOT NULL DEFAULT 100"
+                )
             # equip/unequip are runtime weapon operations, not animation states.
             # death_wait is presentation-only: game1 holds the final frame of death
             # instead of requiring a second corpse animation clip.

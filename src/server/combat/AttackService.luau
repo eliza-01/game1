@@ -5,8 +5,10 @@ local Workspace = game:GetService("Workspace")
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local CharacterShared = Shared:WaitForChild("character")
 local CombatShared = Shared:WaitForChild("combat")
+local AnimationShared = Shared:WaitForChild("animation")
 local Config = require(CombatShared:WaitForChild("AttackConfig"))
 local AttackTimelineConfig = require(CombatShared:WaitForChild("AttackTimelineConfig"))
+local AnimationSpeedScaling = require(AnimationShared:WaitForChild("AnimationSpeedScaling"))
 local CharacterAnimationRegistry = require(CharacterShared:WaitForChild("CharacterAnimationRegistry"))
 local DamageService = require(script.Parent:WaitForChild("DamageService"))
 local HitEffectService = require(script.Parent:WaitForChild("HitEffectService"))
@@ -44,16 +46,16 @@ local function rowsForEquippedAttack(character: Model): any
     return profile.base and profile.base.attack or nil
 end
 
-local function isAllowedAttackClip(character: Model, clipId: string): boolean
+local function allowedAttackDescriptor(character: Model, clipId: string): any?
     if clipId == "" then
-        return false
+        return nil
     end
     for _, descriptor in ipairs(rowsForEquippedAttack(character) or {}) do
         if tostring(descriptor.clipId or "") == clipId then
-            return true
+            return descriptor
         end
     end
-    return false
+    return nil
 end
 
 local function resolveMeleeDamage(player: Player, character: Model, serial: number, aim: Vector3)
@@ -189,15 +191,16 @@ local function attack(player: Player, payload: any)
         return
     end
 
-    if not isAllowedAttackClip(character, clipId) then
+    local descriptor = allowedAttackDescriptor(character, clipId)
+    if not descriptor then
         if Config.DebugLogs then
             print(("[game1][attack] reject player=%s reason=invalid_clip clip=%s"):format(player.Name, clipId))
         end
         return
     end
 
-    local attackSpeed = math.max(1, tonumber(character:GetAttribute("AttackSpeed")) or AttackTimelineConfig.DefaultAttackSpeed)
-    local timing = AttackTimelineConfig.ResolveRuntime(clipId, attackSpeed)
+    local animationSpeedPercent = AnimationSpeedScaling.ResolveForModel(character, "attack")
+    local timing = AttackTimelineConfig.ResolveRuntime(clipId, animationSpeedPercent)
     if not timing then
         if Config.DebugLogs then
             print(("[game1][attack] reject player=%s reason=missing_timeline clip=%s"):format(player.Name, clipId))
@@ -221,7 +224,7 @@ local function attack(player: Player, payload: any)
 
     -- Gameplay results are not resolved on input. They are scheduled from the
     -- same clip timeline that owns the animation lock, so damage/release windows
-    -- stay attached to authored animation periods when AttackSpeed changes.
+    -- stay attached to the same stat-scaled animation periods.
     scheduleTimelineResults(player, character, serial, aim, timing)
     clearAttackStateLater(player, character, serial, attackDuration)
 end

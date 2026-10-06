@@ -127,6 +127,7 @@ required_runtime = [
     "src/server/combat/EntityHitboxService.luau",
     "src/server/combat/SkeletonHitRegionResolver.luau",
     "src/server/dev/TrainingDummyService.luau",
+    "src/server/dev/MovementDebugService.luau",
     "src/server/monster/MonsterSpawnerService.luau",
     "src/server/monster/MonsterSpawnRegistry.luau",
     "src/client/character/MovementController.luau",
@@ -137,11 +138,14 @@ required_runtime = [
     "src/client/character/animation/CharacterAnimationController.luau",
     "src/client/combat/AttackController.luau",
     "src/client/combat/AimPoseController.luau",
+    "src/client/dev/MovementDebugController.luau",
     "src/shared/character/CharacterConfig.luau",
     "src/shared/character/CharacterMovementConfig.luau",
     "src/shared/character/CharacterRegistry.luau",
     "src/shared/character/CharacterAnimationRegistry.luau",
     "src/shared/character/CharacterStatsConfig.luau",
+    "src/shared/animation/AnimationSpeedScaling.luau",
+    "src/shared/animation/AnimationSpeedScalingRegistry.luau",
     "src/shared/combat/AttackConfig.luau",
     "src/shared/combat/AttackTimelineConfig.luau",
 ]
@@ -182,12 +186,15 @@ for required in [
     "animationDuration",
     "normalizedTime",
     "playbackSpeed",
+    "animationSpeedPercent",
+    "clipPercent",
 ]:
     if required not in attack_timeline_text:
         err(f"attack animation timeline config missing {required}")
 for required in [
     "AttackTimelineConfig.ResolveRuntime",
-    "isAllowedAttackClip",
+    "allowedAttackDescriptor",
+    "AnimationSpeedScaling.ResolveForModel",
     "scheduleTimelineResults",
     "activeUntil",
     'character:SetAttribute("AttackEndsAt"',
@@ -366,6 +373,9 @@ if animation_manifest.get("schemaVersion") != 2 or animation_manifest.get("proje
     err("character animation manifest must be game1 schema 2")
 if animation_manifest.get("weaponSets") != ["hands", "1hs", "2hs", "bow"]:
     err("character animation weapon sets must be hands, 1hs, 2hs and bow")
+for binding in animation_manifest.get("bindings") or []:
+    if "playbackSpeedPercent" in binding or "playback_speed_percent" in binding:
+        err(f"character animation binding must not own playback speed: {binding.get('id')}")
 
 animation_store_path = ROOT / "system/control-center/animation_store.py"
 animation_core_dir = ROOT / "system/control-center/animation_core"
@@ -406,7 +416,7 @@ controller_runtime = controller_path.read_text(encoding="utf-8") if controller_p
 for required in ["ResolveLocomotion", "ResolveAction", "AnimationWeaponSet", "skeletonSignature"]:
     if required not in resolver_runtime:
         err(f"animation resolver missing {required}")
-for required in ["MovementState", "PlayAction", "AnimationResolvedClip", "AnimationTrackCache"]:
+for required in ["MovementState", "PlayAction", "AnimationResolvedClip", "AnimationTrackCache", "AnimationPlaybackSpeedPercent", "AnimationSpeedScaling"]:
     if required not in controller_runtime:
         err(f"character animation controller missing {required}")
 client_init_text = (ROOT / "src/client/init.client.luau").read_text(encoding="utf-8")
@@ -455,6 +465,11 @@ for required in ["FILENAME_GUIDE_OPEN_KEY", "localStorage.getItem", "localStorag
 for required in ["chooseAnimationFolder", "scanAnimations", "publishMissingAnimations", "animationFilter", "assignUnassignedAnimation", "manualSlotCatalog"]:
     if required not in js_text:
         err(f"asset manager animation ui missing {required}")
+for forbidden in ["setAnimationSpeed", "data-speed"]:
+    if forbidden in js_text:
+        err(f"asset manager character clip table must not expose per-clip speed control: {forbidden}")
+if "<th>speed %</th>" in ui:
+    err("asset manager animation clip tables must not expose authored speed percent")
 if 'create_animation_asset' not in (ROOT / "system/control-center/opencloud_assets.py").read_text(encoding="utf-8"):
     err("open cloud animation publication helper is missing")
 
@@ -583,10 +598,10 @@ for required in ["DefaultRunSpeed = 50", "WalkSpeedMultiplier = 0.5", "return ru
         err(f"direct RunSpeed/walk-half movement contract missing {required}")
 if 'character:GetAttribute("RunSpeed")' not in rig_text or 'character:GetAttribute("MoveSpeed")' in rig_text:
     err("character rig initial movement must use RunSpeed directly")
-if 'character:GetAttribute("AttackSpeed")' not in attack_text:
-    err("server attack timeline does not use AttackSpeed")
-if 'character:GetAttribute("AttackSpeed")' not in attack_controller_text:
-    err("client attack presentation does not use AttackSpeed")
+if 'AnimationSpeedScaling.ResolveForModel(character, "attack")' not in attack_text:
+    err("server attack timeline does not resolve stat-scaled AttackSpeed playback")
+if 'animationSpeedPercent = animationPlaybackPercent(slot)' not in controller_runtime:
+    err("client attack presentation does not use shared stat-scaled playback")
 for required in ['animationController.PlayAction("attack")', "action.durationSeconds", "clipId = action.clipId"]:
     if required not in attack_controller_text:
         err(f"client full-animation attack lock missing {required}")
@@ -666,6 +681,130 @@ for required in ["Game1StudioDebugPreferences_v1", "Game1StudioPreferences", "pl
 if (ROOT / "src/shared/dev/TestLoadoutConfig.luau").exists():
     err("obsolete generated TestLoadoutConfig must be removed")
 
+# m11 Studio-native movement debugger: game speed/world conversion + animation playback override
+movement_debug_server_path = ROOT / "src/server/dev/MovementDebugService.luau"
+movement_debug_client_path = ROOT / "src/client/dev/MovementDebugController.luau"
+movement_debug_server = movement_debug_server_path.read_text(encoding="utf-8") if movement_debug_server_path.is_file() else ""
+movement_debug_client = movement_debug_client_path.read_text(encoding="utf-8") if movement_debug_client_path.is_file() else ""
+for required in [
+    "GetMovementDebugCatalog",
+    "ApplyMovementDebug",
+    "SetMovementDebugMonsterMode",
+    "applyRuntimeRunSpeed",
+    "MovementDebugRunSpeedOverride",
+    "AnimationSpeedScaling.DebugOverrideAttribute",
+    "animationSpeedPercent",
+    "runSpeedUnitsPerStud",
+    "CharacterMovementConfig.RobloxSpeed",
+    'SetAttribute("BaseRunSpeed"',
+    'SetAttribute("RunSpeed"',
+    'SetAttribute("MoveSpeed"',
+    "controllerManager.BaseMoveSpeed = resolved",
+    "humanoid.WalkSpeed = resolved",
+    "model = model",
+    "Game1MonsterDebugLocomotionMode",
+    "MonsterLocomotionMode",
+    "RunService:IsStudio()",
+]:
+    if required not in movement_debug_server:
+        err(f"Studio movement debugger server missing {required}")
+for required in [
+    "MOVEMENT DEBUG",
+    "Run speed · game parameter",
+    "World distance / 1 second · studs",
+    "Animation playback · runtime override %",
+    "Walk = RunSpeed / 2",
+    "game speed = 1 stud/s",
+    "MONSTER BASE: WALK",
+    "MEASURED · last 1.0 s",
+    "syncSpeedBoxes",
+    "stageSpeedText(runSpeedBox)",
+    "stageSpeedText(distanceBox)",
+    "applyAnimationSpeed",
+    "modelPosition",
+    "RunService.Heartbeat:Connect",
+    "GetMovementDebugCatalog",
+    "ApplyMovementDebug",
+    "SetMovementDebugMonsterMode",
+    "CATALOG_POLL_SECONDS",
+    "RunService:IsStudio()",
+]:
+    if required not in movement_debug_client:
+        err(f"Studio movement debugger client missing {required}")
+movement_config_text = (ROOT / "src/shared/character/CharacterMovementConfig.luau").read_text(encoding="utf-8")
+for required in [
+    "RunSpeedUnitsPerStud = 10",
+    "WalkSpeedMultiplier = 0.5",
+    "function CharacterMovementConfig.RobloxSpeed",
+    "/ CharacterMovementConfig.RunSpeedUnitsPerStud",
+    "function CharacterMovementConfig.RunSpeedFromStudsPerSecond",
+]:
+    if required not in movement_config_text:
+        err(f"game-speed/world-distance conversion contract missing {required}")
+if "MovementDebugRunSpeedOverride" not in stats_service_text:
+    err("character stat recompute must preserve the active Studio movement-debug speed override")
+if "MovementDebugService.Start()" not in server_init_text:
+    err("Studio movement debugger service is not started by the server runtime")
+if "MovementDebugController.Start()" not in client_init_text:
+    err("Studio movement debugger controller is not started by the client runtime")
+
+
+# m12 shared animation-speed scaling: gameplay stat -> playback percentage
+animation_scaling_manifest_path = ROOT / "assets/manifests/animation-speed-scaling.json"
+animation_scaling_runtime_path = ROOT / "src/shared/animation/AnimationSpeedScaling.luau"
+animation_scaling_registry_path = ROOT / "src/shared/animation/AnimationSpeedScalingRegistry.luau"
+animation_scaling_store_path = ROOT / "system/control-center/animation_speed_scaling_store.py"
+animation_scaling_js_path = ROOT / "system/control-center/static/animation-speed.js"
+if not animation_scaling_manifest_path.is_file():
+    err("animation speed scaling manifest is missing")
+    animation_scaling_manifest = {}
+else:
+    animation_scaling_manifest = json.loads(animation_scaling_manifest_path.read_text(encoding="utf-8"))
+if animation_scaling_manifest.get("schemaVersion") != 1 or animation_scaling_manifest.get("project") != "game1":
+    err("animation speed scaling manifest must be game1 schema 1")
+expected_scaling = {
+    ("character", "human_female", "run"): ("RunSpeed", 2.0),
+    ("character", "human_female", "attack"): ("AttackSpeed", 2.0),
+    ("monster", "gremlin", "run"): ("RunSpeed", 0.6),
+}
+actual_scaling = {}
+for profile in animation_scaling_manifest.get("profiles") or []:
+    for rule in profile.get("rules") or []:
+        key = (str(profile.get("targetType") or ""), str(profile.get("targetId") or ""), str(rule.get("channel") or ""))
+        actual_scaling[key] = (str(rule.get("stat") or ""), float(rule.get("unitsPerPercent") or 0))
+for key, expected in expected_scaling.items():
+    actual = actual_scaling.get(key)
+    if not actual or actual[0] != expected[0] or abs(actual[1] - expected[1]) > 1e-6:
+        err(f"animation speed scaling rule mismatch for {key}: expected {expected}, got {actual}")
+animation_scaling_runtime = animation_scaling_runtime_path.read_text(encoding="utf-8") if animation_scaling_runtime_path.is_file() else ""
+animation_scaling_registry = animation_scaling_registry_path.read_text(encoding="utf-8") if animation_scaling_registry_path.is_file() else ""
+animation_scaling_store = animation_scaling_store_path.read_text(encoding="utf-8") if animation_scaling_store_path.is_file() else ""
+animation_scaling_js = animation_scaling_js_path.read_text(encoding="utf-8") if animation_scaling_js_path.is_file() else ""
+monster_assets_js_early = (ROOT / "system/control-center/static/monster-assets.js").read_text(encoding="utf-8")
+monster_animation_registry_early = (ROOT / "src/shared/monster/MonsterAnimationRegistry.luau").read_text(encoding="utf-8")
+for required in ["ResolveForModel", "unitsPerPercent", "DebugOverrideAttribute", "value / unitsPerPercent"]:
+    if required not in animation_scaling_runtime:
+        err(f"animation speed scaling runtime missing {required}")
+for required in ['["human_female"]', 'unitsPerPercent = 2.0', '["gremlin"]', 'unitsPerPercent = 0.6']:
+    if required not in animation_scaling_registry:
+        err(f"generated animation speed scaling registry missing {required}")
+for required in ["AnimationSpeedScalingStore", "unitsPerPercent", "AnimationSpeedScalingRegistry.luau"]:
+    if required not in animation_scaling_store:
+        err(f"animation speed scaling Asset Manager store missing {required}")
+for required in ["animation speed", "units per 1%", "/api/animation-speed-scaling"]:
+    if required not in (ui + animation_scaling_js + host_agent_text).lower():
+        err(f"animation speed scaling Asset Manager UI/API missing {required}")
+if "data-speed" in character_js_text or "data-speed" in monster_assets_js_early:
+    err("per-animation playback Speed % controls must be removed from Asset Manager clip tables")
+if "/api/animation-bindings/" in host_agent_text and 'endswith("/speed")' in host_agent_text:
+    err("character animation binding speed endpoint must be removed")
+if 'monster_binding_prefix) and path.endswith("/speed")' in host_agent_text:
+    err("monster animation binding speed endpoint must be removed")
+if "playbackSpeedPercent" in animation_registry_text or "playbackSpeedPercent" in monster_animation_registry_early:
+    err("runtime animation registries must not carry per-clip playback speed")
+if "(speedStat /" in attack_timeline_text or "DefaultAttackSpeed" in attack_timeline_text:
+    err("attack timeline must consume final stat-scaled playback percent without multiplying AttackSpeed twice")
+
 
 # m7 monster registry / animation / character life + critical contract
 monster_manifest_path = ROOT / "assets/manifests/monsters.json"
@@ -712,6 +851,9 @@ else:
     monster_animation_manifest = json.loads(monster_animation_manifest_path.read_text(encoding="utf-8"))
 if monster_animation_manifest.get("schemaVersion") != 1 or monster_animation_manifest.get("project") != "game1":
     err("monster animation manifest must be game1 schema 1")
+for binding in monster_animation_manifest.get("bindings") or []:
+    if "playbackSpeedPercent" in binding or "playback_speed_percent" in binding:
+        err(f"monster animation binding must not own playback speed: {binding.get('id')}")
 monster_slot_catalog = monster_animation_manifest.get("slotCatalog") or []
 monster_slots = [row.get("slot") for row in monster_slot_catalog]
 if monster_slots != ["idle", "idle_special", "walk", "run", "combat_idle", "attack", "death"]:
@@ -753,6 +895,9 @@ for required in ['id="nav-monsters"', 'id="monsters-view"', 'id="register-monste
 for required in ["monsterRegister", "monsterPublish", "monsterSync", "monsterScanAnimations", "monsterPublishMissingAnimations", "MONSTER_FILENAME_GUIDE_KEY", "MONSTER_ANIMATION_FOLDER_KEY", "initMonsterAnimationFolderExplorer", "row.state||row.slot", "rule.state"]:
     if required not in monster_js_text:
         err(f"asset manager monster javascript missing {required}")
+for forbidden in ["monsterSetAnimationSpeed", "data-speed"]:
+    if forbidden in monster_js_text:
+        err(f"asset manager monster clip table must not expose per-clip speed control: {forbidden}")
 for required in ['id="monster-animation-folder-path"', 'id="choose-monster-animation-folder"', 'id="scan-monster-animations"']:
     if required not in ui:
         err(f"monster animation folder explorer missing {required}")
@@ -806,9 +951,23 @@ if 'finite(stats.RunSpeed, CharacterMovementConfig.DefaultRunSpeed)' not in mons
 for required in ["MonsterSpawnRegistry", "MonsterRegistry", "MonsterAnimationRegistry", "spawnRadius", "maxAlive", "respawnSeconds", "math.sqrt", "Workspace:Raycast", "EntityHitboxService.Attach", 'GetAttributeChangedSignal("LifeState")', '== "Dying"', 'publishedRows(profile, "idle")', 'weightedIdleChoice', 'MonsterAnimationState', 'MonsterIdleVariant', 'idleTrack.DidLoop', 'choice.track.Ended', 'playBaseIdle']:
     if required not in monster_spawner_text:
         err(f"monster runtime spawner missing {required}")
-for required in ["HumanoidRootPart", 'Instance.new("Humanoid")', "humanoid:MoveTo", "MoveToFinished", "WANDER_PAUSE_MIN_SECONDS", "WANDER_PAUSE_MAX_SECONDS", "WANDER_MOVE_REFRESH_SECONDS", "CharacterMovementConfig.ResolveSpeed", 'firstPublishedTrack(profile, "walk")', "MonsterWanderEnabled"]:
+for required in ["HumanoidRootPart", 'Instance.new("Humanoid")', "humanoid:MoveTo", "MoveToFinished", "WANDER_PAUSE_MIN_SECONDS", "WANDER_PAUSE_MAX_SECONDS", "WANDER_MOVE_REFRESH_SECONDS", "CharacterMovementConfig.RobloxSpeed", 'firstPublishedTrack(profile, "walk")', "MonsterWanderEnabled"]:
     if required not in monster_spawner_text:
         err(f"monster random-wander runtime missing {required}")
+for required in [
+    'firstPublishedTrack(profile, "run")',
+    'GetAttributeChangedSignal("RunSpeed")',
+    'GetAttributeChangedSignal("MonsterLocomotionMode")',
+    "refreshWanderLocomotion",
+    "locomotionSpeedFor",
+    "runTrack",
+    "Game1MonsterDebugLocomotionMode",
+    "AnimationSpeedScaling.DebugOverrideAttribute",
+    "AnimationPlaybackSpeedPercent",
+    "AnimationSpeedScaling",
+]:
+    if required not in monster_spawner_text:
+        err(f"monster live movement-debug locomotion missing {required}")
 for required in ['VisualRootWeld', 'animatorFor(model, visual)', 'controller.Parent = visual']:
     if required not in monster_spawner_text:
         err(f"monster animated-navigation bridge missing {required}")
@@ -859,7 +1018,9 @@ for required in [
     "track.TimePosition = terminalTime",
     "track:AdjustWeight(1, 0)",
     "track:AdjustSpeed(0)",
-    "elapsed < terminalTime",
+    "startedSpeed",
+    "expectedElapsed",
+    "elapsed < expectedElapsed",
     "return true, terminalTime",
 ]:
     if required not in death_policy_text:
@@ -977,7 +1138,7 @@ if errors:
         print(" -", item)
     sys.exit(1)
 
-print("verify ok · game1 m8 deterministic death hold + direct movement + attack timelines passed")
+print("verify ok · game1 m12 stat-scaled animation playback passed")
 print("registered character archetypes:", len(archetypes))
 print("active character archetype:", active_id or "none")
 print("race pool: human")

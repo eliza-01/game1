@@ -31,7 +31,14 @@ local function recompute(character: Model)
         for _, modifiers in pairs(sources) do
             delta += tonumber(modifiers[stat]) or 0
         end
-        character:SetAttribute(stat, base + delta)
+        local resolved = base + delta
+        if stat == "RunSpeed" then
+            local debugOverride = tonumber(character:GetAttribute("MovementDebugRunSpeedOverride"))
+            if debugOverride ~= nil then
+                resolved = math.max(0, debugOverride)
+            end
+        end
+        character:SetAttribute(stat, resolved)
     end
 
     local newMaxHP = tonumber(character:GetAttribute("MaxHP")) or Config.Default.MaxHP

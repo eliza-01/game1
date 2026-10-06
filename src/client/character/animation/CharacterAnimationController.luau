@@ -4,8 +4,10 @@ local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local CombatShared = Shared:WaitForChild("combat")
+local AnimationShared = Shared:WaitForChild("animation")
 local DeathAnimationPolicy = require(CombatShared:WaitForChild("DeathAnimationPolicy"))
 local AttackTimelineConfig = require(CombatShared:WaitForChild("AttackTimelineConfig"))
+local AnimationSpeedScaling = require(AnimationShared:WaitForChild("AnimationSpeedScaling"))
 
 local AnimationResolver = require(script.Parent:WaitForChild("AnimationResolver"))
 local AnimationTrackCache = require(script.Parent:WaitForChild("AnimationTrackCache"))
@@ -69,6 +71,23 @@ local function findAnimator(model: Model): Animator?
 	return if found and found:IsA("Animator") then found else nil
 end
 
+local function animationPlaybackPercent(channel: string): number
+	if not character then
+		return 100
+	end
+	return AnimationSpeedScaling.ResolveForModel(character, channel)
+end
+
+local function animationPlaybackScale(channel: string): number
+	return animationPlaybackPercent(channel) / 100
+end
+
+local function publishPlaybackPercent(channel: string)
+	if character then
+		character:SetAttribute("AnimationPlaybackSpeedPercent", animationPlaybackPercent(channel))
+	end
+end
+
 local function movementSlot(): string
 	if not character then
 		return "idle"
@@ -87,8 +106,9 @@ local function applyBackwardPlayback(track: AnimationTrack, slot: string)
 		return
 	end
 	local backward = tostring(character:GetAttribute("AnimationMovementDirection") or "Forward") == "Backward"
+	local playbackScale = animationPlaybackScale(slot)
 	if not backward or slot ~= "walk" then
-		track:AdjustSpeed(1)
+		track:AdjustSpeed(playbackScale)
 		return
 	end
 	task.spawn(function()
@@ -98,7 +118,7 @@ local function applyBackwardPlayback(track: AnimationTrack, slot: string)
 		end
 		if track.IsPlaying and track.Length > 0 then
 			track.TimePosition = math.max(0, track.Length - 0.001)
-			track:AdjustSpeed(-1)
+			track:AdjustSpeed(-playbackScale)
 		end
 	end)
 end
@@ -120,6 +140,7 @@ local function refreshLoop()
 		return
 	end
 	local clipId = tostring(descriptor.clipId or "")
+	publishPlaybackPercent(slot)
 	if currentLoop and currentLoopClipId == clipId then
 		applyBackwardPlayback(currentLoop, slot)
 		return
@@ -133,7 +154,7 @@ local function refreshLoop()
 	end
 	currentLoop = nextTrack
 	currentLoopClipId = clipId
-	nextTrack:Play(0.15, 1, 1)
+	nextTrack:Play(0.15, 1, animationPlaybackScale(slot))
 	applyBackwardPlayback(nextTrack, slot)
 	character:SetAttribute("AnimationResolvedSlot", slot)
 	character:SetAttribute("AnimationResolvedClip", clipId)
@@ -184,7 +205,8 @@ local function playDeath()
 		return
 	end
 
-	DeathAnimationPolicy.Start(track)
+	publishPlaybackPercent("death")
+	DeathAnimationPolicy.Start(track, animationPlaybackScale("death"))
 end
 
 local function maintainDeathTerminalPose(deltaTimeSim: number)
@@ -238,7 +260,8 @@ local function playBaseLifeAction(slot: string, onStopped)
 	currentAction = track
 	currentActionSlot = slot
 	currentActionLockedUntil = 0
-	track:Play(0.06, 1, 1)
+	publishPlaybackPercent(slot)
+	track:Play(0.06, 1, animationPlaybackScale(slot))
 	character:SetAttribute("AnimationActionSlot", slot)
 	character:SetAttribute("AnimationActionClip", tostring(descriptor.clipId or ""))
 	track.Stopped:Once(function()
@@ -306,7 +329,7 @@ local function bindCharacter(newCharacter: Model)
 		end
 		print(("[game1][animation] prewarm %d/%d ready in %.3fs"):format(result.ready, result.total, result.elapsed))
 	end)
-	for _, attribute in ipairs({ "MovementState", "AnimationMovementDirection", "AnimationWeaponSet" }) do
+	for _, attribute in ipairs({ "MovementState", "AnimationMovementDirection", "AnimationWeaponSet", "RunSpeed", AnimationSpeedScaling.DebugOverrideAttribute }) do
 		table.insert(connections, newCharacter:GetAttributeChangedSignal(attribute):Connect(refreshLoop))
 	end
 	table.insert(connections, newCharacter:GetAttributeChangedSignal("LifeState"):Connect(handleLifeState))
@@ -336,11 +359,12 @@ function CharacterAnimationController.PlayAction(slot: string)
 	end
 
 	local clipId = tostring(descriptor.clipId or "")
-	local playbackSpeed = 1
+	local animationSpeedPercent = animationPlaybackPercent(slot)
+	local playbackSpeed = animationSpeedPercent / 100
 	local timeline = nil
 	local runtimeDuration = 0
 	if slot == "attack" then
-		timeline = AttackTimelineConfig.ResolveRuntime(clipId, character:GetAttribute("AttackSpeed"))
+		timeline = AttackTimelineConfig.ResolveRuntime(clipId, animationSpeedPercent)
 		if not timeline then
 			warn(("[game1][animation] attack clip has no timeline: %s"):format(clipId))
 			return nil
@@ -356,6 +380,7 @@ function CharacterAnimationController.PlayAction(slot: string)
 	currentActionSlot = slot
 	currentActionLockedUntil = if slot == "attack" then now + runtimeDuration else 0
 	track.Looped = false
+	publishPlaybackPercent(slot)
 	track:Play(0.06, 1, playbackSpeed)
 	character:SetAttribute("AnimationActionSlot", slot)
 	character:SetAttribute("AnimationActionClip", clipId)
@@ -379,6 +404,7 @@ function CharacterAnimationController.PlayAction(slot: string)
 		track = track,
 		clipId = clipId,
 		playbackSpeed = playbackSpeed,
+		animationSpeedPercent = animationSpeedPercent,
 		durationSeconds = runtimeDuration,
 		endsAt = currentActionLockedUntil,
 		timeline = timeline,

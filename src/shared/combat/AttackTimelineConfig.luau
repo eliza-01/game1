@@ -1,10 +1,12 @@
 -- Authoritative attack-animation timeline configuration.
 --
 -- Every gameplay attack clip must be registered here. `duration` is the source
--- animation duration at AttackSpeed=100. Event positions can be authored either
+-- animation duration at 100% playback. Event positions can be authored either
 -- in source-animation seconds (`time`) or as a 0..1 fraction (`normalizedTime`).
--- Runtime timing is divided by the same playback speed used by the Animator, so
--- AttackSpeed changes presentation and gameplay timing together.
+-- Runtime timing is divided by the same playback speed used by the Animator.
+-- The final playback percentage is resolved by AnimationSpeedScaling from gameplay
+-- stats (or a temporary runtime debug override), so presentation and gameplay
+-- events remain on the same authored animation phase.
 --
 -- `result` links an animation event to gameplay. game1 currently implements
 -- `melee_damage`; the event schema is deliberately generic so later attacks can
@@ -13,7 +15,6 @@
 local AttackTimelineConfig = {}
 
 AttackTimelineConfig.SchemaVersion = 1
-AttackTimelineConfig.DefaultAttackSpeed = 100
 AttackTimelineConfig.EndGuardSeconds = 0.03
 AttackTimelineConfig.EventNames = table.freeze({
     Hit = true,
@@ -83,15 +84,15 @@ function AttackTimelineConfig.ResolveBase(clipId: any): any?
     return source
 end
 
-function AttackTimelineConfig.ResolveRuntime(clipId: any, attackSpeed: any): any?
+function AttackTimelineConfig.ResolveRuntime(clipId: any, animationSpeedPercent: any): any?
     local source = AttackTimelineConfig.ResolveBase(clipId)
     if not source then
         return nil
     end
 
     local baseDuration = math.max(0.001, tonumber(source.duration) or 0)
-    local speedStat = math.max(1, tonumber(attackSpeed) or AttackTimelineConfig.DefaultAttackSpeed)
-    local playbackSpeed = math.max(0.01, speedStat / AttackTimelineConfig.DefaultAttackSpeed)
+    local clipPercent = math.clamp(tonumber(animationSpeedPercent) or 100, 1, 400)
+    local playbackSpeed = math.max(0.01, clipPercent / 100)
     local events = {}
     for eventName, event in pairs(source.events or {}) do
         events[tostring(eventName)] = copyRuntimeEvent(event, baseDuration, playbackSpeed)
@@ -104,6 +105,7 @@ function AttackTimelineConfig.ResolveRuntime(clipId: any, attackSpeed: any): any
         animationDuration = animationDuration,
         duration = animationDuration + AttackTimelineConfig.EndGuardSeconds,
         playbackSpeed = playbackSpeed,
+        animationSpeedPercent = clipPercent,
         events = events,
     }
 end

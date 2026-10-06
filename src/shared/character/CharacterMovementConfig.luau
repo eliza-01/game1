@@ -1,16 +1,24 @@
 local CharacterMovementConfig = {}
 
--- RunSpeed is a world-space movement speed in studs/second for every moving
--- entity. Walking is always exactly half of that stat. Keep the compatibility
--- method names because both ControllerManager characters and Humanoid monsters
--- consume this shared contract.
+-- RunSpeed is a game-design stat, not a Roblox world velocity.
+-- Canonical conversion: 10 RunSpeed units == 1 stud/second.
+-- Walking always uses exactly half of the current RunSpeed stat.
 CharacterMovementConfig.DefaultRunSpeed = 50
 CharacterMovementConfig.WalkSpeedMultiplier = 0.5
+CharacterMovementConfig.RunSpeedUnitsPerStud = 10
+
+local function gameSpeed(currentRunSpeed: any, movementMode: any): number
+    local runSpeed = math.max(0, tonumber(currentRunSpeed) or CharacterMovementConfig.DefaultRunSpeed)
+    if tostring(movementMode) == "Walk" then
+        return runSpeed * CharacterMovementConfig.WalkSpeedMultiplier
+    end
+    return runSpeed
+end
 
 function CharacterMovementConfig.Resolve(_archetype: any): any
     return {
-        groundWalk = CharacterMovementConfig.DefaultRunSpeed * CharacterMovementConfig.WalkSpeedMultiplier,
-        groundRun = CharacterMovementConfig.DefaultRunSpeed,
+        groundWalk = CharacterMovementConfig.RobloxSpeed(nil, CharacterMovementConfig.DefaultRunSpeed, "Walk"),
+        groundRun = CharacterMovementConfig.RobloxSpeed(nil, CharacterMovementConfig.DefaultRunSpeed, "Run"),
     }
 end
 
@@ -19,16 +27,22 @@ function CharacterMovementConfig.MovementMultiplier(_archetype: any, currentRunS
     return value / CharacterMovementConfig.DefaultRunSpeed
 end
 
+-- Returns the game-design speed value for the requested locomotion mode.
 function CharacterMovementConfig.ResolveSpeed(_archetype: any, currentRunSpeed: any, movementMode: any): number
-    local runSpeed = math.max(0, tonumber(currentRunSpeed) or CharacterMovementConfig.DefaultRunSpeed)
-    if tostring(movementMode) == "Walk" then
-        return runSpeed * CharacterMovementConfig.WalkSpeedMultiplier
-    end
-    return runSpeed
+    return gameSpeed(currentRunSpeed, movementMode)
 end
 
-function CharacterMovementConfig.RobloxSpeed(archetype: any, currentRunSpeed: any, movementMode: any): number
-    return CharacterMovementConfig.ResolveSpeed(archetype, currentRunSpeed, movementMode)
+-- Returns the actual Roblox world velocity in studs/second.
+function CharacterMovementConfig.RobloxSpeed(_archetype: any, currentRunSpeed: any, movementMode: any): number
+    return gameSpeed(currentRunSpeed, movementMode) / CharacterMovementConfig.RunSpeedUnitsPerStud
+end
+
+function CharacterMovementConfig.StudsPerSecond(archetype: any, currentRunSpeed: any, movementMode: any): number
+    return CharacterMovementConfig.RobloxSpeed(archetype, currentRunSpeed, movementMode)
+end
+
+function CharacterMovementConfig.RunSpeedFromStudsPerSecond(studsPerSecond: any): number
+    return math.max(0, tonumber(studsPerSecond) or 0) * CharacterMovementConfig.RunSpeedUnitsPerStud
 end
 
 return table.freeze(CharacterMovementConfig)

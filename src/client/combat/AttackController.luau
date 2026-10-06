@@ -44,15 +44,15 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
             return
         end
 
-        local attackSpeed = math.max(1, tonumber(character:GetAttribute("AttackSpeed")) or 100)
         local root = character:FindFirstChild("RootCollider")
         if root and root:IsA("BasePart") then
             local direction = Vector3.new(target.X - root.Position.X, 0, target.Z - root.Position.Z)
             if direction.Magnitude > 0.001 then
-                local speedScale = 100 / attackSpeed
-                local facingDuration = math.min(action.durationSeconds, AttackConfig.FacingTurnSeconds * speedScale)
-                local movementDuration = math.min(action.durationSeconds, AttackConfig.MovementLockSeconds * speedScale)
-                local poseDuration = math.min(action.durationSeconds, AttackConfig.AimPoseSeconds * speedScale)
+                local playbackSpeed = math.max(0.01, tonumber(action.playbackSpeed) or 1)
+                local timelineScale = 1 / playbackSpeed
+                local facingDuration = math.min(action.durationSeconds, AttackConfig.FacingTurnSeconds * timelineScale)
+                local movementDuration = math.min(action.durationSeconds, AttackConfig.MovementLockSeconds * timelineScale)
+                local poseDuration = math.min(action.durationSeconds, AttackConfig.AimPoseSeconds * timelineScale)
 
                 attackSequence += 1
                 local sequence = attackSequence

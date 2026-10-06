@@ -17,6 +17,7 @@
 <div class="asset-sections">
 <button id="nav-characters" class="asset-section active" type="button"><b>characters</b><small>models · rigs</small></button>
 <button id="nav-animations" class="asset-section" type="button"><b>animations</b><small>profiles · clips</small></button>
+<button id="nav-animation-speed" class="asset-section" type="button"><b>animation speed</b><small>stat → playback scaling</small></button>
 <button id="nav-weapons" class="asset-section" type="button"><b>weapons</b><small>models · textures · stats</small></button>
 <button id="nav-monsters" class="asset-section" type="button"><b>monsters</b><small>rigs · stats · animations</small></button>
 </div>
@@ -112,6 +113,18 @@
 </div>
 </div>
 
+<div id="animation-speed-view" hidden>
+<div class="panel hero">
+<div><span class="eyebrow">runtime animation playback · stat scaling</span><h2>animation speed</h2><p>playback speed is derived from gameplay stats here, not authored per animation clip. the rule is direct: <b>playback % = stat / units per 1%</b>. a runtime debug override can still temporarily replace the calculated value during Play.</p></div>
+</div>
+<div class="panel runtime-card"><div class="runtime-state registered"><strong>shared scaling</strong><span>one rule applies to every matching animation state for that character or monster.</span></div></div>
+<div class="panel character-card">
+<div class="section-title"><div><span>animation speed scaling</span><h3>gameplay stat → playback %</h3></div><button id="refresh-animation-speed" type="button">refresh</button></div>
+<small class="hint">example: Human Female Run Speed = 2 means every 2 RunSpeed points produce 1% playback. RunSpeed 50 therefore plays run at 25%. values are live source settings and are written to the shared runtime registry.</small>
+<div id="animation-speed-profiles" class="details"><span class="muted">loading scaling rules…</span></div>
+</div>
+</div>
+
 <div id="weapons-view" hidden>
 <div class="panel hero">
 <div><span class="eyebrow">weapon assets · canonical game1 registry</span><h2>weapons</h2><p>one weapon owns one canonical fbx, zero or more textures, one animation context, additive stat modifiers and stable roblox asset ids. the imported model pivot is the grip reference, matching the reference project attachment contract.</p></div>
@@ -201,7 +214,7 @@
 </div>
 <div class="panel character-card">
 <div class="section-title"><div><span>selected monster animations</span><h3 id="monster-animation-table-title">registered animations</h3></div></div>
-<small class="hint">only animations already registered for the selected monster are listed here. <code>idle_special_01..n</code> are shown as variants of state <code>idle</code>. weight is relative inside one state; after each base idle loop, base idle and special idle variants participate in the weighted choice.</small>
+<small class="hint">only animations already registered for the selected monster are listed here. <code>idle_special_01..n</code> are shown as variants of state <code>idle</code>. weight is relative inside one state. playback speed is configured globally in the Animation Speed section.</small>
 <div class="table-wrap animation-table-wrap"><table><thead><tr><th>state</th><th>variant</th><th>clip</th><th>asset</th><th>status</th><th>weight</th><th>actions</th></tr></thead><tbody id="monster-animation-rows"></tbody></table></div>
 </div>
 </div>
@@ -240,7 +253,8 @@
 </section>
 </main>
 <div id="toast" class="toast"></div>
-<script src="character-assets.js?v=12"></script>
+<script src="character-assets.js?v=13"></script>
+<script src="animation-speed.js?v=1"></script>
 <script src="weapon-assets.js?v=3"></script>
 <script src="monster-assets.js?v=3"></script>
 <script src="monster-spawns.js?v=1"></script>

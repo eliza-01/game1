@@ -6,7 +6,9 @@ local Workspace = game:GetService("Workspace")
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local MonsterShared = Shared:WaitForChild("monster")
 local CharacterShared = Shared:WaitForChild("character")
+local AnimationShared = Shared:WaitForChild("animation")
 local CharacterMovementConfig = require(CharacterShared:WaitForChild("CharacterMovementConfig"))
+local AnimationSpeedScaling = require(AnimationShared:WaitForChild("AnimationSpeedScaling"))
 local MonsterRegistry = require(MonsterShared:WaitForChild("MonsterRegistry"))
 local MonsterAnimationRegistry = require(MonsterShared:WaitForChild("MonsterAnimationRegistry"))
 local CombatRoot = script.Parent.Parent:WaitForChild("combat")
@@ -171,6 +173,28 @@ local function loadAnimationTrack(animator: Animator?, row: any?, looped: boolea
     return track
 end
 
+local function animationPlaybackPercent(model: Model, channel: string): number
+    return AnimationSpeedScaling.ResolveForModel(model, channel)
+end
+
+local function animationPlaybackScale(model: Model, channel: string): number
+    return animationPlaybackPercent(model, channel) / 100
+end
+
+local function playTrackAtConfiguredSpeed(model: Model, track: AnimationTrack?, channel: string, fadeTime: number)
+    if not track then
+        return
+    end
+    local percent = animationPlaybackPercent(model, channel)
+    model:SetAttribute("AnimationPlaybackSpeedPercent", percent)
+    local speed = percent / 100
+    if track.IsPlaying then
+        track:AdjustSpeed(speed)
+    else
+        track:Play(fadeTime, 1, speed)
+    end
+end
+
 local function stopTrack(track: AnimationTrack?)
     if not track then
         return
@@ -225,11 +249,12 @@ local function playBaseIdle(model: Model, entry: any)
         return
     end
     stopTrack(entry.walkTrack)
+    stopTrack(entry.runTrack)
     model:SetAttribute("MonsterAnimationState", "idle")
     model:SetAttribute("MonsterIdleVariant", "base")
-    if entry.idleTrack and not entry.idleTrack.IsPlaying then
+    if entry.idleTrack then
         pcall(function()
-            entry.idleTrack:Play(0.12)
+            playTrackAtConfiguredSpeed(model, entry.idleTrack, "idle", 0.12)
         end)
     end
 end
@@ -247,7 +272,7 @@ local function maybePlayIdleSpecial(model: Model, entry: any)
     model:SetAttribute("MonsterAnimationState", "idle")
     model:SetAttribute("MonsterIdleVariant", ("special_%02d"):format(math.max(1, math.floor(finite(choice.row.variant, 1)))))
     local ok = pcall(function()
-        choice.track:Play(0.08)
+        playTrackAtConfiguredSpeed(model, choice.track, "idle", 0.08)
     end)
     if not ok then
         entry.activeIdleSpecial = nil
@@ -466,8 +491,19 @@ local function horizontalDistance(left: Vector3, right: Vector3): number
     return Vector3.new(right.X - left.X, 0, right.Z - left.Z).Magnitude
 end
 
-local function walkSpeedFor(model: Model): number
-    return CharacterMovementConfig.ResolveSpeed(nil, model:GetAttribute("RunSpeed"), "Walk")
+local function monsterLocomotionMode(model: Model): string
+    return string.lower(tostring(model:GetAttribute("MonsterLocomotionMode") or "Walk")) == "run" and "Run" or "Walk"
+end
+
+local function locomotionSpeedFor(model: Model): number
+    return CharacterMovementConfig.RobloxSpeed(nil, model:GetAttribute("RunSpeed"), monsterLocomotionMode(model))
+end
+
+local function locomotionTrackFor(entry: any, mode: string): AnimationTrack?
+    if mode == "Run" then
+        return entry.runTrack or entry.walkTrack
+    end
+    return entry.walkTrack or entry.runTrack
 end
 
 local function chooseWanderTarget(record: any, current: Vector3): (Vector3?, number, boolean)
@@ -501,9 +537,49 @@ local function chooseWanderTarget(record: any, current: Vector3): (Vector3?, num
     return destination, routeLength, outsideSpawn
 end
 
+local function refreshWanderLocomotion(model: Model, entry: any)
+    if not entry.wandering or entry.dying then
+        return
+    end
+    local humanoid = entry.humanoid
+    local navigationRoot = entry.navigationRoot
+    if not humanoid or not humanoid.Parent or not navigationRoot or not navigationRoot.Parent then
+        return
+    end
+
+    local mode = monsterLocomotionMode(model)
+    local activeTrack = locomotionTrackFor(entry, mode)
+    local inactiveTrack = mode == "Run" and entry.walkTrack or entry.runTrack
+    if inactiveTrack and inactiveTrack ~= activeTrack then
+        stopTrack(inactiveTrack)
+    end
+    if activeTrack then
+        local activeRow = if mode == "Run" then (entry.runRow or entry.walkRow) else (entry.walkRow or entry.runRow)
+        pcall(function() playTrackAtConfiguredSpeed(model, activeTrack, string.lower(mode), 0.1) end)
+    end
+    model:SetAttribute("MonsterAnimationState", string.lower(mode))
+
+    local speed = math.max(0, locomotionSpeedFor(model))
+    humanoid.WalkSpeed = speed
+    humanoid.AutoRotate = true
+    local destination = entry.wanderDestination
+    if destination then
+        if speed <= 0.001 then
+            entry.wanderDeadline = math.huge
+        else
+            local remaining = horizontalDistance(navigationRoot.Position, destination)
+            entry.wanderDeadline = os.clock() + math.max(8, remaining / speed + 4)
+        end
+        humanoid:MoveTo(destination)
+    end
+end
+
 local function stopWanderMovement(entry: any)
     entry.wandering = false
+    entry.wanderDestination = nil
+    entry.wanderDeadline = nil
     stopTrack(entry.walkTrack)
+    stopTrack(entry.runTrack)
     local humanoid = entry.humanoid
     local navigationRoot = entry.navigationRoot
     if humanoid and navigationRoot and navigationRoot.Parent then
@@ -541,31 +617,24 @@ local function startWanderLoop(state: any, model: Model, entry: any)
 
             stopIdleState(entry)
             entry.wandering = true
-            model:SetAttribute("MonsterAnimationState", "walk")
+            entry.wanderDestination = destination
             model:SetAttribute("MonsterIdleVariant", nil)
             model:SetAttribute("MonsterWanderTargetX", destination.X)
             model:SetAttribute("MonsterWanderTargetZ", destination.Z)
             model:SetAttribute("MonsterWanderRouteLength", routeLength)
             model:SetAttribute("MonsterWanderOutsideSpawn", outsideSpawn)
-            if entry.walkTrack then
-                pcall(function() entry.walkTrack:Play(0.1) end)
-            end
+            refreshWanderLocomotion(model, entry)
 
-            local speed = math.max(0.1, walkSpeedFor(model))
-            humanoid.WalkSpeed = speed
-            humanoid.AutoRotate = true
-            humanoid:MoveTo(destination)
             local finished = false
             local moveConnection = humanoid.MoveToFinished:Connect(function()
                 finished = true
             end)
-            local deadline = os.clock() + math.max(8, routeLength / speed + 4)
             local nextRefresh = os.clock() + WANDER_MOVE_REFRESH_SECONDS
             while not finished
                 and state.instances[model] == entry
                 and model.Parent
                 and not entry.dying
-                and os.clock() < deadline
+                and os.clock() < (entry.wanderDeadline or math.huge)
             do
                 task.wait(0.1)
                 if horizontalDistance(navigationRoot.Position, destination) <= WANDER_ARRIVAL_TOLERANCE then
@@ -604,6 +673,8 @@ local function applyMonsterAttributes(model: Model, definition: any, record: any
     model:SetAttribute("Damage", math.max(0, finite(stats.Damage, 10)))
     model:SetAttribute("AttackSpeed", math.max(1, finite(stats.AttackSpeed, 100)))
     model:SetAttribute("RunSpeed", math.max(0, finite(stats.RunSpeed, CharacterMovementConfig.DefaultRunSpeed)))
+    local debugLocomotion = tostring(Workspace:GetAttribute("Game1MonsterDebugLocomotionMode") or "Walk")
+    model:SetAttribute("MonsterLocomotionMode", string.lower(debugLocomotion) == "run" and "Run" or "Walk")
     model:SetAttribute("CritChance", math.clamp(finite(stats.CritChance, 0), 0, 100))
     model:SetAttribute("Defense", math.max(0, finite(stats.Defense, 0)))
 end
@@ -695,7 +766,8 @@ local function beginDeath(state: any, model: Model, entry: any)
         warn("[game1][monster-spawn] required death animation track is missing; monster remains Dying")
         return
     end
-    DeathAnimationPolicy.Start(track)
+    model:SetAttribute("AnimationPlaybackSpeedPercent", animationPlaybackPercent(model, "death"))
+    DeathAnimationPolicy.Start(track, animationPlaybackScale(model, "death"))
 end
 
 local function spawnOne(state: any): Model?
@@ -756,14 +828,23 @@ local function spawnOne(state: any): Model?
             end
         end
     end
-    local walkTrack = loadAnimationTrack(animator, firstPublishedTrack(profile, "walk") or firstPublishedTrack(profile, "run"), true)
-    local deathTrack = loadAnimationTrack(animator, firstPublishedTrack(profile, "death"), false)
+    local walkRow = firstPublishedTrack(profile, "walk") or firstPublishedTrack(profile, "run")
+    local runRow = firstPublishedTrack(profile, "run") or firstPublishedTrack(profile, "walk")
+    local deathRow = firstPublishedTrack(profile, "death")
+    local walkTrack = loadAnimationTrack(animator, walkRow, true)
+    local runTrack = loadAnimationTrack(animator, runRow, true)
+    local deathTrack = loadAnimationTrack(animator, deathRow, false)
     local entry = {
         idleTrack = idleTrack,
+        idleRow = nil,
         idleChoices = idleChoices,
         activeIdleSpecial = nil,
         walkTrack = walkTrack,
+        walkRow = walkRow,
+        runTrack = runTrack,
+        runRow = runRow,
         deathTrack = deathTrack,
+        deathRow = deathRow,
         visual = visual,
         navigationRoot = navigationRoot,
         humanoid = humanoid,
@@ -771,6 +852,12 @@ local function spawnOne(state: any): Model?
         dying = false,
         deathPoseHeld = false,
     }
+    for _, choice in ipairs(idleChoices) do
+        if choice.role == "base" and choice.track == idleTrack then
+            entry.idleRow = choice.row
+            break
+        end
+    end
     state.instances[model] = entry
 
     for _, choice in ipairs(idleChoices) do
@@ -794,6 +881,32 @@ local function spawnOne(state: any): Model?
     playBaseIdle(model, entry)
     startWanderLoop(state, model, entry)
 
+    model:GetAttributeChangedSignal("RunSpeed"):Connect(function()
+        if state.instances[model] == entry then
+            refreshWanderLocomotion(model, entry)
+        end
+    end)
+    model:GetAttributeChangedSignal("MonsterLocomotionMode"):Connect(function()
+        if state.instances[model] == entry then
+            refreshWanderLocomotion(model, entry)
+        end
+    end)
+    model:GetAttributeChangedSignal(AnimationSpeedScaling.DebugOverrideAttribute):Connect(function()
+        if state.instances[model] ~= entry or entry.deathPoseHeld then
+            return
+        end
+        if entry.dying then
+            if entry.deathTrack and entry.deathTrack.IsPlaying then
+                entry.deathTrack:AdjustSpeed(animationPlaybackScale(model, "death"))
+            end
+        elseif entry.wandering then
+            refreshWanderLocomotion(model, entry)
+        elseif entry.activeIdleSpecial then
+            playTrackAtConfiguredSpeed(model, entry.activeIdleSpecial.track, "idle", 0)
+        elseif entry.idleTrack then
+            playTrackAtConfiguredSpeed(model, entry.idleTrack, "idle", 0)
+        end
+    end)
     model:GetAttributeChangedSignal("LifeState"):Connect(function()
         if state.instances[model] ~= entry then
             return

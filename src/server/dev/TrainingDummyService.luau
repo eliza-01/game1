@@ -1,7 +1,9 @@
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
-local DeathLifecycleService = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("DeathLifecycleService"))
+local CombatRoot = script.Parent.Parent:WaitForChild("combat")
+local DeathLifecycleService = require(CombatRoot:WaitForChild("DeathLifecycleService"))
+local EntityHitboxService = require(CombatRoot:WaitForChild("EntityHitboxService"))
 
 local Service = {}
 
@@ -36,38 +38,37 @@ local function createStatusGui(root: BasePart, model: Model)
 end
 
 function Service.Start()
-    if not RunService:IsStudio() or Workspace:FindFirstChild("game1TrainingDummy") then
+    if not RunService:IsStudio() then
         return
     end
 
-    local spawn = Workspace:FindFirstChildWhichIsA("SpawnLocation", true)
+    local model = Workspace:FindFirstChild("game1TrainingDummy")
+    if not model or not model:IsA("Model") then
+        warn("[game1][DUMMY] game1TrainingDummy model is required in Studio")
+        return
+    end
 
-    local model = Instance.new("Model")
-    model.Name = "game1TrainingDummy"
-    model:SetAttribute("Damageable", true)
-    model:SetAttribute("Level", 1)
-    model:SetAttribute("MaxHP", 100)
-    model:SetAttribute("HP", 100)
-    model:SetAttribute("Damage", 0)
-    model:SetAttribute("Defense", 0)
-    model:SetAttribute("LifeState", "Alive")
-    model:SetAttribute("PoseHitboxMode", "root_fallback")
-    model:SetAttribute("PoseHitboxCount", 1)
+    local root = model:FindFirstChild("RootCollider") or model.PrimaryPart
+    if not root or not root:IsA("BasePart") then
+        warn("[game1][DUMMY] training dummy has no RootCollider/PrimaryPart")
+        return
+    end
 
-    local root = Instance.new("Part")
-    root.Name = "RootCollider"
-    root.Size = Vector3.new(3, 5, 3)
-    root.Anchored = true
-    root.Position = (spawn and spawn.Position or Vector3.zero) + Vector3.new(0, 2.5, -6)
-    root.Parent = model
+    model:SetAttribute("Damageable", model:GetAttribute("Damageable") ~= false)
+    model:SetAttribute("LifeState", tostring(model:GetAttribute("LifeState") or "Alive"))
+    if not model:FindFirstChild("StatusGui") then
+        createStatusGui(root, model)
+    end
 
-    model.PrimaryPart = root
-    model.Parent = Workspace
-
-    createStatusGui(root, model)
-
-    if RunService:IsStudio() then
-        print("[game1][DUMMY] spawned · HP=100/100 DEF=0 · attack with LMB inside melee range")
+    -- The training dummy uses the same precomputed combat hitboxes as
+    -- characters and monsters; RootCollider is never a melee damage volume.
+    local visual = model:FindFirstChild("Visual")
+        or model:FindFirstChild("ImportedRig")
+        or model
+    if visual:IsA("Model") then
+        local binding = EntityHitboxService.Attach(model, visual)
+        print(("[game1][DUMMY] combat hitboxes attached · boxes=%d · head=%s")
+            :format(binding.count, tostring(binding.hasHead)))
     end
 
     local spawnCFrame = root.CFrame
@@ -79,12 +80,10 @@ function Service.Start()
         DeathLifecycleService.BeginDeathIdle(model, root, model, function()
             if model.Parent then
                 root.CFrame = spawnCFrame
-                model:SetAttribute("HP", 100)
+                model:SetAttribute("HP", tonumber(model:GetAttribute("MaxHP")) or 100)
                 model:SetAttribute("Damageable", true)
                 model:SetAttribute("LifeState", "Alive")
-    model:SetAttribute("PoseHitboxMode", "root_fallback")
-    model:SetAttribute("PoseHitboxCount", 1)
-                print("[game1][DUMMY] reset · HP=100/100")
+                print("[game1][DUMMY] reset · combat hitboxes preserved")
             end
         end)
     end)

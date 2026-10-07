@@ -1,9 +1,10 @@
 return table.freeze({
     Range = 7,
-    BoxWidth = 5,
-    BoxHeight = 5,
     MaxAimDistance = 420,
     AttackRadiusEpsilon = 0.15,
+    -- Head and body hitboxes are precomputed once from visual-mesh bounds.
+    -- Runtime attacks only test the animated weapon OBB against those boxes.
+    HeadshotDamageMultiplier = 2,
 
     -- Animated EquippedWeapon pose samples are client-observed because the
     -- visible weapon follows client-side Bone transforms. The server owns the

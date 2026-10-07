@@ -7,7 +7,6 @@ local Workspace = game:GetService("Workspace")
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local CombatShared = Shared:WaitForChild("combat")
 local WeaponAttackVolume = require(CombatShared:WaitForChild("WeaponAttackVolume"))
-local SkeletonHitRegionResolver = require(CombatShared:WaitForChild("SkeletonHitRegionResolver"))
 
 local TestLoadoutController = {}
 local started = false
@@ -412,7 +411,7 @@ local function createTargetHitboxPreview()
     folder.Name = "Game1TargetHitboxPreview"
     local pool = {}
 
-    local function acquire(index: number, shape: Enum.PartType, color: Color3): Part
+    local function acquire(index: number, shape: Enum.PartType, color: Color3, transparency: number?): Part
         local part = pool[index]
         if part and part.Shape ~= shape then
             part:Destroy()
@@ -432,7 +431,7 @@ local function createTargetHitboxPreview()
             pool[index] = part
         end
         part.Color = color
-        part.Transparency = 0.68
+        part.Transparency = transparency or 0.68
         return part
     end
 
@@ -450,24 +449,19 @@ local function createTargetHitboxPreview()
     }
 end
 
-local function runtimeVisualForHitboxes(model: Model): Model
-    local imported = model:FindFirstChild("ImportedRig")
-    if imported and imported:IsA("Model") then
-        return imported
+local function debugAnchorFrame(anchor: Instance): CFrame?
+    if anchor:IsA("Bone") then
+        local ok, frame = pcall(function()
+            return anchor.TransformedWorldCFrame
+        end)
+        if ok and typeof(frame) == "CFrame" then
+            return frame
+        end
+        return anchor.WorldCFrame
+    elseif anchor:IsA("BasePart") then
+        return anchor.CFrame
     end
-    return model
-end
-
-local function capsuleFrame(fromPosition: Vector3, toPosition: Vector3): (CFrame, number)
-    local delta = toPosition - fromPosition
-    local length = delta.Magnitude
-    if length <= 1e-5 then
-        return CFrame.new(fromPosition), 0
-    end
-    local midpoint = (fromPosition + toPosition) * 0.5
-    -- Part cylinders are X-axis aligned; lookAt gives us -Z along the segment,
-    -- then the Y rotation moves local X onto that same segment axis.
-    return CFrame.lookAt(midpoint, toPosition) * CFrame.Angles(0, math.pi * 0.5, 0), length
+    return nil
 end
 
 local function createGui()
@@ -759,7 +753,6 @@ function TestLoadoutController.Start()
         local targetPreview = createTargetHitboxPreview()
         local targetHitboxesVisible = false
         local targetModels = {}
-        local targetCache = {}
         local nextTargetScanAt = 0
 
         local function setTargetHitboxesVisible(value: boolean)
@@ -777,11 +770,9 @@ function TestLoadoutController.Start()
                 if descendant:IsA("Model")
                     and descendant ~= ownCharacter
                     and descendant:GetAttribute("Damageable") == true
+                    and tostring(descendant:GetAttribute("CombatHitboxMode") or "") == "precomputed_bone_boxes"
                 then
-                    local mode = tostring(descendant:GetAttribute("PoseHitboxMode") or "")
-                    if mode == "virtual_bone_regions" or descendant:FindFirstChild("RootCollider") then
-                        table.insert(targetModels, descendant)
-                    end
+                    table.insert(targetModels, descendant)
                 end
             end
         end
@@ -797,73 +788,23 @@ function TestLoadoutController.Start()
             local previewIndex = 0
             for _, model in ipairs(targetModels) do
                 if model.Parent and model:GetAttribute("Damageable") == true then
-                    local mode = tostring(model:GetAttribute("PoseHitboxMode") or "root_fallback")
-                    if mode == "virtual_bone_regions" then
-                        local visual = runtimeVisualForHitboxes(model)
-                        local cached = targetCache[model]
-                        if not cached or cached.visual ~= visual then
-                            local resolved = SkeletonHitRegionResolver.Resolve(visual)
-                            local records = {}
-                            for _, segment in ipairs(resolved.segments) do
-                                table.insert(records, {
-                                    bone = segment.bone,
-                                    parentBone = segment.parentBone,
-                                    role = segment.role,
-                                    radius = SkeletonHitRegionResolver.SegmentRadius(
-                                        tostring(segment.role or "generic"),
-                                        segment.length,
-                                        resolved.skeletonHeight
-                                    ),
-                                })
+                    local debugFolder = model:FindFirstChild("CombatHitboxDebugData")
+                    if debugFolder then
+                        for _, record in ipairs(debugFolder:GetChildren()) do
+                            local anchorValue = record:FindFirstChild("Anchor")
+                            local anchor = if anchorValue and anchorValue:IsA("ObjectValue") then anchorValue.Value else nil
+                            local localCFrame = record:GetAttribute("LocalCFrame")
+                            local size = record:GetAttribute("Size")
+                            local zone = tostring(record:GetAttribute("Zone") or "body")
+                            local anchorFrame = anchor and debugAnchorFrame(anchor) or nil
+                            if anchorFrame and typeof(localCFrame) == "CFrame" and typeof(size) == "Vector3" then
+                                previewIndex += 1
+                                local color = if zone == "head" then COLORS.error else COLORS.accent
+                                local transparency = if zone == "head" then 0.72 else 0.82
+                                local hitbox = targetPreview.acquire(previewIndex, Enum.PartType.Block, color, transparency)
+                                hitbox.CFrame = anchorFrame * localCFrame
+                                hitbox.Size = size
                             end
-                            cached = {
-                                visual = visual,
-                                records = records,
-                                headBone = resolved.headBone,
-                                headRadius = if resolved.headBone then SkeletonHitRegionResolver.HeadRadius(resolved.skeletonHeight) else 0,
-                            }
-                            targetCache[model] = cached
-                        end
-
-                        for _, record in ipairs(cached.records) do
-                            if record.bone.Parent and record.parentBone.Parent then
-                                local fromPosition = SkeletonHitRegionResolver.TransformedBoneFrame(record.parentBone).Position
-                                local toPosition = SkeletonHitRegionResolver.TransformedBoneFrame(record.bone).Position
-                                local radius = math.max(0.02, tonumber(record.radius) or 0.1)
-                                local frame, length = capsuleFrame(fromPosition, toPosition)
-                                if length > 0 then
-                                    previewIndex += 1
-                                    local cylinder = targetPreview.acquire(previewIndex, Enum.PartType.Cylinder, COLORS.accent)
-                                    cylinder.CFrame = frame
-                                    cylinder.Size = Vector3.new(length, radius * 2, radius * 2)
-
-                                    previewIndex += 1
-                                    local fromCap = targetPreview.acquire(previewIndex, Enum.PartType.Ball, COLORS.accent)
-                                    fromCap.CFrame = CFrame.new(fromPosition)
-                                    fromCap.Size = Vector3.new(radius * 2, radius * 2, radius * 2)
-
-                                    previewIndex += 1
-                                    local toCap = targetPreview.acquire(previewIndex, Enum.PartType.Ball, COLORS.accent)
-                                    toCap.CFrame = CFrame.new(toPosition)
-                                    toCap.Size = Vector3.new(radius * 2, radius * 2, radius * 2)
-                                end
-                            end
-                        end
-
-                        if cached.headBone and cached.headBone.Parent then
-                            local radius = math.max(0.02, tonumber(cached.headRadius) or 0.2)
-                            previewIndex += 1
-                            local head = targetPreview.acquire(previewIndex, Enum.PartType.Ball, COLORS.error)
-                            head.CFrame = CFrame.new(SkeletonHitRegionResolver.TransformedBoneFrame(cached.headBone).Position)
-                            head.Size = Vector3.new(radius * 2, radius * 2, radius * 2)
-                        end
-                    else
-                        local root = model:FindFirstChild("RootCollider") or model.PrimaryPart
-                        if root and root:IsA("BasePart") and root.CanQuery then
-                            previewIndex += 1
-                            local box = targetPreview.acquire(previewIndex, Enum.PartType.Block, COLORS.mutedStrong)
-                            box.CFrame = root.CFrame
-                            box.Size = root.Size
                         end
                     end
                 end

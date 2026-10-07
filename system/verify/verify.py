@@ -125,7 +125,6 @@ required_runtime = [
     "src/server/combat/AttackService.luau",
     "src/server/combat/DamageService.luau",
     "src/server/combat/EntityHitboxService.luau",
-    "src/server/combat/SkeletonHitRegionResolver.luau",
     "src/server/dev/TrainingDummyService.luau",
     "src/server/dev/MovementDebugService.luau",
     "src/server/monster/MonsterSpawnerService.luau",
@@ -149,6 +148,7 @@ required_runtime = [
     "src/shared/animation/AnimationSpeedScalingRegistry.luau",
     "src/shared/combat/AttackConfig.luau",
     "src/shared/combat/AttackTimelineConfig.luau",
+    "src/shared/combat/SkeletonHeadResolver.luau",
 ]
 for relative in required_runtime:
     if not (ROOT / relative).is_file():
@@ -237,15 +237,35 @@ if "getAssetTemplate" not in character_service_text:
     err("published registered character fallback is missing")
 
 hitbox_text = (ROOT / "src/server/combat/EntityHitboxService.luau").read_text(encoding="utf-8")
-resolver_text = (ROOT / "src/server/combat/SkeletonHitRegionResolver.luau").read_text(encoding="utf-8")
-for required in ["virtual_bone_regions", "QueryBox", "capsuleIntersectsBox", "TransformedBoneFrame", "SegmentRadius", "SemanticRole"]:
-    if required not in hitbox_text + resolver_text:
-        err(f"virtual skeleton hit-region runtime missing {required}")
-if "RunService.Heartbeat" in hitbox_text or 'Instance.new("Part")' in hitbox_text:
-    err("combat hit regions must be virtual queries, not Heartbeat-following replicated Parts")
-for required in ['"upper_arm"', '"shin"', '"forehead"']:
-    if required not in resolver_text:
-        err(f"semantic skeleton resolver regression: missing {required}")
+head_resolver_text = (ROOT / "src/shared/combat/SkeletonHeadResolver.luau").read_text(encoding="utf-8")
+for required in [
+    "CreateEditableMeshAsync",
+    "GetVertexBones",
+    "GetVertexBoneWeights",
+    "GetBoneCFrame",
+    "definitionCache",
+    "precomputed_bone_boxes",
+    "obbIntersects",
+    "strongestInfluence",
+    "excludedTargets",
+]:
+    if required not in hitbox_text:
+        err(f"precomputed combat-hitbox runtime missing {required}")
+for forbidden in [
+    "triangleBoxIntersectionCentroid",
+    "clipAgainstPlane",
+    "deformed_mesh_surface",
+    "CombatMesh",
+    "PoseHitbox",
+    "root_fallback",
+    "virtual_bone_regions",
+    'Instance.new("Part")',
+]:
+    if forbidden in hitbox_text:
+        err(f"obsolete combat-hitbox runtime remains: {forbidden}")
+for required in ["Resolve", "TransformedBoneFrame", 'token == "head"', 'token == "face"']:
+    if required not in head_resolver_text:
+        err(f"head-bone resolver missing {required}")
 
 bridge = ROOT / "system/control-center/studio_bridge.py"
 plugin = ROOT / "system/studio-plugin/Game1Bridge.server.luau"
@@ -1594,43 +1614,6 @@ for required in [
     if required not in test_loadout_m27:
         err(f"m27 Test Loadout weapon-volume preview missing {required}")
 
-# m28 authoritative target-hitbox query + Test Loadout visualization.
-shared_resolver_path_m28 = ROOT / "src/shared/combat/SkeletonHitRegionResolver.luau"
-shared_resolver_m28 = shared_resolver_path_m28.read_text(encoding="utf-8") if shared_resolver_path_m28.is_file() else ""
-if not shared_resolver_m28:
-    err("m28 shared skeleton hit-region resolver is missing")
-for required in ["Resolve", "TransformedBoneFrame", "SegmentRadius", "HeadRadius"]:
-    if required not in shared_resolver_m28:
-        err(f"m28 shared target-hitbox geometry missing {required}")
-
-entity_hitbox_m28 = (ROOT / "src/server/combat/EntityHitboxService.luau").read_text(encoding="utf-8")
-for required in ["QueryDamageablesInBox", "virtual_bone_regions", "root_fallback", "Workspace:GetPartBoundsInBox"]:
-    if required not in entity_hitbox_m28:
-        err(f"m28 authoritative target-hitbox query missing {required}")
-
-attack_service_m28 = (ROOT / "src/server/combat/AttackService.luau").read_text(encoding="utf-8")
-if "EntityHitboxService.QueryDamageablesInBox" not in attack_service_m28:
-    err("m28 weapon volume must damage targets through target hitboxes")
-if "Workspace:GetPartBoundsInBox" in attack_service_m28:
-    err("m28 AttackService must not broadphase-gate virtual animated hitboxes")
-
-dummy_m28 = (ROOT / "src/server/dev/TrainingDummyService.luau").read_text(encoding="utf-8")
-for required in ['PoseHitboxMode", "root_fallback', 'PoseHitboxCount", 1']:
-    if required not in dummy_m28:
-        err(f"m28 Training Dummy hitbox contract missing {required}")
-
-test_loadout_m28 = (ROOT / "src/client/dev/TestLoadoutController.luau").read_text(encoding="utf-8")
-for required in [
-    "TARGET HITBOXES: OFF",
-    "Game1TargetHitboxPreview",
-    "SkeletonHitRegionResolver.Resolve",
-    "Enum.PartType.Cylinder",
-    "Enum.PartType.Ball",
-    'FindFirstChild("RootCollider")',
-]:
-    if required not in test_loadout_m28:
-        err(f"m28 Test Loadout target-hitbox preview missing {required}")
-
 # m29 contact-driven animated weapon sweep. Damage is no longer gated by one
 # timeline frame; every accepted attack pose is queried, with interpolation and
 # one-hit-per-target deduplication across the complete attack.
@@ -1655,6 +1638,79 @@ for required in [
     if required not in attack_config_m29:
         err(f"m29 weapon sweep config missing {required}")
 
+# m31 precomputed tight hitboxes. Mesh geometry is read only while the rig is
+# loaded; attack-time work is limited to cached bone transforms and OBB tests.
+entity_hitbox_m31 = (ROOT / "src/server/combat/EntityHitboxService.luau").read_text(encoding="utf-8")
+for required in [
+    "definitionCache",
+    "buildDefinition",
+    "HEAD_BOX_PADDING",
+    "BODY_BOX_PADDING",
+    "precomputed_bone_boxes",
+    "RunService.Heartbeat",
+    "excludedTargets",
+]:
+    if required not in entity_hitbox_m31:
+        err(f"m31 precomputed hitbox contract missing {required}")
+for forbidden in [
+    "triangleBoxIntersectionCentroid",
+    "clipAgainstPlane",
+    "computePose",
+    "deformRecord",
+    "CombatMeshHeadCutoffY",
+    "deformed_mesh_surface",
+    "PoseHitboxMode",
+    "PoseHitboxCount",
+]:
+    if forbidden in entity_hitbox_m31:
+        err(f"m31 obsolete runtime hit geometry remains: {forbidden}")
+
+attack_service_m31 = (ROOT / "src/server/combat/AttackService.luau").read_text(encoding="utf-8")
+for required in [
+    "HeadshotDamageMultiplier",
+    'hitZone == "head"',
+    'SetAttribute("LastHeadshot"',
+    'SetAttribute("LastAttackHeadshot"',
+    "QueryDamageablesInBox(character, boxCFrame, boxSize, hitTargets)",
+]:
+    if required not in attack_service_m31:
+        err(f"m31 combat-hitbox integration missing {required}")
+for forbidden in ["fallbackAimVolume", "unarmed_fallback"]:
+    if forbidden in attack_service_m31:
+        err(f"m31 obsolete melee fallback remains: {forbidden}")
+
+attack_config_m31 = (ROOT / "src/shared/combat/AttackConfig.luau").read_text(encoding="utf-8")
+if "HeadshotDamageMultiplier = 2" not in attack_config_m31:
+    err("m31 default headshot multiplier must stay explicit and tunable")
+if "BoxWidth" in attack_config_m31 or "BoxHeight" in attack_config_m31:
+    err("m31 obsolete aim-volume dimensions must be removed")
+
+dummy_m31 = (ROOT / "src/server/dev/TrainingDummyService.luau").read_text(encoding="utf-8")
+for required in ["EntityHitboxService.Attach(model, visual)", "combat hitboxes attached"]:
+    if required not in dummy_m31:
+        err(f"m31 Training Dummy hitbox binding missing {required}")
+if "fallback dummy" in dummy_m31:
+    err("m31 Training Dummy must not create a non-mesh fallback target")
+
+test_loadout_m31 = (ROOT / "src/client/dev/TestLoadoutController.luau").read_text(encoding="utf-8")
+for required in [
+    "TARGET HITBOXES: OFF",
+    "Game1TargetHitboxPreview",
+    "CombatHitboxDebugData",
+    "precomputed_bone_boxes",
+]:
+    if required not in test_loadout_m31:
+        err(f"m31 Test Loadout hitbox preview missing {required}")
+for forbidden in ["TARGET MESH REGIONS", "CombatMeshBodyBoxCFrame", "CombatMeshHeadCutoffY"]:
+    if forbidden in test_loadout_m31:
+        err(f"m31 obsolete mesh-classifier preview remains: {forbidden}")
+
+monster_m31 = (ROOT / "src/server/monster/MonsterSpawnerService.luau").read_text(encoding="utf-8")
+if "PoseHitboxCount" in monster_m31:
+    err("m31 monster runtime still publishes obsolete PoseHitboxCount")
+if 'SetAttribute("CombatHitboxCount", hitbox.count)' not in monster_m31:
+    err("m31 monster runtime must publish CombatHitboxCount")
+
 
 if errors:
     print("verify failed")
@@ -1662,7 +1718,7 @@ if errors:
         print(" -", item)
     sys.exit(1)
 
-print("verify ok · game1 m29 continuous animated weapon contact sweep passed")
+print("verify ok · game1 m31 precomputed bone-local hitboxes passed")
 print("registered character archetypes:", len(archetypes))
 print("active character archetype:", active_id or "none")
 print("race pool: human")

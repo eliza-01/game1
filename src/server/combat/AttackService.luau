@@ -62,10 +62,10 @@ local function applyDamageInVolume(
 ): number
     local hitCount = 0
 
-    -- The visible debug target hitboxes and the authoritative damage query share
-    -- this exact source. Virtual bone capsules/spheres are queried directly;
-    -- root-fallback targets (training dummy) use their physical RootCollider.
-    for _, target in ipairs(EntityHitboxService.QueryDamageablesInBox(character, boxCFrame, boxSize)) do
+    -- Target geometry is a precomputed set of tight bone-local boxes derived
+    -- from the visual mesh once when the rig is loaded. Runtime melee does only
+    -- OBB-vs-OBB tests; the head box has priority over all body boxes.
+    for _, target in ipairs(EntityHitboxService.QueryDamageablesInBox(character, boxCFrame, boxSize, hitTargets)) do
         local model = target.model
         local hit = target.hit or {}
         if model
@@ -75,8 +75,14 @@ local function applyDamageInVolume(
         then
             local hitPosition = if typeof(hit.hitPosition) == "Vector3" then hit.hitPosition else root.Position
             local hitDistance = (hitPosition - root.Position).Magnitude
-            local rawDamage = tonumber(character:GetAttribute("Damage")) or 0
+            local hitZone = tostring(hit.hitZone or "body")
+            local damageMultiplier = if hitZone == "head" then Config.HeadshotDamageMultiplier else 1
+            local rawDamage = (tonumber(character:GetAttribute("Damage")) or 0) * damageMultiplier
             local finalDamage, killed = DamageService.Apply(character, model, rawDamage)
+            model:SetAttribute("LastHitZone", hitZone)
+            model:SetAttribute("LastHeadshot", hitZone == "head")
+            character:SetAttribute("LastAttackHitZone", hitZone)
+            character:SetAttribute("LastAttackHeadshot", hitZone == "head")
             if hitTargets then
                 hitTargets[model] = true
             end
@@ -87,7 +93,7 @@ local function applyDamageInVolume(
                     :format(
                         player.Name,
                         model.Name,
-                        tostring(hit.hitZone or "body"),
+                        hitZone,
                         hitDistance,
                         finalDamage,
                         tostring(model:GetAttribute("HP")),
@@ -160,16 +166,6 @@ local function applyAnimatedWeaponSweep(
     return hitCount
 end
 
-local function fallbackAimVolume(root: BasePart, aim: Vector3, attackRange: number): (CFrame, Vector3)
-    local flat = Vector3.new(aim.X - root.Position.X, 0, aim.Z - root.Position.Z)
-    if flat.Magnitude < 0.001 then
-        flat = root.CFrame.LookVector
-    end
-    local direction = flat.Unit
-    local center = root.Position + direction * (attackRange * 0.5)
-    return CFrame.lookAt(center, center + direction), Vector3.new(Config.BoxWidth, Config.BoxHeight, attackRange)
-end
-
 local function validatedAnimatedWeaponVolume(
     player: Player,
     character: Model,
@@ -180,7 +176,7 @@ local function validatedAnimatedWeaponVolume(
 ): (any?, string?)
     local weapon = character:FindFirstChild("EquippedWeapon")
     if not weapon or not weapon:IsA("Model") then
-        return nil, "unarmed"
+        return nil, "missing_equipped_weapon"
     end
 
     local _, boxSize = WeaponAttackVolume.ReadWeaponBox(weapon)
@@ -233,7 +229,6 @@ local function resolveMeleeDamage(
     character: Model,
     serial: number,
     clientAttackId: number,
-    aim: Vector3,
     hitElapsed: number
 )
     if activeSerial[player] ~= serial
@@ -252,47 +247,30 @@ local function resolveMeleeDamage(
 
     local attackRange = math.clamp(tonumber(character:GetAttribute("AttackRadius")) or Config.Range, 1, Config.MaxAimDistance)
     local volume, reason = validatedAnimatedWeaponVolume(player, character, root, clientAttackId, attackRange, hitElapsed)
-    local hitCount = 0
-
-    if volume then
-        -- Equipped weapons use the animated weapon OBB itself as the basis for
-        -- damage. Its longest axis is extended only up to AttackRadius, making
-        -- the hit volume follow the actual attack animation instead of aim yaw.
-        hitCount = applyDamageInVolume(
-            player,
-            character,
-            root,
-            serial,
-            volume.cframe,
-            volume.size,
-            "animated_weapon_volume",
-            activeHitTargets[player]
-        )
-    elseif reason == "unarmed" then
-        -- Hands keep the legacy aim volume until an authored unarmed attack box
-        -- exists. Equipped weapons never fall back to this approximation.
-        local boxCFrame, boxSize = fallbackAimVolume(root, aim, attackRange)
-        hitCount = applyDamageInVolume(
-            player,
-            character,
-            root,
-            serial,
-            boxCFrame,
-            boxSize,
-            "unarmed_fallback",
-            activeHitTargets[player]
-        )
-    elseif Config.DebugLogs and not hasRegisteredHit(player) then
-        print(("[game1][attack] miss player=%s range=%.1f serial=%d reason=%s")
-            :format(player.Name, attackRange, serial, tostring(reason)))
-        return
-    else
+    if not volume then
+        if Config.DebugLogs and not hasRegisteredHit(player) then
+            print(("[game1][attack] miss player=%s range=%.1f serial=%d reason=%s")
+                :format(player.Name, attackRange, serial, tostring(reason)))
+        end
         return
     end
 
+    -- Equipped weapons use the animated weapon OBB itself as the basis for
+    -- damage. Its longest axis is extended only up to AttackRadius.
+    local hitCount = applyDamageInVolume(
+        player,
+        character,
+        root,
+        serial,
+        volume.cframe,
+        volume.size,
+        "animated_weapon_volume",
+        activeHitTargets[player]
+    )
+
     if hitCount == 0 and not hasRegisteredHit(player) and Config.DebugLogs then
-        print(("[game1][attack] miss player=%s range=%.1f serial=%d source=%s")
-            :format(player.Name, attackRange, serial, volume and "animated_weapon_volume" or "unarmed_fallback"))
+        print(("[game1][attack] miss player=%s range=%.1f serial=%d source=animated_weapon_volume")
+            :format(player.Name, attackRange, serial))
     end
 end
 
@@ -301,7 +279,6 @@ local function scheduleTimelineResults(
     character: Model,
     serial: number,
     clientAttackId: number,
-    aim: Vector3,
     timing: any
 )
     for eventName, event in pairs(timing.events or {}) do
@@ -309,7 +286,7 @@ local function scheduleTimelineResults(
         local delaySeconds = math.max(0, tonumber(event.time) or 0)
         if resultType == AttackTimelineConfig.ResultTypes.MeleeDamage then
             task.delay(delaySeconds, function()
-                resolveMeleeDamage(player, character, serial, clientAttackId, aim, delaySeconds)
+                resolveMeleeDamage(player, character, serial, clientAttackId, delaySeconds)
             end)
         elseif Config.DebugLogs and resultType ~= "" then
             warn(("[game1][attack] no result handler event=%s result=%s"):format(tostring(eventName), resultType))
@@ -338,14 +315,13 @@ local function clearAttackStateLater(player: Player, character: Model, serial: n
 end
 
 local function attack(player: Player, payload: any)
-    if type(payload) ~= "table" or typeof(payload.aim) ~= "Vector3" then
+    if type(payload) ~= "table" then
         if Config.DebugLogs then
             print(("[game1][attack] reject player=%s reason=invalid_payload"):format(player.Name))
         end
         return
     end
 
-    local aim: Vector3 = payload.aim
     local clipId = tostring(payload.clipId or "")
     local clientAttackId = math.floor(tonumber(payload.clientAttackId) or 0)
     if clientAttackId <= 0 then
@@ -397,11 +373,10 @@ local function attack(player: Player, payload: any)
     character:SetAttribute("AttackStartedAt", now)
     character:SetAttribute("AttackEndsAt", now + attackDuration)
 
-    -- Equipped weapon damage is primarily resolved continuously from accepted
-    -- animated pose contacts. The authored Hit event remains a compatibility
-    -- checkpoint (and still owns unarmed fallback damage) rather than the only
-    -- instant at which an equipped weapon is allowed to connect.
-    scheduleTimelineResults(player, character, serial, clientAttackId, aim, timing)
+    -- Equipped weapon damage is resolved continuously from accepted animated
+    -- pose contacts. The authored Hit event remains a timing checkpoint for the
+    -- same weapon volume; no alternate melee volume is used.
+    scheduleTimelineResults(player, character, serial, clientAttackId, timing)
     clearAttackStateLater(player, character, serial, clientAttackId, attackDuration)
 end
 

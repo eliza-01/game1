@@ -441,7 +441,7 @@ local function createNavigationRig(runtimeModel: Model, visual: Model, visualRoo
     local boxCFrame, boxSize = visibleBounds(visual)
     local root = Instance.new("Part")
     root.Name = "RootCollider"
-    -- Broadphase only. Precise combat uses EntityHitboxService's virtual bone regions.
+    -- Movement collider only. Combat uses precomputed bone-local mesh bounds.
     root.Size = Vector3.new(math.max(0.5, boxSize.X), math.max(0.5, boxSize.Y), math.max(0.5, boxSize.Z))
     root.CFrame = boxCFrame
     root.Transparency = 1
@@ -918,7 +918,7 @@ local function spawnOne(state: any): Model?
         return nil
     end
     local hitbox = EntityHitboxService.Attach(model, visual)
-    model:SetAttribute("PoseHitboxCount", hitbox.count)
+    model:SetAttribute("CombatHitboxCount", hitbox.count)
 
     local profile = animationProfile(slug)
     local animator = animatorFor(model, visual)

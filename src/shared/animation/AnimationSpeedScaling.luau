@@ -50,7 +50,7 @@ function AnimationSpeedScaling.ResolvePercent(targetType: any, targetId: any, ch
 end
 
 
-function AnimationSpeedScaling.ResolveDetailsForModel(model: Model, channel: any): any
+function AnimationSpeedScaling.ResolveDetailsForModel(model: Model, channel: any, statValueOverride: any?): any
     local normalizedChannel = string.lower(tostring(channel or ""))
     local targetType, targetId = AnimationSpeedScaling.TargetForModel(model)
     local rule = AnimationSpeedScaling.Rule(targetType, targetId, normalizedChannel)
@@ -68,7 +68,8 @@ function AnimationSpeedScaling.ResolveDetailsForModel(model: Model, channel: any
     end
 
     local stat = tostring(rule.stat or "")
-    local statValue = math.max(0, finite(model:GetAttribute(stat), 0))
+    local rawStatValue = if statValueOverride ~= nil then statValueOverride else model:GetAttribute(stat)
+    local statValue = math.max(0, finite(rawStatValue, 0))
     local authoredUnitsPerPercent = math.clamp(
         finite(rule.unitsPerPercent, 1),
         AnimationSpeedScaling.MinUnitsPerPercent,
@@ -105,6 +106,10 @@ end
 
 function AnimationSpeedScaling.ResolveForModel(model: Model, channel: any): number
     return AnimationSpeedScaling.ResolveDetailsForModel(model, channel).percent
+end
+
+function AnimationSpeedScaling.ResolveForModelWithStatValue(model: Model, channel: any, statValue: any): number
+    return AnimationSpeedScaling.ResolveDetailsForModel(model, channel, statValue).percent
 end
 
 function AnimationSpeedScaling.ResolveScaleForModel(model: Model, channel: any): number

@@ -9,7 +9,7 @@ local started = false
 local player = Players.LocalPlayer
 
 local PANEL_WIDTH = 320
-local PANEL_EXPANDED_HEIGHT = 344
+local PANEL_EXPANDED_HEIGHT = 410
 local PANEL_COLLAPSED_SIZE = 44
 local PANEL_X = 16
 local PANEL_Y = 150
@@ -81,6 +81,28 @@ local function button(parent: Instance, text: string): TextButton
     corner(item, 7)
     stroke(item, 0.35)
     return item
+end
+
+local function numericBox(parent: Instance, placeholder: string): TextBox
+    local box = Instance.new("TextBox")
+    box.BackgroundColor3 = COLORS.control
+    box.BorderSizePixel = 0
+    box.TextColor3 = COLORS.text
+    box.PlaceholderColor3 = COLORS.muted
+    box.PlaceholderText = placeholder
+    box.ClearTextOnFocus = false
+    box.Text = ""
+    box.TextSize = 11
+    box.Font = Enum.Font.GothamSemibold
+    box.TextXAlignment = Enum.TextXAlignment.Left
+    box.Parent = parent
+    local padding = Instance.new("UIPadding")
+    padding.PaddingLeft = UDim.new(0, 10)
+    padding.PaddingRight = UDim.new(0, 10)
+    padding.Parent = box
+    corner(box, 7)
+    stroke(box, 0.35)
+    return box
 end
 
 local function createDropdown(gui: ScreenGui, parent: Instance, y: number, labelText: string)
@@ -413,8 +435,18 @@ local function createGui()
     meta.Position = UDim2.fromOffset(1, 172)
     meta.Size = UDim2.new(1, -2, 0, 16)
 
+    sectionCaption(body, "Test attack radius · studs", 194)
+    local radiusBox = numericBox(body, "7")
+    radiusBox.Position = UDim2.fromOffset(0, 212)
+    radiusBox.Size = UDim2.new(1, -82, 0, 32)
+    local radiusReset = button(body, "RESET")
+    radiusReset.Position = UDim2.new(1, -74, 0, 212)
+    radiusReset.Size = UDim2.fromOffset(74, 32)
+    radiusReset.TextSize = 9
+    radiusReset.Font = Enum.Font.GothamSemibold
+
     local radiusToggle = button(body, "ATTACK RADIUS: OFF")
-    radiusToggle.Position = UDim2.fromOffset(0, 196)
+    radiusToggle.Position = UDim2.fromOffset(0, 252)
     radiusToggle.Size = UDim2.new(1, 0, 0, 28)
     radiusToggle.TextSize = 10
     radiusToggle.Font = Enum.Font.GothamSemibold
@@ -422,18 +454,18 @@ local function createGui()
     local statusDot = Instance.new("Frame")
     statusDot.BackgroundColor3 = COLORS.muted
     statusDot.BorderSizePixel = 0
-    statusDot.Position = UDim2.fromOffset(2, 241)
+    statusDot.Position = UDim2.fromOffset(2, 297)
     statusDot.Size = UDim2.fromOffset(6, 6)
     statusDot.Parent = body
     corner(statusDot, 3)
 
     local status = textLabel(body, "Loading catalog…", 9, false)
     status.TextColor3 = COLORS.muted
-    status.Position = UDim2.fromOffset(14, 234)
+    status.Position = UDim2.fromOffset(14, 290)
     status.Size = UDim2.new(1, -14, 0, 20)
 
     local apply = button(body, "LOADING…")
-    apply.Position = UDim2.fromOffset(0, 260)
+    apply.Position = UDim2.fromOffset(0, 316)
     apply.Size = UDim2.new(1, 0, 0, 34)
     apply.BackgroundColor3 = COLORS.disabled
     apply.TextColor3 = COLORS.muted
@@ -471,7 +503,7 @@ local function createGui()
     end)
     setCollapsed(playerGui:GetAttribute(DEBUG_PANEL_OPEN_ATTRIBUTE) ~= DEBUG_PANEL_ID)
 
-    return gui, character, category, weapon, meta, radiusToggle, apply, status, statusDot
+    return gui, character, category, weapon, meta, radiusBox, radiusReset, radiusToggle, apply, status, statusDot
 end
 
 function TestLoadoutController.Start()
@@ -486,12 +518,13 @@ function TestLoadoutController.Start()
         end
         local catalogRemote = remotes:WaitForChild("GetTestLoadoutCatalog", 10)
         local applyRemote = remotes:WaitForChild("ApplyTestLoadout", 10)
-        if not catalogRemote or not applyRemote then
+        local radiusRemote = remotes:WaitForChild("SetTestAttackRadius", 10)
+        if not catalogRemote or not applyRemote or not radiusRemote then
             warn("[game1][test-loadout] remotes are missing")
             return
         end
 
-        local gui, characterDropdown, categorySelector, weaponDropdown, meta, radiusToggle, applyButton, status, statusDot = createGui()
+        local gui, characterDropdown, categorySelector, weaponDropdown, meta, radiusBox, radiusReset, radiusToggle, applyButton, status, statusDot = createGui()
         local catalog = catalogRemote:InvokeServer()
         local weaponRows = catalog.weapons or {}
         local weaponBySlug = {}
@@ -581,6 +614,36 @@ function TestLoadoutController.Start()
             statusDot.BackgroundColor3 = color or COLORS.muted
         end
 
+        local function syncRadiusBox(value: any)
+            local numeric = math.max(1, tonumber(value) or 7)
+            radiusBox.Text = string.format("%.2f", numeric):gsub("0+$", ""):gsub("%.$", "")
+        end
+        local function applyRadiusValue(value: any)
+            local ok, result = pcall(function()
+                return radiusRemote:InvokeServer(value)
+            end)
+            if not ok or type(result) ~= "table" or result.ok ~= true then
+                setStatus("Radius error · " .. tostring(type(result) == "table" and result.error or result), COLORS.error)
+                return
+            end
+            syncRadiusBox(result.attackRadiusStuds)
+            setStatus(result.overridden and "Runtime radius override active" or "Radius reset to weapon default", COLORS.accent)
+        end
+        radiusBox.FocusLost:Connect(function()
+            local value = tonumber(radiusBox.Text)
+            if value then
+                applyRadiusValue(value)
+            else
+                local currentCharacter = player.Character
+                syncRadiusBox(currentCharacter and currentCharacter:GetAttribute("AttackRadius") or 7)
+            end
+        end)
+        radiusReset.Activated:Connect(function()
+            applyRadiusValue("default")
+        end)
+        local initialCharacter = player.Character
+        syncRadiusBox(initialCharacter and initialCharacter:GetAttribute("AttackRadius") or 7)
+
         local function renderApply()
             local changed = characterDropdown.getValue() ~= appliedArchetype or weaponDropdown.getValue() ~= appliedWeaponSlug
             applyButton.Active = not applying and characterDropdown.getValue() ~= ""
@@ -649,6 +712,7 @@ function TestLoadoutController.Start()
             end
             appliedArchetype = tostring(result.archetype or characterDropdown.getValue())
             appliedWeaponSlug = tostring(result.weaponSlug or weaponDropdown.getValue())
+            syncRadiusBox(result.attackRadiusStuds)
             persistSelection()
             setStatus("Loadout active", COLORS.accent)
             renderApply()

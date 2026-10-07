@@ -1,0 +1,1321 @@
+diff --git a/assets/manifests/weapons.json b/assets/manifests/weapons.json
+index 7919350..bbc5c69 100644
+--- a/assets/manifests/weapons.json
++++ b/assets/manifests/weapons.json
+@@ -1,11 +1,12 @@
+ {
+-  "schemaVersion": 1,
++  "schemaVersion": 2,
+   "project": "game1",
+   "activeWeaponSlug": null,
+   "options": {
+     "weaponTypes": [
+-      "1hs",
+-      "2hs",
++      "dagger",
++      "sword",
++      "bigsword",
+       "bow"
+     ],
+     "rarities": [
+@@ -25,14 +26,48 @@
+       "min": 1.0,
+       "max": 420.0,
+       "step": 0.5
+-    }
++    },
++    "attackLocomotionModes": [
++      "Run",
++      "Walk"
++    ]
+   },
++  "attackMovement": [
++    {
++      "weaponType": "dagger",
++      "animationSet": "1hs",
++      "locomotionMode": "Run",
++      "runSpeedMultiplier": 1.0,
++      "runSpeedPercent": 100.0
++    },
++    {
++      "weaponType": "sword",
++      "animationSet": "1hs",
++      "locomotionMode": "Run",
++      "runSpeedMultiplier": 1.0,
++      "runSpeedPercent": 100.0
++    },
++    {
++      "weaponType": "bigsword",
++      "animationSet": "2hs",
++      "locomotionMode": "Walk",
++      "runSpeedMultiplier": 0.75,
++      "runSpeedPercent": 75.0
++    },
++    {
++      "weaponType": "bow",
++      "animationSet": "bow",
++      "locomotionMode": "Walk",
++      "runSpeedMultiplier": 0.75,
++      "runSpeedPercent": 75.0
++    }
++  ],
+   "items": [
+     {
+       "slug": "newbie_axe",
+       "name_en": "Newbie Axe",
+       "name_ru": "Топор Новичка",
+-      "weapon_type": "1hs",
++      "weapon_type": "sword",
+       "rarity": "common",
+       "model_source_path": "assets/source/weapons/1hs/newbie_axe/model/newbie_axe.fbx",
+       "model_prepared_path": "assets/prepared/weapons/1hs/newbie_axe/model/newbie_axe.fbx",
+@@ -70,13 +105,14 @@
+         "Damage": 10
+       },
+       "status": "PUBLISHED",
++      "storage_type": "1hs",
+       "server_storage_path": "ServerStorage.weapons.1hs.newbie_axe.model.newbie_axe"
+     },
+     {
+       "slug": "dragon_divider",
+       "name_en": "Dragon Divider",
+       "name_ru": "Рассекатель Драконов",
+-      "weapon_type": "1hs",
++      "weapon_type": "sword",
+       "rarity": "legendary",
+       "model_source_path": "assets/source/weapons/1hs/dragon_divider/model/dragon_divider.fbx",
+       "model_prepared_path": "assets/prepared/weapons/1hs/dragon_divider/model/dragon_divider.fbx",
+@@ -98,6 +134,7 @@
+         "Damage": 50
+       },
+       "status": "PUBLISHED",
++      "storage_type": "1hs",
+       "server_storage_path": "ServerStorage.weapons.1hs.dragon_divider.model.dragon_divider"
+     }
+   ],
+diff --git a/src/client/character/MovementController.luau b/src/client/character/MovementController.luau
+index 63068aa..da8a555 100644
+--- a/src/client/character/MovementController.luau
++++ b/src/client/character/MovementController.luau
+@@ -7,8 +7,10 @@ local Workspace = game:GetService("Workspace")
+ 
+ local Game1Shared = ReplicatedStorage:WaitForChild("Game1Shared")
+ local CharacterShared = Game1Shared:WaitForChild("character")
++local WeaponShared = Game1Shared:WaitForChild("weapon")
+ local CharacterConfig = require(CharacterShared:WaitForChild("CharacterConfig"))
+ local CharacterMovementConfig = require(CharacterShared:WaitForChild("CharacterMovementConfig"))
++local WeaponAttackMovement = require(WeaponShared:WaitForChild("WeaponAttackMovement"))
+ 
+ local MovementController = {}
+ 
+@@ -29,6 +31,10 @@ local movementLockUntil = 0
+ local movementMode = "Run"
+ local movementDirectionMode = "Forward"
+ local forcedWalk = false
++local attackMovementActive = false
++local attackMovementEndsAt = 0
++local attackMovementMode = "Run"
++local attackMovementRunSpeedMultiplier = 1
+ 
+ local character: Model? = nil
+ local root: BasePart? = nil
+@@ -60,6 +66,40 @@ local function clearCharacter()
+ 	movementMode = "Run"
+ 	movementDirectionMode = "Forward"
+ 	forcedWalk = false
++	attackMovementActive = false
++	attackMovementEndsAt = 0
++	attackMovementMode = "Run"
++	attackMovementRunSpeedMultiplier = 1
++end
++
++local function attackMovementRunning(now: number?): boolean
++	if not attackMovementActive then
++		return false
++	end
++	if (now or os.clock()) >= attackMovementEndsAt then
++		attackMovementActive = false
++		attackMovementEndsAt = 0
++		if character then
++			character:SetAttribute("AttackMovementActive", false)
++		end
++		return false
++	end
++	return true
++end
++
++local function baseMoveSpeedForCurrentState(targetCharacter: Model): number
++	if attackMovementRunning() then
++		return CharacterMovementConfig.RobloxSpeedAtRunMultiplier(
++			targetCharacter:GetAttribute("CharacterArchetype"),
++			targetCharacter:GetAttribute("RunSpeed"),
++			attackMovementRunSpeedMultiplier
++		)
++	end
++	return CharacterMovementConfig.RobloxSpeed(
++		targetCharacter:GetAttribute("CharacterArchetype"),
++		targetCharacter:GetAttribute("RunSpeed"),
++		movementMode
++	)
+ end
+ 
+ local function bindCharacter(newCharacter: Model)
+@@ -112,22 +152,15 @@ local function bindCharacter(newCharacter: Model)
+ 	groundSensor = newSensor
+ 	movementMode = "Run"
+ 	movementDirectionMode = "Forward"
+-	newManager.BaseMoveSpeed = CharacterMovementConfig.RobloxSpeed(
+-		newCharacter:GetAttribute("CharacterArchetype"),
+-		newCharacter:GetAttribute("RunSpeed"),
+-		"Run"
+-	)
++	newManager.BaseMoveSpeed = baseMoveSpeedForCurrentState(newCharacter)
+ 	newCharacter:SetAttribute("AnimationMovementMode", movementMode)
++	newCharacter:SetAttribute("AttackMovementActive", false)
+ 	newCharacter:SetAttribute("AnimationMovementDirection", movementDirectionMode)
+ 	newCharacter:SetAttribute("MovementState", "Idle")
+ 	newCharacter:SetAttribute("MovementStateAuthority", "ClientDerivedPresentation")
+ 	newCharacter:GetAttributeChangedSignal("RunSpeed"):Connect(function()
+ 		if character == newCharacter and controllerManager then
+-			controllerManager.BaseMoveSpeed = CharacterMovementConfig.RobloxSpeed(
+-				newCharacter:GetAttribute("CharacterArchetype"),
+-				newCharacter:GetAttribute("RunSpeed"),
+-				movementMode
+-			)
++			controllerManager.BaseMoveSpeed = baseMoveSpeedForCurrentState(newCharacter)
+ 		end
+ 	end)
+ 
+@@ -308,17 +341,28 @@ local function applyAimFacingCompensation(now: number)
+ end
+ 
+ local function applyMovementMode(walkModifierActive: boolean, backwardActive: boolean)
+-	-- Backward movement is ALWAYS Walk, regardless of Ctrl. The same Walk_<weapon>
+-	-- clip is played in reverse by CharacterAnimationController.
++	-- During an attack the equipped weapon profile owns both the lower-body
++	-- locomotion family and the physical movement fraction. This mirrors the
++	-- RobloxLineage upper-body-over-live-locomotion contract: attacks never plant
++	-- the legs unless the player actually stops moving.
++	local attackActive = attackMovementRunning()
+ 	local walkActive = walkModifierActive or backwardActive
+-	local nextMode = walkActive and "Walk" or "Run"
++	local nextMode = if attackActive then attackMovementMode else (walkActive and "Walk" or "Run")
+ 	local nextDirectionMode = backwardActive and "Backward" or "Forward"
+ 	if controllerManager and character then
+-		controllerManager.BaseMoveSpeed = CharacterMovementConfig.RobloxSpeed(
+-			character:GetAttribute("CharacterArchetype"),
+-			character:GetAttribute("RunSpeed"),
+-			nextMode
+-		)
++		if attackActive then
++			controllerManager.BaseMoveSpeed = CharacterMovementConfig.RobloxSpeedAtRunMultiplier(
++				character:GetAttribute("CharacterArchetype"),
++				character:GetAttribute("RunSpeed"),
++				attackMovementRunSpeedMultiplier
++			)
++		else
++			controllerManager.BaseMoveSpeed = CharacterMovementConfig.RobloxSpeed(
++				character:GetAttribute("CharacterArchetype"),
++				character:GetAttribute("RunSpeed"),
++				nextMode
++			)
++		end
+ 	end
+ 	if character and movementMode ~= nextMode then
+ 		movementMode = nextMode
+@@ -452,6 +496,36 @@ function MovementController.IsMoving(): boolean
+ 	return inputAxis().Magnitude > 0.001
+ end
+ 
++function MovementController.BeginAttackMovement(weaponType: any, duration: number): any
++	local resolved = WeaponAttackMovement.Resolve(weaponType)
++	attackMovementActive = true
++	attackMovementEndsAt = os.clock() + math.max(0.05, tonumber(duration) or 0.05)
++	attackMovementMode = tostring(resolved.locomotionMode or "Run")
++	attackMovementRunSpeedMultiplier = math.clamp(tonumber(resolved.runSpeedMultiplier) or 1, 0, 2)
++	if character then
++		character:SetAttribute("AttackMovementActive", true)
++		character:SetAttribute("AttackMovementLocomotionMode", attackMovementMode)
++		character:SetAttribute("AttackMovementRunSpeedMultiplier", attackMovementRunSpeedMultiplier)
++	end
++	if controllerManager and character then
++		local axis = inputAxis()
++		applyMovementMode(walkModifierDown(), isBackwardAxis(axis))
++	end
++	return resolved
++end
++
++function MovementController.EndAttackMovement()
++	attackMovementActive = false
++	attackMovementEndsAt = 0
++	if character then
++		character:SetAttribute("AttackMovementActive", false)
++	end
++	if controllerManager and character then
++		local axis = inputAxis()
++		applyMovementMode(forcedWalk or walkModifierDown(), isBackwardAxis(axis))
++	end
++end
++
+ function MovementController.BeginForcedWalk()
+ 	forcedWalk = true
+ 	if controllerManager and character then
+diff --git a/src/client/character/animation/CharacterAnimationController.luau b/src/client/character/animation/CharacterAnimationController.luau
+index 167ff19..606ae69 100644
+--- a/src/client/character/animation/CharacterAnimationController.luau
++++ b/src/client/character/animation/CharacterAnimationController.luau
+@@ -5,10 +5,12 @@ local RunService = game:GetService("RunService")
+ local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
+ local CombatShared = Shared:WaitForChild("combat")
+ local AnimationShared = Shared:WaitForChild("animation")
++local CharacterShared = Shared:WaitForChild("character")
+ local DeathAnimationPolicy = require(CombatShared:WaitForChild("DeathAnimationPolicy"))
+ local AttackTimelineConfig = require(CombatShared:WaitForChild("AttackTimelineConfig"))
+ local AnimationSpeedScaling = require(AnimationShared:WaitForChild("AnimationSpeedScaling"))
+ local AnimationFirstFrameSeam = require(AnimationShared:WaitForChild("AnimationFirstFrameSeam"))
++local CharacterMovementConfig = require(CharacterShared:WaitForChild("CharacterMovementConfig"))
+ 
+ local AnimationResolver = require(script.Parent:WaitForChild("AnimationResolver"))
+ local AnimationTrackCache = require(script.Parent:WaitForChild("AnimationTrackCache"))
+@@ -88,7 +90,18 @@ local function animationPlaybackPercent(channel: string): number
+ 	if not character then
+ 		return 100
+ 	end
+-	return AnimationSpeedScaling.ResolveForModel(character, channel)
++	local normalizedChannel = string.lower(tostring(channel or ""))
++	if attackLowerBodyActive and (normalizedChannel == "run" or normalizedChannel == "walk") then
++		local runSpeed = tonumber(character:GetAttribute("RunSpeed")) or CharacterMovementConfig.DefaultRunSpeed
++		local multiplier = tonumber(character:GetAttribute("AttackMovementRunSpeedMultiplier")) or 1
++		local equivalentRunSpeed = CharacterMovementConfig.EquivalentRunSpeedForLocomotion(
++			runSpeed,
++			multiplier,
++			normalizedChannel == "walk" and "Walk" or "Run"
++		)
++		return AnimationSpeedScaling.ResolveForModelWithStatValue(character, normalizedChannel, equivalentRunSpeed)
++	end
++	return AnimationSpeedScaling.ResolveForModel(character, normalizedChannel)
+ end
+ 
+ local function animationPlaybackScale(channel: string): number
+@@ -106,9 +119,15 @@ local function movementSlot(): string
+ 		return "idle"
+ 	end
+ 	if attackLowerBodyActive then
+-		-- RobloxLineage-style planted attack: the visible lower body stays on the
+-		-- weapon combat stance while the source attack drives only the upper body.
+-		return "combat_idle"
++		-- RobloxLineage composition: upper body comes from the attack source rig,
++		-- while the visible lower body remains live locomotion. Stopping during the
++		-- attack returns the legs to combat_idle without interrupting the upper hit.
++		local state = string.lower(tostring(character:GetAttribute("MovementState") or "idle"))
++		if state == "idle" then
++			return "combat_idle"
++		end
++		local configuredMode = string.lower(tostring(character:GetAttribute("AttackMovementLocomotionMode") or "run"))
++		return if configuredMode == "walk" then "walk" else "run"
+ 	end
+ 	local state = string.lower(tostring(character:GetAttribute("MovementState") or "idle"))
+ 	if state == "walk" then
+@@ -158,7 +177,7 @@ local function movementUsesForwardSeam(descriptor, slot: string): boolean
+ 		return false
+ 	end
+ 	local backward = character and tostring(character:GetAttribute("AnimationMovementDirection") or "Forward") == "Backward"
+-	return not (backward and slot == "walk")
++	return not (backward and (slot == "walk" or slot == "run"))
+ end
+ 
+ local function applyBackwardPlayback(track: AnimationTrack, slot: string)
+@@ -167,7 +186,7 @@ local function applyBackwardPlayback(track: AnimationTrack, slot: string)
+ 	end
+ 	local backward = tostring(character:GetAttribute("AnimationMovementDirection") or "Forward") == "Backward"
+ 	local playbackScale = animationPlaybackScale(slot)
+-	if not backward or slot ~= "walk" then
++	if not backward or (slot ~= "walk" and slot ~= "run") then
+ 		track:AdjustSpeed(playbackScale)
+ 		return
+ 	end
+@@ -188,6 +207,9 @@ local function refreshLoop()
+ 		return
+ 	end
+ 	local slot = movementSlot()
++	if attackLowerBodyActive then
++		character:SetAttribute("AnimationAttackLowerBodySlot", slot)
++	end
+ 	local descriptor = AnimationResolver.ResolveLocomotion(character, slot)
+ 	if not descriptor then
+ 		stopCurrentLoop(0.12)
+@@ -424,7 +446,7 @@ local function bindCharacter(newCharacter: Model)
+ 		end
+ 		print(("[game1][animation] prewarm %d/%d ready in %.3fs"):format(result.ready, result.total, result.elapsed))
+ 	end)
+-	local refreshAttributes = { "MovementState", "AnimationMovementDirection", "AnimationWeaponSet", "RunSpeed", "AttackSpeed" }
++	local refreshAttributes = { "MovementState", "AnimationMovementDirection", "AnimationWeaponSet", "RunSpeed", "AttackSpeed", "AttackMovementLocomotionMode", "AttackMovementRunSpeedMultiplier" }
+ 	for _, channel in ipairs({ "run", "walk" }) do
+ 		table.insert(refreshAttributes, AnimationSpeedScaling.DebugUnitsPerPercentAttribute(channel))
+ 	end
+@@ -514,7 +536,7 @@ function CharacterAnimationController.PlayAction(slot: string)
+ 	if slot == "attack" then
+ 		character:SetAttribute("AnimationActionEndsAt", currentActionLockedUntil)
+ 		character:SetAttribute("AnimationAttackUpperBodyComposed", composed)
+-		character:SetAttribute("AnimationAttackLowerBodySlot", "combat_idle")
++		character:SetAttribute("AnimationAttackLowerBodySlot", movementSlot())
+ 		local boundCharacter = character
+ 		local boundTrack = track
+ 		local unlockAt = currentActionLockedUntil
+@@ -561,7 +583,7 @@ function CharacterAnimationController.PlayAction(slot: string)
+ 		endsAt = currentActionLockedUntil,
+ 		timeline = timeline,
+ 		upperBodyComposed = composed,
+-		lowerBodySlot = if slot == "attack" then "combat_idle" else nil,
++		lowerBodySlot = if slot == "attack" then movementSlot() else nil,
+ 	}
+ end
+ 
+diff --git a/src/client/combat/AttackController.luau b/src/client/combat/AttackController.luau
+index 7a90166..3a8edf8 100644
+--- a/src/client/combat/AttackController.luau
++++ b/src/client/combat/AttackController.luau
+@@ -25,8 +25,8 @@ local function finishPresentation(sequence: number)
+         if movementController.UnlockFacing then
+             movementController.UnlockFacing()
+         end
+-        if movementController.UnlockMovement then
+-            movementController.UnlockMovement()
++        if movementController.EndAttackMovement then
++            movementController.EndAttackMovement()
+         end
+     end
+     if aimPoseController and aimPoseController.EndAttack then
+@@ -67,6 +67,14 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
+         attackSequence += 1
+         local sequence = attackSequence
+         local attackDuration = math.max(0.05, tonumber(action.durationSeconds) or 0.05)
++        local movingAtAttackStart = movementController and movementController.IsMoving and movementController.IsMoving() or false
++        if movementController and movementController.BeginAttackMovement then
++            -- Every weapon may attack while moving. The equipped weapon type
++            -- resolves an authored lower-body gait + RunSpeed fraction; no
++            -- weapon-specific numbers live in this controller.
++            movementController.BeginAttackMovement(character:GetAttribute("EquippedWeaponType"), attackDuration)
++        end
++
+         local root = character:FindFirstChild("RootCollider")
+         if root and root:IsA("BasePart") then
+             local direction = Vector3.new(target.X - root.Position.X, 0, target.Z - root.Position.Z)
+@@ -75,14 +83,12 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
+                 local timelineScale = 1 / playbackSpeed
+                 local facingTurnDuration = math.min(attackDuration, AttackConfig.FacingTurnSeconds * timelineScale)
+ 
+-                if movementController then
+-                    -- RobloxLineage planted-melee contract: legs stay planted for
+-                    -- the COMPLETE attack, not only during the initial wind-up.
+-                    movementController.LockMovement(attackDuration)
++                if movementController and not movingAtAttackStart then
+                     if movementController.BeginAimFacingCompensation then
+-                        -- facingTurnDuration controls how quickly root overflow is
+-                        -- reached. Do NOT release it at that time; the final facing
+-                        -- is held until finishPresentation() at attack end.
++                        -- Stationary attacks may turn root overflow toward the
++                        -- aim target and hold it for the complete attack. The
++                        -- moment movement starts, MovementController releases
++                        -- this root compensation and live locomotion owns facing.
+                         movementController.BeginAimFacingCompensation(
+                             facingTurnDuration,
+                             AttackConfig.TorsoYawLimit
+diff --git a/src/client/dev/TestLoadoutController.luau b/src/client/dev/TestLoadoutController.luau
+index e535d33..9705fe0 100644
+--- a/src/client/dev/TestLoadoutController.luau
++++ b/src/client/dev/TestLoadoutController.luau
+@@ -9,7 +9,7 @@ local started = false
+ local player = Players.LocalPlayer
+ 
+ local PANEL_WIDTH = 320
+-local PANEL_EXPANDED_HEIGHT = 344
++local PANEL_EXPANDED_HEIGHT = 410
+ local PANEL_COLLAPSED_SIZE = 44
+ local PANEL_X = 16
+ local PANEL_Y = 150
+@@ -83,6 +83,28 @@ local function button(parent: Instance, text: string): TextButton
+     return item
+ end
+ 
++local function numericBox(parent: Instance, placeholder: string): TextBox
++    local box = Instance.new("TextBox")
++    box.BackgroundColor3 = COLORS.control
++    box.BorderSizePixel = 0
++    box.TextColor3 = COLORS.text
++    box.PlaceholderColor3 = COLORS.muted
++    box.PlaceholderText = placeholder
++    box.ClearTextOnFocus = false
++    box.Text = ""
++    box.TextSize = 11
++    box.Font = Enum.Font.GothamSemibold
++    box.TextXAlignment = Enum.TextXAlignment.Left
++    box.Parent = parent
++    local padding = Instance.new("UIPadding")
++    padding.PaddingLeft = UDim.new(0, 10)
++    padding.PaddingRight = UDim.new(0, 10)
++    padding.Parent = box
++    corner(box, 7)
++    stroke(box, 0.35)
++    return box
++end
++
+ local function createDropdown(gui: ScreenGui, parent: Instance, y: number, labelText: string)
+     sectionCaption(parent, labelText, y)
+ 
+@@ -413,8 +435,18 @@ local function createGui()
+     meta.Position = UDim2.fromOffset(1, 172)
+     meta.Size = UDim2.new(1, -2, 0, 16)
+ 
++    sectionCaption(body, "Test attack radius · studs", 194)
++    local radiusBox = numericBox(body, "7")
++    radiusBox.Position = UDim2.fromOffset(0, 212)
++    radiusBox.Size = UDim2.new(1, -82, 0, 32)
++    local radiusReset = button(body, "RESET")
++    radiusReset.Position = UDim2.new(1, -74, 0, 212)
++    radiusReset.Size = UDim2.fromOffset(74, 32)
++    radiusReset.TextSize = 9
++    radiusReset.Font = Enum.Font.GothamSemibold
++
+     local radiusToggle = button(body, "ATTACK RADIUS: OFF")
+-    radiusToggle.Position = UDim2.fromOffset(0, 196)
++    radiusToggle.Position = UDim2.fromOffset(0, 252)
+     radiusToggle.Size = UDim2.new(1, 0, 0, 28)
+     radiusToggle.TextSize = 10
+     radiusToggle.Font = Enum.Font.GothamSemibold
+@@ -422,18 +454,18 @@ local function createGui()
+     local statusDot = Instance.new("Frame")
+     statusDot.BackgroundColor3 = COLORS.muted
+     statusDot.BorderSizePixel = 0
+-    statusDot.Position = UDim2.fromOffset(2, 241)
++    statusDot.Position = UDim2.fromOffset(2, 297)
+     statusDot.Size = UDim2.fromOffset(6, 6)
+     statusDot.Parent = body
+     corner(statusDot, 3)
+ 
+     local status = textLabel(body, "Loading catalog…", 9, false)
+     status.TextColor3 = COLORS.muted
+-    status.Position = UDim2.fromOffset(14, 234)
++    status.Position = UDim2.fromOffset(14, 290)
+     status.Size = UDim2.new(1, -14, 0, 20)
+ 
+     local apply = button(body, "LOADING…")
+-    apply.Position = UDim2.fromOffset(0, 260)
++    apply.Position = UDim2.fromOffset(0, 316)
+     apply.Size = UDim2.new(1, 0, 0, 34)
+     apply.BackgroundColor3 = COLORS.disabled
+     apply.TextColor3 = COLORS.muted
+@@ -471,7 +503,7 @@ local function createGui()
+     end)
+     setCollapsed(playerGui:GetAttribute(DEBUG_PANEL_OPEN_ATTRIBUTE) ~= DEBUG_PANEL_ID)
+ 
+-    return gui, character, category, weapon, meta, radiusToggle, apply, status, statusDot
++    return gui, character, category, weapon, meta, radiusBox, radiusReset, radiusToggle, apply, status, statusDot
+ end
+ 
+ function TestLoadoutController.Start()
+@@ -486,12 +518,13 @@ function TestLoadoutController.Start()
+         end
+         local catalogRemote = remotes:WaitForChild("GetTestLoadoutCatalog", 10)
+         local applyRemote = remotes:WaitForChild("ApplyTestLoadout", 10)
+-        if not catalogRemote or not applyRemote then
++        local radiusRemote = remotes:WaitForChild("SetTestAttackRadius", 10)
++        if not catalogRemote or not applyRemote or not radiusRemote then
+             warn("[game1][test-loadout] remotes are missing")
+             return
+         end
+ 
+-        local gui, characterDropdown, categorySelector, weaponDropdown, meta, radiusToggle, applyButton, status, statusDot = createGui()
++        local gui, characterDropdown, categorySelector, weaponDropdown, meta, radiusBox, radiusReset, radiusToggle, applyButton, status, statusDot = createGui()
+         local catalog = catalogRemote:InvokeServer()
+         local weaponRows = catalog.weapons or {}
+         local weaponBySlug = {}
+@@ -581,6 +614,36 @@ function TestLoadoutController.Start()
+             statusDot.BackgroundColor3 = color or COLORS.muted
+         end
+ 
++        local function syncRadiusBox(value: any)
++            local numeric = math.max(1, tonumber(value) or 7)
++            radiusBox.Text = string.format("%.2f", numeric):gsub("0+$", ""):gsub("%.$", "")
++        end
++        local function applyRadiusValue(value: any)
++            local ok, result = pcall(function()
++                return radiusRemote:InvokeServer(value)
++            end)
++            if not ok or type(result) ~= "table" or result.ok ~= true then
++                setStatus("Radius error · " .. tostring(type(result) == "table" and result.error or result), COLORS.error)
++                return
++            end
++            syncRadiusBox(result.attackRadiusStuds)
++            setStatus(result.overridden and "Runtime radius override active" or "Radius reset to weapon default", COLORS.accent)
++        end
++        radiusBox.FocusLost:Connect(function()
++            local value = tonumber(radiusBox.Text)
++            if value then
++                applyRadiusValue(value)
++            else
++                local currentCharacter = player.Character
++                syncRadiusBox(currentCharacter and currentCharacter:GetAttribute("AttackRadius") or 7)
++            end
++        end)
++        radiusReset.Activated:Connect(function()
++            applyRadiusValue("default")
++        end)
++        local initialCharacter = player.Character
++        syncRadiusBox(initialCharacter and initialCharacter:GetAttribute("AttackRadius") or 7)
++
+         local function renderApply()
+             local changed = characterDropdown.getValue() ~= appliedArchetype or weaponDropdown.getValue() ~= appliedWeaponSlug
+             applyButton.Active = not applying and characterDropdown.getValue() ~= ""
+@@ -649,6 +712,7 @@ function TestLoadoutController.Start()
+             end
+             appliedArchetype = tostring(result.archetype or characterDropdown.getValue())
+             appliedWeaponSlug = tostring(result.weaponSlug or weaponDropdown.getValue())
++            syncRadiusBox(result.attackRadiusStuds)
+             persistSelection()
+             setStatus("Loadout active", COLORS.accent)
+             renderApply()
+diff --git a/src/server/dev/TestLoadoutService.luau b/src/server/dev/TestLoadoutService.luau
+index fc560a7..a49a8a8 100644
+--- a/src/server/dev/TestLoadoutService.luau
++++ b/src/server/dev/TestLoadoutService.luau
+@@ -131,8 +131,9 @@ local function buildCatalog(player: Player)
+         categories = categories,
+         categoryLabels = {
+             hands = "Hands",
+-            ["1hs"] = "1HS",
+-            ["2hs"] = "2HS",
++            dagger = "Dagger",
++            sword = "Sword",
++            bigsword = "Bigsword",
+             bow = "Bow",
+         },
+         weapons = weapons,
+@@ -141,6 +142,33 @@ local function buildCatalog(player: Player)
+     }
+ end
+ 
++local function weaponRadiusForCharacter(character: Model): number
++    local slug = string.lower(tostring(character:GetAttribute("EquippedWeaponSlug") or ""))
++    local row = if slug ~= "" then WeaponEquipService.GetAvailable(slug) else nil
++    return math.clamp(tonumber(row and row.attackRadiusStuds) or AttackConfig.Range, 1, AttackConfig.MaxAimDistance)
++end
++
++local function setTestAttackRadius(player: Player, value: any)
++    local character = player.Character
++    if not character then
++        return { ok = false, error = "character is not spawned" }
++    end
++    if value == nil or value == false or tostring(value) == "default" then
++        player:SetAttribute("Game1TestAttackRadiusOverride", nil)
++        local radius = weaponRadiusForCharacter(character)
++        character:SetAttribute("AttackRadius", radius)
++        return { ok = true, attackRadiusStuds = radius, overridden = false }
++    end
++    local radius = tonumber(value)
++    if radius == nil then
++        return { ok = false, error = "attack radius must be a number" }
++    end
++    radius = math.clamp(radius, 1, AttackConfig.MaxAimDistance)
++    player:SetAttribute("Game1TestAttackRadiusOverride", radius)
++    character:SetAttribute("AttackRadius", radius)
++    return { ok = true, attackRadiusStuds = radius, overridden = true }
++end
++
+ local function applyLoadout(player: Player, archetypeValue: any, weaponSlugValue: any)
+     local archetype = string.lower(tostring(archetypeValue or ""))
+     local weaponSlug = string.lower(tostring(weaponSlugValue or ""))
+@@ -168,6 +196,10 @@ local function applyLoadout(player: Player, archetypeValue: any, weaponSlugValue
+         return { ok = false, error = equipError or "failed to equip selected weapon" }
+     end
+ 
++    local radiusOverride = tonumber(player:GetAttribute("Game1TestAttackRadiusOverride"))
++    if radiusOverride ~= nil then
++        character:SetAttribute("AttackRadius", math.clamp(radiusOverride, 1, AttackConfig.MaxAimDistance))
++    end
+     character:SetAttribute("WeaponLoadoutSource", "studio-test")
+     player:SetAttribute("Game1TestLoadoutActive", true)
+     return {
+@@ -193,11 +225,19 @@ local function bindPlayer(player: Player)
+             if weaponSlug == "" then
+                 WeaponEquipService.Unequip(character)
+                 character:SetAttribute("WeaponLoadoutSource", "studio-test")
++                local radiusOverride = tonumber(player:GetAttribute("Game1TestAttackRadiusOverride"))
++                if radiusOverride ~= nil then
++                    character:SetAttribute("AttackRadius", math.clamp(radiusOverride, 1, AttackConfig.MaxAimDistance))
++                end
+                 return
+             end
+             local ok, reason = WeaponEquipService.Equip(character, weaponSlug)
+             if ok then
+                 character:SetAttribute("WeaponLoadoutSource", "studio-test")
++                local radiusOverride = tonumber(player:GetAttribute("Game1TestAttackRadiusOverride"))
++                if radiusOverride ~= nil then
++                    character:SetAttribute("AttackRadius", math.clamp(radiusOverride, 1, AttackConfig.MaxAimDistance))
++                end
+             else
+                 warn("[game1][test-loadout] " .. tostring(reason))
+             end
+@@ -214,8 +254,10 @@ function TestLoadoutService.Start()
+     local remotes = ensureRemoteFolder()
+     local catalog = ensureRemoteFunction(remotes, "GetTestLoadoutCatalog")
+     local apply = ensureRemoteFunction(remotes, "ApplyTestLoadout")
++    local radius = ensureRemoteFunction(remotes, "SetTestAttackRadius")
+     catalog.OnServerInvoke = buildCatalog
+     apply.OnServerInvoke = applyLoadout
++    radius.OnServerInvoke = setTestAttackRadius
+ 
+     Players.PlayerAdded:Connect(bindPlayer)
+     for _, player in ipairs(Players:GetPlayers()) do
+diff --git a/src/server/weapon/WeaponEquipService.luau b/src/server/weapon/WeaponEquipService.luau
+index 457ce42..e315262 100644
+--- a/src/server/weapon/WeaponEquipService.luau
++++ b/src/server/weapon/WeaponEquipService.luau
+@@ -6,6 +6,7 @@ local WeaponShared = Shared:WaitForChild("weapon")
+ local CombatShared = Shared:WaitForChild("combat")
+ local AttackConfig = require(CombatShared:WaitForChild("AttackConfig"))
+ local WeaponRegistry = require(WeaponShared:WaitForChild("WeaponRegistry"))
++local WeaponAttackMovement = require(WeaponShared:WaitForChild("WeaponAttackMovement"))
+ local CharacterStatsService = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CharacterStatsService"))
+ 
+ local WeaponEquipService = {}
+@@ -152,6 +153,8 @@ function WeaponEquipService.Unequip(character: Model)
+     character:SetAttribute("EquippedWeaponRarity", "")
+     character:SetAttribute("AttackRadius", attackRadiusFor(nil))
+     character:SetAttribute("AnimationWeaponSet", "hands")
++    character:SetAttribute("AttackMovementLocomotionMode", "Run")
++    character:SetAttribute("AttackMovementRunSpeedMultiplier", 1)
+     CharacterStatsService.ApplyModifiers(character, {})
+ end
+ 
+@@ -199,8 +202,11 @@ function WeaponEquipService.Equip(character: Model, slugValue: any): (boolean, s
+     character:SetAttribute("EquippedWeaponSlug", slug)
+     character:SetAttribute("EquippedWeaponType", tostring(row.weaponType or ""))
+     character:SetAttribute("EquippedWeaponRarity", tostring(row.rarity or ""))
++    local attackMovement = WeaponAttackMovement.Resolve(row.weaponType)
+     character:SetAttribute("AttackRadius", attackRadiusFor(row))
+-    character:SetAttribute("AnimationWeaponSet", tostring(row.weaponType or "hands"))
++    character:SetAttribute("AnimationWeaponSet", attackMovement.animationSet)
++    character:SetAttribute("AttackMovementLocomotionMode", attackMovement.locomotionMode)
++    character:SetAttribute("AttackMovementRunSpeedMultiplier", attackMovement.runSpeedMultiplier)
+     CharacterStatsService.ApplyModifiers(character, row.statModifiers or {})
+     return true, nil
+ end
+@@ -222,6 +228,7 @@ function WeaponEquipService.ListAvailable(): { any }
+                 nameEn = tostring(row.nameEn or slug),
+                 nameRu = tostring(row.nameRu or ""),
+                 weaponType = tostring(row.weaponType or ""),
++                animationSet = WeaponAttackMovement.AnimationSetForType(row.weaponType),
+                 rarity = tostring(row.rarity or ""),
+                 attackRadiusStuds = attackRadiusFor(row),
+                 modelAssetId = tostring(row.modelAssetId or ""),
+diff --git a/src/shared/animation/AnimationSpeedScaling.luau b/src/shared/animation/AnimationSpeedScaling.luau
+index 433cc1c..460902a 100644
+--- a/src/shared/animation/AnimationSpeedScaling.luau
++++ b/src/shared/animation/AnimationSpeedScaling.luau
+@@ -50,7 +50,7 @@ function AnimationSpeedScaling.ResolvePercent(targetType: any, targetId: any, ch
+ end
+ 
+ 
+-function AnimationSpeedScaling.ResolveDetailsForModel(model: Model, channel: any): any
++function AnimationSpeedScaling.ResolveDetailsForModel(model: Model, channel: any, statValueOverride: any?): any
+     local normalizedChannel = string.lower(tostring(channel or ""))
+     local targetType, targetId = AnimationSpeedScaling.TargetForModel(model)
+     local rule = AnimationSpeedScaling.Rule(targetType, targetId, normalizedChannel)
+@@ -68,7 +68,8 @@ function AnimationSpeedScaling.ResolveDetailsForModel(model: Model, channel: any
+     end
+ 
+     local stat = tostring(rule.stat or "")
+-    local statValue = math.max(0, finite(model:GetAttribute(stat), 0))
++    local rawStatValue = if statValueOverride ~= nil then statValueOverride else model:GetAttribute(stat)
++    local statValue = math.max(0, finite(rawStatValue, 0))
+     local authoredUnitsPerPercent = math.clamp(
+         finite(rule.unitsPerPercent, 1),
+         AnimationSpeedScaling.MinUnitsPerPercent,
+@@ -107,6 +108,10 @@ function AnimationSpeedScaling.ResolveForModel(model: Model, channel: any): numb
+     return AnimationSpeedScaling.ResolveDetailsForModel(model, channel).percent
+ end
+ 
++function AnimationSpeedScaling.ResolveForModelWithStatValue(model: Model, channel: any, statValue: any): number
++    return AnimationSpeedScaling.ResolveDetailsForModel(model, channel, statValue).percent
++end
++
+ function AnimationSpeedScaling.ResolveScaleForModel(model: Model, channel: any): number
+     return AnimationSpeedScaling.ResolveForModel(model, channel) / 100
+ end
+diff --git a/src/shared/character/CharacterMovementConfig.luau b/src/shared/character/CharacterMovementConfig.luau
+index e157670..e63a82a 100644
+--- a/src/shared/character/CharacterMovementConfig.luau
++++ b/src/shared/character/CharacterMovementConfig.luau
+@@ -37,6 +37,24 @@ function CharacterMovementConfig.RobloxSpeed(_archetype: any, currentRunSpeed: a
+     return gameSpeed(currentRunSpeed, movementMode) / CharacterMovementConfig.RunSpeedUnitsPerStud
+ end
+ 
++
++function CharacterMovementConfig.RobloxSpeedAtRunMultiplier(_archetype: any, currentRunSpeed: any, runSpeedMultiplier: any): number
++    local runSpeed = math.max(0, tonumber(currentRunSpeed) or CharacterMovementConfig.DefaultRunSpeed)
++    local multiplier = math.max(0, tonumber(runSpeedMultiplier) or 1)
++    return (runSpeed * multiplier) / CharacterMovementConfig.RunSpeedUnitsPerStud
++end
++
++-- Converts an arbitrary attack movement speed back into the equivalent RunSpeed
++-- value expected by a Run/Walk animation scaling rule. Example: attack movement
++-- at 75% RunSpeed with Walk legs => 1.5x the normal Walk cadence because normal
++-- Walk moves at 50% RunSpeed.
++function CharacterMovementConfig.EquivalentRunSpeedForLocomotion(currentRunSpeed: any, runSpeedMultiplier: any, locomotionMode: any): number
++    local runSpeed = math.max(0, tonumber(currentRunSpeed) or CharacterMovementConfig.DefaultRunSpeed)
++    local multiplier = math.max(0, tonumber(runSpeedMultiplier) or 1)
++    local modeMultiplier = if tostring(locomotionMode) == "Walk" then CharacterMovementConfig.WalkSpeedMultiplier else 1
++    return (runSpeed * multiplier) / math.max(0.001, modeMultiplier)
++end
++
+ function CharacterMovementConfig.StudsPerSecond(archetype: any, currentRunSpeed: any, movementMode: any): number
+     return CharacterMovementConfig.RobloxSpeed(archetype, currentRunSpeed, movementMode)
+ end
+diff --git a/src/shared/weapon/WeaponAttackMovement.luau b/src/shared/weapon/WeaponAttackMovement.luau
+new file mode 100644
+index 0000000..16c66ad
+--- /dev/null
++++ b/src/shared/weapon/WeaponAttackMovement.luau
+@@ -0,0 +1,42 @@
++local WeaponRegistry = require(script.Parent:WaitForChild("WeaponRegistry"))
++
++local WeaponAttackMovement = {}
++
++local FALLBACK = table.freeze({
++    weaponType = "hands",
++    animationSet = "hands",
++    locomotionMode = "Run",
++    runSpeedMultiplier = 1,
++})
++
++local function normalizedMode(value: any): string
++    return if string.lower(tostring(value or "")) == "walk" then "Walk" else "Run"
++end
++
++function WeaponAttackMovement.Resolve(weaponTypeValue: any): any
++    local weaponType = string.lower(tostring(weaponTypeValue or ""))
++    local source = WeaponRegistry.attackMovementByType and WeaponRegistry.attackMovementByType[weaponType]
++    if not source then
++        return FALLBACK
++    end
++    return {
++        weaponType = weaponType,
++        animationSet = string.lower(tostring(source.animationSet or weaponType)),
++        locomotionMode = normalizedMode(source.locomotionMode),
++        runSpeedMultiplier = math.clamp(tonumber(source.runSpeedMultiplier) or 1, 0, 2),
++    }
++end
++
++function WeaponAttackMovement.AnimationSetForType(weaponTypeValue: any): string
++    return WeaponAttackMovement.Resolve(weaponTypeValue).animationSet
++end
++
++function WeaponAttackMovement.LocomotionModeForType(weaponTypeValue: any): string
++    return WeaponAttackMovement.Resolve(weaponTypeValue).locomotionMode
++end
++
++function WeaponAttackMovement.RunSpeedMultiplierForType(weaponTypeValue: any): number
++    return WeaponAttackMovement.Resolve(weaponTypeValue).runSpeedMultiplier
++end
++
++return table.freeze(WeaponAttackMovement)
+diff --git a/src/shared/weapon/WeaponRegistry.luau b/src/shared/weapon/WeaponRegistry.luau
+index 6718122..b4e39b4 100644
+--- a/src/shared/weapon/WeaponRegistry.luau
++++ b/src/shared/weapon/WeaponRegistry.luau
+@@ -1,14 +1,36 @@
+ -- generated. do not edit by hand.
+ return table.freeze({
+-	schemaVersion = 1,
++	schemaVersion = 2,
+ 	project = "game1",
+ 	activeWeaponSlug = "",
++	attackMovementByType = table.freeze({
++		["dagger"] = table.freeze({
++			animationSet = "1hs",
++			locomotionMode = "Run",
++			runSpeedMultiplier = 1,
++		}),
++		["sword"] = table.freeze({
++			animationSet = "1hs",
++			locomotionMode = "Run",
++			runSpeedMultiplier = 1,
++		}),
++		["bigsword"] = table.freeze({
++			animationSet = "2hs",
++			locomotionMode = "Walk",
++			runSpeedMultiplier = 0.75,
++		}),
++		["bow"] = table.freeze({
++			animationSet = "bow",
++			locomotionMode = "Walk",
++			runSpeedMultiplier = 0.75,
++		}),
++	}),
+ 	weapons = table.freeze({
+ 		["newbie_axe"] = table.freeze({
+ 			slug = "newbie_axe",
+ 			nameEn = "Newbie Axe",
+ 			nameRu = "Топор Новичка",
+-			weaponType = "1hs",
++			weaponType = "sword",
+ 			rarity = "common",
+ 			attackRadiusStuds = 7,
+ 			status = "PUBLISHED",
+@@ -29,7 +51,7 @@ return table.freeze({
+ 			slug = "dragon_divider",
+ 			nameEn = "Dragon Divider",
+ 			nameRu = "Рассекатель Драконов",
+-			weaponType = "1hs",
++			weaponType = "sword",
+ 			rarity = "legendary",
+ 			attackRadiusStuds = 7,
+ 			status = "PUBLISHED",
+diff --git a/system/control-center/host_agent.py b/system/control-center/host_agent.py
+index 20f3a7d..0c83ddb 100644
+--- a/system/control-center/host_agent.py
++++ b/system/control-center/host_agent.py
+@@ -134,7 +134,7 @@ def sync_weapon_to_studio(slug: str):
+         for item in (row.get("textures") or [])
+         if str(item.get("asset_id") or "").isdigit()
+     ]
+-    destination = ["weapons", str(row.get("weapon_type") or ""), str(row.get("slug") or ""), "model"]
++    destination = ["weapons", str(row.get("storage_type") or row.get("weapon_type") or ""), str(row.get("slug") or ""), "model"]
+     result = run_model_load_bridge(
+         asset_id,
+         destination,
+@@ -506,6 +506,11 @@ class Handler(BaseHTTPRequestHandler):
+                 return self.out(200, weapons.register(self.body()))
+             except Exception as error:
+                 return self.out(400, {"error": str(error)})
++        if path == "/api/weapons/attack-movement":
++            try:
++                return self.out(200, weapons.update_attack_movement(self.body()))
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
+         if path == "/api/monsters":
+             try:
+                 return self.out(200, monsters.register(self.body()))
+diff --git a/system/control-center/schema.sql b/system/control-center/schema.sql
+index eec8bf8..1cc9ed7 100644
+--- a/system/control-center/schema.sql
++++ b/system/control-center/schema.sql
+@@ -128,6 +128,13 @@ create table if not exists weapons (
+     published_at real
+ );
+ 
++create table if not exists weapon_attack_movement (
++    weapon_type text primary key,
++    animation_set text not null default '',
++    locomotion_mode text not null default 'Run',
++    run_speed_multiplier real not null default 1
++);
++
+ create table if not exists weapon_textures (
+     id text primary key,
+     weapon_slug text not null,
+diff --git a/system/control-center/static/asset-manager.css b/system/control-center/static/asset-manager.css
+index 5fddb7a..049a8ba 100644
+--- a/system/control-center/static/asset-manager.css
++++ b/system/control-center/static/asset-manager.css
+@@ -12,3 +12,5 @@
+ .folder-picker{text-align:left}.folder-explorer{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}.folder-explorer input{width:100%;min-width:0;font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace}.folder-explorer button{white-space:nowrap}.folder-picker small{margin-top:8px!important;word-break:normal!important;overflow-wrap:anywhere}@media(max-width:650px){.folder-explorer{grid-template-columns:1fr}.folder-explorer button{width:100%}}
+ .character-stats-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.seam-toggle{display:flex;align-items:center;justify-content:center}.seam-toggle input{width:auto!important;margin:0!important;padding:0;accent-color:var(--mint)}@media(max-width:650px){.character-stats-grid{grid-template-columns:1fr}}
+ .animation-source-path{display:block;width:150px;max-width:150px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;direction:rtl;text-align:left}
++
++.weapon-attack-movement-rules{display:grid;gap:8px;margin-top:12px}.weapon-attack-movement-row{display:grid;grid-template-columns:minmax(90px,.7fr) minmax(110px,1fr) minmax(100px,.8fr) minmax(130px,1fr) auto;gap:8px;align-items:end;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--panel2)}.weapon-attack-movement-row label{margin:0}.weapon-attack-movement-row strong{align-self:center;text-transform:uppercase;font-size:11px;letter-spacing:.06em}.weapon-attack-movement-row button{height:34px}@media(max-width:900px){.weapon-attack-movement-row{grid-template-columns:1fr 1fr}.weapon-attack-movement-row button{grid-column:1/-1}}
+diff --git a/system/control-center/static/index.html b/system/control-center/static/index.html
+index 58aaf71..0502bec 100644
+--- a/system/control-center/static/index.html
++++ b/system/control-center/static/index.html
+@@ -144,6 +144,11 @@
+ <div class="metrics"><div><b id="weapon-metric-total">0</b><span>registered</span></div><div><b id="weapon-metric-published">0</b><span>published</span></div><div><b id="weapon-metric-active">0</b><span>startup</span></div></div>
+ </div>
+ <div class="panel runtime-card"><div id="weapon-runtime-state" class="runtime-state bootstrap"><strong>unarmed</strong><span>no startup weapon selected.</span></div><div id="weapon-publication-state" class="publication-missing">open cloud: checking…</div></div>
++<div class="panel character-card">
++<div class="section-title"><div><span>attack movement by weapon type</span><h3>live lower-body locomotion policy</h3></div></div>
++<small class="hint">all values are authored data, not controller constants. movement % is a fraction of RunSpeed used for the complete attack. legs select which locomotion clip stays live under the upper-body attack. animation set maps the gameplay type to its animation context.</small>
++<div id="weapon-attack-movement-rules" class="weapon-attack-movement-rules"><span class="muted">loading attack movement rules…</span></div>
++</div>
+ <div class="weapon-workflow">
+ <div class="panel character-card">
+ <span class="eyebrow">01 · identity and stats</span><h3>register weapon</h3>
+diff --git a/system/control-center/static/weapon-assets.js b/system/control-center/static/weapon-assets.js
+index edf0c26..35f54ab 100644
+--- a/system/control-center/static/weapon-assets.js
++++ b/system/control-center/static/weapon-assets.js
+@@ -4,14 +4,17 @@ function weaponSlugify(value){return String(value||'').toLowerCase().replace(/[^
+ function weaponStatusTag(status){return `<span class="tag ${String(status||'').toLowerCase()}">${esc(status||'')}</span>`}
+ function weaponRarity(value){return `<span class="rarity-${esc(value)}">${esc(value)}</span>`}
+ function weaponSyncSlug(){if(!weaponState.selected)$('weapon-slug').value=weaponSlugify($('weapon-name-en').value)}
+-function weaponSetForm(row){weaponState.selected=row?.slug||null;weaponState.modelPath='';weaponState.texturePaths=[];if(row){$('weapon-name-en').value=row.name_en||'';$('weapon-name-ru').value=row.name_ru||'';$('weapon-slug').value=row.slug;$('weapon-type').value=row.weapon_type;$('weapon-rarity').value=row.rarity;$('weapon-stat-damage').value=row.stat_modifiers?.Damage??0;$('weapon-stat-attack-speed').value=row.stat_modifiers?.AttackSpeed??0;$('weapon-attack-radius').value=row.attack_radius_studs??7;$('picked-weapon-model').textContent='keep current fbx or choose a replacement';$('picked-weapon-textures').textContent='keep current textures or choose replacements';}else{$('weapon-name-en').value='';$('weapon-name-ru').value='';$('weapon-slug').value='';$('weapon-type').value=weaponState.data?.options?.weaponTypes?.[0]||'1hs';$('weapon-rarity').value=weaponState.data?.options?.rarities?.[0]||'common';$('weapon-stat-damage').value='0';$('weapon-stat-attack-speed').value='0';$('weapon-attack-radius').value=String(weaponState.data?.options?.attackRadius?.default??7);$('picked-weapon-model').textContent='fbx not selected';$('picked-weapon-textures').textContent='textures not selected';}weaponRender()}
++function weaponSetForm(row){weaponState.selected=row?.slug||null;weaponState.modelPath='';weaponState.texturePaths=[];if(row){$('weapon-name-en').value=row.name_en||'';$('weapon-name-ru').value=row.name_ru||'';$('weapon-slug').value=row.slug;$('weapon-type').value=row.weapon_type;$('weapon-rarity').value=row.rarity;$('weapon-stat-damage').value=row.stat_modifiers?.Damage??0;$('weapon-stat-attack-speed').value=row.stat_modifiers?.AttackSpeed??0;$('weapon-attack-radius').value=row.attack_radius_studs??7;$('picked-weapon-model').textContent='keep current fbx or choose a replacement';$('picked-weapon-textures').textContent='keep current textures or choose replacements';}else{$('weapon-name-en').value='';$('weapon-name-ru').value='';$('weapon-slug').value='';$('weapon-type').value=weaponState.data?.options?.weaponTypes?.[0]||'dagger';$('weapon-rarity').value=weaponState.data?.options?.rarities?.[0]||'common';$('weapon-stat-damage').value='0';$('weapon-stat-attack-speed').value='0';$('weapon-attack-radius').value=String(weaponState.data?.options?.attackRadius?.default??7);$('picked-weapon-model').textContent='fbx not selected';$('picked-weapon-textures').textContent='textures not selected';}weaponRender()}
+ function weaponRenderTree(){const host=$('weapon-tree');host.innerHTML='';for(const row of weaponState.data.items){const button=document.createElement('button');button.className=row.slug===weaponState.selected?'active':'';button.innerHTML=`<span>${esc(row.name_en)}<small>${esc(row.weapon_type)} · ${esc(row.rarity)}</small></span><small>${esc(row.status)}</small>`;button.onclick=()=>weaponSetForm(row);host.appendChild(button)}if(!weaponState.data.items.length)host.innerHTML='<small class="muted">no registered weapons.</small>';$('weapon-rail-count').textContent=weaponState.data.items.length}
+ function weaponRenderRows(){const body=$('weapon-rows');body.innerHTML='';for(const row of weaponState.data.items){const active=weaponState.data.activeWeaponSlug===row.slug;const mods=row.stat_modifiers||{};const textures=row.textures||[];const tr=document.createElement('tr');tr.className=row.slug===weaponState.selected?'active':'';tr.innerHTML=`<td>${active?'yes':''}</td><td><b>${esc(row.name_en)}</b><br><small>${esc(row.name_ru||'—')} · ${esc(row.slug)}</small></td><td>${esc(row.weapon_type)}</td><td>${weaponRarity(row.rarity)}</td><td><small>atk ${Number(mods.Damage||0)>=0?'+':''}${esc(mods.Damage||0)}<br>aspd ${Number(mods.AttackSpeed||0)>=0?'+':''}${esc(mods.AttackSpeed||0)}<br>radius ${esc(row.attack_radius_studs??7)} studs</small></td><td>${row.model_asset_id?`model ${esc(row.model_asset_id)}`:'model local'}<br><small>${textures.length} texture${textures.length===1?'':'s'}</small></td><td>${weaponStatusTag(row.status)}</td><td><div class="row-actions"><button data-open>edit</button><button data-publish>publish</button><button data-sync>sync studio</button><button data-active>startup</button><button data-delete class="danger">delete</button></div></td>`;tr.querySelector('[data-open]').onclick=()=>weaponSetForm(row);tr.querySelector('[data-publish]').onclick=()=>weaponPublish(row.slug);tr.querySelector('[data-sync]').onclick=()=>weaponSync(row.slug);tr.querySelector('[data-active]').onclick=()=>weaponActivate(row.slug);tr.querySelector('[data-delete]').onclick=()=>weaponDelete(row.slug);body.appendChild(tr)}}
+ function weaponRenderDetails(row){const host=$('weapon-details');if(!row){host.innerHTML='<span class="muted">select a weapon.</span>';return}const textureHtml=(row.textures||[]).map(tex=>`<div><b>${esc(tex.slot)}</b><span>${esc(tex.source_path)}</span><span>${esc(tex.asset_id||'local')}</span></div>`).join('');host.innerHTML=`<div class="section-title"><div><span>selected weapon</span><h3>${esc(row.name_en)}</h3></div>${weaponStatusTag(row.status)}</div><div class="details-grid"><div><b>slug</b><span>${esc(row.slug)}</span></div><div><b>type / rarity</b><span>${esc(row.weapon_type)} · ${esc(row.rarity)}</span></div><div><b>attack radius</b><span>${esc(row.attack_radius_studs??7)} studs</span></div><div><b>model source</b><span>${esc(row.model_source_path||'—')}</span></div><div><b>model asset id</b><span>${esc(row.model_asset_id||'not published')}</span></div><div><b>serverstorage</b><span>${esc(row.server_storage_path||'—')}</span></div><div><b>revision</b><span>${esc(row.revision)}</span></div></div>${textureHtml?`<div class="texture-list">${textureHtml}</div>`:''}`}
+ function weaponRenderForm(row){const configured=!!weaponState.data?.publication?.configured;if(row){$('weapon-model-status').innerHTML=`<strong>${esc(row.name_en)} · ${esc(row.status)}</strong><span>${esc(row.model_source_path||'no model')} · ${(row.textures||[]).length} registered texture(s)</span>`;$('register-weapon').textContent=(weaponState.modelPath||weaponState.texturePaths.length)?'register new revision':'save metadata';}else{$('weapon-model-status').innerHTML='<strong>not registered</strong><span>choose a weapon fbx. textures are optional.</span>';$('register-weapon').textContent='register weapon'}$('register-weapon').disabled=!row&&!weaponState.modelPath;$('publish-weapon').disabled=!row||!configured||!row.model_source_path;$('sync-weapon').disabled=!row?.model_asset_id;$('activate-weapon').disabled=!row?.model_asset_id;$('weapon-publication-hint').textContent=!row?'select a registered weapon.':!configured?'configure open cloud before publishing.':row.model_asset_id?`publish updates model ${row.model_asset_id} and changed textures.`:'publish creates the permanent model/texture asset ids.'}
++
++function weaponRenderAttackMovement(){const host=$('weapon-attack-movement-rules');if(!host)return;host.innerHTML='';const modes=weaponState.data?.options?.attackLocomotionModes||['Run','Walk'];for(const rule of weaponState.data?.attackMovement||[]){const row=document.createElement('div');row.className='weapon-attack-movement-row';row.innerHTML=`<strong>${esc(rule.weaponType)}</strong><label>animation set<input data-animation-set value="${esc(rule.animationSet||'')}"></label><label>legs<select data-mode>${modes.map(mode=>`<option value="${esc(mode)}"${mode===rule.locomotionMode?' selected':''}>${esc(mode)}</option>`).join('')}</select></label><label>movement · % RunSpeed<input data-percent type="number" min="0" max="200" step="1" value="${esc(Number(rule.runSpeedPercent??100).toFixed(2).replace(/\.00$/,''))}"></label><button data-save type="button">save</button>`;row.querySelector('[data-save]').onclick=()=>weaponSaveAttackMovement(rule.weaponType,row);host.appendChild(row)}if(!(weaponState.data?.attackMovement||[]).length)host.innerHTML='<span class="muted">no attack movement rules.</span>'}
++async function weaponSaveAttackMovement(weaponType,row){try{const percent=Number(row.querySelector('[data-percent]').value);if(!Number.isFinite(percent)||percent<0||percent>200)throw Error('movement % must be between 0 and 200');weaponState.data=await request('/api/weapons/attack-movement',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({weaponType,animationSet:row.querySelector('[data-animation-set]').value.trim(),locomotionMode:row.querySelector('[data-mode]').value,runSpeedMultiplier:percent/100})});weaponState.data.publication=(await request('/api/weapons')).publication;weaponRender();toast(`attack movement saved: ${weaponType}`)}catch(error){toast(error.message,true)}}
+ function weaponRenderRuntime(){const active=weaponState.data.activeWeaponSlug;const host=$('weapon-runtime-state');if(active){const row=weaponState.data.items.find(item=>item.slug===active);host.className='runtime-state registered';host.innerHTML=`<strong>startup weapon · ${esc(active)}</strong><span>${esc(row?.weapon_type||'')} · ${esc(row?.rarity||'')}</span>`}else{host.className='runtime-state bootstrap';host.innerHTML='<strong>unarmed startup</strong><span>animation context: hands</span>'}const pub=weaponState.data.publication||{};$('weapon-publication-state').className=pub.configured?'publication-ready':'publication-missing';$('weapon-publication-state').textContent=pub.configured?`open cloud: ${pub.creatorType} ${pub.creatorId}`:'open cloud: not configured'}
+-function weaponRender(){if(!weaponState.data)return;const row=weaponSelected();$('weapon-metric-total').textContent=weaponState.data.summary?.registered||0;$('weapon-metric-published').textContent=weaponState.data.summary?.published||0;$('weapon-metric-active').textContent=weaponState.data.summary?.active||0;weaponRenderRuntime();weaponRenderTree();weaponRenderRows();weaponRenderDetails(row);weaponRenderForm(row)}
+-async function weaponLoad(){try{weaponState.data=await request('/api/weapons');const types=weaponState.data.options?.weaponTypes||['1hs','2hs','bow'];const rarities=weaponState.data.options?.rarities||['common','uncommon','rare','mythical','legendary','immortal'];$('weapon-type').innerHTML=types.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');$('weapon-rarity').innerHTML=rarities.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');if(weaponState.selected&&!weaponState.data.items.some(x=>x.slug===weaponState.selected))weaponState.selected=null;weaponRender()}catch(error){toast(error.message,true)}}
++function weaponRender(){if(!weaponState.data)return;const row=weaponSelected();$('weapon-metric-total').textContent=weaponState.data.summary?.registered||0;$('weapon-metric-published').textContent=weaponState.data.summary?.published||0;$('weapon-metric-active').textContent=weaponState.data.summary?.active||0;weaponRenderRuntime();weaponRenderAttackMovement();weaponRenderTree();weaponRenderRows();weaponRenderDetails(row);weaponRenderForm(row)}
++async function weaponLoad(){try{weaponState.data=await request('/api/weapons');const types=weaponState.data.options?.weaponTypes||['dagger','sword','bigsword','bow'];const rarities=weaponState.data.options?.rarities||['common','uncommon','rare','mythical','legendary','immortal'];$('weapon-type').innerHTML=types.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');$('weapon-rarity').innerHTML=rarities.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');if(weaponState.selected&&!weaponState.data.items.some(x=>x.slug===weaponState.selected))weaponState.selected=null;weaponRender()}catch(error){toast(error.message,true)}}
+ async function weaponChooseModel(){try{const result=await request('/api/files/choose-weapon-model',{method:'POST'});if(!result.path)return;weaponState.modelPath=result.path;$('picked-weapon-model').textContent=result.path;weaponRenderForm(weaponSelected())}catch(error){toast(error.message,true)}}
+ async function weaponChooseTextures(){try{const result=await request('/api/files/choose-weapon-textures',{method:'POST'});weaponState.texturePaths=result.paths||[];$('picked-weapon-textures').textContent=weaponState.texturePaths.length?weaponState.texturePaths.join(' · '):'textures not selected';weaponRenderForm(weaponSelected())}catch(error){toast(error.message,true)}}
+ async function weaponRegister(){try{const row=weaponSelected();const nameEn=$('weapon-name-en').value.trim();if(!nameEn)throw Error('name en is required');const slug=row?.slug||weaponSlugify(nameEn);if(!slug)throw Error('english name cannot generate a slug');if(!row&&!weaponState.modelPath)throw Error('choose a weapon fbx first');$('register-weapon').disabled=true;const result=await request('/api/weapons',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug,nameEn,nameRu:$('weapon-name-ru').value.trim(),weaponType:$('weapon-type').value,rarity:$('weapon-rarity').value,modelSourcePath:weaponState.modelPath,texturePaths:weaponState.texturePaths,attackRadiusStuds:Number($('weapon-attack-radius').value||7),statModifiers:{Damage:Number($('weapon-stat-damage').value||0),AttackSpeed:Number($('weapon-stat-attack-speed').value||0)}})});weaponState.selected=result.slug;weaponState.modelPath='';weaponState.texturePaths=[];await weaponLoad();weaponSetForm(weaponSelected());toast(`registered weapon ${result.slug}`)}catch(error){toast(error.message,true)}finally{weaponRenderForm(weaponSelected())}}
+diff --git a/system/control-center/weapon_store.py b/system/control-center/weapon_store.py
+index 7ebef67..c584120 100644
+--- a/system/control-center/weapon_store.py
++++ b/system/control-center/weapon_store.py
+@@ -16,10 +16,17 @@ from opencloud_assets import (
+     wait_for_operation,
+ )
+ 
+-SCHEMA_VERSION = 1
++SCHEMA_VERSION = 2
+ PROJECT = "game1"
+ ACTIVE_KEY = "active_weapon_slug"
+-WEAPON_TYPES = ("1hs", "2hs", "bow")
++WEAPON_TYPES = ("dagger", "sword", "bigsword", "bow")
++ATTACK_LOCOMOTION_MODES = ("Run", "Walk")
++ATTACK_MOVEMENT_DEFAULTS = {
++    "dagger": {"animationSet": "1hs", "locomotionMode": "Run", "runSpeedMultiplier": 1.0},
++    "sword": {"animationSet": "1hs", "locomotionMode": "Run", "runSpeedMultiplier": 1.0},
++    "bigsword": {"animationSet": "2hs", "locomotionMode": "Walk", "runSpeedMultiplier": 0.75},
++    "bow": {"animationSet": "bow", "locomotionMode": "Walk", "runSpeedMultiplier": 0.75},
++}
+ RARITIES = ("common", "uncommon", "rare", "mythical", "legendary", "immortal")
+ TEXTURE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
+ STAT_KEYS = ("Damage", "AttackSpeed")
+@@ -130,6 +137,31 @@ class WeaponStore:
+                     value TEXT NOT NULL DEFAULT ''
+                 )"""
+             )
++            connection.execute(
++                """CREATE TABLE IF NOT EXISTS weapon_attack_movement(
++                    weapon_type TEXT PRIMARY KEY,
++                    animation_set TEXT NOT NULL DEFAULT '',
++                    locomotion_mode TEXT NOT NULL DEFAULT 'Run',
++                    run_speed_multiplier REAL NOT NULL DEFAULT 1
++                )"""
++            )
++            # Canonical gameplay weapon types replace the old animation-set labels.
++            # Keep source/prepared paths untouched; _storage_type() preserves the
++            # already-synced legacy ServerStorage location until the model is re-synced.
++            connection.execute("UPDATE weapons SET weapon_type='sword' WHERE lower(weapon_type)='1hs'")
++            connection.execute("UPDATE weapons SET weapon_type='bigsword' WHERE lower(weapon_type)='2hs'")
++            for weapon_type, defaults in ATTACK_MOVEMENT_DEFAULTS.items():
++                connection.execute(
++                    """INSERT OR IGNORE INTO weapon_attack_movement(
++                        weapon_type,animation_set,locomotion_mode,run_speed_multiplier
++                    ) VALUES(?,?,?,?)""",
++                    (
++                        weapon_type,
++                        defaults["animationSet"],
++                        defaults["locomotionMode"],
++                        defaults["runSpeedMultiplier"],
++                    ),
++                )
+             columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(weapons)")}
+             if "attack_radius_studs" not in columns:
+                 connection.execute(
+@@ -156,8 +188,61 @@ class WeaponStore:
+                 "max": ATTACK_RADIUS_MAX,
+                 "step": ATTACK_RADIUS_STEP,
+             },
++            "attackLocomotionModes": list(ATTACK_LOCOMOTION_MODES),
+         }
+ 
++    def attack_movement(self) -> list[dict]:
++        with self.connect() as connection:
++            rows = {
++                str(row["weapon_type"]): dict(row)
++                for row in connection.execute(
++                    "SELECT * FROM weapon_attack_movement ORDER BY weapon_type"
++                ).fetchall()
++            }
++        result = []
++        for weapon_type in WEAPON_TYPES:
++            defaults = ATTACK_MOVEMENT_DEFAULTS[weapon_type]
++            row = rows.get(weapon_type) or {}
++            mode = str(row.get("locomotion_mode") or defaults["locomotionMode"])
++            if mode not in ATTACK_LOCOMOTION_MODES:
++                mode = defaults["locomotionMode"]
++            raw_multiplier = row.get("run_speed_multiplier")
++            multiplier = float(defaults["runSpeedMultiplier"] if raw_multiplier is None else raw_multiplier)
++            result.append({
++                "weaponType": weapon_type,
++                "animationSet": str(row.get("animation_set") or defaults["animationSet"]),
++                "locomotionMode": mode,
++                "runSpeedMultiplier": multiplier,
++                "runSpeedPercent": multiplier * 100,
++            })
++        return result
++
++    def update_attack_movement(self, payload: dict) -> dict:
++        weapon_type = str(payload.get("weaponType") or "").strip().lower()
++        if weapon_type not in WEAPON_TYPES:
++            raise ValueError("unknown weapon type")
++        animation_set = str(payload.get("animationSet") or "").strip().lower()
++        if not animation_set:
++            raise ValueError("animation set is required")
++        locomotion_mode = str(payload.get("locomotionMode") or "").strip().title()
++        if locomotion_mode not in ATTACK_LOCOMOTION_MODES:
++            raise ValueError("attack locomotion mode must be Run or Walk")
++        try:
++            multiplier = float(payload.get("runSpeedMultiplier"))
++        except (TypeError, ValueError):
++            raise ValueError("attack movement multiplier must be a number")
++        if not (0.0 <= multiplier <= 2.0):
++            raise ValueError("attack movement multiplier must be between 0 and 2")
++        with self.connect() as connection:
++            connection.execute(
++                """INSERT OR REPLACE INTO weapon_attack_movement(
++                    weapon_type,animation_set,locomotion_mode,run_speed_multiplier
++                ) VALUES(?,?,?,?)""",
++                (weapon_type, animation_set, locomotion_mode, multiplier),
++            )
++        self.export()
++        return self.snapshot()
++
+     def active_slug(self) -> str | None:
+         with self.connect() as connection:
+             row = connection.execute("SELECT value FROM project_settings WHERE key=?", (ACTIVE_KEY,)).fetchone()
+@@ -214,13 +299,27 @@ class WeaponStore:
+         any_published = bool(model_asset or any(str(item.get("asset_id") or "") for item in textures))
+         return "UPDATE_AVAILABLE" if any_published else "LOCAL_ONLY"
+ 
++    @staticmethod
++    def _storage_type(row: dict) -> str:
++        # Existing Studio templates may still live under weapons.1hs / weapons.2hs.
++        # Preserve that physical location until an explicit model re-register/sync
++        # creates the canonical sword/bigsword folder.
++        source_path = str(row.get("model_source_path") or "").replace("\\", "/")
++        parts = source_path.split("/")
++        if len(parts) >= 4 and parts[0:3] == ["assets", "source", "weapons"]:
++            folder = parts[3].lower()
++            if folder in {"1hs", "2hs", "dagger", "sword", "bigsword", "bow"}:
++                return folder
++        return str(row.get("weapon_type") or "").strip().lower()
++
+     def _decorate(self, connection, row) -> dict:
+         result = dict(row)
+         result["textures"] = self._textures(connection, result["slug"])
+         result["stat_modifiers"] = self._modifiers(connection, result["slug"])
+         result["status"] = self._status(result, result["textures"])
++        result["storage_type"] = self._storage_type(result)
+         result["server_storage_path"] = (
+-            f"ServerStorage.weapons.{result['weapon_type']}.{result['slug']}.model.{result['slug']}"
++            f"ServerStorage.weapons.{result['storage_type']}.{result['slug']}.model.{result['slug']}"
+         )
+         return result
+ 
+@@ -247,7 +346,7 @@ class WeaponStore:
+         weapon_type = str(payload.get("weaponType", old.get("weapon_type") if old else "") or "").strip().lower()
+         rarity = str(payload.get("rarity", old.get("rarity") if old else "") or "").strip().lower()
+         if weapon_type not in WEAPON_TYPES:
+-            raise ValueError("weapon type must be 1hs, 2hs or bow")
++            raise ValueError("weapon type must be dagger, sword, bigsword or bow")
+         if rarity not in RARITIES:
+             raise ValueError("rarity must be common, uncommon, rare, mythical, legendary or immortal")
+         return slug, name_en, name_ru, weapon_type, rarity
+@@ -475,6 +574,7 @@ class WeaponStore:
+             "project": PROJECT,
+             "activeWeaponSlug": active,
+             "options": self.options(),
++            "attackMovement": self.attack_movement(),
+             "items": items,
+             "summary": {
+                 "registered": len(items),
+@@ -506,8 +606,20 @@ class WeaponStore:
+             f"\tschemaVersion = {SCHEMA_VERSION},",
+             '\tproject = "game1",',
+             f"\tactiveWeaponSlug = {self._lua_string(snapshot.get('activeWeaponSlug') or '')},",
+-            "\tweapons = table.freeze({",
++            "\tattackMovementByType = table.freeze({",
+         ]
++        for rule in snapshot.get("attackMovement") or []:
++            lines.extend([
++                f"\t\t[{self._lua_string(rule['weaponType'])}] = table.freeze({{",
++                f"\t\t\tanimationSet = {self._lua_string(rule['animationSet'])},",
++                f"\t\t\tlocomotionMode = {self._lua_string(rule['locomotionMode'])},",
++                f"\t\t\trunSpeedMultiplier = {self._lua_number(rule['runSpeedMultiplier'])},",
++                "\t\t}),",
++            ])
++        lines.extend([
++            "\t}),",
++            "\tweapons = table.freeze({",
++        ])
+         for row in snapshot["items"]:
+             lines.extend([
+                 f"\t\t[{self._lua_string(row['slug'])}] = table.freeze({{",
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index 03775d7..f17ca7b 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -426,7 +426,7 @@ if "CharacterAnimationController.Start()" not in client_init_text:
+ attack_controller_text = (ROOT / "src/client/combat/AttackController.luau").read_text(encoding="utf-8")
+ if 'animationController.PlayAction("attack")' not in attack_controller_text:
+     err("combat attack input is not connected to the semantic attack animation slot")
+-for required in ["BeginAimFacingCompensation", "TorsoYawLimit", "aimPoseController.BeginAttack", "movementController.LockMovement(attackDuration)", "finishPresentation(sequence)"]:
++for required in ["BeginAimFacingCompensation", "TorsoYawLimit", "aimPoseController.BeginAttack", "finishPresentation(sequence)"]:
+     if required not in attack_controller_text:
+         err(f"robloxlineage attack/aim integration missing {required}")
+ aim_pose_text = (ROOT / "src/client/combat/AimPoseController.luau").read_text(encoding="utf-8")
+@@ -440,9 +440,9 @@ for required in ["BeginAimFacingCompensation", "UpdateAimFacingCompensation", "a
+ if "AimPoseController.Start()" not in client_init_text:
+     err("procedural torso aim controller is not started by the client runtime")
+ 
+-# m21 RobloxLineage planted-attack presentation contract. Facing/aim are held for
+-# the complete attack; the full-body source clip is sampled on a proxy and only
+-# the upper-body bridge subtree is composed over combat_idle legs.
++# m21+ RobloxLineage upper-body attack presentation contract. Facing/aim are held
++# for the complete attack when stationary; the source clip is sampled on a proxy
++# and only the upper-body bridge subtree is composed over live lower-body locomotion.
+ attack_composer_path = ROOT / "src/client/character/animation/AttackUpperBodyComposer.luau"
+ attack_composer_text = attack_composer_path.read_text(encoding="utf-8") if attack_composer_path.is_file() else ""
+ for required in [
+@@ -462,11 +462,11 @@ for required in [
+     'return "combat_idle"',
+     "AttackUpperBodyComposer.Begin(character, descriptor, playbackSpeed)",
+     "AnimationAttackUpperBodyComposed",
+-    'AnimationAttackLowerBodySlot", "combat_idle"',
++    "AnimationAttackLowerBodySlot",
+     "AttackUpperBodyComposer.BeginExitBlend()",
+ ]:
+     if required not in controller_runtime:
+-        err(f"planted attack lower/upper-body contract missing {required}")
++        err(f"attack lower/upper-body composition contract missing {required}")
+ for forbidden in [
+     "task.delay(facingDuration",
+     "AttackConfig.MovementLockSeconds",
+@@ -476,8 +476,6 @@ for forbidden in [
+         err(f"attack presentation still releases aim/movement early: {forbidden}")
+ if "aimPoseController.BeginAttack(target, attackDuration)" not in attack_controller_text:
+     err("attack aim pose must stay active for the complete attack duration")
+-if "movementController.LockMovement(attackDuration)" not in attack_controller_text:
+-    err("planted melee movement lock must cover the complete attack duration")
+ if "movementController.EndAimFacingCompensation()" not in attack_controller_text.split("local function finishPresentation", 1)[1].split("function AttackController.Start", 1)[0]:
+     err("root aim compensation must release only from full-attack presentation cleanup")
+ if 'character:SetAttribute("AnimationProfileId", archetype)' not in character_service_text:
+@@ -569,11 +567,11 @@ if not weapon_manifest_path.is_file():
+     weapon_manifest = {}
+ else:
+     weapon_manifest = json.loads(weapon_manifest_path.read_text(encoding="utf-8"))
+-if weapon_manifest.get("schemaVersion") != 1 or weapon_manifest.get("project") != "game1":
+-    err("weapon manifest must be game1 schema 1")
++if weapon_manifest.get("schemaVersion") != 2 or weapon_manifest.get("project") != "game1":
++    err("weapon manifest must be game1 schema 2")
+ weapon_options = weapon_manifest.get("options") or {}
+-if weapon_options.get("weaponTypes") != ["1hs", "2hs", "bow"]:
+-    err("weapon type pool must be 1hs, 2hs, bow")
++if weapon_options.get("weaponTypes") != ["dagger", "sword", "bigsword", "bow"]:
++    err("weapon type pool must be dagger, sword, bigsword, bow")
+ if weapon_options.get("rarities") != ["common", "uncommon", "rare", "mythical", "legendary", "immortal"]:
+     err("weapon rarity pool must be common through immortal")
+ 
+@@ -582,7 +580,7 @@ weapon_store_text = weapon_store_path.read_text(encoding="utf-8") if weapon_stor
+ for required in [
+     "class WeaponStore",
+     "def slugify_english",
+-    'WEAPON_TYPES = ("1hs", "2hs", "bow")',
++    'WEAPON_TYPES = ("dagger", "sword", "bigsword", "bow")',
+     'RARITIES = ("common", "uncommon", "rare", "mythical", "legendary", "immortal")',
+     'STAT_KEYS = ("Damage", "AttackSpeed")',
+     "weapon_stat_modifiers",
+@@ -1297,13 +1295,91 @@ for required in ["Check Roblox Assets Animations", "/api/animations/check-roblox
+ if "state.data.activeArchetypeId" not in character_js_text or "autoSelected=true" not in character_js_text:
+     err("character Asset Manager must auto-select the active/first archetype so starting stats can be saved")
+ 
++# m22 weapon gameplay types + adjustable moving-attack locomotion + Test Loadout radius.
++weapon_manifest_path = ROOT / "assets/manifests/weapons.json"
++weapon_manifest_m22 = json.loads(weapon_manifest_path.read_text(encoding="utf-8")) if weapon_manifest_path.is_file() else {}
++weapon_types_m22 = ((weapon_manifest_m22.get("options") or {}).get("weaponTypes") or [])
++if weapon_types_m22 != ["dagger", "sword", "bigsword", "bow"]:
++    err(f"canonical weapon types are wrong: {weapon_types_m22}")
++attack_movement_rows = {str(row.get("weaponType") or ""): row for row in weapon_manifest_m22.get("attackMovement") or []}
++for weapon_type in ["dagger", "sword", "bigsword", "bow"]:
++    row = attack_movement_rows.get(weapon_type)
++    if not row:
++        err(f"weapon attack movement rule missing: {weapon_type}")
++        continue
++    if str(row.get("locomotionMode") or "") not in {"Run", "Walk"}:
++        err(f"weapon attack locomotion mode invalid: {weapon_type}")
++    multiplier = float(row.get("runSpeedMultiplier") or -1)
++    if multiplier < 0 or multiplier > 2:
++        err(f"weapon attack RunSpeed multiplier invalid: {weapon_type}")
++if attack_movement_rows.get("dagger", {}).get("runSpeedMultiplier") != 1.0:
++    err("dagger default moving attack must start at 100% RunSpeed")
++if attack_movement_rows.get("sword", {}).get("runSpeedMultiplier") != 1.0:
++    err("sword default moving attack must start at 100% RunSpeed")
++if attack_movement_rows.get("bigsword", {}).get("runSpeedMultiplier") != 0.75:
++    err("bigsword default moving attack must start at 75% RunSpeed")
++if attack_movement_rows.get("bow", {}).get("runSpeedMultiplier") != 0.75:
++    err("bow default moving attack must start at 75% RunSpeed")
++
++weapon_store_m22 = (ROOT / "system/control-center/weapon_store.py").read_text(encoding="utf-8")
++weapon_js_m22 = (ROOT / "system/control-center/static/weapon-assets.js").read_text(encoding="utf-8")
++weapon_host_m22 = host_agent_text
++for required in ["weapon_attack_movement", "update_attack_movement", "dagger", "sword", "bigsword", "bow"]:
++    if required not in weapon_store_m22:
++        err(f"Asset Manager weapon type/attack movement storage missing {required}")
++for required in ["weaponRenderAttackMovement", "movement · % RunSpeed", "data-mode", "data-percent"]:
++    if required not in weapon_js_m22:
++        err(f"Asset Manager weapon attack movement UI missing {required}")
++if "/api/weapons/attack-movement" not in weapon_host_m22:
++    err("Asset Manager weapon attack movement API missing")
++
++weapon_attack_movement_path = ROOT / "src/shared/weapon/WeaponAttackMovement.luau"
++weapon_attack_movement_text = weapon_attack_movement_path.read_text(encoding="utf-8") if weapon_attack_movement_path.is_file() else ""
++weapon_equip_m22 = (ROOT / "src/server/weapon/WeaponEquipService.luau").read_text(encoding="utf-8")
++movement_m22 = (ROOT / "src/client/character/MovementController.luau").read_text(encoding="utf-8")
++attack_controller_m22 = (ROOT / "src/client/combat/AttackController.luau").read_text(encoding="utf-8")
++animation_controller_m22 = (ROOT / "src/client/character/animation/CharacterAnimationController.luau").read_text(encoding="utf-8")
++movement_config_m22 = (ROOT / "src/shared/character/CharacterMovementConfig.luau").read_text(encoding="utf-8")
++animation_scaling_m22 = (ROOT / "src/shared/animation/AnimationSpeedScaling.luau").read_text(encoding="utf-8")
++for required in ["attackMovementByType", "runSpeedMultiplier", "locomotionMode", "animationSet"]:
++    if required not in weapon_attack_movement_text + (ROOT / "src/shared/weapon/WeaponRegistry.luau").read_text(encoding="utf-8"):
++        err(f"runtime weapon attack movement registry missing {required}")
++for required in ["AttackMovementLocomotionMode", "AttackMovementRunSpeedMultiplier", "WeaponAttackMovement.Resolve"]:
++    if required not in weapon_equip_m22:
++        err(f"weapon equip attack movement attributes missing {required}")
++for required in ["BeginAttackMovement", "EndAttackMovement", "RobloxSpeedAtRunMultiplier", "AttackMovementActive"]:
++    if required not in movement_m22:
++        err(f"moving attack runtime control missing {required}")
++if "movementController.LockMovement(attackDuration)" in attack_controller_m22:
++    err("attacks must not hard-lock player movement")
++for required in ["BeginAttackMovement", "movingAtAttackStart", "EndAttackMovement"]:
++    if required not in attack_controller_m22:
++        err(f"attack controller moving-attack contract missing {required}")
++for required in ["AttackMovementLocomotionMode", "combat_idle", "EquivalentRunSpeedForLocomotion", "ResolveForModelWithStatValue", "AnimationAttackLowerBodySlot"]:
++    if required not in animation_controller_m22:
++        err(f"live lower-body attack locomotion missing {required}")
++for required in ["RobloxSpeedAtRunMultiplier", "EquivalentRunSpeedForLocomotion"]:
++    if required not in movement_config_m22:
++        err(f"attack movement conversion missing {required}")
++if "ResolveForModelWithStatValue" not in animation_scaling_m22:
++    err("animation scaling cannot resolve attack locomotion cadence from actual movement speed")
++
++test_loadout_server_m22 = (ROOT / "src/server/dev/TestLoadoutService.luau").read_text(encoding="utf-8")
++test_loadout_client_m22 = (ROOT / "src/client/dev/TestLoadoutController.luau").read_text(encoding="utf-8")
++for required in ["SetTestAttackRadius", "Game1TestAttackRadiusOverride", "setTestAttackRadius"]:
++    if required not in test_loadout_server_m22:
++        err(f"Test Loadout attack radius runtime control missing {required}")
++for required in ["SetTestAttackRadius", "Test attack radius · studs", "radiusBox", "RESET"]:
++    if required not in test_loadout_client_m22:
++        err(f"Test Loadout attack radius UI missing {required}")
++
+ if errors:
+     print("verify failed")
+     for item in errors:
+         print(" -", item)
+     sys.exit(1)
+ 
+-print("verify ok · game1 m21 held attack aim + upper-body-over-combat-legs passed")
++print("verify ok · game1 m22 adjustable weapon attack locomotion + Test Loadout radius passed")
+ print("registered character archetypes:", len(archetypes))
+ print("active character archetype:", active_id or "none")
+ print("race pool: human")

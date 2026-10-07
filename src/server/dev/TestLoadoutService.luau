@@ -131,14 +131,42 @@ local function buildCatalog(player: Player)
         categories = categories,
         categoryLabels = {
             hands = "Hands",
-            ["1hs"] = "1HS",
-            ["2hs"] = "2HS",
+            dagger = "Dagger",
+            sword = "Sword",
+            bigsword = "Bigsword",
             bow = "Bow",
         },
         weapons = weapons,
         selectedArchetype = selectedArchetype,
         selectedWeaponSlug = selectedWeaponSlug,
     }
+end
+
+local function weaponRadiusForCharacter(character: Model): number
+    local slug = string.lower(tostring(character:GetAttribute("EquippedWeaponSlug") or ""))
+    local row = if slug ~= "" then WeaponEquipService.GetAvailable(slug) else nil
+    return math.clamp(tonumber(row and row.attackRadiusStuds) or AttackConfig.Range, 1, AttackConfig.MaxAimDistance)
+end
+
+local function setTestAttackRadius(player: Player, value: any)
+    local character = player.Character
+    if not character then
+        return { ok = false, error = "character is not spawned" }
+    end
+    if value == nil or value == false or tostring(value) == "default" then
+        player:SetAttribute("Game1TestAttackRadiusOverride", nil)
+        local radius = weaponRadiusForCharacter(character)
+        character:SetAttribute("AttackRadius", radius)
+        return { ok = true, attackRadiusStuds = radius, overridden = false }
+    end
+    local radius = tonumber(value)
+    if radius == nil then
+        return { ok = false, error = "attack radius must be a number" }
+    end
+    radius = math.clamp(radius, 1, AttackConfig.MaxAimDistance)
+    player:SetAttribute("Game1TestAttackRadiusOverride", radius)
+    character:SetAttribute("AttackRadius", radius)
+    return { ok = true, attackRadiusStuds = radius, overridden = true }
 end
 
 local function applyLoadout(player: Player, archetypeValue: any, weaponSlugValue: any)
@@ -168,6 +196,10 @@ local function applyLoadout(player: Player, archetypeValue: any, weaponSlugValue
         return { ok = false, error = equipError or "failed to equip selected weapon" }
     end
 
+    local radiusOverride = tonumber(player:GetAttribute("Game1TestAttackRadiusOverride"))
+    if radiusOverride ~= nil then
+        character:SetAttribute("AttackRadius", math.clamp(radiusOverride, 1, AttackConfig.MaxAimDistance))
+    end
     character:SetAttribute("WeaponLoadoutSource", "studio-test")
     player:SetAttribute("Game1TestLoadoutActive", true)
     return {
@@ -193,11 +225,19 @@ local function bindPlayer(player: Player)
             if weaponSlug == "" then
                 WeaponEquipService.Unequip(character)
                 character:SetAttribute("WeaponLoadoutSource", "studio-test")
+                local radiusOverride = tonumber(player:GetAttribute("Game1TestAttackRadiusOverride"))
+                if radiusOverride ~= nil then
+                    character:SetAttribute("AttackRadius", math.clamp(radiusOverride, 1, AttackConfig.MaxAimDistance))
+                end
                 return
             end
             local ok, reason = WeaponEquipService.Equip(character, weaponSlug)
             if ok then
                 character:SetAttribute("WeaponLoadoutSource", "studio-test")
+                local radiusOverride = tonumber(player:GetAttribute("Game1TestAttackRadiusOverride"))
+                if radiusOverride ~= nil then
+                    character:SetAttribute("AttackRadius", math.clamp(radiusOverride, 1, AttackConfig.MaxAimDistance))
+                end
             else
                 warn("[game1][test-loadout] " .. tostring(reason))
             end
@@ -214,8 +254,10 @@ function TestLoadoutService.Start()
     local remotes = ensureRemoteFolder()
     local catalog = ensureRemoteFunction(remotes, "GetTestLoadoutCatalog")
     local apply = ensureRemoteFunction(remotes, "ApplyTestLoadout")
+    local radius = ensureRemoteFunction(remotes, "SetTestAttackRadius")
     catalog.OnServerInvoke = buildCatalog
     apply.OnServerInvoke = applyLoadout
+    radius.OnServerInvoke = setTestAttackRadius
 
     Players.PlayerAdded:Connect(bindPlayer)
     for _, player in ipairs(Players:GetPlayers()) do

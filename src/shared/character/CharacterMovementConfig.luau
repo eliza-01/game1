@@ -37,6 +37,24 @@ function CharacterMovementConfig.RobloxSpeed(_archetype: any, currentRunSpeed: a
     return gameSpeed(currentRunSpeed, movementMode) / CharacterMovementConfig.RunSpeedUnitsPerStud
 end
 
+
+function CharacterMovementConfig.RobloxSpeedAtRunMultiplier(_archetype: any, currentRunSpeed: any, runSpeedMultiplier: any): number
+    local runSpeed = math.max(0, tonumber(currentRunSpeed) or CharacterMovementConfig.DefaultRunSpeed)
+    local multiplier = math.max(0, tonumber(runSpeedMultiplier) or 1)
+    return (runSpeed * multiplier) / CharacterMovementConfig.RunSpeedUnitsPerStud
+end
+
+-- Converts an arbitrary attack movement speed back into the equivalent RunSpeed
+-- value expected by a Run/Walk animation scaling rule. Example: attack movement
+-- at 75% RunSpeed with Walk legs => 1.5x the normal Walk cadence because normal
+-- Walk moves at 50% RunSpeed.
+function CharacterMovementConfig.EquivalentRunSpeedForLocomotion(currentRunSpeed: any, runSpeedMultiplier: any, locomotionMode: any): number
+    local runSpeed = math.max(0, tonumber(currentRunSpeed) or CharacterMovementConfig.DefaultRunSpeed)
+    local multiplier = math.max(0, tonumber(runSpeedMultiplier) or 1)
+    local modeMultiplier = if tostring(locomotionMode) == "Walk" then CharacterMovementConfig.WalkSpeedMultiplier else 1
+    return (runSpeed * multiplier) / math.max(0.001, modeMultiplier)
+end
+
 function CharacterMovementConfig.StudsPerSecond(archetype: any, currentRunSpeed: any, movementMode: any): number
     return CharacterMovementConfig.RobloxSpeed(archetype, currentRunSpeed, movementMode)
 end

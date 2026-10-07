@@ -7,8 +7,10 @@ local Workspace = game:GetService("Workspace")
 
 local Game1Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local CharacterShared = Game1Shared:WaitForChild("character")
+local WeaponShared = Game1Shared:WaitForChild("weapon")
 local CharacterConfig = require(CharacterShared:WaitForChild("CharacterConfig"))
 local CharacterMovementConfig = require(CharacterShared:WaitForChild("CharacterMovementConfig"))
+local WeaponAttackMovement = require(WeaponShared:WaitForChild("WeaponAttackMovement"))
 
 local MovementController = {}
 
@@ -29,6 +31,10 @@ local movementLockUntil = 0
 local movementMode = "Run"
 local movementDirectionMode = "Forward"
 local forcedWalk = false
+local attackMovementActive = false
+local attackMovementEndsAt = 0
+local attackMovementMode = "Run"
+local attackMovementRunSpeedMultiplier = 1
 
 local character: Model? = nil
 local root: BasePart? = nil
@@ -60,6 +66,40 @@ local function clearCharacter()
 	movementMode = "Run"
 	movementDirectionMode = "Forward"
 	forcedWalk = false
+	attackMovementActive = false
+	attackMovementEndsAt = 0
+	attackMovementMode = "Run"
+	attackMovementRunSpeedMultiplier = 1
+end
+
+local function attackMovementRunning(now: number?): boolean
+	if not attackMovementActive then
+		return false
+	end
+	if (now or os.clock()) >= attackMovementEndsAt then
+		attackMovementActive = false
+		attackMovementEndsAt = 0
+		if character then
+			character:SetAttribute("AttackMovementActive", false)
+		end
+		return false
+	end
+	return true
+end
+
+local function baseMoveSpeedForCurrentState(targetCharacter: Model): number
+	if attackMovementRunning() then
+		return CharacterMovementConfig.RobloxSpeedAtRunMultiplier(
+			targetCharacter:GetAttribute("CharacterArchetype"),
+			targetCharacter:GetAttribute("RunSpeed"),
+			attackMovementRunSpeedMultiplier
+		)
+	end
+	return CharacterMovementConfig.RobloxSpeed(
+		targetCharacter:GetAttribute("CharacterArchetype"),
+		targetCharacter:GetAttribute("RunSpeed"),
+		movementMode
+	)
 end
 
 local function bindCharacter(newCharacter: Model)
@@ -112,22 +152,15 @@ local function bindCharacter(newCharacter: Model)
 	groundSensor = newSensor
 	movementMode = "Run"
 	movementDirectionMode = "Forward"
-	newManager.BaseMoveSpeed = CharacterMovementConfig.RobloxSpeed(
-		newCharacter:GetAttribute("CharacterArchetype"),
-		newCharacter:GetAttribute("RunSpeed"),
-		"Run"
-	)
+	newManager.BaseMoveSpeed = baseMoveSpeedForCurrentState(newCharacter)
 	newCharacter:SetAttribute("AnimationMovementMode", movementMode)
+	newCharacter:SetAttribute("AttackMovementActive", false)
 	newCharacter:SetAttribute("AnimationMovementDirection", movementDirectionMode)
 	newCharacter:SetAttribute("MovementState", "Idle")
 	newCharacter:SetAttribute("MovementStateAuthority", "ClientDerivedPresentation")
 	newCharacter:GetAttributeChangedSignal("RunSpeed"):Connect(function()
 		if character == newCharacter and controllerManager then
-			controllerManager.BaseMoveSpeed = CharacterMovementConfig.RobloxSpeed(
-				newCharacter:GetAttribute("CharacterArchetype"),
-				newCharacter:GetAttribute("RunSpeed"),
-				movementMode
-			)
+			controllerManager.BaseMoveSpeed = baseMoveSpeedForCurrentState(newCharacter)
 		end
 	end)
 
@@ -308,17 +341,28 @@ local function applyAimFacingCompensation(now: number)
 end
 
 local function applyMovementMode(walkModifierActive: boolean, backwardActive: boolean)
-	-- Backward movement is ALWAYS Walk, regardless of Ctrl. The same Walk_<weapon>
-	-- clip is played in reverse by CharacterAnimationController.
+	-- During an attack the equipped weapon profile owns both the lower-body
+	-- locomotion family and the physical movement fraction. This mirrors the
+	-- RobloxLineage upper-body-over-live-locomotion contract: attacks never plant
+	-- the legs unless the player actually stops moving.
+	local attackActive = attackMovementRunning()
 	local walkActive = walkModifierActive or backwardActive
-	local nextMode = walkActive and "Walk" or "Run"
+	local nextMode = if attackActive then attackMovementMode else (walkActive and "Walk" or "Run")
 	local nextDirectionMode = backwardActive and "Backward" or "Forward"
 	if controllerManager and character then
-		controllerManager.BaseMoveSpeed = CharacterMovementConfig.RobloxSpeed(
-			character:GetAttribute("CharacterArchetype"),
-			character:GetAttribute("RunSpeed"),
-			nextMode
-		)
+		if attackActive then
+			controllerManager.BaseMoveSpeed = CharacterMovementConfig.RobloxSpeedAtRunMultiplier(
+				character:GetAttribute("CharacterArchetype"),
+				character:GetAttribute("RunSpeed"),
+				attackMovementRunSpeedMultiplier
+			)
+		else
+			controllerManager.BaseMoveSpeed = CharacterMovementConfig.RobloxSpeed(
+				character:GetAttribute("CharacterArchetype"),
+				character:GetAttribute("RunSpeed"),
+				nextMode
+			)
+		end
 	end
 	if character and movementMode ~= nextMode then
 		movementMode = nextMode
@@ -450,6 +494,36 @@ function MovementController.IsMoving(): boolean
 		return false
 	end
 	return inputAxis().Magnitude > 0.001
+end
+
+function MovementController.BeginAttackMovement(weaponType: any, duration: number): any
+	local resolved = WeaponAttackMovement.Resolve(weaponType)
+	attackMovementActive = true
+	attackMovementEndsAt = os.clock() + math.max(0.05, tonumber(duration) or 0.05)
+	attackMovementMode = tostring(resolved.locomotionMode or "Run")
+	attackMovementRunSpeedMultiplier = math.clamp(tonumber(resolved.runSpeedMultiplier) or 1, 0, 2)
+	if character then
+		character:SetAttribute("AttackMovementActive", true)
+		character:SetAttribute("AttackMovementLocomotionMode", attackMovementMode)
+		character:SetAttribute("AttackMovementRunSpeedMultiplier", attackMovementRunSpeedMultiplier)
+	end
+	if controllerManager and character then
+		local axis = inputAxis()
+		applyMovementMode(walkModifierDown(), isBackwardAxis(axis))
+	end
+	return resolved
+end
+
+function MovementController.EndAttackMovement()
+	attackMovementActive = false
+	attackMovementEndsAt = 0
+	if character then
+		character:SetAttribute("AttackMovementActive", false)
+	end
+	if controllerManager and character then
+		local axis = inputAxis()
+		applyMovementMode(forcedWalk or walkModifierDown(), isBackwardAxis(axis))
+	end
 end
 
 function MovementController.BeginForcedWalk()

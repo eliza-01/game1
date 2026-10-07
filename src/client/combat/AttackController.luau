@@ -25,8 +25,8 @@ local function finishPresentation(sequence: number)
         if movementController.UnlockFacing then
             movementController.UnlockFacing()
         end
-        if movementController.UnlockMovement then
-            movementController.UnlockMovement()
+        if movementController.EndAttackMovement then
+            movementController.EndAttackMovement()
         end
     end
     if aimPoseController and aimPoseController.EndAttack then
@@ -67,6 +67,14 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
         attackSequence += 1
         local sequence = attackSequence
         local attackDuration = math.max(0.05, tonumber(action.durationSeconds) or 0.05)
+        local movingAtAttackStart = movementController and movementController.IsMoving and movementController.IsMoving() or false
+        if movementController and movementController.BeginAttackMovement then
+            -- Every weapon may attack while moving. The equipped weapon type
+            -- resolves an authored lower-body gait + RunSpeed fraction; no
+            -- weapon-specific numbers live in this controller.
+            movementController.BeginAttackMovement(character:GetAttribute("EquippedWeaponType"), attackDuration)
+        end
+
         local root = character:FindFirstChild("RootCollider")
         if root and root:IsA("BasePart") then
             local direction = Vector3.new(target.X - root.Position.X, 0, target.Z - root.Position.Z)
@@ -75,14 +83,12 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
                 local timelineScale = 1 / playbackSpeed
                 local facingTurnDuration = math.min(attackDuration, AttackConfig.FacingTurnSeconds * timelineScale)
 
-                if movementController then
-                    -- RobloxLineage planted-melee contract: legs stay planted for
-                    -- the COMPLETE attack, not only during the initial wind-up.
-                    movementController.LockMovement(attackDuration)
+                if movementController and not movingAtAttackStart then
                     if movementController.BeginAimFacingCompensation then
-                        -- facingTurnDuration controls how quickly root overflow is
-                        -- reached. Do NOT release it at that time; the final facing
-                        -- is held until finishPresentation() at attack end.
+                        -- Stationary attacks may turn root overflow toward the
+                        -- aim target and hold it for the complete attack. The
+                        -- moment movement starts, MovementController releases
+                        -- this root compensation and live locomotion owns facing.
                         movementController.BeginAimFacingCompensation(
                             facingTurnDuration,
                             AttackConfig.TorsoYawLimit

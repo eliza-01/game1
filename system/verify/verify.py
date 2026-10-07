@@ -426,7 +426,7 @@ if "CharacterAnimationController.Start()" not in client_init_text:
 attack_controller_text = (ROOT / "src/client/combat/AttackController.luau").read_text(encoding="utf-8")
 if 'animationController.PlayAction("attack")' not in attack_controller_text:
     err("combat attack input is not connected to the semantic attack animation slot")
-for required in ["BeginAimFacingCompensation", "TorsoYawLimit", "aimPoseController.BeginAttack", "movementController.LockMovement(attackDuration)", "finishPresentation(sequence)"]:
+for required in ["BeginAimFacingCompensation", "TorsoYawLimit", "aimPoseController.BeginAttack", "finishPresentation(sequence)"]:
     if required not in attack_controller_text:
         err(f"robloxlineage attack/aim integration missing {required}")
 aim_pose_text = (ROOT / "src/client/combat/AimPoseController.luau").read_text(encoding="utf-8")
@@ -440,9 +440,9 @@ for required in ["BeginAimFacingCompensation", "UpdateAimFacingCompensation", "a
 if "AimPoseController.Start()" not in client_init_text:
     err("procedural torso aim controller is not started by the client runtime")
 
-# m21 RobloxLineage planted-attack presentation contract. Facing/aim are held for
-# the complete attack; the full-body source clip is sampled on a proxy and only
-# the upper-body bridge subtree is composed over combat_idle legs.
+# m21+ RobloxLineage upper-body attack presentation contract. Facing/aim are held
+# for the complete attack when stationary; the source clip is sampled on a proxy
+# and only the upper-body bridge subtree is composed over live lower-body locomotion.
 attack_composer_path = ROOT / "src/client/character/animation/AttackUpperBodyComposer.luau"
 attack_composer_text = attack_composer_path.read_text(encoding="utf-8") if attack_composer_path.is_file() else ""
 for required in [
@@ -462,11 +462,11 @@ for required in [
     'return "combat_idle"',
     "AttackUpperBodyComposer.Begin(character, descriptor, playbackSpeed)",
     "AnimationAttackUpperBodyComposed",
-    'AnimationAttackLowerBodySlot", "combat_idle"',
+    "AnimationAttackLowerBodySlot",
     "AttackUpperBodyComposer.BeginExitBlend()",
 ]:
     if required not in controller_runtime:
-        err(f"planted attack lower/upper-body contract missing {required}")
+        err(f"attack lower/upper-body composition contract missing {required}")
 for forbidden in [
     "task.delay(facingDuration",
     "AttackConfig.MovementLockSeconds",
@@ -476,8 +476,6 @@ for forbidden in [
         err(f"attack presentation still releases aim/movement early: {forbidden}")
 if "aimPoseController.BeginAttack(target, attackDuration)" not in attack_controller_text:
     err("attack aim pose must stay active for the complete attack duration")
-if "movementController.LockMovement(attackDuration)" not in attack_controller_text:
-    err("planted melee movement lock must cover the complete attack duration")
 if "movementController.EndAimFacingCompensation()" not in attack_controller_text.split("local function finishPresentation", 1)[1].split("function AttackController.Start", 1)[0]:
     err("root aim compensation must release only from full-attack presentation cleanup")
 if 'character:SetAttribute("AnimationProfileId", archetype)' not in character_service_text:
@@ -569,11 +567,11 @@ if not weapon_manifest_path.is_file():
     weapon_manifest = {}
 else:
     weapon_manifest = json.loads(weapon_manifest_path.read_text(encoding="utf-8"))
-if weapon_manifest.get("schemaVersion") != 1 or weapon_manifest.get("project") != "game1":
-    err("weapon manifest must be game1 schema 1")
+if weapon_manifest.get("schemaVersion") != 2 or weapon_manifest.get("project") != "game1":
+    err("weapon manifest must be game1 schema 2")
 weapon_options = weapon_manifest.get("options") or {}
-if weapon_options.get("weaponTypes") != ["1hs", "2hs", "bow"]:
-    err("weapon type pool must be 1hs, 2hs, bow")
+if weapon_options.get("weaponTypes") != ["dagger", "sword", "bigsword", "bow"]:
+    err("weapon type pool must be dagger, sword, bigsword, bow")
 if weapon_options.get("rarities") != ["common", "uncommon", "rare", "mythical", "legendary", "immortal"]:
     err("weapon rarity pool must be common through immortal")
 
@@ -582,7 +580,7 @@ weapon_store_text = weapon_store_path.read_text(encoding="utf-8") if weapon_stor
 for required in [
     "class WeaponStore",
     "def slugify_english",
-    'WEAPON_TYPES = ("1hs", "2hs", "bow")',
+    'WEAPON_TYPES = ("dagger", "sword", "bigsword", "bow")',
     'RARITIES = ("common", "uncommon", "rare", "mythical", "legendary", "immortal")',
     'STAT_KEYS = ("Damage", "AttackSpeed")',
     "weapon_stat_modifiers",
@@ -1297,13 +1295,91 @@ for required in ["Check Roblox Assets Animations", "/api/animations/check-roblox
 if "state.data.activeArchetypeId" not in character_js_text or "autoSelected=true" not in character_js_text:
     err("character Asset Manager must auto-select the active/first archetype so starting stats can be saved")
 
+# m22 weapon gameplay types + adjustable moving-attack locomotion + Test Loadout radius.
+weapon_manifest_path = ROOT / "assets/manifests/weapons.json"
+weapon_manifest_m22 = json.loads(weapon_manifest_path.read_text(encoding="utf-8")) if weapon_manifest_path.is_file() else {}
+weapon_types_m22 = ((weapon_manifest_m22.get("options") or {}).get("weaponTypes") or [])
+if weapon_types_m22 != ["dagger", "sword", "bigsword", "bow"]:
+    err(f"canonical weapon types are wrong: {weapon_types_m22}")
+attack_movement_rows = {str(row.get("weaponType") or ""): row for row in weapon_manifest_m22.get("attackMovement") or []}
+for weapon_type in ["dagger", "sword", "bigsword", "bow"]:
+    row = attack_movement_rows.get(weapon_type)
+    if not row:
+        err(f"weapon attack movement rule missing: {weapon_type}")
+        continue
+    if str(row.get("locomotionMode") or "") not in {"Run", "Walk"}:
+        err(f"weapon attack locomotion mode invalid: {weapon_type}")
+    multiplier = float(row.get("runSpeedMultiplier") or -1)
+    if multiplier < 0 or multiplier > 2:
+        err(f"weapon attack RunSpeed multiplier invalid: {weapon_type}")
+if attack_movement_rows.get("dagger", {}).get("runSpeedMultiplier") != 1.0:
+    err("dagger default moving attack must start at 100% RunSpeed")
+if attack_movement_rows.get("sword", {}).get("runSpeedMultiplier") != 1.0:
+    err("sword default moving attack must start at 100% RunSpeed")
+if attack_movement_rows.get("bigsword", {}).get("runSpeedMultiplier") != 0.75:
+    err("bigsword default moving attack must start at 75% RunSpeed")
+if attack_movement_rows.get("bow", {}).get("runSpeedMultiplier") != 0.75:
+    err("bow default moving attack must start at 75% RunSpeed")
+
+weapon_store_m22 = (ROOT / "system/control-center/weapon_store.py").read_text(encoding="utf-8")
+weapon_js_m22 = (ROOT / "system/control-center/static/weapon-assets.js").read_text(encoding="utf-8")
+weapon_host_m22 = host_agent_text
+for required in ["weapon_attack_movement", "update_attack_movement", "dagger", "sword", "bigsword", "bow"]:
+    if required not in weapon_store_m22:
+        err(f"Asset Manager weapon type/attack movement storage missing {required}")
+for required in ["weaponRenderAttackMovement", "movement · % RunSpeed", "data-mode", "data-percent"]:
+    if required not in weapon_js_m22:
+        err(f"Asset Manager weapon attack movement UI missing {required}")
+if "/api/weapons/attack-movement" not in weapon_host_m22:
+    err("Asset Manager weapon attack movement API missing")
+
+weapon_attack_movement_path = ROOT / "src/shared/weapon/WeaponAttackMovement.luau"
+weapon_attack_movement_text = weapon_attack_movement_path.read_text(encoding="utf-8") if weapon_attack_movement_path.is_file() else ""
+weapon_equip_m22 = (ROOT / "src/server/weapon/WeaponEquipService.luau").read_text(encoding="utf-8")
+movement_m22 = (ROOT / "src/client/character/MovementController.luau").read_text(encoding="utf-8")
+attack_controller_m22 = (ROOT / "src/client/combat/AttackController.luau").read_text(encoding="utf-8")
+animation_controller_m22 = (ROOT / "src/client/character/animation/CharacterAnimationController.luau").read_text(encoding="utf-8")
+movement_config_m22 = (ROOT / "src/shared/character/CharacterMovementConfig.luau").read_text(encoding="utf-8")
+animation_scaling_m22 = (ROOT / "src/shared/animation/AnimationSpeedScaling.luau").read_text(encoding="utf-8")
+for required in ["attackMovementByType", "runSpeedMultiplier", "locomotionMode", "animationSet"]:
+    if required not in weapon_attack_movement_text + (ROOT / "src/shared/weapon/WeaponRegistry.luau").read_text(encoding="utf-8"):
+        err(f"runtime weapon attack movement registry missing {required}")
+for required in ["AttackMovementLocomotionMode", "AttackMovementRunSpeedMultiplier", "WeaponAttackMovement.Resolve"]:
+    if required not in weapon_equip_m22:
+        err(f"weapon equip attack movement attributes missing {required}")
+for required in ["BeginAttackMovement", "EndAttackMovement", "RobloxSpeedAtRunMultiplier", "AttackMovementActive"]:
+    if required not in movement_m22:
+        err(f"moving attack runtime control missing {required}")
+if "movementController.LockMovement(attackDuration)" in attack_controller_m22:
+    err("attacks must not hard-lock player movement")
+for required in ["BeginAttackMovement", "movingAtAttackStart", "EndAttackMovement"]:
+    if required not in attack_controller_m22:
+        err(f"attack controller moving-attack contract missing {required}")
+for required in ["AttackMovementLocomotionMode", "combat_idle", "EquivalentRunSpeedForLocomotion", "ResolveForModelWithStatValue", "AnimationAttackLowerBodySlot"]:
+    if required not in animation_controller_m22:
+        err(f"live lower-body attack locomotion missing {required}")
+for required in ["RobloxSpeedAtRunMultiplier", "EquivalentRunSpeedForLocomotion"]:
+    if required not in movement_config_m22:
+        err(f"attack movement conversion missing {required}")
+if "ResolveForModelWithStatValue" not in animation_scaling_m22:
+    err("animation scaling cannot resolve attack locomotion cadence from actual movement speed")
+
+test_loadout_server_m22 = (ROOT / "src/server/dev/TestLoadoutService.luau").read_text(encoding="utf-8")
+test_loadout_client_m22 = (ROOT / "src/client/dev/TestLoadoutController.luau").read_text(encoding="utf-8")
+for required in ["SetTestAttackRadius", "Game1TestAttackRadiusOverride", "setTestAttackRadius"]:
+    if required not in test_loadout_server_m22:
+        err(f"Test Loadout attack radius runtime control missing {required}")
+for required in ["SetTestAttackRadius", "Test attack radius · studs", "radiusBox", "RESET"]:
+    if required not in test_loadout_client_m22:
+        err(f"Test Loadout attack radius UI missing {required}")
+
 if errors:
     print("verify failed")
     for item in errors:
         print(" -", item)
     sys.exit(1)
 
-print("verify ok · game1 m21 held attack aim + upper-body-over-combat-legs passed")
+print("verify ok · game1 m22 adjustable weapon attack locomotion + Test Loadout radius passed")
 print("registered character archetypes:", len(archetypes))
 print("active character archetype:", active_id or "none")
 print("race pool: human")

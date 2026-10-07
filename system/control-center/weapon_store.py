@@ -16,10 +16,17 @@ from opencloud_assets import (
     wait_for_operation,
 )
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 PROJECT = "game1"
 ACTIVE_KEY = "active_weapon_slug"
-WEAPON_TYPES = ("1hs", "2hs", "bow")
+WEAPON_TYPES = ("dagger", "sword", "bigsword", "bow")
+ATTACK_LOCOMOTION_MODES = ("Run", "Walk")
+ATTACK_MOVEMENT_DEFAULTS = {
+    "dagger": {"animationSet": "1hs", "locomotionMode": "Run", "runSpeedMultiplier": 1.0},
+    "sword": {"animationSet": "1hs", "locomotionMode": "Run", "runSpeedMultiplier": 1.0},
+    "bigsword": {"animationSet": "2hs", "locomotionMode": "Walk", "runSpeedMultiplier": 0.75},
+    "bow": {"animationSet": "bow", "locomotionMode": "Walk", "runSpeedMultiplier": 0.75},
+}
 RARITIES = ("common", "uncommon", "rare", "mythical", "legendary", "immortal")
 TEXTURE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 STAT_KEYS = ("Damage", "AttackSpeed")
@@ -130,6 +137,31 @@ class WeaponStore:
                     value TEXT NOT NULL DEFAULT ''
                 )"""
             )
+            connection.execute(
+                """CREATE TABLE IF NOT EXISTS weapon_attack_movement(
+                    weapon_type TEXT PRIMARY KEY,
+                    animation_set TEXT NOT NULL DEFAULT '',
+                    locomotion_mode TEXT NOT NULL DEFAULT 'Run',
+                    run_speed_multiplier REAL NOT NULL DEFAULT 1
+                )"""
+            )
+            # Canonical gameplay weapon types replace the old animation-set labels.
+            # Keep source/prepared paths untouched; _storage_type() preserves the
+            # already-synced legacy ServerStorage location until the model is re-synced.
+            connection.execute("UPDATE weapons SET weapon_type='sword' WHERE lower(weapon_type)='1hs'")
+            connection.execute("UPDATE weapons SET weapon_type='bigsword' WHERE lower(weapon_type)='2hs'")
+            for weapon_type, defaults in ATTACK_MOVEMENT_DEFAULTS.items():
+                connection.execute(
+                    """INSERT OR IGNORE INTO weapon_attack_movement(
+                        weapon_type,animation_set,locomotion_mode,run_speed_multiplier
+                    ) VALUES(?,?,?,?)""",
+                    (
+                        weapon_type,
+                        defaults["animationSet"],
+                        defaults["locomotionMode"],
+                        defaults["runSpeedMultiplier"],
+                    ),
+                )
             columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(weapons)")}
             if "attack_radius_studs" not in columns:
                 connection.execute(
@@ -156,7 +188,60 @@ class WeaponStore:
                 "max": ATTACK_RADIUS_MAX,
                 "step": ATTACK_RADIUS_STEP,
             },
+            "attackLocomotionModes": list(ATTACK_LOCOMOTION_MODES),
         }
+
+    def attack_movement(self) -> list[dict]:
+        with self.connect() as connection:
+            rows = {
+                str(row["weapon_type"]): dict(row)
+                for row in connection.execute(
+                    "SELECT * FROM weapon_attack_movement ORDER BY weapon_type"
+                ).fetchall()
+            }
+        result = []
+        for weapon_type in WEAPON_TYPES:
+            defaults = ATTACK_MOVEMENT_DEFAULTS[weapon_type]
+            row = rows.get(weapon_type) or {}
+            mode = str(row.get("locomotion_mode") or defaults["locomotionMode"])
+            if mode not in ATTACK_LOCOMOTION_MODES:
+                mode = defaults["locomotionMode"]
+            raw_multiplier = row.get("run_speed_multiplier")
+            multiplier = float(defaults["runSpeedMultiplier"] if raw_multiplier is None else raw_multiplier)
+            result.append({
+                "weaponType": weapon_type,
+                "animationSet": str(row.get("animation_set") or defaults["animationSet"]),
+                "locomotionMode": mode,
+                "runSpeedMultiplier": multiplier,
+                "runSpeedPercent": multiplier * 100,
+            })
+        return result
+
+    def update_attack_movement(self, payload: dict) -> dict:
+        weapon_type = str(payload.get("weaponType") or "").strip().lower()
+        if weapon_type not in WEAPON_TYPES:
+            raise ValueError("unknown weapon type")
+        animation_set = str(payload.get("animationSet") or "").strip().lower()
+        if not animation_set:
+            raise ValueError("animation set is required")
+        locomotion_mode = str(payload.get("locomotionMode") or "").strip().title()
+        if locomotion_mode not in ATTACK_LOCOMOTION_MODES:
+            raise ValueError("attack locomotion mode must be Run or Walk")
+        try:
+            multiplier = float(payload.get("runSpeedMultiplier"))
+        except (TypeError, ValueError):
+            raise ValueError("attack movement multiplier must be a number")
+        if not (0.0 <= multiplier <= 2.0):
+            raise ValueError("attack movement multiplier must be between 0 and 2")
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT OR REPLACE INTO weapon_attack_movement(
+                    weapon_type,animation_set,locomotion_mode,run_speed_multiplier
+                ) VALUES(?,?,?,?)""",
+                (weapon_type, animation_set, locomotion_mode, multiplier),
+            )
+        self.export()
+        return self.snapshot()
 
     def active_slug(self) -> str | None:
         with self.connect() as connection:
@@ -214,13 +299,27 @@ class WeaponStore:
         any_published = bool(model_asset or any(str(item.get("asset_id") or "") for item in textures))
         return "UPDATE_AVAILABLE" if any_published else "LOCAL_ONLY"
 
+    @staticmethod
+    def _storage_type(row: dict) -> str:
+        # Existing Studio templates may still live under weapons.1hs / weapons.2hs.
+        # Preserve that physical location until an explicit model re-register/sync
+        # creates the canonical sword/bigsword folder.
+        source_path = str(row.get("model_source_path") or "").replace("\\", "/")
+        parts = source_path.split("/")
+        if len(parts) >= 4 and parts[0:3] == ["assets", "source", "weapons"]:
+            folder = parts[3].lower()
+            if folder in {"1hs", "2hs", "dagger", "sword", "bigsword", "bow"}:
+                return folder
+        return str(row.get("weapon_type") or "").strip().lower()
+
     def _decorate(self, connection, row) -> dict:
         result = dict(row)
         result["textures"] = self._textures(connection, result["slug"])
         result["stat_modifiers"] = self._modifiers(connection, result["slug"])
         result["status"] = self._status(result, result["textures"])
+        result["storage_type"] = self._storage_type(result)
         result["server_storage_path"] = (
-            f"ServerStorage.weapons.{result['weapon_type']}.{result['slug']}.model.{result['slug']}"
+            f"ServerStorage.weapons.{result['storage_type']}.{result['slug']}.model.{result['slug']}"
         )
         return result
 
@@ -247,7 +346,7 @@ class WeaponStore:
         weapon_type = str(payload.get("weaponType", old.get("weapon_type") if old else "") or "").strip().lower()
         rarity = str(payload.get("rarity", old.get("rarity") if old else "") or "").strip().lower()
         if weapon_type not in WEAPON_TYPES:
-            raise ValueError("weapon type must be 1hs, 2hs or bow")
+            raise ValueError("weapon type must be dagger, sword, bigsword or bow")
         if rarity not in RARITIES:
             raise ValueError("rarity must be common, uncommon, rare, mythical, legendary or immortal")
         return slug, name_en, name_ru, weapon_type, rarity
@@ -475,6 +574,7 @@ class WeaponStore:
             "project": PROJECT,
             "activeWeaponSlug": active,
             "options": self.options(),
+            "attackMovement": self.attack_movement(),
             "items": items,
             "summary": {
                 "registered": len(items),
@@ -506,8 +606,20 @@ class WeaponStore:
             f"\tschemaVersion = {SCHEMA_VERSION},",
             '\tproject = "game1",',
             f"\tactiveWeaponSlug = {self._lua_string(snapshot.get('activeWeaponSlug') or '')},",
-            "\tweapons = table.freeze({",
+            "\tattackMovementByType = table.freeze({",
         ]
+        for rule in snapshot.get("attackMovement") or []:
+            lines.extend([
+                f"\t\t[{self._lua_string(rule['weaponType'])}] = table.freeze({{",
+                f"\t\t\tanimationSet = {self._lua_string(rule['animationSet'])},",
+                f"\t\t\tlocomotionMode = {self._lua_string(rule['locomotionMode'])},",
+                f"\t\t\trunSpeedMultiplier = {self._lua_number(rule['runSpeedMultiplier'])},",
+                "\t\t}),",
+            ])
+        lines.extend([
+            "\t}),",
+            "\tweapons = table.freeze({",
+        ])
         for row in snapshot["items"]:
             lines.extend([
                 f"\t\t[{self._lua_string(row['slug'])}] = table.freeze({{",

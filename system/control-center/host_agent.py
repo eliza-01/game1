@@ -134,7 +134,7 @@ def sync_weapon_to_studio(slug: str):
         for item in (row.get("textures") or [])
         if str(item.get("asset_id") or "").isdigit()
     ]
-    destination = ["weapons", str(row.get("weapon_type") or ""), str(row.get("slug") or ""), "model"]
+    destination = ["weapons", str(row.get("storage_type") or row.get("weapon_type") or ""), str(row.get("slug") or ""), "model"]
     result = run_model_load_bridge(
         asset_id,
         destination,
@@ -504,6 +504,11 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/weapons":
             try:
                 return self.out(200, weapons.register(self.body()))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path == "/api/weapons/attack-movement":
+            try:
+                return self.out(200, weapons.update_attack_movement(self.body()))
             except Exception as error:
                 return self.out(400, {"error": str(error)})
         if path == "/api/monsters":

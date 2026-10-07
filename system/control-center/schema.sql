@@ -128,6 +128,13 @@ create table if not exists weapons (
     published_at real
 );
 
+create table if not exists weapon_attack_movement (
+    weapon_type text primary key,
+    animation_set text not null default '',
+    locomotion_mode text not null default 'Run',
+    run_speed_multiplier real not null default 1
+);
+
 create table if not exists weapon_textures (
     id text primary key,
     weapon_slug text not null,

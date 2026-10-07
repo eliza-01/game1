@@ -6,6 +6,7 @@ local WeaponShared = Shared:WaitForChild("weapon")
 local CombatShared = Shared:WaitForChild("combat")
 local AttackConfig = require(CombatShared:WaitForChild("AttackConfig"))
 local WeaponRegistry = require(WeaponShared:WaitForChild("WeaponRegistry"))
+local WeaponAttackMovement = require(WeaponShared:WaitForChild("WeaponAttackMovement"))
 local CharacterStatsService = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CharacterStatsService"))
 
 local WeaponEquipService = {}
@@ -152,6 +153,8 @@ function WeaponEquipService.Unequip(character: Model)
     character:SetAttribute("EquippedWeaponRarity", "")
     character:SetAttribute("AttackRadius", attackRadiusFor(nil))
     character:SetAttribute("AnimationWeaponSet", "hands")
+    character:SetAttribute("AttackMovementLocomotionMode", "Run")
+    character:SetAttribute("AttackMovementRunSpeedMultiplier", 1)
     CharacterStatsService.ApplyModifiers(character, {})
 end
 
@@ -199,8 +202,11 @@ function WeaponEquipService.Equip(character: Model, slugValue: any): (boolean, s
     character:SetAttribute("EquippedWeaponSlug", slug)
     character:SetAttribute("EquippedWeaponType", tostring(row.weaponType or ""))
     character:SetAttribute("EquippedWeaponRarity", tostring(row.rarity or ""))
+    local attackMovement = WeaponAttackMovement.Resolve(row.weaponType)
     character:SetAttribute("AttackRadius", attackRadiusFor(row))
-    character:SetAttribute("AnimationWeaponSet", tostring(row.weaponType or "hands"))
+    character:SetAttribute("AnimationWeaponSet", attackMovement.animationSet)
+    character:SetAttribute("AttackMovementLocomotionMode", attackMovement.locomotionMode)
+    character:SetAttribute("AttackMovementRunSpeedMultiplier", attackMovement.runSpeedMultiplier)
     CharacterStatsService.ApplyModifiers(character, row.statModifiers or {})
     return true, nil
 end
@@ -222,6 +228,7 @@ function WeaponEquipService.ListAvailable(): { any }
                 nameEn = tostring(row.nameEn or slug),
                 nameRu = tostring(row.nameRu or ""),
                 weaponType = tostring(row.weaponType or ""),
+                animationSet = WeaponAttackMovement.AnimationSetForType(row.weaponType),
                 rarity = tostring(row.rarity or ""),
                 attackRadiusStuds = attackRadiusFor(row),
                 modelAssetId = tostring(row.modelAssetId or ""),

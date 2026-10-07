@@ -1,14 +1,36 @@
 -- generated. do not edit by hand.
 return table.freeze({
-	schemaVersion = 1,
+	schemaVersion = 2,
 	project = "game1",
 	activeWeaponSlug = "",
+	attackMovementByType = table.freeze({
+		["dagger"] = table.freeze({
+			animationSet = "1hs",
+			locomotionMode = "Run",
+			runSpeedMultiplier = 1,
+		}),
+		["sword"] = table.freeze({
+			animationSet = "1hs",
+			locomotionMode = "Run",
+			runSpeedMultiplier = 1,
+		}),
+		["bigsword"] = table.freeze({
+			animationSet = "2hs",
+			locomotionMode = "Walk",
+			runSpeedMultiplier = 0.75,
+		}),
+		["bow"] = table.freeze({
+			animationSet = "bow",
+			locomotionMode = "Walk",
+			runSpeedMultiplier = 0.75,
+		}),
+	}),
 	weapons = table.freeze({
 		["newbie_axe"] = table.freeze({
 			slug = "newbie_axe",
 			nameEn = "Newbie Axe",
 			nameRu = "Топор Новичка",
-			weaponType = "1hs",
+			weaponType = "sword",
 			rarity = "common",
 			attackRadiusStuds = 7,
 			status = "PUBLISHED",
@@ -29,7 +51,7 @@ return table.freeze({
 			slug = "dragon_divider",
 			nameEn = "Dragon Divider",
 			nameRu = "Рассекатель Драконов",
-			weaponType = "1hs",
+			weaponType = "sword",
 			rarity = "legendary",
 			attackRadiusStuds = 7,
 			status = "PUBLISHED",

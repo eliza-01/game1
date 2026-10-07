@@ -5,10 +5,12 @@ local RunService = game:GetService("RunService")
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local CombatShared = Shared:WaitForChild("combat")
 local AnimationShared = Shared:WaitForChild("animation")
+local CharacterShared = Shared:WaitForChild("character")
 local DeathAnimationPolicy = require(CombatShared:WaitForChild("DeathAnimationPolicy"))
 local AttackTimelineConfig = require(CombatShared:WaitForChild("AttackTimelineConfig"))
 local AnimationSpeedScaling = require(AnimationShared:WaitForChild("AnimationSpeedScaling"))
 local AnimationFirstFrameSeam = require(AnimationShared:WaitForChild("AnimationFirstFrameSeam"))
+local CharacterMovementConfig = require(CharacterShared:WaitForChild("CharacterMovementConfig"))
 
 local AnimationResolver = require(script.Parent:WaitForChild("AnimationResolver"))
 local AnimationTrackCache = require(script.Parent:WaitForChild("AnimationTrackCache"))
@@ -88,7 +90,18 @@ local function animationPlaybackPercent(channel: string): number
 	if not character then
 		return 100
 	end
-	return AnimationSpeedScaling.ResolveForModel(character, channel)
+	local normalizedChannel = string.lower(tostring(channel or ""))
+	if attackLowerBodyActive and (normalizedChannel == "run" or normalizedChannel == "walk") then
+		local runSpeed = tonumber(character:GetAttribute("RunSpeed")) or CharacterMovementConfig.DefaultRunSpeed
+		local multiplier = tonumber(character:GetAttribute("AttackMovementRunSpeedMultiplier")) or 1
+		local equivalentRunSpeed = CharacterMovementConfig.EquivalentRunSpeedForLocomotion(
+			runSpeed,
+			multiplier,
+			normalizedChannel == "walk" and "Walk" or "Run"
+		)
+		return AnimationSpeedScaling.ResolveForModelWithStatValue(character, normalizedChannel, equivalentRunSpeed)
+	end
+	return AnimationSpeedScaling.ResolveForModel(character, normalizedChannel)
 end
 
 local function animationPlaybackScale(channel: string): number
@@ -106,9 +119,15 @@ local function movementSlot(): string
 		return "idle"
 	end
 	if attackLowerBodyActive then
-		-- RobloxLineage-style planted attack: the visible lower body stays on the
-		-- weapon combat stance while the source attack drives only the upper body.
-		return "combat_idle"
+		-- RobloxLineage composition: upper body comes from the attack source rig,
+		-- while the visible lower body remains live locomotion. Stopping during the
+		-- attack returns the legs to combat_idle without interrupting the upper hit.
+		local state = string.lower(tostring(character:GetAttribute("MovementState") or "idle"))
+		if state == "idle" then
+			return "combat_idle"
+		end
+		local configuredMode = string.lower(tostring(character:GetAttribute("AttackMovementLocomotionMode") or "run"))
+		return if configuredMode == "walk" then "walk" else "run"
 	end
 	local state = string.lower(tostring(character:GetAttribute("MovementState") or "idle"))
 	if state == "walk" then
@@ -158,7 +177,7 @@ local function movementUsesForwardSeam(descriptor, slot: string): boolean
 		return false
 	end
 	local backward = character and tostring(character:GetAttribute("AnimationMovementDirection") or "Forward") == "Backward"
-	return not (backward and slot == "walk")
+	return not (backward and (slot == "walk" or slot == "run"))
 end
 
 local function applyBackwardPlayback(track: AnimationTrack, slot: string)
@@ -167,7 +186,7 @@ local function applyBackwardPlayback(track: AnimationTrack, slot: string)
 	end
 	local backward = tostring(character:GetAttribute("AnimationMovementDirection") or "Forward") == "Backward"
 	local playbackScale = animationPlaybackScale(slot)
-	if not backward or slot ~= "walk" then
+	if not backward or (slot ~= "walk" and slot ~= "run") then
 		track:AdjustSpeed(playbackScale)
 		return
 	end
@@ -188,6 +207,9 @@ local function refreshLoop()
 		return
 	end
 	local slot = movementSlot()
+	if attackLowerBodyActive then
+		character:SetAttribute("AnimationAttackLowerBodySlot", slot)
+	end
 	local descriptor = AnimationResolver.ResolveLocomotion(character, slot)
 	if not descriptor then
 		stopCurrentLoop(0.12)
@@ -424,7 +446,7 @@ local function bindCharacter(newCharacter: Model)
 		end
 		print(("[game1][animation] prewarm %d/%d ready in %.3fs"):format(result.ready, result.total, result.elapsed))
 	end)
-	local refreshAttributes = { "MovementState", "AnimationMovementDirection", "AnimationWeaponSet", "RunSpeed", "AttackSpeed" }
+	local refreshAttributes = { "MovementState", "AnimationMovementDirection", "AnimationWeaponSet", "RunSpeed", "AttackSpeed", "AttackMovementLocomotionMode", "AttackMovementRunSpeedMultiplier" }
 	for _, channel in ipairs({ "run", "walk" }) do
 		table.insert(refreshAttributes, AnimationSpeedScaling.DebugUnitsPerPercentAttribute(channel))
 	end
@@ -514,7 +536,7 @@ function CharacterAnimationController.PlayAction(slot: string)
 	if slot == "attack" then
 		character:SetAttribute("AnimationActionEndsAt", currentActionLockedUntil)
 		character:SetAttribute("AnimationAttackUpperBodyComposed", composed)
-		character:SetAttribute("AnimationAttackLowerBodySlot", "combat_idle")
+		character:SetAttribute("AnimationAttackLowerBodySlot", movementSlot())
 		local boundCharacter = character
 		local boundTrack = track
 		local unlockAt = currentActionLockedUntil
@@ -561,7 +583,7 @@ function CharacterAnimationController.PlayAction(slot: string)
 		endsAt = currentActionLockedUntil,
 		timeline = timeline,
 		upperBodyComposed = composed,
-		lowerBodySlot = if slot == "attack" then "combat_idle" else nil,
+		lowerBodySlot = if slot == "attack" then movementSlot() else nil,
 	}
 end
 

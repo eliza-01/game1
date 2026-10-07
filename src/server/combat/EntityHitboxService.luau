@@ -1,8 +1,31 @@
-local SkeletonHitRegionResolver = require(script.Parent:WaitForChild("SkeletonHitRegionResolver"))
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+
+local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
+local CombatShared = Shared:WaitForChild("combat")
+local SkeletonHitRegionResolver = require(CombatShared:WaitForChild("SkeletonHitRegionResolver"))
 
 local EntityHitboxService = {}
 local started = false
 local bindings: { [Model]: any } = {}
+
+local function damageableModelFromPart(part: Instance): Model?
+    local current: Instance? = part
+    while current and current ~= Workspace do
+        if current:IsA("Model") and current:GetAttribute("Damageable") == true then
+            return current
+        end
+        current = current.Parent
+    end
+    return nil
+end
+
+local function overlapParams(exclude: Model?): OverlapParams
+    local params = OverlapParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = if exclude then { exclude } else {}
+    return params
+end
 
 local function sphereIntersectsBox(boxCFrame: CFrame, halfSize: Vector3, center: Vector3, radius: number): boolean
     local localPoint = boxCFrame:PointToObjectSpace(center)
@@ -188,6 +211,58 @@ function EntityHitboxService.QueryBox(entity: Model, boxCFrame: CFrame, boxSize:
         }
     end
     return nil
+end
+
+function EntityHitboxService.QueryDamageablesInBox(exclude: Model?, boxCFrame: CFrame, boxSize: Vector3): { any }
+    local results = {}
+    local seen: { [Model]: boolean } = {}
+
+    -- Virtual animated hit regions are authoritative for bound rigs. Query them
+    -- directly instead of relying on a broadphase RootCollider/mesh overlap first;
+    -- otherwise a posed limb can visibly intersect the weapon volume yet be missed.
+    for entity, binding in pairs(bindings) do
+        if entity ~= exclude
+            and entity.Parent ~= nil
+            and binding.visual.Parent ~= nil
+            and entity:GetAttribute("Damageable") == true
+        then
+            local hit = EntityHitboxService.QueryBox(entity, boxCFrame, boxSize)
+            if hit then
+                seen[entity] = true
+                table.insert(results, {
+                    model = entity,
+                    hit = hit,
+                    mode = "virtual_bone_regions",
+                })
+            end
+        end
+    end
+
+    -- Models without a virtual rig (currently the Studio training dummy and any
+    -- explicit root-fallback entity) use their queryable physical hitbox.
+    for _, part in ipairs(Workspace:GetPartBoundsInBox(boxCFrame, boxSize, overlapParams(exclude))) do
+        local entity = damageableModelFromPart(part)
+        if entity and entity ~= exclude and not seen[entity] and entity:GetAttribute("Damageable") == true then
+            if not EntityHitboxService.HasBinding(entity) then
+                seen[entity] = true
+                table.insert(results, {
+                    model = entity,
+                    hit = {
+                        hitZone = "body",
+                        damageMultiplier = 1,
+                        boneName = part.Name,
+                        role = "root_fallback",
+                        radius = 0,
+                        hitPosition = part.Position,
+                    },
+                    mode = "root_fallback",
+                    part = part,
+                })
+            end
+        end
+    end
+
+    return results
 end
 
 function EntityHitboxService.Start()

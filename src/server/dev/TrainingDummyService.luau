@@ -51,6 +51,8 @@ function Service.Start()
     model:SetAttribute("Damage", 0)
     model:SetAttribute("Defense", 0)
     model:SetAttribute("LifeState", "Alive")
+    model:SetAttribute("PoseHitboxMode", "root_fallback")
+    model:SetAttribute("PoseHitboxCount", 1)
 
     local root = Instance.new("Part")
     root.Name = "RootCollider"
@@ -80,6 +82,8 @@ function Service.Start()
                 model:SetAttribute("HP", 100)
                 model:SetAttribute("Damageable", true)
                 model:SetAttribute("LifeState", "Alive")
+    model:SetAttribute("PoseHitboxMode", "root_fallback")
+    model:SetAttribute("PoseHitboxCount", 1)
                 print("[game1][DUMMY] reset · HP=100/100")
             end
         end)

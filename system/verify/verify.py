@@ -175,8 +175,8 @@ attack_text = (ROOT / "src/server/combat/AttackService.luau").read_text(encoding
 dummy_text = (ROOT / "src/server/dev/TrainingDummyService.luau").read_text(encoding="utf-8")
 if "[game1][attack] hit" not in attack_text or "[game1][attack] miss" not in attack_text:
     err("attack smoke-test logging contract missing")
-if "EntityHitboxService.QueryBox" not in attack_text:
-    err("attack service must refine melee candidates against virtual skeletal hit regions")
+if "EntityHitboxService.QueryDamageablesInBox" not in attack_text:
+    err("attack service must resolve melee damage through authoritative target hitboxes")
 attack_timeline_path = ROOT / "src/shared/combat/AttackTimelineConfig.luau"
 attack_timeline_text = attack_timeline_path.read_text(encoding="utf-8") if attack_timeline_path.is_file() else ""
 for required in [
@@ -690,7 +690,7 @@ if "weapon:PivotTo(socketFrame)" in weapon_attach_text:
 for required in ['character:SetAttribute("AttackRadius"', "attackRadiusStuds", "AttackConfig.MaxAimDistance"]:
     if required not in weapon_equip_text:
         err(f"weapon equip attack-radius runtime missing {required}")
-for required in ['character:GetAttribute("AttackRadius")', "attackRange", "attackBoxSize"]:
+for required in ['character:GetAttribute("AttackRadius")', "attackRange", "WeaponAttackVolume.Build"]:
     if required not in attack_text:
         err(f"server-authoritative weapon attack radius missing {required}")
 
@@ -1543,13 +1543,126 @@ for required in ["stateDurationSeconds", "deathPlaybackPercent", "revivePlayback
     if required not in game_options_registry_m26:
         err(f"m26 generated options registry missing {required}")
 
+# m27 animated EquippedWeapon volume + multi-target melee + Test Loadout preview.
+weapon_volume_path_m27 = ROOT / "src/shared/combat/WeaponAttackVolume.luau"
+weapon_volume_m27 = weapon_volume_path_m27.read_text(encoding="utf-8") if weapon_volume_path_m27.is_file() else ""
+for required in [
+    "WeaponAttackVolume.StampWeaponBox",
+    "WeaponAttackVolume.ReadEquippedWeaponBox",
+    "WeaponAttackVolume.Build",
+    "distanceToSphereExit",
+    "outwardDirection",
+]:
+    if required not in weapon_volume_m27:
+        err(f"m27 animated weapon hit-volume contract missing {required}")
+
+weapon_equip_m27 = (ROOT / "src/server/weapon/WeaponEquipService.luau").read_text(encoding="utf-8")
+if "WeaponAttackVolume.StampWeaponBox(weapon)" not in weapon_equip_m27:
+    err("m27 equipped weapons must persist their canonical local attack box")
+
+attack_controller_m27 = (ROOT / "src/client/combat/AttackController.luau").read_text(encoding="utf-8")
+for required in [
+    'WaitForChild("AttackWeaponPose")',
+    "WeaponPoseSampleInterval",
+    "publishWeaponPose",
+    "clientAttackId = sequence",
+]:
+    if required not in attack_controller_m27:
+        err(f"m27 client animated weapon-pose sampling missing {required}")
+
+attack_service_m27 = (ROOT / "src/server/combat/AttackService.luau").read_text(encoding="utf-8")
+for required in [
+    "validatedAnimatedWeaponVolume",
+    "animated_weapon_volume",
+    "WeaponAttackVolume.Build",
+    'poseEvent.Name = "AttackWeaponPose"',
+    "weaponPoseBuffers",
+    "hitCount += 1",
+]:
+    if required not in attack_service_m27:
+        err(f"m27 server weapon-volume/multi-target contract missing {required}")
+if "local best: Model?" in attack_service_m27:
+    err("m27 melee damage must not collapse an animated weapon volume to one best target")
+
+test_loadout_m27 = (ROOT / "src/client/dev/TestLoadoutController.luau").read_text(encoding="utf-8")
+for required in [
+    "WEAPON HIT VOLUME: OFF",
+    "createWeaponHitVolumePreview",
+    "renderWeaponHitVolume",
+    "WeaponAttackVolume.Build",
+]:
+    if required not in test_loadout_m27:
+        err(f"m27 Test Loadout weapon-volume preview missing {required}")
+
+# m28 authoritative target-hitbox query + Test Loadout visualization.
+shared_resolver_path_m28 = ROOT / "src/shared/combat/SkeletonHitRegionResolver.luau"
+shared_resolver_m28 = shared_resolver_path_m28.read_text(encoding="utf-8") if shared_resolver_path_m28.is_file() else ""
+if not shared_resolver_m28:
+    err("m28 shared skeleton hit-region resolver is missing")
+for required in ["Resolve", "TransformedBoneFrame", "SegmentRadius", "HeadRadius"]:
+    if required not in shared_resolver_m28:
+        err(f"m28 shared target-hitbox geometry missing {required}")
+
+entity_hitbox_m28 = (ROOT / "src/server/combat/EntityHitboxService.luau").read_text(encoding="utf-8")
+for required in ["QueryDamageablesInBox", "virtual_bone_regions", "root_fallback", "Workspace:GetPartBoundsInBox"]:
+    if required not in entity_hitbox_m28:
+        err(f"m28 authoritative target-hitbox query missing {required}")
+
+attack_service_m28 = (ROOT / "src/server/combat/AttackService.luau").read_text(encoding="utf-8")
+if "EntityHitboxService.QueryDamageablesInBox" not in attack_service_m28:
+    err("m28 weapon volume must damage targets through target hitboxes")
+if "Workspace:GetPartBoundsInBox" in attack_service_m28:
+    err("m28 AttackService must not broadphase-gate virtual animated hitboxes")
+
+dummy_m28 = (ROOT / "src/server/dev/TrainingDummyService.luau").read_text(encoding="utf-8")
+for required in ['PoseHitboxMode", "root_fallback', 'PoseHitboxCount", 1']:
+    if required not in dummy_m28:
+        err(f"m28 Training Dummy hitbox contract missing {required}")
+
+test_loadout_m28 = (ROOT / "src/client/dev/TestLoadoutController.luau").read_text(encoding="utf-8")
+for required in [
+    "TARGET HITBOXES: OFF",
+    "Game1TargetHitboxPreview",
+    "SkeletonHitRegionResolver.Resolve",
+    "Enum.PartType.Cylinder",
+    "Enum.PartType.Ball",
+    'FindFirstChild("RootCollider")',
+]:
+    if required not in test_loadout_m28:
+        err(f"m28 Test Loadout target-hitbox preview missing {required}")
+
+# m29 contact-driven animated weapon sweep. Damage is no longer gated by one
+# timeline frame; every accepted attack pose is queried, with interpolation and
+# one-hit-per-target deduplication across the complete attack.
+attack_service_m29 = (ROOT / "src/server/combat/AttackService.luau").read_text(encoding="utf-8")
+for required in [
+    "activeHitTargets",
+    "applyAnimatedWeaponSweep",
+    "animated_weapon_sweep",
+    "lastDamageBoxCFrame",
+    "previousBoxCFrame:Lerp",
+    "and (not hitTargets or hitTargets[model] ~= true)",
+]:
+    if required not in attack_service_m29:
+        err(f"m29 continuous weapon-contact sweep missing {required}")
+
+attack_config_m29 = (ROOT / "src/shared/combat/AttackConfig.luau").read_text(encoding="utf-8")
+for required in [
+    "WeaponPoseSweepLinearStep",
+    "WeaponPoseSweepAngularStep",
+    "WeaponPoseSweepMaxSubsteps",
+]:
+    if required not in attack_config_m29:
+        err(f"m29 weapon sweep config missing {required}")
+
+
 if errors:
     print("verify failed")
     for item in errors:
         print(" -", item)
     sys.exit(1)
 
-print("verify ok · game1 m26 common options + combat state + life playback passed")
+print("verify ok · game1 m29 continuous animated weapon contact sweep passed")
 print("registered character archetypes:", len(archetypes))
 print("active character archetype:", active_id or "none")
 print("race pool: human")

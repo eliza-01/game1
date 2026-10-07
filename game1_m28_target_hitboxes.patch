@@ -1,0 +1,830 @@
+diff --git a/src/client/dev/TestLoadoutController.luau b/src/client/dev/TestLoadoutController.luau
+index ecc62e3..7f053ac 100644
+--- a/src/client/dev/TestLoadoutController.luau
++++ b/src/client/dev/TestLoadoutController.luau
+@@ -7,13 +7,14 @@ local Workspace = game:GetService("Workspace")
+ local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
+ local CombatShared = Shared:WaitForChild("combat")
+ local WeaponAttackVolume = require(CombatShared:WaitForChild("WeaponAttackVolume"))
++local SkeletonHitRegionResolver = require(CombatShared:WaitForChild("SkeletonHitRegionResolver"))
+ 
+ local TestLoadoutController = {}
+ local started = false
+ local player = Players.LocalPlayer
+ 
+ local PANEL_WIDTH = 320
+-local PANEL_EXPANDED_HEIGHT = 448
++local PANEL_EXPANDED_HEIGHT = 482
+ local PANEL_COLLAPSED_SIZE = 44
+ local PANEL_X = 16
+ local PANEL_Y = 150
+@@ -406,6 +407,69 @@ local function createWeaponHitVolumePreview()
+     return folder, part
+ end
+ 
++local function createTargetHitboxPreview()
++    local folder = Instance.new("Folder")
++    folder.Name = "Game1TargetHitboxPreview"
++    local pool = {}
++
++    local function acquire(index: number, shape: Enum.PartType, color: Color3): Part
++        local part = pool[index]
++        if part and part.Shape ~= shape then
++            part:Destroy()
++            part = nil
++        end
++        if not part then
++            part = Instance.new("Part")
++            part.Name = ("TargetHitbox%03d"):format(index)
++            part.Anchored = true
++            part.CanCollide = false
++            part.CanQuery = false
++            part.CanTouch = false
++            part.CastShadow = false
++            part.Material = Enum.Material.Neon
++            part.Shape = shape
++            part.Parent = folder
++            pool[index] = part
++        end
++        part.Color = color
++        part.Transparency = 0.68
++        return part
++    end
++
++    local function hideAfter(lastIndex: number)
++        for index = lastIndex + 1, #pool do
++            local part = pool[index]
++            if part then part.Transparency = 1 end
++        end
++    end
++
++    return {
++        folder = folder,
++        acquire = acquire,
++        hideAfter = hideAfter,
++    }
++end
++
++local function runtimeVisualForHitboxes(model: Model): Model
++    local imported = model:FindFirstChild("ImportedRig")
++    if imported and imported:IsA("Model") then
++        return imported
++    end
++    return model
++end
++
++local function capsuleFrame(fromPosition: Vector3, toPosition: Vector3): (CFrame, number)
++    local delta = toPosition - fromPosition
++    local length = delta.Magnitude
++    if length <= 1e-5 then
++        return CFrame.new(fromPosition), 0
++    end
++    local midpoint = (fromPosition + toPosition) * 0.5
++    -- Part cylinders are X-axis aligned; lookAt gives us -Z along the segment,
++    -- then the Y rotation moves local X onto that same segment axis.
++    return CFrame.lookAt(midpoint, toPosition) * CFrame.Angles(0, math.pi * 0.5, 0), length
++end
++
+ local function createGui()
+     local playerGui = player:WaitForChild("PlayerGui")
+     local previous = playerGui:FindFirstChild("Game1TestLoadoutGui")
+@@ -489,21 +553,27 @@ local function createGui()
+     volumeToggle.TextSize = 10
+     volumeToggle.Font = Enum.Font.GothamSemibold
+ 
++    local targetHitboxToggle = button(body, "TARGET HITBOXES: OFF")
++    targetHitboxToggle.Position = UDim2.fromOffset(0, 320)
++    targetHitboxToggle.Size = UDim2.new(1, 0, 0, 28)
++    targetHitboxToggle.TextSize = 10
++    targetHitboxToggle.Font = Enum.Font.GothamSemibold
++
+     local statusDot = Instance.new("Frame")
+     statusDot.BackgroundColor3 = COLORS.muted
+     statusDot.BorderSizePixel = 0
+-    statusDot.Position = UDim2.fromOffset(2, 331)
++    statusDot.Position = UDim2.fromOffset(2, 365)
+     statusDot.Size = UDim2.fromOffset(6, 6)
+     statusDot.Parent = body
+     corner(statusDot, 3)
+ 
+     local status = textLabel(body, "Loading catalog…", 9, false)
+     status.TextColor3 = COLORS.muted
+-    status.Position = UDim2.fromOffset(14, 324)
++    status.Position = UDim2.fromOffset(14, 358)
+     status.Size = UDim2.new(1, -14, 0, 20)
+ 
+     local apply = button(body, "LOADING…")
+-    apply.Position = UDim2.fromOffset(0, 350)
++    apply.Position = UDim2.fromOffset(0, 384)
+     apply.Size = UDim2.new(1, 0, 0, 34)
+     apply.BackgroundColor3 = COLORS.disabled
+     apply.TextColor3 = COLORS.muted
+@@ -541,7 +611,7 @@ local function createGui()
+     end)
+     setCollapsed(playerGui:GetAttribute(DEBUG_PANEL_OPEN_ATTRIBUTE) ~= DEBUG_PANEL_ID)
+ 
+-    return gui, character, category, weapon, meta, radiusBox, radiusReset, radiusToggle, volumeToggle, apply, status, statusDot
++    return gui, character, category, weapon, meta, radiusBox, radiusReset, radiusToggle, volumeToggle, targetHitboxToggle, apply, status, statusDot
+ end
+ 
+ function TestLoadoutController.Start()
+@@ -562,7 +632,7 @@ function TestLoadoutController.Start()
+             return
+         end
+ 
+-        local gui, characterDropdown, categorySelector, weaponDropdown, meta, radiusBox, radiusReset, radiusToggle, volumeToggle, applyButton, status, statusDot = createGui()
++        local gui, characterDropdown, categorySelector, weaponDropdown, meta, radiusBox, radiusReset, radiusToggle, volumeToggle, targetHitboxToggle, applyButton, status, statusDot = createGui()
+         local catalog = catalogRemote:InvokeServer()
+         local weaponRows = catalog.weapons or {}
+         local weaponBySlug = {}
+@@ -686,6 +756,127 @@ function TestLoadoutController.Start()
+         setVolumeVisible(false)
+         volumeToggle.Activated:Connect(function() setVolumeVisible(not volumeVisible) end)
+ 
++        local targetPreview = createTargetHitboxPreview()
++        local targetHitboxesVisible = false
++        local targetModels = {}
++        local targetCache = {}
++        local nextTargetScanAt = 0
++
++        local function setTargetHitboxesVisible(value: boolean)
++            targetHitboxesVisible = value == true
++            targetHitboxToggle.Text = targetHitboxesVisible and "TARGET HITBOXES: ON" or "TARGET HITBOXES: OFF"
++            targetHitboxToggle.BackgroundColor3 = targetHitboxesVisible and COLORS.controlSelected or COLORS.control
++            targetHitboxToggle.TextColor3 = targetHitboxesVisible and COLORS.accent or COLORS.text
++            targetPreview.folder.Parent = targetHitboxesVisible and Workspace or nil
++        end
++
++        local function refreshTargetModels()
++            table.clear(targetModels)
++            local ownCharacter = player.Character
++            for _, descendant in ipairs(Workspace:GetDescendants()) do
++                if descendant:IsA("Model")
++                    and descendant ~= ownCharacter
++                    and descendant:GetAttribute("Damageable") == true
++                then
++                    local mode = tostring(descendant:GetAttribute("PoseHitboxMode") or "")
++                    if mode == "virtual_bone_regions" or descendant:FindFirstChild("RootCollider") then
++                        table.insert(targetModels, descendant)
++                    end
++                end
++            end
++        end
++
++        local function renderTargetHitboxes()
++            if not targetHitboxesVisible then return end
++            local now = os.clock()
++            if now >= nextTargetScanAt then
++                nextTargetScanAt = now + 0.35
++                refreshTargetModels()
++            end
++
++            local previewIndex = 0
++            for _, model in ipairs(targetModels) do
++                if model.Parent and model:GetAttribute("Damageable") == true then
++                    local mode = tostring(model:GetAttribute("PoseHitboxMode") or "root_fallback")
++                    if mode == "virtual_bone_regions" then
++                        local visual = runtimeVisualForHitboxes(model)
++                        local cached = targetCache[model]
++                        if not cached or cached.visual ~= visual then
++                            local resolved = SkeletonHitRegionResolver.Resolve(visual)
++                            local records = {}
++                            for _, segment in ipairs(resolved.segments) do
++                                table.insert(records, {
++                                    bone = segment.bone,
++                                    parentBone = segment.parentBone,
++                                    role = segment.role,
++                                    radius = SkeletonHitRegionResolver.SegmentRadius(
++                                        tostring(segment.role or "generic"),
++                                        segment.length,
++                                        resolved.skeletonHeight
++                                    ),
++                                })
++                            end
++                            cached = {
++                                visual = visual,
++                                records = records,
++                                headBone = resolved.headBone,
++                                headRadius = if resolved.headBone then SkeletonHitRegionResolver.HeadRadius(resolved.skeletonHeight) else 0,
++                            }
++                            targetCache[model] = cached
++                        end
++
++                        for _, record in ipairs(cached.records) do
++                            if record.bone.Parent and record.parentBone.Parent then
++                                local fromPosition = SkeletonHitRegionResolver.TransformedBoneFrame(record.parentBone).Position
++                                local toPosition = SkeletonHitRegionResolver.TransformedBoneFrame(record.bone).Position
++                                local radius = math.max(0.02, tonumber(record.radius) or 0.1)
++                                local frame, length = capsuleFrame(fromPosition, toPosition)
++                                if length > 0 then
++                                    previewIndex += 1
++                                    local cylinder = targetPreview.acquire(previewIndex, Enum.PartType.Cylinder, COLORS.accent)
++                                    cylinder.CFrame = frame
++                                    cylinder.Size = Vector3.new(length, radius * 2, radius * 2)
++
++                                    previewIndex += 1
++                                    local fromCap = targetPreview.acquire(previewIndex, Enum.PartType.Ball, COLORS.accent)
++                                    fromCap.CFrame = CFrame.new(fromPosition)
++                                    fromCap.Size = Vector3.new(radius * 2, radius * 2, radius * 2)
++
++                                    previewIndex += 1
++                                    local toCap = targetPreview.acquire(previewIndex, Enum.PartType.Ball, COLORS.accent)
++                                    toCap.CFrame = CFrame.new(toPosition)
++                                    toCap.Size = Vector3.new(radius * 2, radius * 2, radius * 2)
++                                end
++                            end
++                        end
++
++                        if cached.headBone and cached.headBone.Parent then
++                            local radius = math.max(0.02, tonumber(cached.headRadius) or 0.2)
++                            previewIndex += 1
++                            local head = targetPreview.acquire(previewIndex, Enum.PartType.Ball, COLORS.error)
++                            head.CFrame = CFrame.new(SkeletonHitRegionResolver.TransformedBoneFrame(cached.headBone).Position)
++                            head.Size = Vector3.new(radius * 2, radius * 2, radius * 2)
++                        end
++                    else
++                        local root = model:FindFirstChild("RootCollider") or model.PrimaryPart
++                        if root and root:IsA("BasePart") and root.CanQuery then
++                            previewIndex += 1
++                            local box = targetPreview.acquire(previewIndex, Enum.PartType.Block, COLORS.mutedStrong)
++                            box.CFrame = root.CFrame
++                            box.Size = root.Size
++                        end
++                    end
++                end
++            end
++            targetPreview.hideAfter(previewIndex)
++        end
++
++        RunService.RenderStepped:Connect(renderTargetHitboxes)
++        setTargetHitboxesVisible(false)
++        targetHitboxToggle.Activated:Connect(function()
++            setTargetHitboxesVisible(not targetHitboxesVisible)
++        end)
++
+         local function setStatus(message: string, color: Color3?)
+             status.Text = message
+             status.TextColor3 = color or COLORS.muted
+diff --git a/src/server/combat/AttackService.luau b/src/server/combat/AttackService.luau
+index b0cec3d..d7ebc39 100644
+--- a/src/server/combat/AttackService.luau
++++ b/src/server/combat/AttackService.luau
+@@ -1,6 +1,5 @@
+ local Players = game:GetService("Players")
+ local ReplicatedStorage = game:GetService("ReplicatedStorage")
+-local Workspace = game:GetService("Workspace")
+ 
+ local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
+ local CharacterShared = Shared:WaitForChild("character")
+@@ -21,17 +20,6 @@ local activeSerial: { [Player]: number } = {}
+ local activeClientAttackId: { [Player]: number } = {}
+ local weaponPoseBuffers: { [Player]: any } = {}
+ 
+-local function modelFromPart(part: Instance): Model?
+-    local current: Instance? = part
+-    while current and current ~= Workspace do
+-        if current:IsA("Model") and current:GetAttribute("Damageable") == true then
+-            return current
+-        end
+-        current = current.Parent
+-    end
+-    return nil
+-end
+-
+ local function rowsForEquippedAttack(character: Model): any
+     local profileId = tostring(character:GetAttribute("AnimationProfileId") or character:GetAttribute("CharacterArchetype") or "")
+     local profile = CharacterAnimationRegistry.profiles[profileId]
+@@ -61,13 +49,6 @@ local function allowedAttackDescriptor(character: Model, clipId: string): any?
+     return nil
+ end
+ 
+-local function overlapParams(character: Model): OverlapParams
+-    local params = OverlapParams.new()
+-    params.FilterType = Enum.RaycastFilterType.Exclude
+-    params.FilterDescendantsInstances = { character }
+-    return params
+-end
+-
+ local function applyDamageInVolume(
+     player: Player,
+     character: Model,
+@@ -75,49 +56,37 @@ local function applyDamageInVolume(
+     serial: number,
+     boxCFrame: CFrame,
+     boxSize: Vector3,
+-    attackRange: number,
+     sourceLabel: string
+ ): number
+-    local parts = Workspace:GetPartBoundsInBox(boxCFrame, boxSize, overlapParams(character))
+-    local seen = {}
+     local hitCount = 0
+ 
+-    for _, part in parts do
+-        local model = modelFromPart(part)
+-        if model and model ~= character and not seen[model] then
+-            seen[model] = true
+-            local targetRoot = model:FindFirstChild("RootCollider") or model.PrimaryPart
+-            if targetRoot and targetRoot:IsA("BasePart") then
+-                local virtualHit = EntityHitboxService.QueryBox(model, boxCFrame, boxSize)
+-                local hasVirtualRig = EntityHitboxService.HasBinding(model)
+-                local intersectsTarget = if hasVirtualRig then virtualHit ~= nil else true
+-                if intersectsTarget then
+-                    local hitPosition = if virtualHit and typeof(virtualHit.hitPosition) == "Vector3"
+-                        then virtualHit.hitPosition
+-                        else part.Position
+-                    local hitRadius = math.max(0, tonumber(virtualHit and virtualHit.radius) or 0)
+-                    local hitDistance = (hitPosition - root.Position).Magnitude
+-                    if hitDistance <= attackRange + hitRadius + Config.AttackRadiusEpsilon then
+-                        local rawDamage = tonumber(character:GetAttribute("Damage")) or 0
+-                        local finalDamage, killed = DamageService.Apply(character, model, rawDamage)
+-                        HitEffectService.Publish(character, model, model:GetAttribute("LastCritical") == true, hitPosition)
+-                        hitCount += 1
+-                        if Config.DebugLogs then
+-                            print(("[game1][attack] hit player=%s target=%s zone=%s distance=%.2f damage=%d targethp=%s killed=%s serial=%d source=%s")
+-                                :format(
+-                                    player.Name,
+-                                    model.Name,
+-                                    tostring(virtualHit and virtualHit.hitZone or "root"),
+-                                    hitDistance,
+-                                    finalDamage,
+-                                    tostring(model:GetAttribute("HP")),
+-                                    tostring(killed),
+-                                    serial,
+-                                    sourceLabel
+-                                ))
+-                        end
+-                    end
+-                end
++    -- The visible debug target hitboxes and the authoritative damage query share
++    -- this exact source. Virtual bone capsules/spheres are queried directly;
++    -- root-fallback targets (training dummy) use their physical RootCollider.
++    for _, target in ipairs(EntityHitboxService.QueryDamageablesInBox(character, boxCFrame, boxSize)) do
++        local model = target.model
++        local hit = target.hit or {}
++        if model and model:IsA("Model") and model:GetAttribute("Damageable") == true then
++            local hitPosition = if typeof(hit.hitPosition) == "Vector3" then hit.hitPosition else root.Position
++            local hitDistance = (hitPosition - root.Position).Magnitude
++            local rawDamage = tonumber(character:GetAttribute("Damage")) or 0
++            local finalDamage, killed = DamageService.Apply(character, model, rawDamage)
++            HitEffectService.Publish(character, model, model:GetAttribute("LastCritical") == true, hitPosition)
++            hitCount += 1
++            if Config.DebugLogs then
++                print(("[game1][attack] hit player=%s target=%s zone=%s distance=%.2f damage=%d targethp=%s killed=%s serial=%d source=%s hitbox=%s")
++                    :format(
++                        player.Name,
++                        model.Name,
++                        tostring(hit.hitZone or "body"),
++                        hitDistance,
++                        finalDamage,
++                        tostring(model:GetAttribute("HP")),
++                        tostring(killed),
++                        serial,
++                        sourceLabel,
++                        tostring(target.mode or "unknown")
++                    ))
+             end
+         end
+     end
+@@ -230,7 +199,6 @@ local function resolveMeleeDamage(
+             serial,
+             volume.cframe,
+             volume.size,
+-            attackRange,
+             "animated_weapon_volume"
+         )
+     elseif reason == "unarmed" then
+@@ -244,7 +212,6 @@ local function resolveMeleeDamage(
+             serial,
+             boxCFrame,
+             boxSize,
+-            attackRange,
+             "unarmed_fallback"
+         )
+     elseif Config.DebugLogs then
+diff --git a/src/server/combat/EntityHitboxService.luau b/src/server/combat/EntityHitboxService.luau
+index b3d3288..943d132 100644
+--- a/src/server/combat/EntityHitboxService.luau
++++ b/src/server/combat/EntityHitboxService.luau
+@@ -1,9 +1,32 @@
+-local SkeletonHitRegionResolver = require(script.Parent:WaitForChild("SkeletonHitRegionResolver"))
++local ReplicatedStorage = game:GetService("ReplicatedStorage")
++local Workspace = game:GetService("Workspace")
++
++local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
++local CombatShared = Shared:WaitForChild("combat")
++local SkeletonHitRegionResolver = require(CombatShared:WaitForChild("SkeletonHitRegionResolver"))
+ 
+ local EntityHitboxService = {}
+ local started = false
+ local bindings: { [Model]: any } = {}
+ 
++local function damageableModelFromPart(part: Instance): Model?
++    local current: Instance? = part
++    while current and current ~= Workspace do
++        if current:IsA("Model") and current:GetAttribute("Damageable") == true then
++            return current
++        end
++        current = current.Parent
++    end
++    return nil
++end
++
++local function overlapParams(exclude: Model?): OverlapParams
++    local params = OverlapParams.new()
++    params.FilterType = Enum.RaycastFilterType.Exclude
++    params.FilterDescendantsInstances = if exclude then { exclude } else {}
++    return params
++end
++
+ local function sphereIntersectsBox(boxCFrame: CFrame, halfSize: Vector3, center: Vector3, radius: number): boolean
+     local localPoint = boxCFrame:PointToObjectSpace(center)
+     local dx = math.max(math.abs(localPoint.X) - halfSize.X, 0)
+@@ -190,6 +213,58 @@ function EntityHitboxService.QueryBox(entity: Model, boxCFrame: CFrame, boxSize:
+     return nil
+ end
+ 
++function EntityHitboxService.QueryDamageablesInBox(exclude: Model?, boxCFrame: CFrame, boxSize: Vector3): { any }
++    local results = {}
++    local seen: { [Model]: boolean } = {}
++
++    -- Virtual animated hit regions are authoritative for bound rigs. Query them
++    -- directly instead of relying on a broadphase RootCollider/mesh overlap first;
++    -- otherwise a posed limb can visibly intersect the weapon volume yet be missed.
++    for entity, binding in pairs(bindings) do
++        if entity ~= exclude
++            and entity.Parent ~= nil
++            and binding.visual.Parent ~= nil
++            and entity:GetAttribute("Damageable") == true
++        then
++            local hit = EntityHitboxService.QueryBox(entity, boxCFrame, boxSize)
++            if hit then
++                seen[entity] = true
++                table.insert(results, {
++                    model = entity,
++                    hit = hit,
++                    mode = "virtual_bone_regions",
++                })
++            end
++        end
++    end
++
++    -- Models without a virtual rig (currently the Studio training dummy and any
++    -- explicit root-fallback entity) use their queryable physical hitbox.
++    for _, part in ipairs(Workspace:GetPartBoundsInBox(boxCFrame, boxSize, overlapParams(exclude))) do
++        local entity = damageableModelFromPart(part)
++        if entity and entity ~= exclude and not seen[entity] and entity:GetAttribute("Damageable") == true then
++            if not EntityHitboxService.HasBinding(entity) then
++                seen[entity] = true
++                table.insert(results, {
++                    model = entity,
++                    hit = {
++                        hitZone = "body",
++                        damageMultiplier = 1,
++                        boneName = part.Name,
++                        role = "root_fallback",
++                        radius = 0,
++                        hitPosition = part.Position,
++                    },
++                    mode = "root_fallback",
++                    part = part,
++                })
++            end
++        end
++    end
++
++    return results
++end
++
+ function EntityHitboxService.Start()
+     if started then
+         return
+diff --git a/src/server/dev/TrainingDummyService.luau b/src/server/dev/TrainingDummyService.luau
+index 93e64b2..7c9b630 100644
+--- a/src/server/dev/TrainingDummyService.luau
++++ b/src/server/dev/TrainingDummyService.luau
+@@ -51,6 +51,8 @@ function Service.Start()
+     model:SetAttribute("Damage", 0)
+     model:SetAttribute("Defense", 0)
+     model:SetAttribute("LifeState", "Alive")
++    model:SetAttribute("PoseHitboxMode", "root_fallback")
++    model:SetAttribute("PoseHitboxCount", 1)
+ 
+     local root = Instance.new("Part")
+     root.Name = "RootCollider"
+@@ -80,6 +82,8 @@ function Service.Start()
+                 model:SetAttribute("HP", 100)
+                 model:SetAttribute("Damageable", true)
+                 model:SetAttribute("LifeState", "Alive")
++    model:SetAttribute("PoseHitboxMode", "root_fallback")
++    model:SetAttribute("PoseHitboxCount", 1)
+                 print("[game1][DUMMY] reset · HP=100/100")
+             end
+         end)
+diff --git a/src/shared/RuntimeVersion.luau b/src/shared/RuntimeVersion.luau
+index b9955a5..8fb8ed9 100644
+--- a/src/shared/RuntimeVersion.luau
++++ b/src/shared/RuntimeVersion.luau
+@@ -1 +1 @@
+-return table.freeze({ Version = "2026.10.07.027", SourceDigest = "game1-m27-animated-weapon-hit-volume-multitarget" })
++return table.freeze({ Version = "2026.10.07.028", SourceDigest = "game1-m28-target-hitbox-debug-authoritative-query" })
+diff --git a/src/shared/combat/SkeletonHitRegionResolver.luau b/src/shared/combat/SkeletonHitRegionResolver.luau
+new file mode 100644
+index 0000000..76968fe
+--- /dev/null
++++ b/src/shared/combat/SkeletonHitRegionResolver.luau
+@@ -0,0 +1,227 @@
++local SkeletonHitRegionResolver = {}
++
++-- Hit regions are semantic and virtual. We intentionally do not match body parts
++-- with loose substrings: e.g. "forehead" must never become a "head" segment.
++local MAX_GENERIC_POSE_SEGMENTS = 20
++local SIDE_TOKENS = {
++    l = true,
++    r = true,
++    left = true,
++    right = true,
++}
++local GENERIC_EXCLUDED_TOKENS = {
++    nub = true,
++    finger = true,
++    thumb = true,
++    index = true,
++    middle = true,
++    ring = true,
++    pinky = true,
++    palm = true,
++    ponytail = true,
++    toe = true,
++    heel = true,
++    weapon = true,
++    shield = true,
++    breast = true,
++    brow = true,
++    forehead = true,
++    lid = true,
++    eye = true,
++    ear = true,
++    nose = true,
++    lip = true,
++    jaw = true,
++    chin = true,
++    cheek = true,
++    tongue = true,
++    teeth = true,
++}
++
++local function transformedBoneFrame(bone: Bone): CFrame
++    local ok, frame = pcall(function()
++        return bone.TransformedWorldCFrame
++    end)
++    if ok and typeof(frame) == "CFrame" then
++        return frame
++    end
++    return bone.WorldCFrame
++end
++
++local function boneTokens(name: string): { string }
++    local normalized = string.lower(name):gsub("[%._%-]+", " ")
++    local result = {}
++    for token in string.gmatch(normalized, "[%w]+") do
++        if tonumber(token) == nil and SIDE_TOKENS[token] ~= true then
++            table.insert(result, token)
++        end
++    end
++    return result
++end
++
++local function hasToken(tokens: { string }, wanted: string): boolean
++    for _, token in tokens do
++        if token == wanted then
++            return true
++        end
++    end
++    return false
++end
++
++local function hasPair(tokens: { string }, first: string, second: string): boolean
++    for index = 1, #tokens - 1 do
++        if tokens[index] == first and tokens[index + 1] == second then
++            return true
++        end
++    end
++    return false
++end
++
++local function semanticRole(name: string): string?
++    local tokens = boneTokens(name)
++
++    -- Exact tokens/sequences only. This is the important distinction from the
++    -- old substring resolver where "forehead" matched "head".
++    if hasToken(tokens, "spine") then
++        return "spine"
++    elseif hasToken(tokens, "neck") then
++        return "neck"
++    elseif hasToken(tokens, "head") or hasToken(tokens, "face") then
++        return "head"
++    elseif hasToken(tokens, "clavicle") or hasToken(tokens, "shoulder") then
++        return "shoulder"
++    elseif hasToken(tokens, "upperarm") or hasPair(tokens, "upper", "arm") then
++        return "upper_arm"
++    elseif hasToken(tokens, "forearm") or hasPair(tokens, "lower", "arm") then
++        return "forearm"
++    elseif hasToken(tokens, "hand") then
++        return "hand"
++    elseif hasToken(tokens, "thigh") or hasPair(tokens, "upper", "leg") then
++        return "thigh"
++    elseif hasToken(tokens, "shin") or hasToken(tokens, "calf") or hasPair(tokens, "lower", "leg") then
++        return "shin"
++    elseif hasToken(tokens, "foot") then
++        return "foot"
++    end
++    return nil
++end
++
++local function isGenericExcluded(name: string): boolean
++    for _, token in boneTokens(name) do
++        if GENERIC_EXCLUDED_TOKENS[token] == true then
++            return true
++        end
++    end
++    return false
++end
++
++local function segmentRadius(role: string, length: number, skeletonHeight: number): number
++    -- Scale all widths from the actual skeleton height instead of fixed stud
++    -- minima. Fixed 0.58/0.98 radii were visibly too fat on smaller imported rigs.
++    local height = math.max(0.1, skeletonHeight)
++    local ratio = 0.035
++    if role == "spine" then
++        ratio = 0.075
++    elseif role == "neck" then
++        ratio = 0.045
++    elseif role == "shoulder" then
++        ratio = 0.050
++    elseif role == "upper_arm" then
++        ratio = 0.040
++    elseif role == "forearm" then
++        ratio = 0.034
++    elseif role == "hand" then
++        ratio = 0.038
++    elseif role == "thigh" then
++        ratio = 0.052
++    elseif role == "shin" then
++        ratio = 0.040
++    elseif role == "foot" then
++        ratio = 0.040
++    end
++
++    local byHeight = height * ratio
++    -- Keep pathological rigs bounded without imposing a large universal minimum.
++    local byLengthCap = math.max(0.08, length * 0.42)
++    return math.clamp(math.min(byHeight, byLengthCap), 0.08, height * 0.10)
++end
++
++function SkeletonHitRegionResolver.Resolve(visual: Model): any
++    local candidates = {}
++    local preferred = {}
++    local headBone: Bone? = nil
++    local minBoneY = math.huge
++    local maxBoneY = -math.huge
++
++    for _, descendant in visual:GetDescendants() do
++        if descendant:IsA("Bone") then
++            local position = transformedBoneFrame(descendant).Position
++            minBoneY = math.min(minBoneY, position.Y)
++            maxBoneY = math.max(maxBoneY, position.Y)
++
++            local role = semanticRole(descendant.Name)
++            if role == "head" and headBone == nil then
++                headBone = descendant
++            end
++
++            if descendant.Parent and descendant.Parent:IsA("Bone") then
++                local parentBone = descendant.Parent :: Bone
++                local length = (position - transformedBoneFrame(parentBone).Position).Magnitude
++                if length > 0.04 and not isGenericExcluded(descendant.Name) then
++                    local candidate = {
++                        bone = descendant,
++                        parentBone = parentBone,
++                        length = length,
++                        role = role,
++                    }
++                    table.insert(candidates, candidate)
++                    if role ~= nil and role ~= "head" then
++                        table.insert(preferred, candidate)
++                    end
++                end
++            end
++        end
++    end
++
++    local selected = preferred
++    if #selected < 5 then
++        table.sort(candidates, function(left, right)
++            return left.length > right.length
++        end)
++        selected = {}
++        for index = 1, math.min(#candidates, MAX_GENERIC_POSE_SEGMENTS) do
++            local candidate = candidates[index]
++            candidate.role = candidate.role or "generic"
++            table.insert(selected, candidate)
++        end
++    end
++
++    local skeletonHeight = if minBoneY < math.huge and maxBoneY > -math.huge
++        then math.max(0.1, maxBoneY - minBoneY)
++        else 1
++
++    return {
++        segments = selected,
++        headBone = headBone,
++        skeletonHeight = skeletonHeight,
++        boneCount = #candidates,
++    }
++end
++
++function SkeletonHitRegionResolver.TransformedBoneFrame(bone: Bone): CFrame
++    return transformedBoneFrame(bone)
++end
++
++function SkeletonHitRegionResolver.SegmentRadius(role: string, length: number, skeletonHeight: number): number
++    return segmentRadius(role, length, skeletonHeight)
++end
++
++function SkeletonHitRegionResolver.HeadRadius(skeletonHeight: number): number
++    return math.clamp(math.max(0.1, skeletonHeight) * 0.085, 0.22, 0.72)
++end
++
++function SkeletonHitRegionResolver.SemanticRole(name: string): string?
++    return semanticRole(name)
++end
++
++return table.freeze(SkeletonHitRegionResolver)
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index 87c55e0..6ab5305 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -175,8 +175,8 @@ attack_text = (ROOT / "src/server/combat/AttackService.luau").read_text(encoding
+ dummy_text = (ROOT / "src/server/dev/TrainingDummyService.luau").read_text(encoding="utf-8")
+ if "[game1][attack] hit" not in attack_text or "[game1][attack] miss" not in attack_text:
+     err("attack smoke-test logging contract missing")
+-if "EntityHitboxService.QueryBox" not in attack_text:
+-    err("attack service must refine melee candidates against virtual skeletal hit regions")
++if "EntityHitboxService.QueryDamageablesInBox" not in attack_text:
++    err("attack service must resolve melee damage through authoritative target hitboxes")
+ attack_timeline_path = ROOT / "src/shared/combat/AttackTimelineConfig.luau"
+ attack_timeline_text = attack_timeline_path.read_text(encoding="utf-8") if attack_timeline_path.is_file() else ""
+ for required in [
+@@ -1594,13 +1594,51 @@ for required in [
+     if required not in test_loadout_m27:
+         err(f"m27 Test Loadout weapon-volume preview missing {required}")
+ 
++# m28 authoritative target-hitbox query + Test Loadout visualization.
++shared_resolver_path_m28 = ROOT / "src/shared/combat/SkeletonHitRegionResolver.luau"
++shared_resolver_m28 = shared_resolver_path_m28.read_text(encoding="utf-8") if shared_resolver_path_m28.is_file() else ""
++if not shared_resolver_m28:
++    err("m28 shared skeleton hit-region resolver is missing")
++for required in ["Resolve", "TransformedBoneFrame", "SegmentRadius", "HeadRadius"]:
++    if required not in shared_resolver_m28:
++        err(f"m28 shared target-hitbox geometry missing {required}")
++
++entity_hitbox_m28 = (ROOT / "src/server/combat/EntityHitboxService.luau").read_text(encoding="utf-8")
++for required in ["QueryDamageablesInBox", "virtual_bone_regions", "root_fallback", "Workspace:GetPartBoundsInBox"]:
++    if required not in entity_hitbox_m28:
++        err(f"m28 authoritative target-hitbox query missing {required}")
++
++attack_service_m28 = (ROOT / "src/server/combat/AttackService.luau").read_text(encoding="utf-8")
++if "EntityHitboxService.QueryDamageablesInBox" not in attack_service_m28:
++    err("m28 weapon volume must damage targets through target hitboxes")
++if "Workspace:GetPartBoundsInBox" in attack_service_m28:
++    err("m28 AttackService must not broadphase-gate virtual animated hitboxes")
++
++dummy_m28 = (ROOT / "src/server/dev/TrainingDummyService.luau").read_text(encoding="utf-8")
++for required in ['PoseHitboxMode", "root_fallback', 'PoseHitboxCount", 1']:
++    if required not in dummy_m28:
++        err(f"m28 Training Dummy hitbox contract missing {required}")
++
++test_loadout_m28 = (ROOT / "src/client/dev/TestLoadoutController.luau").read_text(encoding="utf-8")
++for required in [
++    "TARGET HITBOXES: OFF",
++    "Game1TargetHitboxPreview",
++    "SkeletonHitRegionResolver.Resolve",
++    "Enum.PartType.Cylinder",
++    "Enum.PartType.Ball",
++    'FindFirstChild("RootCollider")',
++]:
++    if required not in test_loadout_m28:
++        err(f"m28 Test Loadout target-hitbox preview missing {required}")
++
++
+ if errors:
+     print("verify failed")
+     for item in errors:
+         print(" -", item)
+     sys.exit(1)
+ 
+-print("verify ok · game1 m27 animated weapon hit volume + multi-target melee passed")
++print("verify ok · game1 m28 authoritative target hitboxes + Test Loadout visualization passed")
+ print("registered character archetypes:", len(archetypes))
+ print("active character archetype:", active_id or "none")
+ print("race pool: human")

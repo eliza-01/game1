@@ -5,6 +5,7 @@ local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local WeaponShared = Shared:WaitForChild("weapon")
 local CombatShared = Shared:WaitForChild("combat")
 local AttackConfig = require(CombatShared:WaitForChild("AttackConfig"))
+local WeaponAttackVolume = require(CombatShared:WaitForChild("WeaponAttackVolume"))
 local WeaponRegistry = require(WeaponShared:WaitForChild("WeaponRegistry"))
 local WeaponAttackMovement = require(WeaponShared:WaitForChild("WeaponAttackMovement"))
 local CharacterStatsService = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CharacterStatsService"))
@@ -197,6 +198,11 @@ function WeaponEquipService.Equip(character: Model, slugValue: any): (boolean, s
     weapon:SetAttribute("Game1WeaponGripRotation", nil)
     weapon:SetAttribute("WeaponAttachmentMode", "runtime-canonical-grip-v2")
     alignWeaponToSocket(weapon, grip, targetSocketCFrame(targetBone) * WEAPON_EQUIP_ROTATION)
+    -- Persist the authored EquippedWeapon OBB in model-local space. The client
+    -- can then reconstruct the exact animated weapon box every frame without
+    -- changing its dimensions, while the server owns the canonical size used
+    -- by combat validation.
+    WeaponAttackVolume.StampWeaponBox(weapon)
     weapon.Parent = character
 
     character:SetAttribute("EquippedWeaponSlug", slug)

@@ -4,12 +4,17 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
+local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
+local CombatShared = Shared:WaitForChild("combat")
+local WeaponAttackVolume = require(CombatShared:WaitForChild("WeaponAttackVolume"))
+local SkeletonHitRegionResolver = require(CombatShared:WaitForChild("SkeletonHitRegionResolver"))
+
 local TestLoadoutController = {}
 local started = false
 local player = Players.LocalPlayer
 
 local PANEL_WIDTH = 320
-local PANEL_EXPANDED_HEIGHT = 410
+local PANEL_EXPANDED_HEIGHT = 482
 local PANEL_COLLAPSED_SIZE = 44
 local PANEL_X = 16
 local PANEL_Y = 150
@@ -374,6 +379,97 @@ local function createAttackRadiusRing()
     return folder, parts
 end
 
+local function createWeaponHitVolumePreview()
+    local folder = Instance.new("Folder")
+    folder.Name = "Game1WeaponHitVolumePreview"
+
+    local part = Instance.new("Part")
+    part.Name = "AnimatedWeaponHitVolume"
+    part.Anchored = true
+    part.CanCollide = false
+    part.CanQuery = false
+    part.CanTouch = false
+    part.CastShadow = false
+    part.Material = Enum.Material.Neon
+    part.Color = COLORS.error
+    part.Transparency = 0.78
+    part.Parent = folder
+
+    local outline = Instance.new("SelectionBox")
+    outline.Name = "VolumeOutline"
+    outline.Adornee = part
+    outline.Color3 = COLORS.error
+    outline.LineThickness = 0.035
+    outline.SurfaceColor3 = COLORS.error
+    outline.SurfaceTransparency = 0.93
+    outline.Parent = part
+
+    return folder, part
+end
+
+local function createTargetHitboxPreview()
+    local folder = Instance.new("Folder")
+    folder.Name = "Game1TargetHitboxPreview"
+    local pool = {}
+
+    local function acquire(index: number, shape: Enum.PartType, color: Color3): Part
+        local part = pool[index]
+        if part and part.Shape ~= shape then
+            part:Destroy()
+            part = nil
+        end
+        if not part then
+            part = Instance.new("Part")
+            part.Name = ("TargetHitbox%03d"):format(index)
+            part.Anchored = true
+            part.CanCollide = false
+            part.CanQuery = false
+            part.CanTouch = false
+            part.CastShadow = false
+            part.Material = Enum.Material.Neon
+            part.Shape = shape
+            part.Parent = folder
+            pool[index] = part
+        end
+        part.Color = color
+        part.Transparency = 0.68
+        return part
+    end
+
+    local function hideAfter(lastIndex: number)
+        for index = lastIndex + 1, #pool do
+            local part = pool[index]
+            if part then part.Transparency = 1 end
+        end
+    end
+
+    return {
+        folder = folder,
+        acquire = acquire,
+        hideAfter = hideAfter,
+    }
+end
+
+local function runtimeVisualForHitboxes(model: Model): Model
+    local imported = model:FindFirstChild("ImportedRig")
+    if imported and imported:IsA("Model") then
+        return imported
+    end
+    return model
+end
+
+local function capsuleFrame(fromPosition: Vector3, toPosition: Vector3): (CFrame, number)
+    local delta = toPosition - fromPosition
+    local length = delta.Magnitude
+    if length <= 1e-5 then
+        return CFrame.new(fromPosition), 0
+    end
+    local midpoint = (fromPosition + toPosition) * 0.5
+    -- Part cylinders are X-axis aligned; lookAt gives us -Z along the segment,
+    -- then the Y rotation moves local X onto that same segment axis.
+    return CFrame.lookAt(midpoint, toPosition) * CFrame.Angles(0, math.pi * 0.5, 0), length
+end
+
 local function createGui()
     local playerGui = player:WaitForChild("PlayerGui")
     local previous = playerGui:FindFirstChild("Game1TestLoadoutGui")
@@ -451,21 +547,33 @@ local function createGui()
     radiusToggle.TextSize = 10
     radiusToggle.Font = Enum.Font.GothamSemibold
 
+    local volumeToggle = button(body, "WEAPON HIT VOLUME: OFF")
+    volumeToggle.Position = UDim2.fromOffset(0, 286)
+    volumeToggle.Size = UDim2.new(1, 0, 0, 28)
+    volumeToggle.TextSize = 10
+    volumeToggle.Font = Enum.Font.GothamSemibold
+
+    local targetHitboxToggle = button(body, "TARGET HITBOXES: OFF")
+    targetHitboxToggle.Position = UDim2.fromOffset(0, 320)
+    targetHitboxToggle.Size = UDim2.new(1, 0, 0, 28)
+    targetHitboxToggle.TextSize = 10
+    targetHitboxToggle.Font = Enum.Font.GothamSemibold
+
     local statusDot = Instance.new("Frame")
     statusDot.BackgroundColor3 = COLORS.muted
     statusDot.BorderSizePixel = 0
-    statusDot.Position = UDim2.fromOffset(2, 297)
+    statusDot.Position = UDim2.fromOffset(2, 365)
     statusDot.Size = UDim2.fromOffset(6, 6)
     statusDot.Parent = body
     corner(statusDot, 3)
 
     local status = textLabel(body, "Loading catalog…", 9, false)
     status.TextColor3 = COLORS.muted
-    status.Position = UDim2.fromOffset(14, 290)
+    status.Position = UDim2.fromOffset(14, 358)
     status.Size = UDim2.new(1, -14, 0, 20)
 
     local apply = button(body, "LOADING…")
-    apply.Position = UDim2.fromOffset(0, 316)
+    apply.Position = UDim2.fromOffset(0, 384)
     apply.Size = UDim2.new(1, 0, 0, 34)
     apply.BackgroundColor3 = COLORS.disabled
     apply.TextColor3 = COLORS.muted
@@ -503,7 +611,7 @@ local function createGui()
     end)
     setCollapsed(playerGui:GetAttribute(DEBUG_PANEL_OPEN_ATTRIBUTE) ~= DEBUG_PANEL_ID)
 
-    return gui, character, category, weapon, meta, radiusBox, radiusReset, radiusToggle, apply, status, statusDot
+    return gui, character, category, weapon, meta, radiusBox, radiusReset, radiusToggle, volumeToggle, targetHitboxToggle, apply, status, statusDot
 end
 
 function TestLoadoutController.Start()
@@ -524,7 +632,7 @@ function TestLoadoutController.Start()
             return
         end
 
-        local gui, characterDropdown, categorySelector, weaponDropdown, meta, radiusBox, radiusReset, radiusToggle, applyButton, status, statusDot = createGui()
+        local gui, characterDropdown, categorySelector, weaponDropdown, meta, radiusBox, radiusReset, radiusToggle, volumeToggle, targetHitboxToggle, applyButton, status, statusDot = createGui()
         local catalog = catalogRemote:InvokeServer()
         local weaponRows = catalog.weapons or {}
         local weaponBySlug = {}
@@ -570,6 +678,9 @@ function TestLoadoutController.Start()
         local ringFolder, ringParts = createAttackRadiusRing()
         local ringVisible = false
         local ringConnection: RBXScriptConnection? = nil
+        local volumeFolder, volumePart = createWeaponHitVolumePreview()
+        local volumeVisible = false
+        local volumeConnection: RBXScriptConnection? = nil
         local rayParams = RaycastParams.new()
         rayParams.FilterType = Enum.RaycastFilterType.Exclude
         rayParams.IgnoreWater = false
@@ -607,6 +718,164 @@ function TestLoadoutController.Start()
         ringConnection = RunService.RenderStepped:Connect(renderAttackRadiusRing)
         setRingVisible(false)
         radiusToggle.Activated:Connect(function() setRingVisible(not ringVisible) end)
+
+        local function setVolumeVisible(value: boolean)
+            volumeVisible = value == true
+            volumeToggle.Text = volumeVisible and "WEAPON HIT VOLUME: ON" or "WEAPON HIT VOLUME: OFF"
+            volumeToggle.BackgroundColor3 = volumeVisible and COLORS.controlSelected or COLORS.control
+            volumeToggle.TextColor3 = volumeVisible and COLORS.accent or COLORS.text
+            volumeFolder.Parent = volumeVisible and Workspace or nil
+        end
+
+        local function renderWeaponHitVolume()
+            if not volumeVisible then return end
+            local currentCharacter = player.Character
+            local root = currentCharacter and currentCharacter:FindFirstChild("RootCollider")
+            if not root or not root:IsA("BasePart") then
+                volumePart.Transparency = 1
+                return
+            end
+            local weaponBoxCFrame, weaponBoxSize, equippedWeapon = WeaponAttackVolume.ReadEquippedWeaponBox(currentCharacter)
+            if typeof(weaponBoxCFrame) ~= "CFrame" or typeof(weaponBoxSize) ~= "Vector3" or not equippedWeapon then
+                volumePart.Transparency = 1
+                return
+            end
+            local radius = math.max(1, tonumber(currentCharacter:GetAttribute("AttackRadius")) or 7)
+            local gripBoxLocalPosition = WeaponAttackVolume.ReadGripBoxLocalPosition(equippedWeapon)
+            local volume = WeaponAttackVolume.Build(root.Position, weaponBoxCFrame, weaponBoxSize, radius, gripBoxLocalPosition)
+            if not volume then
+                volumePart.Transparency = 1
+                return
+            end
+            volumePart.CFrame = volume.cframe
+            volumePart.Size = volume.size
+            volumePart.Transparency = 0.78
+        end
+
+        volumeConnection = RunService.RenderStepped:Connect(renderWeaponHitVolume)
+        setVolumeVisible(false)
+        volumeToggle.Activated:Connect(function() setVolumeVisible(not volumeVisible) end)
+
+        local targetPreview = createTargetHitboxPreview()
+        local targetHitboxesVisible = false
+        local targetModels = {}
+        local targetCache = {}
+        local nextTargetScanAt = 0
+
+        local function setTargetHitboxesVisible(value: boolean)
+            targetHitboxesVisible = value == true
+            targetHitboxToggle.Text = targetHitboxesVisible and "TARGET HITBOXES: ON" or "TARGET HITBOXES: OFF"
+            targetHitboxToggle.BackgroundColor3 = targetHitboxesVisible and COLORS.controlSelected or COLORS.control
+            targetHitboxToggle.TextColor3 = targetHitboxesVisible and COLORS.accent or COLORS.text
+            targetPreview.folder.Parent = targetHitboxesVisible and Workspace or nil
+        end
+
+        local function refreshTargetModels()
+            table.clear(targetModels)
+            local ownCharacter = player.Character
+            for _, descendant in ipairs(Workspace:GetDescendants()) do
+                if descendant:IsA("Model")
+                    and descendant ~= ownCharacter
+                    and descendant:GetAttribute("Damageable") == true
+                then
+                    local mode = tostring(descendant:GetAttribute("PoseHitboxMode") or "")
+                    if mode == "virtual_bone_regions" or descendant:FindFirstChild("RootCollider") then
+                        table.insert(targetModels, descendant)
+                    end
+                end
+            end
+        end
+
+        local function renderTargetHitboxes()
+            if not targetHitboxesVisible then return end
+            local now = os.clock()
+            if now >= nextTargetScanAt then
+                nextTargetScanAt = now + 0.35
+                refreshTargetModels()
+            end
+
+            local previewIndex = 0
+            for _, model in ipairs(targetModels) do
+                if model.Parent and model:GetAttribute("Damageable") == true then
+                    local mode = tostring(model:GetAttribute("PoseHitboxMode") or "root_fallback")
+                    if mode == "virtual_bone_regions" then
+                        local visual = runtimeVisualForHitboxes(model)
+                        local cached = targetCache[model]
+                        if not cached or cached.visual ~= visual then
+                            local resolved = SkeletonHitRegionResolver.Resolve(visual)
+                            local records = {}
+                            for _, segment in ipairs(resolved.segments) do
+                                table.insert(records, {
+                                    bone = segment.bone,
+                                    parentBone = segment.parentBone,
+                                    role = segment.role,
+                                    radius = SkeletonHitRegionResolver.SegmentRadius(
+                                        tostring(segment.role or "generic"),
+                                        segment.length,
+                                        resolved.skeletonHeight
+                                    ),
+                                })
+                            end
+                            cached = {
+                                visual = visual,
+                                records = records,
+                                headBone = resolved.headBone,
+                                headRadius = if resolved.headBone then SkeletonHitRegionResolver.HeadRadius(resolved.skeletonHeight) else 0,
+                            }
+                            targetCache[model] = cached
+                        end
+
+                        for _, record in ipairs(cached.records) do
+                            if record.bone.Parent and record.parentBone.Parent then
+                                local fromPosition = SkeletonHitRegionResolver.TransformedBoneFrame(record.parentBone).Position
+                                local toPosition = SkeletonHitRegionResolver.TransformedBoneFrame(record.bone).Position
+                                local radius = math.max(0.02, tonumber(record.radius) or 0.1)
+                                local frame, length = capsuleFrame(fromPosition, toPosition)
+                                if length > 0 then
+                                    previewIndex += 1
+                                    local cylinder = targetPreview.acquire(previewIndex, Enum.PartType.Cylinder, COLORS.accent)
+                                    cylinder.CFrame = frame
+                                    cylinder.Size = Vector3.new(length, radius * 2, radius * 2)
+
+                                    previewIndex += 1
+                                    local fromCap = targetPreview.acquire(previewIndex, Enum.PartType.Ball, COLORS.accent)
+                                    fromCap.CFrame = CFrame.new(fromPosition)
+                                    fromCap.Size = Vector3.new(radius * 2, radius * 2, radius * 2)
+
+                                    previewIndex += 1
+                                    local toCap = targetPreview.acquire(previewIndex, Enum.PartType.Ball, COLORS.accent)
+                                    toCap.CFrame = CFrame.new(toPosition)
+                                    toCap.Size = Vector3.new(radius * 2, radius * 2, radius * 2)
+                                end
+                            end
+                        end
+
+                        if cached.headBone and cached.headBone.Parent then
+                            local radius = math.max(0.02, tonumber(cached.headRadius) or 0.2)
+                            previewIndex += 1
+                            local head = targetPreview.acquire(previewIndex, Enum.PartType.Ball, COLORS.error)
+                            head.CFrame = CFrame.new(SkeletonHitRegionResolver.TransformedBoneFrame(cached.headBone).Position)
+                            head.Size = Vector3.new(radius * 2, radius * 2, radius * 2)
+                        end
+                    else
+                        local root = model:FindFirstChild("RootCollider") or model.PrimaryPart
+                        if root and root:IsA("BasePart") and root.CanQuery then
+                            previewIndex += 1
+                            local box = targetPreview.acquire(previewIndex, Enum.PartType.Block, COLORS.mutedStrong)
+                            box.CFrame = root.CFrame
+                            box.Size = root.Size
+                        end
+                    end
+                end
+            end
+            targetPreview.hideAfter(previewIndex)
+        end
+
+        RunService.RenderStepped:Connect(renderTargetHitboxes)
+        setTargetHitboxesVisible(false)
+        targetHitboxToggle.Activated:Connect(function()
+            setTargetHitboxesVisible(not targetHitboxesVisible)
+        end)
 
         local function setStatus(message: string, color: Color3?)
             status.Text = message
@@ -747,7 +1016,9 @@ function TestLoadoutController.Start()
         gui.Destroying:Connect(function()
             preferences = nil
             if ringConnection then ringConnection:Disconnect() end
+            if volumeConnection then volumeConnection:Disconnect() end
             ringFolder:Destroy()
+            volumeFolder:Destroy()
         end)
     end)
 end

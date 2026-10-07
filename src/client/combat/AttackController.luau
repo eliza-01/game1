@@ -1,5 +1,6 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
@@ -7,6 +8,7 @@ local CharacterShared = Shared:WaitForChild("character")
 local CombatShared = Shared:WaitForChild("combat")
 local CharacterConfig = require(CharacterShared:WaitForChild("CharacterConfig"))
 local AttackConfig = require(CombatShared:WaitForChild("AttackConfig"))
+local WeaponAttackVolume = require(CombatShared:WaitForChild("WeaponAttackVolume"))
 local UiInputGuard = require(script.Parent.Parent:WaitForChild("UiInputGuard"))
 local AttackController = {}
 local started = false
@@ -14,6 +16,31 @@ local movementController: any = nil
 local animationController: any = nil
 local aimPoseController: any = nil
 local attackSequence = 0
+local activePoseAttackId = 0
+local activePoseUntil = 0
+local activePoseStartedAt = 0
+local poseAccumulator = 0
+local weaponPoseRemote: RemoteEvent? = nil
+
+
+local function publishWeaponPose()
+    if not weaponPoseRemote or activePoseAttackId <= 0 then
+        return
+    end
+    local character = Players.LocalPlayer.Character
+    if not character or tostring(character:GetAttribute("LifeState") or "Alive") ~= "Alive" then
+        return
+    end
+    local boxCFrame = WeaponAttackVolume.ReadEquippedWeaponBox(character)
+    if typeof(boxCFrame) ~= "CFrame" then
+        return
+    end
+    weaponPoseRemote:FireServer({
+        clientAttackId = activePoseAttackId,
+        elapsed = math.max(0, os.clock() - activePoseStartedAt),
+        boxCFrame = boxCFrame,
+    })
+end
 
 local function finishPresentation(sequence: number)
     if sequence ~= attackSequence then
@@ -43,6 +70,23 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
     started = true
     local remotes = ReplicatedStorage:WaitForChild("Game1Remotes")
     local attack = remotes:WaitForChild("AttackIntent")
+    weaponPoseRemote = remotes:WaitForChild("AttackWeaponPose") :: RemoteEvent
+
+    RunService.RenderStepped:Connect(function(deltaTime)
+        if activePoseAttackId <= 0 then
+            return
+        end
+        if os.clock() > activePoseUntil then
+            activePoseAttackId = 0
+            poseAccumulator = 0
+            return
+        end
+        poseAccumulator += deltaTime
+        if poseAccumulator >= AttackConfig.WeaponPoseSampleInterval then
+            poseAccumulator = poseAccumulator % AttackConfig.WeaponPoseSampleInterval
+            publishWeaponPose()
+        end
+    end)
     UserInputService.InputBegan:Connect(function(input, processed)
         if input.UserInputType ~= CharacterConfig.InputBindings.AttackPrimary[1] or UiInputGuard.BlocksWorldInput(input, processed) then return end
 
@@ -113,10 +157,19 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
 
         -- The server validates clipId against the equipped animation profile and
         -- resolves the same authoritative timeline before scheduling any result.
+        -- The server resolves damage from the animated EquippedWeapon box at
+        -- the configured Hit event. Keep streaming that box while this local
+        -- attack is alive; the server validates the canonical dimensions/range.
+        activePoseAttackId = sequence
+        activePoseStartedAt = os.clock()
+        activePoseUntil = activePoseStartedAt + attackDuration
+        poseAccumulator = 0
         attack:FireServer({
             aim = target,
             clipId = action.clipId,
+            clientAttackId = sequence,
         })
+        publishWeaponPose()
     end)
 end
 return AttackController

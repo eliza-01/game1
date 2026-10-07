@@ -7,6 +7,7 @@ local CharacterShared = Shared:WaitForChild("character")
 local CombatShared = Shared:WaitForChild("combat")
 local CharacterConfig = require(CharacterShared:WaitForChild("CharacterConfig"))
 local AttackConfig = require(CombatShared:WaitForChild("AttackConfig"))
+local UiInputGuard = require(script.Parent.Parent:WaitForChild("UiInputGuard"))
 local AttackController = {}
 local started = false
 local movementController: any = nil
@@ -43,7 +44,7 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
     local remotes = ReplicatedStorage:WaitForChild("Game1Remotes")
     local attack = remotes:WaitForChild("AttackIntent")
     UserInputService.InputBegan:Connect(function(input, processed)
-        if processed or input.UserInputType ~= CharacterConfig.InputBindings.AttackPrimary[1] then return end
+        if input.UserInputType ~= CharacterConfig.InputBindings.AttackPrimary[1] or UiInputGuard.BlocksWorldInput(input, processed) then return end
 
         local player = Players.LocalPlayer
         local character = player.Character

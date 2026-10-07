@@ -267,7 +267,7 @@ local function stopIdleState(entry: any)
 end
 
 local function playBaseIdle(model: Model, entry: any)
-    if entry.dying then
+    if entry.dying or model:GetAttribute("MonsterCombatActive") == true then
         return
     end
     stopTrack(entry.walkTrack, entry.walkSeam)
@@ -560,7 +560,7 @@ local function chooseWanderTarget(record: any, current: Vector3): (Vector3?, num
 end
 
 local function refreshWanderLocomotion(model: Model, entry: any)
-    if not entry.wandering or entry.dying then
+    if not entry.wandering or entry.dying or model:GetAttribute("MonsterCombatActive") == true then
         return
     end
     local humanoid = entry.humanoid
@@ -627,6 +627,9 @@ local function startWanderLoop(state: any, model: Model, entry: any)
             if state.instances[model] ~= entry or not model.Parent or entry.dying then
                 break
             end
+            if model:GetAttribute("MonsterCombatActive") == true then
+                continue
+            end
 
             local navigationRoot = entry.navigationRoot
             local humanoid = entry.humanoid
@@ -657,6 +660,7 @@ local function startWanderLoop(state: any, model: Model, entry: any)
                 and state.instances[model] == entry
                 and model.Parent
                 and not entry.dying
+                and model:GetAttribute("MonsterCombatActive") ~= true
                 and os.clock() < (entry.wanderDeadline or math.huge)
             do
                 task.wait(0.1)
@@ -676,7 +680,9 @@ local function startWanderLoop(state: any, model: Model, entry: any)
             if state.instances[model] == entry and model.Parent and not entry.dying then
                 stopWanderMovement(entry)
                 model:SetAttribute("MonsterWanderRouteLength", 0)
-                playBaseIdle(model, entry)
+                if model:GetAttribute("MonsterCombatActive") ~= true then
+                    playBaseIdle(model, entry)
+                end
             end
         end
     end)
@@ -684,6 +690,7 @@ end
 
 local function applyMonsterAttributes(model: Model, definition: any, record: any, instanceId: string)
     local stats = definition.stats or {}
+    local behavior = definition.behavior or {}
     local maxHP = math.max(1, finite(stats.MaxHP, 100))
     model:SetAttribute("Game1MonsterRuntime", true)
     model:SetAttribute("MonsterSlug", tostring(definition.slug or record.monsterSlug or ""))
@@ -700,6 +707,17 @@ local function applyMonsterAttributes(model: Model, definition: any, record: any
     model:SetAttribute("MonsterLocomotionMode", string.lower(debugLocomotion) == "run" and "Run" or "Walk")
     model:SetAttribute("CritChance", math.clamp(finite(stats.CritChance, 0), 0, 100))
     model:SetAttribute("Defense", math.max(0, finite(stats.Defense, 0)))
+    local aggressive = behavior.aggressive == true
+    local aggroRadius = math.max(0, finite(behavior.aggroRadiusStuds, 16))
+    local attackRadius = math.max(0, finite(behavior.attackRadiusStuds, 3))
+    model:SetAttribute("MonsterAuthoredAggressive", aggressive)
+    model:SetAttribute("MonsterAuthoredAggroRadius", aggroRadius)
+    model:SetAttribute("MonsterAuthoredAttackRadius", attackRadius)
+    model:SetAttribute("MonsterAggressive", aggressive)
+    model:SetAttribute("MonsterAggroRadius", aggroRadius)
+    model:SetAttribute("MonsterAttackRadius", attackRadius)
+    model:SetAttribute("MonsterCombatActive", false)
+    model:SetAttribute("MonsterAttackPursuitActive", false)
 end
 
 local function releaseInstance(state: any, model: Model, scheduleRespawn: boolean)
@@ -766,7 +784,7 @@ local function maintainDeathTerminalPose(state: any, model: Model, entry: any, d
 end
 
 local function maintainRuntimeAnimationSeams(model: Model, entry: any, deltaTimeSim: number)
-    if entry.dying then
+    if entry.dying or model:GetAttribute("MonsterCombatActive") == true then
         return
     end
 
@@ -946,6 +964,20 @@ local function spawnOne(state: any): Model?
     end
     playBaseIdle(model, entry)
     startWanderLoop(state, model, entry)
+
+    model:GetAttributeChangedSignal("MonsterCombatActive"):Connect(function()
+        if state.instances[model] ~= entry or entry.dying then
+            return
+        end
+        if model:GetAttribute("MonsterCombatActive") == true then
+            stopWanderMovement(entry)
+            stopIdleState(entry)
+            model:SetAttribute("MonsterIdleVariant", nil)
+        else
+            stopWanderMovement(entry)
+            playBaseIdle(model, entry)
+        end
+    end)
 
     model:GetAttributeChangedSignal("RunSpeed"):Connect(function()
         if state.instances[model] == entry then

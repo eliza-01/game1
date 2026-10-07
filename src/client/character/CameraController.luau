@@ -8,6 +8,7 @@ local Workspace = game:GetService("Workspace")
 local Game1Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local CharacterShared = Game1Shared:WaitForChild("character")
 local CharacterConfig = require(CharacterShared:WaitForChild("CharacterConfig"))
+local UiInputGuard = require(script.Parent.Parent:WaitForChild("UiInputGuard"))
 
 local CameraController = {}
 
@@ -126,10 +127,10 @@ function CameraController.Start()
 	started = true
 
 	UserInputService.InputBegan:Connect(function(input: InputObject, gameProcessed: boolean)
-		if gameProcessed then
-			return
-		end
 		if input.UserInputType == CharacterConfig.InputBindings.CameraOrbit[1] then
+			if UiInputGuard.BlocksWorldInput(input, gameProcessed) then
+				return
+			end
 			rotating = true
 			discardNextMouseDelta = true
 			UserInputService.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
@@ -143,13 +144,12 @@ function CameraController.Start()
 	end)
 
 	UserInputService.InputChanged:Connect(function(input: InputObject, gameProcessed: boolean)
-		if gameProcessed then
-			return
-		end
-
 		-- Mouse movement is intentionally NOT handled here. Camera orbit input is
 		-- sampled once per render frame in updateCameraInput().
 		if input.UserInputType == Enum.UserInputType.MouseWheel then
+			if UiInputGuard.BlocksWorldInput(input, gameProcessed) then
+				return
+			end
 			distance = math.clamp(
 				distance - input.Position.Z * CharacterConfig.CameraZoomStep,
 				CharacterConfig.CameraMinDistance,

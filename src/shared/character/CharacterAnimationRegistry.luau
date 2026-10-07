@@ -6,6 +6,30 @@ return table.freeze({
 		["human_female"] = table.freeze({
 			skeletonSignature = "587cde8efc22c1b5c256abb86f803452db3a7508eb823e758821a4767246f676",
 			base = table.freeze({
+				["death"] = table.freeze({
+					table.freeze({
+						clipId = "human_female__base__death__00",
+						assetId = "118060400424587",
+						animationId = "rbxassetid://118060400424587",
+						variant = 0,
+						weight = 100,
+						looped = false,
+						priority = "Action",
+						duplicateFirstFrameAtEnd = false,
+					}),
+				}),
+				["revive"] = table.freeze({
+					table.freeze({
+						clipId = "human_female__base__revive__00",
+						assetId = "139362684441288",
+						animationId = "rbxassetid://139362684441288",
+						variant = 0,
+						weight = 100,
+						looped = false,
+						priority = "Action",
+						duplicateFirstFrameAtEnd = false,
+					}),
+				}),
 			}),
 			weapons = table.freeze({
 				["1hs"] = table.freeze({

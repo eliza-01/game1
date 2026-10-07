@@ -41,6 +41,7 @@ local function ensureReticle()
     gui.IgnoreGuiInset = true
     gui.ResetOnSpawn = false
     gui.DisplayOrder = 50
+    gui:SetAttribute("WorldInputPassthrough", true)
 
     local dot = Instance.new("Frame")
     dot.Name = "Dot"

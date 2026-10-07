@@ -3,6 +3,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local CombatShared = Shared:WaitForChild("combat")
 local AttackConfig = require(CombatShared:WaitForChild("AttackConfig"))
+local CombatFeedbackService = require(script.Parent:WaitForChild("CombatFeedbackService"))
 
 local DamageService = {}
 local criticalRandom = Random.new()
@@ -45,6 +46,8 @@ function DamageService.Apply(attacker: Model?, target: Model, rawDamage: number)
         target:SetAttribute("LifeState", "Dying")
         target:SetAttribute("DeathStartedAt", os.clock())
     end
+
+    CombatFeedbackService.PublishDamage(attacker, target, finalDamage, critical)
 
     if AttackConfig.DebugLogs then
         print(("[game1][DAMAGE] target=%s raw=%d crit=%s chance=%.1f defense=%d final=%d hp=%d->%d killed=%s"):format(

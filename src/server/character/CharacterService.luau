@@ -185,16 +185,19 @@ local function beginPlayerDeathIdle(player: Player)
         return
     end
     local lifecycleStarted = DeathLifecycleService.BeginDeathIdle(character, context.navigationRoot, context.visual, function(expiredCharacter: Model)
+        -- Player death no longer auto-respawns. The corpse presentation may finish
+        -- and sink, but the player stays dead until explicitly choosing Return to Town.
         if player.Parent == Players and player.Character == expiredCharacter then
             deathContexts[player] = nil
-            createCharacter(player, tostring(player:GetAttribute("SelectedCharacterArchetype") or ""))
+            expiredCharacter:SetAttribute("ReturnToTownAvailable", true)
         end
     end)
     assert(lifecycleStarted, "DeathIdle lifecycle must start exactly once after the player terminal Death pose")
     character:SetAttribute("DeathIdleLifecycleStarted", true)
+    character:SetAttribute("ReturnToTownAvailable", true)
 end
 
-createCharacter = function(player: Player, requestedArchetypeId: string?): Model?
+createCharacter = function(player: Player, requestedArchetypeId: string?, reviveOnSpawn: boolean?): Model?
     if spawning[player] then
         return nil
     end
@@ -242,6 +245,14 @@ createCharacter = function(player: Player, requestedArchetypeId: string?): Model
     character:SetAttribute("MovementController", "ControllerManager")
     character:SetAttribute("VisualController", "AnimationController")
     CharacterStatsService.Initialize(character, if row then row.stats else nil)
+    if reviveOnSpawn == true then
+        -- Return-to-town spawns at full stats, but stays non-interactive until the
+        -- owning client finishes the authored revive presentation. Movement, combat
+        -- and monster targeting all already key off LifeState == Alive.
+        character:SetAttribute("LifeState", "Reviving")
+        character:SetAttribute("Damageable", false)
+        character:SetAttribute("RevivePending", true)
+    end
 
     local rig = CharacterRigService.Build(character, CharacterRigService.SpawnCFrame(player), template, row == nil)
     if not rig then
@@ -331,6 +342,42 @@ function CharacterService.Respawn(player: Player, archetypeId: string?): Model?
     return createCharacter(player, requested)
 end
 
+function CharacterService.ReturnToTown(player: Player): (boolean, string?)
+    if player.Parent ~= Players then
+        return false, "player unavailable"
+    end
+    local character = player.Character
+    if not character or not character.Parent then
+        return false, "character unavailable"
+    end
+    local lifeState = tostring(character:GetAttribute("LifeState") or "Alive")
+    if lifeState ~= "DeathIdle" or character:GetAttribute("ReturnToTownAvailable") ~= true then
+        return false, "return to town is only available after death animation"
+    end
+    local requested = tostring(player:GetAttribute("SelectedCharacterArchetype") or "")
+    local restored = createCharacter(player, requested, true)
+    if not restored then
+        return false, "respawn failed"
+    end
+    return true, nil
+end
+
+local function finishRevive(player: Player)
+    local character = player.Character
+    if not character or not character.Parent then
+        return
+    end
+    if tostring(character:GetAttribute("LifeState") or "") ~= "Reviving"
+        or character:GetAttribute("RevivePending") ~= true
+    then
+        return
+    end
+    character:SetAttribute("RevivePending", false)
+    character:SetAttribute("HP", math.max(0, tonumber(character:GetAttribute("MaxHP")) or 0))
+    character:SetAttribute("Damageable", true)
+    character:SetAttribute("LifeState", "Alive")
+end
+
 function CharacterService.Start()
     if started then
         return
@@ -345,6 +392,18 @@ function CharacterService.Start()
     deathTerminalReached.Name = "DeathTerminalReached"
     deathTerminalReached.Parent = remotes
     deathTerminalReached.OnServerEvent:Connect(beginPlayerDeathIdle)
+
+    local returnToTown = remotes:FindFirstChild("ReturnToTown") or Instance.new("RemoteFunction")
+    returnToTown.Name = "ReturnToTown"
+    returnToTown.Parent = remotes
+    returnToTown.OnServerInvoke = function(player: Player)
+        return CharacterService.ReturnToTown(player)
+    end
+
+    local reviveAnimationFinished = remotes:FindFirstChild("ReviveAnimationFinished") or Instance.new("RemoteEvent")
+    reviveAnimationFinished.Name = "ReviveAnimationFinished"
+    reviveAnimationFinished.Parent = remotes
+    reviveAnimationFinished.OnServerEvent:Connect(finishRevive)
 
     Players.PlayerAdded:Connect(function(player)
         task.defer(createCharacter, player)

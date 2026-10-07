@@ -3,6 +3,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local UiInputGuard = require(script.Parent.Parent:WaitForChild("UiInputGuard"))
 local Workspace = game:GetService("Workspace")
 
 local Game1Shared = ReplicatedStorage:WaitForChild("Game1Shared")
@@ -627,7 +628,7 @@ function MovementController.Start()
 	started = true
 
 	UserInputService.InputBegan:Connect(function(input: InputObject, gameProcessed: boolean)
-		if gameProcessed then
+		if UiInputGuard.BlocksWorldInput(input, gameProcessed) then
 			return
 		end
 

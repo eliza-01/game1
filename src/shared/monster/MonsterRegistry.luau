@@ -11,6 +11,11 @@ return table.freeze({
 			modelAssetId = "87741870449847",
 			serverStoragePath = "ServerStorage.monsters.gremlin.model.gremlin",
 			skeletonSignature = "0b019afea76580de533c3d0c986c3a87b50ce925b2267c31af65818be2b24185",
+			behavior = table.freeze({
+				aggressive = true,
+				aggroRadiusStuds = 32,
+				attackRadiusStuds = 5,
+			}),
 			stats = table.freeze({
 				["MaxHP"] = 100,
 				["Damage"] = 10,

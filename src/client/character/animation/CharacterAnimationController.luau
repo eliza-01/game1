@@ -271,6 +271,17 @@ local function notifyDeathTerminalReached(boundCharacter: Model)
 	end
 end
 
+local function notifyReviveAnimationFinished(boundCharacter: Model)
+	if character ~= boundCharacter or tostring(boundCharacter:GetAttribute("LifeState") or "") ~= "Reviving" then
+		return
+	end
+	local remotes = ReplicatedStorage:FindFirstChild("Game1Remotes")
+	local remote = remotes and remotes:FindFirstChild("ReviveAnimationFinished")
+	if remote and remote:IsA("RemoteEvent") then
+		remote:FireServer()
+	end
+end
+
 local function playDeath()
 	if not character or not cache then
 		return
@@ -387,7 +398,7 @@ local function handleLifeState()
 		-- Keep the frozen terminal frame of Death. There is deliberately no
 		-- separate death_wait animation in game1.
 		lifeTransition = true
-	elseif current == "Alive" and previous ~= "Alive" then
+	elseif current == "Reviving" and previous ~= "Reviving" then
 		deathTrack = nil
 		deathTerminalPoseHeld = false
 		deathTerminalReported = false
@@ -397,6 +408,18 @@ local function handleLifeState()
 		currentActionSlot = ""
 		currentActionLockedUntil = 0
 		character:SetAttribute("AnimationActionEndsAt", nil)
+		local reviveCharacter = character
+		playBaseLifeAction("revive", function()
+			if reviveCharacter then
+				notifyReviveAnimationFinished(reviveCharacter)
+			end
+		end)
+	elseif current == "Alive" and previous == "Reviving" then
+		lifeTransition = false
+		refreshLoop()
+	elseif current == "Alive" and previous ~= "Alive" then
+		-- Same-character resurrection remains supported for dev/test lifecycles.
+		lifeTransition = true
 		playBaseLifeAction("revive", function()
 			if not character then return end
 			lifeTransition = false
@@ -454,7 +477,14 @@ local function bindCharacter(newCharacter: Model)
 		table.insert(connections, newCharacter:GetAttributeChangedSignal(attribute):Connect(refreshLoop))
 	end
 	table.insert(connections, newCharacter:GetAttributeChangedSignal("LifeState"):Connect(handleLifeState))
-	refreshLoop()
+	if lastLifeState == "Reviving" then
+		-- A return-to-town character is born directly in Reviving, so there is no
+		-- attribute edge for the client to observe. Synthesize the transition once.
+		lastLifeState = "Alive"
+		handleLifeState()
+	else
+		refreshLoop()
+	end
 	print("[game1][animation] character animation profile bound")
 end
 

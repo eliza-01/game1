@@ -15,6 +15,11 @@
       "AttackSpeed": 100,
       "RunSpeed": 50,
       "CritChance": 0
+    },
+    "defaultBehavior": {
+      "aggressive": false,
+      "aggroRadiusStuds": 16.0,
+      "attackRadiusStuds": 3.0
     }
   },
   "items": [
@@ -28,9 +33,9 @@
       "model_asset_id": "87741870449847",
       "model_published_sha256": "79cd4359c5d42864b39285fdaf6e03d4689b3527884518c909a7f065ed35b30e",
       "moderation_state": "Approved",
-      "revision": 5,
+      "revision": 9,
       "created_at": 1791249308.7624743,
-      "updated_at": 1791266712.3477688,
+      "updated_at": 1791336501.79709,
       "published_at": 1791266712.3477688,
       "armature_name": "metarig",
       "bone_count": 55,
@@ -61,6 +66,11 @@
         "AttackSpeed": 100,
         "RunSpeed": 50,
         "CritChance": 20
+      },
+      "behavior": {
+        "aggressive": true,
+        "aggroRadiusStuds": 32.0,
+        "attackRadiusStuds": 5.0
       },
       "status": "PUBLISHED",
       "server_storage_path": "ServerStorage.monsters.gremlin.model.gremlin"

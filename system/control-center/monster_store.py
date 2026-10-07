@@ -31,6 +31,11 @@ DEFAULT_STATS = {
     "RunSpeed": 50,
     "CritChance": 0,
 }
+DEFAULT_BEHAVIOR = {
+    "aggressive": False,
+    "aggroRadiusStuds": 16.0,
+    "attackRadiusStuds": 3.0,
+}
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_]{0,63}$")
 
 
@@ -120,6 +125,12 @@ class MonsterStore:
                     value REAL NOT NULL DEFAULT 0,
                     PRIMARY KEY(monster_slug, stat_key)
                 );
+                CREATE TABLE IF NOT EXISTS monster_behavior(
+                    monster_slug TEXT PRIMARY KEY,
+                    aggressive INTEGER NOT NULL DEFAULT 0,
+                    aggro_radius_studs REAL NOT NULL DEFAULT 16,
+                    attack_radius_studs REAL NOT NULL DEFAULT 3
+                );
                 CREATE TABLE IF NOT EXISTS monster_publications(
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     monster_slug TEXT NOT NULL,
@@ -144,7 +155,23 @@ class MonsterStore:
         return digest.hexdigest()
 
     def options(self) -> dict:
-        return {"statKeys": list(STAT_KEYS), "defaultStats": dict(DEFAULT_STATS)}
+        return {
+            "statKeys": list(STAT_KEYS),
+            "defaultStats": dict(DEFAULT_STATS),
+            "defaultBehavior": dict(DEFAULT_BEHAVIOR),
+        }
+
+    def _behavior(self, connection, slug: str) -> dict:
+        result = dict(DEFAULT_BEHAVIOR)
+        row = connection.execute(
+            "SELECT aggressive,aggro_radius_studs,attack_radius_studs FROM monster_behavior WHERE monster_slug=?",
+            (slug,),
+        ).fetchone()
+        if row:
+            result["aggressive"] = bool(row["aggressive"])
+            result["aggroRadiusStuds"] = float(row["aggro_radius_studs"])
+            result["attackRadiusStuds"] = float(row["attack_radius_studs"])
+        return result
 
     def _stats(self, connection, slug: str) -> dict[str, float]:
         values = dict(DEFAULT_STATS)
@@ -178,6 +205,7 @@ class MonsterStore:
         result = dict(row)
         result["textures"] = self._textures(connection, result["slug"])
         result["stats"] = self._stats(connection, result["slug"])
+        result["behavior"] = self._behavior(connection, result["slug"])
         result["status"] = self._status(result, result["textures"])
         result["server_storage_path"] = f"ServerStorage.monsters.{result['slug']}.model.{result['slug']}"
         return result
@@ -217,6 +245,23 @@ class MonsterStore:
             result[key] = value
         return result
 
+    @staticmethod
+    def _validate_behavior(payload: dict, old: dict | None) -> dict:
+        incoming = payload.get("behavior") or {}
+        previous = (old or {}).get("behavior") or {}
+        aggressive = incoming.get("aggressive", previous.get("aggressive", DEFAULT_BEHAVIOR["aggressive"]))
+        if isinstance(aggressive, str):
+            aggressive = aggressive.strip().lower() in {"1", "true", "yes", "on", "aggressive"}
+        aggro_radius = float(incoming.get("aggroRadiusStuds", previous.get("aggroRadiusStuds", DEFAULT_BEHAVIOR["aggroRadiusStuds"])))
+        attack_radius = float(incoming.get("attackRadiusStuds", previous.get("attackRadiusStuds", DEFAULT_BEHAVIOR["attackRadiusStuds"])))
+        if aggro_radius < 0 or attack_radius < 0:
+            raise ValueError("monster aggro/attack radii cannot be negative")
+        return {
+            "aggressive": bool(aggressive),
+            "aggroRadiusStuds": aggro_radius,
+            "attackRadiusStuds": attack_radius,
+        }
+
     def register(self, payload: dict) -> dict:
         incoming_slug = str(payload.get("slug") or "").strip().lower()
         old = self.get(incoming_slug) if incoming_slug else None
@@ -234,6 +279,7 @@ class MonsterStore:
         if not old and not model_source:
             raise ValueError("choose a monster FBX before registration")
         stats = self._validate_stats(payload, old)
+        behavior = self._validate_behavior(payload, old)
 
         now = time.time()
         revision = int(old.get("revision") or 0) + 1 if old else 1
@@ -281,6 +327,10 @@ class MonsterStore:
                     "INSERT OR REPLACE INTO monster_stats(monster_slug,stat_key,value) VALUES(?,?,?)",
                     (slug, key, value),
                 )
+            connection.execute(
+                "INSERT OR REPLACE INTO monster_behavior(monster_slug,aggressive,aggro_radius_studs,attack_radius_studs) VALUES(?,?,?,?)",
+                (slug, 1 if behavior["aggressive"] else 0, behavior["aggroRadiusStuds"], behavior["attackRadiusStuds"]),
+            )
 
             for raw in texture_paths:
                 source = Path(raw).expanduser().resolve()
@@ -392,6 +442,7 @@ class MonsterStore:
             return
         with self.connect() as connection:
             connection.execute("DELETE FROM monster_stats WHERE monster_slug=?", (slug,))
+            connection.execute("DELETE FROM monster_behavior WHERE monster_slug=?", (slug,))
             connection.execute("DELETE FROM monster_textures WHERE monster_slug=?", (slug,))
             connection.execute("DELETE FROM monster_publications WHERE monster_slug=?", (slug,))
             connection.execute("DELETE FROM monsters WHERE slug=?", (slug,))
@@ -451,6 +502,11 @@ class MonsterStore:
                 f"\t\t\tmodelAssetId = {self._lua_string(row.get('model_asset_id') or '')},",
                 f"\t\t\tserverStoragePath = {self._lua_string(row['server_storage_path'])},",
                 f"\t\t\tskeletonSignature = {self._lua_string(row.get('skeleton_signature') or '')},",
+                "\t\t\tbehavior = table.freeze({",
+                f"\t\t\t\taggressive = {str(bool(row.get('behavior', {}).get('aggressive'))).lower()},",
+                f"\t\t\t\taggroRadiusStuds = {self._lua_number(row.get('behavior', {}).get('aggroRadiusStuds', 16))},",
+                f"\t\t\t\tattackRadiusStuds = {self._lua_number(row.get('behavior', {}).get('attackRadiusStuds', 3))},",
+                "\t\t\t}),",
                 "\t\t\tstats = table.freeze({",
             ])
             for key, value in row.get("stats", {}).items():

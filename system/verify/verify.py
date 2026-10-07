@@ -1373,13 +1373,127 @@ for required in ["SetTestAttackRadius", "Test attack radius · studs", "radiusBo
     if required not in test_loadout_client_m22:
         err(f"Test Loadout attack radius UI missing {required}")
 
+
+# m23 global UI input guard + monster behavior/debug + RobloxLineage combat AI + damage feedback.
+ui_guard_m23 = (ROOT / "src/client/UiInputGuard.luau").read_text(encoding="utf-8")
+attack_controller_m23 = (ROOT / "src/client/combat/AttackController.luau").read_text(encoding="utf-8")
+camera_controller_m23 = (ROOT / "src/client/character/CameraController.luau").read_text(encoding="utf-8")
+movement_controller_m23 = (ROOT / "src/client/character/MovementController.luau").read_text(encoding="utf-8")
+aim_pose_m23 = (ROOT / "src/client/combat/AimPoseController.luau").read_text(encoding="utf-8")
+for required in ["GetGuiObjectsAtPosition", "WorldInputPassthrough", "GetFocusedTextBox", "BlocksWorldInput"]:
+    if required not in ui_guard_m23:
+        err(f"global UI world-input guard missing {required}")
+for text, label in [(attack_controller_m23, "attack"), (camera_controller_m23, "camera"), (movement_controller_m23, "movement")]:
+    if "UiInputGuard" not in text:
+        err(f"{label} controller does not use global UI input guard")
+if 'WorldInputPassthrough", true' not in aim_pose_m23:
+    err("aim reticle must be an explicit UI world-input passthrough")
+
+monster_manifest_m23 = json.loads((ROOT / "assets/manifests/monsters.json").read_text(encoding="utf-8"))
+for monster in monster_manifest_m23.get("items") or []:
+    behavior = monster.get("behavior") or {}
+    for key in ["aggressive", "aggroRadiusStuds", "attackRadiusStuds"]:
+        if key not in behavior:
+            err(f"monster behavior manifest missing {monster.get('slug')}:{key}")
+monster_store_m23 = (ROOT / "system/control-center/monster_store.py").read_text(encoding="utf-8")
+monster_js_m23 = (ROOT / "system/control-center/static/monster-assets.js").read_text(encoding="utf-8")
+monster_html_m23 = (ROOT / "system/control-center/static/index.html").read_text(encoding="utf-8")
+for required in ["monster_behavior", "aggroRadiusStuds", "attackRadiusStuds", "aggressive"]:
+    if required not in monster_store_m23:
+        err(f"Asset Manager monster behavior storage missing {required}")
+for required in ["monster-behavior-aggressive", "monster-behavior-aggro-radius", "monster-behavior-attack-radius"]:
+    if required not in monster_js_m23 + monster_html_m23:
+        err(f"Asset Manager monster behavior UI missing {required}")
+
+monster_debug_server_m23 = (ROOT / "src/server/dev/MonsterDebugService.luau").read_text(encoding="utf-8")
+monster_debug_client_m23 = (ROOT / "src/client/dev/MonsterDebugController.luau").read_text(encoding="utf-8")
+for required in ["GetMonsterDebugCatalog", "ApplyMonsterDebug", "MonsterAggressive", "MonsterAggroRadius", "MonsterAttackRadius"]:
+    if required not in monster_debug_server_m23:
+        err(f"Monster Debug server contract missing {required}")
+for required in ["☑ AGGRESSIVE", "☐ PASSIVE", "AGGRO RADIUS", "ATTACK RADIUS", "RESET FROM ASSET MANAGER", "Game1MonsterAggroRadiusPreview", "Game1MonsterAttackRadiusPreview"]:
+    if required not in monster_debug_client_m23:
+        err(f"Monster Debug client UI missing {required}")
+
+monster_ai_m23 = (ROOT / "src/server/monster/MonsterAIService.luau").read_text(encoding="utf-8")
+spawner_m23 = (ROOT / "src/server/monster/MonsterSpawnerService.luau").read_text(encoding="utf-8")
+for required in ["Aggro", "Chase", "Attack", "pursueDirectlyDuringAttack", "attackStillConnects", "PathfindingService", "MonsterAttackPursuitActive", "AttackTimelineConfig.ResolveRuntime"]:
+    if required not in monster_ai_m23:
+        err(f"RobloxLineage monster combat AI contract missing {required}")
+for required in ["MonsterAuthoredAggressive", "MonsterAuthoredAggroRadius", "MonsterAuthoredAttackRadius", "MonsterCombatActive"]:
+    if required not in spawner_m23:
+        err(f"monster spawner behavior bridge missing {required}")
+monster_locomotion_m23 = (ROOT / "src/client/monster/MonsterAttackLocomotionController.luau").read_text(encoding="utf-8")
+for required in ["MonsterAttackPursuitActive", "MonsterAttackPursuitPlaybackSpeed", "lowerPaths", "PreSimulation"]:
+    if required not in monster_locomotion_m23:
+        err(f"monster attack lower-body composition missing {required}")
+
+feedback_server_m23 = (ROOT / "src/server/combat/CombatFeedbackService.luau").read_text(encoding="utf-8")
+feedback_client_m23 = (ROOT / "src/client/combat/CombatFeedbackController.luau").read_text(encoding="utf-8")
+damage_m23 = (ROOT / "src/server/combat/DamageService.luau").read_text(encoding="utf-8")
+for required in ["outgoing", "incoming", "PublishDamage"]:
+    if required not in feedback_server_m23:
+        err(f"damage feedback server missing {required}")
+for required in ["IncomingDamageNumber", "Color3.fromRGB(255, 82, 82)", "CombatDamageNumber"]:
+    if required not in feedback_client_m23:
+        err(f"damage feedback client missing {required}")
+if "CombatFeedbackService.PublishDamage" not in damage_m23:
+    err("DamageService does not publish authoritative damage feedback")
+
+# m25 continuous active-attack pursuit + authored return-to-town revive.
+monster_ai_m25 = (ROOT / "src/server/monster/MonsterAIService.luau").read_text(encoding="utf-8")
+for required in [
+    'RunService.Heartbeat:Wait()',
+    'agent.humanoid:Move(direction, false)',
+    'ATTACK_PURSUIT_FOLLOW_GAIN',
+    'targetRoot.AssemblyLinearVelocity',
+    'The slower AI decision loop must not issue competing MoveTo calls',
+]:
+    if required not in monster_ai_m25:
+        err(f"m25 continuous attack pursuit contract missing {required}")
+pursuit_body_m25 = monster_ai_m25.split('local function pursueDirectlyDuringAttack', 1)[-1].split('local function maintainAttackPursuit', 1)[0]
+if 'MoveTo(' in pursuit_body_m25:
+    err("active-attack pursuit must not stream MoveTo destinations")
+
+monster_sampler_m25 = (ROOT / "src/client/monster/MonsterLocomotionSampler.luau").read_text(encoding="utf-8")
+monster_compositor_m25 = (ROOT / "src/client/monster/MonsterAttackLocomotionController.luau").read_text(encoding="utf-8")
+for required in ['SetPlaybackSpeed', 'AdjustSpeed(speed)']:
+    if required not in monster_sampler_m25:
+        err(f"monster pursuit sampler live-speed contract missing {required}")
+for required in ['suppressHorizontalAttackRootMotion', 'Game1RuntimeAnimationRoot', 'transform.Position.Y', 'entry.sampler:SetPlaybackSpeed']:
+    if required not in monster_compositor_m25:
+        err(f"monster pursuit visual stabilization missing {required}")
+if 'releaseSampler(entry)\n\t\t\tif model:GetAttribute("MonsterAttackPursuitActive")' in monster_compositor_m25:
+    err("pursuit playback changes must not rebuild the locomotion sampler")
+
+character_service_m25 = (ROOT / "src/server/character/CharacterService.luau").read_text(encoding="utf-8")
+death_respawn_path_m25 = ROOT / "src/client/character/DeathRespawnController.luau"
+death_respawn_m25 = death_respawn_path_m25.read_text(encoding="utf-8") if death_respawn_path_m25.is_file() else ""
+character_animation_m25 = (ROOT / "src/client/character/animation/CharacterAnimationController.luau").read_text(encoding="utf-8")
+for required in ["ReturnToTownAvailable", "CharacterService.ReturnToTown", 'RemoteFunction', 'returnToTown.OnServerInvoke']:
+    if required not in character_service_m25:
+        err(f"return-to-town server contract missing {required}")
+if 'createCharacter(player, tostring(player:GetAttribute("SelectedCharacterArchetype") or ""))' in character_service_m25.split('local function beginPlayerDeathIdle', 1)[-1].split('createCharacter = function', 1)[0]:
+    err("player death lifecycle must not auto-respawn after DeathIdle")
+for required in ["Game1DeathRespawn", "В город", "ReturnToTown", 'LifeState") or "") == "DeathIdle"']:
+    if required not in death_respawn_m25:
+        err(f"return-to-town client UI missing {required}")
+for required in ['reviveOnSpawn', 'LifeState", "Reviving"', 'RevivePending', 'ReviveAnimationFinished', 'createCharacter(player, requested, true)']:
+    if required not in character_service_m25:
+        err(f"return-to-town revive server contract missing {required}")
+for required in ['current == "Reviving"', 'playBaseLifeAction("revive"', 'notifyReviveAnimationFinished', 'lastLifeState == "Reviving"']:
+    if required not in character_animation_m25:
+        err(f"return-to-town revive animation contract missing {required}")
+client_init_m25 = (ROOT / "src/client/init.client.luau").read_text(encoding="utf-8")
+if "DeathRespawnController.Start()" not in client_init_m25:
+    err("death respawn controller is not started")
+
 if errors:
     print("verify failed")
     for item in errors:
         print(" -", item)
     sys.exit(1)
 
-print("verify ok · game1 m22 adjustable weapon attack locomotion + Test Loadout radius passed")
+print("verify ok · game1 m25 continuous attack pursuit + authored revive respawn passed")
 print("registered character archetypes:", len(archetypes))
 print("active character archetype:", active_id or "none")
 print("race pool: human")

@@ -2,29 +2,29 @@
   "schemaVersion": 1,
   "project": "game1",
   "records": {
-    "spawn-6e25c59082574dc795239bc428f40d5c": {
-      "spawnId": "spawn-6e25c59082574dc795239bc428f40d5c",
+    "spawn-fa0f11fb6e5744c2842561a361c30634": {
+      "spawnId": "spawn-fa0f11fb6e5744c2842561a361c30634",
       "monsterSlug": "gremlin",
       "mapKey": "main",
       "placeId": 0,
       "position": {
-        "x": 5.033,
-        "y": 0.0,
-        "z": -19.345
+        "x": -6.327,
+        "y": 47.459,
+        "z": 215.564
       },
-      "yawDegrees": 97.08304489438913,
+      "yawDegrees": 45.493627576766805,
       "respawnSeconds": 10.0,
-      "spawnRadius": 15.0,
+      "spawnRadius": 21.0,
       "maxAlive": 4,
       "enabled": true,
-      "createdAtUtc": "2026-10-06T08:38:27.486917Z",
-      "updatedAtUtc": "2026-10-06T08:38:27.486917Z",
+      "createdAtUtc": "2026-10-07T01:21:37.270562Z",
+      "updatedAtUtc": "2026-10-07T01:21:37.270562Z",
       "studioSync": {
         "status": "synced",
-        "recordFingerprint": "8c0e4e519ddad28dc3ec3a8b3564c9d7d998f9f5c670554f19ffad5b129c3197",
+        "recordFingerprint": "78249c17ec82b9d18ca190f97e3272f67235761a35b24c004c572fe5fe100029",
         "placeId": 0,
-        "markerPath": "Workspace.Game1Authoring.MonsterSpawns.Gremlin_6e25c590",
-        "syncedAtUtc": "2026-10-06T08:38:28.533931Z"
+        "markerPath": "Workspace.Game1Authoring.MonsterSpawns.Gremlin_fa0f11fb",
+        "syncedAtUtc": "2026-10-07T01:21:38.309731Z"
       }
     }
   }

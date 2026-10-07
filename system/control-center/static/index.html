@@ -190,6 +190,8 @@
 <label>slug<input id="monster-slug" readonly><small class="hint">generated from english name as lowercase snake_case. existing registered slugs stay stable.</small></label>
 <div class="monster-stats-grid"><label>HP<input id="monster-stat-hp" type="number" min="0" step="1" value="100"></label><label>attack<input id="monster-stat-damage" type="number" min="0" step="1" value="10"></label><label>attack speed<input id="monster-stat-attack-speed" type="number" min="0" step="1" value="100"></label><label>run speed<input id="monster-stat-run-speed" type="number" min="0" step="1" value="50"></label><label>critical chance %<input id="monster-stat-crit-chance" type="number" min="0" max="100" step="0.1" value="0"></label></div>
 <small class="hint">monster stats are absolute runtime values. critical chance is 0..100 percent.</small>
+<div class="monster-stats-grid"><label class="spawn-enabled"><input id="monster-behavior-aggressive" type="checkbox"><span>aggressive · unchecked = passive</span></label><label>aggro radius · studs<input id="monster-behavior-aggro-radius" type="number" min="0" step="0.1" value="16"></label><label>attack radius · studs<input id="monster-behavior-attack-radius" type="number" min="0" step="0.1" value="3"></label></div>
+<small class="hint">behavior is authored here; Monster Debug can override these values only for the current Play session.</small>
 <hr class="card-separator">
 <span class="eyebrow">02 · source assets</span>
 <div class="picker"><button id="choose-monster-model" type="button">choose fbx</button><small id="picked-monster-model">fbx not selected</small></div>

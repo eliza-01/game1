@@ -1,0 +1,473 @@
+diff --git a/src/client/character/animation/CharacterAnimationController.luau b/src/client/character/animation/CharacterAnimationController.luau
+index 606ae69..cc56b8d 100644
+--- a/src/client/character/animation/CharacterAnimationController.luau
++++ b/src/client/character/animation/CharacterAnimationController.luau
+@@ -271,6 +271,17 @@ local function notifyDeathTerminalReached(boundCharacter: Model)
+ 	end
+ end
+ 
++local function notifyReviveAnimationFinished(boundCharacter: Model)
++	if character ~= boundCharacter or tostring(boundCharacter:GetAttribute("LifeState") or "") ~= "Reviving" then
++		return
++	end
++	local remotes = ReplicatedStorage:FindFirstChild("Game1Remotes")
++	local remote = remotes and remotes:FindFirstChild("ReviveAnimationFinished")
++	if remote and remote:IsA("RemoteEvent") then
++		remote:FireServer()
++	end
++end
++
+ local function playDeath()
+ 	if not character or not cache then
+ 		return
+@@ -387,7 +398,7 @@ local function handleLifeState()
+ 		-- Keep the frozen terminal frame of Death. There is deliberately no
+ 		-- separate death_wait animation in game1.
+ 		lifeTransition = true
+-	elseif current == "Alive" and previous ~= "Alive" then
++	elseif current == "Reviving" and previous ~= "Reviving" then
+ 		deathTrack = nil
+ 		deathTerminalPoseHeld = false
+ 		deathTerminalReported = false
+@@ -397,6 +408,18 @@ local function handleLifeState()
+ 		currentActionSlot = ""
+ 		currentActionLockedUntil = 0
+ 		character:SetAttribute("AnimationActionEndsAt", nil)
++		local reviveCharacter = character
++		playBaseLifeAction("revive", function()
++			if reviveCharacter then
++				notifyReviveAnimationFinished(reviveCharacter)
++			end
++		end)
++	elseif current == "Alive" and previous == "Reviving" then
++		lifeTransition = false
++		refreshLoop()
++	elseif current == "Alive" and previous ~= "Alive" then
++		-- Same-character resurrection remains supported for dev/test lifecycles.
++		lifeTransition = true
+ 		playBaseLifeAction("revive", function()
+ 			if not character then return end
+ 			lifeTransition = false
+@@ -454,7 +477,14 @@ local function bindCharacter(newCharacter: Model)
+ 		table.insert(connections, newCharacter:GetAttributeChangedSignal(attribute):Connect(refreshLoop))
+ 	end
+ 	table.insert(connections, newCharacter:GetAttributeChangedSignal("LifeState"):Connect(handleLifeState))
+-	refreshLoop()
++	if lastLifeState == "Reviving" then
++		-- A return-to-town character is born directly in Reviving, so there is no
++		-- attribute edge for the client to observe. Synthesize the transition once.
++		lastLifeState = "Alive"
++		handleLifeState()
++	else
++		refreshLoop()
++	end
+ 	print("[game1][animation] character animation profile bound")
+ end
+ 
+diff --git a/src/client/monster/MonsterAttackLocomotionController.luau b/src/client/monster/MonsterAttackLocomotionController.luau
+index a48d2bd..a5a04a4 100644
+--- a/src/client/monster/MonsterAttackLocomotionController.luau
++++ b/src/client/monster/MonsterAttackLocomotionController.luau
+@@ -59,6 +59,33 @@ local function movementDirection(entry): Vector3?
+ 		or horizontalDirection(entry.root.CFrame.LookVector)
+ end
+ 
++local function resolveRootMotionBones(visual: Model): { Bone }
++	local result = {}
++	for _, object in visual:GetDescendants() do
++		if object:IsA("Bone") then
++			local runtimeBridge = object:GetAttribute("Game1RuntimeAnimationRoot") == true
++			local namedBridge = object.Name == "RootBone" and object.Parent and object.Parent:IsA("BasePart")
++			if runtimeBridge or namedBridge then
++				table.insert(result, object)
++			end
++		end
++	end
++	return result
++end
++
++local function suppressHorizontalAttackRootMotion(entry)
++	-- The attack clip may contain authored forward/back root translation. During
++	-- server-owned pursuit that displacement stacks on top of physical motion and
++	-- looks like short teleports. Keep the authored rotation and vertical motion,
++	-- but let the navigation Humanoid own all horizontal world displacement.
++	for _, bone in entry.rootMotionBones do
++		if bone.Parent then
++			local transform = bone.Transform
++			bone.Transform = CFrame.new(0, transform.Position.Y, 0) * transform.Rotation
++		end
++	end
++end
++
+ local function alignLowerBodyRootsToMovement(entry)
+ 	if not entry.sampler or entry.weight <= 0 or #entry.lowerRootPaths == 0 then
+ 		return
+@@ -99,7 +126,6 @@ local function samplerBaseKey(model: Model): string
+ 	return table.concat({
+ 		tostring(model:GetAttribute("MonsterVisualKey") or ""),
+ 		tostring(model:GetAttribute("MonsterRunAnimationId") or ""),
+-		string.format("%.3f", tonumber(model:GetAttribute("MonsterAttackPursuitPlaybackSpeed")) or 1),
+ 	}, "|")
+ end
+ 
+@@ -159,6 +185,7 @@ local function acquireSampler(entry): boolean
+ 		samplers[cacheKey] = sampler
+ 	else
+ 		sampler:SetPhase(phase)
++		sampler:SetPlaybackSpeed(tonumber(entry.model:GetAttribute("MonsterAttackPursuitPlaybackSpeed")) or 1)
+ 	end
+ 	sampler.users = 1
+ 	sampler:Touch()
+@@ -204,6 +231,7 @@ local function bindMonster(model: Model)
+ 			lowerPaths = lowerPaths,
+ 			lowerRootPaths = lowerRootPaths,
+ 			visualRootOffsetRotation = root.CFrame:ToObjectSpace(visual:GetPivot()).Rotation,
++			rootMotionBones = resolveRootMotionBones(visual),
+ 			weight = 0,
+ 			sampler = nil,
+ 			samplerKey = nil,
+@@ -217,7 +245,9 @@ local function bindMonster(model: Model)
+ 			end
+ 		end))
+ 		table.insert(entry.connections, model:GetAttributeChangedSignal("MonsterAttackPursuitPlaybackSpeed"):Connect(function()
+-			releaseSampler(entry)
++			if entry.sampler then
++				entry.sampler:SetPlaybackSpeed(tonumber(model:GetAttribute("MonsterAttackPursuitPlaybackSpeed")) or 1)
++			end
+ 			if model:GetAttribute("MonsterAttackPursuitActive") == true then
+ 				setEntryActive(entry, true)
+ 			end
+@@ -275,6 +305,9 @@ local function step(deltaTime: number)
+ 		local distanceSquared = cameraDelta:Dot(cameraDelta)
+ 		local pursuitActive = model:GetAttribute("MonsterAttackPursuitActive") == true
+ 			and tostring(model:GetAttribute("LifeState")) == "Alive"
++		if pursuitActive then
++			suppressHorizontalAttackRootMotion(entry)
++		end
+ 		local wantsComposition = pursuitActive and distanceSquared <= maxDistanceSquared
+ 		if wantsComposition and not entry.sampler and activeCount < Config.MaxComposedMonsters then
+ 			acquireSampler(entry)
+diff --git a/src/client/monster/MonsterLocomotionSampler.luau b/src/client/monster/MonsterLocomotionSampler.luau
+index fec8d36..ee97126 100644
+--- a/src/client/monster/MonsterLocomotionSampler.luau
++++ b/src/client/monster/MonsterLocomotionSampler.luau
+@@ -92,6 +92,17 @@ function MonsterLocomotionSampler.new(visual: Model, animationId: string, playba
+ 	return sampler, nil
+ end
+ 
++
++function MonsterLocomotionSampler:SetPlaybackSpeed(playbackSpeed: number)
++	if not self.track then
++		return
++	end
++	local speed = math.max(0.01, tonumber(playbackSpeed) or 1)
++	pcall(function()
++		self.track:AdjustSpeed(speed)
++	end)
++end
++
+ function MonsterLocomotionSampler:SetPhase(phase: number)
+ 	self.phase = math.clamp(tonumber(phase) or 0, 0, 0.999999)
+ 	self.phasePending = true
+diff --git a/src/server/character/CharacterService.luau b/src/server/character/CharacterService.luau
+index fb77751..48ce562 100644
+--- a/src/server/character/CharacterService.luau
++++ b/src/server/character/CharacterService.luau
+@@ -197,7 +197,7 @@ local function beginPlayerDeathIdle(player: Player)
+     character:SetAttribute("ReturnToTownAvailable", true)
+ end
+ 
+-createCharacter = function(player: Player, requestedArchetypeId: string?): Model?
++createCharacter = function(player: Player, requestedArchetypeId: string?, reviveOnSpawn: boolean?): Model?
+     if spawning[player] then
+         return nil
+     end
+@@ -245,6 +245,14 @@ createCharacter = function(player: Player, requestedArchetypeId: string?): Model
+     character:SetAttribute("MovementController", "ControllerManager")
+     character:SetAttribute("VisualController", "AnimationController")
+     CharacterStatsService.Initialize(character, if row then row.stats else nil)
++    if reviveOnSpawn == true then
++        -- Return-to-town spawns at full stats, but stays non-interactive until the
++        -- owning client finishes the authored revive presentation. Movement, combat
++        -- and monster targeting all already key off LifeState == Alive.
++        character:SetAttribute("LifeState", "Reviving")
++        character:SetAttribute("Damageable", false)
++        character:SetAttribute("RevivePending", true)
++    end
+ 
+     local rig = CharacterRigService.Build(character, CharacterRigService.SpawnCFrame(player), template, row == nil)
+     if not rig then
+@@ -347,13 +355,29 @@ function CharacterService.ReturnToTown(player: Player): (boolean, string?)
+         return false, "return to town is only available after death animation"
+     end
+     local requested = tostring(player:GetAttribute("SelectedCharacterArchetype") or "")
+-    local restored = createCharacter(player, requested)
++    local restored = createCharacter(player, requested, true)
+     if not restored then
+         return false, "respawn failed"
+     end
+     return true, nil
+ end
+ 
++local function finishRevive(player: Player)
++    local character = player.Character
++    if not character or not character.Parent then
++        return
++    end
++    if tostring(character:GetAttribute("LifeState") or "") ~= "Reviving"
++        or character:GetAttribute("RevivePending") ~= true
++    then
++        return
++    end
++    character:SetAttribute("RevivePending", false)
++    character:SetAttribute("HP", math.max(0, tonumber(character:GetAttribute("MaxHP")) or 0))
++    character:SetAttribute("Damageable", true)
++    character:SetAttribute("LifeState", "Alive")
++end
++
+ function CharacterService.Start()
+     if started then
+         return
+@@ -376,6 +400,11 @@ function CharacterService.Start()
+         return CharacterService.ReturnToTown(player)
+     end
+ 
++    local reviveAnimationFinished = remotes:FindFirstChild("ReviveAnimationFinished") or Instance.new("RemoteEvent")
++    reviveAnimationFinished.Name = "ReviveAnimationFinished"
++    reviveAnimationFinished.Parent = remotes
++    reviveAnimationFinished.OnServerEvent:Connect(finishRevive)
++
+     Players.PlayerAdded:Connect(function(player)
+         task.defer(createCharacter, player)
+     end)
+diff --git a/src/server/monster/MonsterAIService.luau b/src/server/monster/MonsterAIService.luau
+index feeae94..c173a77 100644
+--- a/src/server/monster/MonsterAIService.luau
++++ b/src/server/monster/MonsterAIService.luau
+@@ -5,6 +5,7 @@
+ local PathfindingService = game:GetService("PathfindingService")
+ local Players = game:GetService("Players")
+ local ReplicatedStorage = game:GetService("ReplicatedStorage")
++local RunService = game:GetService("RunService")
+ local Workspace = game:GetService("Workspace")
+ 
+ local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
+@@ -34,8 +35,10 @@ local STUCK_PROGRESS_STUDS = 0.35
+ local WAYPOINT_TOLERANCE = 1.25
+ local ATTACK_PURSUIT_STOP_MARGIN = 0.35
+ local ATTACK_PURSUIT_SPEED_MULTIPLIER = 1.65
+-local ATTACK_PURSUIT_UPDATE_INTERVAL = 1 / 30
+-local ATTACK_PURSUIT_PLAYBACK_EPSILON = 0.001
++local ATTACK_PURSUIT_FOLLOW_GAIN = 5.5
++local ATTACK_PURSUIT_MIN_CATCHUP_SPEED = 0.75
++local ATTACK_PURSUIT_IDLE_SPEED = 0.08
++local ATTACK_PURSUIT_PLAYBACK_EPSILON = 0.02
+ local ATTACK_ARC_DEGREES = 110
+ local VERTICAL_TOLERANCE = 5
+ 
+@@ -324,7 +327,7 @@ end
+ local function clearAttackPursuit(agent: any)
+     if agent.attackPursuitActive then
+         agent.humanoid:Move(Vector3.zero, false)
+-        agent.humanoid:MoveTo(agent.root.Position)
++        agent.humanoid.WalkSpeed = 0
+         agent.attackPursuitActive = false
+         agent.model:SetAttribute("MonsterAttackPursuitActive", false)
+     else
+@@ -332,12 +335,12 @@ local function clearAttackPursuit(agent: any)
+     end
+ end
+ 
+-local function attackPursuitPlaybackSpeed(agent: any): number
+-    return AnimationSpeedScaling.ResolveScaleForModel(agent.model, "run") * ATTACK_PURSUIT_SPEED_MULTIPLIER
++local function attackPursuitPlaybackSpeed(agent: any, movementMultiplier: number?): number
++    return AnimationSpeedScaling.ResolveScaleForModel(agent.model, "run") * math.max(0.01, movementMultiplier or ATTACK_PURSUIT_SPEED_MULTIPLIER)
+ end
+ 
+-local function publishAttackPursuitPlaybackSpeed(agent: any)
+-    local desired = attackPursuitPlaybackSpeed(agent)
++local function publishAttackPursuitPlaybackSpeed(agent: any, movementMultiplier: number?)
++    local desired = attackPursuitPlaybackSpeed(agent, movementMultiplier)
+     local current = tonumber(agent.model:GetAttribute("MonsterAttackPursuitPlaybackSpeed"))
+     if current == nil or math.abs(current - desired) > ATTACK_PURSUIT_PLAYBACK_EPSILON then
+         agent.model:SetAttribute("MonsterAttackPursuitPlaybackSpeed", desired)
+@@ -358,27 +361,47 @@ local function leaveCombat(agent: any)
+     setState(agent, "Idle")
+ end
+ 
+-local function pursueDirectlyDuringAttack(agent: any, destination: Vector3): boolean
+-    local distance = horizontalDistance(agent.root.Position, destination)
++local function pursueDirectlyDuringAttack(agent: any, targetRoot: BasePart): boolean
++    local offset = horizontalDelta(agent.root.Position, targetRoot.Position)
++    local distance = offset.Magnitude
+     local range = attackRadius(agent)
+-    local stopDistance = math.max(0, range - ATTACK_PURSUIT_STOP_MARGIN)
+-    local shouldMove = if agent.attackPursuitActive then distance > stopDistance else distance > range
+-    if not shouldMove then
++    local preferredDistance = math.max(0, range - ATTACK_PURSUIT_STOP_MARGIN)
++    if distance <= 0.001 then
++        clearAttackPursuit(agent)
++        return false
++    end
++
++    local direction = offset.Unit
++    local targetVelocity = horizontalDelta(Vector3.zero, targetRoot.AssemblyLinearVelocity)
++    local targetRetreatSpeed = math.max(0, targetVelocity:Dot(direction))
++    local maximumSpeed = runSpeedStuds(agent) * ATTACK_PURSUIT_SPEED_MULTIPLIER
++    local distanceError = math.max(0, distance - preferredDistance)
++    local correctionSpeed = distanceError * ATTACK_PURSUIT_FOLLOW_GAIN
++    local desiredSpeed = math.min(maximumSpeed, targetRetreatSpeed + correctionSpeed)
++    if distance > range then
++        desiredSpeed = math.max(desiredSpeed, math.min(maximumSpeed, targetRetreatSpeed + ATTACK_PURSUIT_MIN_CATCHUP_SPEED))
++    end
++
++    if desiredSpeed <= ATTACK_PURSUIT_IDLE_SPEED then
+         clearAttackPursuit(agent)
+         return false
+     end
++
+     local enteringPursuit = not agent.attackPursuitActive
+     agent.attackPursuitActive = true
+-    agent.humanoid.WalkSpeed = runSpeedStuds(agent) * ATTACK_PURSUIT_SPEED_MULTIPLIER
++    agent.humanoid.WalkSpeed = desiredSpeed
+     agent.humanoid.AutoRotate = true
+-    -- Preserve the RobloxLineage direct MoveTo contract, but refresh the live
+-    -- target from a dedicated fast pursuit loop instead of the 0.10s AI tick.
+-    -- Never write RootPart.CFrame while this is active: Humanoid owns motion/turn.
+-    agent.humanoid:MoveTo(destination)
++    -- Active-attack pursuit is a continuous velocity command, not a stream of
++    -- MoveTo destinations. Reissuing MoveTo around the attack-radius boundary
++    -- produces visible stop/catch-up pulses when player and monster speeds are
++    -- close. Humanoid:Move keeps one continuous locomotion owner for the attack.
++    agent.humanoid:Move(direction, false)
++    agent.facing = direction
+     if enteringPursuit then
+         agent.model:SetAttribute("MonsterAttackPursuitActive", true)
+     end
+-    publishAttackPursuitPlaybackSpeed(agent)
++    local baseRunSpeed = math.max(0.001, runSpeedStuds(agent))
++    publishAttackPursuitPlaybackSpeed(agent, desiredSpeed / baseRunSpeed)
+     return true
+ end
+ 
+@@ -394,16 +417,11 @@ local function maintainAttackPursuit(agent: any, target: Model, serial: number)
+                 clearAttackPursuit(agent)
+                 return
+             end
+-            local direction = liveRoot.Position - agent.root.Position
+-            local pursuing = pursueDirectlyDuringAttack(agent, liveRoot.Position)
+-            local flatDirection = horizontalDelta(Vector3.zero, direction)
+-            if flatDirection.Magnitude > 0.001 then
+-                agent.facing = flatDirection.Unit
+-            end
++            local pursuing = pursueDirectlyDuringAttack(agent, liveRoot)
+             if not pursuing then
+-                faceDirection(agent, direction)
++                faceDirection(agent, liveRoot.Position - agent.root.Position)
+             end
+-            task.wait(ATTACK_PURSUIT_UPDATE_INTERVAL)
++            RunService.Heartbeat:Wait()
+         end
+     end)
+ end
+@@ -589,7 +607,7 @@ local function bindMonster(model: Model)
+         if runRow then
+             model:SetAttribute("MonsterRunAnimationId", tostring(runRow.assetId or tostring(runRow.animationId):match("(%d+)$") or ""))
+             model:SetAttribute("MonsterAnimationPhase", random:NextNumber(0, 0.999))
+-            publishAttackPursuitPlaybackSpeed(agent)
++            publishAttackPursuitPlaybackSpeed(agent, ATTACK_PURSUIT_SPEED_MULTIPLIER)
+         end
+         model:SetAttribute("MonsterAttackPursuitActive", false)
+         model:SetAttribute("MonsterAIState", "Idle")
+diff --git a/src/shared/RuntimeVersion.luau b/src/shared/RuntimeVersion.luau
+index 004106c..eb52ea9 100644
+--- a/src/shared/RuntimeVersion.luau
++++ b/src/shared/RuntimeVersion.luau
+@@ -1 +1 @@
+-return table.freeze({ Version = "2026.10.07.024", SourceDigest = "game1-m24-smooth-attack-pursuit-return-to-town" })
++return table.freeze({ Version = "2026.10.07.025", SourceDigest = "game1-m25-continuous-attack-pursuit-revive" })
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index b4773f1..26ccfde 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -1439,32 +1439,52 @@ for required in ["IncomingDamageNumber", "Color3.fromRGB(255, 82, 82)", "CombatD
+ if "CombatFeedbackService.PublishDamage" not in damage_m23:
+     err("DamageService does not publish authoritative damage feedback")
+ 
+-# m24 smooth active-attack pursuit + explicit Return to Town death recovery.
+-monster_ai_m24 = (ROOT / "src/server/monster/MonsterAIService.luau").read_text(encoding="utf-8")
++# m25 continuous active-attack pursuit + authored return-to-town revive.
++monster_ai_m25 = (ROOT / "src/server/monster/MonsterAIService.luau").read_text(encoding="utf-8")
+ for required in [
+-    "ATTACK_PURSUIT_UPDATE_INTERVAL = 1 / 30",
+-    "maintainAttackPursuit",
+-    "publishAttackPursuitPlaybackSpeed",
+-    "The slower AI decision loop must not issue competing MoveTo calls",
++    'RunService.Heartbeat:Wait()',
++    'agent.humanoid:Move(direction, false)',
++    'ATTACK_PURSUIT_FOLLOW_GAIN',
++    'targetRoot.AssemblyLinearVelocity',
++    'The slower AI decision loop must not issue competing MoveTo calls',
+ ]:
+-    if required not in monster_ai_m24:
+-        err(f"m24 smooth attack pursuit contract missing {required}")
+-if 'agent.model:SetAttribute("MonsterAttackPursuitPlaybackSpeed", AnimationSpeedScaling.ResolveScaleForModel(agent.model, "run") * multiplier)' in monster_ai_m24:
+-    err("attack pursuit must not republish lower-body playback on every AI tick")
+-
+-character_service_m24 = (ROOT / "src/server/character/CharacterService.luau").read_text(encoding="utf-8")
+-death_respawn_path_m24 = ROOT / "src/client/character/DeathRespawnController.luau"
+-death_respawn_m24 = death_respawn_path_m24.read_text(encoding="utf-8") if death_respawn_path_m24.is_file() else ""
++    if required not in monster_ai_m25:
++        err(f"m25 continuous attack pursuit contract missing {required}")
++pursuit_body_m25 = monster_ai_m25.split('local function pursueDirectlyDuringAttack', 1)[-1].split('local function maintainAttackPursuit', 1)[0]
++if 'MoveTo(' in pursuit_body_m25:
++    err("active-attack pursuit must not stream MoveTo destinations")
++
++monster_sampler_m25 = (ROOT / "src/client/monster/MonsterLocomotionSampler.luau").read_text(encoding="utf-8")
++monster_compositor_m25 = (ROOT / "src/client/monster/MonsterAttackLocomotionController.luau").read_text(encoding="utf-8")
++for required in ['SetPlaybackSpeed', 'AdjustSpeed(speed)']:
++    if required not in monster_sampler_m25:
++        err(f"monster pursuit sampler live-speed contract missing {required}")
++for required in ['suppressHorizontalAttackRootMotion', 'Game1RuntimeAnimationRoot', 'transform.Position.Y', 'entry.sampler:SetPlaybackSpeed']:
++    if required not in monster_compositor_m25:
++        err(f"monster pursuit visual stabilization missing {required}")
++if 'releaseSampler(entry)\n\t\t\tif model:GetAttribute("MonsterAttackPursuitActive")' in monster_compositor_m25:
++    err("pursuit playback changes must not rebuild the locomotion sampler")
++
++character_service_m25 = (ROOT / "src/server/character/CharacterService.luau").read_text(encoding="utf-8")
++death_respawn_path_m25 = ROOT / "src/client/character/DeathRespawnController.luau"
++death_respawn_m25 = death_respawn_path_m25.read_text(encoding="utf-8") if death_respawn_path_m25.is_file() else ""
++character_animation_m25 = (ROOT / "src/client/character/animation/CharacterAnimationController.luau").read_text(encoding="utf-8")
+ for required in ["ReturnToTownAvailable", "CharacterService.ReturnToTown", 'RemoteFunction', 'returnToTown.OnServerInvoke']:
+-    if required not in character_service_m24:
++    if required not in character_service_m25:
+         err(f"return-to-town server contract missing {required}")
+-if 'createCharacter(player, tostring(player:GetAttribute("SelectedCharacterArchetype") or ""))' in character_service_m24.split('local function beginPlayerDeathIdle', 1)[-1].split('createCharacter = function', 1)[0]:
++if 'createCharacter(player, tostring(player:GetAttribute("SelectedCharacterArchetype") or ""))' in character_service_m25.split('local function beginPlayerDeathIdle', 1)[-1].split('createCharacter = function', 1)[0]:
+     err("player death lifecycle must not auto-respawn after DeathIdle")
+ for required in ["Game1DeathRespawn", "В город", "ReturnToTown", 'LifeState") or "") == "DeathIdle"']:
+-    if required not in death_respawn_m24:
++    if required not in death_respawn_m25:
+         err(f"return-to-town client UI missing {required}")
+-client_init_m24 = (ROOT / "src/client/init.client.luau").read_text(encoding="utf-8")
+-if "DeathRespawnController.Start()" not in client_init_m24:
++for required in ['reviveOnSpawn', 'LifeState", "Reviving"', 'RevivePending', 'ReviveAnimationFinished', 'createCharacter(player, requested, true)']:
++    if required not in character_service_m25:
++        err(f"return-to-town revive server contract missing {required}")
++for required in ['current == "Reviving"', 'playBaseLifeAction("revive"', 'notifyReviveAnimationFinished', 'lastLifeState == "Reviving"']:
++    if required not in character_animation_m25:
++        err(f"return-to-town revive animation contract missing {required}")
++client_init_m25 = (ROOT / "src/client/init.client.luau").read_text(encoding="utf-8")
++if "DeathRespawnController.Start()" not in client_init_m25:
+     err("death respawn controller is not started")
+ 
+ if errors:
+@@ -1473,7 +1493,7 @@ if errors:
+         print(" -", item)
+     sys.exit(1)
+ 
+-print("verify ok · game1 m24 smooth attack pursuit + return-to-town respawn passed")
++print("verify ok · game1 m25 continuous attack pursuit + authored revive respawn passed")
+ print("registered character archetypes:", len(archetypes))
+ print("active character archetype:", active_id or "none")
+ print("race pool: human")

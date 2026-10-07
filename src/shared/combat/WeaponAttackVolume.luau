@@ -2,7 +2,7 @@ local WeaponAttackVolume = {}
 
 local BOX_LOCAL_ATTRIBUTE = "WeaponAttackBoxLocalCFrame"
 local BOX_SIZE_ATTRIBUTE = "WeaponAttackBoxSize"
-local GRIP_BOX_LOCAL_ATTRIBUTE = "WeaponAttackGripBoxLocalPosition"
+local BONE_BOX_LOCAL_ATTRIBUTE = "WeaponAttackBoneBoxLocalPosition"
 
 local function finiteNumber(value: number): boolean
     return value == value and value > -math.huge and value < math.huge
@@ -21,6 +21,15 @@ local function axisForBox(boxCFrame: CFrame, boxSize: Vector3): (Vector3, string
     return boxCFrame.LookVector, "Z", boxSize.Z
 end
 
+local function axisCoordinate(value: Vector3, axisName: string): number
+    if axisName == "X" then
+        return value.X
+    elseif axisName == "Y" then
+        return value.Y
+    end
+    return value.Z
+end
+
 local function setAxisLength(size: Vector3, axisName: string, length: number): Vector3
     if axisName == "X" then
         return Vector3.new(length, size.Y, size.Z)
@@ -30,34 +39,27 @@ local function setAxisLength(size: Vector3, axisName: string, length: number): V
     return Vector3.new(size.X, size.Y, length)
 end
 
-local function outwardDirection(
-    rootPosition: Vector3,
-    boxCFrame: CFrame,
-    axis: Vector3,
-    axisLength: number,
-    gripBoxLocalPosition: Vector3?
-): Vector3
-    local half = math.max(0, axisLength) * 0.5
-    local positive = boxCFrame.Position + axis * half
-    local negative = boxCFrame.Position - axis * half
-
-    -- The runtime grip is normally authored on the handle. Prefer the opposite
-    -- end of the longest weapon axis, so the continuation always leaves from
-    -- the blade/head side and cannot flip just because an animation crosses the
-    -- character root. Root distance is only a compatibility fallback.
-    if typeof(gripBoxLocalPosition) == "Vector3" then
-        local gripWorld = boxCFrame:PointToWorldSpace(gripBoxLocalPosition)
-        local positiveDistance = (positive - gripWorld).Magnitude
-        local negativeDistance = (negative - gripWorld).Magnitude
-        if math.abs(positiveDistance - negativeDistance) > 1e-4 then
-            return if negativeDistance > positiveDistance then -axis else axis
-        end
+local function bladeGeometry(
+    weaponBoxCFrame: CFrame,
+    weaponBoxSize: Vector3,
+    weaponBoneBoxLocalPosition: Vector3
+)
+    local axis, axisName, axisLength = axisForBox(weaponBoxCFrame, weaponBoxSize)
+    local halfLength = axisLength * 0.5
+    local boneAxis = math.clamp(axisCoordinate(weaponBoneBoxLocalPosition, axisName), -halfLength, halfLength)
+    local positiveLength = halfLength - boneAxis
+    local negativeLength = boneAxis + halfLength
+    local directionSign = if positiveLength >= negativeLength then 1 else -1
+    local bladeLength = if directionSign > 0 then positiveLength else negativeLength
+    if bladeLength <= 1e-4 then
+        return nil
     end
 
-    if (negative - rootPosition).Magnitude > (positive - rootPosition).Magnitude then
-        return -axis
-    end
-    return axis
+    local bladeCenterAxis = (boneAxis + directionSign * halfLength) * 0.5
+    local direction = axis * directionSign
+    local bladeCenter = weaponBoxCFrame.Position + axis * bladeCenterAxis
+    local weaponTip = weaponBoxCFrame.Position + axis * (directionSign * halfLength)
+    return direction, axisName, bladeLength, bladeCenter, weaponTip
 end
 
 local function distanceToSphereExit(rootPosition: Vector3, startPosition: Vector3, direction: Vector3, radius: number): number
@@ -80,11 +82,15 @@ function WeaponAttackVolume.StampWeaponBox(weapon: Model): (CFrame, Vector3)
     weapon:SetAttribute(BOX_LOCAL_ATTRIBUTE, localCFrame)
     weapon:SetAttribute(BOX_SIZE_ATTRIBUTE, boxSize)
 
+    -- Game1WeaponGrip is aligned exactly to the character weapon socket bone when
+    -- the weapon is equipped. Persist that point in attack-box space so every
+    -- animated pose can reconstruct the weapon-bone plane without counting the
+    -- handle behind it as an attacking surface.
     local grip = weapon:FindFirstChild("Game1WeaponGrip", true)
     if grip and grip:IsA("Attachment") then
-        weapon:SetAttribute(GRIP_BOX_LOCAL_ATTRIBUTE, boxCFrame:PointToObjectSpace(grip.WorldPosition))
+        weapon:SetAttribute(BONE_BOX_LOCAL_ATTRIBUTE, boxCFrame:PointToObjectSpace(grip.WorldPosition))
     else
-        weapon:SetAttribute(GRIP_BOX_LOCAL_ATTRIBUTE, nil)
+        weapon:SetAttribute(BONE_BOX_LOCAL_ATTRIBUTE, nil)
     end
     return localCFrame, boxSize
 end
@@ -110,9 +116,9 @@ function WeaponAttackVolume.ReadEquippedWeaponBox(character: Model): (CFrame?, V
     return boxCFrame, boxSize, weapon
 end
 
-function WeaponAttackVolume.ReadGripBoxLocalPosition(weapon: Model): Vector3?
-    local value = weapon:GetAttribute(GRIP_BOX_LOCAL_ATTRIBUTE)
-    return if typeof(value) == "Vector3" then value else nil
+function WeaponAttackVolume.ReadWeaponBoneBoxLocalPosition(weapon: Model): Vector3?
+    local value = weapon:GetAttribute(BONE_BOX_LOCAL_ATTRIBUTE)
+    return if typeof(value) == "Vector3" and finiteVector(value) then value else nil
 end
 
 function WeaponAttackVolume.Build(
@@ -120,14 +126,16 @@ function WeaponAttackVolume.Build(
     weaponBoxCFrame: CFrame,
     weaponBoxSize: Vector3,
     attackRadius: number,
-    gripBoxLocalPosition: Vector3?
+    weaponBoneBoxLocalPosition: Vector3?
 ): any?
     if typeof(rootPosition) ~= "Vector3"
         or typeof(weaponBoxCFrame) ~= "CFrame"
         or typeof(weaponBoxSize) ~= "Vector3"
+        or typeof(weaponBoneBoxLocalPosition) ~= "Vector3"
         or not finiteVector(rootPosition)
         or not finiteVector(weaponBoxCFrame.Position)
         or not finiteVector(weaponBoxSize)
+        or not finiteVector(weaponBoneBoxLocalPosition)
     then
         return nil
     end
@@ -137,23 +145,32 @@ function WeaponAttackVolume.Build(
         return nil
     end
 
-    local axis, axisName, axisLength = axisForBox(weaponBoxCFrame, weaponBoxSize)
-    local direction = outwardDirection(rootPosition, weaponBoxCFrame, axis, axisLength, gripBoxLocalPosition)
-    local weaponTip = weaponBoxCFrame.Position + direction * (axisLength * 0.5)
+    local direction, axisName, bladeLength, bladeCenter, weaponTip = bladeGeometry(
+        weaponBoxCFrame,
+        weaponBoxSize,
+        weaponBoneBoxLocalPosition
+    )
+    if not direction then
+        return nil
+    end
+
     local extension = distanceToSphereExit(rootPosition, weaponTip, direction, radius)
 
-    -- The gameplay volume is one OBB: the physical EquippedWeapon box plus a
-    -- continuation along its longest axis. Because the box orientation comes
-    -- from the animated weapon itself, a different attack pose creates a
-    -- different hit volume without any aim-sector approximation.
-    local volumeCFrame = weaponBoxCFrame + direction * (extension * 0.5)
-    local volumeSize = setAxisLength(weaponBoxSize, axisName, axisLength + extension)
+    -- The physical source segment begins at the character weapon bone and ends
+    -- at the blade tip. The handle side of the imported weapon box is excluded.
+    -- The existing attack-radius continuation still starts at that blade tip, so
+    -- the complete attacking OBB can never extend backwards through the handle.
+    local volumeCFrame = CFrame.fromMatrix(bladeCenter, weaponBoxCFrame.XVector, weaponBoxCFrame.YVector, weaponBoxCFrame.ZVector)
+        + direction * (extension * 0.5)
+    local volumeSize = setAxisLength(weaponBoxSize, axisName, bladeLength + extension)
 
     return {
         cframe = volumeCFrame,
         size = volumeSize,
         direction = direction,
         extension = extension,
+        bladeLength = bladeLength,
+        weaponBonePosition = bladeCenter - direction * (bladeLength * 0.5),
         weaponTip = weaponTip,
         radius = radius,
         axis = axisName,

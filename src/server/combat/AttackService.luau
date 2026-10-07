@@ -20,6 +20,8 @@ local activeSerial: { [Player]: number } = {}
 local activeClientAttackId: { [Player]: number } = {}
 local weaponPoseBuffers: { [Player]: any } = {}
 local activeHitTargets: { [Player]: { [Model]: boolean } } = {}
+local activeDamageUntil: { [Player]: number } = {}
+local activeDamageCutoffElapsed: { [Player]: number } = {}
 
 local function rowsForEquippedAttack(character: Model): any
     local profileId = tostring(character:GetAttribute("AnimationProfileId") or character:GetAttribute("CharacterArchetype") or "")
@@ -48,6 +50,18 @@ local function allowedAttackDescriptor(character: Model, clipId: string): any?
         end
     end
     return nil
+end
+
+local function meleeHitTime(timing: any): number?
+    local hit = timing and timing.events and timing.events.Hit
+    if type(hit) ~= "table" or tostring(hit.result or "") ~= AttackTimelineConfig.ResultTypes.MeleeDamage then
+        return nil
+    end
+    local hitTime = tonumber(hit.time)
+    if hitTime == nil then
+        return nil
+    end
+    return math.clamp(hitTime, 0, math.max(0, tonumber(timing.duration) or 0))
 end
 
 local function applyDamageInVolume(
@@ -127,7 +141,7 @@ local function applyAnimatedWeaponSweep(
     currentBoxCFrame: CFrame
 ): number
     local attackRange = math.clamp(tonumber(character:GetAttribute("AttackRadius")) or Config.Range, 1, Config.MaxAimDistance)
-    local gripBoxLocalPosition = WeaponAttackVolume.ReadGripBoxLocalPosition(weapon)
+    local weaponBoneBoxLocalPosition = WeaponAttackVolume.ReadWeaponBoneBoxLocalPosition(weapon)
     local hitTargets = activeHitTargets[player]
     if not hitTargets then
         hitTargets = {}
@@ -149,7 +163,7 @@ local function applyAnimatedWeaponSweep(
         local sampledBoxCFrame = if typeof(previousBoxCFrame) == "CFrame"
             then previousBoxCFrame:Lerp(currentBoxCFrame, alpha)
             else currentBoxCFrame
-        local volume = WeaponAttackVolume.Build(root.Position, sampledBoxCFrame, boxSize, attackRange, gripBoxLocalPosition)
+        local volume = WeaponAttackVolume.Build(root.Position, sampledBoxCFrame, boxSize, attackRange, weaponBoneBoxLocalPosition)
         if volume then
             hitCount += applyDamageInVolume(
                 player,
@@ -216,8 +230,8 @@ local function validatedAnimatedWeaponVolume(
         return nil, "invalid_weapon_pose"
     end
 
-    local gripBoxLocalPosition = WeaponAttackVolume.ReadGripBoxLocalPosition(weapon)
-    local volume = WeaponAttackVolume.Build(root.Position, sample.boxCFrame, boxSize, attackRange, gripBoxLocalPosition)
+    local weaponBoneBoxLocalPosition = WeaponAttackVolume.ReadWeaponBoneBoxLocalPosition(weapon)
+    local volume = WeaponAttackVolume.Build(root.Position, sample.boxCFrame, boxSize, attackRange, weaponBoneBoxLocalPosition)
     if not volume then
         return nil, "invalid_weapon_volume"
     end
@@ -240,6 +254,16 @@ local function resolveMeleeDamage(
         return
     end
 
+    local cutoffElapsed = activeDamageCutoffElapsed[player]
+    if cutoffElapsed == nil or hitElapsed > cutoffElapsed + 1e-4 then
+        return
+    end
+
+    -- Hit is the terminal damage moment. Close the continuous contact window
+    -- before resolving this exact timeline checkpoint so no later pose packet
+    -- can deal damage, even if it arrives in the same server frame.
+    activeDamageUntil[player] = nil
+
     local root = character:FindFirstChild("RootCollider")
     if not root or not root:IsA("BasePart") then
         return
@@ -255,8 +279,9 @@ local function resolveMeleeDamage(
         return
     end
 
-    -- Equipped weapons use the animated weapon OBB itself as the basis for
-    -- damage. Its longest axis is extended only up to AttackRadius.
+    -- Final Hit checkpoint uses the same bone-to-blade attacking OBB as the
+    -- continuous pre-Hit sweep. It may register contact at Hit itself, but never
+    -- reopens the damage window afterwards.
     local hitCount = applyDamageInVolume(
         player,
         character,
@@ -284,7 +309,7 @@ local function scheduleTimelineResults(
     for eventName, event in pairs(timing.events or {}) do
         local resultType = tostring(event.result or "")
         local delaySeconds = math.max(0, tonumber(event.time) or 0)
-        if resultType == AttackTimelineConfig.ResultTypes.MeleeDamage then
+        if eventName == "Hit" and resultType == AttackTimelineConfig.ResultTypes.MeleeDamage then
             task.delay(delaySeconds, function()
                 resolveMeleeDamage(player, character, serial, clientAttackId, delaySeconds)
             end)
@@ -303,12 +328,15 @@ local function clearAttackStateLater(player: Player, character: Model, serial: n
         activeSerial[player] = nil
         activeClientAttackId[player] = nil
         activeHitTargets[player] = nil
+        activeDamageUntil[player] = nil
+        activeDamageCutoffElapsed[player] = nil
         local buffer = weaponPoseBuffers[player]
         if buffer and buffer.clientAttackId == clientAttackId then
             weaponPoseBuffers[player] = nil
         end
         if character.Parent and tonumber(character:GetAttribute("AttackSerial")) == serial then
             character:SetAttribute("AttackEndsAt", nil)
+            character:SetAttribute("AttackDamageEndsAt", nil)
             character:SetAttribute("AttackClipId", nil)
         end
     end)
@@ -357,6 +385,14 @@ local function attack(player: Player, payload: any)
         return
     end
 
+    local hitTime = meleeHitTime(timing)
+    if hitTime == nil then
+        if Config.DebugLogs then
+            print(("[game1][attack] reject player=%s reason=missing_melee_hit_event clip=%s"):format(player.Name, clipId))
+        end
+        return
+    end
+
     local now = os.clock()
     if now < (activeUntil[player] or 0) then
         return
@@ -368,14 +404,17 @@ local function attack(player: Player, payload: any)
     activeClientAttackId[player] = clientAttackId
     activeUntil[player] = now + attackDuration
     activeHitTargets[player] = {}
+    activeDamageCutoffElapsed[player] = hitTime
+    activeDamageUntil[player] = now + hitTime
     character:SetAttribute("AttackSerial", serial)
     character:SetAttribute("AttackClipId", clipId)
     character:SetAttribute("AttackStartedAt", now)
     character:SetAttribute("AttackEndsAt", now + attackDuration)
+    character:SetAttribute("AttackDamageEndsAt", now + hitTime)
 
-    -- Equipped weapon damage is resolved continuously from accepted animated
-    -- pose contacts. The authored Hit event remains a timing checkpoint for the
-    -- same weapon volume; no alternate melee volume is used.
+    -- Equipped weapon damage is contact-driven only from attack start through
+    -- the authored Hit moment. Hit itself is the terminal checkpoint; the rest
+    -- of the animation is presentation/cooldown only and cannot deal damage.
     scheduleTimelineResults(player, character, serial, clientAttackId, timing)
     clearAttackStateLater(player, character, serial, clientAttackId, attackDuration)
 end
@@ -402,6 +441,19 @@ local function recordWeaponPose(player: Player, payload: any)
         return
     end
 
+    local elapsed = math.max(0, tonumber(payload.elapsed) or 0)
+    local damageUntil = activeDamageUntil[player]
+    local damageCutoffElapsed = activeDamageCutoffElapsed[player]
+    if activeClientAttackId[player] ~= clientAttackId
+        or activeSerial[player] == nil
+        or damageUntil == nil
+        or damageCutoffElapsed == nil
+        or os.clock() > damageUntil
+        or elapsed > damageCutoffElapsed + 1e-4
+    then
+        return
+    end
+
     local _, boxSize = WeaponAttackVolume.ReadWeaponBox(weapon)
     if not boxSize then
         return
@@ -412,7 +464,6 @@ local function recordWeaponPose(player: Player, payload: any)
         return
     end
 
-    local elapsed = math.max(0, tonumber(payload.elapsed) or 0)
     local buffer = weaponPoseBuffers[player]
     if not buffer or buffer.character ~= character or buffer.clientAttackId ~= clientAttackId then
         buffer = {
@@ -431,19 +482,16 @@ local function recordWeaponPose(player: Player, payload: any)
         table.remove(buffer.samples, 1)
     end
 
-    -- Weapon attacks are contact-driven, not single-frame timeline snapshots.
-    -- Every accepted animated weapon pose participates in the attack sweep while
-    -- this attack is active. Interpolate between samples so a fast blade cannot
-    -- tunnel through a target between two 30 Hz pose packets. Each target is
-    -- damaged at most once per attack, while different intersected targets can
-    -- all be damaged by the same sweep.
+    -- Accepted poses sweep continuously only up to the authored Hit event.
+    -- Interpolation prevents tunnelling between 30 Hz packets; one target is
+    -- still damaged at most once per attack.
     local serial = activeSerial[player]
-    local attackEndsAt = activeUntil[player]
     local lastDamageElapsed = tonumber(buffer.lastDamageElapsed)
     if serial
         and activeClientAttackId[player] == clientAttackId
-        and attackEndsAt ~= nil
-        and os.clock() <= attackEndsAt
+        and activeDamageUntil[player] ~= nil
+        and os.clock() <= activeDamageUntil[player]
+        and elapsed <= damageCutoffElapsed + 1e-4
         and (lastDamageElapsed == nil or elapsed + 1e-4 >= lastDamageElapsed)
     then
         local previousBoxCFrame = if typeof(buffer.lastDamageBoxCFrame) == "CFrame" then buffer.lastDamageBoxCFrame else nil
@@ -482,6 +530,8 @@ function AttackService.Start()
         activeSerial[player] = nil
         activeClientAttackId[player] = nil
         activeHitTargets[player] = nil
+        activeDamageUntil[player] = nil
+        activeDamageCutoffElapsed[player] = nil
         weaponPoseBuffers[player] = nil
     end)
 end

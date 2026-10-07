@@ -109,9 +109,17 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
             return
         end
 
+        local hitEvent = action.timeline and action.timeline.events and action.timeline.events.Hit
+        local hitTime = tonumber(hitEvent and hitEvent.time)
+        if hitTime == nil then
+            warn(("[game1][attack] action has no Hit timeline event: %s"):format(tostring(action.clipId)))
+            return
+        end
+
         attackSequence += 1
         local sequence = attackSequence
         local attackDuration = math.max(0.05, tonumber(action.durationSeconds) or 0.05)
+        local damagePoseDuration = math.clamp(hitTime, 0, attackDuration)
         local movingAtAttackStart = movementController and movementController.IsMoving and movementController.IsMoving() or false
         if movementController and movementController.BeginAttackMovement then
             -- Every weapon may attack while moving. The equipped weapon type
@@ -155,14 +163,12 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
             finishPresentation(sequence)
         end)
 
-        -- The server validates clipId against the equipped animation profile and
-        -- resolves the same authoritative timeline before scheduling any result.
-        -- The server resolves damage from the animated EquippedWeapon box at
-        -- the configured Hit event. Keep streaming that box while this local
-        -- attack is alive; the server validates the canonical dimensions/range.
+        -- The server validates the same authored Hit event. Weapon contact is
+        -- damaging only from attack start through Hit, so pose streaming stops at
+        -- that moment even though presentation/cooldown continues to clip end.
         activePoseAttackId = sequence
         activePoseStartedAt = os.clock()
-        activePoseUntil = activePoseStartedAt + attackDuration
+        activePoseUntil = activePoseStartedAt + damagePoseDuration
         poseAccumulator = 0
         attack:FireServer({
             aim = target,

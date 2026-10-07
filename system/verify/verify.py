@@ -1571,7 +1571,7 @@ for required in [
     "WeaponAttackVolume.ReadEquippedWeaponBox",
     "WeaponAttackVolume.Build",
     "distanceToSphereExit",
-    "outwardDirection",
+    "bladeGeometry",
 ]:
     if required not in weapon_volume_m27:
         err(f"m27 animated weapon hit-volume contract missing {required}")
@@ -1615,8 +1615,8 @@ for required in [
         err(f"m27 Test Loadout weapon-volume preview missing {required}")
 
 # m29 contact-driven animated weapon sweep. Damage is no longer gated by one
-# timeline frame; every accepted attack pose is queried, with interpolation and
-# one-hit-per-target deduplication across the complete attack.
+# timeline frame; accepted poses are queried continuously with interpolation and
+# one-hit-per-target deduplication. m32 narrows that sweep to the pre-Hit window.
 attack_service_m29 = (ROOT / "src/server/combat/AttackService.luau").read_text(encoding="utf-8")
 for required in [
     "activeHitTargets",
@@ -1712,13 +1712,61 @@ if 'SetAttribute("CombatHitboxCount", hitbox.count)' not in monster_m31:
     err("m31 monster runtime must publish CombatHitboxCount")
 
 
+# m32 terminal Hit window + blade-side weapon volume. Continuous contact is
+# allowed only through the authored Hit event; imported handle geometry behind
+# the character weapon bone is never part of the attacking OBB.
+weapon_volume_m32 = (ROOT / "src/shared/combat/WeaponAttackVolume.luau").read_text(encoding="utf-8")
+for required in [
+    'BONE_BOX_LOCAL_ATTRIBUTE = "WeaponAttackBoneBoxLocalPosition"',
+    "bladeGeometry",
+    "ReadWeaponBoneBoxLocalPosition",
+    "weaponBonePosition",
+    "bladeLength + extension",
+]:
+    if required not in weapon_volume_m32:
+        err(f"m32 bone-to-blade volume contract missing {required}")
+for forbidden in ["ReadGripBoxLocalPosition", "outwardDirection"]:
+    if forbidden in weapon_volume_m32:
+        err(f"m32 obsolete handle-inclusive weapon-volume path remains: {forbidden}")
+
+attack_service_m32 = (ROOT / "src/server/combat/AttackService.luau").read_text(encoding="utf-8")
+for required in [
+    "activeDamageUntil",
+    "activeDamageCutoffElapsed",
+    "meleeHitTime",
+    'SetAttribute("AttackDamageEndsAt"',
+    'eventName == "Hit"',
+    "elapsed > damageCutoffElapsed + 1e-4",
+    "activeDamageUntil[player] = nil",
+    "ReadWeaponBoneBoxLocalPosition",
+]:
+    if required not in attack_service_m32:
+        err(f"m32 terminal Hit damage-window contract missing {required}")
+
+attack_controller_m32 = (ROOT / "src/client/combat/AttackController.luau").read_text(encoding="utf-8")
+for required in [
+    "action.timeline and action.timeline.events and action.timeline.events.Hit",
+    "damagePoseDuration",
+    "activePoseUntil = activePoseStartedAt + damagePoseDuration",
+]:
+    if required not in attack_controller_m32:
+        err(f"m32 client pose cutoff contract missing {required}")
+
+test_loadout_m32 = (ROOT / "src/client/dev/TestLoadoutController.luau").read_text(encoding="utf-8")
+if "ReadWeaponBoneBoxLocalPosition" not in test_loadout_m32:
+    err("m32 Test Loadout weapon-volume preview must use the weapon-bone cutoff")
+if "ReadGripBoxLocalPosition" in test_loadout_m32:
+    err("m32 Test Loadout still uses obsolete grip/handle volume origin")
+
+
+
 if errors:
     print("verify failed")
     for item in errors:
         print(" -", item)
     sys.exit(1)
 
-print("verify ok · game1 m31 precomputed bone-local hitboxes passed")
+print("verify ok · game1 m32 terminal-Hit blade-volume policy passed")
 print("registered character archetypes:", len(archetypes))
 print("active character archetype:", active_id or "none")
 print("race pool: human")

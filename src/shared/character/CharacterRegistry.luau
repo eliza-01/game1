@@ -18,7 +18,7 @@ return table.freeze({
 				Defense = 0,
 				AttackSpeed = 100,
 				RunSpeed = 110,
-				CritChance = 0,
+				CritChance = 10,
 			}),
 			model = table.freeze({
 				assetId = "100818559287050",

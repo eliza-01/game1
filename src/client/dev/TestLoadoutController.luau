@@ -735,8 +735,8 @@ function TestLoadoutController.Start()
                 return
             end
             local radius = math.max(1, tonumber(currentCharacter:GetAttribute("AttackRadius")) or 7)
-            local gripBoxLocalPosition = WeaponAttackVolume.ReadGripBoxLocalPosition(equippedWeapon)
-            local volume = WeaponAttackVolume.Build(root.Position, weaponBoxCFrame, weaponBoxSize, radius, gripBoxLocalPosition)
+            local weaponBoneBoxLocalPosition = WeaponAttackVolume.ReadWeaponBoneBoxLocalPosition(equippedWeapon)
+            local volume = WeaponAttackVolume.Build(root.Position, weaponBoxCFrame, weaponBoxSize, radius, weaponBoneBoxLocalPosition)
             if not volume then
                 volumePart.Transparency = 1
                 return

@@ -24,7 +24,7 @@
         "Defense": 0,
         "AttackSpeed": 100,
         "RunSpeed": 110,
-        "CritChance": 0
+        "CritChance": 10
       },
       "model": {
         "sourcePath": "assets/source/characters/human/female/human_female/model/human_female_014.fbx",

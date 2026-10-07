@@ -1487,13 +1487,69 @@ client_init_m25 = (ROOT / "src/client/init.client.luau").read_text(encoding="utf
 if "DeathRespawnController.Start()" not in client_init_m25:
     err("death respawn controller is not started")
 
+# m26 common Options + authoritative combat-state idle + global character death/revive playback.
+options_manifest_path_m26 = ROOT / "assets/manifests/options.json"
+if not options_manifest_path_m26.is_file():
+    err("m26 Options manifest is missing")
+    options_manifest_m26 = {}
+else:
+    options_manifest_m26 = json.loads(options_manifest_path_m26.read_text(encoding="utf-8"))
+combat_options_m26 = options_manifest_m26.get("combat") or {}
+life_options_m26 = options_manifest_m26.get("characterAnimations") or {}
+if float(combat_options_m26.get("stateDurationSeconds") or -1) != 6.0:
+    err("m26 combat state default duration must be 6 seconds")
+for key in ["deathPlaybackPercent", "revivePlaybackPercent"]:
+    value = float(life_options_m26.get(key) or 0)
+    if value < 1 or value > 400:
+        err(f"m26 character life playback option invalid: {key}")
+
+options_store_m26 = (ROOT / "system/control-center/options_store.py").read_text(encoding="utf-8")
+options_html_m26 = (ROOT / "system/control-center/static/index.html").read_text(encoding="utf-8")
+options_js_m26 = (ROOT / "system/control-center/static/options.js").read_text(encoding="utf-8")
+host_agent_m26 = (ROOT / "system/control-center/host_agent.py").read_text(encoding="utf-8")
+for required in ["stateDurationSeconds", "deathPlaybackPercent", "revivePlaybackPercent", "GameOptionsRegistry.luau"]:
+    if required not in options_store_m26:
+        err(f"m26 Options storage missing {required}")
+for required in ["nav-options", "options-view", "combat state duration", "death playback %", "revive playback %"]:
+    if required not in options_html_m26:
+        err(f"m26 Options UI missing {required}")
+for required in ["/api/options", "save-combat-options", "save-character-life-options"]:
+    if required not in options_js_m26 + host_agent_m26:
+        err(f"m26 Options API/UI missing {required}")
+
+combat_state_service_m26 = (ROOT / "src/server/combat/CombatStateService.luau").read_text(encoding="utf-8")
+damage_service_m26 = (ROOT / "src/server/combat/DamageService.luau").read_text(encoding="utf-8")
+for required in ["GameOptions.CombatStateDurationSeconds", 'SetAttribute("InCombat", true)', 'SetAttribute("CombatState", "Combat")', "CombatUntilServerTime", "ActivatePair"]:
+    if required not in combat_state_service_m26:
+        err(f"m26 combat-state service missing {required}")
+if "CombatStateService.ActivatePair(attacker, target)" not in damage_service_m26:
+    err("m26 DamageService must activate combat state for damage dealer and receiver")
+
+character_animation_m26 = (ROOT / "src/client/character/animation/CharacterAnimationController.luau").read_text(encoding="utf-8")
+for required in ['GetAttribute("InCombat") == true', 'return "combat_idle"', "GameOptions.CharacterLifePlaybackPercent"]:
+    if required not in character_animation_m26:
+        err(f"m26 character combat/life animation contract missing {required}")
+monster_spawner_m26 = (ROOT / "src/server/monster/MonsterSpawnerService.luau").read_text(encoding="utf-8")
+for required in ["playCombatIdleState", "combatIdleTrack", 'GetAttribute("InCombat")', 'MonsterAnimationState", "combat_idle"']:
+    if required not in monster_spawner_m26:
+        err(f"m26 monster combat-idle contract missing {required}")
+
+game_options_m26 = (ROOT / "src/shared/GameOptions.luau").read_text(encoding="utf-8")
+game_options_registry_m26 = (ROOT / "src/shared/GameOptionsRegistry.luau").read_text(encoding="utf-8")
+for required in ["CombatStateDurationSeconds", "CharacterLifePlaybackPercent"]:
+    if required not in game_options_m26:
+        err(f"m26 shared GameOptions missing {required}")
+for required in ["stateDurationSeconds", "deathPlaybackPercent", "revivePlaybackPercent"]:
+    if required not in game_options_registry_m26:
+        err(f"m26 generated options registry missing {required}")
+
 if errors:
     print("verify failed")
     for item in errors:
         print(" -", item)
     sys.exit(1)
 
-print("verify ok · game1 m25 continuous attack pursuit + authored revive respawn passed")
+print("verify ok · game1 m26 common options + combat state + life playback passed")
 print("registered character archetypes:", len(archetypes))
 print("active character archetype:", active_id or "none")
 print("race pool: human")

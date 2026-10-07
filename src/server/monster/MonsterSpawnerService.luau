@@ -267,7 +267,7 @@ local function stopIdleState(entry: any)
 end
 
 local function playBaseIdle(model: Model, entry: any)
-    if entry.dying or model:GetAttribute("MonsterCombatActive") == true then
+    if entry.dying or model:GetAttribute("MonsterCombatActive") == true or model:GetAttribute("InCombat") == true then
         return
     end
     stopTrack(entry.walkTrack, entry.walkSeam)
@@ -281,8 +281,24 @@ local function playBaseIdle(model: Model, entry: any)
     end
 end
 
+local function playCombatIdleState(model: Model, entry: any)
+    if entry.dying or model:GetAttribute("MonsterCombatActive") == true then
+        return
+    end
+    stopIdleState(entry)
+    stopTrack(entry.walkTrack, entry.walkSeam)
+    stopTrack(entry.runTrack, entry.runSeam)
+    model:SetAttribute("MonsterAnimationState", "combat_idle")
+    model:SetAttribute("MonsterIdleVariant", "combat")
+    if entry.combatIdleTrack then
+        pcall(function()
+            playTrackAtConfiguredSpeed(model, entry.combatIdleTrack, "combat_idle", 0.1, entry.combatIdleSeam)
+        end)
+    end
+end
+
 local function maybePlayIdleSpecial(model: Model, entry: any)
-    if entry.dying or entry.activeIdleSpecial ~= nil then
+    if entry.dying or entry.activeIdleSpecial ~= nil or model:GetAttribute("InCombat") == true then
         return
     end
     local choice = weightedIdleChoice(entry.idleChoices or {})
@@ -560,7 +576,7 @@ local function chooseWanderTarget(record: any, current: Vector3): (Vector3?, num
 end
 
 local function refreshWanderLocomotion(model: Model, entry: any)
-    if not entry.wandering or entry.dying or model:GetAttribute("MonsterCombatActive") == true then
+    if not entry.wandering or entry.dying or model:GetAttribute("MonsterCombatActive") == true or model:GetAttribute("InCombat") == true then
         return
     end
     local humanoid = entry.humanoid
@@ -627,7 +643,7 @@ local function startWanderLoop(state: any, model: Model, entry: any)
             if state.instances[model] ~= entry or not model.Parent or entry.dying then
                 break
             end
-            if model:GetAttribute("MonsterCombatActive") == true then
+            if model:GetAttribute("MonsterCombatActive") == true or model:GetAttribute("InCombat") == true then
                 continue
             end
 
@@ -661,6 +677,7 @@ local function startWanderLoop(state: any, model: Model, entry: any)
                 and model.Parent
                 and not entry.dying
                 and model:GetAttribute("MonsterCombatActive") ~= true
+                and model:GetAttribute("InCombat") ~= true
                 and os.clock() < (entry.wanderDeadline or math.huge)
             do
                 task.wait(0.1)
@@ -681,7 +698,11 @@ local function startWanderLoop(state: any, model: Model, entry: any)
                 stopWanderMovement(entry)
                 model:SetAttribute("MonsterWanderRouteLength", 0)
                 if model:GetAttribute("MonsterCombatActive") ~= true then
-                    playBaseIdle(model, entry)
+                    if model:GetAttribute("InCombat") == true then
+                        playCombatIdleState(model, entry)
+                    else
+                        playBaseIdle(model, entry)
+                    end
                 end
             end
         end
@@ -698,6 +719,9 @@ local function applyMonsterAttributes(model: Model, definition: any, record: any
     model:SetAttribute("MonsterInstanceId", instanceId)
     model:SetAttribute("Damageable", true)
     model:SetAttribute("LifeState", "Alive")
+    model:SetAttribute("InCombat", false)
+    model:SetAttribute("CombatState", "Peace")
+    model:SetAttribute("CombatUntilServerTime", 0)
     model:SetAttribute("MaxHP", maxHP)
     model:SetAttribute("HP", maxHP)
     model:SetAttribute("Damage", math.max(0, finite(stats.Damage, 10)))
@@ -729,6 +753,7 @@ local function releaseInstance(state: any, model: Model, scheduleRespawn: boolea
     DeathLifecycleService.Cancel(model)
     stopWanderMovement(entry)
     stopIdleState(entry)
+    stopTrack(entry.combatIdleTrack, entry.combatIdleSeam)
     stopTrack(entry.deathTrack)
     EntityHitboxService.Detach(model)
     if model.Parent then
@@ -810,6 +835,11 @@ local function maintainRuntimeAnimationSeams(model: Model, entry: any, deltaTime
         return
     end
 
+    if model:GetAttribute("InCombat") == true and entry.combatIdleSeam then
+        entry.combatIdleSeam:Step(deltaTimeSim)
+        return
+    end
+
     if entry.idleSeam then
         local _, didLoop = entry.idleSeam:Step(deltaTimeSim)
         if didLoop then
@@ -831,6 +861,7 @@ local function beginDeath(state: any, model: Model, entry: any)
     model:SetAttribute("DeathTerminalPoseHeld", false)
     stopWanderMovement(entry)
     stopIdleState(entry)
+    stopTrack(entry.combatIdleTrack, entry.combatIdleSeam)
     if entry.navigationRoot and entry.navigationRoot.Parent then
         entry.navigationRoot.AssemblyLinearVelocity = Vector3.zero
         entry.navigationRoot.AssemblyAngularVelocity = Vector3.zero
@@ -907,12 +938,15 @@ local function spawnOne(state: any): Model?
             end
         end
     end
+    local combatIdleRow = firstPublishedTrack(profile, "combat_idle") or firstPublishedTrack(profile, "idle")
     local walkRow = firstPublishedTrack(profile, "walk") or firstPublishedTrack(profile, "run")
     local runRow = firstPublishedTrack(profile, "run") or firstPublishedTrack(profile, "walk")
     local deathRow = firstPublishedTrack(profile, "death")
+    local combatIdleTrack = loadAnimationTrack(animator, combatIdleRow, true)
     local walkTrack = loadAnimationTrack(animator, walkRow, true)
     local runTrack = loadAnimationTrack(animator, runRow, true)
     local deathTrack = loadAnimationTrack(animator, deathRow, false)
+    local combatIdleSeam = createRuntimeSeam(animator, combatIdleRow, combatIdleTrack, true)
     local walkSeam = createRuntimeSeam(animator, walkRow, walkTrack, true)
     local runSeam = createRuntimeSeam(animator, runRow, runTrack, true)
     local entry = {
@@ -921,6 +955,9 @@ local function spawnOne(state: any): Model?
         idleRow = nil,
         idleChoices = idleChoices,
         activeIdleSpecial = nil,
+        combatIdleTrack = combatIdleTrack,
+        combatIdleSeam = combatIdleSeam,
+        combatIdleRow = combatIdleRow,
         walkTrack = walkTrack,
         walkSeam = walkSeam,
         walkRow = walkRow,
@@ -972,9 +1009,27 @@ local function spawnOne(state: any): Model?
         if model:GetAttribute("MonsterCombatActive") == true then
             stopWanderMovement(entry)
             stopIdleState(entry)
+            stopTrack(entry.combatIdleTrack, entry.combatIdleSeam)
             model:SetAttribute("MonsterIdleVariant", nil)
         else
             stopWanderMovement(entry)
+            if model:GetAttribute("InCombat") == true then
+                playCombatIdleState(model, entry)
+            else
+                playBaseIdle(model, entry)
+            end
+        end
+    end)
+
+    model:GetAttributeChangedSignal("InCombat"):Connect(function()
+        if state.instances[model] ~= entry or entry.dying or model:GetAttribute("MonsterCombatActive") == true then
+            return
+        end
+        stopWanderMovement(entry)
+        if model:GetAttribute("InCombat") == true then
+            playCombatIdleState(model, entry)
+        else
+            stopTrack(entry.combatIdleTrack, entry.combatIdleSeam)
             playBaseIdle(model, entry)
         end
     end)

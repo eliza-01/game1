@@ -11,6 +11,7 @@ local AttackTimelineConfig = require(CombatShared:WaitForChild("AttackTimelineCo
 local AnimationSpeedScaling = require(AnimationShared:WaitForChild("AnimationSpeedScaling"))
 local AnimationFirstFrameSeam = require(AnimationShared:WaitForChild("AnimationFirstFrameSeam"))
 local CharacterMovementConfig = require(CharacterShared:WaitForChild("CharacterMovementConfig"))
+local GameOptions = require(Shared:WaitForChild("GameOptions"))
 
 local AnimationResolver = require(script.Parent:WaitForChild("AnimationResolver"))
 local AnimationTrackCache = require(script.Parent:WaitForChild("AnimationTrackCache"))
@@ -91,6 +92,9 @@ local function animationPlaybackPercent(channel: string): number
 		return 100
 	end
 	local normalizedChannel = string.lower(tostring(channel or ""))
+	if normalizedChannel == "death" or normalizedChannel == "revive" then
+		return GameOptions.CharacterLifePlaybackPercent(normalizedChannel)
+	end
 	if attackLowerBodyActive and (normalizedChannel == "run" or normalizedChannel == "walk") then
 		local runSpeed = tonumber(character:GetAttribute("RunSpeed")) or CharacterMovementConfig.DefaultRunSpeed
 		local multiplier = tonumber(character:GetAttribute("AttackMovementRunSpeedMultiplier")) or 1
@@ -130,6 +134,9 @@ local function movementSlot(): string
 		return if configuredMode == "walk" then "walk" else "run"
 	end
 	local state = string.lower(tostring(character:GetAttribute("MovementState") or "idle"))
+	if state == "idle" and character:GetAttribute("InCombat") == true then
+		return "combat_idle"
+	end
 	if state == "walk" then
 		return "walk"
 	elseif state == "run" then
@@ -469,7 +476,7 @@ local function bindCharacter(newCharacter: Model)
 		end
 		print(("[game1][animation] prewarm %d/%d ready in %.3fs"):format(result.ready, result.total, result.elapsed))
 	end)
-	local refreshAttributes = { "MovementState", "AnimationMovementDirection", "AnimationWeaponSet", "RunSpeed", "AttackSpeed", "AttackMovementLocomotionMode", "AttackMovementRunSpeedMultiplier" }
+	local refreshAttributes = { "MovementState", "InCombat", "AnimationMovementDirection", "AnimationWeaponSet", "RunSpeed", "AttackSpeed", "AttackMovementLocomotionMode", "AttackMovementRunSpeedMultiplier" }
 	for _, channel in ipairs({ "run", "walk" }) do
 		table.insert(refreshAttributes, AnimationSpeedScaling.DebugUnitsPerPercentAttribute(channel))
 	end

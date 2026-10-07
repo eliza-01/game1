@@ -1,0 +1,738 @@
+diff --git a/assets/manifests/options.json b/assets/manifests/options.json
+new file mode 100644
+index 0000000..6965cb7
+--- /dev/null
++++ b/assets/manifests/options.json
+@@ -0,0 +1,11 @@
++{
++  "schemaVersion": 1,
++  "project": "game1",
++  "combat": {
++    "stateDurationSeconds": 6.0
++  },
++  "characterAnimations": {
++    "deathPlaybackPercent": 100.0,
++    "revivePlaybackPercent": 100.0
++  }
++}
+diff --git a/src/client/character/animation/CharacterAnimationController.luau b/src/client/character/animation/CharacterAnimationController.luau
+index cc56b8d..610dbdc 100644
+--- a/src/client/character/animation/CharacterAnimationController.luau
++++ b/src/client/character/animation/CharacterAnimationController.luau
+@@ -11,6 +11,7 @@ local AttackTimelineConfig = require(CombatShared:WaitForChild("AttackTimelineCo
+ local AnimationSpeedScaling = require(AnimationShared:WaitForChild("AnimationSpeedScaling"))
+ local AnimationFirstFrameSeam = require(AnimationShared:WaitForChild("AnimationFirstFrameSeam"))
+ local CharacterMovementConfig = require(CharacterShared:WaitForChild("CharacterMovementConfig"))
++local GameOptions = require(Shared:WaitForChild("GameOptions"))
+ 
+ local AnimationResolver = require(script.Parent:WaitForChild("AnimationResolver"))
+ local AnimationTrackCache = require(script.Parent:WaitForChild("AnimationTrackCache"))
+@@ -91,6 +92,9 @@ local function animationPlaybackPercent(channel: string): number
+ 		return 100
+ 	end
+ 	local normalizedChannel = string.lower(tostring(channel or ""))
++	if normalizedChannel == "death" or normalizedChannel == "revive" then
++		return GameOptions.CharacterLifePlaybackPercent(normalizedChannel)
++	end
+ 	if attackLowerBodyActive and (normalizedChannel == "run" or normalizedChannel == "walk") then
+ 		local runSpeed = tonumber(character:GetAttribute("RunSpeed")) or CharacterMovementConfig.DefaultRunSpeed
+ 		local multiplier = tonumber(character:GetAttribute("AttackMovementRunSpeedMultiplier")) or 1
+@@ -130,6 +134,9 @@ local function movementSlot(): string
+ 		return if configuredMode == "walk" then "walk" else "run"
+ 	end
+ 	local state = string.lower(tostring(character:GetAttribute("MovementState") or "idle"))
++	if state == "idle" and character:GetAttribute("InCombat") == true then
++		return "combat_idle"
++	end
+ 	if state == "walk" then
+ 		return "walk"
+ 	elseif state == "run" then
+@@ -469,7 +476,7 @@ local function bindCharacter(newCharacter: Model)
+ 		end
+ 		print(("[game1][animation] prewarm %d/%d ready in %.3fs"):format(result.ready, result.total, result.elapsed))
+ 	end)
+-	local refreshAttributes = { "MovementState", "AnimationMovementDirection", "AnimationWeaponSet", "RunSpeed", "AttackSpeed", "AttackMovementLocomotionMode", "AttackMovementRunSpeedMultiplier" }
++	local refreshAttributes = { "MovementState", "InCombat", "AnimationMovementDirection", "AnimationWeaponSet", "RunSpeed", "AttackSpeed", "AttackMovementLocomotionMode", "AttackMovementRunSpeedMultiplier" }
+ 	for _, channel in ipairs({ "run", "walk" }) do
+ 		table.insert(refreshAttributes, AnimationSpeedScaling.DebugUnitsPerPercentAttribute(channel))
+ 	end
+diff --git a/src/server/character/CharacterService.luau b/src/server/character/CharacterService.luau
+index 48ce562..3148805 100644
+--- a/src/server/character/CharacterService.luau
++++ b/src/server/character/CharacterService.luau
+@@ -242,6 +242,9 @@ createCharacter = function(player: Player, requestedArchetypeId: string?, revive
+     character:SetAttribute("AnimationMovementMode", "Run")
+     character:SetAttribute("AnimationMovementDirection", "Forward")
+     character:SetAttribute("MovementState", "Idle")
++    character:SetAttribute("InCombat", false)
++    character:SetAttribute("CombatState", "Peace")
++    character:SetAttribute("CombatUntilServerTime", 0)
+     character:SetAttribute("MovementController", "ControllerManager")
+     character:SetAttribute("VisualController", "AnimationController")
+     CharacterStatsService.Initialize(character, if row then row.stats else nil)
+diff --git a/src/server/combat/CombatStateService.luau b/src/server/combat/CombatStateService.luau
+new file mode 100644
+index 0000000..df4b678
+--- /dev/null
++++ b/src/server/combat/CombatStateService.luau
+@@ -0,0 +1,66 @@
++local ReplicatedStorage = game:GetService("ReplicatedStorage")
++local Workspace = game:GetService("Workspace")
++
++local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
++local GameOptions = require(Shared:WaitForChild("GameOptions"))
++
++local CombatStateService = {}
++local activationSerial = setmetatable({}, { __mode = "k" })
++
++local function validModel(model: Model?): boolean
++	return model ~= nil and model:IsA("Model") and model.Parent ~= nil
++end
++
++local function clearIfCurrent(model: Model, serial: number, expiresAt: number)
++	if not validModel(model) or activationSerial[model] ~= serial then
++		return
++	end
++	local currentUntil = tonumber(model:GetAttribute("CombatUntilServerTime")) or 0
++	if currentUntil > expiresAt + 0.001 or Workspace:GetServerTimeNow() + 0.001 < currentUntil then
++		return
++	end
++	model:SetAttribute("InCombat", false)
++	model:SetAttribute("CombatState", "Peace")
++	model:SetAttribute("CombatUntilServerTime", 0)
++end
++
++function CombatStateService.Activate(model: Model?)
++	if not validModel(model) then
++		return
++	end
++	local duration = GameOptions.CombatStateDurationSeconds()
++	local serial = (activationSerial[model] or 0) + 1
++	activationSerial[model] = serial
++	local expiresAt = Workspace:GetServerTimeNow() + duration
++	model:SetAttribute("InCombat", true)
++	model:SetAttribute("CombatState", "Combat")
++	model:SetAttribute("CombatUntilServerTime", expiresAt)
++	if duration <= 0 then
++		clearIfCurrent(model, serial, expiresAt)
++		return
++	end
++	task.delay(duration + 0.03, function()
++		clearIfCurrent(model, serial, expiresAt)
++	end)
++end
++
++function CombatStateService.ActivatePair(attacker: Model?, target: Model?)
++	if attacker then
++		CombatStateService.Activate(attacker)
++	end
++	if target and target ~= attacker then
++		CombatStateService.Activate(target)
++	end
++end
++
++function CombatStateService.Clear(model: Model?)
++	if not validModel(model) then
++		return
++	end
++	activationSerial[model] = (activationSerial[model] or 0) + 1
++	model:SetAttribute("InCombat", false)
++	model:SetAttribute("CombatState", "Peace")
++	model:SetAttribute("CombatUntilServerTime", 0)
++end
++
++return table.freeze(CombatStateService)
+diff --git a/src/server/combat/DamageService.luau b/src/server/combat/DamageService.luau
+index 10ee4be..98669b1 100644
+--- a/src/server/combat/DamageService.luau
++++ b/src/server/combat/DamageService.luau
+@@ -4,6 +4,7 @@ local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
+ local CombatShared = Shared:WaitForChild("combat")
+ local AttackConfig = require(CombatShared:WaitForChild("AttackConfig"))
+ local CombatFeedbackService = require(script.Parent:WaitForChild("CombatFeedbackService"))
++local CombatStateService = require(script.Parent:WaitForChild("CombatStateService"))
+ 
+ local DamageService = {}
+ local criticalRandom = Random.new()
+@@ -38,6 +39,12 @@ function DamageService.Apply(attacker: Model?, target: Model, rawDamage: number)
+         attacker:SetAttribute("LastAttackCritical", critical)
+     end
+ 
++    if finalDamage > 0 then
++        -- Combat state is a consequence of authoritative damage, not input intent.
++        -- The same generic attributes work for player characters, monsters and NPC rigs.
++        CombatStateService.ActivatePair(attacker, target)
++    end
++
+     local killed = newHP <= 0
+     if killed then
+         -- HP=0 is the exact death edge. Gameplay leaves Alive immediately; presentation
+diff --git a/src/server/monster/MonsterSpawnerService.luau b/src/server/monster/MonsterSpawnerService.luau
+index c34dc75..731e889 100644
+--- a/src/server/monster/MonsterSpawnerService.luau
++++ b/src/server/monster/MonsterSpawnerService.luau
+@@ -267,7 +267,7 @@ local function stopIdleState(entry: any)
+ end
+ 
+ local function playBaseIdle(model: Model, entry: any)
+-    if entry.dying or model:GetAttribute("MonsterCombatActive") == true then
++    if entry.dying or model:GetAttribute("MonsterCombatActive") == true or model:GetAttribute("InCombat") == true then
+         return
+     end
+     stopTrack(entry.walkTrack, entry.walkSeam)
+@@ -281,8 +281,24 @@ local function playBaseIdle(model: Model, entry: any)
+     end
+ end
+ 
++local function playCombatIdleState(model: Model, entry: any)
++    if entry.dying or model:GetAttribute("MonsterCombatActive") == true then
++        return
++    end
++    stopIdleState(entry)
++    stopTrack(entry.walkTrack, entry.walkSeam)
++    stopTrack(entry.runTrack, entry.runSeam)
++    model:SetAttribute("MonsterAnimationState", "combat_idle")
++    model:SetAttribute("MonsterIdleVariant", "combat")
++    if entry.combatIdleTrack then
++        pcall(function()
++            playTrackAtConfiguredSpeed(model, entry.combatIdleTrack, "combat_idle", 0.1, entry.combatIdleSeam)
++        end)
++    end
++end
++
+ local function maybePlayIdleSpecial(model: Model, entry: any)
+-    if entry.dying or entry.activeIdleSpecial ~= nil then
++    if entry.dying or entry.activeIdleSpecial ~= nil or model:GetAttribute("InCombat") == true then
+         return
+     end
+     local choice = weightedIdleChoice(entry.idleChoices or {})
+@@ -560,7 +576,7 @@ local function chooseWanderTarget(record: any, current: Vector3): (Vector3?, num
+ end
+ 
+ local function refreshWanderLocomotion(model: Model, entry: any)
+-    if not entry.wandering or entry.dying or model:GetAttribute("MonsterCombatActive") == true then
++    if not entry.wandering or entry.dying or model:GetAttribute("MonsterCombatActive") == true or model:GetAttribute("InCombat") == true then
+         return
+     end
+     local humanoid = entry.humanoid
+@@ -627,7 +643,7 @@ local function startWanderLoop(state: any, model: Model, entry: any)
+             if state.instances[model] ~= entry or not model.Parent or entry.dying then
+                 break
+             end
+-            if model:GetAttribute("MonsterCombatActive") == true then
++            if model:GetAttribute("MonsterCombatActive") == true or model:GetAttribute("InCombat") == true then
+                 continue
+             end
+ 
+@@ -661,6 +677,7 @@ local function startWanderLoop(state: any, model: Model, entry: any)
+                 and model.Parent
+                 and not entry.dying
+                 and model:GetAttribute("MonsterCombatActive") ~= true
++                and model:GetAttribute("InCombat") ~= true
+                 and os.clock() < (entry.wanderDeadline or math.huge)
+             do
+                 task.wait(0.1)
+@@ -681,7 +698,11 @@ local function startWanderLoop(state: any, model: Model, entry: any)
+                 stopWanderMovement(entry)
+                 model:SetAttribute("MonsterWanderRouteLength", 0)
+                 if model:GetAttribute("MonsterCombatActive") ~= true then
+-                    playBaseIdle(model, entry)
++                    if model:GetAttribute("InCombat") == true then
++                        playCombatIdleState(model, entry)
++                    else
++                        playBaseIdle(model, entry)
++                    end
+                 end
+             end
+         end
+@@ -698,6 +719,9 @@ local function applyMonsterAttributes(model: Model, definition: any, record: any
+     model:SetAttribute("MonsterInstanceId", instanceId)
+     model:SetAttribute("Damageable", true)
+     model:SetAttribute("LifeState", "Alive")
++    model:SetAttribute("InCombat", false)
++    model:SetAttribute("CombatState", "Peace")
++    model:SetAttribute("CombatUntilServerTime", 0)
+     model:SetAttribute("MaxHP", maxHP)
+     model:SetAttribute("HP", maxHP)
+     model:SetAttribute("Damage", math.max(0, finite(stats.Damage, 10)))
+@@ -729,6 +753,7 @@ local function releaseInstance(state: any, model: Model, scheduleRespawn: boolea
+     DeathLifecycleService.Cancel(model)
+     stopWanderMovement(entry)
+     stopIdleState(entry)
++    stopTrack(entry.combatIdleTrack, entry.combatIdleSeam)
+     stopTrack(entry.deathTrack)
+     EntityHitboxService.Detach(model)
+     if model.Parent then
+@@ -810,6 +835,11 @@ local function maintainRuntimeAnimationSeams(model: Model, entry: any, deltaTime
+         return
+     end
+ 
++    if model:GetAttribute("InCombat") == true and entry.combatIdleSeam then
++        entry.combatIdleSeam:Step(deltaTimeSim)
++        return
++    end
++
+     if entry.idleSeam then
+         local _, didLoop = entry.idleSeam:Step(deltaTimeSim)
+         if didLoop then
+@@ -831,6 +861,7 @@ local function beginDeath(state: any, model: Model, entry: any)
+     model:SetAttribute("DeathTerminalPoseHeld", false)
+     stopWanderMovement(entry)
+     stopIdleState(entry)
++    stopTrack(entry.combatIdleTrack, entry.combatIdleSeam)
+     if entry.navigationRoot and entry.navigationRoot.Parent then
+         entry.navigationRoot.AssemblyLinearVelocity = Vector3.zero
+         entry.navigationRoot.AssemblyAngularVelocity = Vector3.zero
+@@ -907,12 +938,15 @@ local function spawnOne(state: any): Model?
+             end
+         end
+     end
++    local combatIdleRow = firstPublishedTrack(profile, "combat_idle") or firstPublishedTrack(profile, "idle")
+     local walkRow = firstPublishedTrack(profile, "walk") or firstPublishedTrack(profile, "run")
+     local runRow = firstPublishedTrack(profile, "run") or firstPublishedTrack(profile, "walk")
+     local deathRow = firstPublishedTrack(profile, "death")
++    local combatIdleTrack = loadAnimationTrack(animator, combatIdleRow, true)
+     local walkTrack = loadAnimationTrack(animator, walkRow, true)
+     local runTrack = loadAnimationTrack(animator, runRow, true)
+     local deathTrack = loadAnimationTrack(animator, deathRow, false)
++    local combatIdleSeam = createRuntimeSeam(animator, combatIdleRow, combatIdleTrack, true)
+     local walkSeam = createRuntimeSeam(animator, walkRow, walkTrack, true)
+     local runSeam = createRuntimeSeam(animator, runRow, runTrack, true)
+     local entry = {
+@@ -921,6 +955,9 @@ local function spawnOne(state: any): Model?
+         idleRow = nil,
+         idleChoices = idleChoices,
+         activeIdleSpecial = nil,
++        combatIdleTrack = combatIdleTrack,
++        combatIdleSeam = combatIdleSeam,
++        combatIdleRow = combatIdleRow,
+         walkTrack = walkTrack,
+         walkSeam = walkSeam,
+         walkRow = walkRow,
+@@ -972,9 +1009,27 @@ local function spawnOne(state: any): Model?
+         if model:GetAttribute("MonsterCombatActive") == true then
+             stopWanderMovement(entry)
+             stopIdleState(entry)
++            stopTrack(entry.combatIdleTrack, entry.combatIdleSeam)
+             model:SetAttribute("MonsterIdleVariant", nil)
+         else
+             stopWanderMovement(entry)
++            if model:GetAttribute("InCombat") == true then
++                playCombatIdleState(model, entry)
++            else
++                playBaseIdle(model, entry)
++            end
++        end
++    end)
++
++    model:GetAttributeChangedSignal("InCombat"):Connect(function()
++        if state.instances[model] ~= entry or entry.dying or model:GetAttribute("MonsterCombatActive") == true then
++            return
++        end
++        stopWanderMovement(entry)
++        if model:GetAttribute("InCombat") == true then
++            playCombatIdleState(model, entry)
++        else
++            stopTrack(entry.combatIdleTrack, entry.combatIdleSeam)
+             playBaseIdle(model, entry)
+         end
+     end)
+diff --git a/src/shared/GameOptions.luau b/src/shared/GameOptions.luau
+new file mode 100644
+index 0000000..b248865
+--- /dev/null
++++ b/src/shared/GameOptions.luau
+@@ -0,0 +1,29 @@
++local Registry = require(script.Parent:WaitForChild("GameOptionsRegistry"))
++
++local GameOptions = {}
++
++local function finite(value: any, fallback: number): number
++	local number = tonumber(value)
++	if number == nil or number ~= number or number == math.huge or number == -math.huge then
++		return fallback
++	end
++	return number
++end
++
++function GameOptions.CombatStateDurationSeconds(): number
++	local combat = Registry.combat or {}
++	return math.clamp(finite(combat.stateDurationSeconds, 6), 0, 3600)
++end
++
++function GameOptions.CharacterLifePlaybackPercent(slot: any): number
++	local life = Registry.characterAnimations or {}
++	local normalized = string.lower(tostring(slot or ""))
++	if normalized == "death" then
++		return math.clamp(finite(life.deathPlaybackPercent, 100), 1, 400)
++	elseif normalized == "revive" then
++		return math.clamp(finite(life.revivePlaybackPercent, 100), 1, 400)
++	end
++	return 100
++end
++
++return table.freeze(GameOptions)
+diff --git a/src/shared/GameOptionsRegistry.luau b/src/shared/GameOptionsRegistry.luau
+new file mode 100644
+index 0000000..ec2d1c6
+--- /dev/null
++++ b/src/shared/GameOptionsRegistry.luau
+@@ -0,0 +1,12 @@
++-- generated by Asset Manager. do not edit by hand.
++return table.freeze({
++	schemaVersion = 1,
++	project = "game1",
++	combat = table.freeze({
++		stateDurationSeconds = 6,
++	}),
++	characterAnimations = table.freeze({
++		deathPlaybackPercent = 100,
++		revivePlaybackPercent = 100,
++	}),
++})
+diff --git a/src/shared/RuntimeVersion.luau b/src/shared/RuntimeVersion.luau
+index eb52ea9..773ee2b 100644
+--- a/src/shared/RuntimeVersion.luau
++++ b/src/shared/RuntimeVersion.luau
+@@ -1 +1 @@
+-return table.freeze({ Version = "2026.10.07.025", SourceDigest = "game1-m25-continuous-attack-pursuit-revive" })
++return table.freeze({ Version = "2026.10.07.026", SourceDigest = "game1-m26-common-options-combat-state-life-playback" })
+diff --git a/system/control-center/host_agent.py b/system/control-center/host_agent.py
+index 0c83ddb..a76343c 100644
+--- a/system/control-center/host_agent.py
++++ b/system/control-center/host_agent.py
+@@ -35,6 +35,7 @@ from monster_store import MonsterStore
+ from monster_animation_store import MonsterAnimationStore
+ from monster_spawn_store import MonsterSpawnStore
+ from animation_speed_scaling_store import AnimationSpeedScalingStore
++from options_store import OptionsStore
+ from character_core.identity import CharacterIdentityService
+ from studio_bridge import run_model_load_bridge, run_monster_spawn_bridge
+ 
+@@ -48,6 +49,7 @@ monsters = MonsterStore(ROOT)
+ monster_animations = MonsterAnimationStore(ROOT)
+ monster_spawns = MonsterSpawnStore(ROOT, monsters, monster_animations, run_monster_spawn_bridge)
+ animation_speed_scaling = AnimationSpeedScalingStore(ROOT)
++options_store = OptionsStore(ROOT)
+ character_identity = CharacterIdentityService(ROOT, store, animations)
+ 
+ 
+@@ -440,6 +442,11 @@ class Handler(BaseHTTPRequestHandler):
+                 return self.out(200, animation_speed_scaling.snapshot())
+             except Exception as error:
+                 return self.out(400, {"error": str(error)})
++        if path == "/api/options":
++            try:
++                return self.out(200, options_store.snapshot())
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
+         monster_prefix = "/api/monsters/"
+         publications_suffix = "/publications"
+         if path.startswith(monster_prefix) and path.endswith(publications_suffix):
+@@ -554,6 +561,11 @@ class Handler(BaseHTTPRequestHandler):
+                 return self.out(200, animation_speed_scaling.update(self.body()))
+             except Exception as error:
+                 return self.out(400, {"error": str(error)})
++        if path == "/api/options":
++            try:
++                return self.out(200, options_store.update(self.body()))
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
+ 
+         if path == "/api/animations/check-roblox-assets":
+             try:
+diff --git a/system/control-center/options_store.py b/system/control-center/options_store.py
+new file mode 100644
+index 0000000..6d4d2c6
+--- /dev/null
++++ b/system/control-center/options_store.py
+@@ -0,0 +1,109 @@
++from __future__ import annotations
++
++import json
++from copy import deepcopy
++from pathlib import Path
++
++
++DEFAULT_PAYLOAD = {
++    "schemaVersion": 1,
++    "project": "game1",
++    "combat": {
++        "stateDurationSeconds": 6.0,
++    },
++    "characterAnimations": {
++        "deathPlaybackPercent": 100.0,
++        "revivePlaybackPercent": 100.0,
++    },
++}
++
++
++class OptionsStore:
++    def __init__(self, root: Path):
++        self.root = Path(root)
++        self.manifest_path = self.root / "assets/manifests/options.json"
++        self.registry_path = self.root / "src/shared/GameOptionsRegistry.luau"
++        self._ensure()
++
++    def _read(self) -> dict:
++        return json.loads(self.manifest_path.read_text(encoding="utf-8"))
++
++    def _validate(self, payload: dict):
++        if int(payload.get("schemaVersion") or 0) != 1:
++            raise ValueError("unsupported options schema")
++        combat = payload.get("combat") or {}
++        duration = float(combat.get("stateDurationSeconds") or 0)
++        if not (0 <= duration <= 3600):
++            raise ValueError("combat state duration must be 0..3600 seconds")
++        animations = payload.get("characterAnimations") or {}
++        for key in ("deathPlaybackPercent", "revivePlaybackPercent"):
++            percent = float(animations.get(key) or 0)
++            if not (1 <= percent <= 400):
++                raise ValueError(f"{key} must be 1..400 percent")
++
++    def _write_registry(self, payload: dict):
++        combat = payload["combat"]
++        animations = payload["characterAnimations"]
++        lines = [
++            "-- generated by Asset Manager. do not edit by hand.",
++            "return table.freeze({",
++            "\tschemaVersion = 1,",
++            '\tproject = "game1",',
++            "\tcombat = table.freeze({",
++            f"\t\tstateDurationSeconds = {float(combat['stateDurationSeconds']):.12g},",
++            "\t}),",
++            "\tcharacterAnimations = table.freeze({",
++            f"\t\tdeathPlaybackPercent = {float(animations['deathPlaybackPercent']):.12g},",
++            f"\t\trevivePlaybackPercent = {float(animations['revivePlaybackPercent']):.12g},",
++            "\t}),",
++            "})",
++            "",
++        ]
++        self.registry_path.parent.mkdir(parents=True, exist_ok=True)
++        self.registry_path.write_text("\n".join(lines), encoding="utf-8")
++
++    def _write(self, payload: dict):
++        self._validate(payload)
++        self.manifest_path.parent.mkdir(parents=True, exist_ok=True)
++        self.manifest_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
++        self._write_registry(payload)
++
++    def _ensure(self):
++        if not self.manifest_path.is_file():
++            self._write(deepcopy(DEFAULT_PAYLOAD))
++            return
++        payload = self._read()
++        changed = False
++        for group, defaults in (("combat", DEFAULT_PAYLOAD["combat"]), ("characterAnimations", DEFAULT_PAYLOAD["characterAnimations"])):
++            if not isinstance(payload.get(group), dict):
++                payload[group] = {}
++                changed = True
++            for key, value in defaults.items():
++                if key not in payload[group]:
++                    payload[group][key] = value
++                    changed = True
++        if changed:
++            payload["schemaVersion"] = 1
++            payload["project"] = "game1"
++            self._write(payload)
++        else:
++            self._validate(payload)
++            self._write_registry(payload)
++
++    def snapshot(self) -> dict:
++        payload = self._read()
++        self._validate(payload)
++        return payload
++
++    def update(self, request: dict) -> dict:
++        payload = self._read()
++        combat = request.get("combat")
++        if isinstance(combat, dict) and "stateDurationSeconds" in combat:
++            payload.setdefault("combat", {})["stateDurationSeconds"] = float(combat["stateDurationSeconds"])
++        animations = request.get("characterAnimations")
++        if isinstance(animations, dict):
++            for key in ("deathPlaybackPercent", "revivePlaybackPercent"):
++                if key in animations:
++                    payload.setdefault("characterAnimations", {})[key] = float(animations[key])
++        self._write(payload)
++        return payload
+diff --git a/system/control-center/static/character-assets.js b/system/control-center/static/character-assets.js
+index 5cc5cfb..ac93b73 100644
+--- a/system/control-center/static/character-assets.js
++++ b/system/control-center/static/character-assets.js
+@@ -43,10 +43,10 @@ function statusTag(status){return `<span class="tag ${String(status||'').toLower
+ 
+ function setView(view){
+   state.view=view;
+-  $('characters-view').hidden=view!=='characters';$('animations-view').hidden=view!=='animations';$('animation-speed-view').hidden=view!=='animation-speed';$('weapons-view').hidden=view!=='weapons';$('monsters-view').hidden=view!=='monsters';
++  $('characters-view').hidden=view!=='characters';$('animations-view').hidden=view!=='animations';$('animation-speed-view').hidden=view!=='animation-speed';$('weapons-view').hidden=view!=='weapons';$('monsters-view').hidden=view!=='monsters';$('options-view').hidden=view!=='options';
+   $('character-rail').hidden=view!=='characters';$('animation-rail').hidden=view!=='animations';$('weapon-rail').hidden=view!=='weapons';$('monster-rail').hidden=view!=='monsters';
+-  $('nav-characters').classList.toggle('active',view==='characters');$('nav-animations').classList.toggle('active',view==='animations');$('nav-animation-speed').classList.toggle('active',view==='animation-speed');$('nav-weapons').classList.toggle('active',view==='weapons');$('nav-monsters').classList.toggle('active',view==='monsters');
+-  if(view==='animations')loadAnimations();if(view==='animation-speed'&&window.game1AnimationSpeedLoad)window.game1AnimationSpeedLoad();if(view==='weapons'&&window.game1WeaponsLoad)window.game1WeaponsLoad();if(view==='monsters'&&window.game1MonstersLoad)window.game1MonstersLoad();
++  $('nav-characters').classList.toggle('active',view==='characters');$('nav-animations').classList.toggle('active',view==='animations');$('nav-animation-speed').classList.toggle('active',view==='animation-speed');$('nav-weapons').classList.toggle('active',view==='weapons');$('nav-monsters').classList.toggle('active',view==='monsters');$('nav-options').classList.toggle('active',view==='options');
++  if(view==='animations')loadAnimations();if(view==='animation-speed'&&window.game1AnimationSpeedLoad)window.game1AnimationSpeedLoad();if(view==='weapons'&&window.game1WeaponsLoad)window.game1WeaponsLoad();if(view==='monsters'&&window.game1MonstersLoad)window.game1MonstersLoad();if(view==='options'&&window.game1OptionsLoad)window.game1OptionsLoad();
+ }
+ 
+ function characterStatsPayload(){return {Level:Number($('character-stat-level').value||1),MaxHP:Number($('character-stat-hp').value||0),Damage:Number($('character-stat-damage').value||0),Defense:Number($('character-stat-defense').value||0),AttackSpeed:Number($('character-stat-attack-speed').value||0),RunSpeed:Number($('character-stat-run-speed').value||0),CritChance:Number($('character-stat-crit-chance').value||0)}}
+@@ -135,7 +135,7 @@ async function setAnimationWeight(bindingId,weight){try{state.animations=await r
+ async function setAnimationDuplicate(clipId,enabled){try{state.animations=await request('/api/animations/'+encodeURIComponent(clipId)+'/duplicate-first-frame',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:!!enabled})});state.animations.publication=state.data?.publication||{};renderAnimations();toast(enabled?'runtime first-frame tail enabled; asset bytes are unchanged':'runtime first-frame tail disabled; asset bytes are unchanged')}catch(error){await loadAnimations();toast(error.message,true)}}
+ async function removeAnimationBinding(bindingId){if(!confirm('remove this semantic animation binding from game1? canonical source files are preserved.'))return;try{state.animations=await request('/api/animation-bindings/'+encodeURIComponent(bindingId),{method:'DELETE'});state.animations.publication=state.data?.publication||{};if(state.animationSelected===bindingId)state.animationSelected=null;renderAnimations();toast('animation binding removed')}catch(error){toast(error.message,true)}}
+ 
+-$('display-name').oninput=()=>{if(!state.selected)state.autoDisplayName=false};$('nav-characters').onclick=()=>setView('characters');$('nav-animations').onclick=()=>setView('animations');$('nav-animation-speed').onclick=()=>setView('animation-speed');$('nav-weapons').onclick=()=>setView('weapons');$('nav-monsters').onclick=()=>setView('monsters');$('race').onchange=syncIdentity;$('gender').onchange=syncIdentity;$('choose-model').onclick=chooseModel;$('save-archetype').onclick=saveArchetype;$('save-character-stats').onclick=saveCharacterStats;$('register-character').onclick=registerCharacter;$('publish-character').onclick=()=>publishCharacter();$('sync-character').onclick=()=>syncStudio();$('activate-character').onclick=()=>activate();$('new-character').onclick=()=>setForm(null);$('clear-form').onclick=()=>setForm(null);$('refresh').onclick=loadCharacters;$('validate-view').onclick=loadCharacters;$('theme').onclick=()=>document.body.classList.toggle('light');
++$('display-name').oninput=()=>{if(!state.selected)state.autoDisplayName=false};$('nav-characters').onclick=()=>setView('characters');$('nav-animations').onclick=()=>setView('animations');$('nav-animation-speed').onclick=()=>setView('animation-speed');$('nav-weapons').onclick=()=>setView('weapons');$('nav-monsters').onclick=()=>setView('monsters');$('nav-options').onclick=()=>setView('options');$('race').onchange=syncIdentity;$('gender').onchange=syncIdentity;$('choose-model').onclick=chooseModel;$('save-archetype').onclick=saveArchetype;$('save-character-stats').onclick=saveCharacterStats;$('register-character').onclick=registerCharacter;$('publish-character').onclick=()=>publishCharacter();$('sync-character').onclick=()=>syncStudio();$('activate-character').onclick=()=>activate();$('new-character').onclick=()=>setForm(null);$('clear-form').onclick=()=>setForm(null);$('refresh').onclick=loadCharacters;$('validate-view').onclick=loadCharacters;$('theme').onclick=()=>document.body.classList.toggle('light');
+ $('animation-character').onchange=()=>{state.animationCharacter=$('animation-character').value;state.animationSelected=null;state.lastScan=null;loadAnimations()};$('choose-animation-folder').onclick=chooseAnimationFolder;$('scan-animations').onclick=scanAnimations;$('publish-missing-animations').onclick=publishMissingAnimations;$('check-roblox-animations').onclick=checkRobloxAnimationAssets;$('refresh-animations').onclick=loadAnimations;
+ initAnimationFolderExplorer();
+ initFilenameRulesDisclosure();
+diff --git a/system/control-center/static/index.html b/system/control-center/static/index.html
+index 3515895..12f5bb3 100644
+--- a/system/control-center/static/index.html
++++ b/system/control-center/static/index.html
+@@ -20,6 +20,7 @@
+ <button id="nav-animation-speed" class="asset-section" type="button"><b>animation speed</b><small>stat → playback scaling</small></button>
+ <button id="nav-weapons" class="asset-section" type="button"><b>weapons</b><small>models · textures · stats</small></button>
+ <button id="nav-monsters" class="asset-section" type="button"><b>monsters</b><small>rigs · stats · animations</small></button>
++<button id="nav-options" class="asset-section" type="button"><b>options</b><small>common runtime settings</small></button>
+ </div>
+ <div id="character-rail">
+ <hr class="rail-separator">
+@@ -138,6 +139,28 @@
+ </div>
+ </div>
+ 
++<div id="options-view" hidden>
++<div class="panel hero">
++<div><span class="eyebrow">common runtime settings · shared gameplay</span><h2>options</h2><p>project-wide settings that are not owned by one character, monster, weapon or animation clip.</p></div>
++</div>
++<div class="panel character-card">
++<div class="section-title"><div><span>combat</span><h3>combat state</h3></div><button id="refresh-options" type="button">refresh</button></div>
++<small class="hint">when an entity deals or receives actual damage it enters combat. while idle in combat, characters, monsters and NPC-compatible rigs use <code>combat_idle</code>. every new hit restarts this timer.</small>
++<div class="details-grid">
++<div><b>combat state duration</b><span><input id="option-combat-state-duration" type="number" min="0" max="3600" step="0.1" value="6"> seconds</span></div>
++</div>
++<div class="actions"><button id="save-combat-options" class="primary" type="button">save combat options</button></div>
++<hr class="card-separator">
++<div class="section-title"><div><span>character life animations</span><h3>global playback speed</h3></div></div>
++<small class="hint">absolute playback percentages shared by every character archetype. these values are independent from RunSpeed / AttackSpeed scaling.</small>
++<div class="character-grid">
++<label>death playback %<input id="option-character-death-playback" type="number" min="1" max="400" step="1" value="100"></label>
++<label>revive playback %<input id="option-character-revive-playback" type="number" min="1" max="400" step="1" value="100"></label>
++</div>
++<div class="actions"><button id="save-character-life-options" class="primary" type="button">save character animation options</button></div>
++</div>
++</div>
++
+ <div id="weapons-view" hidden>
+ <div class="panel hero">
+ <div><span class="eyebrow">weapon assets · canonical game1 registry</span><h2>weapons</h2><p>one weapon owns one canonical fbx, zero or more textures, one animation context, additive stat modifiers and stable roblox asset ids. the imported model pivot is the grip reference, matching the reference project attachment contract.</p></div>
+@@ -275,6 +298,7 @@
+ <div id="toast" class="toast"></div>
+ <script src="character-assets.js?v=14"></script>
+ <script src="animation-speed.js?v=1"></script>
++<script src="options.js?v=1"></script>
+ <script src="weapon-assets.js?v=3"></script>
+ <script src="monster-assets.js?v=4"></script>
+ <script src="monster-spawns.js?v=1"></script>
+diff --git a/system/control-center/static/options.js b/system/control-center/static/options.js
+new file mode 100644
+index 0000000..042d07c
+--- /dev/null
++++ b/system/control-center/static/options.js
+@@ -0,0 +1,23 @@
++const game1OptionsState={data:null,saving:false};
++function game1OptionNumber(id,fallback){const value=Number($(id).value);return Number.isFinite(value)?value:fallback}
++function game1OptionsRender(){
++  const data=game1OptionsState.data||{};
++  const combat=data.combat||{};
++  const life=data.characterAnimations||{};
++  $('option-combat-state-duration').value=String(combat.stateDurationSeconds??6);
++  $('option-character-death-playback').value=String(life.deathPlaybackPercent??100);
++  $('option-character-revive-playback').value=String(life.revivePlaybackPercent??100);
++  $('save-combat-options').disabled=game1OptionsState.saving;
++  $('save-character-life-options').disabled=game1OptionsState.saving;
++}
++async function game1OptionsLoad(){
++  try{game1OptionsState.data=await request('/api/options');game1OptionsRender()}catch(error){toast(error.message,true)}
++}
++async function game1OptionsSave(payload,message){
++  game1OptionsState.saving=true;game1OptionsRender();
++  try{game1OptionsState.data=await request('/api/options',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});game1OptionsRender();toast(message)}catch(error){toast(error.message,true)}finally{game1OptionsState.saving=false;game1OptionsRender()}
++}
++$('refresh-options').onclick=game1OptionsLoad;
++$('save-combat-options').onclick=()=>game1OptionsSave({combat:{stateDurationSeconds:game1OptionNumber('option-combat-state-duration',6)}},'combat options saved');
++$('save-character-life-options').onclick=()=>game1OptionsSave({characterAnimations:{deathPlaybackPercent:game1OptionNumber('option-character-death-playback',100),revivePlaybackPercent:game1OptionNumber('option-character-revive-playback',100)}},'character life animation options saved');
++window.game1OptionsLoad=game1OptionsLoad;
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index 26ccfde..37e6d1d 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -1487,13 +1487,69 @@ client_init_m25 = (ROOT / "src/client/init.client.luau").read_text(encoding="utf
+ if "DeathRespawnController.Start()" not in client_init_m25:
+     err("death respawn controller is not started")
+ 
++# m26 common Options + authoritative combat-state idle + global character death/revive playback.
++options_manifest_path_m26 = ROOT / "assets/manifests/options.json"
++if not options_manifest_path_m26.is_file():
++    err("m26 Options manifest is missing")
++    options_manifest_m26 = {}
++else:
++    options_manifest_m26 = json.loads(options_manifest_path_m26.read_text(encoding="utf-8"))
++combat_options_m26 = options_manifest_m26.get("combat") or {}
++life_options_m26 = options_manifest_m26.get("characterAnimations") or {}
++if float(combat_options_m26.get("stateDurationSeconds") or -1) != 6.0:
++    err("m26 combat state default duration must be 6 seconds")
++for key in ["deathPlaybackPercent", "revivePlaybackPercent"]:
++    value = float(life_options_m26.get(key) or 0)
++    if value < 1 or value > 400:
++        err(f"m26 character life playback option invalid: {key}")
++
++options_store_m26 = (ROOT / "system/control-center/options_store.py").read_text(encoding="utf-8")
++options_html_m26 = (ROOT / "system/control-center/static/index.html").read_text(encoding="utf-8")
++options_js_m26 = (ROOT / "system/control-center/static/options.js").read_text(encoding="utf-8")
++host_agent_m26 = (ROOT / "system/control-center/host_agent.py").read_text(encoding="utf-8")
++for required in ["stateDurationSeconds", "deathPlaybackPercent", "revivePlaybackPercent", "GameOptionsRegistry.luau"]:
++    if required not in options_store_m26:
++        err(f"m26 Options storage missing {required}")
++for required in ["nav-options", "options-view", "combat state duration", "death playback %", "revive playback %"]:
++    if required not in options_html_m26:
++        err(f"m26 Options UI missing {required}")
++for required in ["/api/options", "save-combat-options", "save-character-life-options"]:
++    if required not in options_js_m26 + host_agent_m26:
++        err(f"m26 Options API/UI missing {required}")
++
++combat_state_service_m26 = (ROOT / "src/server/combat/CombatStateService.luau").read_text(encoding="utf-8")
++damage_service_m26 = (ROOT / "src/server/combat/DamageService.luau").read_text(encoding="utf-8")
++for required in ["GameOptions.CombatStateDurationSeconds", 'SetAttribute("InCombat", true)', 'SetAttribute("CombatState", "Combat")', "CombatUntilServerTime", "ActivatePair"]:
++    if required not in combat_state_service_m26:
++        err(f"m26 combat-state service missing {required}")
++if "CombatStateService.ActivatePair(attacker, target)" not in damage_service_m26:
++    err("m26 DamageService must activate combat state for damage dealer and receiver")
++
++character_animation_m26 = (ROOT / "src/client/character/animation/CharacterAnimationController.luau").read_text(encoding="utf-8")
++for required in ['GetAttribute("InCombat") == true', 'return "combat_idle"', "GameOptions.CharacterLifePlaybackPercent"]:
++    if required not in character_animation_m26:
++        err(f"m26 character combat/life animation contract missing {required}")
++monster_spawner_m26 = (ROOT / "src/server/monster/MonsterSpawnerService.luau").read_text(encoding="utf-8")
++for required in ["playCombatIdleState", "combatIdleTrack", 'GetAttribute("InCombat")', 'MonsterAnimationState", "combat_idle"']:
++    if required not in monster_spawner_m26:
++        err(f"m26 monster combat-idle contract missing {required}")
++
++game_options_m26 = (ROOT / "src/shared/GameOptions.luau").read_text(encoding="utf-8")
++game_options_registry_m26 = (ROOT / "src/shared/GameOptionsRegistry.luau").read_text(encoding="utf-8")
++for required in ["CombatStateDurationSeconds", "CharacterLifePlaybackPercent"]:
++    if required not in game_options_m26:
++        err(f"m26 shared GameOptions missing {required}")
++for required in ["stateDurationSeconds", "deathPlaybackPercent", "revivePlaybackPercent"]:
++    if required not in game_options_registry_m26:
++        err(f"m26 generated options registry missing {required}")
++
+ if errors:
+     print("verify failed")
+     for item in errors:
+         print(" -", item)
+     sys.exit(1)
+ 
+-print("verify ok · game1 m25 continuous attack pursuit + authored revive respawn passed")
++print("verify ok · game1 m26 common options + combat state + life playback passed")
+ print("registered character archetypes:", len(archetypes))
+ print("active character archetype:", active_id or "none")
+ print("race pool: human")

@@ -20,6 +20,7 @@
 <button id="nav-animation-speed" class="asset-section" type="button"><b>animation speed</b><small>stat → playback scaling</small></button>
 <button id="nav-weapons" class="asset-section" type="button"><b>weapons</b><small>models · textures · stats</small></button>
 <button id="nav-monsters" class="asset-section" type="button"><b>monsters</b><small>rigs · stats · animations</small></button>
+<button id="nav-options" class="asset-section" type="button"><b>options</b><small>common runtime settings</small></button>
 </div>
 <div id="character-rail">
 <hr class="rail-separator">
@@ -135,6 +136,28 @@
 <div class="section-title"><div><span>animation speed scaling</span><h3>gameplay stat → playback %</h3></div><button id="refresh-animation-speed" type="button">refresh</button></div>
 <small class="hint">example: Human Female Run Speed = 2 means every 2 RunSpeed points produce 1% playback. RunSpeed 50 therefore plays run at 25%. values are live source settings and are written to the shared runtime registry.</small>
 <div id="animation-speed-profiles" class="details"><span class="muted">loading scaling rules…</span></div>
+</div>
+</div>
+
+<div id="options-view" hidden>
+<div class="panel hero">
+<div><span class="eyebrow">common runtime settings · shared gameplay</span><h2>options</h2><p>project-wide settings that are not owned by one character, monster, weapon or animation clip.</p></div>
+</div>
+<div class="panel character-card">
+<div class="section-title"><div><span>combat</span><h3>combat state</h3></div><button id="refresh-options" type="button">refresh</button></div>
+<small class="hint">when an entity deals or receives actual damage it enters combat. while idle in combat, characters, monsters and NPC-compatible rigs use <code>combat_idle</code>. every new hit restarts this timer.</small>
+<div class="details-grid">
+<div><b>combat state duration</b><span><input id="option-combat-state-duration" type="number" min="0" max="3600" step="0.1" value="6"> seconds</span></div>
+</div>
+<div class="actions"><button id="save-combat-options" class="primary" type="button">save combat options</button></div>
+<hr class="card-separator">
+<div class="section-title"><div><span>character life animations</span><h3>global playback speed</h3></div></div>
+<small class="hint">absolute playback percentages shared by every character archetype. these values are independent from RunSpeed / AttackSpeed scaling.</small>
+<div class="character-grid">
+<label>death playback %<input id="option-character-death-playback" type="number" min="1" max="400" step="1" value="100"></label>
+<label>revive playback %<input id="option-character-revive-playback" type="number" min="1" max="400" step="1" value="100"></label>
+</div>
+<div class="actions"><button id="save-character-life-options" class="primary" type="button">save character animation options</button></div>
 </div>
 </div>
 
@@ -275,6 +298,7 @@
 <div id="toast" class="toast"></div>
 <script src="character-assets.js?v=14"></script>
 <script src="animation-speed.js?v=1"></script>
+<script src="options.js?v=1"></script>
 <script src="weapon-assets.js?v=3"></script>
 <script src="monster-assets.js?v=4"></script>
 <script src="monster-spawns.js?v=1"></script>

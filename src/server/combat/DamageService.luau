@@ -4,6 +4,7 @@ local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local CombatShared = Shared:WaitForChild("combat")
 local AttackConfig = require(CombatShared:WaitForChild("AttackConfig"))
 local CombatFeedbackService = require(script.Parent:WaitForChild("CombatFeedbackService"))
+local CombatStateService = require(script.Parent:WaitForChild("CombatStateService"))
 
 local DamageService = {}
 local criticalRandom = Random.new()
@@ -36,6 +37,12 @@ function DamageService.Apply(attacker: Model?, target: Model, rawDamage: number)
     target:SetAttribute("LastAttackerUserId", attacker and attacker:GetAttribute("CharacterOwnerUserId") or 0)
     if attacker then
         attacker:SetAttribute("LastAttackCritical", critical)
+    end
+
+    if finalDamage > 0 then
+        -- Combat state is a consequence of authoritative damage, not input intent.
+        -- The same generic attributes work for player characters, monsters and NPC rigs.
+        CombatStateService.ActivatePair(attacker, target)
     end
 
     local killed = newHP <= 0

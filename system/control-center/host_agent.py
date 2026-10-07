@@ -35,6 +35,7 @@ from monster_store import MonsterStore
 from monster_animation_store import MonsterAnimationStore
 from monster_spawn_store import MonsterSpawnStore
 from animation_speed_scaling_store import AnimationSpeedScalingStore
+from options_store import OptionsStore
 from character_core.identity import CharacterIdentityService
 from studio_bridge import run_model_load_bridge, run_monster_spawn_bridge
 
@@ -48,6 +49,7 @@ monsters = MonsterStore(ROOT)
 monster_animations = MonsterAnimationStore(ROOT)
 monster_spawns = MonsterSpawnStore(ROOT, monsters, monster_animations, run_monster_spawn_bridge)
 animation_speed_scaling = AnimationSpeedScalingStore(ROOT)
+options_store = OptionsStore(ROOT)
 character_identity = CharacterIdentityService(ROOT, store, animations)
 
 
@@ -440,6 +442,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self.out(200, animation_speed_scaling.snapshot())
             except Exception as error:
                 return self.out(400, {"error": str(error)})
+        if path == "/api/options":
+            try:
+                return self.out(200, options_store.snapshot())
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
         monster_prefix = "/api/monsters/"
         publications_suffix = "/publications"
         if path.startswith(monster_prefix) and path.endswith(publications_suffix):
@@ -552,6 +559,11 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/animation-speed-scaling":
             try:
                 return self.out(200, animation_speed_scaling.update(self.body()))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path == "/api/options":
+            try:
+                return self.out(200, options_store.update(self.body()))
             except Exception as error:
                 return self.out(400, {"error": str(error)})
 

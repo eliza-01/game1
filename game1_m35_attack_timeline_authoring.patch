@@ -1,0 +1,1384 @@
+--- a/src/shared/combat/AttackTimelineConfig.luau
++++ b/src/shared/combat/AttackTimelineConfig.luau
+@@ -1,8 +1,8 @@
+--- Authoritative attack-animation timeline configuration.
++-- Runtime resolver for Asset Manager-authored attack-animation timelines.
+ --
+--- Every gameplay attack clip must be registered here. `duration` is the source
+--- animation duration at 100% playback. Event positions can be authored either
+--- in source-animation seconds (`time`) or as a 0..1 fraction (`normalizedTime`).
++-- Every gameplay attack clip is authored in Asset Manager / Timelines and exported
++-- to AttackTimelineData. `duration` is the source animation duration at 100%
++-- playback; events are stored as a 0..1 `normalizedTime`.
+ -- Runtime timing is divided by the same playback speed used by the Animator.
+ -- The final playback percentage is resolved by AnimationSpeedScaling from gameplay
+ -- stats (or a temporary runtime debug override), so presentation and gameplay
+@@ -28,45 +28,13 @@
+     ProjectileRelease = "projectile_release",
+ })
+ 
+-local BY_CLIP = table.freeze({
+-    ["human_female__weapon__1hs__attack__01"] = table.freeze({
+-        duration = 1.866666674,
+-        events = table.freeze({
+-            HitStart = table.freeze({ normalizedTime = 0.40 }),
+-            Hit = table.freeze({ normalizedTime = 0.50, result = "melee_damage" }),
+-        }),
+-    }),
+-    ["human_female__weapon__1hs__attack__02"] = table.freeze({
+-        duration = 1.866666674,
+-        events = table.freeze({
+-            HitStart = table.freeze({ normalizedTime = 0.40 }),
+-            Hit = table.freeze({ normalizedTime = 0.50, result = "melee_damage" }),
+-        }),
+-    }),
+-    ["human_female__weapon__1hs__attack__03"] = table.freeze({
+-        duration = 1.866666674,
+-        events = table.freeze({
+-            HitStart = table.freeze({ normalizedTime = 0.40 }),
+-            Hit = table.freeze({ normalizedTime = 0.50, result = "melee_damage" }),
+-        }),
+-    }),
+-    ["monster__gremlin__attack__01"] = table.freeze({
+-        duration = 1.799999952,
+-        events = table.freeze({
+-            Hit = table.freeze({ normalizedTime = 0.50, result = "melee_damage" }),
+-        }),
+-    }),
+-})
++local BY_CLIP = require(script.Parent:WaitForChild("AttackTimelineData"))
+ 
+ AttackTimelineConfig.ByClip = BY_CLIP
+ 
+ local function copyRuntimeEvent(source: any, baseDuration: number, playbackSpeed: number): any
+-    local sourceTime = tonumber(source and source.time)
+-    local normalized = tonumber(source and source.normalizedTime)
+-    if sourceTime == nil and normalized ~= nil then
+-        sourceTime = math.clamp(normalized, 0, 1) * baseDuration
+-    end
+-    sourceTime = math.clamp(sourceTime or 0, 0, baseDuration)
++    local normalized = math.clamp(tonumber(source and source.normalizedTime) or 0, 0, 1)
++    local sourceTime = normalized * baseDuration
+     return {
+         time = sourceTime / playbackSpeed,
+         sourceTime = sourceTime,
+--- a/system/control-center/host_agent.py
++++ b/system/control-center/host_agent.py
+@@ -36,10 +36,11 @@
+ from monster_spawn_store import MonsterSpawnStore
+ from animation_speed_scaling_store import AnimationSpeedScalingStore
+ from options_store import OptionsStore
++from timeline_store import TimelineStore, EVENT_CATALOG
+ from character_core.identity import CharacterIdentityService
+-from studio_bridge import run_model_load_bridge, run_monster_spawn_bridge
++from studio_bridge import run_model_load_bridge, run_monster_spawn_bridge, run_timeline_editor_bridge
+ 
+-control_agent_build = "game1-m18-opencloud-animation-reimport-001"
++control_agent_build = "game1-m35-attack-timeline-authoring-001"
+ port = int(os.environ.get("CONTROL_AGENT_PORT", "43821"))
+ token = os.environ.get("CONTROL_TOKEN", "Game1LocalControlV1")
+ store = CharacterStore(ROOT)
+@@ -50,6 +51,7 @@
+ monster_spawns = MonsterSpawnStore(ROOT, monsters, monster_animations, run_monster_spawn_bridge)
+ animation_speed_scaling = AnimationSpeedScalingStore(ROOT)
+ options_store = OptionsStore(ROOT)
++timelines = TimelineStore(ROOT, store, animations, monsters, monster_animations)
+ character_identity = CharacterIdentityService(ROOT, store, animations)
+ 
+ 
+@@ -447,6 +449,17 @@
+                 return self.out(200, options_store.snapshot())
+             except Exception as error:
+                 return self.out(400, {"error": str(error)})
++        if path == "/api/timelines":
++            try:
++                return self.out(200, timelines.snapshot())
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
++        if path == "/api/timelines/editor-state":
++            try:
++                session_id = str((parse_qs(parsed.query).get("session") or [""])[0])
++                return self.out(200, timelines.editor_state(session_id))
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
+         monster_prefix = "/api/monsters/"
+         publications_suffix = "/publications"
+         if path.startswith(monster_prefix) and path.endswith(publications_suffix):
+@@ -567,6 +580,28 @@
+             except Exception as error:
+                 return self.out(400, {"error": str(error)})
+ 
++        if path == "/api/timelines/open":
++            try:
++                payload = self.body()
++                session = timelines.begin_editor_session(str(payload.get("clipId") or ""))
++                studio = run_timeline_editor_bridge(session, EVENT_CATALOG)
++                duration = float(studio.get("duration") or 0)
++                if duration > 0:
++                    timelines.update_editor_state({"sessionId": session["sessionId"], "action": "ready", "duration": duration})
++                return self.out(200, {"session": timelines.editor_state(session["sessionId"]), "studio": studio})
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
++        if path == "/api/timelines/editor-event":
++            try:
++                return self.out(200, timelines.update_editor_state(self.body()))
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
++        if path == "/api/timelines/save":
++            try:
++                return self.out(200, timelines.save(self.body()))
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
++
+         if path == "/api/animations/check-roblox-assets":
+             try:
+                 credentials = publication_credentials()
+--- a/system/control-center/static/asset-manager.css
++++ b/system/control-center/static/asset-manager.css
+@@ -14,3 +14,4 @@
+ .animation-source-path{display:block;width:150px;max-width:150px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;direction:rtl;text-align:left}
+ 
+ .weapon-attack-movement-rules{display:grid;gap:8px;margin-top:12px}.weapon-attack-movement-row{display:grid;grid-template-columns:minmax(90px,.7fr) minmax(110px,1fr) minmax(100px,.8fr) minmax(130px,1fr) auto;gap:8px;align-items:end;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--panel2)}.weapon-attack-movement-row label{margin:0}.weapon-attack-movement-row strong{align-self:center;text-transform:uppercase;font-size:11px;letter-spacing:.06em}.weapon-attack-movement-row button{height:34px}@media(max-width:900px){.weapon-attack-movement-row{grid-template-columns:1fr 1fr}.weapon-attack-movement-row button{grid-column:1/-1}}
++.timeline-workflow{display:grid;grid-template-columns:minmax(360px,.9fr) minmax(520px,1.25fr);gap:14px;margin-top:14px}.timeline-clips{display:grid;gap:7px;margin-top:12px}.timeline-clip{display:flex;justify-content:space-between;gap:12px;align-items:center;width:100%;text-align:left;background:var(--panel2)}.timeline-clip.active{border-color:var(--mint);background:#42d6b112}.timeline-clip span,.timeline-clip b,.timeline-clip small{display:block;min-width:0}.timeline-clip small{margin-top:4px;color:var(--muted);font-size:10px;overflow-wrap:anywhere}.timeline-clip i{font-style:normal;font-size:10px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:4px 7px}.timeline-clip.active i{color:var(--mint);border-color:#42d6b155}.timeline-events{display:grid;gap:8px;margin:14px 0}.timeline-event-row{display:grid;grid-template-columns:minmax(130px,1fr) minmax(130px,.65fr) auto;gap:10px;align-items:end;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--panel2)}.timeline-event-row b,.timeline-event-row small{display:block}.timeline-event-row small{margin-top:3px;color:var(--muted);font-size:10px}.timeline-event-row label{margin:0}.timeline-event-row input{width:100%;margin-top:4px}.timeline-meta{margin-top:12px}@media(max-width:1050px){.timeline-workflow{grid-template-columns:1fr}}@media(max-width:650px){.timeline-event-row{grid-template-columns:1fr}.timeline-event-row button{width:100%}}
+--- a/system/control-center/static/character-assets.js
++++ b/system/control-center/static/character-assets.js
+@@ -43,10 +43,10 @@
+ 
+ function setView(view){
+   state.view=view;
+-  $('characters-view').hidden=view!=='characters';$('animations-view').hidden=view!=='animations';$('animation-speed-view').hidden=view!=='animation-speed';$('weapons-view').hidden=view!=='weapons';$('monsters-view').hidden=view!=='monsters';$('options-view').hidden=view!=='options';
++  $('characters-view').hidden=view!=='characters';$('animations-view').hidden=view!=='animations';$('animation-speed-view').hidden=view!=='animation-speed';$('weapons-view').hidden=view!=='weapons';$('monsters-view').hidden=view!=='monsters';$('timelines-view').hidden=view!=='timelines';$('options-view').hidden=view!=='options';
+   $('character-rail').hidden=view!=='characters';$('animation-rail').hidden=view!=='animations';$('weapon-rail').hidden=view!=='weapons';$('monster-rail').hidden=view!=='monsters';
+-  $('nav-characters').classList.toggle('active',view==='characters');$('nav-animations').classList.toggle('active',view==='animations');$('nav-animation-speed').classList.toggle('active',view==='animation-speed');$('nav-weapons').classList.toggle('active',view==='weapons');$('nav-monsters').classList.toggle('active',view==='monsters');$('nav-options').classList.toggle('active',view==='options');
+-  if(view==='animations')loadAnimations();if(view==='animation-speed'&&window.game1AnimationSpeedLoad)window.game1AnimationSpeedLoad();if(view==='weapons'&&window.game1WeaponsLoad)window.game1WeaponsLoad();if(view==='monsters'&&window.game1MonstersLoad)window.game1MonstersLoad();if(view==='options'&&window.game1OptionsLoad)window.game1OptionsLoad();
++  $('nav-characters').classList.toggle('active',view==='characters');$('nav-animations').classList.toggle('active',view==='animations');$('nav-animation-speed').classList.toggle('active',view==='animation-speed');$('nav-weapons').classList.toggle('active',view==='weapons');$('nav-monsters').classList.toggle('active',view==='monsters');$('nav-timelines').classList.toggle('active',view==='timelines');$('nav-options').classList.toggle('active',view==='options');
++  if(view==='animations')loadAnimations();if(view==='animation-speed'&&window.game1AnimationSpeedLoad)window.game1AnimationSpeedLoad();if(view==='weapons'&&window.game1WeaponsLoad)window.game1WeaponsLoad();if(view==='monsters'&&window.game1MonstersLoad)window.game1MonstersLoad();if(view==='timelines'&&window.game1TimelinesLoad)window.game1TimelinesLoad();if(view==='options'&&window.game1OptionsLoad)window.game1OptionsLoad();
+ }
+ 
+ function characterStatsPayload(){return {Level:Number($('character-stat-level').value||1),MaxHP:Number($('character-stat-hp').value||0),Damage:Number($('character-stat-damage').value||0),Defense:Number($('character-stat-defense').value||0),AttackSpeed:Number($('character-stat-attack-speed').value||0),RunSpeed:Number($('character-stat-run-speed').value||0),CritChance:Number($('character-stat-crit-chance').value||0)}}
+@@ -135,7 +135,7 @@
+ async function setAnimationDuplicate(clipId,enabled){try{state.animations=await request('/api/animations/'+encodeURIComponent(clipId)+'/duplicate-first-frame',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:!!enabled})});state.animations.publication=state.data?.publication||{};renderAnimations();toast(enabled?'runtime first-frame tail enabled; asset bytes are unchanged':'runtime first-frame tail disabled; asset bytes are unchanged')}catch(error){await loadAnimations();toast(error.message,true)}}
+ async function removeAnimationBinding(bindingId){if(!confirm('remove this semantic animation binding from game1? canonical source files are preserved.'))return;try{state.animations=await request('/api/animation-bindings/'+encodeURIComponent(bindingId),{method:'DELETE'});state.animations.publication=state.data?.publication||{};if(state.animationSelected===bindingId)state.animationSelected=null;renderAnimations();toast('animation binding removed')}catch(error){toast(error.message,true)}}
+ 
+-$('display-name').oninput=()=>{if(!state.selected)state.autoDisplayName=false};$('nav-characters').onclick=()=>setView('characters');$('nav-animations').onclick=()=>setView('animations');$('nav-animation-speed').onclick=()=>setView('animation-speed');$('nav-weapons').onclick=()=>setView('weapons');$('nav-monsters').onclick=()=>setView('monsters');$('nav-options').onclick=()=>setView('options');$('race').onchange=syncIdentity;$('gender').onchange=syncIdentity;$('choose-model').onclick=chooseModel;$('save-archetype').onclick=saveArchetype;$('save-character-stats').onclick=saveCharacterStats;$('register-character').onclick=registerCharacter;$('publish-character').onclick=()=>publishCharacter();$('sync-character').onclick=()=>syncStudio();$('activate-character').onclick=()=>activate();$('new-character').onclick=()=>setForm(null);$('clear-form').onclick=()=>setForm(null);$('refresh').onclick=loadCharacters;$('validate-view').onclick=loadCharacters;$('theme').onclick=()=>document.body.classList.toggle('light');
++$('display-name').oninput=()=>{if(!state.selected)state.autoDisplayName=false};$('nav-characters').onclick=()=>setView('characters');$('nav-animations').onclick=()=>setView('animations');$('nav-animation-speed').onclick=()=>setView('animation-speed');$('nav-weapons').onclick=()=>setView('weapons');$('nav-monsters').onclick=()=>setView('monsters');$('nav-timelines').onclick=()=>setView('timelines');$('nav-options').onclick=()=>setView('options');$('race').onchange=syncIdentity;$('gender').onchange=syncIdentity;$('choose-model').onclick=chooseModel;$('save-archetype').onclick=saveArchetype;$('save-character-stats').onclick=saveCharacterStats;$('register-character').onclick=registerCharacter;$('publish-character').onclick=()=>publishCharacter();$('sync-character').onclick=()=>syncStudio();$('activate-character').onclick=()=>activate();$('new-character').onclick=()=>setForm(null);$('clear-form').onclick=()=>setForm(null);$('refresh').onclick=loadCharacters;$('validate-view').onclick=loadCharacters;$('theme').onclick=()=>document.body.classList.toggle('light');
+ $('animation-character').onchange=()=>{state.animationCharacter=$('animation-character').value;state.animationSelected=null;state.lastScan=null;loadAnimations()};$('choose-animation-folder').onclick=chooseAnimationFolder;$('scan-animations').onclick=scanAnimations;$('publish-missing-animations').onclick=publishMissingAnimations;$('check-roblox-animations').onclick=checkRobloxAnimationAssets;$('refresh-animations').onclick=loadAnimations;
+ initAnimationFolderExplorer();
+ initFilenameRulesDisclosure();
+--- a/system/control-center/static/index.html
++++ b/system/control-center/static/index.html
+@@ -4,12 +4,12 @@
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width,initial-scale=1">
+ <title>game1 · asset manager</title>
+-<link rel="stylesheet" href="asset-manager.css?v=7">
++<link rel="stylesheet" href="asset-manager.css?v=8">
+ </head>
+ <body>
+ <header>
+ <div><span class="eyebrow">game1 · control center</span><h1>asset manager</h1></div>
+-<div class="header-actions"><span class="pill">characters + animations + weapons + monsters · m7</span><button id="theme" class="icon" type="button" title="theme">◐</button></div>
++<div class="header-actions"><span class="pill">characters + animations + timelines + weapons + monsters · m35</span><button id="theme" class="icon" type="button" title="theme">◐</button></div>
+ </header>
+ <main>
+ <aside class="panel rail">
+@@ -20,6 +20,7 @@
+ <button id="nav-animation-speed" class="asset-section" type="button"><b>animation speed</b><small>stat → playback scaling</small></button>
+ <button id="nav-weapons" class="asset-section" type="button"><b>weapons</b><small>models · textures · stats</small></button>
+ <button id="nav-monsters" class="asset-section" type="button"><b>monsters</b><small>rigs · stats · animations</small></button>
++<button id="nav-timelines" class="asset-section" type="button"><b>timelines</b><small>attack animation events</small></button>
+ <button id="nav-options" class="asset-section" type="button"><b>options</b><small>common runtime settings</small></button>
+ </div>
+ <div id="character-rail">
+@@ -139,6 +140,28 @@
+ </div>
+ </div>
+ 
++
++<div id="timelines-view" hidden>
++<div class="panel hero">
++<div><span class="eyebrow">attack authoring · studio animation preview</span><h2>timelines</h2><p>choose a character or monster attack, open it in Studio, scrub to an exact animation moment and assign an event. confirmed points return here; Save exports the authoritative runtime timeline.</p></div>
++</div>
++<div class="timeline-workflow">
++<div class="panel character-card">
++<div class="section-title"><div><span>01 · target</span><h3>attack animations</h3></div><button id="timeline-refresh" type="button">refresh</button></div>
++<div class="character-grid"><label>type<select id="timeline-subject-type"><option value="characters">characters</option><option value="monsters">monsters</option></select></label><label>character / monster<select id="timeline-subject"></select></label></div>
++<div id="timeline-clips" class="timeline-clips"><span class="muted">loading attacks…</span></div>
++</div>
++<div class="panel character-card">
++<div class="section-title"><div><span>02 · events</span><h3 id="timeline-selected-title">select attack</h3></div><span id="timeline-studio-state" class="pill">studio idle</span></div>
++<small class="hint">Studio owns the visual pose picker. Move the scrubber there, select an event and press Confirm point. This panel updates automatically; nothing is written until Save timeline.</small>
++<div id="timeline-events" class="timeline-events"><span class="muted">select an attack animation.</span></div>
++<div class="details-grid timeline-meta"><div><b>source duration</b><span id="timeline-duration">—</span></div><div><b>clip id</b><span id="timeline-clip-id">—</span></div></div>
++<div class="actions"><button id="timeline-open-studio" class="primary" type="button" disabled>open in studio</button><button id="timeline-save" type="button" disabled>save timeline</button></div>
++<div id="timeline-status" class="status-box"><strong>ready</strong><span>choose an attack.</span></div>
++</div>
++</div>
++</div>
++
+ <div id="options-view" hidden>
+ <div class="panel hero">
+ <div><span class="eyebrow">common runtime settings · shared gameplay</span><h2>options</h2><p>project-wide settings that are not owned by one character, monster, weapon or animation clip.</p></div>
+@@ -296,8 +319,9 @@
+ </section>
+ </main>
+ <div id="toast" class="toast"></div>
+-<script src="character-assets.js?v=14"></script>
++<script src="character-assets.js?v=15"></script>
+ <script src="animation-speed.js?v=1"></script>
++<script src="timelines.js?v=1"></script>
+ <script src="options.js?v=1"></script>
+ <script src="weapon-assets.js?v=3"></script>
+ <script src="monster-assets.js?v=4"></script>
+--- a/system/control-center/studio_bridge.py
++++ b/system/control-center/studio_bridge.py
+@@ -232,3 +232,102 @@
+     if result.get("error"):
+         raise StudioBridgeError(f"Studio Monster Spawn command failed: {result['error']}")
+     return result
++
++
++def run_timeline_editor_bridge(session: dict, event_catalog: list[dict], timeout_seconds: float = 75.0) -> dict:
++    command = {
++        "command": "timeline-editor",
++        "schemaVersion": 1,
++        "project": PROJECT,
++        "sessionId": str(session.get("sessionId") or ""),
++        "subjectType": str(session.get("subjectType") or ""),
++        "subjectId": str(session.get("subjectId") or ""),
++        "subjectName": str(session.get("subjectName") or ""),
++        "clipId": str(session.get("clipId") or ""),
++        "clipName": str(session.get("clipName") or ""),
++        "modelAssetId": str(session.get("modelAssetId") or ""),
++        "animationAssetId": str(session.get("animationAssetId") or ""),
++        "duration": float(session.get("duration") or 0),
++        "events": dict(session.get("events") or {}),
++        "eventCatalog": list(event_catalog or []),
++    }
++    result: dict | None = None
++    command_claimed = False
++    command_claimed_at: float | None = None
++
++    class Handler(http.server.BaseHTTPRequestHandler):
++        def log_message(self, _format: str, *_args) -> None:
++            return
++
++        def _authorized(self) -> bool:
++            return self.headers.get("X-Game1-Token") == TOKEN
++
++        def _json(self, status: int, payload: dict) -> None:
++            body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
++            self.send_response(status)
++            self.send_header("Content-Type", "application/json; charset=utf-8")
++            self.send_header("Content-Length", str(len(body)))
++            self.end_headers()
++            self.wfile.write(body)
++
++        def do_GET(self) -> None:
++            nonlocal command_claimed, command_claimed_at
++            if not self._authorized():
++                self._json(403, {"ok": False})
++                return
++            if self.path != "/command":
++                self._json(404, {"ok": False})
++                return
++            if command_claimed:
++                self._json(409, {"ok": False, "reason": "command-already-claimed"})
++                return
++            command_claimed = True
++            command_claimed_at = time.monotonic()
++            self._json(200, command)
++
++        def do_POST(self) -> None:
++            nonlocal result
++            if not self._authorized():
++                self._json(403, {"ok": False})
++                return
++            if self.path != "/timeline-editor-result":
++                self._json(404, {"ok": False})
++                return
++            try:
++                length = int(self.headers.get("Content-Length", "0"))
++                incoming = json.loads(self.rfile.read(length).decode("utf-8"))
++                if incoming.get("command") != "timeline-editor" or incoming.get("project") != PROJECT:
++                    raise ValueError("unexpected timeline editor result identity")
++                if str(incoming.get("sessionId") or "") != str(command["sessionId"]):
++                    raise ValueError("unexpected timeline editor session id")
++                result = incoming
++                self._json(200, {"ok": True})
++            except Exception as exc:
++                self._json(400, {"ok": False, "error": str(exc)})
++
++    try:
++        server = http.server.ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
++    except OSError as exc:
++        raise StudioBridgeError(f"studio bridge port {PORT} is unavailable: {exc}") from exc
++
++    server.timeout = 0.25
++    started_at = time.monotonic()
++    deadline = started_at + max(0.01, float(timeout_seconds))
++    try:
++        while result is None and time.monotonic() < deadline:
++            server.handle_request()
++            now = time.monotonic()
++            if command_claimed_at is None and now - started_at >= 8.0:
++                break
++            if command_claimed_at is not None and now - command_claimed_at >= 60.0:
++                break
++    finally:
++        server.server_close()
++
++    if result is None:
++        if command_claimed:
++            raise StudioBridgeError("the game1 Studio plugin accepted the timeline editor command but did not finish opening it")
++        raise StudioBridgeError("no timeline editor command was received; install the updated Game1Bridge plugin and restart Studio")
++    if result.get("error"):
++        raise StudioBridgeError(f"Studio timeline editor failed: {result['error']}")
++    return result
+--- a/system/studio-plugin/Game1Bridge.server.luau
++++ b/system/studio-plugin/Game1Bridge.server.luau
+@@ -17,7 +17,8 @@
+     "Control Center"
+ )
+ button.ClickableWhenViewportHidden = true
+-local AGENT_URL = "http://127.0.0.1:43821/api/agent/info"
++local AGENT_BASE_URL = "http://127.0.0.1:43821"
++local AGENT_URL = AGENT_BASE_URL .. "/api/agent/info"
+ local AGENT_TOKEN = "Game1LocalControlV1"
+ local BRIDGE_URL = "http://127.0.0.1:43137"
+ local BRIDGE_TOKEN = "Game1StudioBridgeV1"
+@@ -988,6 +989,451 @@
+     end
+ end
+ 
++local TIMELINE_PREVIEW_NAME = "Game1TimelinePreview"
++local timelineWidgetInfo = DockWidgetPluginGuiInfo.new(
++    Enum.InitialDockState.Right,
++    false,
++    false,
++    380,
++    470,
++    320,
++    360
++)
++local timelineWidget = plugin:CreateDockWidgetPluginGui("Game1AttackTimeline_v1", timelineWidgetInfo)
++timelineWidget.Title = "game1 · Attack Timeline"
++
++local timelineEditor = {
++    sessionId = "",
++    clipId = "",
++    clipName = "",
++    subjectName = "",
++    duration = 0,
++    normalized = 0,
++    selectedEvent = "Hit",
++    eventCatalog = {},
++    events = {},
++    track = nil,
++    preview = nil,
++}
++local timelineDragging = false
++
++local timelineRoot = Instance.new("Frame")
++timelineRoot.Name = "Root"
++timelineRoot.BackgroundColor3 = Color3.fromRGB(32, 34, 39)
++timelineRoot.BorderSizePixel = 0
++timelineRoot.Size = UDim2.fromScale(1, 1)
++timelineRoot.Parent = timelineWidget
++
++local function timelineLabel(name: string, text: string, y: number, height: number, size: number): TextLabel
++    local label = Instance.new("TextLabel")
++    label.Name = name
++    label.BackgroundTransparency = 1
++    label.Position = UDim2.new(0, 12, 0, y)
++    label.Size = UDim2.new(1, -24, 0, height)
++    label.Font = Enum.Font.SourceSans
++    label.Text = text
++    label.TextColor3 = Color3.fromRGB(232, 236, 240)
++    label.TextSize = size
++    label.TextWrapped = true
++    label.TextXAlignment = Enum.TextXAlignment.Left
++    label.TextYAlignment = Enum.TextYAlignment.Center
++    label.Parent = timelineRoot
++    return label
++end
++
++local function timelineButton(name: string, text: string, parent: Instance): TextButton
++    local buttonInstance = Instance.new("TextButton")
++    buttonInstance.Name = name
++    buttonInstance.AutoButtonColor = true
++    buttonInstance.BackgroundColor3 = Color3.fromRGB(47, 51, 58)
++    buttonInstance.BorderSizePixel = 0
++    buttonInstance.Font = Enum.Font.SourceSansSemibold
++    buttonInstance.Text = text
++    buttonInstance.TextColor3 = Color3.fromRGB(230, 234, 239)
++    buttonInstance.TextSize = 14
++    buttonInstance.Parent = parent
++    return buttonInstance
++end
++
++local timelineTitle = timelineLabel("Title", "No attack selected", 10, 42, 18)
++local timelineHint = timelineLabel("Hint", "Open an attack from Asset Manager / Timelines.", 52, 30, 12)
++timelineHint.TextColor3 = Color3.fromRGB(155, 162, 172)
++
++local timelineBar = Instance.new("Frame")
++timelineBar.Name = "Scrubber"
++timelineBar.Active = true
++timelineBar.BackgroundColor3 = Color3.fromRGB(57, 61, 69)
++timelineBar.BorderSizePixel = 0
++timelineBar.Position = UDim2.new(0, 16, 0, 96)
++timelineBar.Size = UDim2.new(1, -32, 0, 18)
++timelineBar.Parent = timelineRoot
++
++local timelineFill = Instance.new("Frame")
++timelineFill.Name = "Fill"
++timelineFill.BackgroundColor3 = Color3.fromRGB(69, 214, 177)
++timelineFill.BorderSizePixel = 0
++timelineFill.Size = UDim2.new(0, 0, 1, 0)
++timelineFill.Parent = timelineBar
++
++local timelineThumb = Instance.new("Frame")
++timelineThumb.Name = "Thumb"
++timelineThumb.AnchorPoint = Vector2.new(0.5, 0.5)
++timelineThumb.BackgroundColor3 = Color3.fromRGB(242, 245, 247)
++timelineThumb.BorderSizePixel = 0
++timelineThumb.Position = UDim2.new(0, 0, 0.5, 0)
++timelineThumb.Size = UDim2.fromOffset(4, 28)
++timelineThumb.Parent = timelineBar
++
++local timelineTime = timelineLabel("Time", "0.000 s · 0.0%", 118, 24, 13)
++local timelineEventHeading = timelineLabel("EventHeading", "Assign selected moment to event", 146, 22, 13)
++
++local timelineEventButtons = Instance.new("Frame")
++timelineEventButtons.Name = "EventButtons"
++timelineEventButtons.BackgroundTransparency = 1
++timelineEventButtons.Position = UDim2.new(0, 12, 0, 172)
++timelineEventButtons.Size = UDim2.new(1, -24, 0, 112)
++timelineEventButtons.Parent = timelineRoot
++
++local timelineMarkers = timelineLabel("Markers", "No event points", 290, 54, 12)
++timelineMarkers.TextColor3 = Color3.fromRGB(170, 178, 188)
++timelineMarkers.TextYAlignment = Enum.TextYAlignment.Top
++
++local timelineConfirm = timelineButton("Confirm", "Confirm point", timelineRoot)
++timelineConfirm.Position = UDim2.new(0, 12, 0, 350)
++timelineConfirm.Size = UDim2.new(1, -24, 0, 38)
++
++local timelineStatus = timelineLabel("Status", "Studio editor idle", 397, 48, 12)
++timelineStatus.TextColor3 = Color3.fromRGB(155, 162, 172)
++timelineStatus.TextYAlignment = Enum.TextYAlignment.Top
++
++local function timelineEventDefinition(eventName: string): any?
++    for _, definition in ipairs(timelineEditor.eventCatalog) do
++        if tostring(definition.name or "") == eventName then
++            return definition
++        end
++    end
++    return nil
++end
++
++local function timelineRefreshMarkers()
++    local rows = {}
++    for _, definition in ipairs(timelineEditor.eventCatalog) do
++        local eventName = tostring(definition.name or "")
++        local event = timelineEditor.events[eventName]
++        if type(event) == "table" then
++            table.insert(rows, ("%s %.1f%%"):format(eventName, (tonumber(event.normalizedTime) or 0) * 100))
++        end
++    end
++    timelineMarkers.Text = if #rows > 0 then table.concat(rows, "  ·  ") else "No event points"
++end
++
++local function timelineSetNormalized(value: number)
++    local normalized = math.clamp(tonumber(value) or 0, 0, 1)
++    timelineEditor.normalized = normalized
++    timelineFill.Size = UDim2.new(normalized, 0, 1, 0)
++    timelineThumb.Position = UDim2.new(normalized, 0, 0.5, 0)
++    local duration = math.max(0, tonumber(timelineEditor.duration) or 0)
++    timelineTime.Text = ("%.3f s · %.1f%%"):format(duration * normalized, normalized * 100)
++    local track = timelineEditor.track
++    if track ~= nil and duration > 0 then
++        pcall(function()
++            track.TimePosition = math.clamp(duration * normalized, 0, math.max(0, duration - 0.0001))
++        end)
++    end
++end
++
++local function timelineSelectEvent(eventName: string)
++    if timelineEventDefinition(eventName) == nil then
++        return
++    end
++    timelineEditor.selectedEvent = eventName
++    for _, child in ipairs(timelineEventButtons:GetChildren()) do
++        if child:IsA("TextButton") then
++            child.BackgroundColor3 = if child.Name == eventName then Color3.fromRGB(49, 112, 96) else Color3.fromRGB(47, 51, 58)
++        end
++    end
++    local existing = timelineEditor.events[eventName]
++    if type(existing) == "table" and tonumber(existing.normalizedTime) ~= nil then
++        timelineSetNormalized(tonumber(existing.normalizedTime) or 0)
++    end
++end
++
++local function timelineBuildEventButtons()
++    for _, child in ipairs(timelineEventButtons:GetChildren()) do
++        child:Destroy()
++    end
++    local count = math.max(1, #timelineEditor.eventCatalog)
++    local gap = 6
++    local widthScale = 1 / math.min(count, 3)
++    for index, definition in ipairs(timelineEditor.eventCatalog) do
++        local eventName = tostring(definition.name or "")
++        if eventName ~= "" then
++            local buttonInstance = timelineButton(eventName, tostring(definition.label or eventName), timelineEventButtons)
++            local column = (index - 1) % 3
++            local row = math.floor((index - 1) / 3)
++            buttonInstance.Position = UDim2.new(column * widthScale, column == 0 and 0 or gap, 0, row * 38)
++            buttonInstance.Size = UDim2.new(widthScale, -gap, 0, 32)
++            buttonInstance.MouseButton1Click:Connect(function()
++                timelineSelectEvent(eventName)
++            end)
++        end
++    end
++    if timelineEventDefinition(timelineEditor.selectedEvent) == nil and #timelineEditor.eventCatalog > 0 then
++        timelineEditor.selectedEvent = tostring(timelineEditor.eventCatalog[1].name or "")
++    end
++    timelineSelectEvent(timelineEditor.selectedEvent)
++end
++
++local function timelineNormalizedFromInput(input: InputObject): number
++    local width = math.max(1, timelineBar.AbsoluteSize.X)
++    return math.clamp((input.Position.X - timelineBar.AbsolutePosition.X) / width, 0, 1)
++end
++
++timelineBar.InputBegan:Connect(function(input)
++    if input.UserInputType == Enum.UserInputType.MouseButton1 then
++        timelineDragging = true
++        timelineSetNormalized(timelineNormalizedFromInput(input))
++    end
++end)
++UserInputService.InputChanged:Connect(function(input)
++    if timelineDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
++        timelineSetNormalized(timelineNormalizedFromInput(input))
++    end
++end)
++UserInputService.InputEnded:Connect(function(input)
++    if input.UserInputType == Enum.UserInputType.MouseButton1 then
++        timelineDragging = false
++    end
++end)
++
++local function postTimelineAgent(payload: any): any
++    local response = HttpService:RequestAsync({
++        Url = AGENT_BASE_URL .. "/api/timelines/editor-event",
++        Method = "POST",
++        Headers = {
++            ["X-Control-Token"] = AGENT_TOKEN,
++            ["Content-Type"] = "application/json",
++        },
++        Body = HttpService:JSONEncode(payload),
++    })
++    if not response.Success then
++        error(("Asset Manager rejected timeline update (HTTP %d): %s"):format(response.StatusCode, response.Body))
++    end
++    local ok, decoded = pcall(HttpService.JSONDecode, HttpService, response.Body)
++    if ok then
++        return decoded
++    end
++    return nil
++end
++
++local function postTimelineEditorResult(payload: any)
++    local response = HttpService:RequestAsync({
++        Url = BRIDGE_URL .. "/timeline-editor-result",
++        Method = "POST",
++        Headers = {
++            ["X-Game1-Token"] = BRIDGE_TOKEN,
++            ["Content-Type"] = "application/json",
++        },
++        Body = HttpService:JSONEncode(payload),
++    })
++    if not response.Success then
++        error("game1 timeline editor bridge rejected response: " .. tostring(response.StatusCode))
++    end
++end
++
++local function destroyTimelinePreview()
++    if timelineEditor.track ~= nil then
++        pcall(function()
++            timelineEditor.track:Stop(0)
++            timelineEditor.track:Destroy()
++        end)
++        timelineEditor.track = nil
++    end
++    if timelineEditor.preview ~= nil then
++        pcall(function()
++            timelineEditor.preview:Destroy()
++        end)
++        timelineEditor.preview = nil
++    end
++    local stale = Workspace:FindFirstChild(TIMELINE_PREVIEW_NAME)
++    if stale then
++        stale:Destroy()
++    end
++end
++
++local function loadTimelinePreviewModel(assetId: number): (Model, Animator)
++    local loaded: Instance? = nil
++    local lastError = ""
++    for _ = 1, 8 do
++        local loadedOk, value = pcall(function()
++            return AssetService:LoadAssetAsync(assetId)
++        end)
++        if loadedOk and value ~= nil then
++            loaded = value
++            break
++        end
++        lastError = tostring(value)
++        task.wait(1)
++    end
++    if loaded == nil then
++        error("could not load preview model asset " .. tostring(assetId) .. ": " .. lastError)
++    end
++
++    local imported: Instance = loaded
++    local children = loaded:GetChildren()
++    if loaded:IsA("Model") and #children == 1 then
++        imported = children[1]
++        imported.Parent = nil
++        loaded:Destroy()
++    end
++
++    local preview = Instance.new("Model")
++    preview.Name = TIMELINE_PREVIEW_NAME
++    preview:SetAttribute("Game1TimelinePreview", true)
++    imported.Name = "ImportedRig"
++    imported.Parent = preview
++    local animator = ensureCharacterHost(preview, imported)
++    for _, descendant in ipairs(preview:GetDescendants()) do
++        if descendant:IsA("BasePart") then
++            descendant.Anchored = true
++            descendant.CanCollide = false
++            descendant.CanTouch = false
++            descendant.CanQuery = false
++        elseif descendant:IsA("Script") or descendant:IsA("LocalScript") then
++            descendant.Enabled = false
++        end
++    end
++    preview.Parent = Workspace
++
++    local boundsCFrame, boundsSize = preview:GetBoundingBox()
++    local targetCenter = Vector3.new(0, math.max(1, boundsSize.Y) * 0.5, 0)
++    preview:PivotTo(preview:GetPivot() + (targetCenter - boundsCFrame.Position))
++    boundsCFrame, boundsSize = preview:GetBoundingBox()
++    local camera = Workspace.CurrentCamera
++    if camera then
++        local center = boundsCFrame.Position
++        local distance = math.max(6, boundsSize.Magnitude * 0.85)
++        camera.CFrame = CFrame.lookAt(center + Vector3.new(0, boundsSize.Y * 0.1, distance), center)
++        camera.Focus = CFrame.new(center)
++    end
++    Selection:Set({ preview })
++    return preview, animator
++end
++
++local function handleTimelineEditor(data: any)
++    local result = {
++        command = "timeline-editor",
++        project = "game1",
++        schemaVersion = 1,
++        sessionId = tostring(data.sessionId or ""),
++        clipId = tostring(data.clipId or ""),
++    }
++    local ok, operationError = xpcall(function()
++        if tostring(data.project or "") ~= "game1" or tonumber(data.schemaVersion) ~= 1 then
++            error("invalid game1 timeline editor command")
++        end
++        local sessionId = tostring(data.sessionId or "")
++        local modelAssetId = tonumber(data.modelAssetId)
++        local animationAssetId = tonumber(data.animationAssetId)
++        if sessionId == "" or modelAssetId == nil or modelAssetId <= 0 or animationAssetId == nil or animationAssetId <= 0 then
++            error("timeline editor command is missing published asset ids")
++        end
++        destroyTimelinePreview()
++
++        timelineEditor.sessionId = sessionId
++        timelineEditor.clipId = tostring(data.clipId or "")
++        timelineEditor.clipName = tostring(data.clipName or timelineEditor.clipId)
++        timelineEditor.subjectName = tostring(data.subjectName or data.subjectId or "")
++        timelineEditor.duration = math.max(0, tonumber(data.duration) or 0)
++        timelineEditor.normalized = 0
++        timelineEditor.eventCatalog = if type(data.eventCatalog) == "table" then data.eventCatalog else {}
++        timelineEditor.events = if type(data.events) == "table" then data.events else {}
++        timelineEditor.selectedEvent = "Hit"
++
++        local preview, animator = loadTimelinePreviewModel(modelAssetId)
++        timelineEditor.preview = preview
++        local animation = Instance.new("Animation")
++        animation.AnimationId = "rbxassetid://" .. tostring(math.floor(animationAssetId))
++        local track = animator:LoadAnimation(animation)
++        animation:Destroy()
++        track.Looped = false
++        track:Play(0, 1, 1)
++        local deadline = os.clock() + 8
++        while track.Length <= 0 and os.clock() < deadline do
++            task.wait(0.05)
++        end
++        track:AdjustSpeed(0)
++        if track.Length > 0 then
++            timelineEditor.duration = track.Length
++        end
++        if timelineEditor.duration <= 0 then
++            error("Roblox did not expose a duration for the selected animation")
++        end
++        timelineEditor.track = track
++
++        timelineTitle.Text = timelineEditor.subjectName .. " · " .. timelineEditor.clipName
++        timelineHint.Text = "Scrub the pose, choose an event, then Confirm point. Save remains in Asset Manager."
++        timelineStatus.Text = "Connected to Asset Manager · " .. timelineEditor.clipId
++        timelineBuildEventButtons()
++        timelineRefreshMarkers()
++        timelineSetNormalized(0)
++        timelineWidget.Enabled = true
++
++        postTimelineAgent({
++            sessionId = timelineEditor.sessionId,
++            action = "ready",
++            duration = timelineEditor.duration,
++        })
++        result.duration = timelineEditor.duration
++        result.preview = preview:GetFullName()
++    end, debug.traceback)
++
++    if not ok then
++        result.error = tostring(operationError)
++        timelineStatus.Text = "Timeline editor error: " .. tostring(operationError)
++        warn("[game1 plugin] timeline editor failed: " .. tostring(operationError))
++    end
++    local postOk, postError = pcall(postTimelineEditorResult, result)
++    if not postOk then
++        warn("[game1 plugin] failed to report timeline editor result: " .. tostring(postError))
++    end
++end
++
++timelineConfirm.MouseButton1Click:Connect(function()
++    if timelineEditor.sessionId == "" or timelineEditor.selectedEvent == "" then
++        return
++    end
++    local eventName = timelineEditor.selectedEvent
++    local normalized = timelineEditor.normalized
++    local definition = timelineEventDefinition(eventName)
++    local event = { normalizedTime = normalized }
++    if definition and tostring(definition.result or "") ~= "" then
++        event.result = tostring(definition.result)
++    end
++    timelineEditor.events[eventName] = event
++    timelineRefreshMarkers()
++    timelineStatus.Text = ("Sending %s = %.1f%% to Asset Manager…"):format(eventName, normalized * 100)
++    local ok, err = pcall(function()
++        postTimelineAgent({
++            sessionId = timelineEditor.sessionId,
++            action = "set-event",
++            eventName = eventName,
++            normalizedTime = normalized,
++            duration = timelineEditor.duration,
++        })
++    end)
++    if ok then
++        timelineStatus.Text = ("Confirmed %s = %.3f s (%.1f%%)"):format(
++            eventName,
++            timelineEditor.duration * normalized,
++            normalized * 100
++        )
++    else
++        timelineStatus.Text = "Confirm failed: " .. tostring(err)
++        warn("[game1 plugin] timeline confirm failed: " .. tostring(err))
++    end
++end)
++
+ local function pollBridge()
+     if RunService:IsRunning() then
+         return
+@@ -1008,6 +1454,8 @@
+         handleModelLoad(data)
+     elseif data.command == "monster-spawn" then
+         handleMonsterSpawn(data)
++    elseif data.command == "timeline-editor" then
++        handleTimelineEditor(data)
+     end
+ end
+ 
+@@ -1018,4 +1466,4 @@
+     end
+ end)
+ 
+-print("[game1 plugin] loaded · model bridge v10 · animation reimport verification moved to Control Center UI")
++print("[game1 plugin] loaded · model bridge v11 · attack timeline editor enabled")
+--- a/system/studio-plugin/install.ps1
++++ b/system/studio-plugin/install.ps1
+@@ -20,7 +20,7 @@
+ 
+ if(-not (Test-Path $Temp)){throw 'Rojo did not create the plugin build'}
+ $BuiltText=Get-Content $Temp -Raw
+-foreach($Marker in @('Game1ControlCenter','model bridge v10')){
++foreach($Marker in @('Game1ControlCenter','model bridge v11','Game1AttackTimeline_v1')){
+     if(-not $BuiltText.Contains($Marker)){
+         throw "Studio bridge build is stale or incomplete; missing marker: $Marker"
+     }
+@@ -38,7 +38,7 @@
+ if($GeneratedHash -ne $InstalledHash){throw 'Installed Studio bridge hash does not match generated bridge hash'}
+ Remove-Item $Temp -Force -ErrorAction SilentlyContinue
+ 
+-Write-Host ("Game1Bridge installed without animation-check UI: {0}" -f $Installed)
++Write-Host ("Game1Bridge installed with Attack Timeline editor: {0}" -f $Installed)
+ Write-Host ("SHA256: {0}" -f $InstalledHash)
+-Write-Host 'Animation reimport verification is now in Control Center / Asset Manager.'
++Write-Host 'Attack Timeline opens from Control Center / Asset Manager / Timelines.'
+ Write-Host 'Fully close every Roblox Studio window, then reopen Studio once.'
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -179,6 +179,8 @@
+     err("attack service must resolve melee damage through authoritative target hitboxes")
+ attack_timeline_path = ROOT / "src/shared/combat/AttackTimelineConfig.luau"
+ attack_timeline_text = attack_timeline_path.read_text(encoding="utf-8") if attack_timeline_path.is_file() else ""
++attack_timeline_data_path = ROOT / "src/shared/combat/AttackTimelineData.luau"
++attack_timeline_data_text = attack_timeline_data_path.read_text(encoding="utf-8") if attack_timeline_data_path.is_file() else ""
+ for required in [
+     "AttackTimelineConfig.EventNames",
+     'MeleeDamage = "melee_damage"',
+@@ -1195,7 +1197,7 @@
+         if str(binding.get("slot") or "") != "attack":
+             continue
+         clip_id = str(binding.get("clipId") or binding.get("clip_id") or "")
+-        if clip_id and f'["{clip_id}"]' not in attack_timeline_text:
++        if clip_id and f'["{clip_id}"]' not in attack_timeline_data_text:
+             err(f"registered attack clip has no authoritative timeline: {clip_id}")
+ 
+ # m13+ starting stats; m15 runtime-only first-frame seam contract.
+@@ -1826,20 +1828,23 @@
+ # m34 authored melee damage window. 1HS attacks are windup until 40%, damaging
+ # only from HitStart=40% through terminal Hit=50%. Client pose traffic is also
+ # confined to that same window; server phase validation independently enforces it.
+-attack_timeline_m34 = (ROOT / "src/shared/combat/AttackTimelineConfig.luau").read_text(encoding="utf-8")
++attack_timeline_manifest_path = ROOT / "assets/manifests/attack-timelines.json"
++attack_timeline_manifest = json.loads(attack_timeline_manifest_path.read_text(encoding="utf-8")) if attack_timeline_manifest_path.is_file() else {}
++attack_timeline_rows = {str(row.get("clipId") or ""): row for row in attack_timeline_manifest.get("timelines") or []}
+ for clip_id in [
+     "human_female__weapon__1hs__attack__01",
+     "human_female__weapon__1hs__attack__02",
+     "human_female__weapon__1hs__attack__03",
+ ]:
+-    start = attack_timeline_m34.find(f'["{clip_id}"]')
+-    if start < 0:
++    row = attack_timeline_rows.get(clip_id)
++    if not row:
+         err(f"m34 timeline clip missing {clip_id}")
+         continue
+-    block = attack_timeline_m34[start: start + 420]
+-    if 'HitStart = table.freeze({ normalizedTime = 0.40 })' not in block:
++    events = row.get("events") or {}
++    if abs(float((events.get("HitStart") or {}).get("normalizedTime") or -1) - 0.40) > 1e-6:
+         err(f"m34 {clip_id} must open melee damage at normalized 0.40")
+-    if 'Hit = table.freeze({ normalizedTime = 0.50, result = "melee_damage" })' not in block:
++    hit = events.get("Hit") or {}
++    if abs(float(hit.get("normalizedTime") or -1) - 0.50) > 1e-6 or str(hit.get("result") or "") != "melee_damage":
+         err(f"m34 {clip_id} must keep terminal Hit at normalized 0.50")
+ 
+ attack_controller_m34 = (ROOT / "src/client/combat/AttackController.luau").read_text(encoding="utf-8")
+@@ -1869,13 +1874,92 @@
+         err(f"m34 server 40%-50% damage gate missing {required}")
+ 
+ 
++# m35 Attack Timeline authoring is owned by Asset Manager. Studio only previews
++# the published rig/animation and sends confirmed normalized event points back.
++timeline_store_text = (ROOT / "system/control-center/timeline_store.py").read_text(encoding="utf-8")
++timeline_js_text = (ROOT / "system/control-center/static/timelines.js").read_text(encoding="utf-8")
++index_m35_text = (ROOT / "system/control-center/static/index.html").read_text(encoding="utf-8")
++studio_bridge_m35_text = (ROOT / "system/control-center/studio_bridge.py").read_text(encoding="utf-8")
++for required in [
++    '"schemaVersion": 1',
++    '"project": "game1"',
++    '"timelines"',
++]:
++    if required not in attack_timeline_manifest_path.read_text(encoding="utf-8"):
++        err(f"m35 attack timeline manifest missing {required}")
++for required in [
++    'require(script.Parent:WaitForChild("AttackTimelineData"))',
++    "AttackTimelineConfig.ByClip = BY_CLIP",
++]:
++    if required not in attack_timeline_text:
++        err(f"m35 runtime timeline resolver missing {required}")
++for required in [
++    "class TimelineStore",
++    "begin_editor_session",
++    "update_editor_state",
++    "export_runtime",
++    "attack-timelines.json",
++    "AttackTimelineData.luau",
++]:
++    if required not in timeline_store_text:
++        err(f"m35 timeline store missing {required}")
++for required in [
++    'id="nav-timelines"',
++    'id="timelines-view"',
++    'id="timeline-open-studio"',
++    'timelines.js?v=1',
++]:
++    if required not in index_m35_text:
++        err(f"m35 Asset Manager timeline UI missing {required}")
++for required in [
++    "/api/timelines/open",
++    "/api/timelines/editor-state",
++    "/api/timelines/save",
++    "setInterval(timelinePoll,700)",
++]:
++    if required not in timeline_js_text:
++        err(f"m35 Asset Manager timeline behavior missing {required}")
++for required in [
++    "run_timeline_editor_bridge",
++    '"command": "timeline-editor"',
++    '"/timeline-editor-result"',
++]:
++    if required not in studio_bridge_m35_text:
++        err(f"m35 Studio timeline bridge missing {required}")
++for required in [
++    "Game1AttackTimeline_v1",
++    "handleTimelineEditor",
++    "Confirm point",
++    'AGENT_BASE_URL .. "/api/timelines/editor-event"',
++    "track.TimePosition",
++]:
++    if required not in studio_plugin_text:
++        err(f"m35 Studio Attack Timeline plugin missing {required}")
++for required in [
++    'path == "/api/timelines"',
++    'path == "/api/timelines/open"',
++    'path == "/api/timelines/editor-event"',
++    'path == "/api/timelines/save"',
++]:
++    if required not in host_agent_text:
++        err(f"m35 host agent timeline API missing {required}")
++for clip_id in [
++    "human_female__weapon__1hs__attack__01",
++    "human_female__weapon__1hs__attack__02",
++    "human_female__weapon__1hs__attack__03",
++    "monster__gremlin__attack__01",
++]:
++    if clip_id not in attack_timeline_data_text:
++        err(f"m35 generated runtime timeline is missing {clip_id}")
++
++
+ if errors:
+     print("verify failed")
+     for item in errors:
+         print(" -", item)
+     sys.exit(1)
+ 
+-print("verify ok · game1 m34 HitStart 40%-to-Hit damage window passed")
++print("verify ok · game1 m35 Asset Manager Attack Timeline authoring passed")
+ print("registered character archetypes:", len(archetypes))
+ print("active character archetype:", active_id or "none")
+ print("race pool: human")
+--- a/assets/manifests/attack-timelines.json
++++ b/assets/manifests/attack-timelines.json
+@@ -0,0 +1,37 @@
++{
++  "schemaVersion": 1,
++  "project": "game1",
++  "timelines": [
++    {
++      "clipId": "human_female__weapon__1hs__attack__01",
++      "duration": 1.866666674,
++      "events": {
++        "HitStart": { "normalizedTime": 0.4 },
++        "Hit": { "normalizedTime": 0.5, "result": "melee_damage" }
++      }
++    },
++    {
++      "clipId": "human_female__weapon__1hs__attack__02",
++      "duration": 1.866666674,
++      "events": {
++        "HitStart": { "normalizedTime": 0.4 },
++        "Hit": { "normalizedTime": 0.5, "result": "melee_damage" }
++      }
++    },
++    {
++      "clipId": "human_female__weapon__1hs__attack__03",
++      "duration": 1.866666674,
++      "events": {
++        "HitStart": { "normalizedTime": 0.4 },
++        "Hit": { "normalizedTime": 0.5, "result": "melee_damage" }
++      }
++    },
++    {
++      "clipId": "monster__gremlin__attack__01",
++      "duration": 1.799999952,
++      "events": {
++        "Hit": { "normalizedTime": 0.5, "result": "melee_damage" }
++      }
++    }
++  ]
++}
+--- a/src/shared/combat/AttackTimelineData.luau
++++ b/src/shared/combat/AttackTimelineData.luau
+@@ -0,0 +1,32 @@
++-- generated from assets/manifests/attack-timelines.json; do not edit by hand.
++local BY_CLIP = {
++    ["human_female__weapon__1hs__attack__01"] = table.freeze({
++        duration = 1.866666674,
++        events = table.freeze({
++            HitStart = table.freeze({ normalizedTime = 0.4 }),
++            Hit = table.freeze({ normalizedTime = 0.5, result = "melee_damage" }),
++        }),
++    }),
++    ["human_female__weapon__1hs__attack__02"] = table.freeze({
++        duration = 1.866666674,
++        events = table.freeze({
++            HitStart = table.freeze({ normalizedTime = 0.4 }),
++            Hit = table.freeze({ normalizedTime = 0.5, result = "melee_damage" }),
++        }),
++    }),
++    ["human_female__weapon__1hs__attack__03"] = table.freeze({
++        duration = 1.866666674,
++        events = table.freeze({
++            HitStart = table.freeze({ normalizedTime = 0.4 }),
++            Hit = table.freeze({ normalizedTime = 0.5, result = "melee_damage" }),
++        }),
++    }),
++    ["monster__gremlin__attack__01"] = table.freeze({
++        duration = 1.799999952,
++        events = table.freeze({
++            Hit = table.freeze({ normalizedTime = 0.5, result = "melee_damage" }),
++        }),
++    }),
++}
++
++return table.freeze(BY_CLIP)
+--- a/system/control-center/static/timelines.js
++++ b/system/control-center/static/timelines.js
+@@ -0,0 +1,21 @@
++const timelineState={data:null,subjectType:'characters',subjectId:'',clipId:'',draft:null,sessionId:'',revision:-1,pollTimer:null,opening:false};
++function timelineItems(){return (timelineState.data?.items||[]).filter(row=>row.subjectType===timelineState.subjectType&&row.subjectId===timelineState.subjectId)}
++function timelineSelected(){return (timelineState.data?.items||[]).find(row=>row.clipId===timelineState.clipId)||null}
++function timelineCloneEvents(events){return JSON.parse(JSON.stringify(events||{}))}
++function timelineStopPoll(){if(timelineState.pollTimer){clearInterval(timelineState.pollTimer);timelineState.pollTimer=null}}
++function timelineSetStatus(title,text,error=false){const host=$('timeline-status');if(!host)return;host.className='status-box'+(error?' blocked':'');host.innerHTML=`<strong>${esc(title)}</strong><span>${esc(text)}</span>`}
++function timelineSubjects(){return timelineState.data?.subjects?.[timelineState.subjectType]||[]}
++function timelineRenderSubjects(){const select=$('timeline-subject');const rows=timelineSubjects();if(!rows.some(x=>x.id===timelineState.subjectId))timelineState.subjectId=rows[0]?.id||'';select.innerHTML=rows.map(row=>`<option value="${esc(row.id)}">${esc(row.name)} · ${esc(row.id)}</option>`).join('');select.value=timelineState.subjectId}
++function timelineRenderClips(){const host=$('timeline-clips'),rows=timelineItems();if(!rows.some(x=>x.clipId===timelineState.clipId)){timelineState.clipId=rows[0]?.clipId||'';timelineState.draft=null;timelineState.sessionId='';timelineStopPoll()}host.innerHTML=rows.length?rows.map(row=>{const events=Object.entries(row.events||{}).map(([name,event])=>`${name} ${Math.round(Number(event.normalizedTime||0)*1000)/10}%`).join(' · ')||'not configured';return `<button class="timeline-clip ${row.clipId===timelineState.clipId?'active':''}" data-timeline-clip="${esc(row.clipId)}" type="button"><span><b>${esc(row.clipName)}</b><small>${esc(row.weaponSet?row.weaponSet+' · ':'')}${esc(events)}</small></span><i>${row.configured?'configured':'new'}</i></button>`}).join(''):'<span class="muted">no registered attack animations for this target.</span>';for(const button of host.querySelectorAll('[data-timeline-clip]'))button.onclick=()=>timelineSelectClip(button.dataset.timelineClip)}
++function timelineDraftFromSelected(){const row=timelineSelected();if(!row)return null;return {duration:Number(row.duration||0),events:timelineCloneEvents(row.events)}}
++function timelineRenderEditor(){const row=timelineSelected();if(!row){$('timeline-selected-title').textContent='select attack';$('timeline-events').innerHTML='<span class="muted">select an attack animation.</span>';$('timeline-open-studio').disabled=true;$('timeline-save').disabled=true;$('timeline-duration').textContent='—';$('timeline-clip-id').textContent='—';return}if(!timelineState.draft)timelineState.draft=timelineDraftFromSelected();$('timeline-selected-title').textContent=`${row.subjectName} · ${row.clipName}`;$('timeline-clip-id').textContent=row.clipId;$('timeline-duration').textContent=timelineState.draft.duration>0?`${timelineState.draft.duration.toFixed(4)} s`:'waiting for Studio';$('timeline-open-studio').disabled=timelineState.opening||!row.modelAssetId||!row.animationAssetId;$('timeline-save').disabled=!(timelineState.draft.duration>0);const catalog=timelineState.data?.eventCatalog||[];$('timeline-events').innerHTML=catalog.map(def=>{const event=timelineState.draft.events?.[def.name];const percent=event?Number(event.normalizedTime||0)*100:'';return `<div class="timeline-event-row"><div><b>${esc(def.label||def.name)}</b><small>${esc(def.name)}${def.result?' · '+esc(def.result):''}</small></div><label>position %<input data-timeline-event="${esc(def.name)}" type="number" min="0" max="100" step="0.1" value="${percent===''?'':Number(percent.toFixed(3))}" placeholder="—"></label><button data-timeline-clear="${esc(def.name)}" type="button" ${event?'':'disabled'}>clear</button></div>`}).join('');for(const input of $('timeline-events').querySelectorAll('[data-timeline-event]'))input.oninput=()=>{const name=input.dataset.timelineEvent,value=input.value.trim();if(value===''){delete timelineState.draft.events[name]}else{const normalized=Math.max(0,Math.min(1,Number(value)/100));const def=catalog.find(x=>x.name===name)||{};timelineState.draft.events[name]={normalizedTime:normalized};if(def.result)timelineState.draft.events[name].result=def.result}timelineRenderEditor()};for(const button of $('timeline-events').querySelectorAll('[data-timeline-clear]'))button.onclick=()=>{delete timelineState.draft.events[button.dataset.timelineClear];timelineRenderEditor()}}
++function timelineRender(){if(!timelineState.data)return;$('timeline-subject-type').value=timelineState.subjectType;timelineRenderSubjects();timelineRenderClips();timelineRenderEditor()}
++function timelineSelectClip(clipId){timelineState.clipId=clipId;timelineState.draft=null;timelineState.sessionId='';timelineState.revision=-1;timelineStopPoll();timelineRender();timelineSetStatus('opening Studio','selected attack is being opened automatically.');timelineOpenStudio()}
++async function timelinePoll(){if(!timelineState.sessionId)return;try{const session=await request('/api/timelines/editor-state?session='+encodeURIComponent(timelineState.sessionId));if(Number(session.revision||0)!==timelineState.revision){timelineState.revision=Number(session.revision||0);timelineState.draft={duration:Number(session.duration||0),events:timelineCloneEvents(session.events)};$('timeline-studio-state').textContent=session.studioReady?'studio connected':'studio opening';timelineRenderEditor();timelineSetStatus('studio connected','confirmed Studio points are mirrored here. Save when the timeline is ready.')}}catch(error){timelineStopPoll();$('timeline-studio-state').textContent='studio session ended';timelineSetStatus('editor session ended',error.message,true)}}
++async function timelineOpenStudio(){const row=timelineSelected();if(!row||timelineState.opening)return;timelineState.opening=true;timelineRenderEditor();$('timeline-studio-state').textContent='opening studio';timelineSetStatus('opening Studio',`${row.subjectName} · ${row.clipName}`);try{const result=await request('/api/timelines/open',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clipId:row.clipId})});const session=result.session;timelineState.sessionId=session.sessionId;timelineState.revision=Number(session.revision||0);timelineState.draft={duration:Number(session.duration||0),events:timelineCloneEvents(session.events)};$('timeline-studio-state').textContent='studio connected';timelineStopPoll();timelineState.pollTimer=setInterval(timelinePoll,700);timelineRenderEditor();timelineSetStatus('Studio editor open','scrub the animation in Studio and confirm event points.')}catch(error){timelineSetStatus('Studio editor failed',error.message,true);$('timeline-studio-state').textContent='studio error';toast(error.message,true)}finally{timelineState.opening=false;timelineRenderEditor()}}
++async function timelineSave(){const row=timelineSelected();if(!row||!timelineState.draft)return;try{timelineSetStatus('saving','writing manifest and runtime timeline…');timelineState.data=await request('/api/timelines/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clipId:row.clipId,duration:timelineState.draft.duration,events:timelineState.draft.events})});const saved=(timelineState.data.items||[]).find(x=>x.clipId===row.clipId);timelineState.draft=saved?{duration:Number(saved.duration||0),events:timelineCloneEvents(saved.events)}:timelineState.draft;timelineRender();timelineSetStatus('saved','authoritative timeline exported to runtime data.');toast('attack timeline saved')}catch(error){timelineSetStatus('save failed',error.message,true);toast(error.message,true)}}
++async function timelineLoad(){try{timelineState.data=await request('/api/timelines');timelineRender();if(timelineState.clipId)timelineSetStatus('ready','open this attack in Studio to author event points.')}catch(error){toast(error.message,true)}}
++window.game1TimelinesLoad=timelineLoad;
++$('timeline-subject-type').onchange=()=>{timelineState.subjectType=$('timeline-subject-type').value;timelineState.subjectId='';timelineState.clipId='';timelineState.draft=null;timelineState.sessionId='';timelineStopPoll();timelineRender()};
++$('timeline-subject').onchange=()=>{timelineState.subjectId=$('timeline-subject').value;timelineState.clipId='';timelineState.draft=null;timelineState.sessionId='';timelineStopPoll();timelineRender()};
++$('timeline-refresh').onclick=timelineLoad;$('timeline-open-studio').onclick=timelineOpenStudio;$('timeline-save').onclick=timelineSave;
+--- a/system/control-center/timeline_store.py
++++ b/system/control-center/timeline_store.py
+@@ -0,0 +1,301 @@
++from __future__ import annotations
++
++from pathlib import Path
++import json
++import time
++import uuid
++
++PROJECT = "game1"
++SCHEMA_VERSION = 1
++EVENT_CATALOG = [
++    {"name": "HitStart", "label": "hit start", "result": ""},
++    {"name": "Hit", "label": "hit", "result": "melee_damage"},
++    {"name": "Hit2", "label": "hit 2", "result": "melee_damage"},
++    {"name": "HitEnd", "label": "hit end", "result": ""},
++    {"name": "Release", "label": "release", "result": "projectile_release"},
++]
++EVENT_BY_NAME = {row["name"]: row for row in EVENT_CATALOG}
++
++
++class TimelineStore:
++    def __init__(self, root: Path, characters, animations, monsters, monster_animations):
++        self.root = root.resolve()
++        self.characters = characters
++        self.animations = animations
++        self.monsters = monsters
++        self.monster_animations = monster_animations
++        self.manifest_path = self.root / "assets/manifests/attack-timelines.json"
++        self.runtime_path = self.root / "src/shared/combat/AttackTimelineData.luau"
++        self.sessions: dict[str, dict] = {}
++        self._ensure_manifest()
++        self.export_runtime()
++
++    def _ensure_manifest(self) -> None:
++        if self.manifest_path.is_file():
++            return
++        seed = {
++            "schemaVersion": SCHEMA_VERSION,
++            "project": PROJECT,
++            "timelines": [
++                {
++                    "clipId": "human_female__weapon__1hs__attack__01",
++                    "duration": 1.866666674,
++                    "events": {
++                        "HitStart": {"normalizedTime": 0.40},
++                        "Hit": {"normalizedTime": 0.50, "result": "melee_damage"},
++                    },
++                },
++                {
++                    "clipId": "human_female__weapon__1hs__attack__02",
++                    "duration": 1.866666674,
++                    "events": {
++                        "HitStart": {"normalizedTime": 0.40},
++                        "Hit": {"normalizedTime": 0.50, "result": "melee_damage"},
++                    },
++                },
++                {
++                    "clipId": "human_female__weapon__1hs__attack__03",
++                    "duration": 1.866666674,
++                    "events": {
++                        "HitStart": {"normalizedTime": 0.40},
++                        "Hit": {"normalizedTime": 0.50, "result": "melee_damage"},
++                    },
++                },
++                {
++                    "clipId": "monster__gremlin__attack__01",
++                    "duration": 1.799999952,
++                    "events": {
++                        "Hit": {"normalizedTime": 0.50, "result": "melee_damage"},
++                    },
++                },
++            ],
++        }
++        self._write_manifest(seed)
++
++    def _load(self) -> dict:
++        try:
++            data = json.loads(self.manifest_path.read_text(encoding="utf-8"))
++        except Exception as exc:
++            raise ValueError(f"attack timeline manifest is invalid: {exc}") from exc
++        if int(data.get("schemaVersion") or 0) != SCHEMA_VERSION or data.get("project") != PROJECT:
++            raise ValueError("attack timeline manifest identity is invalid")
++        timelines = data.get("timelines")
++        if not isinstance(timelines, list):
++            raise ValueError("attack timeline manifest timelines must be a list")
++        return data
++
++    def _write_manifest(self, data: dict) -> None:
++        self.manifest_path.parent.mkdir(parents=True, exist_ok=True)
++        self.manifest_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
++
++    @staticmethod
++    def _lua_string(value: str) -> str:
++        return json.dumps(str(value), ensure_ascii=False)
++
++    @staticmethod
++    def _lua_number(value: float) -> str:
++        text = f"{float(value):.9f}".rstrip("0").rstrip(".")
++        return text if text else "0"
++
++    def export_runtime(self) -> None:
++        data = self._load()
++        lines = [
++            "-- generated from assets/manifests/attack-timelines.json; do not edit by hand.",
++            "local BY_CLIP = {",
++        ]
++        for row in sorted(data.get("timelines") or [], key=lambda item: str(item.get("clipId") or "")):
++            clip_id = str(row.get("clipId") or "").strip()
++            duration = float(row.get("duration") or 0)
++            if not clip_id or duration <= 0:
++                continue
++            lines.append(f"    [{self._lua_string(clip_id)}] = table.freeze({{")
++            lines.append(f"        duration = {self._lua_number(duration)},")
++            lines.append("        events = table.freeze({")
++            events = row.get("events") if isinstance(row.get("events"), dict) else {}
++            for event_name in EVENT_BY_NAME:
++                event = events.get(event_name)
++                if not isinstance(event, dict):
++                    continue
++                normalized = max(0.0, min(1.0, float(event.get("normalizedTime") or 0)))
++                result = str(event.get("result") or EVENT_BY_NAME[event_name]["result"] or "")
++                suffix = f", result = {self._lua_string(result)}" if result else ""
++                lines.append(
++                    f"            {event_name} = table.freeze({{ normalizedTime = {self._lua_number(normalized)}{suffix} }}),"
++                )
++            lines.extend(["        }),", "    }),"])
++        lines.extend(["}", "", "return table.freeze(BY_CLIP)", ""])
++        self.runtime_path.parent.mkdir(parents=True, exist_ok=True)
++        self.runtime_path.write_text("\n".join(lines), encoding="utf-8")
++
++    def _timeline_map(self) -> dict[str, dict]:
++        return {str(row.get("clipId") or ""): row for row in self._load().get("timelines") or []}
++
++    def _attack_rows(self) -> list[dict]:
++        timeline_map = self._timeline_map()
++        rows: list[dict] = []
++        for character in self.characters.list():
++            character_id = str(character.get("id") or "")
++            for clip in self.animations.list_for_character(character_id):
++                if str(clip.get("slot") or "") != "attack":
++                    continue
++                clip_id = str(clip.get("clip_id") or "")
++                timeline = timeline_map.get(clip_id) or {}
++                rows.append({
++                    "subjectType": "characters",
++                    "subjectId": character_id,
++                    "subjectName": str(character.get("display_name") or character_id),
++                    "modelAssetId": str(character.get("model_asset_id") or ""),
++                    "clipId": clip_id,
++                    "clipName": str(clip.get("name") or clip_id),
++                    "animationAssetId": str(clip.get("asset_id") or ""),
++                    "weaponSet": str(clip.get("weapon_set") or ""),
++                    "variant": int(clip.get("variant") or 0),
++                    "duration": float(timeline.get("duration") or 0),
++                    "events": dict(timeline.get("events") or {}),
++                    "configured": bool(timeline),
++                })
++        for monster in self.monsters.list():
++            slug = str(monster.get("slug") or "")
++            for clip in self.monster_animations.list_for_monster(slug):
++                if str(clip.get("slot") or "") != "attack":
++                    continue
++                clip_id = str(clip.get("clip_id") or clip.get("id") or "")
++                timeline = timeline_map.get(clip_id) or {}
++                rows.append({
++                    "subjectType": "monsters",
++                    "subjectId": slug,
++                    "subjectName": str(monster.get("name_en") or slug),
++                    "modelAssetId": str(monster.get("model_asset_id") or ""),
++                    "clipId": clip_id,
++                    "clipName": str(clip.get("name") or clip_id),
++                    "animationAssetId": str(clip.get("asset_id") or ""),
++                    "weaponSet": "",
++                    "variant": int(clip.get("variant") or 0),
++                    "duration": float(timeline.get("duration") or 0),
++                    "events": dict(timeline.get("events") or {}),
++                    "configured": bool(timeline),
++                })
++        rows.sort(key=lambda row: (row["subjectType"], row["subjectName"].casefold(), row["clipName"].casefold()))
++        return rows
++
++    def snapshot(self) -> dict:
++        rows = self._attack_rows()
++        subjects = {"characters": [], "monsters": []}
++        seen: set[tuple[str, str]] = set()
++        for row in rows:
++            key = (row["subjectType"], row["subjectId"])
++            if key in seen:
++                continue
++            seen.add(key)
++            subjects[row["subjectType"]].append({"id": row["subjectId"], "name": row["subjectName"]})
++        return {
++            "schemaVersion": SCHEMA_VERSION,
++            "project": PROJECT,
++            "eventCatalog": EVENT_CATALOG,
++            "subjects": subjects,
++            "items": rows,
++        }
++
++    def _find_attack(self, clip_id: str) -> dict:
++        clip_id = str(clip_id or "").strip()
++        row = next((item for item in self._attack_rows() if item["clipId"] == clip_id), None)
++        if not row:
++            raise ValueError(f"unknown registered attack animation: {clip_id}")
++        if not str(row.get("modelAssetId") or "").isdigit():
++            raise ValueError("publish the selected character/monster model before opening the timeline editor")
++        if not str(row.get("animationAssetId") or "").isdigit():
++            raise ValueError("publish the selected attack animation before opening the timeline editor")
++        return row
++
++    def begin_editor_session(self, clip_id: str) -> dict:
++        row = self._find_attack(clip_id)
++        session_id = uuid.uuid4().hex
++        session = {
++            "sessionId": session_id,
++            "clipId": row["clipId"],
++            "subjectType": row["subjectType"],
++            "subjectId": row["subjectId"],
++            "subjectName": row["subjectName"],
++            "clipName": row["clipName"],
++            "modelAssetId": row["modelAssetId"],
++            "animationAssetId": row["animationAssetId"],
++            "duration": float(row.get("duration") or 0),
++            "events": json.loads(json.dumps(row.get("events") or {})),
++            "revision": 0,
++            "studioReady": False,
++            "updatedAt": time.time(),
++        }
++        self.sessions[session_id] = session
++        return json.loads(json.dumps(session))
++
++    def editor_state(self, session_id: str) -> dict:
++        session = self.sessions.get(str(session_id or ""))
++        if not session:
++            raise ValueError("timeline editor session expired or was not found")
++        return json.loads(json.dumps(session))
++
++    def update_editor_state(self, payload: dict) -> dict:
++        session = self.sessions.get(str(payload.get("sessionId") or ""))
++        if not session:
++            raise ValueError("timeline editor session expired or was not found")
++        duration = float(payload.get("duration") or session.get("duration") or 0)
++        if duration > 0:
++            session["duration"] = duration
++        action = str(payload.get("action") or "ready")
++        if action == "ready":
++            session["studioReady"] = True
++        elif action == "set-event":
++            event_name = str(payload.get("eventName") or "")
++            if event_name not in EVENT_BY_NAME:
++                raise ValueError(f"unsupported attack timeline event: {event_name}")
++            normalized = max(0.0, min(1.0, float(payload.get("normalizedTime") or 0)))
++            event = {"normalizedTime": normalized}
++            result = str(EVENT_BY_NAME[event_name].get("result") or "")
++            if result:
++                event["result"] = result
++            session.setdefault("events", {})[event_name] = event
++            session["studioReady"] = True
++        else:
++            raise ValueError(f"unsupported timeline editor action: {action}")
++        session["revision"] = int(session.get("revision") or 0) + 1
++        session["updatedAt"] = time.time()
++        return self.editor_state(session["sessionId"])
++
++    def save(self, payload: dict) -> dict:
++        clip_id = str(payload.get("clipId") or "").strip()
++        self._find_attack(clip_id)
++        duration = float(payload.get("duration") or 0)
++        if duration <= 0:
++            raise ValueError("timeline duration must be greater than zero")
++        raw_events = payload.get("events")
++        if not isinstance(raw_events, dict) or not raw_events:
++            raise ValueError("timeline requires at least one event")
++        events = {}
++        for event_name, raw in raw_events.items():
++            if event_name not in EVENT_BY_NAME or not isinstance(raw, dict):
++                continue
++            normalized = max(0.0, min(1.0, float(raw.get("normalizedTime") or 0)))
++            event = {"normalizedTime": normalized}
++            result = str(EVENT_BY_NAME[event_name].get("result") or "")
++            if result:
++                event["result"] = result
++            events[event_name] = event
++        if not events:
++            raise ValueError("timeline contains no supported events")
++        if "HitStart" in events and "Hit" in events and events["HitStart"]["normalizedTime"] > events["Hit"]["normalizedTime"]:
++            raise ValueError("HitStart cannot be after Hit")
++
++        data = self._load()
++        row = {"clipId": clip_id, "duration": duration, "events": events}
++        replaced = False
++        for index, current in enumerate(data["timelines"]):
++            if str(current.get("clipId") or "") == clip_id:
++                data["timelines"][index] = row
++                replaced = True
++                break
++        if not replaced:
++            data["timelines"].append(row)
++        data["timelines"].sort(key=lambda item: str(item.get("clipId") or ""))
++        self._write_manifest(data)
++        self.export_runtime()
++        return self.snapshot()

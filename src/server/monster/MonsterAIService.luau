@@ -442,7 +442,7 @@ local function beginAttack(agent: any, target: Model)
     local row = weightedRow(agent.attackRows)
     if not row then return end
     local percent = AnimationSpeedScaling.ResolveForModel(agent.model, "attack")
-    local timing = AttackTimelineConfig.ResolveRuntime(row.clipId, percent, row.duplicateFirstFrameAtEnd == true)
+    local timing = AttackTimelineConfig.ResolveRuntime(row.clipId, percent)
     if not timing then return end
 
     agent.attacking = true

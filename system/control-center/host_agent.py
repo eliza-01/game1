@@ -36,10 +36,11 @@ from monster_animation_store import MonsterAnimationStore
 from monster_spawn_store import MonsterSpawnStore
 from animation_speed_scaling_store import AnimationSpeedScalingStore
 from options_store import OptionsStore
+from timeline_store import TimelineStore
 from character_core.identity import CharacterIdentityService
-from studio_bridge import run_model_load_bridge, run_monster_spawn_bridge
+from studio_bridge import run_model_load_bridge, run_monster_spawn_bridge, run_timeline_editor_bridge
 
-control_agent_build = "game1-m18-opencloud-animation-reimport-001"
+control_agent_build = "game1-m38-character-hitend-rojo-workspace-001"
 port = int(os.environ.get("CONTROL_AGENT_PORT", "43821"))
 token = os.environ.get("CONTROL_TOKEN", "Game1LocalControlV1")
 store = CharacterStore(ROOT)
@@ -50,6 +51,7 @@ monster_animations = MonsterAnimationStore(ROOT)
 monster_spawns = MonsterSpawnStore(ROOT, monsters, monster_animations, run_monster_spawn_bridge)
 animation_speed_scaling = AnimationSpeedScalingStore(ROOT)
 options_store = OptionsStore(ROOT)
+timelines = TimelineStore(ROOT, store, animations, monsters, monster_animations)
 character_identity = CharacterIdentityService(ROOT, store, animations)
 
 
@@ -447,6 +449,17 @@ class Handler(BaseHTTPRequestHandler):
                 return self.out(200, options_store.snapshot())
             except Exception as error:
                 return self.out(400, {"error": str(error)})
+        if path == "/api/timelines":
+            try:
+                return self.out(200, timelines.snapshot())
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path == "/api/timelines/editor-state":
+            try:
+                session_id = str((parse_qs(parsed.query).get("session") or [""])[0])
+                return self.out(200, timelines.editor_state(session_id))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
         monster_prefix = "/api/monsters/"
         publications_suffix = "/publications"
         if path.startswith(monster_prefix) and path.endswith(publications_suffix):
@@ -564,6 +577,28 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/options":
             try:
                 return self.out(200, options_store.update(self.body()))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+
+        if path == "/api/timelines/open":
+            try:
+                payload = self.body()
+                session = timelines.begin_editor_session(str(payload.get("clipId") or ""))
+                studio = run_timeline_editor_bridge(session, timelines.event_catalog_for_subject(session["subjectType"]))
+                duration = float(studio.get("duration") or 0)
+                if duration > 0:
+                    timelines.update_editor_state({"sessionId": session["sessionId"], "action": "ready", "duration": duration})
+                return self.out(200, {"session": timelines.editor_state(session["sessionId"]), "studio": studio})
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path == "/api/timelines/editor-event":
+            try:
+                return self.out(200, timelines.update_editor_state(self.body()))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path == "/api/timelines/save":
+            try:
+                return self.out(200, timelines.save(self.body()))
             except Exception as error:
                 return self.out(400, {"error": str(error)})
 

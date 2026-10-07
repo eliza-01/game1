@@ -1,19 +1,27 @@
 # game1 Place
 
-The canonical Place for this project is **`game1.rbxl`**.
+The canonical authored Place is **`game1.rbxl`**.
 
-It is generated from the clean Rojo project:
+For a brand-new project, generate the seed place with:
 
 ```powershell
 .\place\build-place.ps1
 ```
 
-`current.rbxl` is deliberately **not used** in game1. If a `place/current.rbxl` appears here, verification fails because it may be a RobloxLineage Place copied into the wrong project.
+The build command injects a temporary Baseplate + SpawnLocation only while
+building the initial place. **Live Rojo does not own Workspace scene children.**
+After opening/saving the place in Studio, positions and other authored Workspace
+changes remain in the `.rbxl` instead of being reverted by Rojo sync.
 
-To intentionally regenerate an existing clean Place:
+`current.rbxl` is deliberately **not used** in game1. If a `place/current.rbxl`
+appears here, verification fails because it may be a RobloxLineage Place copied
+into the wrong project.
+
+To intentionally regenerate a fresh seed Place:
 
 ```powershell
 .\place\build-place.ps1 -Force
 ```
 
-The Studio-only `TrainingDummyService` creates a temporary attack target during Play tests, so the built Place does not need authored gameplay content.
+This overwrites the authored place, so use `-Force` only when that is actually
+what you want.

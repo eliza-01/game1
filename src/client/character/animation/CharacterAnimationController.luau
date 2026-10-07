@@ -522,7 +522,7 @@ function CharacterAnimationController.PlayAction(slot: string)
 	local timeline = nil
 	local runtimeDuration = 0
 	if slot == "attack" then
-		timeline = AttackTimelineConfig.ResolveRuntime(clipId, animationSpeedPercent, descriptor.duplicateFirstFrameAtEnd == true)
+		timeline = AttackTimelineConfig.ResolveRuntime(clipId, animationSpeedPercent)
 		if not timeline then
 			warn(("[game1][animation] attack clip has no timeline: %s"):format(clipId))
 			return nil

@@ -1,0 +1,726 @@
+diff --git a/src/client/combat/AimPoseController.luau b/src/client/combat/AimPoseController.luau
+index 1d1e432..8fb5edd 100644
+--- a/src/client/combat/AimPoseController.luau
++++ b/src/client/combat/AimPoseController.luau
+@@ -275,20 +275,35 @@ local function applyPose(deltaTime: number)
+     end
+ end
+ 
+-function AimPoseController.GetAimPosition(): Vector3?
++function AimPoseController.GetAimRay(): (Vector3?, Vector3?)
+     local camera = Workspace.CurrentCamera
+     if not camera then
+-        return nil
++        return nil, nil
+     end
+ 
+-    -- One center-screen reticle owns both attack intent and presentation.
++    -- The center-screen reticle owns gameplay aim. Headshot classification uses
++    -- this exact camera line, while the server rebases it beside the character
++    -- and clamps the usable segment to AttackRadius.
+     local viewport = camera.ViewportSize
+     local ray = camera:ViewportPointToRay(viewport.X * 0.5, viewport.Y * 0.5)
++    local direction = ray.Direction
++    if direction.Magnitude <= 1e-6 then
++        return nil, nil
++    end
++    return ray.Origin, direction.Unit
++end
++
++function AimPoseController.GetAimPosition(): Vector3?
++    local origin, direction = AimPoseController.GetAimRay()
++    if typeof(origin) ~= "Vector3" or typeof(direction) ~= "Vector3" then
++        return nil
++    end
++
+     local params = RaycastParams.new()
+     params.FilterType = Enum.RaycastFilterType.Exclude
+     params.FilterDescendantsInstances = character and { character } or {}
+-    local hit = Workspace:Raycast(ray.Origin, ray.Direction * AttackConfig.MaxAimDistance, params)
+-    return if hit then hit.Position else ray.Origin + ray.Direction * AttackConfig.MaxAimDistance
++    local hit = Workspace:Raycast(origin, direction * AttackConfig.MaxAimDistance, params)
++    return if hit then hit.Position else origin + direction * AttackConfig.MaxAimDistance
+ end
+ 
+ function AimPoseController.BeginAttack(target: Vector3, duration: number)
+diff --git a/src/client/combat/AttackController.luau b/src/client/combat/AttackController.luau
+index 7b0da0f..04caee4 100644
+--- a/src/client/combat/AttackController.luau
++++ b/src/client/combat/AttackController.luau
+@@ -35,10 +35,18 @@ local function publishWeaponPose()
+     if typeof(boxCFrame) ~= "CFrame" then
+         return
+     end
++
++    local aimOrigin = nil
++    local aimDirection = nil
++    if aimPoseController and aimPoseController.GetAimRay then
++        aimOrigin, aimDirection = aimPoseController.GetAimRay()
++    end
+     weaponPoseRemote:FireServer({
+         clientAttackId = activePoseAttackId,
+         elapsed = math.max(0, os.clock() - activePoseStartedAt),
+         boxCFrame = boxCFrame,
++        aimOrigin = aimOrigin,
++        aimDirection = aimDirection,
+     })
+ end
+ 
+@@ -171,7 +179,6 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
+         activePoseUntil = activePoseStartedAt + damagePoseDuration
+         poseAccumulator = 0
+         attack:FireServer({
+-            aim = target,
+             clipId = action.clipId,
+             clientAttackId = sequence,
+         })
+diff --git a/src/server/combat/AttackService.luau b/src/server/combat/AttackService.luau
+index 54252f9..9774032 100644
+--- a/src/server/combat/AttackService.luau
++++ b/src/server/combat/AttackService.luau
+@@ -22,6 +22,7 @@ local weaponPoseBuffers: { [Player]: any } = {}
+ local activeHitTargets: { [Player]: { [Model]: boolean } } = {}
+ local activeDamageUntil: { [Player]: number } = {}
+ local activeDamageCutoffElapsed: { [Player]: number } = {}
++local activeHeadshotTarget: { [Player]: Model } = {}
+ 
+ local function rowsForEquippedAttack(character: Model): any
+     local profileId = tostring(character:GetAttribute("AnimationProfileId") or character:GetAttribute("CharacterArchetype") or "")
+@@ -64,6 +65,63 @@ local function meleeHitTime(timing: any): number?
+     return math.clamp(hitTime, 0, math.max(0, tonumber(timing.duration) or 0))
+ end
+ 
++local function finiteNumber(value: number): boolean
++    return value == value and value > -math.huge and value < math.huge
++end
++
++local function finiteVector(value: Vector3): boolean
++    return finiteNumber(value.X) and finiteNumber(value.Y) and finiteNumber(value.Z)
++end
++
++local function normalizeAimSample(rootPosition: Vector3, aimOrigin: any, aimDirection: any): (Vector3?, Vector3?)
++    if typeof(aimOrigin) ~= "Vector3"
++        or typeof(aimDirection) ~= "Vector3"
++        or not finiteVector(aimOrigin)
++        or not finiteVector(aimDirection)
++        or (aimOrigin - rootPosition).Magnitude > Config.HeadshotAimOriginMaxDistance
++    then
++        return nil, nil
++    end
++
++    local magnitude = aimDirection.Magnitude
++    if magnitude <= 1e-6 then
++        return nil, nil
++    end
++    return aimOrigin, aimDirection / magnitude
++end
++
++local function buildHeadshotAimSegment(
++    rootPosition: Vector3,
++    aimOrigin: any,
++    aimDirection: any,
++    attackRange: number
++): (Vector3?, Vector3?)
++    local origin, direction = normalizeAimSample(rootPosition, aimOrigin, aimDirection)
++    if not origin or not direction then
++        return nil, nil
++    end
++
++    -- Camera distance must not consume melee range. Keep the exact center-screen
++    -- line, but rebase its finite segment to the point on that line closest to
++    -- the attacker. The segment then extends exactly AttackRadius forward.
++    local closestAlongRay = math.max(0, (rootPosition - origin):Dot(direction))
++    return origin + direction * closestAlongRay, direction
++end
++
++local function interpolateAimDirection(previous: Vector3?, current: Vector3?, alpha: number): Vector3?
++    if typeof(current) ~= "Vector3" then
++        return nil
++    end
++    if typeof(previous) ~= "Vector3" then
++        return current
++    end
++    local blended = previous:Lerp(current, alpha)
++    if blended.Magnitude <= 1e-6 then
++        return current
++    end
++    return blended.Unit
++end
++
+ local function applyDamageInVolume(
+     player: Player,
+     character: Model,
+@@ -72,14 +130,26 @@ local function applyDamageInVolume(
+     boxCFrame: CFrame,
+     boxSize: Vector3,
+     sourceLabel: string,
+-    hitTargets: { [Model]: boolean }?
++    hitTargets: { [Model]: boolean }?,
++    aimOrigin: Vector3?,
++    aimDirection: Vector3?,
++    attackRange: number
+ ): number
+     local hitCount = 0
++    local contacts = EntityHitboxService.QueryDamageablesInBox(character, boxCFrame, boxSize, hitTargets)
++
++    -- Weapon contact and headshot classification are deliberately independent.
++    -- The blade OBB decides which targets take melee damage. A finite reticle ray
++    -- only decides whether ONE of those contacts is upgraded to a headshot.
++    local aimedRegion = nil
++    if #contacts > 0 and activeHeadshotTarget[player] == nil then
++        local rayStart, rayDirection = buildHeadshotAimSegment(root.Position, aimOrigin, aimDirection, attackRange)
++        if rayStart and rayDirection then
++            aimedRegion = EntityHitboxService.RaycastAimRegions(character, rayStart, rayDirection, attackRange)
++        end
++    end
+ 
+-    -- Target geometry is a precomputed set of tight bone-local boxes derived
+-    -- from the visual mesh once when the rig is loaded. Runtime melee does only
+-    -- OBB-vs-OBB tests; the head box has priority over all body boxes.
+-    for _, target in ipairs(EntityHitboxService.QueryDamageablesInBox(character, boxCFrame, boxSize, hitTargets)) do
++    for _, target in ipairs(contacts) do
+         local model = target.model
+         local hit = target.hit or {}
+         if model
+@@ -87,23 +157,33 @@ local function applyDamageInVolume(
+             and model:GetAttribute("Damageable") == true
+             and (not hitTargets or hitTargets[model] ~= true)
+         then
++            local isHeadshot = activeHeadshotTarget[player] == nil
++                and aimedRegion ~= nil
++                and aimedRegion.zone == "head"
++                and aimedRegion.model == model
++            local hitZone = if isHeadshot then "head" else "body"
+             local hitPosition = if typeof(hit.hitPosition) == "Vector3" then hit.hitPosition else root.Position
+             local hitDistance = (hitPosition - root.Position).Magnitude
+-            local hitZone = tostring(hit.hitZone or "body")
+-            local damageMultiplier = if hitZone == "head" then Config.HeadshotDamageMultiplier else 1
++            local damageMultiplier = if isHeadshot then Config.HeadshotDamageMultiplier else 1
+             local rawDamage = (tonumber(character:GetAttribute("Damage")) or 0) * damageMultiplier
+             local finalDamage, killed = DamageService.Apply(character, model, rawDamage)
++
+             model:SetAttribute("LastHitZone", hitZone)
+-            model:SetAttribute("LastHeadshot", hitZone == "head")
+-            character:SetAttribute("LastAttackHitZone", hitZone)
+-            character:SetAttribute("LastAttackHeadshot", hitZone == "head")
++            model:SetAttribute("LastHeadshot", isHeadshot)
++            if isHeadshot then
++                activeHeadshotTarget[player] = model
++                character:SetAttribute("LastAttackHitZone", "head")
++                character:SetAttribute("LastAttackHeadshot", true)
++            elseif character:GetAttribute("LastAttackHitZone") == nil then
++                character:SetAttribute("LastAttackHitZone", "body")
++            end
+             if hitTargets then
+                 hitTargets[model] = true
+             end
+             HitEffectService.Publish(character, model, model:GetAttribute("LastCritical") == true, hitPosition)
+             hitCount += 1
+             if Config.DebugLogs then
+-                print(("[game1][attack] hit player=%s target=%s zone=%s distance=%.2f damage=%d targethp=%s killed=%s serial=%d source=%s hitbox=%s")
++                print(("[game1][attack] hit player=%s target=%s zone=%s distance=%.2f damage=%d targethp=%s killed=%s serial=%d source=%s hitbox=%s contact=%s")
+                     :format(
+                         player.Name,
+                         model.Name,
+@@ -114,7 +194,8 @@ local function applyDamageInVolume(
+                         tostring(killed),
+                         serial,
+                         sourceLabel,
+-                        tostring(target.mode or "unknown")
++                        tostring(target.mode or "unknown"),
++                        tostring(hit.geometryRole or "unknown")
+                     ))
+             end
+         end
+@@ -138,7 +219,11 @@ local function applyAnimatedWeaponSweep(
+     weapon: Model,
+     boxSize: Vector3,
+     previousBoxCFrame: CFrame?,
+-    currentBoxCFrame: CFrame
++    currentBoxCFrame: CFrame,
++    previousAimOrigin: Vector3?,
++    previousAimDirection: Vector3?,
++    currentAimOrigin: Vector3?,
++    currentAimDirection: Vector3?
+ ): number
+     local attackRange = math.clamp(tonumber(character:GetAttribute("AttackRadius")) or Config.Range, 1, Config.MaxAimDistance)
+     local weaponBoneBoxLocalPosition = WeaponAttackVolume.ReadWeaponBoneBoxLocalPosition(weapon)
+@@ -163,6 +248,10 @@ local function applyAnimatedWeaponSweep(
+         local sampledBoxCFrame = if typeof(previousBoxCFrame) == "CFrame"
+             then previousBoxCFrame:Lerp(currentBoxCFrame, alpha)
+             else currentBoxCFrame
++        local sampledAimOrigin = if typeof(previousAimOrigin) == "Vector3" and typeof(currentAimOrigin) == "Vector3"
++            then previousAimOrigin:Lerp(currentAimOrigin, alpha)
++            else currentAimOrigin
++        local sampledAimDirection = interpolateAimDirection(previousAimDirection, currentAimDirection, alpha)
+         local volume = WeaponAttackVolume.Build(root.Position, sampledBoxCFrame, boxSize, attackRange, weaponBoneBoxLocalPosition)
+         if volume then
+             hitCount += applyDamageInVolume(
+@@ -173,7 +262,10 @@ local function applyAnimatedWeaponSweep(
+                 volume.cframe,
+                 volume.size,
+                 "animated_weapon_sweep",
+-                hitTargets
++                hitTargets,
++                sampledAimOrigin,
++                sampledAimDirection,
++                attackRange
+             )
+         end
+     end
+@@ -187,20 +279,20 @@ local function validatedAnimatedWeaponVolume(
+     clientAttackId: number,
+     attackRange: number,
+     hitElapsed: number
+-): (any?, string?)
++): (any?, any?, string?)
+     local weapon = character:FindFirstChild("EquippedWeapon")
+     if not weapon or not weapon:IsA("Model") then
+-        return nil, "missing_equipped_weapon"
++        return nil, nil, "missing_equipped_weapon"
+     end
+ 
+     local _, boxSize = WeaponAttackVolume.ReadWeaponBox(weapon)
+     if not boxSize then
+-        return nil, "missing_weapon_box"
++        return nil, nil, "missing_weapon_box"
+     end
+ 
+     local buffer = weaponPoseBuffers[player]
+     if not buffer or buffer.character ~= character or buffer.clientAttackId ~= clientAttackId then
+-        return nil, "missing_weapon_pose"
++        return nil, nil, "missing_weapon_pose"
+     end
+ 
+     hitElapsed = math.max(0, tonumber(hitElapsed) or 0)
+@@ -216,26 +308,26 @@ local function validatedAnimatedWeaponVolume(
+         end
+     end
+     if not sample then
+-        return nil, "missing_weapon_pose"
++        return nil, nil, "missing_weapon_pose"
+     end
+     if bestError > Config.WeaponPoseHitTimeTolerance then
+-        return nil, "weapon_pose_outside_hit_window"
++        return nil, nil, "weapon_pose_outside_hit_window"
+     end
+     if os.clock() - sample.receivedAt > Config.WeaponPoseMaxAgeSeconds then
+-        return nil, "stale_weapon_pose"
++        return nil, nil, "stale_weapon_pose"
+     end
+ 
+     local maxCenterDistance = attackRange + boxSize.Magnitude + Config.WeaponPoseValidationSlack
+     if (sample.boxCFrame.Position - root.Position).Magnitude > maxCenterDistance then
+-        return nil, "invalid_weapon_pose"
++        return nil, nil, "invalid_weapon_pose"
+     end
+ 
+     local weaponBoneBoxLocalPosition = WeaponAttackVolume.ReadWeaponBoneBoxLocalPosition(weapon)
+     local volume = WeaponAttackVolume.Build(root.Position, sample.boxCFrame, boxSize, attackRange, weaponBoneBoxLocalPosition)
+     if not volume then
+-        return nil, "invalid_weapon_volume"
++        return nil, nil, "invalid_weapon_volume"
+     end
+-    return volume, nil
++    return volume, sample, nil
+ end
+ 
+ local function resolveMeleeDamage(
+@@ -270,7 +362,7 @@ local function resolveMeleeDamage(
+     end
+ 
+     local attackRange = math.clamp(tonumber(character:GetAttribute("AttackRadius")) or Config.Range, 1, Config.MaxAimDistance)
+-    local volume, reason = validatedAnimatedWeaponVolume(player, character, root, clientAttackId, attackRange, hitElapsed)
++    local volume, sample, reason = validatedAnimatedWeaponVolume(player, character, root, clientAttackId, attackRange, hitElapsed)
+     if not volume then
+         if Config.DebugLogs and not hasRegisteredHit(player) then
+             print(("[game1][attack] miss player=%s range=%.1f serial=%d reason=%s")
+@@ -290,7 +382,10 @@ local function resolveMeleeDamage(
+         volume.cframe,
+         volume.size,
+         "animated_weapon_volume",
+-        activeHitTargets[player]
++        activeHitTargets[player],
++        sample and sample.aimOrigin or nil,
++        sample and sample.aimDirection or nil,
++        attackRange
+     )
+ 
+     if hitCount == 0 and not hasRegisteredHit(player) and Config.DebugLogs then
+@@ -330,6 +425,7 @@ local function clearAttackStateLater(player: Player, character: Model, serial: n
+         activeHitTargets[player] = nil
+         activeDamageUntil[player] = nil
+         activeDamageCutoffElapsed[player] = nil
++        activeHeadshotTarget[player] = nil
+         local buffer = weaponPoseBuffers[player]
+         if buffer and buffer.clientAttackId == clientAttackId then
+             weaponPoseBuffers[player] = nil
+@@ -404,6 +500,7 @@ local function attack(player: Player, payload: any)
+     activeClientAttackId[player] = clientAttackId
+     activeUntil[player] = now + attackDuration
+     activeHitTargets[player] = {}
++    activeHeadshotTarget[player] = nil
+     activeDamageCutoffElapsed[player] = hitTime
+     activeDamageUntil[player] = now + hitTime
+     character:SetAttribute("AttackSerial", serial)
+@@ -411,6 +508,8 @@ local function attack(player: Player, payload: any)
+     character:SetAttribute("AttackStartedAt", now)
+     character:SetAttribute("AttackEndsAt", now + attackDuration)
+     character:SetAttribute("AttackDamageEndsAt", now + hitTime)
++    character:SetAttribute("LastAttackHitZone", nil)
++    character:SetAttribute("LastAttackHeadshot", false)
+ 
+     -- Equipped weapon damage is contact-driven only from attack start through
+     -- the authored Hit moment. Hit itself is the terminal checkpoint; the rest
+@@ -464,6 +563,8 @@ local function recordWeaponPose(player: Player, payload: any)
+         return
+     end
+ 
++    local aimOrigin, aimDirection = normalizeAimSample(root.Position, payload.aimOrigin, payload.aimDirection)
++
+     local buffer = weaponPoseBuffers[player]
+     if not buffer or buffer.character ~= character or buffer.clientAttackId ~= clientAttackId then
+         buffer = {
+@@ -476,6 +577,8 @@ local function recordWeaponPose(player: Player, payload: any)
+     table.insert(buffer.samples, {
+         elapsed = elapsed,
+         boxCFrame = payload.boxCFrame,
++        aimOrigin = aimOrigin,
++        aimDirection = aimDirection,
+         receivedAt = os.clock(),
+     })
+     while #buffer.samples > Config.WeaponPoseBufferSize do
+@@ -495,6 +598,8 @@ local function recordWeaponPose(player: Player, payload: any)
+         and (lastDamageElapsed == nil or elapsed + 1e-4 >= lastDamageElapsed)
+     then
+         local previousBoxCFrame = if typeof(buffer.lastDamageBoxCFrame) == "CFrame" then buffer.lastDamageBoxCFrame else nil
++        local previousAimOrigin = if typeof(buffer.lastDamageAimOrigin) == "Vector3" then buffer.lastDamageAimOrigin else nil
++        local previousAimDirection = if typeof(buffer.lastDamageAimDirection) == "Vector3" then buffer.lastDamageAimDirection else nil
+         applyAnimatedWeaponSweep(
+             player,
+             character,
+@@ -503,10 +608,16 @@ local function recordWeaponPose(player: Player, payload: any)
+             weapon,
+             boxSize,
+             previousBoxCFrame,
+-            payload.boxCFrame
++            payload.boxCFrame,
++            previousAimOrigin,
++            previousAimDirection,
++            aimOrigin,
++            aimDirection
+         )
+         buffer.lastDamageElapsed = elapsed
+         buffer.lastDamageBoxCFrame = payload.boxCFrame
++        buffer.lastDamageAimOrigin = aimOrigin
++        buffer.lastDamageAimDirection = aimDirection
+     end
+ end
+ 
+@@ -532,6 +643,7 @@ function AttackService.Start()
+         activeHitTargets[player] = nil
+         activeDamageUntil[player] = nil
+         activeDamageCutoffElapsed[player] = nil
++        activeHeadshotTarget[player] = nil
+         weaponPoseBuffers[player] = nil
+     end)
+ end
+diff --git a/src/server/combat/EntityHitboxService.luau b/src/server/combat/EntityHitboxService.luau
+index 0899bcb..c81f21b 100644
+--- a/src/server/combat/EntityHitboxService.luau
++++ b/src/server/combat/EntityHitboxService.luau
+@@ -613,9 +613,8 @@ local function queryBinding(binding: any, weaponCFrame: CFrame, weaponSize: Vect
+     then
+         local hitPosition = closestPointOnBox(binding.worldHeadCFrame, binding.headBox.size, weaponCFrame.Position)
+         return {
+-            hitZone = "head",
+             boneName = binding.headBone and binding.headBone.Name or "",
+-            role = "head",
++            geometryRole = "head",
+             hitPosition = hitPosition,
+         }
+     end
+@@ -642,13 +641,123 @@ local function queryBinding(binding: any, weaponCFrame: CFrame, weaponSize: Vect
+         return nil
+     end
+     return {
+-        hitZone = "body",
+         boneName = bestBoneName,
+-        role = "body",
++        geometryRole = "body",
+         hitPosition = bestPosition,
+     }
+ end
+ 
++local function rayBoxDistance(
++    rayOrigin: Vector3,
++    rayDirection: Vector3,
++    maxDistance: number,
++    boxCFrame: CFrame,
++    boxSize: Vector3
++): number?
++    local localOrigin = boxCFrame:PointToObjectSpace(rayOrigin)
++    local localDirection = boxCFrame:VectorToObjectSpace(rayDirection)
++    local half = boxSize * 0.5
++    local tMin = 0
++    local tMax = maxDistance
++
++    local function clipAxis(originAxis: number, directionAxis: number, halfAxis: number): boolean
++        if math.abs(directionAxis) <= 1e-8 then
++            return math.abs(originAxis) <= halfAxis
++        end
++        local inverse = 1 / directionAxis
++        local near = (-halfAxis - originAxis) * inverse
++        local far = (halfAxis - originAxis) * inverse
++        if near > far then
++            near, far = far, near
++        end
++        tMin = math.max(tMin, near)
++        tMax = math.min(tMax, far)
++        return tMin <= tMax
++    end
++
++    if not clipAxis(localOrigin.X, localDirection.X, half.X)
++        or not clipAxis(localOrigin.Y, localDirection.Y, half.Y)
++        or not clipAxis(localOrigin.Z, localDirection.Z, half.Z)
++    then
++        return nil
++    end
++    return tMin
++end
++
++local function raySegmentNearSphere(
++    rayOrigin: Vector3,
++    rayDirection: Vector3,
++    maxDistance: number,
++    center: Vector3,
++    radius: number
++): boolean
++    local along = math.clamp((center - rayOrigin):Dot(rayDirection), 0, maxDistance)
++    local closest = rayOrigin + rayDirection * along
++    return (center - closest).Magnitude <= radius
++end
++
++local function queryAimBinding(
++    binding: any,
++    rayOrigin: Vector3,
++    rayDirection: Vector3,
++    maxDistance: number
++): any?
++    if not raySegmentNearSphere(
++        rayOrigin,
++        rayDirection,
++        maxDistance,
++        binding.root.Position,
++        binding.definition.broadRadius
++    ) then
++        return nil
++    end
++
++    refreshWorldFrames(binding)
++    local bestDistance = math.huge
++    local bestZone = nil
++    local bestBoneName = ""
++
++    -- Head is tested first and wins exact boundary ties. This does not deal
++    -- damage by itself; it only classifies the first combat hitbox under the
++    -- center-screen aim line.
++    if binding.headBox and binding.worldHeadCFrame then
++        local distance = rayBoxDistance(
++            rayOrigin,
++            rayDirection,
++            maxDistance,
++            binding.worldHeadCFrame,
++            binding.headBox.size
++        )
++        if distance ~= nil then
++            bestDistance = distance
++            bestZone = "head"
++            bestBoneName = binding.headBone and binding.headBone.Name or ""
++        end
++    end
++
++    for index, bodyBox in ipairs(binding.bodyBoxes) do
++        local worldCFrame = binding.worldBodyCFrames[index]
++        if worldCFrame then
++            local distance = rayBoxDistance(rayOrigin, rayDirection, maxDistance, worldCFrame, bodyBox.size)
++            if distance ~= nil and distance < bestDistance - SAT_EPSILON then
++                bestDistance = distance
++                bestZone = "body"
++                bestBoneName = if bodyBox.anchor:IsA("Bone") then bodyBox.anchor.Name else ""
++            end
++        end
++    end
++
++    if not bestZone then
++        return nil
++    end
++    return {
++        zone = bestZone,
++        boneName = bestBoneName,
++        distance = bestDistance,
++        hitPosition = rayOrigin + rayDirection * bestDistance,
++    }
++end
++
+ local function clearAttributes(entity: Model)
+     entity:SetAttribute("CombatHitboxMode", nil)
+     entity:SetAttribute("CombatHitboxCount", nil)
+@@ -791,6 +900,48 @@ function EntityHitboxService.QueryDamageablesInBox(
+     return results
+ end
+ 
++
++function EntityHitboxService.RaycastAimRegions(
++    exclude: Model?,
++    rayOrigin: Vector3,
++    rayDirection: Vector3,
++    maxDistance: number
++): any?
++    if typeof(rayOrigin) ~= "Vector3" or typeof(rayDirection) ~= "Vector3" then
++        return nil
++    end
++    local distanceLimit = math.max(0, tonumber(maxDistance) or 0)
++    local magnitude = rayDirection.Magnitude
++    if distanceLimit <= 0 or magnitude <= 1e-6 then
++        return nil
++    end
++    local direction = rayDirection / magnitude
++
++    local best = nil
++    local bestDistance = math.huge
++    for entity, binding in pairs(bindings) do
++        if entity ~= exclude
++            and entity.Parent ~= nil
++            and binding.visual.Parent ~= nil
++            and entity:GetAttribute("Damageable") == true
++        then
++            local hit = queryAimBinding(binding, rayOrigin, direction, distanceLimit)
++            if hit and hit.distance < bestDistance then
++                bestDistance = hit.distance
++                best = {
++                    model = entity,
++                    zone = hit.zone,
++                    boneName = hit.boneName,
++                    hitPosition = hit.hitPosition,
++                    distance = hit.distance,
++                    mode = "precomputed_bone_boxes",
++                }
++            end
++        end
++    end
++    return best
++end
++
+ function EntityHitboxService.Start()
+     if started then
+         return
+diff --git a/src/shared/combat/AttackConfig.luau b/src/shared/combat/AttackConfig.luau
+index 7867547..1f7fd53 100644
+--- a/src/shared/combat/AttackConfig.luau
++++ b/src/shared/combat/AttackConfig.luau
+@@ -2,9 +2,11 @@ return table.freeze({
+     Range = 7,
+     MaxAimDistance = 420,
+     AttackRadiusEpsilon = 0.15,
+-    -- Head and body hitboxes are precomputed once from visual-mesh bounds.
+-    -- Runtime attacks only test the animated weapon OBB against those boxes.
++    -- Head/body boxes are precomputed once from visual-mesh bounds. Weapon
++    -- contact always deals normal melee damage; headshot is a separate live
++    -- reticle-ray classification and can upgrade at most one target per attack.
+     HeadshotDamageMultiplier = 2,
++    HeadshotAimOriginMaxDistance = 24,
+ 
+     -- Animated EquippedWeapon pose samples are client-observed because the
+     -- visible weapon follows client-side Bone transforms. The server owns the
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index 246a0ee..8f90b61 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -1668,7 +1668,6 @@ for forbidden in [
+ attack_service_m31 = (ROOT / "src/server/combat/AttackService.luau").read_text(encoding="utf-8")
+ for required in [
+     "HeadshotDamageMultiplier",
+-    'hitZone == "head"',
+     'SetAttribute("LastHeadshot"',
+     'SetAttribute("LastAttackHeadshot"',
+     "QueryDamageablesInBox(character, boxCFrame, boxSize, hitTargets)",
+@@ -1760,13 +1759,77 @@ if "ReadGripBoxLocalPosition" in test_loadout_m32:
+ 
+ 
+ 
++# m33 reticle-ray headshot policy. Weapon contact remains multi-target and uses
++# the same precomputed hitboxes, but headshot classification is independent:
++# the center-screen aim segment is clamped to AttackRadius and may upgrade only
++# the one nearest combat region under the reticle, at most once per attack.
++aim_pose_m33 = (ROOT / "src/client/combat/AimPoseController.luau").read_text(encoding="utf-8")
++for required in [
++    "function AimPoseController.GetAimRay()",
++    "ViewportPointToRay",
++    "return ray.Origin, direction.Unit",
++]:
++    if required not in aim_pose_m33:
++        err(f"m33 center-screen aim-ray source missing {required}")
++
++attack_controller_m33 = (ROOT / "src/client/combat/AttackController.luau").read_text(encoding="utf-8")
++for required in [
++    "aimPoseController.GetAimRay",
++    "aimOrigin = aimOrigin",
++    "aimDirection = aimDirection",
++]:
++    if required not in attack_controller_m33:
++        err(f"m33 weapon-pose aim sampling missing {required}")
++if "aim = target" in attack_controller_m33:
++    err("m33 obsolete one-shot AttackIntent aim payload remains")
++
++entity_hitbox_m33 = (ROOT / "src/server/combat/EntityHitboxService.luau").read_text(encoding="utf-8")
++for required in [
++    "rayBoxDistance",
++    "raySegmentNearSphere",
++    "queryAimBinding",
++    "EntityHitboxService.RaycastAimRegions",
++    'geometryRole = "head"',
++    'geometryRole = "body"',
++]:
++    if required not in entity_hitbox_m33:
++        err(f"m33 finite aim-region ray query missing {required}")
++for forbidden in ['hitZone = "head"', 'hitZone = "body"']:
++    if forbidden in entity_hitbox_m33:
++        err(f"m33 weapon contact still classifies headshot directly: {forbidden}")
++
++attack_service_m33 = (ROOT / "src/server/combat/AttackService.luau").read_text(encoding="utf-8")
++for required in [
++    "activeHeadshotTarget",
++    "normalizeAimSample",
++    "buildHeadshotAimSegment",
++    "RaycastAimRegions",
++    'aimedRegion.zone == "head"',
++    "aimedRegion.model == model",
++    "damageMultiplier = if isHeadshot",
++    "sampledAimOrigin",
++    "sampledAimDirection",
++    "lastDamageAimOrigin",
++    "lastDamageAimDirection",
++]:
++    if required not in attack_service_m33:
++        err(f"m33 reticle-gated headshot integration missing {required}")
++if "hit.hitZone" in attack_service_m33:
++    err("m33 headshot must not come from weapon-contact hitZone")
++
++attack_config_m33 = (ROOT / "src/shared/combat/AttackConfig.luau").read_text(encoding="utf-8")
++for required in ["HeadshotDamageMultiplier = 2", "HeadshotAimOriginMaxDistance"]:
++    if required not in attack_config_m33:
++        err(f"m33 headshot config missing {required}")
++
++
+ if errors:
+     print("verify failed")
+     for item in errors:
+         print(" -", item)
+     sys.exit(1)
+ 
+-print("verify ok · game1 m32 terminal-Hit blade-volume policy passed")
++print("verify ok · game1 m33 reticle-ray headshot policy passed")
+ print("registered character archetypes:", len(archetypes))
+ print("active character archetype:", active_id or "none")
+ print("race pool: human")

@@ -11,42 +11,7 @@
           "Enum": 2
         }
       },
-      "Baseplate": {
-        "$className": "Part",
-        "$properties": {
-          "Anchored": true,
-          "CanCollide": true,
-          "Locked": true,
-          "Position": [
-            0,
-            -0.5,
-            0
-          ],
-          "Size": [
-            256,
-            1,
-            256
-          ]
-        }
-      },
-      "SpawnLocation": {
-        "$className": "SpawnLocation",
-        "$properties": {
-          "Anchored": true,
-          "CanCollide": true,
-          "Neutral": true,
-          "Position": [
-            0,
-            0.5,
-            0
-          ],
-          "Size": [
-            6,
-            1,
-            6
-          ]
-        }
-      }
+      "$ignoreUnknownInstances": true
     },
     "Players": {
       "$className": "Players",

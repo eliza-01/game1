@@ -613,9 +613,8 @@ local function queryBinding(binding: any, weaponCFrame: CFrame, weaponSize: Vect
     then
         local hitPosition = closestPointOnBox(binding.worldHeadCFrame, binding.headBox.size, weaponCFrame.Position)
         return {
-            hitZone = "head",
             boneName = binding.headBone and binding.headBone.Name or "",
-            role = "head",
+            geometryRole = "head",
             hitPosition = hitPosition,
         }
     end
@@ -642,10 +641,120 @@ local function queryBinding(binding: any, weaponCFrame: CFrame, weaponSize: Vect
         return nil
     end
     return {
-        hitZone = "body",
         boneName = bestBoneName,
-        role = "body",
+        geometryRole = "body",
         hitPosition = bestPosition,
+    }
+end
+
+local function rayBoxDistance(
+    rayOrigin: Vector3,
+    rayDirection: Vector3,
+    maxDistance: number,
+    boxCFrame: CFrame,
+    boxSize: Vector3
+): number?
+    local localOrigin = boxCFrame:PointToObjectSpace(rayOrigin)
+    local localDirection = boxCFrame:VectorToObjectSpace(rayDirection)
+    local half = boxSize * 0.5
+    local tMin = 0
+    local tMax = maxDistance
+
+    local function clipAxis(originAxis: number, directionAxis: number, halfAxis: number): boolean
+        if math.abs(directionAxis) <= 1e-8 then
+            return math.abs(originAxis) <= halfAxis
+        end
+        local inverse = 1 / directionAxis
+        local near = (-halfAxis - originAxis) * inverse
+        local far = (halfAxis - originAxis) * inverse
+        if near > far then
+            near, far = far, near
+        end
+        tMin = math.max(tMin, near)
+        tMax = math.min(tMax, far)
+        return tMin <= tMax
+    end
+
+    if not clipAxis(localOrigin.X, localDirection.X, half.X)
+        or not clipAxis(localOrigin.Y, localDirection.Y, half.Y)
+        or not clipAxis(localOrigin.Z, localDirection.Z, half.Z)
+    then
+        return nil
+    end
+    return tMin
+end
+
+local function raySegmentNearSphere(
+    rayOrigin: Vector3,
+    rayDirection: Vector3,
+    maxDistance: number,
+    center: Vector3,
+    radius: number
+): boolean
+    local along = math.clamp((center - rayOrigin):Dot(rayDirection), 0, maxDistance)
+    local closest = rayOrigin + rayDirection * along
+    return (center - closest).Magnitude <= radius
+end
+
+local function queryAimBinding(
+    binding: any,
+    rayOrigin: Vector3,
+    rayDirection: Vector3,
+    maxDistance: number
+): any?
+    if not raySegmentNearSphere(
+        rayOrigin,
+        rayDirection,
+        maxDistance,
+        binding.root.Position,
+        binding.definition.broadRadius
+    ) then
+        return nil
+    end
+
+    refreshWorldFrames(binding)
+    local bestDistance = math.huge
+    local bestZone = nil
+    local bestBoneName = ""
+
+    -- Head is tested first and wins exact boundary ties. This does not deal
+    -- damage by itself; it only classifies the first combat hitbox under the
+    -- center-screen aim line.
+    if binding.headBox and binding.worldHeadCFrame then
+        local distance = rayBoxDistance(
+            rayOrigin,
+            rayDirection,
+            maxDistance,
+            binding.worldHeadCFrame,
+            binding.headBox.size
+        )
+        if distance ~= nil then
+            bestDistance = distance
+            bestZone = "head"
+            bestBoneName = binding.headBone and binding.headBone.Name or ""
+        end
+    end
+
+    for index, bodyBox in ipairs(binding.bodyBoxes) do
+        local worldCFrame = binding.worldBodyCFrames[index]
+        if worldCFrame then
+            local distance = rayBoxDistance(rayOrigin, rayDirection, maxDistance, worldCFrame, bodyBox.size)
+            if distance ~= nil and distance < bestDistance - SAT_EPSILON then
+                bestDistance = distance
+                bestZone = "body"
+                bestBoneName = if bodyBox.anchor:IsA("Bone") then bodyBox.anchor.Name else ""
+            end
+        end
+    end
+
+    if not bestZone then
+        return nil
+    end
+    return {
+        zone = bestZone,
+        boneName = bestBoneName,
+        distance = bestDistance,
+        hitPosition = rayOrigin + rayDirection * bestDistance,
     }
 end
 
@@ -789,6 +898,48 @@ function EntityHitboxService.QueryDamageablesInBox(
         end
     end
     return results
+end
+
+
+function EntityHitboxService.RaycastAimRegions(
+    exclude: Model?,
+    rayOrigin: Vector3,
+    rayDirection: Vector3,
+    maxDistance: number
+): any?
+    if typeof(rayOrigin) ~= "Vector3" or typeof(rayDirection) ~= "Vector3" then
+        return nil
+    end
+    local distanceLimit = math.max(0, tonumber(maxDistance) or 0)
+    local magnitude = rayDirection.Magnitude
+    if distanceLimit <= 0 or magnitude <= 1e-6 then
+        return nil
+    end
+    local direction = rayDirection / magnitude
+
+    local best = nil
+    local bestDistance = math.huge
+    for entity, binding in pairs(bindings) do
+        if entity ~= exclude
+            and entity.Parent ~= nil
+            and binding.visual.Parent ~= nil
+            and entity:GetAttribute("Damageable") == true
+        then
+            local hit = queryAimBinding(binding, rayOrigin, direction, distanceLimit)
+            if hit and hit.distance < bestDistance then
+                bestDistance = hit.distance
+                best = {
+                    model = entity,
+                    zone = hit.zone,
+                    boneName = hit.boneName,
+                    hitPosition = hit.hitPosition,
+                    distance = hit.distance,
+                    mode = "precomputed_bone_boxes",
+                }
+            end
+        end
+    end
+    return best
 end
 
 function EntityHitboxService.Start()

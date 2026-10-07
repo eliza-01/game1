@@ -1,0 +1,1473 @@
+diff --git a/README.md b/README.md
+index c710f88..ae0abaf 100644
+--- a/README.md
++++ b/README.md
+@@ -19,7 +19,7 @@ E:\RobloxProjects\game1
+ place\game1.rbxl
+ ```
+ 
+-Он строится с нуля из `default.project.json` и содержит только минимальную тестовую сцену (Baseplate + SpawnLocation) и runtime проекта.
++Первичная сборка создаёт минимальную сцену (Baseplate + SpawnLocation) и runtime. После этого Workspace редактируется и сохраняется в Studio: live Rojo синхронизирует код, но не владеет объектами сцены и не возвращает их позиции назад.
+ 
+ ## Первый запуск
+ 
+diff --git a/assets/manifests/attack-timelines.json b/assets/manifests/attack-timelines.json
+index 335d014..ae300ef 100644
+--- a/assets/manifests/attack-timelines.json
++++ b/assets/manifests/attack-timelines.json
+@@ -1,5 +1,5 @@
+ {
+-  "schemaVersion": 1,
++  "schemaVersion": 2,
+   "project": "game1",
+   "timelines": [
+     {
+@@ -9,10 +9,6 @@
+         "HitStart": {
+           "normalizedTime": 0.4
+         },
+-        "Hit": {
+-          "normalizedTime": 0.5,
+-          "result": "melee_damage"
+-        },
+         "HitEnd": {
+           "normalizedTime": 0.6856649395509499
+         }
+@@ -25,9 +21,8 @@
+         "HitStart": {
+           "normalizedTime": 0.4
+         },
+-        "Hit": {
+-          "normalizedTime": 0.5,
+-          "result": "melee_damage"
++        "HitEnd": {
++          "normalizedTime": 0.5
+         }
+       }
+     },
+@@ -38,9 +33,8 @@
+         "HitStart": {
+           "normalizedTime": 0.4
+         },
+-        "Hit": {
+-          "normalizedTime": 0.5,
+-          "result": "melee_damage"
++        "HitEnd": {
++          "normalizedTime": 0.5
+         }
+       }
+     },
+@@ -49,8 +43,7 @@
+       "duration": 1.799999952,
+       "events": {
+         "Hit": {
+-          "normalizedTime": 0.5,
+-          "result": "melee_damage"
++          "normalizedTime": 0.5
+         }
+       }
+     }
+diff --git a/default.project.json b/default.project.json
+index 8bbde3d..ce88045 100644
+--- a/default.project.json
++++ b/default.project.json
+@@ -11,42 +11,7 @@
+           "Enum": 2
+         }
+       },
+-      "Baseplate": {
+-        "$className": "Part",
+-        "$properties": {
+-          "Anchored": true,
+-          "CanCollide": true,
+-          "Locked": true,
+-          "Position": [
+-            0,
+-            -0.5,
+-            0
+-          ],
+-          "Size": [
+-            256,
+-            1,
+-            256
+-          ]
+-        }
+-      },
+-      "SpawnLocation": {
+-        "$className": "SpawnLocation",
+-        "$properties": {
+-          "Anchored": true,
+-          "CanCollide": true,
+-          "Neutral": true,
+-          "Position": [
+-            0,
+-            0.5,
+-            0
+-          ],
+-          "Size": [
+-            6,
+-            1,
+-            6
+-          ]
+-        }
+-      }
++      "$ignoreUnknownInstances": true
+     },
+     "Players": {
+       "$className": "Players",
+diff --git a/place/README.md b/place/README.md
+index 37d05c3..d99ba16 100644
+--- a/place/README.md
++++ b/place/README.md
+@@ -1,19 +1,27 @@
+ # game1 Place
+ 
+-The canonical Place for this project is **`game1.rbxl`**.
++The canonical authored Place is **`game1.rbxl`**.
+ 
+-It is generated from the clean Rojo project:
++For a brand-new project, generate the seed place with:
+ 
+ ```powershell
+ .\place\build-place.ps1
+ ```
+ 
+-`current.rbxl` is deliberately **not used** in game1. If a `place/current.rbxl` appears here, verification fails because it may be a RobloxLineage Place copied into the wrong project.
++The build command injects a temporary Baseplate + SpawnLocation only while
++building the initial place. **Live Rojo does not own Workspace scene children.**
++After opening/saving the place in Studio, positions and other authored Workspace
++changes remain in the `.rbxl` instead of being reverted by Rojo sync.
+ 
+-To intentionally regenerate an existing clean Place:
++`current.rbxl` is deliberately **not used** in game1. If a `place/current.rbxl`
++appears here, verification fails because it may be a RobloxLineage Place copied
++into the wrong project.
++
++To intentionally regenerate a fresh seed Place:
+ 
+ ```powershell
+ .\place\build-place.ps1 -Force
+ ```
+ 
+-The Studio-only `TrainingDummyService` creates a temporary attack target during Play tests, so the built Place does not need authored gameplay content.
++This overwrites the authored place, so use `-Force` only when that is actually
++what you want.
+diff --git a/place/build-place.ps1 b/place/build-place.ps1
+index 54f7d60..e9115ff 100644
+--- a/place/build-place.ps1
++++ b/place/build-place.ps1
+@@ -3,14 +3,52 @@ $ErrorActionPreference='Stop'
+ $Root=(Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+ $Output=Join-Path $PSScriptRoot 'game1.rbxl'
+ $Legacy=Join-Path $PSScriptRoot 'current.rbxl'
++$LiveProject=Join-Path $Root 'default.project.json'
++$BuildProject=Join-Path $Root '.build-place.project.json'
+ 
+ if(Test-Path $Legacy){
+-    throw "Refusing to continue: place\\current.rbxl exists. game1 never uses current.rbxl; it may belong to RobloxLineage. Move/remove it from the game1 directory first."
++    throw "Refusing to continue: place\current.rbxl exists. game1 never uses current.rbxl; it may belong to RobloxLineage. Move/remove it from the game1 directory first."
+ }
+ if((Test-Path $Output) -and -not $Force){
+-    throw "Refusing to overwrite existing place\\game1.rbxl. Re-run with -Force only if you intentionally want to regenerate the clean Rojo place."
++    throw "Refusing to overwrite existing place\game1.rbxl. Re-run with -Force only if you intentionally want to regenerate the clean Rojo place."
+ }
+ 
++# Live Rojo deliberately does not own authored Workspace children. For a brand
++# new place build only, inject the minimal seed floor/spawn into a temporary
++# project file. Once the place exists, Studio owns their transforms and other
++# authored scene edits; live Rojo only syncs runtime code/services.
++$Project=Get-Content -Raw $LiveProject | ConvertFrom-Json
++$Workspace=$Project.tree.Workspace
++$Baseplate=[pscustomobject]@{
++    '$className'='Part'
++    '$properties'=[pscustomobject]@{
++        Anchored=$true
++        CanCollide=$true
++        Locked=$true
++        Position=@(0,-0.5,0)
++        Size=@(256,1,256)
++    }
++}
++$SpawnLocation=[pscustomobject]@{
++    '$className'='SpawnLocation'
++    '$properties'=[pscustomobject]@{
++        Anchored=$true
++        CanCollide=$true
++        Neutral=$true
++        Position=@(0,0.5,0)
++        Size=@(6,1,6)
++    }
++}
++$Workspace | Add-Member -NotePropertyName 'Baseplate' -NotePropertyValue $Baseplate -Force
++$Workspace | Add-Member -NotePropertyName 'SpawnLocation' -NotePropertyValue $SpawnLocation -Force
++$Project | ConvertTo-Json -Depth 100 | Set-Content -Encoding UTF8 $BuildProject
++
+ Push-Location $Root
+-try { rojo build default.project.json -o $Output } finally { Pop-Location }
++try {
++    rojo build $BuildProject -o $Output
++} finally {
++    Pop-Location
++    Remove-Item $BuildProject -Force -ErrorAction SilentlyContinue
++}
+ Write-Host "Built clean game1 place: $Output"
++Write-Host "Live Rojo will preserve authored Workspace children and transforms."
+diff --git a/src/client/character/animation/CharacterAnimationController.luau b/src/client/character/animation/CharacterAnimationController.luau
+index 610dbdc..3031d63 100644
+--- a/src/client/character/animation/CharacterAnimationController.luau
++++ b/src/client/character/animation/CharacterAnimationController.luau
+@@ -522,7 +522,7 @@ function CharacterAnimationController.PlayAction(slot: string)
+ 	local timeline = nil
+ 	local runtimeDuration = 0
+ 	if slot == "attack" then
+-		timeline = AttackTimelineConfig.ResolveRuntime(clipId, animationSpeedPercent, descriptor.duplicateFirstFrameAtEnd == true)
++		timeline = AttackTimelineConfig.ResolveRuntime(clipId, animationSpeedPercent)
+ 		if not timeline then
+ 			warn(("[game1][animation] attack clip has no timeline: %s"):format(clipId))
+ 			return nil
+diff --git a/src/client/combat/AttackController.luau b/src/client/combat/AttackController.luau
+index 90787ea..1659302 100644
+--- a/src/client/combat/AttackController.luau
++++ b/src/client/combat/AttackController.luau
+@@ -8,6 +8,7 @@ local CharacterShared = Shared:WaitForChild("character")
+ local CombatShared = Shared:WaitForChild("combat")
+ local CharacterConfig = require(CharacterShared:WaitForChild("CharacterConfig"))
+ local AttackConfig = require(CombatShared:WaitForChild("AttackConfig"))
++local CharacterAttackWindow = require(CombatShared:WaitForChild("CharacterAttackWindow"))
+ local WeaponAttackVolume = require(CombatShared:WaitForChild("WeaponAttackVolume"))
+ local UiInputGuard = require(script.Parent.Parent:WaitForChild("UiInputGuard"))
+ local AttackController = {}
+@@ -132,21 +133,17 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
+             return
+         end
+ 
+-        local timelineEvents = action.timeline and action.timeline.events
+-        local hitStartEvent = timelineEvents and timelineEvents.HitStart
+-        local hitEvent = timelineEvents and timelineEvents.Hit
+-        local hitStartTime = tonumber(hitStartEvent and hitStartEvent.time)
+-        local hitTime = tonumber(hitEvent and hitEvent.time)
+-        if hitStartTime == nil or hitTime == nil or hitStartTime > hitTime then
+-            warn(("[game1][attack] action has invalid HitStart/Hit damage window: %s"):format(tostring(action.clipId)))
++        local damageWindow = CharacterAttackWindow.Resolve(action.timeline)
++        if not damageWindow then
++            warn(("[game1][attack] action has invalid HitStart/HitEnd damage window: %s"):format(tostring(action.clipId)))
+             return
+         end
+ 
+         attackSequence += 1
+         local sequence = attackSequence
+         local attackDuration = math.max(0.05, tonumber(action.durationSeconds) or 0.05)
+-        local damagePoseStart = math.clamp(hitStartTime, 0, attackDuration)
+-        local damagePoseEnd = math.clamp(hitTime, damagePoseStart, attackDuration)
++        local damagePoseStart = math.clamp(damageWindow.startTime, 0, attackDuration)
++        local damagePoseEnd = math.clamp(damageWindow.endTime, damagePoseStart, attackDuration)
+         local movingAtAttackStart = movementController and movementController.IsMoving and movementController.IsMoving() or false
+         if movementController and movementController.BeginAttackMovement then
+             -- Every weapon may attack while moving. The equipped weapon type
+@@ -190,9 +187,9 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
+             finishPresentation(sequence)
+         end)
+ 
+-        -- Pose streaming exists only for the authored melee damage window:
+-        -- HitStart (40%) through Hit (50%). Presentation/cooldown still owns the
+-        -- complete animation, but no pose packet is sent before or after damage.
++        -- Pose streaming exists only for the authored character melee window:
++        -- HitStart through HitEnd. Presentation/cooldown still owns the complete
++        -- animation, but no pose packet is sent before or after the damage window.
+         activePoseAttackId = sequence
+         activePoseStartedAt = os.clock()
+         activePoseFrom = activePoseStartedAt + damagePoseStart
+diff --git a/src/server/combat/AttackService.luau b/src/server/combat/AttackService.luau
+index 05fbdd5..583b104 100644
+--- a/src/server/combat/AttackService.luau
++++ b/src/server/combat/AttackService.luau
+@@ -7,6 +7,7 @@ local CombatShared = Shared:WaitForChild("combat")
+ local AnimationShared = Shared:WaitForChild("animation")
+ local Config = require(CombatShared:WaitForChild("AttackConfig"))
+ local AttackTimelineConfig = require(CombatShared:WaitForChild("AttackTimelineConfig"))
++local CharacterAttackWindow = require(CombatShared:WaitForChild("CharacterAttackWindow"))
+ local WeaponAttackVolume = require(CombatShared:WaitForChild("WeaponAttackVolume"))
+ local AnimationSpeedScaling = require(AnimationShared:WaitForChild("AnimationSpeedScaling"))
+ local CharacterAnimationRegistry = require(CharacterShared:WaitForChild("CharacterAnimationRegistry"))
+@@ -18,11 +19,9 @@ local AttackService = {}
+ local activeUntil: { [Player]: number } = {}
+ local activeSerial: { [Player]: number } = {}
+ local activeClientAttackId: { [Player]: number } = {}
+-local weaponPoseBuffers: { [Player]: any } = {}
++local weaponSweepStates: { [Player]: any } = {}
+ local activeHitTargets: { [Player]: { [Model]: boolean } } = {}
+-local activeDamageUntil: { [Player]: number } = {}
+-local activeDamageStartElapsed: { [Player]: number } = {}
+-local activeDamageCutoffElapsed: { [Player]: number } = {}
++local activeDamageWindows: { [Player]: any } = {}
+ local activeHeadshotTarget: { [Player]: Model } = {}
+ 
+ local function rowsForEquippedAttack(character: Model): any
+@@ -54,32 +53,6 @@ local function allowedAttackDescriptor(character: Model, clipId: string): any?
+     return nil
+ end
+ 
+-local function meleeDamageWindow(timing: any): (number?, number?)
+-    local events = timing and timing.events
+-    local hitStart = events and events.HitStart
+-    local hit = events and events.Hit
+-    if type(hitStart) ~= "table"
+-        or type(hit) ~= "table"
+-        or tostring(hit.result or "") ~= AttackTimelineConfig.ResultTypes.MeleeDamage
+-    then
+-        return nil, nil
+-    end
+-
+-    local duration = math.max(0, tonumber(timing.duration) or 0)
+-    local hitStartTime = tonumber(hitStart.time)
+-    local hitTime = tonumber(hit.time)
+-    if hitStartTime == nil or hitTime == nil then
+-        return nil, nil
+-    end
+-
+-    hitStartTime = math.clamp(hitStartTime, 0, duration)
+-    hitTime = math.clamp(hitTime, 0, duration)
+-    if hitStartTime > hitTime then
+-        return nil, nil
+-    end
+-    return hitStartTime, hitTime
+-end
+-
+ local function finiteNumber(value: number): boolean
+     return value == value and value > -math.huge and value < math.huge
+ end
+@@ -219,13 +192,6 @@ local function applyDamageInVolume(
+     return hitCount
+ end
+ 
+-local function hasRegisteredHit(player: Player): boolean
+-    for _ in pairs(activeHitTargets[player] or {}) do
+-        return true
+-    end
+-    return false
+-end
+-
+ local function applyAnimatedWeaponSweep(
+     player: Player,
+     character: Model,
+@@ -287,169 +253,25 @@ local function applyAnimatedWeaponSweep(
+     return hitCount
+ end
+ 
+-local function validatedAnimatedWeaponVolume(
+-    player: Player,
+-    character: Model,
+-    root: BasePart,
+-    clientAttackId: number,
+-    attackRange: number,
+-    hitElapsed: number
+-): (any?, any?, string?)
+-    local weapon = character:FindFirstChild("EquippedWeapon")
+-    if not weapon or not weapon:IsA("Model") then
+-        return nil, nil, "missing_equipped_weapon"
+-    end
+-
+-    local _, boxSize = WeaponAttackVolume.ReadWeaponBox(weapon)
+-    if not boxSize then
+-        return nil, nil, "missing_weapon_box"
+-    end
+-
+-    local buffer = weaponPoseBuffers[player]
+-    if not buffer or buffer.character ~= character or buffer.clientAttackId ~= clientAttackId then
+-        return nil, nil, "missing_weapon_pose"
+-    end
+-
+-    hitElapsed = math.max(0, tonumber(hitElapsed) or 0)
+-    local sample = nil
+-    local bestError = math.huge
+-    for _, candidate in ipairs(buffer.samples or {}) do
+-        if typeof(candidate.boxCFrame) == "CFrame" then
+-            local errorSeconds = math.abs((tonumber(candidate.elapsed) or 0) - hitElapsed)
+-            if errorSeconds < bestError then
+-                bestError = errorSeconds
+-                sample = candidate
+-            end
+-        end
+-    end
+-    if not sample then
+-        return nil, nil, "missing_weapon_pose"
+-    end
+-    if bestError > Config.WeaponPoseHitTimeTolerance then
+-        return nil, nil, "weapon_pose_outside_hit_window"
+-    end
+-    if os.clock() - sample.receivedAt > Config.WeaponPoseMaxAgeSeconds then
+-        return nil, nil, "stale_weapon_pose"
+-    end
+-
+-    local maxCenterDistance = attackRange + boxSize.Magnitude + Config.WeaponPoseValidationSlack
+-    if (sample.boxCFrame.Position - root.Position).Magnitude > maxCenterDistance then
+-        return nil, nil, "invalid_weapon_pose"
+-    end
+-
+-    local weaponBoneBoxLocalPosition = WeaponAttackVolume.ReadWeaponBoneBoxLocalPosition(weapon)
+-    local volume = WeaponAttackVolume.Build(root.Position, sample.boxCFrame, boxSize, attackRange, weaponBoneBoxLocalPosition)
+-    if not volume then
+-        return nil, nil, "invalid_weapon_volume"
+-    end
+-    return volume, sample, nil
+-end
+-
+-local function resolveMeleeDamage(
+-    player: Player,
+-    character: Model,
+-    serial: number,
+-    clientAttackId: number,
+-    hitElapsed: number
+-)
+-    if activeSerial[player] ~= serial
+-        or activeClientAttackId[player] ~= clientAttackId
+-        or player.Character ~= character
+-        or not character.Parent
+-        or tostring(character:GetAttribute("LifeState") or "") ~= "Alive"
+-    then
+-        return
+-    end
+-
+-    local startElapsed = activeDamageStartElapsed[player]
+-    local cutoffElapsed = activeDamageCutoffElapsed[player]
+-    if startElapsed == nil
+-        or cutoffElapsed == nil
+-        or hitElapsed + 1e-4 < startElapsed
+-        or hitElapsed > cutoffElapsed + 1e-4
+-    then
+-        return
+-    end
+-
+-    -- Hit is the terminal damage moment. Close the continuous contact window
+-    -- before resolving this exact timeline checkpoint so no later pose packet
+-    -- can deal damage, even if it arrives in the same server frame.
+-    activeDamageUntil[player] = nil
+-
+-    local root = character:FindFirstChild("RootCollider")
+-    if not root or not root:IsA("BasePart") then
+-        return
+-    end
+-
+-    local attackRange = math.clamp(tonumber(character:GetAttribute("AttackRadius")) or Config.Range, 1, Config.MaxAimDistance)
+-    local volume, sample, reason = validatedAnimatedWeaponVolume(player, character, root, clientAttackId, attackRange, hitElapsed)
+-    if not volume then
+-        if Config.DebugLogs and not hasRegisteredHit(player) then
+-            print(("[game1][attack] miss player=%s range=%.1f serial=%d reason=%s")
+-                :format(player.Name, attackRange, serial, tostring(reason)))
+-        end
+-        return
+-    end
+-
+-    -- Final Hit checkpoint uses the same bone-to-blade attacking OBB as the
+-    -- continuous pre-Hit sweep. It may register contact at Hit itself, but never
+-    -- reopens the damage window afterwards.
+-    local hitCount = applyDamageInVolume(
+-        player,
+-        character,
+-        root,
+-        serial,
+-        volume.cframe,
+-        volume.size,
+-        "animated_weapon_volume",
+-        activeHitTargets[player],
+-        sample and sample.aimOrigin or nil,
+-        sample and sample.aimDirection or nil,
+-        attackRange
+-    )
+-
+-    if hitCount == 0 and not hasRegisteredHit(player) and Config.DebugLogs then
+-        print(("[game1][attack] miss player=%s range=%.1f serial=%d source=animated_weapon_volume")
+-            :format(player.Name, attackRange, serial))
+-    end
+-end
+-
+-local function scheduleTimelineResults(
+-    player: Player,
+-    character: Model,
+-    serial: number,
+-    clientAttackId: number,
+-    timing: any
+-)
+-    for eventName, event in pairs(timing.events or {}) do
+-        local resultType = tostring(event.result or "")
+-        local delaySeconds = math.max(0, tonumber(event.time) or 0)
+-        if eventName == "Hit" and resultType == AttackTimelineConfig.ResultTypes.MeleeDamage then
+-            task.delay(delaySeconds, function()
+-                resolveMeleeDamage(player, character, serial, clientAttackId, delaySeconds)
+-            end)
+-        elseif Config.DebugLogs and resultType ~= "" then
+-            warn(("[game1][attack] no result handler event=%s result=%s"):format(tostring(eventName), resultType))
+-        end
+-    end
+-end
+-
+ local function clearAttackStateLater(player: Player, character: Model, serial: number, clientAttackId: number, durationSeconds: number)
+     task.delay(durationSeconds, function()
+         if activeSerial[player] ~= serial or activeClientAttackId[player] ~= clientAttackId then
+             return
+         end
++        if Config.DebugLogs and next(activeHitTargets[player] or {}) == nil then
++            local attackRange = math.clamp(tonumber(character:GetAttribute("AttackRadius")) or Config.Range, 1, Config.MaxAimDistance)
++            print(("[game1][attack] miss player=%s range=%.1f serial=%d source=animated_weapon_sweep")
++                :format(player.Name, attackRange, serial))
++        end
+         activeUntil[player] = nil
+         activeSerial[player] = nil
+         activeClientAttackId[player] = nil
+         activeHitTargets[player] = nil
+-        activeDamageUntil[player] = nil
+-        activeDamageStartElapsed[player] = nil
+-        activeDamageCutoffElapsed[player] = nil
++        activeDamageWindows[player] = nil
+         activeHeadshotTarget[player] = nil
+-        local buffer = weaponPoseBuffers[player]
+-        if buffer and buffer.clientAttackId == clientAttackId then
+-            weaponPoseBuffers[player] = nil
++        local sweepState = weaponSweepStates[player]
++        if sweepState and sweepState.clientAttackId == clientAttackId then
++            weaponSweepStates[player] = nil
+         end
+         if character.Parent and tonumber(character:GetAttribute("AttackSerial")) == serial then
+             character:SetAttribute("AttackEndsAt", nil)
+@@ -495,7 +317,7 @@ local function attack(player: Player, payload: any)
+     end
+ 
+     local animationSpeedPercent = AnimationSpeedScaling.ResolveForModel(character, "attack")
+-    local timing = AttackTimelineConfig.ResolveRuntime(clipId, animationSpeedPercent, descriptor.duplicateFirstFrameAtEnd == true)
++    local timing = AttackTimelineConfig.ResolveRuntime(clipId, animationSpeedPercent)
+     if not timing then
+         if Config.DebugLogs then
+             print(("[game1][attack] reject player=%s reason=missing_timeline clip=%s"):format(player.Name, clipId))
+@@ -503,10 +325,10 @@ local function attack(player: Player, payload: any)
+         return
+     end
+ 
+-    local hitStartTime, hitTime = meleeDamageWindow(timing)
+-    if hitStartTime == nil or hitTime == nil then
++    local damageWindow = CharacterAttackWindow.Resolve(timing)
++    if not damageWindow then
+         if Config.DebugLogs then
+-            print(("[game1][attack] reject player=%s reason=missing_melee_damage_window clip=%s"):format(player.Name, clipId))
++            print(("[game1][attack] reject player=%s reason=missing_character_damage_window clip=%s"):format(player.Name, clipId))
+         end
+         return
+     end
+@@ -523,22 +345,20 @@ local function attack(player: Player, payload: any)
+     activeUntil[player] = now + attackDuration
+     activeHitTargets[player] = {}
+     activeHeadshotTarget[player] = nil
+-    activeDamageStartElapsed[player] = hitStartTime
+-    activeDamageCutoffElapsed[player] = hitTime
+-    activeDamageUntil[player] = now + hitTime
++    activeDamageWindows[player] = damageWindow
++    weaponSweepStates[player] = nil
+     character:SetAttribute("AttackSerial", serial)
+     character:SetAttribute("AttackClipId", clipId)
+     character:SetAttribute("AttackStartedAt", now)
+     character:SetAttribute("AttackEndsAt", now + attackDuration)
+-    character:SetAttribute("AttackDamageStartsAt", now + hitStartTime)
+-    character:SetAttribute("AttackDamageEndsAt", now + hitTime)
++    character:SetAttribute("AttackDamageStartsAt", now + damageWindow.startTime)
++    character:SetAttribute("AttackDamageEndsAt", now + damageWindow.endTime)
+     character:SetAttribute("LastAttackHitZone", nil)
+     character:SetAttribute("LastAttackHeadshot", false)
+ 
+-    -- Equipped weapon damage exists only inside the authored HitStart -> Hit
+-    -- window (currently 40% -> 50%). Before HitStart is windup; after Hit is
+-    -- presentation/cooldown. Neither side of the window may deal damage.
+-    scheduleTimelineResults(player, character, serial, clientAttackId, timing)
++    -- Character weapon damage exists only inside the authored HitStart -> HitEnd
++    -- interval. Hit is no longer a character damage event; monsters keep their
++    -- separate single-Hit timing policy in MonsterAIService.
+     clearAttackStateLater(player, character, serial, clientAttackId, attackDuration)
+ end
+ 
+@@ -565,17 +385,12 @@ local function recordWeaponPose(player: Player, payload: any)
+     end
+ 
+     local elapsed = math.max(0, tonumber(payload.elapsed) or 0)
+-    local damageUntil = activeDamageUntil[player]
+-    local damageStartElapsed = activeDamageStartElapsed[player]
+-    local damageCutoffElapsed = activeDamageCutoffElapsed[player]
++    local damageWindow = activeDamageWindows[player]
+     if activeClientAttackId[player] ~= clientAttackId
+         or activeSerial[player] == nil
+-        or damageUntil == nil
+-        or damageStartElapsed == nil
+-        or damageCutoffElapsed == nil
+-        or os.clock() > damageUntil
+-        or elapsed + 1e-4 < damageStartElapsed
+-        or elapsed > damageCutoffElapsed + 1e-4
++        or damageWindow == nil
++        or elapsed + 1e-4 < damageWindow.startTime
++        or elapsed > damageWindow.endTime + 1e-4
+     then
+         return
+     end
+@@ -592,42 +407,24 @@ local function recordWeaponPose(player: Player, payload: any)
+ 
+     local aimOrigin, aimDirection = normalizeAimSample(root.Position, payload.aimOrigin, payload.aimDirection)
+ 
+-    local buffer = weaponPoseBuffers[player]
+-    if not buffer or buffer.character ~= character or buffer.clientAttackId ~= clientAttackId then
+-        buffer = {
++    local sweepState = weaponSweepStates[player]
++    if not sweepState or sweepState.character ~= character or sweepState.clientAttackId ~= clientAttackId then
++        sweepState = {
+             character = character,
+             clientAttackId = clientAttackId,
+-            samples = {},
+         }
+-        weaponPoseBuffers[player] = buffer
+-    end
+-    table.insert(buffer.samples, {
+-        elapsed = elapsed,
+-        boxCFrame = payload.boxCFrame,
+-        aimOrigin = aimOrigin,
+-        aimDirection = aimDirection,
+-        receivedAt = os.clock(),
+-    })
+-    while #buffer.samples > Config.WeaponPoseBufferSize do
+-        table.remove(buffer.samples, 1)
++        weaponSweepStates[player] = sweepState
+     end
+ 
+-    -- Accepted poses sweep continuously only inside HitStart -> Hit. The client
+-    -- does not send windup poses, and the server independently rejects any pose
+-    -- whose authored elapsed phase is before HitStart or after Hit.
++    -- Accepted poses sweep continuously only inside HitStart -> HitEnd. There is
++    -- no buffered terminal Hit checkpoint anymore; each accepted pose belongs to
++    -- the active authored window and is resolved immediately.
+     local serial = activeSerial[player]
+-    local lastDamageElapsed = tonumber(buffer.lastDamageElapsed)
+-    if serial
+-        and activeClientAttackId[player] == clientAttackId
+-        and activeDamageUntil[player] ~= nil
+-        and os.clock() <= activeDamageUntil[player]
+-        and elapsed + 1e-4 >= damageStartElapsed
+-        and elapsed <= damageCutoffElapsed + 1e-4
+-        and (lastDamageElapsed == nil or elapsed + 1e-4 >= lastDamageElapsed)
+-    then
+-        local previousBoxCFrame = if typeof(buffer.lastDamageBoxCFrame) == "CFrame" then buffer.lastDamageBoxCFrame else nil
+-        local previousAimOrigin = if typeof(buffer.lastDamageAimOrigin) == "Vector3" then buffer.lastDamageAimOrigin else nil
+-        local previousAimDirection = if typeof(buffer.lastDamageAimDirection) == "Vector3" then buffer.lastDamageAimDirection else nil
++    local lastElapsed = tonumber(sweepState.lastElapsed)
++    if serial and (lastElapsed == nil or elapsed + 1e-4 >= lastElapsed) then
++        local previousBoxCFrame = if typeof(sweepState.lastBoxCFrame) == "CFrame" then sweepState.lastBoxCFrame else nil
++        local previousAimOrigin = if typeof(sweepState.lastAimOrigin) == "Vector3" then sweepState.lastAimOrigin else nil
++        local previousAimDirection = if typeof(sweepState.lastAimDirection) == "Vector3" then sweepState.lastAimDirection else nil
+         applyAnimatedWeaponSweep(
+             player,
+             character,
+@@ -642,10 +439,10 @@ local function recordWeaponPose(player: Player, payload: any)
+             aimOrigin,
+             aimDirection
+         )
+-        buffer.lastDamageElapsed = elapsed
+-        buffer.lastDamageBoxCFrame = payload.boxCFrame
+-        buffer.lastDamageAimOrigin = aimOrigin
+-        buffer.lastDamageAimDirection = aimDirection
++        sweepState.lastElapsed = elapsed
++        sweepState.lastBoxCFrame = payload.boxCFrame
++        sweepState.lastAimOrigin = aimOrigin
++        sweepState.lastAimDirection = aimDirection
+     end
+ end
+ 
+@@ -669,11 +466,9 @@ function AttackService.Start()
+         activeSerial[player] = nil
+         activeClientAttackId[player] = nil
+         activeHitTargets[player] = nil
+-        activeDamageUntil[player] = nil
+-        activeDamageStartElapsed[player] = nil
+-        activeDamageCutoffElapsed[player] = nil
++        activeDamageWindows[player] = nil
+         activeHeadshotTarget[player] = nil
+-        weaponPoseBuffers[player] = nil
++        weaponSweepStates[player] = nil
+     end)
+ end
+ 
+diff --git a/src/server/monster/MonsterAIService.luau b/src/server/monster/MonsterAIService.luau
+index c173a77..95cfcdf 100644
+--- a/src/server/monster/MonsterAIService.luau
++++ b/src/server/monster/MonsterAIService.luau
+@@ -442,7 +442,7 @@ local function beginAttack(agent: any, target: Model)
+     local row = weightedRow(agent.attackRows)
+     if not row then return end
+     local percent = AnimationSpeedScaling.ResolveForModel(agent.model, "attack")
+-    local timing = AttackTimelineConfig.ResolveRuntime(row.clipId, percent, row.duplicateFirstFrameAtEnd == true)
++    local timing = AttackTimelineConfig.ResolveRuntime(row.clipId, percent)
+     if not timing then return end
+ 
+     agent.attacking = true
+diff --git a/src/shared/combat/AttackConfig.luau b/src/shared/combat/AttackConfig.luau
+index 1f7fd53..6fa6e5f 100644
+--- a/src/shared/combat/AttackConfig.luau
++++ b/src/shared/combat/AttackConfig.luau
+@@ -10,11 +10,9 @@ return table.freeze({
+ 
+     -- Animated EquippedWeapon pose samples are client-observed because the
+     -- visible weapon follows client-side Bone transforms. The server owns the
+-    -- canonical box dimensions and accepts only fresh, nearby pose frames.
++    -- canonical box dimensions and accepts only nearby poses inside the authored
++    -- HitStart -> HitEnd character damage window.
+     WeaponPoseSampleInterval = 1 / 30,
+-    WeaponPoseMaxAgeSeconds = 0.25,
+-    WeaponPoseHitTimeTolerance = 0.09,
+-    WeaponPoseBufferSize = 96,
+     WeaponPoseValidationSlack = 2.0,
+     -- Continuous contact sweep subdivision. Pose packets arrive at ~30 Hz; these
+     -- limits add intermediate OBB samples so a fast animated weapon cannot pass
+diff --git a/src/shared/combat/AttackTimelineConfig.luau b/src/shared/combat/AttackTimelineConfig.luau
+index 642481c..7d3f9b2 100644
+--- a/src/shared/combat/AttackTimelineConfig.luau
++++ b/src/shared/combat/AttackTimelineConfig.luau
+@@ -1,88 +1,61 @@
+--- Runtime resolver for Asset Manager-authored attack-animation timelines.
++-- Runtime resolver for Asset Manager-authored attack timelines.
+ --
+--- Every gameplay attack clip is authored in Asset Manager / Timelines and exported
+--- to AttackTimelineData. `duration` is the source animation duration at 100%
+--- playback; events are stored as a 0..1 `normalizedTime`.
+--- Runtime timing is divided by the same playback speed used by the Animator.
+--- The final playback percentage is resolved by AnimationSpeedScaling from gameplay
+--- stats (or a temporary runtime debug override), so presentation and gameplay
+--- events remain on the same authored animation phase.
+---
+--- `result` links an animation event to gameplay. game1 currently implements
+--- `melee_damage`; the event schema is deliberately generic so later attacks can
+--- add Hit2 / Release / HitStart / HitEnd without putting timing constants in the
+--- controller or server combat code.
++-- Asset Manager owns normalized event positions. Runtime converts them to the
++-- exact playback speed used by the animation system. Character melee windows
++-- are interpreted separately by CharacterAttackWindow; monster attacks keep
++-- their current single Hit event semantics.
+ local AttackTimelineConfig = {}
+ 
+-AttackTimelineConfig.SchemaVersion = 1
++AttackTimelineConfig.SchemaVersion = 2
+ AttackTimelineConfig.EndGuardSeconds = 0.03
+ AttackTimelineConfig.EventNames = table.freeze({
+-    Hit = true,
+-    Hit2 = true,
+     HitStart = true,
+     HitEnd = true,
+-    Release = true,
+-})
+-AttackTimelineConfig.ResultTypes = table.freeze({
+-    MeleeDamage = "melee_damage",
+-    ProjectileRelease = "projectile_release",
++    Hit = true,
+ })
+ 
+ local BY_CLIP = require(script.Parent:WaitForChild("AttackTimelineData"))
+-
+ AttackTimelineConfig.ByClip = BY_CLIP
+ 
+-local function copyRuntimeEvent(source: any, baseDuration: number, playbackSpeed: number): any
+-    local normalized = math.clamp(tonumber(source and source.normalizedTime) or 0, 0, 1)
+-    local sourceTime = normalized * baseDuration
++local function copyRuntimeEvent(source: any, sourceDuration: number, playbackSpeed: number): any
++    local normalizedTime = math.clamp(tonumber(source and source.normalizedTime) or 0, 0, 1)
++    local sourceTime = normalizedTime * sourceDuration
+     return {
+         time = sourceTime / playbackSpeed,
+         sourceTime = sourceTime,
+-        normalizedTime = if baseDuration > 0 then sourceTime / baseDuration else 0,
+-        result = tostring(source and source.result or ""),
++        normalizedTime = normalizedTime,
+     }
+ end
+ 
+ function AttackTimelineConfig.ResolveBase(clipId: any): any?
+     local source = BY_CLIP[tostring(clipId or "")]
+-    if type(source) ~= "table" then
+-        return nil
+-    end
+-    local duration = tonumber(source.duration) or 0
+-    if duration <= 0 then
++    if type(source) ~= "table" or (tonumber(source.duration) or 0) <= 0 then
+         return nil
+     end
+     return source
+ end
+ 
+-function AttackTimelineConfig.ResolveRuntime(clipId: any, animationSpeedPercent: any, _duplicateFirstFrameAtEnd: any?): any?
++function AttackTimelineConfig.ResolveRuntime(clipId: any, animationSpeedPercent: any): any?
+     local source = AttackTimelineConfig.ResolveBase(clipId)
+     if not source then
+         return nil
+     end
+ 
+-    local baseDuration = math.max(0.001, tonumber(source.duration) or 0)
+-    local clipPercent = math.clamp(tonumber(animationSpeedPercent) or 100, 1, 400)
+-    local playbackSpeed = math.max(0.01, clipPercent / 100)
++    local sourceDuration = math.max(0.001, tonumber(source.duration) or 0)
++    local speedPercent = math.clamp(tonumber(animationSpeedPercent) or 100, 1, 400)
++    local playbackSpeed = math.max(0.01, speedPercent / 100)
+     local events = {}
+     for eventName, event in pairs(source.events or {}) do
+-        events[tostring(eventName)] = copyRuntimeEvent(event, baseDuration, playbackSpeed)
++        events[tostring(eventName)] = copyRuntimeEvent(event, sourceDuration, playbackSpeed)
+     end
+ 
+-    local sourceAnimationDuration = baseDuration / playbackSpeed
+-    -- Runtime first-frame seam is presentation-only. It never extends the
+-    -- authored attack timeline or changes when an attack may complete.
+-    local runtimeTailDuration = 0
+-    local animationDuration = sourceAnimationDuration
++    local playbackDuration = sourceDuration / playbackSpeed
+     return {
+         clipId = tostring(clipId),
+-        baseDuration = baseDuration,
+-        sourceAnimationDuration = sourceAnimationDuration,
+-        runtimeTailDuration = runtimeTailDuration,
+-        animationDuration = animationDuration,
+-        duration = animationDuration + AttackTimelineConfig.EndGuardSeconds,
++        duration = playbackDuration + AttackTimelineConfig.EndGuardSeconds,
++        playbackDuration = playbackDuration,
+         playbackSpeed = playbackSpeed,
+-        animationSpeedPercent = clipPercent,
++        animationSpeedPercent = speedPercent,
+         events = events,
+     }
+ end
+diff --git a/src/shared/combat/AttackTimelineData.luau b/src/shared/combat/AttackTimelineData.luau
+index a413a2f..5cc10b7 100644
+--- a/src/shared/combat/AttackTimelineData.luau
++++ b/src/shared/combat/AttackTimelineData.luau
+@@ -4,7 +4,6 @@ local BY_CLIP = {
+         duration = 1.866666675,
+         events = table.freeze({
+             HitStart = table.freeze({ normalizedTime = 0.4 }),
+-            Hit = table.freeze({ normalizedTime = 0.5, result = "melee_damage" }),
+             HitEnd = table.freeze({ normalizedTime = 0.68566494 }),
+         }),
+     }),
+@@ -12,20 +11,20 @@ local BY_CLIP = {
+         duration = 1.866666674,
+         events = table.freeze({
+             HitStart = table.freeze({ normalizedTime = 0.4 }),
+-            Hit = table.freeze({ normalizedTime = 0.5, result = "melee_damage" }),
++            HitEnd = table.freeze({ normalizedTime = 0.5 }),
+         }),
+     }),
+     ["human_female__weapon__1hs__attack__03"] = table.freeze({
+         duration = 1.866666674,
+         events = table.freeze({
+             HitStart = table.freeze({ normalizedTime = 0.4 }),
+-            Hit = table.freeze({ normalizedTime = 0.5, result = "melee_damage" }),
++            HitEnd = table.freeze({ normalizedTime = 0.5 }),
+         }),
+     }),
+     ["monster__gremlin__attack__01"] = table.freeze({
+         duration = 1.799999952,
+         events = table.freeze({
+-            Hit = table.freeze({ normalizedTime = 0.5, result = "melee_damage" }),
++            Hit = table.freeze({ normalizedTime = 0.5 }),
+         }),
+     }),
+ }
+diff --git a/src/shared/combat/CharacterAttackWindow.luau b/src/shared/combat/CharacterAttackWindow.luau
+new file mode 100644
+index 0000000..c1dff3d
+--- /dev/null
++++ b/src/shared/combat/CharacterAttackWindow.luau
+@@ -0,0 +1,35 @@
++-- Character-only melee damage-window policy.
++--
++-- A character weapon may deal damage continuously from authored HitStart
++-- through authored HitEnd. Monster attacks intentionally do not use this
++-- module; their current gameplay still resolves one authored Hit checkpoint.
++local CharacterAttackWindow = {}
++
++function CharacterAttackWindow.Resolve(timing: any): any?
++    local events = timing and timing.events
++    local hitStart = events and events.HitStart
++    local hitEnd = events and events.HitEnd
++    if type(hitStart) ~= "table" or type(hitEnd) ~= "table" then
++        return nil
++    end
++
++    local duration = math.max(0, tonumber(timing.duration) or 0)
++    local startTime = tonumber(hitStart.time)
++    local endTime = tonumber(hitEnd.time)
++    if startTime == nil or endTime == nil then
++        return nil
++    end
++
++    startTime = math.clamp(startTime, 0, duration)
++    endTime = math.clamp(endTime, 0, duration)
++    if startTime > endTime then
++        return nil
++    end
++
++    return table.freeze({
++        startTime = startTime,
++        endTime = endTime,
++    })
++end
++
++return table.freeze(CharacterAttackWindow)
+diff --git a/system/control-center/host_agent.py b/system/control-center/host_agent.py
+index 9fa5793..296decd 100644
+--- a/system/control-center/host_agent.py
++++ b/system/control-center/host_agent.py
+@@ -36,11 +36,11 @@ from monster_animation_store import MonsterAnimationStore
+ from monster_spawn_store import MonsterSpawnStore
+ from animation_speed_scaling_store import AnimationSpeedScalingStore
+ from options_store import OptionsStore
+-from timeline_store import TimelineStore, EVENT_CATALOG
++from timeline_store import TimelineStore
+ from character_core.identity import CharacterIdentityService
+ from studio_bridge import run_model_load_bridge, run_monster_spawn_bridge, run_timeline_editor_bridge
+ 
+-control_agent_build = "game1-m35-attack-timeline-authoring-001"
++control_agent_build = "game1-m38-character-hitend-rojo-workspace-001"
+ port = int(os.environ.get("CONTROL_AGENT_PORT", "43821"))
+ token = os.environ.get("CONTROL_TOKEN", "Game1LocalControlV1")
+ store = CharacterStore(ROOT)
+@@ -584,7 +584,7 @@ class Handler(BaseHTTPRequestHandler):
+             try:
+                 payload = self.body()
+                 session = timelines.begin_editor_session(str(payload.get("clipId") or ""))
+-                studio = run_timeline_editor_bridge(session, EVENT_CATALOG)
++                studio = run_timeline_editor_bridge(session, timelines.event_catalog_for_subject(session["subjectType"]))
+                 duration = float(studio.get("duration") or 0)
+                 if duration > 0:
+                     timelines.update_editor_state({"sessionId": session["sessionId"], "action": "ready", "duration": duration})
+diff --git a/system/control-center/static/index.html b/system/control-center/static/index.html
+index ca45cb5..2d05909 100644
+--- a/system/control-center/static/index.html
++++ b/system/control-center/static/index.html
+@@ -321,7 +321,7 @@
+ <div id="toast" class="toast"></div>
+ <script src="character-assets.js?v=15"></script>
+ <script src="animation-speed.js?v=1"></script>
+-<script src="timelines.js?v=1"></script>
++<script src="timelines.js?v=2"></script>
+ <script src="options.js?v=1"></script>
+ <script src="weapon-assets.js?v=3"></script>
+ <script src="monster-assets.js?v=4"></script>
+diff --git a/system/control-center/static/timelines.js b/system/control-center/static/timelines.js
+index 03289de..0dbf4c0 100644
+--- a/system/control-center/static/timelines.js
++++ b/system/control-center/static/timelines.js
+@@ -8,7 +8,7 @@ function timelineSubjects(){return timelineState.data?.subjects?.[timelineState.
+ function timelineRenderSubjects(){const select=$('timeline-subject');const rows=timelineSubjects();if(!rows.some(x=>x.id===timelineState.subjectId))timelineState.subjectId=rows[0]?.id||'';select.innerHTML=rows.map(row=>`<option value="${esc(row.id)}">${esc(row.name)} · ${esc(row.id)}</option>`).join('');select.value=timelineState.subjectId}
+ function timelineRenderClips(){const host=$('timeline-clips'),rows=timelineItems();if(!rows.some(x=>x.clipId===timelineState.clipId)){timelineState.clipId=rows[0]?.clipId||'';timelineState.draft=null;timelineState.sessionId='';timelineStopPoll()}host.innerHTML=rows.length?rows.map(row=>{const events=Object.entries(row.events||{}).map(([name,event])=>`${name} ${Math.round(Number(event.normalizedTime||0)*1000)/10}%`).join(' · ')||'not configured';return `<button class="timeline-clip ${row.clipId===timelineState.clipId?'active':''}" data-timeline-clip="${esc(row.clipId)}" type="button"><span><b>${esc(row.clipName)}</b><small>${esc(row.weaponSet?row.weaponSet+' · ':'')}${esc(events)}</small></span><i>${row.configured?'configured':'new'}</i></button>`}).join(''):'<span class="muted">no registered attack animations for this target.</span>';for(const button of host.querySelectorAll('[data-timeline-clip]'))button.onclick=()=>timelineSelectClip(button.dataset.timelineClip)}
+ function timelineDraftFromSelected(){const row=timelineSelected();if(!row)return null;return {duration:Number(row.duration||0),events:timelineCloneEvents(row.events)}}
+-function timelineRenderEditor(){const row=timelineSelected();if(!row){$('timeline-selected-title').textContent='select attack';$('timeline-events').innerHTML='<span class="muted">select an attack animation.</span>';$('timeline-open-studio').disabled=true;$('timeline-save').disabled=true;$('timeline-duration').textContent='—';$('timeline-clip-id').textContent='—';return}if(!timelineState.draft)timelineState.draft=timelineDraftFromSelected();$('timeline-selected-title').textContent=`${row.subjectName} · ${row.clipName}`;$('timeline-clip-id').textContent=row.clipId;$('timeline-duration').textContent=timelineState.draft.duration>0?`${timelineState.draft.duration.toFixed(4)} s`:'waiting for Studio';$('timeline-open-studio').disabled=timelineState.opening||!row.modelAssetId||!row.animationAssetId;$('timeline-save').disabled=!(timelineState.draft.duration>0);const catalog=timelineState.data?.eventCatalog||[];$('timeline-events').innerHTML=catalog.map(def=>{const event=timelineState.draft.events?.[def.name];const percent=event?Number(event.normalizedTime||0)*100:'';return `<div class="timeline-event-row"><div><b>${esc(def.label||def.name)}</b><small>${esc(def.name)}${def.result?' · '+esc(def.result):''}</small></div><label>position %<input data-timeline-event="${esc(def.name)}" type="number" min="0" max="100" step="0.1" value="${percent===''?'':Number(percent.toFixed(3))}" placeholder="—"></label><button data-timeline-clear="${esc(def.name)}" type="button" ${event?'':'disabled'}>clear</button></div>`}).join('');for(const input of $('timeline-events').querySelectorAll('[data-timeline-event]'))input.oninput=()=>{const name=input.dataset.timelineEvent,value=input.value.trim();if(value===''){delete timelineState.draft.events[name]}else{const normalized=Math.max(0,Math.min(1,Number(value)/100));const def=catalog.find(x=>x.name===name)||{};timelineState.draft.events[name]={normalizedTime:normalized};if(def.result)timelineState.draft.events[name].result=def.result}timelineRenderEditor()};for(const button of $('timeline-events').querySelectorAll('[data-timeline-clear]'))button.onclick=()=>{delete timelineState.draft.events[button.dataset.timelineClear];timelineRenderEditor()}}
++function timelineRenderEditor(){const row=timelineSelected();if(!row){$('timeline-selected-title').textContent='select attack';$('timeline-events').innerHTML='<span class="muted">select an attack animation.</span>';$('timeline-open-studio').disabled=true;$('timeline-save').disabled=true;$('timeline-duration').textContent='—';$('timeline-clip-id').textContent='—';return}if(!timelineState.draft)timelineState.draft=timelineDraftFromSelected();$('timeline-selected-title').textContent=`${row.subjectName} · ${row.clipName}`;$('timeline-clip-id').textContent=row.clipId;$('timeline-duration').textContent=timelineState.draft.duration>0?`${timelineState.draft.duration.toFixed(4)} s`:'waiting for Studio';$('timeline-open-studio').disabled=timelineState.opening||!row.modelAssetId||!row.animationAssetId;$('timeline-save').disabled=!(timelineState.draft.duration>0);const catalog=timelineState.data?.eventCatalogs?.[row.subjectType]||[];$('timeline-events').innerHTML=catalog.map(def=>{const event=timelineState.draft.events?.[def.name];const percent=event?Number(event.normalizedTime||0)*100:'';return `<div class="timeline-event-row"><div><b>${esc(def.label||def.name)}</b><small>${esc(def.name)}</small></div><label>position %<input data-timeline-event="${esc(def.name)}" type="number" min="0" max="100" step="0.1" value="${percent===''?'':Number(percent.toFixed(3))}" placeholder="—"></label><button data-timeline-clear="${esc(def.name)}" type="button" ${event?'':'disabled'}>clear</button></div>`}).join('');for(const input of $('timeline-events').querySelectorAll('[data-timeline-event]'))input.oninput=()=>{const name=input.dataset.timelineEvent,value=input.value.trim();if(value===''){delete timelineState.draft.events[name]}else{const normalized=Math.max(0,Math.min(1,Number(value)/100));timelineState.draft.events[name]={normalizedTime:normalized}}timelineRenderEditor()};for(const button of $('timeline-events').querySelectorAll('[data-timeline-clear]'))button.onclick=()=>{delete timelineState.draft.events[button.dataset.timelineClear];timelineRenderEditor()}}
+ function timelineRender(){if(!timelineState.data)return;$('timeline-subject-type').value=timelineState.subjectType;timelineRenderSubjects();timelineRenderClips();timelineRenderEditor()}
+ function timelineSelectClip(clipId){timelineState.clipId=clipId;timelineState.draft=null;timelineState.sessionId='';timelineState.revision=-1;timelineStopPoll();timelineRender();timelineSetStatus('opening Studio','selected attack is being opened automatically.');timelineOpenStudio()}
+ async function timelinePoll(){if(!timelineState.sessionId)return;try{const session=await request('/api/timelines/editor-state?session='+encodeURIComponent(timelineState.sessionId));if(Number(session.revision||0)!==timelineState.revision){timelineState.revision=Number(session.revision||0);timelineState.draft={duration:Number(session.duration||0),events:timelineCloneEvents(session.events)};$('timeline-studio-state').textContent=session.studioReady?'studio connected':'studio opening';timelineRenderEditor();timelineSetStatus('studio connected','confirmed Studio points are mirrored here. Save when the timeline is ready.')}}catch(error){timelineStopPoll();$('timeline-studio-state').textContent='studio session ended';timelineSetStatus('editor session ended',error.message,true)}}
+diff --git a/system/control-center/timeline_store.py b/system/control-center/timeline_store.py
+index 209ba04..8b8756d 100644
+--- a/system/control-center/timeline_store.py
++++ b/system/control-center/timeline_store.py
+@@ -6,15 +6,26 @@ import time
+ import uuid
+ 
+ PROJECT = "game1"
+-SCHEMA_VERSION = 1
+-EVENT_CATALOG = [
+-    {"name": "HitStart", "label": "hit start", "result": ""},
+-    {"name": "Hit", "label": "hit", "result": "melee_damage"},
+-    {"name": "Hit2", "label": "hit 2", "result": "melee_damage"},
+-    {"name": "HitEnd", "label": "hit end", "result": ""},
+-    {"name": "Release", "label": "release", "result": "projectile_release"},
+-]
+-EVENT_BY_NAME = {row["name"]: row for row in EVENT_CATALOG}
++SCHEMA_VERSION = 2
++
++EVENT_CATALOGS = {
++    "characters": [
++        {"name": "HitStart", "label": "hit start"},
++        {"name": "HitEnd", "label": "hit end"},
++    ],
++    "monsters": [
++        {"name": "Hit", "label": "hit"},
++    ],
++}
++ALL_EVENT_NAMES = ("HitStart", "HitEnd", "Hit")
++
++
++def event_catalog_for_subject(subject_type: str) -> list[dict]:
++    return list(EVENT_CATALOGS.get(str(subject_type or ""), []))
++
++
++def event_names_for_subject(subject_type: str) -> set[str]:
++    return {str(row["name"]) for row in event_catalog_for_subject(subject_type)}
+ 
+ 
+ class TimelineStore:
+@@ -33,7 +44,7 @@ class TimelineStore:
+     def _ensure_manifest(self) -> None:
+         if self.manifest_path.is_file():
+             return
+-        seed = {
++        self._write_manifest({
+             "schemaVersion": SCHEMA_VERSION,
+             "project": PROJECT,
+             "timelines": [
+@@ -42,7 +53,7 @@ class TimelineStore:
+                     "duration": 1.866666674,
+                     "events": {
+                         "HitStart": {"normalizedTime": 0.40},
+-                        "Hit": {"normalizedTime": 0.50, "result": "melee_damage"},
++                        "HitEnd": {"normalizedTime": 0.50},
+                     },
+                 },
+                 {
+@@ -50,7 +61,7 @@ class TimelineStore:
+                     "duration": 1.866666674,
+                     "events": {
+                         "HitStart": {"normalizedTime": 0.40},
+-                        "Hit": {"normalizedTime": 0.50, "result": "melee_damage"},
++                        "HitEnd": {"normalizedTime": 0.50},
+                     },
+                 },
+                 {
+@@ -58,19 +69,16 @@ class TimelineStore:
+                     "duration": 1.866666674,
+                     "events": {
+                         "HitStart": {"normalizedTime": 0.40},
+-                        "Hit": {"normalizedTime": 0.50, "result": "melee_damage"},
++                        "HitEnd": {"normalizedTime": 0.50},
+                     },
+                 },
+                 {
+                     "clipId": "monster__gremlin__attack__01",
+                     "duration": 1.799999952,
+-                    "events": {
+-                        "Hit": {"normalizedTime": 0.50, "result": "melee_damage"},
+-                    },
++                    "events": {"Hit": {"normalizedTime": 0.50}},
+                 },
+             ],
+-        }
+-        self._write_manifest(seed)
++        })
+ 
+     def _load(self) -> dict:
+         try:
+@@ -79,8 +87,7 @@ class TimelineStore:
+             raise ValueError(f"attack timeline manifest is invalid: {exc}") from exc
+         if int(data.get("schemaVersion") or 0) != SCHEMA_VERSION or data.get("project") != PROJECT:
+             raise ValueError("attack timeline manifest identity is invalid")
+-        timelines = data.get("timelines")
+-        if not isinstance(timelines, list):
++        if not isinstance(data.get("timelines"), list):
+             raise ValueError("attack timeline manifest timelines must be a list")
+         return data
+ 
+@@ -112,15 +119,13 @@ class TimelineStore:
+             lines.append(f"        duration = {self._lua_number(duration)},")
+             lines.append("        events = table.freeze({")
+             events = row.get("events") if isinstance(row.get("events"), dict) else {}
+-            for event_name in EVENT_BY_NAME:
++            for event_name in ALL_EVENT_NAMES:
+                 event = events.get(event_name)
+                 if not isinstance(event, dict):
+                     continue
+                 normalized = max(0.0, min(1.0, float(event.get("normalizedTime") or 0)))
+-                result = str(event.get("result") or EVENT_BY_NAME[event_name]["result"] or "")
+-                suffix = f", result = {self._lua_string(result)}" if result else ""
+                 lines.append(
+-                    f"            {event_name} = table.freeze({{ normalizedTime = {self._lua_number(normalized)}{suffix} }}),"
++                    f"            {event_name} = table.freeze({{ normalizedTime = {self._lua_number(normalized)} }}),"
+                 )
+             lines.extend(["        }),", "    }),"])
+         lines.extend(["}", "", "return table.freeze(BY_CLIP)", ""])
+@@ -191,7 +196,7 @@ class TimelineStore:
+         return {
+             "schemaVersion": SCHEMA_VERSION,
+             "project": PROJECT,
+-            "eventCatalog": EVENT_CATALOG,
++            "eventCatalogs": EVENT_CATALOGS,
+             "subjects": subjects,
+             "items": rows,
+         }
+@@ -207,6 +212,31 @@ class TimelineStore:
+             raise ValueError("publish the selected attack animation before opening the timeline editor")
+         return row
+ 
++    @staticmethod
++    def _validate_events(subject_type: str, raw_events: dict) -> dict:
++        allowed = event_names_for_subject(subject_type)
++        events = {}
++        for event_name, raw in raw_events.items():
++            if event_name not in allowed or not isinstance(raw, dict):
++                continue
++            events[event_name] = {
++                "normalizedTime": max(0.0, min(1.0, float(raw.get("normalizedTime") or 0)))
++            }
++        if subject_type == "characters":
++            if "HitStart" not in events or "HitEnd" not in events:
++                raise ValueError("character attack timeline requires HitStart and HitEnd")
++            if events["HitStart"]["normalizedTime"] > events["HitEnd"]["normalizedTime"]:
++                raise ValueError("HitStart cannot be after HitEnd")
++        elif subject_type == "monsters":
++            if "Hit" not in events:
++                raise ValueError("monster attack timeline requires Hit")
++        else:
++            raise ValueError(f"unsupported timeline subject type: {subject_type}")
++        return events
++
++    def event_catalog_for_subject(self, subject_type: str) -> list[dict]:
++        return event_catalog_for_subject(subject_type)
++
+     def begin_editor_session(self, clip_id: str) -> dict:
+         row = self._find_attack(clip_id)
+         session_id = uuid.uuid4().hex
+@@ -246,14 +276,11 @@ class TimelineStore:
+             session["studioReady"] = True
+         elif action == "set-event":
+             event_name = str(payload.get("eventName") or "")
+-            if event_name not in EVENT_BY_NAME:
+-                raise ValueError(f"unsupported attack timeline event: {event_name}")
+-            normalized = max(0.0, min(1.0, float(payload.get("normalizedTime") or 0)))
+-            event = {"normalizedTime": normalized}
+-            result = str(EVENT_BY_NAME[event_name].get("result") or "")
+-            if result:
+-                event["result"] = result
+-            session.setdefault("events", {})[event_name] = event
++            if event_name not in event_names_for_subject(str(session.get("subjectType") or "")):
++                raise ValueError(f"unsupported event for this attack type: {event_name}")
++            session.setdefault("events", {})[event_name] = {
++                "normalizedTime": max(0.0, min(1.0, float(payload.get("normalizedTime") or 0)))
++            }
+             session["studioReady"] = True
+         else:
+             raise ValueError(f"unsupported timeline editor action: {action}")
+@@ -263,37 +290,22 @@ class TimelineStore:
+ 
+     def save(self, payload: dict) -> dict:
+         clip_id = str(payload.get("clipId") or "").strip()
+-        self._find_attack(clip_id)
++        attack = self._find_attack(clip_id)
+         duration = float(payload.get("duration") or 0)
+         if duration <= 0:
+             raise ValueError("timeline duration must be greater than zero")
+         raw_events = payload.get("events")
+-        if not isinstance(raw_events, dict) or not raw_events:
+-            raise ValueError("timeline requires at least one event")
+-        events = {}
+-        for event_name, raw in raw_events.items():
+-            if event_name not in EVENT_BY_NAME or not isinstance(raw, dict):
+-                continue
+-            normalized = max(0.0, min(1.0, float(raw.get("normalizedTime") or 0)))
+-            event = {"normalizedTime": normalized}
+-            result = str(EVENT_BY_NAME[event_name].get("result") or "")
+-            if result:
+-                event["result"] = result
+-            events[event_name] = event
+-        if not events:
+-            raise ValueError("timeline contains no supported events")
+-        if "HitStart" in events and "Hit" in events and events["HitStart"]["normalizedTime"] > events["Hit"]["normalizedTime"]:
+-            raise ValueError("HitStart cannot be after Hit")
++        if not isinstance(raw_events, dict):
++            raise ValueError("timeline events are required")
++        events = self._validate_events(str(attack.get("subjectType") or ""), raw_events)
+ 
+         data = self._load()
+         row = {"clipId": clip_id, "duration": duration, "events": events}
+-        replaced = False
+         for index, current in enumerate(data["timelines"]):
+             if str(current.get("clipId") or "") == clip_id:
+                 data["timelines"][index] = row
+-                replaced = True
+                 break
+-        if not replaced:
++        else:
+             data["timelines"].append(row)
+         data["timelines"].sort(key=lambda item: str(item.get("clipId") or ""))
+         self._write_manifest(data)
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index b4b75ed..4c370bf 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -148,6 +148,7 @@ required_runtime = [
+     "src/shared/animation/AnimationSpeedScalingRegistry.luau",
+     "src/shared/combat/AttackConfig.luau",
+     "src/shared/combat/AttackTimelineConfig.luau",
++    "src/shared/combat/CharacterAttackWindow.luau",
+     "src/shared/combat/SkeletonHeadResolver.luau",
+ ]
+ for relative in required_runtime:
+@@ -183,25 +184,26 @@ attack_timeline_data_path = ROOT / "src/shared/combat/AttackTimelineData.luau"
+ attack_timeline_data_text = attack_timeline_data_path.read_text(encoding="utf-8") if attack_timeline_data_path.is_file() else ""
+ for required in [
+     "AttackTimelineConfig.EventNames",
+-    'MeleeDamage = "melee_damage"',
+     "function AttackTimelineConfig.ResolveRuntime",
+     "EndGuardSeconds = 0.03",
+-    "animationDuration",
+     "normalizedTime",
++    "playbackDuration",
+     "playbackSpeed",
+     "animationSpeedPercent",
+-    "clipPercent",
++    "speedPercent",
+ ]:
+     if required not in attack_timeline_text:
+         err(f"attack animation timeline config missing {required}")
++for forbidden in ["ResultTypes", "melee_damage", "runtimeTailDuration", "_duplicateFirstFrameAtEnd"]:
++    if forbidden in attack_timeline_text:
++        err(f"obsolete attack timeline runtime field remains: {forbidden}")
+ for required in [
+     "AttackTimelineConfig.ResolveRuntime",
++    "CharacterAttackWindow.Resolve",
+     "allowedAttackDescriptor",
+     "AnimationSpeedScaling.ResolveForModel",
+-    "scheduleTimelineResults",
+     "activeUntil",
+     'character:SetAttribute("AttackEndsAt"',
+-    "task.delay(delaySeconds",
+ ]:
+     if required not in attack_text:
+         err(f"server attack timeline contract missing {required}")
+@@ -1259,11 +1261,10 @@ for required in ["AnimationFirstFrameSeam", "createRuntimeSeam", "maintainRuntim
+     if required not in monster_spawner_text_m15:
+         err(f"monster runtime seam integration missing {required}")
+ attack_runtime_text = attack_timeline_text + (ROOT / "src/server/combat/AttackService.luau").read_text(encoding="utf-8")
+-for required in ["runtimeTailDuration = 0", "_duplicateFirstFrameAtEnd", "animationDuration = sourceAnimationDuration"]:
+-    if required not in attack_runtime_text:
+-        err(f"attack timeline/runtime seam integration missing {required}")
+ if "AnimationFirstFrameSeam.RuntimeTailSeconds" in attack_runtime_text:
+     err("runtime seam must not extend attack duration or event timing")
++if "duplicateFirstFrameAtEnd" in attack_timeline_text:
++    err("attack timing resolver must not depend on presentation seam flags")
+ 
+ for animation_manifest_name in ["character-animations.json", "monster-animations.json"]:
+     path = ROOT / "assets/manifests" / animation_manifest_name
+@@ -1594,11 +1595,11 @@ for required in [
+ 
+ attack_service_m27 = (ROOT / "src/server/combat/AttackService.luau").read_text(encoding="utf-8")
+ for required in [
+-    "validatedAnimatedWeaponVolume",
+-    "animated_weapon_volume",
++    "applyAnimatedWeaponSweep",
++    "animated_weapon_sweep",
+     "WeaponAttackVolume.Build",
+     'poseEvent.Name = "AttackWeaponPose"',
+-    "weaponPoseBuffers",
++    "weaponSweepStates",
+     "hitCount += 1",
+ ]:
+     if required not in attack_service_m27:
+@@ -1624,7 +1625,7 @@ for required in [
+     "activeHitTargets",
+     "applyAnimatedWeaponSweep",
+     "animated_weapon_sweep",
+-    "lastDamageBoxCFrame",
++    "lastBoxCFrame",
+     "previousBoxCFrame:Lerp",
+     "and (not hitTargets or hitTargets[model] ~= true)",
+ ]:
+@@ -1731,27 +1732,8 @@ for forbidden in ["ReadGripBoxLocalPosition", "outwardDirection"]:
+         err(f"m32 obsolete handle-inclusive weapon-volume path remains: {forbidden}")
+ 
+ attack_service_m32 = (ROOT / "src/server/combat/AttackService.luau").read_text(encoding="utf-8")
+-for required in [
+-    "activeDamageUntil",
+-    "activeDamageCutoffElapsed",
+-    "meleeDamageWindow",
+-    'SetAttribute("AttackDamageEndsAt"',
+-    'eventName == "Hit"',
+-    "elapsed > damageCutoffElapsed + 1e-4",
+-    "activeDamageUntil[player] = nil",
+-    "ReadWeaponBoneBoxLocalPosition",
+-]:
+-    if required not in attack_service_m32:
+-        err(f"m32 terminal Hit damage-window contract missing {required}")
+-
+-attack_controller_m32 = (ROOT / "src/client/combat/AttackController.luau").read_text(encoding="utf-8")
+-for required in [
+-    "timelineEvents and timelineEvents.Hit",
+-    "damagePoseEnd",
+-    "activePoseUntil = activePoseStartedAt + damagePoseEnd",
+-]:
+-    if required not in attack_controller_m32:
+-        err(f"m32 client pose cutoff contract missing {required}")
++if "ReadWeaponBoneBoxLocalPosition" not in attack_service_m32:
++    err("m32 server weapon sweep must use the weapon-bone cutoff")
+ 
+ test_loadout_m32 = (ROOT / "src/client/dev/TestLoadoutController.luau").read_text(encoding="utf-8")
+ if "ReadWeaponBoneBoxLocalPosition" not in test_loadout_m32:
+@@ -1811,8 +1793,8 @@ for required in [
+     "damageMultiplier = if isHeadshot",
+     "sampledAimOrigin",
+     "sampledAimDirection",
+-    "lastDamageAimOrigin",
+-    "lastDamageAimDirection",
++    "lastAimOrigin",
++    "lastAimDirection",
+ ]:
+     if required not in attack_service_m33:
+         err(f"m33 reticle-gated headshot integration missing {required}")
+@@ -1825,11 +1807,13 @@ for required in ["HeadshotDamageMultiplier = 2", "HeadshotAimOriginMaxDistance"]
+         err(f"m33 headshot config missing {required}")
+ 
+ 
+-# m34 authored melee damage window. 1HS attacks are windup until 40%, damaging
+-# only from HitStart=40% through terminal Hit=50%. Client pose traffic is also
+-# confined to that same window; server phase validation independently enforces it.
++# m38 character attack damage policy. Character attacks use an authored
++# HitStart -> HitEnd interval. The old terminal Hit/result dispatch and pose
++# buffer are removed; monsters intentionally keep their single Hit checkpoint.
+ attack_timeline_manifest_path = ROOT / "assets/manifests/attack-timelines.json"
+ attack_timeline_manifest = json.loads(attack_timeline_manifest_path.read_text(encoding="utf-8")) if attack_timeline_manifest_path.is_file() else {}
++if int(attack_timeline_manifest.get("schemaVersion") or 0) != 2:
++    err("m38 attack timeline manifest must use schemaVersion 2")
+ attack_timeline_rows = {str(row.get("clipId") or ""): row for row in attack_timeline_manifest.get("timelines") or []}
+ for clip_id in [
+     "human_female__weapon__1hs__attack__01",
+@@ -1838,41 +1822,62 @@ for clip_id in [
+ ]:
+     row = attack_timeline_rows.get(clip_id)
+     if not row:
+-        err(f"m34 timeline clip missing {clip_id}")
++        err(f"m38 character timeline clip missing {clip_id}")
+         continue
+     events = row.get("events") or {}
+-    if abs(float((events.get("HitStart") or {}).get("normalizedTime") or -1) - 0.40) > 1e-6:
+-        err(f"m34 {clip_id} must open melee damage at normalized 0.40")
+-    hit = events.get("Hit") or {}
+-    if abs(float(hit.get("normalizedTime") or -1) - 0.50) > 1e-6 or str(hit.get("result") or "") != "melee_damage":
+-        err(f"m34 {clip_id} must keep terminal Hit at normalized 0.50")
+-
+-attack_controller_m34 = (ROOT / "src/client/combat/AttackController.luau").read_text(encoding="utf-8")
++    if "HitStart" not in events or "HitEnd" not in events:
++        err(f"m38 {clip_id} requires HitStart and HitEnd")
++    if "Hit" in events:
++        err(f"m38 {clip_id} must not keep obsolete character Hit damage event")
++    if float((events.get("HitStart") or {}).get("normalizedTime") or 0) > float((events.get("HitEnd") or {}).get("normalizedTime") or 0):
++        err(f"m38 {clip_id} HitStart cannot be after HitEnd")
++monster_timeline = attack_timeline_rows.get("monster__gremlin__attack__01") or {}
++monster_events = monster_timeline.get("events") or {}
++if "Hit" not in monster_events or "HitStart" in monster_events or "HitEnd" in monster_events:
++    err("m38 monster timeline must retain only its single Hit policy")
++
++character_window_path = ROOT / "src/shared/combat/CharacterAttackWindow.luau"
++character_window_text = character_window_path.read_text(encoding="utf-8") if character_window_path.is_file() else ""
++for required in ["CharacterAttackWindow.Resolve", "events and events.HitStart", "events and events.HitEnd", "startTime", "endTime"]:
++    if required not in character_window_text:
++        err(f"m38 character damage-window policy missing {required}")
++
++attack_controller_m38 = (ROOT / "src/client/combat/AttackController.luau").read_text(encoding="utf-8")
+ for required in [
+-    "activePoseFrom",
+-    "timelineEvents and timelineEvents.HitStart",
+-    "damagePoseStart",
+-    "damagePoseEnd",
++    "CharacterAttackWindow.Resolve(action.timeline)",
++    "damageWindow.startTime",
++    "damageWindow.endTime",
+     "activePoseFrom = activePoseStartedAt + damagePoseStart",
+     "activePoseUntil = activePoseStartedAt + damagePoseEnd",
+-    "if now < activePoseFrom then",
+ ]:
+-    if required not in attack_controller_m34:
+-        err(f"m34 client 40%-50% pose window missing {required}")
++    if required not in attack_controller_m38:
++        err(f"m38 client HitStart/HitEnd pose window missing {required}")
+ 
+-attack_service_m34 = (ROOT / "src/server/combat/AttackService.luau").read_text(encoding="utf-8")
++attack_service_m38 = (ROOT / "src/server/combat/AttackService.luau").read_text(encoding="utf-8")
+ for required in [
++    "activeDamageWindows",
++    "CharacterAttackWindow.Resolve(timing)",
++    'SetAttribute("AttackDamageStartsAt"',
++    'SetAttribute("AttackDamageEndsAt"',
++    "elapsed + 1e-4 < damageWindow.startTime",
++    "elapsed > damageWindow.endTime + 1e-4",
++    "weaponSweepStates",
++]:
++    if required not in attack_service_m38:
++        err(f"m38 server HitStart/HitEnd damage gate missing {required}")
++for forbidden in [
++    "activeDamageUntil",
++    "activeDamageCutoffElapsed",
+     "activeDamageStartElapsed",
+     "meleeDamageWindow",
+-    "events and events.HitStart",
+-    'SetAttribute("AttackDamageStartsAt"',
+-    "elapsed + 1e-4 < damageStartElapsed",
+-    "elapsed + 1e-4 >= damageStartElapsed",
+-    "activeDamageStartElapsed[player] = hitStartTime",
++    "scheduleTimelineResults",
++    "resolveMeleeDamage",
++    "validatedAnimatedWeaponVolume",
++    "weaponPoseBuffers",
++    "lastDamageElapsed",
+ ]:
+-    if required not in attack_service_m34:
+-        err(f"m34 server 40%-50% damage gate missing {required}")
+-
++    if forbidden in attack_service_m38:
++        err(f"m38 obsolete terminal-Hit/pose-buffer path remains: {forbidden}")
+ 
+ # m35 Attack Timeline authoring is owned by Asset Manager. Studio only previews
+ # the published rig/animation and sends confirmed normalized event points back.
+@@ -1881,7 +1886,7 @@ timeline_js_text = (ROOT / "system/control-center/static/timelines.js").read_tex
+ index_m35_text = (ROOT / "system/control-center/static/index.html").read_text(encoding="utf-8")
+ studio_bridge_m35_text = (ROOT / "system/control-center/studio_bridge.py").read_text(encoding="utf-8")
+ for required in [
+-    '"schemaVersion": 1',
++    '"schemaVersion": 2',
+     '"project": "game1"',
+     '"timelines"',
+ ]:
+@@ -1903,11 +1908,19 @@ for required in [
+ ]:
+     if required not in timeline_store_text:
+         err(f"m35 timeline store missing {required}")
++for required in ["EVENT_CATALOGS", '"characters"', '"HitStart"', '"HitEnd"', '"monsters"', '"Hit"', "event_catalog_for_subject"]:
++    if required not in timeline_store_text:
++        err(f"m38 subject-specific timeline catalog missing {required}")
++for forbidden in ["Hit2", "projectile_release", '"result"']:
++    if forbidden in timeline_store_text:
++        err(f"m38 obsolete generic timeline event plumbing remains: {forbidden}")
++if "eventCatalogs" not in timeline_js_text:
++    err("m38 Asset Manager must render the subject-specific event catalog")
+ for required in [
+     'id="nav-timelines"',
+     'id="timelines-view"',
+     'id="timeline-open-studio"',
+-    'timelines.js?v=1',
++    'timelines.js?v=2',
+ ]:
+     if required not in index_m35_text:
+         err(f"m35 Asset Manager timeline UI missing {required}")
+@@ -1981,13 +1994,27 @@ for clip_id in [
+         err(f"m35 generated runtime timeline is missing {clip_id}")
+ 
+ 
++# m38 Rojo hotfix: live sync owns runtime code, not authored Workspace scene.
++live_project = json.loads((ROOT / "default.project.json").read_text(encoding="utf-8"))
++workspace_node = ((live_project.get("tree") or {}).get("Workspace") or {})
++if workspace_node.get("$ignoreUnknownInstances") is not True:
++    err("m38 live Rojo Workspace must preserve unknown/authored Studio instances")
++for forbidden in ["Baseplate", "SpawnLocation"]:
++    if forbidden in workspace_node:
++        err(f"m38 live Rojo must not own authored Workspace child {forbidden}")
++build_place_text = (ROOT / "place/build-place.ps1").read_text(encoding="utf-8")
++for required in [".build-place.project.json", "Add-Member -NotePropertyName 'Baseplate'", "Add-Member -NotePropertyName 'SpawnLocation'", "Live Rojo will preserve authored Workspace children"]:
++    if required not in build_place_text:
++        err(f"m38 seed-place build isolation missing {required}")
++
++
+ if errors:
+     print("verify failed")
+     for item in errors:
+         print(" -", item)
+     sys.exit(1)
+ 
+-print("verify ok · game1 m37 in-plugin Attack Timeline viewport preview passed")
++print("verify ok · game1 m38 HitStart-to-HitEnd + Rojo Workspace ownership hotfix passed")
+ print("registered character archetypes:", len(archetypes))
+ print("active character archetype:", active_id or "none")
+ print("race pool: human")

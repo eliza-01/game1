@@ -20,7 +20,7 @@ try {
 
 if(-not (Test-Path $Temp)){throw 'Rojo did not create the plugin build'}
 $BuiltText=Get-Content $Temp -Raw
-foreach($Marker in @('Game1ControlCenter','model bridge v10')){
+foreach($Marker in @('Game1ControlCenter','model bridge v13','Game1AttackTimeline_v2','TimelinePreviewWorld')){
     if(-not $BuiltText.Contains($Marker)){
         throw "Studio bridge build is stale or incomplete; missing marker: $Marker"
     }
@@ -38,7 +38,7 @@ $InstalledHash=(Get-FileHash $Installed -Algorithm SHA256).Hash
 if($GeneratedHash -ne $InstalledHash){throw 'Installed Studio bridge hash does not match generated bridge hash'}
 Remove-Item $Temp -Force -ErrorAction SilentlyContinue
 
-Write-Host ("Game1Bridge installed without animation-check UI: {0}" -f $Installed)
+Write-Host ("Game1Bridge installed with in-plugin Attack Timeline viewport preview: {0}" -f $Installed)
 Write-Host ("SHA256: {0}" -f $InstalledHash)
-Write-Host 'Animation reimport verification is now in Control Center / Asset Manager.'
+Write-Host 'Attack Timeline opens from Control Center / Asset Manager / Timelines.'
 Write-Host 'Fully close every Roblox Studio window, then reopen Studio once.'

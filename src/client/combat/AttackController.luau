@@ -8,6 +8,7 @@ local CharacterShared = Shared:WaitForChild("character")
 local CombatShared = Shared:WaitForChild("combat")
 local CharacterConfig = require(CharacterShared:WaitForChild("CharacterConfig"))
 local AttackConfig = require(CombatShared:WaitForChild("AttackConfig"))
+local CharacterAttackWindow = require(CombatShared:WaitForChild("CharacterAttackWindow"))
 local WeaponAttackVolume = require(CombatShared:WaitForChild("WeaponAttackVolume"))
 local UiInputGuard = require(script.Parent.Parent:WaitForChild("UiInputGuard"))
 local AttackController = {}
@@ -17,6 +18,7 @@ local animationController: any = nil
 local aimPoseController: any = nil
 local attackSequence = 0
 local activePoseAttackId = 0
+local activePoseFrom = 0
 local activePoseUntil = 0
 local activePoseStartedAt = 0
 local poseAccumulator = 0
@@ -35,10 +37,18 @@ local function publishWeaponPose()
     if typeof(boxCFrame) ~= "CFrame" then
         return
     end
+
+    local aimOrigin = nil
+    local aimDirection = nil
+    if aimPoseController and aimPoseController.GetAimRay then
+        aimOrigin, aimDirection = aimPoseController.GetAimRay()
+    end
     weaponPoseRemote:FireServer({
         clientAttackId = activePoseAttackId,
         elapsed = math.max(0, os.clock() - activePoseStartedAt),
         boxCFrame = boxCFrame,
+        aimOrigin = aimOrigin,
+        aimDirection = aimDirection,
     })
 end
 
@@ -76,9 +86,23 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
         if activePoseAttackId <= 0 then
             return
         end
-        if os.clock() > activePoseUntil then
+        local now = os.clock()
+        if now > activePoseUntil then
             activePoseAttackId = 0
+            activePoseFrom = 0
             poseAccumulator = 0
+            return
+        end
+        if activePoseFrom > 0 then
+            if now < activePoseFrom then
+                return
+            end
+            -- Open the authored damage window with an immediate sample on the
+            -- first rendered frame at/after HitStart. No pre-HitStart pose
+            -- packets are sent because they can never deal damage.
+            activePoseFrom = 0
+            poseAccumulator = 0
+            publishWeaponPose()
             return
         end
         poseAccumulator += deltaTime
@@ -109,17 +133,17 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
             return
         end
 
-        local hitEvent = action.timeline and action.timeline.events and action.timeline.events.Hit
-        local hitTime = tonumber(hitEvent and hitEvent.time)
-        if hitTime == nil then
-            warn(("[game1][attack] action has no Hit timeline event: %s"):format(tostring(action.clipId)))
+        local damageWindow = CharacterAttackWindow.Resolve(action.timeline)
+        if not damageWindow then
+            warn(("[game1][attack] action has invalid HitStart/HitEnd damage window: %s"):format(tostring(action.clipId)))
             return
         end
 
         attackSequence += 1
         local sequence = attackSequence
         local attackDuration = math.max(0.05, tonumber(action.durationSeconds) or 0.05)
-        local damagePoseDuration = math.clamp(hitTime, 0, attackDuration)
+        local damagePoseStart = math.clamp(damageWindow.startTime, 0, attackDuration)
+        local damagePoseEnd = math.clamp(damageWindow.endTime, damagePoseStart, attackDuration)
         local movingAtAttackStart = movementController and movementController.IsMoving and movementController.IsMoving() or false
         if movementController and movementController.BeginAttackMovement then
             -- Every weapon may attack while moving. The equipped weapon type
@@ -163,19 +187,18 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
             finishPresentation(sequence)
         end)
 
-        -- The server validates the same authored Hit event. Weapon contact is
-        -- damaging only from attack start through Hit, so pose streaming stops at
-        -- that moment even though presentation/cooldown continues to clip end.
+        -- Pose streaming exists only for the authored character melee window:
+        -- HitStart through HitEnd. Presentation/cooldown still owns the complete
+        -- animation, but no pose packet is sent before or after the damage window.
         activePoseAttackId = sequence
         activePoseStartedAt = os.clock()
-        activePoseUntil = activePoseStartedAt + damagePoseDuration
+        activePoseFrom = activePoseStartedAt + damagePoseStart
+        activePoseUntil = activePoseStartedAt + damagePoseEnd
         poseAccumulator = 0
         attack:FireServer({
-            aim = target,
             clipId = action.clipId,
             clientAttackId = sequence,
         })
-        publishWeaponPose()
     end)
 end
 return AttackController

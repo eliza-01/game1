@@ -275,20 +275,35 @@ local function applyPose(deltaTime: number)
     end
 end
 
-function AimPoseController.GetAimPosition(): Vector3?
+function AimPoseController.GetAimRay(): (Vector3?, Vector3?)
     local camera = Workspace.CurrentCamera
     if not camera then
+        return nil, nil
+    end
+
+    -- The center-screen reticle owns gameplay aim. Headshot classification uses
+    -- this exact camera line, while the server rebases it beside the character
+    -- and clamps the usable segment to AttackRadius.
+    local viewport = camera.ViewportSize
+    local ray = camera:ViewportPointToRay(viewport.X * 0.5, viewport.Y * 0.5)
+    local direction = ray.Direction
+    if direction.Magnitude <= 1e-6 then
+        return nil, nil
+    end
+    return ray.Origin, direction.Unit
+end
+
+function AimPoseController.GetAimPosition(): Vector3?
+    local origin, direction = AimPoseController.GetAimRay()
+    if typeof(origin) ~= "Vector3" or typeof(direction) ~= "Vector3" then
         return nil
     end
 
-    -- One center-screen reticle owns both attack intent and presentation.
-    local viewport = camera.ViewportSize
-    local ray = camera:ViewportPointToRay(viewport.X * 0.5, viewport.Y * 0.5)
     local params = RaycastParams.new()
     params.FilterType = Enum.RaycastFilterType.Exclude
     params.FilterDescendantsInstances = character and { character } or {}
-    local hit = Workspace:Raycast(ray.Origin, ray.Direction * AttackConfig.MaxAimDistance, params)
-    return if hit then hit.Position else ray.Origin + ray.Direction * AttackConfig.MaxAimDistance
+    local hit = Workspace:Raycast(origin, direction * AttackConfig.MaxAimDistance, params)
+    return if hit then hit.Position else origin + direction * AttackConfig.MaxAimDistance
 end
 
 function AimPoseController.BeginAttack(target: Vector3, duration: number)

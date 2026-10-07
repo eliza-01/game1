@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>game1 · asset manager</title>
-<link rel="stylesheet" href="asset-manager.css?v=7">
+<link rel="stylesheet" href="asset-manager.css?v=8">
 </head>
 <body>
 <header>
 <div><span class="eyebrow">game1 · control center</span><h1>asset manager</h1></div>
-<div class="header-actions"><span class="pill">characters + animations + weapons + monsters · m7</span><button id="theme" class="icon" type="button" title="theme">◐</button></div>
+<div class="header-actions"><span class="pill">characters + animations + timelines + weapons + monsters · m35</span><button id="theme" class="icon" type="button" title="theme">◐</button></div>
 </header>
 <main>
 <aside class="panel rail">
@@ -20,6 +20,7 @@
 <button id="nav-animation-speed" class="asset-section" type="button"><b>animation speed</b><small>stat → playback scaling</small></button>
 <button id="nav-weapons" class="asset-section" type="button"><b>weapons</b><small>models · textures · stats</small></button>
 <button id="nav-monsters" class="asset-section" type="button"><b>monsters</b><small>rigs · stats · animations</small></button>
+<button id="nav-timelines" class="asset-section" type="button"><b>timelines</b><small>attack animation events</small></button>
 <button id="nav-options" class="asset-section" type="button"><b>options</b><small>common runtime settings</small></button>
 </div>
 <div id="character-rail">
@@ -136,6 +137,28 @@
 <div class="section-title"><div><span>animation speed scaling</span><h3>gameplay stat → playback %</h3></div><button id="refresh-animation-speed" type="button">refresh</button></div>
 <small class="hint">example: Human Female Run Speed = 2 means every 2 RunSpeed points produce 1% playback. RunSpeed 50 therefore plays run at 25%. values are live source settings and are written to the shared runtime registry.</small>
 <div id="animation-speed-profiles" class="details"><span class="muted">loading scaling rules…</span></div>
+</div>
+</div>
+
+
+<div id="timelines-view" hidden>
+<div class="panel hero">
+<div><span class="eyebrow">attack authoring · studio animation preview</span><h2>timelines</h2><p>choose a character or monster attack, open it in Studio, scrub to an exact animation moment and assign an event. confirmed points return here; Save exports the authoritative runtime timeline.</p></div>
+</div>
+<div class="timeline-workflow">
+<div class="panel character-card">
+<div class="section-title"><div><span>01 · target</span><h3>attack animations</h3></div><button id="timeline-refresh" type="button">refresh</button></div>
+<div class="character-grid"><label>type<select id="timeline-subject-type"><option value="characters">characters</option><option value="monsters">monsters</option></select></label><label>character / monster<select id="timeline-subject"></select></label></div>
+<div id="timeline-clips" class="timeline-clips"><span class="muted">loading attacks…</span></div>
+</div>
+<div class="panel character-card">
+<div class="section-title"><div><span>02 · events</span><h3 id="timeline-selected-title">select attack</h3></div><span id="timeline-studio-state" class="pill">studio idle</span></div>
+<small class="hint">Studio owns the visual pose picker. Move the scrubber there, select an event and press Confirm point. This panel updates automatically; nothing is written until Save timeline.</small>
+<div id="timeline-events" class="timeline-events"><span class="muted">select an attack animation.</span></div>
+<div class="details-grid timeline-meta"><div><b>source duration</b><span id="timeline-duration">—</span></div><div><b>clip id</b><span id="timeline-clip-id">—</span></div></div>
+<div class="actions"><button id="timeline-open-studio" class="primary" type="button" disabled>open in studio</button><button id="timeline-save" type="button" disabled>save timeline</button></div>
+<div id="timeline-status" class="status-box"><strong>ready</strong><span>choose an attack.</span></div>
+</div>
 </div>
 </div>
 
@@ -296,8 +319,9 @@
 </section>
 </main>
 <div id="toast" class="toast"></div>
-<script src="character-assets.js?v=14"></script>
+<script src="character-assets.js?v=15"></script>
 <script src="animation-speed.js?v=1"></script>
+<script src="timelines.js?v=2"></script>
 <script src="options.js?v=1"></script>
 <script src="weapon-assets.js?v=3"></script>
 <script src="monster-assets.js?v=4"></script>

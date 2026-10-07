@@ -19,7 +19,7 @@ E:\RobloxProjects\game1
 place\game1.rbxl
 ```
 
-Он строится с нуля из `default.project.json` и содержит только минимальную тестовую сцену (Baseplate + SpawnLocation) и runtime проекта.
+Первичная сборка создаёт минимальную сцену (Baseplate + SpawnLocation) и runtime. После этого Workspace редактируется и сохраняется в Studio: live Rojo синхронизирует код, но не владеет объектами сцены и не возвращает их позиции назад.
 
 ## Первый запуск
 

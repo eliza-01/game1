@@ -1,0 +1,366 @@
+diff --git a/src/client/combat/AttackController.luau b/src/client/combat/AttackController.luau
+index f052b47..90787ea 100644
+--- a/src/client/combat/AttackController.luau
++++ b/src/client/combat/AttackController.luau
+@@ -17,6 +17,7 @@ local animationController: any = nil
+ local aimPoseController: any = nil
+ local attackSequence = 0
+ local activePoseAttackId = 0
++local activePoseFrom = 0
+ local activePoseUntil = 0
+ local activePoseStartedAt = 0
+ local poseAccumulator = 0
+@@ -84,11 +85,25 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
+         if activePoseAttackId <= 0 then
+             return
+         end
+-        if os.clock() > activePoseUntil then
++        local now = os.clock()
++        if now > activePoseUntil then
+             activePoseAttackId = 0
++            activePoseFrom = 0
+             poseAccumulator = 0
+             return
+         end
++        if activePoseFrom > 0 then
++            if now < activePoseFrom then
++                return
++            end
++            -- Open the authored damage window with an immediate sample on the
++            -- first rendered frame at/after HitStart. No pre-HitStart pose
++            -- packets are sent because they can never deal damage.
++            activePoseFrom = 0
++            poseAccumulator = 0
++            publishWeaponPose()
++            return
++        end
+         poseAccumulator += deltaTime
+         if poseAccumulator >= AttackConfig.WeaponPoseSampleInterval then
+             poseAccumulator = poseAccumulator % AttackConfig.WeaponPoseSampleInterval
+@@ -117,17 +132,21 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
+             return
+         end
+ 
+-        local hitEvent = action.timeline and action.timeline.events and action.timeline.events.Hit
++        local timelineEvents = action.timeline and action.timeline.events
++        local hitStartEvent = timelineEvents and timelineEvents.HitStart
++        local hitEvent = timelineEvents and timelineEvents.Hit
++        local hitStartTime = tonumber(hitStartEvent and hitStartEvent.time)
+         local hitTime = tonumber(hitEvent and hitEvent.time)
+-        if hitTime == nil then
+-            warn(("[game1][attack] action has no Hit timeline event: %s"):format(tostring(action.clipId)))
++        if hitStartTime == nil or hitTime == nil or hitStartTime > hitTime then
++            warn(("[game1][attack] action has invalid HitStart/Hit damage window: %s"):format(tostring(action.clipId)))
+             return
+         end
+ 
+         attackSequence += 1
+         local sequence = attackSequence
+         local attackDuration = math.max(0.05, tonumber(action.durationSeconds) or 0.05)
+-        local damagePoseDuration = math.clamp(hitTime, 0, attackDuration)
++        local damagePoseStart = math.clamp(hitStartTime, 0, attackDuration)
++        local damagePoseEnd = math.clamp(hitTime, damagePoseStart, attackDuration)
+         local movingAtAttackStart = movementController and movementController.IsMoving and movementController.IsMoving() or false
+         if movementController and movementController.BeginAttackMovement then
+             -- Every weapon may attack while moving. The equipped weapon type
+@@ -171,18 +190,18 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
+             finishPresentation(sequence)
+         end)
+ 
+-        -- The server validates the same authored Hit event. Weapon contact is
+-        -- damaging only from attack start through Hit, so pose streaming stops at
+-        -- that moment even though presentation/cooldown continues to clip end.
++        -- Pose streaming exists only for the authored melee damage window:
++        -- HitStart (40%) through Hit (50%). Presentation/cooldown still owns the
++        -- complete animation, but no pose packet is sent before or after damage.
+         activePoseAttackId = sequence
+         activePoseStartedAt = os.clock()
+-        activePoseUntil = activePoseStartedAt + damagePoseDuration
++        activePoseFrom = activePoseStartedAt + damagePoseStart
++        activePoseUntil = activePoseStartedAt + damagePoseEnd
+         poseAccumulator = 0
+         attack:FireServer({
+             clipId = action.clipId,
+             clientAttackId = sequence,
+         })
+-        publishWeaponPose()
+     end)
+ end
+ return AttackController
+diff --git a/src/server/combat/AttackService.luau b/src/server/combat/AttackService.luau
+index 9774032..05fbdd5 100644
+--- a/src/server/combat/AttackService.luau
++++ b/src/server/combat/AttackService.luau
+@@ -21,6 +21,7 @@ local activeClientAttackId: { [Player]: number } = {}
+ local weaponPoseBuffers: { [Player]: any } = {}
+ local activeHitTargets: { [Player]: { [Model]: boolean } } = {}
+ local activeDamageUntil: { [Player]: number } = {}
++local activeDamageStartElapsed: { [Player]: number } = {}
+ local activeDamageCutoffElapsed: { [Player]: number } = {}
+ local activeHeadshotTarget: { [Player]: Model } = {}
+ 
+@@ -53,16 +54,30 @@ local function allowedAttackDescriptor(character: Model, clipId: string): any?
+     return nil
+ end
+ 
+-local function meleeHitTime(timing: any): number?
+-    local hit = timing and timing.events and timing.events.Hit
+-    if type(hit) ~= "table" or tostring(hit.result or "") ~= AttackTimelineConfig.ResultTypes.MeleeDamage then
+-        return nil
++local function meleeDamageWindow(timing: any): (number?, number?)
++    local events = timing and timing.events
++    local hitStart = events and events.HitStart
++    local hit = events and events.Hit
++    if type(hitStart) ~= "table"
++        or type(hit) ~= "table"
++        or tostring(hit.result or "") ~= AttackTimelineConfig.ResultTypes.MeleeDamage
++    then
++        return nil, nil
+     end
++
++    local duration = math.max(0, tonumber(timing.duration) or 0)
++    local hitStartTime = tonumber(hitStart.time)
+     local hitTime = tonumber(hit.time)
+-    if hitTime == nil then
+-        return nil
++    if hitStartTime == nil or hitTime == nil then
++        return nil, nil
+     end
+-    return math.clamp(hitTime, 0, math.max(0, tonumber(timing.duration) or 0))
++
++    hitStartTime = math.clamp(hitStartTime, 0, duration)
++    hitTime = math.clamp(hitTime, 0, duration)
++    if hitStartTime > hitTime then
++        return nil, nil
++    end
++    return hitStartTime, hitTime
+ end
+ 
+ local function finiteNumber(value: number): boolean
+@@ -346,8 +361,13 @@ local function resolveMeleeDamage(
+         return
+     end
+ 
++    local startElapsed = activeDamageStartElapsed[player]
+     local cutoffElapsed = activeDamageCutoffElapsed[player]
+-    if cutoffElapsed == nil or hitElapsed > cutoffElapsed + 1e-4 then
++    if startElapsed == nil
++        or cutoffElapsed == nil
++        or hitElapsed + 1e-4 < startElapsed
++        or hitElapsed > cutoffElapsed + 1e-4
++    then
+         return
+     end
+ 
+@@ -424,6 +444,7 @@ local function clearAttackStateLater(player: Player, character: Model, serial: n
+         activeClientAttackId[player] = nil
+         activeHitTargets[player] = nil
+         activeDamageUntil[player] = nil
++        activeDamageStartElapsed[player] = nil
+         activeDamageCutoffElapsed[player] = nil
+         activeHeadshotTarget[player] = nil
+         local buffer = weaponPoseBuffers[player]
+@@ -432,6 +453,7 @@ local function clearAttackStateLater(player: Player, character: Model, serial: n
+         end
+         if character.Parent and tonumber(character:GetAttribute("AttackSerial")) == serial then
+             character:SetAttribute("AttackEndsAt", nil)
++            character:SetAttribute("AttackDamageStartsAt", nil)
+             character:SetAttribute("AttackDamageEndsAt", nil)
+             character:SetAttribute("AttackClipId", nil)
+         end
+@@ -481,10 +503,10 @@ local function attack(player: Player, payload: any)
+         return
+     end
+ 
+-    local hitTime = meleeHitTime(timing)
+-    if hitTime == nil then
++    local hitStartTime, hitTime = meleeDamageWindow(timing)
++    if hitStartTime == nil or hitTime == nil then
+         if Config.DebugLogs then
+-            print(("[game1][attack] reject player=%s reason=missing_melee_hit_event clip=%s"):format(player.Name, clipId))
++            print(("[game1][attack] reject player=%s reason=missing_melee_damage_window clip=%s"):format(player.Name, clipId))
+         end
+         return
+     end
+@@ -501,19 +523,21 @@ local function attack(player: Player, payload: any)
+     activeUntil[player] = now + attackDuration
+     activeHitTargets[player] = {}
+     activeHeadshotTarget[player] = nil
++    activeDamageStartElapsed[player] = hitStartTime
+     activeDamageCutoffElapsed[player] = hitTime
+     activeDamageUntil[player] = now + hitTime
+     character:SetAttribute("AttackSerial", serial)
+     character:SetAttribute("AttackClipId", clipId)
+     character:SetAttribute("AttackStartedAt", now)
+     character:SetAttribute("AttackEndsAt", now + attackDuration)
++    character:SetAttribute("AttackDamageStartsAt", now + hitStartTime)
+     character:SetAttribute("AttackDamageEndsAt", now + hitTime)
+     character:SetAttribute("LastAttackHitZone", nil)
+     character:SetAttribute("LastAttackHeadshot", false)
+ 
+-    -- Equipped weapon damage is contact-driven only from attack start through
+-    -- the authored Hit moment. Hit itself is the terminal checkpoint; the rest
+-    -- of the animation is presentation/cooldown only and cannot deal damage.
++    -- Equipped weapon damage exists only inside the authored HitStart -> Hit
++    -- window (currently 40% -> 50%). Before HitStart is windup; after Hit is
++    -- presentation/cooldown. Neither side of the window may deal damage.
+     scheduleTimelineResults(player, character, serial, clientAttackId, timing)
+     clearAttackStateLater(player, character, serial, clientAttackId, attackDuration)
+ end
+@@ -542,12 +566,15 @@ local function recordWeaponPose(player: Player, payload: any)
+ 
+     local elapsed = math.max(0, tonumber(payload.elapsed) or 0)
+     local damageUntil = activeDamageUntil[player]
++    local damageStartElapsed = activeDamageStartElapsed[player]
+     local damageCutoffElapsed = activeDamageCutoffElapsed[player]
+     if activeClientAttackId[player] ~= clientAttackId
+         or activeSerial[player] == nil
+         or damageUntil == nil
++        or damageStartElapsed == nil
+         or damageCutoffElapsed == nil
+         or os.clock() > damageUntil
++        or elapsed + 1e-4 < damageStartElapsed
+         or elapsed > damageCutoffElapsed + 1e-4
+     then
+         return
+@@ -585,15 +612,16 @@ local function recordWeaponPose(player: Player, payload: any)
+         table.remove(buffer.samples, 1)
+     end
+ 
+-    -- Accepted poses sweep continuously only up to the authored Hit event.
+-    -- Interpolation prevents tunnelling between 30 Hz packets; one target is
+-    -- still damaged at most once per attack.
++    -- Accepted poses sweep continuously only inside HitStart -> Hit. The client
++    -- does not send windup poses, and the server independently rejects any pose
++    -- whose authored elapsed phase is before HitStart or after Hit.
+     local serial = activeSerial[player]
+     local lastDamageElapsed = tonumber(buffer.lastDamageElapsed)
+     if serial
+         and activeClientAttackId[player] == clientAttackId
+         and activeDamageUntil[player] ~= nil
+         and os.clock() <= activeDamageUntil[player]
++        and elapsed + 1e-4 >= damageStartElapsed
+         and elapsed <= damageCutoffElapsed + 1e-4
+         and (lastDamageElapsed == nil or elapsed + 1e-4 >= lastDamageElapsed)
+     then
+@@ -642,6 +670,7 @@ function AttackService.Start()
+         activeClientAttackId[player] = nil
+         activeHitTargets[player] = nil
+         activeDamageUntil[player] = nil
++        activeDamageStartElapsed[player] = nil
+         activeDamageCutoffElapsed[player] = nil
+         activeHeadshotTarget[player] = nil
+         weaponPoseBuffers[player] = nil
+diff --git a/src/shared/combat/AttackTimelineConfig.luau b/src/shared/combat/AttackTimelineConfig.luau
+index 947b711..3ed5177 100644
+--- a/src/shared/combat/AttackTimelineConfig.luau
++++ b/src/shared/combat/AttackTimelineConfig.luau
+@@ -32,18 +32,21 @@ local BY_CLIP = table.freeze({
+     ["human_female__weapon__1hs__attack__01"] = table.freeze({
+         duration = 1.866666674,
+         events = table.freeze({
++            HitStart = table.freeze({ normalizedTime = 0.40 }),
+             Hit = table.freeze({ normalizedTime = 0.50, result = "melee_damage" }),
+         }),
+     }),
+     ["human_female__weapon__1hs__attack__02"] = table.freeze({
+         duration = 1.866666674,
+         events = table.freeze({
++            HitStart = table.freeze({ normalizedTime = 0.40 }),
+             Hit = table.freeze({ normalizedTime = 0.50, result = "melee_damage" }),
+         }),
+     }),
+     ["human_female__weapon__1hs__attack__03"] = table.freeze({
+         duration = 1.866666674,
+         events = table.freeze({
++            HitStart = table.freeze({ normalizedTime = 0.40 }),
+             Hit = table.freeze({ normalizedTime = 0.50, result = "melee_damage" }),
+         }),
+     }),
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index 8f90b61..a8ce442 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -1732,7 +1732,7 @@ attack_service_m32 = (ROOT / "src/server/combat/AttackService.luau").read_text(e
+ for required in [
+     "activeDamageUntil",
+     "activeDamageCutoffElapsed",
+-    "meleeHitTime",
++    "meleeDamageWindow",
+     'SetAttribute("AttackDamageEndsAt"',
+     'eventName == "Hit"',
+     "elapsed > damageCutoffElapsed + 1e-4",
+@@ -1744,9 +1744,9 @@ for required in [
+ 
+ attack_controller_m32 = (ROOT / "src/client/combat/AttackController.luau").read_text(encoding="utf-8")
+ for required in [
+-    "action.timeline and action.timeline.events and action.timeline.events.Hit",
+-    "damagePoseDuration",
+-    "activePoseUntil = activePoseStartedAt + damagePoseDuration",
++    "timelineEvents and timelineEvents.Hit",
++    "damagePoseEnd",
++    "activePoseUntil = activePoseStartedAt + damagePoseEnd",
+ ]:
+     if required not in attack_controller_m32:
+         err(f"m32 client pose cutoff contract missing {required}")
+@@ -1823,13 +1823,59 @@ for required in ["HeadshotDamageMultiplier = 2", "HeadshotAimOriginMaxDistance"]
+         err(f"m33 headshot config missing {required}")
+ 
+ 
++# m34 authored melee damage window. 1HS attacks are windup until 40%, damaging
++# only from HitStart=40% through terminal Hit=50%. Client pose traffic is also
++# confined to that same window; server phase validation independently enforces it.
++attack_timeline_m34 = (ROOT / "src/shared/combat/AttackTimelineConfig.luau").read_text(encoding="utf-8")
++for clip_id in [
++    "human_female__weapon__1hs__attack__01",
++    "human_female__weapon__1hs__attack__02",
++    "human_female__weapon__1hs__attack__03",
++]:
++    start = attack_timeline_m34.find(f'["{clip_id}"]')
++    if start < 0:
++        err(f"m34 timeline clip missing {clip_id}")
++        continue
++    block = attack_timeline_m34[start: start + 420]
++    if 'HitStart = table.freeze({ normalizedTime = 0.40 })' not in block:
++        err(f"m34 {clip_id} must open melee damage at normalized 0.40")
++    if 'Hit = table.freeze({ normalizedTime = 0.50, result = "melee_damage" })' not in block:
++        err(f"m34 {clip_id} must keep terminal Hit at normalized 0.50")
++
++attack_controller_m34 = (ROOT / "src/client/combat/AttackController.luau").read_text(encoding="utf-8")
++for required in [
++    "activePoseFrom",
++    "timelineEvents and timelineEvents.HitStart",
++    "damagePoseStart",
++    "damagePoseEnd",
++    "activePoseFrom = activePoseStartedAt + damagePoseStart",
++    "activePoseUntil = activePoseStartedAt + damagePoseEnd",
++    "if now < activePoseFrom then",
++]:
++    if required not in attack_controller_m34:
++        err(f"m34 client 40%-50% pose window missing {required}")
++
++attack_service_m34 = (ROOT / "src/server/combat/AttackService.luau").read_text(encoding="utf-8")
++for required in [
++    "activeDamageStartElapsed",
++    "meleeDamageWindow",
++    "events and events.HitStart",
++    'SetAttribute("AttackDamageStartsAt"',
++    "elapsed + 1e-4 < damageStartElapsed",
++    "elapsed + 1e-4 >= damageStartElapsed",
++    "activeDamageStartElapsed[player] = hitStartTime",
++]:
++    if required not in attack_service_m34:
++        err(f"m34 server 40%-50% damage gate missing {required}")
++
++
+ if errors:
+     print("verify failed")
+     for item in errors:
+         print(" -", item)
+     sys.exit(1)
+ 
+-print("verify ok · game1 m33 reticle-ray headshot policy passed")
++print("verify ok · game1 m34 HitStart 40%-to-Hit damage window passed")
+ print("registered character archetypes:", len(archetypes))
+ print("active character archetype:", active_id or "none")
+ print("race pool: human")

@@ -2,17 +2,17 @@ return table.freeze({
     Range = 7,
     MaxAimDistance = 420,
     AttackRadiusEpsilon = 0.15,
-    -- Head and body hitboxes are precomputed once from visual-mesh bounds.
-    -- Runtime attacks only test the animated weapon OBB against those boxes.
+    -- Head/body boxes are precomputed once from visual-mesh bounds. Weapon
+    -- contact always deals normal melee damage; headshot is a separate live
+    -- reticle-ray classification and can upgrade at most one target per attack.
     HeadshotDamageMultiplier = 2,
+    HeadshotAimOriginMaxDistance = 24,
 
     -- Animated EquippedWeapon pose samples are client-observed because the
     -- visible weapon follows client-side Bone transforms. The server owns the
-    -- canonical box dimensions and accepts only fresh, nearby pose frames.
+    -- canonical box dimensions and accepts only nearby poses inside the authored
+    -- HitStart -> HitEnd character damage window.
     WeaponPoseSampleInterval = 1 / 30,
-    WeaponPoseMaxAgeSeconds = 0.25,
-    WeaponPoseHitTimeTolerance = 0.09,
-    WeaponPoseBufferSize = 96,
     WeaponPoseValidationSlack = 2.0,
     -- Continuous contact sweep subdivision. Pose packets arrive at ~30 Hz; these
     -- limits add intermediate OBB samples so a fast animated weapon cannot pass

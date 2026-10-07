@@ -1,0 +1,145 @@
+--- a/system/studio-plugin/Game1Bridge.server.luau
++++ b/system/studio-plugin/Game1Bridge.server.luau
+@@ -1127,6 +1127,19 @@
+     timelineMarkers.Text = if #rows > 0 then table.concat(rows, "  ·  ") else "No event points"
+ end
+ 
++local function timelineFreezeTrackAt(track: AnimationTrack, timePosition: number)
++    -- TimePosition only affects the evaluated pose while an AnimationTrack is playing.
++    -- Short attack clips could finish while m35 was waiting for Length, leaving the
++    -- scrubber attached to a stopped track and the rig permanently in rest pose.
++    if not track.IsPlaying then
++        track:Play(0, 1, 1)
++    end
++    track.Priority = Enum.AnimationPriority.Action4
++    track:AdjustWeight(1, 0)
++    track:AdjustSpeed(0)
++    track.TimePosition = math.clamp(timePosition, 0, math.max(0, track.Length - 0.0001))
++end
++
+ local function timelineSetNormalized(value: number)
+     local normalized = math.clamp(tonumber(value) or 0, 0, 1)
+     timelineEditor.normalized = normalized
+@@ -1136,9 +1149,12 @@
+     timelineTime.Text = ("%.3f s · %.1f%%"):format(duration * normalized, normalized * 100)
+     local track = timelineEditor.track
+     if track ~= nil and duration > 0 then
+-        pcall(function()
+-            track.TimePosition = math.clamp(duration * normalized, 0, math.max(0, duration - 0.0001))
++        local ok, err = pcall(function()
++            timelineFreezeTrackAt(track, duration * normalized)
+         end)
++        if not ok then
++            timelineStatus.Text = "Pose preview failed: " .. tostring(err)
++        end
+     end
+ end
+ 
+@@ -1293,16 +1309,29 @@
+     imported.Name = "ImportedRig"
+     imported.Parent = preview
+     local animator = ensureCharacterHost(preview, imported)
++    local baseParts = {}
++    local hasMotorRig = preview:FindFirstChildWhichIsA("Motor6D", true) ~= nil
+     for _, descendant in ipairs(preview:GetDescendants()) do
+         if descendant:IsA("BasePart") then
+-            descendant.Anchored = true
++            table.insert(baseParts, descendant)
++            descendant.Anchored = not hasMotorRig
+             descendant.CanCollide = false
+             descendant.CanTouch = false
+             descendant.CanQuery = false
++            descendant.Massless = true
+         elseif descendant:IsA("Script") or descendant:IsA("LocalScript") then
+             descendant.Enabled = false
+         end
+     end
++    if hasMotorRig and #baseParts > 0 then
++        local anchor = preview.PrimaryPart
++            or preview:FindFirstChild("HumanoidRootPart", true)
++            or preview:FindFirstChild("RootPart", true)
++            or baseParts[1]
++        if anchor and anchor:IsA("BasePart") then
++            anchor.Anchored = true
++        end
++    end
+     preview.Parent = Workspace
+ 
+     local boundsCFrame, boundsSize = preview:GetBoundingBox()
+@@ -1357,12 +1386,13 @@
+         local track = animator:LoadAnimation(animation)
+         animation:Destroy()
+         track.Looped = false
+-        track:Play(0, 1, 1)
++        track.Priority = Enum.AnimationPriority.Action4
++        -- LoadAnimation resolves the clip asynchronously. Do not play the short attack
++        -- merely to discover Length; playback begins only when a pose is requested.
+         local deadline = os.clock() + 8
+         while track.Length <= 0 and os.clock() < deadline do
+             task.wait(0.05)
+         end
+-        track:AdjustSpeed(0)
+         if track.Length > 0 then
+             timelineEditor.duration = track.Length
+         end
+@@ -1466,4 +1496,4 @@
+     end
+ end)
+ 
+-print("[game1 plugin] loaded · model bridge v11 · attack timeline editor enabled")
++print("[game1 plugin] loaded · model bridge v12 · attack timeline scrub preview fixed")
+--- a/system/studio-plugin/install.ps1
++++ b/system/studio-plugin/install.ps1
+@@ -20,7 +20,7 @@
+ 
+ if(-not (Test-Path $Temp)){throw 'Rojo did not create the plugin build'}
+ $BuiltText=Get-Content $Temp -Raw
+-foreach($Marker in @('Game1ControlCenter','model bridge v11','Game1AttackTimeline_v1')){
++foreach($Marker in @('Game1ControlCenter','model bridge v12','Game1AttackTimeline_v1')){
+     if(-not $BuiltText.Contains($Marker)){
+         throw "Studio bridge build is stale or incomplete; missing marker: $Marker"
+     }
+@@ -38,7 +38,7 @@
+ if($GeneratedHash -ne $InstalledHash){throw 'Installed Studio bridge hash does not match generated bridge hash'}
+ Remove-Item $Temp -Force -ErrorAction SilentlyContinue
+ 
+-Write-Host ("Game1Bridge installed with Attack Timeline editor: {0}" -f $Installed)
++Write-Host ("Game1Bridge installed with fixed Attack Timeline scrub preview: {0}" -f $Installed)
+ Write-Host ("SHA256: {0}" -f $InstalledHash)
+ Write-Host 'Attack Timeline opens from Control Center / Asset Manager / Timelines.'
+ Write-Host 'Fully close every Roblox Studio window, then reopen Studio once.'
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -1935,6 +1935,23 @@
+ ]:
+     if required not in studio_plugin_text:
+         err(f"m35 Studio Attack Timeline plugin missing {required}")
++
++# m36 keeps the preview track alive while scrubbing. TimePosition is only evaluated
++# by Roblox for a playing AnimationTrack; Motor6D rigs also need articulated parts
++# to remain unanchored behind one anchored assembly root.
++for required in [
++    "timelineFreezeTrackAt",
++    "if not track.IsPlaying then",
++    "track:Play(0, 1, 1)",
++    "track:AdjustWeight(1, 0)",
++    "track:AdjustSpeed(0)",
++    "track.Priority = Enum.AnimationPriority.Action4",
++    'preview:FindFirstChildWhichIsA("Motor6D", true)',
++    "anchor.Anchored = true",
++    "model bridge v12",
++]:
++    if required not in studio_plugin_text:
++        err(f"m36 Studio timeline scrub preview fix missing {required}")
+ for required in [
+     'path == "/api/timelines"',
+     'path == "/api/timelines/open"',
+@@ -1959,7 +1976,7 @@
+         print(" -", item)
+     sys.exit(1)
+ 
+-print("verify ok · game1 m35 Asset Manager Attack Timeline authoring passed")
++print("verify ok · game1 m36 Attack Timeline scrub preview fix passed")
+ print("registered character archetypes:", len(archetypes))
+ print("active character archetype:", active_id or "none")
+ print("race pool: human")

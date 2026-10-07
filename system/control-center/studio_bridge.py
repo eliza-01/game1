@@ -232,3 +232,102 @@ def run_monster_spawn_bridge(
     if result.get("error"):
         raise StudioBridgeError(f"Studio Monster Spawn command failed: {result['error']}")
     return result
+
+
+def run_timeline_editor_bridge(session: dict, event_catalog: list[dict], timeout_seconds: float = 75.0) -> dict:
+    command = {
+        "command": "timeline-editor",
+        "schemaVersion": 1,
+        "project": PROJECT,
+        "sessionId": str(session.get("sessionId") or ""),
+        "subjectType": str(session.get("subjectType") or ""),
+        "subjectId": str(session.get("subjectId") or ""),
+        "subjectName": str(session.get("subjectName") or ""),
+        "clipId": str(session.get("clipId") or ""),
+        "clipName": str(session.get("clipName") or ""),
+        "modelAssetId": str(session.get("modelAssetId") or ""),
+        "animationAssetId": str(session.get("animationAssetId") or ""),
+        "duration": float(session.get("duration") or 0),
+        "events": dict(session.get("events") or {}),
+        "eventCatalog": list(event_catalog or []),
+    }
+    result: dict | None = None
+    command_claimed = False
+    command_claimed_at: float | None = None
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def log_message(self, _format: str, *_args) -> None:
+            return
+
+        def _authorized(self) -> bool:
+            return self.headers.get("X-Game1-Token") == TOKEN
+
+        def _json(self, status: int, payload: dict) -> None:
+            body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_GET(self) -> None:
+            nonlocal command_claimed, command_claimed_at
+            if not self._authorized():
+                self._json(403, {"ok": False})
+                return
+            if self.path != "/command":
+                self._json(404, {"ok": False})
+                return
+            if command_claimed:
+                self._json(409, {"ok": False, "reason": "command-already-claimed"})
+                return
+            command_claimed = True
+            command_claimed_at = time.monotonic()
+            self._json(200, command)
+
+        def do_POST(self) -> None:
+            nonlocal result
+            if not self._authorized():
+                self._json(403, {"ok": False})
+                return
+            if self.path != "/timeline-editor-result":
+                self._json(404, {"ok": False})
+                return
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                incoming = json.loads(self.rfile.read(length).decode("utf-8"))
+                if incoming.get("command") != "timeline-editor" or incoming.get("project") != PROJECT:
+                    raise ValueError("unexpected timeline editor result identity")
+                if str(incoming.get("sessionId") or "") != str(command["sessionId"]):
+                    raise ValueError("unexpected timeline editor session id")
+                result = incoming
+                self._json(200, {"ok": True})
+            except Exception as exc:
+                self._json(400, {"ok": False, "error": str(exc)})
+
+    try:
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
+    except OSError as exc:
+        raise StudioBridgeError(f"studio bridge port {PORT} is unavailable: {exc}") from exc
+
+    server.timeout = 0.25
+    started_at = time.monotonic()
+    deadline = started_at + max(0.01, float(timeout_seconds))
+    try:
+        while result is None and time.monotonic() < deadline:
+            server.handle_request()
+            now = time.monotonic()
+            if command_claimed_at is None and now - started_at >= 8.0:
+                break
+            if command_claimed_at is not None and now - command_claimed_at >= 60.0:
+                break
+    finally:
+        server.server_close()
+
+    if result is None:
+        if command_claimed:
+            raise StudioBridgeError("the game1 Studio plugin accepted the timeline editor command but did not finish opening it")
+        raise StudioBridgeError("no timeline editor command was received; install the updated Game1Bridge plugin and restart Studio")
+    if result.get("error"):
+        raise StudioBridgeError(f"Studio timeline editor failed: {result['error']}")
+    return result

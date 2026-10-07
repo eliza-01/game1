@@ -9,6 +9,10 @@ return table.freeze({
 					stat = "AttackSpeed",
 					unitsPerPercent = 2.0,
 				}),
+				["combat_idle"] = table.freeze({
+					stat = "AttackSpeed",
+					unitsPerPercent = 4.0,
+				}),
 				["run"] = table.freeze({
 					stat = "RunSpeed",
 					unitsPerPercent = 1.9,

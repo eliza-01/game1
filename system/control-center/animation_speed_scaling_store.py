@@ -27,6 +27,12 @@ DEFAULT_PAYLOAD = {
                     "unitsPerPercent": 4.0,
                 },
                 {
+                    "channel": "combat_idle",
+                    "label": "Idle Combat Speed",
+                    "stat": "AttackSpeed",
+                    "unitsPerPercent": 2.0,
+                },
+                {
                     "channel": "attack",
                     "label": "Attack Speed",
                     "stat": "AttackSpeed",

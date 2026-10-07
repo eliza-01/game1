@@ -17,7 +17,7 @@ return table.freeze({
 				Damage = 10,
 				Defense = 0,
 				AttackSpeed = 100,
-				RunSpeed = 110,
+				RunSpeed = 130,
 				CritChance = 10,
 			}),
 			model = table.freeze({

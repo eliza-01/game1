@@ -833,6 +833,7 @@ expected_scaling = {
     ("character", "human_female", "run"): "RunSpeed",
     ("character", "human_female", "walk"): "RunSpeed",
     ("character", "human_female", "attack"): "AttackSpeed",
+    ("character", "human_female", "combat_idle"): "AttackSpeed",
     ("monster", "gremlin", "run"): "RunSpeed",
 }
 actual_scaling = {}
@@ -1452,13 +1453,21 @@ for required in ["MonsterAttackPursuitActive", "MonsterAttackPursuitPlaybackSpee
 
 feedback_server_m23 = (ROOT / "src/server/combat/CombatFeedbackService.luau").read_text(encoding="utf-8")
 feedback_client_m23 = (ROOT / "src/client/combat/CombatFeedbackController.luau").read_text(encoding="utf-8")
+feedback_visuals_m39_path = ROOT / "src/client/combat/CombatFloatingText.luau"
+feedback_visuals_m39 = feedback_visuals_m39_path.read_text(encoding="utf-8") if feedback_visuals_m39_path.is_file() else ""
 damage_m23 = (ROOT / "src/server/combat/DamageService.luau").read_text(encoding="utf-8")
 for required in ["outgoing", "incoming", "PublishDamage"]:
     if required not in feedback_server_m23:
         err(f"damage feedback server missing {required}")
 for required in ["IncomingDamageNumber", "Color3.fromRGB(255, 82, 82)", "CombatDamageNumber"]:
+    if required not in feedback_visuals_m39:
+        err(f"damage feedback visuals missing {required}")
+for required in ['WaitForChild("CombatFloatingText")', "ShowDamage", "ShowCritical", "if critical then"]:
     if required not in feedback_client_m23:
-        err(f"damage feedback client missing {required}")
+        err(f"m39 combat feedback controller missing {required}")
+for required in ['gui.Name = "CriticalBillboard"', 'label.Text = "Critical!"', "CRITICAL_LIFETIME", "CRITICAL_RISE_STUDS"]:
+    if required not in feedback_visuals_m39:
+        err(f"m39 Critical! world feedback missing {required}")
 if "CombatFeedbackService.PublishDamage" not in damage_m23:
     err("DamageService does not publish authoritative damage feedback")
 
@@ -2008,13 +2017,33 @@ for required in [".build-place.project.json", "Add-Member -NotePropertyName 'Bas
         err(f"m38 seed-place build isolation missing {required}")
 
 
+# m40 Asset Manager: Animation Speed is presented as one clear card per animation channel.
+animation_speed_ui_text = (ROOT / "system/control-center/static/animation-speed.js").read_text(encoding="utf-8")
+animation_speed_css_text = (ROOT / "system/control-center/static/asset-manager.css").read_text(encoding="utf-8")
+animation_speed_html_text = (ROOT / "system/control-center/static/index.html").read_text(encoding="utf-8")
+for required in [
+    "animation-speed-profile",
+    "animation-speed-rule-grid",
+    "animation-speed-rule",
+    "Gameplay stat",
+    "Stat units for +1% playback",
+    "Playback formula",
+    "Scales independently from Combat Idle",
+]:
+    if required not in animation_speed_ui_text and required not in animation_speed_css_text:
+        err(f"m40 Animation Speed grouped UI missing {required}")
+for required in ["each animation block is configured independently", "Stat units for +1% playback"]:
+    if required not in animation_speed_html_text:
+        err(f"m40 Animation Speed help copy missing {required}")
+
+
 if errors:
     print("verify failed")
     for item in errors:
         print(" -", item)
     sys.exit(1)
 
-print("verify ok · game1 m38 HitStart-to-HitEnd + Rojo Workspace ownership hotfix passed")
+print("verify ok · game1 m40 grouped Animation Speed controls passed")
 print("registered character archetypes:", len(archetypes))
 print("active character archetype:", active_id or "none")
 print("race pool: human")

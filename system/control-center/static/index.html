@@ -6,7 +6,7 @@
 <title>game1 · asset manager</title>
 <link rel="stylesheet" href="asset-manager.css?v=8">
 <link rel="stylesheet" href="location-assets.css?v=1">
-<link rel="stylesheet" href="deco-assets.css?v=2">
+<link rel="stylesheet" href="deco-assets.css?v=3">
 </head>
 <body>
 <header>
@@ -248,6 +248,7 @@
 <label>asset name<input id="location-asset-name" autocomplete="off" placeholder="for example Oak Tree"></label>
 <label>slug<input id="location-asset-slug" readonly><small class="hint">stable lowercase id generated from the asset name.</small></label>
 <label>category<select id="location-asset-category"></select></label>
+<div class="deco-gameplay-policy"><label class="deco-policy-toggle"><input id="location-asset-destructible" type="checkbox"><span><b>Destructible</b><small>On: weapon attacks pass through for the future destruction pipeline. Off: the asset is a solid weapon blocker and causes bounce.</small></span></label></div>
 <hr class="card-separator">
 <span class="eyebrow">02 · source assets</span>
 <div class="deco-source-pickers"><div class="picker"><button id="choose-location-asset-model" type="button">choose fbx</button><small id="picked-location-asset-model">fbx not selected</small></div><div class="picker"><button id="choose-location-asset-texture" type="button">choose PNG/JPG</button><small id="picked-location-asset-texture">PNG/JPG not selected</small></div></div>
@@ -263,7 +264,7 @@
 <div class="panel character-card">
 <div class="section-title"><div><span>published library</span><h3>registered assets</h3></div><button id="refresh-location-assets-table" type="button">refresh</button></div>
 <div class="deco-assets-note"><strong>Studio placement</strong><span>Open <b>DecoManager</b> in Roblox Studio, choose a category, browse variants with arrows, then Place. <b>Save Assets Data</b> snapshots all placed instances and saves the place.</span></div>
-<div class="table-wrap weapon-table-wrap"><table><thead><tr><th>asset</th><th>category</th><th>Roblox assets</th><th>status</th><th></th></tr></thead><tbody id="location-asset-rows"></tbody></table></div>
+<div class="table-wrap weapon-table-wrap"><table><thead><tr><th>asset</th><th>category</th><th>weapon contact</th><th>Roblox assets</th><th>status</th><th></th></tr></thead><tbody id="location-asset-rows"></tbody></table></div>
 </div>
 </div>
 </div>
@@ -368,7 +369,7 @@
 <script src="animation-speed.js?v=1"></script>
 <script src="timelines.js?v=2"></script>
 <script src="locations.js?v=1"></script>
-<script src="deco-assets.js?v=2"></script>
+<script src="deco-assets.js?v=3"></script>
 <script src="options.js?v=1"></script>
 <script src="weapon-assets.js?v=3"></script>
 <script src="monster-assets.js?v=4"></script>

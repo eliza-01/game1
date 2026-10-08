@@ -1974,7 +1974,7 @@ for required in [
     'AnimationClipProvider:GetAnimationClipAsync',
     'clip:IsA("KeyframeSequence")',
     'preview.Parent = timelineWorld',
-    'model bridge v20',
+    'model bridge v21',
 ]:
     if required not in studio_plugin_text:
         err(f"m37 in-plugin timeline preview missing {required}")
@@ -2106,7 +2106,7 @@ for required in [
 ]:
     if required not in location_plugin_text:
         err(f"m41 Studio Location authoring module missing {required}")
-for required in ['require(script.Parent.modules.LocationCommands)', 'data.command == "location-authoring"', 'model bridge v20']:
+for required in ['require(script.Parent.modules.LocationCommands)', 'data.command == "location-authoring"', 'model bridge v21']:
     if required not in studio_plugin_text:
         err(f"m41 Game1Bridge Location integration missing {required}")
 
@@ -2152,7 +2152,7 @@ for path in [
 
 if location_asset_manifest_path.is_file():
     location_asset_manifest = json.loads(location_asset_manifest_path.read_text(encoding="utf-8"))
-    if location_asset_manifest.get("schemaVersion") != 2 or location_asset_manifest.get("project") != "game1":
+    if location_asset_manifest.get("schemaVersion") != 3 or location_asset_manifest.get("project") != "game1":
         err("m43 location-assets.json schema/project is invalid")
     category_ids = [row.get("id") for row in ((location_asset_manifest.get("options") or {}).get("categories") or [])]
     if category_ids != ["tree", "bush", "rock", "light", "fence", "decoration"]:
@@ -2192,7 +2192,7 @@ for required in [
     'path == "/api/location-assets/layout"',
     'location_assets.publish',
     'location_assets.delete',
-    'game1-m46-location-assets-shared-textures-001',
+    'game1-m50-environment-weapon-bounce-001',
 ]:
     if required not in host_agent_text:
         err(f"m43 host agent Location Assets API missing {required}")
@@ -2207,8 +2207,8 @@ for required in [
     'id="choose-location-asset-model"',
     'id="choose-location-asset-texture"',
     'id="publish-location-asset"',
-    'deco-assets.css?v=2',
-    'deco-assets.js?v=2',
+    'deco-assets.css?v=3',
+    'deco-assets.js?v=3',
 ]:
     if required not in index_m43_text:
         err(f"m43 Asset Manager Location Assets section missing {required}")
@@ -2251,7 +2251,7 @@ for required in [
     'decoration = "Decorations"',
     "Workspace:Raycast",
     "self.plugin:Activate(true)",
-    'placed:SetAttribute("Game1DecoAsset", true)',
+    'placed:SetAttribute("Game1DecoAssetSlug", tostring(row.slug or ""))',
     "function DecoPlacement:serialize()",
     "DecoTransform.supportOffset",
     "DecoTransform.placementPivot",
@@ -2276,7 +2276,7 @@ for required in [
 for required in [
     'require(script.Parent.modules.DecoManager)',
     'DecoManager.new({',
-    'model bridge v20',
+    'model bridge v21',
 ]:
     if required not in studio_plugin_text:
         err(f"m43 Game1Bridge DecoManager integration missing {required}")
@@ -2302,7 +2302,7 @@ else:
 
 for required in [
     "from studio_save import request_active_studio_save",
-    'control_agent_build = "game1-m46-location-assets-shared-textures-001"',
+    'control_agent_build = "game1-m50-environment-weapon-bounce-001"',
     'result["studioSave"] = request_active_studio_save()',
 ]:
     if required not in host_agent_text:
@@ -2318,7 +2318,7 @@ for required in [
         err(f"m45 DecoManager drag/save hotfix missing {required}")
 if "self.AssetService:SavePlaceAsync" in deco_manager_text:
     err("m45 DecoManager still calls cloud SavePlaceAsync directly")
-if "model bridge v20" not in studio_plugin_text:
+if "model bridge v21" not in studio_plugin_text:
     err("m45 Studio plugin version marker is stale")
 
 # m44 Location Assets: PNG/JPG source textures with clean extension-aware preparation.
@@ -2343,7 +2343,7 @@ if "PNG/JPG" not in deco_assets_js_text or "PNG/JPG" not in index_m43_text:
 
 # m46 Location Assets: Decorations category + shared registered texture references.
 for required in [
-    'SCHEMA_VERSION = 2',
+    'SCHEMA_VERSION = 3',
     '"decoration": "Decorations"',
     'texture_reference_slug TEXT NOT NULL DEFAULT',
     'def _resolve_texture_owner',
@@ -2379,7 +2379,7 @@ for required in [
         err(f"m46 DecoManager Decorations category missing {required}")
 if 'decoration = "Decorations"' not in deco_placement_text:
     err("m46 DecoPlacement Decorations folder mapping is missing")
-if "model bridge v20" not in studio_plugin_text:
+if "model bridge v21" not in studio_plugin_text:
     err("m46 Studio plugin version marker is stale")
 
 
@@ -2403,7 +2403,7 @@ for required in [
 ]:
     if required not in deco_loader_text:
         err(f"m47 static Location Asset sanitization missing {required}")
-if "model bridge v20" not in studio_plugin_text:
+if "model bridge v21" not in studio_plugin_text:
     err("m47 Studio plugin version marker is stale")
 
 
@@ -2437,7 +2437,7 @@ if "model:PivotTo(DecoTransform.previewPivot(model))" not in deco_manager_text:
     err("m48 DecoManager preview still replaces the imported asset basis")
 if '"DecoTransform"' not in (ROOT / "system/studio-plugin/plugin.project.json").read_text(encoding="utf-8"):
     err("m48 Studio plugin project does not include DecoTransform")
-if "model bridge v20" not in studio_plugin_text:
+if "model bridge v21" not in studio_plugin_text:
     err("m48 Studio plugin version marker is stale")
 
 
@@ -2450,13 +2450,195 @@ if prepare_placed_match is None:
 elif 'Anchored = true' in prepare_placed_match.group(1):
     err("m49 DecoPlacement still anchors placed decoration BaseParts")
 
+
+# m50 Environment weapon bounce: Location Asset gameplay policy is registry-owned,
+# DecoManager stores identity only, and solid environment contact terminates the
+# authored damage window before reversing the current attack at 2x speed.
+weapon_bounce_config_path = ROOT / "src/shared/combat/WeaponBounceConfig.luau"
+environment_asset_service_path = ROOT / "src/server/world/EnvironmentAssetService.luau"
+weapon_environment_collision_path = ROOT / "src/server/combat/WeaponEnvironmentCollision.luau"
+weapon_bounce_service_path = ROOT / "src/server/combat/WeaponBounceService.luau"
+weapon_bounce_controller_path = ROOT / "src/client/combat/WeaponBounceController.luau"
+weapon_bounce_effect_pool_path = ROOT / "src/client/combat/effects/WeaponBounceEffectPool.luau"
+for path in [
+    weapon_bounce_config_path,
+    environment_asset_service_path,
+    weapon_environment_collision_path,
+    weapon_bounce_service_path,
+    weapon_bounce_controller_path,
+    weapon_bounce_effect_pool_path,
+]:
+    if not path.is_file():
+        err(f"m50 weapon bounce module missing: {path.relative_to(ROOT)}")
+
+if location_asset_manifest_path.is_file():
+    location_asset_manifest = json.loads(location_asset_manifest_path.read_text(encoding="utf-8"))
+    if location_asset_manifest.get("schemaVersion") != 3:
+        err("m50 Location Asset manifest must use schemaVersion 3")
+    for row in location_asset_manifest.get("items") or []:
+        if not isinstance(row.get("destructible"), bool):
+            err(f"m50 Location Asset destructible policy missing/invalid for {row.get('slug')}")
+
+for required in [
+    "destructible INTEGER NOT NULL DEFAULT 0",
+    'ALTER TABLE location_assets ADD COLUMN destructible INTEGER NOT NULL DEFAULT 0',
+    'result["destructible"] = bool(result.get("destructible"))',
+    'f"\\t\\t\\tdestructible = {str(bool(row.get(\'destructible\'))).lower()},"',
+]:
+    if required not in location_asset_store_text:
+        err(f"m50 LocationAssetStore destructible policy missing {required}")
+for required in [
+    'id="location-asset-destructible"',
+    "solid weapon blocker and causes bounce",
+    "weapon contact",
+]:
+    if required not in index_m43_text:
+        err(f"m50 Location Assets destructible UI missing {required}")
+for required in [
+    "location-asset-destructible",
+    "destructible: $('location-asset-destructible').checked",
+    "solid · bounce",
+]:
+    if required not in deco_assets_js_text:
+        err(f"m50 Location Assets destructible behavior missing {required}")
+
+# Studio authoring persists only stable identity/editor metadata. Gameplay policy
+# is deliberately not copied to placed Instances.
+for required in [
+    'placed:SetAttribute("Game1DecoInstanceId", instanceId)',
+    'placed:SetAttribute("Game1DecoAssetSlug", tostring(row.slug or ""))',
+    'locationAssetId = tostring(descendant:GetAttribute("Game1DecoAssetSlug") or "")',
+]:
+    if required not in deco_placement_text:
+        err(f"m50 DecoPlacement identity-only authoring missing {required}")
+for forbidden in [
+    'SetAttribute("Destructible"',
+    'SetAttribute("Game1DecoAsset",',
+    'SetAttribute("Game1DecoCategory",',
+    'SetAttribute("Game1DecoModelAssetId",',
+    'SetAttribute("Game1DecoTextureAssetId",',
+]:
+    if forbidden in deco_placement_text:
+        err(f"m50 DecoPlacement still persists gameplay/redundant metadata: {forbidden}")
+for required in ['"schemaVersion": 2', '"locationAssetId": location_asset_id']:
+    if required not in deco_layout_store_text:
+        err(f"m50 deco backup identity schema missing {required}")
+
+if environment_asset_service_path.is_file():
+    environment_asset_service_text = environment_asset_service_path.read_text(encoding="utf-8")
+    for required in [
+        'LocationAssetRegistry = require',
+        'LOCATION_ASSET_ID_ATTRIBUTE = "Game1DecoAssetSlug"',
+        'descendant.Anchored = true',
+        'function EnvironmentAssetService.GetDefinition',
+        'function EnvironmentAssetService.ResolvePart',
+        'function EnvironmentAssetService.GetRegisteredSnapshot',
+        'registryRevision += 1',
+    ]:
+        if required not in environment_asset_service_text:
+            err(f"m50 EnvironmentAssetService missing {required}")
+    for forbidden in ['SetAttribute("Destructible"', 'SetAttribute("Game1DecoCategory"']:
+        if forbidden in environment_asset_service_text:
+            err(f"m50 runtime must resolve policy server-side instead of stamping Attributes: {forbidden}")
+
+if weapon_environment_collision_path.is_file():
+    weapon_environment_collision_text = weapon_environment_collision_path.read_text(encoding="utf-8")
+    for required in [
+        'EnvironmentAssetService.GetRegisteredSnapshot()',
+        'Workspace:Blockcast',
+        'Workspace:GetPartsInPart',
+        'definition.destructible == true',
+        'filterRevision',
+    ]:
+        if required not in weapon_environment_collision_text:
+            err(f"m50 WeaponEnvironmentCollision missing {required}")
+
+if weapon_bounce_config_path.is_file():
+    weapon_bounce_config_text = weapon_bounce_config_path.read_text(encoding="utf-8")
+    for required in [
+        'RemoteName = "WeaponBounce"',
+        'ReverseSpeedMultiplier = 2',
+        'RecoverySeconds = 0.12',
+        'ServerReplicationRadius = 160',
+        'ClientRenderRadius = 180',
+    ]:
+        if required not in weapon_bounce_config_text:
+            err(f"m50 WeaponBounceConfig missing {required}")
+
+if weapon_bounce_service_path.is_file():
+    weapon_bounce_service_text = weapon_bounce_service_path.read_text(encoding="utf-8")
+    for required in [
+        'payload.attackerUserId = attacker.UserId',
+        'WeaponBounceConfig.ServerReplicationRadius',
+        'remote:FireClient(player, payload)',
+    ]:
+        if required not in weapon_bounce_service_text:
+            err(f"m50 WeaponBounceService replication missing {required}")
+
+if weapon_bounce_controller_path.is_file():
+    weapon_bounce_controller_text = weapon_bounce_controller_path.read_text(encoding="utf-8")
+    for required in [
+        'attackerUserId == Players.LocalPlayer.UserId',
+        'WeaponBounceConfig.ClientRenderRadius',
+        'effects:Emit(position, normal, camera.CFrame)',
+    ]:
+        if required not in weapon_bounce_controller_text:
+            err(f"m50 WeaponBounceController presentation missing {required}")
+
+attack_service_text = (ROOT / "src/server/combat/AttackService.luau").read_text(encoding="utf-8")
+for required in [
+    'WeaponEnvironmentCollision.Query(previousVolume, volume)',
+    'activeEnvironmentBlocked[player] = true',
+    'activeDamageWindows[player] = nil',
+    'WeaponBounceService.Publish(player, {',
+    'LastAttackBounced',
+]:
+    if required not in attack_service_text:
+        err(f"m50 AttackService environment-bounce integration missing {required}")
+if attack_service_text.find('WeaponEnvironmentCollision.Query(previousVolume, volume)') > attack_service_text.find('hitCount += applyDamageInVolume', attack_service_text.find('local function applyAnimatedWeaponSweep')):
+    err("m50 environment collision must resolve before damage in each weapon sweep substep")
+
+upper_composer_text = (ROOT / "src/client/character/animation/AttackUpperBodyComposer.luau").read_text(encoding="utf-8")
+character_animation_text = (ROOT / "src/client/character/animation/CharacterAnimationController.luau").read_text(encoding="utf-8")
+attack_controller_text = (ROOT / "src/client/combat/AttackController.luau").read_text(encoding="utf-8")
+client_init_text = (ROOT / "src/client/init.client.luau").read_text(encoding="utf-8")
+server_init_text = (ROOT / "src/server/init.server.luau").read_text(encoding="utf-8")
+for required in ['function AttackUpperBodyComposer.SetPlaybackSpeed', 'sourcePlaybackSpeed <= 0', 'exitBlendRequested = false']:
+    if required not in upper_composer_text:
+        err(f"m50 upper-body reverse playback support missing {required}")
+for required in [
+    'function CharacterAnimationController.BounceCurrentAttack',
+    'track:AdjustSpeed(-reverseSpeed)',
+    'AttackUpperBodyComposer.SetPlaybackSpeed(-reverseSpeed)',
+    'AnimationAttackBounced',
+]:
+    if required not in character_animation_text:
+        err(f"m50 character attack reverse presentation missing {required}")
+for required in ['function AttackController.CancelForBounce', 'activePoseAttackId = 0']:
+    if required not in attack_controller_text:
+        err(f"m50 attack controller bounce cancellation missing {required}")
+for required in ['WeaponBounceController.Start(CharacterAnimationController, AttackController)']:
+    if required not in client_init_text:
+        err(f"m50 client bounce startup missing {required}")
+for required in ['EnvironmentAssetService.Start()', 'WeaponBounceService.Start()']:
+    if required not in server_init_text:
+        err(f"m50 server environment/bounce startup missing {required}")
+
+if 'control_agent_build = "game1-m50-environment-weapon-bounce-001"' not in host_agent_text:
+    err("m50 Control Center build marker is stale")
+if "model bridge v21" not in studio_plugin_text:
+    err("m50 Studio plugin version marker is stale")
+install_plugin_text = (ROOT / "system/studio-plugin/install.ps1").read_text(encoding="utf-8")
+if "model bridge v21" not in install_plugin_text:
+    err("m50 Studio plugin installer marker is stale")
+
 if errors:
     print("verify failed")
     for item in errors:
         print(" -", item)
     sys.exit(1)
 
-print("verify ok · game1 m49 unanchored DecoManager placement passed")
+print("verify ok · game1 m50 registry-owned environment weapon bounce passed")
 print("registered character archetypes:", len(archetypes))
 print("active character archetype:", active_id or "none")
 print("race pool: human")

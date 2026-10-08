@@ -44,6 +44,7 @@ function decoAssetSetForm(row) {
     $('location-asset-name').value = row.name_en || '';
     $('location-asset-slug').value = row.slug || '';
     $('location-asset-category').value = row.category || 'tree';
+    $('location-asset-destructible').checked = row.destructible === true || Number(row.destructible || 0) === 1;
     $('picked-location-asset-model').textContent = 'keep current fbx or choose a replacement';
     $('picked-location-asset-texture').textContent = row.texture_shared
       ? `reusing ${row.texture_owner_slug || row.texture_reference_slug}`
@@ -52,6 +53,7 @@ function decoAssetSetForm(row) {
     $('location-asset-name').value = '';
     $('location-asset-slug').value = '';
     $('location-asset-category').value = decoAssetState.data?.options?.categories?.[0]?.id || 'tree';
+    $('location-asset-destructible').checked = false;
     $('picked-location-asset-model').textContent = 'fbx not selected';
     $('picked-location-asset-texture').textContent = 'PNG/JPG not selected';
   }
@@ -154,7 +156,8 @@ function decoAssetRender() {
   rows.innerHTML = '';
   for (const row of decoAssetState.data.items || []) {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td><b>${esc(row.name_en)}</b><small>${esc(row.slug)}</small></td><td>${esc(decoAssetCategoryLabel(row.category))}</td><td><small>model ${esc(row.model_asset_id || '—')}</small><small>${row.texture_shared ? `shared ${esc(row.texture_owner_slug || row.texture_reference_slug)} · ` : 'texture '}${esc(row.texture_asset_id || '—')}</small></td><td>${decoAssetStatusTag(row.status)}</td><td><button data-select type="button">edit</button></td>`;
+    const contactPolicy = (row.destructible === true || Number(row.destructible || 0) === 1) ? '<span class="tag">destructible</span>' : '<span class="tag published">solid · bounce</span>';
+    tr.innerHTML = `<td><b>${esc(row.name_en)}</b><small>${esc(row.slug)}</small></td><td>${esc(decoAssetCategoryLabel(row.category))}</td><td>${contactPolicy}</td><td><small>model ${esc(row.model_asset_id || '—')}</small><small>${row.texture_shared ? `shared ${esc(row.texture_owner_slug || row.texture_reference_slug)} · ` : 'texture '}${esc(row.texture_asset_id || '—')}</small></td><td>${decoAssetStatusTag(row.status)}</td><td><button data-select type="button">edit</button></td>`;
     tr.querySelector('[data-select]').onclick = () => decoAssetSetForm(row);
     rows.appendChild(tr);
   }
@@ -206,6 +209,7 @@ async function decoAssetRegister() {
       modelSourcePath: decoAssetState.modelPath,
       textureSourcePath: decoAssetState.texturePath,
       textureReferenceSlug: decoAssetState.textureReferenceSlug,
+      destructible: $('location-asset-destructible').checked,
     };
     if (!selected && !payload.modelSourcePath) {
       throw Error('choose FBX');

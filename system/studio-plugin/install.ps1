@@ -20,7 +20,7 @@ try {
 
 if(-not (Test-Path $Temp)){throw 'Rojo did not create the plugin build'}
 $BuiltText=Get-Content $Temp -Raw
-foreach($Marker in @('Game1ControlCenter','model bridge v20','Game1AttackTimeline_v2','TimelinePreviewWorld','location-authoring','Game1LocationMarker','Game1DecoManager_v1','DecoPreviewWorld','Save Assets Data','Game1DecoAssets')){
+foreach($Marker in @('Game1ControlCenter','model bridge v21','Game1AttackTimeline_v2','TimelinePreviewWorld','location-authoring','Game1LocationMarker','Game1DecoManager_v1','DecoPreviewWorld','Save Assets Data','Game1DecoAssets')){
     if(-not $BuiltText.Contains($Marker)){
         throw "Studio bridge build is stale or incomplete; missing marker: $Marker"
     }
@@ -38,7 +38,7 @@ $InstalledHash=(Get-FileHash $Installed -Algorithm SHA256).Hash
 if($GeneratedHash -ne $InstalledHash){throw 'Installed Studio bridge hash does not match generated bridge hash'}
 Remove-Item $Temp -Force -ErrorAction SilentlyContinue
 
-Write-Host ("Game1Bridge installed with DecoManager + Locations authoring + in-plugin Attack Timeline viewport preview: {0}" -f $Installed)
+Write-Host ("Game1Bridge installed with DecoManager identity placement + Locations authoring + Attack Timeline preview: {0}" -f $Installed)
 Write-Host ("SHA256: {0}" -f $InstalledHash)
 Write-Host 'DecoManager places published Location Assets; Locations draw from Asset Manager / Locations; Attack Timeline opens from Asset Manager / Timelines.'
 Write-Host 'Fully close every Roblox Studio window, then reopen Studio once.'

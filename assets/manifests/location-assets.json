@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "project": "game1",
   "options": {
     "categories": [
@@ -51,6 +51,7 @@
       "updated_at": 1791443607.9077108,
       "published_at": 1791443607.9077108,
       "texture_reference_slug": "main_statue",
+      "destructible": false,
       "texture_owner_slug": "main_statue",
       "texture_shared": true,
       "status": "PUBLISHED",
@@ -77,15 +78,43 @@
       "updated_at": 1791440120.3517294,
       "published_at": 1791440120.3517294,
       "texture_reference_slug": "",
+      "destructible": false,
       "texture_owner_slug": "main_statue",
       "texture_shared": false,
       "status": "PUBLISHED",
       "category_label": "Rocks"
+    },
+    {
+      "slug": "christmas_tree",
+      "name_en": "Christmas Tree",
+      "category": "tree",
+      "model_source_path": "assets/source/location-assets/tree/christmas_tree/model/christmas_tree.fbx",
+      "model_prepared_path": "assets/prepared/location-assets/tree/christmas_tree/model/christmas_tree.fbx",
+      "model_sha256": "3d0275623bdb3030da26a4673727f15737e45dfc1fe390930e41a3d83cf1ad48",
+      "model_asset_id": "135618055671248",
+      "model_published_sha256": "3d0275623bdb3030da26a4673727f15737e45dfc1fe390930e41a3d83cf1ad48",
+      "model_moderation_state": "Approved",
+      "texture_source_path": "assets/source/location-assets/tree/christmas_tree/textures/christmas_tree.jpg",
+      "texture_prepared_path": "assets/prepared/location-assets/tree/christmas_tree/textures/christmas_tree.jpg",
+      "texture_sha256": "9de5d31b2ae82633f6f91ee9705040c4fd5c03d579424189faa9bafe03ce6386",
+      "texture_asset_id": "130407188742566",
+      "texture_published_sha256": "9de5d31b2ae82633f6f91ee9705040c4fd5c03d579424189faa9bafe03ce6386",
+      "texture_moderation_state": "Reviewing",
+      "revision": 1,
+      "created_at": 1791465860.1735055,
+      "updated_at": 1791465902.8469105,
+      "published_at": 1791465902.8469105,
+      "texture_reference_slug": "",
+      "destructible": false,
+      "texture_owner_slug": "christmas_tree",
+      "texture_shared": false,
+      "status": "PUBLISHED",
+      "category_label": "Trees"
     }
   ],
   "summary": {
-    "registered": 2,
-    "published": 2,
+    "registered": 3,
+    "published": 3,
     "changed": 0
   }
 }

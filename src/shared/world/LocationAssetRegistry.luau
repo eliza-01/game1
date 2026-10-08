@@ -1,6 +1,6 @@
 -- generated. do not edit by hand.
 return table.freeze({
-	schemaVersion = 2,
+	schemaVersion = 3,
 	project = "game1",
 	assets = table.freeze({
 		["pillar_with_lantern"] = table.freeze({
@@ -12,6 +12,7 @@ return table.freeze({
 			textureAssetId = "128890927196285",
 			textureOwnerSlug = "main_statue",
 			textureShared = true,
+			destructible = false,
 		}),
 		["main_statue"] = table.freeze({
 			slug = "main_statue",
@@ -22,6 +23,18 @@ return table.freeze({
 			textureAssetId = "128890927196285",
 			textureOwnerSlug = "main_statue",
 			textureShared = false,
+			destructible = false,
+		}),
+		["christmas_tree"] = table.freeze({
+			slug = "christmas_tree",
+			name = "Christmas Tree",
+			category = "tree",
+			status = "PUBLISHED",
+			modelAssetId = "135618055671248",
+			textureAssetId = "130407188742566",
+			textureOwnerSlug = "christmas_tree",
+			textureShared = false,
+			destructible = false,
 		}),
 	}),
 })

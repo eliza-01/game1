@@ -1,0 +1,1940 @@
+diff --git a/assets/manifests/location-assets.json b/assets/manifests/location-assets.json
+index 4c848bd..afe87c5 100644
+--- a/assets/manifests/location-assets.json
++++ b/assets/manifests/location-assets.json
+@@ -1,5 +1,5 @@
+ {
+-  "schemaVersion": 2,
++  "schemaVersion": 3,
+   "project": "game1",
+   "options": {
+     "categories": [
+@@ -51,6 +51,7 @@
+       "updated_at": 1791443607.9077108,
+       "published_at": 1791443607.9077108,
+       "texture_reference_slug": "main_statue",
++      "destructible": false,
+       "texture_owner_slug": "main_statue",
+       "texture_shared": true,
+       "status": "PUBLISHED",
+@@ -77,6 +78,7 @@
+       "updated_at": 1791440120.3517294,
+       "published_at": 1791440120.3517294,
+       "texture_reference_slug": "",
++      "destructible": false,
+       "texture_owner_slug": "main_statue",
+       "texture_shared": false,
+       "status": "PUBLISHED",
+@@ -103,6 +105,7 @@
+       "updated_at": 1791465902.8469105,
+       "published_at": 1791465902.8469105,
+       "texture_reference_slug": "",
++      "destructible": false,
+       "texture_owner_slug": "christmas_tree",
+       "texture_shared": false,
+       "status": "PUBLISHED",
+diff --git a/src/client/character/animation/AttackUpperBodyComposer.luau b/src/client/character/animation/AttackUpperBodyComposer.luau
+index cd80373..c7f8f5c 100644
+--- a/src/client/character/animation/AttackUpperBodyComposer.luau
++++ b/src/client/character/animation/AttackUpperBodyComposer.luau
+@@ -213,6 +213,22 @@ function AttackUpperBodyComposer.GetExitBlendSeconds(): number
+ 	return math.max(0, tonumber(AttackConfig.UpperBodyAttackExitBlendSeconds) or 0.12)
+ end
+ 
++function AttackUpperBodyComposer.SetPlaybackSpeed(speed: number): boolean
++	if not active or not sourceTrack then
++		return false
++	end
++	sourcePoseFrozen = false
++	sourcePlaybackSpeed = tonumber(speed) or 0
++	if sourcePlaybackSpeed < 0 then
++		-- A late HitEnd may overlap the normal exit blend. Bounce owns the pose
++		-- from the contact frame backwards, so cancel any forward exit fade first.
++		exitBlendRequested = false
++		exitBlendStartedAt = 0
++	end
++	sourceTrack:AdjustSpeed(sourcePlaybackSpeed)
++	return true
++end
++
+ function AttackUpperBodyComposer.BeginExitBlend()
+ 	if not active or exitBlendRequested then
+ 		return
+@@ -317,7 +333,7 @@ end
+ 
+ local function holdSourceTerminalPose(deltaTime: number)
+ 	local track = sourceTrack
+-	if not active or not track or sourcePoseFrozen then
++	if not active or not track or sourcePoseFrozen or sourcePlaybackSpeed <= 0 then
+ 		return
+ 	end
+ 	local length = tonumber(track.Length) or 0
+diff --git a/src/client/character/animation/CharacterAnimationController.luau b/src/client/character/animation/CharacterAnimationController.luau
+index 3031d63..1a1afc6 100644
+--- a/src/client/character/animation/CharacterAnimationController.luau
++++ b/src/client/character/animation/CharacterAnimationController.luau
+@@ -33,6 +33,9 @@ local currentActionOnComplete = nil
+ local currentActionSlot = ""
+ local currentActionLockedUntil = 0
+ local currentActionComposed = false
++local currentActionTimeline = nil
++local currentActionClipId = ""
++local currentActionToken = 0
+ local attackLowerBodyActive = false
+ local connections = {}
+ local lifeTransition = false
+@@ -65,6 +68,9 @@ local function clearCharacter()
+ 	currentActionSlot = ""
+ 	currentActionLockedUntil = 0
+ 	currentActionComposed = false
++	currentActionTimeline = nil
++	currentActionClipId = ""
++	currentActionToken += 1
+ 	attackLowerBodyActive = false
+ 	AttackUpperBodyComposer.End()
+ 	lifeTransition = false
+@@ -154,6 +160,8 @@ local function stopCurrentLoop(fadeTime: number?)
+ 	currentLoopSeam = nil
+ end
+ 
++local refreshLoop
++
+ local function stopCurrentAction(fadeTime: number?)
+ 	if currentActionComposed then
+ 		AttackUpperBodyComposer.End()
+@@ -165,9 +173,37 @@ local function stopCurrentAction(fadeTime: number?)
+ 	currentActionSeam = nil
+ 	currentActionOnComplete = nil
+ 	currentActionComposed = false
++	currentActionTimeline = nil
++	currentActionClipId = ""
++	currentActionToken += 1
+ 	attackLowerBodyActive = false
+ end
+ 
++local function finishAttackPresentation(boundCharacter: Model, boundTrack: AnimationTrack, token: number)
++	if character ~= boundCharacter or currentAction ~= boundTrack or currentActionToken ~= token then
++		return
++	end
++	currentActionLockedUntil = 0
++	currentActionSlot = ""
++	if currentActionComposed then
++		AttackUpperBodyComposer.End()
++	elseif currentActionSeam then
++		currentActionSeam:Stop(0.04)
++		currentActionSeam = nil
++	elseif boundTrack.IsPlaying then
++		boundTrack:Stop(0.04)
++	end
++	currentActionComposed = false
++	currentActionTimeline = nil
++	currentActionClipId = ""
++	attackLowerBodyActive = false
++	currentAction = nil
++	boundCharacter:SetAttribute("AnimationActionEndsAt", nil)
++	boundCharacter:SetAttribute("AnimationAttackUpperBodyComposed", false)
++	boundCharacter:SetAttribute("AnimationAttackLowerBodySlot", nil)
++	refreshLoop()
++end
++
+ local function createSeam(descriptor, track: AnimationTrack, looped: boolean)
+ 	if not cache or descriptor.duplicateFirstFrameAtEnd ~= true then
+ 		return nil
+@@ -209,7 +245,7 @@ local function applyBackwardPlayback(track: AnimationTrack, slot: string)
+ 	end)
+ end
+ 
+-local function refreshLoop()
++refreshLoop = function()
+ 	if not character or not cache or lifeTransition then
+ 		return
+ 	end
+@@ -532,6 +568,8 @@ function CharacterAnimationController.PlayAction(slot: string)
+ 	end
+ 
+ 	stopCurrentAction(0.06)
++	currentActionToken += 1
++	local actionToken = currentActionToken
+ 	currentActionSlot = slot
+ 	currentActionLockedUntil = if slot == "attack" then now + runtimeDuration else 0
+ 	publishPlaybackPercent(slot)
+@@ -556,6 +594,8 @@ function CharacterAnimationController.PlayAction(slot: string)
+ 
+ 	currentAction = track
+ 	currentActionComposed = composed
++	currentActionTimeline = timeline
++	currentActionClipId = clipId
+ 	if not composed then
+ 		track.Looped = false
+ 		currentActionSeam = createSeam(descriptor, track, false)
+@@ -572,17 +612,17 @@ function CharacterAnimationController.PlayAction(slot: string)
+ 	character:SetAttribute("AnimationActionClip", clipId)
+ 	if slot == "attack" then
+ 		character:SetAttribute("AnimationActionEndsAt", currentActionLockedUntil)
++		character:SetAttribute("AnimationAttackBounced", false)
+ 		character:SetAttribute("AnimationAttackUpperBodyComposed", composed)
+ 		character:SetAttribute("AnimationAttackLowerBodySlot", movementSlot())
+ 		local boundCharacter = character
+ 		local boundTrack = track
+-		local unlockAt = currentActionLockedUntil
+ 		local exitBlend = if composed then AttackUpperBodyComposer.GetExitBlendSeconds() else 0
+ 		if composed and runtimeDuration > exitBlend + 0.01 then
+ 			task.delay(runtimeDuration - exitBlend, function()
+ 				if character == boundCharacter
+ 					and currentAction == boundTrack
+-					and currentActionLockedUntil == unlockAt
++					and currentActionToken == actionToken
+ 					and currentActionComposed
+ 				then
+ 					AttackUpperBodyComposer.BeginExitBlend()
+@@ -590,24 +630,7 @@ function CharacterAnimationController.PlayAction(slot: string)
+ 			end)
+ 		end
+ 		task.delay(runtimeDuration, function()
+-			if character ~= boundCharacter or currentAction ~= boundTrack or currentActionLockedUntil ~= unlockAt then
+-				return
+-			end
+-			currentActionLockedUntil = 0
+-			currentActionSlot = ""
+-			if currentActionComposed then
+-				AttackUpperBodyComposer.End()
+-			elseif currentActionSeam then
+-				currentActionSeam:Stop(0.04)
+-				currentActionSeam = nil
+-			end
+-			currentActionComposed = false
+-			attackLowerBodyActive = false
+-			currentAction = nil
+-			boundCharacter:SetAttribute("AnimationActionEndsAt", nil)
+-			boundCharacter:SetAttribute("AnimationAttackUpperBodyComposed", false)
+-			boundCharacter:SetAttribute("AnimationAttackLowerBodySlot", nil)
+-			refreshLoop()
++			finishAttackPresentation(boundCharacter, boundTrack, actionToken)
+ 		end)
+ 	end
+ 
+@@ -624,6 +647,75 @@ function CharacterAnimationController.PlayAction(slot: string)
+ 	}
+ end
+ 
++function CharacterAnimationController.BounceCurrentAttack(clipId: string, reverseSpeedMultiplier: number?): (boolean, number)
++	if not character
++		or currentActionSlot ~= "attack"
++		or not currentAction
++		or currentActionClipId ~= tostring(clipId or "")
++	then
++		return false, 0
++	end
++
++	local track = currentAction :: AnimationTrack
++	local timeline = currentActionTimeline
++	local playbackSpeed = math.max(0.01, tonumber(timeline and timeline.playbackSpeed) or 1)
++	local multiplier = math.max(0.1, tonumber(reverseSpeedMultiplier) or 2)
++	local reverseSpeed = playbackSpeed * multiplier
++	local sourceTime = math.max(0, tonumber(track.TimePosition) or 0)
++	local rewindSeconds = sourceTime / reverseSpeed
++	local exitBlend = if currentActionComposed then AttackUpperBodyComposer.GetExitBlendSeconds() else 0
++
++	currentActionToken += 1
++	local bounceToken = currentActionToken
++	currentActionLockedUntil = os.clock() + rewindSeconds + exitBlend
++	character:SetAttribute("AnimationActionEndsAt", currentActionLockedUntil)
++	character:SetAttribute("AnimationAttackBounced", true)
++
++	if currentActionSeam then
++		currentActionSeam:Stop(0)
++		currentActionSeam = nil
++	end
++
++	if currentActionComposed then
++		AttackUpperBodyComposer.SetPlaybackSpeed(-reverseSpeed)
++	else
++		if not track.IsPlaying then
++			track:Play(0, 1, 0)
++			pcall(function()
++				track.TimePosition = sourceTime
++			end)
++		end
++		track:AdjustSpeed(-reverseSpeed)
++	end
++
++	local boundCharacter = character
++	local boundTrack = track
++	task.delay(rewindSeconds, function()
++		if character ~= boundCharacter or currentAction ~= boundTrack or currentActionToken ~= bounceToken then
++			return
++		end
++		pcall(function()
++			boundTrack.TimePosition = 0
++		end)
++		if currentActionComposed then
++			AttackUpperBodyComposer.SetPlaybackSpeed(0)
++			AttackUpperBodyComposer.BeginExitBlend()
++			if exitBlend > 0 then
++				task.delay(exitBlend, function()
++					finishAttackPresentation(boundCharacter, boundTrack, bounceToken)
++				end)
++			else
++				finishAttackPresentation(boundCharacter, boundTrack, bounceToken)
++			end
++		else
++			boundTrack:AdjustSpeed(0)
++			finishAttackPresentation(boundCharacter, boundTrack, bounceToken)
++		end
++	end)
++
++	return true, rewindSeconds + exitBlend
++end
++
+ function CharacterAnimationController.SetWeaponSet(weaponSet: string?)
+ 	if character then
+ 		character:SetAttribute("AnimationWeaponSet", string.lower(tostring(weaponSet or "")))
+diff --git a/src/client/combat/AttackController.luau b/src/client/combat/AttackController.luau
+index 1659302..9bf0a73 100644
+--- a/src/client/combat/AttackController.luau
++++ b/src/client/combat/AttackController.luau
+@@ -72,6 +72,21 @@ local function finishPresentation(sequence: number)
+     end
+ end
+ 
++function AttackController.CancelForBounce(clientAttackId: number)
++    local id = math.floor(tonumber(clientAttackId) or 0)
++    if id <= 0 or id ~= attackSequence then
++        return false
++    end
++    if activePoseAttackId == id then
++        activePoseAttackId = 0
++        activePoseFrom = 0
++        activePoseUntil = 0
++        poseAccumulator = 0
++    end
++    finishPresentation(id)
++    return true
++end
++
+ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
+     movementController = movement
+     animationController = animation
+diff --git a/src/client/combat/WeaponBounceController.luau b/src/client/combat/WeaponBounceController.luau
+new file mode 100644
+index 0000000..a9882d0
+--- /dev/null
++++ b/src/client/combat/WeaponBounceController.luau
+@@ -0,0 +1,84 @@
++local Players = game:GetService("Players")
++local ReplicatedStorage = game:GetService("ReplicatedStorage")
++local Workspace = game:GetService("Workspace")
++
++local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
++local CombatShared = Shared:WaitForChild("combat")
++local HitEffectConfig = require(CombatShared:WaitForChild("HitEffectConfig"))
++local WeaponBounceConfig = require(CombatShared:WaitForChild("WeaponBounceConfig"))
++local WeaponBounceEffectPool = require(script.Parent:WaitForChild("effects"):WaitForChild("WeaponBounceEffectPool"))
++
++local WeaponBounceController = {}
++local started = false
++local animationController: any = nil
++local attackController: any = nil
++local effects: any = nil
++
++local function renderCamera(position: Vector3): Camera?
++    local camera = Workspace.CurrentCamera
++    if not camera then
++        return nil
++    end
++    local radius = math.max(1, tonumber(WeaponBounceConfig.ClientRenderRadius) or 180)
++    local delta = camera.CFrame.Position - position
++    return if delta:Dot(delta) <= radius * radius then camera else nil
++end
++
++local function onBounce(payload: any)
++    if type(payload) ~= "table" then
++        return
++    end
++
++    local clientAttackId = math.floor(tonumber(payload.clientAttackId) or 0)
++    local clipId = tostring(payload.clipId or "")
++    local attackerUserId = math.floor(tonumber(payload.attackerUserId) or 0)
++    if clientAttackId <= 0 or clipId == "" or attackerUserId <= 0 then
++        return
++    end
++
++    if attackerUserId == Players.LocalPlayer.UserId then
++        if attackController and attackController.CancelForBounce then
++            attackController.CancelForBounce(clientAttackId)
++        end
++        if animationController and animationController.BounceCurrentAttack then
++            animationController.BounceCurrentAttack(
++                clipId,
++                tonumber(payload.reverseSpeedMultiplier) or WeaponBounceConfig.ReverseSpeedMultiplier
++            )
++        end
++    end
++
++    local position = payload.position
++    local normal = payload.normal
++    if effects and typeof(position) == "Vector3" and typeof(normal) == "Vector3" then
++        local camera = renderCamera(position)
++        if camera then
++            if normal.Magnitude <= 1e-5 then
++                normal = Vector3.yAxis
++            else
++                normal = normal.Unit
++            end
++            effects:Emit(position, normal, camera.CFrame)
++        end
++    end
++end
++
++function WeaponBounceController.Start(animation: any, attack: any)
++    animationController = animation
++    attackController = attack
++    if started then
++        return
++    end
++    started = true
++
++    effects = WeaponBounceEffectPool.new(HitEffectConfig, WeaponBounceConfig.EffectPoolSize)
++    local remotes = ReplicatedStorage:WaitForChild("Game1Remotes")
++    local remote = remotes:WaitForChild(WeaponBounceConfig.RemoteName)
++    if not remote:IsA("RemoteEvent") then
++        warn("[game1][weapon-bounce] remote has wrong class; bounce presentation disabled")
++        return
++    end
++    remote.OnClientEvent:Connect(onBounce)
++end
++
++return table.freeze(WeaponBounceController)
+diff --git a/src/client/combat/effects/WeaponBounceEffectPool.luau b/src/client/combat/effects/WeaponBounceEffectPool.luau
+new file mode 100644
+index 0000000..b5b9535
+--- /dev/null
++++ b/src/client/combat/effects/WeaponBounceEffectPool.luau
+@@ -0,0 +1,51 @@
++local RunService = game:GetService("RunService")
++local Workspace = game:GetService("Workspace")
++
++local HitSparkBurst = require(script.Parent:WaitForChild("HitSparkBurst"))
++local HitFrontFlash = require(script.Parent:WaitForChild("HitFrontFlash"))
++
++local WeaponBounceEffectPool = {}
++WeaponBounceEffectPool.__index = WeaponBounceEffectPool
++
++local function makeSlot(parent: Instance, config: any, index: number): any
++    return {
++        sparks = HitSparkBurst.Create(parent, config, index),
++        flash = HitFrontFlash.Create(parent, config, index),
++    }
++end
++
++function WeaponBounceEffectPool.new(effectConfig: any, poolSize: number): any
++    local folder = Instance.new("Folder")
++    folder.Name = "_Game1LocalWeaponBounceEffects"
++    folder.Archivable = false
++    folder.Parent = Workspace
++
++    local count = math.max(1, math.floor(tonumber(poolSize) or 1))
++    local slots = table.create(count)
++    for index = 1, count do
++        slots[index] = makeSlot(folder, effectConfig, index)
++    end
++
++    local self = setmetatable({
++        _config = effectConfig,
++        _slots = slots,
++        _cursor = 0,
++    }, WeaponBounceEffectPool)
++
++    RunService.RenderStepped:Connect(function(dt)
++        for _, slot in ipairs(slots) do
++            HitSparkBurst.Step(slot.sparks, dt)
++        end
++    end)
++    return self
++end
++
++function WeaponBounceEffectPool:Emit(position: Vector3, normal: Vector3, cameraCFrame: CFrame)
++    self._cursor = (self._cursor % #self._slots) + 1
++    local slot = self._slots[self._cursor]
++    local sourcePosition = position + normal * 2
++    HitSparkBurst.Emit(slot.sparks, self._config, position, cameraCFrame, false)
++    HitFrontFlash.Emit(slot.flash, self._config, position, sourcePosition, cameraCFrame, false)
++end
++
++return WeaponBounceEffectPool
+diff --git a/src/client/init.client.luau b/src/client/init.client.luau
+index 48b15d0..1254c4f 100644
+--- a/src/client/init.client.luau
++++ b/src/client/init.client.luau
+@@ -16,6 +16,7 @@ local CharacterAnimationController = require(AnimationRoot:WaitForChild("Charact
+ local AttackController = require(CombatRoot:WaitForChild("AttackController"))
+ local HitEffectController = require(CombatRoot:WaitForChild("HitEffectController"))
+ local CombatFeedbackController = require(CombatRoot:WaitForChild("CombatFeedbackController"))
++local WeaponBounceController = require(CombatRoot:WaitForChild("WeaponBounceController"))
+ local AimPoseController = require(CombatRoot:WaitForChild("AimPoseController"))
+ local WeaponRoot = script:WaitForChild("weapon")
+ local WeaponAttachmentController = require(WeaponRoot:WaitForChild("WeaponAttachmentController"))
+@@ -37,6 +38,7 @@ HitEffectController.Start()
+ CombatFeedbackController.Start()
+ MonsterAttackLocomotionController.Start()
+ AttackController.Start(MovementController, CharacterAnimationController, AimPoseController)
++WeaponBounceController.Start(CharacterAnimationController, AttackController)
+ PlayerStatusController.Start()
+ DeathRespawnController.Start()
+ TestLoadoutController.Start()
+diff --git a/src/server/combat/AttackService.luau b/src/server/combat/AttackService.luau
+index 583b104..8b3d513 100644
+--- a/src/server/combat/AttackService.luau
++++ b/src/server/combat/AttackService.luau
+@@ -9,11 +9,14 @@ local Config = require(CombatShared:WaitForChild("AttackConfig"))
+ local AttackTimelineConfig = require(CombatShared:WaitForChild("AttackTimelineConfig"))
+ local CharacterAttackWindow = require(CombatShared:WaitForChild("CharacterAttackWindow"))
+ local WeaponAttackVolume = require(CombatShared:WaitForChild("WeaponAttackVolume"))
++local WeaponBounceConfig = require(CombatShared:WaitForChild("WeaponBounceConfig"))
+ local AnimationSpeedScaling = require(AnimationShared:WaitForChild("AnimationSpeedScaling"))
+ local CharacterAnimationRegistry = require(CharacterShared:WaitForChild("CharacterAnimationRegistry"))
+ local DamageService = require(script.Parent:WaitForChild("DamageService"))
+ local HitEffectService = require(script.Parent:WaitForChild("HitEffectService"))
+ local EntityHitboxService = require(script.Parent:WaitForChild("EntityHitboxService"))
++local WeaponEnvironmentCollision = require(script.Parent:WaitForChild("WeaponEnvironmentCollision"))
++local WeaponBounceService = require(script.Parent:WaitForChild("WeaponBounceService"))
+ 
+ local AttackService = {}
+ local activeUntil: { [Player]: number } = {}
+@@ -23,6 +26,7 @@ local weaponSweepStates: { [Player]: any } = {}
+ local activeHitTargets: { [Player]: { [Model]: boolean } } = {}
+ local activeDamageWindows: { [Player]: any } = {}
+ local activeHeadshotTarget: { [Player]: Model } = {}
++local activeEnvironmentBlocked: { [Player]: boolean } = {}
+ 
+ local function rowsForEquippedAttack(character: Model): any
+     local profileId = tostring(character:GetAttribute("AnimationProfileId") or character:GetAttribute("CharacterArchetype") or "")
+@@ -192,20 +196,26 @@ local function applyDamageInVolume(
+     return hitCount
+ end
+ 
++local triggerWeaponBounce
++
+ local function applyAnimatedWeaponSweep(
+     player: Player,
+     character: Model,
+     root: BasePart,
+     serial: number,
++    clientAttackId: number,
++    clipId: string,
+     weapon: Model,
+     boxSize: Vector3,
+     previousBoxCFrame: CFrame?,
+     currentBoxCFrame: CFrame,
++    previousElapsed: number?,
++    currentElapsed: number,
+     previousAimOrigin: Vector3?,
+     previousAimDirection: Vector3?,
+     currentAimOrigin: Vector3?,
+     currentAimDirection: Vector3?
+-): number
++): (number, boolean)
+     local attackRange = math.clamp(tonumber(character:GetAttribute("AttackRadius")) or Config.Range, 1, Config.MaxAimDistance)
+     local weaponBoneBoxLocalPosition = WeaponAttackVolume.ReadWeaponBoneBoxLocalPosition(weapon)
+     local hitTargets = activeHitTargets[player]
+@@ -223,6 +233,17 @@ local function applyAnimatedWeaponSweep(
+         steps = math.clamp(math.max(1, linearSteps, angularSteps), 1, Config.WeaponPoseSweepMaxSubsteps)
+     end
+ 
++    local previousVolume = nil
++    if typeof(previousBoxCFrame) == "CFrame" then
++        previousVolume = WeaponAttackVolume.Build(
++            root.Position,
++            previousBoxCFrame,
++            boxSize,
++            attackRange,
++            weaponBoneBoxLocalPosition
++        )
++    end
++
+     local hitCount = 0
+     for step = 1, steps do
+         local alpha = step / steps
+@@ -233,8 +254,27 @@ local function applyAnimatedWeaponSweep(
+             then previousAimOrigin:Lerp(currentAimOrigin, alpha)
+             else currentAimOrigin
+         local sampledAimDirection = interpolateAimDirection(previousAimDirection, currentAimDirection, alpha)
++        local sampledElapsed = if previousElapsed ~= nil
++            then previousElapsed + (currentElapsed - previousElapsed) * alpha
++            else currentElapsed
+         local volume = WeaponAttackVolume.Build(root.Position, sampledBoxCFrame, boxSize, attackRange, weaponBoneBoxLocalPosition)
+         if volume then
++            local environmentContact = WeaponEnvironmentCollision.Query(previousVolume, volume)
++            if environmentContact then
++                local bounced = triggerWeaponBounce(
++                    player,
++                    character,
++                    serial,
++                    clientAttackId,
++                    clipId,
++                    sampledElapsed,
++                    environmentContact
++                )
++                if bounced then
++                    return hitCount, true
++                end
++            end
++
+             hitCount += applyDamageInVolume(
+                 player,
+                 character,
+@@ -248,40 +288,121 @@ local function applyAnimatedWeaponSweep(
+                 sampledAimDirection,
+                 attackRange
+             )
++            previousVolume = volume
+         end
+     end
+-    return hitCount
++    return hitCount, false
+ end
+ 
+-local function clearAttackStateLater(player: Player, character: Model, serial: number, clientAttackId: number, durationSeconds: number)
++local function clearAttackState(
++    player: Player,
++    character: Model,
++    serial: number,
++    clientAttackId: number,
++    reportMiss: boolean
++): boolean
++    if activeSerial[player] ~= serial or activeClientAttackId[player] ~= clientAttackId then
++        return false
++    end
++
++    if reportMiss
++        and Config.DebugLogs
++        and activeEnvironmentBlocked[player] ~= true
++        and next(activeHitTargets[player] or {}) == nil
++    then
++        local attackRange = math.clamp(tonumber(character:GetAttribute("AttackRadius")) or Config.Range, 1, Config.MaxAimDistance)
++        print(("[game1][attack] miss player=%s range=%.1f serial=%d source=animated_weapon_sweep")
++            :format(player.Name, attackRange, serial))
++    end
++
++    activeUntil[player] = nil
++    activeSerial[player] = nil
++    activeClientAttackId[player] = nil
++    activeHitTargets[player] = nil
++    activeDamageWindows[player] = nil
++    activeHeadshotTarget[player] = nil
++    activeEnvironmentBlocked[player] = nil
++    local sweepState = weaponSweepStates[player]
++    if sweepState and sweepState.clientAttackId == clientAttackId then
++        weaponSweepStates[player] = nil
++    end
++    if character.Parent and tonumber(character:GetAttribute("AttackSerial")) == serial then
++        character:SetAttribute("AttackEndsAt", nil)
++        character:SetAttribute("AttackDamageStartsAt", nil)
++        character:SetAttribute("AttackDamageEndsAt", nil)
++        character:SetAttribute("AttackClipId", nil)
++    end
++    return true
++end
++
++local function clearAttackStateLater(
++    player: Player,
++    character: Model,
++    serial: number,
++    clientAttackId: number,
++    durationSeconds: number,
++    reportMiss: boolean
++)
+     task.delay(durationSeconds, function()
+-        if activeSerial[player] ~= serial or activeClientAttackId[player] ~= clientAttackId then
+-            return
+-        end
+-        if Config.DebugLogs and next(activeHitTargets[player] or {}) == nil then
+-            local attackRange = math.clamp(tonumber(character:GetAttribute("AttackRadius")) or Config.Range, 1, Config.MaxAimDistance)
+-            print(("[game1][attack] miss player=%s range=%.1f serial=%d source=animated_weapon_sweep")
+-                :format(player.Name, attackRange, serial))
+-        end
+-        activeUntil[player] = nil
+-        activeSerial[player] = nil
+-        activeClientAttackId[player] = nil
+-        activeHitTargets[player] = nil
+-        activeDamageWindows[player] = nil
+-        activeHeadshotTarget[player] = nil
+-        local sweepState = weaponSweepStates[player]
+-        if sweepState and sweepState.clientAttackId == clientAttackId then
+-            weaponSweepStates[player] = nil
+-        end
+-        if character.Parent and tonumber(character:GetAttribute("AttackSerial")) == serial then
+-            character:SetAttribute("AttackEndsAt", nil)
+-            character:SetAttribute("AttackDamageStartsAt", nil)
+-            character:SetAttribute("AttackDamageEndsAt", nil)
+-            character:SetAttribute("AttackClipId", nil)
+-        end
++        clearAttackState(player, character, serial, clientAttackId, reportMiss)
+     end)
+ end
+ 
++triggerWeaponBounce = function(
++    player: Player,
++    character: Model,
++    serial: number,
++    clientAttackId: number,
++    clipId: string,
++    elapsed: number,
++    contact: any
++): boolean
++    if activeEnvironmentBlocked[player] == true
++        or activeSerial[player] ~= serial
++        or activeClientAttackId[player] ~= clientAttackId
++    then
++        return false
++    end
++
++    activeEnvironmentBlocked[player] = true
++    activeDamageWindows[player] = nil
++    weaponSweepStates[player] = nil
++
++    local reverseSeconds = math.max(0, elapsed) / math.max(0.1, WeaponBounceConfig.ReverseSpeedMultiplier)
++    local recoverySeconds = math.max(
++        WeaponBounceConfig.MinimumRecoverySeconds,
++        reverseSeconds + WeaponBounceConfig.RecoverySeconds
++    )
++    local now = os.clock()
++    activeUntil[player] = now + recoverySeconds
++    character:SetAttribute("AttackEndsAt", now + recoverySeconds)
++    character:SetAttribute("AttackDamageEndsAt", now)
++    character:SetAttribute("LastAttackBounced", true)
++
++    WeaponBounceService.Publish(player, {
++        clientAttackId = clientAttackId,
++        clipId = clipId,
++        position = contact.position,
++        normal = contact.normal,
++        assetId = tostring(contact.definition and contact.definition.slug or ""),
++        reverseSpeedMultiplier = WeaponBounceConfig.ReverseSpeedMultiplier,
++    })
++
++    if Config.DebugLogs then
++        print(("[game1][attack] bounce player=%s asset=%s part=%s elapsed=%.3f serial=%d")
++            :format(
++                player.Name,
++                tostring(contact.definition and contact.definition.slug or "unknown"),
++                tostring(contact.part and contact.part:GetFullName() or "unknown"),
++                elapsed,
++                serial
++            ))
++    end
++
++    clearAttackStateLater(player, character, serial, clientAttackId, recoverySeconds, false)
++    return true
++end
++
+ local function attack(player: Player, payload: any)
+     if type(payload) ~= "table" then
+         if Config.DebugLogs then
+@@ -345,6 +466,7 @@ local function attack(player: Player, payload: any)
+     activeUntil[player] = now + attackDuration
+     activeHitTargets[player] = {}
+     activeHeadshotTarget[player] = nil
++    activeEnvironmentBlocked[player] = false
+     activeDamageWindows[player] = damageWindow
+     weaponSweepStates[player] = nil
+     character:SetAttribute("AttackSerial", serial)
+@@ -355,11 +477,12 @@ local function attack(player: Player, payload: any)
+     character:SetAttribute("AttackDamageEndsAt", now + damageWindow.endTime)
+     character:SetAttribute("LastAttackHitZone", nil)
+     character:SetAttribute("LastAttackHeadshot", false)
++    character:SetAttribute("LastAttackBounced", false)
+ 
+     -- Character weapon damage exists only inside the authored HitStart -> HitEnd
+     -- interval. Hit is no longer a character damage event; monsters keep their
+     -- separate single-Hit timing policy in MonsterAIService.
+-    clearAttackStateLater(player, character, serial, clientAttackId, attackDuration)
++    clearAttackStateLater(player, character, serial, clientAttackId, attackDuration, true)
+ end
+ 
+ local function recordWeaponPose(player: Player, payload: any)
+@@ -425,24 +548,30 @@ local function recordWeaponPose(player: Player, payload: any)
+         local previousBoxCFrame = if typeof(sweepState.lastBoxCFrame) == "CFrame" then sweepState.lastBoxCFrame else nil
+         local previousAimOrigin = if typeof(sweepState.lastAimOrigin) == "Vector3" then sweepState.lastAimOrigin else nil
+         local previousAimDirection = if typeof(sweepState.lastAimDirection) == "Vector3" then sweepState.lastAimDirection else nil
+-        applyAnimatedWeaponSweep(
++        local _, bounced = applyAnimatedWeaponSweep(
+             player,
+             character,
+             root,
+             serial,
++            clientAttackId,
++            tostring(character:GetAttribute("AttackClipId") or ""),
+             weapon,
+             boxSize,
+             previousBoxCFrame,
+             payload.boxCFrame,
++            lastElapsed,
++            elapsed,
+             previousAimOrigin,
+             previousAimDirection,
+             aimOrigin,
+             aimDirection
+         )
+-        sweepState.lastElapsed = elapsed
+-        sweepState.lastBoxCFrame = payload.boxCFrame
+-        sweepState.lastAimOrigin = aimOrigin
+-        sweepState.lastAimDirection = aimDirection
++        if not bounced and weaponSweepStates[player] == sweepState then
++            sweepState.lastElapsed = elapsed
++            sweepState.lastBoxCFrame = payload.boxCFrame
++            sweepState.lastAimOrigin = aimOrigin
++            sweepState.lastAimDirection = aimDirection
++        end
+     end
+ end
+ 
+@@ -468,6 +597,7 @@ function AttackService.Start()
+         activeHitTargets[player] = nil
+         activeDamageWindows[player] = nil
+         activeHeadshotTarget[player] = nil
++        activeEnvironmentBlocked[player] = nil
+         weaponSweepStates[player] = nil
+     end)
+ end
+diff --git a/src/server/combat/WeaponBounceService.luau b/src/server/combat/WeaponBounceService.luau
+new file mode 100644
+index 0000000..05586d5
+--- /dev/null
++++ b/src/server/combat/WeaponBounceService.luau
+@@ -0,0 +1,64 @@
++local Players = game:GetService("Players")
++local ReplicatedStorage = game:GetService("ReplicatedStorage")
++
++local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
++local CombatShared = Shared:WaitForChild("combat")
++local WeaponBounceConfig = require(CombatShared:WaitForChild("WeaponBounceConfig"))
++
++local WeaponBounceService = {}
++local remote: RemoteEvent? = nil
++
++local function characterPosition(player: Player): Vector3?
++    local character = player.Character
++    if not character then
++        return nil
++    end
++    local root = character:FindFirstChild("RootCollider")
++        or character:FindFirstChild("HumanoidRootPart")
++        or character.PrimaryPart
++    return if root and root:IsA("BasePart") then root.Position else nil
++end
++
++function WeaponBounceService.Start()
++    local remotes = ReplicatedStorage:FindFirstChild("Game1Remotes") or Instance.new("Folder")
++    remotes.Name = "Game1Remotes"
++    remotes.Parent = ReplicatedStorage
++
++    local existing = remotes:FindFirstChild(WeaponBounceConfig.RemoteName)
++    if existing and not existing:IsA("RemoteEvent") then
++        existing:Destroy()
++        existing = nil
++    end
++    if not existing then
++        existing = Instance.new("RemoteEvent")
++        existing.Name = WeaponBounceConfig.RemoteName
++        existing.Parent = remotes
++    end
++    remote = existing :: RemoteEvent
++end
++
++function WeaponBounceService.Publish(attacker: Player, payload: any)
++    if not remote or type(payload) ~= "table" then
++        return
++    end
++
++    payload.attackerUserId = attacker.UserId
++    local position = payload.position
++    local radius = math.max(1, tonumber(WeaponBounceConfig.ServerReplicationRadius) or 160)
++    local radiusSquared = radius * radius
++    for _, player in ipairs(Players:GetPlayers()) do
++        if player == attacker then
++            remote:FireClient(player, payload)
++        elseif typeof(position) == "Vector3" then
++            local viewerPosition = characterPosition(player)
++            if viewerPosition then
++                local delta = viewerPosition - position
++                if delta:Dot(delta) <= radiusSquared then
++                    remote:FireClient(player, payload)
++                end
++            end
++        end
++    end
++end
++
++return table.freeze(WeaponBounceService)
+diff --git a/src/server/combat/WeaponEnvironmentCollision.luau b/src/server/combat/WeaponEnvironmentCollision.luau
+new file mode 100644
+index 0000000..267f76e
+--- /dev/null
++++ b/src/server/combat/WeaponEnvironmentCollision.luau
+@@ -0,0 +1,162 @@
++local Workspace = game:GetService("Workspace")
++
++local EnvironmentAssetService = require(script.Parent.Parent:WaitForChild("world"):WaitForChild("EnvironmentAssetService"))
++
++local WeaponEnvironmentCollision = {}
++
++local filterRevision = -1
++local blockingCount = 0
++local rayParams = RaycastParams.new()
++local overlapQueryParams = OverlapParams.new()
++local overlapProbe: Part? = nil
++rayParams.FilterType = Enum.RaycastFilterType.Include
++rayParams.IgnoreWater = true
++overlapQueryParams.FilterType = Enum.RaycastFilterType.Include
++overlapQueryParams.MaxParts = 32
++
++local function refreshFilters(): boolean
++    local registeredModels, revision = EnvironmentAssetService.GetRegisteredSnapshot()
++    if revision == filterRevision then
++        return blockingCount > 0
++    end
++
++    local blockingModels = {}
++    for _, model in ipairs(registeredModels) do
++        local definition = EnvironmentAssetService.GetDefinition(model)
++        if definition and definition.destructible ~= true then
++            table.insert(blockingModels, model)
++        end
++    end
++    rayParams.FilterDescendantsInstances = blockingModels
++    overlapQueryParams.FilterDescendantsInstances = blockingModels
++    blockingCount = #blockingModels
++    filterRevision = revision
++    return blockingCount > 0
++end
++
++local function queryProbe(): Part
++    local current = overlapProbe
++    if current and current.Parent == Workspace then
++        return current
++    end
++
++    local probe = Instance.new("Part")
++    probe.Name = "_Game1WeaponEnvironmentProbe"
++    probe.Anchored = true
++    probe.CanCollide = false
++    probe.CanTouch = false
++    probe.CanQuery = false
++    probe.CastShadow = false
++    probe.Transparency = 1
++    probe.Archivable = false
++    probe.Size = Vector3.one
++    probe.Parent = Workspace
++    overlapProbe = probe
++    return probe
++end
++
++local function contactFromPart(part: BasePart, volume: any): (Vector3, Vector3)
++    local origin = if typeof(volume.weaponBonePosition) == "Vector3" then volume.weaponBonePosition else volume.cframe.Position
++    local direction = if typeof(volume.direction) == "Vector3" and volume.direction.Magnitude > 1e-6
++        then volume.direction.Unit
++        else volume.cframe.LookVector
++    local distance = math.max(0.01, tonumber(volume.bladeLength) or 0) + math.max(0, tonumber(volume.extension) or 0)
++
++    local params = RaycastParams.new()
++    params.FilterType = Enum.RaycastFilterType.Include
++    params.FilterDescendantsInstances = { part }
++    params.IgnoreWater = true
++    local ray = Workspace:Raycast(origin, direction * distance, params)
++    if ray then
++        return ray.Position, ray.Normal
++    end
++
++    local contact = part.Position
++    pcall(function()
++        contact = part:GetClosestPointOnSurface(volume.cframe.Position)
++    end)
++    local normal = volume.cframe.Position - contact
++    if normal.Magnitude <= 1e-5 then
++        normal = -direction
++    end
++    return contact, normal.Unit
++end
++
++local function resolveHit(part: BasePart, position: Vector3, normal: Vector3): any?
++    local model, definition = EnvironmentAssetService.ResolvePart(part)
++    if not model or not definition or definition.destructible == true then
++        return nil
++    end
++    return {
++        model = model,
++        definition = definition,
++        part = part,
++        position = position,
++        normal = if normal.Magnitude > 1e-6 then normal.Unit else Vector3.yAxis,
++    }
++end
++
++function WeaponEnvironmentCollision.Query(previousVolume: any?, currentVolume: any): any?
++    if type(currentVolume) ~= "table" or typeof(currentVolume.cframe) ~= "CFrame" or typeof(currentVolume.size) ~= "Vector3" then
++        return nil
++    end
++    if not refreshFilters() then
++        return nil
++    end
++
++    -- Translation uses Blockcast so the first physical collision on the swept
++    -- weapon box is authoritative. Roblox shapecasts intentionally ignore an
++    -- overlap that already exists at the starting pose, so the exact-volume
++    -- GetPartsInPart query below covers first-sample and rotation-only contact.
++    if type(previousVolume) == "table" and typeof(previousVolume.cframe) == "CFrame" then
++        local displacement = currentVolume.cframe.Position - previousVolume.cframe.Position
++        if displacement.Magnitude > 1e-4 then
++            local castSize = Vector3.new(
++                math.max(previousVolume.size.X, currentVolume.size.X),
++                math.max(previousVolume.size.Y, currentVolume.size.Y),
++                math.max(previousVolume.size.Z, currentVolume.size.Z)
++            )
++            local hit = Workspace:Blockcast(previousVolume.cframe, castSize, displacement, rayParams)
++            if hit and hit.Instance and hit.Instance:IsA("BasePart") then
++                local resolved = resolveHit(hit.Instance, hit.Position, hit.Normal)
++                if resolved then
++                    return resolved
++                end
++            end
++        end
++    end
++
++    local probe = queryProbe()
++    probe.Size = currentVolume.size
++    probe.CFrame = currentVolume.cframe
++    local candidates = Workspace:GetPartsInPart(probe, overlapQueryParams)
++    if #candidates == 0 then
++        return nil
++    end
++
++    local best = nil
++    local bestDistance = math.huge
++    local reference = if typeof(currentVolume.weaponBonePosition) == "Vector3"
++        then currentVolume.weaponBonePosition
++        else currentVolume.cframe.Position
++    for _, part in ipairs(candidates) do
++        local model, definition = EnvironmentAssetService.ResolvePart(part)
++        if model and definition and definition.destructible ~= true then
++            local position, normal = contactFromPart(part, currentVolume)
++            local distance = (position - reference).Magnitude
++            if distance < bestDistance then
++                bestDistance = distance
++                best = {
++                    model = model,
++                    definition = definition,
++                    part = part,
++                    position = position,
++                    normal = normal,
++                }
++            end
++        end
++    end
++    return best
++end
++
++return table.freeze(WeaponEnvironmentCollision)
+diff --git a/src/server/init.server.luau b/src/server/init.server.luau
+index ee331ac..a6dec3e 100644
+--- a/src/server/init.server.luau
++++ b/src/server/init.server.luau
+@@ -8,12 +8,15 @@ local CharacterRoot = script:WaitForChild("character")
+ local CombatRoot = script:WaitForChild("combat")
+ local DevRoot = script:WaitForChild("dev")
+ local MonsterRoot = script:WaitForChild("monster")
++local WorldRoot = script:WaitForChild("world")
+ 
+ local CharacterService = require(CharacterRoot:WaitForChild("CharacterService"))
+ local EntityHitboxService = require(CombatRoot:WaitForChild("EntityHitboxService"))
+ local AttackService = require(CombatRoot:WaitForChild("AttackService"))
+ local HitEffectService = require(CombatRoot:WaitForChild("HitEffectService"))
+ local CombatFeedbackService = require(CombatRoot:WaitForChild("CombatFeedbackService"))
++local WeaponBounceService = require(CombatRoot:WaitForChild("WeaponBounceService"))
++local EnvironmentAssetService = require(WorldRoot:WaitForChild("EnvironmentAssetService"))
+ local TrainingDummyService = require(DevRoot:WaitForChild("TrainingDummyService"))
+ local TestLoadoutService = require(DevRoot:WaitForChild("TestLoadoutService"))
+ local MovementDebugService = require(DevRoot:WaitForChild("MovementDebugService"))
+@@ -24,7 +27,9 @@ local MonsterAIService = require(MonsterRoot:WaitForChild("MonsterAIService"))
+ print(("[game1][server] %s v%s · runtime %s")
+     :format(ProjectInfo.Name, ProjectInfo.Version, RuntimeVersion.Version))
+ 
++EnvironmentAssetService.Start()
+ EntityHitboxService.Start()
++WeaponBounceService.Start()
+ HitEffectService.Start()
+ CombatFeedbackService.Start()
+ AttackService.Start()
+diff --git a/src/server/world/EnvironmentAssetService.luau b/src/server/world/EnvironmentAssetService.luau
+new file mode 100644
+index 0000000..8894c2f
+--- /dev/null
++++ b/src/server/world/EnvironmentAssetService.luau
+@@ -0,0 +1,155 @@
++local ReplicatedStorage = game:GetService("ReplicatedStorage")
++local Workspace = game:GetService("Workspace")
++
++local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
++local WorldShared = Shared:WaitForChild("world")
++local LocationAssetRegistry = require(WorldShared:WaitForChild("LocationAssetRegistry"))
++
++local EnvironmentAssetService = {}
++
++local ROOT_NAME = "Game1DecoAssets"
++local LOCATION_ASSET_ID_ATTRIBUTE = "Game1DecoAssetSlug"
++
++local started = false
++local definitionsByModel: { [Model]: any } = {}
++local registeredModels: { Model } = {}
++local registryRevision = 0
++local rootConnections: { RBXScriptConnection } = {}
++
++local function clearConnections()
++    for _, connection in ipairs(rootConnections) do
++        connection:Disconnect()
++    end
++    table.clear(rootConnections)
++end
++
++local function rebuildRegisteredModels()
++    local nextModels = {}
++    for model in pairs(definitionsByModel) do
++        if model.Parent ~= nil then
++            table.insert(nextModels, model)
++        end
++    end
++    table.sort(nextModels, function(left, right)
++        return left:GetFullName() < right:GetFullName()
++    end)
++    registeredModels = nextModels
++    registryRevision += 1
++end
++
++local function applyStaticRuntimePhysics(model: Model)
++    -- Authoring stays editable: DecoManager saves unanchored instances in Studio.
++    -- Runtime owns world physics and turns registered location assets into stable
++    -- scenery without copying gameplay policy into Instance attributes.
++    for _, descendant in ipairs(model:GetDescendants()) do
++        if descendant:IsA("BasePart") then
++            descendant.Anchored = true
++            descendant.CanQuery = true
++        end
++    end
++end
++
++local function unregisterModel(model: Model, deferRebuild: boolean?)
++    if definitionsByModel[model] == nil then
++        return
++    end
++    definitionsByModel[model] = nil
++    if deferRebuild ~= true then
++        rebuildRegisteredModels()
++    end
++end
++
++local function registerModel(model: Model, deferRebuild: boolean?)
++    local locationAssetId = tostring(model:GetAttribute(LOCATION_ASSET_ID_ATTRIBUTE) or "")
++    if locationAssetId == "" then
++        unregisterModel(model, deferRebuild)
++        return
++    end
++
++    local definition = LocationAssetRegistry.assets[locationAssetId]
++    if type(definition) ~= "table" or tostring(definition.status or "") ~= "PUBLISHED" then
++        warn(("[game1][environment] placed asset %s references unknown/unpublished location asset %s")
++            :format(model:GetFullName(), locationAssetId))
++        unregisterModel(model, deferRebuild)
++        return
++    end
++
++    definitionsByModel[model] = definition
++    applyStaticRuntimePhysics(model)
++    if deferRebuild ~= true then
++        rebuildRegisteredModels()
++    end
++end
++
++local function scanRoot(root: Instance)
++    table.clear(definitionsByModel)
++    for _, descendant in ipairs(root:GetDescendants()) do
++        if descendant:IsA("Model") and tostring(descendant:GetAttribute(LOCATION_ASSET_ID_ATTRIBUTE) or "") ~= "" then
++            registerModel(descendant, true)
++        end
++    end
++    rebuildRegisteredModels()
++end
++
++function EnvironmentAssetService.GetDefinition(model: Model): any?
++    return definitionsByModel[model]
++end
++
++function EnvironmentAssetService.ResolvePart(part: BasePart): (Model?, any?)
++    local cursor: Instance? = part
++    while cursor and cursor ~= Workspace do
++        if cursor:IsA("Model") then
++            local definition = definitionsByModel[cursor]
++            if definition ~= nil then
++                return cursor, definition
++            end
++        end
++        cursor = cursor.Parent
++    end
++    return nil, nil
++end
++
++-- Consumers receive the service-owned array plus a revision number and must treat
++-- the array as read-only. Domain-specific systems (combat, harvesting, etc.) can
++-- derive their own filtered indexes without EnvironmentAssetService owning those
++-- gameplay rules.
++function EnvironmentAssetService.GetRegisteredSnapshot(): ({ Model }, number)
++    return registeredModels, registryRevision
++end
++
++function EnvironmentAssetService.Start()
++    if started then
++        return
++    end
++    started = true
++
++    clearConnections()
++    local root = Workspace:FindFirstChild(ROOT_NAME)
++    if root == nil then
++        root = Instance.new("Folder")
++        root.Name = ROOT_NAME
++        root.Parent = Workspace
++    end
++
++    scanRoot(root)
++    table.insert(rootConnections, root.DescendantAdded:Connect(function(descendant)
++        if descendant:IsA("Model") and tostring(descendant:GetAttribute(LOCATION_ASSET_ID_ATTRIBUTE) or "") ~= "" then
++            registerModel(descendant)
++        elseif descendant:IsA("BasePart") then
++            local model = descendant:FindFirstAncestorOfClass("Model")
++            if model and definitionsByModel[model] then
++                descendant.Anchored = true
++                descendant.CanQuery = true
++            end
++        end
++    end))
++    table.insert(rootConnections, root.DescendantRemoving:Connect(function(descendant)
++        if descendant:IsA("Model") and definitionsByModel[descendant] then
++            unregisterModel(descendant)
++        end
++    end))
++
++    print(("[game1][environment] registered %d placed location asset(s)"):format(#registeredModels))
++end
++
++return table.freeze(EnvironmentAssetService)
+diff --git a/src/shared/combat/WeaponBounceConfig.luau b/src/shared/combat/WeaponBounceConfig.luau
+new file mode 100644
+index 0000000..ad77fbe
+--- /dev/null
++++ b/src/shared/combat/WeaponBounceConfig.luau
+@@ -0,0 +1,9 @@
++return table.freeze({
++    RemoteName = "WeaponBounce",
++    ReverseSpeedMultiplier = 2,
++    RecoverySeconds = 0.12,
++    MinimumRecoverySeconds = 0.05,
++    EffectPoolSize = 6,
++    ServerReplicationRadius = 160,
++    ClientRenderRadius = 180,
++})
+diff --git a/src/shared/world/LocationAssetRegistry.luau b/src/shared/world/LocationAssetRegistry.luau
+index 7e06e35..27b3363 100644
+--- a/src/shared/world/LocationAssetRegistry.luau
++++ b/src/shared/world/LocationAssetRegistry.luau
+@@ -1,6 +1,6 @@
+ -- generated. do not edit by hand.
+ return table.freeze({
+-	schemaVersion = 2,
++	schemaVersion = 3,
+ 	project = "game1",
+ 	assets = table.freeze({
+ 		["pillar_with_lantern"] = table.freeze({
+@@ -12,6 +12,7 @@ return table.freeze({
+ 			textureAssetId = "128890927196285",
+ 			textureOwnerSlug = "main_statue",
+ 			textureShared = true,
++			destructible = false,
+ 		}),
+ 		["main_statue"] = table.freeze({
+ 			slug = "main_statue",
+@@ -22,6 +23,7 @@ return table.freeze({
+ 			textureAssetId = "128890927196285",
+ 			textureOwnerSlug = "main_statue",
+ 			textureShared = false,
++			destructible = false,
+ 		}),
+ 		["christmas_tree"] = table.freeze({
+ 			slug = "christmas_tree",
+@@ -32,6 +34,7 @@ return table.freeze({
+ 			textureAssetId = "130407188742566",
+ 			textureOwnerSlug = "christmas_tree",
+ 			textureShared = false,
++			destructible = false,
+ 		}),
+ 	}),
+ })
+diff --git a/system/control-center/deco_layout_store.py b/system/control-center/deco_layout_store.py
+index 180f008..d4fdc96 100644
+--- a/system/control-center/deco_layout_store.py
++++ b/system/control-center/deco_layout_store.py
+@@ -15,11 +15,10 @@ class DecoLayoutStore:
+     def _validate_record(record: dict, index: int) -> dict:
+         if not isinstance(record, dict):
+             raise ValueError(f"deco record {index} must be an object")
+-        slug = str(record.get("slug") or "").strip().lower()
+-        category = str(record.get("category") or "").strip().lower()
++        location_asset_id = str(record.get("locationAssetId") or "").strip().lower()
+         cframe = record.get("cframe")
+-        if not slug or not category:
+-            raise ValueError(f"deco record {index} is missing slug/category")
++        if not location_asset_id:
++            raise ValueError(f"deco record {index} is missing locationAssetId")
+         if not isinstance(cframe, list) or len(cframe) != 12:
+             raise ValueError(f"deco record {index} cframe must contain 12 numbers")
+         try:
+@@ -31,11 +30,8 @@ class DecoLayoutStore:
+             raise ValueError(f"deco record {index} scale must be positive")
+         return {
+             "instanceId": str(record.get("instanceId") or "").strip(),
+-            "name": str(record.get("name") or slug).strip(),
+-            "slug": slug,
+-            "category": category,
+-            "modelAssetId": str(record.get("modelAssetId") or "").strip(),
+-            "textureAssetId": str(record.get("textureAssetId") or "").strip(),
++            "name": str(record.get("name") or location_asset_id).strip(),
++            "locationAssetId": location_asset_id,
+             "cframe": normalized_cframe,
+             "scale": scale,
+         }
+@@ -48,7 +44,7 @@ class DecoLayoutStore:
+         now = datetime.now(timezone.utc)
+         stamp = now.strftime("%Y%m%dT%H%M%S-%fZ")
+         snapshot = {
+-            "schemaVersion": 1,
++            "schemaVersion": 2,
+             "project": "game1",
+             "savedAt": now.isoformat().replace("+00:00", "Z"),
+             "placeId": int(payload.get("placeId") or 0),
+diff --git a/system/control-center/host_agent.py b/system/control-center/host_agent.py
+index efb07ea..9b6eba7 100644
+--- a/system/control-center/host_agent.py
++++ b/system/control-center/host_agent.py
+@@ -44,7 +44,7 @@ from studio_save import request_active_studio_save
+ from character_core.identity import CharacterIdentityService
+ from studio_bridge import run_model_load_bridge, run_monster_spawn_bridge, run_timeline_editor_bridge, run_location_authoring_bridge
+ 
+-control_agent_build = "game1-m46-location-assets-shared-textures-001"
++control_agent_build = "game1-m50-environment-weapon-bounce-001"
+ port = int(os.environ.get("CONTROL_AGENT_PORT", "43821"))
+ token = os.environ.get("CONTROL_TOKEN", "Game1LocalControlV1")
+ store = CharacterStore(ROOT)
+diff --git a/system/control-center/location_asset_store.py b/system/control-center/location_asset_store.py
+index 06a1507..c89aa2f 100644
+--- a/system/control-center/location_asset_store.py
++++ b/system/control-center/location_asset_store.py
+@@ -16,7 +16,7 @@ from opencloud_assets import (
+     wait_for_operation,
+ )
+ 
+-SCHEMA_VERSION = 2
++SCHEMA_VERSION = 3
+ PROJECT = "game1"
+ CATEGORIES = ("tree", "bush", "rock", "light", "fence", "decoration")
+ TEXTURE_SUFFIXES = (".png", ".jpg", ".jpeg")
+@@ -31,6 +31,21 @@ CATEGORY_LABELS = {
+ SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_]{0,63}$")
+ 
+ 
++def parse_bool(value, default: bool = False) -> bool:
++    if value is None:
++        return default
++    if isinstance(value, bool):
++        return value
++    if isinstance(value, (int, float)):
++        return value != 0
++    normalized = str(value).strip().lower()
++    if normalized in {"1", "true", "yes", "on"}:
++        return True
++    if normalized in {"0", "false", "no", "off", ""}:
++        return False
++    raise ValueError("destructible must be a boolean")
++
++
+ def slugify_english(value: str) -> str:
+     text = str(value or "").strip().lower()
+     text = re.sub(r"[^a-z0-9]+", "_", text).strip("_")
+@@ -78,6 +93,7 @@ class LocationAssetStore:
+                     texture_published_sha256 TEXT NOT NULL DEFAULT '',
+                     texture_moderation_state TEXT NOT NULL DEFAULT '',
+                     texture_reference_slug TEXT NOT NULL DEFAULT '',
++                    destructible INTEGER NOT NULL DEFAULT 0,
+                     revision INTEGER NOT NULL DEFAULT 1,
+                     created_at REAL NOT NULL,
+                     updated_at REAL NOT NULL,
+@@ -89,6 +105,10 @@ class LocationAssetStore:
+                 connection.execute(
+                     "ALTER TABLE location_assets ADD COLUMN texture_reference_slug TEXT NOT NULL DEFAULT ''"
+                 )
++            if "destructible" not in columns:
++                connection.execute(
++                    "ALTER TABLE location_assets ADD COLUMN destructible INTEGER NOT NULL DEFAULT 0"
++                )
+             connection.execute(
+                 """CREATE TABLE IF NOT EXISTS location_asset_publications(
+                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+@@ -171,6 +191,7 @@ class LocationAssetStore:
+         owner = self._resolve_texture_owner(result, rows_by_slug)
+         result["texture_owner_slug"] = str(owner.get("slug") or "") if owner else ""
+         result["texture_shared"] = bool(str(result.get("texture_reference_slug") or ""))
++        result["destructible"] = bool(result.get("destructible"))
+         if owner is not None and owner.get("slug") != result.get("slug"):
+             for field in (
+                 "texture_source_path",
+@@ -228,6 +249,7 @@ class LocationAssetStore:
+         if old is None:
+             old = self._raw_get(slug)
+         category = str(payload.get("category") or (old.get("category") if old else "") or "").strip().lower()
++        destructible = parse_bool(payload.get("destructible"), bool(old.get("destructible")) if old else False)
+         if category not in CATEGORIES:
+             raise ValueError("location asset category must be tree, bush, rock, light, fence or decoration")
+ 
+@@ -331,9 +353,9 @@ class LocationAssetStore:
+                 """INSERT OR REPLACE INTO location_assets(
+                     slug,name_en,category,
+                     model_source_path,model_prepared_path,model_sha256,model_asset_id,model_published_sha256,model_moderation_state,
+-                    texture_source_path,texture_prepared_path,texture_sha256,texture_asset_id,texture_published_sha256,texture_moderation_state,texture_reference_slug,
++                    texture_source_path,texture_prepared_path,texture_sha256,texture_asset_id,texture_published_sha256,texture_moderation_state,texture_reference_slug,destructible,
+                     revision,created_at,updated_at,published_at
+-                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
++                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                 (
+                     slug, name_en, category,
+                     values["model_source_path"], values["model_prepared_path"], values["model_sha256"],
+@@ -341,7 +363,7 @@ class LocationAssetStore:
+                     str(old.get("model_published_sha256") or "") if old else "",
+                     str(old.get("model_moderation_state") or "") if old else "",
+                     values["texture_source_path"], values["texture_prepared_path"], values["texture_sha256"],
+-                    texture_asset_id, texture_published_sha256, texture_moderation_state, stored_reference,
++                    texture_asset_id, texture_published_sha256, texture_moderation_state, stored_reference, 1 if destructible else 0,
+                     revision,
+                     old.get("created_at") if old else now,
+                     now,
+@@ -519,6 +541,7 @@ class LocationAssetStore:
+                 f"\t\t\ttextureAssetId = {self._lua_string(row.get('texture_asset_id') or '')},",
+                 f"\t\t\ttextureOwnerSlug = {self._lua_string(row.get('texture_owner_slug') or '')},",
+                 f"\t\t\ttextureShared = {str(bool(row.get('texture_shared'))).lower()},",
++                f"\t\t\tdestructible = {str(bool(row.get('destructible'))).lower()},",
+                 "\t\t}),",
+             ])
+         lines.extend(["\t}),", "})", ""])
+diff --git a/system/control-center/static/deco-assets.css b/system/control-center/static/deco-assets.css
+index c4a9951..0a34e50 100644
+--- a/system/control-center/static/deco-assets.css
++++ b/system/control-center/static/deco-assets.css
+@@ -67,3 +67,33 @@
+     grid-template-columns: 1fr;
+   }
+ }
++
++.deco-gameplay-policy {
++  margin-top: 10px;
++  padding: 11px 12px;
++  border: 1px solid var(--line);
++  border-radius: 12px;
++  background: var(--panel2);
++}
++
++.deco-policy-toggle {
++  display: flex;
++  align-items: flex-start;
++  gap: 10px;
++  margin: 0;
++}
++
++.deco-policy-toggle input {
++  margin-top: 3px;
++  flex: 0 0 auto;
++}
++
++.deco-policy-toggle span {
++  display: grid;
++  gap: 3px;
++}
++
++.deco-policy-toggle small {
++  color: var(--muted);
++  line-height: 1.4;
++}
+diff --git a/system/control-center/static/deco-assets.js b/system/control-center/static/deco-assets.js
+index a3c6d04..8b9b3ee 100644
+--- a/system/control-center/static/deco-assets.js
++++ b/system/control-center/static/deco-assets.js
+@@ -44,6 +44,7 @@ function decoAssetSetForm(row) {
+     $('location-asset-name').value = row.name_en || '';
+     $('location-asset-slug').value = row.slug || '';
+     $('location-asset-category').value = row.category || 'tree';
++    $('location-asset-destructible').checked = row.destructible === true || Number(row.destructible || 0) === 1;
+     $('picked-location-asset-model').textContent = 'keep current fbx or choose a replacement';
+     $('picked-location-asset-texture').textContent = row.texture_shared
+       ? `reusing ${row.texture_owner_slug || row.texture_reference_slug}`
+@@ -52,6 +53,7 @@ function decoAssetSetForm(row) {
+     $('location-asset-name').value = '';
+     $('location-asset-slug').value = '';
+     $('location-asset-category').value = decoAssetState.data?.options?.categories?.[0]?.id || 'tree';
++    $('location-asset-destructible').checked = false;
+     $('picked-location-asset-model').textContent = 'fbx not selected';
+     $('picked-location-asset-texture').textContent = 'PNG/JPG not selected';
+   }
+@@ -154,7 +156,8 @@ function decoAssetRender() {
+   rows.innerHTML = '';
+   for (const row of decoAssetState.data.items || []) {
+     const tr = document.createElement('tr');
+-    tr.innerHTML = `<td><b>${esc(row.name_en)}</b><small>${esc(row.slug)}</small></td><td>${esc(decoAssetCategoryLabel(row.category))}</td><td><small>model ${esc(row.model_asset_id || '—')}</small><small>${row.texture_shared ? `shared ${esc(row.texture_owner_slug || row.texture_reference_slug)} · ` : 'texture '}${esc(row.texture_asset_id || '—')}</small></td><td>${decoAssetStatusTag(row.status)}</td><td><button data-select type="button">edit</button></td>`;
++    const contactPolicy = (row.destructible === true || Number(row.destructible || 0) === 1) ? '<span class="tag">destructible</span>' : '<span class="tag published">solid · bounce</span>';
++    tr.innerHTML = `<td><b>${esc(row.name_en)}</b><small>${esc(row.slug)}</small></td><td>${esc(decoAssetCategoryLabel(row.category))}</td><td>${contactPolicy}</td><td><small>model ${esc(row.model_asset_id || '—')}</small><small>${row.texture_shared ? `shared ${esc(row.texture_owner_slug || row.texture_reference_slug)} · ` : 'texture '}${esc(row.texture_asset_id || '—')}</small></td><td>${decoAssetStatusTag(row.status)}</td><td><button data-select type="button">edit</button></td>`;
+     tr.querySelector('[data-select]').onclick = () => decoAssetSetForm(row);
+     rows.appendChild(tr);
+   }
+@@ -206,6 +209,7 @@ async function decoAssetRegister() {
+       modelSourcePath: decoAssetState.modelPath,
+       textureSourcePath: decoAssetState.texturePath,
+       textureReferenceSlug: decoAssetState.textureReferenceSlug,
++      destructible: $('location-asset-destructible').checked,
+     };
+     if (!selected && !payload.modelSourcePath) {
+       throw Error('choose FBX');
+diff --git a/system/control-center/static/index.html b/system/control-center/static/index.html
+index df3e5f6..2a0373f 100644
+--- a/system/control-center/static/index.html
++++ b/system/control-center/static/index.html
+@@ -6,7 +6,7 @@
+ <title>game1 · asset manager</title>
+ <link rel="stylesheet" href="asset-manager.css?v=8">
+ <link rel="stylesheet" href="location-assets.css?v=1">
+-<link rel="stylesheet" href="deco-assets.css?v=2">
++<link rel="stylesheet" href="deco-assets.css?v=3">
+ </head>
+ <body>
+ <header>
+@@ -248,6 +248,7 @@
+ <label>asset name<input id="location-asset-name" autocomplete="off" placeholder="for example Oak Tree"></label>
+ <label>slug<input id="location-asset-slug" readonly><small class="hint">stable lowercase id generated from the asset name.</small></label>
+ <label>category<select id="location-asset-category"></select></label>
++<div class="deco-gameplay-policy"><label class="deco-policy-toggle"><input id="location-asset-destructible" type="checkbox"><span><b>Destructible</b><small>On: weapon attacks pass through for the future destruction pipeline. Off: the asset is a solid weapon blocker and causes bounce.</small></span></label></div>
+ <hr class="card-separator">
+ <span class="eyebrow">02 · source assets</span>
+ <div class="deco-source-pickers"><div class="picker"><button id="choose-location-asset-model" type="button">choose fbx</button><small id="picked-location-asset-model">fbx not selected</small></div><div class="picker"><button id="choose-location-asset-texture" type="button">choose PNG/JPG</button><small id="picked-location-asset-texture">PNG/JPG not selected</small></div></div>
+@@ -263,7 +264,7 @@
+ <div class="panel character-card">
+ <div class="section-title"><div><span>published library</span><h3>registered assets</h3></div><button id="refresh-location-assets-table" type="button">refresh</button></div>
+ <div class="deco-assets-note"><strong>Studio placement</strong><span>Open <b>DecoManager</b> in Roblox Studio, choose a category, browse variants with arrows, then Place. <b>Save Assets Data</b> snapshots all placed instances and saves the place.</span></div>
+-<div class="table-wrap weapon-table-wrap"><table><thead><tr><th>asset</th><th>category</th><th>Roblox assets</th><th>status</th><th></th></tr></thead><tbody id="location-asset-rows"></tbody></table></div>
++<div class="table-wrap weapon-table-wrap"><table><thead><tr><th>asset</th><th>category</th><th>weapon contact</th><th>Roblox assets</th><th>status</th><th></th></tr></thead><tbody id="location-asset-rows"></tbody></table></div>
+ </div>
+ </div>
+ </div>
+@@ -368,7 +369,7 @@
+ <script src="animation-speed.js?v=1"></script>
+ <script src="timelines.js?v=2"></script>
+ <script src="locations.js?v=1"></script>
+-<script src="deco-assets.js?v=2"></script>
++<script src="deco-assets.js?v=3"></script>
+ <script src="options.js?v=1"></script>
+ <script src="weapon-assets.js?v=3"></script>
+ <script src="monster-assets.js?v=4"></script>
+diff --git a/system/studio-plugin/Game1Bridge.server.luau b/system/studio-plugin/Game1Bridge.server.luau
+index fde5396..2a7a5ed 100644
+--- a/system/studio-plugin/Game1Bridge.server.luau
++++ b/system/studio-plugin/Game1Bridge.server.luau
+@@ -1805,4 +1805,4 @@ task.spawn(function()
+     end
+ end)
+ 
+-print("[game1 plugin] loaded · model bridge v20 · DecoManager editable placement + authored FBX basis + decorations + shared textures + locations + viewport timeline pose sampler")
++print("[game1 plugin] loaded · model bridge v21 · DecoManager identity-only placement + environment bounce authoring + locations + viewport timeline pose sampler")
+diff --git a/system/studio-plugin/install.ps1 b/system/studio-plugin/install.ps1
+index 80d3489..2f6f300 100644
+--- a/system/studio-plugin/install.ps1
++++ b/system/studio-plugin/install.ps1
+@@ -20,7 +20,7 @@ try {
+ 
+ if(-not (Test-Path $Temp)){throw 'Rojo did not create the plugin build'}
+ $BuiltText=Get-Content $Temp -Raw
+-foreach($Marker in @('Game1ControlCenter','model bridge v20','Game1AttackTimeline_v2','TimelinePreviewWorld','location-authoring','Game1LocationMarker','Game1DecoManager_v1','DecoPreviewWorld','Save Assets Data','Game1DecoAssets')){
++foreach($Marker in @('Game1ControlCenter','model bridge v21','Game1AttackTimeline_v2','TimelinePreviewWorld','location-authoring','Game1LocationMarker','Game1DecoManager_v1','DecoPreviewWorld','Save Assets Data','Game1DecoAssets')){
+     if(-not $BuiltText.Contains($Marker)){
+         throw "Studio bridge build is stale or incomplete; missing marker: $Marker"
+     }
+@@ -38,7 +38,7 @@ $InstalledHash=(Get-FileHash $Installed -Algorithm SHA256).Hash
+ if($GeneratedHash -ne $InstalledHash){throw 'Installed Studio bridge hash does not match generated bridge hash'}
+ Remove-Item $Temp -Force -ErrorAction SilentlyContinue
+ 
+-Write-Host ("Game1Bridge installed with DecoManager + Locations authoring + in-plugin Attack Timeline viewport preview: {0}" -f $Installed)
++Write-Host ("Game1Bridge installed with DecoManager identity placement + Locations authoring + Attack Timeline preview: {0}" -f $Installed)
+ Write-Host ("SHA256: {0}" -f $InstalledHash)
+ Write-Host 'DecoManager places published Location Assets; Locations draw from Asset Manager / Locations; Attack Timeline opens from Asset Manager / Timelines.'
+ Write-Host 'Fully close every Roblox Studio window, then reopen Studio once.'
+diff --git a/system/studio-plugin/modules/DecoPlacement.luau b/system/studio-plugin/modules/DecoPlacement.luau
+index c54a40a..120de8e 100644
+--- a/system/studio-plugin/modules/DecoPlacement.luau
++++ b/system/studio-plugin/modules/DecoPlacement.luau
+@@ -175,12 +175,10 @@ function DecoPlacement:_commit()
+     preparePlaced(placed)
+     local instanceId = self.HttpService:GenerateGUID(false)
+     placed.Name = tostring(row.slug or "deco") .. "__" .. string.sub(instanceId, 1, 8)
+-    placed:SetAttribute("Game1DecoAsset", true)
++    -- Studio placement stores identity, not gameplay policy. Runtime resolves the
++    -- current LocationAssetRegistry definition from this stable asset key.
+     placed:SetAttribute("Game1DecoInstanceId", instanceId)
+     placed:SetAttribute("Game1DecoAssetSlug", tostring(row.slug or ""))
+-    placed:SetAttribute("Game1DecoCategory", tostring(row.category or ""))
+-    placed:SetAttribute("Game1DecoModelAssetId", tostring(row.model_asset_id or ""))
+-    placed:SetAttribute("Game1DecoTextureAssetId", tostring(row.texture_asset_id or ""))
+     placed.Parent = self:_categoryFolder(tostring(row.category or ""))
+     placed:PivotTo(pivot)
+ 
+@@ -242,7 +240,7 @@ function DecoPlacement:serialize(): { any }
+     end
+     local records = {}
+     for _, descendant in ipairs(root:GetDescendants()) do
+-        if descendant:IsA("Model") and descendant:GetAttribute("Game1DecoAsset") == true then
++        if descendant:IsA("Model") and tostring(descendant:GetAttribute("Game1DecoAssetSlug") or "") ~= "" then
+             local pivot = descendant:GetPivot()
+             local cframe = { pivot:GetComponents() }
+             local scale = 1
+@@ -252,10 +250,7 @@ function DecoPlacement:serialize(): { any }
+             table.insert(records, {
+                 instanceId = tostring(descendant:GetAttribute("Game1DecoInstanceId") or ""),
+                 name = descendant.Name,
+-                slug = tostring(descendant:GetAttribute("Game1DecoAssetSlug") or ""),
+-                category = tostring(descendant:GetAttribute("Game1DecoCategory") or ""),
+-                modelAssetId = tostring(descendant:GetAttribute("Game1DecoModelAssetId") or ""),
+-                textureAssetId = tostring(descendant:GetAttribute("Game1DecoTextureAssetId") or ""),
++                locationAssetId = tostring(descendant:GetAttribute("Game1DecoAssetSlug") or ""),
+                 cframe = cframe,
+                 scale = scale,
+             })
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index 8636ac1..fd3a40a 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -1974,7 +1974,7 @@ for required in [
+     'AnimationClipProvider:GetAnimationClipAsync',
+     'clip:IsA("KeyframeSequence")',
+     'preview.Parent = timelineWorld',
+-    'model bridge v20',
++    'model bridge v21',
+ ]:
+     if required not in studio_plugin_text:
+         err(f"m37 in-plugin timeline preview missing {required}")
+@@ -2106,7 +2106,7 @@ for required in [
+ ]:
+     if required not in location_plugin_text:
+         err(f"m41 Studio Location authoring module missing {required}")
+-for required in ['require(script.Parent.modules.LocationCommands)', 'data.command == "location-authoring"', 'model bridge v20']:
++for required in ['require(script.Parent.modules.LocationCommands)', 'data.command == "location-authoring"', 'model bridge v21']:
+     if required not in studio_plugin_text:
+         err(f"m41 Game1Bridge Location integration missing {required}")
+ 
+@@ -2152,7 +2152,7 @@ for path in [
+ 
+ if location_asset_manifest_path.is_file():
+     location_asset_manifest = json.loads(location_asset_manifest_path.read_text(encoding="utf-8"))
+-    if location_asset_manifest.get("schemaVersion") != 2 or location_asset_manifest.get("project") != "game1":
++    if location_asset_manifest.get("schemaVersion") != 3 or location_asset_manifest.get("project") != "game1":
+         err("m43 location-assets.json schema/project is invalid")
+     category_ids = [row.get("id") for row in ((location_asset_manifest.get("options") or {}).get("categories") or [])]
+     if category_ids != ["tree", "bush", "rock", "light", "fence", "decoration"]:
+@@ -2192,7 +2192,7 @@ for required in [
+     'path == "/api/location-assets/layout"',
+     'location_assets.publish',
+     'location_assets.delete',
+-    'game1-m46-location-assets-shared-textures-001',
++    'game1-m50-environment-weapon-bounce-001',
+ ]:
+     if required not in host_agent_text:
+         err(f"m43 host agent Location Assets API missing {required}")
+@@ -2207,8 +2207,8 @@ for required in [
+     'id="choose-location-asset-model"',
+     'id="choose-location-asset-texture"',
+     'id="publish-location-asset"',
+-    'deco-assets.css?v=2',
+-    'deco-assets.js?v=2',
++    'deco-assets.css?v=3',
++    'deco-assets.js?v=3',
+ ]:
+     if required not in index_m43_text:
+         err(f"m43 Asset Manager Location Assets section missing {required}")
+@@ -2251,7 +2251,7 @@ for required in [
+     'decoration = "Decorations"',
+     "Workspace:Raycast",
+     "self.plugin:Activate(true)",
+-    'placed:SetAttribute("Game1DecoAsset", true)',
++    'placed:SetAttribute("Game1DecoAssetSlug", tostring(row.slug or ""))',
+     "function DecoPlacement:serialize()",
+     "DecoTransform.supportOffset",
+     "DecoTransform.placementPivot",
+@@ -2276,7 +2276,7 @@ for required in [
+ for required in [
+     'require(script.Parent.modules.DecoManager)',
+     'DecoManager.new({',
+-    'model bridge v20',
++    'model bridge v21',
+ ]:
+     if required not in studio_plugin_text:
+         err(f"m43 Game1Bridge DecoManager integration missing {required}")
+@@ -2302,7 +2302,7 @@ else:
+ 
+ for required in [
+     "from studio_save import request_active_studio_save",
+-    'control_agent_build = "game1-m46-location-assets-shared-textures-001"',
++    'control_agent_build = "game1-m50-environment-weapon-bounce-001"',
+     'result["studioSave"] = request_active_studio_save()',
+ ]:
+     if required not in host_agent_text:
+@@ -2318,7 +2318,7 @@ for required in [
+         err(f"m45 DecoManager drag/save hotfix missing {required}")
+ if "self.AssetService:SavePlaceAsync" in deco_manager_text:
+     err("m45 DecoManager still calls cloud SavePlaceAsync directly")
+-if "model bridge v20" not in studio_plugin_text:
++if "model bridge v21" not in studio_plugin_text:
+     err("m45 Studio plugin version marker is stale")
+ 
+ # m44 Location Assets: PNG/JPG source textures with clean extension-aware preparation.
+@@ -2343,7 +2343,7 @@ if "PNG/JPG" not in deco_assets_js_text or "PNG/JPG" not in index_m43_text:
+ 
+ # m46 Location Assets: Decorations category + shared registered texture references.
+ for required in [
+-    'SCHEMA_VERSION = 2',
++    'SCHEMA_VERSION = 3',
+     '"decoration": "Decorations"',
+     'texture_reference_slug TEXT NOT NULL DEFAULT',
+     'def _resolve_texture_owner',
+@@ -2379,7 +2379,7 @@ for required in [
+         err(f"m46 DecoManager Decorations category missing {required}")
+ if 'decoration = "Decorations"' not in deco_placement_text:
+     err("m46 DecoPlacement Decorations folder mapping is missing")
+-if "model bridge v20" not in studio_plugin_text:
++if "model bridge v21" not in studio_plugin_text:
+     err("m46 Studio plugin version marker is stale")
+ 
+ 
+@@ -2403,7 +2403,7 @@ for required in [
+ ]:
+     if required not in deco_loader_text:
+         err(f"m47 static Location Asset sanitization missing {required}")
+-if "model bridge v20" not in studio_plugin_text:
++if "model bridge v21" not in studio_plugin_text:
+     err("m47 Studio plugin version marker is stale")
+ 
+ 
+@@ -2437,7 +2437,7 @@ if "model:PivotTo(DecoTransform.previewPivot(model))" not in deco_manager_text:
+     err("m48 DecoManager preview still replaces the imported asset basis")
+ if '"DecoTransform"' not in (ROOT / "system/studio-plugin/plugin.project.json").read_text(encoding="utf-8"):
+     err("m48 Studio plugin project does not include DecoTransform")
+-if "model bridge v20" not in studio_plugin_text:
++if "model bridge v21" not in studio_plugin_text:
+     err("m48 Studio plugin version marker is stale")
+ 
+ 
+@@ -2450,13 +2450,195 @@ if prepare_placed_match is None:
+ elif 'Anchored = true' in prepare_placed_match.group(1):
+     err("m49 DecoPlacement still anchors placed decoration BaseParts")
+ 
++
++# m50 Environment weapon bounce: Location Asset gameplay policy is registry-owned,
++# DecoManager stores identity only, and solid environment contact terminates the
++# authored damage window before reversing the current attack at 2x speed.
++weapon_bounce_config_path = ROOT / "src/shared/combat/WeaponBounceConfig.luau"
++environment_asset_service_path = ROOT / "src/server/world/EnvironmentAssetService.luau"
++weapon_environment_collision_path = ROOT / "src/server/combat/WeaponEnvironmentCollision.luau"
++weapon_bounce_service_path = ROOT / "src/server/combat/WeaponBounceService.luau"
++weapon_bounce_controller_path = ROOT / "src/client/combat/WeaponBounceController.luau"
++weapon_bounce_effect_pool_path = ROOT / "src/client/combat/effects/WeaponBounceEffectPool.luau"
++for path in [
++    weapon_bounce_config_path,
++    environment_asset_service_path,
++    weapon_environment_collision_path,
++    weapon_bounce_service_path,
++    weapon_bounce_controller_path,
++    weapon_bounce_effect_pool_path,
++]:
++    if not path.is_file():
++        err(f"m50 weapon bounce module missing: {path.relative_to(ROOT)}")
++
++if location_asset_manifest_path.is_file():
++    location_asset_manifest = json.loads(location_asset_manifest_path.read_text(encoding="utf-8"))
++    if location_asset_manifest.get("schemaVersion") != 3:
++        err("m50 Location Asset manifest must use schemaVersion 3")
++    for row in location_asset_manifest.get("items") or []:
++        if not isinstance(row.get("destructible"), bool):
++            err(f"m50 Location Asset destructible policy missing/invalid for {row.get('slug')}")
++
++for required in [
++    "destructible INTEGER NOT NULL DEFAULT 0",
++    'ALTER TABLE location_assets ADD COLUMN destructible INTEGER NOT NULL DEFAULT 0',
++    'result["destructible"] = bool(result.get("destructible"))',
++    'f"\\t\\t\\tdestructible = {str(bool(row.get(\'destructible\'))).lower()},"',
++]:
++    if required not in location_asset_store_text:
++        err(f"m50 LocationAssetStore destructible policy missing {required}")
++for required in [
++    'id="location-asset-destructible"',
++    "solid weapon blocker and causes bounce",
++    "weapon contact",
++]:
++    if required not in index_m43_text:
++        err(f"m50 Location Assets destructible UI missing {required}")
++for required in [
++    "location-asset-destructible",
++    "destructible: $('location-asset-destructible').checked",
++    "solid · bounce",
++]:
++    if required not in deco_assets_js_text:
++        err(f"m50 Location Assets destructible behavior missing {required}")
++
++# Studio authoring persists only stable identity/editor metadata. Gameplay policy
++# is deliberately not copied to placed Instances.
++for required in [
++    'placed:SetAttribute("Game1DecoInstanceId", instanceId)',
++    'placed:SetAttribute("Game1DecoAssetSlug", tostring(row.slug or ""))',
++    'locationAssetId = tostring(descendant:GetAttribute("Game1DecoAssetSlug") or "")',
++]:
++    if required not in deco_placement_text:
++        err(f"m50 DecoPlacement identity-only authoring missing {required}")
++for forbidden in [
++    'SetAttribute("Destructible"',
++    'SetAttribute("Game1DecoAsset",',
++    'SetAttribute("Game1DecoCategory",',
++    'SetAttribute("Game1DecoModelAssetId",',
++    'SetAttribute("Game1DecoTextureAssetId",',
++]:
++    if forbidden in deco_placement_text:
++        err(f"m50 DecoPlacement still persists gameplay/redundant metadata: {forbidden}")
++for required in ['"schemaVersion": 2', '"locationAssetId": location_asset_id']:
++    if required not in deco_layout_store_text:
++        err(f"m50 deco backup identity schema missing {required}")
++
++if environment_asset_service_path.is_file():
++    environment_asset_service_text = environment_asset_service_path.read_text(encoding="utf-8")
++    for required in [
++        'LocationAssetRegistry = require',
++        'LOCATION_ASSET_ID_ATTRIBUTE = "Game1DecoAssetSlug"',
++        'descendant.Anchored = true',
++        'function EnvironmentAssetService.GetDefinition',
++        'function EnvironmentAssetService.ResolvePart',
++        'function EnvironmentAssetService.GetRegisteredSnapshot',
++        'registryRevision += 1',
++    ]:
++        if required not in environment_asset_service_text:
++            err(f"m50 EnvironmentAssetService missing {required}")
++    for forbidden in ['SetAttribute("Destructible"', 'SetAttribute("Game1DecoCategory"']:
++        if forbidden in environment_asset_service_text:
++            err(f"m50 runtime must resolve policy server-side instead of stamping Attributes: {forbidden}")
++
++if weapon_environment_collision_path.is_file():
++    weapon_environment_collision_text = weapon_environment_collision_path.read_text(encoding="utf-8")
++    for required in [
++        'EnvironmentAssetService.GetRegisteredSnapshot()',
++        'Workspace:Blockcast',
++        'Workspace:GetPartsInPart',
++        'definition.destructible == true',
++        'filterRevision',
++    ]:
++        if required not in weapon_environment_collision_text:
++            err(f"m50 WeaponEnvironmentCollision missing {required}")
++
++if weapon_bounce_config_path.is_file():
++    weapon_bounce_config_text = weapon_bounce_config_path.read_text(encoding="utf-8")
++    for required in [
++        'RemoteName = "WeaponBounce"',
++        'ReverseSpeedMultiplier = 2',
++        'RecoverySeconds = 0.12',
++        'ServerReplicationRadius = 160',
++        'ClientRenderRadius = 180',
++    ]:
++        if required not in weapon_bounce_config_text:
++            err(f"m50 WeaponBounceConfig missing {required}")
++
++if weapon_bounce_service_path.is_file():
++    weapon_bounce_service_text = weapon_bounce_service_path.read_text(encoding="utf-8")
++    for required in [
++        'payload.attackerUserId = attacker.UserId',
++        'WeaponBounceConfig.ServerReplicationRadius',
++        'remote:FireClient(player, payload)',
++    ]:
++        if required not in weapon_bounce_service_text:
++            err(f"m50 WeaponBounceService replication missing {required}")
++
++if weapon_bounce_controller_path.is_file():
++    weapon_bounce_controller_text = weapon_bounce_controller_path.read_text(encoding="utf-8")
++    for required in [
++        'attackerUserId == Players.LocalPlayer.UserId',
++        'WeaponBounceConfig.ClientRenderRadius',
++        'effects:Emit(position, normal, camera.CFrame)',
++    ]:
++        if required not in weapon_bounce_controller_text:
++            err(f"m50 WeaponBounceController presentation missing {required}")
++
++attack_service_text = (ROOT / "src/server/combat/AttackService.luau").read_text(encoding="utf-8")
++for required in [
++    'WeaponEnvironmentCollision.Query(previousVolume, volume)',
++    'activeEnvironmentBlocked[player] = true',
++    'activeDamageWindows[player] = nil',
++    'WeaponBounceService.Publish(player, {',
++    'LastAttackBounced',
++]:
++    if required not in attack_service_text:
++        err(f"m50 AttackService environment-bounce integration missing {required}")
++if attack_service_text.find('WeaponEnvironmentCollision.Query(previousVolume, volume)') > attack_service_text.find('hitCount += applyDamageInVolume', attack_service_text.find('local function applyAnimatedWeaponSweep')):
++    err("m50 environment collision must resolve before damage in each weapon sweep substep")
++
++upper_composer_text = (ROOT / "src/client/character/animation/AttackUpperBodyComposer.luau").read_text(encoding="utf-8")
++character_animation_text = (ROOT / "src/client/character/animation/CharacterAnimationController.luau").read_text(encoding="utf-8")
++attack_controller_text = (ROOT / "src/client/combat/AttackController.luau").read_text(encoding="utf-8")
++client_init_text = (ROOT / "src/client/init.client.luau").read_text(encoding="utf-8")
++server_init_text = (ROOT / "src/server/init.server.luau").read_text(encoding="utf-8")
++for required in ['function AttackUpperBodyComposer.SetPlaybackSpeed', 'sourcePlaybackSpeed <= 0', 'exitBlendRequested = false']:
++    if required not in upper_composer_text:
++        err(f"m50 upper-body reverse playback support missing {required}")
++for required in [
++    'function CharacterAnimationController.BounceCurrentAttack',
++    'track:AdjustSpeed(-reverseSpeed)',
++    'AttackUpperBodyComposer.SetPlaybackSpeed(-reverseSpeed)',
++    'AnimationAttackBounced',
++]:
++    if required not in character_animation_text:
++        err(f"m50 character attack reverse presentation missing {required}")
++for required in ['function AttackController.CancelForBounce', 'activePoseAttackId = 0']:
++    if required not in attack_controller_text:
++        err(f"m50 attack controller bounce cancellation missing {required}")
++for required in ['WeaponBounceController.Start(CharacterAnimationController, AttackController)']:
++    if required not in client_init_text:
++        err(f"m50 client bounce startup missing {required}")
++for required in ['EnvironmentAssetService.Start()', 'WeaponBounceService.Start()']:
++    if required not in server_init_text:
++        err(f"m50 server environment/bounce startup missing {required}")
++
++if 'control_agent_build = "game1-m50-environment-weapon-bounce-001"' not in host_agent_text:
++    err("m50 Control Center build marker is stale")
++if "model bridge v21" not in studio_plugin_text:
++    err("m50 Studio plugin version marker is stale")
++install_plugin_text = (ROOT / "system/studio-plugin/install.ps1").read_text(encoding="utf-8")
++if "model bridge v21" not in install_plugin_text:
++    err("m50 Studio plugin installer marker is stale")
++
+ if errors:
+     print("verify failed")
+     for item in errors:
+         print(" -", item)
+     sys.exit(1)
+ 
+-print("verify ok · game1 m49 unanchored DecoManager placement passed")
++print("verify ok · game1 m50 registry-owned environment weapon bounce passed")
+ print("registered character archetypes:", len(archetypes))
+ print("active character archetype:", active_id or "none")
+ print("race pool: human")

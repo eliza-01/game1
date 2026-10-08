@@ -16,7 +16,7 @@ from opencloud_assets import (
     wait_for_operation,
 )
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 PROJECT = "game1"
 CATEGORIES = ("tree", "bush", "rock", "light", "fence", "decoration")
 TEXTURE_SUFFIXES = (".png", ".jpg", ".jpeg")
@@ -29,6 +29,21 @@ CATEGORY_LABELS = {
     "decoration": "Decorations",
 }
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_]{0,63}$")
+
+
+def parse_bool(value, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    normalized = str(value).strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off", ""}:
+        return False
+    raise ValueError("destructible must be a boolean")
 
 
 def slugify_english(value: str) -> str:
@@ -78,6 +93,7 @@ class LocationAssetStore:
                     texture_published_sha256 TEXT NOT NULL DEFAULT '',
                     texture_moderation_state TEXT NOT NULL DEFAULT '',
                     texture_reference_slug TEXT NOT NULL DEFAULT '',
+                    destructible INTEGER NOT NULL DEFAULT 0,
                     revision INTEGER NOT NULL DEFAULT 1,
                     created_at REAL NOT NULL,
                     updated_at REAL NOT NULL,
@@ -88,6 +104,10 @@ class LocationAssetStore:
             if "texture_reference_slug" not in columns:
                 connection.execute(
                     "ALTER TABLE location_assets ADD COLUMN texture_reference_slug TEXT NOT NULL DEFAULT ''"
+                )
+            if "destructible" not in columns:
+                connection.execute(
+                    "ALTER TABLE location_assets ADD COLUMN destructible INTEGER NOT NULL DEFAULT 0"
                 )
             connection.execute(
                 """CREATE TABLE IF NOT EXISTS location_asset_publications(
@@ -171,6 +191,7 @@ class LocationAssetStore:
         owner = self._resolve_texture_owner(result, rows_by_slug)
         result["texture_owner_slug"] = str(owner.get("slug") or "") if owner else ""
         result["texture_shared"] = bool(str(result.get("texture_reference_slug") or ""))
+        result["destructible"] = bool(result.get("destructible"))
         if owner is not None and owner.get("slug") != result.get("slug"):
             for field in (
                 "texture_source_path",
@@ -228,6 +249,7 @@ class LocationAssetStore:
         if old is None:
             old = self._raw_get(slug)
         category = str(payload.get("category") or (old.get("category") if old else "") or "").strip().lower()
+        destructible = parse_bool(payload.get("destructible"), bool(old.get("destructible")) if old else False)
         if category not in CATEGORIES:
             raise ValueError("location asset category must be tree, bush, rock, light, fence or decoration")
 
@@ -331,9 +353,9 @@ class LocationAssetStore:
                 """INSERT OR REPLACE INTO location_assets(
                     slug,name_en,category,
                     model_source_path,model_prepared_path,model_sha256,model_asset_id,model_published_sha256,model_moderation_state,
-                    texture_source_path,texture_prepared_path,texture_sha256,texture_asset_id,texture_published_sha256,texture_moderation_state,texture_reference_slug,
+                    texture_source_path,texture_prepared_path,texture_sha256,texture_asset_id,texture_published_sha256,texture_moderation_state,texture_reference_slug,destructible,
                     revision,created_at,updated_at,published_at
-                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     slug, name_en, category,
                     values["model_source_path"], values["model_prepared_path"], values["model_sha256"],
@@ -341,7 +363,7 @@ class LocationAssetStore:
                     str(old.get("model_published_sha256") or "") if old else "",
                     str(old.get("model_moderation_state") or "") if old else "",
                     values["texture_source_path"], values["texture_prepared_path"], values["texture_sha256"],
-                    texture_asset_id, texture_published_sha256, texture_moderation_state, stored_reference,
+                    texture_asset_id, texture_published_sha256, texture_moderation_state, stored_reference, 1 if destructible else 0,
                     revision,
                     old.get("created_at") if old else now,
                     now,
@@ -519,6 +541,7 @@ class LocationAssetStore:
                 f"\t\t\ttextureAssetId = {self._lua_string(row.get('texture_asset_id') or '')},",
                 f"\t\t\ttextureOwnerSlug = {self._lua_string(row.get('texture_owner_slug') or '')},",
                 f"\t\t\ttextureShared = {str(bool(row.get('texture_shared'))).lower()},",
+                f"\t\t\tdestructible = {str(bool(row.get('destructible'))).lower()},",
                 "\t\t}),",
             ])
         lines.extend(["\t}),", "})", ""])

@@ -9,11 +9,14 @@ local Config = require(CombatShared:WaitForChild("AttackConfig"))
 local AttackTimelineConfig = require(CombatShared:WaitForChild("AttackTimelineConfig"))
 local CharacterAttackWindow = require(CombatShared:WaitForChild("CharacterAttackWindow"))
 local WeaponAttackVolume = require(CombatShared:WaitForChild("WeaponAttackVolume"))
+local WeaponBounceConfig = require(CombatShared:WaitForChild("WeaponBounceConfig"))
 local AnimationSpeedScaling = require(AnimationShared:WaitForChild("AnimationSpeedScaling"))
 local CharacterAnimationRegistry = require(CharacterShared:WaitForChild("CharacterAnimationRegistry"))
 local DamageService = require(script.Parent:WaitForChild("DamageService"))
 local HitEffectService = require(script.Parent:WaitForChild("HitEffectService"))
 local EntityHitboxService = require(script.Parent:WaitForChild("EntityHitboxService"))
+local WeaponEnvironmentCollision = require(script.Parent:WaitForChild("WeaponEnvironmentCollision"))
+local WeaponBounceService = require(script.Parent:WaitForChild("WeaponBounceService"))
 
 local AttackService = {}
 local activeUntil: { [Player]: number } = {}
@@ -23,6 +26,7 @@ local weaponSweepStates: { [Player]: any } = {}
 local activeHitTargets: { [Player]: { [Model]: boolean } } = {}
 local activeDamageWindows: { [Player]: any } = {}
 local activeHeadshotTarget: { [Player]: Model } = {}
+local activeEnvironmentBlocked: { [Player]: boolean } = {}
 
 local function rowsForEquippedAttack(character: Model): any
     local profileId = tostring(character:GetAttribute("AnimationProfileId") or character:GetAttribute("CharacterArchetype") or "")
@@ -192,20 +196,26 @@ local function applyDamageInVolume(
     return hitCount
 end
 
+local triggerWeaponBounce
+
 local function applyAnimatedWeaponSweep(
     player: Player,
     character: Model,
     root: BasePart,
     serial: number,
+    clientAttackId: number,
+    clipId: string,
     weapon: Model,
     boxSize: Vector3,
     previousBoxCFrame: CFrame?,
     currentBoxCFrame: CFrame,
+    previousElapsed: number?,
+    currentElapsed: number,
     previousAimOrigin: Vector3?,
     previousAimDirection: Vector3?,
     currentAimOrigin: Vector3?,
     currentAimDirection: Vector3?
-): number
+): (number, boolean)
     local attackRange = math.clamp(tonumber(character:GetAttribute("AttackRadius")) or Config.Range, 1, Config.MaxAimDistance)
     local weaponBoneBoxLocalPosition = WeaponAttackVolume.ReadWeaponBoneBoxLocalPosition(weapon)
     local hitTargets = activeHitTargets[player]
@@ -223,6 +233,17 @@ local function applyAnimatedWeaponSweep(
         steps = math.clamp(math.max(1, linearSteps, angularSteps), 1, Config.WeaponPoseSweepMaxSubsteps)
     end
 
+    local previousVolume = nil
+    if typeof(previousBoxCFrame) == "CFrame" then
+        previousVolume = WeaponAttackVolume.Build(
+            root.Position,
+            previousBoxCFrame,
+            boxSize,
+            attackRange,
+            weaponBoneBoxLocalPosition
+        )
+    end
+
     local hitCount = 0
     for step = 1, steps do
         local alpha = step / steps
@@ -233,8 +254,27 @@ local function applyAnimatedWeaponSweep(
             then previousAimOrigin:Lerp(currentAimOrigin, alpha)
             else currentAimOrigin
         local sampledAimDirection = interpolateAimDirection(previousAimDirection, currentAimDirection, alpha)
+        local sampledElapsed = if previousElapsed ~= nil
+            then previousElapsed + (currentElapsed - previousElapsed) * alpha
+            else currentElapsed
         local volume = WeaponAttackVolume.Build(root.Position, sampledBoxCFrame, boxSize, attackRange, weaponBoneBoxLocalPosition)
         if volume then
+            local environmentContact = WeaponEnvironmentCollision.Query(previousVolume, volume)
+            if environmentContact then
+                local bounced = triggerWeaponBounce(
+                    player,
+                    character,
+                    serial,
+                    clientAttackId,
+                    clipId,
+                    sampledElapsed,
+                    environmentContact
+                )
+                if bounced then
+                    return hitCount, true
+                end
+            end
+
             hitCount += applyDamageInVolume(
                 player,
                 character,
@@ -248,38 +288,119 @@ local function applyAnimatedWeaponSweep(
                 sampledAimDirection,
                 attackRange
             )
+            previousVolume = volume
         end
     end
-    return hitCount
+    return hitCount, false
 end
 
-local function clearAttackStateLater(player: Player, character: Model, serial: number, clientAttackId: number, durationSeconds: number)
+local function clearAttackState(
+    player: Player,
+    character: Model,
+    serial: number,
+    clientAttackId: number,
+    reportMiss: boolean
+): boolean
+    if activeSerial[player] ~= serial or activeClientAttackId[player] ~= clientAttackId then
+        return false
+    end
+
+    if reportMiss
+        and Config.DebugLogs
+        and activeEnvironmentBlocked[player] ~= true
+        and next(activeHitTargets[player] or {}) == nil
+    then
+        local attackRange = math.clamp(tonumber(character:GetAttribute("AttackRadius")) or Config.Range, 1, Config.MaxAimDistance)
+        print(("[game1][attack] miss player=%s range=%.1f serial=%d source=animated_weapon_sweep")
+            :format(player.Name, attackRange, serial))
+    end
+
+    activeUntil[player] = nil
+    activeSerial[player] = nil
+    activeClientAttackId[player] = nil
+    activeHitTargets[player] = nil
+    activeDamageWindows[player] = nil
+    activeHeadshotTarget[player] = nil
+    activeEnvironmentBlocked[player] = nil
+    local sweepState = weaponSweepStates[player]
+    if sweepState and sweepState.clientAttackId == clientAttackId then
+        weaponSweepStates[player] = nil
+    end
+    if character.Parent and tonumber(character:GetAttribute("AttackSerial")) == serial then
+        character:SetAttribute("AttackEndsAt", nil)
+        character:SetAttribute("AttackDamageStartsAt", nil)
+        character:SetAttribute("AttackDamageEndsAt", nil)
+        character:SetAttribute("AttackClipId", nil)
+    end
+    return true
+end
+
+local function clearAttackStateLater(
+    player: Player,
+    character: Model,
+    serial: number,
+    clientAttackId: number,
+    durationSeconds: number,
+    reportMiss: boolean
+)
     task.delay(durationSeconds, function()
-        if activeSerial[player] ~= serial or activeClientAttackId[player] ~= clientAttackId then
-            return
-        end
-        if Config.DebugLogs and next(activeHitTargets[player] or {}) == nil then
-            local attackRange = math.clamp(tonumber(character:GetAttribute("AttackRadius")) or Config.Range, 1, Config.MaxAimDistance)
-            print(("[game1][attack] miss player=%s range=%.1f serial=%d source=animated_weapon_sweep")
-                :format(player.Name, attackRange, serial))
-        end
-        activeUntil[player] = nil
-        activeSerial[player] = nil
-        activeClientAttackId[player] = nil
-        activeHitTargets[player] = nil
-        activeDamageWindows[player] = nil
-        activeHeadshotTarget[player] = nil
-        local sweepState = weaponSweepStates[player]
-        if sweepState and sweepState.clientAttackId == clientAttackId then
-            weaponSweepStates[player] = nil
-        end
-        if character.Parent and tonumber(character:GetAttribute("AttackSerial")) == serial then
-            character:SetAttribute("AttackEndsAt", nil)
-            character:SetAttribute("AttackDamageStartsAt", nil)
-            character:SetAttribute("AttackDamageEndsAt", nil)
-            character:SetAttribute("AttackClipId", nil)
-        end
+        clearAttackState(player, character, serial, clientAttackId, reportMiss)
     end)
+end
+
+triggerWeaponBounce = function(
+    player: Player,
+    character: Model,
+    serial: number,
+    clientAttackId: number,
+    clipId: string,
+    elapsed: number,
+    contact: any
+): boolean
+    if activeEnvironmentBlocked[player] == true
+        or activeSerial[player] ~= serial
+        or activeClientAttackId[player] ~= clientAttackId
+    then
+        return false
+    end
+
+    activeEnvironmentBlocked[player] = true
+    activeDamageWindows[player] = nil
+    weaponSweepStates[player] = nil
+
+    local reverseSeconds = math.max(0, elapsed) / math.max(0.1, WeaponBounceConfig.ReverseSpeedMultiplier)
+    local recoverySeconds = math.max(
+        WeaponBounceConfig.MinimumRecoverySeconds,
+        reverseSeconds + WeaponBounceConfig.RecoverySeconds
+    )
+    local now = os.clock()
+    activeUntil[player] = now + recoverySeconds
+    character:SetAttribute("AttackEndsAt", now + recoverySeconds)
+    character:SetAttribute("AttackDamageEndsAt", now)
+    character:SetAttribute("LastAttackBounced", true)
+
+    WeaponBounceService.Publish(player, {
+        clientAttackId = clientAttackId,
+        clipId = clipId,
+        position = contact.position,
+        normal = contact.normal,
+        assetId = tostring(contact.definition and contact.definition.slug or ""),
+        reverseSpeedMultiplier = WeaponBounceConfig.ReverseSpeedMultiplier,
+    })
+
+    if Config.DebugLogs then
+        print(("[game1][attack] bounce player=%s asset=%s part=%s elapsed=%.3f serial=%d")
+            :format(
+                player.Name,
+                tostring(contact.definition and contact.definition.slug or "unknown"),
+                tostring(contact.part and contact.part:GetFullName() or "unknown"),
+                elapsed,
+                serial
+            ))
+    end
+
+    clearAttackStateLater(player, character, serial, clientAttackId, recoverySeconds, false)
+    return true
 end
 
 local function attack(player: Player, payload: any)
@@ -345,6 +466,7 @@ local function attack(player: Player, payload: any)
     activeUntil[player] = now + attackDuration
     activeHitTargets[player] = {}
     activeHeadshotTarget[player] = nil
+    activeEnvironmentBlocked[player] = false
     activeDamageWindows[player] = damageWindow
     weaponSweepStates[player] = nil
     character:SetAttribute("AttackSerial", serial)
@@ -355,11 +477,12 @@ local function attack(player: Player, payload: any)
     character:SetAttribute("AttackDamageEndsAt", now + damageWindow.endTime)
     character:SetAttribute("LastAttackHitZone", nil)
     character:SetAttribute("LastAttackHeadshot", false)
+    character:SetAttribute("LastAttackBounced", false)
 
     -- Character weapon damage exists only inside the authored HitStart -> HitEnd
     -- interval. Hit is no longer a character damage event; monsters keep their
     -- separate single-Hit timing policy in MonsterAIService.
-    clearAttackStateLater(player, character, serial, clientAttackId, attackDuration)
+    clearAttackStateLater(player, character, serial, clientAttackId, attackDuration, true)
 end
 
 local function recordWeaponPose(player: Player, payload: any)
@@ -425,24 +548,30 @@ local function recordWeaponPose(player: Player, payload: any)
         local previousBoxCFrame = if typeof(sweepState.lastBoxCFrame) == "CFrame" then sweepState.lastBoxCFrame else nil
         local previousAimOrigin = if typeof(sweepState.lastAimOrigin) == "Vector3" then sweepState.lastAimOrigin else nil
         local previousAimDirection = if typeof(sweepState.lastAimDirection) == "Vector3" then sweepState.lastAimDirection else nil
-        applyAnimatedWeaponSweep(
+        local _, bounced = applyAnimatedWeaponSweep(
             player,
             character,
             root,
             serial,
+            clientAttackId,
+            tostring(character:GetAttribute("AttackClipId") or ""),
             weapon,
             boxSize,
             previousBoxCFrame,
             payload.boxCFrame,
+            lastElapsed,
+            elapsed,
             previousAimOrigin,
             previousAimDirection,
             aimOrigin,
             aimDirection
         )
-        sweepState.lastElapsed = elapsed
-        sweepState.lastBoxCFrame = payload.boxCFrame
-        sweepState.lastAimOrigin = aimOrigin
-        sweepState.lastAimDirection = aimDirection
+        if not bounced and weaponSweepStates[player] == sweepState then
+            sweepState.lastElapsed = elapsed
+            sweepState.lastBoxCFrame = payload.boxCFrame
+            sweepState.lastAimOrigin = aimOrigin
+            sweepState.lastAimDirection = aimDirection
+        end
     end
 end
 
@@ -468,6 +597,7 @@ function AttackService.Start()
         activeHitTargets[player] = nil
         activeDamageWindows[player] = nil
         activeHeadshotTarget[player] = nil
+        activeEnvironmentBlocked[player] = nil
         weaponSweepStates[player] = nil
     end)
 end

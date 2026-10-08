@@ -72,6 +72,21 @@ local function finishPresentation(sequence: number)
     end
 end
 
+function AttackController.CancelForBounce(clientAttackId: number)
+    local id = math.floor(tonumber(clientAttackId) or 0)
+    if id <= 0 or id ~= attackSequence then
+        return false
+    end
+    if activePoseAttackId == id then
+        activePoseAttackId = 0
+        activePoseFrom = 0
+        activePoseUntil = 0
+        poseAccumulator = 0
+    end
+    finishPresentation(id)
+    return true
+end
+
 function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
     movementController = movement
     animationController = animation

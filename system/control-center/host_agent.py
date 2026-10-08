@@ -44,7 +44,7 @@ from studio_save import request_active_studio_save
 from character_core.identity import CharacterIdentityService
 from studio_bridge import run_model_load_bridge, run_monster_spawn_bridge, run_timeline_editor_bridge, run_location_authoring_bridge
 
-control_agent_build = "game1-m46-location-assets-shared-textures-001"
+control_agent_build = "game1-m50-environment-weapon-bounce-001"
 port = int(os.environ.get("CONTROL_AGENT_PORT", "43821"))
 token = os.environ.get("CONTROL_TOKEN", "Game1LocalControlV1")
 store = CharacterStore(ROOT)

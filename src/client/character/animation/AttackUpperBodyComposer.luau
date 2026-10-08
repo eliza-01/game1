@@ -213,6 +213,22 @@ function AttackUpperBodyComposer.GetExitBlendSeconds(): number
 	return math.max(0, tonumber(AttackConfig.UpperBodyAttackExitBlendSeconds) or 0.12)
 end
 
+function AttackUpperBodyComposer.SetPlaybackSpeed(speed: number): boolean
+	if not active or not sourceTrack then
+		return false
+	end
+	sourcePoseFrozen = false
+	sourcePlaybackSpeed = tonumber(speed) or 0
+	if sourcePlaybackSpeed < 0 then
+		-- A late HitEnd may overlap the normal exit blend. Bounce owns the pose
+		-- from the contact frame backwards, so cancel any forward exit fade first.
+		exitBlendRequested = false
+		exitBlendStartedAt = 0
+	end
+	sourceTrack:AdjustSpeed(sourcePlaybackSpeed)
+	return true
+end
+
 function AttackUpperBodyComposer.BeginExitBlend()
 	if not active or exitBlendRequested then
 		return
@@ -317,7 +333,7 @@ end
 
 local function holdSourceTerminalPose(deltaTime: number)
 	local track = sourceTrack
-	if not active or not track or sourcePoseFrozen then
+	if not active or not track or sourcePoseFrozen or sourcePlaybackSpeed <= 0 then
 		return
 	end
 	local length = tonumber(track.Length) or 0

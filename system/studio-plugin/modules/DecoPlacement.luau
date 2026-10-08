@@ -175,12 +175,10 @@ function DecoPlacement:_commit()
     preparePlaced(placed)
     local instanceId = self.HttpService:GenerateGUID(false)
     placed.Name = tostring(row.slug or "deco") .. "__" .. string.sub(instanceId, 1, 8)
-    placed:SetAttribute("Game1DecoAsset", true)
+    -- Studio placement stores identity, not gameplay policy. Runtime resolves the
+    -- current LocationAssetRegistry definition from this stable asset key.
     placed:SetAttribute("Game1DecoInstanceId", instanceId)
     placed:SetAttribute("Game1DecoAssetSlug", tostring(row.slug or ""))
-    placed:SetAttribute("Game1DecoCategory", tostring(row.category or ""))
-    placed:SetAttribute("Game1DecoModelAssetId", tostring(row.model_asset_id or ""))
-    placed:SetAttribute("Game1DecoTextureAssetId", tostring(row.texture_asset_id or ""))
     placed.Parent = self:_categoryFolder(tostring(row.category or ""))
     placed:PivotTo(pivot)
 
@@ -242,7 +240,7 @@ function DecoPlacement:serialize(): { any }
     end
     local records = {}
     for _, descendant in ipairs(root:GetDescendants()) do
-        if descendant:IsA("Model") and descendant:GetAttribute("Game1DecoAsset") == true then
+        if descendant:IsA("Model") and tostring(descendant:GetAttribute("Game1DecoAssetSlug") or "") ~= "" then
             local pivot = descendant:GetPivot()
             local cframe = { pivot:GetComponents() }
             local scale = 1
@@ -252,10 +250,7 @@ function DecoPlacement:serialize(): { any }
             table.insert(records, {
                 instanceId = tostring(descendant:GetAttribute("Game1DecoInstanceId") or ""),
                 name = descendant.Name,
-                slug = tostring(descendant:GetAttribute("Game1DecoAssetSlug") or ""),
-                category = tostring(descendant:GetAttribute("Game1DecoCategory") or ""),
-                modelAssetId = tostring(descendant:GetAttribute("Game1DecoModelAssetId") or ""),
-                textureAssetId = tostring(descendant:GetAttribute("Game1DecoTextureAssetId") or ""),
+                locationAssetId = tostring(descendant:GetAttribute("Game1DecoAssetSlug") or ""),
                 cframe = cframe,
                 scale = scale,
             })

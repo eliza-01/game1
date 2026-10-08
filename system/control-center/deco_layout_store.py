@@ -15,11 +15,10 @@ class DecoLayoutStore:
     def _validate_record(record: dict, index: int) -> dict:
         if not isinstance(record, dict):
             raise ValueError(f"deco record {index} must be an object")
-        slug = str(record.get("slug") or "").strip().lower()
-        category = str(record.get("category") or "").strip().lower()
+        location_asset_id = str(record.get("locationAssetId") or "").strip().lower()
         cframe = record.get("cframe")
-        if not slug or not category:
-            raise ValueError(f"deco record {index} is missing slug/category")
+        if not location_asset_id:
+            raise ValueError(f"deco record {index} is missing locationAssetId")
         if not isinstance(cframe, list) or len(cframe) != 12:
             raise ValueError(f"deco record {index} cframe must contain 12 numbers")
         try:
@@ -31,11 +30,8 @@ class DecoLayoutStore:
             raise ValueError(f"deco record {index} scale must be positive")
         return {
             "instanceId": str(record.get("instanceId") or "").strip(),
-            "name": str(record.get("name") or slug).strip(),
-            "slug": slug,
-            "category": category,
-            "modelAssetId": str(record.get("modelAssetId") or "").strip(),
-            "textureAssetId": str(record.get("textureAssetId") or "").strip(),
+            "name": str(record.get("name") or location_asset_id).strip(),
+            "locationAssetId": location_asset_id,
             "cframe": normalized_cframe,
             "scale": scale,
         }
@@ -48,7 +44,7 @@ class DecoLayoutStore:
         now = datetime.now(timezone.utc)
         stamp = now.strftime("%Y%m%dT%H%M%S-%fZ")
         snapshot = {
-            "schemaVersion": 1,
+            "schemaVersion": 2,
             "project": "game1",
             "savedAt": now.isoformat().replace("+00:00", "Z"),
             "placeId": int(payload.get("placeId") or 0),

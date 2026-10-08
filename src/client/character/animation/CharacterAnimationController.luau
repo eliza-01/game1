@@ -33,6 +33,9 @@ local currentActionOnComplete = nil
 local currentActionSlot = ""
 local currentActionLockedUntil = 0
 local currentActionComposed = false
+local currentActionTimeline = nil
+local currentActionClipId = ""
+local currentActionToken = 0
 local attackLowerBodyActive = false
 local connections = {}
 local lifeTransition = false
@@ -65,6 +68,9 @@ local function clearCharacter()
 	currentActionSlot = ""
 	currentActionLockedUntil = 0
 	currentActionComposed = false
+	currentActionTimeline = nil
+	currentActionClipId = ""
+	currentActionToken += 1
 	attackLowerBodyActive = false
 	AttackUpperBodyComposer.End()
 	lifeTransition = false
@@ -154,6 +160,8 @@ local function stopCurrentLoop(fadeTime: number?)
 	currentLoopSeam = nil
 end
 
+local refreshLoop
+
 local function stopCurrentAction(fadeTime: number?)
 	if currentActionComposed then
 		AttackUpperBodyComposer.End()
@@ -165,7 +173,35 @@ local function stopCurrentAction(fadeTime: number?)
 	currentActionSeam = nil
 	currentActionOnComplete = nil
 	currentActionComposed = false
+	currentActionTimeline = nil
+	currentActionClipId = ""
+	currentActionToken += 1
 	attackLowerBodyActive = false
+end
+
+local function finishAttackPresentation(boundCharacter: Model, boundTrack: AnimationTrack, token: number)
+	if character ~= boundCharacter or currentAction ~= boundTrack or currentActionToken ~= token then
+		return
+	end
+	currentActionLockedUntil = 0
+	currentActionSlot = ""
+	if currentActionComposed then
+		AttackUpperBodyComposer.End()
+	elseif currentActionSeam then
+		currentActionSeam:Stop(0.04)
+		currentActionSeam = nil
+	elseif boundTrack.IsPlaying then
+		boundTrack:Stop(0.04)
+	end
+	currentActionComposed = false
+	currentActionTimeline = nil
+	currentActionClipId = ""
+	attackLowerBodyActive = false
+	currentAction = nil
+	boundCharacter:SetAttribute("AnimationActionEndsAt", nil)
+	boundCharacter:SetAttribute("AnimationAttackUpperBodyComposed", false)
+	boundCharacter:SetAttribute("AnimationAttackLowerBodySlot", nil)
+	refreshLoop()
 end
 
 local function createSeam(descriptor, track: AnimationTrack, looped: boolean)
@@ -209,7 +245,7 @@ local function applyBackwardPlayback(track: AnimationTrack, slot: string)
 	end)
 end
 
-local function refreshLoop()
+refreshLoop = function()
 	if not character or not cache or lifeTransition then
 		return
 	end
@@ -532,6 +568,8 @@ function CharacterAnimationController.PlayAction(slot: string)
 	end
 
 	stopCurrentAction(0.06)
+	currentActionToken += 1
+	local actionToken = currentActionToken
 	currentActionSlot = slot
 	currentActionLockedUntil = if slot == "attack" then now + runtimeDuration else 0
 	publishPlaybackPercent(slot)
@@ -556,6 +594,8 @@ function CharacterAnimationController.PlayAction(slot: string)
 
 	currentAction = track
 	currentActionComposed = composed
+	currentActionTimeline = timeline
+	currentActionClipId = clipId
 	if not composed then
 		track.Looped = false
 		currentActionSeam = createSeam(descriptor, track, false)
@@ -572,17 +612,17 @@ function CharacterAnimationController.PlayAction(slot: string)
 	character:SetAttribute("AnimationActionClip", clipId)
 	if slot == "attack" then
 		character:SetAttribute("AnimationActionEndsAt", currentActionLockedUntil)
+		character:SetAttribute("AnimationAttackBounced", false)
 		character:SetAttribute("AnimationAttackUpperBodyComposed", composed)
 		character:SetAttribute("AnimationAttackLowerBodySlot", movementSlot())
 		local boundCharacter = character
 		local boundTrack = track
-		local unlockAt = currentActionLockedUntil
 		local exitBlend = if composed then AttackUpperBodyComposer.GetExitBlendSeconds() else 0
 		if composed and runtimeDuration > exitBlend + 0.01 then
 			task.delay(runtimeDuration - exitBlend, function()
 				if character == boundCharacter
 					and currentAction == boundTrack
-					and currentActionLockedUntil == unlockAt
+					and currentActionToken == actionToken
 					and currentActionComposed
 				then
 					AttackUpperBodyComposer.BeginExitBlend()
@@ -590,24 +630,7 @@ function CharacterAnimationController.PlayAction(slot: string)
 			end)
 		end
 		task.delay(runtimeDuration, function()
-			if character ~= boundCharacter or currentAction ~= boundTrack or currentActionLockedUntil ~= unlockAt then
-				return
-			end
-			currentActionLockedUntil = 0
-			currentActionSlot = ""
-			if currentActionComposed then
-				AttackUpperBodyComposer.End()
-			elseif currentActionSeam then
-				currentActionSeam:Stop(0.04)
-				currentActionSeam = nil
-			end
-			currentActionComposed = false
-			attackLowerBodyActive = false
-			currentAction = nil
-			boundCharacter:SetAttribute("AnimationActionEndsAt", nil)
-			boundCharacter:SetAttribute("AnimationAttackUpperBodyComposed", false)
-			boundCharacter:SetAttribute("AnimationAttackLowerBodySlot", nil)
-			refreshLoop()
+			finishAttackPresentation(boundCharacter, boundTrack, actionToken)
 		end)
 	end
 
@@ -622,6 +645,75 @@ function CharacterAnimationController.PlayAction(slot: string)
 		upperBodyComposed = composed,
 		lowerBodySlot = if slot == "attack" then movementSlot() else nil,
 	}
+end
+
+function CharacterAnimationController.BounceCurrentAttack(clipId: string, reverseSpeedMultiplier: number?): (boolean, number)
+	if not character
+		or currentActionSlot ~= "attack"
+		or not currentAction
+		or currentActionClipId ~= tostring(clipId or "")
+	then
+		return false, 0
+	end
+
+	local track = currentAction :: AnimationTrack
+	local timeline = currentActionTimeline
+	local playbackSpeed = math.max(0.01, tonumber(timeline and timeline.playbackSpeed) or 1)
+	local multiplier = math.max(0.1, tonumber(reverseSpeedMultiplier) or 2)
+	local reverseSpeed = playbackSpeed * multiplier
+	local sourceTime = math.max(0, tonumber(track.TimePosition) or 0)
+	local rewindSeconds = sourceTime / reverseSpeed
+	local exitBlend = if currentActionComposed then AttackUpperBodyComposer.GetExitBlendSeconds() else 0
+
+	currentActionToken += 1
+	local bounceToken = currentActionToken
+	currentActionLockedUntil = os.clock() + rewindSeconds + exitBlend
+	character:SetAttribute("AnimationActionEndsAt", currentActionLockedUntil)
+	character:SetAttribute("AnimationAttackBounced", true)
+
+	if currentActionSeam then
+		currentActionSeam:Stop(0)
+		currentActionSeam = nil
+	end
+
+	if currentActionComposed then
+		AttackUpperBodyComposer.SetPlaybackSpeed(-reverseSpeed)
+	else
+		if not track.IsPlaying then
+			track:Play(0, 1, 0)
+			pcall(function()
+				track.TimePosition = sourceTime
+			end)
+		end
+		track:AdjustSpeed(-reverseSpeed)
+	end
+
+	local boundCharacter = character
+	local boundTrack = track
+	task.delay(rewindSeconds, function()
+		if character ~= boundCharacter or currentAction ~= boundTrack or currentActionToken ~= bounceToken then
+			return
+		end
+		pcall(function()
+			boundTrack.TimePosition = 0
+		end)
+		if currentActionComposed then
+			AttackUpperBodyComposer.SetPlaybackSpeed(0)
+			AttackUpperBodyComposer.BeginExitBlend()
+			if exitBlend > 0 then
+				task.delay(exitBlend, function()
+					finishAttackPresentation(boundCharacter, boundTrack, bounceToken)
+				end)
+			else
+				finishAttackPresentation(boundCharacter, boundTrack, bounceToken)
+			end
+		else
+			boundTrack:AdjustSpeed(0)
+			finishAttackPresentation(boundCharacter, boundTrack, bounceToken)
+		end
+	end)
+
+	return true, rewindSeconds + exitBlend
 end
 
 function CharacterAnimationController.SetWeaponSet(weaponSet: string?)

@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 2,
+  "project": "game1",
+  "options": {
+    "categories": [
+      {
+        "id": "tree",
+        "label": "Trees"
+      },
+      {
+        "id": "bush",
+        "label": "Bushes"
+      },
+      {
+        "id": "rock",
+        "label": "Rocks"
+      },
+      {
+        "id": "light",
+        "label": "Lights"
+      },
+      {
+        "id": "fence",
+        "label": "Fences"
+      },
+      {
+        "id": "decoration",
+        "label": "Decorations"
+      }
+    ]
+  },
+  "items": [
+    {
+      "slug": "pillar_with_lantern",
+      "name_en": "Pillar with Lantern",
+      "category": "decoration",
+      "model_source_path": "assets/source/location-assets/decoration/pillar_with_lantern/model/pillar_with_lantern.fbx",
+      "model_prepared_path": "assets/prepared/location-assets/decoration/pillar_with_lantern/model/pillar_with_lantern.fbx",
+      "model_sha256": "efc2ffe5d750402b2073d8a35c4e984da104648611fc32affe18eba1cfe3e669",
+      "model_asset_id": "92342287911723",
+      "model_published_sha256": "efc2ffe5d750402b2073d8a35c4e984da104648611fc32affe18eba1cfe3e669",
+      "model_moderation_state": "Approved",
+      "texture_source_path": "assets/source/location-assets/rock/main_statue/textures/main_statue.jpg",
+      "texture_prepared_path": "assets/prepared/location-assets/rock/main_statue/textures/main_statue.jpg",
+      "texture_sha256": "8f8ade9148ff40e8b5933c6abeb5e2c55e68a95d89147d6b317cee7412c5e8bf",
+      "texture_asset_id": "128890927196285",
+      "texture_published_sha256": "8f8ade9148ff40e8b5933c6abeb5e2c55e68a95d89147d6b317cee7412c5e8bf",
+      "texture_moderation_state": "Reviewing",
+      "revision": 1,
+      "created_at": 1791443599.8616817,
+      "updated_at": 1791443607.9077108,
+      "published_at": 1791443607.9077108,
+      "texture_reference_slug": "main_statue",
+      "texture_owner_slug": "main_statue",
+      "texture_shared": true,
+      "status": "PUBLISHED",
+      "category_label": "Decorations"
+    },
+    {
+      "slug": "main_statue",
+      "name_en": "Main Statue",
+      "category": "rock",
+      "model_source_path": "assets/source/location-assets/rock/main_statue/model/main_statue.fbx",
+      "model_prepared_path": "assets/prepared/location-assets/rock/main_statue/model/main_statue.fbx",
+      "model_sha256": "37254b458431a59c92544ecab886c8ac2576f94a84ee6d411b097a5ada7b9a64",
+      "model_asset_id": "91485812008019",
+      "model_published_sha256": "37254b458431a59c92544ecab886c8ac2576f94a84ee6d411b097a5ada7b9a64",
+      "model_moderation_state": "Approved",
+      "texture_source_path": "assets/source/location-assets/rock/main_statue/textures/main_statue.jpg",
+      "texture_prepared_path": "assets/prepared/location-assets/rock/main_statue/textures/main_statue.jpg",
+      "texture_sha256": "8f8ade9148ff40e8b5933c6abeb5e2c55e68a95d89147d6b317cee7412c5e8bf",
+      "texture_asset_id": "128890927196285",
+      "texture_published_sha256": "8f8ade9148ff40e8b5933c6abeb5e2c55e68a95d89147d6b317cee7412c5e8bf",
+      "texture_moderation_state": "Reviewing",
+      "revision": 2,
+      "created_at": 1791439769.9058099,
+      "updated_at": 1791440120.3517294,
+      "published_at": 1791440120.3517294,
+      "texture_reference_slug": "",
+      "texture_owner_slug": "main_statue",
+      "texture_shared": false,
+      "status": "PUBLISHED",
+      "category_label": "Rocks"
+    }
+  ],
+  "summary": {
+    "registered": 2,
+    "published": 2,
+    "changed": 0
+  }
+}

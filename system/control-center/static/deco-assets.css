@@ -1,0 +1,69 @@
+.deco-asset-workflow {
+  display: grid;
+  grid-template-columns: minmax(320px, .82fr) minmax(440px, 1.18fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.deco-source-pickers {
+  display: grid;
+  gap: 10px;
+}
+
+.deco-source-pickers .picker {
+  margin: 0;
+}
+
+.deco-texture-source {
+  margin-top: 10px;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel2);
+}
+
+.deco-texture-source label {
+  margin: 0;
+}
+
+.deco-tree-group {
+  padding: 12px 9px 5px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.deco-assets-note {
+  display: grid;
+  gap: 5px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel2);
+}
+
+#location-asset-rows td small {
+  display: block;
+  margin-top: 3px;
+}
+
+.deco-category-strip {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.deco-category-strip span {
+  padding: 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+@media (max-width: 1050px) {
+  .deco-asset-workflow {
+    grid-template-columns: 1fr;
+  }
+}

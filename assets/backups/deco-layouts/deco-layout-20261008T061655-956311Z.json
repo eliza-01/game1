@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "project": "game1",
+  "savedAt": "2026-10-08T06:16:55.956311Z",
+  "placeId": 0,
+  "placeName": "game1",
+  "records": [
+    {
+      "instanceId": "906c20f0-ac0a-4395-be25-78e8eb02cc31",
+      "name": "main_statue__906c20f0",
+      "slug": "main_statue",
+      "category": "rock",
+      "modelAssetId": "91485812008019",
+      "textureAssetId": "128890927196285",
+      "cframe": [
+        415.9965515136719,
+        -58.0,
+        -274.5234069824219,
+        -0.9858779311180115,
+        0.0,
+        -0.16746561229228973,
+        0.0,
+        1.0,
+        0.0,
+        0.16746561229228973,
+        0.0,
+        -0.9858779311180115
+      ],
+      "scale": 1.0
+    }
+  ],
+  "summary": {
+    "placed": 1
+  }
+}

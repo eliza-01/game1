@@ -12,6 +12,15 @@
       },
       "LocationCommands": {
         "$path": "modules/LocationCommands.luau"
+      },
+      "DecoAssetLoader": {
+        "$path": "modules/DecoAssetLoader.luau"
+      },
+      "DecoPlacement": {
+        "$path": "modules/DecoPlacement.luau"
+      },
+      "DecoManager": {
+        "$path": "modules/DecoManager.luau"
       }
     }
   }

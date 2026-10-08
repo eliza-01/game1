@@ -1973,7 +1973,7 @@ for required in [
     'AnimationClipProvider:GetAnimationClipAsync',
     'clip:IsA("KeyframeSequence")',
     'preview.Parent = timelineWorld',
-    'model bridge v14',
+    'model bridge v18',
 ]:
     if required not in studio_plugin_text:
         err(f"m37 in-plugin timeline preview missing {required}")
@@ -2105,7 +2105,7 @@ for required in [
 ]:
     if required not in location_plugin_text:
         err(f"m41 Studio Location authoring module missing {required}")
-for required in ['require(script.Parent.modules.LocationCommands)', 'data.command == "location-authoring"', 'model bridge v14']:
+for required in ['require(script.Parent.modules.LocationCommands)', 'data.command == "location-authoring"', 'model bridge v18']:
     if required not in studio_plugin_text:
         err(f"m41 Game1Bridge Location integration missing {required}")
 
@@ -2125,13 +2125,294 @@ for required in ["Location details", "Studio contour", "draw in Studio", "regist
         err(f"m42 Location UI copy missing {required}")
 
 
+# m43 Location Assets: weapon-style FBX+PNG publication and modular Studio DecoManager.
+location_asset_manifest_path = ROOT / "assets/manifests/location-assets.json"
+location_asset_registry_path = ROOT / "src/shared/world/LocationAssetRegistry.luau"
+location_asset_store_path = ROOT / "system/control-center/location_asset_store.py"
+deco_layout_store_path = ROOT / "system/control-center/deco_layout_store.py"
+deco_assets_js_path = ROOT / "system/control-center/static/deco-assets.js"
+deco_assets_css_path = ROOT / "system/control-center/static/deco-assets.css"
+deco_loader_path = ROOT / "system/studio-plugin/modules/DecoAssetLoader.luau"
+deco_manager_path = ROOT / "system/studio-plugin/modules/DecoManager.luau"
+deco_placement_path = ROOT / "system/studio-plugin/modules/DecoPlacement.luau"
+for path in [
+    location_asset_manifest_path,
+    location_asset_registry_path,
+    location_asset_store_path,
+    deco_layout_store_path,
+    deco_assets_js_path,
+    deco_assets_css_path,
+    deco_loader_path,
+    deco_manager_path,
+    deco_placement_path,
+]:
+    if not path.is_file():
+        err(f"m43 Location Assets / DecoManager file missing: {path.relative_to(ROOT)}")
+
+if location_asset_manifest_path.is_file():
+    location_asset_manifest = json.loads(location_asset_manifest_path.read_text(encoding="utf-8"))
+    if location_asset_manifest.get("schemaVersion") != 2 or location_asset_manifest.get("project") != "game1":
+        err("m43 location-assets.json schema/project is invalid")
+    category_ids = [row.get("id") for row in ((location_asset_manifest.get("options") or {}).get("categories") or [])]
+    if category_ids != ["tree", "bush", "rock", "light", "fence", "decoration"]:
+        err("m46 Location Assets categories must be tree/bush/rock/light/fence/decoration in canonical order")
+
+location_asset_store_text = location_asset_store_path.read_text(encoding="utf-8") if location_asset_store_path.is_file() else ""
+for required in [
+    "class LocationAssetStore",
+    'CATEGORIES = ("tree", "bush", "rock", "light", "fence", "decoration")',
+    "assets/source/location-assets",
+    "assets/prepared/location-assets",
+    "create_model_asset",
+    "update_model_asset",
+    "create_image_asset",
+    "update_image_asset",
+    'return "PUBLISHED"',
+    "LocationAssetRegistry.luau",
+]:
+    if required not in location_asset_store_text:
+        err(f"m43 LocationAssetStore missing {required}")
+
+deco_layout_store_text = deco_layout_store_path.read_text(encoding="utf-8") if deco_layout_store_path.is_file() else ""
+for required in [
+    "class DecoLayoutStore",
+    "assets/backups/deco-layouts",
+    "deco-layout-latest.json",
+    '"cframe"',
+    '"scale"',
+]:
+    if required not in deco_layout_store_text:
+        err(f"m43 DecoLayoutStore missing {required}")
+
+for required in [
+    'path == "/api/location-assets"',
+    'path == "/api/files/choose-location-asset-model"',
+    'path == "/api/files/choose-location-asset-texture"',
+    'path == "/api/location-assets/layout"',
+    'location_assets.publish',
+    'location_assets.delete',
+    'game1-m46-location-assets-shared-textures-001',
+]:
+    if required not in host_agent_text:
+        err(f"m43 host agent Location Assets API missing {required}")
+
+index_m43_text = (ROOT / "system/control-center/static/index.html").read_text(encoding="utf-8")
+deco_assets_js_text = deco_assets_js_path.read_text(encoding="utf-8") if deco_assets_js_path.is_file() else ""
+deco_assets_css_text = deco_assets_css_path.read_text(encoding="utf-8") if deco_assets_css_path.is_file() else ""
+for required in [
+    'id="nav-location-assets"',
+    'id="location-assets-view"',
+    'id="location-asset-category"',
+    'id="choose-location-asset-model"',
+    'id="choose-location-asset-texture"',
+    'id="publish-location-asset"',
+    'deco-assets.css?v=2',
+    'deco-assets.js?v=2',
+]:
+    if required not in index_m43_text:
+        err(f"m43 Asset Manager Location Assets section missing {required}")
+for required in [
+    "/api/location-assets",
+    "/api/files/choose-location-asset-model",
+    "/api/files/choose-location-asset-texture",
+    "decoAssetPublish",
+    "window.game1LocationAssetsLoad",
+]:
+    if required not in deco_assets_js_text:
+        err(f"m43 Location Assets UI behavior missing {required}")
+for required in ["deco-asset-workflow", "deco-source-pickers", "deco-tree-group"]:
+    if required not in deco_assets_css_text:
+        err(f"m43 Location Assets UI styling missing {required}")
+
+plugin_project_text = (ROOT / "system/studio-plugin/plugin.project.json").read_text(encoding="utf-8")
+for required in ["DecoAssetLoader", "DecoPlacement", "DecoManager"]:
+    if required not in plugin_project_text:
+        err(f"m43 Studio plugin project is missing module {required}")
+
+deco_loader_text = deco_loader_path.read_text(encoding="utf-8") if deco_loader_path.is_file() else ""
+for required in [
+    'self.AssetService:LoadAssetAsync(assetId)',
+    'row.status or ""',
+    'descendant.TextureID = uri',
+    'Url = self.agentBaseUrl .. "/api/location-assets"',
+]:
+    if required not in deco_loader_text:
+        err(f"m43 DecoAssetLoader missing {required}")
+
+deco_placement_text = deco_placement_path.read_text(encoding="utf-8") if deco_placement_path.is_file() else ""
+for required in [
+    'ROOT_NAME = "Game1DecoAssets"',
+    'tree = "Trees"',
+    'bush = "Bushes"',
+    'rock = "Rocks"',
+    'light = "Lights"',
+    'fence = "Fences"',
+    'decoration = "Decorations"',
+    "Workspace:Raycast",
+    "self.plugin:Activate(true)",
+    'placed:SetAttribute("Game1DecoAsset", true)',
+    "function DecoPlacement:serialize()",
+    "localSupportOffset",
+    "orientationForSurface",
+]:
+    if required not in deco_placement_text:
+        err(f"m43 DecoPlacement missing {required}")
+
+deco_manager_text = deco_manager_path.read_text(encoding="utf-8") if deco_manager_path.is_file() else ""
+for required in [
+    'CreateDockWidgetPluginGui("Game1DecoManager_v1"',
+    'self.widget.Title = "game1 · DecoManager"',
+    'Instance.new("ViewportFrame")',
+    'Instance.new("WorldModel")',
+    'DecoPreviewWorld',
+    '"Save Assets Data"',
+    'self.agentBaseUrl .. "/api/location-assets/layout"',
+    'local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration" }',
+]:
+    if required not in deco_manager_text:
+        err(f"m43 DecoManager missing {required}")
+
+for required in [
+    'require(script.Parent.modules.DecoManager)',
+    'DecoManager.new({',
+    'model bridge v18',
+]:
+    if required not in studio_plugin_text:
+        err(f"m43 Game1Bridge DecoManager integration missing {required}")
+for forbidden in ["game:SavePlace(", "SavePlace(Enum.SaveFilter", "SavePlaceAsync"]:
+    if forbidden in deco_manager_text:
+        err(f"m45 obsolete direct place-save path remains in DecoManager: {forbidden}")
+
+
+# m45 DecoManager hotfix: Studio-native local-place save and strict LMB preview drag.
+studio_save_path = ROOT / "system/control-center/studio_save.py"
+if not studio_save_path.is_file():
+    err("m45 Studio-native save helper is missing")
+else:
+    studio_save_text = studio_save_path.read_text(encoding="utf-8")
+    for required in [
+        "request_active_studio_save",
+        "studio-native-ctrl-s",
+        "Roblox Studio must be the active window",
+        "keybd_event(_VK_CONTROL",
+    ]:
+        if required not in studio_save_text:
+            err(f"m45 Studio-native save helper missing {required}")
+
+for required in [
+    "from studio_save import request_active_studio_save",
+    'control_agent_build = "game1-m46-location-assets-shared-textures-001"',
+    'result["studioSave"] = request_active_studio_save()',
+]:
+    if required not in host_agent_text:
+        err(f"m45 host agent save bridge missing {required}")
+
+for required in [
+    "self.viewport.MouseLeave:Connect",
+    "self.viewport.InputEnded:Connect",
+    "self.previewDragging = false",
+    "Studio save requested",
+]:
+    if required not in deco_manager_text:
+        err(f"m45 DecoManager drag/save hotfix missing {required}")
+if "self.AssetService:SavePlaceAsync" in deco_manager_text:
+    err("m45 DecoManager still calls cloud SavePlaceAsync directly")
+if "model bridge v18" not in studio_plugin_text:
+    err("m45 Studio plugin version marker is stale")
+
+# m44 Location Assets: PNG/JPG source textures with clean extension-aware preparation.
+for required in [
+    'TEXTURE_SUFFIXES = (".png", ".jpg", ".jpeg")',
+    'canonical_suffix = ".jpg" if source_suffix == ".jpeg" else source_suffix',
+    "_retire_replaced_file",
+    "PNG or JPG",
+]:
+    if required not in location_asset_store_text:
+        err(f"m44 LocationAssetStore image format support missing {required}")
+for required in [
+    "def choose_location_asset_texture()",
+    "*.png;*.jpg;*.jpeg",
+]:
+    if required not in host_agent_text:
+        err(f"m44 Location Asset texture picker missing {required}")
+if "choose_location_asset_png" in host_agent_text:
+    err("m44 legacy PNG-only Location Asset picker remains")
+if "PNG/JPG" not in deco_assets_js_text or "PNG/JPG" not in index_m43_text:
+    err("m44 Location Assets UI does not advertise PNG/JPG texture support")
+
+# m46 Location Assets: Decorations category + shared registered texture references.
+for required in [
+    'SCHEMA_VERSION = 2',
+    '"decoration": "Decorations"',
+    'texture_reference_slug TEXT NOT NULL DEFAULT',
+    'def _resolve_texture_owner',
+    'textureReferenceSlug',
+    'texture_owner_slug',
+    'texture_shared',
+    'shared texture owner',
+    'texture is reused by location assets',
+]:
+    if required not in location_asset_store_text:
+        err(f"m46 shared Location Asset texture support missing {required}")
+for required in [
+    'id="location-asset-texture-reference"',
+    'decorations</span>',
+    'reuse registered texture',
+]:
+    if required not in index_m43_text:
+        err(f"m46 Location Assets UI missing {required}")
+for required in [
+    'textureReferenceSlug',
+    'decoAssetRenderTextureReferences',
+    'location-asset-texture-reference',
+    'reuse a registered texture',
+]:
+    if required not in deco_assets_js_text:
+        err(f"m46 Location Assets shared-texture UI behavior missing {required}")
+for required in [
+    'decoration = "Decorations"',
+    'local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration" }',
+    'local row = math.floor((index - 1) / 3)',
+]:
+    if required not in deco_manager_text:
+        err(f"m46 DecoManager Decorations category missing {required}")
+if 'decoration = "Decorations"' not in deco_placement_text:
+    err("m46 DecoPlacement Decorations folder mapping is missing")
+if "model bridge v18" not in studio_plugin_text:
+    err("m46 Studio plugin version marker is stale")
+
+
+# m47 DecoManager: transient placement sessions never reuse/destroy the manager template.
+for required in [
+    'sourceTemplate = nil',
+    'function DecoPlacement:_detachSession()',
+    'self.plugin:Activate(true)',
+    'ghost.Parent = if camera ~= nil then camera else self.Workspace',
+    'local placed = sourceTemplate:Clone()',
+    'self.committing = true',
+]:
+    if required not in deco_placement_text:
+        err(f"m47 DecoPlacement lifecycle hotfix missing {required}")
+if 'self.template:Destroy()' in deco_placement_text:
+    err("m47 DecoPlacement still destroys a placement-owned template clone")
+for required in [
+    'descendant:IsA("AnimationController")',
+    'descendant:IsA("Animator")',
+    'descendant.Name == "InitialPoses"',
+]:
+    if required not in deco_loader_text:
+        err(f"m47 static Location Asset sanitization missing {required}")
+if "model bridge v18" not in studio_plugin_text:
+    err("m47 Studio plugin version marker is stale")
+
+
 if errors:
     print("verify failed")
     for item in errors:
         print(" -", item)
     sys.exit(1)
 
-print("verify ok · game1 m42 polished Location editor UI passed")
+print("verify ok · game1 m47 DecoManager placement lifecycle hotfix passed")
 print("registered character archetypes:", len(archetypes))
 print("active character archetype:", active_id or "none")
 print("race pool: human")

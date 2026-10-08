@@ -1,5 +1,6 @@
 local AnimationClipProvider = game:GetService("AnimationClipProvider")
 local AssetService = game:GetService("AssetService")
+local ChangeHistoryService = game:GetService("ChangeHistoryService")
 local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -11,6 +12,7 @@ local Workspace = game:GetService("Workspace")
 
 local CharacterTemplate = require(script.Parent.modules.CharacterTemplate)
 local LocationCommands = require(script.Parent.modules.LocationCommands)
+local DecoManager = require(script.Parent.modules.DecoManager)
 
 local toolbar = plugin:CreateToolbar("game1")
 local button = toolbar:CreateButton(
@@ -34,6 +36,18 @@ local locationCommands = LocationCommands({
     BRIDGE_URL = BRIDGE_URL,
     BRIDGE_TOKEN = BRIDGE_TOKEN,
     plugin = plugin,
+})
+
+local decoManager = DecoManager.new({
+    plugin = plugin,
+    toolbar = toolbar,
+    HttpService = HttpService,
+    AssetService = AssetService,
+    Workspace = Workspace,
+    ChangeHistoryService = ChangeHistoryService,
+    UserInputService = UserInputService,
+    agentBaseUrl = AGENT_BASE_URL,
+    agentToken = AGENT_TOKEN,
 })
 
 local STUDIO_DEBUG_PREFERENCES_SETTING = "Game1StudioDebugPreferences_v1"
@@ -1791,4 +1805,4 @@ task.spawn(function()
     end
 end)
 
-print("[game1 plugin] loaded · model bridge v14 · locations + viewport timeline pose sampler")
+print("[game1 plugin] loaded · model bridge v18 · DecoManager placement lifecycle + decorations + shared textures + locations + viewport timeline pose sampler")

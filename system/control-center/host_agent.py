@@ -38,10 +38,13 @@ from animation_speed_scaling_store import AnimationSpeedScalingStore
 from options_store import OptionsStore
 from timeline_store import TimelineStore
 from location_store import LocationStore
+from location_asset_store import LocationAssetStore
+from deco_layout_store import DecoLayoutStore
+from studio_save import request_active_studio_save
 from character_core.identity import CharacterIdentityService
 from studio_bridge import run_model_load_bridge, run_monster_spawn_bridge, run_timeline_editor_bridge, run_location_authoring_bridge
 
-control_agent_build = "game1-m41-location-registration-001"
+control_agent_build = "game1-m46-location-assets-shared-textures-001"
 port = int(os.environ.get("CONTROL_AGENT_PORT", "43821"))
 token = os.environ.get("CONTROL_TOKEN", "Game1LocalControlV1")
 store = CharacterStore(ROOT)
@@ -54,6 +57,8 @@ animation_speed_scaling = AnimationSpeedScalingStore(ROOT)
 options_store = OptionsStore(ROOT)
 timelines = TimelineStore(ROOT, store, animations, monsters, monster_animations)
 locations = LocationStore(ROOT, run_location_authoring_bridge)
+location_assets = LocationAssetStore(ROOT)
+deco_layouts = DecoLayoutStore(ROOT)
 character_identity = CharacterIdentityService(ROOT, store, animations)
 
 
@@ -264,6 +269,38 @@ if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
     )
 
 
+def choose_location_asset_fbx() -> str:
+    return _powershell_picker(
+        r'''
+Add-Type -AssemblyName System.Windows.Forms
+$dialog = New-Object System.Windows.Forms.OpenFileDialog
+$dialog.Title = 'game1 · choose location asset fbx'
+$dialog.Filter = 'fbx location asset model (*.fbx)|*.fbx'
+$dialog.Multiselect = $false
+if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    Write-Output $dialog.FileName
+}
+'''
+    )
+
+
+def choose_location_asset_texture() -> str:
+    return _powershell_picker(
+        r'''
+Add-Type -AssemblyName System.Windows.Forms
+$dialog = New-Object System.Windows.Forms.OpenFileDialog
+$dialog.Title = 'game1 · choose location asset texture'
+$dialog.Filter = 'texture (*.png;*.jpg;*.jpeg)|*.png;*.jpg;*.jpeg|png texture (*.png)|*.png|jpeg texture (*.jpg;*.jpeg)|*.jpg;*.jpeg'
+$dialog.Multiselect = $false
+if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    Write-Output $dialog.FileName
+}
+'''
+    )
+
+
 def choose_monster_fbx() -> str:
     return _powershell_picker(
         r'''
@@ -427,6 +464,10 @@ class Handler(BaseHTTPRequestHandler):
             snapshot = weapons.snapshot()
             snapshot["publication"] = publication_config()
             return self.out(200, snapshot)
+        if path == "/api/location-assets":
+            snapshot = location_assets.snapshot()
+            snapshot["publication"] = publication_config()
+            return self.out(200, snapshot)
         if path == "/api/monsters":
             snapshot = monsters.snapshot()
             snapshot["publication"] = publication_config()
@@ -476,6 +517,10 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith(weapon_prefix) and path.endswith(publications_suffix):
             slug = unquote(path[len(weapon_prefix):-len(publications_suffix)].strip("/"))
             return self.out(200, {"items": weapons.publications(slug)})
+        location_asset_prefix = "/api/location-assets/"
+        if path.startswith(location_asset_prefix) and path.endswith(publications_suffix):
+            slug = unquote(path[len(location_asset_prefix):-len(publications_suffix)].strip("/"))
+            return self.out(200, {"items": location_assets.publications(slug)})
         prefix = "/api/characters/"
         suffix = "/publications"
         if path.startswith(prefix) and path.endswith(suffix):
@@ -523,6 +568,16 @@ class Handler(BaseHTTPRequestHandler):
                 return self.out(200, {"paths": choose_weapon_textures()})
             except Exception as error:
                 return self.out(400, {"error": str(error)})
+        if path == "/api/files/choose-location-asset-model":
+            try:
+                return self.out(200, {"path": choose_location_asset_fbx()})
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path == "/api/files/choose-location-asset-texture":
+            try:
+                return self.out(200, {"path": choose_location_asset_texture()})
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
         if path == "/api/characters":
             try:
                 return self.out(200, store.register(self.body()))
@@ -531,6 +586,19 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/weapons":
             try:
                 return self.out(200, weapons.register(self.body()))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path == "/api/location-assets":
+            try:
+                return self.out(200, location_assets.register(self.body()))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path == "/api/location-assets/layout":
+            try:
+                payload = self.body()
+                result = deco_layouts.save(payload)
+                result["studioSave"] = request_active_studio_save()
+                return self.out(200, result)
             except Exception as error:
                 return self.out(400, {"error": str(error)})
         if path == "/api/weapons/attack-movement":
@@ -848,6 +916,17 @@ class Handler(BaseHTTPRequestHandler):
                 return self.out(200, monster_animations.set_weight(binding_id, int(payload.get("weight") or 100)))
             except Exception as error:
                 return self.out(400, {"error": str(error)})
+        location_asset_prefix = "/api/location-assets/"
+        location_asset_publish_suffix = "/publish"
+        if path.startswith(location_asset_prefix) and path.endswith(location_asset_publish_suffix):
+            slug = unquote(path[len(location_asset_prefix):-len(location_asset_publish_suffix)].strip("/"))
+            try:
+                payload = self.body()
+                credentials = publication_credentials(str(payload.get("description") or "game1 location asset"))
+                return self.out(200, location_assets.publish(slug, credentials))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+
         weapon_prefix = "/api/weapons/"
         weapon_publish_suffix = "/publish"
         weapon_sync_suffix = "/sync"
@@ -938,6 +1017,14 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError("delete monster spawns first: " + ", ".join(spawn_ids[:8]))
                 monster_animations.delete_profile(slug)
                 monsters.delete(slug)
+                return self.out(200, {"ok": True})
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        location_asset_prefix = "/api/location-assets/"
+        if path.startswith(location_asset_prefix):
+            slug = unquote(path[len(location_asset_prefix):])
+            try:
+                location_assets.delete(slug)
                 return self.out(200, {"ok": True})
             except Exception as error:
                 return self.out(400, {"error": str(error)})

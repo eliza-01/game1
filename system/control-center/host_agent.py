@@ -37,10 +37,11 @@ from monster_spawn_store import MonsterSpawnStore
 from animation_speed_scaling_store import AnimationSpeedScalingStore
 from options_store import OptionsStore
 from timeline_store import TimelineStore
+from location_store import LocationStore
 from character_core.identity import CharacterIdentityService
-from studio_bridge import run_model_load_bridge, run_monster_spawn_bridge, run_timeline_editor_bridge
+from studio_bridge import run_model_load_bridge, run_monster_spawn_bridge, run_timeline_editor_bridge, run_location_authoring_bridge
 
-control_agent_build = "game1-m38-character-hitend-rojo-workspace-001"
+control_agent_build = "game1-m41-location-registration-001"
 port = int(os.environ.get("CONTROL_AGENT_PORT", "43821"))
 token = os.environ.get("CONTROL_TOKEN", "Game1LocalControlV1")
 store = CharacterStore(ROOT)
@@ -52,6 +53,7 @@ monster_spawns = MonsterSpawnStore(ROOT, monsters, monster_animations, run_monst
 animation_speed_scaling = AnimationSpeedScalingStore(ROOT)
 options_store = OptionsStore(ROOT)
 timelines = TimelineStore(ROOT, store, animations, monsters, monster_animations)
+locations = LocationStore(ROOT, run_location_authoring_bridge)
 character_identity = CharacterIdentityService(ROOT, store, animations)
 
 
@@ -454,6 +456,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self.out(200, timelines.snapshot())
             except Exception as error:
                 return self.out(400, {"error": str(error)})
+        if path == "/api/locations":
+            try:
+                return self.out(200, locations.snapshot())
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
         if path == "/api/timelines/editor-state":
             try:
                 session_id = str((parse_qs(parsed.query).get("session") or [""])[0])
@@ -577,6 +584,37 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/options":
             try:
                 return self.out(200, options_store.update(self.body()))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+
+        if path == "/api/locations/draw":
+            try:
+                return self.out(200, locations.draw(self.body()))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path == "/api/locations/register":
+            try:
+                return self.out(200, locations.register(self.body()))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path == "/api/locations/select":
+            try:
+                return self.out(200, locations.select(self.body()))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path == "/api/locations/restore":
+            try:
+                return self.out(200, locations.restore())
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path == "/api/locations/delete":
+            try:
+                return self.out(200, locations.delete(self.body()))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path == "/api/locations/validate":
+            try:
+                return self.out(200, locations.validate())
             except Exception as error:
                 return self.out(400, {"error": str(error)})
 

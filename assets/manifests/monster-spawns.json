@@ -1,29 +1,5 @@
 {
   "schemaVersion": 1,
   "project": "game1",
-  "records": {
-    "spawn-fa0f11fb6e5744c2842561a361c30634": {
-      "spawnId": "spawn-fa0f11fb6e5744c2842561a361c30634",
-      "monsterSlug": "gremlin",
-      "mapKey": "main",
-      "placeId": 0,
-      "position": {
-        "x": -6.327,
-        "y": 47.459,
-        "z": 215.564
-      },
-      "yawDegrees": 45.493627576766805,
-      "respawnSeconds": 10.0,
-      "spawnRadius": 21.0,
-      "maxAlive": 4,
-      "enabled": true,
-      "createdAtUtc": "2026-10-07T01:21:37.270562Z",
-      "updatedAtUtc": "2026-10-07T01:21:37.270562Z",
-      "studioSync": {
-        "status": "synced",
-        "recordFingerprint": "78249c17ec82b9d18ca190f97e3272f67235761a35b24c004c572fe5fe100029",
-        "syncedAtUtc": "2026-10-07T20:28:15.500335Z"
-      }
-    }
-  }
+  "records": {}
 }

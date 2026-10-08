@@ -20,7 +20,7 @@ try {
 
 if(-not (Test-Path $Temp)){throw 'Rojo did not create the plugin build'}
 $BuiltText=Get-Content $Temp -Raw
-foreach($Marker in @('Game1ControlCenter','model bridge v13','Game1AttackTimeline_v2','TimelinePreviewWorld')){
+foreach($Marker in @('Game1ControlCenter','model bridge v14','Game1AttackTimeline_v2','TimelinePreviewWorld','location-authoring','Game1LocationMarker')){
     if(-not $BuiltText.Contains($Marker)){
         throw "Studio bridge build is stale or incomplete; missing marker: $Marker"
     }
@@ -38,7 +38,7 @@ $InstalledHash=(Get-FileHash $Installed -Algorithm SHA256).Hash
 if($GeneratedHash -ne $InstalledHash){throw 'Installed Studio bridge hash does not match generated bridge hash'}
 Remove-Item $Temp -Force -ErrorAction SilentlyContinue
 
-Write-Host ("Game1Bridge installed with in-plugin Attack Timeline viewport preview: {0}" -f $Installed)
+Write-Host ("Game1Bridge installed with Locations authoring + in-plugin Attack Timeline viewport preview: {0}" -f $Installed)
 Write-Host ("SHA256: {0}" -f $InstalledHash)
-Write-Host 'Attack Timeline opens from Control Center / Asset Manager / Timelines.'
+Write-Host 'Locations draw from Asset Manager / Locations; Attack Timeline opens from Asset Manager / Timelines.'
 Write-Host 'Fully close every Roblox Studio window, then reopen Studio once.'

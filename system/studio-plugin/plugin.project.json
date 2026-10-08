@@ -9,6 +9,9 @@
       "$className": "Folder",
       "CharacterTemplate": {
         "$path": "modules/CharacterTemplate.luau"
+      },
+      "LocationCommands": {
+        "$path": "modules/LocationCommands.luau"
       }
     }
   }

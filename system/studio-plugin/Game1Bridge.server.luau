@@ -10,6 +10,7 @@ local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
 local CharacterTemplate = require(script.Parent.modules.CharacterTemplate)
+local LocationCommands = require(script.Parent.modules.LocationCommands)
 
 local toolbar = plugin:CreateToolbar("game1")
 local button = toolbar:CreateButton(
@@ -24,6 +25,16 @@ local AGENT_URL = AGENT_BASE_URL .. "/api/agent/info"
 local AGENT_TOKEN = "Game1LocalControlV1"
 local BRIDGE_URL = "http://127.0.0.1:43137"
 local BRIDGE_TOKEN = "Game1StudioBridgeV1"
+
+local locationCommands = LocationCommands({
+    HttpService = HttpService,
+    Selection = Selection,
+    Workspace = Workspace,
+    UserInputService = UserInputService,
+    BRIDGE_URL = BRIDGE_URL,
+    BRIDGE_TOKEN = BRIDGE_TOKEN,
+    plugin = plugin,
+})
 
 local STUDIO_DEBUG_PREFERENCES_SETTING = "Game1StudioDebugPreferences_v1"
 local STUDIO_DEBUG_PREFERENCES_FOLDER = "Game1StudioPreferences"
@@ -1768,6 +1779,8 @@ local function pollBridge()
         handleMonsterSpawn(data)
     elseif data.command == "timeline-editor" then
         handleTimelineEditor(data)
+    elseif data.command == "location-authoring" then
+        locationCommands.handle(data)
     end
 end
 
@@ -1778,4 +1791,4 @@ task.spawn(function()
     end
 end)
 
-print("[game1 plugin] loaded · model bridge v13 · viewport timeline pose sampler")
+print("[game1 plugin] loaded · model bridge v14 · locations + viewport timeline pose sampler")

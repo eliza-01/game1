@@ -5,11 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>game1 · asset manager</title>
 <link rel="stylesheet" href="asset-manager.css?v=8">
+<link rel="stylesheet" href="location-assets.css?v=1">
 </head>
 <body>
 <header>
 <div><span class="eyebrow">game1 · control center</span><h1>asset manager</h1></div>
-<div class="header-actions"><span class="pill">characters + animations + timelines + weapons + monsters · m35</span><button id="theme" class="icon" type="button" title="theme">◐</button></div>
+<div class="header-actions"><span class="pill">characters + animations + weapons + monsters + locations + timelines · m41</span><button id="theme" class="icon" type="button" title="theme">◐</button></div>
 </header>
 <main>
 <aside class="panel rail">
@@ -20,6 +21,7 @@
 <button id="nav-animation-speed" class="asset-section" type="button"><b>animation speed</b><small>stat → playback scaling</small></button>
 <button id="nav-weapons" class="asset-section" type="button"><b>weapons</b><small>models · textures · stats</small></button>
 <button id="nav-monsters" class="asset-section" type="button"><b>monsters</b><small>rigs · stats · animations</small></button>
+<button id="nav-locations" class="asset-section" type="button"><b>locations</b><small>polygon registry · studio authoring</small></button>
 <button id="nav-timelines" class="asset-section" type="button"><b>timelines</b><small>attack animation events</small></button>
 <button id="nav-options" class="asset-section" type="button"><b>options</b><small>common runtime settings</small></button>
 </div>
@@ -140,6 +142,8 @@
 </div>
 </div>
 
+
+<div id="locations-view" hidden></div>
 
 <div id="timelines-view" hidden>
 <div class="panel hero">
@@ -322,6 +326,7 @@
 <script src="character-assets.js?v=15"></script>
 <script src="animation-speed.js?v=1"></script>
 <script src="timelines.js?v=2"></script>
+<script src="locations.js?v=1"></script>
 <script src="options.js?v=1"></script>
 <script src="weapon-assets.js?v=3"></script>
 <script src="monster-assets.js?v=4"></script>

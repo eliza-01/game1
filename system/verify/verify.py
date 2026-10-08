@@ -1973,7 +1973,7 @@ for required in [
     'AnimationClipProvider:GetAnimationClipAsync',
     'clip:IsA("KeyframeSequence")',
     'preview.Parent = timelineWorld',
-    'model bridge v13',
+    'model bridge v14',
 ]:
     if required not in studio_plugin_text:
         err(f"m37 in-plugin timeline preview missing {required}")
@@ -2037,13 +2037,101 @@ for required in ["each animation block is configured independently", "Stat units
         err(f"m40 Animation Speed help copy missing {required}")
 
 
+# m41 Location registration: RobloxLineage polygon authoring flow adapted to game1.
+location_manifest_path = ROOT / "assets/manifests/locations.json"
+location_store_path = ROOT / "system/control-center/location_store.py"
+location_js_path = ROOT / "system/control-center/static/locations.js"
+location_css_path = ROOT / "system/control-center/static/location-assets.css"
+location_plugin_path = ROOT / "system/studio-plugin/modules/LocationCommands.luau"
+location_registry_path = ROOT / "src/shared/world/LocationRegistry.luau"
+for path in [location_manifest_path, location_store_path, location_js_path, location_css_path, location_plugin_path, location_registry_path]:
+    if not path.is_file():
+        err(f"m41 Location authoring file missing: {path.relative_to(ROOT)}")
+if location_manifest_path.is_file():
+    location_manifest = json.loads(location_manifest_path.read_text(encoding="utf-8"))
+    if location_manifest.get("schemaVersion") != 1 or location_manifest.get("project") != "game1" or not isinstance(location_manifest.get("records"), dict):
+        err("m41 locations.json schema/project is invalid")
+location_store_text = location_store_path.read_text(encoding="utf-8") if location_store_path.is_file() else ""
+for required in [
+    "class LocationStore",
+    "_validate_polygon",
+    "must not self-intersect",
+    "def draw",
+    "def register",
+    "def restore",
+    "LocationRegistry.luau",
+]:
+    if required not in location_store_text:
+        err(f"m41 LocationStore missing {required}")
+location_js_text = location_js_path.read_text(encoding="utf-8") if location_js_path.is_file() else ""
+for required in [
+    "/api/locations/draw",
+    "/api/locations/register",
+    "/api/locations/select",
+    "/api/locations/restore",
+    "/api/locations/delete",
+    "/api/locations/validate",
+    "click the first point",
+]:
+    if required not in location_js_text:
+        err(f"m41 Locations UI missing {required}")
+for required in ['id="nav-locations"', 'id="locations-view"', 'location-assets.css?v=1', 'locations.js?v=1']:
+    if required not in index_m35_text:
+        err(f"m41 Asset Manager Locations section missing {required}")
+for required in [
+    'path == "/api/locations"',
+    'path == "/api/locations/draw"',
+    'path == "/api/locations/register"',
+    'path == "/api/locations/restore"',
+]:
+    if required not in host_agent_text:
+        err(f"m41 host agent Location API missing {required}")
+for required in [
+    "run_location_authoring_bridge",
+    '"command": "location-authoring"',
+    '"/location-authoring-result"',
+]:
+    if required not in studio_bridge_m35_text:
+        err(f"m41 Studio Location bridge missing {required}")
+location_plugin_text = location_plugin_path.read_text(encoding="utf-8") if location_plugin_path.is_file() else ""
+for required in [
+    'AUTHORING_ROOT = "Game1Authoring"',
+    'LOCATION_FOLDER = "Locations"',
+    'Game1LocationMarker',
+    'PreviewForLocationId',
+    'plugin:Activate(true)',
+    'mouse.Button1Down',
+    'syncedLocationIds',
+]:
+    if required not in location_plugin_text:
+        err(f"m41 Studio Location authoring module missing {required}")
+for required in ['require(script.Parent.modules.LocationCommands)', 'data.command == "location-authoring"', 'model bridge v14']:
+    if required not in studio_plugin_text:
+        err(f"m41 Game1Bridge Location integration missing {required}")
+
+# m42 Location UI polish: structured editor fields, geometry state and action hierarchy.
+location_css_text = location_css_path.read_text(encoding="utf-8") if location_css_path.is_file() else ""
+for required in [
+    "location-editor-section",
+    "location-field",
+    "location-geometry-summary",
+    "location-action-zone",
+    "location-empty",
+]:
+    if required not in location_js_text or required not in location_css_text:
+        err(f"m42 Location UI structure missing {required}")
+for required in ["Location details", "Studio contour", "draw in Studio", "registry paths"]:
+    if required not in location_js_text:
+        err(f"m42 Location UI copy missing {required}")
+
+
 if errors:
     print("verify failed")
     for item in errors:
         print(" -", item)
     sys.exit(1)
 
-print("verify ok · game1 m40 grouped Animation Speed controls passed")
+print("verify ok · game1 m42 polished Location editor UI passed")
 print("registered character archetypes:", len(archetypes))
 print("active character archetype:", active_id or "none")
 print("race pool: human")

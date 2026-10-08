@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import http.server
 import json
+import re
 import time
 
 PROJECT = "game1"
@@ -330,4 +331,119 @@ def run_timeline_editor_bridge(session: dict, event_catalog: list[dict], timeout
         raise StudioBridgeError("no timeline editor command was received; install the updated Game1Bridge plugin and restart Studio")
     if result.get("error"):
         raise StudioBridgeError(f"Studio timeline editor failed: {result['error']}")
+    return result
+
+
+def run_location_authoring_bridge(
+    action: str,
+    *,
+    operation_id: str,
+    location_id: str = "",
+    name: str = "",
+    place_id: int = 0,
+    points: list[dict] | None = None,
+    records: list[dict] | None = None,
+    timeout_seconds: float = 45.0,
+) -> dict:
+    """Run one polygon Location authoring operation in Studio Edit mode."""
+    action = str(action or "").strip().lower()
+    if action not in {"draw", "upsert", "select", "delete", "sync"}:
+        raise StudioBridgeError(f"unsupported Location authoring action: {action}")
+    operation_id = str(operation_id or "").strip()
+    if not operation_id:
+        raise StudioBridgeError("Location authoring operation id is required")
+    if action != "sync" and not re.fullmatch(r"location-[a-z0-9-]{12,64}", str(location_id or "")):
+        raise StudioBridgeError("Location authoring location id is invalid")
+
+    command = {
+        "command": "location-authoring",
+        "schemaVersion": 1,
+        "project": PROJECT,
+        "action": action,
+        "operationId": operation_id,
+        "locationId": str(location_id or ""),
+        "name": str(name or ""),
+        "placeId": int(place_id or 0),
+        "points": points if isinstance(points, list) else [],
+        "records": records if isinstance(records, list) else [],
+    }
+    result: dict | None = None
+    command_claimed = False
+    command_claimed_at: float | None = None
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def log_message(self, _format: str, *_args) -> None:
+            return
+
+        def _authorized(self) -> bool:
+            return self.headers.get("X-Game1-Token") == TOKEN
+
+        def _json(self, status: int, payload: dict) -> None:
+            body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_GET(self) -> None:
+            nonlocal command_claimed, command_claimed_at
+            if not self._authorized():
+                self._json(403, {"ok": False})
+                return
+            if self.path != "/command":
+                self._json(404, {"ok": False})
+                return
+            if command_claimed:
+                self._json(409, {"ok": False, "reason": "command-already-claimed"})
+                return
+            command_claimed = True
+            command_claimed_at = time.monotonic()
+            self._json(200, command)
+
+        def do_POST(self) -> None:
+            nonlocal result
+            if not self._authorized():
+                self._json(403, {"ok": False})
+                return
+            if self.path != "/location-authoring-result":
+                self._json(404, {"ok": False})
+                return
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                incoming = json.loads(self.rfile.read(length).decode("utf-8"))
+                if incoming.get("command") != "location-authoring" or incoming.get("project") != PROJECT:
+                    raise ValueError("unexpected Location authoring bridge result identity")
+                if str(incoming.get("operationId") or "") != operation_id:
+                    raise ValueError("unexpected Location authoring operation id")
+                result = incoming
+                self._json(200, {"ok": True})
+            except Exception as exc:
+                self._json(400, {"ok": False, "error": str(exc)})
+
+    try:
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
+    except OSError as exc:
+        raise StudioBridgeError(f"studio bridge port {PORT} is unavailable: {exc}") from exc
+
+    server.timeout = 0.25
+    started_at = time.monotonic()
+    deadline = started_at + max(0.01, float(timeout_seconds))
+    try:
+        while result is None and time.monotonic() < deadline:
+            server.handle_request()
+            now = time.monotonic()
+            if command_claimed_at is None and now - started_at >= 8.0:
+                break
+            if command_claimed_at is not None and now - command_claimed_at >= max(10.0, float(timeout_seconds) - 1):
+                break
+    finally:
+        server.server_close()
+
+    if result is None:
+        if command_claimed:
+            raise StudioBridgeError("the game1 Studio plugin accepted the Location command but did not return a result")
+        raise StudioBridgeError("no Location command was received; install the updated Game1Bridge plugin and restart Studio")
+    if result.get("error"):
+        raise StudioBridgeError(f"Studio Location command failed: {result['error']}")
     return result

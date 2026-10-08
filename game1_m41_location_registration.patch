@@ -1,0 +1,1429 @@
+diff --git a/assets/manifests/locations.json b/assets/manifests/locations.json
+new file mode 100644
+index 0000000..de0a50f
+--- /dev/null
++++ b/assets/manifests/locations.json
+@@ -0,0 +1,5 @@
++{
++  "schemaVersion": 1,
++  "project": "game1",
++  "records": {}
++}
+diff --git a/src/shared/world/LocationRegistry.luau b/src/shared/world/LocationRegistry.luau
+new file mode 100644
+index 0000000..fb744c3
+--- /dev/null
++++ b/src/shared/world/LocationRegistry.luau
+@@ -0,0 +1,7 @@
++-- generated from assets/manifests/locations.json. do not edit by hand.
++-- client-readable polygon location registry.
++local HttpService = game:GetService("HttpService")
++
++local data = HttpService:JSONDecode([==[{"project":"game1","records":[],"schemaVersion":1,"sourceDigest":"4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}]==])
++
++return table.freeze(data)
+diff --git a/system/control-center/host_agent.py b/system/control-center/host_agent.py
+index 296decd..46aa889 100644
+--- a/system/control-center/host_agent.py
++++ b/system/control-center/host_agent.py
+@@ -37,10 +37,11 @@ from monster_spawn_store import MonsterSpawnStore
+ from animation_speed_scaling_store import AnimationSpeedScalingStore
+ from options_store import OptionsStore
+ from timeline_store import TimelineStore
++from location_store import LocationStore
+ from character_core.identity import CharacterIdentityService
+-from studio_bridge import run_model_load_bridge, run_monster_spawn_bridge, run_timeline_editor_bridge
++from studio_bridge import run_model_load_bridge, run_monster_spawn_bridge, run_timeline_editor_bridge, run_location_authoring_bridge
+ 
+-control_agent_build = "game1-m38-character-hitend-rojo-workspace-001"
++control_agent_build = "game1-m41-location-registration-001"
+ port = int(os.environ.get("CONTROL_AGENT_PORT", "43821"))
+ token = os.environ.get("CONTROL_TOKEN", "Game1LocalControlV1")
+ store = CharacterStore(ROOT)
+@@ -52,6 +53,7 @@ monster_spawns = MonsterSpawnStore(ROOT, monsters, monster_animations, run_monst
+ animation_speed_scaling = AnimationSpeedScalingStore(ROOT)
+ options_store = OptionsStore(ROOT)
+ timelines = TimelineStore(ROOT, store, animations, monsters, monster_animations)
++locations = LocationStore(ROOT, run_location_authoring_bridge)
+ character_identity = CharacterIdentityService(ROOT, store, animations)
+ 
+ 
+@@ -454,6 +456,11 @@ class Handler(BaseHTTPRequestHandler):
+                 return self.out(200, timelines.snapshot())
+             except Exception as error:
+                 return self.out(400, {"error": str(error)})
++        if path == "/api/locations":
++            try:
++                return self.out(200, locations.snapshot())
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
+         if path == "/api/timelines/editor-state":
+             try:
+                 session_id = str((parse_qs(parsed.query).get("session") or [""])[0])
+@@ -580,6 +587,37 @@ class Handler(BaseHTTPRequestHandler):
+             except Exception as error:
+                 return self.out(400, {"error": str(error)})
+ 
++        if path == "/api/locations/draw":
++            try:
++                return self.out(200, locations.draw(self.body()))
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
++        if path == "/api/locations/register":
++            try:
++                return self.out(200, locations.register(self.body()))
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
++        if path == "/api/locations/select":
++            try:
++                return self.out(200, locations.select(self.body()))
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
++        if path == "/api/locations/restore":
++            try:
++                return self.out(200, locations.restore())
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
++        if path == "/api/locations/delete":
++            try:
++                return self.out(200, locations.delete(self.body()))
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
++        if path == "/api/locations/validate":
++            try:
++                return self.out(200, locations.validate())
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
++
+         if path == "/api/timelines/open":
+             try:
+                 payload = self.body()
+diff --git a/system/control-center/location_store.py b/system/control-center/location_store.py
+new file mode 100644
+index 0000000..dffa292
+--- /dev/null
++++ b/system/control-center/location_store.py
+@@ -0,0 +1,369 @@
++from __future__ import annotations
++
++from pathlib import Path
++from datetime import datetime, timezone
++import hashlib
++import json
++import math
++import re
++import uuid
++
++SCHEMA_VERSION = 1
++RUNTIME_SCHEMA_VERSION = 1
++PROJECT = "game1"
++MAX_POINTS = 128
++
++
++def utc_now() -> str:
++    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
++
++
++def _finite(value: object, label: str) -> float:
++    try:
++        number = float(value)
++    except (TypeError, ValueError) as exc:
++        raise ValueError(f"{label} must be a number") from exc
++    if not math.isfinite(number):
++        raise ValueError(f"{label} must be finite")
++    return number
++
++
++def _orientation(a: tuple[float, float], b: tuple[float, float], c: tuple[float, float]) -> float:
++    return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
++
++
++def _on_segment(a: tuple[float, float], b: tuple[float, float], point: tuple[float, float]) -> bool:
++    return (
++        min(a[0], b[0]) - 1e-7 <= point[0] <= max(a[0], b[0]) + 1e-7
++        and min(a[1], b[1]) - 1e-7 <= point[1] <= max(a[1], b[1]) + 1e-7
++        and abs(_orientation(a, b, point)) <= 1e-7
++    )
++
++
++def _segments_intersect(
++    a: tuple[float, float],
++    b: tuple[float, float],
++    c: tuple[float, float],
++    d: tuple[float, float],
++) -> bool:
++    o1 = _orientation(a, b, c)
++    o2 = _orientation(a, b, d)
++    o3 = _orientation(c, d, a)
++    o4 = _orientation(c, d, b)
++    if ((o1 > 0 > o2) or (o1 < 0 < o2)) and ((o3 > 0 > o4) or (o3 < 0 < o4)):
++        return True
++    return (
++        (abs(o1) <= 1e-7 and _on_segment(a, b, c))
++        or (abs(o2) <= 1e-7 and _on_segment(a, b, d))
++        or (abs(o3) <= 1e-7 and _on_segment(c, d, a))
++        or (abs(o4) <= 1e-7 and _on_segment(c, d, b))
++    )
++
++
++class LocationStore:
++    """Project-owned polygon locations authored in Studio Edit mode."""
++
++    def __init__(self, root: Path, bridge):
++        self.root = root.resolve()
++        self.bridge = bridge
++        self.manifest_path = self.root / "assets/manifests/locations.json"
++        self.registry_path = self.root / "src/shared/world/LocationRegistry.luau"
++        self._ensure()
++
++    @staticmethod
++    def _empty() -> dict:
++        return {"schemaVersion": SCHEMA_VERSION, "project": PROJECT, "records": {}}
++
++    def _ensure(self) -> None:
++        self.manifest_path.parent.mkdir(parents=True, exist_ok=True)
++        if not self.manifest_path.is_file():
++            self._atomic_json(self.manifest_path, self._empty())
++        manifest = self._load()
++        self._write_registry(manifest)
++
++    def _load(self) -> dict:
++        try:
++            value = json.loads(self.manifest_path.read_text(encoding="utf-8"))
++        except Exception as exc:
++            raise ValueError(f"cannot read locations.json: {exc}") from exc
++        if value.get("schemaVersion") != SCHEMA_VERSION or value.get("project") != PROJECT:
++            raise ValueError("invalid locations.json schema/project")
++        if not isinstance(value.get("records"), dict):
++            raise ValueError("invalid locations.json records")
++        return value
++
++    @staticmethod
++    def _normalize_points(raw_points: object) -> list[dict]:
++        if not isinstance(raw_points, list):
++            raise ValueError("Location polygon points are missing")
++        if len(raw_points) < 3:
++            raise ValueError("Location polygon must contain at least 3 points")
++        if len(raw_points) > MAX_POINTS:
++            raise ValueError(f"Location polygon cannot contain more than {MAX_POINTS} points")
++        points = []
++        for index, raw in enumerate(raw_points, start=1):
++            if not isinstance(raw, dict):
++                raise ValueError(f"Location point {index} is invalid")
++            points.append({
++                "x": round(_finite(raw.get("x"), f"Point {index} X"), 4),
++                "y": round(_finite(raw.get("y"), f"Point {index} Y"), 4),
++                "z": round(_finite(raw.get("z"), f"Point {index} Z"), 4),
++            })
++        return points
++
++    @classmethod
++    def _validate_polygon(cls, raw_points: object) -> list[dict]:
++        points = cls._normalize_points(raw_points)
++        xz = [(point["x"], point["z"]) for point in points]
++        if len({(round(x, 4), round(z, 4)) for x, z in xz}) < 3:
++            raise ValueError("Location polygon must contain at least 3 unique X/Z points")
++
++        count = len(xz)
++        for index in range(count):
++            a = xz[index]
++            b = xz[(index + 1) % count]
++            if math.dist(a, b) < 0.01:
++                raise ValueError(f"Location polygon edge {index + 1} is too short")
++            for other in range(index + 1, count):
++                if other == index or other == (index + 1) % count or (other + 1) % count == index:
++                    continue
++                c = xz[other]
++                d = xz[(other + 1) % count]
++                if _segments_intersect(a, b, c, d):
++                    raise ValueError("Location polygon must not self-intersect")
++
++        twice_area = 0.0
++        for index, current in enumerate(xz):
++            following = xz[(index + 1) % count]
++            twice_area += current[0] * following[1] - following[0] * current[1]
++        if abs(twice_area) < 2.0:
++            raise ValueError("Location polygon area is too small")
++        return points
++
++    @staticmethod
++    def _core(record: dict) -> dict:
++        return {
++            "locationId": str(record.get("locationId") or ""),
++            "name": str(record.get("name") or ""),
++            "placeId": int(record.get("placeId") or 0),
++            "points": [
++                {
++                    "x": float(point.get("x") or 0),
++                    "y": float(point.get("y") or 0),
++                    "z": float(point.get("z") or 0),
++                }
++                for point in (record.get("points") or [])
++            ],
++        }
++
++    @classmethod
++    def _fingerprint(cls, record: dict) -> str:
++        body = json.dumps(cls._core(record), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
++        return hashlib.sha256(body.encode("utf-8")).hexdigest()
++
++    def _validate_record(self, payload: dict) -> dict:
++        location_id = str(payload.get("locationId") or "").strip().casefold()
++        if not re.fullmatch(r"location-[a-z0-9-]{12,64}", location_id):
++            raise ValueError("Location ID is invalid")
++        name = " ".join(str(payload.get("name") or "").strip().split())
++        if not name or len(name) > 80:
++            raise ValueError("Location name must contain from 1 to 80 characters")
++        place_id = _finite(payload.get("placeId", 0), "Place ID")
++        if place_id < 0 or not place_id.is_integer():
++            raise ValueError("Place ID must be a non-negative integer")
++        points = self._validate_polygon(payload.get("points"))
++        now = utc_now()
++        return {
++            "locationId": location_id,
++            "name": name,
++            "placeId": int(place_id),
++            "points": points,
++            "createdAtUtc": str(payload.get("createdAtUtc") or now),
++            "updatedAtUtc": now,
++        }
++
++    def _record_view(self, record: dict) -> dict:
++        value = json.loads(json.dumps(record))
++        sync = record.get("studioSync") or {}
++        synchronized = sync.get("status") == "synced" and sync.get("recordFingerprint") == self._fingerprint(record)
++        value["syncState"] = "synced" if synchronized else ("error" if sync.get("status") == "error" else "stale")
++        value["pointCount"] = len(record.get("points") or [])
++        return value
++
++    def snapshot(self) -> dict:
++        manifest = self._load()
++        records = [self._record_view(row) for _, row in sorted(manifest["records"].items())]
++        return {
++            "schemaVersion": SCHEMA_VERSION,
++            "project": PROJECT,
++            "records": records,
++            "recordCount": len(records),
++            "manifestPath": self.manifest_path.relative_to(self.root).as_posix(),
++            "registryPath": self.registry_path.relative_to(self.root).as_posix(),
++        }
++
++    def draw(self, payload: dict) -> dict:
++        manifest = self._load()
++        location_id = str(payload.get("locationId") or "").strip().casefold() or f"location-{uuid.uuid4().hex}"
++        existing = manifest["records"].get(location_id) or {}
++        name = " ".join(str(payload.get("name") or existing.get("name") or "New Location").strip().split()) or "New Location"
++        result = self.bridge(
++            "draw",
++            operation_id=str(uuid.uuid4()),
++            location_id=location_id,
++            name=name,
++            place_id=int(payload.get("placeId") or existing.get("placeId") or 0),
++            points=payload.get("points") if isinstance(payload.get("points"), list) else existing.get("points") or [],
++            timeout_seconds=300,
++        )
++        draft = {
++            **existing,
++            "locationId": location_id,
++            "name": name,
++            "placeId": int(result.get("placeId") or 0),
++            "points": result.get("points") or [],
++        }
++        self._validate_polygon(draft["points"])
++        return {"ok": True, "draft": draft, "studio": result}
++
++    def register(self, payload: dict) -> dict:
++        manifest = self._load()
++        location_id = str(payload.get("locationId") or "").strip().casefold()
++        existing = manifest["records"].get(location_id) or {}
++        record = self._validate_record({**existing, **payload})
++        fingerprint = self._fingerprint(record)
++        prior_sync = existing.get("studioSync") or {}
++        studio_current = (
++            bool(existing)
++            and prior_sync.get("status") == "synced"
++            and prior_sync.get("recordFingerprint") == fingerprint
++        )
++
++        if studio_current:
++            record["studioSync"] = dict(prior_sync)
++            studio = {"ok": True, "synchronized": True, "skipped": True, "reason": "studio-fields-unchanged"}
++        else:
++            try:
++                studio = self.bridge(
++                    "upsert",
++                    operation_id=str(uuid.uuid4()),
++                    location_id=record["locationId"],
++                    name=record["name"],
++                    place_id=record["placeId"],
++                    points=record["points"],
++                    timeout_seconds=30,
++                )
++                record["studioSync"] = {
++                    "status": "synced",
++                    "recordFingerprint": fingerprint,
++                    "placeId": int(studio.get("placeId") or record["placeId"]),
++                    "markerPath": str(studio.get("markerPath") or ""),
++                    "syncedAtUtc": utc_now(),
++                }
++            except Exception as exc:
++                studio = {"ok": False, "synchronized": False, "error": str(exc)}
++                record["studioSync"] = {
++                    "status": "error",
++                    "recordFingerprint": fingerprint,
++                    "error": str(exc),
++                    "attemptedAtUtc": utc_now(),
++                }
++        manifest["records"][record["locationId"]] = record
++        self._commit(manifest)
++        return {"ok": True, "record": self._record_view(record), "studio": studio}
++
++    def select(self, payload: dict) -> dict:
++        location_id = str(payload.get("locationId") or "").strip().casefold()
++        if location_id not in self._load()["records"]:
++            raise ValueError("Location is not registered")
++        return self.bridge("select", operation_id=str(uuid.uuid4()), location_id=location_id, timeout_seconds=30)
++
++    def restore(self) -> dict:
++        manifest = self._load()
++        records = [self._core(record) for record in manifest["records"].values()]
++        result = self.bridge("sync", operation_id=str(uuid.uuid4()), records=records, timeout_seconds=45)
++        synced_ids = {str(value) for value in (result.get("syncedLocationIds") or [])}
++        now = utc_now()
++        for record in manifest["records"].values():
++            if record["locationId"] not in synced_ids:
++                continue
++            record["studioSync"] = {
++                "status": "synced",
++                "recordFingerprint": self._fingerprint(record),
++                "placeId": int(result.get("placeId") or record.get("placeId") or 0),
++                "markerPath": "",
++                "syncedAtUtc": now,
++            }
++        self._commit(manifest)
++        return {"ok": True, "studio": result, "recordCount": len(synced_ids), "totalRecordCount": len(records)}
++
++    def delete(self, payload: dict) -> dict:
++        manifest = self._load()
++        location_id = str(payload.get("locationId") or "").strip().casefold()
++        removed = manifest["records"].pop(location_id, None)
++        if not removed:
++            raise ValueError("Location is not registered")
++        self._commit(manifest)
++        try:
++            studio = self.bridge("delete", operation_id=str(uuid.uuid4()), location_id=location_id, timeout_seconds=30)
++        except Exception as exc:
++            studio = {"ok": False, "error": str(exc)}
++        return {"ok": True, "locationId": location_id, "studio": studio}
++
++    def validate(self) -> dict:
++        manifest = self._load()
++        errors: list[str] = []
++        seen: set[str] = set()
++        for key, source in manifest["records"].items():
++            try:
++                record = self._validate_record(source)
++                if key != record["locationId"]:
++                    errors.append(f"record key mismatch: {key}")
++                if record["locationId"] in seen:
++                    errors.append(f"duplicate locationId: {record['locationId']}")
++                seen.add(record["locationId"])
++            except Exception as exc:
++                errors.append(f"{key}: {exc}")
++        expected = self._runtime_payload(manifest)
++        if not self.registry_path.is_file():
++            errors.append("LocationRegistry.luau is missing")
++        elif expected["sourceDigest"] not in self.registry_path.read_text(encoding="utf-8"):
++            errors.append("LocationRegistry.luau is stale")
++        if errors:
++            raise ValueError("Location validation failed: " + " | ".join(errors))
++        return {"ok": True, "recordCount": len(manifest["records"]), "registryCurrent": True}
++
++    def _runtime_payload(self, manifest: dict) -> dict:
++        records = [self._core(row) for _, row in sorted(manifest["records"].items())]
++        digest = hashlib.sha256(
++            json.dumps(records, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
++        ).hexdigest()
++        return {
++            "schemaVersion": RUNTIME_SCHEMA_VERSION,
++            "project": PROJECT,
++            "sourceDigest": digest,
++            "records": records,
++        }
++
++    def _write_registry(self, manifest: dict) -> None:
++        payload = self._runtime_payload(manifest)
++        encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
++        self.registry_path.parent.mkdir(parents=True, exist_ok=True)
++        self.registry_path.write_text(
++            "-- generated from assets/manifests/locations.json. do not edit by hand.\n"
++            "-- client-readable polygon location registry.\n"
++            "local HttpService = game:GetService(\"HttpService\")\n\n"
++            f"local data = HttpService:JSONDecode([==[{encoded}]==])\n\n"
++            "return table.freeze(data)\n",
++            encoding="utf-8",
++        )
++
++    def _commit(self, manifest: dict) -> None:
++        self._atomic_json(self.manifest_path, manifest)
++        self._write_registry(manifest)
++
++    @staticmethod
++    def _atomic_json(path: Path, value: dict) -> None:
++        tmp = path.with_suffix(path.suffix + ".tmp")
++        tmp.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
++        tmp.replace(path)
+diff --git a/system/control-center/static/character-assets.js b/system/control-center/static/character-assets.js
+index 7890ead..6846542 100644
+--- a/system/control-center/static/character-assets.js
++++ b/system/control-center/static/character-assets.js
+@@ -43,10 +43,10 @@ function statusTag(status){return `<span class="tag ${String(status||'').toLower
+ 
+ function setView(view){
+   state.view=view;
+-  $('characters-view').hidden=view!=='characters';$('animations-view').hidden=view!=='animations';$('animation-speed-view').hidden=view!=='animation-speed';$('weapons-view').hidden=view!=='weapons';$('monsters-view').hidden=view!=='monsters';$('timelines-view').hidden=view!=='timelines';$('options-view').hidden=view!=='options';
++  $('characters-view').hidden=view!=='characters';$('animations-view').hidden=view!=='animations';$('animation-speed-view').hidden=view!=='animation-speed';$('weapons-view').hidden=view!=='weapons';$('monsters-view').hidden=view!=='monsters';$('locations-view').hidden=view!=='locations';$('timelines-view').hidden=view!=='timelines';$('options-view').hidden=view!=='options';
+   $('character-rail').hidden=view!=='characters';$('animation-rail').hidden=view!=='animations';$('weapon-rail').hidden=view!=='weapons';$('monster-rail').hidden=view!=='monsters';
+-  $('nav-characters').classList.toggle('active',view==='characters');$('nav-animations').classList.toggle('active',view==='animations');$('nav-animation-speed').classList.toggle('active',view==='animation-speed');$('nav-weapons').classList.toggle('active',view==='weapons');$('nav-monsters').classList.toggle('active',view==='monsters');$('nav-timelines').classList.toggle('active',view==='timelines');$('nav-options').classList.toggle('active',view==='options');
+-  if(view==='animations')loadAnimations();if(view==='animation-speed'&&window.game1AnimationSpeedLoad)window.game1AnimationSpeedLoad();if(view==='weapons'&&window.game1WeaponsLoad)window.game1WeaponsLoad();if(view==='monsters'&&window.game1MonstersLoad)window.game1MonstersLoad();if(view==='timelines'&&window.game1TimelinesLoad)window.game1TimelinesLoad();if(view==='options'&&window.game1OptionsLoad)window.game1OptionsLoad();
++  $('nav-characters').classList.toggle('active',view==='characters');$('nav-animations').classList.toggle('active',view==='animations');$('nav-animation-speed').classList.toggle('active',view==='animation-speed');$('nav-weapons').classList.toggle('active',view==='weapons');$('nav-monsters').classList.toggle('active',view==='monsters');$('nav-locations').classList.toggle('active',view==='locations');$('nav-timelines').classList.toggle('active',view==='timelines');$('nav-options').classList.toggle('active',view==='options');
++  if(view==='animations')loadAnimations();if(view==='animation-speed'&&window.game1AnimationSpeedLoad)window.game1AnimationSpeedLoad();if(view==='weapons'&&window.game1WeaponsLoad)window.game1WeaponsLoad();if(view==='monsters'&&window.game1MonstersLoad)window.game1MonstersLoad();if(view==='locations'&&window.game1LocationsLoad)window.game1LocationsLoad();if(view==='timelines'&&window.game1TimelinesLoad)window.game1TimelinesLoad();if(view==='options'&&window.game1OptionsLoad)window.game1OptionsLoad();
+ }
+ 
+ function characterStatsPayload(){return {Level:Number($('character-stat-level').value||1),MaxHP:Number($('character-stat-hp').value||0),Damage:Number($('character-stat-damage').value||0),Defense:Number($('character-stat-defense').value||0),AttackSpeed:Number($('character-stat-attack-speed').value||0),RunSpeed:Number($('character-stat-run-speed').value||0),CritChance:Number($('character-stat-crit-chance').value||0)}}
+@@ -135,7 +135,7 @@ async function setAnimationWeight(bindingId,weight){try{state.animations=await r
+ async function setAnimationDuplicate(clipId,enabled){try{state.animations=await request('/api/animations/'+encodeURIComponent(clipId)+'/duplicate-first-frame',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:!!enabled})});state.animations.publication=state.data?.publication||{};renderAnimations();toast(enabled?'runtime first-frame tail enabled; asset bytes are unchanged':'runtime first-frame tail disabled; asset bytes are unchanged')}catch(error){await loadAnimations();toast(error.message,true)}}
+ async function removeAnimationBinding(bindingId){if(!confirm('remove this semantic animation binding from game1? canonical source files are preserved.'))return;try{state.animations=await request('/api/animation-bindings/'+encodeURIComponent(bindingId),{method:'DELETE'});state.animations.publication=state.data?.publication||{};if(state.animationSelected===bindingId)state.animationSelected=null;renderAnimations();toast('animation binding removed')}catch(error){toast(error.message,true)}}
+ 
+-$('display-name').oninput=()=>{if(!state.selected)state.autoDisplayName=false};$('nav-characters').onclick=()=>setView('characters');$('nav-animations').onclick=()=>setView('animations');$('nav-animation-speed').onclick=()=>setView('animation-speed');$('nav-weapons').onclick=()=>setView('weapons');$('nav-monsters').onclick=()=>setView('monsters');$('nav-timelines').onclick=()=>setView('timelines');$('nav-options').onclick=()=>setView('options');$('race').onchange=syncIdentity;$('gender').onchange=syncIdentity;$('choose-model').onclick=chooseModel;$('save-archetype').onclick=saveArchetype;$('save-character-stats').onclick=saveCharacterStats;$('register-character').onclick=registerCharacter;$('publish-character').onclick=()=>publishCharacter();$('sync-character').onclick=()=>syncStudio();$('activate-character').onclick=()=>activate();$('new-character').onclick=()=>setForm(null);$('clear-form').onclick=()=>setForm(null);$('refresh').onclick=loadCharacters;$('validate-view').onclick=loadCharacters;$('theme').onclick=()=>document.body.classList.toggle('light');
++$('display-name').oninput=()=>{if(!state.selected)state.autoDisplayName=false};$('nav-characters').onclick=()=>setView('characters');$('nav-animations').onclick=()=>setView('animations');$('nav-animation-speed').onclick=()=>setView('animation-speed');$('nav-weapons').onclick=()=>setView('weapons');$('nav-monsters').onclick=()=>setView('monsters');$('nav-locations').onclick=()=>setView('locations');$('nav-timelines').onclick=()=>setView('timelines');$('nav-options').onclick=()=>setView('options');$('race').onchange=syncIdentity;$('gender').onchange=syncIdentity;$('choose-model').onclick=chooseModel;$('save-archetype').onclick=saveArchetype;$('save-character-stats').onclick=saveCharacterStats;$('register-character').onclick=registerCharacter;$('publish-character').onclick=()=>publishCharacter();$('sync-character').onclick=()=>syncStudio();$('activate-character').onclick=()=>activate();$('new-character').onclick=()=>setForm(null);$('clear-form').onclick=()=>setForm(null);$('refresh').onclick=loadCharacters;$('validate-view').onclick=loadCharacters;$('theme').onclick=()=>document.body.classList.toggle('light');
+ $('animation-character').onchange=()=>{state.animationCharacter=$('animation-character').value;state.animationSelected=null;state.lastScan=null;loadAnimations()};$('choose-animation-folder').onclick=chooseAnimationFolder;$('scan-animations').onclick=scanAnimations;$('publish-missing-animations').onclick=publishMissingAnimations;$('check-roblox-animations').onclick=checkRobloxAnimationAssets;$('refresh-animations').onclick=loadAnimations;
+ initAnimationFolderExplorer();
+ initFilenameRulesDisclosure();
+diff --git a/system/control-center/static/index.html b/system/control-center/static/index.html
+index b523829..97f9be1 100644
+--- a/system/control-center/static/index.html
++++ b/system/control-center/static/index.html
+@@ -5,11 +5,12 @@
+ <meta name="viewport" content="width=device-width,initial-scale=1">
+ <title>game1 · asset manager</title>
+ <link rel="stylesheet" href="asset-manager.css?v=8">
++<link rel="stylesheet" href="location-assets.css?v=1">
+ </head>
+ <body>
+ <header>
+ <div><span class="eyebrow">game1 · control center</span><h1>asset manager</h1></div>
+-<div class="header-actions"><span class="pill">characters + animations + timelines + weapons + monsters · m35</span><button id="theme" class="icon" type="button" title="theme">◐</button></div>
++<div class="header-actions"><span class="pill">characters + animations + weapons + monsters + locations + timelines · m41</span><button id="theme" class="icon" type="button" title="theme">◐</button></div>
+ </header>
+ <main>
+ <aside class="panel rail">
+@@ -20,6 +21,7 @@
+ <button id="nav-animation-speed" class="asset-section" type="button"><b>animation speed</b><small>stat → playback scaling</small></button>
+ <button id="nav-weapons" class="asset-section" type="button"><b>weapons</b><small>models · textures · stats</small></button>
+ <button id="nav-monsters" class="asset-section" type="button"><b>monsters</b><small>rigs · stats · animations</small></button>
++<button id="nav-locations" class="asset-section" type="button"><b>locations</b><small>polygon registry · studio authoring</small></button>
+ <button id="nav-timelines" class="asset-section" type="button"><b>timelines</b><small>attack animation events</small></button>
+ <button id="nav-options" class="asset-section" type="button"><b>options</b><small>common runtime settings</small></button>
+ </div>
+@@ -141,6 +143,8 @@
+ </div>
+ 
+ 
++<div id="locations-view" hidden></div>
++
+ <div id="timelines-view" hidden>
+ <div class="panel hero">
+ <div><span class="eyebrow">attack authoring · studio animation preview</span><h2>timelines</h2><p>choose a character or monster attack, open it in Studio, scrub to an exact animation moment and assign an event. confirmed points return here; Save exports the authoritative runtime timeline.</p></div>
+@@ -322,6 +326,7 @@
+ <script src="character-assets.js?v=15"></script>
+ <script src="animation-speed.js?v=1"></script>
+ <script src="timelines.js?v=2"></script>
++<script src="locations.js?v=1"></script>
+ <script src="options.js?v=1"></script>
+ <script src="weapon-assets.js?v=3"></script>
+ <script src="monster-assets.js?v=4"></script>
+diff --git a/system/control-center/static/location-assets.css b/system/control-center/static/location-assets.css
+new file mode 100644
+index 0000000..61c7b27
+--- /dev/null
++++ b/system/control-center/static/location-assets.css
+@@ -0,0 +1,29 @@
++#locations-view .location-workflow{display:grid;grid-template-columns:minmax(340px,.82fr) minmax(560px,1.3fr);gap:14px;margin-top:14px}
++#locations-view .location-card{min-width:0}
++#locations-view .location-sidebar>p,#locations-view .location-editor>p{margin-top:8px}
++#locations-view .location-toolbar{display:flex;flex-wrap:wrap;gap:7px;margin:10px 0}
++#locations-view .location-list{display:grid;gap:7px;margin-top:10px}
++#locations-view .location-record{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;text-align:left;background:var(--panel2)}
++#locations-view .location-record.active{border-color:var(--mint);background:#42d6b112}
++#locations-view .location-record span,#locations-view .location-record strong,#locations-view .location-record small{display:block;min-width:0}
++#locations-view .location-record small{margin-top:4px;color:var(--muted);font-size:10px;overflow-wrap:anywhere}
++#locations-view .location-record i,#locations-view .location-state{font-style:normal;font-size:10px;letter-spacing:.07em;border:1px solid var(--line);border-radius:999px;padding:4px 7px}
++#locations-view .location-record i.synced,#locations-view .location-state.synced{color:var(--mint);border-color:#42d6b166}
++#locations-view .location-record i.stale,#locations-view .location-state.stale,#locations-view .location-state.edited{color:var(--orange);border-color:#ff9f4366}
++#locations-view .location-record i.error,#locations-view .location-state.error{color:var(--danger);border-color:#ff657766}
++#locations-view .location-state.draft{color:var(--muted)}
++#locations-view .location-editor-grid{display:grid;grid-template-columns:minmax(180px,1.2fr) minmax(210px,1fr) minmax(150px,.65fr);gap:9px;margin-top:12px}
++#locations-view .location-geometry{margin-top:14px;padding:13px;border:1px solid var(--line);border-radius:11px;background:var(--panel2)}
++#locations-view .location-geometry>strong,#locations-view .location-geometry>small{display:block}
++#locations-view .location-geometry>small{margin-top:4px;color:var(--muted);font-size:11px}
++#locations-view .location-geometry details{margin-top:10px}
++#locations-view .location-points{margin-top:8px;max-height:250px;overflow:auto;font:11px ui-monospace,SFMono-Regular,Consolas,monospace;line-height:1.6;color:var(--muted)}
++#locations-view .location-primary-actions{margin-top:14px}
++#locations-view .location-secondary-actions{margin-top:8px}
++#locations-view .location-manifest{margin-top:14px}
++#locations-view .location-manifest dl{display:grid;gap:8px;margin:10px 0 0}
++#locations-view .location-manifest dl>div{display:grid;grid-template-columns:90px minmax(0,1fr);gap:8px}
++#locations-view .location-manifest dt{color:var(--muted);font-size:10px;text-transform:uppercase}
++#locations-view .location-manifest dd{margin:0;font-size:11px;overflow-wrap:anywhere}
++@media(max-width:1100px){#locations-view .location-workflow{grid-template-columns:1fr}}
++@media(max-width:720px){#locations-view .location-editor-grid{grid-template-columns:1fr}}
+diff --git a/system/control-center/static/locations.js b/system/control-center/static/locations.js
+new file mode 100644
+index 0000000..50f55c5
+--- /dev/null
++++ b/system/control-center/static/locations.js
+@@ -0,0 +1,78 @@
++(()=>{
++  'use strict';
++  const $=id=>document.getElementById(id);
++  const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
++  function toast(message,bad=false){const node=$('toast');if(!node)return;node.textContent=message;node.className='toast show'+(bad?' error':'');clearTimeout(toast.timer);toast.timer=setTimeout(()=>node.className='toast',5200)}
++  const view=$('locations-view');
++  if(!view)return;
++
++  view.innerHTML=`
++    <div class="panel hero location-hero">
++      <div><span class="eyebrow">polygon location registry · studio authoring</span><h2>locations</h2><p>Same authoring flow as RobloxLineage: place polygon vertices directly on the map in Studio, click the first vertex to close the contour, then save the location into the project registry.</p></div>
++      <div class="metrics"><div><b id="location-count">0</b><span>registered</span></div><div><b id="location-synced">0</b><span>studio synced</span></div><div><b id="location-stale">0</b><span>stale / error</span></div></div>
++    </div>
++    <div class="location-workflow">
++      <div class="panel location-card location-sidebar">
++        <div class="section-title"><div><span>polygon locations</span><h3>registry</h3></div><span id="location-list-count">0</span></div>
++        <p class="hint">The polygon is authored in Studio. Runtime uses X/Z; Y is preserved so Studio markers stay on the actual map surface.</p>
++        <label>search<input id="location-search" type="search" placeholder="name or Location ID"></label>
++        <div class="location-toolbar"><button id="location-restore" type="button">restore markers</button><button id="location-validate" type="button">validate</button><button id="location-refresh" type="button">refresh</button></div>
++        <div id="location-records" class="location-list"><span class="muted">no registered locations.</span></div>
++        <details class="naming-guide location-manifest"><summary>manifest</summary><div id="location-manifest-info" class="details"></div></details>
++      </div>
++      <div class="panel location-card location-editor">
++        <div class="section-title"><div><span>location editor</span><h3>location polygon</h3></div><span id="location-state" class="location-state draft">DRAFT</span></div>
++        <p class="hint">Click surfaces in Studio in contour order. After the third point, click the first orange vertex to close the polygon. Esc cancels drawing.</p>
++        <div class="location-editor-grid">
++          <label>name<input id="location-name" maxlength="80" placeholder="for example Starting Village"></label>
++          <label>Location ID<input id="location-id" readonly placeholder="created when drawing"></label>
++          <label>Roblox Place ID<input id="location-place-id" type="number" readonly value="0"></label>
++        </div>
++        <div class="location-geometry">
++          <strong id="location-geometry-title">contour not set</strong>
++          <small id="location-geometry-hint">At least 3 points are required.</small>
++          <details><summary>point coordinates</summary><div id="location-points" class="location-points">—</div></details>
++        </div>
++        <div class="actions location-primary-actions"><button id="location-draw" class="primary" type="button">draw location in Studio</button><button id="location-save" type="button">save location</button></div>
++        <div class="actions location-secondary-actions"><button id="location-select" type="button" disabled>select in Studio</button><button id="location-new" type="button">new location</button><button id="location-delete" class="danger" type="button" disabled>delete</button></div>
++        <div id="location-operation" class="status-box"><strong>ready</strong><span>draw the first location in Studio.</span></div>
++      </div>
++    </div>`;
++
++  let state={records:[],recordCount:0,manifestPath:'',registryPath:''};
++  let selectedId='';
++  let points=[];
++  let busy=false;
++
++  async function request(path,body){
++    const options=body===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)};
++    const response=await fetch(path,options);let data={};try{data=await response.json()}catch{}
++    if(!response.ok)throw Error(data.error||`http ${response.status}`);return data;
++  }
++  function current(){return state.records.find(row=>row.locationId===selectedId)||null}
++  function payload(){return {locationId:$('location-id').value.trim(),name:$('location-name').value.trim(),placeId:Number($('location-place-id').value||0),points:points.map(p=>({...p}))}}
++  function setOperation(title,text,bad=false){const node=$('location-operation');node.className='status-box'+(bad?' error':'');node.innerHTML=`<strong>${esc(title)}</strong><span>${esc(text)}</span>`}
++  function setEditorState(value){const stateName=String(value||'draft').toLowerCase();const node=$('location-state');node.textContent=stateName.toUpperCase();node.className='location-state '+stateName}
++  function markDirty(){setEditorState(selectedId?'edited':'draft')}
++  function resetDraft(){selectedId='';points=[];$('location-id').value='';$('location-name').value='';$('location-place-id').value='0';setEditorState('draft');setOperation('new location','draw a closed polygon in Studio.');render()}
++  function applyRecord(row,draft=false){selectedId=draft?'':String(row.locationId||'');$('location-id').value=String(row.locationId||'');$('location-name').value=String(row.name||'');$('location-place-id').value=Number(row.placeId||0);points=(row.points||[]).map(p=>({x:Number(p.x),y:Number(p.y),z:Number(p.z)}));setEditorState(draft?'draft':(row.syncState||'stale'));render()}
++  function renderGeometry(){const count=points.length;$('location-geometry-title').textContent=count>=3?`closed polygon · ${count} points`:(count?`unfinished contour · ${count} points`:'contour not set');$('location-geometry-hint').textContent=count>=3?'Runtime registry stores this X/Z polygon; Y stays available for Studio authoring.':'At least 3 points are required. Close it by clicking the first point in Studio.';$('location-points').innerHTML=count?points.map((p,index)=>`${String(index+1).padStart(2,'0')} · X ${Number(p.x).toFixed(2)} · Y ${Number(p.y).toFixed(2)} · Z ${Number(p.z).toFixed(2)}`).join('<br>'):'—'}
++  function renderRecords(){const query=$('location-search').value.trim().toLowerCase();const rows=(state.records||[]).filter(row=>!query||String(row.name||'').toLowerCase().includes(query)||String(row.locationId||'').toLowerCase().includes(query));$('location-list-count').textContent=String(rows.length);$('location-records').innerHTML=rows.length?rows.map(row=>`<button type="button" class="location-record ${row.locationId===selectedId?'active':''}" data-location-id="${esc(row.locationId)}"><span><strong>${esc(row.name)}</strong><small>${esc(row.locationId)} · ${Number(row.pointCount||row.points?.length||0)} points · Place ${Number(row.placeId||0)}</small></span><i class="${esc(row.syncState||'stale')}">${esc(String(row.syncState||'stale').toUpperCase())}</i></button>`).join(''):'<span class="muted">no registered locations.</span>';$('location-records').querySelectorAll('[data-location-id]').forEach(node=>{node.disabled=busy;node.onclick=()=>{const row=state.records.find(item=>item.locationId===node.dataset.locationId);if(row){applyRecord(row);const error=row.studioSync?.error||'';setOperation(error?'studio sync error':'location loaded',error||'polygon loaded from the project registry.',!!error)}}})}
++  function renderMetrics(){const rows=state.records||[];$('location-count').textContent=String(rows.length);$('location-synced').textContent=String(rows.filter(row=>row.syncState==='synced').length);$('location-stale').textContent=String(rows.filter(row=>row.syncState!=='synced').length);$('location-manifest-info').innerHTML=`<dl><div><dt>manifest</dt><dd>${esc(state.manifestPath||'—')}</dd></div><div><dt>runtime registry</dt><dd>${esc(state.registryPath||'—')}</dd></div><div><dt>records</dt><dd>${rows.length}</dd></div></dl>`}
++  function render(){renderGeometry();renderRecords();renderMetrics();const row=current();$('location-select').disabled=busy||!row;$('location-delete').disabled=busy||!row;$('location-draw').disabled=busy;$('location-save').disabled=busy||points.length<3||!$('location-name').value.trim()||!$('location-id').value.trim();$('location-new').disabled=busy;$('location-restore').disabled=busy;$('location-validate').disabled=busy;$('location-refresh').disabled=busy}
++  async function refresh(preserve=true){const draft=preserve?payload():null;const selected=preserve?selectedId:'';state=await request('/api/locations');if(preserve&&draft&&draft.locationId&&!state.records.some(row=>row.locationId===selected)){selectedId=selected;$('location-id').value=draft.locationId;$('location-name').value=draft.name;$('location-place-id').value=draft.placeId;points=draft.points}else if(selected){const row=state.records.find(item=>item.locationId===selected);if(row)applyRecord(row)}render()}
++  async function run(title,text,fn){if(busy)return;busy=true;render();setOperation(title,text||'working…');try{return await fn()}catch(error){setOperation('error',error.message,true);toast(error.message,true);return null}finally{busy=false;render()}}
++
++  $('location-name').addEventListener('input',()=>{markDirty();render()});
++  $('location-search').addEventListener('input',renderRecords);
++  $('location-draw').onclick=()=>run('Studio drawing','Place vertices; click the first point to close.',async()=>{const result=await request('/api/locations/draw',payload());applyRecord(result.draft,true);$('location-id').value=result.draft.locationId;setEditorState('draft');setOperation('contour ready',`${points.length} points received from Studio. Save the location.`);toast('Location contour received from Studio.')});
++  $('location-save').onclick=()=>run('saving location','writing manifest, runtime registry and Studio marker…',async()=>{const result=await request('/api/locations/register',payload());selectedId=result.record.locationId;await refresh(false);applyRecord(state.records.find(row=>row.locationId===selectedId)||result.record);const ok=result.record.syncState==='synced';const detail=result.studio?.skipped?'Studio marker already current.':(result.studio?.error||'Studio marker synchronized.');setOperation(ok?'location saved':'location saved · studio stale',detail,!ok);toast(ok?'Location saved.':'Location saved, but Studio sync failed.',!ok)});
++  $('location-select').onclick=()=>run('selecting location','focusing marker in Studio…',async()=>{await request('/api/locations/select',{locationId:selectedId});setOperation('selected','Studio marker selected and camera focused.')});
++  $('location-new').onclick=resetDraft;
++  $('location-delete').onclick=()=>{const row=current();if(!row||!confirm(`Delete location “${row.name}”?`))return;run('deleting location','removing registry record and Studio marker…',async()=>{await request('/api/locations/delete',{locationId:row.locationId});resetDraft();await refresh(false);setOperation('deleted','Location removed.');toast('Location deleted.')})};
++  $('location-restore').onclick=()=>run('restoring markers','rebuilding all project-owned Location markers in Studio…',async()=>{const result=await request('/api/locations/restore',{});await refresh(false);setOperation('markers restored',`${result.recordCount} location marker(s) synchronized.`);toast('Location markers restored.')});
++  $('location-validate').onclick=()=>run('validating registry','checking polygons and generated runtime data…',async()=>{const result=await request('/api/locations/validate',{});setOperation('registry valid',`${result.recordCount} location record(s); runtime registry current.`);toast('Location registry valid.')});
++  $('location-refresh').onclick=()=>refresh(false).catch(error=>toast(error.message,true));
++
++  window.game1LocationsLoad=()=>refresh(false).catch(error=>{setOperation('error',error.message,true);toast(error.message,true)});
++})();
+diff --git a/system/control-center/studio_bridge.py b/system/control-center/studio_bridge.py
+index 2c61120..097d586 100644
+--- a/system/control-center/studio_bridge.py
++++ b/system/control-center/studio_bridge.py
+@@ -2,6 +2,7 @@ from __future__ import annotations
+ 
+ import http.server
+ import json
++import re
+ import time
+ 
+ PROJECT = "game1"
+@@ -331,3 +332,118 @@ def run_timeline_editor_bridge(session: dict, event_catalog: list[dict], timeout
+     if result.get("error"):
+         raise StudioBridgeError(f"Studio timeline editor failed: {result['error']}")
+     return result
++
++
++def run_location_authoring_bridge(
++    action: str,
++    *,
++    operation_id: str,
++    location_id: str = "",
++    name: str = "",
++    place_id: int = 0,
++    points: list[dict] | None = None,
++    records: list[dict] | None = None,
++    timeout_seconds: float = 45.0,
++) -> dict:
++    """Run one polygon Location authoring operation in Studio Edit mode."""
++    action = str(action or "").strip().lower()
++    if action not in {"draw", "upsert", "select", "delete", "sync"}:
++        raise StudioBridgeError(f"unsupported Location authoring action: {action}")
++    operation_id = str(operation_id or "").strip()
++    if not operation_id:
++        raise StudioBridgeError("Location authoring operation id is required")
++    if action != "sync" and not re.fullmatch(r"location-[a-z0-9-]{12,64}", str(location_id or "")):
++        raise StudioBridgeError("Location authoring location id is invalid")
++
++    command = {
++        "command": "location-authoring",
++        "schemaVersion": 1,
++        "project": PROJECT,
++        "action": action,
++        "operationId": operation_id,
++        "locationId": str(location_id or ""),
++        "name": str(name or ""),
++        "placeId": int(place_id or 0),
++        "points": points if isinstance(points, list) else [],
++        "records": records if isinstance(records, list) else [],
++    }
++    result: dict | None = None
++    command_claimed = False
++    command_claimed_at: float | None = None
++
++    class Handler(http.server.BaseHTTPRequestHandler):
++        def log_message(self, _format: str, *_args) -> None:
++            return
++
++        def _authorized(self) -> bool:
++            return self.headers.get("X-Game1-Token") == TOKEN
++
++        def _json(self, status: int, payload: dict) -> None:
++            body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
++            self.send_response(status)
++            self.send_header("Content-Type", "application/json; charset=utf-8")
++            self.send_header("Content-Length", str(len(body)))
++            self.end_headers()
++            self.wfile.write(body)
++
++        def do_GET(self) -> None:
++            nonlocal command_claimed, command_claimed_at
++            if not self._authorized():
++                self._json(403, {"ok": False})
++                return
++            if self.path != "/command":
++                self._json(404, {"ok": False})
++                return
++            if command_claimed:
++                self._json(409, {"ok": False, "reason": "command-already-claimed"})
++                return
++            command_claimed = True
++            command_claimed_at = time.monotonic()
++            self._json(200, command)
++
++        def do_POST(self) -> None:
++            nonlocal result
++            if not self._authorized():
++                self._json(403, {"ok": False})
++                return
++            if self.path != "/location-authoring-result":
++                self._json(404, {"ok": False})
++                return
++            try:
++                length = int(self.headers.get("Content-Length", "0"))
++                incoming = json.loads(self.rfile.read(length).decode("utf-8"))
++                if incoming.get("command") != "location-authoring" or incoming.get("project") != PROJECT:
++                    raise ValueError("unexpected Location authoring bridge result identity")
++                if str(incoming.get("operationId") or "") != operation_id:
++                    raise ValueError("unexpected Location authoring operation id")
++                result = incoming
++                self._json(200, {"ok": True})
++            except Exception as exc:
++                self._json(400, {"ok": False, "error": str(exc)})
++
++    try:
++        server = http.server.ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
++    except OSError as exc:
++        raise StudioBridgeError(f"studio bridge port {PORT} is unavailable: {exc}") from exc
++
++    server.timeout = 0.25
++    started_at = time.monotonic()
++    deadline = started_at + max(0.01, float(timeout_seconds))
++    try:
++        while result is None and time.monotonic() < deadline:
++            server.handle_request()
++            now = time.monotonic()
++            if command_claimed_at is None and now - started_at >= 8.0:
++                break
++            if command_claimed_at is not None and now - command_claimed_at >= max(10.0, float(timeout_seconds) - 1):
++                break
++    finally:
++        server.server_close()
++
++    if result is None:
++        if command_claimed:
++            raise StudioBridgeError("the game1 Studio plugin accepted the Location command but did not return a result")
++        raise StudioBridgeError("no Location command was received; install the updated Game1Bridge plugin and restart Studio")
++    if result.get("error"):
++        raise StudioBridgeError(f"Studio Location command failed: {result['error']}")
++    return result
+diff --git a/system/studio-plugin/Game1Bridge.server.luau b/system/studio-plugin/Game1Bridge.server.luau
+index 9a1d7cc..13288f4 100644
+--- a/system/studio-plugin/Game1Bridge.server.luau
++++ b/system/studio-plugin/Game1Bridge.server.luau
+@@ -10,6 +10,7 @@ local UserInputService = game:GetService("UserInputService")
+ local Workspace = game:GetService("Workspace")
+ 
+ local CharacterTemplate = require(script.Parent.modules.CharacterTemplate)
++local LocationCommands = require(script.Parent.modules.LocationCommands)
+ 
+ local toolbar = plugin:CreateToolbar("game1")
+ local button = toolbar:CreateButton(
+@@ -25,6 +26,16 @@ local AGENT_TOKEN = "Game1LocalControlV1"
+ local BRIDGE_URL = "http://127.0.0.1:43137"
+ local BRIDGE_TOKEN = "Game1StudioBridgeV1"
+ 
++local locationCommands = LocationCommands({
++    HttpService = HttpService,
++    Selection = Selection,
++    Workspace = Workspace,
++    UserInputService = UserInputService,
++    BRIDGE_URL = BRIDGE_URL,
++    BRIDGE_TOKEN = BRIDGE_TOKEN,
++    plugin = plugin,
++})
++
+ local STUDIO_DEBUG_PREFERENCES_SETTING = "Game1StudioDebugPreferences_v1"
+ local STUDIO_DEBUG_PREFERENCES_FOLDER = "Game1StudioPreferences"
+ local STUDIO_DEBUG_PREFERENCE_FIELDS = {
+@@ -1768,6 +1779,8 @@ local function pollBridge()
+         handleMonsterSpawn(data)
+     elseif data.command == "timeline-editor" then
+         handleTimelineEditor(data)
++    elseif data.command == "location-authoring" then
++        locationCommands.handle(data)
+     end
+ end
+ 
+@@ -1778,4 +1791,4 @@ task.spawn(function()
+     end
+ end)
+ 
+-print("[game1 plugin] loaded · model bridge v13 · viewport timeline pose sampler")
++print("[game1 plugin] loaded · model bridge v14 · locations + viewport timeline pose sampler")
+diff --git a/system/studio-plugin/install.ps1 b/system/studio-plugin/install.ps1
+index ce1fb96..28bd415 100644
+--- a/system/studio-plugin/install.ps1
++++ b/system/studio-plugin/install.ps1
+@@ -20,7 +20,7 @@ try {
+ 
+ if(-not (Test-Path $Temp)){throw 'Rojo did not create the plugin build'}
+ $BuiltText=Get-Content $Temp -Raw
+-foreach($Marker in @('Game1ControlCenter','model bridge v13','Game1AttackTimeline_v2','TimelinePreviewWorld')){
++foreach($Marker in @('Game1ControlCenter','model bridge v14','Game1AttackTimeline_v2','TimelinePreviewWorld','location-authoring','Game1LocationMarker')){
+     if(-not $BuiltText.Contains($Marker)){
+         throw "Studio bridge build is stale or incomplete; missing marker: $Marker"
+     }
+@@ -38,7 +38,7 @@ $InstalledHash=(Get-FileHash $Installed -Algorithm SHA256).Hash
+ if($GeneratedHash -ne $InstalledHash){throw 'Installed Studio bridge hash does not match generated bridge hash'}
+ Remove-Item $Temp -Force -ErrorAction SilentlyContinue
+ 
+-Write-Host ("Game1Bridge installed with in-plugin Attack Timeline viewport preview: {0}" -f $Installed)
++Write-Host ("Game1Bridge installed with Locations authoring + in-plugin Attack Timeline viewport preview: {0}" -f $Installed)
+ Write-Host ("SHA256: {0}" -f $InstalledHash)
+-Write-Host 'Attack Timeline opens from Control Center / Asset Manager / Timelines.'
++Write-Host 'Locations draw from Asset Manager / Locations; Attack Timeline opens from Asset Manager / Timelines.'
+ Write-Host 'Fully close every Roblox Studio window, then reopen Studio once.'
+diff --git a/system/studio-plugin/modules/LocationCommands.luau b/system/studio-plugin/modules/LocationCommands.luau
+new file mode 100644
+index 0000000..b14c539
+--- /dev/null
++++ b/system/studio-plugin/modules/LocationCommands.luau
+@@ -0,0 +1,445 @@
++-- Polygon Location authoring commands for game1 Asset Manager.
++return function(Context)
++    local HttpService = Context.HttpService
++    local Selection = Context.Selection
++    local Workspace = Context.Workspace
++    local UserInputService = Context.UserInputService
++    local BRIDGE_URL = Context.BRIDGE_URL
++    local BRIDGE_TOKEN = Context.BRIDGE_TOKEN
++    local plugin = Context.plugin
++
++    local AUTHORING_ROOT = "Game1Authoring"
++    local LOCATION_FOLDER = "Locations"
++
++    local function postResult(payload: any)
++        local response = HttpService:RequestAsync({
++            Url = BRIDGE_URL .. "/location-authoring-result",
++            Method = "POST",
++            Headers = {
++                ["X-Game1-Token"] = BRIDGE_TOKEN,
++                ["Content-Type"] = "application/json",
++            },
++            Body = HttpService:JSONEncode(payload),
++        })
++        if not response.Success then
++            error("game1 Location authoring result bridge rejected response: " .. tostring(response.StatusCode))
++        end
++    end
++
++    local function locationFolder(): Folder
++        local root = Workspace:FindFirstChild(AUTHORING_ROOT)
++        if root and not root:IsA("Folder") then
++            error("Workspace." .. AUTHORING_ROOT .. " exists but is not a Folder")
++        end
++        if not root then
++            root = Instance.new("Folder")
++            root.Name = AUTHORING_ROOT
++            root:SetAttribute("Game1Authoring", true)
++            root.Parent = Workspace
++        end
++        local folder = root:FindFirstChild(LOCATION_FOLDER)
++        if folder and not folder:IsA("Folder") then
++            error(root:GetFullName() .. "." .. LOCATION_FOLDER .. " exists but is not a Folder")
++        end
++        if not folder then
++            folder = Instance.new("Folder")
++            folder.Name = LOCATION_FOLDER
++            folder.Parent = root
++        end
++        return folder :: Folder
++    end
++
++    local function findLocationMarker(locationId: string): Model?
++        local root = Workspace:FindFirstChild(AUTHORING_ROOT)
++        local folder = root and root:FindFirstChild(LOCATION_FOLDER)
++        if not folder then
++            return nil
++        end
++        for _, child in ipairs(folder:GetChildren()) do
++            if child:IsA("Model") and tostring(child:GetAttribute("LocationId") or "") == locationId then
++                return child
++            end
++        end
++        return nil
++    end
++
++    local function safeName(value: any): string
++        local name = tostring(value or "Location"):gsub("[^%w]+", "_"):gsub("^_+", ""):gsub("_+$", "")
++        return name ~= "" and name or "Location"
++    end
++
++    local function markerName(data: any): string
++        local shortId = tostring(data.locationId or "location"):gsub("^location%-", ""):sub(1, 8)
++        return string.format("%s_%s", safeName(data.name), shortId)
++    end
++
++    local function pointFromData(value: any): Vector3
++        if typeof(value) ~= "table" then
++            error("Location point is invalid")
++        end
++        local x = tonumber(value.x)
++        local y = tonumber(value.y)
++        local z = tonumber(value.z)
++        if not x or not y or not z then
++            error("Location point coordinates are invalid")
++        end
++        return Vector3.new(x, y, z)
++    end
++
++    local function markerPart(
++        parent: Instance,
++        name: string,
++        size: Vector3,
++        cframe: CFrame,
++        color: Color3,
++        transparency: number
++    ): Part
++        local item = Instance.new("Part")
++        item.Name = name
++        item.Anchored = true
++        item.CanCollide = false
++        item.CanTouch = false
++        item.CanQuery = false
++        item.CastShadow = false
++        item.Material = Enum.Material.Neon
++        item.Color = color
++        item.Transparency = transparency
++        item.Size = size
++        item.CFrame = cframe
++        item.Parent = parent
++        return item
++    end
++
++    local function linePart(
++        parent: Instance,
++        name: string,
++        a: Vector3,
++        b: Vector3,
++        color: Color3,
++        transparency: number
++    ): Part?
++        local delta = b - a
++        local length = delta.Magnitude
++        if length < 0.02 then
++            return nil
++        end
++        return markerPart(
++            parent,
++            name,
++            Vector3.new(0.16, 0.16, length),
++            CFrame.lookAt((a + b) * 0.5, b),
++            color,
++            transparency
++        )
++    end
++
++    local function addLabel(marker: Model, adornee: BasePart, data: any, preview: boolean)
++        local billboard = Instance.new("BillboardGui")
++        billboard.Name = "Label"
++        billboard.Adornee = adornee
++        billboard.AlwaysOnTop = true
++        billboard.LightInfluence = 0
++        billboard.Size = UDim2.fromOffset(260, 52)
++        billboard.StudsOffsetWorldSpace = Vector3.new(0, 2.4, 0)
++        billboard.Parent = marker
++
++        local text = Instance.new("TextLabel")
++        text.BackgroundColor3 = Color3.fromRGB(17, 22, 30)
++        text.BackgroundTransparency = 0.1
++        text.BorderSizePixel = 0
++        text.Size = UDim2.fromScale(1, 1)
++        text.Font = Enum.Font.GothamSemibold
++        text.TextColor3 = Color3.fromRGB(246, 248, 251)
++        text.TextSize = 14
++        text.TextWrapped = true
++        text.Text = string.format("%s\nLocation%s", tostring(data.name or "Location"), preview and " · DRAW" or "")
++        text.Parent = billboard
++
++        local corner = Instance.new("UICorner")
++        corner.CornerRadius = UDim.new(0, 7)
++        corner.Parent = text
++    end
++
++    local function clearCopies(locationId: string, preview: boolean)
++        for _, child in ipairs(locationFolder():GetChildren()) do
++            if child:IsA("Model") then
++                local registered = not preview and tostring(child:GetAttribute("LocationId") or "") == locationId
++                local previewCopy = tostring(child:GetAttribute("PreviewForLocationId") or "") == locationId
++                if registered or previewCopy then
++                    child:Destroy()
++                end
++            end
++        end
++    end
++
++    local function createLocationMarker(data: any, preview: boolean): Model
++        local locationId = tostring(data.locationId or "")
++        if not locationId:match("^location%-%w[%w%-]+$") then
++            error("Location command has invalid locationId")
++        end
++        local values = typeof(data.points) == "table" and data.points or {}
++        if #values < 3 then
++            error("Registered Location polygon must contain at least 3 points")
++        end
++        clearCopies(locationId, preview)
++
++        local marker = Instance.new("Model")
++        marker.Name = markerName(data)
++        marker:SetAttribute("Game1LocationMarker", true)
++        marker:SetAttribute("LocationId", preview and "" or locationId)
++        if preview then
++            marker:SetAttribute("PreviewForLocationId", locationId)
++        end
++        marker:SetAttribute("LocationName", tostring(data.name or "Location"))
++        marker:SetAttribute("PlaceId", tonumber(data.placeId) or game.PlaceId)
++        marker.Parent = locationFolder()
++
++        local color = preview and Color3.fromRGB(255, 161, 84) or Color3.fromRGB(66, 214, 177)
++        local points = {}
++        for index, raw in ipairs(values) do
++            local world = pointFromData(raw)
++            table.insert(points, world)
++            local vertex = markerPart(
++                marker,
++                string.format("Point_%03d", index),
++                Vector3.new(0.75, 0.75, 0.75),
++                CFrame.new(world),
++                color,
++                0.08
++            )
++            vertex.Shape = Enum.PartType.Ball
++            vertex:SetAttribute("LocationVertexIndex", index)
++        end
++        for index = 1, #points do
++            local nextIndex = index == #points and 1 or index + 1
++            linePart(marker, string.format("Edge_%03d", index), points[index], points[nextIndex], color, 0.08)
++        end
++        local first = marker:FindFirstChild("Point_001")
++        if first and first:IsA("BasePart") then
++            marker.PrimaryPart = first
++            addLabel(marker, first, data, preview)
++        end
++        Selection:Set({ marker })
++        return marker
++    end
++
++    local function createDrawPreview(data: any): (Model, Part)
++        local locationId = tostring(data.locationId or "")
++        clearCopies(locationId, true)
++        local marker = Instance.new("Model")
++        marker.Name = "DRAW_" .. markerName(data)
++        marker:SetAttribute("Game1LocationMarker", true)
++        marker:SetAttribute("PreviewForLocationId", locationId)
++        marker:SetAttribute("LocationName", tostring(data.name or "Location"))
++        marker.Parent = locationFolder()
++        local liveEdge = markerPart(
++            marker,
++            "LiveEdge",
++            Vector3.new(0.1, 0.1, 0.1),
++            CFrame.new(),
++            Color3.fromRGB(255, 161, 84),
++            0.2
++        )
++        return marker, liveEdge
++    end
++
++    local function updateLiveEdge(liveEdge: Part, a: Vector3?, b: Vector3?)
++        if not a or not b or (b - a).Magnitude < 0.02 then
++            liveEdge.Transparency = 1
++            return
++        end
++        local length = (b - a).Magnitude
++        liveEdge.Size = Vector3.new(0.12, 0.12, length)
++        liveEdge.CFrame = CFrame.lookAt((a + b) * 0.5, b)
++        liveEdge.Transparency = 0.22
++    end
++
++    local function drawResult(data: any): any
++        local mouse = plugin:GetMouse()
++        local marker, liveEdge = createDrawPreview(data)
++        local color = Color3.fromRGB(255, 161, 84)
++        local points: { Vector3 } = {}
++        local finished = false
++        local cancelled = false
++        local firstVertex: Part? = nil
++
++        plugin:Activate(true)
++        local moveConnection = mouse.Move:Connect(function()
++            if #points > 0 and mouse.Target then
++                updateLiveEdge(liveEdge, points[#points], mouse.Hit.Position)
++            end
++        end)
++        local clickConnection = mouse.Button1Down:Connect(function()
++            if not mouse.Target then
++                return
++            end
++            if firstVertex and mouse.Target == firstVertex then
++                if #points >= 3 then
++                    finished = true
++                end
++                return
++            end
++            if mouse.Target:IsDescendantOf(marker) then
++                return
++            end
++            local world = mouse.Hit.Position
++            table.insert(points, world)
++            local index = #points
++            local vertex = markerPart(
++                marker,
++                string.format("Point_%03d", index),
++                Vector3.new(1.05, 1.05, 1.05),
++                CFrame.new(world),
++                color,
++                0.04
++            )
++            vertex.Shape = Enum.PartType.Ball
++            vertex:SetAttribute("LocationVertexIndex", index)
++            if index == 1 then
++                firstVertex = vertex
++                vertex.CanQuery = true
++                addLabel(marker, vertex, data, true)
++            elseif index > 1 then
++                linePart(marker, string.format("Edge_%03d", index - 1), points[index - 1], world, color, 0.08)
++            end
++        end)
++        local inputConnection = UserInputService.InputBegan:Connect(function(input, processed)
++            if not processed and input.KeyCode == Enum.KeyCode.Escape then
++                cancelled = true
++            end
++        end)
++
++        local deadline = os.clock() + 295
++        repeat
++            task.wait(0.05)
++        until finished or cancelled or os.clock() >= deadline
++        moveConnection:Disconnect()
++        clickConnection:Disconnect()
++        inputConnection:Disconnect()
++        plugin:Deactivate()
++
++        if not finished then
++            marker:Destroy()
++            error(cancelled and "Location drawing was cancelled" or "Location drawing timed out")
++        end
++        liveEdge:Destroy()
++        if firstVertex then
++            firstVertex.CanQuery = false
++        end
++        linePart(marker, string.format("Edge_%03d", #points), points[#points], points[1], color, 0.08)
++
++        local resultPoints = {}
++        for _, world in ipairs(points) do
++            table.insert(resultPoints, { x = world.X, y = world.Y, z = world.Z })
++        end
++        Selection:Set({ marker })
++        return {
++            points = resultPoints,
++            placeId = game.PlaceId,
++            markerPath = marker:GetFullName(),
++            closed = true,
++        }
++    end
++
++    local function validatePlace(data: any)
++        local expectedPlaceId = tonumber(data.placeId) or 0
++        if expectedPlaceId > 0 and game.PlaceId > 0 and expectedPlaceId ~= game.PlaceId then
++            error(string.format("Open PlaceId %d does not match Location PlaceId %d", game.PlaceId, expectedPlaceId))
++        end
++    end
++
++    local function handle(data: any)
++        local payload = {
++            schemaVersion = 1,
++            project = "game1",
++            command = "location-authoring",
++            action = tostring(data.action or ""),
++            operationId = tostring(data.operationId or ""),
++            locationId = tostring(data.locationId or ""),
++            placeId = game.PlaceId,
++            placeName = game.Name,
++        }
++
++        local ok, resultOrError = xpcall(function()
++            if tostring(data.project or "") ~= "game1" or tonumber(data.schemaVersion) ~= 1 then
++                error("invalid game1 Location command")
++            end
++            validatePlace(data)
++            local action = tostring(data.action or "")
++            if action == "draw" then
++                return drawResult(data)
++            elseif action == "upsert" then
++                local marker = createLocationMarker(data, false)
++                return { markerPath = marker:GetFullName(), synchronized = true }
++            elseif action == "select" then
++                local marker = findLocationMarker(tostring(data.locationId or ""))
++                if not marker then
++                    error("Registered Location marker was not found in Studio")
++                end
++                Selection:Set({ marker })
++                local root = marker.PrimaryPart
++                local camera = Workspace.CurrentCamera
++                if root and camera then
++                    camera.CFrame = CFrame.lookAt(root.Position + Vector3.new(18, 16, 18), root.Position)
++                end
++                return { markerPath = marker:GetFullName(), synchronized = true }
++            elseif action == "delete" then
++                local marker = findLocationMarker(tostring(data.locationId or ""))
++                if marker then
++                    marker:Destroy()
++                end
++                for _, child in ipairs(locationFolder():GetChildren()) do
++                    if child:IsA("Model")
++                        and tostring(child:GetAttribute("PreviewForLocationId") or "") == tostring(data.locationId or "") then
++                        child:Destroy()
++                    end
++                end
++                return { deleted = marker ~= nil, synchronized = true }
++            elseif action == "sync" then
++                local folder = locationFolder()
++                for _, child in ipairs(folder:GetChildren()) do
++                    if child:IsA("Model") and child:GetAttribute("Game1LocationMarker") == true then
++                        child:Destroy()
++                    end
++                end
++                local created = 0
++                local skipped = 0
++                local syncedLocationIds = {}
++                for _, record in ipairs(typeof(data.records) == "table" and data.records or {}) do
++                    local recordPlaceId = tonumber(record.placeId) or 0
++                    if recordPlaceId == 0 or game.PlaceId == 0 or recordPlaceId == game.PlaceId then
++                        createLocationMarker(record, false)
++                        created += 1
++                        table.insert(syncedLocationIds, tostring(record.locationId or ""))
++                    else
++                        skipped += 1
++                    end
++                end
++                return {
++                    synchronized = true,
++                    created = created,
++                    skipped = skipped,
++                    syncedLocationIds = syncedLocationIds,
++                }
++            end
++            error("Unsupported Location action: " .. action)
++        end, debug.traceback)
++
++        if ok then
++            for key, value in pairs(resultOrError) do
++                payload[key] = value
++            end
++        else
++            payload.error = tostring(resultOrError)
++        end
++
++        local postOk, postError = pcall(postResult, payload)
++        if not postOk then
++            warn("[game1 plugin] failed to report Location result: " .. tostring(postError))
++        end
++    end
++
++    return {
++        handle = handle,
++    }
++end
+diff --git a/system/studio-plugin/plugin.project.json b/system/studio-plugin/plugin.project.json
+index 3b045e3..1922464 100644
+--- a/system/studio-plugin/plugin.project.json
++++ b/system/studio-plugin/plugin.project.json
+@@ -9,6 +9,9 @@
+       "$className": "Folder",
+       "CharacterTemplate": {
+         "$path": "modules/CharacterTemplate.luau"
++      },
++      "LocationCommands": {
++        "$path": "modules/LocationCommands.luau"
+       }
+     }
+   }
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index 4ff3e36..960cec8 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -1973,7 +1973,7 @@ for required in [
+     'AnimationClipProvider:GetAnimationClipAsync',
+     'clip:IsA("KeyframeSequence")',
+     'preview.Parent = timelineWorld',
+-    'model bridge v13',
++    'model bridge v14',
+ ]:
+     if required not in studio_plugin_text:
+         err(f"m37 in-plugin timeline preview missing {required}")
+@@ -2037,13 +2037,87 @@ for required in ["each animation block is configured independently", "Stat units
+         err(f"m40 Animation Speed help copy missing {required}")
+ 
+ 
++# m41 Location registration: RobloxLineage polygon authoring flow adapted to game1.
++location_manifest_path = ROOT / "assets/manifests/locations.json"
++location_store_path = ROOT / "system/control-center/location_store.py"
++location_js_path = ROOT / "system/control-center/static/locations.js"
++location_css_path = ROOT / "system/control-center/static/location-assets.css"
++location_plugin_path = ROOT / "system/studio-plugin/modules/LocationCommands.luau"
++location_registry_path = ROOT / "src/shared/world/LocationRegistry.luau"
++for path in [location_manifest_path, location_store_path, location_js_path, location_css_path, location_plugin_path, location_registry_path]:
++    if not path.is_file():
++        err(f"m41 Location authoring file missing: {path.relative_to(ROOT)}")
++if location_manifest_path.is_file():
++    location_manifest = json.loads(location_manifest_path.read_text(encoding="utf-8"))
++    if location_manifest.get("schemaVersion") != 1 or location_manifest.get("project") != "game1" or not isinstance(location_manifest.get("records"), dict):
++        err("m41 locations.json schema/project is invalid")
++location_store_text = location_store_path.read_text(encoding="utf-8") if location_store_path.is_file() else ""
++for required in [
++    "class LocationStore",
++    "_validate_polygon",
++    "must not self-intersect",
++    "def draw",
++    "def register",
++    "def restore",
++    "LocationRegistry.luau",
++]:
++    if required not in location_store_text:
++        err(f"m41 LocationStore missing {required}")
++location_js_text = location_js_path.read_text(encoding="utf-8") if location_js_path.is_file() else ""
++for required in [
++    "/api/locations/draw",
++    "/api/locations/register",
++    "/api/locations/select",
++    "/api/locations/restore",
++    "/api/locations/delete",
++    "/api/locations/validate",
++    "click the first point",
++]:
++    if required not in location_js_text:
++        err(f"m41 Locations UI missing {required}")
++for required in ['id="nav-locations"', 'id="locations-view"', 'location-assets.css?v=1', 'locations.js?v=1']:
++    if required not in index_m35_text:
++        err(f"m41 Asset Manager Locations section missing {required}")
++for required in [
++    'path == "/api/locations"',
++    'path == "/api/locations/draw"',
++    'path == "/api/locations/register"',
++    'path == "/api/locations/restore"',
++]:
++    if required not in host_agent_text:
++        err(f"m41 host agent Location API missing {required}")
++for required in [
++    "run_location_authoring_bridge",
++    '"command": "location-authoring"',
++    '"/location-authoring-result"',
++]:
++    if required not in studio_bridge_m35_text:
++        err(f"m41 Studio Location bridge missing {required}")
++location_plugin_text = location_plugin_path.read_text(encoding="utf-8") if location_plugin_path.is_file() else ""
++for required in [
++    'AUTHORING_ROOT = "Game1Authoring"',
++    'LOCATION_FOLDER = "Locations"',
++    'Game1LocationMarker',
++    'PreviewForLocationId',
++    'plugin:Activate(true)',
++    'mouse.Button1Down',
++    'syncedLocationIds',
++]:
++    if required not in location_plugin_text:
++        err(f"m41 Studio Location authoring module missing {required}")
++for required in ['require(script.Parent.modules.LocationCommands)', 'data.command == "location-authoring"', 'model bridge v14']:
++    if required not in studio_plugin_text:
++        err(f"m41 Game1Bridge Location integration missing {required}")
++
++
++
+ if errors:
+     print("verify failed")
+     for item in errors:
+         print(" -", item)
+     sys.exit(1)
+ 
+-print("verify ok · game1 m40 grouped Animation Speed controls passed")
++print("verify ok · game1 m41 polygon Location registration passed")
+ print("registered character archetypes:", len(archetypes))
+ print("active character archetype:", active_id or "none")
+ print("race pool: human")

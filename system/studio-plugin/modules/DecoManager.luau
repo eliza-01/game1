@@ -1,5 +1,6 @@
 local DecoAssetLoader = require(script.Parent.DecoAssetLoader)
 local DecoPlacement = require(script.Parent.DecoPlacement)
+local DecoTransform = require(script.Parent.DecoTransform)
 
 local DecoManager = {}
 DecoManager.__index = DecoManager
@@ -247,7 +248,7 @@ function DecoManager:_updatePreviewCamera()
 end
 
 function DecoManager:_framePreview(model: Model)
-    model:PivotTo(CFrame.new())
+    model:PivotTo(DecoTransform.previewPivot(model))
     local boundsCFrame, boundsSize = model:GetBoundingBox()
     local radius = math.max(boundsSize.X, boundsSize.Y, boundsSize.Z, 1)
     self.cameraTarget = boundsCFrame.Position

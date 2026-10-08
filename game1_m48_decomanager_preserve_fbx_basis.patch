@@ -1,0 +1,351 @@
+diff --git a/system/studio-plugin/Game1Bridge.server.luau b/system/studio-plugin/Game1Bridge.server.luau
+index 49becc7..381e3bc 100644
+--- a/system/studio-plugin/Game1Bridge.server.luau
++++ b/system/studio-plugin/Game1Bridge.server.luau
+@@ -1805,4 +1805,4 @@ task.spawn(function()
+     end
+ end)
+ 
+-print("[game1 plugin] loaded · model bridge v18 · DecoManager placement lifecycle + decorations + shared textures + locations + viewport timeline pose sampler")
++print("[game1 plugin] loaded · model bridge v19 · DecoManager authored FBX basis + placement lifecycle + decorations + shared textures + locations + viewport timeline pose sampler")
+diff --git a/system/studio-plugin/install.ps1 b/system/studio-plugin/install.ps1
+index 3d2edc8..5067f5e 100644
+--- a/system/studio-plugin/install.ps1
++++ b/system/studio-plugin/install.ps1
+@@ -20,7 +20,7 @@ try {
+ 
+ if(-not (Test-Path $Temp)){throw 'Rojo did not create the plugin build'}
+ $BuiltText=Get-Content $Temp -Raw
+-foreach($Marker in @('Game1ControlCenter','model bridge v18','Game1AttackTimeline_v2','TimelinePreviewWorld','location-authoring','Game1LocationMarker','Game1DecoManager_v1','DecoPreviewWorld','Save Assets Data','Game1DecoAssets')){
++foreach($Marker in @('Game1ControlCenter','model bridge v19','Game1AttackTimeline_v2','TimelinePreviewWorld','location-authoring','Game1LocationMarker','Game1DecoManager_v1','DecoPreviewWorld','Save Assets Data','Game1DecoAssets')){
+     if(-not $BuiltText.Contains($Marker)){
+         throw "Studio bridge build is stale or incomplete; missing marker: $Marker"
+     }
+diff --git a/system/studio-plugin/modules/DecoManager.luau b/system/studio-plugin/modules/DecoManager.luau
+index 30bd6e5..38f60f2 100644
+--- a/system/studio-plugin/modules/DecoManager.luau
++++ b/system/studio-plugin/modules/DecoManager.luau
+@@ -1,5 +1,6 @@
+ local DecoAssetLoader = require(script.Parent.DecoAssetLoader)
+ local DecoPlacement = require(script.Parent.DecoPlacement)
++local DecoTransform = require(script.Parent.DecoTransform)
+ 
+ local DecoManager = {}
+ DecoManager.__index = DecoManager
+@@ -247,7 +248,7 @@ function DecoManager:_updatePreviewCamera()
+ end
+ 
+ function DecoManager:_framePreview(model: Model)
+-    model:PivotTo(CFrame.new())
++    model:PivotTo(DecoTransform.previewPivot(model))
+     local boundsCFrame, boundsSize = model:GetBoundingBox()
+     local radius = math.max(boundsSize.X, boundsSize.Y, boundsSize.Z, 1)
+     self.cameraTarget = boundsCFrame.Position
+diff --git a/system/studio-plugin/modules/DecoPlacement.luau b/system/studio-plugin/modules/DecoPlacement.luau
+index 9cb4723..23bfbc7 100644
+--- a/system/studio-plugin/modules/DecoPlacement.luau
++++ b/system/studio-plugin/modules/DecoPlacement.luau
+@@ -1,3 +1,5 @@
++local DecoTransform = require(script.Parent.DecoTransform)
++
+ local DecoPlacement = {}
+ DecoPlacement.__index = DecoPlacement
+ 
+@@ -33,42 +35,6 @@ local function preparePlaced(model: Model)
+     end
+ end
+ 
+-local function localSupportOffset(model: Model): number
+-    local pivot = model:GetPivot()
+-    local minimumY = math.huge
+-    local hasPart = false
+-    for _, descendant in ipairs(model:GetDescendants()) do
+-        if descendant:IsA("BasePart") then
+-            hasPart = true
+-            local localPart = pivot:ToObjectSpace(descendant.CFrame)
+-            local half = descendant.Size * 0.5
+-            for _, x in ipairs({ -1, 1 }) do
+-                for _, y in ipairs({ -1, 1 }) do
+-                    for _, z in ipairs({ -1, 1 }) do
+-                        local point = localPart:PointToWorldSpace(Vector3.new(half.X * x, half.Y * y, half.Z * z))
+-                        minimumY = math.min(minimumY, point.Y)
+-                    end
+-                end
+-            end
+-        end
+-    end
+-    if not hasPart then
+-        error("location asset model contains no BasePart geometry")
+-    end
+-    return math.max(0, -minimumY)
+-end
+-
+-local function orientationForSurface(normal: Vector3, cameraLook: Vector3): CFrame
+-    local up = if normal.Magnitude > 0.001 then normal.Unit else Vector3.yAxis
+-    local forward = cameraLook - up * cameraLook:Dot(up)
+-    if forward.Magnitude < 0.01 then
+-        local fallback = if math.abs(up.Y) < 0.95 then Vector3.yAxis else Vector3.zAxis
+-        forward = fallback - up * fallback:Dot(up)
+-    end
+-    forward = forward.Unit
+-    return CFrame.lookAt(Vector3.zero, forward, up)
+-end
+-
+ function DecoPlacement.new(config: any)
+     local self = setmetatable({
+         plugin = config.plugin,
+@@ -80,6 +46,7 @@ function DecoPlacement.new(config: any)
+         row = nil,
+         ghost = nil,
+         supportOffset = 0,
++        authoredPivotRotation = CFrame.identity,
+         moveConnection = nil,
+         clickConnection = nil,
+         statusCallback = nil,
+@@ -153,9 +120,14 @@ function DecoPlacement:_updateGhost()
+     end
+     local camera = self.Workspace.CurrentCamera
+     local cameraLook = if camera then camera.CFrame.LookVector else Vector3.new(0, 0, -1)
+-    local orientation = orientationForSurface(hit.Normal, cameraLook)
+-    local targetPosition = hit.Position + hit.Normal.Unit * self.supportOffset
+-    self.ghost:PivotTo(CFrame.new(targetPosition) * orientation)
++    local normal = if hit.Normal.Magnitude > 0.001 then hit.Normal.Unit else Vector3.yAxis
++    local targetPosition = hit.Position + normal * self.supportOffset
++    self.ghost:PivotTo(DecoTransform.placementPivot(
++        self.authoredPivotRotation,
++        targetPosition,
++        normal,
++        cameraLook
++    ))
+     self:_status("Placement · click to place on " .. hit.Instance:GetFullName())
+ end
+ 
+@@ -173,6 +145,7 @@ function DecoPlacement:_detachSession(): Model?
+     self.sourceTemplate = nil
+     self.row = nil
+     self.supportOffset = 0
++    self.authoredPivotRotation = CFrame.identity
+     return ghost
+ end
+ 
+@@ -235,7 +208,8 @@ function DecoPlacement:start(template: Model, row: any, statusCallback: (string)
+     self.sourceTemplate = template
+     self.row = row
+     self.statusCallback = statusCallback
+-    self.supportOffset = localSupportOffset(template)
++    self.supportOffset = DecoTransform.supportOffset(template)
++    self.authoredPivotRotation = DecoTransform.authoredPivotRotation(template)
+ 
+     local ghost = template:Clone()
+     ghost.Name = "Game1DecoPlacementGhost"
+diff --git a/system/studio-plugin/modules/DecoTransform.luau b/system/studio-plugin/modules/DecoTransform.luau
+new file mode 100644
+index 0000000..a63c6bd
+--- /dev/null
++++ b/system/studio-plugin/modules/DecoTransform.luau
+@@ -0,0 +1,77 @@
++local DecoTransform = {}
++
++local WORLD_UP = Vector3.yAxis
++
++local function rotationOnly(cframe: CFrame): CFrame
++    return CFrame.fromMatrix(Vector3.zero, cframe.XVector, cframe.YVector, cframe.ZVector)
++end
++
++local function surfaceFrame(normal: Vector3, cameraLook: Vector3): CFrame
++    local up = if normal.Magnitude > 0.001 then normal.Unit else WORLD_UP
++    local forward = cameraLook - up * cameraLook:Dot(up)
++    if forward.Magnitude < 0.01 then
++        local fallback = if math.abs(up.Y) < 0.95 then WORLD_UP else Vector3.zAxis
++        forward = fallback - up * fallback:Dot(up)
++    end
++    return CFrame.lookAt(Vector3.zero, forward.Unit, up)
++end
++
++function DecoTransform.authoredPivotRotation(model: Model): CFrame
++    return rotationOnly(model:GetPivot())
++end
++
++function DecoTransform.previewPivot(model: Model): CFrame
++    -- Re-center the model without replacing the imported FBX basis. Roblox can
++    -- encode FBX axis conversion in the model/part pivot; forcing identity here
++    -- makes otherwise-correct Z-up source assets appear rotated in the viewport.
++    return DecoTransform.authoredPivotRotation(model)
++end
++
++function DecoTransform.supportOffset(model: Model): number
++    -- Measure the lowest rendered part point against Roblox world-up in the
++    -- asset's authored pose. This is independent of the model pivot's local axes.
++    -- The same offset remains valid after surfaceFrame rotates the whole authored
++    -- pose from world-up onto the hit normal.
++    local pivot = model:GetPivot()
++    local minimum = math.huge
++    local hasPart = false
++
++    for _, descendant in ipairs(model:GetDescendants()) do
++        if descendant:IsA("BasePart") then
++            hasPart = true
++            local half = descendant.Size * 0.5
++            for _, x in ipairs({ -1, 1 }) do
++                for _, y in ipairs({ -1, 1 }) do
++                    for _, z in ipairs({ -1, 1 }) do
++                        local point = descendant.CFrame:PointToWorldSpace(Vector3.new(
++                            half.X * x,
++                            half.Y * y,
++                            half.Z * z
++                        ))
++                        local height = (point - pivot.Position):Dot(WORLD_UP)
++                        minimum = math.min(minimum, height)
++                    end
++                end
++            end
++        end
++    end
++
++    if not hasPart then
++        error("location asset model contains no BasePart geometry")
++    end
++    return math.max(0, -minimum)
++end
++
++function DecoTransform.placementPivot(
++    authoredPivotRotation: CFrame,
++    targetPosition: Vector3,
++    surfaceNormal: Vector3,
++    cameraLook: Vector3
++): CFrame
++    -- surfaceFrame is a delta from canonical Roblox world-up to the requested
++    -- surface. authoredPivotRotation is multiplied afterwards so importer-authored
++    -- FBX basis compensation is preserved instead of overwritten.
++    return CFrame.new(targetPosition) * surfaceFrame(surfaceNormal, cameraLook) * authoredPivotRotation
++end
++
++return DecoTransform
+diff --git a/system/studio-plugin/plugin.project.json b/system/studio-plugin/plugin.project.json
+index 8191eeb..73b51d3 100644
+--- a/system/studio-plugin/plugin.project.json
++++ b/system/studio-plugin/plugin.project.json
+@@ -16,6 +16,9 @@
+       "DecoAssetLoader": {
+         "$path": "modules/DecoAssetLoader.luau"
+       },
++      "DecoTransform": {
++        "$path": "modules/DecoTransform.luau"
++      },
+       "DecoPlacement": {
+         "$path": "modules/DecoPlacement.luau"
+       },
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index 2fdbb65..01f6661 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -1973,7 +1973,7 @@ for required in [
+     'AnimationClipProvider:GetAnimationClipAsync',
+     'clip:IsA("KeyframeSequence")',
+     'preview.Parent = timelineWorld',
+-    'model bridge v18',
++    'model bridge v19',
+ ]:
+     if required not in studio_plugin_text:
+         err(f"m37 in-plugin timeline preview missing {required}")
+@@ -2105,7 +2105,7 @@ for required in [
+ ]:
+     if required not in location_plugin_text:
+         err(f"m41 Studio Location authoring module missing {required}")
+-for required in ['require(script.Parent.modules.LocationCommands)', 'data.command == "location-authoring"', 'model bridge v18']:
++for required in ['require(script.Parent.modules.LocationCommands)', 'data.command == "location-authoring"', 'model bridge v19']:
+     if required not in studio_plugin_text:
+         err(f"m41 Game1Bridge Location integration missing {required}")
+ 
+@@ -2252,8 +2252,8 @@ for required in [
+     "self.plugin:Activate(true)",
+     'placed:SetAttribute("Game1DecoAsset", true)',
+     "function DecoPlacement:serialize()",
+-    "localSupportOffset",
+-    "orientationForSurface",
++    "DecoTransform.supportOffset",
++    "DecoTransform.placementPivot",
+ ]:
+     if required not in deco_placement_text:
+         err(f"m43 DecoPlacement missing {required}")
+@@ -2275,7 +2275,7 @@ for required in [
+ for required in [
+     'require(script.Parent.modules.DecoManager)',
+     'DecoManager.new({',
+-    'model bridge v18',
++    'model bridge v19',
+ ]:
+     if required not in studio_plugin_text:
+         err(f"m43 Game1Bridge DecoManager integration missing {required}")
+@@ -2317,7 +2317,7 @@ for required in [
+         err(f"m45 DecoManager drag/save hotfix missing {required}")
+ if "self.AssetService:SavePlaceAsync" in deco_manager_text:
+     err("m45 DecoManager still calls cloud SavePlaceAsync directly")
+-if "model bridge v18" not in studio_plugin_text:
++if "model bridge v19" not in studio_plugin_text:
+     err("m45 Studio plugin version marker is stale")
+ 
+ # m44 Location Assets: PNG/JPG source textures with clean extension-aware preparation.
+@@ -2378,7 +2378,7 @@ for required in [
+         err(f"m46 DecoManager Decorations category missing {required}")
+ if 'decoration = "Decorations"' not in deco_placement_text:
+     err("m46 DecoPlacement Decorations folder mapping is missing")
+-if "model bridge v18" not in studio_plugin_text:
++if "model bridge v19" not in studio_plugin_text:
+     err("m46 Studio plugin version marker is stale")
+ 
+ 
+@@ -2402,17 +2402,51 @@ for required in [
+ ]:
+     if required not in deco_loader_text:
+         err(f"m47 static Location Asset sanitization missing {required}")
+-if "model bridge v18" not in studio_plugin_text:
++if "model bridge v19" not in studio_plugin_text:
+     err("m47 Studio plugin version marker is stale")
+ 
+ 
++# m48 DecoManager: preserve the imported FBX/model pivot basis in preview and placement.
++deco_transform_path = ROOT / "system/studio-plugin/modules/DecoTransform.luau"
++if not deco_transform_path.exists():
++    err("m48 DecoTransform module is missing")
++else:
++    deco_transform_text = deco_transform_path.read_text(encoding="utf-8")
++    for required in [
++        "function DecoTransform.authoredPivotRotation",
++        "function DecoTransform.previewPivot",
++        "function DecoTransform.supportOffset",
++        "function DecoTransform.placementPivot",
++        "surfaceFrame(surfaceNormal, cameraLook) * authoredPivotRotation",
++    ]:
++        if required not in deco_transform_text:
++            err(f"m48 DecoTransform missing {required}")
++for required in [
++    "local DecoTransform = require(script.Parent.DecoTransform)",
++    "DecoTransform.supportOffset(template)",
++    "DecoTransform.authoredPivotRotation(template)",
++    "DecoTransform.placementPivot(",
++]:
++    if required not in deco_placement_text:
++        err(f"m48 DecoPlacement authored-basis handling missing {required}")
++for removed in ["localSupportOffset", "orientationForSurface"]:
++    if removed in deco_placement_text:
++        err(f"m48 DecoPlacement still contains obsolete transform helper {removed}")
++if "model:PivotTo(DecoTransform.previewPivot(model))" not in deco_manager_text:
++    err("m48 DecoManager preview still replaces the imported asset basis")
++if '"DecoTransform"' not in (ROOT / "system/studio-plugin/plugin.project.json").read_text(encoding="utf-8"):
++    err("m48 Studio plugin project does not include DecoTransform")
++if "model bridge v19" not in studio_plugin_text:
++    err("m48 Studio plugin version marker is stale")
++
++
+ if errors:
+     print("verify failed")
+     for item in errors:
+         print(" -", item)
+     sys.exit(1)
+ 
+-print("verify ok · game1 m47 DecoManager placement lifecycle hotfix passed")
++print("verify ok · game1 m48 DecoManager authored FBX orientation preservation passed")
+ print("registered character archetypes:", len(archetypes))
+ print("active character archetype:", active_id or "none")
+ print("race pool: human")

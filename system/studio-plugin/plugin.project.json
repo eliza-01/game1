@@ -16,6 +16,9 @@
       "DecoAssetLoader": {
         "$path": "modules/DecoAssetLoader.luau"
       },
+      "DecoTransform": {
+        "$path": "modules/DecoTransform.luau"
+      },
       "DecoPlacement": {
         "$path": "modules/DecoPlacement.luau"
       },

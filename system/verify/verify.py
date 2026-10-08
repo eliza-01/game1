@@ -1,5 +1,6 @@
 from pathlib import Path
 import json
+import re
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -1973,7 +1974,7 @@ for required in [
     'AnimationClipProvider:GetAnimationClipAsync',
     'clip:IsA("KeyframeSequence")',
     'preview.Parent = timelineWorld',
-    'model bridge v18',
+    'model bridge v20',
 ]:
     if required not in studio_plugin_text:
         err(f"m37 in-plugin timeline preview missing {required}")
@@ -2105,7 +2106,7 @@ for required in [
 ]:
     if required not in location_plugin_text:
         err(f"m41 Studio Location authoring module missing {required}")
-for required in ['require(script.Parent.modules.LocationCommands)', 'data.command == "location-authoring"', 'model bridge v18']:
+for required in ['require(script.Parent.modules.LocationCommands)', 'data.command == "location-authoring"', 'model bridge v20']:
     if required not in studio_plugin_text:
         err(f"m41 Game1Bridge Location integration missing {required}")
 
@@ -2252,8 +2253,8 @@ for required in [
     "self.plugin:Activate(true)",
     'placed:SetAttribute("Game1DecoAsset", true)',
     "function DecoPlacement:serialize()",
-    "localSupportOffset",
-    "orientationForSurface",
+    "DecoTransform.supportOffset",
+    "DecoTransform.placementPivot",
 ]:
     if required not in deco_placement_text:
         err(f"m43 DecoPlacement missing {required}")
@@ -2275,7 +2276,7 @@ for required in [
 for required in [
     'require(script.Parent.modules.DecoManager)',
     'DecoManager.new({',
-    'model bridge v18',
+    'model bridge v20',
 ]:
     if required not in studio_plugin_text:
         err(f"m43 Game1Bridge DecoManager integration missing {required}")
@@ -2317,7 +2318,7 @@ for required in [
         err(f"m45 DecoManager drag/save hotfix missing {required}")
 if "self.AssetService:SavePlaceAsync" in deco_manager_text:
     err("m45 DecoManager still calls cloud SavePlaceAsync directly")
-if "model bridge v18" not in studio_plugin_text:
+if "model bridge v20" not in studio_plugin_text:
     err("m45 Studio plugin version marker is stale")
 
 # m44 Location Assets: PNG/JPG source textures with clean extension-aware preparation.
@@ -2378,7 +2379,7 @@ for required in [
         err(f"m46 DecoManager Decorations category missing {required}")
 if 'decoration = "Decorations"' not in deco_placement_text:
     err("m46 DecoPlacement Decorations folder mapping is missing")
-if "model bridge v18" not in studio_plugin_text:
+if "model bridge v20" not in studio_plugin_text:
     err("m46 Studio plugin version marker is stale")
 
 
@@ -2402,9 +2403,52 @@ for required in [
 ]:
     if required not in deco_loader_text:
         err(f"m47 static Location Asset sanitization missing {required}")
-if "model bridge v18" not in studio_plugin_text:
+if "model bridge v20" not in studio_plugin_text:
     err("m47 Studio plugin version marker is stale")
 
+
+# m48 DecoManager: preserve the imported FBX/model pivot basis in preview and placement.
+deco_transform_path = ROOT / "system/studio-plugin/modules/DecoTransform.luau"
+if not deco_transform_path.exists():
+    err("m48 DecoTransform module is missing")
+else:
+    deco_transform_text = deco_transform_path.read_text(encoding="utf-8")
+    for required in [
+        "function DecoTransform.authoredPivotRotation",
+        "function DecoTransform.previewPivot",
+        "function DecoTransform.supportOffset",
+        "function DecoTransform.placementPivot",
+        "surfaceFrame(surfaceNormal, cameraLook) * authoredPivotRotation",
+    ]:
+        if required not in deco_transform_text:
+            err(f"m48 DecoTransform missing {required}")
+for required in [
+    "local DecoTransform = require(script.Parent.DecoTransform)",
+    "DecoTransform.supportOffset(template)",
+    "DecoTransform.authoredPivotRotation(template)",
+    "DecoTransform.placementPivot(",
+]:
+    if required not in deco_placement_text:
+        err(f"m48 DecoPlacement authored-basis handling missing {required}")
+for removed in ["localSupportOffset", "orientationForSurface"]:
+    if removed in deco_placement_text:
+        err(f"m48 DecoPlacement still contains obsolete transform helper {removed}")
+if "model:PivotTo(DecoTransform.previewPivot(model))" not in deco_manager_text:
+    err("m48 DecoManager preview still replaces the imported asset basis")
+if '"DecoTransform"' not in (ROOT / "system/studio-plugin/plugin.project.json").read_text(encoding="utf-8"):
+    err("m48 Studio plugin project does not include DecoTransform")
+if "model bridge v20" not in studio_plugin_text:
+    err("m48 Studio plugin version marker is stale")
+
+
+# m49 DecoManager: placed decoration instances stay unanchored for manual Studio editing.
+if 'descendant.Anchored = false' not in deco_placement_text:
+    err("m49 DecoPlacement must leave placed decoration BaseParts unanchored")
+prepare_placed_match = re.search(r'local function preparePlaced\(model: Model\)(.*?)\nend', deco_placement_text, re.S)
+if prepare_placed_match is None:
+    err("m49 DecoPlacement preparePlaced helper is missing")
+elif 'Anchored = true' in prepare_placed_match.group(1):
+    err("m49 DecoPlacement still anchors placed decoration BaseParts")
 
 if errors:
     print("verify failed")
@@ -2412,7 +2456,7 @@ if errors:
         print(" -", item)
     sys.exit(1)
 
-print("verify ok · game1 m47 DecoManager placement lifecycle hotfix passed")
+print("verify ok · game1 m49 unanchored DecoManager placement passed")
 print("registered character archetypes:", len(archetypes))
 print("active character archetype:", active_id or "none")
 print("race pool: human")

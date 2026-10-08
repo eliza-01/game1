@@ -1,0 +1,132 @@
+diff --git a/system/studio-plugin/Game1Bridge.server.luau b/system/studio-plugin/Game1Bridge.server.luau
+index 381e3bc..fde5396 100644
+--- a/system/studio-plugin/Game1Bridge.server.luau
++++ b/system/studio-plugin/Game1Bridge.server.luau
+@@ -1805,4 +1805,4 @@ task.spawn(function()
+     end
+ end)
+ 
+-print("[game1 plugin] loaded · model bridge v19 · DecoManager authored FBX basis + placement lifecycle + decorations + shared textures + locations + viewport timeline pose sampler")
++print("[game1 plugin] loaded · model bridge v20 · DecoManager editable placement + authored FBX basis + decorations + shared textures + locations + viewport timeline pose sampler")
+diff --git a/system/studio-plugin/install.ps1 b/system/studio-plugin/install.ps1
+index 5067f5e..80d3489 100644
+--- a/system/studio-plugin/install.ps1
++++ b/system/studio-plugin/install.ps1
+@@ -20,7 +20,7 @@ try {
+ 
+ if(-not (Test-Path $Temp)){throw 'Rojo did not create the plugin build'}
+ $BuiltText=Get-Content $Temp -Raw
+-foreach($Marker in @('Game1ControlCenter','model bridge v19','Game1AttackTimeline_v2','TimelinePreviewWorld','location-authoring','Game1LocationMarker','Game1DecoManager_v1','DecoPreviewWorld','Save Assets Data','Game1DecoAssets')){
++foreach($Marker in @('Game1ControlCenter','model bridge v20','Game1AttackTimeline_v2','TimelinePreviewWorld','location-authoring','Game1LocationMarker','Game1DecoManager_v1','DecoPreviewWorld','Save Assets Data','Game1DecoAssets')){
+     if(-not $BuiltText.Contains($Marker)){
+         throw "Studio bridge build is stale or incomplete; missing marker: $Marker"
+     }
+diff --git a/system/studio-plugin/modules/DecoPlacement.luau b/system/studio-plugin/modules/DecoPlacement.luau
+index 23bfbc7..c54a40a 100644
+--- a/system/studio-plugin/modules/DecoPlacement.luau
++++ b/system/studio-plugin/modules/DecoPlacement.luau
+@@ -29,7 +29,9 @@ end
+ local function preparePlaced(model: Model)
+     for _, descendant in ipairs(model:GetDescendants()) do
+         if descendant:IsA("BasePart") then
+-            descendant.Anchored = true
++            -- Placement ghosts are anchored, authored decorations are not. Keep the
++            -- placed asset editable with the normal Studio transform tools.
++            descendant.Anchored = false
+             descendant.CanTouch = false
+         end
+     end
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index 01f6661..8636ac1 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -1,5 +1,6 @@
+ from pathlib import Path
+ import json
++import re
+ import sys
+ 
+ ROOT = Path(__file__).resolve().parents[2]
+@@ -1973,7 +1974,7 @@ for required in [
+     'AnimationClipProvider:GetAnimationClipAsync',
+     'clip:IsA("KeyframeSequence")',
+     'preview.Parent = timelineWorld',
+-    'model bridge v19',
++    'model bridge v20',
+ ]:
+     if required not in studio_plugin_text:
+         err(f"m37 in-plugin timeline preview missing {required}")
+@@ -2105,7 +2106,7 @@ for required in [
+ ]:
+     if required not in location_plugin_text:
+         err(f"m41 Studio Location authoring module missing {required}")
+-for required in ['require(script.Parent.modules.LocationCommands)', 'data.command == "location-authoring"', 'model bridge v19']:
++for required in ['require(script.Parent.modules.LocationCommands)', 'data.command == "location-authoring"', 'model bridge v20']:
+     if required not in studio_plugin_text:
+         err(f"m41 Game1Bridge Location integration missing {required}")
+ 
+@@ -2275,7 +2276,7 @@ for required in [
+ for required in [
+     'require(script.Parent.modules.DecoManager)',
+     'DecoManager.new({',
+-    'model bridge v19',
++    'model bridge v20',
+ ]:
+     if required not in studio_plugin_text:
+         err(f"m43 Game1Bridge DecoManager integration missing {required}")
+@@ -2317,7 +2318,7 @@ for required in [
+         err(f"m45 DecoManager drag/save hotfix missing {required}")
+ if "self.AssetService:SavePlaceAsync" in deco_manager_text:
+     err("m45 DecoManager still calls cloud SavePlaceAsync directly")
+-if "model bridge v19" not in studio_plugin_text:
++if "model bridge v20" not in studio_plugin_text:
+     err("m45 Studio plugin version marker is stale")
+ 
+ # m44 Location Assets: PNG/JPG source textures with clean extension-aware preparation.
+@@ -2378,7 +2379,7 @@ for required in [
+         err(f"m46 DecoManager Decorations category missing {required}")
+ if 'decoration = "Decorations"' not in deco_placement_text:
+     err("m46 DecoPlacement Decorations folder mapping is missing")
+-if "model bridge v19" not in studio_plugin_text:
++if "model bridge v20" not in studio_plugin_text:
+     err("m46 Studio plugin version marker is stale")
+ 
+ 
+@@ -2402,7 +2403,7 @@ for required in [
+ ]:
+     if required not in deco_loader_text:
+         err(f"m47 static Location Asset sanitization missing {required}")
+-if "model bridge v19" not in studio_plugin_text:
++if "model bridge v20" not in studio_plugin_text:
+     err("m47 Studio plugin version marker is stale")
+ 
+ 
+@@ -2436,17 +2437,26 @@ if "model:PivotTo(DecoTransform.previewPivot(model))" not in deco_manager_text:
+     err("m48 DecoManager preview still replaces the imported asset basis")
+ if '"DecoTransform"' not in (ROOT / "system/studio-plugin/plugin.project.json").read_text(encoding="utf-8"):
+     err("m48 Studio plugin project does not include DecoTransform")
+-if "model bridge v19" not in studio_plugin_text:
++if "model bridge v20" not in studio_plugin_text:
+     err("m48 Studio plugin version marker is stale")
+ 
+ 
++# m49 DecoManager: placed decoration instances stay unanchored for manual Studio editing.
++if 'descendant.Anchored = false' not in deco_placement_text:
++    err("m49 DecoPlacement must leave placed decoration BaseParts unanchored")
++prepare_placed_match = re.search(r'local function preparePlaced\(model: Model\)(.*?)\nend', deco_placement_text, re.S)
++if prepare_placed_match is None:
++    err("m49 DecoPlacement preparePlaced helper is missing")
++elif 'Anchored = true' in prepare_placed_match.group(1):
++    err("m49 DecoPlacement still anchors placed decoration BaseParts")
++
+ if errors:
+     print("verify failed")
+     for item in errors:
+         print(" -", item)
+     sys.exit(1)
+ 
+-print("verify ok · game1 m48 DecoManager authored FBX orientation preservation passed")
++print("verify ok · game1 m49 unanchored DecoManager placement passed")
+ print("registered character archetypes:", len(archetypes))
+ print("active character archetype:", active_id or "none")
+ print("race pool: human")

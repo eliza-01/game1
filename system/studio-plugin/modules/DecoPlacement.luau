@@ -1,3 +1,5 @@
+local DecoTransform = require(script.Parent.DecoTransform)
+
 local DecoPlacement = {}
 DecoPlacement.__index = DecoPlacement
 
@@ -27,46 +29,12 @@ end
 local function preparePlaced(model: Model)
     for _, descendant in ipairs(model:GetDescendants()) do
         if descendant:IsA("BasePart") then
-            descendant.Anchored = true
+            -- Placement ghosts are anchored, authored decorations are not. Keep the
+            -- placed asset editable with the normal Studio transform tools.
+            descendant.Anchored = false
             descendant.CanTouch = false
         end
     end
-end
-
-local function localSupportOffset(model: Model): number
-    local pivot = model:GetPivot()
-    local minimumY = math.huge
-    local hasPart = false
-    for _, descendant in ipairs(model:GetDescendants()) do
-        if descendant:IsA("BasePart") then
-            hasPart = true
-            local localPart = pivot:ToObjectSpace(descendant.CFrame)
-            local half = descendant.Size * 0.5
-            for _, x in ipairs({ -1, 1 }) do
-                for _, y in ipairs({ -1, 1 }) do
-                    for _, z in ipairs({ -1, 1 }) do
-                        local point = localPart:PointToWorldSpace(Vector3.new(half.X * x, half.Y * y, half.Z * z))
-                        minimumY = math.min(minimumY, point.Y)
-                    end
-                end
-            end
-        end
-    end
-    if not hasPart then
-        error("location asset model contains no BasePart geometry")
-    end
-    return math.max(0, -minimumY)
-end
-
-local function orientationForSurface(normal: Vector3, cameraLook: Vector3): CFrame
-    local up = if normal.Magnitude > 0.001 then normal.Unit else Vector3.yAxis
-    local forward = cameraLook - up * cameraLook:Dot(up)
-    if forward.Magnitude < 0.01 then
-        local fallback = if math.abs(up.Y) < 0.95 then Vector3.yAxis else Vector3.zAxis
-        forward = fallback - up * fallback:Dot(up)
-    end
-    forward = forward.Unit
-    return CFrame.lookAt(Vector3.zero, forward, up)
 end
 
 function DecoPlacement.new(config: any)
@@ -80,6 +48,7 @@ function DecoPlacement.new(config: any)
         row = nil,
         ghost = nil,
         supportOffset = 0,
+        authoredPivotRotation = CFrame.identity,
         moveConnection = nil,
         clickConnection = nil,
         statusCallback = nil,
@@ -153,9 +122,14 @@ function DecoPlacement:_updateGhost()
     end
     local camera = self.Workspace.CurrentCamera
     local cameraLook = if camera then camera.CFrame.LookVector else Vector3.new(0, 0, -1)
-    local orientation = orientationForSurface(hit.Normal, cameraLook)
-    local targetPosition = hit.Position + hit.Normal.Unit * self.supportOffset
-    self.ghost:PivotTo(CFrame.new(targetPosition) * orientation)
+    local normal = if hit.Normal.Magnitude > 0.001 then hit.Normal.Unit else Vector3.yAxis
+    local targetPosition = hit.Position + normal * self.supportOffset
+    self.ghost:PivotTo(DecoTransform.placementPivot(
+        self.authoredPivotRotation,
+        targetPosition,
+        normal,
+        cameraLook
+    ))
     self:_status("Placement · click to place on " .. hit.Instance:GetFullName())
 end
 
@@ -173,6 +147,7 @@ function DecoPlacement:_detachSession(): Model?
     self.sourceTemplate = nil
     self.row = nil
     self.supportOffset = 0
+    self.authoredPivotRotation = CFrame.identity
     return ghost
 end
 
@@ -235,7 +210,8 @@ function DecoPlacement:start(template: Model, row: any, statusCallback: (string)
     self.sourceTemplate = template
     self.row = row
     self.statusCallback = statusCallback
-    self.supportOffset = localSupportOffset(template)
+    self.supportOffset = DecoTransform.supportOffset(template)
+    self.authoredPivotRotation = DecoTransform.authoredPivotRotation(template)
 
     local ghost = template:Clone()
     ghost.Name = "Game1DecoPlacementGhost"

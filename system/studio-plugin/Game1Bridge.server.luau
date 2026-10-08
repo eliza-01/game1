@@ -1805,4 +1805,4 @@ task.spawn(function()
     end
 end)
 
-print("[game1 plugin] loaded · model bridge v18 · DecoManager placement lifecycle + decorations + shared textures + locations + viewport timeline pose sampler")
+print("[game1 plugin] loaded · model bridge v20 · DecoManager editable placement + authored FBX basis + decorations + shared textures + locations + viewport timeline pose sampler")

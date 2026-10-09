@@ -28,7 +28,7 @@
       },
       "model": {
         "sourcePath": "assets/source/characters/human/female/human_female/model/human_female_014.fbx",
-        "preparedPath": "assets/prepared/characters/human/female/human_female/model/human_female_014.fbx",
+        "preparedPath": "assets/source/characters/human/female/human_female/model/human_female_014.fbx",
         "sha256": "fe18b4d066e91afb9c893dfd859044b4de67c17c2273ab6a860893ee3a69911f",
         "assetId": "100818559287050",
         "replacementPending": false,

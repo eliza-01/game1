@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 2,
+  "project": "game1",
+  "timelines": [
+    {
+      "clipId": "human_female__weapon__1hs__attack__01",
+      "duration": 1.8666666746139526,
+      "events": {
+        "HitStart": {
+          "normalizedTime": 0.4
+        },
+        "HitEnd": {
+          "normalizedTime": 0.6856649395509499
+        }
+      }
+    },
+    {
+      "clipId": "human_female__weapon__1hs__attack__02",
+      "duration": 1.866666674,
+      "events": {
+        "HitStart": {
+          "normalizedTime": 0.4
+        },
+        "HitEnd": {
+          "normalizedTime": 0.5
+        }
+      }
+    },
+    {
+      "clipId": "human_female__weapon__1hs__attack__03",
+      "duration": 1.866666674,
+      "events": {
+        "HitStart": {
+          "normalizedTime": 0.4
+        },
+        "HitEnd": {
+          "normalizedTime": 0.5
+        }
+      }
+    },
+    {
+      "clipId": "monster__gremlin__attack__01",
+      "duration": 1.799999952,
+      "events": {
+        "Hit": {
+          "normalizedTime": 0.5
+        }
+      }
+    }
+  ]
+}

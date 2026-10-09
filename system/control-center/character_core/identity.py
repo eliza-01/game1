@@ -129,7 +129,7 @@ class CharacterIdentityService:
             display_name = f"{race.title()} {gender.title()}"
 
         source_root = self.root / "assets/source/characters"
-        prepared_root = self.root / "assets/prepared/characters"
+        prepared_root = source_root
         old_source = self._managed_file(str(old.get("source_path") or ""), source_root)
         old_prepared = self._managed_file(str(old.get("prepared_path") or ""), prepared_root)
         new_source = (
@@ -137,7 +137,7 @@ class CharacterIdentityService:
             if old_source else None
         )
         new_prepared = (
-            self.root / "assets/prepared/characters" / race / gender / new_id / "model" / old_prepared.name
+            self.root / "assets/source/characters" / race / gender / new_id / "model" / old_prepared.name
             if old_prepared else None
         )
 
@@ -183,7 +183,7 @@ class CharacterIdentityService:
             source_relative = self._animation_relative(race, gender, new_id, row, source_suffix)
             prepared_relative = self._animation_relative(race, gender, new_id, row, prepared_suffix)
             target_source = self.root / "assets/source" / source_relative
-            target_prepared = self.root / "assets/prepared" / prepared_relative
+            target_prepared = self.root / "assets/source" / prepared_relative
             if old_animation_source:
                 moves.append((old_animation_source, target_source))
             if old_animation_prepared:

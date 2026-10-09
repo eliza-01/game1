@@ -43,6 +43,9 @@ from deco_layout_store import DecoLayoutStore
 from studio_save import request_active_studio_save
 from character_core.identity import CharacterIdentityService
 from studio_bridge import run_model_load_bridge, run_monster_spawn_bridge, run_timeline_editor_bridge, run_location_authoring_bridge
+from source_only_assets import migrate_source_only_assets
+
+migrate_source_only_assets(ROOT, ROOT / ".control-center" / "game1.db")
 
 control_agent_build = "game1-m50-environment-weapon-bounce-001"
 port = int(os.environ.get("CONTROL_AGENT_PORT", "43821"))

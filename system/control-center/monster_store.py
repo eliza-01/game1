@@ -294,15 +294,14 @@ class MonsterStore:
                 raise ValueError("monster model must be an FBX file")
             analysis = analyze_character_fbx(self.root, source)
             source_target = self.root / "assets/source/monsters" / slug / "model" / f"{slug}.fbx"
-            prepared_target = self.root / "assets/prepared/monsters" / slug / "model" / f"{slug}.fbx"
-            for target in (source_target, prepared_target):
-                target.parent.mkdir(parents=True, exist_ok=True)
-                if old:
-                    self._archive_existing(target, slug, int(old.get("revision") or 1))
-                shutil.copy2(source, target)
-            model_source_path = source_target.relative_to(self.root).as_posix()
-            model_prepared_path = prepared_target.relative_to(self.root).as_posix()
-            model_sha256 = self._sha256(prepared_target)
+            source_target.parent.mkdir(parents=True, exist_ok=True)
+            if old:
+                self._archive_existing(source_target, slug, int(old.get("revision") or 1))
+            shutil.copy2(source, source_target)
+            canonical_path = source_target.relative_to(self.root).as_posix()
+            model_source_path = canonical_path
+            model_prepared_path = canonical_path
+            model_sha256 = self._sha256(source_target)
 
         with self.connect() as connection:
             connection.execute(
@@ -341,12 +340,11 @@ class MonsterStore:
                 previous = connection.execute("SELECT * FROM monster_textures WHERE id=?", (texture_id,)).fetchone()
                 canonical_name = f"{slot}{source.suffix.lower()}"
                 source_target = self.root / "assets/source/monsters" / slug / "textures" / canonical_name
-                prepared_target = self.root / "assets/prepared/monsters" / slug / "textures" / canonical_name
                 source_target.parent.mkdir(parents=True, exist_ok=True)
-                prepared_target.parent.mkdir(parents=True, exist_ok=True)
+                if previous:
+                    self._archive_existing(source_target, slug, int(previous.get("revision") or 1))
                 shutil.copy2(source, source_target)
-                shutil.copy2(source, prepared_target)
-                digest = self._sha256(prepared_target)
+                digest = self._sha256(source_target)
                 texture_revision = int(previous["revision"] or 0) + 1 if previous else 1
                 connection.execute(
                     """INSERT OR REPLACE INTO monster_textures(
@@ -355,7 +353,7 @@ class MonsterStore:
                     ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (
                         texture_id, slug, slot, source_target.relative_to(self.root).as_posix(),
-                        prepared_target.relative_to(self.root).as_posix(), digest,
+                        source_target.relative_to(self.root).as_posix(), digest,
                         previous["asset_id"] if previous else None,
                         str(previous["published_sha256"] or "") if previous else "",
                         str(previous["moderation_state"] or "") if previous else "",
@@ -371,9 +369,9 @@ class MonsterStore:
         row = self.get(slug)
         if not row:
             raise ValueError(f"unknown monster: {slug}")
-        model = self.root / str(row.get("model_prepared_path") or "")
+        model = self.root / str(row.get("model_prepared_path") or row.get("model_source_path") or "")
         if not model.is_file():
-            raise ValueError("canonical prepared monster FBX is missing")
+            raise ValueError("canonical monster FBX is missing")
         api_key = str(credentials.get("apiKey") or "")
         creator_type = str(credentials.get("creatorType") or "")
         creator_id = str(credentials.get("creatorId") or "")
@@ -414,7 +412,7 @@ class MonsterStore:
         for texture in row.get("textures") or []:
             if str(texture.get("asset_id") or "") and str(texture.get("published_sha256") or "") == str(texture.get("sha256") or ""):
                 continue
-            file_path = self.root / str(texture.get("prepared_path") or "")
+            file_path = self.root / str(texture.get("prepared_path") or texture.get("source_path") or "")
             texture_asset = str(texture.get("asset_id") or "").strip()
             common = dict(
                 display_name=f"{row['name_en']} {texture['slot']}", description=description,

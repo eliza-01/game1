@@ -116,30 +116,32 @@ class AnimationStorageMixin:
                 if still_used is None:
                     connection.execute("DELETE FROM animation_publications WHERE clip_id=?", (clip_id,))
                     connection.execute("DELETE FROM animation_clips WHERE id=?", (clip_id,))
-        self._restore_prepared_files()
+        self._normalize_source_only_files()
 
-    def _restore_prepared_files(self) -> None:
-        """Undo legacy physical seam transforms; prepared animation bytes mirror source."""
+    def _normalize_source_only_files(self) -> None:
+        """Keep canonical animation metadata bound to the single assets/source tree."""
         updates = []
         with self.connect() as connection:
             rows = [dict(row) for row in connection.execute(
                 "SELECT id,source_path,prepared_path,sha256,source_sha256 FROM animation_clips"
             )]
             for row in rows:
-                source = self.root / str(row.get("source_path") or "")
-                prepared = self.root / str(row.get("prepared_path") or "")
-                if not source.is_file():
+                canonical = str(row.get("source_path") or row.get("prepared_path") or "").replace("\\", "/")
+                canonical = canonical.replace("assets/prepared/", "assets/source/")
+                source = self.root / canonical
+                if not canonical or not source.is_file():
                     continue
-                source_sha = self._sha256(source)
-                prepared_sha = self._sha256(prepared) if prepared.is_file() else ""
-                if prepared_sha != source_sha:
-                    prepared.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(source, prepared)
-                if str(row.get("sha256") or "") != source_sha or str(row.get("source_sha256") or "") != source_sha:
-                    updates.append((source_sha, source_sha, _now(), str(row["id"])))
+                digest = self._sha256(source)
+                if (
+                    str(row.get("source_path") or "") != canonical
+                    or str(row.get("prepared_path") or "") != canonical
+                    or str(row.get("sha256") or "") != digest
+                    or str(row.get("source_sha256") or "") != digest
+                ):
+                    updates.append((canonical, canonical, digest, digest, _now(), str(row["id"])))
             if updates:
                 connection.executemany(
-                    "UPDATE animation_clips SET sha256=?,source_sha256=?,updated_at=? WHERE id=?",
+                    "UPDATE animation_clips SET source_path=?,prepared_path=?,sha256=?,source_sha256=?,updated_at=? WHERE id=?",
                     updates,
                 )
 
@@ -223,7 +225,7 @@ class AnimationStorageMixin:
         self.export()
 
     def _is_managed_animation_path(self, path: Path) -> bool:
-        for root in (self.root / "assets/source/characters", self.root / "assets/prepared/characters"):
+        for root in (self.root / "assets/source/characters",):
             try:
                 path.relative_to(root.resolve())
                 return True
@@ -244,7 +246,8 @@ class AnimationStorageMixin:
             relative = Path("characters") / race / gender / character_id / "animations" / "base" / f"{stem}{suffix}"
         else:
             relative = Path("characters") / race / gender / character_id / "animations" / "weapons" / weapon_set / f"{stem}{suffix}"
-        return self.root / "assets/source" / relative, self.root / "assets/prepared" / relative
+        canonical = self.root / "assets/source" / relative
+        return canonical, canonical
 
     def _register_source(self, connection, character: dict, source: Path, binding: dict, now: float) -> tuple[str, dict]:
         character_id = str(character.get("id") or "")
@@ -252,7 +255,6 @@ class AnimationStorageMixin:
         binding_id = _binding_id(character_id, binding["scope"], binding["weaponSet"], binding["slot"], int(binding["variant"]))
         source_path, prepared_path = self._canonical_paths(character, binding, source.suffix.lower())
         source_path.parent.mkdir(parents=True, exist_ok=True)
-        prepared_path.parent.mkdir(parents=True, exist_ok=True)
         source_sha = self._sha256(source)
         old = connection.execute("SELECT * FROM animation_clips WHERE id=?", (clip_id,)).fetchone()
         old_dict = dict(old) if old else None
@@ -260,9 +262,8 @@ class AnimationStorageMixin:
         same_source = bool(old_dict and previous_source_sha == source_sha)
         if not same_source or not source_path.is_file():
             shutil.copy2(source, source_path)
-        if not same_source or not prepared_path.is_file():
-            shutil.copy2(source_path, prepared_path)
-        prepared_sha = self._sha256(prepared_path)
+        prepared_sha = self._sha256(source_path)
+        source_sha = prepared_sha
 
         relative_source = source_path.relative_to(self.root).as_posix()
         relative_prepared = prepared_path.relative_to(self.root).as_posix()
@@ -495,7 +496,7 @@ class AnimationStorageMixin:
 
 
     def set_duplicate_first_frame(self, clip_id: str, enabled: bool) -> dict:
-        # Runtime presentation flag only. Never mutate source/prepared animation
+        # Runtime presentation flag only. Never mutate canonical animation
         # bytes, publication checksum, revision, or permanent Roblox asset id.
         with self.connect() as connection:
             raw = connection.execute("SELECT character_id FROM animation_clips WHERE id=?", (clip_id,)).fetchone()

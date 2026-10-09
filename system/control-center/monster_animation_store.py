@@ -193,30 +193,32 @@ class MonsterAnimationStore:
                     "ALTER TABLE monster_animation_bindings ADD COLUMN playback_speed_percent INTEGER NOT NULL DEFAULT 100"
                 )
             self._migrate_combat_idle(connection)
-        self._restore_prepared_files()
+        self._normalize_source_only_files()
 
-    def _restore_prepared_files(self) -> None:
-        """Undo legacy physical seam transforms; prepared animation bytes mirror source."""
+    def _normalize_source_only_files(self) -> None:
+        """Keep canonical monster animation metadata bound to assets/source only."""
         updates = []
         with self.connect() as connection:
             rows = [dict(row) for row in connection.execute(
                 "SELECT id,source_path,prepared_path,sha256,source_sha256 FROM monster_animation_clips"
             )]
             for row in rows:
-                source = self.root / str(row.get("source_path") or "")
-                prepared = self.root / str(row.get("prepared_path") or "")
-                if not source.is_file():
+                canonical = str(row.get("source_path") or row.get("prepared_path") or "").replace("\\", "/")
+                canonical = canonical.replace("assets/prepared/", "assets/source/")
+                source = self.root / canonical
+                if not canonical or not source.is_file():
                     continue
-                source_sha = self._sha256(source)
-                prepared_sha = self._sha256(prepared) if prepared.is_file() else ""
-                if prepared_sha != source_sha:
-                    prepared.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(source, prepared)
-                if str(row.get("sha256") or "") != source_sha or str(row.get("source_sha256") or "") != source_sha:
-                    updates.append((source_sha, source_sha, time.time(), str(row["id"])))
+                digest = self._sha256(source)
+                if (
+                    str(row.get("source_path") or "") != canonical
+                    or str(row.get("prepared_path") or "") != canonical
+                    or str(row.get("sha256") or "") != digest
+                    or str(row.get("source_sha256") or "") != digest
+                ):
+                    updates.append((canonical, canonical, digest, digest, time.time(), str(row["id"])))
             if updates:
                 connection.executemany(
-                    "UPDATE monster_animation_clips SET sha256=?,source_sha256=?,updated_at=? WHERE id=?",
+                    "UPDATE monster_animation_clips SET source_path=?,prepared_path=?,sha256=?,source_sha256=?,updated_at=? WHERE id=?",
                     updates,
                 )
 
@@ -310,7 +312,7 @@ class MonsterAnimationStore:
         self.export()
 
     def _managed(self, path: Path) -> bool:
-        for root in (self.root / "assets/source/monsters", self.root / "assets/prepared/monsters"):
+        for root in (self.root / "assets/source/monsters",):
             try:
                 path.relative_to(root.resolve())
                 return True
@@ -327,9 +329,8 @@ class MonsterAnimationStore:
         binding_id = "binding__" + clip_id
         relative = Path("monsters") / slug / "animations" / f"{stem}{source.suffix.lower()}"
         source_target = self.root / "assets/source" / relative
-        prepared_target = self.root / "assets/prepared" / relative
+        prepared_target = source_target
         source_target.parent.mkdir(parents=True, exist_ok=True)
-        prepared_target.parent.mkdir(parents=True, exist_ok=True)
         source_sha = self._sha256(source)
         old = connection.execute("SELECT * FROM monster_animation_clips WHERE id=?", (clip_id,)).fetchone()
         old_dict = dict(old) if old else None
@@ -337,9 +338,8 @@ class MonsterAnimationStore:
         same_source = bool(old_dict and previous_source_sha == source_sha)
         if not same_source or not source_target.is_file():
             shutil.copy2(source, source_target)
-        if not same_source or not prepared_target.is_file():
-            shutil.copy2(source_target, prepared_target)
-        digest = self._sha256(prepared_target)
+        digest = self._sha256(source_target)
+        source_sha = digest
         if old_dict is None:
             connection.execute(
                 """INSERT INTO monster_animation_clips(id,monster_slug,name,source_path,prepared_path,sha256,source_sha256,duplicate_first_frame_at_end,asset_id,published_sha256,moderation_state,revision,created_at,updated_at,content_updated_at,published_at)
@@ -489,7 +489,7 @@ class MonsterAnimationStore:
 
 
     def set_duplicate_first_frame(self, clip_id: str, enabled: bool) -> dict:
-        # Runtime presentation flag only. Never mutate source/prepared animation
+        # Runtime presentation flag only. Never mutate canonical animation
         # bytes, publication checksum, revision, or permanent Roblox asset id.
         with self.connect() as connection:
             raw = connection.execute("SELECT monster_slug FROM monster_animation_clips WHERE id=?", (clip_id,)).fetchone()
@@ -533,7 +533,7 @@ class MonsterAnimationStore:
         if not raw:
             raise ValueError(f"unknown monster animation clip: {clip_id}")
         row = dict(raw)
-        path = self.root / str(row.get("prepared_path") or "")
+        path = self.root / str(row.get("prepared_path") or row.get("source_path") or "")
         if not path.is_file():
             raise ValueError("registered monster animation file is missing")
         asset_id = str(row.get("asset_id") or "").strip()

@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "project": "game1",
+  "migration": "location-assets-source-only-v1",
+  "completedAtUtc": "2026-10-09T20:42:50.522313Z",
+  "changed": true,
+  "migratedRows": 10,
+  "movedPreparedOnlyFiles": 0,
+  "removedIdentityDuplicates": 14,
+  "backupPath": "assets/reimported/location-assets/source-only-migration/20261009T204250Z/game1.db.before"
+}

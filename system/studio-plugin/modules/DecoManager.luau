@@ -1,6 +1,7 @@
 local DecoAssetLoader = require(script.Parent.DecoAssetLoader)
 local DecoPlacement = require(script.Parent.DecoPlacement)
 local DecoTransform = require(script.Parent.DecoTransform)
+local DecoPlacedAssetSync = require(script.Parent.DecoPlacedAssetSync)
 
 local DecoManager = {}
 DecoManager.__index = DecoManager
@@ -323,7 +324,17 @@ function DecoManager:refreshRegistry()
         return
     end
     self.registry = result
+    local syncResult = DecoPlacedAssetSync.RefreshTextures(self.Workspace, result)
+    if syncResult.parts > 0 then
+        self.ChangeHistoryService:SetWaypoint("Refresh Deco Asset Textures")
+    end
     self:_setCategory(self.category)
+    if syncResult.parts > 0 then
+        self:_setStatus(("Registry refreshed · updated texture on %d placed asset(s) / %d MeshPart(s)"):format(
+            syncResult.models,
+            syncResult.parts
+        ))
+    end
 end
 
 function DecoManager:_placeCurrent()

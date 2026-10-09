@@ -12,11 +12,11 @@ class AnimationPublicationMixin:
         if not raw:
             raise ValueError(f"unknown animation clip: {clip_id}")
         row = dict(raw)
-        path = (self.root / str(row.get("prepared_path") or "")).resolve()
+        path = (self.root / str(row.get("prepared_path") or row.get("source_path") or "")).resolve()
         if not path.is_file() or path.suffix.lower() not in ANIMATION_EXTENSIONS:
             raise ValueError("registered animation file is missing")
         if self._sha256(path) != str(row.get("sha256") or ""):
-            raise ValueError("registered animation checksum does not match the prepared file")
+            raise ValueError("registered animation checksum does not match the canonical file")
 
         asset_id = str(row.get("asset_id") or "").strip()
         common = dict(

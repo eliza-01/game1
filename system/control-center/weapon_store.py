@@ -146,7 +146,7 @@ class WeaponStore:
                 )"""
             )
             # Canonical gameplay weapon types replace the old animation-set labels.
-            # Keep source/prepared paths untouched; _storage_type() preserves the
+            # Keep canonical asset paths untouched; _storage_type() preserves the
             # already-synced legacy ServerStorage location until the model is re-synced.
             connection.execute("UPDATE weapons SET weapon_type='sword' WHERE lower(weapon_type)='1hs'")
             connection.execute("UPDATE weapons SET weapon_type='bigsword' WHERE lower(weapon_type)='2hs'")
@@ -393,15 +393,14 @@ class WeaponStore:
             if not source.is_file() or source.suffix.lower() != ".fbx":
                 raise ValueError("weapon model must be an FBX file")
             source_target = self.root / "assets/source/weapons" / weapon_type / slug / "model" / f"{slug}.fbx"
-            prepared_target = self.root / "assets/prepared/weapons" / weapon_type / slug / "model" / f"{slug}.fbx"
-            for target in (source_target, prepared_target):
-                target.parent.mkdir(parents=True, exist_ok=True)
-                if old:
-                    self._archive_existing(target, slug, int(old.get("revision") or 1))
-                shutil.copy2(source, target)
-            model_source_path = source_target.relative_to(self.root).as_posix()
-            model_prepared_path = prepared_target.relative_to(self.root).as_posix()
-            model_sha256 = self._sha256(prepared_target)
+            source_target.parent.mkdir(parents=True, exist_ok=True)
+            if old:
+                self._archive_existing(source_target, slug, int(old.get("revision") or 1))
+            shutil.copy2(source, source_target)
+            canonical_path = source_target.relative_to(self.root).as_posix()
+            model_source_path = canonical_path
+            model_prepared_path = canonical_path
+            model_sha256 = self._sha256(source_target)
 
         with self.connect() as connection:
             connection.execute(
@@ -439,15 +438,11 @@ class WeaponStore:
                 previous = connection.execute("SELECT * FROM weapon_textures WHERE id=?", (texture_id,)).fetchone()
                 canonical_name = f"{slot}{source.suffix.lower()}"
                 source_target = self.root / "assets/source/weapons" / weapon_type / slug / "textures" / canonical_name
-                prepared_target = self.root / "assets/prepared/weapons" / weapon_type / slug / "textures" / canonical_name
                 source_target.parent.mkdir(parents=True, exist_ok=True)
-                prepared_target.parent.mkdir(parents=True, exist_ok=True)
                 if previous:
                     self._archive_existing(source_target, slug, int(previous["revision"] or 1))
-                    self._archive_existing(prepared_target, slug, int(previous["revision"] or 1))
                 shutil.copy2(source, source_target)
-                shutil.copy2(source, prepared_target)
-                digest = self._sha256(prepared_target)
+                digest = self._sha256(source_target)
                 texture_revision = int(previous["revision"] or 0) + 1 if previous else 1
                 connection.execute(
                     """INSERT OR REPLACE INTO weapon_textures(
@@ -457,7 +452,7 @@ class WeaponStore:
                     (
                         texture_id, slug, slot,
                         source_target.relative_to(self.root).as_posix(),
-                        prepared_target.relative_to(self.root).as_posix(),
+                        source_target.relative_to(self.root).as_posix(),
                         digest,
                         previous["asset_id"] if previous else None,
                         str(previous["published_sha256"] or "") if previous else "",
@@ -476,9 +471,9 @@ class WeaponStore:
         row = self.get(slug)
         if not row:
             raise ValueError(f"unknown weapon: {slug}")
-        model = self.root / str(row.get("model_prepared_path") or "")
+        model = self.root / str(row.get("model_prepared_path") or row.get("model_source_path") or "")
         if not model.is_file():
-            raise ValueError("canonical prepared weapon FBX is missing")
+            raise ValueError("canonical weapon FBX is missing")
         api_key = str(credentials.get("apiKey") or "")
         creator_type = str(credentials.get("creatorType") or "")
         creator_id = str(credentials.get("creatorId") or "")
@@ -515,7 +510,7 @@ class WeaponStore:
         for texture in row.get("textures") or []:
             if str(texture.get("asset_id") or "") and str(texture.get("published_sha256") or "") == str(texture.get("sha256") or ""):
                 continue
-            file_path = self.root / str(texture.get("prepared_path") or "")
+            file_path = self.root / str(texture.get("prepared_path") or texture.get("source_path") or "")
             texture_asset = str(texture.get("asset_id") or "").strip()
             display_name = f"{row['name_en']} {texture['slot']}"
             if texture_asset:

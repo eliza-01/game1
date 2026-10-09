@@ -1805,4 +1805,4 @@ task.spawn(function()
     end
 end)
 
-print("[game1 plugin] loaded · model bridge v21 · DecoManager identity-only placement + environment bounce authoring + locations + viewport timeline pose sampler")
+print("[game1 plugin] loaded · model bridge v22 · DecoManager identity-only placement + environment bounce authoring + locations + viewport timeline pose sampler")

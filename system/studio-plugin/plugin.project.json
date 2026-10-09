@@ -22,6 +22,9 @@
       "DecoPlacement": {
         "$path": "modules/DecoPlacement.luau"
       },
+      "DecoPlacedAssetSync": {
+        "$path": "modules/DecoPlacedAssetSync.luau"
+      },
       "DecoManager": {
         "$path": "modules/DecoManager.luau"
       }

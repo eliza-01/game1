@@ -1227,7 +1227,7 @@ if transform_path.exists():
     err("legacy physical animation_keyframe_transform.py must be removed; first-frame seam is runtime-only")
 for store_file in [ROOT / "system/control-center/animation_core/storage.py", ROOT / "system/control-center/monster_animation_store.py"]:
     text = store_file.read_text(encoding="utf-8") if store_file.is_file() else ""
-    for required in ["source_sha256", "duplicate_first_frame_at_end", "set_duplicate_first_frame", "_restore_prepared_files", "shutil.copy2"]:
+    for required in ["source_sha256", "duplicate_first_frame_at_end", "set_duplicate_first_frame", "_normalize_source_only_files", "shutil.copy2"]:
         if required not in text:
             err(f"runtime animation seam storage contract missing {required} in {store_file.name}")
     if "prepare_animation_file" in text or "animation_keyframe_transform" in text:
@@ -1974,7 +1974,7 @@ for required in [
     'AnimationClipProvider:GetAnimationClipAsync',
     'clip:IsA("KeyframeSequence")',
     'preview.Parent = timelineWorld',
-    'model bridge v21',
+    'model bridge v22',
 ]:
     if required not in studio_plugin_text:
         err(f"m37 in-plugin timeline preview missing {required}")
@@ -2106,7 +2106,7 @@ for required in [
 ]:
     if required not in location_plugin_text:
         err(f"m41 Studio Location authoring module missing {required}")
-for required in ['require(script.Parent.modules.LocationCommands)', 'data.command == "location-authoring"', 'model bridge v21']:
+for required in ['require(script.Parent.modules.LocationCommands)', 'data.command == "location-authoring"', 'model bridge v22']:
     if required not in studio_plugin_text:
         err(f"m41 Game1Bridge Location integration missing {required}")
 
@@ -2152,7 +2152,7 @@ for path in [
 
 if location_asset_manifest_path.is_file():
     location_asset_manifest = json.loads(location_asset_manifest_path.read_text(encoding="utf-8"))
-    if location_asset_manifest.get("schemaVersion") != 3 or location_asset_manifest.get("project") != "game1":
+    if location_asset_manifest.get("schemaVersion") != 4 or location_asset_manifest.get("project") != "game1":
         err("m43 location-assets.json schema/project is invalid")
     category_ids = [row.get("id") for row in ((location_asset_manifest.get("options") or {}).get("categories") or [])]
     if category_ids != ["tree", "bush", "rock", "light", "fence", "decoration"]:
@@ -2163,11 +2163,11 @@ for required in [
     "class LocationAssetStore",
     'CATEGORIES = ("tree", "bush", "rock", "light", "fence", "decoration")',
     "assets/source/location-assets",
-    "assets/prepared/location-assets",
+    "model_path TEXT NOT NULL DEFAULT ''",
+    "texture_path TEXT NOT NULL DEFAULT ''",
     "create_model_asset",
     "update_model_asset",
     "create_image_asset",
-    "update_image_asset",
     'return "PUBLISHED"',
     "LocationAssetRegistry.luau",
 ]:
@@ -2276,7 +2276,7 @@ for required in [
 for required in [
     'require(script.Parent.modules.DecoManager)',
     'DecoManager.new({',
-    'model bridge v21',
+    'model bridge v22',
 ]:
     if required not in studio_plugin_text:
         err(f"m43 Game1Bridge DecoManager integration missing {required}")
@@ -2318,7 +2318,7 @@ for required in [
         err(f"m45 DecoManager drag/save hotfix missing {required}")
 if "self.AssetService:SavePlaceAsync" in deco_manager_text:
     err("m45 DecoManager still calls cloud SavePlaceAsync directly")
-if "model bridge v21" not in studio_plugin_text:
+if "model bridge v22" not in studio_plugin_text:
     err("m45 Studio plugin version marker is stale")
 
 # m44 Location Assets: PNG/JPG source textures with clean extension-aware preparation.
@@ -2343,7 +2343,7 @@ if "PNG/JPG" not in deco_assets_js_text or "PNG/JPG" not in index_m43_text:
 
 # m46 Location Assets: Decorations category + shared registered texture references.
 for required in [
-    'SCHEMA_VERSION = 3',
+    'SCHEMA_VERSION = 4',
     '"decoration": "Decorations"',
     'texture_reference_slug TEXT NOT NULL DEFAULT',
     'def _resolve_texture_owner',
@@ -2379,7 +2379,7 @@ for required in [
         err(f"m46 DecoManager Decorations category missing {required}")
 if 'decoration = "Decorations"' not in deco_placement_text:
     err("m46 DecoPlacement Decorations folder mapping is missing")
-if "model bridge v21" not in studio_plugin_text:
+if "model bridge v22" not in studio_plugin_text:
     err("m46 Studio plugin version marker is stale")
 
 
@@ -2403,7 +2403,7 @@ for required in [
 ]:
     if required not in deco_loader_text:
         err(f"m47 static Location Asset sanitization missing {required}")
-if "model bridge v21" not in studio_plugin_text:
+if "model bridge v22" not in studio_plugin_text:
     err("m47 Studio plugin version marker is stale")
 
 
@@ -2437,7 +2437,7 @@ if "model:PivotTo(DecoTransform.previewPivot(model))" not in deco_manager_text:
     err("m48 DecoManager preview still replaces the imported asset basis")
 if '"DecoTransform"' not in (ROOT / "system/studio-plugin/plugin.project.json").read_text(encoding="utf-8"):
     err("m48 Studio plugin project does not include DecoTransform")
-if "model bridge v21" not in studio_plugin_text:
+if "model bridge v22" not in studio_plugin_text:
     err("m48 Studio plugin version marker is stale")
 
 
@@ -2473,15 +2473,14 @@ for path in [
 
 if location_asset_manifest_path.is_file():
     location_asset_manifest = json.loads(location_asset_manifest_path.read_text(encoding="utf-8"))
-    if location_asset_manifest.get("schemaVersion") != 3:
-        err("m50 Location Asset manifest must use schemaVersion 3")
+    if location_asset_manifest.get("schemaVersion") != 4:
+        err("m52 Location Asset manifest must use schemaVersion 4")
     for row in location_asset_manifest.get("items") or []:
         if not isinstance(row.get("destructible"), bool):
             err(f"m50 Location Asset destructible policy missing/invalid for {row.get('slug')}")
 
 for required in [
     "destructible INTEGER NOT NULL DEFAULT 0",
-    'ALTER TABLE location_assets ADD COLUMN destructible INTEGER NOT NULL DEFAULT 0',
     'result["destructible"] = bool(result.get("destructible"))',
     'f"\\t\\t\\tdestructible = {str(bool(row.get(\'destructible\'))).lower()},"',
 ]:
@@ -2626,11 +2625,179 @@ for required in ['EnvironmentAssetService.Start()', 'WeaponBounceService.Start()
 
 if 'control_agent_build = "game1-m50-environment-weapon-bounce-001"' not in host_agent_text:
     err("m50 Control Center build marker is stale")
-if "model bridge v21" not in studio_plugin_text:
-    err("m50 Studio plugin version marker is stale")
+if "model bridge v22" not in studio_plugin_text:
+    err("m51 Studio plugin version marker is stale")
 install_plugin_text = (ROOT / "system/studio-plugin/install.ps1").read_text(encoding="utf-8")
-if "model bridge v21" not in install_plugin_text:
-    err("m50 Studio plugin installer marker is stale")
+if "model bridge v22" not in install_plugin_text:
+    err("m51 Studio plugin installer marker is stale")
+
+# m51 Location Assets: changed owned textures get a fresh Roblox Image Asset ID.
+deco_placed_sync_path = ROOT / "system/studio-plugin/modules/DecoPlacedAssetSync.luau"
+environment_visuals_path = ROOT / "src/server/world/EnvironmentAssetVisuals.luau"
+for path in [deco_placed_sync_path, environment_visuals_path]:
+    if not path.is_file():
+        err(f"m51 texture synchronization module missing: {path.relative_to(ROOT)}")
+deco_placed_sync_text = deco_placed_sync_path.read_text(encoding="utf-8") if deco_placed_sync_path.is_file() else ""
+environment_visuals_text = environment_visuals_path.read_text(encoding="utf-8") if environment_visuals_path.is_file() else ""
+for required in [
+    "legacy_texture_updates",
+    "COUNT(DISTINCT publication.sha256)>1",
+    "texture_replaced =",
+    "replacement is identity-changing for Location Assets by design",
+    "operation = create_image_asset(",
+]:
+    if required not in location_asset_store_text:
+        err(f"m51 Location Asset replacement publication missing {required}")
+if "update_image_asset" in location_asset_store_text:
+    err("m51 Location Assets still contain legacy in-place Image Asset updates")
+for required in [
+    "replacing an owned texture publishes a new Roblox Image Asset ID",
+    "texture ${published.texture_asset_id || '—'}",
+]:
+    if required not in (index_m43_text + deco_assets_js_text):
+        err(f"m51 Location Assets UI publication identity missing {required}")
+for required in ["Game1DecoAssetSlug", "part.TextureID = uri", "RefreshTextures"]:
+    if required not in deco_placed_sync_text:
+        err(f"m51 DecoManager placed-texture sync missing {required}")
+for required in ["DecoPlacedAssetSync.RefreshTextures", "Refresh Deco Asset Textures"]:
+    if required not in deco_manager_text:
+        err(f"m51 DecoManager registry refresh integration missing {required}")
+if '"DecoPlacedAssetSync"' not in plugin_project_text:
+    err("m51 Studio plugin project is missing DecoPlacedAssetSync")
+for required in ["textureAssetId", "part.TextureID = uri", "ApplyModel", "ApplyPart"]:
+    if required not in environment_visuals_text:
+        err(f"m51 runtime environment texture hydration missing {required}")
+for required in ["EnvironmentAssetVisuals.ApplyModel", "EnvironmentAssetVisuals.ApplyPart"]:
+    if required not in environment_asset_service_text:
+        err(f"m51 EnvironmentAssetService visual hydration missing {required}")
+
+
+# m52 Location Assets: source-only canonical storage. The one-off Location
+# Asset migration was retired by m53 after the project-wide source-only
+# migration became authoritative.
+for required in [
+    "model_path TEXT NOT NULL DEFAULT ''",
+    "texture_path TEXT NOT NULL DEFAULT ''",
+    'self.root / "assets/source/location-assets"',
+]:
+    if required not in location_asset_store_text:
+        err(f"m52 source-only LocationAssetStore missing {required}")
+for forbidden in [
+    "assets/prepared/location-assets",
+    "model_source_path",
+    "model_prepared_path",
+    "texture_source_path",
+    "texture_prepared_path",
+]:
+    if forbidden in location_asset_store_text:
+        err(f"m52 active LocationAssetStore still contains legacy storage field/path {forbidden}")
+
+if location_asset_manifest_path.is_file():
+    location_asset_manifest = json.loads(location_asset_manifest_path.read_text(encoding="utf-8"))
+    if location_asset_manifest.get("schemaVersion") != 4:
+        err("m52 Location Asset manifest schema must be 4")
+    for row in location_asset_manifest.get("items") or []:
+        if not str(row.get("model_path") or "").startswith("assets/source/location-assets/"):
+            err(f"m52 Location Asset model path is not canonical source-only: {row.get('slug')}")
+        if not str(row.get("texture_reference_slug") or "") and not str(row.get("texture_path") or "").startswith("assets/source/location-assets/"):
+            err(f"m52 owned Location Asset texture path is not canonical source-only: {row.get('slug')}")
+        for legacy_field in ("model_source_path", "model_prepared_path", "texture_source_path", "texture_prepared_path"):
+            if legacy_field in row:
+                err(f"m52 manifest still exports legacy field {legacy_field}: {row.get('slug')}")
+
+if "row.texture_path" not in deco_assets_js_text or "row.texture_source_path" in deco_assets_js_text:
+    err("m52 Location Assets UI must use source-only texture_path")
+
+# m53 project-wide source-only storage. Active asset bytes live only in
+# assets/source. Compatibility DB columns may remain for old query shapes,
+# but both aliases must resolve to the same canonical source path and no active
+# subsystem may recreate assets/prepared.
+source_only_module = ROOT / "system/control-center/source_only_assets.py"
+source_only_text = source_only_module.read_text(encoding="utf-8") if source_only_module.is_file() else ""
+if not source_only_module.is_file():
+    err("m53 project-wide source-only migration module is missing")
+if (ROOT / "system/control-center/location_asset_source_only_migration.py").exists():
+    err("m53 obsolete Location Asset-only source migration must be removed")
+for required in [
+    "def migrate_source_only_assets",
+    '"game1-source-only-assets-v1"',
+    '"assets/prepared/"',
+    '"assets/source/"',
+    '"prepared-wins"',
+    '"source-wins"',
+    '"prepared-before"',
+]:
+    if required not in source_only_text:
+        err(f"m53 source-only migration contract missing {required}")
+if 'migrate_source_only_assets(ROOT, ROOT / ".control-center" / "game1.db")' not in host_agent_text:
+    err("m53 Control Center startup does not run source-only migration before stores")
+migrate_text = (ROOT / "system/control-center/migrate.py").read_text(encoding="utf-8")
+if 'migrate_source_only_assets(ROOT, ROOT / ".control-center" / "game1.db")' not in migrate_text:
+    err("m53 migrate.py does not run project-wide source-only migration")
+
+legacy_prepared_root = ROOT / "assets/prepared"
+if legacy_prepared_root.exists():
+    legacy_files = [path for path in legacy_prepared_root.rglob("*") if path.is_file()]
+    if legacy_files:
+        err(f"m53 source-only migration incomplete: assets/prepared still has {len(legacy_files)} file(s)")
+    else:
+        err("m53 source-only migration incomplete: empty assets/prepared tree still exists")
+
+active_manifest_stale = []
+for manifest_path in (ROOT / "assets/manifests").glob("*.json"):
+    if "assets/prepared/" in manifest_path.read_text(encoding="utf-8", errors="replace"):
+        active_manifest_stale.append(manifest_path.name)
+if active_manifest_stale:
+    err("m53 manifests still reference assets/prepared: " + ", ".join(sorted(active_manifest_stale)))
+
+for active_store in [
+    ROOT / "system/control-center/character_store.py",
+    ROOT / "system/control-center/character_core/identity.py",
+    ROOT / "system/control-center/animation_core/storage.py",
+    ROOT / "system/control-center/weapon_store.py",
+    ROOT / "system/control-center/monster_store.py",
+    ROOT / "system/control-center/monster_animation_store.py",
+]:
+    active_text = active_store.read_text(encoding="utf-8")
+    if 'self.root / "assets/prepared' in active_text or 'self.root / "assets" / "prepared"' in active_text:
+        err(f"m53 active store can still create assets/prepared: {active_store.relative_to(ROOT)}")
+
+if "<b>prepared</b>" in character_js_text or "source/prepared copies" in ui:
+    err("m53 Asset Manager still exposes the removed Source/Prepared dual-storage UI")
+
+# Validate compatibility aliases in the live SQLite DB. They remain only so old
+# query shapes keep working; both values must point at the exact same assets/source file.
+import sqlite3 as _sqlite3_m53
+_db_m53 = ROOT / ".control-center/game1.db"
+if _db_m53.is_file():
+    _con_m53 = _sqlite3_m53.connect(_db_m53)
+    _con_m53.row_factory = _sqlite3_m53.Row
+    _pairs_m53 = [
+        ("characters", "source_path", "prepared_path"),
+        ("animation_clips", "source_path", "prepared_path"),
+        ("weapons", "model_source_path", "model_prepared_path"),
+        ("weapon_textures", "source_path", "prepared_path"),
+        ("monsters", "model_source_path", "model_prepared_path"),
+        ("monster_textures", "source_path", "prepared_path"),
+        ("monster_animation_clips", "source_path", "prepared_path"),
+    ]
+    _tables_m53 = {str(row[0]) for row in _con_m53.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    for _table, _source_col, _prepared_col in _pairs_m53:
+        if _table not in _tables_m53:
+            continue
+        _cols = {str(row[1]) for row in _con_m53.execute(f"PRAGMA table_info({_table})")}
+        if not {_source_col, _prepared_col}.issubset(_cols):
+            continue
+        for _row in _con_m53.execute(f"SELECT {_source_col},{_prepared_col} FROM {_table}"):
+            _source_value = str(_row[0] or "").replace("\\", "/")
+            _prepared_value = str(_row[1] or "").replace("\\", "/")
+            if _source_value != _prepared_value:
+                err(f"m53 {_table} still has split Source/Prepared paths")
+                break
+            if _source_value and not _source_value.startswith("assets/source/"):
+                err(f"m53 {_table} canonical path is outside assets/source: {_source_value}")
+                break
+    _con_m53.close()
 
 if errors:
     print("verify failed")
@@ -2638,7 +2805,7 @@ if errors:
         print(" -", item)
     sys.exit(1)
 
-print("verify ok · game1 m50 registry-owned environment weapon bounce passed")
+print("verify ok · game1 m53 project-wide source-only asset storage passed")
 print("registered character archetypes:", len(archetypes))
 print("active character archetype:", active_id or "none")
 print("race pool: human")

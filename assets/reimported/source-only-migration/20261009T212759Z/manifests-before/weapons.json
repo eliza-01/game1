@@ -1,0 +1,146 @@
+{
+  "schemaVersion": 2,
+  "project": "game1",
+  "activeWeaponSlug": null,
+  "options": {
+    "weaponTypes": [
+      "dagger",
+      "sword",
+      "bigsword",
+      "bow"
+    ],
+    "rarities": [
+      "common",
+      "uncommon",
+      "rare",
+      "mythical",
+      "legendary",
+      "immortal"
+    ],
+    "statKeys": [
+      "Damage",
+      "AttackSpeed"
+    ],
+    "attackRadius": {
+      "default": 7.0,
+      "min": 1.0,
+      "max": 420.0,
+      "step": 0.5
+    },
+    "attackLocomotionModes": [
+      "Run",
+      "Walk"
+    ]
+  },
+  "attackMovement": [
+    {
+      "weaponType": "dagger",
+      "animationSet": "1hs",
+      "locomotionMode": "Run",
+      "runSpeedMultiplier": 1.0,
+      "runSpeedPercent": 100.0
+    },
+    {
+      "weaponType": "sword",
+      "animationSet": "1hs",
+      "locomotionMode": "Run",
+      "runSpeedMultiplier": 1.0,
+      "runSpeedPercent": 100.0
+    },
+    {
+      "weaponType": "bigsword",
+      "animationSet": "2hs",
+      "locomotionMode": "Walk",
+      "runSpeedMultiplier": 0.75,
+      "runSpeedPercent": 75.0
+    },
+    {
+      "weaponType": "bow",
+      "animationSet": "bow",
+      "locomotionMode": "Walk",
+      "runSpeedMultiplier": 0.75,
+      "runSpeedPercent": 75.0
+    }
+  ],
+  "items": [
+    {
+      "slug": "newbie_axe",
+      "name_en": "Newbie Axe",
+      "name_ru": "Топор Новичка",
+      "weapon_type": "sword",
+      "rarity": "common",
+      "model_source_path": "assets/source/weapons/1hs/newbie_axe/model/newbie_axe.fbx",
+      "model_prepared_path": "assets/prepared/weapons/1hs/newbie_axe/model/newbie_axe.fbx",
+      "model_sha256": "64e106884acc7b985dca48e960d4999d959dd62e3b78aa169fa16f096df585d8",
+      "model_asset_id": "98087242454283",
+      "model_published_sha256": "64e106884acc7b985dca48e960d4999d959dd62e3b78aa169fa16f096df585d8",
+      "moderation_state": "Approved",
+      "revision": 1,
+      "created_at": 1791159719.983613,
+      "updated_at": 1791159752.6252778,
+      "published_at": 1791159752.6252778,
+      "grip_rot_x": 90.0,
+      "grip_rot_y": 0.0,
+      "grip_rot_z": 0.0,
+      "attack_radius_studs": 7.0,
+      "textures": [
+        {
+          "id": "newbie_axe__starter_axe_01",
+          "weapon_slug": "newbie_axe",
+          "slot": "starter_axe_01",
+          "source_path": "assets/source/weapons/1hs/newbie_axe/textures/starter_axe_01.png",
+          "prepared_path": "assets/prepared/weapons/1hs/newbie_axe/textures/starter_axe_01.png",
+          "sha256": "697f198b97b642a92552dd6da2525250e01a55ee445461bd2016734e6cc8f7dd",
+          "asset_id": "114414624522732",
+          "published_sha256": "697f198b97b642a92552dd6da2525250e01a55ee445461bd2016734e6cc8f7dd",
+          "moderation_state": "Reviewing",
+          "revision": 1,
+          "created_at": 1791159719.983613,
+          "updated_at": 1791159756.1325212,
+          "published_at": 1791159756.1325212
+        }
+      ],
+      "stat_modifiers": {
+        "AttackSpeed": 50,
+        "Damage": 10
+      },
+      "status": "PUBLISHED",
+      "storage_type": "1hs",
+      "server_storage_path": "ServerStorage.weapons.1hs.newbie_axe.model.newbie_axe"
+    },
+    {
+      "slug": "dragon_divider",
+      "name_en": "Dragon Divider",
+      "name_ru": "Рассекатель Драконов",
+      "weapon_type": "sword",
+      "rarity": "legendary",
+      "model_source_path": "assets/source/weapons/1hs/dragon_divider/model/dragon_divider.fbx",
+      "model_prepared_path": "assets/prepared/weapons/1hs/dragon_divider/model/dragon_divider.fbx",
+      "model_sha256": "a86fe015acc9d4b5bbfa266ecb918366e769ef1b3e08116005f1f7e3d0cb4130",
+      "model_asset_id": "104973757039880",
+      "model_published_sha256": "a86fe015acc9d4b5bbfa266ecb918366e769ef1b3e08116005f1f7e3d0cb4130",
+      "moderation_state": "Approved",
+      "revision": 3,
+      "created_at": 1791170967.6393898,
+      "updated_at": 1791171016.6005626,
+      "published_at": 1791171016.6005626,
+      "grip_rot_x": 0.0,
+      "grip_rot_y": 0.0,
+      "grip_rot_z": 0.0,
+      "attack_radius_studs": 7.0,
+      "textures": [],
+      "stat_modifiers": {
+        "AttackSpeed": 100,
+        "Damage": 50
+      },
+      "status": "PUBLISHED",
+      "storage_type": "1hs",
+      "server_storage_path": "ServerStorage.weapons.1hs.dragon_divider.model.dragon_divider"
+    }
+  ],
+  "summary": {
+    "registered": 2,
+    "published": 2,
+    "active": 0
+  }
+}

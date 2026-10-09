@@ -4,6 +4,7 @@ local Workspace = game:GetService("Workspace")
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local WorldShared = Shared:WaitForChild("world")
 local LocationAssetRegistry = require(WorldShared:WaitForChild("LocationAssetRegistry"))
+local EnvironmentAssetVisuals = require(script.Parent:WaitForChild("EnvironmentAssetVisuals"))
 
 local EnvironmentAssetService = {}
 
@@ -75,6 +76,7 @@ local function registerModel(model: Model, deferRebuild: boolean?)
     end
 
     definitionsByModel[model] = definition
+    EnvironmentAssetVisuals.ApplyModel(model, definition)
     applyStaticRuntimePhysics(model)
     if deferRebuild ~= true then
         rebuildRegisteredModels()
@@ -138,6 +140,7 @@ function EnvironmentAssetService.Start()
         elseif descendant:IsA("BasePart") then
             local model = descendant:FindFirstAncestorOfClass("Model")
             if model and definitionsByModel[model] then
+                EnvironmentAssetVisuals.ApplyPart(descendant, definitionsByModel[model])
                 descendant.Anchored = true
                 descendant.CanQuery = true
             end

@@ -11,12 +11,11 @@ import time
 from opencloud_assets import (
     create_image_asset,
     create_model_asset,
-    update_image_asset,
     update_model_asset,
     wait_for_operation,
 )
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 PROJECT = "game1"
 CATEGORIES = ("tree", "bush", "rock", "light", "fence", "decoration")
 TEXTURE_SUFFIXES = (".png", ".jpg", ".jpeg")
@@ -80,14 +79,12 @@ class LocationAssetStore:
                     slug TEXT PRIMARY KEY,
                     name_en TEXT NOT NULL,
                     category TEXT NOT NULL,
-                    model_source_path TEXT NOT NULL DEFAULT '',
-                    model_prepared_path TEXT NOT NULL DEFAULT '',
+                    model_path TEXT NOT NULL DEFAULT '',
                     model_sha256 TEXT NOT NULL DEFAULT '',
                     model_asset_id TEXT,
                     model_published_sha256 TEXT NOT NULL DEFAULT '',
                     model_moderation_state TEXT NOT NULL DEFAULT '',
-                    texture_source_path TEXT NOT NULL DEFAULT '',
-                    texture_prepared_path TEXT NOT NULL DEFAULT '',
+                    texture_path TEXT NOT NULL DEFAULT '',
                     texture_sha256 TEXT NOT NULL DEFAULT '',
                     texture_asset_id TEXT,
                     texture_published_sha256 TEXT NOT NULL DEFAULT '',
@@ -101,14 +98,15 @@ class LocationAssetStore:
                 )"""
             )
             columns = {row[1] for row in connection.execute("PRAGMA table_info(location_assets)").fetchall()}
-            if "texture_reference_slug" not in columns:
-                connection.execute(
-                    "ALTER TABLE location_assets ADD COLUMN texture_reference_slug TEXT NOT NULL DEFAULT ''"
-                )
-            if "destructible" not in columns:
-                connection.execute(
-                    "ALTER TABLE location_assets ADD COLUMN destructible INTEGER NOT NULL DEFAULT 0"
-                )
+            required = {
+                "slug", "name_en", "category", "model_path", "model_sha256", "model_asset_id",
+                "model_published_sha256", "model_moderation_state", "texture_path", "texture_sha256",
+                "texture_asset_id", "texture_published_sha256", "texture_moderation_state",
+                "texture_reference_slug", "destructible", "revision", "created_at", "updated_at", "published_at",
+            }
+            if not required.issubset(columns):
+                missing = ", ".join(sorted(required - columns))
+                raise RuntimeError(f"Location Asset database schema is incomplete after migration: {missing}")
             connection.execute(
                 """CREATE TABLE IF NOT EXISTS location_asset_publications(
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -122,6 +120,30 @@ class LocationAssetStore:
                     published_at REAL NOT NULL
                 )"""
             )
+            # Before m51 Location Assets updated changed images in-place. Roblox image
+            # consumers can keep serving the old image for that Asset ID, so a replacement
+            # texture must have a fresh publication identity. Detect those rows from
+            # publication history and make them pending for one clean republish.
+            legacy_texture_updates = connection.execute(
+                """SELECT la.slug
+                   FROM location_assets AS la
+                   JOIN location_asset_publications AS publication
+                     ON publication.asset_slug=la.slug
+                    AND publication.kind='texture'
+                    AND publication.asset_id=la.texture_asset_id
+                   WHERE COALESCE(la.texture_reference_slug,'')=''
+                     AND COALESCE(la.texture_asset_id,'')<>''
+                   GROUP BY la.slug,la.texture_asset_id
+                   HAVING COUNT(DISTINCT publication.sha256)>1"""
+            ).fetchall()
+            if legacy_texture_updates:
+                now = time.time()
+                connection.executemany(
+                    """UPDATE location_assets
+                       SET texture_asset_id=NULL,texture_published_sha256='',texture_moderation_state='',updated_at=?
+                       WHERE slug=?""",
+                    [(now, str(row["slug"])) for row in legacy_texture_updates],
+                )
 
     @staticmethod
     def _sha256(path: Path) -> str:
@@ -147,7 +169,7 @@ class LocationAssetStore:
         )
 
     def _status(self, row: dict) -> str:
-        if not row.get("model_source_path") or not row.get("texture_source_path"):
+        if not row.get("model_path") or not row.get("texture_path"):
             return "INCOMPLETE"
         model_current = bool(
             str(row.get("model_asset_id") or "")
@@ -194,8 +216,7 @@ class LocationAssetStore:
         result["destructible"] = bool(result.get("destructible"))
         if owner is not None and owner.get("slug") != result.get("slug"):
             for field in (
-                "texture_source_path",
-                "texture_prepared_path",
+                "texture_path",
                 "texture_sha256",
                 "texture_asset_id",
                 "texture_published_sha256",
@@ -253,13 +274,13 @@ class LocationAssetStore:
         if category not in CATEGORIES:
             raise ValueError("location asset category must be tree, bush, rock, light, fence or decoration")
 
-        model_source = str(payload.get("modelSourcePath") or "").strip()
-        texture_source = str(payload.get("textureSourcePath") or "").strip()
+        selected_model = str(payload.get("modelSourcePath") or "").strip()
+        selected_texture = str(payload.get("textureSourcePath") or "").strip()
         texture_reference = str(payload.get("textureReferenceSlug") or "").strip().lower()
         old_reference = str(old.get("texture_reference_slug") or "").strip().lower() if old else ""
-        if old is None and not model_source:
+        if old is None and not selected_model:
             raise ValueError("choose a location asset FBX before registration")
-        if texture_source and texture_reference:
+        if selected_texture and texture_reference:
             raise ValueError("choose either a texture file or a reused registered texture, not both")
 
         reference_owner = None
@@ -270,23 +291,21 @@ class LocationAssetStore:
             if reference_row is None:
                 raise ValueError(f"unknown shared texture asset: {texture_reference}")
             reference_owner = self._resolve_texture_owner(reference_row)
-            if reference_owner is None or not str(reference_owner.get("texture_prepared_path") or ""):
+            if reference_owner is None or not str(reference_owner.get("texture_path") or ""):
                 raise ValueError("selected shared texture has no canonical texture source")
             texture_reference = str(reference_owner.get("slug") or texture_reference)
 
-        if old is None and not texture_source and not texture_reference:
+        if old is None and not selected_texture and not texture_reference:
             raise ValueError("choose a location asset PNG/JPG or reuse a registered texture before registration")
-        if old is not None and old_reference and not texture_reference and not texture_source:
+        if old is not None and old_reference and not texture_reference and not selected_texture:
             raise ValueError("choose a replacement PNG/JPG or another shared texture before clearing the current shared texture")
 
         now = time.time()
         revision = int(old.get("revision") or 0) + 1 if old else 1
         values = {
-            "model_source_path": str(old.get("model_source_path") or "") if old else "",
-            "model_prepared_path": str(old.get("model_prepared_path") or "") if old else "",
+            "model_path": str(old.get("model_path") or "") if old else "",
             "model_sha256": str(old.get("model_sha256") or "") if old else "",
-            "texture_source_path": str(old.get("texture_source_path") or "") if old else "",
-            "texture_prepared_path": str(old.get("texture_prepared_path") or "") if old else "",
+            "texture_path": str(old.get("texture_path") or "") if old else "",
             "texture_sha256": str(old.get("texture_sha256") or "") if old else "",
         }
         texture_asset_id = old.get("texture_asset_id") if old else None
@@ -294,43 +313,41 @@ class LocationAssetStore:
         texture_moderation_state = str(old.get("texture_moderation_state") or "") if old else ""
         stored_reference = old_reference
 
-        if model_source:
-            source = Path(model_source).expanduser().resolve()
-            if not source.is_file() or source.suffix.lower() != ".fbx":
+        if selected_model:
+            selected = Path(selected_model).expanduser().resolve()
+            if not selected.is_file() or selected.suffix.lower() != ".fbx":
                 raise ValueError("location asset model must be an FBX file")
-            source_target = self.root / "assets/source/location-assets" / category / slug / "model" / f"{slug}.fbx"
-            prepared_target = self.root / "assets/prepared/location-assets" / category / slug / "model" / f"{slug}.fbx"
-            for target in (source_target, prepared_target):
-                target.parent.mkdir(parents=True, exist_ok=True)
-                if old:
-                    self._archive_existing(target, slug, int(old.get("revision") or 1))
-                shutil.copy2(source, target)
-            values["model_source_path"] = source_target.relative_to(self.root).as_posix()
-            values["model_prepared_path"] = prepared_target.relative_to(self.root).as_posix()
-            values["model_sha256"] = self._sha256(prepared_target)
+            canonical_target = self.root / "assets/source/location-assets" / category / slug / "model" / f"{slug}.fbx"
+            canonical_target.parent.mkdir(parents=True, exist_ok=True)
+            if old:
+                self._archive_existing(canonical_target, slug, int(old.get("revision") or 1))
+            shutil.copy2(selected, canonical_target)
+            values["model_path"] = canonical_target.relative_to(self.root).as_posix()
+            values["model_sha256"] = self._sha256(canonical_target)
 
-        if texture_source:
-            source = Path(texture_source).expanduser().resolve()
-            source_suffix = source.suffix.lower()
-            if not source.is_file() or source_suffix not in TEXTURE_SUFFIXES:
+        if selected_texture:
+            selected = Path(selected_texture).expanduser().resolve()
+            source_suffix = selected.suffix.lower()
+            if not selected.is_file() or source_suffix not in TEXTURE_SUFFIXES:
                 raise ValueError("location asset texture must be a PNG or JPG file")
             canonical_suffix = ".jpg" if source_suffix == ".jpeg" else source_suffix
-            source_target = self.root / "assets/source/location-assets" / category / slug / "textures" / f"{slug}{canonical_suffix}"
-            prepared_target = self.root / "assets/prepared/location-assets" / category / slug / "textures" / f"{slug}{canonical_suffix}"
+            canonical_target = self.root / "assets/source/location-assets" / category / slug / "textures" / f"{slug}{canonical_suffix}"
             if old:
-                replacements = {source_target.resolve(), prepared_target.resolve()}
+                replacements = {canonical_target.resolve()}
                 old_revision = int(old.get("revision") or 1)
-                self._retire_replaced_file(str(old.get("texture_source_path") or ""), slug, old_revision, replacements)
-                self._retire_replaced_file(str(old.get("texture_prepared_path") or ""), slug, old_revision, replacements)
-            for target in (source_target, prepared_target):
-                target.parent.mkdir(parents=True, exist_ok=True)
-                if old:
-                    self._archive_existing(target, slug, int(old.get("revision") or 1))
-                shutil.copy2(source, target)
-            values["texture_source_path"] = source_target.relative_to(self.root).as_posix()
-            values["texture_prepared_path"] = prepared_target.relative_to(self.root).as_posix()
-            values["texture_sha256"] = self._sha256(prepared_target)
-            if old_reference:
+                self._retire_replaced_file(str(old.get("texture_path") or ""), slug, old_revision, replacements)
+            canonical_target.parent.mkdir(parents=True, exist_ok=True)
+            if old:
+                self._archive_existing(canonical_target, slug, int(old.get("revision") or 1))
+            shutil.copy2(selected, canonical_target)
+            values["texture_path"] = canonical_target.relative_to(self.root).as_posix()
+            values["texture_sha256"] = self._sha256(canonical_target)
+            old_texture_sha256 = str(old.get("texture_sha256") or "") if old else ""
+            texture_replaced = old is None or bool(old_reference) or values["texture_sha256"] != old_texture_sha256
+            if texture_replaced:
+                # A changed Location Asset texture is a new Roblox Image asset, never
+                # an in-place update of the previous image id. This keeps Studio/DecoManager
+                # deterministic and lets shared-texture consumers follow the new owner id.
                 texture_asset_id = None
                 texture_published_sha256 = ""
                 texture_moderation_state = ""
@@ -338,10 +355,8 @@ class LocationAssetStore:
         elif texture_reference:
             if old and not old_reference:
                 old_revision = int(old.get("revision") or 1)
-                self._retire_replaced_file(str(old.get("texture_source_path") or ""), slug, old_revision, set())
-                self._retire_replaced_file(str(old.get("texture_prepared_path") or ""), slug, old_revision, set())
-            values["texture_source_path"] = ""
-            values["texture_prepared_path"] = ""
+                self._retire_replaced_file(str(old.get("texture_path") or ""), slug, old_revision, set())
+            values["texture_path"] = ""
             values["texture_sha256"] = ""
             texture_asset_id = None
             texture_published_sha256 = ""
@@ -352,17 +367,17 @@ class LocationAssetStore:
             connection.execute(
                 """INSERT OR REPLACE INTO location_assets(
                     slug,name_en,category,
-                    model_source_path,model_prepared_path,model_sha256,model_asset_id,model_published_sha256,model_moderation_state,
-                    texture_source_path,texture_prepared_path,texture_sha256,texture_asset_id,texture_published_sha256,texture_moderation_state,texture_reference_slug,destructible,
+                    model_path,model_sha256,model_asset_id,model_published_sha256,model_moderation_state,
+                    texture_path,texture_sha256,texture_asset_id,texture_published_sha256,texture_moderation_state,texture_reference_slug,destructible,
                     revision,created_at,updated_at,published_at
-                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     slug, name_en, category,
-                    values["model_source_path"], values["model_prepared_path"], values["model_sha256"],
+                    values["model_path"], values["model_sha256"],
                     old.get("model_asset_id") if old else None,
                     str(old.get("model_published_sha256") or "") if old else "",
                     str(old.get("model_moderation_state") or "") if old else "",
-                    values["texture_source_path"], values["texture_prepared_path"], values["texture_sha256"],
+                    values["texture_path"], values["texture_sha256"],
                     texture_asset_id, texture_published_sha256, texture_moderation_state, stored_reference, 1 if destructible else 0,
                     revision,
                     old.get("created_at") if old else now,
@@ -377,12 +392,12 @@ class LocationAssetStore:
         row = self.get(slug)
         if not row:
             raise ValueError(f"unknown location asset: {slug}")
-        model = self.root / str(row.get("model_prepared_path") or "")
-        texture = self.root / str(row.get("texture_prepared_path") or "")
+        model = self.root / str(row.get("model_path") or "")
+        texture = self.root / str(row.get("texture_path") or "")
         if not model.is_file():
-            raise ValueError("canonical prepared location asset FBX is missing")
+            raise ValueError("canonical Location Asset FBX is missing")
         if not texture.is_file():
-            raise ValueError("canonical prepared location asset texture is missing")
+            raise ValueError("canonical Location Asset texture is missing")
         texture_reference = str(row.get("texture_reference_slug") or "").strip().lower()
         if texture_reference and not self._texture_current(row):
             raise ValueError(f"shared texture owner {texture_reference} must publish its texture first")
@@ -432,27 +447,17 @@ class LocationAssetStore:
 
         row = self.get(slug)
         if not texture_reference and str(row.get("texture_published_sha256") or "") != str(row.get("texture_sha256") or ""):
-            current_texture_id = str(row.get("texture_asset_id") or "").strip()
             display_name = f"{row['name_en']} texture"
-            if current_texture_id:
-                operation = update_image_asset(
-                    texture,
-                    asset_id=current_texture_id,
-                    display_name=display_name,
-                    description=description,
-                    creator_type=creator_type,
-                    creator_id=creator_id,
-                    api_key=api_key,
-                )
-            else:
-                operation = create_image_asset(
-                    texture,
-                    display_name=display_name,
-                    description=description,
-                    creator_type=creator_type,
-                    creator_id=creator_id,
-                    api_key=api_key,
-                )
+            # Dirty owned textures always publish as a new Roblox Image asset. Image
+            # replacement is identity-changing for Location Assets by design.
+            operation = create_image_asset(
+                texture,
+                display_name=display_name,
+                description=description,
+                creator_type=creator_type,
+                creator_id=creator_id,
+                api_key=api_key,
+            )
             result = wait_for_operation(operation, api_key=api_key)
             now = time.time()
             with self.connect() as connection:

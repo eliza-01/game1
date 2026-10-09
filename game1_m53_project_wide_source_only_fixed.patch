@@ -1,0 +1,1391 @@
+diff --git a/system/control-center/animation_core/publication.py b/system/control-center/animation_core/publication.py
+index 462f410..1985f49 100644
+--- a/system/control-center/animation_core/publication.py
++++ b/system/control-center/animation_core/publication.py
+@@ -12,11 +12,11 @@ class AnimationPublicationMixin:
+         if not raw:
+             raise ValueError(f"unknown animation clip: {clip_id}")
+         row = dict(raw)
+-        path = (self.root / str(row.get("prepared_path") or "")).resolve()
++        path = (self.root / str(row.get("prepared_path") or row.get("source_path") or "")).resolve()
+         if not path.is_file() or path.suffix.lower() not in ANIMATION_EXTENSIONS:
+             raise ValueError("registered animation file is missing")
+         if self._sha256(path) != str(row.get("sha256") or ""):
+-            raise ValueError("registered animation checksum does not match the prepared file")
++            raise ValueError("registered animation checksum does not match the canonical file")
+ 
+         asset_id = str(row.get("asset_id") or "").strip()
+         common = dict(
+diff --git a/system/control-center/animation_core/storage.py b/system/control-center/animation_core/storage.py
+index e8269b2..e931d2f 100644
+--- a/system/control-center/animation_core/storage.py
++++ b/system/control-center/animation_core/storage.py
+@@ -116,30 +116,32 @@ class AnimationStorageMixin:
+                 if still_used is None:
+                     connection.execute("DELETE FROM animation_publications WHERE clip_id=?", (clip_id,))
+                     connection.execute("DELETE FROM animation_clips WHERE id=?", (clip_id,))
+-        self._restore_prepared_files()
++        self._normalize_source_only_files()
+ 
+-    def _restore_prepared_files(self) -> None:
+-        """Undo legacy physical seam transforms; prepared animation bytes mirror source."""
++    def _normalize_source_only_files(self) -> None:
++        """Keep canonical animation metadata bound to the single assets/source tree."""
+         updates = []
+         with self.connect() as connection:
+             rows = [dict(row) for row in connection.execute(
+                 "SELECT id,source_path,prepared_path,sha256,source_sha256 FROM animation_clips"
+             )]
+             for row in rows:
+-                source = self.root / str(row.get("source_path") or "")
+-                prepared = self.root / str(row.get("prepared_path") or "")
+-                if not source.is_file():
++                canonical = str(row.get("source_path") or row.get("prepared_path") or "").replace("\\", "/")
++                canonical = canonical.replace("assets/prepared/", "assets/source/")
++                source = self.root / canonical
++                if not canonical or not source.is_file():
+                     continue
+-                source_sha = self._sha256(source)
+-                prepared_sha = self._sha256(prepared) if prepared.is_file() else ""
+-                if prepared_sha != source_sha:
+-                    prepared.parent.mkdir(parents=True, exist_ok=True)
+-                    shutil.copy2(source, prepared)
+-                if str(row.get("sha256") or "") != source_sha or str(row.get("source_sha256") or "") != source_sha:
+-                    updates.append((source_sha, source_sha, _now(), str(row["id"])))
++                digest = self._sha256(source)
++                if (
++                    str(row.get("source_path") or "") != canonical
++                    or str(row.get("prepared_path") or "") != canonical
++                    or str(row.get("sha256") or "") != digest
++                    or str(row.get("source_sha256") or "") != digest
++                ):
++                    updates.append((canonical, canonical, digest, digest, _now(), str(row["id"])))
+             if updates:
+                 connection.executemany(
+-                    "UPDATE animation_clips SET sha256=?,source_sha256=?,updated_at=? WHERE id=?",
++                    "UPDATE animation_clips SET source_path=?,prepared_path=?,sha256=?,source_sha256=?,updated_at=? WHERE id=?",
+                     updates,
+                 )
+ 
+@@ -223,7 +225,7 @@ class AnimationStorageMixin:
+         self.export()
+ 
+     def _is_managed_animation_path(self, path: Path) -> bool:
+-        for root in (self.root / "assets/source/characters", self.root / "assets/prepared/characters"):
++        for root in (self.root / "assets/source/characters",):
+             try:
+                 path.relative_to(root.resolve())
+                 return True
+@@ -244,7 +246,8 @@ class AnimationStorageMixin:
+             relative = Path("characters") / race / gender / character_id / "animations" / "base" / f"{stem}{suffix}"
+         else:
+             relative = Path("characters") / race / gender / character_id / "animations" / "weapons" / weapon_set / f"{stem}{suffix}"
+-        return self.root / "assets/source" / relative, self.root / "assets/prepared" / relative
++        canonical = self.root / "assets/source" / relative
++        return canonical, canonical
+ 
+     def _register_source(self, connection, character: dict, source: Path, binding: dict, now: float) -> tuple[str, dict]:
+         character_id = str(character.get("id") or "")
+@@ -252,7 +255,6 @@ class AnimationStorageMixin:
+         binding_id = _binding_id(character_id, binding["scope"], binding["weaponSet"], binding["slot"], int(binding["variant"]))
+         source_path, prepared_path = self._canonical_paths(character, binding, source.suffix.lower())
+         source_path.parent.mkdir(parents=True, exist_ok=True)
+-        prepared_path.parent.mkdir(parents=True, exist_ok=True)
+         source_sha = self._sha256(source)
+         old = connection.execute("SELECT * FROM animation_clips WHERE id=?", (clip_id,)).fetchone()
+         old_dict = dict(old) if old else None
+@@ -260,9 +262,8 @@ class AnimationStorageMixin:
+         same_source = bool(old_dict and previous_source_sha == source_sha)
+         if not same_source or not source_path.is_file():
+             shutil.copy2(source, source_path)
+-        if not same_source or not prepared_path.is_file():
+-            shutil.copy2(source_path, prepared_path)
+-        prepared_sha = self._sha256(prepared_path)
++        prepared_sha = self._sha256(source_path)
++        source_sha = prepared_sha
+ 
+         relative_source = source_path.relative_to(self.root).as_posix()
+         relative_prepared = prepared_path.relative_to(self.root).as_posix()
+@@ -495,7 +496,7 @@ class AnimationStorageMixin:
+ 
+ 
+     def set_duplicate_first_frame(self, clip_id: str, enabled: bool) -> dict:
+-        # Runtime presentation flag only. Never mutate source/prepared animation
++        # Runtime presentation flag only. Never mutate canonical animation
+         # bytes, publication checksum, revision, or permanent Roblox asset id.
+         with self.connect() as connection:
+             raw = connection.execute("SELECT character_id FROM animation_clips WHERE id=?", (clip_id,)).fetchone()
+diff --git a/system/control-center/character_core/identity.py b/system/control-center/character_core/identity.py
+index f862965..1bc13d9 100644
+--- a/system/control-center/character_core/identity.py
++++ b/system/control-center/character_core/identity.py
+@@ -129,7 +129,7 @@ class CharacterIdentityService:
+             display_name = f"{race.title()} {gender.title()}"
+ 
+         source_root = self.root / "assets/source/characters"
+-        prepared_root = self.root / "assets/prepared/characters"
++        prepared_root = source_root
+         old_source = self._managed_file(str(old.get("source_path") or ""), source_root)
+         old_prepared = self._managed_file(str(old.get("prepared_path") or ""), prepared_root)
+         new_source = (
+@@ -137,7 +137,7 @@ class CharacterIdentityService:
+             if old_source else None
+         )
+         new_prepared = (
+-            self.root / "assets/prepared/characters" / race / gender / new_id / "model" / old_prepared.name
++            self.root / "assets/source/characters" / race / gender / new_id / "model" / old_prepared.name
+             if old_prepared else None
+         )
+ 
+@@ -183,7 +183,7 @@ class CharacterIdentityService:
+             source_relative = self._animation_relative(race, gender, new_id, row, source_suffix)
+             prepared_relative = self._animation_relative(race, gender, new_id, row, prepared_suffix)
+             target_source = self.root / "assets/source" / source_relative
+-            target_prepared = self.root / "assets/prepared" / prepared_relative
++            target_prepared = self.root / "assets/source" / prepared_relative
+             if old_animation_source:
+                 moves.append((old_animation_source, target_source))
+             if old_animation_prepared:
+diff --git a/system/control-center/character_store.py b/system/control-center/character_store.py
+index 37e0d7a..051055c 100644
+--- a/system/control-center/character_store.py
++++ b/system/control-center/character_store.py
+@@ -335,48 +335,42 @@ class CharacterStore:
+                 raise ValueError(f"select a valid character FBX: {source_file}")
+ 
+             relative = Path("characters") / race / gender / character_id / "model" / source_file.name
+-            source_target = self.root / "assets" / "source" / relative
+-            prepared_target = self.root / "assets" / "prepared" / relative
+-            source_digest = hashlib.sha256(source_file.read_bytes()).hexdigest()
++            canonical_target = self.root / "assets" / "source" / relative
+ 
+             with tempfile.TemporaryDirectory(prefix="game1-character-prepare-") as tmp:
+-                prepared_candidate = Path(tmp) / source_file.name
+-                prepare_character_fbx(self.root, source_file, prepared_candidate)
+-                analysis = analyze_character_fbx(self.root, prepared_candidate)
+-                prepared_digest = hashlib.sha256(prepared_candidate.read_bytes()).hexdigest()
++                canonical_candidate = Path(tmp) / source_file.name
++                prepare_character_fbx(self.root, source_file, canonical_candidate)
++                analysis = analyze_character_fbx(self.root, canonical_candidate)
++                canonical_digest = hashlib.sha256(canonical_candidate.read_bytes()).hexdigest()
+ 
+                 revision_stamp = time.strftime("%Y%m%dT%H%M%S", time.gmtime())
+-                for label, destination, incoming, digest in (
+-                    ("source", source_target, source_file, source_digest),
+-                    ("prepared", prepared_target, prepared_candidate, prepared_digest),
+-                ):
+-                    destination.parent.mkdir(parents=True, exist_ok=True)
+-                    if destination.exists():
+-                        existing = hashlib.sha256(destination.read_bytes()).hexdigest()
+-                        if existing != digest:
+-                            archive = (
+-                                self.root
+-                                / "assets"
+-                                / "reimported"
+-                                / "characters"
+-                                / race
+-                                / gender
+-                                / character_id
+-                                / revision_stamp
+-                                / label
+-                                / destination.name
+-                            )
+-                            archive.parent.mkdir(parents=True, exist_ok=True)
+-                            shutil.copy2(destination, archive)
+-                            destination.unlink()
+-                        else:
+-                            continue
+-                    shutil.copy2(incoming, destination)
+-                    created_files.append(destination)
+-
+-            source = source_target.relative_to(self.root).as_posix()
+-            prepared = prepared_target.relative_to(self.root).as_posix()
+-            sha = prepared_digest
++                canonical_target.parent.mkdir(parents=True, exist_ok=True)
++                if canonical_target.exists():
++                    existing = hashlib.sha256(canonical_target.read_bytes()).hexdigest()
++                    if existing != canonical_digest:
++                        archive = (
++                            self.root
++                            / "assets"
++                            / "reimported"
++                            / "characters"
++                            / race
++                            / gender
++                            / character_id
++                            / revision_stamp
++                            / "canonical"
++                            / canonical_target.name
++                        )
++                        archive.parent.mkdir(parents=True, exist_ok=True)
++                        shutil.copy2(canonical_target, archive)
++                        canonical_target.unlink()
++                if not canonical_target.exists():
++                    shutil.copy2(canonical_candidate, canonical_target)
++                    created_files.append(canonical_target)
++
++            canonical = canonical_target.relative_to(self.root).as_posix()
++            source = canonical
++            prepared = canonical
++            sha = canonical_digest
+ 
+         replacement_pending = int(old.get("model_replacement_pending") or 0) if old else 0
+         force_replacement = bool(data.get("forceReplacement"))
+@@ -457,15 +451,14 @@ class CharacterStore:
+         if target_id == source_id:
+             return target
+ 
+-        source_path = self.root / str(source.get("source_path") or "")
+-        prepared_path = self.root / str(source.get("prepared_path") or "")
+-        if not source_path.is_file() or not prepared_path.is_file():
+-            raise ValueError("selected registered model is missing its canonical source/prepared files")
++        canonical_path = self.root / str(source.get("prepared_path") or source.get("source_path") or "")
++        if not canonical_path.is_file():
++            raise ValueError("selected registered model is missing its canonical source file")
+ 
+         race = str(target.get("race") or "")
+         gender = str(target.get("gender") or "")
+-        target_source = self.root / "assets/source/characters" / race / gender / target_id / "model" / source_path.name
+-        target_prepared = self.root / "assets/prepared/characters" / race / gender / target_id / "model" / prepared_path.name
++        target_source = self.root / "assets/source/characters" / race / gender / target_id / "model" / canonical_path.name
++        target_prepared = target_source
+         revision_stamp = time.strftime("%Y%m%dT%H%M%S", time.gmtime())
+ 
+         def archive_old(stored_path: str, label: str):
+@@ -475,7 +468,7 @@ class CharacterStore:
+             old_path = (self.root / value).resolve()
+             if not old_path.is_file():
+                 return
+-            if old_path in {source_path.resolve(), prepared_path.resolve()}:
++            if old_path == canonical_path.resolve():
+                 return
+             archive = (
+                 self.root
+@@ -492,16 +485,18 @@ class CharacterStore:
+             if not archive.exists():
+                 shutil.copy2(old_path, archive)
+ 
+-        archive_old(str(target.get("source_path") or ""), "source")
+-        archive_old(str(target.get("prepared_path") or ""), "prepared")
+-
+-        for incoming, destination in ((source_path, target_source), (prepared_path, target_prepared)):
+-            destination.parent.mkdir(parents=True, exist_ok=True)
+-            if incoming.resolve() == destination.resolve():
+-                continue
+-            if destination.exists():
+-                incoming_sha = hashlib.sha256(incoming.read_bytes()).hexdigest()
+-                destination_sha = hashlib.sha256(destination.read_bytes()).hexdigest()
++        archived_paths = set()
++        for stored_path in (str(target.get("source_path") or ""), str(target.get("prepared_path") or "")):
++            normalized = stored_path.replace("\\", "/")
++            if normalized and normalized not in archived_paths:
++                archive_old(stored_path, "canonical")
++                archived_paths.add(normalized)
++
++        target_source.parent.mkdir(parents=True, exist_ok=True)
++        if canonical_path.resolve() != target_source.resolve():
++            if target_source.exists():
++                incoming_sha = hashlib.sha256(canonical_path.read_bytes()).hexdigest()
++                destination_sha = hashlib.sha256(target_source.read_bytes()).hexdigest()
+                 if incoming_sha != destination_sha:
+                     archive = (
+                         self.root
+@@ -512,11 +507,11 @@ class CharacterStore:
+                         / revision_stamp
+                         / "model-reassignment"
+                         / "replaced"
+-                        / destination.name
++                        / target_source.name
+                     )
+                     archive.parent.mkdir(parents=True, exist_ok=True)
+-                    shutil.copy2(destination, archive)
+-            shutil.copy2(incoming, destination)
++                    shutil.copy2(target_source, archive)
++            shutil.copy2(canonical_path, target_source)
+ 
+         now = time.time()
+         target_asset_id = str(target.get("model_asset_id") or "").strip()
+@@ -564,14 +559,14 @@ class CharacterStore:
+                 (target_id, source_id, "", now),
+             )
+ 
+-        for stored_path, replacement in (
+-            (str(target.get("source_path") or ""), target_source),
+-            (str(target.get("prepared_path") or ""), target_prepared),
+-        ):
+-            if not stored_path:
++        cleaned_paths = set()
++        for stored_path in (str(target.get("source_path") or ""), str(target.get("prepared_path") or "")):
++            normalized = stored_path.replace("\\", "/")
++            if not normalized or normalized in cleaned_paths:
+                 continue
++            cleaned_paths.add(normalized)
+             old_path = (self.root / stored_path).resolve()
+-            if old_path == replacement.resolve() or old_path in {source_path.resolve(), prepared_path.resolve()}:
++            if old_path == target_source.resolve() or old_path == canonical_path.resolve():
+                 continue
+             try:
+                 old_path.unlink(missing_ok=True)
+@@ -586,9 +581,9 @@ class CharacterStore:
+         row = self.get(character_id)
+         if not row:
+             raise ValueError(f"unknown character archetype: {character_id}")
+-        prepared = self.root / str(row.get("prepared_path") or "")
++        prepared = self.root / str(row.get("prepared_path") or row.get("source_path") or "")
+         if not prepared.is_file():
+-            raise ValueError("canonical prepared FBX is missing; re-register the model")
++            raise ValueError("canonical character FBX is missing; re-register the model")
+ 
+         api_key = str(publication.get("apiKey") or "").strip()
+         creator_type = str(publication.get("creatorType") or "").strip().lower()
+diff --git a/system/control-center/host_agent.py b/system/control-center/host_agent.py
+index 9b6eba7..de1e953 100644
+--- a/system/control-center/host_agent.py
++++ b/system/control-center/host_agent.py
+@@ -43,6 +43,9 @@ from deco_layout_store import DecoLayoutStore
+ from studio_save import request_active_studio_save
+ from character_core.identity import CharacterIdentityService
+ from studio_bridge import run_model_load_bridge, run_monster_spawn_bridge, run_timeline_editor_bridge, run_location_authoring_bridge
++from source_only_assets import migrate_source_only_assets
++
++migrate_source_only_assets(ROOT, ROOT / ".control-center" / "game1.db")
+ 
+ control_agent_build = "game1-m50-environment-weapon-bounce-001"
+ port = int(os.environ.get("CONTROL_AGENT_PORT", "43821"))
+diff --git a/system/control-center/location_asset_source_only_migration.py b/system/control-center/location_asset_source_only_migration.py
+deleted file mode 100644
+index 5a7af60..0000000
+--- a/system/control-center/location_asset_source_only_migration.py
++++ /dev/null
+@@ -1,248 +0,0 @@
+-from __future__ import annotations
+-
+-from datetime import datetime, timezone
+-from pathlib import Path
+-import hashlib
+-import json
+-import shutil
+-import sqlite3
+-
+-MIGRATION_ID = "location-assets-source-only-v1"
+-LEGACY_PREFIX = "assets/prepared/location-assets/"
+-SOURCE_PREFIX = "assets/source/location-assets/"
+-
+-
+-def _sha256(path: Path) -> str:
+-    digest = hashlib.sha256()
+-    with path.open("rb") as stream:
+-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+-            digest.update(chunk)
+-    return digest.hexdigest()
+-
+-
+-def _utc_stamp() -> str:
+-    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+-
+-
+-def _canonical_path(source_value: object, prepared_value: object) -> str:
+-    source = str(source_value or "").strip().replace("\\", "/")
+-    prepared = str(prepared_value or "").strip().replace("\\", "/")
+-    value = source or prepared
+-    if not value:
+-        return ""
+-    if value.startswith(LEGACY_PREFIX):
+-        value = SOURCE_PREFIX + value[len(LEGACY_PREFIX):]
+-    if not value.startswith(SOURCE_PREFIX):
+-        raise RuntimeError(f"Location Asset path is outside canonical source storage: {value}")
+-    return value
+-
+-
+-def _plan_file_migration(root: Path) -> list[tuple[Path, Path, str]]:
+-    legacy_root = root / "assets/prepared/location-assets"
+-    source_root = root / "assets/source/location-assets"
+-    if not legacy_root.exists():
+-        return []
+-
+-    actions: list[tuple[Path, Path, str]] = []
+-    conflicts: list[str] = []
+-    for old in sorted((path for path in legacy_root.rglob("*") if path.is_file()), key=lambda path: path.as_posix().casefold()):
+-        relative = old.relative_to(legacy_root)
+-        new = source_root / relative
+-        if new.exists():
+-            if not new.is_file():
+-                conflicts.append(f"destination is not a file: {new.relative_to(root).as_posix()}")
+-            elif _sha256(old) != _sha256(new):
+-                conflicts.append(f"different bytes at canonical path: {relative.as_posix()}")
+-            else:
+-                actions.append((old, new, "dedupe"))
+-        else:
+-            actions.append((old, new, "move"))
+-    if conflicts:
+-        raise RuntimeError("Location Asset source-only migration aborted before changes:\n- " + "\n- ".join(conflicts))
+-    return actions
+-
+-
+-def _table_columns(connection: sqlite3.Connection) -> set[str]:
+-    exists = connection.execute(
+-        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='location_assets'"
+-    ).fetchone()
+-    if not exists:
+-        return set()
+-    return {str(row[1]) for row in connection.execute("PRAGMA table_info(location_assets)").fetchall()}
+-
+-
+-def _needs_db_migration(db: Path) -> bool:
+-    if not db.is_file():
+-        return False
+-    with sqlite3.connect(db) as connection:
+-        columns = _table_columns(connection)
+-    if not columns:
+-        return False
+-    if {"model_path", "texture_path"}.issubset(columns):
+-        return False
+-    legacy = {"model_source_path", "model_prepared_path", "texture_source_path", "texture_prepared_path"}
+-    if legacy.intersection(columns):
+-        return True
+-    raise RuntimeError("Location Asset database uses an unknown storage schema; migration stopped without changes.")
+-
+-
+-def _value(row: sqlite3.Row, columns: set[str], name: str, default=None):
+-    return row[name] if name in columns else default
+-
+-
+-def _migrate_database(db: Path) -> int:
+-    if not db.is_file():
+-        return 0
+-    connection = sqlite3.connect(db)
+-    connection.row_factory = sqlite3.Row
+-    try:
+-        columns = _table_columns(connection)
+-        if not columns or {"model_path", "texture_path"}.issubset(columns):
+-            return 0
+-        legacy = {"model_source_path", "model_prepared_path", "texture_source_path", "texture_prepared_path"}
+-        if not legacy.intersection(columns):
+-            raise RuntimeError("Location Asset database cannot be migrated: legacy path columns are missing.")
+-
+-        rows = connection.execute("SELECT * FROM location_assets ORDER BY slug").fetchall()
+-        with connection:
+-            connection.execute("DROP TABLE IF EXISTS location_assets_source_only_v4")
+-            connection.execute(
+-                """CREATE TABLE location_assets_source_only_v4(
+-                    slug TEXT PRIMARY KEY,
+-                    name_en TEXT NOT NULL,
+-                    category TEXT NOT NULL,
+-                    model_path TEXT NOT NULL DEFAULT '',
+-                    model_sha256 TEXT NOT NULL DEFAULT '',
+-                    model_asset_id TEXT,
+-                    model_published_sha256 TEXT NOT NULL DEFAULT '',
+-                    model_moderation_state TEXT NOT NULL DEFAULT '',
+-                    texture_path TEXT NOT NULL DEFAULT '',
+-                    texture_sha256 TEXT NOT NULL DEFAULT '',
+-                    texture_asset_id TEXT,
+-                    texture_published_sha256 TEXT NOT NULL DEFAULT '',
+-                    texture_moderation_state TEXT NOT NULL DEFAULT '',
+-                    texture_reference_slug TEXT NOT NULL DEFAULT '',
+-                    destructible INTEGER NOT NULL DEFAULT 0,
+-                    revision INTEGER NOT NULL DEFAULT 1,
+-                    created_at REAL NOT NULL,
+-                    updated_at REAL NOT NULL,
+-                    published_at REAL
+-                )"""
+-            )
+-            for row in rows:
+-                connection.execute(
+-                    """INSERT INTO location_assets_source_only_v4(
+-                        slug,name_en,category,
+-                        model_path,model_sha256,model_asset_id,model_published_sha256,model_moderation_state,
+-                        texture_path,texture_sha256,texture_asset_id,texture_published_sha256,texture_moderation_state,
+-                        texture_reference_slug,destructible,revision,created_at,updated_at,published_at
+-                    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+-                    (
+-                        str(_value(row, columns, "slug", "")),
+-                        str(_value(row, columns, "name_en", "")),
+-                        str(_value(row, columns, "category", "")),
+-                        _canonical_path(
+-                            _value(row, columns, "model_source_path", ""),
+-                            _value(row, columns, "model_prepared_path", ""),
+-                        ),
+-                        str(_value(row, columns, "model_sha256", "")),
+-                        _value(row, columns, "model_asset_id"),
+-                        str(_value(row, columns, "model_published_sha256", "")),
+-                        str(_value(row, columns, "model_moderation_state", "")),
+-                        _canonical_path(
+-                            _value(row, columns, "texture_source_path", ""),
+-                            _value(row, columns, "texture_prepared_path", ""),
+-                        ),
+-                        str(_value(row, columns, "texture_sha256", "")),
+-                        _value(row, columns, "texture_asset_id"),
+-                        str(_value(row, columns, "texture_published_sha256", "")),
+-                        str(_value(row, columns, "texture_moderation_state", "")),
+-                        str(_value(row, columns, "texture_reference_slug", "")),
+-                        int(_value(row, columns, "destructible", 0) or 0),
+-                        int(_value(row, columns, "revision", 1) or 1),
+-                        float(_value(row, columns, "created_at", 0) or 0),
+-                        float(_value(row, columns, "updated_at", 0) or 0),
+-                        _value(row, columns, "published_at"),
+-                    ),
+-                )
+-            connection.execute("DROP TABLE location_assets")
+-            connection.execute("ALTER TABLE location_assets_source_only_v4 RENAME TO location_assets")
+-        return len(rows)
+-    finally:
+-        connection.close()
+-
+-
+-def _remove_empty_legacy_tree(root: Path) -> None:
+-    legacy_root = root / "assets/prepared/location-assets"
+-    if not legacy_root.exists():
+-        return
+-    for path in sorted(legacy_root.rglob("*"), key=lambda item: len(item.parts), reverse=True):
+-        if path.is_dir():
+-            try:
+-                path.rmdir()
+-            except OSError:
+-                pass
+-    try:
+-        legacy_root.rmdir()
+-    except OSError:
+-        pass
+-
+-
+-def migrate_location_assets_source_only(root: Path, db: Path) -> dict:
+-    root = root.resolve()
+-    db = db.resolve()
+-    actions = _plan_file_migration(root)
+-    db_migration = _needs_db_migration(db)
+-    if not actions and not db_migration:
+-        return {"migration": MIGRATION_ID, "changed": False, "migratedRows": 0, "moved": 0, "deduped": 0}
+-
+-    stamp = _utc_stamp()
+-    backup_root = root / "assets/reimported/location-assets/source-only-migration" / stamp
+-    db_backup = backup_root / "game1.db.before"
+-    if db.is_file():
+-        backup_root.mkdir(parents=True, exist_ok=True)
+-        shutil.copy2(db, db_backup)
+-
+-    applied: list[tuple[Path, Path, str]] = []
+-    try:
+-        for old, new, mode in actions:
+-            new.parent.mkdir(parents=True, exist_ok=True)
+-            if mode == "move":
+-                shutil.move(str(old), str(new))
+-            else:
+-                old.unlink()
+-            applied.append((old, new, mode))
+-
+-        migrated_rows = _migrate_database(db) if db_migration else 0
+-        _remove_empty_legacy_tree(root)
+-
+-        report = {
+-            "schemaVersion": 1,
+-            "project": "game1",
+-            "migration": MIGRATION_ID,
+-            "completedAtUtc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+-            "changed": True,
+-            "migratedRows": migrated_rows,
+-            "movedPreparedOnlyFiles": sum(1 for _old, _new, mode in applied if mode == "move"),
+-            "removedIdentityDuplicates": sum(1 for _old, _new, mode in applied if mode == "dedupe"),
+-            "backupPath": db_backup.relative_to(root).as_posix() if db_backup.is_file() else "",
+-        }
+-        reports = root / "assets/reports"
+-        reports.mkdir(parents=True, exist_ok=True)
+-        (reports / f"location-assets-source-only-migration-{stamp}.json").write_text(
+-            json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+-        )
+-        return report
+-    except Exception:
+-        for old, new, mode in reversed(applied):
+-            try:
+-                old.parent.mkdir(parents=True, exist_ok=True)
+-                if mode == "move" and new.is_file() and not old.exists():
+-                    shutil.move(str(new), str(old))
+-                elif mode == "dedupe" and new.is_file() and not old.exists():
+-                    shutil.copy2(new, old)
+-            except Exception:
+-                pass
+-        if db_backup.is_file():
+-            shutil.copy2(db_backup, db)
+-        raise
+diff --git a/system/control-center/location_asset_store.py b/system/control-center/location_asset_store.py
+index 28650d9..10c3ddc 100644
+--- a/system/control-center/location_asset_store.py
++++ b/system/control-center/location_asset_store.py
+@@ -8,8 +8,6 @@ import shutil
+ import sqlite3
+ import time
+ 
+-from location_asset_source_only_migration import migrate_location_assets_source_only
+-
+ from opencloud_assets import (
+     create_image_asset,
+     create_model_asset,
+@@ -66,7 +64,6 @@ class LocationAssetStore:
+         self.runtime = self.root / ".control-center"
+         self.runtime.mkdir(parents=True, exist_ok=True)
+         self.db = self.runtime / "game1.db"
+-        migrate_location_assets_source_only(self.root, self.db)
+         self._init()
+         self.export()
+ 
+diff --git a/system/control-center/migrate.py b/system/control-center/migrate.py
+index 2391494..698364a 100644
+--- a/system/control-center/migrate.py
++++ b/system/control-center/migrate.py
+@@ -9,7 +9,9 @@ from weapon_store import WeaponStore
+ from monster_store import MonsterStore
+ from monster_animation_store import MonsterAnimationStore
+ from location_asset_store import LocationAssetStore
++from source_only_assets import migrate_source_only_assets
+ 
++source_only_report = migrate_source_only_assets(ROOT, ROOT / ".control-center" / "game1.db")
+ characters = CharacterStore(ROOT)
+ animations = AnimationStore(ROOT)
+ weapons = WeaponStore(ROOT)
+@@ -20,6 +22,11 @@ character_snapshot = characters.snapshot()
+ animation_snapshot = animations.snapshot(character_snapshot.get("activeArchetypeId"))
+ weapon_snapshot = weapons.snapshot()
+ print("game1 data migrated")
++if source_only_report:
++    print("asset storage: source-only migration applied")
++    print("source-only backup:", source_only_report["backupPath"])
++else:
++    print("asset storage: source-only")
+ print("character schema:", character_snapshot["schemaVersion"])
+ print("registered characters:", len(character_snapshot["items"]))
+ print("active character:", character_snapshot["activeArchetypeId"] or "none")
+diff --git a/system/control-center/monster_animation_store.py b/system/control-center/monster_animation_store.py
+index 1280198..4e68dc6 100644
+--- a/system/control-center/monster_animation_store.py
++++ b/system/control-center/monster_animation_store.py
+@@ -193,30 +193,32 @@ class MonsterAnimationStore:
+                     "ALTER TABLE monster_animation_bindings ADD COLUMN playback_speed_percent INTEGER NOT NULL DEFAULT 100"
+                 )
+             self._migrate_combat_idle(connection)
+-        self._restore_prepared_files()
++        self._normalize_source_only_files()
+ 
+-    def _restore_prepared_files(self) -> None:
+-        """Undo legacy physical seam transforms; prepared animation bytes mirror source."""
++    def _normalize_source_only_files(self) -> None:
++        """Keep canonical monster animation metadata bound to assets/source only."""
+         updates = []
+         with self.connect() as connection:
+             rows = [dict(row) for row in connection.execute(
+                 "SELECT id,source_path,prepared_path,sha256,source_sha256 FROM monster_animation_clips"
+             )]
+             for row in rows:
+-                source = self.root / str(row.get("source_path") or "")
+-                prepared = self.root / str(row.get("prepared_path") or "")
+-                if not source.is_file():
++                canonical = str(row.get("source_path") or row.get("prepared_path") or "").replace("\\", "/")
++                canonical = canonical.replace("assets/prepared/", "assets/source/")
++                source = self.root / canonical
++                if not canonical or not source.is_file():
+                     continue
+-                source_sha = self._sha256(source)
+-                prepared_sha = self._sha256(prepared) if prepared.is_file() else ""
+-                if prepared_sha != source_sha:
+-                    prepared.parent.mkdir(parents=True, exist_ok=True)
+-                    shutil.copy2(source, prepared)
+-                if str(row.get("sha256") or "") != source_sha or str(row.get("source_sha256") or "") != source_sha:
+-                    updates.append((source_sha, source_sha, time.time(), str(row["id"])))
++                digest = self._sha256(source)
++                if (
++                    str(row.get("source_path") or "") != canonical
++                    or str(row.get("prepared_path") or "") != canonical
++                    or str(row.get("sha256") or "") != digest
++                    or str(row.get("source_sha256") or "") != digest
++                ):
++                    updates.append((canonical, canonical, digest, digest, time.time(), str(row["id"])))
+             if updates:
+                 connection.executemany(
+-                    "UPDATE monster_animation_clips SET sha256=?,source_sha256=?,updated_at=? WHERE id=?",
++                    "UPDATE monster_animation_clips SET source_path=?,prepared_path=?,sha256=?,source_sha256=?,updated_at=? WHERE id=?",
+                     updates,
+                 )
+ 
+@@ -310,7 +312,7 @@ class MonsterAnimationStore:
+         self.export()
+ 
+     def _managed(self, path: Path) -> bool:
+-        for root in (self.root / "assets/source/monsters", self.root / "assets/prepared/monsters"):
++        for root in (self.root / "assets/source/monsters",):
+             try:
+                 path.relative_to(root.resolve())
+                 return True
+@@ -327,9 +329,8 @@ class MonsterAnimationStore:
+         binding_id = "binding__" + clip_id
+         relative = Path("monsters") / slug / "animations" / f"{stem}{source.suffix.lower()}"
+         source_target = self.root / "assets/source" / relative
+-        prepared_target = self.root / "assets/prepared" / relative
++        prepared_target = source_target
+         source_target.parent.mkdir(parents=True, exist_ok=True)
+-        prepared_target.parent.mkdir(parents=True, exist_ok=True)
+         source_sha = self._sha256(source)
+         old = connection.execute("SELECT * FROM monster_animation_clips WHERE id=?", (clip_id,)).fetchone()
+         old_dict = dict(old) if old else None
+@@ -337,9 +338,8 @@ class MonsterAnimationStore:
+         same_source = bool(old_dict and previous_source_sha == source_sha)
+         if not same_source or not source_target.is_file():
+             shutil.copy2(source, source_target)
+-        if not same_source or not prepared_target.is_file():
+-            shutil.copy2(source_target, prepared_target)
+-        digest = self._sha256(prepared_target)
++        digest = self._sha256(source_target)
++        source_sha = digest
+         if old_dict is None:
+             connection.execute(
+                 """INSERT INTO monster_animation_clips(id,monster_slug,name,source_path,prepared_path,sha256,source_sha256,duplicate_first_frame_at_end,asset_id,published_sha256,moderation_state,revision,created_at,updated_at,content_updated_at,published_at)
+@@ -489,7 +489,7 @@ class MonsterAnimationStore:
+ 
+ 
+     def set_duplicate_first_frame(self, clip_id: str, enabled: bool) -> dict:
+-        # Runtime presentation flag only. Never mutate source/prepared animation
++        # Runtime presentation flag only. Never mutate canonical animation
+         # bytes, publication checksum, revision, or permanent Roblox asset id.
+         with self.connect() as connection:
+             raw = connection.execute("SELECT monster_slug FROM monster_animation_clips WHERE id=?", (clip_id,)).fetchone()
+@@ -533,7 +533,7 @@ class MonsterAnimationStore:
+         if not raw:
+             raise ValueError(f"unknown monster animation clip: {clip_id}")
+         row = dict(raw)
+-        path = self.root / str(row.get("prepared_path") or "")
++        path = self.root / str(row.get("prepared_path") or row.get("source_path") or "")
+         if not path.is_file():
+             raise ValueError("registered monster animation file is missing")
+         asset_id = str(row.get("asset_id") or "").strip()
+diff --git a/system/control-center/monster_store.py b/system/control-center/monster_store.py
+index ca7348e..2066560 100644
+--- a/system/control-center/monster_store.py
++++ b/system/control-center/monster_store.py
+@@ -294,15 +294,14 @@ class MonsterStore:
+                 raise ValueError("monster model must be an FBX file")
+             analysis = analyze_character_fbx(self.root, source)
+             source_target = self.root / "assets/source/monsters" / slug / "model" / f"{slug}.fbx"
+-            prepared_target = self.root / "assets/prepared/monsters" / slug / "model" / f"{slug}.fbx"
+-            for target in (source_target, prepared_target):
+-                target.parent.mkdir(parents=True, exist_ok=True)
+-                if old:
+-                    self._archive_existing(target, slug, int(old.get("revision") or 1))
+-                shutil.copy2(source, target)
+-            model_source_path = source_target.relative_to(self.root).as_posix()
+-            model_prepared_path = prepared_target.relative_to(self.root).as_posix()
+-            model_sha256 = self._sha256(prepared_target)
++            source_target.parent.mkdir(parents=True, exist_ok=True)
++            if old:
++                self._archive_existing(source_target, slug, int(old.get("revision") or 1))
++            shutil.copy2(source, source_target)
++            canonical_path = source_target.relative_to(self.root).as_posix()
++            model_source_path = canonical_path
++            model_prepared_path = canonical_path
++            model_sha256 = self._sha256(source_target)
+ 
+         with self.connect() as connection:
+             connection.execute(
+@@ -341,12 +340,11 @@ class MonsterStore:
+                 previous = connection.execute("SELECT * FROM monster_textures WHERE id=?", (texture_id,)).fetchone()
+                 canonical_name = f"{slot}{source.suffix.lower()}"
+                 source_target = self.root / "assets/source/monsters" / slug / "textures" / canonical_name
+-                prepared_target = self.root / "assets/prepared/monsters" / slug / "textures" / canonical_name
+                 source_target.parent.mkdir(parents=True, exist_ok=True)
+-                prepared_target.parent.mkdir(parents=True, exist_ok=True)
++                if previous:
++                    self._archive_existing(source_target, slug, int(previous.get("revision") or 1))
+                 shutil.copy2(source, source_target)
+-                shutil.copy2(source, prepared_target)
+-                digest = self._sha256(prepared_target)
++                digest = self._sha256(source_target)
+                 texture_revision = int(previous["revision"] or 0) + 1 if previous else 1
+                 connection.execute(
+                     """INSERT OR REPLACE INTO monster_textures(
+@@ -355,7 +353,7 @@ class MonsterStore:
+                     ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                     (
+                         texture_id, slug, slot, source_target.relative_to(self.root).as_posix(),
+-                        prepared_target.relative_to(self.root).as_posix(), digest,
++                        source_target.relative_to(self.root).as_posix(), digest,
+                         previous["asset_id"] if previous else None,
+                         str(previous["published_sha256"] or "") if previous else "",
+                         str(previous["moderation_state"] or "") if previous else "",
+@@ -371,9 +369,9 @@ class MonsterStore:
+         row = self.get(slug)
+         if not row:
+             raise ValueError(f"unknown monster: {slug}")
+-        model = self.root / str(row.get("model_prepared_path") or "")
++        model = self.root / str(row.get("model_prepared_path") or row.get("model_source_path") or "")
+         if not model.is_file():
+-            raise ValueError("canonical prepared monster FBX is missing")
++            raise ValueError("canonical monster FBX is missing")
+         api_key = str(credentials.get("apiKey") or "")
+         creator_type = str(credentials.get("creatorType") or "")
+         creator_id = str(credentials.get("creatorId") or "")
+@@ -414,7 +412,7 @@ class MonsterStore:
+         for texture in row.get("textures") or []:
+             if str(texture.get("asset_id") or "") and str(texture.get("published_sha256") or "") == str(texture.get("sha256") or ""):
+                 continue
+-            file_path = self.root / str(texture.get("prepared_path") or "")
++            file_path = self.root / str(texture.get("prepared_path") or texture.get("source_path") or "")
+             texture_asset = str(texture.get("asset_id") or "").strip()
+             common = dict(
+                 display_name=f"{row['name_en']} {texture['slot']}", description=description,
+diff --git a/system/control-center/source_only_assets.py b/system/control-center/source_only_assets.py
+new file mode 100644
+index 0000000..7c8cea4
+--- /dev/null
++++ b/system/control-center/source_only_assets.py
+@@ -0,0 +1,281 @@
++from __future__ import annotations
++
++from datetime import datetime, timezone
++from pathlib import Path
++import hashlib
++import json
++import shutil
++import sqlite3
++
++IGNORE = {".gitkeep", "desktop.ini"}
++PATH_COLUMNS = (
++    ("characters", "source_path", "sha256"),
++    ("characters", "prepared_path", "sha256"),
++    ("animation_clips", "source_path", "source_sha256"),
++    ("animation_clips", "prepared_path", "sha256"),
++    ("weapons", "model_source_path", "model_sha256"),
++    ("weapons", "model_prepared_path", "model_sha256"),
++    ("weapon_textures", "source_path", "sha256"),
++    ("weapon_textures", "prepared_path", "sha256"),
++    ("monsters", "model_source_path", "model_sha256"),
++    ("monsters", "model_prepared_path", "model_sha256"),
++    ("monster_textures", "source_path", "sha256"),
++    ("monster_textures", "prepared_path", "sha256"),
++    ("monster_animation_clips", "source_path", "source_sha256"),
++    ("monster_animation_clips", "prepared_path", "sha256"),
++)
++REWRITE_COLUMNS = (
++    ("characters", "source_path"), ("characters", "prepared_path"),
++    ("animation_clips", "source_path"), ("animation_clips", "prepared_path"),
++    ("weapons", "model_source_path"), ("weapons", "model_prepared_path"),
++    ("weapon_textures", "source_path"), ("weapon_textures", "prepared_path"),
++    ("monsters", "model_source_path"), ("monsters", "model_prepared_path"),
++    ("monster_textures", "source_path"), ("monster_textures", "prepared_path"),
++    ("monster_animation_clips", "source_path"), ("monster_animation_clips", "prepared_path"),
++)
++
++
++def sha256(path: Path) -> str:
++    digest = hashlib.sha256()
++    with path.open("rb") as stream:
++        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
++            digest.update(chunk)
++    return digest.hexdigest()
++
++
++def _columns(connection: sqlite3.Connection, table: str) -> set[str]:
++    try:
++        return {str(row[1]) for row in connection.execute(f"PRAGMA table_info({table})")}
++    except sqlite3.DatabaseError:
++        return set()
++
++
++def _expected_hashes(connection: sqlite3.Connection) -> dict[str, set[str]]:
++    result: dict[str, set[str]] = {}
++    tables = {str(row[0]) for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
++    for table, path_column, hash_column in PATH_COLUMNS:
++        if table not in tables:
++            continue
++        columns = _columns(connection, table)
++        if path_column not in columns or hash_column not in columns:
++            continue
++        for path_value, digest in connection.execute(
++            f"SELECT {path_column},{hash_column} FROM {table} WHERE COALESCE({path_column},'')<>''"
++        ):
++            path_value = str(path_value or "").replace("\\", "/")
++            digest = str(digest or "").lower()
++            if path_value and digest:
++                result.setdefault(path_value, set()).add(digest)
++    return result
++
++
++def _rewrite_value(value):
++    if isinstance(value, str):
++        return value.replace("assets/prepared/", "assets/source/").replace("assets\\prepared\\", "assets\\source\\")
++    if isinstance(value, list):
++        return [_rewrite_value(item) for item in value]
++    if isinstance(value, dict):
++        return {key: _rewrite_value(item) for key, item in value.items()}
++    return value
++
++
++def _remove_tree(root: Path) -> None:
++    if not root.exists():
++        return
++    for path in sorted(root.rglob("*"), key=lambda item: len(item.parts), reverse=True):
++        if path.is_file():
++            path.unlink(missing_ok=True)
++        elif path.is_dir():
++            try:
++                path.rmdir()
++            except OSError:
++                pass
++    try:
++        root.rmdir()
++    except OSError:
++        pass
++
++
++def migrate_source_only_assets(project_root: Path, db_path: Path) -> dict | None:
++    project_root = project_root.resolve()
++    assets = project_root / "assets"
++    source_root = assets / "source"
++    prepared_root = assets / "prepared"
++    manifests = assets / "manifests"
++    reports = assets / "reports"
++
++    prepared_files = []
++    if prepared_root.exists():
++        prepared_files = sorted(
++            [p for p in prepared_root.rglob("*") if p.is_file() and p.name.lower() not in IGNORE],
++            key=lambda p: p.as_posix().casefold(),
++        )
++
++    legacy_db_paths = False
++    if db_path.is_file():
++        with sqlite3.connect(db_path) as connection:
++            tables = {str(row[0]) for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
++            for table, column in REWRITE_COLUMNS:
++                if table not in tables or column not in _columns(connection, table):
++                    continue
++                if connection.execute(
++                    f"SELECT 1 FROM {table} WHERE {column} LIKE 'assets/prepared/%' LIMIT 1"
++                ).fetchone():
++                    legacy_db_paths = True
++                    break
++
++    legacy_manifest_paths = False
++    if manifests.exists():
++        for path in manifests.glob("*.json"):
++            try:
++                text = path.read_text(encoding="utf-8")
++            except OSError:
++                continue
++            if "assets/prepared/" in text or "assets\\prepared\\" in text:
++                legacy_manifest_paths = True
++                break
++
++    if not prepared_files and not legacy_db_paths and not legacy_manifest_paths:
++        if prepared_root.exists():
++            _remove_tree(prepared_root)
++        return None
++
++    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
++    backup_root = assets / "reimported" / "source-only-migration" / stamp
++    backup_root.mkdir(parents=True, exist_ok=True)
++    if db_path.is_file():
++        shutil.copy2(db_path, backup_root / "game1.db.before")
++    if manifests.exists():
++        shutil.copytree(manifests, backup_root / "manifests-before", dirs_exist_ok=True)
++    if prepared_root.exists():
++        shutil.copytree(prepared_root, backup_root / "prepared-before", dirs_exist_ok=True)
++
++    expected: dict[str, set[str]] = {}
++    if db_path.is_file():
++        with sqlite3.connect(db_path) as connection:
++            expected = _expected_hashes(connection)
++
++    source_root.mkdir(parents=True, exist_ok=True)
++    moved = 0
++    deduped = 0
++    prepared_wins = 0
++    source_wins = 0
++    conflict_records: list[dict] = []
++    unresolved: list[str] = []
++
++    plan: list[tuple[Path, Path, str]] = []
++    for old in prepared_files:
++        relative = old.relative_to(prepared_root)
++        new = source_root / relative
++        if not new.exists():
++            plan.append((old, new, "move"))
++            continue
++        if not new.is_file():
++            unresolved.append(f"canonical destination is not a file: {relative.as_posix()}")
++            continue
++        old_sha = sha256(old)
++        new_sha = sha256(new)
++        if old_sha == new_sha:
++            plan.append((old, new, "dedupe"))
++            continue
++
++        old_key = old.relative_to(project_root).as_posix()
++        new_key = new.relative_to(project_root).as_posix()
++        old_expected = expected.get(old_key, set())
++        new_expected = expected.get(new_key, set())
++        old_active = old_sha in old_expected
++        new_active = new_sha in new_expected
++        any_reference = bool(old_expected or new_expected)
++
++        if old_active:
++            mode = "prepared-wins"
++        elif new_active:
++            mode = "source-wins"
++        elif any_reference:
++            unresolved.append(
++                f"active metadata does not match either copy: {relative.as_posix()}"
++            )
++            continue
++        else:
++            # An orphaned legacy conflict has no authority in active metadata.
++            # Preserve both in the migration backup and keep the canonical Source copy.
++            mode = "source-wins"
++        plan.append((old, new, mode))
++        conflict_records.append({
++            "path": relative.as_posix(),
++            "resolution": mode,
++            "sourceSha256": new_sha,
++            "preparedSha256": old_sha,
++            "referenced": any_reference,
++        })
++
++    if unresolved:
++        raise RuntimeError("Source-only migration aborted before changes:\n- " + "\n- ".join(unresolved))
++
++    for old, new, mode in plan:
++        new.parent.mkdir(parents=True, exist_ok=True)
++        if mode == "move":
++            shutil.move(str(old), str(new))
++            moved += 1
++        elif mode == "dedupe":
++            old.unlink(missing_ok=True)
++            deduped += 1
++        elif mode == "prepared-wins":
++            shutil.copy2(old, new)
++            old.unlink(missing_ok=True)
++            prepared_wins += 1
++        elif mode == "source-wins":
++            old.unlink(missing_ok=True)
++            source_wins += 1
++
++    if db_path.is_file():
++        with sqlite3.connect(db_path) as connection:
++            tables = {str(row[0]) for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
++            for table, column in REWRITE_COLUMNS:
++                if table not in tables or column not in _columns(connection, table):
++                    continue
++                connection.execute(
++                    f"UPDATE {table} SET {column}=REPLACE({column}, 'assets/prepared/', 'assets/source/') "
++                    f"WHERE {column} LIKE 'assets/prepared/%'"
++                )
++            for table in ("animation_clips", "monster_animation_clips"):
++                columns = _columns(connection, table)
++                if {"sha256", "source_sha256"}.issubset(columns):
++                    connection.execute(f"UPDATE {table} SET source_sha256=sha256")
++
++    rewritten_manifests = 0
++    if manifests.exists():
++        for path in manifests.glob("*.json"):
++            try:
++                before = json.loads(path.read_text(encoding="utf-8"))
++            except (OSError, json.JSONDecodeError):
++                continue
++            after = _rewrite_value(before)
++            if after != before:
++                path.write_text(json.dumps(after, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
++                rewritten_manifests += 1
++
++    _remove_tree(prepared_root)
++    if prepared_root.exists():
++        remaining = [p for p in prepared_root.rglob("*") if p.is_file()]
++        if remaining:
++            raise RuntimeError(f"assets/prepared still contains {len(remaining)} file(s) after migration")
++        _remove_tree(prepared_root)
++
++    reports.mkdir(parents=True, exist_ok=True)
++    report = {
++        "schemaVersion": 1,
++        "migration": "game1-source-only-assets-v1",
++        "completedAtUtc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
++        "movedPreparedOnlyFiles": moved,
++        "removedIdentityDuplicates": deduped,
++        "preparedWins": prepared_wins,
++        "sourceWins": source_wins,
++        "conflicts": conflict_records,
++        "rewrittenManifestFiles": rewritten_manifests,
++        "backupPath": backup_root.relative_to(project_root).as_posix(),
++    }
++    (reports / f"source-only-migration-{stamp}.json").write_text(
++        json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n"
++    )
++    return report
+diff --git a/system/control-center/static/character-assets.js b/system/control-center/static/character-assets.js
+index 41f212f..df8d298 100644
+--- a/system/control-center/static/character-assets.js
++++ b/system/control-center/static/character-assets.js
+@@ -56,7 +56,7 @@ function setForm(row){state.selected=row?.id||null;state.sourcePath='';state.aut
+ function renderRuntime(){const r=state.data.runtime;const host=$('runtime-state');if(r.mode==='registered'){host.className='runtime-state registered';host.innerHTML=`<strong>registered · ${esc(r.activeArchetypeId)}</strong><span>${esc(r.race)} / ${esc(r.gender)} · model asset ${esc(r.modelAssetId)}</span>`}else{host.className='runtime-state bootstrap';host.innerHTML=`<strong>bootstrap placeholder</strong><span>${esc(r.reason)}${r.activeArchetypeId?' · selected '+esc(r.activeArchetypeId):''}</span>`}const pub=state.data.publication||{};$('publication-state').className=pub.configured?'publication-ready':'publication-missing';$('publication-state').textContent=pub.configured?`open cloud: ${pub.creatorType} ${pub.creatorId}`:'open cloud: not configured'}
+ function renderTree(){const host=$('character-tree');host.innerHTML='';for(const item of state.data.items){const button=document.createElement('button');button.className=item.id===state.selected?'active':'';button.innerHTML=`<span>${esc(item.display_name||item.id)}<small>${esc(item.race||'?')} · ${esc(item.gender||'?')}</small></span><small>${esc(item.status)}</small>`;button.onclick=()=>setForm(item);host.appendChild(button)}if(!state.data.items.length)host.innerHTML='<small class="muted">no registered characters.</small>';$('rail-count').textContent=state.data.items.length}
+ function renderRows(){const body=$('rows');body.innerHTML='';for(const item of state.data.items){const active=state.data.activeArchetypeId===item.id;const publishLabel=item.model_replacement_pending?'publish replacement':item.model_asset_id?(item.status==='PUBLISHED'?'published':'publish new asset'):'publish';const tr=document.createElement('tr');tr.className=item.id===state.selected?'active':'';tr.innerHTML=`<td>${active?'yes':''}</td><td><b>${esc(item.race||'?')} / ${esc(item.gender||'?')}</b><br><small>${esc(item.id)}</small></td><td>${item.model_asset_id?`asset ${esc(item.model_asset_id)}`:'local only'}<br><small>${esc(item.sha256||'').slice(0,12)}</small></td><td>${esc(item.armature_name||'—')}<br><small>${esc(item.bone_count||0)} bones · ${esc(item.mesh_count||0)} mesh</small></td><td>${statusTag(item.status)}</td><td>${esc(item.revision)}</td><td><div class="row-actions"><button data-open>edit</button><button data-publish>${publishLabel}</button><button data-sync>sync studio</button><button data-active>activate</button><button data-delete class="danger">delete</button></div></td>`;tr.querySelector('[data-open]').onclick=()=>setForm(item);const publishButton=tr.querySelector('[data-publish]');publishButton.disabled=item.status==='PUBLISHED'&&!item.model_replacement_pending;publishButton.onclick=()=>publishCharacter(item.id);tr.querySelector('[data-sync]').onclick=()=>syncStudio(item.id);tr.querySelector('[data-active]').onclick=()=>activate(item.id);tr.querySelector('[data-delete]').onclick=()=>removeCharacter(item.id);body.appendChild(tr)}}
+-function renderDetails(row){const host=$('selected-details');if(!row){host.innerHTML='<span class="muted">select a character.</span>';return}host.innerHTML=`<div class="section-title"><div><span>selected</span><h3>${esc(row.display_name)}</h3></div>${statusTag(row.status)}</div><div class="details-grid"><div><b>canonical source</b><span>${esc(row.source_path||'—')}</span></div><div><b>prepared</b><span>${esc(row.prepared_path||'—')}</span></div><div><b>model asset id</b><span>${esc(row.model_asset_id||'not published')}</span></div><div><b>replacement</b><span>${row.model_replacement_pending?'new asset id on next publish':'no pending replacement'}</span></div><div><b>publication</b><span>${esc(row.moderation_state||'—')}</span></div><div><b>armature</b><span>${esc(row.armature_name||'—')} · ${esc(row.bone_count||0)} bones</span></div><div><b>skeleton signature</b><span>${esc(row.skeleton_signature||'—')}</span></div></div>`}
++function renderDetails(row){const host=$('selected-details');if(!row){host.innerHTML='<span class="muted">select a character.</span>';return}host.innerHTML=`<div class="section-title"><div><span>selected</span><h3>${esc(row.display_name)}</h3></div>${statusTag(row.status)}</div><div class="details-grid"><div><b>canonical asset</b><span>${esc(row.source_path||row.prepared_path||'—')}</span></div><div><b>model asset id</b><span>${esc(row.model_asset_id||'not published')}</span></div><div><b>replacement</b><span>${row.model_replacement_pending?'new asset id on next publish':'no pending replacement'}</span></div><div><b>publication</b><span>${esc(row.moderation_state||'—')}</span></div><div><b>armature</b><span>${esc(row.armature_name||'—')} · ${esc(row.bone_count||0)} bones</span></div><div><b>skeleton signature</b><span>${esc(row.skeleton_signature||'—')}</span></div></div>`}
+ function renderForm(row){const configured=!!state.data?.publication?.configured;$('save-character-stats').disabled=!row;const replacement=!!row?.model_replacement_pending;const has=row&&row.source_path;const needsRepublish=!!(row?.model_asset_id&&row?.status==='CHANGED'&&!replacement);const publishedUnchanged=!!(row?.model_asset_id&&row?.status==='PUBLISHED'&&!replacement);$('choose-model').textContent=row?'choose replacement fbx':'choose fbx';if(row){$('model-status').innerHTML=replacement?`<strong>${esc(row.display_name)} · replacement ready</strong><span>${esc(row.source_path||'no source')} · current Roblox asset ${esc(row.model_asset_id||'—')} stays active until the new upload succeeds.</span>`:`<strong>${esc(row.display_name)} · ${esc(row.status)}</strong><span>${esc(row.source_path||'no source')} · ${esc(row.armature_name||'no armature metadata')} · ${esc(row.bone_count||0)} bones</span>`;$('save-archetype').disabled=false;$('save-archetype').textContent='save identity';if(row.model_asset_id){$('register-character').textContent=state.sourcePath?'replace model · publish new asset':'choose replacement fbx';$('register-character').disabled=!state.sourcePath||!configured;}else{$('register-character').textContent=state.sourcePath?'save model revision':'choose fbx for revision';$('register-character').disabled=!state.sourcePath;}}else{$('model-status').innerHTML='<strong>not registered</strong><span>choose an fbx with a skinned armature.</span>';$('save-archetype').disabled=true;$('save-archetype').textContent='save identity';$('register-character').textContent='register character';$('register-character').disabled=!state.sourcePath;}$('publish-character').disabled=!has||!configured||publishedUnchanged;$('publish-character').textContent=replacement?'publish replacement':row?.model_asset_id?(publishedUnchanged?'published':'publish new asset'):'publish model';$('sync-character').disabled=!row?.model_asset_id;$('activate-character').disabled=!row?.model_asset_id;$('publication-hint').textContent=!row?'select a registered character.':!configured?'configure open cloud in .env.local before publishing.':replacement?`replacement is staged; publishing creates a NEW Roblox asset. current asset ${row.model_asset_id} remains assigned until success.`:needsRepublish?`current FBX must be republished through the bone-safe pipeline. publish creates a NEW Roblox asset; asset ${row.model_asset_id} stays assigned until success.`:row.model_asset_id?`asset ${row.model_asset_id} is immutable here. choose a replacement FBX to publish a new asset id.`:'first publish creates a permanent model asset id.'}
+ function renderCharacters(){if(!state.data)return;const row=selectedRow();const published=state.data.items.filter(x=>x.status==='PUBLISHED').length;$('metric-total').textContent=state.data.items.length;$('metric-published').textContent=published;$('metric-active').textContent=state.data.activeArchetypeId?'1':'0';renderRuntime();renderTree();renderRows();renderDetails(row);renderForm(row)}
+ async function loadCharacters(){try{const formRace=$('race').value;const formGender=$('gender').value;state.data=await request('/api/characters');const races=state.data.options?.races||['human'];const genders=state.data.options?.genders||['male','female'];$('race').innerHTML=races.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');$('gender').innerHTML=genders.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');if(state.selected&&!state.data.items.some(x=>x.id===state.selected))state.selected=null;let autoSelected=false;if(!state.selected&&state.data.items.length){state.selected=state.data.activeArchetypeId&&state.data.items.some(x=>x.id===state.data.activeArchetypeId)?state.data.activeArchetypeId:state.data.items[0].id;autoSelected=true}const row=selectedRow();const wantedRace=autoSelected?(row?.race||races[0]||''):(formRace||row?.race||races[0]||'');const wantedGender=autoSelected?(row?.gender||genders[0]||''):(formGender||row?.gender||genders[0]||'');$('race').value=races.includes(wantedRace)?wantedRace:(row?.race||races[0]||'');$('gender').value=genders.includes(wantedGender)?wantedGender:(row?.gender||genders[0]||'');if(autoSelected&&row){$('character-id').value=row.id;$('display-name').value=row.display_name||'';fillCharacterStats(row);$('picked-model').textContent='current model stays active until a replacement is published'}else if(!state.selected)syncIdentity();renderCharacters();populateAnimationCharacters()}catch(error){toast(error.message,true)}}
+@@ -102,7 +102,7 @@ function renderAnimationRows(){
+   }
+   if(!items.length)body.innerHTML='<tr><td colspan="9" class="muted">no registered clips in this section.</td></tr>';
+ }
+-function renderAnimationDetails(){const host=$('animation-details');const row=(state.animations?.items||[]).find(x=>x.binding_id===state.animationSelected);if(!row){host.innerHTML='<span class="muted">select a clip.</span>';return}host.innerHTML=`<div class="section-title"><div><span>selected clip</span><h3>${esc(row.name)}</h3></div>${statusTag(row.status)}</div><div class="details-grid"><div><b>semantic binding</b><span>${esc(row.scope)} · ${esc(row.weapon_set||'base')} · ${esc(row.slot)} · variant ${esc(row.variant||0)}</span></div><div><b>runtime</b><span>looped ${row.looped?'yes':'no'} · priority ${esc(row.priority)} · playback scaling from Animation Speed</span></div><div><b>canonical source</b><span>${esc(row.source_path)}</span></div><div><b>prepared</b><span>${esc(row.prepared_path)}</span></div><div><b>end-frame seam</b><span>${row.duplicate_first_frame_at_end?'first keyframe duplicated at end':'disabled'}</span></div><div><b>asset id</b><span>${esc(row.asset_id||'not published')}</span></div><div><b>sha256</b><span>${esc(row.sha256||'')}</span></div></div>`}
++function renderAnimationDetails(){const host=$('animation-details');const row=(state.animations?.items||[]).find(x=>x.binding_id===state.animationSelected);if(!row){host.innerHTML='<span class="muted">select a clip.</span>';return}host.innerHTML=`<div class="section-title"><div><span>selected clip</span><h3>${esc(row.name)}</h3></div>${statusTag(row.status)}</div><div class="details-grid"><div><b>semantic binding</b><span>${esc(row.scope)} · ${esc(row.weapon_set||'base')} · ${esc(row.slot)} · variant ${esc(row.variant||0)}</span></div><div><b>runtime</b><span>looped ${row.looped?'yes':'no'} · priority ${esc(row.priority)} · playback scaling from Animation Speed</span></div><div><b>canonical asset</b><span>${esc(row.source_path||row.prepared_path)}</span></div><div><b>end-frame seam</b><span>${row.duplicate_first_frame_at_end?'first keyframe duplicated at end':'disabled'}</span></div><div><b>asset id</b><span>${esc(row.asset_id||'not published')}</span></div><div><b>sha256</b><span>${esc(row.sha256||'')}</span></div></div>`}
+ function renderFilenameRules(){
+   const host=$('animation-filename-rules');if(!host)return;
+   const rows=state.animations?.filenameRules||[];if(!rows.length){host.innerHTML='<span class="muted">no filename rules returned by backend.</span>';return}
+diff --git a/system/control-center/static/index.html b/system/control-center/static/index.html
+index 58c863f..23c515b 100644
+--- a/system/control-center/static/index.html
++++ b/system/control-center/static/index.html
+@@ -68,7 +68,7 @@
+ <div class="character-workflow">
+ <div class="panel character-card">
+ <span class="eyebrow">01 · character archetype</span><h3>register model</h3>
+-<p>choose identity, then select an fbx. registration validates the armature in blender and writes canonical source/prepared copies plus skeleton metadata. when editing a published archetype, choosing another FBX exposes one replacement action: prepare it, publish a new Roblox asset, then apply the new id.</p>
++<p>choose identity, then select an fbx. registration validates the armature in blender and writes one canonical source-only FBX plus skeleton metadata. when editing a published archetype, choosing another FBX exposes one replacement action: prepare it, publish a new Roblox asset, then apply the new id.</p>
+ <div class="character-grid"><label>race<select id="race"></select></label><label>gender<select id="gender"></select></label></div>
+ <label>archetype id<input id="character-id" autocomplete="off" pattern="[a-z0-9][a-z0-9_-]{0,63}"></label>
+ <small class="hint">editing identity migrates canonical model/animation paths and keeps the currently assigned Roblox asset id. model replacement is a separate action below.</small>
+diff --git a/system/control-center/weapon_store.py b/system/control-center/weapon_store.py
+index c584120..451c36b 100644
+--- a/system/control-center/weapon_store.py
++++ b/system/control-center/weapon_store.py
+@@ -146,7 +146,7 @@ class WeaponStore:
+                 )"""
+             )
+             # Canonical gameplay weapon types replace the old animation-set labels.
+-            # Keep source/prepared paths untouched; _storage_type() preserves the
++            # Keep canonical asset paths untouched; _storage_type() preserves the
+             # already-synced legacy ServerStorage location until the model is re-synced.
+             connection.execute("UPDATE weapons SET weapon_type='sword' WHERE lower(weapon_type)='1hs'")
+             connection.execute("UPDATE weapons SET weapon_type='bigsword' WHERE lower(weapon_type)='2hs'")
+@@ -393,15 +393,14 @@ class WeaponStore:
+             if not source.is_file() or source.suffix.lower() != ".fbx":
+                 raise ValueError("weapon model must be an FBX file")
+             source_target = self.root / "assets/source/weapons" / weapon_type / slug / "model" / f"{slug}.fbx"
+-            prepared_target = self.root / "assets/prepared/weapons" / weapon_type / slug / "model" / f"{slug}.fbx"
+-            for target in (source_target, prepared_target):
+-                target.parent.mkdir(parents=True, exist_ok=True)
+-                if old:
+-                    self._archive_existing(target, slug, int(old.get("revision") or 1))
+-                shutil.copy2(source, target)
+-            model_source_path = source_target.relative_to(self.root).as_posix()
+-            model_prepared_path = prepared_target.relative_to(self.root).as_posix()
+-            model_sha256 = self._sha256(prepared_target)
++            source_target.parent.mkdir(parents=True, exist_ok=True)
++            if old:
++                self._archive_existing(source_target, slug, int(old.get("revision") or 1))
++            shutil.copy2(source, source_target)
++            canonical_path = source_target.relative_to(self.root).as_posix()
++            model_source_path = canonical_path
++            model_prepared_path = canonical_path
++            model_sha256 = self._sha256(source_target)
+ 
+         with self.connect() as connection:
+             connection.execute(
+@@ -439,15 +438,11 @@ class WeaponStore:
+                 previous = connection.execute("SELECT * FROM weapon_textures WHERE id=?", (texture_id,)).fetchone()
+                 canonical_name = f"{slot}{source.suffix.lower()}"
+                 source_target = self.root / "assets/source/weapons" / weapon_type / slug / "textures" / canonical_name
+-                prepared_target = self.root / "assets/prepared/weapons" / weapon_type / slug / "textures" / canonical_name
+                 source_target.parent.mkdir(parents=True, exist_ok=True)
+-                prepared_target.parent.mkdir(parents=True, exist_ok=True)
+                 if previous:
+                     self._archive_existing(source_target, slug, int(previous["revision"] or 1))
+-                    self._archive_existing(prepared_target, slug, int(previous["revision"] or 1))
+                 shutil.copy2(source, source_target)
+-                shutil.copy2(source, prepared_target)
+-                digest = self._sha256(prepared_target)
++                digest = self._sha256(source_target)
+                 texture_revision = int(previous["revision"] or 0) + 1 if previous else 1
+                 connection.execute(
+                     """INSERT OR REPLACE INTO weapon_textures(
+@@ -457,7 +452,7 @@ class WeaponStore:
+                     (
+                         texture_id, slug, slot,
+                         source_target.relative_to(self.root).as_posix(),
+-                        prepared_target.relative_to(self.root).as_posix(),
++                        source_target.relative_to(self.root).as_posix(),
+                         digest,
+                         previous["asset_id"] if previous else None,
+                         str(previous["published_sha256"] or "") if previous else "",
+@@ -476,9 +471,9 @@ class WeaponStore:
+         row = self.get(slug)
+         if not row:
+             raise ValueError(f"unknown weapon: {slug}")
+-        model = self.root / str(row.get("model_prepared_path") or "")
++        model = self.root / str(row.get("model_prepared_path") or row.get("model_source_path") or "")
+         if not model.is_file():
+-            raise ValueError("canonical prepared weapon FBX is missing")
++            raise ValueError("canonical weapon FBX is missing")
+         api_key = str(credentials.get("apiKey") or "")
+         creator_type = str(credentials.get("creatorType") or "")
+         creator_id = str(credentials.get("creatorId") or "")
+@@ -515,7 +510,7 @@ class WeaponStore:
+         for texture in row.get("textures") or []:
+             if str(texture.get("asset_id") or "") and str(texture.get("published_sha256") or "") == str(texture.get("sha256") or ""):
+                 continue
+-            file_path = self.root / str(texture.get("prepared_path") or "")
++            file_path = self.root / str(texture.get("prepared_path") or texture.get("source_path") or "")
+             texture_asset = str(texture.get("asset_id") or "").strip()
+             display_name = f"{row['name_en']} {texture['slot']}"
+             if texture_asset:
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index c75c591..0f7994a 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -1227,7 +1227,7 @@ if transform_path.exists():
+     err("legacy physical animation_keyframe_transform.py must be removed; first-frame seam is runtime-only")
+ for store_file in [ROOT / "system/control-center/animation_core/storage.py", ROOT / "system/control-center/monster_animation_store.py"]:
+     text = store_file.read_text(encoding="utf-8") if store_file.is_file() else ""
+-    for required in ["source_sha256", "duplicate_first_frame_at_end", "set_duplicate_first_frame", "_restore_prepared_files", "shutil.copy2"]:
++    for required in ["source_sha256", "duplicate_first_frame_at_end", "set_duplicate_first_frame", "_normalize_source_only_files", "shutil.copy2"]:
+         if required not in text:
+             err(f"runtime animation seam storage contract missing {required} in {store_file.name}")
+     if "prepare_animation_file" in text or "animation_keyframe_transform" in text:
+@@ -2672,27 +2672,10 @@ for required in ["EnvironmentAssetVisuals.ApplyModel", "EnvironmentAssetVisuals.
+         err(f"m51 EnvironmentAssetService visual hydration missing {required}")
+ 
+ 
+-# m52 Location Assets: source-only canonical storage, migrated from the old
+-# source/prepared mirror without keeping legacy path fields in the active schema.
+-location_asset_migration_path = ROOT / "system/control-center/location_asset_source_only_migration.py"
+-if not location_asset_migration_path.is_file():
+-    err("m52 Location Asset source-only migration module is missing")
+-else:
+-    location_asset_migration_text = location_asset_migration_path.read_text(encoding="utf-8")
+-    for required in [
+-        'MIGRATION_ID = "location-assets-source-only-v1"',
+-        'LEGACY_PREFIX = "assets/prepared/location-assets/"',
+-        'SOURCE_PREFIX = "assets/source/location-assets/"',
+-        "def migrate_location_assets_source_only",
+-        "different bytes at canonical path",
+-        "removedIdentityDuplicates",
+-        "migratedRows",
+-    ]:
+-        if required not in location_asset_migration_text:
+-            err(f"m52 source-only migration missing {required}")
+-
++# m52 Location Assets: source-only canonical storage. The one-off Location
++# Asset migration was retired by m53 after the project-wide source-only
++# migration became authoritative.
+ for required in [
+-    "migrate_location_assets_source_only(self.root, self.db)",
+     "model_path TEXT NOT NULL DEFAULT ''",
+     "texture_path TEXT NOT NULL DEFAULT ''",
+     'self.root / "assets/source/location-assets"',
+@@ -2725,11 +2708,96 @@ if location_asset_manifest_path.is_file():
+ if "row.texture_path" not in deco_assets_js_text or "row.texture_source_path" in deco_assets_js_text:
+     err("m52 Location Assets UI must use source-only texture_path")
+ 
+-legacy_location_asset_root = ROOT / "assets/prepared/location-assets"
+-legacy_location_asset_files = [path for path in legacy_location_asset_root.rglob("*") if path.is_file()] if legacy_location_asset_root.exists() else []
+-if legacy_location_asset_files:
+-    err(f"m52 source-only migration is incomplete: assets/prepared/location-assets still has {len(legacy_location_asset_files)} file(s)")
+-
++# m53 project-wide source-only storage. Active asset bytes live only in
++# assets/source. Compatibility DB columns may remain for old query shapes,
++# but both aliases must resolve to the same canonical source path and no active
++# subsystem may recreate assets/prepared.
++source_only_module = ROOT / "system/control-center/source_only_assets.py"
++source_only_text = source_only_module.read_text(encoding="utf-8") if source_only_module.is_file() else ""
++if not source_only_module.is_file():
++    err("m53 project-wide source-only migration module is missing")
++if (ROOT / "system/control-center/location_asset_source_only_migration.py").exists():
++    err("m53 obsolete Location Asset-only source migration must be removed")
++for required in [
++    "def migrate_source_only_assets",
++    '"game1-source-only-assets-v1"',
++    '"assets/prepared/"',
++    '"assets/source/"',
++    '"prepared-wins"',
++    '"source-wins"',
++    '"prepared-before"',
++]:
++    if required not in source_only_text:
++        err(f"m53 source-only migration contract missing {required}")
++if 'migrate_source_only_assets(ROOT, ROOT / ".control-center" / "game1.db")' not in host_agent_text:
++    err("m53 Control Center startup does not run source-only migration before stores")
++migrate_text = (ROOT / "system/control-center/migrate.py").read_text(encoding="utf-8")
++if 'migrate_source_only_assets(ROOT, ROOT / ".control-center" / "game1.db")' not in migrate_text:
++    err("m53 migrate.py does not run project-wide source-only migration")
++
++legacy_prepared_root = ROOT / "assets/prepared"
++if legacy_prepared_root.exists():
++    legacy_files = [path for path in legacy_prepared_root.rglob("*") if path.is_file()]
++    if legacy_files:
++        err(f"m53 source-only migration incomplete: assets/prepared still has {len(legacy_files)} file(s)")
++    else:
++        err("m53 source-only migration incomplete: empty assets/prepared tree still exists")
++
++active_manifest_stale = []
++for manifest_path in (ROOT / "assets/manifests").glob("*.json"):
++    if "assets/prepared/" in manifest_path.read_text(encoding="utf-8", errors="replace"):
++        active_manifest_stale.append(manifest_path.name)
++if active_manifest_stale:
++    err("m53 manifests still reference assets/prepared: " + ", ".join(sorted(active_manifest_stale)))
++
++for active_store in [
++    ROOT / "system/control-center/character_store.py",
++    ROOT / "system/control-center/character_core/identity.py",
++    ROOT / "system/control-center/animation_core/storage.py",
++    ROOT / "system/control-center/weapon_store.py",
++    ROOT / "system/control-center/monster_store.py",
++    ROOT / "system/control-center/monster_animation_store.py",
++]:
++    active_text = active_store.read_text(encoding="utf-8")
++    if 'self.root / "assets/prepared' in active_text or 'self.root / "assets" / "prepared"' in active_text:
++        err(f"m53 active store can still create assets/prepared: {active_store.relative_to(ROOT)}")
++
++if "<b>prepared</b>" in character_js_text or "source/prepared copies" in ui:
++    err("m53 Asset Manager still exposes the removed Source/Prepared dual-storage UI")
++
++# Validate compatibility aliases in the live SQLite DB. They remain only so old
++# query shapes keep working; both values must point at the exact same assets/source file.
++import sqlite3 as _sqlite3_m53
++_db_m53 = ROOT / ".control-center/game1.db"
++if _db_m53.is_file():
++    _con_m53 = _sqlite3_m53.connect(_db_m53)
++    _con_m53.row_factory = _sqlite3_m53.Row
++    _pairs_m53 = [
++        ("characters", "source_path", "prepared_path"),
++        ("animation_clips", "source_path", "prepared_path"),
++        ("weapons", "model_source_path", "model_prepared_path"),
++        ("weapon_textures", "source_path", "prepared_path"),
++        ("monsters", "model_source_path", "model_prepared_path"),
++        ("monster_textures", "source_path", "prepared_path"),
++        ("monster_animation_clips", "source_path", "prepared_path"),
++    ]
++    _tables_m53 = {str(row[0]) for row in _con_m53.execute("SELECT name FROM sqlite_master WHERE type='table'")}
++    for _table, _source_col, _prepared_col in _pairs_m53:
++        if _table not in _tables_m53:
++            continue
++        _cols = {str(row[1]) for row in _con_m53.execute(f"PRAGMA table_info({_table})")}
++        if not {_source_col, _prepared_col}.issubset(_cols):
++            continue
++        for _row in _con_m53.execute(f"SELECT {_source_col},{_prepared_col} FROM {_table}"):
++            _source_value = str(_row[0] or "").replace("\\", "/")
++            _prepared_value = str(_row[1] or "").replace("\\", "/")
++            if _source_value != _prepared_value:
++                err(f"m53 {_table} still has split Source/Prepared paths")
++                break
++            if _source_value and not _source_value.startswith("assets/source/"):
++                err(f"m53 {_table} canonical path is outside assets/source: {_source_value}")
++                break
++    _con_m53.close()
+ 
+ if errors:
+     print("verify failed")
+@@ -2737,7 +2805,7 @@ if errors:
+         print(" -", item)
+     sys.exit(1)
+ 
+-print("verify ok · game1 m52 source-only Location Asset storage passed")
++print("verify ok · game1 m53 project-wide source-only asset storage passed")
+ print("registered character archetypes:", len(archetypes))
+ print("active character archetype:", active_id or "none")
+ print("race pool: human")

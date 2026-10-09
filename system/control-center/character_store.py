@@ -335,48 +335,42 @@ class CharacterStore:
                 raise ValueError(f"select a valid character FBX: {source_file}")
 
             relative = Path("characters") / race / gender / character_id / "model" / source_file.name
-            source_target = self.root / "assets" / "source" / relative
-            prepared_target = self.root / "assets" / "prepared" / relative
-            source_digest = hashlib.sha256(source_file.read_bytes()).hexdigest()
+            canonical_target = self.root / "assets" / "source" / relative
 
             with tempfile.TemporaryDirectory(prefix="game1-character-prepare-") as tmp:
-                prepared_candidate = Path(tmp) / source_file.name
-                prepare_character_fbx(self.root, source_file, prepared_candidate)
-                analysis = analyze_character_fbx(self.root, prepared_candidate)
-                prepared_digest = hashlib.sha256(prepared_candidate.read_bytes()).hexdigest()
+                canonical_candidate = Path(tmp) / source_file.name
+                prepare_character_fbx(self.root, source_file, canonical_candidate)
+                analysis = analyze_character_fbx(self.root, canonical_candidate)
+                canonical_digest = hashlib.sha256(canonical_candidate.read_bytes()).hexdigest()
 
                 revision_stamp = time.strftime("%Y%m%dT%H%M%S", time.gmtime())
-                for label, destination, incoming, digest in (
-                    ("source", source_target, source_file, source_digest),
-                    ("prepared", prepared_target, prepared_candidate, prepared_digest),
-                ):
-                    destination.parent.mkdir(parents=True, exist_ok=True)
-                    if destination.exists():
-                        existing = hashlib.sha256(destination.read_bytes()).hexdigest()
-                        if existing != digest:
-                            archive = (
-                                self.root
-                                / "assets"
-                                / "reimported"
-                                / "characters"
-                                / race
-                                / gender
-                                / character_id
-                                / revision_stamp
-                                / label
-                                / destination.name
-                            )
-                            archive.parent.mkdir(parents=True, exist_ok=True)
-                            shutil.copy2(destination, archive)
-                            destination.unlink()
-                        else:
-                            continue
-                    shutil.copy2(incoming, destination)
-                    created_files.append(destination)
+                canonical_target.parent.mkdir(parents=True, exist_ok=True)
+                if canonical_target.exists():
+                    existing = hashlib.sha256(canonical_target.read_bytes()).hexdigest()
+                    if existing != canonical_digest:
+                        archive = (
+                            self.root
+                            / "assets"
+                            / "reimported"
+                            / "characters"
+                            / race
+                            / gender
+                            / character_id
+                            / revision_stamp
+                            / "canonical"
+                            / canonical_target.name
+                        )
+                        archive.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(canonical_target, archive)
+                        canonical_target.unlink()
+                if not canonical_target.exists():
+                    shutil.copy2(canonical_candidate, canonical_target)
+                    created_files.append(canonical_target)
 
-            source = source_target.relative_to(self.root).as_posix()
-            prepared = prepared_target.relative_to(self.root).as_posix()
-            sha = prepared_digest
+            canonical = canonical_target.relative_to(self.root).as_posix()
+            source = canonical
+            prepared = canonical
+            sha = canonical_digest
 
         replacement_pending = int(old.get("model_replacement_pending") or 0) if old else 0
         force_replacement = bool(data.get("forceReplacement"))
@@ -457,15 +451,14 @@ class CharacterStore:
         if target_id == source_id:
             return target
 
-        source_path = self.root / str(source.get("source_path") or "")
-        prepared_path = self.root / str(source.get("prepared_path") or "")
-        if not source_path.is_file() or not prepared_path.is_file():
-            raise ValueError("selected registered model is missing its canonical source/prepared files")
+        canonical_path = self.root / str(source.get("prepared_path") or source.get("source_path") or "")
+        if not canonical_path.is_file():
+            raise ValueError("selected registered model is missing its canonical source file")
 
         race = str(target.get("race") or "")
         gender = str(target.get("gender") or "")
-        target_source = self.root / "assets/source/characters" / race / gender / target_id / "model" / source_path.name
-        target_prepared = self.root / "assets/prepared/characters" / race / gender / target_id / "model" / prepared_path.name
+        target_source = self.root / "assets/source/characters" / race / gender / target_id / "model" / canonical_path.name
+        target_prepared = target_source
         revision_stamp = time.strftime("%Y%m%dT%H%M%S", time.gmtime())
 
         def archive_old(stored_path: str, label: str):
@@ -475,7 +468,7 @@ class CharacterStore:
             old_path = (self.root / value).resolve()
             if not old_path.is_file():
                 return
-            if old_path in {source_path.resolve(), prepared_path.resolve()}:
+            if old_path == canonical_path.resolve():
                 return
             archive = (
                 self.root
@@ -492,16 +485,18 @@ class CharacterStore:
             if not archive.exists():
                 shutil.copy2(old_path, archive)
 
-        archive_old(str(target.get("source_path") or ""), "source")
-        archive_old(str(target.get("prepared_path") or ""), "prepared")
+        archived_paths = set()
+        for stored_path in (str(target.get("source_path") or ""), str(target.get("prepared_path") or "")):
+            normalized = stored_path.replace("\\", "/")
+            if normalized and normalized not in archived_paths:
+                archive_old(stored_path, "canonical")
+                archived_paths.add(normalized)
 
-        for incoming, destination in ((source_path, target_source), (prepared_path, target_prepared)):
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            if incoming.resolve() == destination.resolve():
-                continue
-            if destination.exists():
-                incoming_sha = hashlib.sha256(incoming.read_bytes()).hexdigest()
-                destination_sha = hashlib.sha256(destination.read_bytes()).hexdigest()
+        target_source.parent.mkdir(parents=True, exist_ok=True)
+        if canonical_path.resolve() != target_source.resolve():
+            if target_source.exists():
+                incoming_sha = hashlib.sha256(canonical_path.read_bytes()).hexdigest()
+                destination_sha = hashlib.sha256(target_source.read_bytes()).hexdigest()
                 if incoming_sha != destination_sha:
                     archive = (
                         self.root
@@ -512,11 +507,11 @@ class CharacterStore:
                         / revision_stamp
                         / "model-reassignment"
                         / "replaced"
-                        / destination.name
+                        / target_source.name
                     )
                     archive.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(destination, archive)
-            shutil.copy2(incoming, destination)
+                    shutil.copy2(target_source, archive)
+            shutil.copy2(canonical_path, target_source)
 
         now = time.time()
         target_asset_id = str(target.get("model_asset_id") or "").strip()
@@ -564,14 +559,14 @@ class CharacterStore:
                 (target_id, source_id, "", now),
             )
 
-        for stored_path, replacement in (
-            (str(target.get("source_path") or ""), target_source),
-            (str(target.get("prepared_path") or ""), target_prepared),
-        ):
-            if not stored_path:
+        cleaned_paths = set()
+        for stored_path in (str(target.get("source_path") or ""), str(target.get("prepared_path") or "")):
+            normalized = stored_path.replace("\\", "/")
+            if not normalized or normalized in cleaned_paths:
                 continue
+            cleaned_paths.add(normalized)
             old_path = (self.root / stored_path).resolve()
-            if old_path == replacement.resolve() or old_path in {source_path.resolve(), prepared_path.resolve()}:
+            if old_path == target_source.resolve() or old_path == canonical_path.resolve():
                 continue
             try:
                 old_path.unlink(missing_ok=True)
@@ -586,9 +581,9 @@ class CharacterStore:
         row = self.get(character_id)
         if not row:
             raise ValueError(f"unknown character archetype: {character_id}")
-        prepared = self.root / str(row.get("prepared_path") or "")
+        prepared = self.root / str(row.get("prepared_path") or row.get("source_path") or "")
         if not prepared.is_file():
-            raise ValueError("canonical prepared FBX is missing; re-register the model")
+            raise ValueError("canonical character FBX is missing; re-register the model")
 
         api_key = str(publication.get("apiKey") or "").strip()
         creator_type = str(publication.get("creatorType") or "").strip().lower()

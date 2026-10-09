@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "project": "game1",
+  "profiles": [
+    {
+      "targetType": "character",
+      "targetId": "human_female",
+      "displayName": "Human Female",
+      "rules": [
+        {
+          "channel": "run",
+          "label": "Run Speed",
+          "stat": "RunSpeed",
+          "unitsPerPercent": 1.9
+        },
+        {
+          "channel": "walk",
+          "label": "Walk Speed",
+          "stat": "RunSpeed",
+          "unitsPerPercent": 2.0
+        },
+        {
+          "channel": "combat_idle",
+          "label": "Idle Combat Speed",
+          "stat": "AttackSpeed",
+          "unitsPerPercent": 4.0
+        },
+        {
+          "channel": "attack",
+          "label": "Attack Speed",
+          "stat": "AttackSpeed",
+          "unitsPerPercent": 2.0
+        }
+      ]
+    },
+    {
+      "targetType": "monster",
+      "targetId": "gremlin",
+      "displayName": "Gremlin",
+      "rules": [
+        {
+          "channel": "run",
+          "label": "Run Speed",
+          "stat": "RunSpeed",
+          "unitsPerPercent": 0.6
+        }
+      ]
+    }
+  ]
+}

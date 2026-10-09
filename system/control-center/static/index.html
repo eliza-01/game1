@@ -68,7 +68,7 @@
 <div class="character-workflow">
 <div class="panel character-card">
 <span class="eyebrow">01 · character archetype</span><h3>register model</h3>
-<p>choose identity, then select an fbx. registration validates the armature in blender and writes canonical source/prepared copies plus skeleton metadata. when editing a published archetype, choosing another FBX exposes one replacement action: prepare it, publish a new Roblox asset, then apply the new id.</p>
+<p>choose identity, then select an fbx. registration validates the armature in blender and writes one canonical source-only FBX plus skeleton metadata. when editing a published archetype, choosing another FBX exposes one replacement action: prepare it, publish a new Roblox asset, then apply the new id.</p>
 <div class="character-grid"><label>race<select id="race"></select></label><label>gender<select id="gender"></select></label></div>
 <label>archetype id<input id="character-id" autocomplete="off" pattern="[a-z0-9][a-z0-9_-]{0,63}"></label>
 <small class="hint">editing identity migrates canonical model/animation paths and keeps the currently assigned Roblox asset id. model replacement is a separate action below.</small>
@@ -238,7 +238,7 @@
 
 <div id="location-assets-view" hidden>
 <div class="panel hero">
-<div><span class="eyebrow">environment library · published decor</span><h2>location assets</h2><p>register a static decoration with one FBX and either a new PNG/JPG texture or a texture already registered by another location asset. publish the required assets, then place published variants through Studio DecoManager. placed instances belong to the place; registry publication and placement backups stay separate.</p><div class="deco-category-strip"><span>trees</span><span>bushes</span><span>rocks</span><span>lights</span><span>fences</span><span>decorations</span></div></div>
+<div><span class="eyebrow">environment library · published decor</span><h2>location assets</h2><p>register a static decoration with one FBX and either a new PNG/JPG texture or a texture already registered by another location asset. replacing an owned texture publishes a new Roblox Image Asset ID; assets reusing that texture follow the owner's new ID automatically. publish the required assets, then place published variants through Studio DecoManager. placed instances belong to the place; registry publication and placement backups stay separate.</p><div class="deco-category-strip"><span>trees</span><span>bushes</span><span>rocks</span><span>lights</span><span>fences</span><span>decorations</span></div></div>
 <div class="metrics"><div><b id="location-asset-metric-total">0</b><span>registered</span></div><div><b id="location-asset-metric-published">0</b><span>published</span></div><div><b id="location-asset-metric-changed">0</b><span>changed</span></div></div>
 </div>
 <div class="panel runtime-card"><div class="runtime-state registered"><strong>DecoManager registry</strong><span>Studio reads published entries directly from Asset Manager. No ServerStorage sync is required.</span></div><div id="location-asset-publication-state" class="publication-missing">open cloud: checking…</div></div>

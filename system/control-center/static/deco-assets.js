@@ -96,7 +96,7 @@ function decoAssetRenderTextureReferences() {
   select.innerHTML = '<option value="">own / new PNG/JPG texture</option>';
   for (const row of decoAssetState.data?.items || []) {
     if (row.slug === selectedSlug || row.texture_owner_slug !== row.slug) continue;
-    if (!row.texture_source_path) continue;
+    if (!row.texture_path) continue;
     const option = document.createElement('option');
     option.value = row.texture_owner_slug;
     const owner = (decoAssetState.data?.items || []).find((item) => item.slug === row.texture_owner_slug) || row;
@@ -237,14 +237,14 @@ async function decoAssetPublish() {
   if (!row) return;
   try {
     toast('publishing location asset…');
-    await request(`/api/location-assets/${encodeURIComponent(row.slug)}/publish`, {
+    const published = await request(`/api/location-assets/${encodeURIComponent(row.slug)}/publish`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ description: $('location-asset-publication-description').value }),
     });
     await decoAssetLoad();
     decoAssetSetForm(decoAssetSelected());
-    toast('location asset published · DecoManager can refresh now');
+    toast(`location asset published · model ${published.model_asset_id || '—'} · texture ${published.texture_asset_id || '—'}`);
   } catch (error) {
     toast(error.message, true);
   }

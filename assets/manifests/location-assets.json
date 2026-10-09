@@ -26,6 +26,18 @@
       {
         "id": "decoration",
         "label": "Decorations"
+      },
+      {
+        "id": "ladder",
+        "label": "Ladders"
+      },
+      {
+        "id": "flower",
+        "label": "Flowers"
+      },
+      {
+        "id": "building",
+        "label": "Buildings"
       }
     ]
   },
@@ -181,9 +193,59 @@
       "category_label": "Fences"
     },
     {
+      "slug": "wooden_fence_01",
+      "name_en": "Wooden Fence 01",
+      "category": "fence",
+      "model_path": "assets/source/location-assets/fence/wooden_fence_01/model/wooden_fence_01.fbx",
+      "model_sha256": "b2090a38d58468a84351dfb7b4dfaee5a5e58ae54a7bb906306725a418f5f3e4",
+      "model_asset_id": "101906654018611",
+      "model_published_sha256": "b2090a38d58468a84351dfb7b4dfaee5a5e58ae54a7bb906306725a418f5f3e4",
+      "model_moderation_state": "Approved",
+      "texture_path": "assets/source/location-assets/fence/stone_fence_01/textures/stone_fence_01.jpg",
+      "texture_sha256": "2f41320116f4b423de010f4c906b5b16eabc981c055bb4fc478c84437a95bb88",
+      "texture_asset_id": "119920676388867",
+      "texture_published_sha256": "2f41320116f4b423de010f4c906b5b16eabc981c055bb4fc478c84437a95bb88",
+      "texture_moderation_state": "Approved",
+      "texture_reference_slug": "stone_fence_01",
+      "destructible": false,
+      "revision": 1,
+      "created_at": 1791582079.0043566,
+      "updated_at": 1791582102.8554742,
+      "published_at": 1791582102.8554742,
+      "texture_owner_slug": "stone_fence_01",
+      "texture_shared": true,
+      "status": "PUBLISHED",
+      "category_label": "Fences"
+    },
+    {
+      "slug": "wooden_fence_pillar_01",
+      "name_en": "Wooden Fence Pillar 01",
+      "category": "fence",
+      "model_path": "assets/source/location-assets/fence/wooden_fence_pillar_01/model/wooden_fence_pillar_01.fbx",
+      "model_sha256": "129b154df9bf320d522f8b31550f990fa8867b6ab2331c3c77f79d683b5adf8f",
+      "model_asset_id": "113465135754485",
+      "model_published_sha256": "129b154df9bf320d522f8b31550f990fa8867b6ab2331c3c77f79d683b5adf8f",
+      "model_moderation_state": "Approved",
+      "texture_path": "assets/source/location-assets/fence/stone_fence_01/textures/stone_fence_01.jpg",
+      "texture_sha256": "2f41320116f4b423de010f4c906b5b16eabc981c055bb4fc478c84437a95bb88",
+      "texture_asset_id": "119920676388867",
+      "texture_published_sha256": "2f41320116f4b423de010f4c906b5b16eabc981c055bb4fc478c84437a95bb88",
+      "texture_moderation_state": "Approved",
+      "texture_reference_slug": "stone_fence_01",
+      "destructible": false,
+      "revision": 1,
+      "created_at": 1791582446.2359698,
+      "updated_at": 1791582458.3048537,
+      "published_at": 1791582458.3048537,
+      "texture_owner_slug": "stone_fence_01",
+      "texture_shared": true,
+      "status": "PUBLISHED",
+      "category_label": "Fences"
+    },
+    {
       "slug": "stone_ladder_01",
       "name_en": "Stone Ladder 01",
-      "category": "fence",
+      "category": "ladder",
       "model_path": "assets/source/location-assets/fence/stone_ladder_01/model/stone_ladder_01.fbx",
       "model_sha256": "e2b0f1078cfc120abc3708f0b8fe9a54ad019a36d21baf3e8ac779e67f96816e",
       "model_asset_id": "126950847829152",
@@ -196,14 +258,14 @@
       "texture_moderation_state": "Approved",
       "texture_reference_slug": "stone_fence_01",
       "destructible": false,
-      "revision": 1,
+      "revision": 2,
       "created_at": 1791576204.461649,
-      "updated_at": 1791576221.5396745,
+      "updated_at": 1791583589.037727,
       "published_at": 1791576221.5396745,
       "texture_owner_slug": "stone_fence_01",
       "texture_shared": true,
       "status": "PUBLISHED",
-      "category_label": "Fences"
+      "category_label": "Ladders"
     },
     {
       "slug": "lantern_01",
@@ -282,8 +344,8 @@
     }
   ],
   "summary": {
-    "registered": 10,
-    "published": 10,
+    "registered": 12,
+    "published": 12,
     "changed": 0
   }
 }

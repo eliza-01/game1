@@ -4,7 +4,25 @@ const decoAssetState = {
   modelPath: '',
   texturePath: '',
   textureReferenceSlug: '',
+  libraryCategory: 'all',
 };
+
+const DECO_LIBRARY_CATEGORY_KEY = 'game1.locationAssets.libraryCategory';
+const DECO_SELECTED_ASSET_KEY = 'game1.locationAssets.selectedAsset';
+
+function decoAssetRemember(key, value) {
+  try {
+    if (value) localStorage.setItem(key, value);
+    else localStorage.removeItem(key);
+  } catch {}
+}
+
+function decoAssetRestorePreferences() {
+  try {
+    decoAssetState.libraryCategory = localStorage.getItem(DECO_LIBRARY_CATEGORY_KEY) || 'all';
+    decoAssetState.selected = localStorage.getItem(DECO_SELECTED_ASSET_KEY) || null;
+  } catch {}
+}
 
 function decoAssetSelected() {
   return decoAssetState.data?.items?.find((row) => row.slug === decoAssetState.selected) || null;
@@ -34,8 +52,15 @@ function decoAssetSyncSlug() {
   }
 }
 
+function decoAssetBeginNew() {
+  decoAssetSetForm(null);
+  const input = $('location-asset-name');
+  if (input) input.focus();
+}
+
 function decoAssetSetForm(row) {
   decoAssetState.selected = row?.slug || null;
+  decoAssetRemember(DECO_SELECTED_ASSET_KEY, decoAssetState.selected || '');
   decoAssetState.modelPath = '';
   decoAssetState.texturePath = '';
   decoAssetState.textureReferenceSlug = row?.texture_reference_slug || '';
@@ -44,6 +69,8 @@ function decoAssetSetForm(row) {
     $('location-asset-name').value = row.name_en || '';
     $('location-asset-slug').value = row.slug || '';
     $('location-asset-category').value = row.category || 'tree';
+    decoAssetState.libraryCategory = row.category || 'tree';
+    decoAssetRemember(DECO_LIBRARY_CATEGORY_KEY, decoAssetState.libraryCategory);
     $('location-asset-destructible').checked = row.destructible === true || Number(row.destructible || 0) === 1;
     $('picked-location-asset-model').textContent = 'keep current fbx or choose a replacement';
     $('picked-location-asset-texture').textContent = row.texture_shared
@@ -52,7 +79,11 @@ function decoAssetSetForm(row) {
   } else {
     $('location-asset-name').value = '';
     $('location-asset-slug').value = '';
-    $('location-asset-category').value = decoAssetState.data?.options?.categories?.[0]?.id || 'tree';
+    const validCategories = new Set((decoAssetState.data?.options?.categories || []).map((item) => item.id));
+    const category = validCategories.has(decoAssetState.libraryCategory)
+      ? decoAssetState.libraryCategory
+      : (decoAssetState.data?.options?.categories?.[0]?.id || 'tree');
+    $('location-asset-category').value = category;
     $('location-asset-destructible').checked = false;
     $('picked-location-asset-model').textContent = 'fbx not selected';
     $('picked-location-asset-texture').textContent = 'PNG/JPG not selected';
@@ -106,6 +137,30 @@ function decoAssetRenderTextureReferences() {
   select.value = current;
 }
 
+function decoAssetUseCategory(category, { updateEditor = true } = {}) {
+  const categories = decoAssetState.data?.options?.categories || [];
+  if (!categories.some((row) => row.id === category)) return;
+  decoAssetState.libraryCategory = category;
+  decoAssetRemember(DECO_LIBRARY_CATEGORY_KEY, category);
+  if (updateEditor) $('location-asset-category').value = category;
+}
+
+function decoAssetRenderLibraryFilter() {
+  const select = $('location-asset-library-category');
+  if (!select) return;
+  const categories = decoAssetState.data?.options?.categories || [];
+  const valid = new Set(['all', ...categories.map((row) => row.id)]);
+  if (!valid.has(decoAssetState.libraryCategory)) decoAssetState.libraryCategory = 'all';
+  select.innerHTML = '<option value="all">all categories</option>';
+  for (const category of categories) {
+    const option = document.createElement('option');
+    option.value = category.id;
+    option.textContent = category.label;
+    select.appendChild(option);
+  }
+  select.value = decoAssetState.libraryCategory;
+}
+
 function decoAssetRender() {
   if (!decoAssetState.data) return;
 
@@ -128,6 +183,8 @@ function decoAssetRender() {
 
   decoAssetRenderTree();
   decoAssetRenderTextureReferences();
+  decoAssetRenderLibraryFilter();
+  $('register-location-asset').textContent = selected ? 'save asset changes' : 'register asset';
 
   const publication = decoAssetState.data.publication || {};
   const publicationState = $('location-asset-publication-state');
@@ -154,11 +211,19 @@ function decoAssetRender() {
 
   const rows = $('location-asset-rows');
   rows.innerHTML = '';
-  for (const row of decoAssetState.data.items || []) {
+  const libraryRows = (decoAssetState.data.items || []).filter((row) =>
+    decoAssetState.libraryCategory === 'all' || row.category === decoAssetState.libraryCategory
+  );
+  for (const row of libraryRows) {
     const tr = document.createElement('tr');
     const contactPolicy = (row.destructible === true || Number(row.destructible || 0) === 1) ? '<span class="tag">destructible</span>' : '<span class="tag published">solid · bounce</span>';
     tr.innerHTML = `<td><b>${esc(row.name_en)}</b><small>${esc(row.slug)}</small></td><td>${esc(decoAssetCategoryLabel(row.category))}</td><td>${contactPolicy}</td><td><small>model ${esc(row.model_asset_id || '—')}</small><small>${row.texture_shared ? `shared ${esc(row.texture_owner_slug || row.texture_reference_slug)} · ` : 'texture '}${esc(row.texture_asset_id || '—')}</small></td><td>${decoAssetStatusTag(row.status)}</td><td><button data-select type="button">edit</button></td>`;
     tr.querySelector('[data-select]').onclick = () => decoAssetSetForm(row);
+    rows.appendChild(tr);
+  }
+  if (!libraryRows.length) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td colspan="6"><span class="muted">no registered assets in ${esc(decoAssetState.libraryCategory === 'all' ? 'the library' : decoAssetCategoryLabel(decoAssetState.libraryCategory))}.</span></td>`;
     rows.appendChild(tr);
   }
 }
@@ -168,8 +233,18 @@ async function decoAssetLoad() {
     decoAssetState.data = await request('/api/location-assets');
     if (decoAssetState.selected && !decoAssetSelected()) {
       decoAssetState.selected = null;
+      decoAssetRemember(DECO_SELECTED_ASSET_KEY, '');
     }
-    decoAssetRender();
+    const selected = decoAssetSelected();
+    if (selected) {
+      decoAssetSetForm(selected);
+    } else {
+      decoAssetRender();
+      const categories = new Set((decoAssetState.data?.options?.categories || []).map((row) => row.id));
+      if (categories.has(decoAssetState.libraryCategory)) {
+        $('location-asset-category').value = decoAssetState.libraryCategory;
+      }
+    }
   } catch (error) {
     toast(error.message, true);
   }
@@ -225,7 +300,6 @@ async function decoAssetRegister() {
     });
     decoAssetState.selected = row.slug;
     await decoAssetLoad();
-    decoAssetSetForm(decoAssetSelected());
     toast(`registered ${row.name_en}`);
   } catch (error) {
     toast(error.message, true);
@@ -243,7 +317,6 @@ async function decoAssetPublish() {
       body: JSON.stringify({ description: $('location-asset-publication-description').value }),
     });
     await decoAssetLoad();
-    decoAssetSetForm(decoAssetSelected());
     toast(`location asset published · model ${published.model_asset_id || '—'} · texture ${published.texture_asset_id || '—'}`);
   } catch (error) {
     toast(error.message, true);
@@ -266,9 +339,11 @@ async function decoAssetDelete() {
   }
 }
 
+decoAssetRestorePreferences();
 window.game1LocationAssetsLoad = decoAssetLoad;
 $('location-asset-name').oninput = decoAssetSyncSlug;
-$('new-location-asset').onclick = () => decoAssetSetForm(null);
+$('new-location-asset').onclick = decoAssetBeginNew;
+$('new-location-asset-main').onclick = decoAssetBeginNew;
 $('refresh-location-assets').onclick = decoAssetLoad;
 $('refresh-location-assets-table').onclick = decoAssetLoad;
 $('choose-location-asset-model').onclick = decoAssetChooseModel;
@@ -282,7 +357,21 @@ $('location-asset-texture-reference').onchange = () => {
     $('picked-location-asset-texture').textContent = 'PNG/JPG not selected';
   }
 };
+$('location-asset-library-category').onchange = () => {
+  const category = $('location-asset-library-category').value || 'all';
+  if (category === 'all') {
+    decoAssetState.libraryCategory = 'all';
+    decoAssetRemember(DECO_LIBRARY_CATEGORY_KEY, 'all');
+  } else {
+    decoAssetUseCategory(category);
+  }
+  decoAssetRender();
+};
+$('location-asset-category').onchange = () => {
+  decoAssetUseCategory($('location-asset-category').value, { updateEditor: false });
+  decoAssetRender();
+};
 $('register-location-asset').onclick = decoAssetRegister;
-$('clear-location-asset-form').onclick = () => decoAssetSetForm(null);
+$('clear-location-asset-form').onclick = decoAssetBeginNew;
 $('publish-location-asset').onclick = decoAssetPublish;
 $('delete-location-asset').onclick = decoAssetDelete;

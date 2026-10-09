@@ -11,6 +11,9 @@ local CATEGORY_FOLDERS = {
     light = "Lights",
     fence = "Fences",
     decoration = "Decorations",
+    ladder = "Ladders",
+    flower = "Flowers",
+    building = "Buildings",
 }
 
 local function prepareGhost(model: Model)

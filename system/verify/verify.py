@@ -1974,7 +1974,7 @@ for required in [
     'AnimationClipProvider:GetAnimationClipAsync',
     'clip:IsA("KeyframeSequence")',
     'preview.Parent = timelineWorld',
-    'model bridge v22',
+    'model bridge v24',
 ]:
     if required not in studio_plugin_text:
         err(f"m37 in-plugin timeline preview missing {required}")
@@ -2106,7 +2106,7 @@ for required in [
 ]:
     if required not in location_plugin_text:
         err(f"m41 Studio Location authoring module missing {required}")
-for required in ['require(script.Parent.modules.LocationCommands)', 'data.command == "location-authoring"', 'model bridge v22']:
+for required in ['require(script.Parent.modules.LocationCommands)', 'data.command == "location-authoring"', 'model bridge v24']:
     if required not in studio_plugin_text:
         err(f"m41 Game1Bridge Location integration missing {required}")
 
@@ -2155,13 +2155,13 @@ if location_asset_manifest_path.is_file():
     if location_asset_manifest.get("schemaVersion") != 4 or location_asset_manifest.get("project") != "game1":
         err("m43 location-assets.json schema/project is invalid")
     category_ids = [row.get("id") for row in ((location_asset_manifest.get("options") or {}).get("categories") or [])]
-    if category_ids != ["tree", "bush", "rock", "light", "fence", "decoration"]:
-        err("m46 Location Assets categories must be tree/bush/rock/light/fence/decoration in canonical order")
+    if category_ids != ["tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building"]:
+        err("m46 Location Assets categories must be tree/bush/rock/light/fence/decoration/ladder/flower/building in canonical order")
 
 location_asset_store_text = location_asset_store_path.read_text(encoding="utf-8") if location_asset_store_path.is_file() else ""
 for required in [
     "class LocationAssetStore",
-    'CATEGORIES = ("tree", "bush", "rock", "light", "fence", "decoration")',
+    'CATEGORIES = ("tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building")',
     "assets/source/location-assets",
     "model_path TEXT NOT NULL DEFAULT ''",
     "texture_path TEXT NOT NULL DEFAULT ''",
@@ -2207,8 +2207,8 @@ for required in [
     'id="choose-location-asset-model"',
     'id="choose-location-asset-texture"',
     'id="publish-location-asset"',
-    'deco-assets.css?v=3',
-    'deco-assets.js?v=3',
+    'deco-assets.css?v=4',
+    'deco-assets.js?v=4',
 ]:
     if required not in index_m43_text:
         err(f"m43 Asset Manager Location Assets section missing {required}")
@@ -2249,6 +2249,8 @@ for required in [
     'light = "Lights"',
     'fence = "Fences"',
     'decoration = "Decorations"',
+    'ladder = "Ladders"',
+    'flower = "Flowers"',
     "Workspace:Raycast",
     "self.plugin:Activate(true)",
     'placed:SetAttribute("Game1DecoAssetSlug", tostring(row.slug or ""))',
@@ -2268,7 +2270,7 @@ for required in [
     'DecoPreviewWorld',
     '"Save Assets Data"',
     'self.agentBaseUrl .. "/api/location-assets/layout"',
-    'local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration" }',
+    'local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building" }',
 ]:
     if required not in deco_manager_text:
         err(f"m43 DecoManager missing {required}")
@@ -2276,7 +2278,7 @@ for required in [
 for required in [
     'require(script.Parent.modules.DecoManager)',
     'DecoManager.new({',
-    'model bridge v22',
+    'model bridge v24',
 ]:
     if required not in studio_plugin_text:
         err(f"m43 Game1Bridge DecoManager integration missing {required}")
@@ -2318,7 +2320,7 @@ for required in [
         err(f"m45 DecoManager drag/save hotfix missing {required}")
 if "self.AssetService:SavePlaceAsync" in deco_manager_text:
     err("m45 DecoManager still calls cloud SavePlaceAsync directly")
-if "model bridge v22" not in studio_plugin_text:
+if "model bridge v24" not in studio_plugin_text:
     err("m45 Studio plugin version marker is stale")
 
 # m44 Location Assets: PNG/JPG source textures with clean extension-aware preparation.
@@ -2372,14 +2374,16 @@ for required in [
         err(f"m46 Location Assets shared-texture UI behavior missing {required}")
 for required in [
     'decoration = "Decorations"',
-    'local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration" }',
-    'local row = math.floor((index - 1) / 3)',
+    'ladder = "Ladders"',
+    'flower = "Flowers"',
+    'local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building" }',
+    'local row = math.floor((index - 1) / 4)',
 ]:
     if required not in deco_manager_text:
         err(f"m46 DecoManager Decorations category missing {required}")
 if 'decoration = "Decorations"' not in deco_placement_text:
     err("m46 DecoPlacement Decorations folder mapping is missing")
-if "model bridge v22" not in studio_plugin_text:
+if "model bridge v24" not in studio_plugin_text:
     err("m46 Studio plugin version marker is stale")
 
 
@@ -2403,7 +2407,7 @@ for required in [
 ]:
     if required not in deco_loader_text:
         err(f"m47 static Location Asset sanitization missing {required}")
-if "model bridge v22" not in studio_plugin_text:
+if "model bridge v24" not in studio_plugin_text:
     err("m47 Studio plugin version marker is stale")
 
 
@@ -2437,7 +2441,7 @@ if "model:PivotTo(DecoTransform.previewPivot(model))" not in deco_manager_text:
     err("m48 DecoManager preview still replaces the imported asset basis")
 if '"DecoTransform"' not in (ROOT / "system/studio-plugin/plugin.project.json").read_text(encoding="utf-8"):
     err("m48 Studio plugin project does not include DecoTransform")
-if "model bridge v22" not in studio_plugin_text:
+if "model bridge v24" not in studio_plugin_text:
     err("m48 Studio plugin version marker is stale")
 
 
@@ -2625,10 +2629,10 @@ for required in ['EnvironmentAssetService.Start()', 'WeaponBounceService.Start()
 
 if 'control_agent_build = "game1-m50-environment-weapon-bounce-001"' not in host_agent_text:
     err("m50 Control Center build marker is stale")
-if "model bridge v22" not in studio_plugin_text:
+if "model bridge v24" not in studio_plugin_text:
     err("m51 Studio plugin version marker is stale")
 install_plugin_text = (ROOT / "system/studio-plugin/install.ps1").read_text(encoding="utf-8")
-if "model bridge v22" not in install_plugin_text:
+if "model bridge v24" not in install_plugin_text:
     err("m51 Studio plugin installer marker is stale")
 
 # m51 Location Assets: changed owned textures get a fresh Roblox Image Asset ID.
@@ -2805,7 +2809,74 @@ if errors:
         print(" -", item)
     sys.exit(1)
 
-print("verify ok · game1 m53 project-wide source-only asset storage passed")
+# m54 Location Assets UX: create mode, remembered navigation/library category, named Roblox descriptions, new categories.
+for required in [
+    "ASSET_MANAGER_VIEW_KEY='game1.assetManager.activeSection'",
+    "window.addEventListener('load',restoreAssetManagerView)",
+    "localStorage.setItem(ASSET_MANAGER_VIEW_KEY,view)",
+]:
+    if required not in character_js_text:
+        err(f"m54 Asset Manager remembered section missing {required}")
+for required in [
+    "DECO_LIBRARY_CATEGORY_KEY = 'game1.locationAssets.libraryCategory'",
+    "DECO_SELECTED_ASSET_KEY = 'game1.locationAssets.selectedAsset'",
+    "function decoAssetBeginNew()",
+    "new-location-asset-main",
+    "location-asset-library-category",
+    "save asset changes",
+]:
+    if required not in deco_assets_js_text and required not in index_m43_text:
+        err(f"m54 Location Assets UX missing {required}")
+for required in [
+    'id="new-location-asset-main"',
+    'id="location-asset-library-category"',
+    'ladders</span>',
+    'flowers</span>',
+    'game1 location asset · Oak Tree',
+]:
+    if required not in index_m43_text:
+        err(f"m54 Location Assets markup missing {required}")
+for required in [
+    '"ladder": "Ladders"',
+    '"flower": "Flowers"',
+    'description = f"{description} · {asset_name}"',
+]:
+    if required not in location_asset_store_text:
+        err(f"m54 LocationAssetStore missing {required}")
+for required in [
+    'ladder = "Ladders"',
+    'flower = "Flowers"',
+    'local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building" }',
+    'local column = (index - 1) % 4',
+]:
+    if required not in deco_manager_text:
+        err(f"m54 DecoManager category support missing {required}")
+for required in ['ladder = "Ladders"', 'flower = "Flowers"']:
+    if required not in deco_placement_text:
+        err(f"m54 DecoPlacement category folder missing {required}")
+if "model bridge v24" not in studio_plugin_text or "model bridge v24" not in install_plugin_text:
+    err("m54 Studio plugin version marker must match current bridge")
+
+# m55 Location Assets: Buildings + synchronized editor/library category context.
+for required in [
+    '"building": "Buildings"',
+    'building = "Buildings"',
+    'buildings</span>',
+    'function decoAssetUseCategory(category',
+    "$('location-asset-category').onchange",
+]:
+    if required not in location_asset_store_text and required not in deco_manager_text and required not in deco_placement_text and required not in index_m43_text and required not in deco_assets_js_text:
+        err(f"m55 Buildings/category synchronization missing {required}")
+if 'category filter<select id="location-asset-library-category"' not in index_m43_text:
+    err("m55 library category filter label missing")
+if "decoAssetUseCategory($('location-asset-category').value, { updateEditor: false })" not in deco_assets_js_text:
+    err("m55 editor category must synchronize library filter")
+if "decoAssetUseCategory(category);" not in deco_assets_js_text:
+    err("m55 library category must synchronize editor category")
+if 'model bridge v24' not in studio_plugin_text or 'model bridge v24' not in install_plugin_text:
+    err("m55 Studio plugin version marker must be v24")
+
+print("verify ok · game1 m55 Buildings + synchronized Location Asset category context passed")
 print("registered character archetypes:", len(archetypes))
 print("active character archetype:", active_id or "none")
 print("race pool: human")

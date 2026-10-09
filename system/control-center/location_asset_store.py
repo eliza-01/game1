@@ -17,7 +17,7 @@ from opencloud_assets import (
 
 SCHEMA_VERSION = 4
 PROJECT = "game1"
-CATEGORIES = ("tree", "bush", "rock", "light", "fence", "decoration")
+CATEGORIES = ("tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building")
 TEXTURE_SUFFIXES = (".png", ".jpg", ".jpeg")
 CATEGORY_LABELS = {
     "tree": "Trees",
@@ -26,6 +26,9 @@ CATEGORY_LABELS = {
     "light": "Lights",
     "fence": "Fences",
     "decoration": "Decorations",
+    "ladder": "Ladders",
+    "flower": "Flowers",
+    "building": "Buildings",
 }
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_]{0,63}$")
 
@@ -272,7 +275,7 @@ class LocationAssetStore:
         category = str(payload.get("category") or (old.get("category") if old else "") or "").strip().lower()
         destructible = parse_bool(payload.get("destructible"), bool(old.get("destructible")) if old else False)
         if category not in CATEGORIES:
-            raise ValueError("location asset category must be tree, bush, rock, light, fence or decoration")
+            raise ValueError("location asset category must be tree, bush, rock, light, fence, decoration, ladder, flower or building")
 
         selected_model = str(payload.get("modelSourcePath") or "").strip()
         selected_texture = str(payload.get("textureSourcePath") or "").strip()
@@ -405,7 +408,11 @@ class LocationAssetStore:
         api_key = str(credentials.get("apiKey") or "")
         creator_type = str(credentials.get("creatorType") or "")
         creator_id = str(credentials.get("creatorId") or "")
-        description = str(credentials.get("description") or "game1 location asset").strip()
+        base_description = str(credentials.get("description") or "game1 location asset").strip()
+        description = base_description or "game1 location asset"
+        asset_name = str(row.get("name_en") or "").strip()
+        if asset_name and asset_name.casefold() not in description.casefold():
+            description = f"{description} · {asset_name}"
 
         if str(row.get("model_published_sha256") or "") != str(row.get("model_sha256") or ""):
             current_asset_id = str(row.get("model_asset_id") or "").strip()

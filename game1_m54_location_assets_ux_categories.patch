@@ -1,0 +1,602 @@
+diff --git a/assets/manifests/location-assets.json b/assets/manifests/location-assets.json
+index 020f0c9..11aa7d5 100644
+--- a/assets/manifests/location-assets.json
++++ b/assets/manifests/location-assets.json
+@@ -26,6 +26,14 @@
+       {
+         "id": "decoration",
+         "label": "Decorations"
++      },
++      {
++        "id": "ladder",
++        "label": "Ladders"
++      },
++      {
++        "id": "flower",
++        "label": "Flowers"
+       }
+     ]
+   },
+diff --git a/system/control-center/location_asset_store.py b/system/control-center/location_asset_store.py
+index 10c3ddc..358299b 100644
+--- a/system/control-center/location_asset_store.py
++++ b/system/control-center/location_asset_store.py
+@@ -17,7 +17,7 @@ from opencloud_assets import (
+ 
+ SCHEMA_VERSION = 4
+ PROJECT = "game1"
+-CATEGORIES = ("tree", "bush", "rock", "light", "fence", "decoration")
++CATEGORIES = ("tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower")
+ TEXTURE_SUFFIXES = (".png", ".jpg", ".jpeg")
+ CATEGORY_LABELS = {
+     "tree": "Trees",
+@@ -26,6 +26,8 @@ CATEGORY_LABELS = {
+     "light": "Lights",
+     "fence": "Fences",
+     "decoration": "Decorations",
++    "ladder": "Ladders",
++    "flower": "Flowers",
+ }
+ SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_]{0,63}$")
+ 
+@@ -272,7 +274,7 @@ class LocationAssetStore:
+         category = str(payload.get("category") or (old.get("category") if old else "") or "").strip().lower()
+         destructible = parse_bool(payload.get("destructible"), bool(old.get("destructible")) if old else False)
+         if category not in CATEGORIES:
+-            raise ValueError("location asset category must be tree, bush, rock, light, fence or decoration")
++            raise ValueError("location asset category must be tree, bush, rock, light, fence, decoration, ladder or flower")
+ 
+         selected_model = str(payload.get("modelSourcePath") or "").strip()
+         selected_texture = str(payload.get("textureSourcePath") or "").strip()
+@@ -405,7 +407,11 @@ class LocationAssetStore:
+         api_key = str(credentials.get("apiKey") or "")
+         creator_type = str(credentials.get("creatorType") or "")
+         creator_id = str(credentials.get("creatorId") or "")
+-        description = str(credentials.get("description") or "game1 location asset").strip()
++        base_description = str(credentials.get("description") or "game1 location asset").strip()
++        description = base_description or "game1 location asset"
++        asset_name = str(row.get("name_en") or "").strip()
++        if asset_name and asset_name.casefold() not in description.casefold():
++            description = f"{description} · {asset_name}"
+ 
+         if str(row.get("model_published_sha256") or "") != str(row.get("model_sha256") or ""):
+             current_asset_id = str(row.get("model_asset_id") or "").strip()
+diff --git a/system/control-center/static/character-assets.js b/system/control-center/static/character-assets.js
+index df8d298..da1c0b2 100644
+--- a/system/control-center/static/character-assets.js
++++ b/system/control-center/static/character-assets.js
+@@ -6,6 +6,8 @@ const state = {
+ const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const FILENAME_GUIDE_OPEN_KEY='game1.animation.filenameRules.open';
+ const ANIMATION_FOLDER_KEY='game1.animation.folder';
++const ASSET_MANAGER_VIEW_KEY='game1.assetManager.activeSection';
++const ASSET_MANAGER_VIEWS=new Set(['characters','animations','animation-speed','weapons','monsters','locations','location-assets','timelines','options']);
+ 
+ function normalizeAnimationFolderPath(value){
+   let path=String(value??'').trim();
+@@ -42,7 +44,9 @@ function syncIdentity(){if(state.selected)return;$('character-id').value=identit
+ function statusTag(status){return `<span class="tag ${String(status||'').toLowerCase()}">${esc(status||'')}</span>`}
+ 
+ function setView(view){
++  if(!ASSET_MANAGER_VIEWS.has(view))view='characters';
+   state.view=view;
++  try{localStorage.setItem(ASSET_MANAGER_VIEW_KEY,view)}catch{}
+   $('characters-view').hidden=view!=='characters';$('animations-view').hidden=view!=='animations';$('animation-speed-view').hidden=view!=='animation-speed';$('weapons-view').hidden=view!=='weapons';$('monsters-view').hidden=view!=='monsters';$('locations-view').hidden=view!=='locations';$('location-assets-view').hidden=view!=='location-assets';$('timelines-view').hidden=view!=='timelines';$('options-view').hidden=view!=='options';
+   $('character-rail').hidden=view!=='characters';$('animation-rail').hidden=view!=='animations';$('weapon-rail').hidden=view!=='weapons';$('monster-rail').hidden=view!=='monsters';$('location-asset-rail').hidden=view!=='location-assets';
+   $('nav-characters').classList.toggle('active',view==='characters');$('nav-animations').classList.toggle('active',view==='animations');$('nav-animation-speed').classList.toggle('active',view==='animation-speed');$('nav-weapons').classList.toggle('active',view==='weapons');$('nav-monsters').classList.toggle('active',view==='monsters');$('nav-locations').classList.toggle('active',view==='locations');$('nav-location-assets').classList.toggle('active',view==='location-assets');$('nav-timelines').classList.toggle('active',view==='timelines');$('nav-options').classList.toggle('active',view==='options');
+@@ -135,6 +139,9 @@ async function setAnimationWeight(bindingId,weight){try{state.animations=await r
+ async function setAnimationDuplicate(clipId,enabled){try{state.animations=await request('/api/animations/'+encodeURIComponent(clipId)+'/duplicate-first-frame',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:!!enabled})});state.animations.publication=state.data?.publication||{};renderAnimations();toast(enabled?'runtime first-frame tail enabled; asset bytes are unchanged':'runtime first-frame tail disabled; asset bytes are unchanged')}catch(error){await loadAnimations();toast(error.message,true)}}
+ async function removeAnimationBinding(bindingId){if(!confirm('remove this semantic animation binding from game1? canonical source files are preserved.'))return;try{state.animations=await request('/api/animation-bindings/'+encodeURIComponent(bindingId),{method:'DELETE'});state.animations.publication=state.data?.publication||{};if(state.animationSelected===bindingId)state.animationSelected=null;renderAnimations();toast('animation binding removed')}catch(error){toast(error.message,true)}}
+ 
++function restoreAssetManagerView(){let saved='characters';try{saved=localStorage.getItem(ASSET_MANAGER_VIEW_KEY)||'characters'}catch{}setView(ASSET_MANAGER_VIEWS.has(saved)?saved:'characters')}
++window.addEventListener('load',restoreAssetManagerView);
++
+ $('display-name').oninput=()=>{if(!state.selected)state.autoDisplayName=false};$('nav-characters').onclick=()=>setView('characters');$('nav-animations').onclick=()=>setView('animations');$('nav-animation-speed').onclick=()=>setView('animation-speed');$('nav-weapons').onclick=()=>setView('weapons');$('nav-monsters').onclick=()=>setView('monsters');$('nav-locations').onclick=()=>setView('locations');$('nav-location-assets').onclick=()=>setView('location-assets');$('nav-timelines').onclick=()=>setView('timelines');$('nav-options').onclick=()=>setView('options');$('race').onchange=syncIdentity;$('gender').onchange=syncIdentity;$('choose-model').onclick=chooseModel;$('save-archetype').onclick=saveArchetype;$('save-character-stats').onclick=saveCharacterStats;$('register-character').onclick=registerCharacter;$('publish-character').onclick=()=>publishCharacter();$('sync-character').onclick=()=>syncStudio();$('activate-character').onclick=()=>activate();$('new-character').onclick=()=>setForm(null);$('clear-form').onclick=()=>setForm(null);$('refresh').onclick=loadCharacters;$('validate-view').onclick=loadCharacters;$('theme').onclick=()=>document.body.classList.toggle('light');
+ $('animation-character').onchange=()=>{state.animationCharacter=$('animation-character').value;state.animationSelected=null;state.lastScan=null;loadAnimations()};$('choose-animation-folder').onclick=chooseAnimationFolder;$('scan-animations').onclick=scanAnimations;$('publish-missing-animations').onclick=publishMissingAnimations;$('check-roblox-animations').onclick=checkRobloxAnimationAssets;$('refresh-animations').onclick=loadAnimations;
+ initAnimationFolderExplorer();
+diff --git a/system/control-center/static/deco-assets.css b/system/control-center/static/deco-assets.css
+index 0a34e50..e0a8917 100644
+--- a/system/control-center/static/deco-assets.css
++++ b/system/control-center/static/deco-assets.css
+@@ -97,3 +97,31 @@
+   color: var(--muted);
+   line-height: 1.4;
+ }
++
++.deco-library-controls {
++  display: flex;
++  align-items: end;
++  gap: 8px;
++  flex-wrap: wrap;
++}
++
++.deco-library-controls label {
++  margin: 0;
++  min-width: 150px;
++  color: var(--muted);
++  font-size: 10px;
++  text-transform: uppercase;
++  letter-spacing: .06em;
++}
++
++.deco-library-controls select {
++  min-width: 150px;
++  margin-top: 4px;
++}
++
++@media (max-width: 650px) {
++  .deco-library-controls { width: 100%; }
++  .deco-library-controls label,
++  .deco-library-controls select,
++  .deco-library-controls button { width: 100%; }
++}
+diff --git a/system/control-center/static/deco-assets.js b/system/control-center/static/deco-assets.js
+index cbd9953..27f250e 100644
+--- a/system/control-center/static/deco-assets.js
++++ b/system/control-center/static/deco-assets.js
+@@ -4,8 +4,26 @@ const decoAssetState = {
+   modelPath: '',
+   texturePath: '',
+   textureReferenceSlug: '',
++  libraryCategory: 'all',
+ };
+ 
++const DECO_LIBRARY_CATEGORY_KEY = 'game1.locationAssets.libraryCategory';
++const DECO_SELECTED_ASSET_KEY = 'game1.locationAssets.selectedAsset';
++
++function decoAssetRemember(key, value) {
++  try {
++    if (value) localStorage.setItem(key, value);
++    else localStorage.removeItem(key);
++  } catch {}
++}
++
++function decoAssetRestorePreferences() {
++  try {
++    decoAssetState.libraryCategory = localStorage.getItem(DECO_LIBRARY_CATEGORY_KEY) || 'all';
++    decoAssetState.selected = localStorage.getItem(DECO_SELECTED_ASSET_KEY) || null;
++  } catch {}
++}
++
+ function decoAssetSelected() {
+   return decoAssetState.data?.items?.find((row) => row.slug === decoAssetState.selected) || null;
+ }
+@@ -34,8 +52,15 @@ function decoAssetSyncSlug() {
+   }
+ }
+ 
++function decoAssetBeginNew() {
++  decoAssetSetForm(null);
++  const input = $('location-asset-name');
++  if (input) input.focus();
++}
++
+ function decoAssetSetForm(row) {
+   decoAssetState.selected = row?.slug || null;
++  decoAssetRemember(DECO_SELECTED_ASSET_KEY, decoAssetState.selected || '');
+   decoAssetState.modelPath = '';
+   decoAssetState.texturePath = '';
+   decoAssetState.textureReferenceSlug = row?.texture_reference_slug || '';
+@@ -106,6 +131,22 @@ function decoAssetRenderTextureReferences() {
+   select.value = current;
+ }
+ 
++function decoAssetRenderLibraryFilter() {
++  const select = $('location-asset-library-category');
++  if (!select) return;
++  const categories = decoAssetState.data?.options?.categories || [];
++  const valid = new Set(['all', ...categories.map((row) => row.id)]);
++  if (!valid.has(decoAssetState.libraryCategory)) decoAssetState.libraryCategory = 'all';
++  select.innerHTML = '<option value="all">all categories</option>';
++  for (const category of categories) {
++    const option = document.createElement('option');
++    option.value = category.id;
++    option.textContent = category.label;
++    select.appendChild(option);
++  }
++  select.value = decoAssetState.libraryCategory;
++}
++
+ function decoAssetRender() {
+   if (!decoAssetState.data) return;
+ 
+@@ -128,6 +169,8 @@ function decoAssetRender() {
+ 
+   decoAssetRenderTree();
+   decoAssetRenderTextureReferences();
++  decoAssetRenderLibraryFilter();
++  $('register-location-asset').textContent = selected ? 'save asset changes' : 'register asset';
+ 
+   const publication = decoAssetState.data.publication || {};
+   const publicationState = $('location-asset-publication-state');
+@@ -154,13 +197,21 @@ function decoAssetRender() {
+ 
+   const rows = $('location-asset-rows');
+   rows.innerHTML = '';
+-  for (const row of decoAssetState.data.items || []) {
++  const libraryRows = (decoAssetState.data.items || []).filter((row) =>
++    decoAssetState.libraryCategory === 'all' || row.category === decoAssetState.libraryCategory
++  );
++  for (const row of libraryRows) {
+     const tr = document.createElement('tr');
+     const contactPolicy = (row.destructible === true || Number(row.destructible || 0) === 1) ? '<span class="tag">destructible</span>' : '<span class="tag published">solid · bounce</span>';
+     tr.innerHTML = `<td><b>${esc(row.name_en)}</b><small>${esc(row.slug)}</small></td><td>${esc(decoAssetCategoryLabel(row.category))}</td><td>${contactPolicy}</td><td><small>model ${esc(row.model_asset_id || '—')}</small><small>${row.texture_shared ? `shared ${esc(row.texture_owner_slug || row.texture_reference_slug)} · ` : 'texture '}${esc(row.texture_asset_id || '—')}</small></td><td>${decoAssetStatusTag(row.status)}</td><td><button data-select type="button">edit</button></td>`;
+     tr.querySelector('[data-select]').onclick = () => decoAssetSetForm(row);
+     rows.appendChild(tr);
+   }
++  if (!libraryRows.length) {
++    const tr = document.createElement('tr');
++    tr.innerHTML = `<td colspan="6"><span class="muted">no registered assets in ${esc(decoAssetState.libraryCategory === 'all' ? 'the library' : decoAssetCategoryLabel(decoAssetState.libraryCategory))}.</span></td>`;
++    rows.appendChild(tr);
++  }
+ }
+ 
+ async function decoAssetLoad() {
+@@ -168,6 +219,7 @@ async function decoAssetLoad() {
+     decoAssetState.data = await request('/api/location-assets');
+     if (decoAssetState.selected && !decoAssetSelected()) {
+       decoAssetState.selected = null;
++      decoAssetRemember(DECO_SELECTED_ASSET_KEY, '');
+     }
+     decoAssetRender();
+   } catch (error) {
+@@ -266,9 +318,11 @@ async function decoAssetDelete() {
+   }
+ }
+ 
++decoAssetRestorePreferences();
+ window.game1LocationAssetsLoad = decoAssetLoad;
+ $('location-asset-name').oninput = decoAssetSyncSlug;
+-$('new-location-asset').onclick = () => decoAssetSetForm(null);
++$('new-location-asset').onclick = decoAssetBeginNew;
++$('new-location-asset-main').onclick = decoAssetBeginNew;
+ $('refresh-location-assets').onclick = decoAssetLoad;
+ $('refresh-location-assets-table').onclick = decoAssetLoad;
+ $('choose-location-asset-model').onclick = decoAssetChooseModel;
+@@ -282,7 +336,12 @@ $('location-asset-texture-reference').onchange = () => {
+     $('picked-location-asset-texture').textContent = 'PNG/JPG not selected';
+   }
+ };
++$('location-asset-library-category').onchange = () => {
++  decoAssetState.libraryCategory = $('location-asset-library-category').value || 'all';
++  decoAssetRemember(DECO_LIBRARY_CATEGORY_KEY, decoAssetState.libraryCategory);
++  decoAssetRender();
++};
+ $('register-location-asset').onclick = decoAssetRegister;
+-$('clear-location-asset-form').onclick = () => decoAssetSetForm(null);
++$('clear-location-asset-form').onclick = decoAssetBeginNew;
+ $('publish-location-asset').onclick = decoAssetPublish;
+ $('delete-location-asset').onclick = decoAssetDelete;
+diff --git a/system/control-center/static/index.html b/system/control-center/static/index.html
+index 23c515b..b477253 100644
+--- a/system/control-center/static/index.html
++++ b/system/control-center/static/index.html
+@@ -6,12 +6,12 @@
+ <title>game1 · asset manager</title>
+ <link rel="stylesheet" href="asset-manager.css?v=8">
+ <link rel="stylesheet" href="location-assets.css?v=1">
+-<link rel="stylesheet" href="deco-assets.css?v=3">
++<link rel="stylesheet" href="deco-assets.css?v=4">
+ </head>
+ <body>
+ <header>
+ <div><span class="eyebrow">game1 · control center</span><h1>asset manager</h1></div>
+-<div class="header-actions"><span class="pill">characters + animations + weapons + monsters + locations + location assets + timelines · m46</span><button id="theme" class="icon" type="button" title="theme">◐</button></div>
++<div class="header-actions"><span class="pill">characters + animations + weapons + monsters + locations + location assets + timelines · m54</span><button id="theme" class="icon" type="button" title="theme">◐</button></div>
+ </header>
+ <main>
+ <aside class="panel rail">
+@@ -23,7 +23,7 @@
+ <button id="nav-weapons" class="asset-section" type="button"><b>weapons</b><small>models · textures · stats</small></button>
+ <button id="nav-monsters" class="asset-section" type="button"><b>monsters</b><small>rigs · stats · animations</small></button>
+ <button id="nav-locations" class="asset-section" type="button"><b>locations</b><small>polygon registry · studio authoring</small></button>
+-<button id="nav-location-assets" class="asset-section" type="button"><b>location assets</b><small>trees · bushes · rocks · lights · fences · decorations</small></button>
++<button id="nav-location-assets" class="asset-section" type="button"><b>location assets</b><small>trees · bushes · rocks · lights · fences · decorations · ladders · flowers</small></button>
+ <button id="nav-timelines" class="asset-section" type="button"><b>timelines</b><small>attack animation events</small></button>
+ <button id="nav-options" class="asset-section" type="button"><b>options</b><small>common runtime settings</small></button>
+ </div>
+@@ -238,13 +238,13 @@
+ 
+ <div id="location-assets-view" hidden>
+ <div class="panel hero">
+-<div><span class="eyebrow">environment library · published decor</span><h2>location assets</h2><p>register a static decoration with one FBX and either a new PNG/JPG texture or a texture already registered by another location asset. replacing an owned texture publishes a new Roblox Image Asset ID; assets reusing that texture follow the owner's new ID automatically. publish the required assets, then place published variants through Studio DecoManager. placed instances belong to the place; registry publication and placement backups stay separate.</p><div class="deco-category-strip"><span>trees</span><span>bushes</span><span>rocks</span><span>lights</span><span>fences</span><span>decorations</span></div></div>
++<div><span class="eyebrow">environment library · published decor</span><h2>location assets</h2><p>register a static decoration with one FBX and either a new PNG/JPG texture or a texture already registered by another location asset. replacing an owned texture publishes a new Roblox Image Asset ID; assets reusing that texture follow the owner's new ID automatically. publish the required assets, then place published variants through Studio DecoManager. placed instances belong to the place; registry publication and placement backups stay separate.</p><div class="deco-category-strip"><span>trees</span><span>bushes</span><span>rocks</span><span>lights</span><span>fences</span><span>decorations</span><span>ladders</span><span>flowers</span></div></div>
+ <div class="metrics"><div><b id="location-asset-metric-total">0</b><span>registered</span></div><div><b id="location-asset-metric-published">0</b><span>published</span></div><div><b id="location-asset-metric-changed">0</b><span>changed</span></div></div>
+ </div>
+ <div class="panel runtime-card"><div class="runtime-state registered"><strong>DecoManager registry</strong><span>Studio reads published entries directly from Asset Manager. No ServerStorage sync is required.</span></div><div id="location-asset-publication-state" class="publication-missing">open cloud: checking…</div></div>
+ <div class="deco-asset-workflow">
+ <div class="panel character-card">
+-<span class="eyebrow">01 · identity</span><h3>register location asset</h3>
++<div class="section-title"><div><span>01 · identity</span><h3>register location asset</h3></div><button id="new-location-asset-main" type="button">new asset</button></div>
+ <label>asset name<input id="location-asset-name" autocomplete="off" placeholder="for example Oak Tree"></label>
+ <label>slug<input id="location-asset-slug" readonly><small class="hint">stable lowercase id generated from the asset name.</small></label>
+ <label>category<select id="location-asset-category"></select></label>
+@@ -257,12 +257,12 @@
+ <div class="actions"><button id="register-location-asset" class="primary" type="button">register asset</button><button id="clear-location-asset-form" type="button">clear form</button><button id="delete-location-asset" class="danger" type="button" disabled>delete</button></div>
+ <hr class="card-separator">
+ <span class="eyebrow">03 · publication</span><h3 class="subheading">Roblox model + image</h3>
+-<label>description<input id="location-asset-publication-description" value="game1 location asset"></label>
++<label>description<input id="location-asset-publication-description" value="game1 location asset"><small class="hint">the asset name is appended automatically in Roblox, for example <code>game1 location asset · Oak Tree</code>.</small></label>
+ <div class="actions"><button id="publish-location-asset" class="primary" type="button" disabled>publish all changed</button></div>
+ <small id="location-asset-publication-hint" class="hint">select a registered location asset.</small>
+ </div>
+ <div class="panel character-card">
+-<div class="section-title"><div><span>published library</span><h3>registered assets</h3></div><button id="refresh-location-assets-table" type="button">refresh</button></div>
++<div class="section-title"><div><span>published library</span><h3>registered assets</h3></div><div class="deco-library-controls"><label>category<select id="location-asset-library-category"><option value="all">all categories</option></select></label><button id="refresh-location-assets-table" type="button">refresh</button></div></div>
+ <div class="deco-assets-note"><strong>Studio placement</strong><span>Open <b>DecoManager</b> in Roblox Studio, choose a category, browse variants with arrows, then Place. <b>Save Assets Data</b> snapshots all placed instances and saves the place.</span></div>
+ <div class="table-wrap weapon-table-wrap"><table><thead><tr><th>asset</th><th>category</th><th>weapon contact</th><th>Roblox assets</th><th>status</th><th></th></tr></thead><tbody id="location-asset-rows"></tbody></table></div>
+ </div>
+@@ -369,7 +369,7 @@
+ <script src="animation-speed.js?v=1"></script>
+ <script src="timelines.js?v=2"></script>
+ <script src="locations.js?v=1"></script>
+-<script src="deco-assets.js?v=3"></script>
++<script src="deco-assets.js?v=4"></script>
+ <script src="options.js?v=1"></script>
+ <script src="weapon-assets.js?v=3"></script>
+ <script src="monster-assets.js?v=4"></script>
+diff --git a/system/studio-plugin/Game1Bridge.server.luau b/system/studio-plugin/Game1Bridge.server.luau
+index 2c09b02..31b36c0 100644
+--- a/system/studio-plugin/Game1Bridge.server.luau
++++ b/system/studio-plugin/Game1Bridge.server.luau
+@@ -1805,4 +1805,4 @@ task.spawn(function()
+     end
+ end)
+ 
+-print("[game1 plugin] loaded · model bridge v22 · DecoManager identity-only placement + environment bounce authoring + locations + viewport timeline pose sampler")
++print("[game1 plugin] loaded · model bridge v23 · DecoManager identity-only placement + environment bounce authoring + locations + viewport timeline pose sampler")
+diff --git a/system/studio-plugin/install.ps1 b/system/studio-plugin/install.ps1
+index 4e09660..7e94c9d 100644
+--- a/system/studio-plugin/install.ps1
++++ b/system/studio-plugin/install.ps1
+@@ -20,7 +20,7 @@ try {
+ 
+ if(-not (Test-Path $Temp)){throw 'Rojo did not create the plugin build'}
+ $BuiltText=Get-Content $Temp -Raw
+-foreach($Marker in @('Game1ControlCenter','model bridge v22','Game1AttackTimeline_v2','TimelinePreviewWorld','location-authoring','Game1LocationMarker','Game1DecoManager_v1','DecoPreviewWorld','Save Assets Data','Game1DecoAssets')){
++foreach($Marker in @('Game1ControlCenter','model bridge v23','Game1AttackTimeline_v2','TimelinePreviewWorld','location-authoring','Game1LocationMarker','Game1DecoManager_v1','DecoPreviewWorld','Save Assets Data','Game1DecoAssets')){
+     if(-not $BuiltText.Contains($Marker)){
+         throw "Studio bridge build is stale or incomplete; missing marker: $Marker"
+     }
+diff --git a/system/studio-plugin/modules/DecoManager.luau b/system/studio-plugin/modules/DecoManager.luau
+index 6036a6c..37486b0 100644
+--- a/system/studio-plugin/modules/DecoManager.luau
++++ b/system/studio-plugin/modules/DecoManager.luau
+@@ -6,7 +6,7 @@ local DecoPlacedAssetSync = require(script.Parent.DecoPlacedAssetSync)
+ local DecoManager = {}
+ DecoManager.__index = DecoManager
+ 
+-local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration" }
++local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower" }
+ local CATEGORY_LABELS = {
+     tree = "Trees",
+     bush = "Bushes",
+@@ -14,6 +14,8 @@ local CATEGORY_LABELS = {
+     light = "Lights",
+     fence = "Fences",
+     decoration = "Decorations",
++    ladder = "Ladders",
++    flower = "Flowers",
+ }
+ 
+ local function newLabel(parent: Instance, text: string, size: UDim2, position: UDim2, textSize: number, bold: boolean?): TextLabel
+@@ -123,9 +125,9 @@ function DecoManager:_buildUI()
+     categoryHost.Parent = root
+     self.categoryButtons = {}
+     for index, category in ipairs(CATEGORY_ORDER) do
+-        local column = (index - 1) % 3
+-        local row = math.floor((index - 1) / 3)
+-        local button = newButton(categoryHost, CATEGORY_LABELS[category], UDim2.new(1 / 3, -5, 0, 32), UDim2.new(column / 3, 0, 0, row * 36))
++        local column = (index - 1) % 4
++        local row = math.floor((index - 1) / 4)
++        local button = newButton(categoryHost, CATEGORY_LABELS[category], UDim2.new(1 / 4, -5, 0, 32), UDim2.new(column / 4, 0, 0, row * 36))
+         button.TextSize = 11
+         self.categoryButtons[category] = button
+     end
+diff --git a/system/studio-plugin/modules/DecoPlacement.luau b/system/studio-plugin/modules/DecoPlacement.luau
+index 120de8e..8ba5fdb 100644
+--- a/system/studio-plugin/modules/DecoPlacement.luau
++++ b/system/studio-plugin/modules/DecoPlacement.luau
+@@ -11,6 +11,8 @@ local CATEGORY_FOLDERS = {
+     light = "Lights",
+     fence = "Fences",
+     decoration = "Decorations",
++    ladder = "Ladders",
++    flower = "Flowers",
+ }
+ 
+ local function prepareGhost(model: Model)
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index 0f7994a..86a0540 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -1974,7 +1974,7 @@ for required in [
+     'AnimationClipProvider:GetAnimationClipAsync',
+     'clip:IsA("KeyframeSequence")',
+     'preview.Parent = timelineWorld',
+-    'model bridge v22',
++    'model bridge v23',
+ ]:
+     if required not in studio_plugin_text:
+         err(f"m37 in-plugin timeline preview missing {required}")
+@@ -2106,7 +2106,7 @@ for required in [
+ ]:
+     if required not in location_plugin_text:
+         err(f"m41 Studio Location authoring module missing {required}")
+-for required in ['require(script.Parent.modules.LocationCommands)', 'data.command == "location-authoring"', 'model bridge v22']:
++for required in ['require(script.Parent.modules.LocationCommands)', 'data.command == "location-authoring"', 'model bridge v23']:
+     if required not in studio_plugin_text:
+         err(f"m41 Game1Bridge Location integration missing {required}")
+ 
+@@ -2155,13 +2155,13 @@ if location_asset_manifest_path.is_file():
+     if location_asset_manifest.get("schemaVersion") != 4 or location_asset_manifest.get("project") != "game1":
+         err("m43 location-assets.json schema/project is invalid")
+     category_ids = [row.get("id") for row in ((location_asset_manifest.get("options") or {}).get("categories") or [])]
+-    if category_ids != ["tree", "bush", "rock", "light", "fence", "decoration"]:
+-        err("m46 Location Assets categories must be tree/bush/rock/light/fence/decoration in canonical order")
++    if category_ids != ["tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower"]:
++        err("m46 Location Assets categories must be tree/bush/rock/light/fence/decoration/ladder/flower in canonical order")
+ 
+ location_asset_store_text = location_asset_store_path.read_text(encoding="utf-8") if location_asset_store_path.is_file() else ""
+ for required in [
+     "class LocationAssetStore",
+-    'CATEGORIES = ("tree", "bush", "rock", "light", "fence", "decoration")',
++    'CATEGORIES = ("tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower")',
+     "assets/source/location-assets",
+     "model_path TEXT NOT NULL DEFAULT ''",
+     "texture_path TEXT NOT NULL DEFAULT ''",
+@@ -2207,8 +2207,8 @@ for required in [
+     'id="choose-location-asset-model"',
+     'id="choose-location-asset-texture"',
+     'id="publish-location-asset"',
+-    'deco-assets.css?v=3',
+-    'deco-assets.js?v=3',
++    'deco-assets.css?v=4',
++    'deco-assets.js?v=4',
+ ]:
+     if required not in index_m43_text:
+         err(f"m43 Asset Manager Location Assets section missing {required}")
+@@ -2249,6 +2249,8 @@ for required in [
+     'light = "Lights"',
+     'fence = "Fences"',
+     'decoration = "Decorations"',
++    'ladder = "Ladders"',
++    'flower = "Flowers"',
+     "Workspace:Raycast",
+     "self.plugin:Activate(true)",
+     'placed:SetAttribute("Game1DecoAssetSlug", tostring(row.slug or ""))',
+@@ -2268,7 +2270,7 @@ for required in [
+     'DecoPreviewWorld',
+     '"Save Assets Data"',
+     'self.agentBaseUrl .. "/api/location-assets/layout"',
+-    'local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration" }',
++    'local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower" }',
+ ]:
+     if required not in deco_manager_text:
+         err(f"m43 DecoManager missing {required}")
+@@ -2276,7 +2278,7 @@ for required in [
+ for required in [
+     'require(script.Parent.modules.DecoManager)',
+     'DecoManager.new({',
+-    'model bridge v22',
++    'model bridge v23',
+ ]:
+     if required not in studio_plugin_text:
+         err(f"m43 Game1Bridge DecoManager integration missing {required}")
+@@ -2318,7 +2320,7 @@ for required in [
+         err(f"m45 DecoManager drag/save hotfix missing {required}")
+ if "self.AssetService:SavePlaceAsync" in deco_manager_text:
+     err("m45 DecoManager still calls cloud SavePlaceAsync directly")
+-if "model bridge v22" not in studio_plugin_text:
++if "model bridge v23" not in studio_plugin_text:
+     err("m45 Studio plugin version marker is stale")
+ 
+ # m44 Location Assets: PNG/JPG source textures with clean extension-aware preparation.
+@@ -2372,14 +2374,16 @@ for required in [
+         err(f"m46 Location Assets shared-texture UI behavior missing {required}")
+ for required in [
+     'decoration = "Decorations"',
+-    'local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration" }',
+-    'local row = math.floor((index - 1) / 3)',
++    'ladder = "Ladders"',
++    'flower = "Flowers"',
++    'local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower" }',
++    'local row = math.floor((index - 1) / 4)',
+ ]:
+     if required not in deco_manager_text:
+         err(f"m46 DecoManager Decorations category missing {required}")
+ if 'decoration = "Decorations"' not in deco_placement_text:
+     err("m46 DecoPlacement Decorations folder mapping is missing")
+-if "model bridge v22" not in studio_plugin_text:
++if "model bridge v23" not in studio_plugin_text:
+     err("m46 Studio plugin version marker is stale")
+ 
+ 
+@@ -2403,7 +2407,7 @@ for required in [
+ ]:
+     if required not in deco_loader_text:
+         err(f"m47 static Location Asset sanitization missing {required}")
+-if "model bridge v22" not in studio_plugin_text:
++if "model bridge v23" not in studio_plugin_text:
+     err("m47 Studio plugin version marker is stale")
+ 
+ 
+@@ -2437,7 +2441,7 @@ if "model:PivotTo(DecoTransform.previewPivot(model))" not in deco_manager_text:
+     err("m48 DecoManager preview still replaces the imported asset basis")
+ if '"DecoTransform"' not in (ROOT / "system/studio-plugin/plugin.project.json").read_text(encoding="utf-8"):
+     err("m48 Studio plugin project does not include DecoTransform")
+-if "model bridge v22" not in studio_plugin_text:
++if "model bridge v23" not in studio_plugin_text:
+     err("m48 Studio plugin version marker is stale")
+ 
+ 
+@@ -2625,10 +2629,10 @@ for required in ['EnvironmentAssetService.Start()', 'WeaponBounceService.Start()
+ 
+ if 'control_agent_build = "game1-m50-environment-weapon-bounce-001"' not in host_agent_text:
+     err("m50 Control Center build marker is stale")
+-if "model bridge v22" not in studio_plugin_text:
++if "model bridge v23" not in studio_plugin_text:
+     err("m51 Studio plugin version marker is stale")
+ install_plugin_text = (ROOT / "system/studio-plugin/install.ps1").read_text(encoding="utf-8")
+-if "model bridge v22" not in install_plugin_text:
++if "model bridge v23" not in install_plugin_text:
+     err("m51 Studio plugin installer marker is stale")
+ 
+ # m51 Location Assets: changed owned textures get a fresh Roblox Image Asset ID.
+@@ -2805,7 +2809,55 @@ if errors:
+         print(" -", item)
+     sys.exit(1)
+ 
+-print("verify ok · game1 m53 project-wide source-only asset storage passed")
++# m54 Location Assets UX: create mode, remembered navigation/library category, named Roblox descriptions, new categories.
++for required in [
++    "ASSET_MANAGER_VIEW_KEY='game1.assetManager.activeSection'",
++    "window.addEventListener('load',restoreAssetManagerView)",
++    "localStorage.setItem(ASSET_MANAGER_VIEW_KEY,view)",
++]:
++    if required not in character_js_text:
++        err(f"m54 Asset Manager remembered section missing {required}")
++for required in [
++    "DECO_LIBRARY_CATEGORY_KEY = 'game1.locationAssets.libraryCategory'",
++    "DECO_SELECTED_ASSET_KEY = 'game1.locationAssets.selectedAsset'",
++    "function decoAssetBeginNew()",
++    "new-location-asset-main",
++    "location-asset-library-category",
++    "save asset changes",
++]:
++    if required not in deco_assets_js_text and required not in index_m43_text:
++        err(f"m54 Location Assets UX missing {required}")
++for required in [
++    'id="new-location-asset-main"',
++    'id="location-asset-library-category"',
++    'ladders</span>',
++    'flowers</span>',
++    'game1 location asset · Oak Tree',
++]:
++    if required not in index_m43_text:
++        err(f"m54 Location Assets markup missing {required}")
++for required in [
++    '"ladder": "Ladders"',
++    '"flower": "Flowers"',
++    'description = f"{description} · {asset_name}"',
++]:
++    if required not in location_asset_store_text:
++        err(f"m54 LocationAssetStore missing {required}")
++for required in [
++    'ladder = "Ladders"',
++    'flower = "Flowers"',
++    'local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower" }',
++    'local column = (index - 1) % 4',
++]:
++    if required not in deco_manager_text:
++        err(f"m54 DecoManager category support missing {required}")
++for required in ['ladder = "Ladders"', 'flower = "Flowers"']:
++    if required not in deco_placement_text:
++        err(f"m54 DecoPlacement category folder missing {required}")
++if "model bridge v23" not in studio_plugin_text or "model bridge v23" not in install_plugin_text:
++    err("m54 Studio plugin version marker must be v23")
++
++print("verify ok · game1 m54 Location Assets UX + ladders/flowers passed")
+ print("registered character archetypes:", len(archetypes))
+ print("active character archetype:", active_id or "none")
+ print("race pool: human")

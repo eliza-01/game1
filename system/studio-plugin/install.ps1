@@ -20,7 +20,7 @@ try {
 
 if(-not (Test-Path $Temp)){throw 'Rojo did not create the plugin build'}
 $BuiltText=Get-Content $Temp -Raw
-foreach($Marker in @('Game1ControlCenter','model bridge v22','Game1AttackTimeline_v2','TimelinePreviewWorld','location-authoring','Game1LocationMarker','Game1DecoManager_v1','DecoPreviewWorld','Save Assets Data','Game1DecoAssets')){
+foreach($Marker in @('Game1ControlCenter','model bridge v24','Game1AttackTimeline_v2','TimelinePreviewWorld','location-authoring','Game1LocationMarker','Game1DecoManager_v1','DecoPreviewWorld','Save Assets Data','Game1DecoAssets')){
     if(-not $BuiltText.Contains($Marker)){
         throw "Studio bridge build is stale or incomplete; missing marker: $Marker"
     }

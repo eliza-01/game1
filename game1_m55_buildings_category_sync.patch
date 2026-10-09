@@ -1,0 +1,446 @@
+diff --git a/assets/manifests/location-assets.json b/assets/manifests/location-assets.json
+index 11aa7d5..a7a51c3 100644
+--- a/assets/manifests/location-assets.json
++++ b/assets/manifests/location-assets.json
+@@ -34,6 +34,10 @@
+       {
+         "id": "flower",
+         "label": "Flowers"
++      },
++      {
++        "id": "building",
++        "label": "Buildings"
+       }
+     ]
+   },
+diff --git a/system/control-center/location_asset_store.py b/system/control-center/location_asset_store.py
+index 358299b..db8ecb2 100644
+--- a/system/control-center/location_asset_store.py
++++ b/system/control-center/location_asset_store.py
+@@ -17,7 +17,7 @@ from opencloud_assets import (
+ 
+ SCHEMA_VERSION = 4
+ PROJECT = "game1"
+-CATEGORIES = ("tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower")
++CATEGORIES = ("tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building")
+ TEXTURE_SUFFIXES = (".png", ".jpg", ".jpeg")
+ CATEGORY_LABELS = {
+     "tree": "Trees",
+@@ -28,6 +28,7 @@ CATEGORY_LABELS = {
+     "decoration": "Decorations",
+     "ladder": "Ladders",
+     "flower": "Flowers",
++    "building": "Buildings",
+ }
+ SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_]{0,63}$")
+ 
+@@ -274,7 +275,7 @@ class LocationAssetStore:
+         category = str(payload.get("category") or (old.get("category") if old else "") or "").strip().lower()
+         destructible = parse_bool(payload.get("destructible"), bool(old.get("destructible")) if old else False)
+         if category not in CATEGORIES:
+-            raise ValueError("location asset category must be tree, bush, rock, light, fence, decoration, ladder or flower")
++            raise ValueError("location asset category must be tree, bush, rock, light, fence, decoration, ladder, flower or building")
+ 
+         selected_model = str(payload.get("modelSourcePath") or "").strip()
+         selected_texture = str(payload.get("textureSourcePath") or "").strip()
+diff --git a/system/control-center/static/deco-assets.js b/system/control-center/static/deco-assets.js
+index 27f250e..02633bb 100644
+--- a/system/control-center/static/deco-assets.js
++++ b/system/control-center/static/deco-assets.js
+@@ -69,6 +69,8 @@ function decoAssetSetForm(row) {
+     $('location-asset-name').value = row.name_en || '';
+     $('location-asset-slug').value = row.slug || '';
+     $('location-asset-category').value = row.category || 'tree';
++    decoAssetState.libraryCategory = row.category || 'tree';
++    decoAssetRemember(DECO_LIBRARY_CATEGORY_KEY, decoAssetState.libraryCategory);
+     $('location-asset-destructible').checked = row.destructible === true || Number(row.destructible || 0) === 1;
+     $('picked-location-asset-model').textContent = 'keep current fbx or choose a replacement';
+     $('picked-location-asset-texture').textContent = row.texture_shared
+@@ -77,7 +79,11 @@ function decoAssetSetForm(row) {
+   } else {
+     $('location-asset-name').value = '';
+     $('location-asset-slug').value = '';
+-    $('location-asset-category').value = decoAssetState.data?.options?.categories?.[0]?.id || 'tree';
++    const validCategories = new Set((decoAssetState.data?.options?.categories || []).map((item) => item.id));
++    const category = validCategories.has(decoAssetState.libraryCategory)
++      ? decoAssetState.libraryCategory
++      : (decoAssetState.data?.options?.categories?.[0]?.id || 'tree');
++    $('location-asset-category').value = category;
+     $('location-asset-destructible').checked = false;
+     $('picked-location-asset-model').textContent = 'fbx not selected';
+     $('picked-location-asset-texture').textContent = 'PNG/JPG not selected';
+@@ -131,6 +137,14 @@ function decoAssetRenderTextureReferences() {
+   select.value = current;
+ }
+ 
++function decoAssetUseCategory(category, { updateEditor = true } = {}) {
++  const categories = decoAssetState.data?.options?.categories || [];
++  if (!categories.some((row) => row.id === category)) return;
++  decoAssetState.libraryCategory = category;
++  decoAssetRemember(DECO_LIBRARY_CATEGORY_KEY, category);
++  if (updateEditor) $('location-asset-category').value = category;
++}
++
+ function decoAssetRenderLibraryFilter() {
+   const select = $('location-asset-library-category');
+   if (!select) return;
+@@ -221,7 +235,16 @@ async function decoAssetLoad() {
+       decoAssetState.selected = null;
+       decoAssetRemember(DECO_SELECTED_ASSET_KEY, '');
+     }
+-    decoAssetRender();
++    const selected = decoAssetSelected();
++    if (selected) {
++      decoAssetSetForm(selected);
++    } else {
++      decoAssetRender();
++      const categories = new Set((decoAssetState.data?.options?.categories || []).map((row) => row.id));
++      if (categories.has(decoAssetState.libraryCategory)) {
++        $('location-asset-category').value = decoAssetState.libraryCategory;
++      }
++    }
+   } catch (error) {
+     toast(error.message, true);
+   }
+@@ -277,7 +300,6 @@ async function decoAssetRegister() {
+     });
+     decoAssetState.selected = row.slug;
+     await decoAssetLoad();
+-    decoAssetSetForm(decoAssetSelected());
+     toast(`registered ${row.name_en}`);
+   } catch (error) {
+     toast(error.message, true);
+@@ -295,7 +317,6 @@ async function decoAssetPublish() {
+       body: JSON.stringify({ description: $('location-asset-publication-description').value }),
+     });
+     await decoAssetLoad();
+-    decoAssetSetForm(decoAssetSelected());
+     toast(`location asset published · model ${published.model_asset_id || '—'} · texture ${published.texture_asset_id || '—'}`);
+   } catch (error) {
+     toast(error.message, true);
+@@ -337,8 +358,17 @@ $('location-asset-texture-reference').onchange = () => {
+   }
+ };
+ $('location-asset-library-category').onchange = () => {
+-  decoAssetState.libraryCategory = $('location-asset-library-category').value || 'all';
+-  decoAssetRemember(DECO_LIBRARY_CATEGORY_KEY, decoAssetState.libraryCategory);
++  const category = $('location-asset-library-category').value || 'all';
++  if (category === 'all') {
++    decoAssetState.libraryCategory = 'all';
++    decoAssetRemember(DECO_LIBRARY_CATEGORY_KEY, 'all');
++  } else {
++    decoAssetUseCategory(category);
++  }
++  decoAssetRender();
++};
++$('location-asset-category').onchange = () => {
++  decoAssetUseCategory($('location-asset-category').value, { updateEditor: false });
+   decoAssetRender();
+ };
+ $('register-location-asset').onclick = decoAssetRegister;
+diff --git a/system/control-center/static/index.html b/system/control-center/static/index.html
+index b477253..6458ae8 100644
+--- a/system/control-center/static/index.html
++++ b/system/control-center/static/index.html
+@@ -23,7 +23,7 @@
+ <button id="nav-weapons" class="asset-section" type="button"><b>weapons</b><small>models · textures · stats</small></button>
+ <button id="nav-monsters" class="asset-section" type="button"><b>monsters</b><small>rigs · stats · animations</small></button>
+ <button id="nav-locations" class="asset-section" type="button"><b>locations</b><small>polygon registry · studio authoring</small></button>
+-<button id="nav-location-assets" class="asset-section" type="button"><b>location assets</b><small>trees · bushes · rocks · lights · fences · decorations · ladders · flowers</small></button>
++<button id="nav-location-assets" class="asset-section" type="button"><b>location assets</b><small>trees · bushes · rocks · lights · fences · decorations · ladders · flowers · buildings</small></button>
+ <button id="nav-timelines" class="asset-section" type="button"><b>timelines</b><small>attack animation events</small></button>
+ <button id="nav-options" class="asset-section" type="button"><b>options</b><small>common runtime settings</small></button>
+ </div>
+@@ -238,7 +238,7 @@
+ 
+ <div id="location-assets-view" hidden>
+ <div class="panel hero">
+-<div><span class="eyebrow">environment library · published decor</span><h2>location assets</h2><p>register a static decoration with one FBX and either a new PNG/JPG texture or a texture already registered by another location asset. replacing an owned texture publishes a new Roblox Image Asset ID; assets reusing that texture follow the owner's new ID automatically. publish the required assets, then place published variants through Studio DecoManager. placed instances belong to the place; registry publication and placement backups stay separate.</p><div class="deco-category-strip"><span>trees</span><span>bushes</span><span>rocks</span><span>lights</span><span>fences</span><span>decorations</span><span>ladders</span><span>flowers</span></div></div>
++<div><span class="eyebrow">environment library · published decor</span><h2>location assets</h2><p>register a static decoration with one FBX and either a new PNG/JPG texture or a texture already registered by another location asset. replacing an owned texture publishes a new Roblox Image Asset ID; assets reusing that texture follow the owner's new ID automatically. publish the required assets, then place published variants through Studio DecoManager. placed instances belong to the place; registry publication and placement backups stay separate.</p><div class="deco-category-strip"><span>trees</span><span>bushes</span><span>rocks</span><span>lights</span><span>fences</span><span>decorations</span><span>ladders</span><span>flowers</span><span>buildings</span></div></div>
+ <div class="metrics"><div><b id="location-asset-metric-total">0</b><span>registered</span></div><div><b id="location-asset-metric-published">0</b><span>published</span></div><div><b id="location-asset-metric-changed">0</b><span>changed</span></div></div>
+ </div>
+ <div class="panel runtime-card"><div class="runtime-state registered"><strong>DecoManager registry</strong><span>Studio reads published entries directly from Asset Manager. No ServerStorage sync is required.</span></div><div id="location-asset-publication-state" class="publication-missing">open cloud: checking…</div></div>
+@@ -262,7 +262,7 @@
+ <small id="location-asset-publication-hint" class="hint">select a registered location asset.</small>
+ </div>
+ <div class="panel character-card">
+-<div class="section-title"><div><span>published library</span><h3>registered assets</h3></div><div class="deco-library-controls"><label>category<select id="location-asset-library-category"><option value="all">all categories</option></select></label><button id="refresh-location-assets-table" type="button">refresh</button></div></div>
++<div class="section-title"><div><span>published library</span><h3>registered assets</h3></div><div class="deco-library-controls"><label>category filter<select id="location-asset-library-category"><option value="all">all categories</option></select></label><button id="refresh-location-assets-table" type="button">refresh</button></div></div>
+ <div class="deco-assets-note"><strong>Studio placement</strong><span>Open <b>DecoManager</b> in Roblox Studio, choose a category, browse variants with arrows, then Place. <b>Save Assets Data</b> snapshots all placed instances and saves the place.</span></div>
+ <div class="table-wrap weapon-table-wrap"><table><thead><tr><th>asset</th><th>category</th><th>weapon contact</th><th>Roblox assets</th><th>status</th><th></th></tr></thead><tbody id="location-asset-rows"></tbody></table></div>
+ </div>
+diff --git a/system/studio-plugin/Game1Bridge.server.luau b/system/studio-plugin/Game1Bridge.server.luau
+index 31b36c0..a53a008 100644
+--- a/system/studio-plugin/Game1Bridge.server.luau
++++ b/system/studio-plugin/Game1Bridge.server.luau
+@@ -1805,4 +1805,4 @@ task.spawn(function()
+     end
+ end)
+ 
+-print("[game1 plugin] loaded · model bridge v23 · DecoManager identity-only placement + environment bounce authoring + locations + viewport timeline pose sampler")
++print("[game1 plugin] loaded · model bridge v24 · DecoManager identity-only placement + environment bounce authoring + locations + viewport timeline pose sampler")
+diff --git a/system/studio-plugin/install.ps1 b/system/studio-plugin/install.ps1
+index 7e94c9d..b741a5e 100644
+--- a/system/studio-plugin/install.ps1
++++ b/system/studio-plugin/install.ps1
+@@ -20,7 +20,7 @@ try {
+ 
+ if(-not (Test-Path $Temp)){throw 'Rojo did not create the plugin build'}
+ $BuiltText=Get-Content $Temp -Raw
+-foreach($Marker in @('Game1ControlCenter','model bridge v23','Game1AttackTimeline_v2','TimelinePreviewWorld','location-authoring','Game1LocationMarker','Game1DecoManager_v1','DecoPreviewWorld','Save Assets Data','Game1DecoAssets')){
++foreach($Marker in @('Game1ControlCenter','model bridge v24','Game1AttackTimeline_v2','TimelinePreviewWorld','location-authoring','Game1LocationMarker','Game1DecoManager_v1','DecoPreviewWorld','Save Assets Data','Game1DecoAssets')){
+     if(-not $BuiltText.Contains($Marker)){
+         throw "Studio bridge build is stale or incomplete; missing marker: $Marker"
+     }
+diff --git a/system/studio-plugin/modules/DecoManager.luau b/system/studio-plugin/modules/DecoManager.luau
+index 37486b0..2d6759d 100644
+--- a/system/studio-plugin/modules/DecoManager.luau
++++ b/system/studio-plugin/modules/DecoManager.luau
+@@ -6,7 +6,7 @@ local DecoPlacedAssetSync = require(script.Parent.DecoPlacedAssetSync)
+ local DecoManager = {}
+ DecoManager.__index = DecoManager
+ 
+-local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower" }
++local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building" }
+ local CATEGORY_LABELS = {
+     tree = "Trees",
+     bush = "Bushes",
+@@ -16,6 +16,7 @@ local CATEGORY_LABELS = {
+     decoration = "Decorations",
+     ladder = "Ladders",
+     flower = "Flowers",
++    building = "Buildings",
+ }
+ 
+ local function newLabel(parent: Instance, text: string, size: UDim2, position: UDim2, textSize: number, bold: boolean?): TextLabel
+@@ -102,9 +103,9 @@ function DecoManager:_buildUI()
+         false,
+         false,
+         390,
+-        680,
++        720,
+         330,
+-        650
++        690
+     )
+     self.widget = self.plugin:CreateDockWidgetPluginGui("Game1DecoManager_v1", info)
+     self.widget.Title = "game1 · DecoManager"
+@@ -120,7 +121,7 @@ function DecoManager:_buildUI()
+ 
+     local categoryHost = Instance.new("Frame")
+     categoryHost.BackgroundTransparency = 1
+-    categoryHost.Size = UDim2.new(1, -24, 0, 70)
++    categoryHost.Size = UDim2.new(1, -24, 0, 106)
+     categoryHost.Position = UDim2.new(0, 12, 0, 68)
+     categoryHost.Parent = root
+     self.categoryButtons = {}
+@@ -135,7 +136,7 @@ function DecoManager:_buildUI()
+     local navHost = Instance.new("Frame")
+     navHost.BackgroundTransparency = 1
+     navHost.Size = UDim2.new(1, -24, 0, 40)
+-    navHost.Position = UDim2.new(0, 12, 0, 145)
++    navHost.Position = UDim2.new(0, 12, 0, 181)
+     navHost.Parent = root
+     self.previous = newButton(navHost, "‹", UDim2.new(0, 44, 1, 0), UDim2.new(0, 0, 0, 0))
+     self.next = newButton(navHost, "›", UDim2.new(0, 44, 1, 0), UDim2.new(1, -44, 0, 0))
+@@ -146,7 +147,7 @@ function DecoManager:_buildUI()
+     self.viewport.BackgroundColor3 = Color3.fromRGB(11, 16, 22)
+     self.viewport.BorderSizePixel = 0
+     self.viewport.Size = UDim2.new(1, -24, 0, 276)
+-    self.viewport.Position = UDim2.new(0, 12, 0, 193)
++    self.viewport.Position = UDim2.new(0, 12, 0, 229)
+     self.viewport.Ambient = Color3.fromRGB(180, 180, 180)
+     self.viewport.LightColor = Color3.fromRGB(255, 255, 255)
+     self.viewport.LightDirection = Vector3.new(-1, -1, -1)
+@@ -173,16 +174,16 @@ function DecoManager:_buildUI()
+     self.cameraPitch = math.rad(18)
+     self.previewDragging = false
+ 
+-    self.assetName = newLabel(root, "—", UDim2.new(1, -24, 0, 24), UDim2.new(0, 12, 0, 478), 14, true)
+-    self.assetMeta = newLabel(root, "published registry", UDim2.new(1, -24, 0, 20), UDim2.new(0, 12, 0, 502), 10, false)
++    self.assetName = newLabel(root, "—", UDim2.new(1, -24, 0, 24), UDim2.new(0, 12, 0, 514), 14, true)
++    self.assetMeta = newLabel(root, "published registry", UDim2.new(1, -24, 0, 20), UDim2.new(0, 12, 0, 538), 10, false)
+     self.assetMeta.TextColor3 = Color3.fromRGB(143, 161, 173)
+ 
+-    self.place = newButton(root, "Place", UDim2.new(0.5, -17, 0, 38), UDim2.new(0, 12, 0, 532))
++    self.place = newButton(root, "Place", UDim2.new(0.5, -17, 0, 38), UDim2.new(0, 12, 0, 568))
+     self.place.BackgroundColor3 = Color3.fromRGB(66, 214, 177)
+     self.place.TextColor3 = Color3.fromRGB(6, 39, 31)
+-    self.save = newButton(root, "Save Assets Data", UDim2.new(0.5, -17, 0, 38), UDim2.new(0.5, 5, 0, 532))
+-    self.refresh = newButton(root, "Refresh registry", UDim2.new(1, -24, 0, 32), UDim2.new(0, 12, 0, 578))
+-    self.status = newLabel(root, "Open DecoManager to load published assets.", UDim2.new(1, -24, 0, 38), UDim2.new(0, 12, 0, 614), 10, false)
++    self.save = newButton(root, "Save Assets Data", UDim2.new(0.5, -17, 0, 38), UDim2.new(0.5, 5, 0, 568))
++    self.refresh = newButton(root, "Refresh registry", UDim2.new(1, -24, 0, 32), UDim2.new(0, 12, 0, 614))
++    self.status = newLabel(root, "Open DecoManager to load published assets.", UDim2.new(1, -24, 0, 38), UDim2.new(0, 12, 0, 650), 10, false)
+     self.status.TextColor3 = Color3.fromRGB(143, 161, 173)
+     self.status.TextWrapped = true
+ 
+diff --git a/system/studio-plugin/modules/DecoPlacement.luau b/system/studio-plugin/modules/DecoPlacement.luau
+index 8ba5fdb..a405232 100644
+--- a/system/studio-plugin/modules/DecoPlacement.luau
++++ b/system/studio-plugin/modules/DecoPlacement.luau
+@@ -13,6 +13,7 @@ local CATEGORY_FOLDERS = {
+     decoration = "Decorations",
+     ladder = "Ladders",
+     flower = "Flowers",
++    building = "Buildings",
+ }
+ 
+ local function prepareGhost(model: Model)
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index 86a0540..d96daed 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -1974,7 +1974,7 @@ for required in [
+     'AnimationClipProvider:GetAnimationClipAsync',
+     'clip:IsA("KeyframeSequence")',
+     'preview.Parent = timelineWorld',
+-    'model bridge v23',
++    'model bridge v24',
+ ]:
+     if required not in studio_plugin_text:
+         err(f"m37 in-plugin timeline preview missing {required}")
+@@ -2106,7 +2106,7 @@ for required in [
+ ]:
+     if required not in location_plugin_text:
+         err(f"m41 Studio Location authoring module missing {required}")
+-for required in ['require(script.Parent.modules.LocationCommands)', 'data.command == "location-authoring"', 'model bridge v23']:
++for required in ['require(script.Parent.modules.LocationCommands)', 'data.command == "location-authoring"', 'model bridge v24']:
+     if required not in studio_plugin_text:
+         err(f"m41 Game1Bridge Location integration missing {required}")
+ 
+@@ -2155,13 +2155,13 @@ if location_asset_manifest_path.is_file():
+     if location_asset_manifest.get("schemaVersion") != 4 or location_asset_manifest.get("project") != "game1":
+         err("m43 location-assets.json schema/project is invalid")
+     category_ids = [row.get("id") for row in ((location_asset_manifest.get("options") or {}).get("categories") or [])]
+-    if category_ids != ["tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower"]:
+-        err("m46 Location Assets categories must be tree/bush/rock/light/fence/decoration/ladder/flower in canonical order")
++    if category_ids != ["tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building"]:
++        err("m46 Location Assets categories must be tree/bush/rock/light/fence/decoration/ladder/flower/building in canonical order")
+ 
+ location_asset_store_text = location_asset_store_path.read_text(encoding="utf-8") if location_asset_store_path.is_file() else ""
+ for required in [
+     "class LocationAssetStore",
+-    'CATEGORIES = ("tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower")',
++    'CATEGORIES = ("tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building")',
+     "assets/source/location-assets",
+     "model_path TEXT NOT NULL DEFAULT ''",
+     "texture_path TEXT NOT NULL DEFAULT ''",
+@@ -2270,7 +2270,7 @@ for required in [
+     'DecoPreviewWorld',
+     '"Save Assets Data"',
+     'self.agentBaseUrl .. "/api/location-assets/layout"',
+-    'local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower" }',
++    'local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building" }',
+ ]:
+     if required not in deco_manager_text:
+         err(f"m43 DecoManager missing {required}")
+@@ -2278,7 +2278,7 @@ for required in [
+ for required in [
+     'require(script.Parent.modules.DecoManager)',
+     'DecoManager.new({',
+-    'model bridge v23',
++    'model bridge v24',
+ ]:
+     if required not in studio_plugin_text:
+         err(f"m43 Game1Bridge DecoManager integration missing {required}")
+@@ -2320,7 +2320,7 @@ for required in [
+         err(f"m45 DecoManager drag/save hotfix missing {required}")
+ if "self.AssetService:SavePlaceAsync" in deco_manager_text:
+     err("m45 DecoManager still calls cloud SavePlaceAsync directly")
+-if "model bridge v23" not in studio_plugin_text:
++if "model bridge v24" not in studio_plugin_text:
+     err("m45 Studio plugin version marker is stale")
+ 
+ # m44 Location Assets: PNG/JPG source textures with clean extension-aware preparation.
+@@ -2376,14 +2376,14 @@ for required in [
+     'decoration = "Decorations"',
+     'ladder = "Ladders"',
+     'flower = "Flowers"',
+-    'local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower" }',
++    'local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building" }',
+     'local row = math.floor((index - 1) / 4)',
+ ]:
+     if required not in deco_manager_text:
+         err(f"m46 DecoManager Decorations category missing {required}")
+ if 'decoration = "Decorations"' not in deco_placement_text:
+     err("m46 DecoPlacement Decorations folder mapping is missing")
+-if "model bridge v23" not in studio_plugin_text:
++if "model bridge v24" not in studio_plugin_text:
+     err("m46 Studio plugin version marker is stale")
+ 
+ 
+@@ -2407,7 +2407,7 @@ for required in [
+ ]:
+     if required not in deco_loader_text:
+         err(f"m47 static Location Asset sanitization missing {required}")
+-if "model bridge v23" not in studio_plugin_text:
++if "model bridge v24" not in studio_plugin_text:
+     err("m47 Studio plugin version marker is stale")
+ 
+ 
+@@ -2441,7 +2441,7 @@ if "model:PivotTo(DecoTransform.previewPivot(model))" not in deco_manager_text:
+     err("m48 DecoManager preview still replaces the imported asset basis")
+ if '"DecoTransform"' not in (ROOT / "system/studio-plugin/plugin.project.json").read_text(encoding="utf-8"):
+     err("m48 Studio plugin project does not include DecoTransform")
+-if "model bridge v23" not in studio_plugin_text:
++if "model bridge v24" not in studio_plugin_text:
+     err("m48 Studio plugin version marker is stale")
+ 
+ 
+@@ -2629,10 +2629,10 @@ for required in ['EnvironmentAssetService.Start()', 'WeaponBounceService.Start()
+ 
+ if 'control_agent_build = "game1-m50-environment-weapon-bounce-001"' not in host_agent_text:
+     err("m50 Control Center build marker is stale")
+-if "model bridge v23" not in studio_plugin_text:
++if "model bridge v24" not in studio_plugin_text:
+     err("m51 Studio plugin version marker is stale")
+ install_plugin_text = (ROOT / "system/studio-plugin/install.ps1").read_text(encoding="utf-8")
+-if "model bridge v23" not in install_plugin_text:
++if "model bridge v24" not in install_plugin_text:
+     err("m51 Studio plugin installer marker is stale")
+ 
+ # m51 Location Assets: changed owned textures get a fresh Roblox Image Asset ID.
+@@ -2846,7 +2846,7 @@ for required in [
+ for required in [
+     'ladder = "Ladders"',
+     'flower = "Flowers"',
+-    'local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower" }',
++    'local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building" }',
+     'local column = (index - 1) % 4',
+ ]:
+     if required not in deco_manager_text:
+@@ -2854,10 +2854,29 @@ for required in [
+ for required in ['ladder = "Ladders"', 'flower = "Flowers"']:
+     if required not in deco_placement_text:
+         err(f"m54 DecoPlacement category folder missing {required}")
+-if "model bridge v23" not in studio_plugin_text or "model bridge v23" not in install_plugin_text:
+-    err("m54 Studio plugin version marker must be v23")
+-
+-print("verify ok · game1 m54 Location Assets UX + ladders/flowers passed")
++if "model bridge v24" not in studio_plugin_text or "model bridge v24" not in install_plugin_text:
++    err("m54 Studio plugin version marker must match current bridge")
++
++# m55 Location Assets: Buildings + synchronized editor/library category context.
++for required in [
++    '"building": "Buildings"',
++    'building = "Buildings"',
++    'buildings</span>',
++    'function decoAssetUseCategory(category',
++    "$('location-asset-category').onchange",
++]:
++    if required not in location_asset_store_text and required not in deco_manager_text and required not in deco_placement_text and required not in index_m43_text and required not in deco_assets_js_text:
++        err(f"m55 Buildings/category synchronization missing {required}")
++if 'category filter<select id="location-asset-library-category"' not in index_m43_text:
++    err("m55 library category filter label missing")
++if "decoAssetUseCategory($('location-asset-category').value, { updateEditor: false })" not in deco_assets_js_text:
++    err("m55 editor category must synchronize library filter")
++if "decoAssetUseCategory(category);" not in deco_assets_js_text:
++    err("m55 library category must synchronize editor category")
++if 'model bridge v24' not in studio_plugin_text or 'model bridge v24' not in install_plugin_text:
++    err("m55 Studio plugin version marker must be v24")
++
++print("verify ok · game1 m55 Buildings + synchronized Location Asset category context passed")
+ print("registered character archetypes:", len(archetypes))
+ print("active character archetype:", active_id or "none")
+ print("race pool: human")

@@ -6,7 +6,7 @@ local DecoPlacedAssetSync = require(script.Parent.DecoPlacedAssetSync)
 local DecoManager = {}
 DecoManager.__index = DecoManager
 
-local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration" }
+local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building" }
 local CATEGORY_LABELS = {
     tree = "Trees",
     bush = "Bushes",
@@ -14,6 +14,9 @@ local CATEGORY_LABELS = {
     light = "Lights",
     fence = "Fences",
     decoration = "Decorations",
+    ladder = "Ladders",
+    flower = "Flowers",
+    building = "Buildings",
 }
 
 local function newLabel(parent: Instance, text: string, size: UDim2, position: UDim2, textSize: number, bold: boolean?): TextLabel
@@ -100,9 +103,9 @@ function DecoManager:_buildUI()
         false,
         false,
         390,
-        680,
+        720,
         330,
-        650
+        690
     )
     self.widget = self.plugin:CreateDockWidgetPluginGui("Game1DecoManager_v1", info)
     self.widget.Title = "game1 · DecoManager"
@@ -118,14 +121,14 @@ function DecoManager:_buildUI()
 
     local categoryHost = Instance.new("Frame")
     categoryHost.BackgroundTransparency = 1
-    categoryHost.Size = UDim2.new(1, -24, 0, 70)
+    categoryHost.Size = UDim2.new(1, -24, 0, 106)
     categoryHost.Position = UDim2.new(0, 12, 0, 68)
     categoryHost.Parent = root
     self.categoryButtons = {}
     for index, category in ipairs(CATEGORY_ORDER) do
-        local column = (index - 1) % 3
-        local row = math.floor((index - 1) / 3)
-        local button = newButton(categoryHost, CATEGORY_LABELS[category], UDim2.new(1 / 3, -5, 0, 32), UDim2.new(column / 3, 0, 0, row * 36))
+        local column = (index - 1) % 4
+        local row = math.floor((index - 1) / 4)
+        local button = newButton(categoryHost, CATEGORY_LABELS[category], UDim2.new(1 / 4, -5, 0, 32), UDim2.new(column / 4, 0, 0, row * 36))
         button.TextSize = 11
         self.categoryButtons[category] = button
     end
@@ -133,7 +136,7 @@ function DecoManager:_buildUI()
     local navHost = Instance.new("Frame")
     navHost.BackgroundTransparency = 1
     navHost.Size = UDim2.new(1, -24, 0, 40)
-    navHost.Position = UDim2.new(0, 12, 0, 145)
+    navHost.Position = UDim2.new(0, 12, 0, 181)
     navHost.Parent = root
     self.previous = newButton(navHost, "‹", UDim2.new(0, 44, 1, 0), UDim2.new(0, 0, 0, 0))
     self.next = newButton(navHost, "›", UDim2.new(0, 44, 1, 0), UDim2.new(1, -44, 0, 0))
@@ -144,7 +147,7 @@ function DecoManager:_buildUI()
     self.viewport.BackgroundColor3 = Color3.fromRGB(11, 16, 22)
     self.viewport.BorderSizePixel = 0
     self.viewport.Size = UDim2.new(1, -24, 0, 276)
-    self.viewport.Position = UDim2.new(0, 12, 0, 193)
+    self.viewport.Position = UDim2.new(0, 12, 0, 229)
     self.viewport.Ambient = Color3.fromRGB(180, 180, 180)
     self.viewport.LightColor = Color3.fromRGB(255, 255, 255)
     self.viewport.LightDirection = Vector3.new(-1, -1, -1)
@@ -171,16 +174,16 @@ function DecoManager:_buildUI()
     self.cameraPitch = math.rad(18)
     self.previewDragging = false
 
-    self.assetName = newLabel(root, "—", UDim2.new(1, -24, 0, 24), UDim2.new(0, 12, 0, 478), 14, true)
-    self.assetMeta = newLabel(root, "published registry", UDim2.new(1, -24, 0, 20), UDim2.new(0, 12, 0, 502), 10, false)
+    self.assetName = newLabel(root, "—", UDim2.new(1, -24, 0, 24), UDim2.new(0, 12, 0, 514), 14, true)
+    self.assetMeta = newLabel(root, "published registry", UDim2.new(1, -24, 0, 20), UDim2.new(0, 12, 0, 538), 10, false)
     self.assetMeta.TextColor3 = Color3.fromRGB(143, 161, 173)
 
-    self.place = newButton(root, "Place", UDim2.new(0.5, -17, 0, 38), UDim2.new(0, 12, 0, 532))
+    self.place = newButton(root, "Place", UDim2.new(0.5, -17, 0, 38), UDim2.new(0, 12, 0, 568))
     self.place.BackgroundColor3 = Color3.fromRGB(66, 214, 177)
     self.place.TextColor3 = Color3.fromRGB(6, 39, 31)
-    self.save = newButton(root, "Save Assets Data", UDim2.new(0.5, -17, 0, 38), UDim2.new(0.5, 5, 0, 532))
-    self.refresh = newButton(root, "Refresh registry", UDim2.new(1, -24, 0, 32), UDim2.new(0, 12, 0, 578))
-    self.status = newLabel(root, "Open DecoManager to load published assets.", UDim2.new(1, -24, 0, 38), UDim2.new(0, 12, 0, 614), 10, false)
+    self.save = newButton(root, "Save Assets Data", UDim2.new(0.5, -17, 0, 38), UDim2.new(0.5, 5, 0, 568))
+    self.refresh = newButton(root, "Refresh registry", UDim2.new(1, -24, 0, 32), UDim2.new(0, 12, 0, 614))
+    self.status = newLabel(root, "Open DecoManager to load published assets.", UDim2.new(1, -24, 0, 38), UDim2.new(0, 12, 0, 650), 10, false)
     self.status.TextColor3 = Color3.fromRGB(143, 161, 173)
     self.status.TextWrapped = true
 

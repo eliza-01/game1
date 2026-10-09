@@ -6,6 +6,8 @@ const state = {
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const FILENAME_GUIDE_OPEN_KEY='game1.animation.filenameRules.open';
 const ANIMATION_FOLDER_KEY='game1.animation.folder';
+const ASSET_MANAGER_VIEW_KEY='game1.assetManager.activeSection';
+const ASSET_MANAGER_VIEWS=new Set(['characters','animations','animation-speed','weapons','monsters','locations','location-assets','timelines','options']);
 
 function normalizeAnimationFolderPath(value){
   let path=String(value??'').trim();
@@ -42,7 +44,9 @@ function syncIdentity(){if(state.selected)return;$('character-id').value=identit
 function statusTag(status){return `<span class="tag ${String(status||'').toLowerCase()}">${esc(status||'')}</span>`}
 
 function setView(view){
+  if(!ASSET_MANAGER_VIEWS.has(view))view='characters';
   state.view=view;
+  try{localStorage.setItem(ASSET_MANAGER_VIEW_KEY,view)}catch{}
   $('characters-view').hidden=view!=='characters';$('animations-view').hidden=view!=='animations';$('animation-speed-view').hidden=view!=='animation-speed';$('weapons-view').hidden=view!=='weapons';$('monsters-view').hidden=view!=='monsters';$('locations-view').hidden=view!=='locations';$('location-assets-view').hidden=view!=='location-assets';$('timelines-view').hidden=view!=='timelines';$('options-view').hidden=view!=='options';
   $('character-rail').hidden=view!=='characters';$('animation-rail').hidden=view!=='animations';$('weapon-rail').hidden=view!=='weapons';$('monster-rail').hidden=view!=='monsters';$('location-asset-rail').hidden=view!=='location-assets';
   $('nav-characters').classList.toggle('active',view==='characters');$('nav-animations').classList.toggle('active',view==='animations');$('nav-animation-speed').classList.toggle('active',view==='animation-speed');$('nav-weapons').classList.toggle('active',view==='weapons');$('nav-monsters').classList.toggle('active',view==='monsters');$('nav-locations').classList.toggle('active',view==='locations');$('nav-location-assets').classList.toggle('active',view==='location-assets');$('nav-timelines').classList.toggle('active',view==='timelines');$('nav-options').classList.toggle('active',view==='options');
@@ -134,6 +138,9 @@ window.game1CheckRobloxAnimations=checkRobloxAnimationAssets;
 async function setAnimationWeight(bindingId,weight){try{state.animations=await request('/api/animation-bindings/'+encodeURIComponent(bindingId)+'/weight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({weight:Number(weight)})});state.animations.publication=state.data?.publication||{};renderAnimations()}catch(error){toast(error.message,true)}}
 async function setAnimationDuplicate(clipId,enabled){try{state.animations=await request('/api/animations/'+encodeURIComponent(clipId)+'/duplicate-first-frame',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:!!enabled})});state.animations.publication=state.data?.publication||{};renderAnimations();toast(enabled?'runtime first-frame tail enabled; asset bytes are unchanged':'runtime first-frame tail disabled; asset bytes are unchanged')}catch(error){await loadAnimations();toast(error.message,true)}}
 async function removeAnimationBinding(bindingId){if(!confirm('remove this semantic animation binding from game1? canonical source files are preserved.'))return;try{state.animations=await request('/api/animation-bindings/'+encodeURIComponent(bindingId),{method:'DELETE'});state.animations.publication=state.data?.publication||{};if(state.animationSelected===bindingId)state.animationSelected=null;renderAnimations();toast('animation binding removed')}catch(error){toast(error.message,true)}}
+
+function restoreAssetManagerView(){let saved='characters';try{saved=localStorage.getItem(ASSET_MANAGER_VIEW_KEY)||'characters'}catch{}setView(ASSET_MANAGER_VIEWS.has(saved)?saved:'characters')}
+window.addEventListener('load',restoreAssetManagerView);
 
 $('display-name').oninput=()=>{if(!state.selected)state.autoDisplayName=false};$('nav-characters').onclick=()=>setView('characters');$('nav-animations').onclick=()=>setView('animations');$('nav-animation-speed').onclick=()=>setView('animation-speed');$('nav-weapons').onclick=()=>setView('weapons');$('nav-monsters').onclick=()=>setView('monsters');$('nav-locations').onclick=()=>setView('locations');$('nav-location-assets').onclick=()=>setView('location-assets');$('nav-timelines').onclick=()=>setView('timelines');$('nav-options').onclick=()=>setView('options');$('race').onchange=syncIdentity;$('gender').onchange=syncIdentity;$('choose-model').onclick=chooseModel;$('save-archetype').onclick=saveArchetype;$('save-character-stats').onclick=saveCharacterStats;$('register-character').onclick=registerCharacter;$('publish-character').onclick=()=>publishCharacter();$('sync-character').onclick=()=>syncStudio();$('activate-character').onclick=()=>activate();$('new-character').onclick=()=>setForm(null);$('clear-form').onclick=()=>setForm(null);$('refresh').onclick=loadCharacters;$('validate-view').onclick=loadCharacters;$('theme').onclick=()=>document.body.classList.toggle('light');
 $('animation-character').onchange=()=>{state.animationCharacter=$('animation-character').value;state.animationSelected=null;state.lastScan=null;loadAnimations()};$('choose-animation-folder').onclick=chooseAnimationFolder;$('scan-animations').onclick=scanAnimations;$('publish-missing-animations').onclick=publishMissingAnimations;$('check-roblox-animations').onclick=checkRobloxAnimationAssets;$('refresh-animations').onclick=loadAnimations;

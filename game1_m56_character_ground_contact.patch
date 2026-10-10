@@ -1,0 +1,79 @@
+diff --git a/src/server/character/CharacterRigService.luau b/src/server/character/CharacterRigService.luau
+index d1c3b64..11ad9f2 100644
+--- a/src/server/character/CharacterRigService.luau
++++ b/src/server/character/CharacterRigService.luau
+@@ -143,22 +143,6 @@ local function createGroundSensor(controllerManager: ControllerManager, sensorPa
+     controllerManager.GroundSensor = sensor
+ end
+ 
+-local function sensedFloorY(character: Model, root: BasePart): (number, string)
+-    local params = RaycastParams.new()
+-    params.FilterType = Enum.RaycastFilterType.Exclude
+-    params.FilterDescendantsInstances = { character }
+-    params.RespectCanCollide = true
+-    local distance = CharacterConfig.GroundSearchDistance
+-        + CharacterConfig.RootColliderSize.Y
+-        + CharacterConfig.SpawnClearance
+-        + 1
+-    local result = Workspace:Raycast(root.Position, Vector3.new(0, -distance, 0), params)
+-    if result then
+-        return result.Position.Y, "Raycast"
+-    end
+-    return root.Position.Y - CharacterConfig.RootAnchorOffset, "ControllerFallback"
+-end
+-
+ local function ensureAnimationHost(visual: Model): AnimationController
+     local host = visual:FindFirstChildOfClass("AnimationController")
+     if not host then
+@@ -351,7 +335,11 @@ local function attachVisual(
+         visual:Destroy()
+         return nil, nil
+     end
+-    local floorY, floorSource = sensedFloorY(character, root)
++    -- Ground contact is defined by RootCollider's bottom plane. Measuring the
++    -- scene independently here can produce a different height than physics uses
++    -- (e.g. when a spawn surface or another collider is underneath the rig).
++    -- Once welded, feet and collider must move together on slopes and steps.
++    local floorY = root.Position.Y - root.Size.Y * 0.5
+     local groundCorrectionY = 0
+     local groundParts = 0
+     if authoredRoot then
+@@ -365,7 +353,7 @@ local function attachVisual(
+     character:SetAttribute("VisualGroundParts", groundParts)
+     character:SetAttribute("VisualFootContactSource", if authoredRoot then "visible_geometry" else "bootstrap_root")
+     character:SetAttribute("VisualGroundFloorY", floorY)
+-    character:SetAttribute("VisualGroundSource", floorSource)
++    character:SetAttribute("VisualGroundSource", "RootColliderBottom")
+     character:SetAttribute("VisualRootAnchorSize", tostring(CharacterConfig.VisualRootAnchorSize))
+     character:SetAttribute("RootGroundClearance", CharacterConfig.RootGroundClearance)
+     character:SetAttribute("NavigationHipHeight", CharacterConfig.NavigationHipHeight)
+diff --git a/src/shared/character/CharacterConfig.luau b/src/shared/character/CharacterConfig.luau
+index 69e0d57..284d561 100644
+--- a/src/shared/character/CharacterConfig.luau
++++ b/src/shared/character/CharacterConfig.luau
+@@ -1,16 +1,20 @@
+ local CharacterConfig = {}
+ CharacterConfig.DefaultArchetype = "default"
+ CharacterConfig.RootColliderSize = Vector3.new(2.2, 2.0, 1.4)
+-CharacterConfig.RootGroundClearance = 0.25
++-- Ground contact contract: both physical boxes and the visual sole share Y = 0.
++-- The GroundController offset is measured to NavigationRoot CENTER, not its bottom.
++CharacterConfig.RootGroundClearance = 0
+ CharacterConfig.RootAnchorOffset = CharacterConfig.RootColliderSize.Y * 0.5 + CharacterConfig.RootGroundClearance
+ CharacterConfig.NavigationRootSize = Vector3.new(2.0, 2.0, 1.0)
+-CharacterConfig.NavigationHipHeight = 1.8
++-- Do not add a second hip-height on top of the box half-height.
++CharacterConfig.NavigationHipHeight = 0
+ CharacterConfig.NavigationCenterOffset = CharacterConfig.NavigationRootSize.Y * 0.5 + CharacterConfig.NavigationHipHeight
+-CharacterConfig.GroundOffset = CharacterConfig.NavigationHipHeight
++CharacterConfig.GroundOffset = CharacterConfig.NavigationCenterOffset
+ CharacterConfig.GroundSearchDistance = CharacterConfig.NavigationCenterOffset + 1.0
+ CharacterConfig.SpawnClearance = 0
+-CharacterConfig.VisualGroundClearance = 0.015
+-CharacterConfig.VisualRootAnchorSize = Vector3.new(0.35, CharacterConfig.VisualGroundClearance * 2, 0.35)
++CharacterConfig.VisualGroundClearance = 0
++-- RootPart must still have nonzero size when visual ground clearance is zero.
++CharacterConfig.VisualRootAnchorSize = Vector3.new(0.35, 0.03, 0.35)
+ CharacterConfig.TurnSpeed = 12
+ CharacterConfig.JumpVelocity = 34
+ CharacterConfig.JumpGroundIgnoreTime = 0.18

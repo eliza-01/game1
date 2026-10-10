@@ -143,22 +143,6 @@ local function createGroundSensor(controllerManager: ControllerManager, sensorPa
     controllerManager.GroundSensor = sensor
 end
 
-local function sensedFloorY(character: Model, root: BasePart): (number, string)
-    local params = RaycastParams.new()
-    params.FilterType = Enum.RaycastFilterType.Exclude
-    params.FilterDescendantsInstances = { character }
-    params.RespectCanCollide = true
-    local distance = CharacterConfig.GroundSearchDistance
-        + CharacterConfig.RootColliderSize.Y
-        + CharacterConfig.SpawnClearance
-        + 1
-    local result = Workspace:Raycast(root.Position, Vector3.new(0, -distance, 0), params)
-    if result then
-        return result.Position.Y, "Raycast"
-    end
-    return root.Position.Y - CharacterConfig.RootAnchorOffset, "ControllerFallback"
-end
-
 local function ensureAnimationHost(visual: Model): AnimationController
     local host = visual:FindFirstChildOfClass("AnimationController")
     if not host then
@@ -351,7 +335,11 @@ local function attachVisual(
         visual:Destroy()
         return nil, nil
     end
-    local floorY, floorSource = sensedFloorY(character, root)
+    -- Ground contact is defined by RootCollider's bottom plane. Measuring the
+    -- scene independently here can produce a different height than physics uses
+    -- (e.g. when a spawn surface or another collider is underneath the rig).
+    -- Once welded, feet and collider must move together on slopes and steps.
+    local floorY = root.Position.Y - root.Size.Y * 0.5
     local groundCorrectionY = 0
     local groundParts = 0
     if authoredRoot then
@@ -365,7 +353,7 @@ local function attachVisual(
     character:SetAttribute("VisualGroundParts", groundParts)
     character:SetAttribute("VisualFootContactSource", if authoredRoot then "visible_geometry" else "bootstrap_root")
     character:SetAttribute("VisualGroundFloorY", floorY)
-    character:SetAttribute("VisualGroundSource", floorSource)
+    character:SetAttribute("VisualGroundSource", "RootColliderBottom")
     character:SetAttribute("VisualRootAnchorSize", tostring(CharacterConfig.VisualRootAnchorSize))
     character:SetAttribute("RootGroundClearance", CharacterConfig.RootGroundClearance)
     character:SetAttribute("NavigationHipHeight", CharacterConfig.NavigationHipHeight)

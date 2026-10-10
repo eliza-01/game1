@@ -1,16 +1,21 @@
 local CharacterConfig = {}
 CharacterConfig.DefaultArchetype = "default"
 CharacterConfig.RootColliderSize = Vector3.new(2.2, 2.0, 1.4)
-CharacterConfig.RootGroundClearance = 0.25
+-- Ground contact contract: both physical boxes and the visual sole share Y = 0.
+CharacterConfig.RootGroundClearance = 0
 CharacterConfig.RootAnchorOffset = CharacterConfig.RootColliderSize.Y * 0.5 + CharacterConfig.RootGroundClearance
 CharacterConfig.NavigationRootSize = Vector3.new(2.0, 2.0, 1.0)
-CharacterConfig.NavigationHipHeight = 1.8
+-- Do not add a second hip-height on top of the box half-height.
+CharacterConfig.NavigationHipHeight = 0
 CharacterConfig.NavigationCenterOffset = CharacterConfig.NavigationRootSize.Y * 0.5 + CharacterConfig.NavigationHipHeight
-CharacterConfig.GroundOffset = CharacterConfig.NavigationHipHeight
+-- NavigationRoot is a collidable box; physics contact defines its standing height.
+-- Keep GroundController hover lift at zero to avoid floating above the floor.
+CharacterConfig.GroundOffset = 0
 CharacterConfig.GroundSearchDistance = CharacterConfig.NavigationCenterOffset + 1.0
 CharacterConfig.SpawnClearance = 0
-CharacterConfig.VisualGroundClearance = 0.015
-CharacterConfig.VisualRootAnchorSize = Vector3.new(0.35, CharacterConfig.VisualGroundClearance * 2, 0.35)
+CharacterConfig.VisualGroundClearance = 0
+-- RootPart must still have nonzero size when visual ground clearance is zero.
+CharacterConfig.VisualRootAnchorSize = Vector3.new(0.35, 0.03, 0.35)
 CharacterConfig.TurnSpeed = 12
 CharacterConfig.JumpVelocity = 34
 CharacterConfig.JumpGroundIgnoreTime = 0.18

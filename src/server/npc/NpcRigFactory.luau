@@ -27,41 +27,6 @@ local function visibleBounds(model: Model): (CFrame, Vector3)
     return CFrame.new((low + high) * 0.5), high - low
 end
 
-local function bridgeRootBones(visual: Model): number
-    -- The Studio FBX animation export expects a synthetic RootBone above the authored roots.
-    local count = 0
-    for _, item in ipairs(visual:GetDescendants()) do
-        if item:IsA("MeshPart") then
-            local topBones = {}
-            local rootBone: Bone? = nil
-            for _, child in ipairs(item:GetChildren()) do
-                if child:IsA("Bone") then
-                    if child.Name == "RootBone" then
-                        rootBone = child
-                    else
-                        table.insert(topBones, child)
-                    end
-                end
-            end
-            if #topBones > 0 then
-                if not rootBone then
-                    rootBone = Instance.new("Bone")
-                    rootBone.Name = "RootBone"
-                    rootBone.CFrame = CFrame.identity
-                    rootBone.Parent = item
-                    count += 1
-                end
-                for _, bone in ipairs(topBones) do
-                    local relative = bone.CFrame
-                    bone.Parent = rootBone
-                    bone.CFrame = rootBone.CFrame:Inverse() * relative
-                end
-            end
-        end
-    end
-    return count
-end
-
 function NpcRigFactory.Create(model: Model, surface: Vector3, yawDegrees: number): (Model?, BasePart?)
     local visual = model:FindFirstChild("ImportedRig")
     if not visual or not visual:IsA("Model") then
@@ -78,6 +43,9 @@ function NpcRigFactory.Create(model: Model, surface: Vector3, yawDegrees: number
             item:Destroy()
         end
     end
+    -- The published rig owns the bone hierarchy. Never insert a runtime RootBone or
+    -- reparent authored bones: that changes how imported animation tracks bind.
+    -- Keep the same invariant as CharacterRigService (root parts/welds are separate).
     local visualRoot = visual:FindFirstChild("RootPart", true)
         or visual.PrimaryPart
         or visual:FindFirstChildWhichIsA("MeshPart", true)
@@ -123,7 +91,6 @@ function NpcRigFactory.Create(model: Model, surface: Vector3, yawDegrees: number
     visualWeld.Part1 = visualRoot
     visualWeld.Parent = collider
     model.PrimaryPart = root
-    model:SetAttribute("RuntimeAnimationRootBridgeCount", bridgeRootBones(visual))
     return visual, root
 end
 

@@ -251,6 +251,21 @@ class NpcPipelineTests(unittest.TestCase):
             self.assertNotIn('blacksmith', module)
             self.assertNotIn('innkeeper', module)
 
+    def test_npc_special_exits_before_animation_track_fades_to_rest(self):
+        repo = Path(__file__).resolve().parents[2]
+        idle = (repo / "src/server/npc/NpcIdlePresentation.luau").read_text(encoding="utf-8")
+        tracks = (repo / "src/server/npc/NpcAnimationTracks.luau").read_text(encoding="utf-8")
+        config = (repo / "src/shared/npc/NpcAnimationConfig.luau").read_text(encoding="utf-8")
+        self.assertIn("SpecialExitBlendSeconds = 0.15", config)
+        self.assertIn("clip.track.Stopped:Connect", idle)
+        self.assertNotIn("clip.track.Ended:Connect", idle)
+        self.assertIn("local remaining = Tracks.SecondsRemaining(special)", idle)
+        self.assertIn("remaining <= Config.SpecialExitBlendSeconds", idle)
+        self.assertLess(idle.index("self:_playBase(fade)"), idle.index("Tracks.Stop(finished, fade)"))
+        self.assertIn("clip.playbackSpeed = speed", tracks)
+        self.assertIn("length - position) / speed", tracks)
+        self.assertIn("RunService.PreAnimation:Connect", (repo / "src/server/npc/NpcSpawnerService.luau").read_text(encoding="utf-8"))
+
     def test_npc_runtime_preserves_authored_skeleton_before_loading_animation(self):
         # Regression: the old NPC factory inserted an artificial RootBone above
         # authored "spine", making animations deform the leg and upper-body branches.

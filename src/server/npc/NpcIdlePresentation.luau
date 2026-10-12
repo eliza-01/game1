@@ -43,7 +43,9 @@ function NpcIdlePresentation.new(entity: Model, animator: Animator, profile: any
             end
             table.insert(self.choices, clip)
             if role == "special" and not clip.seam then
-                table.insert(self.connections, clip.track.Ended:Connect(function()
+                -- Stopped is a fallback if a track completes before our frame-step.
+                -- Ended fires AFTER the fade-out and is too late to prevent rest pose.
+                table.insert(self.connections, clip.track.Stopped:Connect(function()
                     if self.active and self.activeSpecial == clip then
                         self:_finishSpecial()
                     end
@@ -61,7 +63,7 @@ function NpcIdlePresentation.new(entity: Model, animator: Animator, profile: any
     return self
 end
 
-function NpcIdlePresentation:_playBase()
+function NpcIdlePresentation:_playBase(fade: number?)
     if not self.active then
         return
     end
@@ -69,7 +71,7 @@ function NpcIdlePresentation:_playBase()
     self.entity:SetAttribute("NpcIdleVariant", "base")
     self.elapsedWithoutBase = 0
     if self.base then
-        Tracks.Play(self.entity, self.base, "idle", Config.TransitionSeconds)
+        Tracks.Play(self.entity, self.base, "idle", fade or Config.TransitionSeconds)
     end
 end
 
@@ -79,10 +81,14 @@ function NpcIdlePresentation:_finishSpecial()
     end
     local finished = self.activeSpecial
     self.activeSpecial = nil
-    Tracks.Stop(finished, 0.04)
     if self.base and (tonumber(self.base.row.weight) or 100) > 0 then
-        self:_playBase()
+        -- Start the destination pose BEFORE fading out the source. At a one-shot
+        -- terminal frame there must always be at least one weighted track.
+        local fade = Config.SpecialExitBlendSeconds
+        self:_playBase(fade)
+        Tracks.Stop(finished, fade)
     else
+        Tracks.Stop(finished, Config.SpecialExitBlendSeconds)
         self.entity:SetAttribute("NpcAnimationState", "idle")
         self.entity:SetAttribute("NpcIdleVariant", nil)
         self.elapsedWithoutBase = 0
@@ -146,6 +152,13 @@ function NpcIdlePresentation:Step(delta: number)
     end
     local special = self.activeSpecial
     if special then
+        -- Sample in PreAnimation, before the engine reaches the end of the clip.
+        -- A natural non-looped Ended event would fire after the pose has faded.
+        local remaining = Tracks.SecondsRemaining(special)
+        if remaining and remaining <= Config.SpecialExitBlendSeconds then
+            self:_finishSpecial()
+            return
+        end
         local completed = Tracks.Step(special, delta)
         if completed then
             self:_finishSpecial()

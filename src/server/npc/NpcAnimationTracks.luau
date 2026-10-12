@@ -90,7 +90,24 @@ function NpcAnimationTracks.Play(entity: Model, clip: any?, channel: string, fad
         warn("[game1][npc] animation playback failed: " .. tostring(failure))
         return false
     end
+    -- The presentation uses the same speed to schedule one-shot crossfades.
+    clip.playbackSpeed = speed
     return true
+end
+
+-- Seconds remaining on an active one-shot at the exact playback speed chosen by Play.
+-- nil means that Roblox has not resolved the asset length or the track has stopped.
+function NpcAnimationTracks.SecondsRemaining(clip: any?): number?
+    if not clip or not clip.track or not clip.track.IsPlaying then
+        return nil
+    end
+    local length = tonumber(clip.track.Length) or 0
+    if length <= 0 then
+        return nil
+    end
+    local position = tonumber(clip.track.TimePosition) or 0
+    local speed = math.max(0.01, tonumber(clip.playbackSpeed) or 1)
+    return math.max(0, length - position) / speed
 end
 
 function NpcAnimationTracks.Stop(clip: any?, fade: number?)

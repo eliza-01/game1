@@ -28,13 +28,16 @@ def _finite(value, label: str) -> float:
 
 
 class MonsterSpawnStore:
-    def __init__(self, root: Path, monsters, animations, bridge):
+    def __init__(self, root: Path, monsters, animations, bridge, kind: str = "monster"):
+        if kind not in {"monster", "npc"}:
+            raise ValueError("unsupported spawn kind")
+        self.kind = kind
         self.root = root.resolve()
         self.monsters = monsters
         self.animations = animations
         self.bridge = bridge
-        self.manifest_path = self.root / "assets/manifests/monster-spawns.json"
-        self.registry_path = self.root / "src/server/monster/MonsterSpawnRegistry.luau"
+        self.manifest_path = self.root / f"assets/manifests/{self.kind}-spawns.json"
+        self.registry_path = self.root / ("src/server/npc/NpcSpawnRegistry.luau" if self.kind == "npc" else "src/server/monster/MonsterSpawnRegistry.luau")
         self._ensure()
 
     @staticmethod
@@ -91,17 +94,23 @@ class MonsterSpawnStore:
         monster = self._monster(slug)
         reasons = []
         if str(monster.get("status") or "") != "PUBLISHED":
-            reasons.append("Monster model/textures are not published/current.")
+            reasons.append(f"{self.kind.title()} model/textures are not published/current.")
         if not str(monster.get("model_asset_id") or "").isdigit():
-            reasons.append("Monster model has no Roblox asset id.")
+            reasons.append(f"{self.kind.title()} model has no Roblox asset id.")
         rows = self.animations.list_for_monster(str(monster["slug"]))
         published_slots = {str(row.get("slot") or "") for row in rows if str(row.get("status") or "") == "PUBLISHED"}
-        missing = [slot for slot in REQUIRED_ANIMATION_SLOTS if slot not in published_slots]
-        if missing:
+        needed = ("idle", "death") if self.kind == "npc" else REQUIRED_ANIMATION_SLOTS
+        missing = [slot for slot in needed if slot not in published_slots]
+        # NPC presentation is optional: a published rig can stand in its bind pose,
+        # and the death lifecycle can complete without an animation track. Monsters
+        # retain their existing animation requirements.
+        if missing and self.kind == "monster":
             reasons.append("Required published animations are missing: " + ", ".join(missing) + ".")
         return {
             "ready": not reasons,
             "reasons": reasons,
+            "animationReady": not missing,
+            "missingAnimationSlots": missing,
             "monsterSlug": str(monster["slug"]),
             "name": str(monster.get("name_en") or monster["slug"]),
             "status": str(monster.get("status") or ""),
@@ -177,6 +186,8 @@ class MonsterSpawnStore:
                 "status": str(row.get("status") or ""),
                 "ready": bool(ready["ready"]),
                 "reasons": ready["reasons"],
+                "animationReady": bool(ready["animationReady"]),
+                "missingAnimationSlots": ready["missingAnimationSlots"],
             })
         records = [self._record_view(row) for _, row in sorted(manifest["records"].items())]
         return {

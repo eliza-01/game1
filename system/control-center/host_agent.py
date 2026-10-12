@@ -56,6 +56,12 @@ weapons = WeaponStore(ROOT)
 monsters = MonsterStore(ROOT)
 monster_animations = MonsterAnimationStore(ROOT)
 monster_spawns = MonsterSpawnStore(ROOT, monsters, monster_animations, run_monster_spawn_bridge)
+# NPC data uses the same proven asset pipelines, with its own SQLite DB and runtime registries.
+npcs = MonsterStore(ROOT, kind="npc")
+npc_animations = MonsterAnimationStore(ROOT, kind="npc")
+def run_npc_spawn_bridge(action, **kwargs):
+    return run_monster_spawn_bridge(action, entity_kind="npc", **kwargs)
+npc_spawns = MonsterSpawnStore(ROOT, npcs, npc_animations, run_npc_spawn_bridge, kind="npc")
 animation_speed_scaling = AnimationSpeedScalingStore(ROOT)
 options_store = OptionsStore(ROOT)
 timelines = TimelineStore(ROOT, store, animations, monsters, monster_animations)
@@ -63,6 +69,22 @@ locations = LocationStore(ROOT, run_location_authoring_bridge)
 location_assets = LocationAssetStore(ROOT)
 deco_layouts = DecoLayoutStore(ROOT)
 character_identity = CharacterIdentityService(ROOT, store, animations)
+
+
+def npc_place_spawn(payload: dict):
+    # The Studio authoring preview needs the same published rig/textures that the
+    # runtime will clone. Synchronize it before starting the viewport gesture.
+    slug = str(payload.get("monsterSlug") or "").strip().lower()
+    if not npc_spawns.readiness(slug)["ready"]:
+        return npc_spawns.place(payload)  # Preserve the store's readiness error.
+    sync_monster_to_studio(slug, kind="npc")
+    return npc_spawns.place(payload)
+
+
+def npc_register_spawn(payload: dict):
+    slug = str(payload.get("monsterSlug") or "").strip().lower()
+    sync_monster_to_studio(slug, kind="npc")
+    return npc_spawns.register(payload)
 
 
 def publication_config():
@@ -164,19 +186,20 @@ def sync_weapon_to_studio(slug: str):
     return {"weapon": row, "studio": result}
 
 
-def sync_monster_to_studio(slug: str):
-    row = monsters.get(slug)
+def sync_monster_to_studio(slug: str, kind: str = "monster"):
+    actor_store = npcs if kind == "npc" else monsters
+    row = actor_store.get(slug)
     if not row:
-        raise ValueError(f"unknown monster: {slug}")
+        raise ValueError(f"unknown {kind}: {slug}")
     asset_id = str(row.get("model_asset_id") or "").strip()
     if not asset_id:
-        raise ValueError("publish the monster model before syncing it to Studio")
+        raise ValueError(f"publish the {kind} model before syncing it to Studio")
     texture_assets = [
         {"slot": str(item.get("slot") or ""), "assetId": str(item.get("asset_id") or "")}
         for item in (row.get("textures") or [])
         if str(item.get("asset_id") or "").isdigit()
     ]
-    destination = ["monsters", str(row.get("slug") or ""), "model"]
+    destination = [f"{kind}s", str(row.get("slug") or ""), "model"]
     result = run_model_load_bridge(
         asset_id,
         destination,
@@ -184,6 +207,7 @@ def sync_monster_to_studio(slug: str):
         placement_mode="monster-rig",
         metadata={
             "monsterSlug": str(row.get("slug") or ""),
+            "entityKind": kind,
             "textures": texture_assets,
         },
     )
@@ -480,6 +504,20 @@ class Handler(BaseHTTPRequestHandler):
             snapshot = monster_animations.snapshot(slug)
             snapshot["publication"] = publication_config()
             return self.out(200, snapshot)
+        if path == "/api/npcs":
+            snapshot = npcs.snapshot()
+            snapshot["publication"] = publication_config()
+            return self.out(200, snapshot)
+        if path == "/api/npc-animations":
+            slug = str((parse_qs(parsed.query).get("npc") or [""])[0]).strip().lower()
+            snapshot = npc_animations.snapshot(slug)
+            snapshot["publication"] = publication_config()
+            return self.out(200, snapshot)
+        if path == "/api/npc-spawns":
+            try:
+                return self.out(200, npc_spawns.snapshot())
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
         if path == "/api/monster-spawns":
             try:
                 return self.out(200, monster_spawns.snapshot())
@@ -511,6 +549,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self.out(200, timelines.editor_state(session_id))
             except Exception as error:
                 return self.out(400, {"error": str(error)})
+        if path.startswith("/api/npcs/") and path.endswith("/publications"):
+            slug = unquote(path[len("/api/npcs/"):-len("/publications")].strip("/"))
+            return self.out(200, {"items": npcs.publications(slug)})
         monster_prefix = "/api/monsters/"
         publications_suffix = "/publications"
         if path.startswith(monster_prefix) and path.endswith(publications_suffix):
@@ -549,6 +590,16 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 payload = self.body()
                 return self.out(200, {"path": choose_animation_folder(str(payload.get("initialPath") or ""))})
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path == "/api/files/choose-npc-model":
+            try:
+                return self.out(200, {"path": choose_monster_fbx()})
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path == "/api/files/choose-npc-textures":
+            try:
+                return self.out(200, {"paths": choose_monster_textures()})
             except Exception as error:
                 return self.out(400, {"error": str(error)})
         if path == "/api/files/choose-monster-model":
@@ -607,6 +658,24 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/weapons/attack-movement":
             try:
                 return self.out(200, weapons.update_attack_movement(self.body()))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path == "/api/npcs":
+            try:
+                return self.out(200, npcs.register({**self.body(), "behavior": {"aggressive": False, "aggroRadiusStuds": 0, "attackRadiusStuds": 0}}))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        npc_spawn_actions = {
+            "/api/npc-spawns/place": lambda body: npc_place_spawn(body),
+            "/api/npc-spawns/register": lambda body: npc_register_spawn(body),
+            "/api/npc-spawns/select": lambda body: npc_spawns.select(body),
+            "/api/npc-spawns/delete": lambda body: npc_spawns.delete(body),
+            "/api/npc-spawns/restore": lambda body: npc_spawns.restore(),
+            "/api/npc-spawns/validate": lambda body: npc_spawns.validate(),
+        }
+        if path in npc_spawn_actions:
+            try:
+                return self.out(200, npc_spawn_actions[path](self.body()))
             except Exception as error:
                 return self.out(400, {"error": str(error)})
         if path == "/api/monsters":
@@ -716,15 +785,17 @@ class Handler(BaseHTTPRequestHandler):
                 credentials = publication_credentials()
                 character = animations.check_manual_reimports(credentials)
                 monster = monster_animations.check_manual_reimports(credentials)
+                npc = npc_animations.check_manual_reimports(credentials)
                 return self.out(200, {
                     "schemaVersion": 1,
                     "project": "game1",
-                    "requested": int(character.get("requested") or 0) + int(monster.get("requested") or 0),
-                    "confirmed": int(character.get("confirmed") or 0) + int(monster.get("confirmed") or 0),
-                    "pending": int(character.get("pending") or 0) + int(monster.get("pending") or 0),
-                    "failed": int(character.get("failed") or 0) + int(monster.get("failed") or 0),
+                    "requested": int(character.get("requested") or 0) + int(monster.get("requested") or 0) + int(npc.get("requested") or 0),
+                    "confirmed": int(character.get("confirmed") or 0) + int(monster.get("confirmed") or 0) + int(npc.get("confirmed") or 0),
+                    "pending": int(character.get("pending") or 0) + int(monster.get("pending") or 0) + int(npc.get("pending") or 0),
+                    "failed": int(character.get("failed") or 0) + int(monster.get("failed") or 0) + int(npc.get("failed") or 0),
                     "character": character,
                     "monster": monster,
+                    "npc": npc,
                 })
             except Exception as error:
                 return self.out(400, {"error": str(error)})
@@ -742,6 +813,20 @@ class Handler(BaseHTTPRequestHandler):
                     str(payload.get("monsterSlug") or ""), str(payload.get("sourcePath") or ""),
                     str(payload.get("slot") or ""), int(payload.get("variant") or 0),
                 ))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path == "/api/npc-animations/scan":
+            try:
+                payload = self.body()
+                return self.out(200, npc_animations.scan_folder(str(payload.get("npcSlug") or ""), str(payload.get("rootPath") or "")))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path == "/api/npc-animations/assign":
+            try:
+                payload = self.body()
+                return self.out(200, npc_animations.assign_file(
+                    str(payload.get("npcSlug") or ""), str(payload.get("sourcePath") or ""),
+                    str(payload.get("slot") or ""), int(payload.get("variant") or 0)))
             except Exception as error:
                 return self.out(400, {"error": str(error)})
         if path == "/api/animations/scan":
@@ -866,6 +951,35 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/characters/active/clear":
             return self.out(200, store.clear_active())
 
+        if path.startswith("/api/npcs/"):
+            slug, _, action = unquote(path[len("/api/npcs/"):]).rpartition("/")
+            try:
+                if action == "publish":
+                    credentials = publication_credentials(str(self.body().get("description") or "game1 npc"))
+                    return self.out(200, npcs.publish(slug, credentials))
+                if action == "sync":
+                    return self.out(200, sync_monster_to_studio(slug, kind="npc"))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path.startswith("/api/npc-animations/"):
+            clip_id, _, action = unquote(path[len("/api/npc-animations/"):]).rpartition("/")
+            try:
+                payload = self.body()
+                if action == "duplicate-first-frame":
+                    return self.out(200, npc_animations.set_duplicate_first_frame(clip_id, bool(payload.get("enabled"))))
+                if action == "publish-missing":
+                    return self.out(200, npc_animations.publish_missing(clip_id, publication_credentials(str(payload.get("description") or "game1 npc animation"))))
+                if action == "publish":
+                    return self.out(200, npc_animations.publish_clip(clip_id, publication_credentials(str(payload.get("description") or "game1 npc animation"))))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path.startswith("/api/npc-animation-bindings/") and path.endswith("/weight"):
+            try:
+                key = unquote(path[len("/api/npc-animation-bindings/"):-len("/weight")].strip("/"))
+                payload = self.body()
+                return self.out(200, npc_animations.set_weight(key, int(payload.get("weight", 100))))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
         monster_prefix = "/api/monsters/"
         monster_publish_suffix = "/publish"
         monster_sync_suffix = "/sync"
@@ -1003,6 +1117,22 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith(binding_prefix):
             try:
                 return self.out(200, animations.delete_binding(unquote(path[len(binding_prefix):])))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path.startswith("/api/npc-animation-bindings/"):
+            try:
+                return self.out(200, npc_animations.delete_binding(unquote(path[len("/api/npc-animation-bindings/"):])))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path.startswith("/api/npcs/"):
+            slug = unquote(path[len("/api/npcs/"):])
+            try:
+                used = npc_spawns.monster_usage(slug)
+                if used:
+                    raise ValueError("delete NPC spawn points first: " + ", ".join(used[:8]))
+                npc_animations.delete_profile(slug)
+                npcs.delete(slug)
+                return self.out(200, {"ok": True})
             except Exception as error:
                 return self.out(400, {"error": str(error)})
         monster_binding_prefix = "/api/monster-animation-bindings/"

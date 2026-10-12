@@ -5,8 +5,9 @@ import hashlib
 import json
 import re
 import shutil
-import sqlite3
 import time
+
+from sqlite_connection import connect as connect_sqlite
 
 from opencloud_assets import create_animation_asset, wait_for_operation
 from animation_reimport_check import find_confirmed_manual_reimport
@@ -39,11 +40,13 @@ def _parse_variant(value: str) -> tuple[str, int]:
     return match.group(1), int(match.group(2) or 0)
 
 
-def classify(path: Path, slug: str) -> dict | None:
+def classify(path: Path, slug: str, npc: bool = False) -> dict | None:
     stem = _safe_token(path.stem)
     prefix = _safe_token(slug) + "_"
     if prefix and stem.startswith(prefix):
         stem = stem[len(prefix):]
+    if npc and stem.startswith("1hs_"):
+        stem = stem[4:]
     body, variant = _parse_variant(stem)
     aliases = {
         "idle": "idle",
@@ -84,7 +87,7 @@ def classify(path: Path, slug: str) -> dict | None:
     return {"slot": slot, "variant": variant, **definition}
 
 
-def filename_rules(slug: str) -> list[dict]:
+def filename_rules(slug: str, npc: bool = False) -> list[dict]:
     prefix = _safe_token(slug)
     rows = []
     for definition in SLOT_CATALOG:
@@ -94,24 +97,25 @@ def filename_rules(slug: str) -> list[dict]:
             **definition,
             "state": definition.get("state") or definition["slot"],
             "variantPattern": "01..n" if definition.get("variants") else "",
-            "canonicalFilename": f"{prefix}_{definition['slot']}{suffix}.rbxm" if prefix else f"{definition['slot']}{suffix}.rbxm",
+            "canonicalFilename": f"{prefix}_{'1hs_' if npc else ''}{definition['slot']}{suffix}.rbxm" if prefix else f"{definition['slot']}{suffix}.rbxm",
         })
     return rows
 
 
 class MonsterAnimationStore:
-    def __init__(self, root: Path):
+    def __init__(self, root: Path, kind: str = "monster"):
+        if kind not in {"monster", "npc"}:
+            raise ValueError("unsupported actor kind")
+        self.kind = kind
         self.root = root.resolve()
         self.runtime = self.root / ".control-center"
-        self.db = self.runtime / "game1.db"
+        self.db = self.runtime / ("game1_npcs.db" if self.kind == "npc" else "game1.db")
         self._init()
         self._sync_profiles()
         self.export()
 
     def connect(self):
-        connection = sqlite3.connect(self.db)
-        connection.row_factory = sqlite3.Row
-        return connection
+        return connect_sqlite(self.db)
 
     def _init(self):
         with self.connect() as connection:
@@ -312,7 +316,7 @@ class MonsterAnimationStore:
         self.export()
 
     def _managed(self, path: Path) -> bool:
-        for root in (self.root / "assets/source/monsters",):
+        for root in (self.root / f"assets/source/{self.kind}s",):
             try:
                 path.relative_to(root.resolve())
                 return True
@@ -325,9 +329,9 @@ class MonsterAnimationStore:
         variant = int(binding["variant"])
         suffix = f"_{variant:02d}" if variant else ""
         stem = f"{slot}{suffix}"
-        clip_id = f"monster__{slug}__{slot}__{variant:02d}"
+        clip_id = f"{self.kind}__{slug}__{slot}__{variant:02d}"
         binding_id = "binding__" + clip_id
-        relative = Path("monsters") / slug / "animations" / f"{stem}{source.suffix.lower()}"
+        relative = Path(f"{self.kind}s") / slug / "animations" / f"{stem}{source.suffix.lower()}"
         source_target = self.root / "assets/source" / relative
         prepared_target = source_target
         source_target.parent.mkdir(parents=True, exist_ok=True)
@@ -384,7 +388,7 @@ class MonsterAnimationStore:
         recognized, unassigned = [], []
         coordinates = {}
         for path in files:
-            binding = classify(path, slug)
+            binding = classify(path, slug, npc=self.kind == "npc")
             if binding is None:
                 unassigned.append({"path": str(path), "filename": path.name, "reason": "name does not match a monster animation state"})
                 continue
@@ -479,8 +483,8 @@ class MonsterAnimationStore:
         compatible = bool(profile and monster and str(profile.get("skeleton_signature") or "") == str(monster.get("skeleton_signature") or ""))
         return {
             "schemaVersion": SCHEMA_VERSION, "project": PROJECT, "monsterSlug": selected, "monsters": monsters,
-            "profile": profile, "skeletonCompatible": compatible, "slotCatalog": SLOT_CATALOG,
-            "filenameRules": filename_rules(selected), "items": items,
+            "profile": profile, "skeletonCompatible": compatible, "slotCatalog": SLOT_CATALOG, "weaponSets": (["1hs"] if self.kind == "npc" else []),
+            "filenameRules": filename_rules(selected, npc=self.kind == "npc"), "items": items,
             "summary": {
                 "registered": len(items), "published": sum(row["status"] == "PUBLISHED" for row in items),
                 "localOnly": sum(row["status"] == "LOCAL_ONLY" for row in items), "changed": sum(row["status"] == "CHANGED" for row in items),
@@ -504,7 +508,7 @@ class MonsterAnimationStore:
         return self.snapshot(slug)
 
     def set_weight(self, binding_id: str, weight: int) -> dict:
-        weight = max(1, min(10000, int(weight)))
+        weight = max(0 if self.kind == "npc" else 1, min(10000, int(weight)))
         with self.connect() as connection:
             row = connection.execute("SELECT monster_slug FROM monster_animation_bindings WHERE id=?", (binding_id,)).fetchone()
             if not row:
@@ -657,8 +661,8 @@ class MonsterAnimationStore:
         for row in clips:
             row["status"] = self._status(row)
         manifest_bindings = [{key: value for key, value in row.items() if key != "playback_speed_percent"} for row in bindings]
-        payload = {"schemaVersion": SCHEMA_VERSION, "project": PROJECT, "slotCatalog": SLOT_CATALOG, "profiles": profiles, "clips": clips, "bindings": manifest_bindings}
-        manifest = self.root / "assets/manifests/monster-animations.json"
+        payload = {"schemaVersion": SCHEMA_VERSION, "project": PROJECT, "slotCatalog": SLOT_CATALOG, "weaponSets": (["1hs"] if self.kind == "npc" else []), "profiles": profiles, "clips": clips, "bindings": manifest_bindings}
+        manifest = self.root / f"assets/manifests/{self.kind}-animations.json"
         manifest.parent.mkdir(parents=True, exist_ok=True)
         manifest.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
@@ -678,6 +682,7 @@ class MonsterAnimationStore:
                 "sourceSlot": internal_slot, "role": role, "variant": int(binding["variant"]), "weight": int(binding["weight"]),
                 "looped": bool(binding["looped"]), "priority": str(binding["priority"]),
                 "duplicateFirstFrameAtEnd": bool(clip.get("duplicate_first_frame_at_end")),
+                "weaponSet": "1hs" if self.kind == "npc" else "",
             })
         for profile in profiles_map.values():
             for rows in profile["slots"].values():
@@ -697,6 +702,7 @@ class MonsterAnimationStore:
                         f"\t\t\t\t\t\tanimationId = {q(row['animationId'])},",
                         f"\t\t\t\t\t\tsourceSlot = {q(row['sourceSlot'])},",
                         f"\t\t\t\t\t\trole = {q(row['role'])},",
+                        f"\t\t\t\t\t\tweaponSet = {q(row['weaponSet'])},",
                         f"\t\t\t\t\t\tvariant = {row['variant']},",
                         f"\t\t\t\t\t\tweight = {row['weight']},",
                         f"\t\t\t\t\t\tlooped = {'true' if row['looped'] else 'false'},",
@@ -707,6 +713,6 @@ class MonsterAnimationStore:
                 lines.append("\t\t\t\t}),")
             lines += ["\t\t\t}),", "\t\t}),"]
         lines += ["\t}),", "})", ""]
-        target = self.root / "src/shared/monster/MonsterAnimationRegistry.luau"
+        target = self.root / ("src/shared/npc/NpcAnimationRegistry.luau" if self.kind == "npc" else "src/shared/monster/MonsterAnimationRegistry.luau")
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text("\n".join(lines), encoding="utf-8")

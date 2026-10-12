@@ -1,0 +1,122 @@
+diff --git a/system/control-center/monster_store.py b/system/control-center/monster_store.py
+--- a/system/control-center/monster_store.py
++++ b/system/control-center/monster_store.py
+@@ -5,13 +5,14 @@
+ import json
+ import re
+ import shutil
+-import sqlite3
+ import tempfile
+ import time
+ import unicodedata
+ 
+ from character_analysis import analyze_character_fbx, prepare_character_publication_fbx
+ from character_store import _assert_publication_skeleton_matches
++from sqlite_connection import connect as connect_sqlite
++
+ from opencloud_assets import (
+     create_image_asset,
+     create_model_asset,
+@@ -77,9 +78,7 @@
+         self.export()
+ 
+     def connect(self):
+-        connection = sqlite3.connect(self.db)
+-        connection.row_factory = sqlite3.Row
+-        return connection
++        return connect_sqlite(self.db)
+ 
+     def _init(self):
+         with self.connect() as connection:
+diff --git a/system/control-center/monster_animation_store.py b/system/control-center/monster_animation_store.py
+--- a/system/control-center/monster_animation_store.py
++++ b/system/control-center/monster_animation_store.py
+@@ -5,8 +5,9 @@
+ import json
+ import re
+ import shutil
+-import sqlite3
+ import time
++
++from sqlite_connection import connect as connect_sqlite
+ 
+ from opencloud_assets import create_animation_asset, wait_for_operation
+ from animation_reimport_check import find_confirmed_manual_reimport
+@@ -114,9 +115,7 @@
+         self.export()
+ 
+     def connect(self):
+-        connection = sqlite3.connect(self.db)
+-        connection.row_factory = sqlite3.Row
+-        return connection
++        return connect_sqlite(self.db)
+ 
+     def _init(self):
+         with self.connect() as connection:
+diff --git a/system/verify/test_npc_pipeline.py b/system/verify/test_npc_pipeline.py
+--- a/system/verify/test_npc_pipeline.py
++++ b/system/verify/test_npc_pipeline.py
+@@ -36,8 +36,24 @@
+     def tearDown(self):
+         self.temp.cleanup()
+ 
++    def test_sqlite_handles_are_closed_after_transactions(self):
++        # A committed transaction is not enough: Windows locks an open DB file.
++        for store in (self.monsters, self.npcs, self.npc_animations):
++            with self.subTest(store=store.kind, cls=type(store).__name__):
++                with store.connect() as db:
++                    self.assertEqual(db.execute("SELECT 1").fetchone()[0], 1)
++                with self.assertRaises(sqlite3.ProgrammingError):
++                    db.execute("SELECT 1")
++
++                with self.assertRaises(RuntimeError):
++                    with store.connect() as failed:
++                        failed.execute("SELECT 1")
++                        raise RuntimeError("abort transaction")
++                with self.assertRaises(sqlite3.ProgrammingError):
++                    failed.execute("SELECT 1")
++
+     def seed_npc(self):
+-        with sqlite3.connect(self.npcs.db) as db:
++        with self.npcs.connect() as db:
+             db.execute(
+                 """INSERT INTO monsters(slug,name_en,model_source_path,model_sha256,model_asset_id,
+                     model_published_sha256,created_at,updated_at,skeleton_signature)
+@@ -56,7 +72,7 @@
+         scan = self.npc_animations.scan_folder("blacksmith", str(animation_folder))
+         self.assertEqual(scan["recognized"], 3)
+         self.assertEqual(scan["created"], 3)
+-        with sqlite3.connect(self.npcs.db) as db:
++        with self.npcs.connect() as db:
+             db.execute("UPDATE monster_animation_clips SET asset_id='54321', published_sha256=sha256")
+         self.npc_animations.export()
+ 
+diff --git a/system/control-center/sqlite_connection.py b/system/control-center/sqlite_connection.py
+new file mode 100644
+--- /dev/null
++++ b/system/control-center/sqlite_connection.py
+@@ -0,0 +1,24 @@
++"""SQLite connection whose context exit commits/rolls back AND closes the handle.
++
++The standard sqlite3.Connection context manager manages a transaction but does not
++close the connection. Keeping Windows handles open prevents temporary database
++cleanup and can lock files when rebuilding authoring registries.
++"""
++from __future__ import annotations
++
++import sqlite3
++from pathlib import Path
++
++
++class ClosingConnection(sqlite3.Connection):
++    def __exit__(self, exc_type, exc_value, traceback):
++        try:
++            return super().__exit__(exc_type, exc_value, traceback)
++        finally:
++            self.close()
++
++
++def connect(path: Path) -> sqlite3.Connection:
++    connection = sqlite3.connect(path, factory=ClosingConnection)
++    connection.row_factory = sqlite3.Row
++    return connection

@@ -290,6 +290,7 @@ local function definitionCacheKey(binding: any): string
     local parentName = binding.headParentBone and binding.headParentBone.Name or ""
     local identity = tostring(
         binding.entity:GetAttribute("MonsterSlug")
+        or binding.entity:GetAttribute("NpcSlug")
         or binding.entity:GetAttribute("CharacterArchetype")
         or binding.visual.Name
     )

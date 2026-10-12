@@ -27,6 +27,12 @@
       },
       "DecoManager": {
         "$path": "modules/DecoManager.luau"
+      },
+      "NpcSpawnPreview": {
+        "$path": "modules/NpcSpawnPreview.luau"
+      },
+      "NpcSpawnPlacement": {
+        "$path": "modules/NpcSpawnPlacement.luau"
       }
     }
   }

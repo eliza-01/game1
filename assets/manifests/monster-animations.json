@@ -73,6 +73,7 @@
       "variants": false
     }
   ],
+  "weaponSets": [],
   "profiles": [
     {
       "monster_slug": "gremlin",

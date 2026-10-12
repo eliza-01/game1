@@ -1,0 +1,724 @@
+diff --git a/src/shared/animation/WeightedAnimationChoice.luau b/src/shared/animation/WeightedAnimationChoice.luau
+new file mode 100644
+--- /dev/null
++++ b/src/shared/animation/WeightedAnimationChoice.luau
+@@ -0,0 +1,39 @@
++-- Data-driven weighted choice shared by actor presentation systems.
++-- Zero weight means disabled; negative/non-finite values are ignored.
++-- The caller owns timing and selection eligibility (combat, locomotion, death).
++local WeightedAnimationChoice = {}
++
++function WeightedAnimationChoice.Select(choices: {any}, random: Random): any?
++    local total = 0
++    for _, choice in ipairs(choices) do
++        local weight = tonumber(choice.row and choice.row.weight)
++        if weight and weight == weight and weight < math.huge and weight > 0 then
++            total += weight
++        end
++    end
++    if total <= 0 then
++        return nil
++    end
++    local roll = random:NextNumber(0, total)
++    local cumulative = 0
++    for _, choice in ipairs(choices) do
++        local weight = tonumber(choice.row and choice.row.weight)
++        if weight and weight == weight and weight < math.huge and weight > 0 then
++            cumulative += weight
++            if roll < cumulative then
++                return choice
++            end
++        end
++    end
++    -- Defend against floating-point rounding at the upper bound.
++    for index = #choices, 1, -1 do
++        local choice = choices[index]
++        local weight = tonumber(choice.row and choice.row.weight)
++        if weight and weight == weight and weight < math.huge and weight > 0 then
++            return choice
++        end
++    end
++    return nil
++end
++
++return table.freeze(WeightedAnimationChoice)
+diff --git a/src/shared/npc/NpcAnimationConfig.luau b/src/shared/npc/NpcAnimationConfig.luau
+new file mode 100644
+--- /dev/null
++++ b/src/shared/npc/NpcAnimationConfig.luau
+@@ -0,0 +1,9 @@
++-- NPC presentation defaults, independent of individual NPC definitions.
++return table.freeze({
++    WeaponSet = "1hs",
++    TransitionSeconds = 0.1,
++    -- Fallback cadence when there is no playable looping base idle.
++    MissingBaseIdleCycleSeconds = 4,
++    -- A missing/unavailable Roblox asset must not lock an NPC in a special forever.
++    UnresolvedSpecialTimeoutSeconds = 8,
++})
+diff --git a/src/server/npc/NpcAnimationTracks.luau b/src/server/npc/NpcAnimationTracks.luau
+new file mode 100644
+--- /dev/null
++++ b/src/server/npc/NpcAnimationTracks.luau
+@@ -0,0 +1,119 @@
++-- Animation registry adapter: loading, priority, playback speed and runtime seam.
++-- Does not decide which animation to play or when to transition actor state.
++local ReplicatedStorage = game:GetService("ReplicatedStorage")
++local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
++local AnimationShared = Shared:WaitForChild("animation")
++local NpcConfig = require(Shared:WaitForChild("npc"):WaitForChild("NpcAnimationConfig"))
++local AnimationSpeedScaling = require(AnimationShared:WaitForChild("AnimationSpeedScaling"))
++local AnimationFirstFrameSeam = require(AnimationShared:WaitForChild("AnimationFirstFrameSeam"))
++
++local NpcAnimationTracks = {}
++
++local priorities = {
++    Idle = Enum.AnimationPriority.Idle,
++    Movement = Enum.AnimationPriority.Movement,
++    Action = Enum.AnimationPriority.Action,
++    Action2 = Enum.AnimationPriority.Action2,
++    Action3 = Enum.AnimationPriority.Action3,
++    Action4 = Enum.AnimationPriority.Action4,
++}
++
++function NpcAnimationTracks.PublishedRows(profile: any?, slot: string): {any}
++    local slots = profile and profile.slots
++    local rows = slots and slots[slot]
++    local result = {}
++    if typeof(rows) ~= "table" then
++        return result
++    end
++    for _, row in ipairs(rows) do
++        if tostring(row.weaponSet or NpcConfig.WeaponSet) == NpcConfig.WeaponSet
++            and tostring(row.animationId or ""):match("^rbxassetid://%d+$") then
++            table.insert(result, row)
++        end
++    end
++    return result
++end
++
++local function load(animator: Animator, animationId: string): AnimationTrack?
++    local animation = Instance.new("Animation")
++    animation.AnimationId = animationId
++    local success, result = pcall(function()
++        return animator:LoadAnimation(animation)
++    end)
++    animation:Destroy()
++    if not success then
++        warn("[game1][npc] animation load failed: " .. tostring(result))
++        return nil
++    end
++    return result :: AnimationTrack
++end
++
++function NpcAnimationTracks.Load(animator: Animator, row: any?, looped: boolean, allowSeam: boolean?): any?
++    if not row then
++        return nil
++    end
++    local animationId = tostring(row.animationId)
++    local track = load(animator, animationId)
++    if not track then
++        return nil
++    end
++    track.Looped = looped
++    track.Priority = priorities[tostring(row.priority or "")] or (if looped then Enum.AnimationPriority.Idle else Enum.AnimationPriority.Action)
++    local seam = nil
++    if row.duplicateFirstFrameAtEnd == true and allowSeam ~= false then
++        local companion = load(animator, animationId)
++        if companion then
++            companion.Priority = track.Priority
++            seam = AnimationFirstFrameSeam.new(track, companion, looped)
++        end
++    end
++    return { row = row, track = track, seam = seam }
++end
++
++function NpcAnimationTracks.Play(entity: Model, clip: any?, channel: string, fade: number?): boolean
++    if not clip then
++        return false
++    end
++    local percent = AnimationSpeedScaling.ResolveForModel(entity, channel)
++    entity:SetAttribute("AnimationPlaybackSpeedPercent", percent)
++    local speed = percent / 100
++    local success, failure = pcall(function()
++        if clip.seam then
++            clip.seam:Play(fade or NpcConfig.TransitionSeconds, speed)
++        elseif clip.track.IsPlaying then
++            clip.track:AdjustSpeed(speed)
++        else
++            clip.track:Play(fade or NpcConfig.TransitionSeconds, 1, speed)
++        end
++    end)
++    if not success then
++        warn("[game1][npc] animation playback failed: " .. tostring(failure))
++        return false
++    end
++    return true
++end
++
++function NpcAnimationTracks.Stop(clip: any?, fade: number?)
++    if not clip then
++        return
++    end
++    local success, failure = pcall(function()
++        if clip.seam then
++            clip.seam:Stop(fade or NpcConfig.TransitionSeconds)
++        elseif clip.track.IsPlaying then
++            clip.track:Stop(fade or NpcConfig.TransitionSeconds)
++        end
++    end)
++    if not success then
++        warn("[game1][npc] animation stop failed: " .. tostring(failure))
++    end
++end
++
++function NpcAnimationTracks.Step(clip: any?, delta: number): (boolean, boolean)
++    if clip and clip.seam then
++        return clip.seam:Step(delta)
++    end
++    return false, false
++end
++
++return table.freeze(NpcAnimationTracks)
+diff --git a/src/server/npc/NpcIdlePresentation.luau b/src/server/npc/NpcIdlePresentation.luau
+new file mode 100644
+--- /dev/null
++++ b/src/server/npc/NpcIdlePresentation.luau
+@@ -0,0 +1,182 @@
++-- One responsibility: peaceful NPC idle presentation and weighted special cycles.
++-- Population, combat AI, death and asset publication are not owned here.
++local ReplicatedStorage = game:GetService("ReplicatedStorage")
++local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
++local WeightedAnimationChoice = require(Shared:WaitForChild("animation"):WaitForChild("WeightedAnimationChoice"))
++local Config = require(Shared:WaitForChild("npc"):WaitForChild("NpcAnimationConfig"))
++local Tracks = require(script.Parent:WaitForChild("NpcAnimationTracks"))
++
++local NpcIdlePresentation = {}
++NpcIdlePresentation.__index = NpcIdlePresentation
++local selectionRandom = Random.new()
++
++local function roleOf(row: any): string
++    local role = tostring(row.role or "")
++    if role == "special" or role == "base" then
++        return role
++    end
++    if tostring(row.sourceSlot or "") == "idle_special" or (tonumber(row.variant) or 0) > 0 then
++        return "special"
++    end
++    return "base"
++end
++
++function NpcIdlePresentation.new(entity: Model, animator: Animator, profile: any?): any
++    local self = setmetatable({
++        entity = entity,
++        base = nil,
++        choices = {},
++        activeSpecial = nil,
++        active = false,
++        elapsedWithoutBase = 0,
++        specialStarted = 0,
++        connections = {},
++    }, NpcIdlePresentation)
++
++    for _, row in ipairs(Tracks.PublishedRows(profile, "idle")) do
++        local role = roleOf(row)
++        local clip = Tracks.Load(animator, row, role == "base")
++        if clip then
++            clip.role = role
++            if role == "base" and not self.base then
++                self.base = clip
++            end
++            table.insert(self.choices, clip)
++            if role == "special" and not clip.seam then
++                table.insert(self.connections, clip.track.Ended:Connect(function()
++                    if self.active and self.activeSpecial == clip then
++                        self:_finishSpecial()
++                    end
++                end))
++            end
++        end
++    end
++    if self.base and not self.base.seam then
++        table.insert(self.connections, self.base.track.DidLoop:Connect(function()
++            if self.active and not self.activeSpecial then
++                self:_rollAtIdleBoundary()
++            end
++        end))
++    end
++    return self
++end
++
++function NpcIdlePresentation:_playBase()
++    if not self.active then
++        return
++    end
++    self.entity:SetAttribute("NpcAnimationState", "idle")
++    self.entity:SetAttribute("NpcIdleVariant", "base")
++    self.elapsedWithoutBase = 0
++    if self.base then
++        Tracks.Play(self.entity, self.base, "idle", Config.TransitionSeconds)
++    end
++end
++
++function NpcIdlePresentation:_finishSpecial()
++    if not self.activeSpecial then
++        return
++    end
++    local finished = self.activeSpecial
++    self.activeSpecial = nil
++    Tracks.Stop(finished, 0.04)
++    if self.base and (tonumber(self.base.row.weight) or 100) > 0 then
++        self:_playBase()
++    else
++        self.entity:SetAttribute("NpcAnimationState", "idle")
++        self.entity:SetAttribute("NpcIdleVariant", nil)
++        self.elapsedWithoutBase = 0
++    end
++end
++
++function NpcIdlePresentation:_rollAtIdleBoundary()
++    if not self.active or self.activeSpecial then
++        return
++    end
++    local selected = WeightedAnimationChoice.Select(self.choices, selectionRandom)
++    if not selected or selected.role == "base" then
++        -- Native idle keeps looping, but recover if the asset stopped unexpectedly.
++        if self.base and selected and not self.base.track.IsPlaying then
++            self:_playBase()
++        end
++        return
++    end
++    self.activeSpecial = selected
++    self.specialStarted = os.clock()
++    Tracks.Stop(self.base, 0.08)
++    self.entity:SetAttribute("NpcAnimationState", "idle")
++    self.entity:SetAttribute("NpcIdleVariant", ("special_%02d"):format(math.max(1, math.floor(tonumber(selected.row.variant) or 1))))
++    if not Tracks.Play(self.entity, selected, "idle", 0.08) then
++        self:_finishSpecial()
++    end
++end
++
++function NpcIdlePresentation:Start()
++    if self.active then
++        return
++    end
++    self.active = true
++    self.entity:SetAttribute("NpcAnimationState", "idle")
++    self.entity:SetAttribute("NpcIdleVariant", nil)
++    if self.base and (tonumber(self.base.row.weight) or 100) > 0 then
++        self:_playBase()
++    else
++        -- Special-only profiles work without an idle clip. A disabled base
++        -- (weight 0) is never played just to make selection possible.
++        self:_rollAtIdleBoundary()
++    end
++end
++
++function NpcIdlePresentation:Stop()
++    self.active = false
++    self.activeSpecial = nil
++    self.elapsedWithoutBase = 0
++    Tracks.Stop(self.base)
++    for _, clip in ipairs(self.choices) do
++        if clip.role == "special" then
++            Tracks.Stop(clip)
++        end
++    end
++    self.entity:SetAttribute("NpcIdleVariant", nil)
++end
++
++function NpcIdlePresentation:Step(delta: number)
++    if not self.active then
++        return
++    end
++    local special = self.activeSpecial
++    if special then
++        local completed = Tracks.Step(special, delta)
++        if completed then
++            self:_finishSpecial()
++        elseif special.track.Length <= 0 and os.clock() - self.specialStarted >= Config.UnresolvedSpecialTimeoutSeconds then
++            warn("[game1][npc] special idle asset did not resolve: " .. tostring(special.row.animationId))
++            self:_finishSpecial()
++        end
++        return
++    end
++    if self.base and self.base.track.IsPlaying and self.base.track.Length > 0 then
++        local _, wrapped = Tracks.Step(self.base, delta)
++        if wrapped then
++            self:_rollAtIdleBoundary()
++        end
++        return
++    end
++    -- No usable base loop: attempt weighted selection at a bounded interval.
++    -- This also handles Roblox animation assets whose Length never resolves.
++    self.elapsedWithoutBase += math.max(0, delta)
++    if self.elapsedWithoutBase >= Config.MissingBaseIdleCycleSeconds then
++        self.elapsedWithoutBase = 0
++        self:_rollAtIdleBoundary()
++    end
++end
++
++function NpcIdlePresentation:Destroy()
++    self:Stop()
++    for _, connection in ipairs(self.connections) do
++        connection:Disconnect()
++    end
++    table.clear(self.connections)
++end
++
++return table.freeze(NpcIdlePresentation)
+diff --git a/src/server/npc/NpcAnimationService.luau b/src/server/npc/NpcAnimationService.luau
+--- a/src/server/npc/NpcAnimationService.luau
++++ b/src/server/npc/NpcAnimationService.luau
+@@ -1,44 +1,13 @@
+--- Actor presentation only. Does not know about spawn quotas, damage calculations or authoring.
++-- NPC actor animation state machine: peace/combat/death transitions only.
++-- Idle weights, clip loading and spawn quotas are owned by separate modules.
+ local ReplicatedStorage = game:GetService("ReplicatedStorage")
+ local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
+ local DeathAnimationPolicy = require(Shared:WaitForChild("combat"):WaitForChild("DeathAnimationPolicy"))
+ local AnimationSpeedScaling = require(Shared:WaitForChild("animation"):WaitForChild("AnimationSpeedScaling"))
++local NpcIdlePresentation = require(script.Parent:WaitForChild("NpcIdlePresentation"))
++local Tracks = require(script.Parent:WaitForChild("NpcAnimationTracks"))
+ 
+ local NpcAnimationService = {}
+-
+-local function pick(profile: any?, slot: string): any?
+-    local slots = profile and profile.slots
+-    local rows = slots and slots[slot]
+-    if typeof(rows) ~= "table" then
+-        return nil
+-    end
+-    for _, row in ipairs(rows) do
+-        if tostring(row.weaponSet or "1hs") == "1hs"
+-            and tostring(row.animationId or ""):match("^rbxassetid://%d+$") then
+-            return row
+-        end
+-    end
+-    return nil
+-end
+-
+-local function loadTrack(animator: Animator, row: any?, looped: boolean): AnimationTrack?
+-    if not row then
+-        return nil
+-    end
+-    local asset = Instance.new("Animation")
+-    asset.AnimationId = tostring(row.animationId)
+-    local success, track = pcall(function()
+-        return animator:LoadAnimation(asset)
+-    end)
+-    asset:Destroy()
+-    if not success then
+-        warn("[game1][npc] animation could not load: " .. tostring(track))
+-        return nil
+-    end
+-    track.Looped = looped
+-    track.Priority = if looped then Enum.AnimationPriority.Idle else Enum.AnimationPriority.Action
+-    return track
+-end
+ 
+ function NpcAnimationService.Create(entity: Model, visual: Model, profile: any?): any
+     local controller = visual:FindFirstChildOfClass("AnimationController")
+@@ -58,50 +27,63 @@
+         animator = Instance.new("Animator")
+         animator.Parent = controller
+     end
+-    local idle = loadTrack(animator, pick(profile, "idle"), true)
+-    local combatIdle = loadTrack(animator, pick(profile, "combat_idle"), true)
+-    local death = loadTrack(animator, pick(profile, "death"), false)
+-    local current: AnimationTrack? = nil
++
++    local function first(slot: string): any?
++        return Tracks.PublishedRows(profile, slot)[1]
++    end
++    local idle = NpcIdlePresentation.new(entity, animator, profile)
++    local combatIdle = Tracks.Load(animator, first("combat_idle"), true)
++    -- DeathAnimationPolicy owns the terminal pose; a loop seam is not used for death.
++    local deathClip = Tracks.Load(animator, first("death"), false, false)
++    local death = deathClip and deathClip.track or nil
+     local dying = false
+     local finished = false
++    local disposed = false
+     local deathStartedAt = 0
+-    local function stop(track: AnimationTrack?)
+-        if track and track.IsPlaying then
+-            track:Stop(0.1)
++
++    local function syncState()
++        if dying or disposed then
++            return
++        end
++        if entity:GetAttribute("InCombat") == true then
++            idle:Stop()
++            entity:SetAttribute("NpcAnimationState", "combat_idle")
++            if combatIdle then
++                Tracks.Play(entity, combatIdle, "combat_idle")
++            end
++        else
++            Tracks.Stop(combatIdle)
++            idle:Start()
+         end
+     end
+-    local function playIdle()
+-        if dying then
+-            return
+-        end
+-        local nextTrack = if entity:GetAttribute("InCombat") == true then (combatIdle or idle) else idle
+-        if current == nextTrack then
+-            return
+-        end
+-        stop(current)
+-        current = nextTrack
+-        entity:SetAttribute("NpcAnimationState", if nextTrack == combatIdle and combatIdle then "combat_idle" else "idle")
+-        if nextTrack then
+-            local speed = AnimationSpeedScaling.ResolveForModel(entity, "idle") / 100
+-            nextTrack:Play(0.12, 1, speed)
+-        end
+-    end
++
+     local function beginDeath()
+-        if dying then
++        if dying or disposed then
+             return
+         end
+         dying = true
+         deathStartedAt = os.clock()
+-        stop(current)
+-        current = nil
++        idle:Stop()
++        Tracks.Stop(combatIdle)
+         entity:SetAttribute("NpcAnimationState", "death")
+-        entity:SetAttribute("DeathAnimationStartedAt", os.clock())
++        entity:SetAttribute("DeathAnimationStartedAt", deathStartedAt)
+         if death then
+             DeathAnimationPolicy.Start(death, AnimationSpeedScaling.ResolveForModel(entity, "death") / 100)
+         end
+     end
++
+     local function step(delta: number): boolean
+-        if not dying or finished then
++        if disposed then
++            return false
++        end
++        if not dying then
++            idle:Step(delta)
++            if entity:GetAttribute("InCombat") == true then
++                Tracks.Step(combatIdle, delta)
++            end
++            return false
++        end
++        if finished then
+             return false
+         end
+         if not death then
+@@ -109,9 +91,8 @@
+             return true
+         end
+         local reached, terminalTime = DeathAnimationPolicy.LatchVisibleTerminalPose(death, delta)
+-        -- A failed Roblox asset load must never monopolize a population slot forever.
+         if not reached and death.Length <= 0 and os.clock() - deathStartedAt >= 8 then
+-            warn("[game1][npc] death animation failed to resolve within 8s; releasing corpse lifecycle: " .. entity.Name)
++            warn("[game1][npc] unresolved death animation; releasing corpse lifecycle: " .. entity.Name)
+             finished = true
+             return true
+         end
+@@ -124,9 +105,21 @@
+         end
+         return false
+     end
+-    entity:GetAttributeChangedSignal("InCombat"):Connect(playIdle)
+-    playIdle()
+-    return { BeginDeath = beginDeath, Step = step }
++
++    local changed = entity:GetAttributeChangedSignal("InCombat"):Connect(syncState)
++    local function destroy()
++        if disposed then
++            return
++        end
++        disposed = true
++        changed:Disconnect()
++        idle:Destroy()
++        Tracks.Stop(combatIdle)
++        Tracks.Stop(deathClip)
++    end
++
++    syncState()
++    return { BeginDeath = beginDeath, Step = step, Destroy = destroy }
+ end
+ 
+ return table.freeze(NpcAnimationService)
+diff --git a/src/server/npc/NpcSpawnerService.luau b/src/server/npc/NpcSpawnerService.luau
+--- a/src/server/npc/NpcSpawnerService.luau
++++ b/src/server/npc/NpcSpawnerService.luau
+@@ -85,6 +85,9 @@
+     end
+     state.instances[entity] = nil
+     DeathLifecycleService.Cancel(entity)
++    if entry.presentation then
++        entry.presentation.Destroy()
++    end
+     EntityHitboxService.Detach(entity)
+     if entity.Parent then
+         entity:Destroy()
+@@ -195,7 +198,7 @@
+     RunService.PreAnimation:Connect(function(delta)
+         for _, state in pairs(states) do
+             for entity, entry in pairs(state.instances) do
+-                if entry.dying and entry.presentation.Step(delta) then
++                if entry.presentation.Step(delta) and entry.dying then
+                     entity:SetAttribute("NpcAnimationState", "death_idle")
+                     DeathLifecycleService.BeginDeathIdle(entity, entry.root, entry.visual, function()
+                         release(state, entity, true)
+diff --git a/system/control-center/monster_animation_store.py b/system/control-center/monster_animation_store.py
+--- a/system/control-center/monster_animation_store.py
++++ b/system/control-center/monster_animation_store.py
+@@ -508,7 +508,7 @@
+         return self.snapshot(slug)
+ 
+     def set_weight(self, binding_id: str, weight: int) -> dict:
+-        weight = max(1, min(10000, int(weight)))
++        weight = max(0 if self.kind == "npc" else 1, min(10000, int(weight)))
+         with self.connect() as connection:
+             row = connection.execute("SELECT monster_slug FROM monster_animation_bindings WHERE id=?", (binding_id,)).fetchone()
+             if not row:
+diff --git a/system/control-center/host_agent.py b/system/control-center/host_agent.py
+--- a/system/control-center/host_agent.py
++++ b/system/control-center/host_agent.py
+@@ -976,7 +976,8 @@
+         if path.startswith("/api/npc-animation-bindings/") and path.endswith("/weight"):
+             try:
+                 key = unquote(path[len("/api/npc-animation-bindings/"):-len("/weight")].strip("/"))
+-                return self.out(200, npc_animations.set_weight(key, int(self.body().get("weight") or 100)))
++                payload = self.body()
++                return self.out(200, npc_animations.set_weight(key, int(payload.get("weight", 100))))
+             except Exception as error:
+                 return self.out(400, {"error": str(error)})
+         monster_prefix = "/api/monsters/"
+diff --git a/system/control-center/static/npc-assets.js b/system/control-center/static/npc-assets.js
+--- a/system/control-center/static/npc-assets.js
++++ b/system/control-center/static/npc-assets.js
+@@ -32,7 +32,7 @@
+ async function npcSync(slug){try{toast('syncing npc into serverstorage…');const result=await request('/api/npcs/'+encodeURIComponent(slug)+'/sync',{method:'POST'});await npcLoad();toast(`studio synced: ${result.studio?.destination||slug}`)}catch(error){toast(error.message,true)}}
+ async function npcDelete(slug){if(!confirm(`delete npc ${slug} and its animation profile from game1 registry? roblox cloud assets are not deleted.`))return;try{await request('/api/npcs/'+encodeURIComponent(slug),{method:'DELETE'});if(npcState.selected===slug)npcState.selected=null;if(npcState.animationNpc===slug){npcState.animationNpc=null;npcRememberAnimationTarget(null);npcState.animations=null}await npcLoad();npcSetForm(null);toast('npc registry row deleted')}catch(error){toast(error.message,true)}}
+ function npcRenderFilenameRules(){const host=$('npc-animation-filename-rules');if(!host)return;const rules=npcState.animations?.filenameRules||[];if(!rules.length){host.innerHTML='<span class="muted">select a npc.</span>';return}host.innerHTML=`<div class="filename-rule-group"><div class="filename-rule-context">NPC</div><div class="filename-rule-table"><div class="filename-rule-head"><span>state</span><span>canonical filename</span><span>variant</span></div>${rules.map(rule=>`<div class="filename-rule-row"><code>${esc(rule.state)}</code><code>${esc(rule.canonicalFilename)}</code><span>${esc(rule.variantPattern||'—')}</span></div>`).join('')}</div></div>`}
+-function npcRenderAnimationRows(){const body=$('npc-animation-rows');if(!body)return;body.innerHTML='';const rows=npcState.animations?.items||[];if(!rows.length){body.innerHTML=`<tr><td colspan="8"><span class="muted">no registered animations for ${esc(npcAnimationSelected()?.slug||'selected npc')}.</span></td></tr>`;return}for(const row of rows){const tr=document.createElement('tr');tr.innerHTML=`<td><b>${esc(row.state||row.slot)}</b></td><td>${row.variant?String(row.variant).padStart(2,'0'):'—'}</td><td>${esc(row.name)}</td><td>${esc(row.asset_id||'local')}</td><td>${npcStatusTag(row.status)}</td><td><input data-weight class="weight-input" type="number" min="1" max="10000" value="${esc(row.weight)}"></td><td><label class="seam-toggle" title="runtime-only: blend the animation terminal pose into frame zero without modifying the asset"><input data-duplicate type="checkbox" ${row.duplicate_first_frame_at_end?'checked':''}></label></td><td><div class="row-actions"><button data-publish>publish</button><button data-remove class="danger">remove</button></div></td>`;const weight=tr.querySelector('[data-weight]');weight.onchange=()=>npcSetAnimationWeight(row.binding_id,weight.value);tr.querySelector('[data-duplicate]').onchange=e=>npcSetAnimationDuplicate(row.clip_id,e.target.checked);tr.querySelector('[data-publish]').disabled=row.status==='PUBLISHED';tr.querySelector('[data-publish]').onclick=()=>npcPublishAnimation(row.clip_id);tr.querySelector('[data-remove]').onclick=()=>npcRemoveAnimation(row.binding_id);body.appendChild(tr)}}
++function npcRenderAnimationRows(){const body=$('npc-animation-rows');if(!body)return;body.innerHTML='';const rows=npcState.animations?.items||[];if(!rows.length){body.innerHTML=`<tr><td colspan="8"><span class="muted">no registered animations for ${esc(npcAnimationSelected()?.slug||'selected npc')}.</span></td></tr>`;return}for(const row of rows){const tr=document.createElement('tr');tr.innerHTML=`<td><b>${esc(row.state||row.slot)}</b></td><td>${row.variant?String(row.variant).padStart(2,'0'):'—'}</td><td>${esc(row.name)}</td><td>${esc(row.asset_id||'local')}</td><td>${npcStatusTag(row.status)}</td><td><input data-weight class="weight-input" type="number" min="0" max="10000" value="${esc(row.weight)}"></td><td><label class="seam-toggle" title="runtime-only: blend the animation terminal pose into frame zero without modifying the asset"><input data-duplicate type="checkbox" ${row.duplicate_first_frame_at_end?'checked':''}></label></td><td><div class="row-actions"><button data-publish>publish</button><button data-remove class="danger">remove</button></div></td>`;const weight=tr.querySelector('[data-weight]');weight.onchange=()=>npcSetAnimationWeight(row.binding_id,weight.value);tr.querySelector('[data-duplicate]').onchange=e=>npcSetAnimationDuplicate(row.clip_id,e.target.checked);tr.querySelector('[data-publish]').disabled=row.status==='PUBLISHED';tr.querySelector('[data-publish]').onclick=()=>npcPublishAnimation(row.clip_id);tr.querySelector('[data-remove]').onclick=()=>npcRemoveAnimation(row.binding_id);body.appendChild(tr)}}
+ function npcRenderUnassigned(){const host=$('npc-animation-unassigned');if(!host)return;const rows=npcState.lastScan?.unassigned||[];if(!rows.length){host.innerHTML='';return}const defs=npcState.animations?.slotCatalog||[];host.innerHTML=`<details open><summary>unassigned files · ${rows.length} · assign manually</summary><div class="unassigned-list">${rows.slice(0,100).map((row,index)=>`<div class="unassigned-row npc-unassigned-row" data-npc-unassigned="${index}"><div class="unassigned-file"><b>${esc(row.filename)}</b><small>${esc(row.reason)}</small></div><label>state<select data-slot>${defs.map(def=>`<option value="${esc(def.slot)}">${esc(def.label||def.slot)}</option>`).join('')}</select></label><label>variant<input data-variant type="number" min="0" max="999" value="0"></label><button data-assign class="primary" type="button">assign</button></div>`).join('')}</div></details>`;for(const node of host.querySelectorAll('[data-npc-unassigned]')){const row=rows[Number(node.dataset.npcUnassigned)];const slot=node.querySelector('[data-slot]'),variant=node.querySelector('[data-variant]');const update=()=>{const def=defs.find(x=>x.slot===slot.value);variant.disabled=!def?.variants;if(def?.variants&&Number(variant.value)<=0)variant.value='1';if(!def?.variants)variant.value='0'};slot.onchange=update;update();node.querySelector('[data-assign]').onclick=()=>npcAssignAnimation(row,node)}}
+ function npcRenderAnimations(){npcRenderAnimationTarget();npcRenderAnimationFolderControls();const data=npcState.animations;if(!data)return;npcRenderFilenameRules();npcRenderAnimationRows();npcRenderUnassigned();const selected=npcAnimationSelected();$('npc-animation-profile-state').className='runtime-state '+(selected&&data.skeletonCompatible?'registered':'bootstrap');$('npc-animation-profile-state').innerHTML=selected?`<strong>animations · ${esc(selected.name_en)} · ${esc(selected.slug)}</strong><span>${data.skeletonCompatible?'skeleton compatible':'skeleton changed'} · ${esc(data.profile?.skeleton_signature||'no skeleton signature')}</span>`:'<strong>no npc selected</strong><span>choose a registered npc below.</span>';$('publish-missing-npc-animations').disabled=npcState.animationPublishing||!selected||!data.publication?.configured||!(data.items||[]).some(row=>row.status==='LOCAL_ONLY');$('check-roblox-npc-animations').disabled=npcState.animationPublishing||!data.publication?.configured;$('npc-animation-table-title').textContent=`${selected?.slug||'npc'} · registered animations`;npcRenderAnimationFolderControls()}
+ async function npcLoadAnimations(){try{npcEnsureAnimationTarget();const slug=npcState.animationNpc||'';npcState.animations=await request('/api/npc-animations?npc='+encodeURIComponent(slug));const profileRoot=npcNormalizeAnimationFolderPath(npcState.animations.profile?.scan_root||'');if(!npcState.animationFolder&&profileRoot)npcSetAnimationFolder(profileRoot,true);npcRenderAnimations()}catch(error){toast(error.message,true)}}
+diff --git a/system/control-center/static/index.html b/system/control-center/static/index.html
+--- a/system/control-center/static/index.html
++++ b/system/control-center/static/index.html
+@@ -426,7 +426,7 @@
+ </div>
+ <div class="panel character-card">
+ <div class="section-title"><div><span>selected npc animations</span><h3 id="npc-animation-table-title">registered animations</h3></div></div>
+-<small class="hint">only animations already registered for the selected npc are listed here. <code>idle_special_01..n</code> are shown as variants of state <code>idle</code>. weight is relative inside one state. playback speed is configured globally in the Animation Speed section.</small>
++<small class="hint">only animations already registered for the selected npc are listed here. <code>idle_special_01..n</code> are shown as variants of state <code>idle</code>. Weight is relative within idle (base + specials); 0 disables selection of that clip. Specials are selected at the end of a base idle cycle, or periodically if base idle is missing. playback speed is configured globally in the Animation Speed section.</small>
+ <div class="table-wrap animation-table-wrap"><table><thead><tr><th>state</th><th>variant</th><th>clip</th><th>asset</th><th>status</th><th>weight</th><th>first→end</th><th>actions</th></tr></thead><tbody id="npc-animation-rows"></tbody></table></div>
+ </div>
+ </div>
+diff --git a/system/verify/test_npc_pipeline.py b/system/verify/test_npc_pipeline.py
+--- a/system/verify/test_npc_pipeline.py
++++ b/system/verify/test_npc_pipeline.py
+@@ -174,6 +174,83 @@
+         self.assertEqual(registered["yawDegrees"], 45)
+         self.assertEqual(registered["position"], {"x": 4, "y": 10, "z": 6})
+ 
++    def test_npc_idle_special_weights_export_and_per_npc_isolation(self):
++        self.seed_npc()
++        with self.npcs.connect() as db:
++            db.execute(
++                """INSERT INTO monsters(slug,name_en,model_source_path,model_sha256,model_asset_id,
++                    model_published_sha256,created_at,updated_at,skeleton_signature)
++                    VALUES(?,?,?,?,?,?,?,?,?)""",
++                ("innkeeper", "Innkeeper", "assets/source/npcs/innkeeper/model/innkeeper.fbx",
++                 "sha-other", "12346", "sha-other", 1.0, 1.0, "rig-2"),
++            )
++        self.npcs.export()
++        self.npc_animations._sync_profiles()
++        folder = self.root / "animations"
++        folder.mkdir()
++        for slug in ("blacksmith", "innkeeper"):
++            for slot in ("idle", "idle_special_01", "idle_special_02"):
++                (folder / f"{slug}_1hs_{slot}.rbxm").write_bytes(f"{slug}/{slot}".encode())
++        # Each scanned folder contains only clips for that profile.
++        for slug in ("blacksmith", "innkeeper"):
++            individual = folder / slug
++            individual.mkdir()
++            for file in folder.glob(f"{slug}_1hs_*.rbxm"):
++                file.rename(individual / file.name)
++            self.assertEqual(self.npc_animations.scan_folder(slug, str(individual))["recognized"], 3)
++        with self.npc_animations.connect() as db:
++            db.execute("UPDATE monster_animation_clips SET asset_id='54321',published_sha256=sha256")
++        self.npc_animations.export()
++        rows = self.npc_animations.list_for_monster("blacksmith")
++        base = next(row for row in rows if row["slot"] == "idle")
++        special1 = next(row for row in rows if row["slot"] == "idle_special" and row["variant"] == 1)
++        special2 = next(row for row in rows if row["slot"] == "idle_special" and row["variant"] == 2)
++        self.npc_animations.set_weight(base["binding_id"], 300)
++        self.npc_animations.set_weight(special1["binding_id"], 25)
++        self.npc_animations.set_weight(special2["binding_id"], 0)
++        manifest = json.loads((self.root / "assets/manifests/npc-animations.json").read_text())
++        weights = {(row["monster_slug"], row["slot"], row["variant"]): row["weight"] for row in manifest["bindings"]}
++        self.assertEqual(weights[("blacksmith", "idle", 0)], 300)
++        self.assertEqual(weights[("blacksmith", "idle_special", 1)], 25)
++        self.assertEqual(weights[("blacksmith", "idle_special", 2)], 0)
++        self.assertEqual(weights[("innkeeper", "idle", 0)], 100)
++        generated = (self.root / "src/shared/npc/NpcAnimationRegistry.luau").read_text()
++        self.assertIn('role = "special"', generated)
++        self.assertIn('sourceSlot = "idle_special"', generated)
++        self.assertIn('weight = 0', generated)
++        self.assertIn('weaponSet = "1hs"', generated)
++        self.assertIn('["blacksmith"]', generated)
++        self.assertIn('["innkeeper"]', generated)
++
++    def test_npc_idle_runtime_wiring_and_zero_weight_api(self):
++        repo = Path(__file__).resolve().parents[2]
++        npc_root = repo / "src/server/npc"
++        service = (npc_root / "NpcAnimationService.luau").read_text()
++        idle = (npc_root / "NpcIdlePresentation.luau").read_text()
++        tracks = (npc_root / "NpcAnimationTracks.luau").read_text()
++        chooser = (repo / "src/shared/animation/WeightedAnimationChoice.luau").read_text()
++        spawner = (npc_root / "NpcSpawnerService.luau").read_text()
++        host = (repo / "system/control-center/host_agent.py").read_text()
++        ui = (repo / "system/control-center/static/npc-assets.js").read_text()
++        self.assertIn('WeightedAnimationChoice.Select(self.choices, selectionRandom)', idle)
++        self.assertIn('self.base.track.DidLoop:Connect', idle)
++        self.assertIn('Tracks.Step(self.base, delta)', idle)
++        self.assertIn('Tracks.Step(special, delta)', idle)
++        self.assertIn('self.activeSpecial', idle)
++        self.assertIn('IdleVariant', idle)
++        self.assertIn('weight > 0', chooser)
++        self.assertIn('row.animationId', tracks)
++        self.assertIn('first("death")', service)
++        self.assertIn('idle:Step(delta)', service)
++        self.assertIn('idle:Stop()', service)
++        self.assertIn('entry.presentation.Step(delta)', spawner)
++        self.assertIn('entry.presentation.Destroy()', spawner)
++        self.assertIn('payload.get("weight", 100)', host)
++        self.assertIn('data-weight class="weight-input" type="number" min="0"', ui)
++        for module in (service, idle, tracks, chooser):
++            self.assertNotIn('blacksmith', module)
++            self.assertNotIn('innkeeper', module)
++
+     def test_spawn_contract_delete_and_population_limits(self):
+         self.seed_npc()
+         self.seed_clips()
+diff --git a/docs/NPC_ARCHITECTURE_M59_RU.md b/docs/NPC_ARCHITECTURE_M59_RU.md
+--- a/docs/NPC_ARCHITECTURE_M59_RU.md
++++ b/docs/NPC_ARCHITECTURE_M59_RU.md
+@@ -28,3 +28,13 @@
+ - `NpcSpawnPlacement` (только плагин Studio) управляет жестом: наведение — позиция на физической поверхности; удержание ЛКМ — блокировка позиции и вращение горизонтальным drag; отпускание — подтверждение; Esc — отмена и удаление preview.
+ - После отпускания предварительная модель остаётся в черновой точке до `register`. При регистрации marker заменяется лёгким маркером без копии тяжёлой модели, чтобы количество NPC spawn points не раздувало `.rbxl`. В Play режиме runtime использует те же `position` и `yawDegrees`.
+ - Монстры используют старый `monsterSpawnPlacementResult` без изменений; направление NPC читается из того же поля `yawDegrees` в общем spawn contract.
++
++## M63 · Анимационное состояние NPC и веса idle
++
++- `NpcAnimationTracks` — адаптер опубликованных `NpcAnimationRegistry` rows для профиля оружия из `NpcAnimationConfig`. Создаёт `AnimationTrack`, управляет приоритетами, скоростью и optional runtime-only `AnimationFirstFrameSeam`. Не знает про боевые состояния или популяцию.
++- `NpcIdlePresentation` — самостоятельный контроллер мирного idle. Идентифицирует base/special по `role`/`sourceSlot`, выбирает варианты из весов через общий `WeightedAnimationChoice`, запускает special на границе завершения base idle и возвращается к base после special. Для base с включённым `first→end` граница определяется seam; иначе — `DidLoop`. При отсутствии работающего base idle выбор выполняется с интервалом `MissingBaseIdleCycleSeconds`.
++- `NpcAnimationService` — оркестрация состояний `idle ↔ combat_idle → death`. Переход в бой и смерть останавливает special, смерть управляется `DeathAnimationPolicy`; сервис предоставляет `Step`/`Destroy` и не создаёт/не удаляет NPC.
++- `NpcSpawnerService` владеет экземплярами NPC и вызывает `presentation.Step` до завершения жизни, а `presentation.Destroy` при очистке. Без AI NPC не атакуют.
++- Веса NPC от `0` до `10000`. Значение `0` исключает вариант из выбора. Веса пропорциональны: при base=300, special_01=25 и special_02=0 вероятность special_01 при очередном выборе равна `25/(300+25)`; special_02 не выбирается. Существующая шкала monsters (`1..10000`) не изменяется.
++- Для диагностики в Roblox Studio у NPC выставляется атрибут `NpcIdleVariant` = `base` / `special_XX` / `nil`; `NpcAnimationState` остаётся `idle`, `combat_idle` или `death`.
++- Модули не содержат имён NPC и не зависят от структуры отдельного реестра конкретного персонажа. Не опубликованные анимации не загружаются. Для корректной демонстрации надо проверить игру непосредственно в Roblox Studio: модель со связанным FBX-скелетом и опубликованные `idle`, `idle_special_01`.

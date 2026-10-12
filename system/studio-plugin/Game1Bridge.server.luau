@@ -13,6 +13,8 @@ local Workspace = game:GetService("Workspace")
 local CharacterTemplate = require(script.Parent.modules.CharacterTemplate)
 local LocationCommands = require(script.Parent.modules.LocationCommands)
 local DecoManager = require(script.Parent.modules.DecoManager)
+local NpcSpawnPreview = require(script.Parent.modules.NpcSpawnPreview)
+local NpcSpawnPlacement = require(script.Parent.modules.NpcSpawnPlacement)
 
 local toolbar = plugin:CreateToolbar("game1")
 local button = toolbar:CreateButton(
@@ -470,13 +472,15 @@ end
 
 local function placeMonsterRig(importedRig: Model, destination: Instance, wrapperName: string, assetId: number, metadata: any): (Model, any, any, any)
     wrapperName = validSegment(wrapperName)
+    local actorKind = if tostring(metadata.entityKind or "monster") == "npc" then "npc" else "monster"
+    local managedAttribute = if actorKind == "npc" then "Game1NpcRig" else "Game1MonsterRig"
     local stats = validateCharacterRig(importedRig)
     local existing = destination:FindFirstChild(wrapperName)
     if existing ~= nil and not existing:IsA("Model") then
-        error("monster destination already contains a non-Model instance named " .. wrapperName)
+        error(actorKind .. " destination already contains a non-Model instance named " .. wrapperName)
     end
-    if existing ~= nil and existing:GetAttribute("Game1MonsterRig") ~= true then
-        error("refusing to replace an unmanaged monster Model named " .. wrapperName)
+    if existing ~= nil and existing:GetAttribute(managedAttribute) ~= true then
+        error("refusing to replace an unmanaged " .. actorKind .. " Model named " .. wrapperName)
     end
 
     local wrapper = existing :: Model?
@@ -513,10 +517,10 @@ local function placeMonsterRig(importedRig: Model, destination: Instance, wrappe
     stats = modelRigStats(importedRig)
     local textureStats = applyWeaponTextures(importedRig, metadata.textures or {})
 
-    wrapper:SetAttribute("Game1MonsterRig", true)
+    wrapper:SetAttribute(managedAttribute, true)
     wrapper:SetAttribute("Game1PlacementMode", "monster-rig")
     wrapper:SetAttribute("Game1ModelAssetId", tostring(assetId))
-    wrapper:SetAttribute("MonsterSlug", tostring(metadata.monsterSlug or wrapperName))
+    wrapper:SetAttribute(if actorKind == "npc" then "NpcSlug" else "MonsterSlug", tostring(metadata.monsterSlug or wrapperName))
     return wrapper :: Model, stats, templateInfo, textureStats
 end
 
@@ -636,7 +640,7 @@ local function handleModelLoad(data: any)
             result.template = templateInfo
             result.monsterStats = {
                 textures = textureStats,
-                monsterSlug = tostring(wrapper:GetAttribute("MonsterSlug") or ""),
+                monsterSlug = tostring(wrapper:GetAttribute("MonsterSlug") or wrapper:GetAttribute("NpcSlug") or ""),
             }
             result.importedCount = #wrapper:GetDescendants()
         else
@@ -681,7 +685,7 @@ local function postMonsterSpawnResult(payload: any)
     end
 end
 
-local function monsterSpawnMarkerFolder(): Folder
+local function monsterSpawnMarkerFolder(kind: string?): Folder
     local root = Workspace:FindFirstChild(MONSTER_SPAWN_AUTHORING_ROOT)
     if root and not root:IsA("Folder") then
         error("Workspace." .. MONSTER_SPAWN_AUTHORING_ROOT .. " exists but is not a Folder")
@@ -692,21 +696,22 @@ local function monsterSpawnMarkerFolder(): Folder
         root:SetAttribute("Game1Authoring", true)
         root.Parent = Workspace
     end
-    local folder = root:FindFirstChild(MONSTER_SPAWN_MARKER_FOLDER)
+    local markerFolderName = if kind == "npc" then "NpcSpawns" else MONSTER_SPAWN_MARKER_FOLDER
+    local folder = root:FindFirstChild(markerFolderName)
     if folder and not folder:IsA("Folder") then
-        error(root:GetFullName() .. "." .. MONSTER_SPAWN_MARKER_FOLDER .. " exists but is not a Folder")
+        error(root:GetFullName() .. "." .. markerFolderName .. " exists but is not a Folder")
     end
     if not folder then
         folder = Instance.new("Folder")
-        folder.Name = MONSTER_SPAWN_MARKER_FOLDER
+        folder.Name = markerFolderName
         folder.Parent = root
     end
     return folder :: Folder
 end
 
-local function findMonsterSpawnMarker(spawnId: string): Model?
+local function findMonsterSpawnMarker(spawnId: string, kind: string?): Model?
     local root = Workspace:FindFirstChild(MONSTER_SPAWN_AUTHORING_ROOT)
-    local folder = root and root:FindFirstChild(MONSTER_SPAWN_MARKER_FOLDER)
+    local folder = root and root:FindFirstChild(if kind == "npc" then "NpcSpawns" else MONSTER_SPAWN_MARKER_FOLDER)
     if not folder then
         return nil
     end
@@ -758,13 +763,14 @@ local function monsterSpawnMarkerName(data: any): string
     return string.format("%s_%s", name, shortId)
 end
 
-local function createMonsterSpawnMarker(data: any, markerState: string): Model
+local function createMonsterSpawnMarker(data: any, markerState: string, actorKind: string?): Model
     local spawnId = tostring(data.spawnId or "")
     if not spawnId:match("^spawn%-%w[%w%-]+$") then
         error("Monster Spawn command has invalid spawnId")
     end
     local preview = markerState == "preview"
-    local folder = monsterSpawnMarkerFolder()
+    local kind = if actorKind == "npc" then "npc" else "monster"
+    local folder = monsterSpawnMarkerFolder(kind)
     for _, child in ipairs(folder:GetChildren()) do
         if child:IsA("Model") then
             local registeredCopy = not preview and tostring(child:GetAttribute("SpawnId") or "") == spawnId
@@ -779,14 +785,15 @@ local function createMonsterSpawnMarker(data: any, markerState: string): Model
     local color = preview and Color3.fromRGB(255, 111, 97) or Color3.fromRGB(66, 214, 177)
     local marker = Instance.new("Model")
     marker.Name = monsterSpawnMarkerName(data)
-    marker:SetAttribute("Game1MonsterSpawnMarker", true)
+    marker:SetAttribute(if kind == "npc" then "Game1NpcSpawnMarker" else "Game1MonsterSpawnMarker", true)
+    marker:SetAttribute("EntityKind", kind)
     marker:SetAttribute("SpawnState", markerState)
     marker:SetAttribute("SpawnId", preview and "" or spawnId)
     if preview then
         marker:SetAttribute("PreviewForSpawnId", spawnId)
     end
-    marker:SetAttribute("MonsterSlug", tostring(data.monsterSlug or ""))
-    marker:SetAttribute("MonsterName", tostring(data.monsterName or ""))
+    marker:SetAttribute(if kind == "npc" then "NpcSlug" else "MonsterSlug", tostring(data.monsterSlug or ""))
+    marker:SetAttribute(if kind == "npc" then "NpcName" else "MonsterName", tostring(data.monsterName or ""))
     marker:SetAttribute("MapKey", tostring(data.mapKey or "main"))
     marker:SetAttribute("PlaceId", tonumber(data.placeId) or game.PlaceId)
     marker:SetAttribute("YawDegrees", tonumber(data.yawDegrees) or 0)
@@ -828,6 +835,18 @@ local function createMonsterSpawnMarker(data: any, markerState: string): Model
     corner.Parent = text
 
     marker.PrimaryPart = point
+    if preview and kind == "npc" then
+        -- Only the unregistered, short-lived draft holds a rendered NPC.
+        -- Registered markers remain lightweight regardless of population size.
+        local attached, attachError = pcall(function()
+            NpcSpawnPreview.Attach(ServerStorage, marker, tostring(data.monsterSlug or ""))
+            NpcSpawnPreview.Move(marker, world.Position, tonumber(data.yawDegrees) or 0)
+        end)
+        if not attached then
+            marker:Destroy()
+            error(attachError)
+        end
+    end
     Selection:Set({ marker })
     return marker
 end
@@ -835,6 +854,7 @@ end
 local function moveMonsterSpawnMarker(marker: Model, position: Vector3, yawDegrees: number)
     local world = monsterSpawnMarkerCFrame({ x = position.X, y = position.Y, z = position.Z }, yawDegrees)
     marker:SetAttribute("YawDegrees", yawDegrees)
+    NpcSpawnPreview.Move(marker, position, yawDegrees)
     local point = marker:FindFirstChild("Point")
     if point and point:IsA("BasePart") then
         point.CFrame = world * CFrame.Angles(0, 0, math.rad(90))
@@ -861,6 +881,18 @@ local function monsterSpawnPlacementResult(data: any): any
         error(string.format("Open PlaceId %d does not match Spawn PlaceId %d", game.PlaceId, expectedPlaceId))
     end
 
+    if tostring(data.entityKind or "monster") == "npc" then
+        return NpcSpawnPlacement.Place({
+            plugin = plugin,
+            Workspace = Workspace,
+            UserInputService = UserInputService,
+            data = data,
+            cameraYaw = monsterSpawnCameraYaw,
+            createMarker = createMonsterSpawnMarker,
+            moveMarker = moveMonsterSpawnMarker,
+        })
+    end
+
     local mouse = plugin:GetMouse()
     local initial = data.position
     local startPosition = Vector3.new(0, 0, 0)
@@ -873,7 +905,7 @@ local function monsterSpawnPlacementResult(data: any): any
     data.position = { x = startPosition.X, y = startPosition.Y, z = startPosition.Z }
     data.yawDegrees = yaw
     data.placeId = game.PlaceId
-    local preview = createMonsterSpawnMarker(data, "preview")
+    local preview = createMonsterSpawnMarker(data, "preview", tostring(data.entityKind or "monster"))
     local finished = false
     local cancelled = false
     local chosenPosition = startPosition
@@ -921,6 +953,7 @@ local function monsterSpawnPlacementResult(data: any): any
 end
 
 local function handleMonsterSpawn(data: any)
+    local kind = tostring(data.entityKind or "monster")
     local result = {
         command = "monster-spawn",
         project = "game1",
@@ -934,8 +967,8 @@ local function handleMonsterSpawn(data: any)
         mapKey = tostring(data.mapKey or "main"),
     }
     local ok, operationError = xpcall(function()
-        if tostring(data.project or "") ~= "game1" or tonumber(data.schemaVersion) ~= 1 then
-            error("invalid game1 Monster Spawn command")
+        if tostring(data.project or "") ~= "game1" or tonumber(data.schemaVersion) ~= 1 or (kind ~= "monster" and kind ~= "npc") then
+            error("invalid game1 actor spawn command")
         end
         local action = tostring(data.action or "")
         if action == "place" then
@@ -948,11 +981,11 @@ local function handleMonsterSpawn(data: any)
             if expectedPlaceId > 0 and game.PlaceId > 0 and expectedPlaceId ~= game.PlaceId then
                 error(string.format("Open PlaceId %d does not match Spawn PlaceId %d", game.PlaceId, expectedPlaceId))
             end
-            local marker = createMonsterSpawnMarker(data, "registered")
+            local marker = createMonsterSpawnMarker(data, "registered", kind)
             result.markerPath = marker:GetFullName()
             result.synchronized = true
         elseif action == "select" then
-            local marker = findMonsterSpawnMarker(tostring(data.spawnId or ""))
+            local marker = findMonsterSpawnMarker(tostring(data.spawnId or ""), kind)
             if not marker then
                 error("registered Monster Spawn marker was not found in Studio")
             end
@@ -966,11 +999,11 @@ local function handleMonsterSpawn(data: any)
             result.synchronized = true
         elseif action == "delete" then
             local spawnId = tostring(data.spawnId or "")
-            local marker = findMonsterSpawnMarker(spawnId)
+            local marker = findMonsterSpawnMarker(spawnId, kind)
             if marker then
                 marker:Destroy()
             end
-            for _, child in ipairs(monsterSpawnMarkerFolder():GetChildren()) do
+            for _, child in ipairs(monsterSpawnMarkerFolder(kind):GetChildren()) do
                 if child:IsA("Model") and tostring(child:GetAttribute("PreviewForSpawnId") or "") == spawnId then
                     child:Destroy()
                 end
@@ -978,9 +1011,9 @@ local function handleMonsterSpawn(data: any)
             result.deleted = marker ~= nil
             result.synchronized = true
         elseif action == "sync" then
-            local folder = monsterSpawnMarkerFolder()
+            local folder = monsterSpawnMarkerFolder(kind)
             for _, child in ipairs(folder:GetChildren()) do
-                if child:IsA("Model") and child:GetAttribute("Game1MonsterSpawnMarker") == true then
+                if child:IsA("Model") and child:GetAttribute(if kind == "npc" then "Game1NpcSpawnMarker" else "Game1MonsterSpawnMarker") == true then
                     child:Destroy()
                 end
             end
@@ -990,7 +1023,7 @@ local function handleMonsterSpawn(data: any)
             for _, record in ipairs(typeof(data.records) == "table" and data.records or {}) do
                 local recordPlaceId = tonumber(record.placeId) or 0
                 if recordPlaceId == 0 or game.PlaceId == 0 or recordPlaceId == game.PlaceId then
-                    createMonsterSpawnMarker(record, "registered")
+                    createMonsterSpawnMarker(record, "registered", kind)
                     created += 1
                     table.insert(syncedSpawnIds, tostring(record.spawnId or ""))
                 else

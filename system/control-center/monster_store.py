@@ -5,13 +5,14 @@ import hashlib
 import json
 import re
 import shutil
-import sqlite3
 import tempfile
 import time
 import unicodedata
 
 from character_analysis import analyze_character_fbx, prepare_character_publication_fbx
 from character_store import _assert_publication_skeleton_matches
+from sqlite_connection import connect as connect_sqlite
+
 from opencloud_assets import (
     create_image_asset,
     create_model_asset,
@@ -65,18 +66,19 @@ def _safe_texture_slot(path: Path) -> str:
 
 
 class MonsterStore:
-    def __init__(self, root: Path):
+    def __init__(self, root: Path, kind: str = "monster"):
+        if kind not in {"monster", "npc"}:
+            raise ValueError("unsupported actor kind")
+        self.kind = kind
         self.root = root.resolve()
         self.runtime = self.root / ".control-center"
         self.runtime.mkdir(parents=True, exist_ok=True)
-        self.db = self.runtime / "game1.db"
+        self.db = self.runtime / ("game1_npcs.db" if self.kind == "npc" else "game1.db")
         self._init()
         self.export()
 
     def connect(self):
-        connection = sqlite3.connect(self.db)
-        connection.row_factory = sqlite3.Row
-        return connection
+        return connect_sqlite(self.db)
 
     def _init(self):
         with self.connect() as connection:
@@ -207,7 +209,7 @@ class MonsterStore:
         result["stats"] = self._stats(connection, result["slug"])
         result["behavior"] = self._behavior(connection, result["slug"])
         result["status"] = self._status(result, result["textures"])
-        result["server_storage_path"] = f"ServerStorage.monsters.{result['slug']}.model.{result['slug']}"
+        result["server_storage_path"] = f"ServerStorage.{self.kind}s.{result['slug']}.model.{result['slug']}"
         return result
 
     def list(self) -> list[dict]:
@@ -225,7 +227,7 @@ class MonsterStore:
         if not target.is_file():
             return
         relative = target.relative_to(self.root)
-        archive = self.root / "assets/reimported/monsters" / slug / f"r{revision:04d}" / relative.name
+        archive = self.root / f"assets/reimported/{self.kind}s" / slug / f"r{revision:04d}" / relative.name
         archive.parent.mkdir(parents=True, exist_ok=True)
         if not archive.exists():
             shutil.copy2(target, archive)
@@ -293,7 +295,7 @@ class MonsterStore:
             if not source.is_file() or source.suffix.lower() != ".fbx":
                 raise ValueError("monster model must be an FBX file")
             analysis = analyze_character_fbx(self.root, source)
-            source_target = self.root / "assets/source/monsters" / slug / "model" / f"{slug}.fbx"
+            source_target = self.root / f"assets/source/{self.kind}s" / slug / "model" / f"{slug}.fbx"
             source_target.parent.mkdir(parents=True, exist_ok=True)
             if old:
                 self._archive_existing(source_target, slug, int(old.get("revision") or 1))
@@ -339,7 +341,7 @@ class MonsterStore:
                 texture_id = f"{slug}__{slot}"
                 previous = connection.execute("SELECT * FROM monster_textures WHERE id=?", (texture_id,)).fetchone()
                 canonical_name = f"{slot}{source.suffix.lower()}"
-                source_target = self.root / "assets/source/monsters" / slug / "textures" / canonical_name
+                source_target = self.root / f"assets/source/{self.kind}s" / slug / "textures" / canonical_name
                 source_target.parent.mkdir(parents=True, exist_ok=True)
                 if previous:
                     self._archive_existing(source_target, slug, int(previous.get("revision") or 1))
@@ -389,7 +391,7 @@ class MonsterStore:
                     },
                     prepared["analysis"],
                 )
-                current_asset_id = str(row.get("model_asset_id") or "").strip()
+                current_asset_id = "" if self.kind == "npc" else str(row.get("model_asset_id") or "").strip()
                 common = dict(
                     display_name=row["name_en"], description=description,
                     creator_type=creator_type, creator_id=creator_id, api_key=api_key,
@@ -477,18 +479,18 @@ class MonsterStore:
 
     def export(self):
         snapshot = self.snapshot()
-        manifest_path = self.root / "assets/manifests/monsters.json"
+        manifest_path = self.root / f"assets/manifests/{self.kind}s.json"
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
         manifest_path.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
-        registry_path = self.root / "src/shared/monster/MonsterRegistry.luau"
+        registry_path = self.root / ("src/shared/npc/NpcRegistry.luau" if self.kind == "npc" else "src/shared/monster/MonsterRegistry.luau")
         registry_path.parent.mkdir(parents=True, exist_ok=True)
         lines = [
             "-- generated. do not edit by hand.",
             "return table.freeze({",
             f"\tschemaVersion = {SCHEMA_VERSION},",
             '\tproject = "game1",',
-            "\tmonsters = table.freeze({",
+            f"\t{self.kind}s = table.freeze({{",
         ]
         for row in snapshot["items"]:
             lines.extend([

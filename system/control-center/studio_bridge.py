@@ -134,8 +134,12 @@ def run_monster_spawn_bridge(
     enabled: bool = True,
     records: list[dict] | None = None,
     timeout_seconds: float = 45.0,
+    entity_kind: str = "monster",
 ) -> dict:
+    if entity_kind not in {"monster", "npc"}:
+        raise ValueError("invalid spawn entity kind")
     command = {
+        "entityKind": entity_kind,
         "command": "monster-spawn",
         "schemaVersion": 1,
         "project": PROJECT,

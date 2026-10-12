@@ -11,7 +11,7 @@
 <body>
 <header>
 <div><span class="eyebrow">game1 · control center</span><h1>asset manager</h1></div>
-<div class="header-actions"><span class="pill">characters + animations + weapons + monsters + locations + location assets + timelines · m54</span><button id="theme" class="icon" type="button" title="theme">◐</button></div>
+<div class="header-actions"><span class="pill">characters + animations + weapons + NPCs + monsters + locations + location assets + timelines · m59</span><button id="theme" class="icon" type="button" title="theme">◐</button></div>
 </header>
 <main>
 <aside class="panel rail">
@@ -21,6 +21,7 @@
 <button id="nav-animations" class="asset-section" type="button"><b>animations</b><small>profiles · clips</small></button>
 <button id="nav-animation-speed" class="asset-section" type="button"><b>animation speed</b><small>stat → playback scaling</small></button>
 <button id="nav-weapons" class="asset-section" type="button"><b>weapons</b><small>models · textures · stats</small></button>
+<button id="nav-npcs" class="asset-section" type="button"><b>NPCs</b><small>1hs rigs · animations · spawns</small></button>
 <button id="nav-monsters" class="asset-section" type="button"><b>monsters</b><small>rigs · stats · animations</small></button>
 <button id="nav-locations" class="asset-section" type="button"><b>locations</b><small>polygon registry · studio authoring</small></button>
 <button id="nav-location-assets" class="asset-section" type="button"><b>location assets</b><small>trees · bushes · rocks · lights · fences · decorations · ladders · flowers · buildings</small></button>
@@ -44,6 +45,12 @@
 <div class="section-title"><div><span>weapon registry</span><h3>weapons</h3></div><span id="weapon-rail-count">0</span></div>
 <div class="tree-actions"><button id="new-weapon" class="primary" type="button">new</button><button id="refresh-weapons" type="button">refresh</button></div>
 <div id="weapon-tree" class="tree"></div>
+</div>
+<div id="npc-rail" hidden>
+<hr class="rail-separator">
+<div class="section-title"><div><span>NPC registry</span><h3>NPCs · 1hs</h3></div><span id="npc-rail-count">0</span></div>
+<div class="tree-actions"><button id="new-npc" class="primary" type="button">new</button><button id="refresh-npcs" type="button">refresh</button></div>
+<div id="npc-tree" class="tree"></div>
 </div>
 <div id="monster-rail" hidden>
 <hr class="rail-separator">
@@ -362,10 +369,104 @@
 </div>
 </div>
 
+<div id="npcs-view" hidden>
+<div class="panel hero">
+<div><span class="eyebrow">npc assets · canonical game1 registry</span><h2>npcs</h2><p>independent NPC archetypes with published articulated FBX, stats and animation profiles. Initial weapon profile: 1hs only. NPCs are stationary in this phase, damageable and respawn through authored spawn points.</p></div>
+<div class="metrics"><div><b id="npc-metric-total">0</b><span>registered</span></div><div><b id="npc-metric-published">0</b><span>published</span></div><div><b id="npc-metric-changed">0</b><span>changed</span></div></div>
+</div>
+<div class="panel runtime-card"><div id="npc-registry-state" class="runtime-state registered"><strong>npc registry</strong><span>loading…</span></div><div id="npc-publication-state" class="publication-missing">open cloud: checking…</div></div>
+<div class="weapon-workflow npc-workflow">
+<div class="panel character-card">
+<span class="eyebrow">01 · identity and stats</span><h3>register npc</h3>
+<div class="character-grid"><label>name en<input id="npc-name-en" autocomplete="off"></label><label>name ru<input id="npc-name-ru" autocomplete="off"></label></div>
+<label>slug<input id="npc-slug" readonly><small class="hint">generated from english name as lowercase snake_case. existing registered slugs stay stable.</small></label>
+<div class="npc-stats-grid monster-stats-grid"><label>HP<input id="npc-stat-hp" type="number" min="0" step="1" value="100"></label><label>attack<input id="npc-stat-damage" type="number" min="0" step="1" value="10"></label><label>attack speed<input id="npc-stat-attack-speed" type="number" min="0" step="1" value="100"></label><label>run speed<input id="npc-stat-run-speed" type="number" min="0" step="1" value="50"></label><label>critical chance %<input id="npc-stat-crit-chance" type="number" min="0" max="100" step="0.1" value="0"></label></div>
+<small class="hint">npc stats are absolute runtime values. critical chance is 0..100 percent.</small>
+<div class="npc-stats-grid monster-stats-grid"><label class="spawn-enabled"><input id="npc-behavior-aggressive" type="checkbox" disabled><span>aggressive · unchecked = passive</span></label><label>aggro radius · studs<input id="npc-behavior-aggro-radius" disabled type="number" min="0" step="0.1" value="16"></label><label>attack radius · studs<input id="npc-behavior-attack-radius" type="number" min="0" step="0.1" value="3"></label></div>
+<small class="hint">NPCs remain passive. Attack radius is saved with NPC metadata for a future combat AI; aggro, patrol, dialog and factions will be configured separately.</small>
+<hr class="card-separator">
+<span class="eyebrow">02 · source assets</span>
+<div class="picker"><button id="choose-npc-model" type="button">choose fbx</button><small id="picked-npc-model">fbx not selected</small></div>
+<div class="picker"><button id="choose-npc-textures" type="button">choose textures</button><small id="picked-npc-textures">textures not selected</small></div>
+<div id="npc-model-status" class="status-box"><strong>not registered</strong><span>choose a rigged npc fbx. textures are optional.</span></div>
+<div class="actions"><button id="register-npc" class="primary" type="button">register npc</button><button id="clear-npc-form" type="button">clear form</button></div>
+<hr class="card-separator">
+<span class="eyebrow">03 · publication and studio</span><h3 class="subheading">roblox assets</h3>
+<label>description<input id="npc-publication-description" value="game1 npc"></label>
+<div class="actions"><button id="publish-npc" class="primary" type="button" disabled>publish all changed</button><button id="sync-npc" type="button" disabled>sync studio</button></div>
+<small id="npc-publication-hint" class="hint">select a registered npc.</small>
+</div>
+<div class="panel character-card">
+<div class="section-title"><div><span>versioned registry</span><h3>registered npcs</h3></div><button id="validate-npcs" type="button">refresh</button></div>
+<div class="table-wrap weapon-table-wrap"><table><thead><tr><th>npc</th><th>stats</th><th>skeleton</th><th>assets</th><th>status</th><th>actions</th></tr></thead><tbody id="npc-rows"></tbody></table></div>
+<div id="npc-details" class="details"><span class="muted">select a npc.</span></div>
+</div>
+</div>
+
+<div class="panel hero npc-animation-hero">
+<div><span class="eyebrow">npc animation library</span><h2>npc animations</h2><p>same registration/publication pipeline as characters. Only 1hs is enabled (idle, walk, run, combat_idle, attack variants, death). choose the target npc here; every scan, assignment and publication below applies only to that npc.</p></div>
+</div>
+<div class="panel runtime-card"><div id="npc-animation-profile-state" class="runtime-state bootstrap"><strong>select npc</strong><span>register a npc first.</span></div></div>
+<div class="animation-workflow">
+<div class="panel character-card">
+<span class="eyebrow">04 · target and scan</span><h3>npc animations</h3>
+<label>npc<select id="npc-animation-npc"></select><small class="hint">this is the npc whose animation files will be scanned, registered and published.</small></label>
+<hr class="card-separator">
+<h3 class="subheading">animation folder</h3>
+<details id="npc-animation-filename-guide" class="naming-guide" open><summary>filename rules · npc states</summary><div id="npc-animation-filename-rules" class="filename-rules"><span class="muted">select a npc.</span></div><small class="hint">canonical names use <code>{npc_slug}_1hs_{state}</code>, e.g. <code>blacksmith_1hs_idle.rbxm</code>. <code>idle_special_01</code>, <code>idle_special_02</code>, … are variants inside <code>idle</code>; <code>combat_idle</code> is the waiting pose while already in combat; <code>attack_01</code>, <code>attack_02</code>, … are variants inside <code>attack</code>.</small></details>
+<div class="picker folder-picker"><div class="folder-explorer"><input id="npc-animation-folder-path" type="text" autocomplete="off" spellcheck="false" placeholder="C:\path\to\npc-animations"><button id="choose-npc-animation-folder" type="button">explore…</button></div><small>paste a folder path or choose it in Explorer · the last npc animation folder is remembered</small></div>
+<div class="actions"><button id="scan-npc-animations" class="primary wide" type="button" disabled>scan folder</button></div>
+<div id="npc-animation-scan-status" class="status-box"><strong>nothing scanned yet</strong><span>unrecognized files can be assigned manually.</span></div>
+<hr class="card-separator">
+<span class="eyebrow">05 · publication queue</span><h3 class="subheading">roblox animation assets</h3>
+<label>description<input id="npc-animation-publication-description" value="game1 npc animation"></label>
+<div class="actions"><button id="publish-missing-npc-animations" class="primary" type="button" disabled>publish missing</button><button id="check-roblox-npc-animations" type="button">Check Roblox Assets Animations</button><button id="refresh-npc-animations" type="button">refresh</button></div>
+<div id="npc-animation-publish-progress" class="queue-progress" hidden><strong id="npc-animation-publish-current">publication queue</strong><span id="npc-animation-publish-count">0 / 0</span><progress id="npc-animation-publish-bar" value="0" max="1"></progress></div>
+<div id="npc-animation-unassigned" class="unassigned"></div>
+</div>
+<div class="panel character-card">
+<div class="section-title"><div><span>selected npc animations</span><h3 id="npc-animation-table-title">registered animations</h3></div></div>
+<small class="hint">only animations already registered for the selected npc are listed here. <code>idle_special_01..n</code> are shown as variants of state <code>idle</code>. Weight is relative within idle (base + specials); 0 disables selection of that clip. Specials are selected at the end of a base idle cycle, or periodically if base idle is missing. playback speed is configured globally in the Animation Speed section.</small>
+<div class="table-wrap animation-table-wrap"><table><thead><tr><th>state</th><th>variant</th><th>clip</th><th>asset</th><th>status</th><th>weight</th><th>first→end</th><th>actions</th></tr></thead><tbody id="npc-animation-rows"></tbody></table></div>
+</div>
+</div>
+
+<div class="panel hero npc-spawn-hero">
+<div><span class="eyebrow">npc spawn authoring · studio handshake</span><h2>npc spawns</h2><p>choose a registered npc, place a marker by clicking a surface in Studio, then register population settings. one spawn record owns position, radius, max alive, respawn delay and enabled state.</p></div>
+<div class="metrics"><div><b id="npc-spawn-count">0</b><span>registered spawns</span></div><div><b id="npc-spawn-synced">0</b><span>studio synced</span></div><div><b id="npc-spawn-stale">0</b><span>stale</span></div></div>
+</div>
+<div class="npc-spawn-workflow monster-spawn-workflow">
+<div class="panel character-card">
+<span class="eyebrow">06 · npc and readiness</span><h3>spawn npc</h3>
+<label>npc<select id="npc-spawn-npc"></select></label>
+<div id="npc-spawn-readiness" class="status-box"><strong>select npc</strong><span>a published model is required; NPC animations are optional for spawning.</span></div>
+<hr class="card-separator">
+<span class="eyebrow">07 · placement</span><h3 class="subheading">point in Studio</h3>
+<div class="character-grid"><label>spawn id<input id="npc-spawn-id" readonly placeholder="created on placement"></label><label>place id<input id="npc-spawn-place-id" type="number" readonly value="0"></label></div>
+<div class="character-grid"><label>map key<input id="npc-spawn-map-key" value="main"></label><label>yaw °<input id="npc-spawn-yaw" type="number" step="0.1" value="0"></label></div>
+<div class="npc-spawn-position-grid monster-spawn-position-grid"><label>X<input id="npc-spawn-x" type="number" step="0.001"></label><label>Y<input id="npc-spawn-y" type="number" step="0.001"></label><label>Z<input id="npc-spawn-z" type="number" step="0.001"></label></div>
+<div class="actions"><button id="npc-spawn-place" class="primary" type="button">preview &amp; place NPC in Studio</button><button id="npc-spawn-select" type="button" disabled>select marker</button></div>
+<small class="hint">Studio: hover over the ground to preview the published NPC. Hold LMB to lock position, drag horizontally to rotate, release LMB to place. Esc cancels. Register spawn to save the lightweight marker.</small>
+</div>
+<div class="panel character-card">
+<span class="eyebrow">08 · population</span><h3>spawn settings</h3>
+<div class="npc-spawn-settings-grid monster-spawn-settings-grid"><label>respawn sec<input id="npc-spawn-respawn" type="number" min="0" max="86400" step="0.1" value="10"></label><label>spawn radius<input id="npc-spawn-radius" type="number" min="0" max="10000" step="0.1" value="0"></label><label>max alive<input id="npc-spawn-max-alive" type="number" min="1" max="1000" step="1" value="1"></label></div>
+<label class="spawn-enabled"><input id="npc-spawn-enabled" type="checkbox" checked><span>enabled · runtime maintains this population</span></label>
+<small id="npc-spawn-radius-hint" class="hint">radius is the random ground area around the authored point. max alive is the population cap for this record.</small>
+<div class="actions"><button id="npc-spawn-register" class="primary" type="button" disabled>register spawn</button><button id="npc-spawn-new" type="button">new spawn</button><button id="npc-spawn-delete" class="danger" type="button" disabled>delete</button></div>
+<div id="npc-spawn-operation" class="status-box"><strong>ready</strong><span>place a point in Studio.</span></div>
+<hr class="card-separator">
+<div class="section-title"><div><span>versioned spawn registry</span><h3>registered points</h3></div><div class="row-actions"><button id="npc-spawn-restore" type="button">restore markers</button><button id="npc-spawn-validate" type="button">validate</button><button id="npc-spawn-refresh" type="button">refresh</button></div></div>
+<div id="npc-spawn-records" class="npc-spawn-records monster-spawn-records"><span class="muted">no registered spawns.</span></div>
+<details class="naming-guide"><summary>manifest and runtime rule</summary><div id="npc-spawn-manifest" class="details"></div><small class="hint">each death frees one population slot; after respawn seconds exactly one replacement is created, never above max alive. radius 0 means all instances use the authored point.</small></details>
+</div>
+</div>
+</div>
+
 </section>
 </main>
 <div id="toast" class="toast"></div>
-<script src="character-assets.js?v=16"></script>
+<script src="character-assets.js?v=17"></script>
 <script src="animation-speed.js?v=1"></script>
 <script src="timelines.js?v=2"></script>
 <script src="locations.js?v=1"></script>
@@ -373,6 +474,8 @@
 <script src="options.js?v=1"></script>
 <script src="weapon-assets.js?v=3"></script>
 <script src="monster-assets.js?v=4"></script>
+<script src="npc-assets.js?v=1"></script>
+<script src="npc-spawns.js?v=3"></script>
 <script src="monster-spawns.js?v=1"></script>
 </body>
 </html>

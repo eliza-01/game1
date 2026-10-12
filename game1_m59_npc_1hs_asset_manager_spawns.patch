@@ -1,0 +1,1819 @@
+diff --git a/system/control-center/monster_store.py b/system/control-center/monster_store.py
+--- a/system/control-center/monster_store.py
++++ b/system/control-center/monster_store.py
+@@ -65,11 +65,14 @@
+ 
+ 
+ class MonsterStore:
+-    def __init__(self, root: Path):
++    def __init__(self, root: Path, kind: str = "monster"):
++        if kind not in {"monster", "npc"}:
++            raise ValueError("unsupported actor kind")
++        self.kind = kind
+         self.root = root.resolve()
+         self.runtime = self.root / ".control-center"
+         self.runtime.mkdir(parents=True, exist_ok=True)
+-        self.db = self.runtime / "game1.db"
++        self.db = self.runtime / ("game1_npcs.db" if self.kind == "npc" else "game1.db")
+         self._init()
+         self.export()
+ 
+@@ -207,7 +210,7 @@
+         result["stats"] = self._stats(connection, result["slug"])
+         result["behavior"] = self._behavior(connection, result["slug"])
+         result["status"] = self._status(result, result["textures"])
+-        result["server_storage_path"] = f"ServerStorage.monsters.{result['slug']}.model.{result['slug']}"
++        result["server_storage_path"] = f"ServerStorage.{self.kind}s.{result['slug']}.model.{result['slug']}"
+         return result
+ 
+     def list(self) -> list[dict]:
+@@ -225,7 +228,7 @@
+         if not target.is_file():
+             return
+         relative = target.relative_to(self.root)
+-        archive = self.root / "assets/reimported/monsters" / slug / f"r{revision:04d}" / relative.name
++        archive = self.root / f"assets/reimported/{self.kind}s" / slug / f"r{revision:04d}" / relative.name
+         archive.parent.mkdir(parents=True, exist_ok=True)
+         if not archive.exists():
+             shutil.copy2(target, archive)
+@@ -293,7 +296,7 @@
+             if not source.is_file() or source.suffix.lower() != ".fbx":
+                 raise ValueError("monster model must be an FBX file")
+             analysis = analyze_character_fbx(self.root, source)
+-            source_target = self.root / "assets/source/monsters" / slug / "model" / f"{slug}.fbx"
++            source_target = self.root / f"assets/source/{self.kind}s" / slug / "model" / f"{slug}.fbx"
+             source_target.parent.mkdir(parents=True, exist_ok=True)
+             if old:
+                 self._archive_existing(source_target, slug, int(old.get("revision") or 1))
+@@ -339,7 +342,7 @@
+                 texture_id = f"{slug}__{slot}"
+                 previous = connection.execute("SELECT * FROM monster_textures WHERE id=?", (texture_id,)).fetchone()
+                 canonical_name = f"{slot}{source.suffix.lower()}"
+-                source_target = self.root / "assets/source/monsters" / slug / "textures" / canonical_name
++                source_target = self.root / f"assets/source/{self.kind}s" / slug / "textures" / canonical_name
+                 source_target.parent.mkdir(parents=True, exist_ok=True)
+                 if previous:
+                     self._archive_existing(source_target, slug, int(previous.get("revision") or 1))
+@@ -389,7 +392,7 @@
+                     },
+                     prepared["analysis"],
+                 )
+-                current_asset_id = str(row.get("model_asset_id") or "").strip()
++                current_asset_id = "" if self.kind == "npc" else str(row.get("model_asset_id") or "").strip()
+                 common = dict(
+                     display_name=row["name_en"], description=description,
+                     creator_type=creator_type, creator_id=creator_id, api_key=api_key,
+@@ -477,18 +480,18 @@
+ 
+     def export(self):
+         snapshot = self.snapshot()
+-        manifest_path = self.root / "assets/manifests/monsters.json"
++        manifest_path = self.root / f"assets/manifests/{self.kind}s.json"
+         manifest_path.parent.mkdir(parents=True, exist_ok=True)
+         manifest_path.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+ 
+-        registry_path = self.root / "src/shared/monster/MonsterRegistry.luau"
++        registry_path = self.root / ("src/shared/npc/NpcRegistry.luau" if self.kind == "npc" else "src/shared/monster/MonsterRegistry.luau")
+         registry_path.parent.mkdir(parents=True, exist_ok=True)
+         lines = [
+             "-- generated. do not edit by hand.",
+             "return table.freeze({",
+             f"\tschemaVersion = {SCHEMA_VERSION},",
+             '\tproject = "game1",',
+-            "\tmonsters = table.freeze({",
++            f"\t{self.kind}s = table.freeze({{",
+         ]
+         for row in snapshot["items"]:
+             lines.extend([
+diff --git a/system/control-center/monster_animation_store.py b/system/control-center/monster_animation_store.py
+--- a/system/control-center/monster_animation_store.py
++++ b/system/control-center/monster_animation_store.py
+@@ -39,11 +39,13 @@
+     return match.group(1), int(match.group(2) or 0)
+ 
+ 
+-def classify(path: Path, slug: str) -> dict | None:
++def classify(path: Path, slug: str, npc: bool = False) -> dict | None:
+     stem = _safe_token(path.stem)
+     prefix = _safe_token(slug) + "_"
+     if prefix and stem.startswith(prefix):
+         stem = stem[len(prefix):]
++    if npc and stem.startswith("1hs_"):
++        stem = stem[4:]
+     body, variant = _parse_variant(stem)
+     aliases = {
+         "idle": "idle",
+@@ -84,7 +86,7 @@
+     return {"slot": slot, "variant": variant, **definition}
+ 
+ 
+-def filename_rules(slug: str) -> list[dict]:
++def filename_rules(slug: str, npc: bool = False) -> list[dict]:
+     prefix = _safe_token(slug)
+     rows = []
+     for definition in SLOT_CATALOG:
+@@ -94,16 +96,19 @@
+             **definition,
+             "state": definition.get("state") or definition["slot"],
+             "variantPattern": "01..n" if definition.get("variants") else "",
+-            "canonicalFilename": f"{prefix}_{definition['slot']}{suffix}.rbxm" if prefix else f"{definition['slot']}{suffix}.rbxm",
++            "canonicalFilename": f"{prefix}_{'1hs_' if npc else ''}{definition['slot']}{suffix}.rbxm" if prefix else f"{definition['slot']}{suffix}.rbxm",
+         })
+     return rows
+ 
+ 
+ class MonsterAnimationStore:
+-    def __init__(self, root: Path):
++    def __init__(self, root: Path, kind: str = "monster"):
++        if kind not in {"monster", "npc"}:
++            raise ValueError("unsupported actor kind")
++        self.kind = kind
+         self.root = root.resolve()
+         self.runtime = self.root / ".control-center"
+-        self.db = self.runtime / "game1.db"
++        self.db = self.runtime / ("game1_npcs.db" if self.kind == "npc" else "game1.db")
+         self._init()
+         self._sync_profiles()
+         self.export()
+@@ -312,7 +317,7 @@
+         self.export()
+ 
+     def _managed(self, path: Path) -> bool:
+-        for root in (self.root / "assets/source/monsters",):
++        for root in (self.root / f"assets/source/{self.kind}s",):
+             try:
+                 path.relative_to(root.resolve())
+                 return True
+@@ -325,9 +330,9 @@
+         variant = int(binding["variant"])
+         suffix = f"_{variant:02d}" if variant else ""
+         stem = f"{slot}{suffix}"
+-        clip_id = f"monster__{slug}__{slot}__{variant:02d}"
++        clip_id = f"{self.kind}__{slug}__{slot}__{variant:02d}"
+         binding_id = "binding__" + clip_id
+-        relative = Path("monsters") / slug / "animations" / f"{stem}{source.suffix.lower()}"
++        relative = Path(f"{self.kind}s") / slug / "animations" / f"{stem}{source.suffix.lower()}"
+         source_target = self.root / "assets/source" / relative
+         prepared_target = source_target
+         source_target.parent.mkdir(parents=True, exist_ok=True)
+@@ -384,7 +389,7 @@
+         recognized, unassigned = [], []
+         coordinates = {}
+         for path in files:
+-            binding = classify(path, slug)
++            binding = classify(path, slug, npc=self.kind == "npc")
+             if binding is None:
+                 unassigned.append({"path": str(path), "filename": path.name, "reason": "name does not match a monster animation state"})
+                 continue
+@@ -479,8 +484,8 @@
+         compatible = bool(profile and monster and str(profile.get("skeleton_signature") or "") == str(monster.get("skeleton_signature") or ""))
+         return {
+             "schemaVersion": SCHEMA_VERSION, "project": PROJECT, "monsterSlug": selected, "monsters": monsters,
+-            "profile": profile, "skeletonCompatible": compatible, "slotCatalog": SLOT_CATALOG,
+-            "filenameRules": filename_rules(selected), "items": items,
++            "profile": profile, "skeletonCompatible": compatible, "slotCatalog": SLOT_CATALOG, "weaponSets": (["1hs"] if self.kind == "npc" else []),
++            "filenameRules": filename_rules(selected, npc=self.kind == "npc"), "items": items,
+             "summary": {
+                 "registered": len(items), "published": sum(row["status"] == "PUBLISHED" for row in items),
+                 "localOnly": sum(row["status"] == "LOCAL_ONLY" for row in items), "changed": sum(row["status"] == "CHANGED" for row in items),
+@@ -657,8 +662,8 @@
+         for row in clips:
+             row["status"] = self._status(row)
+         manifest_bindings = [{key: value for key, value in row.items() if key != "playback_speed_percent"} for row in bindings]
+-        payload = {"schemaVersion": SCHEMA_VERSION, "project": PROJECT, "slotCatalog": SLOT_CATALOG, "profiles": profiles, "clips": clips, "bindings": manifest_bindings}
+-        manifest = self.root / "assets/manifests/monster-animations.json"
++        payload = {"schemaVersion": SCHEMA_VERSION, "project": PROJECT, "slotCatalog": SLOT_CATALOG, "weaponSets": (["1hs"] if self.kind == "npc" else []), "profiles": profiles, "clips": clips, "bindings": manifest_bindings}
++        manifest = self.root / f"assets/manifests/{self.kind}-animations.json"
+         manifest.parent.mkdir(parents=True, exist_ok=True)
+         manifest.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+ 
+@@ -678,6 +683,7 @@
+                 "sourceSlot": internal_slot, "role": role, "variant": int(binding["variant"]), "weight": int(binding["weight"]),
+                 "looped": bool(binding["looped"]), "priority": str(binding["priority"]),
+                 "duplicateFirstFrameAtEnd": bool(clip.get("duplicate_first_frame_at_end")),
++                "weaponSet": "1hs" if self.kind == "npc" else "",
+             })
+         for profile in profiles_map.values():
+             for rows in profile["slots"].values():
+@@ -697,6 +703,7 @@
+                         f"\t\t\t\t\t\tanimationId = {q(row['animationId'])},",
+                         f"\t\t\t\t\t\tsourceSlot = {q(row['sourceSlot'])},",
+                         f"\t\t\t\t\t\trole = {q(row['role'])},",
++                        f"\t\t\t\t\t\tweaponSet = {q(row['weaponSet'])},",
+                         f"\t\t\t\t\t\tvariant = {row['variant']},",
+                         f"\t\t\t\t\t\tweight = {row['weight']},",
+                         f"\t\t\t\t\t\tlooped = {'true' if row['looped'] else 'false'},",
+@@ -707,6 +714,6 @@
+                 lines.append("\t\t\t\t}),")
+             lines += ["\t\t\t}),", "\t\t}),"]
+         lines += ["\t}),", "})", ""]
+-        target = self.root / "src/shared/monster/MonsterAnimationRegistry.luau"
++        target = self.root / ("src/shared/npc/NpcAnimationRegistry.luau" if self.kind == "npc" else "src/shared/monster/MonsterAnimationRegistry.luau")
+         target.parent.mkdir(parents=True, exist_ok=True)
+         target.write_text("\n".join(lines), encoding="utf-8")
+diff --git a/system/control-center/monster_spawn_store.py b/system/control-center/monster_spawn_store.py
+--- a/system/control-center/monster_spawn_store.py
++++ b/system/control-center/monster_spawn_store.py
+@@ -28,13 +28,16 @@
+ 
+ 
+ class MonsterSpawnStore:
+-    def __init__(self, root: Path, monsters, animations, bridge):
++    def __init__(self, root: Path, monsters, animations, bridge, kind: str = "monster"):
++        if kind not in {"monster", "npc"}:
++            raise ValueError("unsupported spawn kind")
++        self.kind = kind
+         self.root = root.resolve()
+         self.monsters = monsters
+         self.animations = animations
+         self.bridge = bridge
+-        self.manifest_path = self.root / "assets/manifests/monster-spawns.json"
+-        self.registry_path = self.root / "src/server/monster/MonsterSpawnRegistry.luau"
++        self.manifest_path = self.root / f"assets/manifests/{self.kind}-spawns.json"
++        self.registry_path = self.root / ("src/server/npc/NpcSpawnRegistry.luau" if self.kind == "npc" else "src/server/monster/MonsterSpawnRegistry.luau")
+         self._ensure()
+ 
+     @staticmethod
+@@ -91,12 +94,13 @@
+         monster = self._monster(slug)
+         reasons = []
+         if str(monster.get("status") or "") != "PUBLISHED":
+-            reasons.append("Monster model/textures are not published/current.")
++            reasons.append(f"{self.kind.title()} model/textures are not published/current.")
+         if not str(monster.get("model_asset_id") or "").isdigit():
+-            reasons.append("Monster model has no Roblox asset id.")
++            reasons.append(f"{self.kind.title()} model has no Roblox asset id.")
+         rows = self.animations.list_for_monster(str(monster["slug"]))
+         published_slots = {str(row.get("slot") or "") for row in rows if str(row.get("status") or "") == "PUBLISHED"}
+-        missing = [slot for slot in REQUIRED_ANIMATION_SLOTS if slot not in published_slots]
++        needed = ("idle", "death") if self.kind == "npc" else REQUIRED_ANIMATION_SLOTS
++        missing = [slot for slot in needed if slot not in published_slots]
+         if missing:
+             reasons.append("Required published animations are missing: " + ", ".join(missing) + ".")
+         return {
+diff --git a/system/control-center/studio_bridge.py b/system/control-center/studio_bridge.py
+--- a/system/control-center/studio_bridge.py
++++ b/system/control-center/studio_bridge.py
+@@ -134,8 +134,12 @@
+     enabled: bool = True,
+     records: list[dict] | None = None,
+     timeout_seconds: float = 45.0,
++    entity_kind: str = "monster",
+ ) -> dict:
++    if entity_kind not in {"monster", "npc"}:
++        raise ValueError("invalid spawn entity kind")
+     command = {
++        "entityKind": entity_kind,
+         "command": "monster-spawn",
+         "schemaVersion": 1,
+         "project": PROJECT,
+diff --git a/system/control-center/host_agent.py b/system/control-center/host_agent.py
+--- a/system/control-center/host_agent.py
++++ b/system/control-center/host_agent.py
+@@ -56,6 +56,12 @@
+ monsters = MonsterStore(ROOT)
+ monster_animations = MonsterAnimationStore(ROOT)
+ monster_spawns = MonsterSpawnStore(ROOT, monsters, monster_animations, run_monster_spawn_bridge)
++# NPC data uses the same proven asset pipelines, with its own SQLite DB and runtime registries.
++npcs = MonsterStore(ROOT, kind="npc")
++npc_animations = MonsterAnimationStore(ROOT, kind="npc")
++def run_npc_spawn_bridge(action, **kwargs):
++    return run_monster_spawn_bridge(action, entity_kind="npc", **kwargs)
++npc_spawns = MonsterSpawnStore(ROOT, npcs, npc_animations, run_npc_spawn_bridge, kind="npc")
+ animation_speed_scaling = AnimationSpeedScalingStore(ROOT)
+ options_store = OptionsStore(ROOT)
+ timelines = TimelineStore(ROOT, store, animations, monsters, monster_animations)
+@@ -63,6 +69,12 @@
+ location_assets = LocationAssetStore(ROOT)
+ deco_layouts = DecoLayoutStore(ROOT)
+ character_identity = CharacterIdentityService(ROOT, store, animations)
++
++
++def npc_register_spawn(payload: dict):
++    slug = str(payload.get("monsterSlug") or "").strip().lower()
++    sync_monster_to_studio(slug, kind="npc")
++    return npc_spawns.register(payload)
+ 
+ 
+ def publication_config():
+@@ -164,19 +176,20 @@
+     return {"weapon": row, "studio": result}
+ 
+ 
+-def sync_monster_to_studio(slug: str):
+-    row = monsters.get(slug)
++def sync_monster_to_studio(slug: str, kind: str = "monster"):
++    actor_store = npcs if kind == "npc" else monsters
++    row = actor_store.get(slug)
+     if not row:
+-        raise ValueError(f"unknown monster: {slug}")
++        raise ValueError(f"unknown {kind}: {slug}")
+     asset_id = str(row.get("model_asset_id") or "").strip()
+     if not asset_id:
+-        raise ValueError("publish the monster model before syncing it to Studio")
++        raise ValueError(f"publish the {kind} model before syncing it to Studio")
+     texture_assets = [
+         {"slot": str(item.get("slot") or ""), "assetId": str(item.get("asset_id") or "")}
+         for item in (row.get("textures") or [])
+         if str(item.get("asset_id") or "").isdigit()
+     ]
+-    destination = ["monsters", str(row.get("slug") or ""), "model"]
++    destination = [f"{kind}s", str(row.get("slug") or ""), "model"]
+     result = run_model_load_bridge(
+         asset_id,
+         destination,
+@@ -184,6 +197,7 @@
+         placement_mode="monster-rig",
+         metadata={
+             "monsterSlug": str(row.get("slug") or ""),
++            "entityKind": kind,
+             "textures": texture_assets,
+         },
+     )
+@@ -480,6 +494,20 @@
+             snapshot = monster_animations.snapshot(slug)
+             snapshot["publication"] = publication_config()
+             return self.out(200, snapshot)
++        if path == "/api/npcs":
++            snapshot = npcs.snapshot()
++            snapshot["publication"] = publication_config()
++            return self.out(200, snapshot)
++        if path == "/api/npc-animations":
++            slug = str((parse_qs(parsed.query).get("npc") or [""])[0]).strip().lower()
++            snapshot = npc_animations.snapshot(slug)
++            snapshot["publication"] = publication_config()
++            return self.out(200, snapshot)
++        if path == "/api/npc-spawns":
++            try:
++                return self.out(200, npc_spawns.snapshot())
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
+         if path == "/api/monster-spawns":
+             try:
+                 return self.out(200, monster_spawns.snapshot())
+@@ -511,6 +539,9 @@
+                 return self.out(200, timelines.editor_state(session_id))
+             except Exception as error:
+                 return self.out(400, {"error": str(error)})
++        if path.startswith("/api/npcs/") and path.endswith("/publications"):
++            slug = unquote(path[len("/api/npcs/"):-len("/publications")].strip("/"))
++            return self.out(200, {"items": npcs.publications(slug)})
+         monster_prefix = "/api/monsters/"
+         publications_suffix = "/publications"
+         if path.startswith(monster_prefix) and path.endswith(publications_suffix):
+@@ -551,6 +582,16 @@
+                 return self.out(200, {"path": choose_animation_folder(str(payload.get("initialPath") or ""))})
+             except Exception as error:
+                 return self.out(400, {"error": str(error)})
++        if path == "/api/files/choose-npc-model":
++            try:
++                return self.out(200, {"path": choose_monster_fbx()})
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
++        if path == "/api/files/choose-npc-textures":
++            try:
++                return self.out(200, {"paths": choose_monster_textures()})
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
+         if path == "/api/files/choose-monster-model":
+             try:
+                 return self.out(200, {"path": choose_monster_fbx()})
+@@ -607,6 +648,24 @@
+         if path == "/api/weapons/attack-movement":
+             try:
+                 return self.out(200, weapons.update_attack_movement(self.body()))
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
++        if path == "/api/npcs":
++            try:
++                return self.out(200, npcs.register({**self.body(), "behavior": {"aggressive": False, "aggroRadiusStuds": 0, "attackRadiusStuds": 0}}))
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
++        npc_spawn_actions = {
++            "/api/npc-spawns/place": lambda body: npc_spawns.place(body),
++            "/api/npc-spawns/register": lambda body: npc_register_spawn(body),
++            "/api/npc-spawns/select": lambda body: npc_spawns.select(body),
++            "/api/npc-spawns/delete": lambda body: npc_spawns.delete(body),
++            "/api/npc-spawns/restore": lambda body: npc_spawns.restore(),
++            "/api/npc-spawns/validate": lambda body: npc_spawns.validate(),
++        }
++        if path in npc_spawn_actions:
++            try:
++                return self.out(200, npc_spawn_actions[path](self.body()))
+             except Exception as error:
+                 return self.out(400, {"error": str(error)})
+         if path == "/api/monsters":
+@@ -716,15 +775,17 @@
+                 credentials = publication_credentials()
+                 character = animations.check_manual_reimports(credentials)
+                 monster = monster_animations.check_manual_reimports(credentials)
++                npc = npc_animations.check_manual_reimports(credentials)
+                 return self.out(200, {
+                     "schemaVersion": 1,
+                     "project": "game1",
+-                    "requested": int(character.get("requested") or 0) + int(monster.get("requested") or 0),
+-                    "confirmed": int(character.get("confirmed") or 0) + int(monster.get("confirmed") or 0),
+-                    "pending": int(character.get("pending") or 0) + int(monster.get("pending") or 0),
+-                    "failed": int(character.get("failed") or 0) + int(monster.get("failed") or 0),
++                    "requested": int(character.get("requested") or 0) + int(monster.get("requested") or 0) + int(npc.get("requested") or 0),
++                    "confirmed": int(character.get("confirmed") or 0) + int(monster.get("confirmed") or 0) + int(npc.get("confirmed") or 0),
++                    "pending": int(character.get("pending") or 0) + int(monster.get("pending") or 0) + int(npc.get("pending") or 0),
++                    "failed": int(character.get("failed") or 0) + int(monster.get("failed") or 0) + int(npc.get("failed") or 0),
+                     "character": character,
+                     "monster": monster,
++                    "npc": npc,
+                 })
+             except Exception as error:
+                 return self.out(400, {"error": str(error)})
+@@ -742,6 +803,20 @@
+                     str(payload.get("monsterSlug") or ""), str(payload.get("sourcePath") or ""),
+                     str(payload.get("slot") or ""), int(payload.get("variant") or 0),
+                 ))
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
++        if path == "/api/npc-animations/scan":
++            try:
++                payload = self.body()
++                return self.out(200, npc_animations.scan_folder(str(payload.get("npcSlug") or ""), str(payload.get("rootPath") or "")))
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
++        if path == "/api/npc-animations/assign":
++            try:
++                payload = self.body()
++                return self.out(200, npc_animations.assign_file(
++                    str(payload.get("npcSlug") or ""), str(payload.get("sourcePath") or ""),
++                    str(payload.get("slot") or ""), int(payload.get("variant") or 0)))
+             except Exception as error:
+                 return self.out(400, {"error": str(error)})
+         if path == "/api/animations/scan":
+@@ -866,6 +941,34 @@
+         if path == "/api/characters/active/clear":
+             return self.out(200, store.clear_active())
+ 
++        if path.startswith("/api/npcs/"):
++            slug, _, action = unquote(path[len("/api/npcs/"):]).rpartition("/")
++            try:
++                if action == "publish":
++                    credentials = publication_credentials(str(self.body().get("description") or "game1 npc"))
++                    return self.out(200, npcs.publish(slug, credentials))
++                if action == "sync":
++                    return self.out(200, sync_monster_to_studio(slug, kind="npc"))
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
++        if path.startswith("/api/npc-animations/"):
++            clip_id, _, action = unquote(path[len("/api/npc-animations/"):]).rpartition("/")
++            try:
++                payload = self.body()
++                if action == "duplicate-first-frame":
++                    return self.out(200, npc_animations.set_duplicate_first_frame(clip_id, bool(payload.get("enabled"))))
++                if action == "publish-missing":
++                    return self.out(200, npc_animations.publish_missing(clip_id, publication_credentials(str(payload.get("description") or "game1 npc animation"))))
++                if action == "publish":
++                    return self.out(200, npc_animations.publish_clip(clip_id, publication_credentials(str(payload.get("description") or "game1 npc animation"))))
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
++        if path.startswith("/api/npc-animation-bindings/") and path.endswith("/weight"):
++            try:
++                key = unquote(path[len("/api/npc-animation-bindings/"):-len("/weight")].strip("/"))
++                return self.out(200, npc_animations.set_weight(key, int(self.body().get("weight") or 100)))
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
+         monster_prefix = "/api/monsters/"
+         monster_publish_suffix = "/publish"
+         monster_sync_suffix = "/sync"
+@@ -1005,6 +1108,22 @@
+                 return self.out(200, animations.delete_binding(unquote(path[len(binding_prefix):])))
+             except Exception as error:
+                 return self.out(400, {"error": str(error)})
++        if path.startswith("/api/npc-animation-bindings/"):
++            try:
++                return self.out(200, npc_animations.delete_binding(unquote(path[len("/api/npc-animation-bindings/"):])))
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
++        if path.startswith("/api/npcs/"):
++            slug = unquote(path[len("/api/npcs/"):])
++            try:
++                used = npc_spawns.monster_usage(slug)
++                if used:
++                    raise ValueError("delete NPC spawn points first: " + ", ".join(used[:8]))
++                npc_animations.delete_profile(slug)
++                npcs.delete(slug)
++                return self.out(200, {"ok": True})
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
+         monster_binding_prefix = "/api/monster-animation-bindings/"
+         if path.startswith(monster_binding_prefix):
+             try:
+diff --git a/system/control-center/static/index.html b/system/control-center/static/index.html
+--- a/system/control-center/static/index.html
++++ b/system/control-center/static/index.html
+@@ -11,7 +11,7 @@
+ <body>
+ <header>
+ <div><span class="eyebrow">game1 · control center</span><h1>asset manager</h1></div>
+-<div class="header-actions"><span class="pill">characters + animations + weapons + monsters + locations + location assets + timelines · m54</span><button id="theme" class="icon" type="button" title="theme">◐</button></div>
++<div class="header-actions"><span class="pill">characters + animations + weapons + NPCs + monsters + locations + location assets + timelines · m59</span><button id="theme" class="icon" type="button" title="theme">◐</button></div>
+ </header>
+ <main>
+ <aside class="panel rail">
+@@ -21,6 +21,7 @@
+ <button id="nav-animations" class="asset-section" type="button"><b>animations</b><small>profiles · clips</small></button>
+ <button id="nav-animation-speed" class="asset-section" type="button"><b>animation speed</b><small>stat → playback scaling</small></button>
+ <button id="nav-weapons" class="asset-section" type="button"><b>weapons</b><small>models · textures · stats</small></button>
++<button id="nav-npcs" class="asset-section" type="button"><b>NPCs</b><small>1hs rigs · animations · spawns</small></button>
+ <button id="nav-monsters" class="asset-section" type="button"><b>monsters</b><small>rigs · stats · animations</small></button>
+ <button id="nav-locations" class="asset-section" type="button"><b>locations</b><small>polygon registry · studio authoring</small></button>
+ <button id="nav-location-assets" class="asset-section" type="button"><b>location assets</b><small>trees · bushes · rocks · lights · fences · decorations · ladders · flowers · buildings</small></button>
+@@ -44,6 +45,12 @@
+ <div class="section-title"><div><span>weapon registry</span><h3>weapons</h3></div><span id="weapon-rail-count">0</span></div>
+ <div class="tree-actions"><button id="new-weapon" class="primary" type="button">new</button><button id="refresh-weapons" type="button">refresh</button></div>
+ <div id="weapon-tree" class="tree"></div>
++</div>
++<div id="npc-rail" hidden>
++<hr class="rail-separator">
++<div class="section-title"><div><span>NPC registry</span><h3>NPCs · 1hs</h3></div><span id="npc-rail-count">0</span></div>
++<div class="tree-actions"><button id="new-npc" class="primary" type="button">new</button><button id="refresh-npcs" type="button">refresh</button></div>
++<div id="npc-tree" class="tree"></div>
+ </div>
+ <div id="monster-rail" hidden>
+ <hr class="rail-separator">
+@@ -362,10 +369,103 @@
+ </div>
+ </div>
+ 
++<div id="npcs-view" hidden>
++<div class="panel hero">
++<div><span class="eyebrow">npc assets · canonical game1 registry</span><h2>npcs</h2><p>independent NPC archetypes with published articulated FBX, stats and animation profiles. Initial weapon profile: 1hs only. NPCs are stationary in this phase, damageable and respawn through authored spawn points.</p></div>
++<div class="metrics"><div><b id="npc-metric-total">0</b><span>registered</span></div><div><b id="npc-metric-published">0</b><span>published</span></div><div><b id="npc-metric-changed">0</b><span>changed</span></div></div>
++</div>
++<div class="panel runtime-card"><div id="npc-registry-state" class="runtime-state registered"><strong>npc registry</strong><span>loading…</span></div><div id="npc-publication-state" class="publication-missing">open cloud: checking…</div></div>
++<div class="weapon-workflow npc-workflow">
++<div class="panel character-card">
++<span class="eyebrow">01 · identity and stats</span><h3>register npc</h3>
++<div class="character-grid"><label>name en<input id="npc-name-en" autocomplete="off"></label><label>name ru<input id="npc-name-ru" autocomplete="off"></label></div>
++<label>slug<input id="npc-slug" readonly><small class="hint">generated from english name as lowercase snake_case. existing registered slugs stay stable.</small></label>
++<div class="npc-stats-grid monster-stats-grid"><label>HP<input id="npc-stat-hp" type="number" min="0" step="1" value="100"></label><label>attack<input id="npc-stat-damage" type="number" min="0" step="1" value="10"></label><label>attack speed<input id="npc-stat-attack-speed" type="number" min="0" step="1" value="100"></label><label>run speed<input id="npc-stat-run-speed" type="number" min="0" step="1" value="50"></label><label>critical chance %<input id="npc-stat-crit-chance" type="number" min="0" max="100" step="0.1" value="0"></label></div>
++<small class="hint">npc stats are absolute runtime values. critical chance is 0..100 percent.</small>
++<div class="npc-stats-grid monster-stats-grid"><label class="spawn-enabled"><input id="npc-behavior-aggressive" type="checkbox" disabled><span>aggressive · unchecked = passive</span></label><label>aggro radius · studs<input id="npc-behavior-aggro-radius" disabled type="number" min="0" step="0.1" value="16"></label><label>attack radius · studs<input id="npc-behavior-attack-radius" disabled type="number" min="0" step="0.1" value="3"></label></div>
++<small class="hint">NPC behavior is passive in M59. Aggro, patrol, dialog, factions and attacks will be configured in separate behavior/AI components later.</small>
++<hr class="card-separator">
++<span class="eyebrow">02 · source assets</span>
++<div class="picker"><button id="choose-npc-model" type="button">choose fbx</button><small id="picked-npc-model">fbx not selected</small></div>
++<div class="picker"><button id="choose-npc-textures" type="button">choose textures</button><small id="picked-npc-textures">textures not selected</small></div>
++<div id="npc-model-status" class="status-box"><strong>not registered</strong><span>choose a rigged npc fbx. textures are optional.</span></div>
++<div class="actions"><button id="register-npc" class="primary" type="button">register npc</button><button id="clear-npc-form" type="button">clear form</button></div>
++<hr class="card-separator">
++<span class="eyebrow">03 · publication and studio</span><h3 class="subheading">roblox assets</h3>
++<label>description<input id="npc-publication-description" value="game1 npc"></label>
++<div class="actions"><button id="publish-npc" class="primary" type="button" disabled>publish all changed</button><button id="sync-npc" type="button" disabled>sync studio</button></div>
++<small id="npc-publication-hint" class="hint">select a registered npc.</small>
++</div>
++<div class="panel character-card">
++<div class="section-title"><div><span>versioned registry</span><h3>registered npcs</h3></div><button id="validate-npcs" type="button">refresh</button></div>
++<div class="table-wrap weapon-table-wrap"><table><thead><tr><th>npc</th><th>stats</th><th>skeleton</th><th>assets</th><th>status</th><th>actions</th></tr></thead><tbody id="npc-rows"></tbody></table></div>
++<div id="npc-details" class="details"><span class="muted">select a npc.</span></div>
++</div>
++</div>
++
++<div class="panel hero npc-animation-hero">
++<div><span class="eyebrow">npc animation library</span><h2>npc animations</h2><p>same registration/publication pipeline as characters. Only 1hs is enabled (idle, walk, run, combat_idle, attack variants, death). choose the target npc here; every scan, assignment and publication below applies only to that npc.</p></div>
++</div>
++<div class="panel runtime-card"><div id="npc-animation-profile-state" class="runtime-state bootstrap"><strong>select npc</strong><span>register a npc first.</span></div></div>
++<div class="animation-workflow">
++<div class="panel character-card">
++<span class="eyebrow">04 · target and scan</span><h3>npc animations</h3>
++<label>npc<select id="npc-animation-npc"></select><small class="hint">this is the npc whose animation files will be scanned, registered and published.</small></label>
++<hr class="card-separator">
++<h3 class="subheading">animation folder</h3>
++<details id="npc-animation-filename-guide" class="naming-guide" open><summary>filename rules · npc states</summary><div id="npc-animation-filename-rules" class="filename-rules"><span class="muted">select a npc.</span></div><small class="hint">canonical names use <code>{npc_slug}_1hs_{state}</code>, e.g. <code>blacksmith_1hs_idle.rbxm</code>. <code>idle_special_01</code>, <code>idle_special_02</code>, … are variants inside <code>idle</code>; <code>combat_idle</code> is the waiting pose while already in combat; <code>attack_01</code>, <code>attack_02</code>, … are variants inside <code>attack</code>.</small></details>
++<div class="picker folder-picker"><div class="folder-explorer"><input id="npc-animation-folder-path" type="text" autocomplete="off" spellcheck="false" placeholder="C:\path\to\npc-animations"><button id="choose-npc-animation-folder" type="button">explore…</button></div><small>paste a folder path or choose it in Explorer · the last npc animation folder is remembered</small></div>
++<div class="actions"><button id="scan-npc-animations" class="primary wide" type="button" disabled>scan folder</button></div>
++<div id="npc-animation-scan-status" class="status-box"><strong>nothing scanned yet</strong><span>unrecognized files can be assigned manually.</span></div>
++<hr class="card-separator">
++<span class="eyebrow">05 · publication queue</span><h3 class="subheading">roblox animation assets</h3>
++<label>description<input id="npc-animation-publication-description" value="game1 npc animation"></label>
++<div class="actions"><button id="publish-missing-npc-animations" class="primary" type="button" disabled>publish missing</button><button id="check-roblox-npc-animations" type="button">Check Roblox Assets Animations</button><button id="refresh-npc-animations" type="button">refresh</button></div>
++<div id="npc-animation-publish-progress" class="queue-progress" hidden><strong id="npc-animation-publish-current">publication queue</strong><span id="npc-animation-publish-count">0 / 0</span><progress id="npc-animation-publish-bar" value="0" max="1"></progress></div>
++<div id="npc-animation-unassigned" class="unassigned"></div>
++</div>
++<div class="panel character-card">
++<div class="section-title"><div><span>selected npc animations</span><h3 id="npc-animation-table-title">registered animations</h3></div></div>
++<small class="hint">only animations already registered for the selected npc are listed here. <code>idle_special_01..n</code> are shown as variants of state <code>idle</code>. weight is relative inside one state. playback speed is configured globally in the Animation Speed section.</small>
++<div class="table-wrap animation-table-wrap"><table><thead><tr><th>state</th><th>variant</th><th>clip</th><th>asset</th><th>status</th><th>weight</th><th>first→end</th><th>actions</th></tr></thead><tbody id="npc-animation-rows"></tbody></table></div>
++</div>
++</div>
++
++<div class="panel hero npc-spawn-hero">
++<div><span class="eyebrow">npc spawn authoring · studio handshake</span><h2>npc spawns</h2><p>choose a registered npc, place a marker by clicking a surface in Studio, then register population settings. one spawn record owns position, radius, max alive, respawn delay and enabled state.</p></div>
++<div class="metrics"><div><b id="npc-spawn-count">0</b><span>registered spawns</span></div><div><b id="npc-spawn-synced">0</b><span>studio synced</span></div><div><b id="npc-spawn-stale">0</b><span>stale</span></div></div>
++</div>
++<div class="npc-spawn-workflow monster-spawn-workflow">
++<div class="panel character-card">
++<span class="eyebrow">06 · npc and readiness</span><h3>spawn npc</h3>
++<label>npc<select id="npc-spawn-npc"></select></label>
++<div id="npc-spawn-readiness" class="status-box"><strong>select npc</strong><span>published model and idle/death are required.</span></div>
++<hr class="card-separator">
++<span class="eyebrow">07 · placement</span><h3 class="subheading">point in Studio</h3>
++<div class="character-grid"><label>spawn id<input id="npc-spawn-id" readonly placeholder="created on placement"></label><label>place id<input id="npc-spawn-place-id" type="number" readonly value="0"></label></div>
++<div class="character-grid"><label>map key<input id="npc-spawn-map-key" value="main"></label><label>yaw °<input id="npc-spawn-yaw" type="number" step="0.1" value="0"></label></div>
++<div class="npc-spawn-position-grid monster-spawn-position-grid"><label>X<input id="npc-spawn-x" type="number" step="0.001"></label><label>Y<input id="npc-spawn-y" type="number" step="0.001"></label><label>Z<input id="npc-spawn-z" type="number" step="0.001"></label></div>
++<div class="actions"><button id="npc-spawn-place" class="primary" type="button">place point in Studio</button><button id="npc-spawn-select" type="button" disabled>select marker</button></div>
++</div>
++<div class="panel character-card">
++<span class="eyebrow">08 · population</span><h3>spawn settings</h3>
++<div class="npc-spawn-settings-grid monster-spawn-settings-grid"><label>respawn sec<input id="npc-spawn-respawn" type="number" min="0" max="86400" step="0.1" value="10"></label><label>spawn radius<input id="npc-spawn-radius" type="number" min="0" max="10000" step="0.1" value="0"></label><label>max alive<input id="npc-spawn-max-alive" type="number" min="1" max="1000" step="1" value="1"></label></div>
++<label class="spawn-enabled"><input id="npc-spawn-enabled" type="checkbox" checked><span>enabled · runtime maintains this population</span></label>
++<small id="npc-spawn-radius-hint" class="hint">radius is the random ground area around the authored point. max alive is the population cap for this record.</small>
++<div class="actions"><button id="npc-spawn-register" class="primary" type="button" disabled>register spawn</button><button id="npc-spawn-new" type="button">new spawn</button><button id="npc-spawn-delete" class="danger" type="button" disabled>delete</button></div>
++<div id="npc-spawn-operation" class="status-box"><strong>ready</strong><span>place a point in Studio.</span></div>
++<hr class="card-separator">
++<div class="section-title"><div><span>versioned spawn registry</span><h3>registered points</h3></div><div class="row-actions"><button id="npc-spawn-restore" type="button">restore markers</button><button id="npc-spawn-validate" type="button">validate</button><button id="npc-spawn-refresh" type="button">refresh</button></div></div>
++<div id="npc-spawn-records" class="npc-spawn-records monster-spawn-records"><span class="muted">no registered spawns.</span></div>
++<details class="naming-guide"><summary>manifest and runtime rule</summary><div id="npc-spawn-manifest" class="details"></div><small class="hint">each death frees one population slot; after respawn seconds exactly one replacement is created, never above max alive. radius 0 means all instances use the authored point.</small></details>
++</div>
++</div>
++</div>
++
+ </section>
+ </main>
+ <div id="toast" class="toast"></div>
+-<script src="character-assets.js?v=16"></script>
++<script src="character-assets.js?v=17"></script>
+ <script src="animation-speed.js?v=1"></script>
+ <script src="timelines.js?v=2"></script>
+ <script src="locations.js?v=1"></script>
+@@ -373,6 +473,8 @@
+ <script src="options.js?v=1"></script>
+ <script src="weapon-assets.js?v=3"></script>
+ <script src="monster-assets.js?v=4"></script>
++<script src="npc-assets.js?v=1"></script>
++<script src="npc-spawns.js?v=1"></script>
+ <script src="monster-spawns.js?v=1"></script>
+ </body>
+ </html>
+diff --git a/system/control-center/static/character-assets.js b/system/control-center/static/character-assets.js
+--- a/system/control-center/static/character-assets.js
++++ b/system/control-center/static/character-assets.js
+@@ -7,7 +7,7 @@
+ const FILENAME_GUIDE_OPEN_KEY='game1.animation.filenameRules.open';
+ const ANIMATION_FOLDER_KEY='game1.animation.folder';
+ const ASSET_MANAGER_VIEW_KEY='game1.assetManager.activeSection';
+-const ASSET_MANAGER_VIEWS=new Set(['characters','animations','animation-speed','weapons','monsters','locations','location-assets','timelines','options']);
++const ASSET_MANAGER_VIEWS=new Set(['characters','animations','animation-speed','weapons','monsters','npcs','locations','location-assets','timelines','options']);
+ 
+ function normalizeAnimationFolderPath(value){
+   let path=String(value??'').trim();
+@@ -47,10 +47,10 @@
+   if(!ASSET_MANAGER_VIEWS.has(view))view='characters';
+   state.view=view;
+   try{localStorage.setItem(ASSET_MANAGER_VIEW_KEY,view)}catch{}
+-  $('characters-view').hidden=view!=='characters';$('animations-view').hidden=view!=='animations';$('animation-speed-view').hidden=view!=='animation-speed';$('weapons-view').hidden=view!=='weapons';$('monsters-view').hidden=view!=='monsters';$('locations-view').hidden=view!=='locations';$('location-assets-view').hidden=view!=='location-assets';$('timelines-view').hidden=view!=='timelines';$('options-view').hidden=view!=='options';
+-  $('character-rail').hidden=view!=='characters';$('animation-rail').hidden=view!=='animations';$('weapon-rail').hidden=view!=='weapons';$('monster-rail').hidden=view!=='monsters';$('location-asset-rail').hidden=view!=='location-assets';
+-  $('nav-characters').classList.toggle('active',view==='characters');$('nav-animations').classList.toggle('active',view==='animations');$('nav-animation-speed').classList.toggle('active',view==='animation-speed');$('nav-weapons').classList.toggle('active',view==='weapons');$('nav-monsters').classList.toggle('active',view==='monsters');$('nav-locations').classList.toggle('active',view==='locations');$('nav-location-assets').classList.toggle('active',view==='location-assets');$('nav-timelines').classList.toggle('active',view==='timelines');$('nav-options').classList.toggle('active',view==='options');
+-  if(view==='animations')loadAnimations();if(view==='animation-speed'&&window.game1AnimationSpeedLoad)window.game1AnimationSpeedLoad();if(view==='weapons'&&window.game1WeaponsLoad)window.game1WeaponsLoad();if(view==='monsters'&&window.game1MonstersLoad)window.game1MonstersLoad();if(view==='locations'&&window.game1LocationsLoad)window.game1LocationsLoad();if(view==='location-assets'&&window.game1LocationAssetsLoad)window.game1LocationAssetsLoad();if(view==='timelines'&&window.game1TimelinesLoad)window.game1TimelinesLoad();if(view==='options'&&window.game1OptionsLoad)window.game1OptionsLoad();
++  $('characters-view').hidden=view!=='characters';$('animations-view').hidden=view!=='animations';$('animation-speed-view').hidden=view!=='animation-speed';$('weapons-view').hidden=view!=='weapons';$('monsters-view').hidden=view!=='monsters';$('npcs-view').hidden=view!=='npcs';$('locations-view').hidden=view!=='locations';$('location-assets-view').hidden=view!=='location-assets';$('timelines-view').hidden=view!=='timelines';$('options-view').hidden=view!=='options';
++  $('character-rail').hidden=view!=='characters';$('animation-rail').hidden=view!=='animations';$('weapon-rail').hidden=view!=='weapons';$('monster-rail').hidden=view!=='monsters';$('npc-rail').hidden=view!=='npcs';$('location-asset-rail').hidden=view!=='location-assets';
++  $('nav-characters').classList.toggle('active',view==='characters');$('nav-animations').classList.toggle('active',view==='animations');$('nav-animation-speed').classList.toggle('active',view==='animation-speed');$('nav-weapons').classList.toggle('active',view==='weapons');$('nav-monsters').classList.toggle('active',view==='monsters');$('nav-npcs').classList.toggle('active',view==='npcs');$('nav-locations').classList.toggle('active',view==='locations');$('nav-location-assets').classList.toggle('active',view==='location-assets');$('nav-timelines').classList.toggle('active',view==='timelines');$('nav-options').classList.toggle('active',view==='options');
++  if(view==='animations')loadAnimations();if(view==='animation-speed'&&window.game1AnimationSpeedLoad)window.game1AnimationSpeedLoad();if(view==='weapons'&&window.game1WeaponsLoad)window.game1WeaponsLoad();if(view==='monsters'&&window.game1MonstersLoad)window.game1MonstersLoad();if(view==='npcs'&&window.game1NpcsLoad)window.game1NpcsLoad();if(view==='locations'&&window.game1LocationsLoad)window.game1LocationsLoad();if(view==='location-assets'&&window.game1LocationAssetsLoad)window.game1LocationAssetsLoad();if(view==='timelines'&&window.game1TimelinesLoad)window.game1TimelinesLoad();if(view==='options'&&window.game1OptionsLoad)window.game1OptionsLoad();
+ }
+ 
+ function characterStatsPayload(){return {Level:Number($('character-stat-level').value||1),MaxHP:Number($('character-stat-hp').value||0),Damage:Number($('character-stat-damage').value||0),Defense:Number($('character-stat-defense').value||0),AttackSpeed:Number($('character-stat-attack-speed').value||0),RunSpeed:Number($('character-stat-run-speed').value||0),CritChance:Number($('character-stat-crit-chance').value||0)}}
+@@ -142,7 +142,7 @@
+ function restoreAssetManagerView(){let saved='characters';try{saved=localStorage.getItem(ASSET_MANAGER_VIEW_KEY)||'characters'}catch{}setView(ASSET_MANAGER_VIEWS.has(saved)?saved:'characters')}
+ window.addEventListener('load',restoreAssetManagerView);
+ 
+-$('display-name').oninput=()=>{if(!state.selected)state.autoDisplayName=false};$('nav-characters').onclick=()=>setView('characters');$('nav-animations').onclick=()=>setView('animations');$('nav-animation-speed').onclick=()=>setView('animation-speed');$('nav-weapons').onclick=()=>setView('weapons');$('nav-monsters').onclick=()=>setView('monsters');$('nav-locations').onclick=()=>setView('locations');$('nav-location-assets').onclick=()=>setView('location-assets');$('nav-timelines').onclick=()=>setView('timelines');$('nav-options').onclick=()=>setView('options');$('race').onchange=syncIdentity;$('gender').onchange=syncIdentity;$('choose-model').onclick=chooseModel;$('save-archetype').onclick=saveArchetype;$('save-character-stats').onclick=saveCharacterStats;$('register-character').onclick=registerCharacter;$('publish-character').onclick=()=>publishCharacter();$('sync-character').onclick=()=>syncStudio();$('activate-character').onclick=()=>activate();$('new-character').onclick=()=>setForm(null);$('clear-form').onclick=()=>setForm(null);$('refresh').onclick=loadCharacters;$('validate-view').onclick=loadCharacters;$('theme').onclick=()=>document.body.classList.toggle('light');
++$('display-name').oninput=()=>{if(!state.selected)state.autoDisplayName=false};$('nav-characters').onclick=()=>setView('characters');$('nav-animations').onclick=()=>setView('animations');$('nav-animation-speed').onclick=()=>setView('animation-speed');$('nav-weapons').onclick=()=>setView('weapons');$('nav-monsters').onclick=()=>setView('monsters');$('nav-npcs').onclick=()=>setView('npcs');$('nav-locations').onclick=()=>setView('locations');$('nav-location-assets').onclick=()=>setView('location-assets');$('nav-timelines').onclick=()=>setView('timelines');$('nav-options').onclick=()=>setView('options');$('race').onchange=syncIdentity;$('gender').onchange=syncIdentity;$('choose-model').onclick=chooseModel;$('save-archetype').onclick=saveArchetype;$('save-character-stats').onclick=saveCharacterStats;$('register-character').onclick=registerCharacter;$('publish-character').onclick=()=>publishCharacter();$('sync-character').onclick=()=>syncStudio();$('activate-character').onclick=()=>activate();$('new-character').onclick=()=>setForm(null);$('clear-form').onclick=()=>setForm(null);$('refresh').onclick=loadCharacters;$('validate-view').onclick=loadCharacters;$('theme').onclick=()=>document.body.classList.toggle('light');
+ $('animation-character').onchange=()=>{state.animationCharacter=$('animation-character').value;state.animationSelected=null;state.lastScan=null;loadAnimations()};$('choose-animation-folder').onclick=chooseAnimationFolder;$('scan-animations').onclick=scanAnimations;$('publish-missing-animations').onclick=publishMissingAnimations;$('check-roblox-animations').onclick=checkRobloxAnimationAssets;$('refresh-animations').onclick=loadAnimations;
+ initAnimationFolderExplorer();
+ initFilenameRulesDisclosure();
+diff --git a/system/control-center/static/npc-assets.js b/system/control-center/static/npc-assets.js
+new file mode 100644
+--- /dev/null
++++ b/system/control-center/static/npc-assets.js
+@@ -0,0 +1,51 @@
++const npcState={data:null,selected:null,animationNpc:null,modelPath:'',texturePaths:[],animations:null,animationFolder:'',lastScan:null,animationPublishing:false,animationSelected:null};
++const NPC_FILENAME_GUIDE_KEY='game1.npc.animation.filenameRules.open';
++const NPC_ANIMATION_FOLDER_KEY='game1.npc.animation.folder';
++const NPC_ANIMATION_TARGET_KEY='game1.npc.animation.selectedNpc';
++
++function npcNormalizeAnimationFolderPath(value){let path=String(value??'').trim();if(path.length>=2&&((path.startsWith('"')&&path.endsWith('"'))||(path.startsWith("'")&&path.endsWith("'"))))path=path.slice(1,-1).trim();return path}
++function npcRememberAnimationFolder(path){try{if(path)localStorage.setItem(NPC_ANIMATION_FOLDER_KEY,path);else localStorage.removeItem(NPC_ANIMATION_FOLDER_KEY)}catch{}}
++function npcRenderAnimationFolderControls(){const input=$('npc-animation-folder-path');if(input&&document.activeElement!==input&&input.value!==npcState.animationFolder)input.value=npcState.animationFolder;const scan=$('scan-npc-animations');if(scan)scan.disabled=npcState.animationPublishing||!npcState.animationNpc||!npcState.animationFolder}
++function npcSetAnimationFolder(path,persist=true){npcState.animationFolder=npcNormalizeAnimationFolderPath(path);if(persist)npcRememberAnimationFolder(npcState.animationFolder);npcRenderAnimationFolderControls()}
++function initNpcAnimationFolderExplorer(){const input=$('npc-animation-folder-path');if(!input)return;try{npcState.animationFolder=npcNormalizeAnimationFolderPath(localStorage.getItem(NPC_ANIMATION_FOLDER_KEY)||'')}catch{}input.value=npcState.animationFolder;input.addEventListener('input',()=>{npcState.animationFolder=npcNormalizeAnimationFolderPath(input.value);npcRenderAnimationFolderControls()});input.addEventListener('change',()=>npcSetAnimationFolder(input.value,true));input.addEventListener('keydown',event=>{if(event.key!=='Enter')return;event.preventDefault();npcSetAnimationFolder(input.value,true);if(!$('scan-npc-animations').disabled)npcScanAnimations()});npcRenderAnimationFolderControls()}
++function npcSelected(){return npcState.data?.items?.find(row=>row.slug===npcState.selected)||null}
++function npcAnimationSelected(){return npcState.data?.items?.find(row=>row.slug===npcState.animationNpc)||null}
++function npcRememberAnimationTarget(slug){try{if(slug)localStorage.setItem(NPC_ANIMATION_TARGET_KEY,slug);else localStorage.removeItem(NPC_ANIMATION_TARGET_KEY)}catch{}}
++function npcEnsureAnimationTarget(){const rows=npcState.data?.items||[];const exists=slug=>!!slug&&rows.some(row=>row.slug===slug);if(exists(npcState.animationNpc))return false;let saved='';try{saved=localStorage.getItem(NPC_ANIMATION_TARGET_KEY)||''}catch{}const next=exists(saved)?saved:exists(npcState.selected)?npcState.selected:(rows[0]?.slug||null);const changed=next!==npcState.animationNpc;npcState.animationNpc=next;if(next)npcRememberAnimationTarget(next);return changed}
++function npcRenderAnimationTarget(){const select=$('npc-animation-npc');if(!select)return;npcEnsureAnimationTarget();const rows=npcState.data?.items||[];if(!rows.length){select.innerHTML='<option value="">no registered npcs</option>';select.value='';select.disabled=true;return}select.disabled=false;select.innerHTML=rows.map(row=>`<option value="${esc(row.slug)}">${esc(row.name_en)} · ${esc(row.slug)}</option>`).join('');select.value=npcState.animationNpc||rows[0].slug}
++async function npcSelectAnimationTarget(slug){const next=String(slug||'').trim();if(next===npcState.animationNpc)return;npcState.animationNpc=next||null;npcRememberAnimationTarget(npcState.animationNpc);npcState.lastScan=null;npcState.animations=null;$('npc-animation-scan-status').innerHTML='<strong>nothing scanned yet</strong><span>choose a folder and scan animations for this npc.</span>';npcRenderAnimationTarget();npcRenderAnimationFolderControls();await npcLoadAnimations()}
++function npcSlugify(value){const map={а:'a',б:'b',в:'v',г:'g',д:'d',е:'e',ё:'e',ж:'zh',з:'z',и:'i',й:'y',к:'k',л:'l',м:'m',н:'n',о:'o',п:'p',р:'r',с:'s',т:'t',у:'u',ф:'f',х:'h',ц:'ts',ч:'ch',ш:'sh',щ:'sch',ъ:'',ы:'y',ь:'',э:'e',ю:'yu',я:'ya'};let text=String(value||'').trim().toLowerCase().normalize('NFKD').replace(/[а-яё]/g,ch=>map[ch]??ch).replace(/[\u0300-\u036f]/g,'');return text.replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').replace(/_+/g,'_').slice(0,64).replace(/_+$/,'')}
++function npcStatusTag(status){return `<span class="tag ${String(status||'').toLowerCase()}">${esc(status||'')}</span>`}
++function npcSyncSlug(){if(!npcState.selected)$('npc-slug').value=npcSlugify($('npc-name-en').value)}
++function npcSetForm(row){npcState.selected=row?.slug||null;npcState.modelPath='';npcState.texturePaths=[];npcState.lastScan=null;npcState.animationSelected=null;if(row){$('npc-name-en').value=row.name_en||'';$('npc-name-ru').value=row.name_ru||'';$('npc-slug').value=row.slug;const stats=row.stats||{};$('npc-stat-hp').value=stats.MaxHP??100;$('npc-stat-damage').value=stats.Damage??10;$('npc-stat-attack-speed').value=stats.AttackSpeed??100;$('npc-stat-run-speed').value=stats.RunSpeed??50;$('npc-stat-crit-chance').value=stats.CritChance??0;const behavior=row.behavior||{};$('npc-behavior-aggressive').checked=behavior.aggressive===true;$('npc-behavior-aggro-radius').value=behavior.aggroRadiusStuds??16;$('npc-behavior-attack-radius').value=behavior.attackRadiusStuds??3;$('picked-npc-model').textContent='keep current fbx or choose a replacement';$('picked-npc-textures').textContent='keep current textures or choose replacements';}else{$('npc-name-en').value='';$('npc-name-ru').value='';$('npc-slug').value='';const stats=npcState.data?.options?.defaultStats||{};$('npc-stat-hp').value=stats.MaxHP??100;$('npc-stat-damage').value=stats.Damage??10;$('npc-stat-attack-speed').value=stats.AttackSpeed??100;$('npc-stat-run-speed').value=stats.RunSpeed??50;$('npc-stat-crit-chance').value=stats.CritChance??0;const behavior=npcState.data?.options?.defaultBehavior||{};$('npc-behavior-aggressive').checked=behavior.aggressive===true;$('npc-behavior-aggro-radius').value=behavior.aggroRadiusStuds??16;$('npc-behavior-attack-radius').value=behavior.attackRadiusStuds??3;$('picked-npc-model').textContent='fbx not selected';$('picked-npc-textures').textContent='textures not selected';}npcRender();npcLoadAnimations()}
++function npcRenderTree(){const host=$('npc-tree');host.innerHTML='';for(const row of npcState.data.items){const button=document.createElement('button');button.className=row.slug===npcState.selected?'active':'';button.innerHTML=`<span>${esc(row.name_en)}<small>${esc(row.slug)}</small></span><small>${esc(row.status)}</small>`;button.onclick=()=>npcSetForm(row);host.appendChild(button)}if(!npcState.data.items.length)host.innerHTML='<small class="muted">no registered npcs.</small>';$('npc-rail-count').textContent=npcState.data.items.length}
++function npcRenderRows(){const body=$('npc-rows');body.innerHTML='';for(const row of npcState.data.items){const stats=row.stats||{};const textures=row.textures||[];const tr=document.createElement('tr');tr.className=row.slug===npcState.selected?'active':'';tr.innerHTML=`<td><b>${esc(row.name_en)}</b><br><small>${esc(row.name_ru||'—')} · ${esc(row.slug)}</small></td><td><small>HP ${esc(stats.MaxHP)} · ATK ${esc(stats.Damage)}<br>ASPD ${esc(stats.AttackSpeed)} · RUN ${esc(stats.RunSpeed)} · CRIT ${esc(stats.CritChance)}%<br>${row.behavior?.aggressive?'AGGRESSIVE':'PASSIVE'} · AGGRO ${esc(row.behavior?.aggroRadiusStuds??16)} · RANGE ${esc(row.behavior?.attackRadiusStuds??3)}</small></td><td>${esc(row.bone_count||0)} bones<br><small>${esc(row.mesh_count||0)} mesh</small></td><td>${row.model_asset_id?`model ${esc(row.model_asset_id)}`:'model local'}<br><small>${textures.length} texture${textures.length===1?'':'s'}</small></td><td>${npcStatusTag(row.status)}</td><td><div class="row-actions"><button data-open>edit</button><button data-publish>publish</button><button data-sync>sync studio</button><button data-delete class="danger">delete</button></div></td>`;tr.querySelector('[data-open]').onclick=()=>npcSetForm(row);tr.querySelector('[data-publish]').onclick=()=>npcPublish(row.slug);tr.querySelector('[data-sync]').onclick=()=>npcSync(row.slug);tr.querySelector('[data-delete]').onclick=()=>npcDelete(row.slug);body.appendChild(tr)}}
++function npcRenderDetails(row){const host=$('npc-details');if(!row){host.innerHTML='<span class="muted">select a npc.</span>';return}const textureHtml=(row.textures||[]).map(tex=>`<div><b>${esc(tex.slot)}</b><span>${esc(tex.source_path)}</span><span>${esc(tex.asset_id||'local')}</span></div>`).join('');host.innerHTML=`<div class="section-title"><div><span>selected npc</span><h3>${esc(row.name_en)}</h3></div>${npcStatusTag(row.status)}</div><div class="details-grid"><div><b>slug</b><span>${esc(row.slug)}</span></div><div><b>skeleton</b><span>${esc(row.armature_name||'—')} · ${esc(row.bone_count||0)} bones</span></div><div><b>model source</b><span>${esc(row.model_source_path||'—')}</span></div><div><b>model asset id</b><span>${esc(row.model_asset_id||'not published')}</span></div><div><b>serverstorage</b><span>${esc(row.server_storage_path||'—')}</span></div><div><b>revision</b><span>${esc(row.revision)}</span></div></div>${textureHtml?`<div class="texture-list">${textureHtml}</div>`:''}`}
++function npcRenderForm(row){const configured=!!npcState.data?.publication?.configured;if(row){$('npc-model-status').innerHTML=`<strong>${esc(row.name_en)} · ${esc(row.status)}</strong><span>${esc(row.model_source_path||'no model')} · ${esc(row.bone_count||0)} bones · ${(row.textures||[]).length} texture(s)</span>`;$('register-npc').textContent=(npcState.modelPath||npcState.texturePaths.length)?'register new revision':'save metadata';}else{$('npc-model-status').innerHTML='<strong>not registered</strong><span>choose a rigged npc fbx. textures are optional.</span>';$('register-npc').textContent='register npc'}$('register-npc').disabled=!row&&!npcState.modelPath;$('publish-npc').disabled=!row||!configured||!row.model_source_path;$('sync-npc').disabled=!row?.model_asset_id;$('npc-publication-hint').textContent=!row?'select a registered npc.':!configured?'configure open cloud before publishing.':row.model_asset_id?`publish updates model ${row.model_asset_id} and changed textures.`:'publish creates the permanent model/texture asset ids.'}
++function npcRenderRuntime(){const pub=npcState.data.publication||{};$('npc-registry-state').className='runtime-state registered';$('npc-registry-state').innerHTML=`<strong>npc registry · ${npcState.data.summary?.registered||0}</strong><span>rigged models · stats · animation profiles</span>`;$('npc-publication-state').className=pub.configured?'publication-ready':'publication-missing';$('npc-publication-state').textContent=pub.configured?`open cloud: ${pub.creatorType} ${pub.creatorId}`:'open cloud: not configured'}
++function npcRender(){if(!npcState.data)return;const row=npcSelected();npcRenderAnimationTarget();$('npc-metric-total').textContent=npcState.data.summary?.registered||0;$('npc-metric-published').textContent=npcState.data.summary?.published||0;$('npc-metric-changed').textContent=npcState.data.summary?.changed||0;npcRenderRuntime();npcRenderTree();npcRenderRows();npcRenderDetails(row);npcRenderForm(row);npcRenderAnimations()}
++async function npcLoad(){try{npcState.data=await request('/api/npcs');if(npcState.selected&&!npcState.data.items.some(x=>x.slug===npcState.selected))npcState.selected=null;if(npcEnsureAnimationTarget())npcState.animations=null;npcRender();await npcLoadAnimations()}catch(error){toast(error.message,true)}}
++async function npcChooseModel(){try{const result=await request('/api/files/choose-npc-model',{method:'POST'});if(!result.path)return;npcState.modelPath=result.path;$('picked-npc-model').textContent=result.path;npcRenderForm(npcSelected())}catch(error){toast(error.message,true)}}
++async function npcChooseTextures(){try{const result=await request('/api/files/choose-npc-textures',{method:'POST'});npcState.texturePaths=result.paths||[];$('picked-npc-textures').textContent=npcState.texturePaths.length?npcState.texturePaths.join(' · '):'textures not selected';npcRenderForm(npcSelected())}catch(error){toast(error.message,true)}}
++async function npcRegister(){try{const row=npcSelected();const nameEn=$('npc-name-en').value.trim();if(!nameEn)throw Error('name en is required');const slug=row?.slug||npcSlugify(nameEn);if(!row&&!npcState.modelPath)throw Error('choose a npc fbx first');const crit=Number($('npc-stat-crit-chance').value||0);if(crit<0||crit>100)throw Error('critical chance must be 0..100');$('register-npc').disabled=true;const result=await request('/api/npcs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug,nameEn,nameRu:$('npc-name-ru').value.trim(),modelSourcePath:npcState.modelPath,texturePaths:npcState.texturePaths,stats:{MaxHP:Number($('npc-stat-hp').value||0),Damage:Number($('npc-stat-damage').value||0),AttackSpeed:Number($('npc-stat-attack-speed').value||0),RunSpeed:Number($('npc-stat-run-speed').value||0),CritChance:crit},behavior:{aggressive:$('npc-behavior-aggressive').checked,aggroRadiusStuds:Number($('npc-behavior-aggro-radius').value||0),attackRadiusStuds:Number($('npc-behavior-attack-radius').value||0)}})});npcState.selected=result.slug;npcState.animationNpc=result.slug;npcRememberAnimationTarget(result.slug);npcState.modelPath='';npcState.texturePaths=[];await npcLoad();npcSetForm(npcSelected());toast(`registered npc ${result.slug}`)}catch(error){toast(error.message,true)}finally{npcRenderForm(npcSelected())}}
++async function npcPublish(slug){try{toast('publishing npc model and changed textures…');await request('/api/npcs/'+encodeURIComponent(slug)+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:$('npc-publication-description').value})});await npcLoad();toast('npc publication complete')}catch(error){toast(error.message,true)}}
++async function npcSync(slug){try{toast('syncing npc into serverstorage…');const result=await request('/api/npcs/'+encodeURIComponent(slug)+'/sync',{method:'POST'});await npcLoad();toast(`studio synced: ${result.studio?.destination||slug}`)}catch(error){toast(error.message,true)}}
++async function npcDelete(slug){if(!confirm(`delete npc ${slug} and its animation profile from game1 registry? roblox cloud assets are not deleted.`))return;try{await request('/api/npcs/'+encodeURIComponent(slug),{method:'DELETE'});if(npcState.selected===slug)npcState.selected=null;if(npcState.animationNpc===slug){npcState.animationNpc=null;npcRememberAnimationTarget(null);npcState.animations=null}await npcLoad();npcSetForm(null);toast('npc registry row deleted')}catch(error){toast(error.message,true)}}
++function npcRenderFilenameRules(){const host=$('npc-animation-filename-rules');if(!host)return;const rules=npcState.animations?.filenameRules||[];if(!rules.length){host.innerHTML='<span class="muted">select a npc.</span>';return}host.innerHTML=`<div class="filename-rule-group"><div class="filename-rule-context">NPC</div><div class="filename-rule-table"><div class="filename-rule-head"><span>state</span><span>canonical filename</span><span>variant</span></div>${rules.map(rule=>`<div class="filename-rule-row"><code>${esc(rule.state)}</code><code>${esc(rule.canonicalFilename)}</code><span>${esc(rule.variantPattern||'—')}</span></div>`).join('')}</div></div>`}
++function npcRenderAnimationRows(){const body=$('npc-animation-rows');if(!body)return;body.innerHTML='';const rows=npcState.animations?.items||[];if(!rows.length){body.innerHTML=`<tr><td colspan="8"><span class="muted">no registered animations for ${esc(npcAnimationSelected()?.slug||'selected npc')}.</span></td></tr>`;return}for(const row of rows){const tr=document.createElement('tr');tr.innerHTML=`<td><b>${esc(row.state||row.slot)}</b></td><td>${row.variant?String(row.variant).padStart(2,'0'):'—'}</td><td>${esc(row.name)}</td><td>${esc(row.asset_id||'local')}</td><td>${npcStatusTag(row.status)}</td><td><input data-weight class="weight-input" type="number" min="1" max="10000" value="${esc(row.weight)}"></td><td><label class="seam-toggle" title="runtime-only: blend the animation terminal pose into frame zero without modifying the asset"><input data-duplicate type="checkbox" ${row.duplicate_first_frame_at_end?'checked':''}></label></td><td><div class="row-actions"><button data-publish>publish</button><button data-remove class="danger">remove</button></div></td>`;const weight=tr.querySelector('[data-weight]');weight.onchange=()=>npcSetAnimationWeight(row.binding_id,weight.value);tr.querySelector('[data-duplicate]').onchange=e=>npcSetAnimationDuplicate(row.clip_id,e.target.checked);tr.querySelector('[data-publish]').disabled=row.status==='PUBLISHED';tr.querySelector('[data-publish]').onclick=()=>npcPublishAnimation(row.clip_id);tr.querySelector('[data-remove]').onclick=()=>npcRemoveAnimation(row.binding_id);body.appendChild(tr)}}
++function npcRenderUnassigned(){const host=$('npc-animation-unassigned');if(!host)return;const rows=npcState.lastScan?.unassigned||[];if(!rows.length){host.innerHTML='';return}const defs=npcState.animations?.slotCatalog||[];host.innerHTML=`<details open><summary>unassigned files · ${rows.length} · assign manually</summary><div class="unassigned-list">${rows.slice(0,100).map((row,index)=>`<div class="unassigned-row npc-unassigned-row" data-npc-unassigned="${index}"><div class="unassigned-file"><b>${esc(row.filename)}</b><small>${esc(row.reason)}</small></div><label>state<select data-slot>${defs.map(def=>`<option value="${esc(def.slot)}">${esc(def.label||def.slot)}</option>`).join('')}</select></label><label>variant<input data-variant type="number" min="0" max="999" value="0"></label><button data-assign class="primary" type="button">assign</button></div>`).join('')}</div></details>`;for(const node of host.querySelectorAll('[data-npc-unassigned]')){const row=rows[Number(node.dataset.npcUnassigned)];const slot=node.querySelector('[data-slot]'),variant=node.querySelector('[data-variant]');const update=()=>{const def=defs.find(x=>x.slot===slot.value);variant.disabled=!def?.variants;if(def?.variants&&Number(variant.value)<=0)variant.value='1';if(!def?.variants)variant.value='0'};slot.onchange=update;update();node.querySelector('[data-assign]').onclick=()=>npcAssignAnimation(row,node)}}
++function npcRenderAnimations(){npcRenderAnimationTarget();npcRenderAnimationFolderControls();const data=npcState.animations;if(!data)return;npcRenderFilenameRules();npcRenderAnimationRows();npcRenderUnassigned();const selected=npcAnimationSelected();$('npc-animation-profile-state').className='runtime-state '+(selected&&data.skeletonCompatible?'registered':'bootstrap');$('npc-animation-profile-state').innerHTML=selected?`<strong>animations · ${esc(selected.name_en)} · ${esc(selected.slug)}</strong><span>${data.skeletonCompatible?'skeleton compatible':'skeleton changed'} · ${esc(data.profile?.skeleton_signature||'no skeleton signature')}</span>`:'<strong>no npc selected</strong><span>choose a registered npc below.</span>';$('publish-missing-npc-animations').disabled=npcState.animationPublishing||!selected||!data.publication?.configured||!(data.items||[]).some(row=>row.status==='LOCAL_ONLY');$('check-roblox-npc-animations').disabled=npcState.animationPublishing||!data.publication?.configured;$('npc-animation-table-title').textContent=`${selected?.slug||'npc'} · registered animations`;npcRenderAnimationFolderControls()}
++async function npcLoadAnimations(){try{npcEnsureAnimationTarget();const slug=npcState.animationNpc||'';npcState.animations=await request('/api/npc-animations?npc='+encodeURIComponent(slug));const profileRoot=npcNormalizeAnimationFolderPath(npcState.animations.profile?.scan_root||'');if(!npcState.animationFolder&&profileRoot)npcSetAnimationFolder(profileRoot,true);npcRenderAnimations()}catch(error){toast(error.message,true)}}
++async function npcChooseAnimationFolder(){try{npcSetAnimationFolder($('npc-animation-folder-path').value,false);const result=await request('/api/files/choose-animation-folder',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({initialPath:npcState.animationFolder})});if(!result.path)return;npcSetAnimationFolder(result.path,true);npcRenderAnimations()}catch(error){toast(error.message,true)}}
++async function npcScanAnimations(){try{npcSetAnimationFolder($('npc-animation-folder-path').value,true);if(!npcState.animationNpc)throw Error('choose a npc in the npc animations section');if(!npcState.animationFolder)throw Error('choose or paste a npc animation folder');$('scan-npc-animations').disabled=true;npcState.lastScan=await request('/api/npc-animations/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({npcSlug:npcState.animationNpc,rootPath:npcState.animationFolder})});await npcLoadAnimations();$('npc-animation-scan-status').innerHTML=`<strong>scan complete · ${npcState.lastScan.recognized}/${npcState.lastScan.filesScanned} recognized</strong><span>${npcState.lastScan.created} new · ${npcState.lastScan.changed} changed · ${npcState.lastScan.unchanged} unchanged · ${npcState.lastScan.unassigned.length} unassigned</span>`;npcRenderUnassigned();toast(`registered ${npcState.lastScan.recognized} npc animation clips`)}catch(error){toast(error.message,true)}finally{npcRenderAnimations()}}
++async function npcAssignAnimation(row,node){try{const slot=node.querySelector('[data-slot]').value,variant=Number(node.querySelector('[data-variant]').value||0);await request('/api/npc-animations/assign',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({npcSlug:npcState.animationNpc,sourcePath:row.path,slot,variant})});npcState.lastScan.unassigned=(npcState.lastScan.unassigned||[]).filter(item=>item.path!==row.path);await npcLoadAnimations();npcRenderUnassigned();toast(`assigned ${row.filename} → ${slot}`)}catch(error){toast(error.message,true)}}
++async function npcPublishAnimation(clipId){try{await request('/api/npc-animations/'+encodeURIComponent(clipId)+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:$('npc-animation-publication-description').value})});await npcLoadAnimations();toast('npc animation published')}catch(error){toast(error.message,true)}}
++async function npcPublishMissingAnimations(){if(npcState.animationPublishing)return;let published=0;try{const queue=(npcState.animations?.items||[]).filter(row=>row.status==='LOCAL_ONLY');if(!queue.length)return;npcState.animationPublishing=true;npcRenderAnimations();const host=$('npc-animation-publish-progress'),bar=$('npc-animation-publish-bar'),count=$('npc-animation-publish-count'),current=$('npc-animation-publish-current');host.hidden=false;bar.max=queue.length;bar.value=0;for(let index=0;index<queue.length;index++){const row=queue[index];current.textContent=`${row.name} · ${row.state||row.slot}`;count.textContent=`${index} / ${queue.length}`;await request('/api/npc-animations/'+encodeURIComponent(row.clip_id)+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:$('npc-animation-publication-description').value})});published=index+1;bar.value=published;count.textContent=`${published} / ${queue.length}`;}current.textContent='publication queue complete';toast(`published ${published} npc animation assets`)}catch(error){toast(`published ${published}; stopped: ${error.message}`,true)}finally{npcState.animationPublishing=false;await npcLoadAnimations();npcRenderAnimations()}}
++async function npcSetAnimationDuplicate(clipId,enabled){try{npcState.animations=await request('/api/npc-animations/'+encodeURIComponent(clipId)+'/duplicate-first-frame',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:!!enabled})});npcState.animations.publication=npcState.data?.publication||{};npcRenderAnimations();toast(enabled?'runtime first-frame tail enabled; asset bytes are unchanged':'runtime first-frame tail disabled; asset bytes are unchanged')}catch(error){await npcLoadAnimations();toast(error.message,true)}}
++async function npcSetAnimationWeight(bindingId,weight){try{npcState.animations=await request('/api/npc-animation-bindings/'+encodeURIComponent(bindingId)+'/weight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({weight:Number(weight)})});npcState.animations.publication=npcState.data?.publication||{};npcRenderAnimations()}catch(error){toast(error.message,true)}}
++async function npcRemoveAnimation(bindingId){if(!confirm('remove this npc animation binding? canonical source files are preserved.'))return;try{npcState.animations=await request('/api/npc-animation-bindings/'+encodeURIComponent(bindingId),{method:'DELETE'});npcState.animations.publication=npcState.data?.publication||{};npcRenderAnimations();toast('npc animation binding removed')}catch(error){toast(error.message,true)}}
++function initNpcFilenameDisclosure(){const guide=$('npc-animation-filename-guide');if(!guide)return;try{const saved=localStorage.getItem(NPC_FILENAME_GUIDE_KEY);if(saved!==null)guide.open=saved==='1'}catch{}guide.addEventListener('toggle',()=>{try{localStorage.setItem(NPC_FILENAME_GUIDE_KEY,guide.open?'1':'0')}catch{}})}
++window.game1NpcsLoad=npcLoad;window.game1NpcAnimationsLoad=npcLoadAnimations;
++initNpcAnimationFolderExplorer();
++$('npc-animation-npc').onchange=()=>npcSelectAnimationTarget($('npc-animation-npc').value);
++$('npc-name-en').oninput=npcSyncSlug;$('new-npc').onclick=()=>npcSetForm(null);$('refresh-npcs').onclick=npcLoad;$('validate-npcs').onclick=npcLoad;$('choose-npc-model').onclick=npcChooseModel;$('choose-npc-textures').onclick=npcChooseTextures;$('register-npc').onclick=npcRegister;$('clear-npc-form').onclick=()=>npcSetForm(null);$('publish-npc').onclick=()=>npcSelected()&&npcPublish(npcSelected().slug);$('sync-npc').onclick=()=>npcSelected()&&npcSync(npcSelected().slug);$('choose-npc-animation-folder').onclick=npcChooseAnimationFolder;$('scan-npc-animations').onclick=npcScanAnimations;$('publish-missing-npc-animations').onclick=npcPublishMissingAnimations;$('check-roblox-npc-animations').onclick=()=>window.game1CheckRobloxAnimations&&window.game1CheckRobloxAnimations();$('refresh-npc-animations').onclick=npcLoadAnimations;initNpcFilenameDisclosure();
+diff --git a/system/control-center/static/npc-spawns.js b/system/control-center/static/npc-spawns.js
+new file mode 100644
+--- /dev/null
++++ b/system/control-center/static/npc-spawns.js
+@@ -0,0 +1,25 @@
++const npcSpawnState={data:null,selectedSpawnId:'',selectedNpcSlug:'',busy:false};
++function npcSpawnCurrentRecord(){return (npcSpawnState.data?.records||[]).find(row=>row.spawnId===npcSpawnState.selectedSpawnId)||null}
++function npcSpawnSelectedNpc(){return (npcSpawnState.data?.monsters||[]).find(row=>row.slug===npcSpawnState.selectedNpcSlug)||null}
++function npcSpawnNumber(id,fallback=0){const value=Number($(id).value);return Number.isFinite(value)?value:fallback}
++function npcSpawnPayload(){return{spawnId:$('npc-spawn-id').value.trim(),monsterSlug:npcSpawnState.selectedNpcSlug,mapKey:$('npc-spawn-map-key').value.trim(),placeId:npcSpawnNumber('npc-spawn-place-id'),position:{x:npcSpawnNumber('npc-spawn-x',NaN),y:npcSpawnNumber('npc-spawn-y',NaN),z:npcSpawnNumber('npc-spawn-z',NaN)},yawDegrees:npcSpawnNumber('npc-spawn-yaw'),respawnSeconds:npcSpawnNumber('npc-spawn-respawn',10),spawnRadius:npcSpawnNumber('npc-spawn-radius'),maxAlive:npcSpawnNumber('npc-spawn-max-alive',1),enabled:$('npc-spawn-enabled').checked}}
++function npcSpawnSetOperation(title,detail,bad=false){$('npc-spawn-operation').innerHTML=`<strong${bad?' class="blocked"':''}>${esc(title)}</strong><span>${esc(detail||'')}</span>`}
++function npcSpawnApply(row,isDraft=false){if(!row)return;npcSpawnState.selectedSpawnId=isDraft?'':String(row.spawnId||'');npcSpawnState.selectedNpcSlug=String(row.monsterSlug||npcSpawnState.selectedNpcSlug||'');$('npc-spawn-id').value=String(row.spawnId||'');$('npc-spawn-place-id').value=Number(row.placeId||0);$('npc-spawn-map-key').value=row.mapKey||npcSpawnState.data?.defaults?.mapKey||'main';$('npc-spawn-yaw').value=Number(row.yawDegrees||0);const p=row.position||{};$('npc-spawn-x').value=Number.isFinite(Number(p.x))?Number(p.x).toFixed(3):'';$('npc-spawn-y').value=Number.isFinite(Number(p.y))?Number(p.y).toFixed(3):'';$('npc-spawn-z').value=Number.isFinite(Number(p.z))?Number(p.z).toFixed(3):'';$('npc-spawn-respawn').value=Number(row.respawnSeconds??npcSpawnState.data?.defaults?.respawnSeconds??10);$('npc-spawn-radius').value=Number(row.spawnRadius??npcSpawnState.data?.defaults?.spawnRadius??0);$('npc-spawn-max-alive').value=Number(row.maxAlive??npcSpawnState.data?.defaults?.maxAlive??1);$('npc-spawn-enabled').checked=row.enabled!==false;npcSpawnRender()}
++function npcSpawnReset(keepNpc=true){const defaults=npcSpawnState.data?.defaults||{};npcSpawnState.selectedSpawnId='';if(!keepNpc)npcSpawnState.selectedNpcSlug='';$('npc-spawn-id').value='';$('npc-spawn-place-id').value='0';$('npc-spawn-map-key').value=defaults.mapKey||'main';$('npc-spawn-yaw').value='0';$('npc-spawn-x').value='';$('npc-spawn-y').value='';$('npc-spawn-z').value='';$('npc-spawn-respawn').value=defaults.respawnSeconds??10;$('npc-spawn-radius').value=defaults.spawnRadius??0;$('npc-spawn-max-alive').value=defaults.maxAlive??1;$('npc-spawn-enabled').checked=true;npcSpawnSetOperation('new spawn','place a point in Studio.');npcSpawnRender()}
++function npcSpawnRenderNpcs(){const select=$('npc-spawn-npc');const rows=npcSpawnState.data?.monsters||[];if(!npcSpawnState.selectedNpcSlug&&rows.length)npcSpawnState.selectedNpcSlug=rows[0].slug;select.innerHTML=rows.map(row=>`<option value="${esc(row.slug)}">${esc(row.name)} · ${esc(row.slug)}${row.ready?'':' · NOT READY'}</option>`).join('');select.value=npcSpawnState.selectedNpcSlug;const selected=npcSpawnSelectedNpc();const box=$('npc-spawn-readiness');if(!selected){box.innerHTML='<strong>no registered npcs</strong><span>register/publish a npc first.</span>';return}if(selected.ready){box.innerHTML=`<strong>${esc(selected.name)} · READY</strong><span>model and required animation states are published. registration will sync the template to ServerStorage automatically.</span>`}else{box.innerHTML=`<strong class="blocked">${esc(selected.name)} · BLOCKED</strong>${(selected.reasons||[]).map(reason=>`<span>${esc(reason)}</span>`).join('')}`}}
++function npcSpawnRenderRecords(){const host=$('npc-spawn-records');const rows=npcSpawnState.data?.records||[];host.innerHTML=rows.map(row=>{const p=row.position||{},npc=row.monster||{};return `<button type="button" data-npc-spawn-id="${esc(row.spawnId)}" class="npc-spawn-record monster-spawn-record ${row.spawnId===npcSpawnState.selectedSpawnId?'active':''}"><span><strong>${esc(npc.name||row.monsterSlug)}</strong><small>${esc(row.monsterSlug)} · ${esc(row.spawnId)}</small></span><span><b>${esc(row.mapKey)}</b><small>${Number(p.x||0).toFixed(2)}, ${Number(p.y||0).toFixed(2)}, ${Number(p.z||0).toFixed(2)} · r ${Number(row.spawnRadius||0)} · max ${Number(row.maxAlive||1)}</small></span><i class="${esc(row.syncState||'stale')}">${esc(String(row.syncState||'stale').toUpperCase())}</i></button>`}).join('')||'<span class="muted">no registered spawns.</span>';for(const button of host.querySelectorAll('[data-npc-spawn-id]'))button.onclick=()=>{const row=rows.find(item=>item.spawnId===button.dataset.npcSpawnId);if(row){npcSpawnApply(row,false);npcSpawnSetOperation('registered spawn loaded',row.syncState==='synced'?'Studio marker is synchronized.':'marker is stale; save or restore markers.')}}}
++function npcSpawnRender(){if(!npcSpawnState.data)return;const rows=npcSpawnState.data.records||[];$('npc-spawn-count').textContent=rows.length;$('npc-spawn-synced').textContent=rows.filter(row=>row.syncState==='synced').length;$('npc-spawn-stale').textContent=rows.filter(row=>row.syncState!=='synced').length;npcSpawnRenderNpcs();npcSpawnRenderRecords();const selected=npcSpawnSelectedNpc();const coords=['npc-spawn-x','npc-spawn-y','npc-spawn-z'].every(id=>$(id).value!==''&&Number.isFinite(Number($(id).value)));$('npc-spawn-place').disabled=npcSpawnState.busy||!selected?.ready;$('npc-spawn-register').disabled=npcSpawnState.busy||!selected?.ready||!coords||!$('npc-spawn-id').value;$('npc-spawn-select').disabled=npcSpawnState.busy||!npcSpawnState.selectedSpawnId;$('npc-spawn-delete').disabled=npcSpawnState.busy||!npcSpawnState.selectedSpawnId;$('npc-spawn-new').disabled=npcSpawnState.busy;$('npc-spawn-restore').disabled=npcSpawnState.busy||!rows.length;$('npc-spawn-validate').disabled=npcSpawnState.busy;$('npc-spawn-refresh').disabled=npcSpawnState.busy;const radius=npcSpawnNumber('npc-spawn-radius'),maxAlive=npcSpawnNumber('npc-spawn-max-alive',1);$('npc-spawn-radius-hint').textContent=maxAlive>1&&radius===0?'all population instances will overlap at one point. set spawn radius for a distributed group.':'radius is the random ground area around the authored point. max alive is the population cap for this record.';$('npc-spawn-manifest').innerHTML=`<div><b>manifest</b><span>${esc(npcSpawnState.data.manifestPath||'')}</span></div><div><b>runtime registry</b><span>${esc(npcSpawnState.data.registryPath||'')}</span></div>`}
++async function npcSpawnLoad(preserve=true){try{const prior=preserve?($('npc-spawn-id').value||npcSpawnState.selectedSpawnId):'';npcSpawnState.data=await request('/api/npc-spawns');const row=(npcSpawnState.data.records||[]).find(item=>item.spawnId===prior);if(row)npcSpawnApply(row,false);else npcSpawnRender()}catch(error){toast('npc spawn: '+error.message,true)}}
++async function npcSpawnRun(title,fn){if(npcSpawnState.busy)return;npcSpawnState.busy=true;npcSpawnSetOperation(title,'waiting for Studio…');npcSpawnRender();try{return await fn()}catch(error){npcSpawnSetOperation('error',error.message,true);toast('npc spawn: '+error.message,true);return null}finally{npcSpawnState.busy=false;npcSpawnRender()}}
++$('npc-spawn-npc').onchange=()=>{npcSpawnState.selectedNpcSlug=$('npc-spawn-npc').value;npcSpawnReset(true)};
++$('npc-spawn-radius').oninput=npcSpawnRender;$('npc-spawn-max-alive').oninput=npcSpawnRender;
++$('npc-spawn-place').onclick=()=>npcSpawnRun('click a Terrain/Part surface in Studio; Esc cancels',async()=>{const result=await request('/api/npc-spawns/place',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(npcSpawnPayload())});npcSpawnApply(result.draft,true);$('npc-spawn-id').value=result.draft.spawnId;npcSpawnSetOperation('point received','review population settings, then register spawn.');toast('spawn point received from Studio')});
++$('npc-spawn-register').onclick=()=>npcSpawnRun('syncing npc template and registering marker',async()=>{const result=await request('/api/npc-spawns/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(npcSpawnPayload())});npcSpawnState.selectedSpawnId=result.record.spawnId;await npcSpawnLoad(true);npcSpawnSetOperation(result.record.syncState==='synced'?'spawn registered':'spawn saved; marker stale',result.studio?.error||'Studio marker synchronized.',result.record.syncState!=='synced');toast(result.record.syncState==='synced'?'spawn registered and synchronized':'spawn saved but Studio marker sync failed',result.record.syncState!=='synced')});
++$('npc-spawn-select').onclick=()=>npcSpawnRun('selecting marker',async()=>{await request('/api/npc-spawns/select',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({spawnId:npcSpawnState.selectedSpawnId})});npcSpawnSetOperation('marker selected','Studio camera points at the spawn marker.')});
++$('npc-spawn-new').onclick=()=>npcSpawnReset(true);
++$('npc-spawn-delete').onclick=()=>{const row=npcSpawnCurrentRecord();if(!row||!confirm(`delete spawn ${row.spawnId}? npc assets are preserved.`))return;npcSpawnRun('deleting spawn',async()=>{await request('/api/npc-spawns/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({spawnId:row.spawnId})});npcSpawnReset(true);await npcSpawnLoad(false);npcSpawnSetOperation('spawn deleted','manifest, runtime registry and marker updated.');toast('spawn deleted')})};
++$('npc-spawn-restore').onclick=()=>npcSpawnRun('restoring all markers',async()=>{const result=await request('/api/npc-spawns/restore',{method:'POST'});await npcSpawnLoad(true);npcSpawnSetOperation('markers restored',`${result.recordCount} marker(s) synchronized.`);toast('npc spawn markers restored')});
++$('npc-spawn-validate').onclick=()=>npcSpawnRun('validating registry',async()=>{const result=await request('/api/npc-spawns/validate',{method:'POST'});npcSpawnSetOperation('registry valid',`${result.recordCount} spawn record(s).`);toast('npc spawn registry valid')});
++$('npc-spawn-refresh').onclick=()=>npcSpawnLoad(true);
++window.game1NpcSpawnsLoad=npcSpawnLoad;
++npcSpawnLoad(false);
+diff --git a/system/studio-plugin/Game1Bridge.server.luau b/system/studio-plugin/Game1Bridge.server.luau
+--- a/system/studio-plugin/Game1Bridge.server.luau
++++ b/system/studio-plugin/Game1Bridge.server.luau
+@@ -470,13 +470,15 @@
+ 
+ local function placeMonsterRig(importedRig: Model, destination: Instance, wrapperName: string, assetId: number, metadata: any): (Model, any, any, any)
+     wrapperName = validSegment(wrapperName)
++    local actorKind = if tostring(metadata.entityKind or "monster") == "npc" then "npc" else "monster"
++    local managedAttribute = if actorKind == "npc" then "Game1NpcRig" else "Game1MonsterRig"
+     local stats = validateCharacterRig(importedRig)
+     local existing = destination:FindFirstChild(wrapperName)
+     if existing ~= nil and not existing:IsA("Model") then
+-        error("monster destination already contains a non-Model instance named " .. wrapperName)
+-    end
+-    if existing ~= nil and existing:GetAttribute("Game1MonsterRig") ~= true then
+-        error("refusing to replace an unmanaged monster Model named " .. wrapperName)
++        error(actorKind .. " destination already contains a non-Model instance named " .. wrapperName)
++    end
++    if existing ~= nil and existing:GetAttribute(managedAttribute) ~= true then
++        error("refusing to replace an unmanaged " .. actorKind .. " Model named " .. wrapperName)
+     end
+ 
+     local wrapper = existing :: Model?
+@@ -513,10 +515,10 @@
+     stats = modelRigStats(importedRig)
+     local textureStats = applyWeaponTextures(importedRig, metadata.textures or {})
+ 
+-    wrapper:SetAttribute("Game1MonsterRig", true)
++    wrapper:SetAttribute(managedAttribute, true)
+     wrapper:SetAttribute("Game1PlacementMode", "monster-rig")
+     wrapper:SetAttribute("Game1ModelAssetId", tostring(assetId))
+-    wrapper:SetAttribute("MonsterSlug", tostring(metadata.monsterSlug or wrapperName))
++    wrapper:SetAttribute(if actorKind == "npc" then "NpcSlug" else "MonsterSlug", tostring(metadata.monsterSlug or wrapperName))
+     return wrapper :: Model, stats, templateInfo, textureStats
+ end
+ 
+@@ -636,7 +638,7 @@
+             result.template = templateInfo
+             result.monsterStats = {
+                 textures = textureStats,
+-                monsterSlug = tostring(wrapper:GetAttribute("MonsterSlug") or ""),
++                monsterSlug = tostring(wrapper:GetAttribute("MonsterSlug") or wrapper:GetAttribute("NpcSlug") or ""),
+             }
+             result.importedCount = #wrapper:GetDescendants()
+         else
+@@ -681,7 +683,7 @@
+     end
+ end
+ 
+-local function monsterSpawnMarkerFolder(): Folder
++local function monsterSpawnMarkerFolder(kind: string?): Folder
+     local root = Workspace:FindFirstChild(MONSTER_SPAWN_AUTHORING_ROOT)
+     if root and not root:IsA("Folder") then
+         error("Workspace." .. MONSTER_SPAWN_AUTHORING_ROOT .. " exists but is not a Folder")
+@@ -692,21 +694,22 @@
+         root:SetAttribute("Game1Authoring", true)
+         root.Parent = Workspace
+     end
+-    local folder = root:FindFirstChild(MONSTER_SPAWN_MARKER_FOLDER)
++    local markerFolderName = if kind == "npc" then "NpcSpawns" else MONSTER_SPAWN_MARKER_FOLDER
++    local folder = root:FindFirstChild(markerFolderName)
+     if folder and not folder:IsA("Folder") then
+-        error(root:GetFullName() .. "." .. MONSTER_SPAWN_MARKER_FOLDER .. " exists but is not a Folder")
++        error(root:GetFullName() .. "." .. markerFolderName .. " exists but is not a Folder")
+     end
+     if not folder then
+         folder = Instance.new("Folder")
+-        folder.Name = MONSTER_SPAWN_MARKER_FOLDER
++        folder.Name = markerFolderName
+         folder.Parent = root
+     end
+     return folder :: Folder
+ end
+ 
+-local function findMonsterSpawnMarker(spawnId: string): Model?
++local function findMonsterSpawnMarker(spawnId: string, kind: string?): Model?
+     local root = Workspace:FindFirstChild(MONSTER_SPAWN_AUTHORING_ROOT)
+-    local folder = root and root:FindFirstChild(MONSTER_SPAWN_MARKER_FOLDER)
++    local folder = root and root:FindFirstChild(if kind == "npc" then "NpcSpawns" else MONSTER_SPAWN_MARKER_FOLDER)
+     if not folder then
+         return nil
+     end
+@@ -758,13 +761,14 @@
+     return string.format("%s_%s", name, shortId)
+ end
+ 
+-local function createMonsterSpawnMarker(data: any, markerState: string): Model
++local function createMonsterSpawnMarker(data: any, markerState: string, actorKind: string?): Model
+     local spawnId = tostring(data.spawnId or "")
+     if not spawnId:match("^spawn%-%w[%w%-]+$") then
+         error("Monster Spawn command has invalid spawnId")
+     end
+     local preview = markerState == "preview"
+-    local folder = monsterSpawnMarkerFolder()
++    local kind = if actorKind == "npc" then "npc" else "monster"
++    local folder = monsterSpawnMarkerFolder(kind)
+     for _, child in ipairs(folder:GetChildren()) do
+         if child:IsA("Model") then
+             local registeredCopy = not preview and tostring(child:GetAttribute("SpawnId") or "") == spawnId
+@@ -779,14 +783,15 @@
+     local color = preview and Color3.fromRGB(255, 111, 97) or Color3.fromRGB(66, 214, 177)
+     local marker = Instance.new("Model")
+     marker.Name = monsterSpawnMarkerName(data)
+-    marker:SetAttribute("Game1MonsterSpawnMarker", true)
++    marker:SetAttribute(if kind == "npc" then "Game1NpcSpawnMarker" else "Game1MonsterSpawnMarker", true)
++    marker:SetAttribute("EntityKind", kind)
+     marker:SetAttribute("SpawnState", markerState)
+     marker:SetAttribute("SpawnId", preview and "" or spawnId)
+     if preview then
+         marker:SetAttribute("PreviewForSpawnId", spawnId)
+     end
+-    marker:SetAttribute("MonsterSlug", tostring(data.monsterSlug or ""))
+-    marker:SetAttribute("MonsterName", tostring(data.monsterName or ""))
++    marker:SetAttribute(if kind == "npc" then "NpcSlug" else "MonsterSlug", tostring(data.monsterSlug or ""))
++    marker:SetAttribute(if kind == "npc" then "NpcName" else "MonsterName", tostring(data.monsterName or ""))
+     marker:SetAttribute("MapKey", tostring(data.mapKey or "main"))
+     marker:SetAttribute("PlaceId", tonumber(data.placeId) or game.PlaceId)
+     marker:SetAttribute("YawDegrees", tonumber(data.yawDegrees) or 0)
+@@ -873,7 +878,7 @@
+     data.position = { x = startPosition.X, y = startPosition.Y, z = startPosition.Z }
+     data.yawDegrees = yaw
+     data.placeId = game.PlaceId
+-    local preview = createMonsterSpawnMarker(data, "preview")
++    local preview = createMonsterSpawnMarker(data, "preview", tostring(data.entityKind or "monster"))
+     local finished = false
+     local cancelled = false
+     local chosenPosition = startPosition
+@@ -921,6 +926,7 @@
+ end
+ 
+ local function handleMonsterSpawn(data: any)
++    local kind = tostring(data.entityKind or "monster")
+     local result = {
+         command = "monster-spawn",
+         project = "game1",
+@@ -934,8 +940,8 @@
+         mapKey = tostring(data.mapKey or "main"),
+     }
+     local ok, operationError = xpcall(function()
+-        if tostring(data.project or "") ~= "game1" or tonumber(data.schemaVersion) ~= 1 then
+-            error("invalid game1 Monster Spawn command")
++        if tostring(data.project or "") ~= "game1" or tonumber(data.schemaVersion) ~= 1 or (kind ~= "monster" and kind ~= "npc") then
++            error("invalid game1 actor spawn command")
+         end
+         local action = tostring(data.action or "")
+         if action == "place" then
+@@ -948,11 +954,11 @@
+             if expectedPlaceId > 0 and game.PlaceId > 0 and expectedPlaceId ~= game.PlaceId then
+                 error(string.format("Open PlaceId %d does not match Spawn PlaceId %d", game.PlaceId, expectedPlaceId))
+             end
+-            local marker = createMonsterSpawnMarker(data, "registered")
++            local marker = createMonsterSpawnMarker(data, "registered", kind)
+             result.markerPath = marker:GetFullName()
+             result.synchronized = true
+         elseif action == "select" then
+-            local marker = findMonsterSpawnMarker(tostring(data.spawnId or ""))
++            local marker = findMonsterSpawnMarker(tostring(data.spawnId or ""), kind)
+             if not marker then
+                 error("registered Monster Spawn marker was not found in Studio")
+             end
+@@ -966,11 +972,11 @@
+             result.synchronized = true
+         elseif action == "delete" then
+             local spawnId = tostring(data.spawnId or "")
+-            local marker = findMonsterSpawnMarker(spawnId)
++            local marker = findMonsterSpawnMarker(spawnId, kind)
+             if marker then
+                 marker:Destroy()
+             end
+-            for _, child in ipairs(monsterSpawnMarkerFolder():GetChildren()) do
++            for _, child in ipairs(monsterSpawnMarkerFolder(kind):GetChildren()) do
+                 if child:IsA("Model") and tostring(child:GetAttribute("PreviewForSpawnId") or "") == spawnId then
+                     child:Destroy()
+                 end
+@@ -978,9 +984,9 @@
+             result.deleted = marker ~= nil
+             result.synchronized = true
+         elseif action == "sync" then
+-            local folder = monsterSpawnMarkerFolder()
++            local folder = monsterSpawnMarkerFolder(kind)
+             for _, child in ipairs(folder:GetChildren()) do
+-                if child:IsA("Model") and child:GetAttribute("Game1MonsterSpawnMarker") == true then
++                if child:IsA("Model") and child:GetAttribute(if kind == "npc" then "Game1NpcSpawnMarker" else "Game1MonsterSpawnMarker") == true then
+                     child:Destroy()
+                 end
+             end
+@@ -990,7 +996,7 @@
+             for _, record in ipairs(typeof(data.records) == "table" and data.records or {}) do
+                 local recordPlaceId = tonumber(record.placeId) or 0
+                 if recordPlaceId == 0 or game.PlaceId == 0 or recordPlaceId == game.PlaceId then
+-                    createMonsterSpawnMarker(record, "registered")
++                    createMonsterSpawnMarker(record, "registered", kind)
+                     created += 1
+                     table.insert(syncedSpawnIds, tostring(record.spawnId or ""))
+                 else
+diff --git a/src/server/init.server.luau b/src/server/init.server.luau
+--- a/src/server/init.server.luau
++++ b/src/server/init.server.luau
+@@ -8,6 +8,7 @@
+ local CombatRoot = script:WaitForChild("combat")
+ local DevRoot = script:WaitForChild("dev")
+ local MonsterRoot = script:WaitForChild("monster")
++local NpcRoot = script:WaitForChild("npc")
+ local WorldRoot = script:WaitForChild("world")
+ 
+ local CharacterService = require(CharacterRoot:WaitForChild("CharacterService"))
+@@ -23,6 +24,7 @@
+ local MonsterDebugService = require(DevRoot:WaitForChild("MonsterDebugService"))
+ local MonsterSpawnerService = require(MonsterRoot:WaitForChild("MonsterSpawnerService"))
+ local MonsterAIService = require(MonsterRoot:WaitForChild("MonsterAIService"))
++local NpcSpawnerService = require(NpcRoot:WaitForChild("NpcSpawnerService"))
+ 
+ print(("[game1][server] %s v%s · runtime %s")
+     :format(ProjectInfo.Name, ProjectInfo.Version, RuntimeVersion.Version))
+@@ -36,6 +38,7 @@
+ CharacterService.Start()
+ MonsterSpawnerService.Start()
+ MonsterAIService.Start()
++NpcSpawnerService.Start()
+ MovementDebugService.Start()
+ MonsterDebugService.Start()
+ TestLoadoutService.Start()
+diff --git a/src/server/combat/EntityHitboxService.luau b/src/server/combat/EntityHitboxService.luau
+--- a/src/server/combat/EntityHitboxService.luau
++++ b/src/server/combat/EntityHitboxService.luau
+@@ -290,6 +290,7 @@
+     local parentName = binding.headParentBone and binding.headParentBone.Name or ""
+     local identity = tostring(
+         binding.entity:GetAttribute("MonsterSlug")
++        or binding.entity:GetAttribute("NpcSlug")
+         or binding.entity:GetAttribute("CharacterArchetype")
+         or binding.visual.Name
+     )
+diff --git a/src/server/npc/NpcSpawnerService.luau b/src/server/npc/NpcSpawnerService.luau
+new file mode 100644
+--- /dev/null
++++ b/src/server/npc/NpcSpawnerService.luau
+@@ -0,0 +1,221 @@
++-- Population + lifecycle orchestration for passive NPCs. AI/interaction/navigation belong to future services.
++local ReplicatedStorage = game:GetService("ReplicatedStorage")
++local ServerStorage = game:GetService("ServerStorage")
++local RunService = game:GetService("RunService")
++local Workspace = game:GetService("Workspace")
++local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
++local NpcShared = Shared:WaitForChild("npc")
++local NpcRegistry = require(NpcShared:WaitForChild("NpcRegistry"))
++local NpcAnimationRegistry = require(NpcShared:WaitForChild("NpcAnimationRegistry"))
++local NpcSpawnRegistry = require(script.Parent:WaitForChild("NpcSpawnRegistry"))
++local CombatRoot = script.Parent.Parent:WaitForChild("combat")
++local EntityHitboxService = require(CombatRoot:WaitForChild("EntityHitboxService"))
++local DeathLifecycleService = require(CombatRoot:WaitForChild("DeathLifecycleService"))
++local NpcRigFactory = require(script.Parent:WaitForChild("NpcRigFactory"))
++local NpcAnimationService = require(script.Parent:WaitForChild("NpcAnimationService"))
++
++local NpcSpawnerService = {}
++local started = false
++local states: {[string]: any} = {}
++local random = Random.new()
++
++local function folder(): Folder
++    local current = Workspace:FindFirstChild("NPCs")
++    if current and not current:IsA("Folder") then
++        error("Workspace.NPCs must be a Folder")
++    end
++    if not current then
++        current = Instance.new("Folder")
++        current.Name = "NPCs"
++        current.Parent = Workspace
++    end
++    return current :: Folder
++end
++
++local function modelAtPath(path: string): Model?
++    local parts = string.split(path, ".")
++    if parts[1] ~= "ServerStorage" then
++        return nil
++    end
++    local instance: Instance? = ServerStorage
++    for index = 2, #parts do
++        instance = if instance then instance:FindFirstChild(parts[index]) else nil
++        if not instance then
++            return nil
++        end
++    end
++    return if instance and instance:IsA("Model") then instance else nil
++end
++
++local function finite(value: any, fallback: number): number
++    local n = tonumber(value)
++    return if n and n == n and n > -math.huge and n < math.huge then n else fallback
++end
++
++local function spawnSurface(record: any): Vector3
++    local point = record.position or {}
++    local center = Vector3.new(finite(point.x, 0), finite(point.y, 0), finite(point.z, 0))
++    local radius = math.max(0, finite(record.spawnRadius, 0))
++    if radius > 0 then
++        local angle = random:NextNumber(0, 2 * math.pi)
++        local distance = radius * math.sqrt(random:NextNumber())
++        center += Vector3.new(math.cos(angle) * distance, 0, math.sin(angle) * distance)
++    end
++    local params = RaycastParams.new()
++    params.FilterType = Enum.RaycastFilterType.Exclude
++    local ignore: {Instance} = { folder() }
++    local authoring = Workspace:FindFirstChild("Game1Authoring")
++    if authoring then
++        table.insert(ignore, authoring)
++    end
++    local monsters = Workspace:FindFirstChild("Monsters")
++    if monsters then
++        table.insert(ignore, monsters)
++    end
++    params.FilterDescendantsInstances = ignore
++    params.RespectCanCollide = true
++    local hit = Workspace:Raycast(center + Vector3.new(0, 96, 0), Vector3.new(0, -384, 0), params)
++    return if hit then hit.Position else center
++end
++
++local function release(state: any, entity: Model, scheduleRespawn: boolean)
++    local entry = state.instances[entity]
++    if not entry then
++        return
++    end
++    state.instances[entity] = nil
++    DeathLifecycleService.Cancel(entity)
++    EntityHitboxService.Detach(entity)
++    if entity.Parent then
++        entity:Destroy()
++    end
++    if scheduleRespawn then
++        task.delay(math.max(0, finite(state.record.respawnSeconds, 10)), function()
++            if state.active then
++                state.fill()
++            end
++        end)
++    end
++end
++
++local function spawnOne(state: any): boolean
++    local record = state.record
++    local slug = tostring(record.monsterSlug or "") -- internal spawn serialization is shared with monsters
++    local definition = (NpcRegistry.npcs or {})[slug]
++    if not definition or definition.status ~= "PUBLISHED" then
++        warn("[game1][npc] NPC is missing or unpublished: " .. slug)
++        return false
++    end
++    local template = modelAtPath(tostring(definition.serverStoragePath or ""))
++    if not template then
++        warn("[game1][npc] NPC template is not synced to ServerStorage: " .. slug)
++        return false
++    end
++    local entity = template:Clone()
++    entity.Name = slug .. "_" .. tostring(random:NextInteger(100000, 999999))
++    entity.Parent = folder()
++    local visual, root = NpcRigFactory.Create(entity, spawnSurface(record), finite(record.yawDegrees, 0))
++    if not visual or not root then
++        entity:Destroy()
++        warn("[game1][npc] published model has no usable visual rig: " .. slug)
++        return false
++    end
++    local stats = definition.stats or {}
++    local hp = math.max(1, finite(stats.MaxHP, 100))
++    entity:SetAttribute("Game1NpcRuntime", true)
++    entity:SetAttribute("NpcSlug", slug)
++    entity:SetAttribute("NpcWeaponSet", "1hs")
++    entity:SetAttribute("SpawnId", tostring(record.spawnId or ""))
++    entity:SetAttribute("Damageable", true)
++    entity:SetAttribute("LifeState", "Alive")
++    entity:SetAttribute("InCombat", false)
++    entity:SetAttribute("CombatState", "Peace")
++    entity:SetAttribute("CombatUntilServerTime", 0)
++    entity:SetAttribute("HP", hp)
++    entity:SetAttribute("MaxHP", hp)
++    entity:SetAttribute("Damage", math.max(0, finite(stats.Damage, 10)))
++    entity:SetAttribute("Defense", math.max(0, finite(stats.Defense, 0)))
++    entity:SetAttribute("CritChance", math.clamp(finite(stats.CritChance, 0), 0, 100))
++    entity:SetAttribute("AttackSpeed", math.max(1, finite(stats.AttackSpeed, 100)))
++    entity:SetAttribute("RunSpeed", math.max(0, finite(stats.RunSpeed, 50)))
++    local hitbox = EntityHitboxService.Attach(entity, visual)
++    entity:SetAttribute("CombatHitboxCount", hitbox.count)
++    local profile = (NpcAnimationRegistry.profiles or {})[slug]
++    local presentation = NpcAnimationService.Create(entity, visual, profile)
++    local entry = { root = root, visual = visual, presentation = presentation, dying = false }
++    state.instances[entity] = entry
++    entity:GetAttributeChangedSignal("LifeState"):Connect(function()
++        if state.instances[entity] ~= entry then
++            return
++        end
++        if entity:GetAttribute("LifeState") == "Dying" and not entry.dying then
++            entry.dying = true
++            entity:SetAttribute("Damageable", false)
++            presentation.BeginDeath()
++        end
++    end)
++    entity.Destroying:Connect(function()
++        -- External removals still restore the authored population cap.
++        if state.instances[entity] == entry then
++            release(state, entity, true)
++        end
++    end)
++    return true
++end
++
++local function fill(state: any)
++    if not state.active or state.filling then
++        return
++    end
++    state.filling = true
++    local count = 0
++    for entity in pairs(state.instances) do
++        if entity.Parent then
++            count += 1
++        end
++    end
++    local target = math.clamp(math.floor(finite(state.record.maxAlive, 1)), 1, 1000)
++    while count < target and spawnOne(state) do
++        count += 1
++    end
++    state.filling = false
++end
++
++function NpcSpawnerService.Start()
++    if started then
++        return
++    end
++    started = true
++    folder()
++    local authoring = Workspace:FindFirstChild("Game1Authoring")
++    local markers = authoring and authoring:FindFirstChild("NpcSpawns")
++    if markers then
++        markers:Destroy()
++    end
++    RunService.PreAnimation:Connect(function(delta)
++        for _, state in pairs(states) do
++            for entity, entry in pairs(state.instances) do
++                if entry.dying and entry.presentation.Step(delta) then
++                    entity:SetAttribute("NpcAnimationState", "death_idle")
++                    DeathLifecycleService.BeginDeathIdle(entity, entry.root, entry.visual, function()
++                        release(state, entity, true)
++                    end)
++                end
++            end
++        end
++    end)
++    local count = 0
++    for _, record in ipairs(NpcSpawnRegistry.records or {}) do
++        local placeId = math.floor(finite(record.placeId, 0))
++        if record.enabled ~= false and (placeId == 0 or game.PlaceId == 0 or placeId == game.PlaceId) then
++            local state = { record = record, active = true, filling = false, instances = {} }
++            state.fill = function() fill(state) end
++            states[tostring(record.spawnId or count + 1)] = state
++            fill(state)
++            count += 1
++        end
++    end
++    print(("[game1][npc] %d spawn record(s) active"):format(count))
++end
++
++return table.freeze(NpcSpawnerService)
+diff --git a/src/server/npc/NpcRigFactory.luau b/src/server/npc/NpcRigFactory.luau
+new file mode 100644
+--- /dev/null
++++ b/src/server/npc/NpcRigFactory.luau
+@@ -0,0 +1,130 @@
++-- One responsibility: turn a published articulated FBX into a stationary, combat-queryable world actor.
++-- The visual is never used as a physics collider. Later navigation may replace the anchored world root.
++local NpcRigFactory = {}
++
++local function visibleBounds(model: Model): (CFrame, Vector3)
++    local low = Vector3.new(math.huge, math.huge, math.huge)
++    local high = Vector3.new(-math.huge, -math.huge, -math.huge)
++    local found = false
++    for _, item in ipairs(model:GetDescendants()) do
++        if item:IsA("BasePart") and item.Name ~= "RootPart" and item.Name ~= "RootCollider" then
++            found = true
++            local h = item.Size * 0.5
++            for x = -1, 1, 2 do
++                for y = -1, 1, 2 do
++                    for z = -1, 1, 2 do
++                        local v = item.CFrame:PointToWorldSpace(Vector3.new(h.X * x, h.Y * y, h.Z * z))
++                        low = Vector3.new(math.min(low.X, v.X), math.min(low.Y, v.Y), math.min(low.Z, v.Z))
++                        high = Vector3.new(math.max(high.X, v.X), math.max(high.Y, v.Y), math.max(high.Z, v.Z))
++                    end
++                end
++            end
++        end
++    end
++    if not found then
++        return model:GetBoundingBox()
++    end
++    return CFrame.new((low + high) * 0.5), high - low
++end
++
++local function bridgeRootBones(visual: Model): number
++    -- The Studio FBX animation export expects a synthetic RootBone above the authored roots.
++    local count = 0
++    for _, item in ipairs(visual:GetDescendants()) do
++        if item:IsA("MeshPart") then
++            local topBones = {}
++            local rootBone: Bone? = nil
++            for _, child in ipairs(item:GetChildren()) do
++                if child:IsA("Bone") then
++                    if child.Name == "RootBone" then
++                        rootBone = child
++                    else
++                        table.insert(topBones, child)
++                    end
++                end
++            end
++            if #topBones > 0 then
++                if not rootBone then
++                    rootBone = Instance.new("Bone")
++                    rootBone.Name = "RootBone"
++                    rootBone.CFrame = CFrame.identity
++                    rootBone.Parent = item
++                    count += 1
++                end
++                for _, bone in ipairs(topBones) do
++                    local relative = bone.CFrame
++                    bone.Parent = rootBone
++                    bone.CFrame = rootBone.CFrame:Inverse() * relative
++                end
++            end
++        end
++    end
++    return count
++end
++
++function NpcRigFactory.Create(model: Model, surface: Vector3, yawDegrees: number): (Model?, BasePart?)
++    local visual = model:FindFirstChild("ImportedRig")
++    if not visual or not visual:IsA("Model") then
++        visual = model
++    end
++    for _, item in ipairs(model:GetDescendants()) do
++        if item:IsA("BasePart") then
++            item.Anchored = false
++            item.CanCollide = false
++            item.CanTouch = false
++            item.CanQuery = false
++            item.Massless = true
++        elseif item:IsA("Humanoid") then
++            item:Destroy()
++        end
++    end
++    local visualRoot = visual:FindFirstChild("RootPart", true)
++        or visual.PrimaryPart
++        or visual:FindFirstChildWhichIsA("MeshPart", true)
++        or visual:FindFirstChildWhichIsA("BasePart", true)
++    if not visualRoot or not visualRoot:IsA("BasePart") then
++        return nil, nil
++    end
++    model:PivotTo(CFrame.new(surface) * CFrame.Angles(0, math.rad(yawDegrees), 0) * model:GetPivot().Rotation)
++    local boundsFrame, boundsSize = visibleBounds(visual)
++    model:PivotTo(model:GetPivot() + Vector3.new(0, surface.Y - (boundsFrame.Position.Y - boundsSize.Y * 0.5), 0))
++    boundsFrame, boundsSize = visibleBounds(visual)
++
++    local root = Instance.new("Part")
++    root.Name = "NavigationRoot"
++    root.Size = Vector3.new(2, 2, 1)
++    root.CFrame = CFrame.new(surface + Vector3.new(0, 2.8, 0)) * CFrame.Angles(0, math.rad(yawDegrees), 0)
++    root.Anchored = true -- NPCs do not move autonomously in the initial 1hs phase.
++    root.Transparency = 1
++    root.CanCollide = false
++    root.CanQuery = false
++    root.CanTouch = false
++    root.CastShadow = false
++    root.Parent = model
++
++    local collider = Instance.new("Part")
++    collider.Name = "RootCollider"
++    collider.Size = Vector3.new(math.max(0.5, boundsSize.X), math.max(0.5, boundsSize.Y), math.max(0.5, boundsSize.Z))
++    collider.CFrame = boundsFrame
++    collider.Anchored = false
++    collider.Transparency = 1
++    collider.CanCollide = false
++    collider.CanQuery = true -- bone-aligned hitbox cache uses this stable root space.
++    collider.CanTouch = false
++    collider.Massless = true
++    collider.Parent = model
++
++    local colliderWeld = Instance.new("WeldConstraint")
++    colliderWeld.Part0 = root
++    colliderWeld.Part1 = collider
++    colliderWeld.Parent = root
++    local visualWeld = Instance.new("WeldConstraint")
++    visualWeld.Part0 = collider
++    visualWeld.Part1 = visualRoot
++    visualWeld.Parent = collider
++    model.PrimaryPart = root
++    model:SetAttribute("RuntimeAnimationRootBridgeCount", bridgeRootBones(visual))
++    return visual, root
++end
++
++return table.freeze(NpcRigFactory)
+diff --git a/src/server/npc/NpcAnimationService.luau b/src/server/npc/NpcAnimationService.luau
+new file mode 100644
+--- /dev/null
++++ b/src/server/npc/NpcAnimationService.luau
+@@ -0,0 +1,132 @@
++-- Actor presentation only. Does not know about spawn quotas, damage calculations or authoring.
++local ReplicatedStorage = game:GetService("ReplicatedStorage")
++local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
++local DeathAnimationPolicy = require(Shared:WaitForChild("combat"):WaitForChild("DeathAnimationPolicy"))
++local AnimationSpeedScaling = require(Shared:WaitForChild("animation"):WaitForChild("AnimationSpeedScaling"))
++
++local NpcAnimationService = {}
++
++local function pick(profile: any?, slot: string): any?
++    local slots = profile and profile.slots
++    local rows = slots and slots[slot]
++    if typeof(rows) ~= "table" then
++        return nil
++    end
++    for _, row in ipairs(rows) do
++        if tostring(row.weaponSet or "1hs") == "1hs"
++            and tostring(row.animationId or ""):match("^rbxassetid://%d+$") then
++            return row
++        end
++    end
++    return nil
++end
++
++local function loadTrack(animator: Animator, row: any?, looped: boolean): AnimationTrack?
++    if not row then
++        return nil
++    end
++    local asset = Instance.new("Animation")
++    asset.AnimationId = tostring(row.animationId)
++    local success, track = pcall(function()
++        return animator:LoadAnimation(asset)
++    end)
++    asset:Destroy()
++    if not success then
++        warn("[game1][npc] animation could not load: " .. tostring(track))
++        return nil
++    end
++    track.Looped = looped
++    track.Priority = if looped then Enum.AnimationPriority.Idle else Enum.AnimationPriority.Action
++    return track
++end
++
++function NpcAnimationService.Create(entity: Model, visual: Model, profile: any?): any
++    local controller = visual:FindFirstChildOfClass("AnimationController")
++        or visual:FindFirstChildWhichIsA("AnimationController", true)
++    if not controller then
++        controller = Instance.new("AnimationController")
++        controller.Name = "AnimationController"
++        controller.Parent = visual
++    end
++    for _, child in ipairs(entity:GetDescendants()) do
++        if child:IsA("AnimationController") and child ~= controller then
++            child:Destroy()
++        end
++    end
++    local animator = controller:FindFirstChildOfClass("Animator")
++    if not animator then
++        animator = Instance.new("Animator")
++        animator.Parent = controller
++    end
++    local idle = loadTrack(animator, pick(profile, "idle"), true)
++    local combatIdle = loadTrack(animator, pick(profile, "combat_idle"), true)
++    local death = loadTrack(animator, pick(profile, "death"), false)
++    local current: AnimationTrack? = nil
++    local dying = false
++    local finished = false
++    local deathStartedAt = 0
++    local function stop(track: AnimationTrack?)
++        if track and track.IsPlaying then
++            track:Stop(0.1)
++        end
++    end
++    local function playIdle()
++        if dying then
++            return
++        end
++        local nextTrack = if entity:GetAttribute("InCombat") == true then (combatIdle or idle) else idle
++        if current == nextTrack then
++            return
++        end
++        stop(current)
++        current = nextTrack
++        entity:SetAttribute("NpcAnimationState", if nextTrack == combatIdle and combatIdle then "combat_idle" else "idle")
++        if nextTrack then
++            local speed = AnimationSpeedScaling.ResolveForModel(entity, "idle") / 100
++            nextTrack:Play(0.12, 1, speed)
++        end
++    end
++    local function beginDeath()
++        if dying then
++            return
++        end
++        dying = true
++        deathStartedAt = os.clock()
++        stop(current)
++        current = nil
++        entity:SetAttribute("NpcAnimationState", "death")
++        entity:SetAttribute("DeathAnimationStartedAt", os.clock())
++        if death then
++            DeathAnimationPolicy.Start(death, AnimationSpeedScaling.ResolveForModel(entity, "death") / 100)
++        end
++    end
++    local function step(delta: number): boolean
++        if not dying or finished then
++            return false
++        end
++        if not death then
++            finished = true
++            return true
++        end
++        local reached, terminalTime = DeathAnimationPolicy.LatchVisibleTerminalPose(death, delta)
++        -- A failed Roblox asset load must never monopolize a population slot forever.
++        if not reached and death.Length <= 0 and os.clock() - deathStartedAt >= 8 then
++            warn("[game1][npc] death animation failed to resolve within 8s; releasing corpse lifecycle: " .. entity.Name)
++            finished = true
++            return true
++        end
++        if reached then
++            finished = true
++            entity:SetAttribute("DeathAnimationLength", death.Length)
++            entity:SetAttribute("DeathAnimationTerminalTime", terminalTime)
++            entity:SetAttribute("DeathTerminalPoseHeld", true)
++            return true
++        end
++        return false
++    end
++    entity:GetAttributeChangedSignal("InCombat"):Connect(playIdle)
++    playIdle()
++    return { BeginDeath = beginDeath, Step = step }
++end
++
++return table.freeze(NpcAnimationService)
+diff --git a/src/server/npc/NpcSpawnRegistry.luau b/src/server/npc/NpcSpawnRegistry.luau
+new file mode 100644
+--- /dev/null
++++ b/src/server/npc/NpcSpawnRegistry.luau
+@@ -0,0 +1,4 @@
++-- generated. do not edit by hand.
++local HttpService = game:GetService("HttpService")
++local data = HttpService:JSONDecode([==[{"project":"game1","records":[],"schemaVersion":1,"sourceDigest":"4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}]==])
++return table.freeze(data)
+diff --git a/src/shared/npc/NpcRegistry.luau b/src/shared/npc/NpcRegistry.luau
+new file mode 100644
+--- /dev/null
++++ b/src/shared/npc/NpcRegistry.luau
+@@ -0,0 +1,7 @@
++-- generated. do not edit by hand.
++return table.freeze({
++	schemaVersion = 1,
++	project = "game1",
++	npcs = table.freeze({
++	}),
++})
+diff --git a/src/shared/npc/NpcAnimationRegistry.luau b/src/shared/npc/NpcAnimationRegistry.luau
+new file mode 100644
+--- /dev/null
++++ b/src/shared/npc/NpcAnimationRegistry.luau
+@@ -0,0 +1,7 @@
++-- generated. do not edit by hand.
++return table.freeze({
++	schemaVersion = 1,
++	project = "game1",
++	profiles = table.freeze({
++	}),
++})
+diff --git a/assets/manifests/npcs.json b/assets/manifests/npcs.json
+new file mode 100644
+--- /dev/null
++++ b/assets/manifests/npcs.json
+@@ -0,0 +1,31 @@
++{
++  "schemaVersion": 1,
++  "project": "game1",
++  "options": {
++    "statKeys": [
++      "MaxHP",
++      "Damage",
++      "AttackSpeed",
++      "RunSpeed",
++      "CritChance"
++    ],
++    "defaultStats": {
++      "MaxHP": 100,
++      "Damage": 10,
++      "AttackSpeed": 100,
++      "RunSpeed": 50,
++      "CritChance": 0
++    },
++    "defaultBehavior": {
++      "aggressive": false,
++      "aggroRadiusStuds": 16.0,
++      "attackRadiusStuds": 3.0
++    }
++  },
++  "items": [],
++  "summary": {
++    "registered": 0,
++    "published": 0,
++    "changed": 0
++  }
++}
+diff --git a/assets/manifests/npc-animations.json b/assets/manifests/npc-animations.json
+new file mode 100644
+--- /dev/null
++++ b/assets/manifests/npc-animations.json
+@@ -0,0 +1,82 @@
++{
++  "schemaVersion": 1,
++  "project": "game1",
++  "slotCatalog": [
++    {
++      "group": "stance",
++      "slot": "idle",
++      "state": "idle",
++      "role": "base",
++      "label": "idle · base",
++      "looped": true,
++      "priority": "Idle",
++      "variants": false
++    },
++    {
++      "group": "stance",
++      "slot": "idle_special",
++      "state": "idle",
++      "role": "special",
++      "label": "idle · special",
++      "looped": false,
++      "priority": "Idle",
++      "variants": true
++    },
++    {
++      "group": "movement",
++      "slot": "walk",
++      "state": "walk",
++      "role": "base",
++      "label": "walk",
++      "looped": true,
++      "priority": "Movement",
++      "variants": false
++    },
++    {
++      "group": "movement",
++      "slot": "run",
++      "state": "run",
++      "role": "base",
++      "label": "run",
++      "looped": true,
++      "priority": "Movement",
++      "variants": false
++    },
++    {
++      "group": "combat",
++      "slot": "combat_idle",
++      "state": "combat_idle",
++      "role": "base",
++      "label": "combat idle",
++      "looped": true,
++      "priority": "Idle",
++      "variants": false
++    },
++    {
++      "group": "combat",
++      "slot": "attack",
++      "state": "attack",
++      "role": "variant",
++      "label": "attack",
++      "looped": false,
++      "priority": "Action",
++      "variants": true
++    },
++    {
++      "group": "life",
++      "slot": "death",
++      "state": "death",
++      "role": "base",
++      "label": "death",
++      "looped": false,
++      "priority": "Action",
++      "variants": false
++    }
++  ],
++  "weaponSets": [
++    "1hs"
++  ],
++  "profiles": [],
++  "clips": [],
++  "bindings": []
++}
+diff --git a/assets/manifests/npc-spawns.json b/assets/manifests/npc-spawns.json
+new file mode 100644
+--- /dev/null
++++ b/assets/manifests/npc-spawns.json
+@@ -0,0 +1,5 @@
++{
++  "schemaVersion": 1,
++  "project": "game1",
++  "records": {}
++}
+diff --git a/system/verify/test_npc_pipeline.py b/system/verify/test_npc_pipeline.py
+new file mode 100644
+--- /dev/null
++++ b/system/verify/test_npc_pipeline.py
+@@ -0,0 +1,115 @@
++"""Offline contract tests for NPC authoring: no Studio, Roblox, network or project DB required."""
++from __future__ import annotations
++
++from pathlib import Path
++import json
++import sqlite3
++import sys
++import tempfile
++import unittest
++
++sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "control-center"))
++from monster_store import MonsterStore
++from monster_animation_store import MonsterAnimationStore, classify
++from monster_spawn_store import MonsterSpawnStore
++
++
++class NpcPipelineTests(unittest.TestCase):
++    def setUp(self):
++        self.temp = tempfile.TemporaryDirectory(prefix="game1-npc-contract-")
++        self.root = Path(self.temp.name)
++        self.npcs = MonsterStore(self.root, kind="npc")
++        self.monsters = MonsterStore(self.root, kind="monster")
++        self.npc_animations = MonsterAnimationStore(self.root, kind="npc")
++        self.bridge_calls = []
++
++        def bridge(action, **kwargs):
++            self.bridge_calls.append((action, kwargs))
++            if action == "place":
++                return {"mapKey": kwargs["map_key"], "placeId": 17, "position": {"x": 4, "y": 10, "z": 6}, "yawDegrees": 45}
++            if action == "sync":
++                return {"syncedSpawnIds": [row["spawnId"] for row in kwargs["records"]], "synchronized": True}
++            return {"synchronized": True}
++
++        self.spawns = MonsterSpawnStore(self.root, self.npcs, self.npc_animations, bridge, kind="npc")
++
++    def tearDown(self):
++        self.temp.cleanup()
++
++    def seed_npc(self):
++        with sqlite3.connect(self.npcs.db) as db:
++            db.execute(
++                """INSERT INTO monsters(slug,name_en,model_source_path,model_sha256,model_asset_id,
++                    model_published_sha256,created_at,updated_at,skeleton_signature)
++                    VALUES(?,?,?,?,?,?,?,?,?)""",
++                ("blacksmith", "Blacksmith", "assets/source/npcs/blacksmith/model/blacksmith.fbx",
++                 "sha-model", "12345", "sha-model", 1.0, 1.0, "rig-1"),
++            )
++        self.npcs.export()
++        self.npc_animations._sync_profiles()
++
++    def seed_clips(self):
++        animation_folder = self.root / "animation-inbox"
++        animation_folder.mkdir(parents=True, exist_ok=True)
++        for slot in ("idle", "death", "attack_01"):
++            (animation_folder / f"blacksmith_1hs_{slot}.rbxm").write_bytes(slot.encode())
++        scan = self.npc_animations.scan_folder("blacksmith", str(animation_folder))
++        self.assertEqual(scan["recognized"], 3)
++        self.assertEqual(scan["created"], 3)
++        with sqlite3.connect(self.npcs.db) as db:
++            db.execute("UPDATE monster_animation_clips SET asset_id='54321', published_sha256=sha256")
++        self.npc_animations.export()
++
++    def test_storage_and_registry_namespaces_are_isolated(self):
++        self.seed_npc()
++        self.assertEqual(len(self.npcs.list()), 1)
++        self.assertEqual(self.monsters.list(), [])
++        self.assertEqual(self.npcs.get("blacksmith")["status"], "PUBLISHED")
++        registry = (self.root / "src/shared/npc/NpcRegistry.luau").read_text()
++        self.assertIn('npcs = table.freeze({', registry)
++        self.assertIn('ServerStorage.npcs.blacksmith.model.blacksmith', registry)
++        self.assertEqual(self.npcs.db.name, "game1_npcs.db")
++        self.assertEqual(self.monsters.db.name, "game1.db")
++
++    def test_1hs_filename_binding_and_published_readiness(self):
++        self.seed_npc()
++        self.seed_clips()
++        self.assertEqual(classify(Path("blacksmith_1hs_attack_02.rbxm"), "blacksmith", npc=True)["slot"], "attack")
++        self.assertEqual(classify(Path("blacksmith_2hs_idle.rbxm"), "blacksmith", npc=True), None)
++        self.assertTrue(self.spawns.readiness("blacksmith")["ready"])
++        registry = (self.root / "src/shared/npc/NpcAnimationRegistry.luau").read_text()
++        self.assertIn('weaponSet = "1hs"', registry)
++        self.assertIn('rbxassetid://54321', registry)
++        self.assertEqual(self.npc_animations.snapshot("blacksmith")["weaponSets"], ["1hs"])
++
++    def test_spawn_contract_delete_and_population_limits(self):
++        self.seed_npc()
++        self.seed_clips()
++        draft = self.spawns.place({"monsterSlug": "blacksmith", "mapKey": "main"})["draft"]
++        self.assertTrue(draft["spawnId"].startswith("spawn-"))
++        result = self.spawns.register({**draft, "respawnSeconds": 7, "spawnRadius": 4, "maxAlive": 2})
++        self.assertEqual(result["record"]["maxAlive"], 2)
++        self.assertEqual(self.spawns.snapshot()["recordCount"], 1)
++        self.assertEqual(len(self.spawns.monster_usage("blacksmith")), 1)
++        manifest = json.loads((self.root / "assets/manifests/npc-spawns.json").read_text())
++        self.assertEqual(len(manifest["records"]), 1)
++        registry = (self.root / "src/server/npc/NpcSpawnRegistry.luau").read_text()
++        self.assertIn('"respawnSeconds":7.0', registry)
++        self.assertIn('"maxAlive":2', registry)
++        self.assertTrue(self.spawns.validate()["ok"])
++        self.spawns.delete({"spawnId": draft["spawnId"]})
++        self.assertEqual(self.spawns.snapshot()["recordCount"], 0)
++
++    def test_invalid_input_fails_closed(self):
++        self.seed_npc()
++        self.seed_clips()
++        draft = self.spawns.place({"monsterSlug": "blacksmith"})["draft"]
++        for changes in ({"maxAlive": 0}, {"maxAlive": 1001}, {"spawnRadius": -1},
++                        {"respawnSeconds": -1}, {"position": {"x": float("nan"), "y": 0, "z": 1}}):
++            with self.subTest(changes=changes), self.assertRaises(ValueError):
++                self.spawns.register({**draft, **changes})
++        self.assertEqual(self.spawns.snapshot()["recordCount"], 0)
++
++
++if __name__ == "__main__":
++    unittest.main(verbosity=2)
+diff --git a/docs/NPC_ARCHITECTURE_M59_RU.md b/docs/NPC_ARCHITECTURE_M59_RU.md
+new file mode 100644
+--- /dev/null
++++ b/docs/NPC_ARCHITECTURE_M59_RU.md
+@@ -0,0 +1,22 @@
++# NPC subsystem · M59 (1hs)
++
++## Границы ответственности
++
++- **Asset Manager / authoring**: `host_agent.py` и отдельные UI-файлы `npc-assets.js`, `npc-spawns.js`; NPC публикуются через уже существующий Open Cloud pipeline. Их записи хранятся в `.control-center/game1_npcs.db` и не смешиваются с монстрами/персонажами.
++- **Published contracts**: `assets/manifests/npcs.json`, `npc-animations.json`, `npc-spawns.json`; экспортируются в `NpcRegistry`, `NpcAnimationRegistry`, `NpcSpawnRegistry`. Сервер использует эти read-only регистры, не обращается к HTTP/SQLite.
++- **Studio authoring**: общий транспорт `studio_bridge.py`; команды размечены `entityKind=npc`. Маркеры располагаются отдельно в `Workspace.Game1Authoring.NpcSpawns`. NPC-ассеты — в `ServerStorage.npcs.<slug>.model.<slug>`. Обновление допускается только для шаблонов с `Game1NpcRig=true`.
++- **Spawner**: `NpcSpawnerService` авторитетно управляет популяцией (`maxAlive`, `spawnRadius`, `placeId`, `respawnSeconds`). Возрождение начинается после исчезновения тела, и не превышает локальный лимит. Каждый экземпляр существует только на сервере и имеет уникальный runtime identity.
++- **Presentation**: `NpcRigFactory` отвечает за визуальную сборку, `NpcAnimationService` — за анимационный lifecycle. Спавнеру неизвестны детали костей и треков.
++- **Combat**: общий `EntityHitboxService` + `DamageService` определяют попадания и HP; NPC имеют `NpcSlug`, `Damageable`, `LifeState`, `HP`, `MaxHP`. После `Dying` используется общий `DeathLifecycleService`. NPC никогда не регистрируются в агро/AI монстров.
++
++## Контракт первой итерации
++
++Только профиль оружия `1hs`: `idle`, `idle_special_01..n`, `walk`, `run`, `combat_idle`, `attack_01..n`, `death`. Для разрешения постановки на точку требуются опубликованные `idle` и `death` плюс модель NPC. Остальные слоты можно зарегистрировать/опубликовать сейчас, но они будут использоваться будущим отдельным NPC movement/AI компонентом. NPC статичны, пассивны, уязвимы для атак игроков, умирают, исчезают и возрождаются. Квесты, торговля, диалоги, дружелюбные/враждебные фракции и активные атаки NPC в M59 **не реализованы**.
++
++## Важные инварианты
++
++1. `npcs.db` не содержит записей Monster DB; `assets/source/npcs` — отдельный источник FBX.
++2. Отдельные `NpcSlug`/`Game1NpcRig`; никакой `MonsterSlug` на NPC runtime. Внутренние поля serialized spawn store (`monsterSlug`) сохранены ради повторного использования существующего валидатора и транспортного контракта; не означают тип сущности.
++3. Никакая авторская точка не порождает модель, пока шаблон не опубликован и не скопирован в Studio. Для обновления опубликованного FBX создаётся новый Roblox Asset ID.
++4. Studio Plugin необходимо пересобрать и перезапустить Studio после M59, но **Rojo-сервер не нужно перезапускать**.
++5. Проверки без Studio: `python system/verify/verify.py` + `python system/verify/test_npc_pipeline.py`. Отдельно проверять runtime в Studio: регистрацию, FBX/анимации, marker sync, получаемый урон, позу смерти, удаление тела и количество NPC после respawn.

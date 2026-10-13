@@ -8,6 +8,7 @@ import shutil
 import time
 
 from sqlite_connection import connect as connect_sqlite
+from npc_animation_taxonomy import WEAPON_SETS, filename as npc_filename, parse as npc_parse, validate_rename
 
 from opencloud_assets import create_animation_asset, wait_for_operation
 from animation_reimport_check import find_confirmed_manual_reimport
@@ -45,8 +46,13 @@ def classify(path: Path, slug: str, npc: bool = False) -> dict | None:
     prefix = _safe_token(slug) + "_"
     if prefix and stem.startswith(prefix):
         stem = stem[len(prefix):]
-    if npc and stem.startswith("1hs_"):
-        stem = stem[4:]
+    weapon_set = ""
+    if npc:
+        parsed = npc_parse(path.name, slug)
+        if not parsed:
+            return None
+        weapon_set = parsed["weaponSet"]
+        stem = parsed["slot"] + ("_%02d" % parsed["variant"] if parsed["variant"] else "")
     body, variant = _parse_variant(stem)
     aliases = {
         "idle": "idle",
@@ -84,7 +90,7 @@ def classify(path: Path, slug: str, npc: bool = False) -> dict | None:
         variant = max(1, variant)
     else:
         variant = 0
-    return {"slot": slot, "variant": variant, **definition}
+    return {"slot": slot, "variant": variant, "weaponSet": weapon_set, **definition}
 
 
 def filename_rules(slug: str, npc: bool = False) -> list[dict]:
@@ -97,7 +103,7 @@ def filename_rules(slug: str, npc: bool = False) -> list[dict]:
             **definition,
             "state": definition.get("state") or definition["slot"],
             "variantPattern": "01..n" if definition.get("variants") else "",
-            "canonicalFilename": f"{prefix}_{'1hs_' if npc else ''}{definition['slot']}{suffix}.rbxm" if prefix else f"{definition['slot']}{suffix}.rbxm",
+            "canonicalFilename": npc_filename(prefix, "base", definition["slot"], variant) if npc else f"{prefix}_{definition['slot']}{suffix}.rbxm",
         })
     return rows
 
@@ -197,7 +203,37 @@ class MonsterAnimationStore:
                     "ALTER TABLE monster_animation_bindings ADD COLUMN playback_speed_percent INTEGER NOT NULL DEFAULT 100"
                 )
             self._migrate_combat_idle(connection)
+            if self.kind == "npc":
+                self._migrate_npc_categories(connection)
         self._normalize_source_only_files()
+
+    @staticmethod
+    def _migrate_npc_categories(connection):
+        """Replace old uniqueness (actor,slot,variant) with (actor,set,slot,variant).
+
+        Existing IDs, animation asset IDs and publication histories are retained.
+        """
+        columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(monster_animation_bindings)")}
+        if "weapon_set" in columns:
+            return
+        connection.execute("""CREATE TABLE monster_animation_bindings_m67(
+            id TEXT PRIMARY KEY, monster_slug TEXT NOT NULL, slot TEXT NOT NULL,
+            variant INTEGER NOT NULL DEFAULT 0, clip_id TEXT NOT NULL,
+            weight INTEGER NOT NULL DEFAULT 100,
+            playback_speed_percent INTEGER NOT NULL DEFAULT 100,
+            looped INTEGER NOT NULL DEFAULT 0, priority TEXT NOT NULL DEFAULT 'Movement',
+            created_at REAL NOT NULL, updated_at REAL NOT NULL,
+            weapon_set TEXT NOT NULL DEFAULT '1hs', disarm INTEGER NOT NULL DEFAULT 0,
+            UNIQUE(monster_slug,weapon_set,slot,variant)
+        )""")
+        connection.execute("""INSERT INTO monster_animation_bindings_m67(
+            id,monster_slug,slot,variant,clip_id,weight,playback_speed_percent,
+            looped,priority,created_at,updated_at,weapon_set,disarm)
+            SELECT id,monster_slug,slot,variant,clip_id,weight,playback_speed_percent,
+            looped,priority,created_at,updated_at,'1hs',0
+            FROM monster_animation_bindings""")
+        connection.execute("DROP TABLE monster_animation_bindings")
+        connection.execute("ALTER TABLE monster_animation_bindings_m67 RENAME TO monster_animation_bindings")
 
     def _normalize_source_only_files(self) -> None:
         """Keep canonical monster animation metadata bound to assets/source only."""
@@ -328,9 +364,23 @@ class MonsterAnimationStore:
         slot = binding["slot"]
         variant = int(binding["variant"])
         suffix = f"_{variant:02d}" if variant else ""
-        stem = f"{slot}{suffix}"
-        clip_id = f"{self.kind}__{slug}__{slot}__{variant:02d}"
+        weapon_set = binding.get("weaponSet", "1hs") if self.kind == "npc" else ""
+        stem = f"{weapon_set + '_' if weapon_set else ''}{slot}{suffix}"
+        clip_id = f"{self.kind}__{slug}__{weapon_set + '__' if weapon_set else ''}{slot}__{variant:02d}"
+        if self.kind == "npc" and weapon_set == "1hs":
+            legacy_id = f"npc__{slug}__{slot}__{variant:02d}"
+            if connection.execute("SELECT 1 FROM monster_animation_clips WHERE id=?", (legacy_id,)).fetchone():
+                clip_id = legacy_id
         binding_id = "binding__" + clip_id
+        if self.kind == "npc":
+            # Coordinate identity wins over filename identity after an in-place
+            # rename: re-scanning must retain the published clip id/history.
+            existing = connection.execute("""SELECT id,clip_id FROM monster_animation_bindings
+                WHERE monster_slug=? AND weapon_set=? AND slot=? AND variant=?""",
+                (slug,weapon_set,slot,variant)).fetchone()
+            if existing:
+                clip_id = str(existing["clip_id"])
+                binding_id = str(existing["id"])
         relative = Path(f"{self.kind}s") / slug / "animations" / f"{stem}{source.suffix.lower()}"
         source_target = self.root / "assets/source" / relative
         prepared_target = source_target
@@ -365,12 +415,21 @@ class MonsterAnimationStore:
                     (stem, source_target.relative_to(self.root).as_posix(), prepared_target.relative_to(self.root).as_posix(), digest, source_sha, revision, now, clip_id),
                 )
             outcome = "changed" if content_changed else "unchanged"
-        connection.execute(
-            """INSERT INTO monster_animation_bindings(id,monster_slug,slot,variant,clip_id,weight,looped,priority,created_at,updated_at)
-               VALUES(?,?,?,?,?,?,?,?,?,?)
-               ON CONFLICT(monster_slug,slot,variant) DO UPDATE SET clip_id=excluded.clip_id,looped=excluded.looped,priority=excluded.priority,updated_at=excluded.updated_at""",
-            (binding_id, slug, slot, variant, clip_id, 100, 1 if binding["looped"] else 0, binding["priority"], now, now),
-        )
+        if self.kind == "npc":
+            connection.execute(
+                """INSERT INTO monster_animation_bindings(id,monster_slug,slot,variant,clip_id,weight,looped,priority,created_at,updated_at,weapon_set,disarm)
+                   VALUES(?,?,?,?,?,?,?,?,?,?,?,0)
+                   ON CONFLICT(monster_slug,weapon_set,slot,variant)
+                   DO UPDATE SET clip_id=excluded.clip_id,looped=excluded.looped,priority=excluded.priority,updated_at=excluded.updated_at""",
+                (binding_id, slug, slot, variant, clip_id, 100, int(binding["looped"]), binding["priority"], now, now, weapon_set),
+            )
+        else:
+            connection.execute(
+                """INSERT INTO monster_animation_bindings(id,monster_slug,slot,variant,clip_id,weight,looped,priority,created_at,updated_at)
+                   VALUES(?,?,?,?,?,?,?,?,?,?)
+                   ON CONFLICT(monster_slug,slot,variant) DO UPDATE SET clip_id=excluded.clip_id,looped=excluded.looped,priority=excluded.priority,updated_at=excluded.updated_at""",
+                (binding_id, slug, slot, variant, clip_id, 100, int(binding["looped"]), binding["priority"], now, now),
+            )
         return outcome, {"filename": source.name, "clipId": clip_id, **binding}
 
     def scan_folder(self, slug: str, folder: str) -> dict:
@@ -392,7 +451,7 @@ class MonsterAnimationStore:
             if binding is None:
                 unassigned.append({"path": str(path), "filename": path.name, "reason": "name does not match a monster animation state"})
                 continue
-            coordinate = (binding["slot"], int(binding["variant"]))
+            coordinate = (binding.get("weaponSet", ""), binding["slot"], int(binding["variant"]))
             if coordinate in coordinates:
                 raise ValueError(f"monster animation scan is ambiguous: {coordinates[coordinate].name} and {path.name} map to {coordinate[0]} {coordinate[1]:02d}")
             coordinates[coordinate] = path
@@ -417,7 +476,7 @@ class MonsterAnimationStore:
             "created": created, "changed": changed, "unchanged": unchanged, "items": imported, "unassigned": unassigned,
         }
 
-    def assign_file(self, slug: str, source_path: str, slot: str, variant: int = 0) -> dict:
+    def assign_file(self, slug: str, source_path: str, slot: str, variant: int = 0, weapon_set: str = "1hs") -> dict:
         self._monster(slug)
         profile = self._profile(slug)
         source = Path(str(source_path or "")).expanduser().resolve()
@@ -435,6 +494,10 @@ class MonsterAnimationStore:
         definition = SLOT_BY_NAME[slot]
         variant = max(1, int(variant or 0)) if definition.get("variants") else 0
         binding = {"slot": slot, "variant": variant, **definition}
+        if self.kind == "npc":
+            if weapon_set not in WEAPON_SETS:
+                raise ValueError(f"unknown NPC animation subtype: {weapon_set}")
+            binding["weaponSet"] = weapon_set
         now = time.time()
         with self.connect() as connection:
             outcome, item = self._register(connection, slug, source, binding, now)
@@ -452,9 +515,10 @@ class MonsterAnimationStore:
         if not slug:
             return []
         with self.connect() as connection:
+            extra = "b.weapon_set,b.disarm," if self.kind == "npc" else ""
             rows = connection.execute(
-                """SELECT b.id AS binding_id,b.monster_slug,b.slot,b.variant,b.clip_id,b.weight,b.looped,b.priority,
-                          c.name,c.source_path,c.prepared_path,c.sha256,c.source_sha256,c.duplicate_first_frame_at_end,c.asset_id,c.published_sha256,c.moderation_state,c.revision,c.published_at
+                f"""SELECT b.id AS binding_id,b.monster_slug,b.slot,b.variant,b.clip_id,b.weight,b.looped,b.priority,
+                          {extra}c.name,c.source_path,c.prepared_path,c.sha256,c.source_sha256,c.duplicate_first_frame_at_end,c.asset_id,c.published_sha256,c.moderation_state,c.revision,c.published_at
                    FROM monster_animation_bindings b JOIN monster_animation_clips c ON c.id=b.clip_id
                    WHERE b.monster_slug=? ORDER BY b.slot,b.variant""",
                 (slug,),
@@ -465,6 +529,10 @@ class MonsterAnimationStore:
             definition = SLOT_BY_NAME.get(str(value.get("slot") or ""), {})
             value["state"] = str(definition.get("state") or value.get("slot") or "")
             value["role"] = str(definition.get("role") or "base")
+            if self.kind == "npc":
+                value["weaponSet"] = value["weapon_set"]
+                value["disarm"] = bool(value["disarm"])
+                value["canonicalFilename"] = npc_filename(slug, value["weapon_set"], value["slot"], value["variant"], Path(value["source_path"]).suffix)
             value["status"] = self._status(value)
             value["looped"] = bool(value.get("looped"))
             value["duplicate_first_frame_at_end"] = bool(value.get("duplicate_first_frame_at_end"))
@@ -483,7 +551,7 @@ class MonsterAnimationStore:
         compatible = bool(profile and monster and str(profile.get("skeleton_signature") or "") == str(monster.get("skeleton_signature") or ""))
         return {
             "schemaVersion": SCHEMA_VERSION, "project": PROJECT, "monsterSlug": selected, "monsters": monsters,
-            "profile": profile, "skeletonCompatible": compatible, "slotCatalog": SLOT_CATALOG, "weaponSets": (["1hs"] if self.kind == "npc" else []),
+            "profile": profile, "skeletonCompatible": compatible, "slotCatalog": SLOT_CATALOG, "weaponSets": (list(WEAPON_SETS) if self.kind == "npc" else []),
             "filenameRules": filename_rules(selected, npc=self.kind == "npc"), "items": items,
             "summary": {
                 "registered": len(items), "published": sum(row["status"] == "PUBLISHED" for row in items),
@@ -515,6 +583,94 @@ class MonsterAnimationStore:
                 raise ValueError(f"unknown monster animation binding: {binding_id}")
             connection.execute("UPDATE monster_animation_bindings SET weight=?,updated_at=? WHERE id=?", (weight, time.time(), binding_id))
             slug = str(row["monster_slug"])
+        self.export()
+        return self.snapshot(slug)
+
+    def set_disarm(self, binding_id: str, enabled: bool) -> dict:
+        if self.kind != "npc":
+            raise ValueError("disarm is only available for NPC idle specials")
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT monster_slug,slot FROM monster_animation_bindings WHERE id=?", (binding_id,)
+            ).fetchone()
+            if not row:
+                raise ValueError("unknown NPC animation binding")
+            if row["slot"] != "idle_special":
+                raise ValueError("disarm is only available for idle_special")
+            connection.execute("UPDATE monster_animation_bindings SET disarm=?,updated_at=? WHERE id=?",
+                               (int(bool(enabled)), time.time(), binding_id))
+            slug = str(row["monster_slug"])
+        self.export()
+        return self.snapshot(slug)
+
+    def rename_npc_binding(self, binding_id: str, weapon_set: str, proposed_filename: str) -> dict:
+        """Move canonical source and atomically migrate its coordinate metadata.
+
+        Asset id/publications/revisions are untouched because animation bytes do not change.
+        Filesystem moves are reversed if SQLite validation/commit fails.
+        """
+        if self.kind != "npc":
+            raise ValueError("NPC animations only")
+        moved_files = []
+        try:
+            with self.connect() as connection:
+                row = connection.execute("""SELECT b.monster_slug,b.slot,b.variant,b.weapon_set,b.clip_id,
+                     c.source_path,c.prepared_path,c.name FROM monster_animation_bindings b
+                     JOIN monster_animation_clips c ON c.id=b.clip_id WHERE b.id=?""", (binding_id,)).fetchone()
+                if not row:
+                    raise ValueError("unknown NPC animation binding")
+                slug, slot, variant = str(row["monster_slug"]), str(row["slot"]), int(row["variant"])
+                ext = Path(row["source_path"]).suffix.lower()
+                expected = validate_rename(proposed_filename, slug, weapon_set, slot, variant, ext)
+                conflict = connection.execute("""SELECT id FROM monster_animation_bindings
+                    WHERE monster_slug=? AND weapon_set=? AND slot=? AND variant=? AND id<>?""",
+                    (slug, weapon_set, slot, variant, binding_id)).fetchone()
+                if conflict:
+                    raise ValueError(f"animation {weapon_set}_{slot}_{variant:02d} already registered")
+                old_path = (self.root / str(row["source_path"])).resolve()
+                # Preserve the existing extension and use one canonical path for all NPCs.
+                managed_filename = f"{weapon_set}_{slot}{'_%02d' % variant if variant else ''}{ext}"
+                canonical = Path("assets/source/npcs") / slug / "animations" / managed_filename
+                new_path = (self.root / canonical).resolve()
+                if not old_path.is_file():
+                    raise ValueError(f"source animation file not found: {old_path}")
+                if old_path != new_path and new_path.exists():
+                    raise ValueError(f"destination already exists: {new_path}")
+                # Also migrate the input scan folder when it still contains the
+                # original source. Otherwise the next scan would resurrect the
+                # old 1hs binding after we renamed it to base.
+                scan = connection.execute(
+                    "SELECT scan_root FROM monster_animation_profiles WHERE monster_slug=?", (slug,)
+                ).fetchone()
+                scan_root = Path(str(scan["scan_root"] or "")).resolve() if scan else None
+                if scan_root and scan_root.is_dir():
+                    old_filename = npc_filename(slug, str(row["weapon_set"]), slot, variant, ext)
+                    matches = [p for p in scan_root.rglob(old_filename) if p.is_file() and p.resolve() != old_path]
+                    matches = [p for p in matches if self._sha256(p) == self._sha256(old_path)]
+                    if len(matches) > 1:
+                        raise ValueError("several matching source animations in the scan folder; rename manually to " + expected)
+                    if matches:
+                        source = matches[0]
+                        dest = source.with_name(expected)
+                        if source != dest:
+                            if dest.exists():
+                                raise ValueError("scan source destination already exists: " + str(dest))
+                            source.replace(dest)
+                            moved_files.append((source, dest))
+                if old_path != new_path:
+                    new_path.parent.mkdir(parents=True, exist_ok=True)
+                    old_path.replace(new_path)
+                    moved_files.append((old_path, new_path))
+                now = time.time()
+                connection.execute("UPDATE monster_animation_bindings SET weapon_set=?,updated_at=? WHERE id=?",
+                                   (weapon_set, now, binding_id))
+                connection.execute("""UPDATE monster_animation_clips SET name=?,source_path=?,prepared_path=?,updated_at=? WHERE id=?""",
+                                   (Path(expected).stem, canonical.as_posix(), canonical.as_posix(), now, str(row["clip_id"])))
+        except Exception:
+            for source, destination in reversed(moved_files):
+                if destination.exists():
+                    destination.replace(source)
+            raise
         self.export()
         return self.snapshot(slug)
 
@@ -661,7 +817,7 @@ class MonsterAnimationStore:
         for row in clips:
             row["status"] = self._status(row)
         manifest_bindings = [{key: value for key, value in row.items() if key != "playback_speed_percent"} for row in bindings]
-        payload = {"schemaVersion": SCHEMA_VERSION, "project": PROJECT, "slotCatalog": SLOT_CATALOG, "weaponSets": (["1hs"] if self.kind == "npc" else []), "profiles": profiles, "clips": clips, "bindings": manifest_bindings}
+        payload = {"schemaVersion": SCHEMA_VERSION, "project": PROJECT, "slotCatalog": SLOT_CATALOG, "weaponSets": (list(WEAPON_SETS) if self.kind == "npc" else []), "profiles": profiles, "clips": clips, "bindings": manifest_bindings}
         manifest = self.root / f"assets/manifests/{self.kind}-animations.json"
         manifest.parent.mkdir(parents=True, exist_ok=True)
         manifest.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -682,7 +838,8 @@ class MonsterAnimationStore:
                 "sourceSlot": internal_slot, "role": role, "variant": int(binding["variant"]), "weight": int(binding["weight"]),
                 "looped": bool(binding["looped"]), "priority": str(binding["priority"]),
                 "duplicateFirstFrameAtEnd": bool(clip.get("duplicate_first_frame_at_end")),
-                "weaponSet": "1hs" if self.kind == "npc" else "",
+                "weaponSet": str(binding.get("weapon_set") or "1hs") if self.kind == "npc" else "",
+                "disarm": bool(binding.get("disarm")) if self.kind == "npc" else False,
             })
         for profile in profiles_map.values():
             for rows in profile["slots"].values():
@@ -705,6 +862,7 @@ class MonsterAnimationStore:
                         f"\t\t\t\t\t\tweaponSet = {q(row['weaponSet'])},",
                         f"\t\t\t\t\t\tvariant = {row['variant']},",
                         f"\t\t\t\t\t\tweight = {row['weight']},",
+                        f"\t\t\t\t\t\tdisarm = {'true' if row['disarm'] else 'false'},",
                         f"\t\t\t\t\t\tlooped = {'true' if row['looped'] else 'false'},",
                         f"\t\t\t\t\t\tpriority = {q(row['priority'])},",
                         f"\t\t\t\t\t\tduplicateFirstFrameAtEnd = {'true' if row['duplicateFirstFrameAtEnd'] else 'false'},",

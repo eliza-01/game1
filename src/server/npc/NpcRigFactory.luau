@@ -1,5 +1,7 @@
--- One responsibility: turn a published articulated FBX into a stationary, combat-queryable world actor.
--- The visual is never used as a physics collider. Later navigation may replace the anchored world root.
+-- Build a mobile world actor without changing any imported bone or skinning data.
+-- Navigation uses the same elevated HumanoidRootPart principle as monsters;
+-- RootCollider remains a separate, non-colliding combat query reference.
+local ActorCollisionPolicy = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorCollisionPolicy"))
 local NpcRigFactory = {}
 
 local function visibleBounds(model: Model): (CFrame, Vector3)
@@ -59,14 +61,15 @@ function NpcRigFactory.Create(model: Model, surface: Vector3, yawDegrees: number
     boundsFrame, boundsSize = visibleBounds(visual)
 
     local root = Instance.new("Part")
-    root.Name = "NavigationRoot"
+    root.Name = "HumanoidRootPart"
     root.Size = Vector3.new(2, 2, 1)
     root.CFrame = CFrame.new(surface + Vector3.new(0, 2.8, 0)) * CFrame.Angles(0, math.rad(yawDegrees), 0)
-    root.Anchored = true -- NPCs do not move autonomously in the initial 1hs phase.
+    root.Anchored = false
     root.Transparency = 1
-    root.CanCollide = false
+    ActorCollisionPolicy.Assign(root)
     root.CanQuery = false
     root.CanTouch = false
+    root.Massless = false
     root.CastShadow = false
     root.Parent = model
 
@@ -90,7 +93,27 @@ function NpcRigFactory.Create(model: Model, surface: Vector3, yawDegrees: number
     visualWeld.Part0 = collider
     visualWeld.Part1 = visualRoot
     visualWeld.Parent = collider
+    local humanoid = Instance.new("Humanoid")
+    humanoid.Name = "Humanoid"
+    humanoid.RequiresNeck = false
+    humanoid.BreakJointsOnDeath = false
+    humanoid.AutoRotate = true
+    humanoid.HipHeight = 1.8
+    humanoid.UseJumpPower = false
+    humanoid.JumpHeight = 0
+    humanoid.MaxSlopeAngle = 89
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
+    humanoid.WalkSpeed = 0
+    -- Gameplay health is owned exclusively by DamageService, not Humanoid.
+    humanoid.MaxHealth = 1
+    humanoid.Health = 1
+    humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
+    humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+    humanoid.NameDisplayDistance = 0
+    humanoid.Parent = model
+
     model.PrimaryPart = root
+    pcall(function() root:SetNetworkOwner(nil) end)
     return visual, root
 end
 

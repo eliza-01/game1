@@ -19,6 +19,7 @@ local CharacterMovementConfig = require(CharacterShared:WaitForChild("CharacterM
 local AnimationSpeedScaling = require(AnimationShared:WaitForChild("AnimationSpeedScaling"))
 local DamageService = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("DamageService"))
 local HitEffectService = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("HitEffectService"))
+local Facing = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorFacingTracker"))
 
 local MonsterAIService = {}
 local started = false
@@ -285,7 +286,7 @@ local function faceDirection(agent: any, direction: Vector3)
     local flat = Vector3.new(direction.X, 0, direction.Z)
     if flat.Magnitude <= 0.001 then return end
     agent.facing = flat.Unit
-    if not agent.attackPursuitActive and agent.root.Parent then
+    if not agent.attacking and agent.root.Parent then
         local position = agent.root.Position
         agent.root.CFrame = CFrame.lookAt(position, position + agent.facing, Vector3.yAxis)
     end
@@ -348,6 +349,7 @@ local function publishAttackPursuitPlaybackSpeed(agent: any, movementMultiplier:
 end
 
 local function leaveCombat(agent: any)
+    Facing.Stop(agent.model)
     agent.target = nil
     agent.attacking = false
     agent.attackSerial += 1
@@ -390,7 +392,7 @@ local function pursueDirectlyDuringAttack(agent: any, targetRoot: BasePart): boo
     local enteringPursuit = not agent.attackPursuitActive
     agent.attackPursuitActive = true
     agent.humanoid.WalkSpeed = desiredSpeed
-    agent.humanoid.AutoRotate = true
+    -- Facing yaw is owned by ActorFacingTracker; leave AutoRotate disabled.
     -- Active-attack pursuit is a continuous velocity command, not a stream of
     -- MoveTo destinations. Reissuing MoveTo around the attack-radius boundary
     -- produces visible stop/catch-up pulses when player and monster speeds are
@@ -418,9 +420,7 @@ local function maintainAttackPursuit(agent: any, target: Model, serial: number)
                 return
             end
             local pursuing = pursueDirectlyDuringAttack(agent, liveRoot)
-            if not pursuing then
-                faceDirection(agent, liveRoot.Position - agent.root.Position)
-            end
+            -- Facing is updated continuously by the shared tracker even at rest.
             RunService.Heartbeat:Wait()
         end
     end)
@@ -432,7 +432,7 @@ local function attackStillConnects(agent: any, target: Model): boolean
     local delta = horizontalDelta(agent.root.Position, targetRoot.Position)
     if delta.Magnitude > attackRadius(agent) or math.abs(targetRoot.Position.Y - agent.root.Position.Y) > VERTICAL_TOLERANCE then return false end
     if delta.Magnitude > 0.001 then
-        if agent.facing:Dot(delta.Unit) < math.cos(math.rad(ATTACK_ARC_DEGREES * 0.5)) then return false end
+        if agent.root.CFrame.LookVector:Dot(delta.Unit) < math.cos(math.rad(ATTACK_ARC_DEGREES * 0.5)) then return false end
     end
     return hasLineOfSight(agent, target)
 end
@@ -446,6 +446,7 @@ local function beginAttack(agent: any, target: Model)
     if not timing then return end
 
     agent.attacking = true
+    Facing.Track(agent.model, agent.root, agent.humanoid, target, rootOf)
     agent.attackSerial += 1
     local serial = agent.attackSerial
     local duration = math.max(0.05, finite(timing.duration, 0.05))
@@ -476,7 +477,7 @@ local function beginAttack(agent: any, target: Model)
             local direction = liveRoot.Position - agent.root.Position
             local flatDirection = horizontalDelta(Vector3.zero, direction)
             if flatDirection.Magnitude > 0.001 then agent.facing = flatDirection.Unit end
-            if not agent.attackPursuitActive then faceDirection(agent, direction) end
+            -- Do not snap yaw on Hit: shared tracker already follows the target.
         end
         if attackStillConnects(agent, target) then
             local damage, killed = DamageService.Apply(agent.model, target, finite(agent.model:GetAttribute("Damage"), 0))
@@ -494,6 +495,7 @@ local function beginAttack(agent: any, target: Model)
         if not agent.active or agent.attackSerial ~= serial then return end
         agent.attacking = false
         agent.attackEndsAt = 0
+        Facing.Stop(agent.model)
         clearAttackPursuit(agent)
         stopTrack(agent.attackTrack)
         agent.attackTrack = nil
@@ -614,6 +616,7 @@ local function bindMonster(model: Model)
         model:GetAttributeChangedSignal("LifeState"):Connect(function()
             if agents[model] == agent and tostring(model:GetAttribute("LifeState") or "") ~= "Alive" then
                 agent.attackSerial += 1
+                Facing.Stop(agent.model)
                 agent.attacking = false
                 agent.target = nil
                 clearAttackPursuit(agent)
@@ -625,6 +628,7 @@ local function bindMonster(model: Model)
         model.Destroying:Connect(function()
             if agents[model] == agent then
                 agent.active = false
+                Facing.Stop(agent.model)
                 clearPath(agent)
                 agents[model] = nil
             end

@@ -91,12 +91,13 @@ class NpcPipelineTests(unittest.TestCase):
         self.seed_npc()
         self.seed_clips()
         self.assertEqual(classify(Path("blacksmith_1hs_attack_02.rbxm"), "blacksmith", npc=True)["slot"], "attack")
-        self.assertEqual(classify(Path("blacksmith_2hs_idle.rbxm"), "blacksmith", npc=True), None)
+        self.assertEqual(classify(Path("blacksmith_2hs_idle.rbxm"), "blacksmith", npc=True)["weaponSet"], "2hs")
         self.assertTrue(self.spawns.readiness("blacksmith")["ready"])
         registry = (self.root / "src/shared/npc/NpcAnimationRegistry.luau").read_text()
         self.assertIn('weaponSet = "1hs"', registry)
         self.assertIn('rbxassetid://54321', registry)
-        self.assertEqual(self.npc_animations.snapshot("blacksmith")["weaponSets"], ["1hs"])
+        self.assertIn("base", self.npc_animations.snapshot("blacksmith")["weaponSets"])
+        self.assertIn("1hs", self.npc_animations.snapshot("blacksmith")["weaponSets"])
 
     def test_npc_spawns_without_any_animations(self):
         self.seed_npc()

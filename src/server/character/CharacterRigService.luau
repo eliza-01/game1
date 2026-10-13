@@ -6,6 +6,7 @@ local CharacterShared = Shared:WaitForChild("character")
 local CharacterConfig = require(CharacterShared:WaitForChild("CharacterConfig"))
 local CharacterMovementConfig = require(CharacterShared:WaitForChild("CharacterMovementConfig"))
 
+local ActorCollisionPolicy = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorCollisionPolicy"))
 local CharacterRigService = {}
 
 local function getSpawnLocation(player: Player): SpawnLocation?
@@ -65,7 +66,7 @@ local function createNavigationRoot(character: Model, root: BasePart): BasePart
     navigationRoot.Transparency = 1
     navigationRoot.CastShadow = false
     navigationRoot.Anchored = false
-    navigationRoot.CanCollide = true
+    ActorCollisionPolicy.Assign(navigationRoot)
     navigationRoot.CanTouch = false
     navigationRoot.CanQuery = false
     navigationRoot.Massless = false

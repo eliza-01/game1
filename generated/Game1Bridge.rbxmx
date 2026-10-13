@@ -479,11 +479,38 @@ local function applyWeaponTextures(model: Model, textures: { any }): any
     }
 end
 
+-- Reject incomplete imported NPC skeletons before replacing a working Studio template.
+-- Registration owns the expected names; the plugin never encodes NPC-specific bones.
+local function assertExpectedBones(importedRig: Model, expected: any)
+    if typeof(expected) ~= "table" or #expected == 0 then
+        return
+    end
+    local present = {}
+    for _, object in importedRig:GetDescendants() do
+        if object:IsA("Bone") then
+            present[object.Name] = true
+        end
+    end
+    local missing = {}
+    for _, name in expected do
+        if typeof(name) == "string" and name ~= "" and not present[name] then
+            table.insert(missing, name)
+        end
+    end
+    if #missing > 0 then
+        table.sort(missing)
+        error(("Roblox imported an incomplete skeleton: %d of %d bones missing (%s). "
+            .. "Republish the NPC model with the updated bone-survival pipeline and sync again.")
+            :format(#missing, #expected, table.concat(missing, ", ", 1, math.min(12, #missing))))
+    end
+end
+
 local function placeMonsterRig(importedRig: Model, destination: Instance, wrapperName: string, assetId: number, metadata: any): (Model, any, any, any)
     wrapperName = validSegment(wrapperName)
     local actorKind = if tostring(metadata.entityKind or "monster") == "npc" then "npc" else "monster"
     local managedAttribute = if actorKind == "npc" then "Game1NpcRig" else "Game1MonsterRig"
     local stats = validateCharacterRig(importedRig)
+    assertExpectedBones(importedRig, metadata.expectedBones)
     local existing = destination:FindFirstChild(wrapperName)
     if existing ~= nil and not existing:IsA("Model") then
         error(actorKind .. " destination already contains a non-Model instance named " .. wrapperName)

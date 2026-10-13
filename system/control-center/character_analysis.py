@@ -145,4 +145,24 @@ def prepare_character_publication_fbx(project_root: Path, source: Path, output: 
         preparation = json.loads(report_path.read_text(encoding="utf-8"))
 
     analysis = analyze_character_fbx(project_root, output)
+    over_limit = [
+        str(mesh.get("name") or "mesh")
+        for mesh in (analysis.get("meshes") or [])
+        if int(mesh.get("maxInfluences") or 0) > 4
+    ]
+    if over_limit:
+        raise CharacterAnalysisError(
+            "publication FBX still has more than four bone influences: " + ", ".join(over_limit)
+        )
+    expected = {str(bone.get("name") or "") for bone in (analysis.get("bones") or [])}
+    survived = {
+        str(name)
+        for mesh in (analysis.get("meshes") or [])
+        for name in (mesh.get("influencedBones") or [])
+    }
+    missing = sorted(expected - survived)
+    if missing:
+        raise CharacterAnalysisError(
+            "publication FBX contains bones without skin influence: " + ", ".join(missing)
+        )
     return {"preparation": preparation, "analysis": analysis}

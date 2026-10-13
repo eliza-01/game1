@@ -2,31 +2,6 @@
   "schemaVersion": 1,
   "project": "game1",
   "records": {
-    "spawn-ca8dd6d110954125bf1b4bac5c5a0f72": {
-      "spawnId": "spawn-ca8dd6d110954125bf1b4bac5c5a0f72",
-      "monsterSlug": "warsmith",
-      "mapKey": "main",
-      "placeId": 0,
-      "position": {
-        "x": 455.916,
-        "y": -54.0,
-        "z": -229.86
-      },
-      "yawDegrees": 50.050000000000004,
-      "respawnSeconds": 10.0,
-      "spawnRadius": 0.0,
-      "maxAlive": 1,
-      "enabled": true,
-      "createdAtUtc": "2026-10-11T06:37:24.773247Z",
-      "updatedAtUtc": "2026-10-11T06:37:24.773247Z",
-      "studioSync": {
-        "status": "synced",
-        "recordFingerprint": "99bc178874a6173bfb44f12e0a8aebb16e37edefc168d4646022899b192a2005",
-        "placeId": 0,
-        "markerPath": "Workspace.Game1Authoring.NpcSpawns.Warsmith_ca8dd6d1",
-        "syncedAtUtc": "2026-10-11T06:37:25.799606Z"
-      }
-    },
     "spawn-de7d477ee069408eb1de4d7895a03f9d": {
       "spawnId": "spawn-de7d477ee069408eb1de4d7895a03f9d",
       "monsterSlug": "guard_01",
@@ -50,6 +25,31 @@
         "placeId": 0,
         "markerPath": "Workspace.Game1Authoring.NpcSpawns.Guard_01_de7d477e",
         "syncedAtUtc": "2026-10-12T13:40:31.011484Z"
+      }
+    },
+    "spawn-6de4624d878b4e7b9e7a4d77406b071b": {
+      "spawnId": "spawn-6de4624d878b4e7b9e7a4d77406b071b",
+      "monsterSlug": "warsmith",
+      "mapKey": "main",
+      "placeId": 0,
+      "position": {
+        "x": 455.111,
+        "y": -54.0,
+        "z": -228.476
+      },
+      "yawDegrees": 46.800000000000004,
+      "respawnSeconds": 10.0,
+      "spawnRadius": 0.0,
+      "maxAlive": 1,
+      "enabled": true,
+      "createdAtUtc": "2026-10-13T00:41:53.298802Z",
+      "updatedAtUtc": "2026-10-13T00:41:53.298802Z",
+      "studioSync": {
+        "status": "synced",
+        "recordFingerprint": "2a2a5b97369c4517adf4831a1b4ac6076403f269093dadb30b4e483469fde755",
+        "placeId": 0,
+        "markerPath": "Workspace.Game1Authoring.NpcSpawns.Warsmith_6de4624d",
+        "syncedAtUtc": "2026-10-13T00:41:54.324905Z"
       }
     }
   }

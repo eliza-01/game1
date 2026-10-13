@@ -2,7 +2,7 @@ const animationSpeedState={data:null,saving:new Set()};
 const animationSpeedChannelMeta={
   run:{title:'Run',description:'Running movement animations.'},
   walk:{title:'Walk',description:'Walking movement animations.'},
-  combat_idle:{title:'Combat Idle',description:'Idle animation while the character is in combat stance.'},
+  combat_idle:{title:'Combat Idle',description:'Combat stance animation for Characters and NPCs.'},
   attack:{title:'Attack',description:'Attack animations. Scales independently from Combat Idle.'},
 };
 function animationSpeedNumber(value){const n=Number(value);return Number.isFinite(n)?n:0}
@@ -32,7 +32,8 @@ function animationSpeedRender(){
         <div class="animation-speed-rule-actions"><span>applies to <b>${esc(meta.title)}</b> only</span><button data-animation-speed-save class="primary" type="button">save ${esc(meta.title)}</button></div>
       </article>`;
     }).join('');
-    return `<section class="animation-speed-profile"><div class="animation-speed-profile-head"><div><span>${esc(profile.targetType)}</span><h3>${esc(profile.displayName||profile.targetId)}</h3><small>Each animation block has its own playback scaling rule.</small></div><span class="pill">${esc(profile.targetId)}</span></div><div class="animation-speed-rule-grid">${cards}</div></section>`;
+    const explanation=profile.targetType==='humanoid'?'Shared across all Characters and NPCs; each animation state has an independent rule.':'Separate scaling rules for this monster profile.';
+    return `<section class="animation-speed-profile"><div class="animation-speed-profile-head"><div><span>${esc(profile.targetType)}</span><h3>${esc(profile.displayName||profile.targetId)}</h3><small>${esc(explanation)}</small></div><span class="pill">${esc(profile.targetId)}</span></div><div class="animation-speed-rule-grid">${cards}</div></section>`;
   }).join('');
   for(const profile of profiles){for(const rule of profile.rules||[]){
     const key=[profile.targetType,profile.targetId,rule.channel].join(':');

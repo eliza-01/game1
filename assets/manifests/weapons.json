@@ -136,11 +136,101 @@
       "status": "PUBLISHED",
       "storage_type": "1hs",
       "server_storage_path": "ServerStorage.weapons.1hs.dragon_divider.model.dragon_divider"
+    },
+    {
+      "slug": "guards_sword_01",
+      "name_en": "Guards Sword 01",
+      "name_ru": "Меч Гварда 01",
+      "weapon_type": "sword",
+      "rarity": "uncommon",
+      "model_source_path": "assets/source/weapons/sword/guards_sword_01/model/guards_sword_01.fbx",
+      "model_prepared_path": "assets/source/weapons/sword/guards_sword_01/model/guards_sword_01.fbx",
+      "model_sha256": "f0fab3b04c26235e3051fff91f7c59e7d56285f52537c0458e2718acbb9da264",
+      "model_asset_id": "131917076297036",
+      "model_published_sha256": "f0fab3b04c26235e3051fff91f7c59e7d56285f52537c0458e2718acbb9da264",
+      "moderation_state": "Approved",
+      "revision": 1,
+      "created_at": 1791851055.3575127,
+      "updated_at": 1791851075.4700058,
+      "published_at": 1791851075.4700058,
+      "grip_rot_x": 0.0,
+      "grip_rot_y": 0.0,
+      "grip_rot_z": 0.0,
+      "attack_radius_studs": 7.0,
+      "textures": [
+        {
+          "id": "guards_sword_01__guards_sword_01",
+          "weapon_slug": "guards_sword_01",
+          "slot": "guards_sword_01",
+          "source_path": "assets/source/weapons/sword/guards_sword_01/textures/guards_sword_01.jpg",
+          "prepared_path": "assets/source/weapons/sword/guards_sword_01/textures/guards_sword_01.jpg",
+          "sha256": "3f6c0de95bbabc907c0573bb18d238cb629f333cd7daa7a67a54014adb63cc26",
+          "asset_id": "75862292451032",
+          "published_sha256": "3f6c0de95bbabc907c0573bb18d238cb629f333cd7daa7a67a54014adb63cc26",
+          "moderation_state": "Reviewing",
+          "revision": 1,
+          "created_at": 1791851055.3575127,
+          "updated_at": 1791851081.652693,
+          "published_at": 1791851081.652693
+        }
+      ],
+      "stat_modifiers": {
+        "AttackSpeed": 0,
+        "Damage": 0
+      },
+      "status": "PUBLISHED",
+      "storage_type": "sword",
+      "server_storage_path": "ServerStorage.weapons.sword.guards_sword_01.model.guards_sword_01"
+    },
+    {
+      "slug": "warsmiths_hummer_01",
+      "name_en": "Warsmiths Hummer 01",
+      "name_ru": "Молот Кузнеца 01",
+      "weapon_type": "sword",
+      "rarity": "uncommon",
+      "model_source_path": "assets/source/weapons/sword/warsmiths_hummer_01/model/warsmiths_hummer_01.fbx",
+      "model_prepared_path": "assets/source/weapons/sword/warsmiths_hummer_01/model/warsmiths_hummer_01.fbx",
+      "model_sha256": "5d7173e7e1b21de9bfcfb7f8e0fd4ba45d0627d1f990ce6bfbfba73ba8a69863",
+      "model_asset_id": "136542486506010",
+      "model_published_sha256": "5d7173e7e1b21de9bfcfb7f8e0fd4ba45d0627d1f990ce6bfbfba73ba8a69863",
+      "moderation_state": "Approved",
+      "revision": 1,
+      "created_at": 1791851455.331772,
+      "updated_at": 1791851463.4508345,
+      "published_at": 1791851463.4508345,
+      "grip_rot_x": 0.0,
+      "grip_rot_y": 0.0,
+      "grip_rot_z": 0.0,
+      "attack_radius_studs": 7.0,
+      "textures": [
+        {
+          "id": "warsmiths_hummer_01__warsmiths_hummer",
+          "weapon_slug": "warsmiths_hummer_01",
+          "slot": "warsmiths_hummer",
+          "source_path": "assets/source/weapons/sword/warsmiths_hummer_01/textures/warsmiths_hummer.jpg",
+          "prepared_path": "assets/source/weapons/sword/warsmiths_hummer_01/textures/warsmiths_hummer.jpg",
+          "sha256": "3f6c0de95bbabc907c0573bb18d238cb629f333cd7daa7a67a54014adb63cc26",
+          "asset_id": "73070479826352",
+          "published_sha256": "3f6c0de95bbabc907c0573bb18d238cb629f333cd7daa7a67a54014adb63cc26",
+          "moderation_state": "Approved",
+          "revision": 1,
+          "created_at": 1791851455.331772,
+          "updated_at": 1791851467.1071875,
+          "published_at": 1791851467.1071875
+        }
+      ],
+      "stat_modifiers": {
+        "AttackSpeed": 0,
+        "Damage": 0
+      },
+      "status": "PUBLISHED",
+      "storage_type": "sword",
+      "server_storage_path": "ServerStorage.weapons.sword.warsmiths_hummer_01.model.warsmiths_hummer_01"
     }
   ],
   "summary": {
-    "registered": 2,
-    "published": 2,
+    "registered": 4,
+    "published": 4,
     "active": 0
   }
 }

@@ -10,9 +10,9 @@ DEFAULT_PAYLOAD = {
     "project": "game1",
     "profiles": [
         {
-            "targetType": "character",
-            "targetId": "human_female",
-            "displayName": "Human Female",
+            "targetType": "humanoid",
+            "targetId": "all",
+            "displayName": "All Characters & NPCs",
             "rules": [
                 {
                     "channel": "run",
@@ -70,8 +70,36 @@ class AnimationSpeedScalingStore:
             self._write(payload)
         else:
             payload = self._read()
-            self._validate(payload)
-            self._write_registry(payload)
+            if self._migrate_shared_humanoid_profile(payload):
+                self._write(payload)
+            else:
+                self._validate(payload)
+                self._write_registry(payload)
+
+    @staticmethod
+    def _migrate_shared_humanoid_profile(payload: dict) -> bool:
+        """One-time non-destructive migration from archetype-specific rules.
+
+        Preserve the full legacy profiles separately, including any other
+        character overrides, but expose and publish ONE authoritative rule set
+        for all player Characters and NPCs. Monster rules are independent.
+        """
+        profiles = payload.get("profiles") or []
+        if any(str(p.get("targetType") or "").lower() == "humanoid" for p in profiles):
+            return False
+        source = next((p for p in profiles if p.get("targetType") == "character"
+                       and p.get("targetId") == "human_female"), None)
+        if source is None:
+            source = next((p for p in profiles if p.get("targetType") == "character"), None)
+        defaults = deepcopy(DEFAULT_PAYLOAD["profiles"][0])
+        if source:
+            authored = {r["channel"]: r for r in source.get("rules", [])}
+            defaults["rules"] = [deepcopy(authored.get(r["channel"], r)) for r in defaults["rules"]]
+        former = [p for p in profiles if p.get("targetType") == "character"]
+        if former:
+            payload.setdefault("legacyProfiles", []).extend(deepcopy(former))
+        payload["profiles"] = [defaults] + [p for p in profiles if p.get("targetType") != "character"]
+        return True
 
     def _read(self) -> dict:
         return json.loads(self.manifest_path.read_text(encoding="utf-8"))
@@ -86,7 +114,9 @@ class AnimationSpeedScalingStore:
         for profile in profiles:
             target_type = str(profile.get("targetType") or "").strip().lower()
             target_id = str(profile.get("targetId") or "").strip().lower()
-            if target_type not in {"character", "monster"} or not target_id:
+            if target_type not in {"humanoid", "monster"} or not target_id:
+                raise ValueError("invalid animation speed scaling target")
+            if target_type == "humanoid" and target_id != "all":
                 raise ValueError("invalid animation speed scaling target")
             rules = profile.get("rules")
             if not isinstance(rules, list) or not rules:
@@ -112,7 +142,7 @@ class AnimationSpeedScalingStore:
         return text if "." in text else text + ".0"
 
     def _write_registry(self, payload: dict):
-        grouped: dict[str, dict[str, dict]] = {"character": {}, "monster": {}}
+        grouped: dict[str, dict[str, dict]] = {"humanoid": {}, "monster": {}}
         for profile in payload.get("profiles") or []:
             target_type = str(profile["targetType"]).lower()
             target_id = str(profile["targetId"]).lower()
@@ -131,7 +161,7 @@ class AnimationSpeedScalingStore:
             '\tproject = "game1",',
             "\tprofiles = table.freeze({",
         ]
-        for target_type in ("character", "monster"):
+        for target_type in ("humanoid", "monster"):
             lines.append(f"\t\t[{self._lua_string(target_type)}] = table.freeze({{")
             for target_id in sorted(grouped[target_type]):
                 lines.append(f"\t\t\t[{self._lua_string(target_id)}] = table.freeze({{")

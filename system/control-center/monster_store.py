@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import hashlib
 import json
+import math
 import re
 import shutil
 import tempfile
@@ -23,6 +24,7 @@ from opencloud_assets import (
 
 SCHEMA_VERSION = 1
 PROJECT = "game1"
+NPC_PUBLICATION_PIPELINE = "roblox-open-cloud-bone-survival-v3-four-influences"
 TEXTURE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 STAT_KEYS = ("MaxHP", "Damage", "AttackSpeed", "RunSpeed", "CritChance")
 DEFAULT_STATS = {
@@ -36,6 +38,12 @@ DEFAULT_BEHAVIOR = {
     "aggressive": False,
     "aggroRadiusStuds": 16.0,
     "attackRadiusStuds": 3.0,
+}
+NPC_DEFAULT_BEHAVIOR = {
+    "retaliateWhenAttacked": False,
+    "pursuitRadiusStuds": 16.0,
+    "attackRadiusStuds": 3.0,
+    "returnDelaySeconds": 10.0,
 }
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_]{0,63}$")
 
@@ -147,6 +155,21 @@ class MonsterStore:
                 );
                 """
             )
+            # Migration for existing NPC databases; do not clear published ids.
+            columns = {row[1] for row in connection.execute("PRAGMA table_info(monsters)")}
+            if "publication_pipeline" not in columns:
+                connection.execute(
+                    "ALTER TABLE monsters ADD COLUMN publication_pipeline TEXT NOT NULL DEFAULT ''"
+                )
+            if self.kind == "npc":
+                behavior_columns = {row[1] for row in connection.execute("PRAGMA table_info(monster_behavior)")}
+                if "retaliate_when_attacked" not in behavior_columns:
+                    connection.execute("ALTER TABLE monster_behavior ADD COLUMN retaliate_when_attacked INTEGER NOT NULL DEFAULT 0")
+                    # Legacy 'aggressive' was an opt-in. Migrate the opt-in but
+                    # never retain proximity-based, unsolicited aggression.
+                    connection.execute("UPDATE monster_behavior SET retaliate_when_attacked = aggressive")
+                if "return_delay_seconds" not in behavior_columns:
+                    connection.execute("ALTER TABLE monster_behavior ADD COLUMN return_delay_seconds REAL NOT NULL DEFAULT 10")
 
     @staticmethod
     def _sha256(path: Path) -> str:
@@ -160,10 +183,24 @@ class MonsterStore:
         return {
             "statKeys": list(STAT_KEYS),
             "defaultStats": dict(DEFAULT_STATS),
-            "defaultBehavior": dict(DEFAULT_BEHAVIOR),
+            "defaultBehavior": dict(NPC_DEFAULT_BEHAVIOR if self.kind == "npc" else DEFAULT_BEHAVIOR),
         }
 
     def _behavior(self, connection, slug: str) -> dict:
+        if self.kind == "npc":
+            result = dict(NPC_DEFAULT_BEHAVIOR)
+            row = connection.execute(
+                "SELECT retaliate_when_attacked,aggro_radius_studs,attack_radius_studs,return_delay_seconds "
+                "FROM monster_behavior WHERE monster_slug=?", (slug,),
+            ).fetchone()
+            if row:
+                result.update(
+                    retaliateWhenAttacked=bool(row["retaliate_when_attacked"]),
+                    pursuitRadiusStuds=float(row["aggro_radius_studs"]),
+                    attackRadiusStuds=float(row["attack_radius_studs"]),
+                    returnDelaySeconds=float(row["return_delay_seconds"]),
+                )
+            return result
         result = dict(DEFAULT_BEHAVIOR)
         row = connection.execute(
             "SELECT aggressive,aggro_radius_studs,attack_radius_studs FROM monster_behavior WHERE monster_slug=?",
@@ -209,6 +246,11 @@ class MonsterStore:
         result["stats"] = self._stats(connection, result["slug"])
         result["behavior"] = self._behavior(connection, result["slug"])
         result["status"] = self._status(result, result["textures"])
+        result["publicationUpgradeAvailable"] = bool(
+            self.kind == "npc"
+            and result.get("model_asset_id")
+            and str(result.get("publication_pipeline") or "") != NPC_PUBLICATION_PIPELINE
+        )
         result["server_storage_path"] = f"ServerStorage.{self.kind}s.{result['slug']}.model.{result['slug']}"
         return result
 
@@ -247,10 +289,22 @@ class MonsterStore:
             result[key] = value
         return result
 
-    @staticmethod
-    def _validate_behavior(payload: dict, old: dict | None) -> dict:
+    def _validate_behavior(self, payload: dict, old: dict | None) -> dict:
         incoming = payload.get("behavior") or {}
         previous = (old or {}).get("behavior") or {}
+        if self.kind == "npc":
+            raw = incoming.get("retaliateWhenAttacked", previous.get("retaliateWhenAttacked", False))
+            if isinstance(raw, str):
+                raw = raw.strip().lower() in {"1", "true", "yes", "on"}
+            radius = float(incoming.get("pursuitRadiusStuds", previous.get("pursuitRadiusStuds", 16)))
+            attack = float(incoming.get("attackRadiusStuds", previous.get("attackRadiusStuds", 3)))
+            delay = float(incoming.get("returnDelaySeconds", previous.get("returnDelaySeconds", 10)))
+            if not all(math.isfinite(v) for v in (radius, attack, delay)) or radius < 0 or attack < 0 or delay < 0 or delay > 600:
+                raise ValueError("NPC pursuit/attack radius must be nonnegative and return delay must be within 0..600 seconds")
+            if abs(delay * 2 - round(delay * 2)) > 0.00001:
+                raise ValueError("NPC return delay must use 0.5-second steps")
+            return {"retaliateWhenAttacked": bool(raw), "pursuitRadiusStuds": radius,
+                    "attackRadiusStuds": attack, "returnDelaySeconds": delay}
         aggressive = incoming.get("aggressive", previous.get("aggressive", DEFAULT_BEHAVIOR["aggressive"]))
         if isinstance(aggressive, str):
             aggressive = aggressive.strip().lower() in {"1", "true", "yes", "on", "aggressive"}
@@ -328,10 +382,17 @@ class MonsterStore:
                     "INSERT OR REPLACE INTO monster_stats(monster_slug,stat_key,value) VALUES(?,?,?)",
                     (slug, key, value),
                 )
-            connection.execute(
-                "INSERT OR REPLACE INTO monster_behavior(monster_slug,aggressive,aggro_radius_studs,attack_radius_studs) VALUES(?,?,?,?)",
-                (slug, 1 if behavior["aggressive"] else 0, behavior["aggroRadiusStuds"], behavior["attackRadiusStuds"]),
-            )
+            if self.kind == "npc":
+                connection.execute(
+                    "INSERT OR REPLACE INTO monster_behavior(monster_slug,aggressive,aggro_radius_studs,attack_radius_studs,retaliate_when_attacked,return_delay_seconds) VALUES(?,?,?,?,?,?)",
+                    (slug, 0, behavior["pursuitRadiusStuds"], behavior["attackRadiusStuds"],
+                     int(behavior["retaliateWhenAttacked"]), behavior["returnDelaySeconds"]),
+                )
+            else:
+                connection.execute(
+                    "INSERT OR REPLACE INTO monster_behavior(monster_slug,aggressive,aggro_radius_studs,attack_radius_studs) VALUES(?,?,?,?)",
+                    (slug, 1 if behavior["aggressive"] else 0, behavior["aggroRadiusStuds"], behavior["attackRadiusStuds"]),
+                )
 
             for raw in texture_paths:
                 source = Path(raw).expanduser().resolve()
@@ -379,7 +440,10 @@ class MonsterStore:
         creator_id = str(credentials.get("creatorId") or "")
         description = str(credentials.get("description") or "game1 monster").strip()
 
-        if not str(row.get("model_asset_id") or "") or str(row.get("model_published_sha256") or "") != str(row.get("model_sha256") or ""):
+        if (not str(row.get("model_asset_id") or "")
+            or str(row.get("model_published_sha256") or "") != str(row.get("model_sha256") or "")
+            or (self.kind == "npc" and str(row.get("publication_pipeline") or "") != NPC_PUBLICATION_PIPELINE)
+        ):
             with tempfile.TemporaryDirectory(prefix="game1-monster-publication-") as tmp:
                 publication_fbx = Path(tmp) / f"{slug}.fbx"
                 prepared = prepare_character_publication_fbx(self.root, model, publication_fbx)
@@ -401,8 +465,10 @@ class MonsterStore:
             now = time.time()
             with self.connect() as connection:
                 connection.execute(
-                    """UPDATE monsters SET model_asset_id=?,model_published_sha256=?,moderation_state=?,published_at=?,updated_at=? WHERE slug=?""",
-                    (result.asset_id, row["model_sha256"], result.moderation_state or "", now, now, slug),
+                    """UPDATE monsters SET model_asset_id=?,model_published_sha256=?,publication_pipeline=?,moderation_state=?,published_at=?,updated_at=? WHERE slug=?""",
+                    (result.asset_id, row["model_sha256"],
+                     NPC_PUBLICATION_PIPELINE if self.kind == "npc" else "",
+                     result.moderation_state or "", now, now, slug),
                 )
                 connection.execute(
                     """INSERT INTO monster_publications(monster_slug,kind,slot,monster_revision,asset_id,operation_path,sha256,moderation_state,published_at)
@@ -503,8 +569,14 @@ class MonsterStore:
                 f"\t\t\tserverStoragePath = {self._lua_string(row['server_storage_path'])},",
                 f"\t\t\tskeletonSignature = {self._lua_string(row.get('skeleton_signature') or '')},",
                 "\t\t\tbehavior = table.freeze({",
-                f"\t\t\t\taggressive = {str(bool(row.get('behavior', {}).get('aggressive'))).lower()},",
-                f"\t\t\t\taggroRadiusStuds = {self._lua_number(row.get('behavior', {}).get('aggroRadiusStuds', 16))},",
+                *([
+                    f"\t\t\t\tretaliateWhenAttacked = {str(bool(row.get('behavior', {}).get('retaliateWhenAttacked'))).lower()},",
+                    f"\t\t\t\tpursuitRadiusStuds = {self._lua_number(row.get('behavior', {}).get('pursuitRadiusStuds', 16))},",
+                    f"\t\t\t\treturnDelaySeconds = {self._lua_number(row.get('behavior', {}).get('returnDelaySeconds', 10))},",
+                ] if self.kind == 'npc' else [
+                    f"\t\t\t\taggressive = {str(bool(row.get('behavior', {}).get('aggressive'))).lower()},",
+                    f"\t\t\t\taggroRadiusStuds = {self._lua_number(row.get('behavior', {}).get('aggroRadiusStuds', 16))},",
+                ]),
                 f"\t\t\t\tattackRadiusStuds = {self._lua_number(row.get('behavior', {}).get('attackRadiusStuds', 3))},",
                 "\t\t\t}),",
                 "\t\t\tstats = table.freeze({",

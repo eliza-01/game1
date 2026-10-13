@@ -21,9 +21,11 @@ local function roleOf(row: any): string
     return "base"
 end
 
-function NpcIdlePresentation.new(entity: Model, animator: Animator, profile: any?): any
+function NpcIdlePresentation.new(entity: Model, animator: Animator, profile: any?, weaponSet: string?, weaponPresentation: any): any
     local self = setmetatable({
         entity = entity,
+        weaponPresentation = weaponPresentation,
+        releaseWeaponHide = nil,
         base = nil,
         choices = {},
         activeSpecial = nil,
@@ -33,7 +35,7 @@ function NpcIdlePresentation.new(entity: Model, animator: Animator, profile: any
         connections = {},
     }, NpcIdlePresentation)
 
-    for _, row in ipairs(Tracks.PublishedRows(profile, "idle")) do
+    for _, row in ipairs(Tracks.PublishedRows(profile, "idle", weaponSet)) do
         local role = roleOf(row)
         local clip = Tracks.Load(animator, row, role == "base")
         if clip then
@@ -75,15 +77,24 @@ function NpcIdlePresentation:_playBase(fade: number?)
     end
 end
 
+function NpcIdlePresentation:_releaseWeaponHide()
+    local release = self.releaseWeaponHide
+    self.releaseWeaponHide = nil
+    if release then
+        release()
+    end
+end
+
 function NpcIdlePresentation:_finishSpecial()
     if not self.activeSpecial then
         return
     end
     local finished = self.activeSpecial
     self.activeSpecial = nil
+    self:_releaseWeaponHide()
     if self.base and (tonumber(self.base.row.weight) or 100) > 0 then
-        -- Start the destination pose BEFORE fading out the source. At a one-shot
-        -- terminal frame there must always be at least one weighted track.
+        -- Start the destination pose BEFORE fading out the source.
+        -- Keep at least one weighted animation through the transition.
         local fade = Config.SpecialExitBlendSeconds
         self:_playBase(fade)
         Tracks.Stop(finished, fade)
@@ -112,7 +123,12 @@ function NpcIdlePresentation:_rollAtIdleBoundary()
     Tracks.Stop(self.base, 0.08)
     self.entity:SetAttribute("NpcAnimationState", "idle")
     self.entity:SetAttribute("NpcIdleVariant", ("special_%02d"):format(math.max(1, math.floor(tonumber(selected.row.variant) or 1))))
-    if not Tracks.Play(self.entity, selected, "idle", 0.08) then
+    if Tracks.Play(self.entity, selected, "idle", 0.08) then
+        -- Animation chooses a scoped presentation override; it never owns the weapon.
+        if selected.row.disarm == true then
+            self.releaseWeaponHide = self.weaponPresentation:AcquireHidden()
+        end
+    else
         self:_finishSpecial()
     end
 end
@@ -135,6 +151,7 @@ end
 
 function NpcIdlePresentation:Stop()
     self.active = false
+    self:_releaseWeaponHide()
     self.activeSpecial = nil
     self.elapsedWithoutBase = 0
     Tracks.Stop(self.base)
@@ -152,8 +169,8 @@ function NpcIdlePresentation:Step(delta: number)
     end
     local special = self.activeSpecial
     if special then
-        -- Sample in PreAnimation, before the engine reaches the end of the clip.
-        -- A natural non-looped Ended event would fire after the pose has faded.
+        -- Crossfade before the special loses its final pose. Never let the
+        -- animator briefly resolve an empty/rest pose at the transition.
         local remaining = Tracks.SecondsRemaining(special)
         if remaining and remaining <= Config.SpecialExitBlendSeconds then
             self:_finishSpecial()

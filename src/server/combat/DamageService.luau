@@ -5,6 +5,7 @@ local CombatShared = Shared:WaitForChild("combat")
 local AttackConfig = require(CombatShared:WaitForChild("AttackConfig"))
 local CombatFeedbackService = require(script.Parent:WaitForChild("CombatFeedbackService"))
 local CombatStateService = require(script.Parent:WaitForChild("CombatStateService"))
+local ActorDamageSignals = require(script.Parent:WaitForChild("ActorDamageSignals"))
 
 local DamageService = {}
 local criticalRandom = Random.new()
@@ -54,6 +55,7 @@ function DamageService.Apply(attacker: Model?, target: Model, rawDamage: number)
         target:SetAttribute("DeathStartedAt", os.clock())
     end
 
+    ActorDamageSignals.Publish(attacker, target, normalizedRawDamage, finalDamage, killed)
     CombatFeedbackService.PublishDamage(attacker, target, finalDamage, critical)
 
     if AttackConfig.DebugLogs then

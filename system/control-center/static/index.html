@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>game1 · asset manager</title>
-<link rel="stylesheet" href="asset-manager.css?v=8">
+<link rel="stylesheet" href="asset-manager.css?v=9">
 <link rel="stylesheet" href="location-assets.css?v=1">
 <link rel="stylesheet" href="deco-assets.css?v=4">
 </head>
@@ -371,7 +371,7 @@
 
 <div id="npcs-view" hidden>
 <div class="panel hero">
-<div><span class="eyebrow">npc assets · canonical game1 registry</span><h2>npcs</h2><p>independent NPC archetypes with published articulated FBX, stats and animation profiles. Initial weapon profile: 1hs only. NPCs are stationary in this phase, damageable and respawn through authored spawn points.</p></div>
+<div><span class="eyebrow">npc assets · canonical game1 registry</span><h2>npcs</h2><p>independent NPC archetypes with published articulated FBX, stats and animation profiles. NPCs can use registered equipment and animation subtypes. Passive or aggressive behavior is configured per NPC; authored spawn points control respawn.</p></div>
 <div class="metrics"><div><b id="npc-metric-total">0</b><span>registered</span></div><div><b id="npc-metric-published">0</b><span>published</span></div><div><b id="npc-metric-changed">0</b><span>changed</span></div></div>
 </div>
 <div class="panel runtime-card"><div id="npc-registry-state" class="runtime-state registered"><strong>npc registry</strong><span>loading…</span></div><div id="npc-publication-state" class="publication-missing">open cloud: checking…</div></div>
@@ -382,8 +382,8 @@
 <label>slug<input id="npc-slug" readonly><small class="hint">generated from english name as lowercase snake_case. existing registered slugs stay stable.</small></label>
 <div class="npc-stats-grid monster-stats-grid"><label>HP<input id="npc-stat-hp" type="number" min="0" step="1" value="100"></label><label>attack<input id="npc-stat-damage" type="number" min="0" step="1" value="10"></label><label>attack speed<input id="npc-stat-attack-speed" type="number" min="0" step="1" value="100"></label><label>run speed<input id="npc-stat-run-speed" type="number" min="0" step="1" value="50"></label><label>critical chance %<input id="npc-stat-crit-chance" type="number" min="0" max="100" step="0.1" value="0"></label></div>
 <small class="hint">npc stats are absolute runtime values. critical chance is 0..100 percent.</small>
-<div class="npc-stats-grid monster-stats-grid"><label class="spawn-enabled"><input id="npc-behavior-aggressive" type="checkbox" disabled><span>aggressive · unchecked = passive</span></label><label>aggro radius · studs<input id="npc-behavior-aggro-radius" disabled type="number" min="0" step="0.1" value="16"></label><label>attack radius · studs<input id="npc-behavior-attack-radius" type="number" min="0" step="0.1" value="3"></label></div>
-<small class="hint">NPCs remain passive. Attack radius is saved with NPC metadata for a future combat AI; aggro, patrol, dialog and factions will be configured separately.</small>
+<div class="npc-stats-grid monster-stats-grid"><label class="spawn-enabled"><input id="npc-behavior-retaliate" type="checkbox"><span>responds to aggression · retaliate only after being damaged</span></label><label>pursuit radius from spawn · studs<input id="npc-behavior-pursuit-radius" type="number" min="0" step="0.1" value="16"></label><label>attack radius · studs<input id="npc-behavior-attack-radius" type="number" min="0" step="0.1" value="3"></label><label>return delay max · seconds<input id="npc-behavior-return-delay" type="number" min="0" max="600" step="0.5" value="10"></label></div>
+<small class="hint">NPCs never acquire enemies by proximity. When attacked, they defend themselves within their spawn pursuit radius. After their target dies they wait 0..max seconds (random, in 0.5-second steps), return to their original spawn position and face the authored direction.</small>
 <hr class="card-separator">
 <span class="eyebrow">02 · source assets</span>
 <div class="picker"><button id="choose-npc-model" type="button">choose fbx</button><small id="picked-npc-model">fbx not selected</small></div>
@@ -403,8 +403,18 @@
 </div>
 </div>
 
+<div class="panel character-card npc-equipment-card">
+<div class="section-title"><div><span>equipment loadout</span><h3>NPC weapon equipment</h3></div></div>
+<small class="hint">Select a registered NPC above. Right and left hands are independent. Only published registered weapons can be equipped; the NPC skeleton must have the corresponding weapon bone. Loadouts apply on the next NPC spawn / Play.</small>
+<div class="character-grid">
+<label>right hand · Weapon_R_Bone<select id="npc-equipment-right"><option value="">None</option></select></label>
+<label>left hand · Weapon_L_Bone<select id="npc-equipment-left"><option value="">None</option></select></label>
+</div>
+<div class="actions"><button class="primary" id="npc-equipment-save" type="button">save NPC equipment</button><button id="npc-equipment-sync" type="button">sync weapon templates to Studio</button><small id="npc-equipment-status" class="hint">Select a registered NPC.</small></div>
+</div>
+
 <div class="panel hero npc-animation-hero">
-<div><span class="eyebrow">npc animation library</span><h2>npc animations</h2><p>same registration/publication pipeline as characters. Only 1hs is enabled (idle, walk, run, combat_idle, attack variants, death). choose the target npc here; every scan, assignment and publication below applies only to that npc.</p></div>
+<div><span class="eyebrow">npc animation library</span><h2>npc animations</h2><p>same registration/publication pipeline as characters. Animation types: base (common), 1hs, 2hs and bow; base clips are reusable across loadouts. choose the target npc here; every scan, assignment and publication below applies only to that npc.</p></div>
 </div>
 <div class="panel runtime-card"><div id="npc-animation-profile-state" class="runtime-state bootstrap"><strong>select npc</strong><span>register a npc first.</span></div></div>
 <div class="animation-workflow">
@@ -413,7 +423,7 @@
 <label>npc<select id="npc-animation-npc"></select><small class="hint">this is the npc whose animation files will be scanned, registered and published.</small></label>
 <hr class="card-separator">
 <h3 class="subheading">animation folder</h3>
-<details id="npc-animation-filename-guide" class="naming-guide" open><summary>filename rules · npc states</summary><div id="npc-animation-filename-rules" class="filename-rules"><span class="muted">select a npc.</span></div><small class="hint">canonical names use <code>{npc_slug}_1hs_{state}</code>, e.g. <code>blacksmith_1hs_idle.rbxm</code>. <code>idle_special_01</code>, <code>idle_special_02</code>, … are variants inside <code>idle</code>; <code>combat_idle</code> is the waiting pose while already in combat; <code>attack_01</code>, <code>attack_02</code>, … are variants inside <code>attack</code>.</small></details>
+<details id="npc-animation-filename-guide" class="naming-guide" open><summary>filename rules · npc states</summary><div id="npc-animation-filename-rules" class="filename-rules"><span class="muted">select a npc.</span></div><small class="hint">canonical names use <code>{npc_slug}_{type}_{state}</code>, e.g. <code>blacksmith_base_idle_special_01.rbxm</code>. Change type and rename a registered clip together to migrate it without losing its published asset ID. <code>idle_special_01</code>, <code>idle_special_02</code>, … are variants inside <code>idle</code>; <code>combat_idle</code> is the waiting pose while already in combat; <code>attack_01</code>, <code>attack_02</code>, … are variants inside <code>attack</code>.</small></details>
 <div class="picker folder-picker"><div class="folder-explorer"><input id="npc-animation-folder-path" type="text" autocomplete="off" spellcheck="false" placeholder="C:\path\to\npc-animations"><button id="choose-npc-animation-folder" type="button">explore…</button></div><small>paste a folder path or choose it in Explorer · the last npc animation folder is remembered</small></div>
 <div class="actions"><button id="scan-npc-animations" class="primary wide" type="button" disabled>scan folder</button></div>
 <div id="npc-animation-scan-status" class="status-box"><strong>nothing scanned yet</strong><span>unrecognized files can be assigned manually.</span></div>
@@ -427,7 +437,7 @@
 <div class="panel character-card">
 <div class="section-title"><div><span>selected npc animations</span><h3 id="npc-animation-table-title">registered animations</h3></div></div>
 <small class="hint">only animations already registered for the selected npc are listed here. <code>idle_special_01..n</code> are shown as variants of state <code>idle</code>. Weight is relative within idle (base + specials); 0 disables selection of that clip. Specials are selected at the end of a base idle cycle, or periodically if base idle is missing. playback speed is configured globally in the Animation Speed section.</small>
-<div class="table-wrap animation-table-wrap"><table><thead><tr><th>state</th><th>variant</th><th>clip</th><th>asset</th><th>status</th><th>weight</th><th>first→end</th><th>actions</th></tr></thead><tbody id="npc-animation-rows"></tbody></table></div>
+<div class="table-wrap animation-table-wrap"><table><thead><tr><th>state</th><th>variant</th><th>type</th><th>canonical filename / rename</th><th>asset</th><th>status</th><th>weight</th><th>disarm</th><th>first→end</th><th>actions</th></tr></thead><tbody id="npc-animation-rows"></tbody></table></div>
 </div>
 </div>
 
@@ -474,7 +484,7 @@
 <script src="options.js?v=1"></script>
 <script src="weapon-assets.js?v=3"></script>
 <script src="monster-assets.js?v=4"></script>
-<script src="npc-assets.js?v=1"></script>
+<script src="npc-assets.js?v=2"></script>
 <script src="npc-spawns.js?v=3"></script>
 <script src="monster-spawns.js?v=1"></script>
 </body>

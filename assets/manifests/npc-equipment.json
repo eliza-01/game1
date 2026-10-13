@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "npcSlug": "",
+  "loadout": {
+    "right": "",
+    "left": ""
+  },
+  "loadouts": {
+    "guard_01": {
+      "right": "guards_sword_01",
+      "left": ""
+    },
+    "warsmith": {
+      "right": "warsmiths_hummer_01",
+      "left": ""
+    }
+  },
+  "weapons": [
+    {
+      "slug": "newbie_axe",
+      "nameEn": "Newbie Axe",
+      "weaponType": "sword",
+      "status": "PUBLISHED"
+    },
+    {
+      "slug": "dragon_divider",
+      "nameEn": "Dragon Divider",
+      "weaponType": "sword",
+      "status": "PUBLISHED"
+    },
+    {
+      "slug": "guards_sword_01",
+      "nameEn": "Guards Sword 01",
+      "weaponType": "sword",
+      "status": "PUBLISHED"
+    },
+    {
+      "slug": "warsmiths_hummer_01",
+      "nameEn": "Warsmiths Hummer 01",
+      "weaponType": "sword",
+      "status": "PUBLISHED"
+    }
+  ]
+}

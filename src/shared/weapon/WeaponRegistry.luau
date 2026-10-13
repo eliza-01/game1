@@ -64,5 +64,47 @@ return table.freeze({
 			textures = table.freeze({
 			}),
 		}),
+		["guards_sword_01"] = table.freeze({
+			slug = "guards_sword_01",
+			nameEn = "Guards Sword 01",
+			nameRu = "Меч Гварда 01",
+			weaponType = "sword",
+			rarity = "uncommon",
+			attackRadiusStuds = 7,
+			status = "PUBLISHED",
+			modelAssetId = "131917076297036",
+			serverStoragePath = "ServerStorage.weapons.sword.guards_sword_01.model.guards_sword_01",
+			statModifiers = table.freeze({
+				["AttackSpeed"] = 0,
+				["Damage"] = 0,
+			}),
+			textures = table.freeze({
+				["guards_sword_01"] = table.freeze({
+					assetId = "75862292451032",
+					sha256 = "3f6c0de95bbabc907c0573bb18d238cb629f333cd7daa7a67a54014adb63cc26",
+				}),
+			}),
+		}),
+		["warsmiths_hummer_01"] = table.freeze({
+			slug = "warsmiths_hummer_01",
+			nameEn = "Warsmiths Hummer 01",
+			nameRu = "Молот Кузнеца 01",
+			weaponType = "sword",
+			rarity = "uncommon",
+			attackRadiusStuds = 7,
+			status = "PUBLISHED",
+			modelAssetId = "136542486506010",
+			serverStoragePath = "ServerStorage.weapons.sword.warsmiths_hummer_01.model.warsmiths_hummer_01",
+			statModifiers = table.freeze({
+				["AttackSpeed"] = 0,
+				["Damage"] = 0,
+			}),
+			textures = table.freeze({
+				["warsmiths_hummer"] = table.freeze({
+					assetId = "73070479826352",
+					sha256 = "3f6c0de95bbabc907c0573bb18d238cb629f333cd7daa7a67a54014adb63cc26",
+				}),
+			}),
+		}),
 	}),
 })

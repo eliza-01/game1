@@ -34,10 +34,7 @@ local function findByStudioPath(studioPath: string): Instance?
 end
 
 local function findCharacterBone(character: Model, names: { string }): Bone?
-    local visual = character:FindFirstChild("Visual")
-    if not visual then
-        return nil
-    end
+    local visual = character:FindFirstChild("Visual") or character:FindFirstChild("ImportedRig") or character
     for _, name in ipairs(names) do
         local found = visual:FindFirstChild(name, true)
         if found and found:IsA("Bone") then
@@ -215,6 +212,42 @@ function WeaponEquipService.Equip(character: Model, slugValue: any): (boolean, s
     character:SetAttribute("AttackMovementRunSpeedMultiplier", attackMovement.runSpeedMultiplier)
     CharacterStatsService.ApplyModifiers(character, row.statModifiers or {})
     return true, nil
+end
+
+-- Common actor equipment entry point: NPCs call this without player-only stats.
+-- Reuses exactly the same runtime grip, authored OBB and bone solver as Equip().
+function WeaponEquipService.EquipVisual(actor: Model, slugValue: any, hand: string, modelName: string): (Model?, any?, string?)
+    local slug = string.lower(tostring(slugValue or ""))
+    local row = WeaponRegistry.weapons and WeaponRegistry.weapons[slug]
+    if not row or row.status ~= "PUBLISHED" then
+        return nil, row, "weapon not registered/published: " .. slug
+    end
+    local template = findByStudioPath(tostring(row.serverStoragePath or ""))
+    if not template or not template:IsA("Model") then
+        return nil, row, "weapon is not synced to ServerStorage: " .. slug
+    end
+    local names = if hand == "right" then RIGHT_SOCKET_NAMES else if hand == "left" then LEFT_SOCKET_NAMES else nil
+    if not names then return nil, row, "invalid hand: " .. hand end
+    local bone = findCharacterBone(actor, names)
+    if not bone then return nil, row, "NPC has no " .. hand .. " weapon socket" end
+    local weapon = template:Clone()
+    weapon.Name = modelName
+    prepareWeapon(weapon)
+    local grip = ensureCanonicalRuntimeGrip(weapon)
+    if not grip then weapon:Destroy(); return nil, row, "weapon has no grip BasePart" end
+    weapon:SetAttribute("Game1WeaponAttachment", true)
+    weapon:SetAttribute("WeaponTargetBoneName", bone.Name)
+    weapon:SetAttribute("WeaponHand", hand)
+    weapon:SetAttribute("WeaponSlug", slug)
+    weapon:SetAttribute("WeaponType", tostring(row.weaponType or ""))
+    weapon:SetAttribute("WeaponRarity", tostring(row.rarity or ""))
+    weapon:SetAttribute("AttackRadius", attackRadiusFor(row))
+    weapon:SetAttribute("Game1WeaponGripRotation", nil)
+    weapon:SetAttribute("WeaponAttachmentMode", "runtime-canonical-grip-v2")
+    alignWeaponToSocket(weapon, grip, targetSocketCFrame(bone) * WEAPON_EQUIP_ROTATION)
+    WeaponAttackVolume.StampWeaponBox(weapon)
+    weapon.Parent = actor
+    return weapon, row, nil
 end
 
 function WeaponEquipService.GetAvailable(slugValue: any): any?

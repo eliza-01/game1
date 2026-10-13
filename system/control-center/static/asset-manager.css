@@ -18,3 +18,35 @@
 
 /* Animation Speed: one self-contained card per animation channel. */
 #animation-speed-profiles{display:grid;gap:20px}.animation-speed-profile{display:grid;gap:12px}.animation-speed-profile+.animation-speed-profile{border-top:1px solid var(--line);padding-top:20px}.animation-speed-profile-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.animation-speed-profile-head>div>span,.animation-speed-rule-head>div>span{display:block;color:var(--mint);font-size:10px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}.animation-speed-profile-head h3{font-size:18px;margin-top:3px}.animation-speed-profile-head small{display:block;color:var(--muted);font-size:11px;margin-top:5px}.animation-speed-rule-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.animation-speed-rule{min-width:0;border:1px solid var(--line);border-radius:14px;background:var(--panel2);padding:14px;display:grid;gap:13px}.animation-speed-rule-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding-bottom:11px;border-bottom:1px solid var(--line)}.animation-speed-rule-head h4{font-size:17px;margin-top:3px}.animation-speed-rule-head small{display:block;color:var(--muted);font-size:11px;line-height:1.4;margin-top:4px}.animation-speed-channel{flex:none;border:1px solid var(--line);border-radius:999px;padding:5px 8px;color:var(--muted);font:10px ui-monospace,SFMono-Regular,Consolas,monospace}.animation-speed-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.animation-speed-field{display:block!important;margin:0!important;min-width:0;padding:10px;border:1px solid color-mix(in srgb,var(--line),transparent 12%);border-radius:10px;background:color-mix(in srgb,var(--panel),transparent 28%);color:var(--text)!important}.animation-speed-field b,.animation-speed-field strong,.animation-speed-field code,.animation-speed-field small{display:block}.animation-speed-field b{font-size:11px}.animation-speed-field strong{font-size:14px;margin-top:6px}.animation-speed-field code{margin-top:7px;overflow-wrap:anywhere}.animation-speed-field small{color:var(--muted);font-size:10px;line-height:1.35;margin-top:6px}.animation-speed-field input{width:100%;margin-top:7px!important;font-weight:800}.animation-speed-readonly strong{color:var(--mint)}.animation-speed-rule-actions{display:flex;justify-content:space-between;align-items:center;gap:10px;padding-top:2px}.animation-speed-rule-actions>span{color:var(--muted);font-size:10px}.animation-speed-rule-actions>span b{color:var(--text)}.animation-speed-rule-actions button{white-space:nowrap}@media(max-width:1050px){.animation-speed-rule-grid{grid-template-columns:1fr}}@media(max-width:650px){.animation-speed-fields{grid-template-columns:1fr}.animation-speed-rule-actions{align-items:stretch;flex-direction:column}.animation-speed-rule-actions button{width:100%}.animation-speed-profile-head{align-items:flex-start}}
+
+/* Numeric weights and weapon type selectors must never clip their values. */
+.animation-table-wrap input.weight-input,
+.animation-table-wrap input[data-weight] {
+  field-sizing: content;
+  width: max-content;
+  min-width: 8.5ch;
+  max-width: none;
+  padding-inline: 8px;
+  box-sizing: content-box;
+  font-variant-numeric: tabular-nums;
+}
+.animation-table-wrap select[data-set],
+.animation-table-wrap select[data-type] {
+  field-sizing: content;
+  width: max-content;
+  min-width: 8ch;
+  max-width: none;
+  white-space: nowrap;
+  box-sizing: content-box;
+}
+.animation-table-wrap td:has(input.weight-input),
+.animation-table-wrap td:has(select[data-set]) {white-space:nowrap;}
+
+.unassigned-row select[data-set],
+.unassigned-row select[data-slot],
+.unassigned-row input[data-variant] {
+  field-sizing: content;
+  width: max-content;
+  min-width: 8ch;
+  max-width: 100%;
+}

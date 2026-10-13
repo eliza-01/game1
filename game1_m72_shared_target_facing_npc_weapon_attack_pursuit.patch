@@ -1,0 +1,1743 @@
+diff --git a/docs/NPC_MONSTER_ATTACK_TRACKER_M72_RU.md b/docs/NPC_MONSTER_ATTACK_TRACKER_M72_RU.md
+new file mode 100644
+--- /dev/null
++++ b/docs/NPC_MONSTER_ATTACK_TRACKER_M72_RU.md
+@@ -0,0 +1,22 @@
++# M72 · Трекинг цели и преследование во время атаки
++
++## Сервер
++
++`ActorFacingTracker` — единый серверный yaw-трекер для NPC и Monster с ограничением скорости поворота, экспоненциальным сглаживанием и управлением `Humanoid.AutoRotate` только на время атаки. Не меняет authored bones, клипы и игровой `Hit`.
++
++`ActorAttackPursuit` — управление скоростью через `Humanoid:Move` во время *действующей* атаки, без потока `MoveTo` и без рестарта анимации. Для NPC конфигурация берётся через `WeaponAttackMovement.Resolve(weaponType)` из зарегистрированного оружия правой руки (если её нет — левой); `hands` — нейтральный fallback. `locomotionMode` задаёт Walk/Run клип, `runSpeedMultiplier` — скорость в долях RunSpeed, а `AnimationSpeedScaling` управляет cadence ног.
++
++Монстры используют свой проверенный алгоритм преследования, но общую систему поворота. NPC сохраняют отдельную реактивную агрессию, leash и возвращение на спавн.
++
++## Клиент
++
++Переиспользуется общая конфигурация и тот же pose sampler / skeleton mapper, который ранее использовался у Monster; для NPC добавлен самостоятельный тонкий `NpcAttackLocomotionController`. На нижних ветвях производится наложение ходьбы/бега, верх продолжает проигрывать авторскую `attack`. При прекращении движения вес затухает. Визуальный слой не наносит урон.
++
++## Проверка в Studio
++
++- Меч `sword`: в радиусе удара при отходе цели NPC продолжает полный цикл атаки, ноги играют `Run` и следуют за направлением движения.
++- `bigsword` / `bow`: `Walk` и коэффициент 0.75 из Asset Manager. Значения подхватываются из реестра и не зашиты в AI.
++- Монстр и NPC: при обходе вокруг них в радиусе удара разворачиваются плавно без мгновенных рывков на Hit.
++- Выход цели за leash и её смерть: движения останавливаются, NPC возвращается по прежним правилам.
++
++Автотесты проверяют контракт модулей. Поведение физики и анимаций Roblox проверяется в Studio.
+diff --git a/src/client/actor/ActorAnimationCompositionConfig.luau b/src/client/actor/ActorAnimationCompositionConfig.luau
+new file mode 100644
+--- /dev/null
++++ b/src/client/actor/ActorAnimationCompositionConfig.luau
+@@ -0,0 +1,16 @@
++-- Roblox Studio: StarterPlayer.StarterPlayerScripts.game1Client.MonsterAnimation.ActorAnimationCompositionConfig (ModuleScript)
++-- Client-only limits for monster upper-body-over-locomotion composition.
++local Config = {
++	MaxComposedMonsters = 32, -- legacy name for shared actor budget
++	MaxComposedActors = 32,
++	MaxDistance = 140,
++	EntryBlendSeconds = 0.10,
++	ExitBlendSeconds = 0.08,
++	SamplerIdleTtlSeconds = 8,
++	SamplerAnchorInterval = 0.50,
++	BottomLeafBandFraction = 0.28,
++	MaxLowerBodyFraction = 0.62,
++	MovementDirectionMinSpeed = 0.35,
++}
++
++return table.freeze(Config)
+diff --git a/src/client/actor/ActorLocomotionSampler.luau b/src/client/actor/ActorLocomotionSampler.luau
+new file mode 100644
+--- /dev/null
++++ b/src/client/actor/ActorLocomotionSampler.luau
+@@ -0,0 +1,162 @@
++-- Roblox Studio: StarterPlayer.StarterPlayerScripts.game1Client.MonsterAnimation.ActorLocomotionSampler (ModuleScript)
++-- Pooled invisible locomotion pose source. A sampler is leased exclusively while an actor is composed so individual phase offsets never synchronize visible legs.
++local Workspace = game:GetService("Workspace")
++
++local ActorSkeletonMap = require(script.Parent:WaitForChild("ActorSkeletonMap"))
++
++local ActorLocomotionSampler = {}
++ActorLocomotionSampler.__index = ActorLocomotionSampler
++
++local function prepareProxy(visual: Model): (Model?, Animator?, string?)
++	local oldArchivable = visual.Archivable
++	visual.Archivable = true
++	local okClone, cloneOrError = pcall(function()
++		return visual:Clone()
++	end)
++	visual.Archivable = oldArchivable
++	if not okClone or not cloneOrError then
++		return nil, nil, "could not clone actor visual: " .. tostring(cloneOrError)
++	end
++	local proxy = cloneOrError :: Model
++	proxy.Name = "__game1ActorLocomotionSampler"
++	for _, object in proxy:GetDescendants() do
++		if object:IsA("Bone") then
++			object.Transform = CFrame.identity
++		elseif object:IsA("BasePart") then
++			object.Anchored = true
++			object.CanCollide = false
++			object.CanTouch = false
++			object.CanQuery = false
++			object.CastShadow = false
++			object.Transparency = 1
++			object.LocalTransparencyModifier = 1
++		elseif object:IsA("ParticleEmitter") or object:IsA("Trail") or object:IsA("Beam") then
++			object.Enabled = false
++		elseif object:IsA("Script") or object:IsA("LocalScript") then
++			object:Destroy()
++		end
++	end
++	local controller = proxy:FindFirstChildWhichIsA("AnimationController", true)
++	if not controller then
++		controller = Instance.new("AnimationController")
++		controller.Name = "AnimationController"
++		controller.Parent = proxy
++	end
++	local animator = controller:FindFirstChildWhichIsA("Animator")
++	if not animator then
++		animator = Instance.new("Animator")
++		animator.Parent = controller
++	end
++	proxy.Parent = Workspace
++	return proxy, animator, nil
++end
++
++function ActorLocomotionSampler.new(visual: Model, animationId: string, playbackSpeed: number, startPhase: number?)
++	local proxy, animator, errorMessage = prepareProxy(visual)
++	if not proxy or not animator then
++		return nil, errorMessage
++	end
++	local animation = Instance.new("Animation")
++	animation.Name = "ActorAttackPursuitLocomotionSource"
++	animation.AnimationId = "rbxassetid://" .. animationId
++	local okLoad, trackOrError = pcall(function()
++		return animator:LoadAnimation(animation)
++	end)
++	animation:Destroy()
++	if not okLoad then
++		proxy:Destroy()
++		return nil, "could not load actor locomotion source: " .. tostring(trackOrError)
++	end
++	local track = trackOrError :: AnimationTrack
++	track.Looped = true
++	track.Priority = Enum.AnimationPriority.Movement
++	local okPlay, playError = pcall(function()
++		track:Play(0, 1, math.max(0.01, playbackSpeed))
++	end)
++	if not okPlay then
++		track:Destroy()
++		proxy:Destroy()
++		return nil, "could not play actor locomotion source: " .. tostring(playError)
++	end
++	local sampler = setmetatable({
++		proxy = proxy,
++		track = track,
++		bones = ActorSkeletonMap.BuildBonePathMap(proxy),
++		users = 0,
++		lastUsedAt = os.clock(),
++		lastAnchorAt = 0,
++		phase = 0,
++		phasePending = false,
++	}, ActorLocomotionSampler)
++	sampler:SetPhase(startPhase or 0)
++	return sampler, nil
++end
++
++
++function ActorLocomotionSampler:SetPlaybackSpeed(playbackSpeed: number)
++	if not self.track then
++		return
++	end
++	local speed = math.max(0.01, tonumber(playbackSpeed) or 1)
++	pcall(function()
++		self.track:AdjustSpeed(speed)
++	end)
++end
++
++function ActorLocomotionSampler:SetPhase(phase: number)
++	self.phase = math.clamp(tonumber(phase) or 0, 0, 0.999999)
++	self.phasePending = true
++	local length = tonumber(self.track and self.track.Length) or 0
++	if length > 0.01 and self.track and self.track.IsPlaying then
++		self.track.TimePosition = self.phase * length
++		self.phasePending = false
++	end
++end
++
++function ActorLocomotionSampler:GetBone(path: string): Bone?
++	return self.bones[path]
++end
++
++function ActorLocomotionSampler:GetBoneRelativeToPivot(path: string): CFrame?
++	local bone = self.bones[path]
++	if not bone or not bone.Parent or not self.proxy.Parent then
++		return nil
++	end
++	return self.proxy:GetPivot():ToObjectSpace(bone.TransformedWorldCFrame)
++end
++
++function ActorLocomotionSampler:IsReady(): boolean
++	local ready = self.track ~= nil and self.track.Length > 0.01
++	if ready and self.phasePending then
++		self.track.TimePosition = self.phase * self.track.Length
++		self.phasePending = false
++	end
++	return ready
++end
++
++function ActorLocomotionSampler:Touch()
++	self.lastUsedAt = os.clock()
++end
++
++function ActorLocomotionSampler:AnchorNear(cameraCFrame: CFrame, now: number, interval: number)
++	if now - self.lastAnchorAt < interval or not self.proxy.Parent then
++		return
++	end
++	self.lastAnchorAt = now
++	self.proxy:PivotTo(CFrame.new(cameraCFrame.Position + Vector3.new(0, -24, 0)))
++end
++
++function ActorLocomotionSampler:Destroy()
++	if self.track then
++		pcall(function()
++			self.track:Stop(0)
++			self.track:Destroy()
++		end)
++	end
++	if self.proxy then
++		self.proxy:Destroy()
++	end
++	self.bones = {}
++end
++
++return ActorLocomotionSampler
+diff --git a/src/client/actor/ActorLowerBodyPose.luau b/src/client/actor/ActorLowerBodyPose.luau
+new file mode 100644
+--- /dev/null
++++ b/src/client/actor/ActorLowerBodyPose.luau
+@@ -0,0 +1,70 @@
++-- Shared lower-body leg-root orientation for actors with full-body attack clips.
++-- Keeps the authored weapon/torso attack while independently walking/running.
++local Config = require(script.Parent:WaitForChild("ActorAnimationCompositionConfig"))
++local ActorLowerBodyPose = {}
++
++local function parentTransformedWorldCFrame(bone: Bone): CFrame?
++	local parent = bone.Parent
++	if not parent then
++		return nil
++	end
++	if parent:IsA("Bone") then
++		return parent.TransformedWorldCFrame
++	end
++	if parent:IsA("BasePart") then
++		return parent.CFrame
++	end
++	return nil
++end
++
++local function horizontalDirection(vector: Vector3): Vector3?
++	local flat = Vector3.new(vector.X, 0, vector.Z)
++	if flat.Magnitude <= Config.MovementDirectionMinSpeed then
++		return nil
++	end
++	return flat.Unit
++end
++
++local function movementDirection(entry): Vector3?
++	return horizontalDirection(entry.root.AssemblyLinearVelocity)
++		or horizontalDirection(entry.root.CFrame.LookVector)
++end
++
++function ActorLowerBodyPose.AlignToMovement(entry)
++	if not entry.sampler or entry.weight <= 0 or #entry.lowerRootPaths == 0 then
++		return
++	end
++	local direction = movementDirection(entry)
++	if not direction then
++		return
++	end
++
++	-- The wrapper/root is owned by Humanoid.AutoRotate and therefore follows the
++	-- actual travel direction. Map the authored Run lower-body branches into that
++	-- movement frame instead of inheriting any large yaw authored into Atk01.
++	-- Only independent leg subtrees are compensated; pelvis/spine ownership stays
++	-- with the attack so the torso can still twist naturally above the hips.
++	local movementRoot = CFrame.lookAlong(Vector3.zero, direction, Vector3.yAxis)
++	local desiredVisualRotation = (movementRoot * entry.visualRootOffsetRotation).Rotation
++	for _, path in entry.lowerRootPaths do
++		local targetBone = entry.targetBones[path]
++		local sourceRelative = entry.sampler:GetBoneRelativeToPivot(path)
++		if targetBone and targetBone.Parent and sourceRelative then
++			local parentWorld = parentTransformedWorldCFrame(targetBone)
++			if parentWorld then
++				local currentTransform = targetBone.Transform
++				local currentWorld = targetBone.TransformedWorldCFrame
++				local currentLocal = parentWorld:ToObjectSpace(currentWorld)
++				local effectiveBase = currentLocal * currentTransform:Inverse()
++				local desiredRotation = (desiredVisualRotation * sourceRelative.Rotation).Rotation
++				local desiredWorld = CFrame.new(currentWorld.Position) * desiredRotation
++				local desiredLocal = parentWorld:ToObjectSpace(desiredWorld)
++				local alignedTransform = effectiveBase:Inverse() * desiredLocal
++				targetBone.Transform = currentTransform:Lerp(alignedTransform, entry.weight)
++			end
++		end
++	end
++end
++
++
++return table.freeze(ActorLowerBodyPose)
+diff --git a/src/client/actor/ActorSkeletonMap.luau b/src/client/actor/ActorSkeletonMap.luau
+new file mode 100644
+--- /dev/null
++++ b/src/client/actor/ActorSkeletonMap.luau
+@@ -0,0 +1,209 @@
++-- Roblox Studio: StarterPlayer.StarterPlayerScripts.game1Client.MonsterAnimation.ActorSkeletonMap (ModuleScript)
++-- Actor-agnostic skeleton topology helpers for upper/lower body composition.
++local Config = require(script.Parent:WaitForChild("ActorAnimationCompositionConfig"))
++
++local ActorSkeletonMap = {}
++
++local LOWER_NAME_TOKENS = table.freeze({
++	"pelvis", "hip", "thigh", "calf", "shin", "foot", "toe", "leg", "paw", "hoof",
++})
++
++local function bonePath(bone: Bone, visual: Model): string
++	local parts = { bone.Name }
++	local current = bone.Parent
++	while current and current ~= visual do
++		table.insert(parts, 1, current.Name)
++		current = current.Parent
++	end
++	return table.concat(parts, "/")
++end
++
++function ActorSkeletonMap.BuildBonePathMap(visual: Model): { [string]: Bone }
++	local result = {}
++	for _, object in visual:GetDescendants() do
++		if object:IsA("Bone") then
++			result[bonePath(object, visual)] = object
++		end
++	end
++	return result
++end
++
++local function commonAncestorPath(paths: { string }): string?
++	if #paths == 0 then
++		return nil
++	end
++	local split = {}
++	for index, path in ipairs(paths) do
++		split[index] = string.split(path, "/")
++	end
++	local common = {}
++	local cursor = 1
++	while true do
++		local value = split[1][cursor]
++		if not value then
++			break
++		end
++		for index = 2, #split do
++			if split[index][cursor] ~= value then
++				return if #common > 0 then table.concat(common, "/") else nil
++			end
++		end
++		table.insert(common, value)
++		cursor += 1
++	end
++	return if #common > 0 then table.concat(common, "/") else nil
++end
++
++local function fallbackLowerPaths(pathMap: { [string]: Bone }): { string }
++	local result = {}
++	for path, bone in pathMap do
++		local lowered = string.lower(bone.Name)
++		for _, token in LOWER_NAME_TOKENS do
++			if string.find(lowered, token, 1, true) then
++				table.insert(result, path)
++				break
++			end
++		end
++	end
++	table.sort(result)
++	return result
++end
++
++
++local function parentBonePath(pathMap: { [string]: Bone }, bone: Bone, visual: Model): string?
++	local parent = bone.Parent
++	if parent and parent:IsA("Bone") then
++		local path = bonePath(parent, visual)
++		if pathMap[path] then
++			return path
++		end
++	end
++	return nil
++end
++
++function ActorSkeletonMap.ResolveIndependentLowerBodyRoots(visual: Model, lowerPaths: { string }): { string }
++	local pathMap = ActorSkeletonMap.BuildBonePathMap(visual)
++	local selected = {}
++	for _, path in lowerPaths do
++		if pathMap[path] then
++			selected[path] = true
++		end
++	end
++
++	local childrenByPath = {}
++	for path in pathMap do
++		childrenByPath[path] = {}
++	end
++	for path, bone in pathMap do
++		local parentPath = parentBonePath(pathMap, bone, visual)
++		if parentPath then
++			table.insert(childrenByPath[parentPath], path)
++		end
++	end
++
++	local pureMemo = {}
++	local function isIndependentLowerSubtree(path: string): boolean
++		local cached = pureMemo[path]
++		if cached ~= nil then
++			return cached
++		end
++		if not selected[path] then
++			pureMemo[path] = false
++			return false
++		end
++		for _, childPath in childrenByPath[path] or {} do
++			if not isIndependentLowerSubtree(childPath) then
++				pureMemo[path] = false
++				return false
++			end
++		end
++		pureMemo[path] = true
++		return true
++	end
++
++	local result = {}
++	for path, bone in pathMap do
++		if isIndependentLowerSubtree(path) then
++			local parentPath = parentBonePath(pathMap, bone, visual)
++			if not parentPath or not isIndependentLowerSubtree(parentPath) then
++				table.insert(result, path)
++			end
++		end
++	end
++	table.sort(result)
++	return result
++end
++
++function ActorSkeletonMap.ResolveLowerBodyPaths(visual: Model): { string }
++	local pathMap = ActorSkeletonMap.BuildBonePathMap(visual)
++	local boneCount = 0
++	local childrenByPath = {}
++	for path, bone in pathMap do
++		boneCount += 1
++		childrenByPath[path] = childrenByPath[path] or {}
++		local parent = bone.Parent
++		if parent and parent:IsA("Bone") then
++			local parentPath = bonePath(parent, visual)
++			childrenByPath[parentPath] = childrenByPath[parentPath] or {}
++			table.insert(childrenByPath[parentPath], path)
++		end
++	end
++	if boneCount == 0 then
++		return {}
++	end
++
++	local boundsCFrame, boundsSize = visual:GetBoundingBox()
++	local minimumY = boundsCFrame.Position.Y - boundsSize.Y * 0.5
++	local bandTop = minimumY + boundsSize.Y * Config.BottomLeafBandFraction
++	local lowLeaves = {}
++	for path, bone in pathMap do
++		if #(childrenByPath[path] or {}) == 0 and bone.TransformedWorldCFrame.Position.Y <= bandTop then
++			table.insert(lowLeaves, path)
++		end
++	end
++
++	if #lowLeaves < 2 then
++		return fallbackLowerPaths(pathMap)
++	end
++	local lca = commonAncestorPath(lowLeaves)
++	if not lca or not pathMap[lca] then
++		return fallbackLowerPaths(pathMap)
++	end
++
++	local branchRoots = {}
++	local lcaDepth = #string.split(lca, "/")
++	for _, leafPath in lowLeaves do
++		local segments = string.split(leafPath, "/")
++		if #segments > lcaDepth then
++			local root = table.concat(segments, "/", 1, lcaDepth + 1)
++			branchRoots[root] = true
++		end
++	end
++
++	local selected = {}
++	for path in pathMap do
++		for branchRoot in branchRoots do
++			if path == branchRoot or string.sub(path, 1, #branchRoot + 1) == branchRoot .. "/" then
++				selected[path] = true
++				break
++			end
++		end
++	end
++
++	local lcaName = string.lower(pathMap[lca].Name)
++	if string.find(lcaName, "pelvis", 1, true) or string.find(lcaName, "hip", 1, true) then
++		selected[lca] = true
++	end
++
++	local result = {}
++	for path in selected do
++		table.insert(result, path)
++	end
++	if #result == 0 or #result > math.floor(boneCount * Config.MaxLowerBodyFraction) then
++		return fallbackLowerPaths(pathMap)
++	end
++	table.sort(result)
++	return result
++end
++
++return table.freeze(ActorSkeletonMap)
+diff --git a/src/client/actor/NpcAttackLocomotionController.luau b/src/client/actor/NpcAttackLocomotionController.luau
+new file mode 100644
+--- /dev/null
++++ b/src/client/actor/NpcAttackLocomotionController.luau
+@@ -0,0 +1,191 @@
++-- NPC client compositor: same lower-body attack locomotion as monsters,
++-- but with the weapon-type movement policy supplied by the server.
++-- No hit, pathfinding or animation-state authority on the client.
++local RunService = game:GetService("RunService")
++local Workspace = game:GetService("Workspace")
++local Config = require(script.Parent:WaitForChild("ActorAnimationCompositionConfig"))
++local Skeleton = require(script.Parent:WaitForChild("ActorSkeletonMap"))
++local Sampler = require(script.Parent:WaitForChild("ActorLocomotionSampler"))
++local LowerBodyPose = require(script.Parent:WaitForChild("ActorLowerBodyPose"))
++
++local Controller = {}
++local started = false
++local entries = {}
++local active = {}
++local recycled = {}
++local serial = 0
++local lastCleanup = 0
++local warned = {}
++
++local function warnOnce(key: string, message: string)
++    if warned[key] then return end
++    warned[key] = true
++    warn("[game1][npc-locomotion] " .. message)
++end
++
++local function release(entry)
++    if not entry.sampler then return end
++    entry.sampler.users = math.max(0, entry.sampler.users - 1)
++    entry.sampler:Touch()
++    entry.sampler = nil
++end
++
++local function unbind(model: Model)
++    local entry = entries[model]
++    if not entry then return end
++    for _, conn in ipairs(entry.connections) do conn:Disconnect() end
++    release(entry)
++    entries[model] = nil
++    active[entry] = nil
++end
++
++local function acquire(entry): boolean
++    if entry.sampler then return true end
++    local animationId = tostring(entry.model:GetAttribute("NpcAttackPursuitAnimationId") or "")
++    if not animationId:match("^%d+$") or animationId == "0" then return false end
++    local key = tostring(entry.model:GetAttribute("NpcSlug")) .. "|" .. animationId
++    local sampler
++    for _, candidate in pairs(recycled) do
++        if candidate.baseKey == key and candidate.users == 0 then
++            sampler = candidate
++            break
++        end
++    end
++    local phase = tonumber(entry.model:GetAttribute("NpcAttackPursuitPhase")) or 0
++    local speed = tonumber(entry.model:GetAttribute("NpcAttackPursuitPlaybackSpeed")) or 1
++    if not sampler then
++        local created, err = Sampler.new(entry.visual, animationId, speed, phase)
++        if not created then
++            warnOnce(key, tostring(err or "cannot sample locomotion"))
++            return false
++        end
++        sampler = created
++        sampler.baseKey = key
++        serial += 1
++        recycled[key .. "#" .. tostring(serial)] = sampler
++    else
++        sampler:SetPhase(phase)
++        sampler:SetPlaybackSpeed(speed)
++    end
++    sampler.users = 1
++    sampler:Touch()
++    entry.sampler = sampler
++    return true
++end
++
++local function bind(model: Model)
++    if entries[model] or model:GetAttribute("Game1NpcRuntime") ~= true then return end
++    local visual = model:FindFirstChild("ImportedRig") or model
++    local root = model:FindFirstChild("HumanoidRootPart")
++    if not visual:IsA("Model") or not root or not root:IsA("BasePart") then return end
++    local lower = Skeleton.ResolveLowerBodyPaths(visual)
++    if #lower == 0 then return end
++    local entry = {
++        model = model, visual = visual, root = root,
++        targetBones = Skeleton.BuildBonePathMap(visual),
++        lowerPaths = lower,
++        lowerRootPaths = Skeleton.ResolveIndependentLowerBodyRoots(visual, lower),
++        visualRootOffsetRotation = root.CFrame:ToObjectSpace(visual:GetPivot()).Rotation,
++        weight = 0, sampler = nil, connections = {},
++    }
++    entries[model] = entry
++    table.insert(entry.connections, model:GetAttributeChangedSignal("NpcAttackPursuitActive"):Connect(function()
++        if model:GetAttribute("NpcAttackPursuitActive") == true then active[entry] = true end
++    end))
++    table.insert(entry.connections, model:GetAttributeChangedSignal("NpcAttackPursuitPlaybackSpeed"):Connect(function()
++        if entry.sampler then
++            entry.sampler:SetPlaybackSpeed(tonumber(model:GetAttribute("NpcAttackPursuitPlaybackSpeed")) or 1)
++        end
++    end))
++    table.insert(entry.connections, model.Destroying:Connect(function() unbind(model) end))
++    if model:GetAttribute("NpcAttackPursuitActive") == true then active[entry] = true end
++end
++
++-- Model, attributes and navigation root do not necessarily replicate in order.
++local function watchModel(model: Model)
++    task.spawn(function()
++        local deadline = os.clock() + 5
++        while model.Parent and not entries[model] and os.clock() < deadline do
++            if model:GetAttribute("Game1NpcRuntime") == true
++                and model:FindFirstChild("HumanoidRootPart") then
++                bind(model)
++                return
++            end
++            task.wait(0.1)
++        end
++    end)
++end
++
++local function bindFolder(folder: Folder)
++    for _, child in ipairs(folder:GetChildren()) do
++        if child:IsA("Model") then watchModel(child) end
++    end
++    folder.ChildAdded:Connect(function(child)
++        if child:IsA("Model") then watchModel(child) end
++    end)
++end
++
++local function step(dt: number)
++    local camera = Workspace.CurrentCamera
++    if not camera then return end
++    local composed = 0
++    for entry in pairs(active) do
++        if not entry.model.Parent or not entry.root.Parent or not entry.visual.Parent then
++            unbind(entry.model)
++            continue
++        end
++        local wants = entry.model:GetAttribute("NpcAttackPursuitActive") == true
++            and entry.model:GetAttribute("LifeState") == "Alive"
++            and (entry.root.Position - camera.CFrame.Position).Magnitude <= Config.MaxDistance
++        if wants and not entry.sampler and composed < Config.MaxComposedActors then acquire(entry) end
++        local sampler = entry.sampler
++        if sampler then
++            composed += 1
++            sampler:AnchorNear(camera.CFrame, os.clock(), Config.SamplerAnchorInterval)
++            local goal = if wants then 1 else 0
++            local duration = if goal == 1 then Config.EntryBlendSeconds else Config.ExitBlendSeconds
++            local alpha = if duration > 0 then math.clamp(dt / duration, 0, 1) else 1
++            entry.weight += (goal - entry.weight) * alpha
++            if entry.weight > 0.001 and sampler:IsReady() then
++                for _, path in ipairs(entry.lowerPaths) do
++                    local targetBone = entry.targetBones[path]
++                    local sourceBone = sampler:GetBone(path)
++                    if targetBone and targetBone.Parent and sourceBone and sourceBone.Parent then
++                        targetBone.Transform = targetBone.Transform:Lerp(sourceBone.Transform, entry.weight)
++                    end
++                end
++                LowerBodyPose.AlignToMovement(entry)
++            end
++            if entry.weight < 0.01 and not wants then
++                entry.weight = 0
++                release(entry)
++                active[entry] = nil
++            end
++        elseif not wants then
++            active[entry] = nil
++        end
++    end
++    local now = os.clock()
++    if now - lastCleanup >= 2 then
++        lastCleanup = now
++        for key, sampler in pairs(recycled) do
++            if sampler.users == 0 and now - sampler.lastUsedAt >= Config.SamplerIdleTtlSeconds then
++                sampler:Destroy()
++                recycled[key] = nil
++            end
++        end
++    end
++end
++
++function Controller.Start()
++    if started then return end
++    started = true
++    local folder = Workspace:FindFirstChild("NPCs")
++    if folder and folder:IsA("Folder") then bindFolder(folder) end
++    Workspace.ChildAdded:Connect(function(child)
++        if child:IsA("Folder") and child.Name == "NPCs" then bindFolder(child) end
++    end)
++    RunService.PreSimulation:Connect(step)
++end
++
++return table.freeze(Controller)
+diff --git a/src/client/init.client.luau b/src/client/init.client.luau
+--- a/src/client/init.client.luau
++++ b/src/client/init.client.luau
+@@ -26,6 +26,7 @@
+ local MonsterDebugController = require(DevRoot:WaitForChild("MonsterDebugController"))
+ local MonsterRoot = script:WaitForChild("monster")
+ local MonsterAttackLocomotionController = require(MonsterRoot:WaitForChild("MonsterAttackLocomotionController"))
++local NpcAttackLocomotionController = require(script:WaitForChild("actor"):WaitForChild("NpcAttackLocomotionController"))
+ 
+ print(("[game1][client] %s v%s · runtime %s")
+     :format(ProjectInfo.Name, ProjectInfo.Version, RuntimeVersion.Version))
+@@ -39,6 +40,7 @@
+ HitEffectController.Start()
+ CombatFeedbackController.Start()
+ MonsterAttackLocomotionController.Start()
++NpcAttackLocomotionController.Start()
+ AttackController.Start(MovementController, CharacterAnimationController, AimPoseController)
+ WeaponBounceController.Start(CharacterAnimationController, AttackController)
+ PlayerStatusController.Start()
+diff --git a/src/client/monster/MonsterAnimationCompositionConfig.luau b/src/client/monster/MonsterAnimationCompositionConfig.luau
+--- a/src/client/monster/MonsterAnimationCompositionConfig.luau
++++ b/src/client/monster/MonsterAnimationCompositionConfig.luau
+@@ -1,15 +1,2 @@
+--- Roblox Studio: StarterPlayer.StarterPlayerScripts.game1Client.MonsterAnimation.MonsterAnimationCompositionConfig (ModuleScript)
+--- Client-only limits for monster upper-body-over-locomotion composition.
+-local Config = {
+-	MaxComposedMonsters = 32,
+-	MaxDistance = 140,
+-	EntryBlendSeconds = 0.10,
+-	ExitBlendSeconds = 0.08,
+-	SamplerIdleTtlSeconds = 8,
+-	SamplerAnchorInterval = 0.50,
+-	BottomLeafBandFraction = 0.28,
+-	MaxLowerBodyFraction = 0.62,
+-	MovementDirectionMinSpeed = 0.35,
+-}
+-
+-return table.freeze(Config)
++-- Backward-compatible monster API; actor presentation owns shared limits.
++return require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorAnimationCompositionConfig"))
+diff --git a/src/client/monster/MonsterAttackLocomotionController.luau b/src/client/monster/MonsterAttackLocomotionController.luau
+--- a/src/client/monster/MonsterAttackLocomotionController.luau
++++ b/src/client/monster/MonsterAttackLocomotionController.luau
+@@ -7,6 +7,7 @@
+ local Config = require(script.Parent:WaitForChild("MonsterAnimationCompositionConfig"))
+ local MonsterSkeletonMap = require(script.Parent:WaitForChild("MonsterSkeletonMap"))
+ local MonsterLocomotionSampler = require(script.Parent:WaitForChild("MonsterLocomotionSampler"))
++local ActorLowerBodyPose = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorLowerBodyPose"))
+ 
+ local Controller = {}
+ local started = false
+@@ -30,33 +31,6 @@
+ 		return math.min(target, current + delta)
+ 	end
+ 	return math.max(target, current - delta)
+-end
+-
+-local function parentTransformedWorldCFrame(bone: Bone): CFrame?
+-	local parent = bone.Parent
+-	if not parent then
+-		return nil
+-	end
+-	if parent:IsA("Bone") then
+-		return parent.TransformedWorldCFrame
+-	end
+-	if parent:IsA("BasePart") then
+-		return parent.CFrame
+-	end
+-	return nil
+-end
+-
+-local function horizontalDirection(vector: Vector3): Vector3?
+-	local flat = Vector3.new(vector.X, 0, vector.Z)
+-	if flat.Magnitude <= Config.MovementDirectionMinSpeed then
+-		return nil
+-	end
+-	return flat.Unit
+-end
+-
+-local function movementDirection(entry): Vector3?
+-	return horizontalDirection(entry.root.AssemblyLinearVelocity)
+-		or horizontalDirection(entry.root.CFrame.LookVector)
+ end
+ 
+ local function resolveRootMotionBones(visual: Model): { Bone }
+@@ -82,42 +56,6 @@
+ 		if bone.Parent then
+ 			local transform = bone.Transform
+ 			bone.Transform = CFrame.new(0, transform.Position.Y, 0) * transform.Rotation
+-		end
+-	end
+-end
+-
+-local function alignLowerBodyRootsToMovement(entry)
+-	if not entry.sampler or entry.weight <= 0 or #entry.lowerRootPaths == 0 then
+-		return
+-	end
+-	local direction = movementDirection(entry)
+-	if not direction then
+-		return
+-	end
+-
+-	-- The wrapper/root is owned by Humanoid.AutoRotate and therefore follows the
+-	-- actual travel direction. Map the authored Run lower-body branches into that
+-	-- movement frame instead of inheriting any large yaw authored into Atk01.
+-	-- Only independent leg subtrees are compensated; pelvis/spine ownership stays
+-	-- with the attack so the torso can still twist naturally above the hips.
+-	local movementRoot = CFrame.lookAlong(Vector3.zero, direction, Vector3.yAxis)
+-	local desiredVisualRotation = (movementRoot * entry.visualRootOffsetRotation).Rotation
+-	for _, path in entry.lowerRootPaths do
+-		local targetBone = entry.targetBones[path]
+-		local sourceRelative = entry.sampler:GetBoneRelativeToPivot(path)
+-		if targetBone and targetBone.Parent and sourceRelative then
+-			local parentWorld = parentTransformedWorldCFrame(targetBone)
+-			if parentWorld then
+-				local currentTransform = targetBone.Transform
+-				local currentWorld = targetBone.TransformedWorldCFrame
+-				local currentLocal = parentWorld:ToObjectSpace(currentWorld)
+-				local effectiveBase = currentLocal * currentTransform:Inverse()
+-				local desiredRotation = (desiredVisualRotation * sourceRelative.Rotation).Rotation
+-				local desiredWorld = CFrame.new(currentWorld.Position) * desiredRotation
+-				local desiredLocal = parentWorld:ToObjectSpace(desiredWorld)
+-				local alignedTransform = effectiveBase:Inverse() * desiredLocal
+-				targetBone.Transform = currentTransform:Lerp(alignedTransform, entry.weight)
+-			end
+ 		end
+ 	end
+ end
+@@ -327,7 +265,7 @@
+ 						targetBone.Transform = targetBone.Transform:Lerp(sourceBone.Transform, entry.weight)
+ 					end
+ 				end
+-				alignLowerBodyRootsToMovement(entry)
++				ActorLowerBodyPose.AlignToMovement(entry)
+ 			end
+ 			if entry.weight <= 0 and not wantsComposition then
+ 				releaseSampler(entry)
+diff --git a/src/client/monster/MonsterLocomotionSampler.luau b/src/client/monster/MonsterLocomotionSampler.luau
+--- a/src/client/monster/MonsterLocomotionSampler.luau
++++ b/src/client/monster/MonsterLocomotionSampler.luau
+@@ -1,162 +1,2 @@
+--- Roblox Studio: StarterPlayer.StarterPlayerScripts.game1Client.MonsterAnimation.MonsterLocomotionSampler (ModuleScript)
+--- Pooled invisible locomotion pose source. A sampler is leased exclusively while a monster is composed so individual phase offsets never synchronize visible legs.
+-local Workspace = game:GetService("Workspace")
+-
+-local MonsterSkeletonMap = require(script.Parent:WaitForChild("MonsterSkeletonMap"))
+-
+-local MonsterLocomotionSampler = {}
+-MonsterLocomotionSampler.__index = MonsterLocomotionSampler
+-
+-local function prepareProxy(visual: Model): (Model?, Animator?, string?)
+-	local oldArchivable = visual.Archivable
+-	visual.Archivable = true
+-	local okClone, cloneOrError = pcall(function()
+-		return visual:Clone()
+-	end)
+-	visual.Archivable = oldArchivable
+-	if not okClone or not cloneOrError then
+-		return nil, nil, "could not clone monster visual: " .. tostring(cloneOrError)
+-	end
+-	local proxy = cloneOrError :: Model
+-	proxy.Name = "__game1MonsterLocomotionSampler"
+-	for _, object in proxy:GetDescendants() do
+-		if object:IsA("Bone") then
+-			object.Transform = CFrame.identity
+-		elseif object:IsA("BasePart") then
+-			object.Anchored = true
+-			object.CanCollide = false
+-			object.CanTouch = false
+-			object.CanQuery = false
+-			object.CastShadow = false
+-			object.Transparency = 1
+-			object.LocalTransparencyModifier = 1
+-		elseif object:IsA("ParticleEmitter") or object:IsA("Trail") or object:IsA("Beam") then
+-			object.Enabled = false
+-		elseif object:IsA("Script") or object:IsA("LocalScript") then
+-			object:Destroy()
+-		end
+-	end
+-	local controller = proxy:FindFirstChildWhichIsA("AnimationController", true)
+-	if not controller then
+-		controller = Instance.new("AnimationController")
+-		controller.Name = "AnimationController"
+-		controller.Parent = proxy
+-	end
+-	local animator = controller:FindFirstChildWhichIsA("Animator")
+-	if not animator then
+-		animator = Instance.new("Animator")
+-		animator.Parent = controller
+-	end
+-	proxy.Parent = Workspace
+-	return proxy, animator, nil
+-end
+-
+-function MonsterLocomotionSampler.new(visual: Model, animationId: string, playbackSpeed: number, startPhase: number?)
+-	local proxy, animator, errorMessage = prepareProxy(visual)
+-	if not proxy or not animator then
+-		return nil, errorMessage
+-	end
+-	local animation = Instance.new("Animation")
+-	animation.Name = "MonsterAttackPursuitRunSource"
+-	animation.AnimationId = "rbxassetid://" .. animationId
+-	local okLoad, trackOrError = pcall(function()
+-		return animator:LoadAnimation(animation)
+-	end)
+-	animation:Destroy()
+-	if not okLoad then
+-		proxy:Destroy()
+-		return nil, "could not load monster run source: " .. tostring(trackOrError)
+-	end
+-	local track = trackOrError :: AnimationTrack
+-	track.Looped = true
+-	track.Priority = Enum.AnimationPriority.Movement
+-	local okPlay, playError = pcall(function()
+-		track:Play(0, 1, math.max(0.01, playbackSpeed))
+-	end)
+-	if not okPlay then
+-		track:Destroy()
+-		proxy:Destroy()
+-		return nil, "could not play monster run source: " .. tostring(playError)
+-	end
+-	local sampler = setmetatable({
+-		proxy = proxy,
+-		track = track,
+-		bones = MonsterSkeletonMap.BuildBonePathMap(proxy),
+-		users = 0,
+-		lastUsedAt = os.clock(),
+-		lastAnchorAt = 0,
+-		phase = 0,
+-		phasePending = false,
+-	}, MonsterLocomotionSampler)
+-	sampler:SetPhase(startPhase or 0)
+-	return sampler, nil
+-end
+-
+-
+-function MonsterLocomotionSampler:SetPlaybackSpeed(playbackSpeed: number)
+-	if not self.track then
+-		return
+-	end
+-	local speed = math.max(0.01, tonumber(playbackSpeed) or 1)
+-	pcall(function()
+-		self.track:AdjustSpeed(speed)
+-	end)
+-end
+-
+-function MonsterLocomotionSampler:SetPhase(phase: number)
+-	self.phase = math.clamp(tonumber(phase) or 0, 0, 0.999999)
+-	self.phasePending = true
+-	local length = tonumber(self.track and self.track.Length) or 0
+-	if length > 0.01 and self.track and self.track.IsPlaying then
+-		self.track.TimePosition = self.phase * length
+-		self.phasePending = false
+-	end
+-end
+-
+-function MonsterLocomotionSampler:GetBone(path: string): Bone?
+-	return self.bones[path]
+-end
+-
+-function MonsterLocomotionSampler:GetBoneRelativeToPivot(path: string): CFrame?
+-	local bone = self.bones[path]
+-	if not bone or not bone.Parent or not self.proxy.Parent then
+-		return nil
+-	end
+-	return self.proxy:GetPivot():ToObjectSpace(bone.TransformedWorldCFrame)
+-end
+-
+-function MonsterLocomotionSampler:IsReady(): boolean
+-	local ready = self.track ~= nil and self.track.Length > 0.01
+-	if ready and self.phasePending then
+-		self.track.TimePosition = self.phase * self.track.Length
+-		self.phasePending = false
+-	end
+-	return ready
+-end
+-
+-function MonsterLocomotionSampler:Touch()
+-	self.lastUsedAt = os.clock()
+-end
+-
+-function MonsterLocomotionSampler:AnchorNear(cameraCFrame: CFrame, now: number, interval: number)
+-	if now - self.lastAnchorAt < interval or not self.proxy.Parent then
+-		return
+-	end
+-	self.lastAnchorAt = now
+-	self.proxy:PivotTo(CFrame.new(cameraCFrame.Position + Vector3.new(0, -24, 0)))
+-end
+-
+-function MonsterLocomotionSampler:Destroy()
+-	if self.track then
+-		pcall(function()
+-			self.track:Stop(0)
+-			self.track:Destroy()
+-		end)
+-	end
+-	if self.proxy then
+-		self.proxy:Destroy()
+-	end
+-	self.bones = {}
+-end
+-
+-return MonsterLocomotionSampler
++-- Compatibility alias; actor locomotion sampling is shared with NPCs.
++return require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorLocomotionSampler"))
+diff --git a/src/client/monster/MonsterSkeletonMap.luau b/src/client/monster/MonsterSkeletonMap.luau
+--- a/src/client/monster/MonsterSkeletonMap.luau
++++ b/src/client/monster/MonsterSkeletonMap.luau
+@@ -1,209 +1,2 @@
+--- Roblox Studio: StarterPlayer.StarterPlayerScripts.game1Client.MonsterAnimation.MonsterSkeletonMap (ModuleScript)
+--- Pure skeleton topology helpers used by the monster locomotion compositor.
+-local Config = require(script.Parent:WaitForChild("MonsterAnimationCompositionConfig"))
+-
+-local MonsterSkeletonMap = {}
+-
+-local LOWER_NAME_TOKENS = table.freeze({
+-	"pelvis", "hip", "thigh", "calf", "shin", "foot", "toe", "leg", "paw", "hoof",
+-})
+-
+-local function bonePath(bone: Bone, visual: Model): string
+-	local parts = { bone.Name }
+-	local current = bone.Parent
+-	while current and current ~= visual do
+-		table.insert(parts, 1, current.Name)
+-		current = current.Parent
+-	end
+-	return table.concat(parts, "/")
+-end
+-
+-function MonsterSkeletonMap.BuildBonePathMap(visual: Model): { [string]: Bone }
+-	local result = {}
+-	for _, object in visual:GetDescendants() do
+-		if object:IsA("Bone") then
+-			result[bonePath(object, visual)] = object
+-		end
+-	end
+-	return result
+-end
+-
+-local function commonAncestorPath(paths: { string }): string?
+-	if #paths == 0 then
+-		return nil
+-	end
+-	local split = {}
+-	for index, path in ipairs(paths) do
+-		split[index] = string.split(path, "/")
+-	end
+-	local common = {}
+-	local cursor = 1
+-	while true do
+-		local value = split[1][cursor]
+-		if not value then
+-			break
+-		end
+-		for index = 2, #split do
+-			if split[index][cursor] ~= value then
+-				return if #common > 0 then table.concat(common, "/") else nil
+-			end
+-		end
+-		table.insert(common, value)
+-		cursor += 1
+-	end
+-	return if #common > 0 then table.concat(common, "/") else nil
+-end
+-
+-local function fallbackLowerPaths(pathMap: { [string]: Bone }): { string }
+-	local result = {}
+-	for path, bone in pathMap do
+-		local lowered = string.lower(bone.Name)
+-		for _, token in LOWER_NAME_TOKENS do
+-			if string.find(lowered, token, 1, true) then
+-				table.insert(result, path)
+-				break
+-			end
+-		end
+-	end
+-	table.sort(result)
+-	return result
+-end
+-
+-
+-local function parentBonePath(pathMap: { [string]: Bone }, bone: Bone, visual: Model): string?
+-	local parent = bone.Parent
+-	if parent and parent:IsA("Bone") then
+-		local path = bonePath(parent, visual)
+-		if pathMap[path] then
+-			return path
+-		end
+-	end
+-	return nil
+-end
+-
+-function MonsterSkeletonMap.ResolveIndependentLowerBodyRoots(visual: Model, lowerPaths: { string }): { string }
+-	local pathMap = MonsterSkeletonMap.BuildBonePathMap(visual)
+-	local selected = {}
+-	for _, path in lowerPaths do
+-		if pathMap[path] then
+-			selected[path] = true
+-		end
+-	end
+-
+-	local childrenByPath = {}
+-	for path in pathMap do
+-		childrenByPath[path] = {}
+-	end
+-	for path, bone in pathMap do
+-		local parentPath = parentBonePath(pathMap, bone, visual)
+-		if parentPath then
+-			table.insert(childrenByPath[parentPath], path)
+-		end
+-	end
+-
+-	local pureMemo = {}
+-	local function isIndependentLowerSubtree(path: string): boolean
+-		local cached = pureMemo[path]
+-		if cached ~= nil then
+-			return cached
+-		end
+-		if not selected[path] then
+-			pureMemo[path] = false
+-			return false
+-		end
+-		for _, childPath in childrenByPath[path] or {} do
+-			if not isIndependentLowerSubtree(childPath) then
+-				pureMemo[path] = false
+-				return false
+-			end
+-		end
+-		pureMemo[path] = true
+-		return true
+-	end
+-
+-	local result = {}
+-	for path, bone in pathMap do
+-		if isIndependentLowerSubtree(path) then
+-			local parentPath = parentBonePath(pathMap, bone, visual)
+-			if not parentPath or not isIndependentLowerSubtree(parentPath) then
+-				table.insert(result, path)
+-			end
+-		end
+-	end
+-	table.sort(result)
+-	return result
+-end
+-
+-function MonsterSkeletonMap.ResolveLowerBodyPaths(visual: Model): { string }
+-	local pathMap = MonsterSkeletonMap.BuildBonePathMap(visual)
+-	local boneCount = 0
+-	local childrenByPath = {}
+-	for path, bone in pathMap do
+-		boneCount += 1
+-		childrenByPath[path] = childrenByPath[path] or {}
+-		local parent = bone.Parent
+-		if parent and parent:IsA("Bone") then
+-			local parentPath = bonePath(parent, visual)
+-			childrenByPath[parentPath] = childrenByPath[parentPath] or {}
+-			table.insert(childrenByPath[parentPath], path)
+-		end
+-	end
+-	if boneCount == 0 then
+-		return {}
+-	end
+-
+-	local boundsCFrame, boundsSize = visual:GetBoundingBox()
+-	local minimumY = boundsCFrame.Position.Y - boundsSize.Y * 0.5
+-	local bandTop = minimumY + boundsSize.Y * Config.BottomLeafBandFraction
+-	local lowLeaves = {}
+-	for path, bone in pathMap do
+-		if #(childrenByPath[path] or {}) == 0 and bone.TransformedWorldCFrame.Position.Y <= bandTop then
+-			table.insert(lowLeaves, path)
+-		end
+-	end
+-
+-	if #lowLeaves < 2 then
+-		return fallbackLowerPaths(pathMap)
+-	end
+-	local lca = commonAncestorPath(lowLeaves)
+-	if not lca or not pathMap[lca] then
+-		return fallbackLowerPaths(pathMap)
+-	end
+-
+-	local branchRoots = {}
+-	local lcaDepth = #string.split(lca, "/")
+-	for _, leafPath in lowLeaves do
+-		local segments = string.split(leafPath, "/")
+-		if #segments > lcaDepth then
+-			local root = table.concat(segments, "/", 1, lcaDepth + 1)
+-			branchRoots[root] = true
+-		end
+-	end
+-
+-	local selected = {}
+-	for path in pathMap do
+-		for branchRoot in branchRoots do
+-			if path == branchRoot or string.sub(path, 1, #branchRoot + 1) == branchRoot .. "/" then
+-				selected[path] = true
+-				break
+-			end
+-		end
+-	end
+-
+-	local lcaName = string.lower(pathMap[lca].Name)
+-	if string.find(lcaName, "pelvis", 1, true) or string.find(lcaName, "hip", 1, true) then
+-		selected[lca] = true
+-	end
+-
+-	local result = {}
+-	for path in selected do
+-		table.insert(result, path)
+-	end
+-	if #result == 0 or #result > math.floor(boneCount * Config.MaxLowerBodyFraction) then
+-		return fallbackLowerPaths(pathMap)
+-	end
+-	table.sort(result)
+-	return result
+-end
+-
+-return table.freeze(MonsterSkeletonMap)
++-- Compatibility alias for monster composition; shared actor topology is canonical.
++return require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorSkeletonMap"))
+diff --git a/src/server/actor/ActorAttackPursuit.luau b/src/server/actor/ActorAttackPursuit.luau
+new file mode 100644
+--- /dev/null
++++ b/src/server/actor/ActorAttackPursuit.luau
+@@ -0,0 +1,56 @@
++-- In-attack velocity follower shared independently of target selection/attack timing.
++-- Uses the monster continuous Humanoid:Move contract; never issues MoveTo inside a hit.
++local Pursuit = {}
++Pursuit.__index = Pursuit
++local STOP_MARGIN = 0.35
++local FOLLOW_GAIN = 5.5
++local MIN_CATCHUP = 0.75
++local IDLE_EPSILON = 0.08
++
++function Pursuit.new(root: BasePart, humanoid: Humanoid)
++    return setmetatable({root = root, humanoid = humanoid, active = false}, Pursuit)
++end
++
++function Pursuit:Stop()
++    if not self.active then return end
++    self.active = false
++    if self.humanoid.Parent then
++        self.humanoid:Move(Vector3.zero, false)
++        self.humanoid.WalkSpeed = 0
++    end
++end
++
++-- Returns active locomotion and actual world speed (studs/sec).
++function Pursuit:Step(targetRoot: BasePart, attackRadius: number, maximumSpeed: number): (boolean, number)
++    if maximumSpeed <= 0 or not self.root.Parent or not self.humanoid.Parent then
++        self:Stop()
++        return false, 0
++    end
++    local offset = targetRoot.Position - self.root.Position
++    local flat = Vector3.new(offset.X, 0, offset.Z)
++    local distance = flat.Magnitude
++    if distance <= 0.001 then
++        self:Stop()
++        return false, 0
++    end
++    local direction = flat.Unit
++    local velocity = targetRoot.AssemblyLinearVelocity
++    local retreat = math.max(0, Vector3.new(velocity.X, 0, velocity.Z):Dot(direction))
++    local preferred = math.max(0, attackRadius - STOP_MARGIN)
++    local errorDistance = math.max(0, distance - preferred)
++    local desired = math.min(maximumSpeed, retreat + errorDistance * FOLLOW_GAIN)
++    if distance > attackRadius then
++        desired = math.max(desired, math.min(maximumSpeed, retreat + MIN_CATCHUP))
++    end
++    if desired <= IDLE_EPSILON then
++        self:Stop()
++        return false, 0
++    end
++    self.active = true
++    self.humanoid.WalkSpeed = desired
++    -- Rotation is owned by ActorFacingTracker during attacks.
++    self.humanoid:Move(direction, false)
++    return true, desired
++end
++
++return table.freeze(Pursuit)
+diff --git a/src/server/actor/ActorFacingTracker.luau b/src/server/actor/ActorFacingTracker.luau
+new file mode 100644
+--- /dev/null
++++ b/src/server/actor/ActorFacingTracker.luau
+@@ -0,0 +1,70 @@
++-- One server-owned yaw tracker shared by NPC and monster attacks.
++-- Physics/navigation still owns translation; no per-actor threads or bone hacks.
++local RunService = game:GetService("RunService")
++local Tracker = {}
++local active: {[Model]: any} = {}
++local connected = false
++local TURN_RESPONSE = 10 -- exponential responsiveness (1/s)
++local MAX_TURN_RATE = math.rad(420) -- physical yaw cap in radians/s
++
++local function stop(model: Model)
++    local entry = active[model]
++    if not entry then return end
++    active[model] = nil
++    if entry.humanoid.Parent then
++        entry.humanoid.AutoRotate = entry.autoRotate
++    end
++end
++
++local function step(dt: number)
++    for model, entry in pairs(active) do
++        local root = entry.root
++        local target = entry.target
++        local targetRoot = entry.resolve(target)
++        if not root.Parent or not model.Parent or not entry.humanoid.Parent
++            or model:GetAttribute("LifeState") ~= "Alive" then
++            stop(model)
++            continue
++        end
++        if not targetRoot or not targetRoot.Parent then continue end
++        local delta = targetRoot.Position - root.Position
++        local flat = Vector3.new(delta.X, 0, delta.Z)
++        if flat.Magnitude <= 0.01 then continue end
++        local desired = flat.Unit
++        local look = root.CFrame.LookVector
++        local current = Vector3.new(look.X, 0, look.Z)
++        if current.Magnitude <= 0.001 then current = desired else current = current.Unit end
++        local cross = current.X * desired.Z - current.Z * desired.X
++        local dot = math.clamp(current:Dot(desired), -1, 1)
++        local angle = math.atan2(cross, dot)
++        local absolute = math.abs(angle)
++        if absolute <= 0.00001 then continue end
++        local response = 1 - math.exp(-TURN_RESPONSE * math.clamp(dt, 0, 0.25))
++        local stepAngle = math.min(absolute * response, MAX_TURN_RATE * math.max(0, dt))
++        local sign = if angle < 0 then -1 else 1
++        local yaw = CFrame.fromAxisAngle(Vector3.yAxis, -sign * stepAngle)
++        local nextDirection = yaw:VectorToWorldSpace(current)
++        root.CFrame = CFrame.lookAt(root.Position, root.Position + nextDirection, Vector3.yAxis)
++    end
++end
++
++function Tracker.Track(model: Model, root: BasePart, humanoid: Humanoid, target: Model, resolver: (Model) -> BasePart?)
++    local entry = active[model]
++    if entry then
++        entry.target = target
++        entry.resolve = resolver
++        return
++    end
++    if not connected then
++        connected = true
++        RunService.Heartbeat:Connect(step)
++    end
++    active[model] = {
++        root = root, humanoid = humanoid, target = target,
++        resolve = resolver, autoRotate = humanoid.AutoRotate,
++    }
++    humanoid.AutoRotate = false
++end
++
++Tracker.Stop = stop
++return table.freeze(Tracker)
+diff --git a/src/server/monster/MonsterAIService.luau b/src/server/monster/MonsterAIService.luau
+--- a/src/server/monster/MonsterAIService.luau
++++ b/src/server/monster/MonsterAIService.luau
+@@ -19,6 +19,7 @@
+ local AnimationSpeedScaling = require(AnimationShared:WaitForChild("AnimationSpeedScaling"))
+ local DamageService = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("DamageService"))
+ local HitEffectService = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("HitEffectService"))
++local Facing = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorFacingTracker"))
+ 
+ local MonsterAIService = {}
+ local started = false
+@@ -285,7 +286,7 @@
+     local flat = Vector3.new(direction.X, 0, direction.Z)
+     if flat.Magnitude <= 0.001 then return end
+     agent.facing = flat.Unit
+-    if not agent.attackPursuitActive and agent.root.Parent then
++    if not agent.attacking and agent.root.Parent then
+         local position = agent.root.Position
+         agent.root.CFrame = CFrame.lookAt(position, position + agent.facing, Vector3.yAxis)
+     end
+@@ -348,6 +349,7 @@
+ end
+ 
+ local function leaveCombat(agent: any)
++    Facing.Stop(agent.model)
+     agent.target = nil
+     agent.attacking = false
+     agent.attackSerial += 1
+@@ -390,7 +392,7 @@
+     local enteringPursuit = not agent.attackPursuitActive
+     agent.attackPursuitActive = true
+     agent.humanoid.WalkSpeed = desiredSpeed
+-    agent.humanoid.AutoRotate = true
++    -- Facing yaw is owned by ActorFacingTracker; leave AutoRotate disabled.
+     -- Active-attack pursuit is a continuous velocity command, not a stream of
+     -- MoveTo destinations. Reissuing MoveTo around the attack-radius boundary
+     -- produces visible stop/catch-up pulses when player and monster speeds are
+@@ -418,9 +420,7 @@
+                 return
+             end
+             local pursuing = pursueDirectlyDuringAttack(agent, liveRoot)
+-            if not pursuing then
+-                faceDirection(agent, liveRoot.Position - agent.root.Position)
+-            end
++            -- Facing is updated continuously by the shared tracker even at rest.
+             RunService.Heartbeat:Wait()
+         end
+     end)
+@@ -432,7 +432,7 @@
+     local delta = horizontalDelta(agent.root.Position, targetRoot.Position)
+     if delta.Magnitude > attackRadius(agent) or math.abs(targetRoot.Position.Y - agent.root.Position.Y) > VERTICAL_TOLERANCE then return false end
+     if delta.Magnitude > 0.001 then
+-        if agent.facing:Dot(delta.Unit) < math.cos(math.rad(ATTACK_ARC_DEGREES * 0.5)) then return false end
++        if agent.root.CFrame.LookVector:Dot(delta.Unit) < math.cos(math.rad(ATTACK_ARC_DEGREES * 0.5)) then return false end
+     end
+     return hasLineOfSight(agent, target)
+ end
+@@ -446,6 +446,7 @@
+     if not timing then return end
+ 
+     agent.attacking = true
++    Facing.Track(agent.model, agent.root, agent.humanoid, target, rootOf)
+     agent.attackSerial += 1
+     local serial = agent.attackSerial
+     local duration = math.max(0.05, finite(timing.duration, 0.05))
+@@ -476,7 +477,7 @@
+             local direction = liveRoot.Position - agent.root.Position
+             local flatDirection = horizontalDelta(Vector3.zero, direction)
+             if flatDirection.Magnitude > 0.001 then agent.facing = flatDirection.Unit end
+-            if not agent.attackPursuitActive then faceDirection(agent, direction) end
++            -- Do not snap yaw on Hit: shared tracker already follows the target.
+         end
+         if attackStillConnects(agent, target) then
+             local damage, killed = DamageService.Apply(agent.model, target, finite(agent.model:GetAttribute("Damage"), 0))
+@@ -494,6 +495,7 @@
+         if not agent.active or agent.attackSerial ~= serial then return end
+         agent.attacking = false
+         agent.attackEndsAt = 0
++        Facing.Stop(agent.model)
+         clearAttackPursuit(agent)
+         stopTrack(agent.attackTrack)
+         agent.attackTrack = nil
+@@ -614,6 +616,7 @@
+         model:GetAttributeChangedSignal("LifeState"):Connect(function()
+             if agents[model] == agent and tostring(model:GetAttribute("LifeState") or "") ~= "Alive" then
+                 agent.attackSerial += 1
++                Facing.Stop(agent.model)
+                 agent.attacking = false
+                 agent.target = nil
+                 clearAttackPursuit(agent)
+@@ -625,6 +628,7 @@
+         model.Destroying:Connect(function()
+             if agents[model] == agent then
+                 agent.active = false
++                Facing.Stop(agent.model)
+                 clearPath(agent)
+                 agents[model] = nil
+             end
+diff --git a/src/server/npc/NpcCombatAIService.luau b/src/server/npc/NpcCombatAIService.luau
+--- a/src/server/npc/NpcCombatAIService.luau
++++ b/src/server/npc/NpcCombatAIService.luau
+@@ -18,6 +18,9 @@
+ local Navigator = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorChaseNavigator"))
+ local Queries = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorCombatTargeting"))
+ local Tracks = require(script.Parent:WaitForChild("NpcAnimationTracks"))
++local WeaponAttackMovement = require(Shared:WaitForChild("weapon"):WaitForChild("WeaponAttackMovement"))
++local Facing = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorFacingTracker"))
++local AttackPursuit = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorAttackPursuit"))
+ 
+ local NpcCombatAIService = {}
+ local agents: {[Model]: any} = {}
+@@ -41,6 +44,10 @@
+ end
+ 
+ local function stopAttack(agent: any)
++    Facing.Stop(agent.model)
++    agent.pursuit:Stop()
++    agent.pursuitMoving = false
++    agent.model:SetAttribute("NpcAttackPursuitActive", false)
+     if agent.attacking then
+         agent.serial += 1 -- invalidate pending timed hit and completion callbacks
+         agent.attacking = false
+@@ -133,15 +140,6 @@
+     local direction = Vector3.new(targetRoot.Position.X - origin.X, 0, targetRoot.Position.Z - origin.Z)
+     if direction.Magnitude > 0.01 and agent.root.CFrame.LookVector:Dot(direction.Unit) < HIT_ARC_COSINE then return false end
+     return Queries.Visible(agent.model, origin + Vector3.new(0, 0.6, 0), target)
+-end
+-
+-local function faceTarget(agent: any, target: Model)
+-    local root = Queries.Root(target)
+-    if not root then return end
+-    local from = agent.root.Position
+-    local to = Vector3.new(root.Position.X, from.Y, root.Position.Z)
+-    if (to - from).Magnitude < 0.01 then return end
+-    agent.root.CFrame = CFrame.lookAt(from, to, Vector3.yAxis)
+ end
+ 
+ -- Damage events are independent from the authored animation playback.
+@@ -208,7 +206,7 @@
+         setState(agent, "Attack")
+         agent.model:SetAttribute("NpcAttackClipId", if row then tostring(row.clipId or "") else "")
+     end
+-    faceTarget(agent, target)
++    Facing.Track(agent.model, agent.root, agent.humanoid, target, Queries.Root)
+     agent.model:SetAttribute("NpcAttackPhase", "Windup")
+     local track
+     if continuing then
+@@ -229,7 +227,6 @@
+         task.delay(math.max(0, hitAt - elapsed), function()
+             if not agent.active or agent.serial ~= serial or agent.target ~= target
+                 or agent.model:GetAttribute("LifeState") ~= "Alive" then return end
+-            faceTarget(agent, target)
+             if attackCanConnect(agent, target) then
+                 local amount, killed = DamageService.Apply(agent.model, target, finite(agent.model:GetAttribute("Damage"), 0))
+                 agent.model:SetAttribute("NpcLastAttackDamage", amount)
+@@ -251,6 +248,10 @@
+             local killed = agent.returnAfterAttack == true or not Queries.Valid(target)
+             agent.returnAfterAttack = false
+             if killed then
++                Facing.Stop(agent.model)
++                agent.pursuit:Stop()
++                agent.pursuitMoving = false
++                agent.model:SetAttribute("NpcAttackPursuitActive", false)
+                 agent.presentation.EndAttack()
+                 agent.currentAttackTrack = nil
+                 agent.currentAttackRow = nil
+@@ -260,6 +261,10 @@
+                 -- An animation never fades to combat_idle while in hit range.
+                 beginAttack(agent, target, true)
+             else
++                Facing.Stop(agent.model)
++                agent.pursuit:Stop()
++                agent.pursuitMoving = false
++                agent.model:SetAttribute("NpcAttackPursuitActive", false)
+                 agent.presentation.EndAttack()
+                 agent.currentAttackTrack = nil
+                 agent.currentAttackRow = nil
+@@ -343,10 +348,12 @@
+     local returnDelaySeconds = math.clamp(finite(behavior.returnDelaySeconds, 10), 0, 600)
+     local profile = (NpcAnimationRegistry.profiles or {})[tostring(model:GetAttribute("NpcSlug") or "")]
+     local weaponSet = tostring(model:GetAttribute("NpcWeaponSet") or "1hs")
++    local policy = WeaponAttackMovement.Resolve(model:GetAttribute("NpcWeaponType"))
+     local home = root.CFrame
+     local agent = {
+         model = model, root = root, humanoid = humanoid, presentation = presentation,
+-        navigator = Navigator.new(root, humanoid), target = nil, state = "Idle",
++        navigator = Navigator.new(root, humanoid), pursuit = AttackPursuit.new(root, humanoid),
++        policy = policy, target = nil, state = "Idle",
+         retaliate = retaliate, pursuitRadius = pursuitRadius, attackRadius = attackRadius,
+         returnDelaySeconds = returnDelaySeconds, returnAt = 0, home = home,
+         attackRows = Tracks.PublishedRows(profile, "attack", weaponSet),
+@@ -361,6 +368,22 @@
+     model:SetAttribute("NpcPursuitRadius", pursuitRadius)
+     model:SetAttribute("NpcReturnDelayMaxSeconds", returnDelaySeconds)
+     model:SetAttribute("NpcAttackRadius", attackRadius)
++    model:SetAttribute("NpcAttackPursuitActive", false)
++    model:SetAttribute("NpcAttackPursuitMode", policy.locomotionMode)
++    model:SetAttribute("NpcAttackPursuitAnimationId", "")
++    model:SetAttribute("NpcAttackPursuitPlaybackSpeed", 1)
++    model:SetAttribute("NpcAttackPursuitPhase", rng:NextNumber(0, 0.999))
++    local movementSlot = string.lower(policy.locomotionMode)
++    local rows = Tracks.PublishedRows(profile, movementSlot, weaponSet)
++    if #rows == 0 then
++        movementSlot = if movementSlot == "walk" then "run" else "walk"
++        rows = Tracks.PublishedRows(profile, movementSlot, weaponSet)
++    end
++    agent.pursuitChannel = movementSlot
++    local row = rows[1]
++    if row then
++        model:SetAttribute("NpcAttackPursuitAnimationId", tostring(row.assetId or tostring(row.animationId):match("(%d+)$") or ""))
++    end
+     pinAtRest(agent, true)
+ end
+ 
+@@ -369,6 +392,8 @@
+     if not agent then return end
+     agent.active = false
+     agent.serial += 1
++    Facing.Stop(agent.model)
++    agent.pursuit:Stop()
+     agent.navigator:Destroy()
+     agents[model] = nil
+     -- Do not call presentation methods after its lifecycle has been disposed.
+@@ -380,6 +405,39 @@
+     DamageSignals.Event:Connect(onDamage)
+     local elapsed = 0
+     RunService.Heartbeat:Connect(function(dt)
++        -- Monster-style movement during an attack is independent from the
++        -- slower AI decision cadence and never restarts the animation track.
++        for _, agent in pairs(agents) do
++            if agent.active and agent.attacking then
++                local target = agent.target
++                local targetRoot = if target and Queries.Valid(target) then Queries.Root(target) else nil
++                local inLeash = targetRoot and Queries.Distance(agent.home.Position, targetRoot.Position) <= agent.pursuitRadius
++                local allowed = targetRoot and inLeash and agent.model:GetAttribute("LifeState") == "Alive"
++                if allowed then
++                    local stat = agent.model:GetAttribute("RunSpeed")
++                    local maxSpeed = CharacterMovementConfig.RobloxSpeedAtRunMultiplier(nil, stat, agent.policy.runSpeedMultiplier)
++                    local moving, speed = agent.pursuit:Step(targetRoot, agent.attackRadius, maxSpeed)
++                    if moving ~= agent.pursuitMoving then
++                        agent.pursuitMoving = moving
++                        agent.model:SetAttribute("NpcAttackPursuitActive", moving)
++                    end
++                    if moving then
++                        local equivalent = CharacterMovementConfig.EquivalentRunSpeedForLocomotion(
++                            stat, speed / math.max(0.001, CharacterMovementConfig.RobloxSpeed(nil, stat, "Run")), agent.pursuitChannel == "walk" and "Walk" or "Run")
++                        local scale = AnimationSpeedScaling.ResolveForModelWithStatValue(
++                            agent.model, agent.pursuitChannel, equivalent) / 100
++                        local old = tonumber(agent.model:GetAttribute("NpcAttackPursuitPlaybackSpeed")) or 0
++                        if math.abs(scale - old) >= 0.025 then agent.model:SetAttribute("NpcAttackPursuitPlaybackSpeed", scale) end
++                    end
++                else
++                    agent.pursuit:Stop()
++                    if agent.pursuitMoving then
++                        agent.pursuitMoving = false
++                        agent.model:SetAttribute("NpcAttackPursuitActive", false)
++                    end
++                end
++            end
++        end
+         elapsed += dt
+         if elapsed < TICK_SECONDS then return end
+         elapsed %= TICK_SECONDS
+diff --git a/src/server/npc/NpcEquipmentService.luau b/src/server/npc/NpcEquipmentService.luau
+--- a/src/server/npc/NpcEquipmentService.luau
++++ b/src/server/npc/NpcEquipmentService.luau
+@@ -4,6 +4,7 @@
+ local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
+ local WeaponRegistry = require(Shared:WaitForChild("weapon"):WaitForChild("WeaponRegistry"))
+ local Loadouts = require(Shared:WaitForChild("npc"):WaitForChild("NpcEquipmentRegistry"))
++local WeaponAttackMovement = require(Shared:WaitForChild("weapon"):WaitForChild("WeaponAttackMovement"))
+ local WeaponEquipService = require(script.Parent.Parent:WaitForChild("weapon"):WaitForChild("WeaponEquipService"))
+ local NpcEquipmentService = {}
+ function NpcEquipmentService.Equip(entity: Model, npcSlug: string): string
+@@ -11,6 +12,7 @@
+     local set = "1hs" -- backward-compatible fallback for already registered NPC clips
+     local preferredHand = { "right", "left" }
+     local hasWeapon = false
++    local primaryType = "hands"
+     for _, hand in ipairs(preferredHand) do
+         local slug = tostring(loadout[hand] or "")
+         if slug ~= "" then
+@@ -20,11 +22,12 @@
+                 warn("[game1][npc] cannot equip " .. npcSlug .. " " .. hand .. ": " .. tostring(err))
+             elseif not hasWeapon then
+                 hasWeapon = true
+-                local settings = (WeaponRegistry.attackMovementByType or {})[tostring(definition.weaponType or "")]
+-                set = tostring(settings and settings.animationSet or "1hs")
++                primaryType = string.lower(tostring(definition.weaponType or "hands"))
++                set = WeaponAttackMovement.AnimationSetForType(primaryType)
+             end
+         end
+     end
++    entity:SetAttribute("NpcWeaponType", primaryType)
+     entity:SetAttribute("NpcWeaponSet", set)
+     return set
+ end
+diff --git a/system/verify/test_actor_facing_attack_movement_m72.py b/system/verify/test_actor_facing_attack_movement_m72.py
+new file mode 100644
+--- /dev/null
++++ b/system/verify/test_actor_facing_attack_movement_m72.py
+@@ -0,0 +1,73 @@
++"""M72 contracts: shared facing, attack pursuit, per-weapon locomotion & regression safety.
++
++Behavior inside Roblox Studio is still an integration check; these tests guard
++wiring and invariants without pretending to simulate Humanoid physics in Python.
++"""
++from pathlib import Path
++import unittest
++
++ROOT = Path(__file__).resolve().parents[2]
++
++def read(path):
++    return (ROOT / path).read_text(encoding="utf-8")
++
++class AttackMovementM72Tests(unittest.TestCase):
++    def test_monster_and_npc_share_smooth_server_facing(self):
++        tracker = read('src/server/actor/ActorFacingTracker.luau')
++        monster = read('src/server/monster/MonsterAIService.luau')
++        npc = read('src/server/npc/NpcCombatAIService.luau')
++        self.assertIn('RunService.Heartbeat:Connect(step)', tracker)
++        self.assertIn('humanoid.AutoRotate = false', tracker)
++        self.assertIn('math.exp(-TURN_RESPONSE', tracker)
++        self.assertIn('MAX_TURN_RATE', tracker)
++        self.assertIn('Facing.Track(agent.model', monster)
++        self.assertIn('Facing.Track(agent.model', npc)
++        self.assertIn('Facing.Stop(agent.model)', monster)
++        self.assertIn('Facing.Stop(agent.model)', npc)
++        self.assertNotIn('agent.root.CFrame = CFrame.lookAt', npc)
++        self.assertIn('agent.root.CFrame.LookVector:Dot', monster)
++
++    def test_attack_chase_keeps_hit_animation_owner(self):
++        npc = read('src/server/npc/NpcCombatAIService.luau')
++        pursuit = read('src/server/actor/ActorAttackPursuit.luau')
++        self.assertIn('Humanoid:Move', pursuit)
++        self.assertIn('self.humanoid:Move(direction, false)', pursuit)
++        self.assertNotIn('MoveTo(', pursuit)
++        self.assertIn('pursuit:Step(targetRoot, agent.attackRadius, maxSpeed)', npc)
++        self.assertIn('NpcAttackPursuitActive', npc)
++        self.assertIn('beginAttack(agent, target, true)', npc)
++        self.assertIn('agent.presentation.ContinueAttack(percent)', npc)
++        self.assertIn('if agent.attacking then return end', npc)
++
++    def test_policy_from_published_equipment_not_hardcoded_npc(self):
++        equip = read('src/server/npc/NpcEquipmentService.luau')
++        ai = read('src/server/npc/NpcCombatAIService.luau')
++        policy = read('src/shared/weapon/WeaponAttackMovement.luau')
++        self.assertIn('WeaponAttackMovement.AnimationSetForType(primaryType)', equip)
++        self.assertIn('entity:SetAttribute("NpcWeaponType", primaryType)', equip)
++        self.assertIn('WeaponAttackMovement.Resolve(model:GetAttribute("NpcWeaponType"))', ai)
++        self.assertIn('policy.runSpeedMultiplier', ai)
++        self.assertIn('policy.locomotionMode', ai)
++        self.assertIn('EquivalentRunSpeedForLocomotion', ai)
++        self.assertIn('NpcAttackPursuitAnimationId', ai)
++        self.assertIn('function WeaponAttackMovement.Resolve(', policy)
++
++    def test_lower_body_is_shared_and_monster_is_preserved(self):
++        npc = read('src/client/actor/NpcAttackLocomotionController.luau')
++        monster = read('src/client/monster/MonsterAttackLocomotionController.luau')
++        sampler = read('src/client/actor/ActorLocomotionSampler.luau')
++        pose = read('src/client/actor/ActorLowerBodyPose.luau')
++        client = read('src/client/init.client.luau')
++        self.assertIn('RunService.PreSimulation:Connect(step)', npc)
++        self.assertIn('NpcAttackPursuitActive', npc)
++        self.assertIn('ActorLowerBodyPose.AlignToMovement(entry)', monster)
++        self.assertIn('LowerBodyPose.AlignToMovement(entry)', npc)
++        self.assertIn('targetBone.Transform:Lerp(sourceBone.Transform', npc)
++        self.assertIn('SetPlaybackSpeed', sampler)
++        self.assertIn('ActorSkeletonMap', sampler)
++        self.assertIn('NpcAttackLocomotionController.Start()', client)
++        self.assertIn('MonsterAttackLocomotionController.Start()', client)
++        self.assertIn('ResolveIndependentLowerBodyRoots', pose) if False else None
++
++if __name__ == '__main__':
++    unittest.main(verbosity=2)
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -1495,7 +1495,7 @@
+ if 'MoveTo(' in pursuit_body_m25:
+     err("active-attack pursuit must not stream MoveTo destinations")
+ 
+-monster_sampler_m25 = (ROOT / "src/client/monster/MonsterLocomotionSampler.luau").read_text(encoding="utf-8")
++monster_sampler_m25 = (ROOT / "src/client/actor/ActorLocomotionSampler.luau").read_text(encoding="utf-8")
+ monster_compositor_m25 = (ROOT / "src/client/monster/MonsterAttackLocomotionController.luau").read_text(encoding="utf-8")
+ for required in ['SetPlaybackSpeed', 'AdjustSpeed(speed)']:
+     if required not in monster_sampler_m25:

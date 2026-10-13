@@ -18,6 +18,7 @@ local DeathLifecycleService = require(CombatRoot:WaitForChild("DeathLifecycleSer
 local DeathAnimationPolicy = require(Shared:WaitForChild("combat"):WaitForChild("DeathAnimationPolicy"))
 local SpawnRegistry = require(script.Parent:WaitForChild("MonsterSpawnRegistry"))
 
+local ActorCollisionPolicy = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorCollisionPolicy"))
 local MonsterSpawnerService = {}
 local started = false
 local spawnRandom = Random.new()
@@ -432,7 +433,7 @@ local function createNavigationRig(runtimeModel: Model, visual: Model, visualRoo
     navigationRoot.Transparency = 1
     navigationRoot.CastShadow = false
     navigationRoot.Anchored = false
-    navigationRoot.CanCollide = true
+    ActorCollisionPolicy.Assign(navigationRoot)
     navigationRoot.CanTouch = false
     navigationRoot.CanQuery = false
     navigationRoot.Massless = false

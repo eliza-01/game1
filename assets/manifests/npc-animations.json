@@ -74,7 +74,10 @@
     }
   ],
   "weaponSets": [
-    "1hs"
+    "base",
+    "1hs",
+    "2hs",
+    "bow"
   ],
   "profiles": [
     {
@@ -295,7 +298,9 @@
       "looped": 0,
       "priority": "Action",
       "created_at": 1791812271.1105022,
-      "updated_at": 1791812271.1105022
+      "updated_at": 1791812271.1105022,
+      "weapon_set": "1hs",
+      "disarm": 0
     },
     {
       "id": "binding__npc__guard_01__combat_idle__00",
@@ -307,7 +312,9 @@
       "looped": 1,
       "priority": "Idle",
       "created_at": 1791812271.1105022,
-      "updated_at": 1791812271.1105022
+      "updated_at": 1791812271.1105022,
+      "weapon_set": "1hs",
+      "disarm": 0
     },
     {
       "id": "binding__npc__guard_01__death__00",
@@ -319,7 +326,9 @@
       "looped": 0,
       "priority": "Action",
       "created_at": 1791812271.1105022,
-      "updated_at": 1791812271.1105022
+      "updated_at": 1791812271.1105022,
+      "weapon_set": "1hs",
+      "disarm": 0
     },
     {
       "id": "binding__npc__guard_01__idle__00",
@@ -331,7 +340,9 @@
       "looped": 1,
       "priority": "Idle",
       "created_at": 1791812271.1105022,
-      "updated_at": 1791812271.1105022
+      "updated_at": 1791812271.1105022,
+      "weapon_set": "1hs",
+      "disarm": 0
     },
     {
       "id": "binding__npc__guard_01__idle_special__01",
@@ -343,7 +354,9 @@
       "looped": 0,
       "priority": "Idle",
       "created_at": 1791812271.1105022,
-      "updated_at": 1791812347.5396872
+      "updated_at": 1791812347.5396872,
+      "weapon_set": "1hs",
+      "disarm": 0
     },
     {
       "id": "binding__npc__guard_01__run__00",
@@ -355,7 +368,9 @@
       "looped": 1,
       "priority": "Movement",
       "created_at": 1791812271.1105022,
-      "updated_at": 1791812271.1105022
+      "updated_at": 1791812271.1105022,
+      "weapon_set": "1hs",
+      "disarm": 0
     },
     {
       "id": "binding__npc__guard_01__walk__00",
@@ -367,7 +382,9 @@
       "looped": 1,
       "priority": "Movement",
       "created_at": 1791812271.1105022,
-      "updated_at": 1791812271.1105022
+      "updated_at": 1791812271.1105022,
+      "weapon_set": "1hs",
+      "disarm": 0
     },
     {
       "id": "binding__npc__warsmith__idle__00",
@@ -379,7 +396,9 @@
       "looped": 1,
       "priority": "Idle",
       "created_at": 1791700992.746519,
-      "updated_at": 1791700992.746519
+      "updated_at": 1791700992.746519,
+      "weapon_set": "1hs",
+      "disarm": 0
     },
     {
       "id": "binding__npc__warsmith__idle_special__01",
@@ -391,7 +410,9 @@
       "looped": 0,
       "priority": "Idle",
       "created_at": 1791700992.746519,
-      "updated_at": 1791701022.8479013
+      "updated_at": 1791701022.8479013,
+      "weapon_set": "1hs",
+      "disarm": 0
     },
     {
       "id": "binding__npc__warsmith__idle_special__02",
@@ -403,7 +424,9 @@
       "looped": 0,
       "priority": "Idle",
       "created_at": 1791700992.746519,
-      "updated_at": 1791701014.0438545
+      "updated_at": 1791701014.0438545,
+      "weapon_set": "1hs",
+      "disarm": 0
     }
   ]
 }

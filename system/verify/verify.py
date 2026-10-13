@@ -368,9 +368,17 @@ if preparer.is_file() and "transform_apply" in preparer.read_text(encoding="utf-
 
 publication_preparer = ROOT / "system/asset-manager/prepare_character_publication_fbx.py"
 publication_preparer_text = publication_preparer.read_text(encoding="utf-8") if publication_preparer.is_file() else ""
+bone_planner = ROOT / "system/asset-manager/bone_weight_survival.py"
+bone_planner_text = bone_planner.read_text(encoding="utf-8") if bone_planner.is_file() else ""
 for required in [
     "SURVIVAL_WEIGHT = 0.05",
-    "ROBLOX_MAX_INFLUENCES = 4",
+    "MAX_INFLUENCES = 4",
+]:
+    if required not in bone_planner_text:
+        err(f"shared publication bone-survival planner missing {required}")
+for required in [
+    "plan_publication_weights",
+    "ROBLOX_MAX_INFLUENCES = MAX_INFLUENCES",
     "assert_rest_unchanged",
     "use_armature_deform_only=False",
     "global_scale=1.0",
@@ -831,10 +839,10 @@ else:
 if animation_scaling_manifest.get("schemaVersion") != 1 or animation_scaling_manifest.get("project") != "game1":
     err("animation speed scaling manifest must be game1 schema 1")
 expected_scaling = {
-    ("character", "human_female", "run"): "RunSpeed",
-    ("character", "human_female", "walk"): "RunSpeed",
-    ("character", "human_female", "attack"): "AttackSpeed",
-    ("character", "human_female", "combat_idle"): "AttackSpeed",
+    ("humanoid", "all", "run"): "RunSpeed",
+    ("humanoid", "all", "walk"): "RunSpeed",
+    ("humanoid", "all", "attack"): "AttackSpeed",
+    ("humanoid", "all", "combat_idle"): "AttackSpeed",
     ("monster", "gremlin", "run"): "RunSpeed",
 }
 actual_scaling = {}
@@ -857,7 +865,7 @@ for required in ["ResolveForModel", "ResolveDetailsForModel", "TargetForModel", 
         err(f"animation speed scaling runtime missing {required}")
 if "DebugOverrideAttribute" in animation_scaling_runtime or "MovementDebugAnimationSpeedPercentOverride" in animation_scaling_runtime:
     err("animation speed scaling must not support an absolute playback-percent debug override")
-for required in ['["human_female"]', 'unitsPerPercent = 2.0', '["gremlin"]', 'unitsPerPercent = 0.6']:
+for required in ['["humanoid"]', '["all"]', 'unitsPerPercent = 2.0', '["gremlin"]', 'unitsPerPercent = 0.6']:
     if required not in animation_scaling_registry:
         err(f"generated animation speed scaling registry missing {required}")
 for required in ["AnimationSpeedScalingStore", "unitsPerPercent", "AnimationSpeedScalingRegistry.luau"]:
@@ -1487,7 +1495,7 @@ pursuit_body_m25 = monster_ai_m25.split('local function pursueDirectlyDuringAtta
 if 'MoveTo(' in pursuit_body_m25:
     err("active-attack pursuit must not stream MoveTo destinations")
 
-monster_sampler_m25 = (ROOT / "src/client/monster/MonsterLocomotionSampler.luau").read_text(encoding="utf-8")
+monster_sampler_m25 = (ROOT / "src/client/actor/ActorLocomotionSampler.luau").read_text(encoding="utf-8")
 monster_compositor_m25 = (ROOT / "src/client/monster/MonsterAttackLocomotionController.luau").read_text(encoding="utf-8")
 for required in ['SetPlaybackSpeed', 'AdjustSpeed(speed)']:
     if required not in monster_sampler_m25:

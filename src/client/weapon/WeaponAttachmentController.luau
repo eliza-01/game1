@@ -29,7 +29,7 @@ local function targetSocketCFrame(targetBone: Bone): CFrame
 end
 
 local function buildState(character: Model, weapon: Model)
-    local visual = character:FindFirstChild("Visual")
+    local visual = character:FindFirstChild("Visual") or character:FindFirstChild("ImportedRig") or character
     if not visual then
         return nil
     end
@@ -73,6 +73,19 @@ local function updateWeapon(character: Model, weapon: Model)
 end
 
 local function update()
+    local npcs = workspace:FindFirstChild("NPCs")
+    if npcs then
+        for _, npc in npcs:GetChildren() do
+            if npc:IsA("Model") and npc:GetAttribute("Game1NpcRuntime") == true then
+                for _, name in { "EquippedWeaponRight", "EquippedWeaponLeft" } do
+                    local weapon = npc:FindFirstChild(name)
+                    if weapon and weapon:IsA("Model") and weapon:GetAttribute("Game1WeaponAttachment") == true then
+                        updateWeapon(npc, weapon)
+                    end
+                end
+            end
+        end
+    end
     for _, player in Players:GetPlayers() do
         local character = player.Character
         if character then

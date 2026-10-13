@@ -33,6 +33,7 @@ from animation_store import AnimationStore
 from weapon_store import WeaponStore
 from monster_store import MonsterStore
 from monster_animation_store import MonsterAnimationStore
+from npc_equipment_store import NpcEquipmentStore
 from monster_spawn_store import MonsterSpawnStore
 from animation_speed_scaling_store import AnimationSpeedScalingStore
 from options_store import OptionsStore
@@ -59,6 +60,7 @@ monster_spawns = MonsterSpawnStore(ROOT, monsters, monster_animations, run_monst
 # NPC data uses the same proven asset pipelines, with its own SQLite DB and runtime registries.
 npcs = MonsterStore(ROOT, kind="npc")
 npc_animations = MonsterAnimationStore(ROOT, kind="npc")
+npc_equipment = NpcEquipmentStore(ROOT, npcs, weapons)
 def run_npc_spawn_bridge(action, **kwargs):
     return run_monster_spawn_bridge(action, entity_kind="npc", **kwargs)
 npc_spawns = MonsterSpawnStore(ROOT, npcs, npc_animations, run_npc_spawn_bridge, kind="npc")
@@ -208,6 +210,11 @@ def sync_monster_to_studio(slug: str, kind: str = "monster"):
         metadata={
             "monsterSlug": str(row.get("slug") or ""),
             "entityKind": kind,
+            "expectedBones": [
+                str(item.get("name"))
+                for item in json.loads(str(row.get("skeleton_json") or "{}" )).get("bones", [])
+                if str(item.get("name") or "")
+            ],
             "textures": texture_assets,
         },
     )
@@ -508,6 +515,9 @@ class Handler(BaseHTTPRequestHandler):
             snapshot = npcs.snapshot()
             snapshot["publication"] = publication_config()
             return self.out(200, snapshot)
+        if path == "/api/npc-equipment":
+            slug = str((parse_qs(parsed.query).get("npc") or [""])[0]).strip().lower()
+            return self.out(200, npc_equipment.snapshot(slug))
         if path == "/api/npc-animations":
             slug = str((parse_qs(parsed.query).get("npc") or [""])[0]).strip().lower()
             snapshot = npc_animations.snapshot(slug)
@@ -662,7 +672,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.out(400, {"error": str(error)})
         if path == "/api/npcs":
             try:
-                return self.out(200, npcs.register({**self.body(), "behavior": {"aggressive": False, "aggroRadiusStuds": 0, "attackRadiusStuds": 0}}))
+                return self.out(200, npcs.register(self.body()))
             except Exception as error:
                 return self.out(400, {"error": str(error)})
         npc_spawn_actions = {
@@ -815,6 +825,26 @@ class Handler(BaseHTTPRequestHandler):
                 ))
             except Exception as error:
                 return self.out(400, {"error": str(error)})
+        if path == "/api/npc-equipment":
+            try:
+                payload = self.body()
+                return self.out(200, npc_equipment.set_loadout(
+                    str(payload.get("npcSlug") or ""),str(payload.get("right") or ""),str(payload.get("left") or "")))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path == "/api/npc-equipment/sync":
+            try:
+                slug = str(self.body().get("npcSlug") or "").strip().lower()
+                if not npcs.get(slug):
+                    raise ValueError("unknown NPC: " + slug)
+                loadout = npc_equipment.snapshot(slug)["loadout"]
+                synced = []
+                for weapon_slug in sorted({loadout["right"], loadout["left"]} - {""}):
+                    sync_weapon_to_studio(weapon_slug)
+                    synced.append(weapon_slug)
+                return self.out(200, {"ok": True, "weapons": synced})
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
         if path == "/api/npc-animations/scan":
             try:
                 payload = self.body()
@@ -826,7 +856,8 @@ class Handler(BaseHTTPRequestHandler):
                 payload = self.body()
                 return self.out(200, npc_animations.assign_file(
                     str(payload.get("npcSlug") or ""), str(payload.get("sourcePath") or ""),
-                    str(payload.get("slot") or ""), int(payload.get("variant") or 0)))
+                    str(payload.get("slot") or ""), int(payload.get("variant") or 0),
+                    str(payload.get("weaponSet") or "1hs")))
             except Exception as error:
                 return self.out(400, {"error": str(error)})
         if path == "/api/animations/scan":
@@ -965,12 +996,21 @@ class Handler(BaseHTTPRequestHandler):
             clip_id, _, action = unquote(path[len("/api/npc-animations/"):]).rpartition("/")
             try:
                 payload = self.body()
+                if action == "rename":
+                    return self.out(200, npc_animations.rename_npc_binding(
+                        clip_id, str(payload.get("weaponSet") or ""), str(payload.get("filename") or "")))
                 if action == "duplicate-first-frame":
                     return self.out(200, npc_animations.set_duplicate_first_frame(clip_id, bool(payload.get("enabled"))))
                 if action == "publish-missing":
                     return self.out(200, npc_animations.publish_missing(clip_id, publication_credentials(str(payload.get("description") or "game1 npc animation"))))
                 if action == "publish":
                     return self.out(200, npc_animations.publish_clip(clip_id, publication_credentials(str(payload.get("description") or "game1 npc animation"))))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path.startswith("/api/npc-animation-bindings/") and path.endswith("/disarm"):
+            try:
+                key = unquote(path[len("/api/npc-animation-bindings/"):-len("/disarm")].strip("/"))
+                return self.out(200, npc_animations.set_disarm(key, bool(self.body().get("enabled"))))
             except Exception as error:
                 return self.out(400, {"error": str(error)})
         if path.startswith("/api/npc-animation-bindings/") and path.endswith("/weight"):
@@ -1132,6 +1172,7 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError("delete NPC spawn points first: " + ", ".join(used[:8]))
                 npc_animations.delete_profile(slug)
                 npcs.delete(slug)
+                npc_equipment.delete(slug)
                 return self.out(200, {"ok": True})
             except Exception as error:
                 return self.out(400, {"error": str(error)})
@@ -1165,6 +1206,9 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith(weapon_prefix):
             slug = unquote(path[len(weapon_prefix):])
             try:
+                users = npc_equipment.users_of_weapon(slug)
+                if users:
+                    raise ValueError("weapon is equipped by NPC(s): " + ", ".join(users) + "; unequip before deleting")
                 weapons.delete(slug)
                 return self.out(200, {"ok": True})
             except Exception as error:

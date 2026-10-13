@@ -1,4 +1,4 @@
--- Population + lifecycle orchestration for passive NPCs. AI/interaction/navigation belong to future services.
+-- NPC population/death/respawn owner. Combat decisions and navigation live in separate services.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 local RunService = game:GetService("RunService")
@@ -13,6 +13,8 @@ local EntityHitboxService = require(CombatRoot:WaitForChild("EntityHitboxService
 local DeathLifecycleService = require(CombatRoot:WaitForChild("DeathLifecycleService"))
 local NpcRigFactory = require(script.Parent:WaitForChild("NpcRigFactory"))
 local NpcAnimationService = require(script.Parent:WaitForChild("NpcAnimationService"))
+local NpcEquipmentService = require(script.Parent:WaitForChild("NpcEquipmentService"))
+local NpcCombatAIService = require(script.Parent:WaitForChild("NpcCombatAIService"))
 
 local NpcSpawnerService = {}
 local started = false
@@ -85,6 +87,7 @@ local function release(state: any, entity: Model, scheduleRespawn: boolean)
     end
     state.instances[entity] = nil
     DeathLifecycleService.Cancel(entity)
+    NpcCombatAIService.Unbind(entity)
     if entry.presentation then
         entry.presentation.Destroy()
     end
@@ -127,7 +130,7 @@ local function spawnOne(state: any): boolean
     local hp = math.max(1, finite(stats.MaxHP, 100))
     entity:SetAttribute("Game1NpcRuntime", true)
     entity:SetAttribute("NpcSlug", slug)
-    entity:SetAttribute("NpcWeaponSet", "1hs")
+    NpcEquipmentService.Equip(entity, slug)
     entity:SetAttribute("SpawnId", tostring(record.spawnId or ""))
     entity:SetAttribute("Damageable", true)
     entity:SetAttribute("LifeState", "Alive")
@@ -147,6 +150,7 @@ local function spawnOne(state: any): boolean
     local presentation = NpcAnimationService.Create(entity, visual, profile)
     local entry = { root = root, visual = visual, presentation = presentation, dying = false }
     state.instances[entity] = entry
+    NpcCombatAIService.Bind(entity, root, presentation)
     entity:GetAttributeChangedSignal("LifeState"):Connect(function()
         if state.instances[entity] ~= entry then
             return
@@ -154,6 +158,7 @@ local function spawnOne(state: any): boolean
         if entity:GetAttribute("LifeState") == "Dying" and not entry.dying then
             entry.dying = true
             entity:SetAttribute("Damageable", false)
+            NpcCombatAIService.Unbind(entity)
             presentation.BeginDeath()
         end
     end)
@@ -189,6 +194,7 @@ function NpcSpawnerService.Start()
         return
     end
     started = true
+    NpcCombatAIService.Start()
     folder()
     local authoring = Workspace:FindFirstChild("Game1Authoring")
     local markers = authoring and authoring:FindFirstChild("NpcSpawns")

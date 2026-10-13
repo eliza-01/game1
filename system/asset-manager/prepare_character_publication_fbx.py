@@ -11,11 +11,14 @@ import json
 import sys
 from pathlib import Path
 
-SURVIVAL_WEIGHT = 0.05
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from bone_weight_survival import (
+    MAX_INFLUENCES, SURVIVAL_WEIGHT, plan_publication_weights,
+)
+
 COMPARE_EPSILON = 1e-6
 POSITIVE_EPSILON = 1e-8
-ROBLOX_MAX_INFLUENCES = 4
-
+ROBLOX_MAX_INFLUENCES = MAX_INFLUENCES
 
 def clean_scene():
     bpy.ops.object.select_all(action="SELECT")
@@ -96,83 +99,55 @@ def count_over_limit(armature, meshes):
     return total
 
 
-def strengthen_weak_bones(armature, meshes):
+def prepare_publication_weights(armature, meshes):
     bones = list(armature.data.bones)
-    bone_names = {bone.name for bone in bones}
-    max_weight = {bone.name: 0.0 for bone in bones}
-    vertex_cache = []
-
-    for mesh_obj in meshes:
-        index_to_name = {
-            group.index: group.name
-            for group in mesh_obj.vertex_groups
-            if group.name in bone_names
+    names = {bone.name for bone in bones}
+    heads = {
+        bone.name: tuple(armature.matrix_world @ bone.head_local)
+        for bone in bones
+    }
+    vertices = []
+    for mesh in meshes:
+        group_names = {
+            group.index: group.name for group in mesh.vertex_groups
+            if group.name in names
         }
-        for vertex in mesh_obj.data.vertices:
-            weights = active_bone_weights(mesh_obj, vertex, index_to_name)
-            for bone_name, weight in weights.items():
-                if weight > max_weight[bone_name]:
-                    max_weight[bone_name] = weight
-            vertex_cache.append(
-                {
-                    "mesh": mesh_obj,
-                    "vertex": vertex,
-                    "weights": weights,
-                    "world": mesh_obj.matrix_world @ vertex.co,
-                }
-            )
+        for vertex in mesh.data.vertices:
+            weights = active_bone_weights(mesh, vertex, group_names)
+            vertices.append({
+                'mesh': mesh.name,
+                'index': vertex.index,
+                'object': mesh,
+                'position': tuple(mesh.matrix_world @ vertex.co),
+                'original': weights,
+                'weights': dict(weights),
+            })
 
-    weak_bones = [
-        bone for bone in bones
-        if max_weight[bone.name] + COMPARE_EPSILON < SURVIVAL_WEIGHT
-    ]
-    patched = []
-
+    report = plan_publication_weights(heads, vertices)
     for bone in bones:
         bone.use_deform = True
-
-    for bone in weak_bones:
-        candidates = []
-        bone_world = armature.matrix_world @ bone.head_local
-        for item in vertex_cache:
-            weights = item["weights"]
-            already_present = bone.name in weights and weights[bone.name] > POSITIVE_EPSILON
-            positive_count = len(weights)
-            fits = positive_count <= ROBLOX_MAX_INFLUENCES if already_present else positive_count < ROBLOX_MAX_INFLUENCES
-            group = item["mesh"].vertex_groups.get(bone.name)
-            unlocked = group is None or not group.lock_weight
-            if fits and unlocked:
-                # Prefer the vertex that already carries this bone's tiny service
-                # influence; otherwise use the nearest safe vertex to the bone head.
-                candidates.append(
-                    (
-                        0 if already_present else 1,
-                        (item["world"] - bone_world).length_squared,
-                        item,
-                    )
-                )
-        if not candidates:
-            raise RuntimeError(
-                f"no <=4-influence vertex is available to preserve bone {bone.name!r}"
-            )
-        _, _, chosen = min(candidates, key=lambda value: (value[0], value[1]))
-        mesh_obj = chosen["mesh"]
-        group = mesh_obj.vertex_groups.get(bone.name)
-        if group is None:
-            group = mesh_obj.vertex_groups.new(name=bone.name)
-        group.add([chosen["vertex"].index], SURVIVAL_WEIGHT, "REPLACE")
-        chosen["weights"][bone.name] = SURVIVAL_WEIGHT
-        patched.append(
-            {
-                "bone": bone.name,
-                "mesh": mesh_obj.name,
-                "vertex": int(chosen["vertex"].index),
-                "previousMaxWeight": max_weight[bone.name],
-                "publicationWeight": SURVIVAL_WEIGHT,
-            }
-        )
-
-    return patched
+    for vertex in vertices:
+        old = vertex['original']
+        new = vertex['weights']
+        if old == new:
+            continue
+        mesh = vertex['object']
+        index = vertex['index']
+        # Remove dropped influences, including the fifth/seventh FBX weight.
+        # Never touch non-armature vertex groups.
+        for name in old.keys() - new.keys():
+            group = mesh.vertex_groups.get(name)
+            if group:
+                group.remove([index])
+        for name, weight in new.items():
+            group = mesh.vertex_groups.get(name)
+            if group is None:
+                group = mesh.vertex_groups.new(name=name)
+            if not old.get(name) or abs(old[name] - weight) > 1e-7:
+                group.add([index], weight, 'REPLACE')
+    if count_over_limit(armature, meshes) != 0:
+        raise RuntimeError('publication skin still exceeds four influences per vertex')
+    return report
 
 
 def main(source: Path, output: Path, report_path: Path):
@@ -198,7 +173,7 @@ def main(source: Path, output: Path, report_path: Path):
 
     before = rest_snapshot(armature)
     over_limit_before = count_over_limit(armature, meshes)
-    patched = strengthen_weak_bones(armature, meshes)
+    report = prepare_publication_weights(armature, meshes)
     over_limit_after = count_over_limit(armature, meshes)
     assert_rest_unchanged(armature, before)
 
@@ -235,8 +210,10 @@ def main(source: Path, output: Path, report_path: Path):
                 "boneCount": len(armature.data.bones),
                 "meshNames": [obj.name for obj in meshes],
                 "survivalWeight": SURVIVAL_WEIGHT,
-                "patchedBoneCount": len(patched),
-                "patchedBones": patched,
+                "patchedBoneCount": report["patchedBoneCount"],
+                "patchedBones": report["patchedBones"],
+                "survivingBoneCount": report["survivingBoneCount"],
+                "prunedVertices": report["prunedVertices"],
                 "verticesOverFourBefore": over_limit_before,
                 "verticesOverFourAfter": over_limit_after,
                 "restTransformsChanged": False,

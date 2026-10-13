@@ -3,8 +3,8 @@ return table.freeze({
 	schemaVersion = 1,
 	project = "game1",
 	profiles = table.freeze({
-		["character"] = table.freeze({
-			["human_female"] = table.freeze({
+		["humanoid"] = table.freeze({
+			["all"] = table.freeze({
 				["attack"] = table.freeze({
 					stat = "AttackSpeed",
 					unitsPerPercent = 2.0,

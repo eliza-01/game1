@@ -21,21 +21,23 @@ function AnimationSpeedScaling.DebugUnitsPerPercentAttribute(channel: any): stri
     return AnimationSpeedScaling.DebugUnitsPerPercentPrefix .. normalized
 end
 
+-- All playable Characters and NPCs use the same four animation-speed rules.
+-- Monster tuning remains an independent profile.
 function AnimationSpeedScaling.TargetForModel(model: Model): (string, string)
     if model:GetAttribute("Game1MonsterRuntime") == true or model:GetAttribute("MonsterSlug") ~= nil then
         return "monster", string.lower(tostring(model:GetAttribute("MonsterSlug") or ""))
     end
-    return "character", string.lower(tostring(
-        model:GetAttribute("AnimationProfileId")
-            or model:GetAttribute("CharacterArchetype")
-            or model:GetAttribute("NPCSlug")
-            or ""
-    ))
+    return "humanoid", "all"
 end
 
 function AnimationSpeedScaling.Rule(targetType: any, targetId: any, channel: any): any?
-    local byType = Registry.profiles[string.lower(tostring(targetType or ""))]
-    local profile = byType and byType[string.lower(tostring(targetId or ""))]
+    local kind = string.lower(tostring(targetType or ""))
+    local id = string.lower(tostring(targetId or ""))
+    if kind == "character" or kind == "npc" or kind == "humanoid" then
+        kind, id = "humanoid", "all"
+    end
+    local byType = Registry.profiles[kind]
+    local profile = byType and byType[id]
     return profile and profile[string.lower(tostring(channel or ""))] or nil
 end
 

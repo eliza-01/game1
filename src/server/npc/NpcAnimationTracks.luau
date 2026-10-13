@@ -18,20 +18,53 @@ local priorities = {
     Action4 = Enum.AnimationPriority.Action4,
 }
 
-function NpcAnimationTracks.PublishedRows(profile: any?, slot: string): {any}
+function NpcAnimationTracks.PublishedRows(profile: any?, slot: string, weaponSet: string?): {any}
     local slots = profile and profile.slots
     local rows = slots and slots[slot]
-    local result = {}
-    if typeof(rows) ~= "table" then
-        return result
-    end
+    if typeof(rows) ~= "table" then return {} end
+    local activeSet = tostring(weaponSet or NpcConfig.WeaponSet)
+    local preferred = {}
+    local common = {}
     for _, row in ipairs(rows) do
-        if tostring(row.weaponSet or NpcConfig.WeaponSet) == NpcConfig.WeaponSet
-            and tostring(row.animationId or ""):match("^rbxassetid://%d+$") then
-            table.insert(result, row)
+        if tostring(row.animationId or ""):match("^rbxassetid://%d+$") then
+            local set = tostring(row.weaponSet or "1hs")
+            if set == activeSet then
+                table.insert(preferred, row)
+            elseif set == "base" then
+                table.insert(common, row)
+            end
         end
     end
-    return result
+    -- Special idles are independent actions, so generic variants participate
+    -- in the same weighted choice as equipment-specific special variants.
+    if slot == "idle" then
+        local result = {}
+        local hasBase = false
+        for _, row in ipairs(preferred) do
+            if row.role == "base" then hasBase = true end
+            table.insert(result, row)
+        end
+        for _, row in ipairs(common) do
+            if row.role == "special" or not hasBase then
+                table.insert(result, row)
+            end
+        end
+        return result
+    end
+    -- Death is a universal terminal state. Prefer an explicitly tagged base
+    -- death, then this weapon profile, then a legacy death from any old set.
+    if slot == "death" then
+        if #common > 0 then return common end
+        if #preferred > 0 then return preferred end
+        for _, row in ipairs(rows) do
+            if tostring(row.animationId or ""):match("^rbxassetid://%d+$") then
+                return { row }
+            end
+        end
+        return {}
+    end
+    -- Weapon-specific action overrides common action; otherwise use base.
+    return if #preferred > 0 then preferred else common
 end
 
 local function load(animator: Animator, animationId: string): AnimationTrack?
@@ -70,11 +103,11 @@ function NpcAnimationTracks.Load(animator: Animator, row: any?, looped: boolean,
     return { row = row, track = track, seam = seam }
 end
 
-function NpcAnimationTracks.Play(entity: Model, clip: any?, channel: string, fade: number?): boolean
+function NpcAnimationTracks.Play(entity: Model, clip: any?, channel: string, fade: number?, speedPercentOverride: number?): boolean
     if not clip then
         return false
     end
-    local percent = AnimationSpeedScaling.ResolveForModel(entity, channel)
+    local percent = speedPercentOverride or AnimationSpeedScaling.ResolveForModel(entity, channel)
     entity:SetAttribute("AnimationPlaybackSpeedPercent", percent)
     local speed = percent / 100
     local success, failure = pcall(function()
@@ -90,21 +123,14 @@ function NpcAnimationTracks.Play(entity: Model, clip: any?, channel: string, fad
         warn("[game1][npc] animation playback failed: " .. tostring(failure))
         return false
     end
-    -- The presentation uses the same speed to schedule one-shot crossfades.
     clip.playbackSpeed = speed
     return true
 end
 
--- Seconds remaining on an active one-shot at the exact playback speed chosen by Play.
--- nil means that Roblox has not resolved the asset length or the track has stopped.
 function NpcAnimationTracks.SecondsRemaining(clip: any?): number?
-    if not clip or not clip.track or not clip.track.IsPlaying then
-        return nil
-    end
+    if not clip or not clip.track or not clip.track.IsPlaying then return nil end
     local length = tonumber(clip.track.Length) or 0
-    if length <= 0 then
-        return nil
-    end
+    if length <= 0 then return nil end
     local position = tonumber(clip.track.TimePosition) or 0
     local speed = math.max(0.01, tonumber(clip.playbackSpeed) or 1)
     return math.max(0, length - position) / speed

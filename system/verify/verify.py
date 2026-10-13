@@ -1480,17 +1480,24 @@ for required in ['gui.Name = "CriticalBillboard"', 'label.Text = "Critical!"', "
 if "CombatFeedbackService.PublishDamage" not in damage_m23:
     err("DamageService does not publish authoritative damage feedback")
 
-# m25 continuous active-attack pursuit + authored return-to-town revive.
+# m25 / m73: continuous attack pursuit is now shared by monsters and NPCs.
 monster_ai_m25 = (ROOT / "src/server/monster/MonsterAIService.luau").read_text(encoding="utf-8")
+actor_pursuit_m73 = (ROOT / "src/server/actor/ActorAttackPursuit.luau").read_text(encoding="utf-8")
 for required in [
     'RunService.Heartbeat:Wait()',
-    'agent.humanoid:Move(direction, false)',
-    'ATTACK_PURSUIT_FOLLOW_GAIN',
-    'targetRoot.AssemblyLinearVelocity',
-    'The slower AI decision loop must not issue competing MoveTo calls',
+    'agent.attackPursuit:Step(',
+    'AttackPursuit.new(root, humanoid)',
 ]:
     if required not in monster_ai_m25:
-        err(f"m25 continuous attack pursuit contract missing {required}")
+        err(f"monster continuous attack pursuit missing {required}")
+for required in [
+    'self.humanoid:Move(direction, false)',
+    'targetRoot.AssemblyLinearVelocity',
+    'FOLLOW_GAIN',
+    'MAX_ACCELERATION',
+]:
+    if required not in actor_pursuit_m73:
+        err(f"shared continuous attack pursuit missing {required}")
 pursuit_body_m25 = monster_ai_m25.split('local function pursueDirectlyDuringAttack', 1)[-1].split('local function maintainAttackPursuit', 1)[0]
 if 'MoveTo(' in pursuit_body_m25:
     err("active-attack pursuit must not stream MoveTo destinations")

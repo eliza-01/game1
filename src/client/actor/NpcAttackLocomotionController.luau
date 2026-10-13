@@ -154,7 +154,7 @@ local function step(dt: number)
                         targetBone.Transform = targetBone.Transform:Lerp(sourceBone.Transform, entry.weight)
                     end
                 end
-                LowerBodyPose.AlignToMovement(entry)
+                LowerBodyPose.AlignToMovement(entry, dt)
             end
             if entry.weight < 0.01 and not wants then
                 entry.weight = 0

@@ -1,0 +1,1157 @@
+diff --git a/docs/CUSTOM_SCALING_M74_RU.md b/docs/CUSTOM_SCALING_M74_RU.md
+new file mode 100644
+index 0000000..4d38fdf
+--- /dev/null
++++ b/docs/CUSTOM_SCALING_M74_RU.md
+@@ -0,0 +1,21 @@
++# M74 — Custom Animation Scaling
++
++## Правила
++
++- Общие stat → playback профили продолжают применяться ко всем Characters/NPC, а отдельно — к монстрам.
++- Индивидуальное правило хранится под неизменяемым Roblox Animation Asset ID; не под именем файла или NPC.
++- Приоритет: Studio-only transient override → сохранённый custom override → правило состояния → 100% fallback.
++- При удалении custom override базовые параметры не меняются и начинают использоваться автоматически.
++- Одна анимация может быть привязана к нескольким архетипам: её override действует во всех местах использования Asset ID.
++
++## Runtime
++
++- `AnimationSpeedScaling` — единственный резолвер скорости по Asset ID, стату и каналу.
++- Серверные NPC/монстры и клиентский Character читают настройки через него. При активном отладочном override скорость уже проигрываемых треков обновляется через `Animator:GetPlayingAnimationTracks()` в ответ на изменение, а не покадровыми операциями.
++- Для одновременного управления Hit и playback временем NPC / Monster AI вычисляет скорость того же конкретного клипа, что и аниматор.
++- Studio Play `CustomScaling` — экранное окно только для Studio, не входит в игровые билды. Изменения хранятся исключительно в атрибутах Workspace текущей симуляции, автоматически сбрасываются при остановке Play.
++- Сохранение в Asset Manager синхронизирует generated `AnimationSpeedScalingRegistry.luau` через Rojo; после изменения постоянных настроек следует перезапустить Play.
++
++## Миграция
++
++Файл `animation-speed-scaling.json` сохраняет `schemaVersion:1`, существующие `profiles` и `legacyProfiles`. Необязательный массив `customScaling` добавляется при первом сохранении custom записи. Никакие опубликованные анимации не переиздаются.
+diff --git a/src/client/character/animation/CharacterAnimationController.luau b/src/client/character/animation/CharacterAnimationController.luau
+index 1a1afc6..8582f14 100644
+--- a/src/client/character/animation/CharacterAnimationController.luau
++++ b/src/client/character/animation/CharacterAnimationController.luau
+@@ -93,13 +93,14 @@ local function findAnimator(model: Model): Animator?
+ 	return if found and found:IsA("Animator") then found else nil
+ end
+ 
+-local function animationPlaybackPercent(channel: string): number
++local function animationPlaybackPercent(channel: string, animationId: any?): number
+ 	if not character then
+ 		return 100
+ 	end
+ 	local normalizedChannel = string.lower(tostring(channel or ""))
+ 	if normalizedChannel == "death" or normalizedChannel == "revive" then
+-		return GameOptions.CharacterLifePlaybackPercent(normalizedChannel)
++		local _, custom = AnimationSpeedScaling.RuleForAnimation(character, normalizedChannel, animationId)
++		if not custom then return GameOptions.CharacterLifePlaybackPercent(normalizedChannel) end
+ 	end
+ 	if attackLowerBodyActive and (normalizedChannel == "run" or normalizedChannel == "walk") then
+ 		local runSpeed = tonumber(character:GetAttribute("RunSpeed")) or CharacterMovementConfig.DefaultRunSpeed
+@@ -109,13 +110,13 @@ local function animationPlaybackPercent(channel: string): number
+ 			multiplier,
+ 			normalizedChannel == "walk" and "Walk" or "Run"
+ 		)
+-		return AnimationSpeedScaling.ResolveForModelWithStatValue(character, normalizedChannel, equivalentRunSpeed)
++		return AnimationSpeedScaling.ResolveForAnimation(character, normalizedChannel, animationId, equivalentRunSpeed)
+ 	end
+-	return AnimationSpeedScaling.ResolveForModel(character, normalizedChannel)
++	return AnimationSpeedScaling.ResolveForAnimation(character, normalizedChannel, animationId)
+ end
+ 
+-local function animationPlaybackScale(channel: string): number
+-	return animationPlaybackPercent(channel) / 100
++local function animationPlaybackScale(channel: string, animationId: any?): number
++	return animationPlaybackPercent(channel, animationId) / 100
+ end
+ 
+ local function publishPlaybackPercent(channel: string)
+@@ -228,7 +229,7 @@ local function applyBackwardPlayback(track: AnimationTrack, slot: string)
+ 		return
+ 	end
+ 	local backward = tostring(character:GetAttribute("AnimationMovementDirection") or "Forward") == "Backward"
+-	local playbackScale = animationPlaybackScale(slot)
++	local playbackScale = animationPlaybackScale(slot, track.Animation and track.Animation.AnimationId)
+ 	if not backward or (slot ~= "walk" and slot ~= "run") then
+ 		track:AdjustSpeed(playbackScale)
+ 		return
+@@ -264,7 +265,7 @@ refreshLoop = function()
+ 	end
+ 
+ 	local clipId = tostring(descriptor.clipId or "")
+-	local playbackScale = animationPlaybackScale(slot)
++	local playbackScale = animationPlaybackScale(slot, descriptor.animationId)
+ 	local wantsSeam = movementUsesForwardSeam(descriptor, slot)
+ 	publishPlaybackPercent(slot)
+ 
+@@ -355,7 +356,7 @@ local function playDeath()
+ 	end
+ 
+ 	publishPlaybackPercent("death")
+-	DeathAnimationPolicy.Start(track, animationPlaybackScale("death"))
++	DeathAnimationPolicy.Start(track, animationPlaybackScale("death", track.Animation and track.Animation.AnimationId))
+ end
+ 
+ local function maintainDeathTerminalPose(deltaTimeSim: number)
+@@ -406,7 +407,7 @@ local function playBaseLifeAction(slot: string, onStopped)
+ 	currentActionSlot = slot
+ 	currentActionLockedUntil = 0
+ 	publishPlaybackPercent(slot)
+-	local playbackScale = animationPlaybackScale(slot)
++	local playbackScale = animationPlaybackScale(slot, descriptor.animationId)
+ 	currentActionSeam = createSeam(descriptor, track, false)
+ 	character:SetAttribute("AnimationActionSlot", slot)
+ 	character:SetAttribute("AnimationActionClip", tostring(descriptor.clipId or ""))
+@@ -553,7 +554,7 @@ function CharacterAnimationController.PlayAction(slot: string)
+ 	end
+ 
+ 	local clipId = tostring(descriptor.clipId or "")
+-	local animationSpeedPercent = animationPlaybackPercent(slot)
++	local animationSpeedPercent = animationPlaybackPercent(slot, descriptor.animationId)
+ 	local playbackSpeed = animationSpeedPercent / 100
+ 	local timeline = nil
+ 	local runtimeDuration = 0
+diff --git a/src/client/dev/CustomScalingDebugController.luau b/src/client/dev/CustomScalingDebugController.luau
+new file mode 100644
+index 0000000..b1ccd0a
+--- /dev/null
++++ b/src/client/dev/CustomScalingDebugController.luau
+@@ -0,0 +1,160 @@
++-- Studio Play-only debug window. Changes affect the running simulation only.
++local RunService = game:GetService("RunService")
++local Players = game:GetService("Players")
++local ReplicatedStorage = game:GetService("ReplicatedStorage")
++local Workspace = game:GetService("Workspace")
++local Scaling = require(ReplicatedStorage:WaitForChild("Game1Shared"):WaitForChild("animation"):WaitForChild("AnimationSpeedScaling"))
++local Controller = {}
++local palette = {
++    background = Color3.fromRGB(16, 22, 31),
++    input = Color3.fromRGB(31, 43, 55),
++    text = Color3.fromRGB(241, 247, 249),
++    muted = Color3.fromRGB(164, 184, 194),
++    accent = Color3.fromRGB(65, 201, 172),
++}
++
++local function new(class: string, properties: any, parent: Instance): Instance
++    local widget = Instance.new(class)
++    for key, value in pairs(properties) do widget[key] = value end
++    widget.Parent = parent
++    return widget
++end
++
++local function caption(parent: Instance, value: string, y: number, height: number?): TextLabel
++    return new("TextLabel", {
++        BackgroundTransparency = 1, TextColor3 = palette.text, Text = value,
++        Font = Enum.Font.Gotham, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left,
++        TextYAlignment = Enum.TextYAlignment.Center,
++        Position = UDim2.fromOffset(12, y), Size = UDim2.new(1, -24, 0, height or 22),
++    }, parent) :: TextLabel
++end
++
++local function input(parent: Instance, y: number, placeholder: string): TextBox
++    return new("TextBox", {
++        BackgroundColor3 = palette.input, TextColor3 = palette.text, PlaceholderColor3 = palette.muted,
++        PlaceholderText = placeholder, Text = "", BorderSizePixel = 0, TextSize = 13,
++        TextXAlignment = Enum.TextXAlignment.Left, ClearTextOnFocus = false,
++        Position = UDim2.fromOffset(12, y), Size = UDim2.new(1, -24, 0, 31),
++        Font = Enum.Font.Gotham,
++    }, parent) :: TextBox
++end
++
++local function button(parent: Instance, label: string, position: UDim2, size: UDim2): TextButton
++    return new("TextButton", {
++        BackgroundColor3 = palette.input, TextColor3 = palette.text, Text = label,
++        TextSize = 12, Font = Enum.Font.GothamSemibold, BorderSizePixel = 0,
++        Position = position, Size = size,
++    }, parent) :: TextButton
++end
++
++local function refreshLocally(assetId: string)
++    for _, player in ipairs(Players:GetPlayers()) do
++        if player.Character then Scaling.RefreshPlaying(player.Character, assetId) end
++    end
++    for _, name in ipairs({"NPCs", "Monsters"}) do
++        local folder = Workspace:FindFirstChild(name)
++        if folder then
++            for _, actor in ipairs(folder:GetChildren()) do
++                if actor:IsA("Model") then Scaling.RefreshPlaying(actor, assetId) end
++            end
++        end
++    end
++end
++
++function Controller.Start()
++    if not RunService:IsStudio() then return end
++    local player = Players.LocalPlayer
++    if not player then return end
++    local remote = ReplicatedStorage:WaitForChild("Game1CustomScalingDebug", 20)
++    if not remote then return end
++    local apply = remote:WaitForChild("Apply") :: RemoteFunction
++    local refresh = remote:WaitForChild("Refresh") :: RemoteEvent
++    refresh.OnClientEvent:Connect(function(assetId, expectedUnits, expectedStat)
++        -- Attribute replication and the RemoteEvent may arrive in either order.
++        task.spawn(function()
++            local key = Scaling.CustomDebugPrefix .. tostring(assetId)
++            local deadline = os.clock() + 1.5
++            while os.clock() < deadline do
++                if Workspace:GetAttribute(key) == expectedUnits
++                    and Workspace:GetAttribute(key .. "_Stat") == expectedStat then
++                    break
++                end
++                RunService.Heartbeat:Wait()
++            end
++            refreshLocally(assetId)
++        end)
++    end)
++    local gui = new("ScreenGui", {Name = "CustomScaling", ResetOnSpawn = false, DisplayOrder = 135}, player:WaitForChild("PlayerGui"))
++    local toggle = button(gui, "CS", UDim2.fromOffset(16, 635), UDim2.fromOffset(44, 34))
++    toggle.BackgroundColor3 = palette.accent
++    local panel = new("Frame", {BackgroundColor3 = palette.background, BorderSizePixel = 0,
++        Position = UDim2.fromOffset(66, 275), Size = UDim2.fromOffset(350, 395), Visible = false}, gui)
++    caption(panel, "CustomScaling · Studio Play", 6, 28)
++    caption(panel, "Temporary overrides, not saved to Asset Manager", 34, 18).TextColor3 = palette.muted
++    local search = input(panel, 58, "Search animation / NPC / monster / ID")
++    local results = new("ScrollingFrame", {BackgroundColor3 = palette.input, BorderSizePixel = 0,
++        Position = UDim2.fromOffset(12, 94), Size = UDim2.new(1, -24, 0, 132),
++        ScrollBarThickness = 4, CanvasSize = UDim2.fromOffset(0, 0)}, panel)
++    local selected = caption(panel, "Select a published animation", 231, 20)
++    selected.TextTruncate = Enum.TextTruncate.AtEnd
++    local statButton = button(panel, "Stat: AttackSpeed", UDim2.fromOffset(12, 263), UDim2.fromOffset(158, 31))
++    local units = input(panel, 300, "Stat units for +1% playback")
++    local applyButton = button(panel, "Apply live", UDim2.fromOffset(12, 344), UDim2.fromOffset(156, 32))
++    applyButton.BackgroundColor3 = palette.accent
++    local resetButton = button(panel, "Reset live", UDim2.fromOffset(178, 344), UDim2.fromOffset(160, 32))
++    local rows = {}
++    for id, entry in pairs(Scaling.Catalog()) do
++        table.insert(rows, {id = id, label = tostring(entry.label), channel = tostring(entry.channel)})
++    end
++    table.sort(rows, function(a, b) return a.label < b.label end)
++    local selectedId: string? = nil
++    local stat = "AttackSpeed"
++    local function draw()
++        for _, child in ipairs(results:GetChildren()) do child:Destroy() end
++        local term = string.lower(search.Text)
++        local y = 0
++        local count = 0
++        for _, row in ipairs(rows) do
++            if term == "" or string.find(string.lower(row.label .. " " .. row.id), term, 1, true) then
++                local option = button(results, row.label, UDim2.fromOffset(2, y), UDim2.new(1, -8, 0, 25))
++                option.TextSize = 10
++                option.TextTruncate = Enum.TextTruncate.AtEnd
++                option.MouseButton1Click:Connect(function()
++                    selectedId = row.id
++                    selected.Text = row.label
++                    local override = Scaling.RuleForAnimation(player.Character or Workspace, row.channel, row.id)
++                    stat = override and override.stat or (if row.channel == "run" or row.channel == "walk" then "RunSpeed" else "AttackSpeed")
++                    statButton.Text = "Stat: " .. stat
++                    units.Text = tostring(override and override.unitsPerPercent or 1)
++                end)
++                y += 27
++                count += 1
++                if count >= 40 then break end
++            end
++        end
++        results.CanvasSize = UDim2.fromOffset(0, y)
++    end
++    search:GetPropertyChangedSignal("Text"):Connect(draw)
++    draw()
++    toggle.MouseButton1Click:Connect(function() panel.Visible = not panel.Visible end)
++    statButton.MouseButton1Click:Connect(function()
++        stat = if stat == "AttackSpeed" then "RunSpeed" else "AttackSpeed"
++        statButton.Text = "Stat: " .. stat
++    end)
++    local function update(clear: boolean)
++        if not selectedId then selected.Text = "Choose an animation first"; return end
++        local success, result = pcall(function()
++            return apply:InvokeServer(selectedId, stat, tonumber(units.Text), clear)
++        end)
++        if not success or not result.ok then
++            selected.Text = "Error: " .. tostring(if success then result.error else result)
++        else
++            refreshLocally(selectedId)
++            local metadata = Scaling.Catalog()[selectedId]
++            selected.Text = (metadata and metadata.label or selectedId) .. (if clear then " · reset" else " · live")
++        end
++    end
++    applyButton.MouseButton1Click:Connect(function() update(false) end)
++    resetButton.MouseButton1Click:Connect(function() update(true) end)
++end
++return Controller
+diff --git a/src/client/init.client.luau b/src/client/init.client.luau
+index fc5a054..bf839e6 100644
+--- a/src/client/init.client.luau
++++ b/src/client/init.client.luau
+@@ -47,4 +47,5 @@ PlayerStatusController.Start()
+ DeathRespawnController.Start()
+ TestLoadoutController.Start()
+ MovementDebugController.Start()
++require(DevRoot:WaitForChild("CustomScalingDebugController")).Start()
+ MonsterDebugController.Start()
+diff --git a/src/server/combat/AttackService.luau b/src/server/combat/AttackService.luau
+index 8b3d513..c542e3a 100644
+--- a/src/server/combat/AttackService.luau
++++ b/src/server/combat/AttackService.luau
+@@ -437,7 +437,7 @@ local function attack(player: Player, payload: any)
+         return
+     end
+ 
+-    local animationSpeedPercent = AnimationSpeedScaling.ResolveForModel(character, "attack")
++    local animationSpeedPercent = AnimationSpeedScaling.ResolveForAnimation(character, "attack", descriptor.animationId)
+     local timing = AttackTimelineConfig.ResolveRuntime(clipId, animationSpeedPercent)
+     if not timing then
+         if Config.DebugLogs then
+diff --git a/src/server/dev/CustomScalingDebugService.luau b/src/server/dev/CustomScalingDebugService.luau
+new file mode 100644
+index 0000000..e4cf9ee
+--- /dev/null
++++ b/src/server/dev/CustomScalingDebugService.luau
+@@ -0,0 +1,67 @@
++-- Studio-only transient clip scaling. Persistent authoring belongs to Asset Manager.
++local RunService = game:GetService("RunService")
++local ReplicatedStorage = game:GetService("ReplicatedStorage")
++local Players = game:GetService("Players")
++local Workspace = game:GetService("Workspace")
++local Scaling = require(ReplicatedStorage:WaitForChild("Game1Shared"):WaitForChild("animation"):WaitForChild("AnimationSpeedScaling"))
++
++local Service = {}
++local started = false
++
++local function actors(): {Model}
++    local result = {}
++    for _, player in ipairs(Players:GetPlayers()) do
++        if player.Character then table.insert(result, player.Character) end
++    end
++    for _, folderName in ipairs({"NPCs", "Monsters"}) do
++        local folder = Workspace:FindFirstChild(folderName)
++        if folder then
++            for _, child in ipairs(folder:GetChildren()) do
++                if child:IsA("Model") then table.insert(result, child) end
++            end
++        end
++    end
++    return result
++end
++
++function Service.Start()
++    if started or not RunService:IsStudio() then return end
++    started = true
++    local folder = ReplicatedStorage:FindFirstChild("Game1CustomScalingDebug")
++    if not folder then
++        folder = Instance.new("Folder")
++        folder.Name = "Game1CustomScalingDebug"
++        folder.Parent = ReplicatedStorage
++    end
++    local apply = Instance.new("RemoteFunction")
++    apply.Name = "Apply"
++    apply.Parent = folder
++    local refresh = Instance.new("RemoteEvent")
++    refresh.Name = "Refresh"
++    refresh.Parent = folder
++    apply.OnServerInvoke = function(_player: Player, assetId: any, stat: any, units: any, clear: any)
++        local id = Scaling.AssetId(assetId)
++        if id == "" or not Scaling.Catalog()[id] then
++            return {ok = false, error = "Animation ID is not in the published registry"}
++        end
++        local key = Scaling.CustomDebugPrefix .. id
++        if clear == true then
++            Workspace:SetAttribute(key, nil)
++            Workspace:SetAttribute(key .. "_Stat", nil)
++        else
++            local number = tonumber(units)
++            if (stat ~= "AttackSpeed" and stat ~= "RunSpeed") or not number
++                or number ~= number or number < 0.001 or number > 1000 then
++                return {ok = false, error = "Select RunSpeed/AttackSpeed and units 0.001..1000"}
++            end
++            Workspace:SetAttribute(key .. "_Stat", stat)
++            Workspace:SetAttribute(key, number)
++        end
++        for _, model in ipairs(actors()) do
++            Scaling.RefreshPlaying(model, id)
++        end
++        refresh:FireAllClients(id, Workspace:GetAttribute(key), Workspace:GetAttribute(key .. "_Stat"))
++        return {ok = true, assetId = id, debugUnits = Workspace:GetAttribute(key)}
++    end
++end
++return table.freeze(Service)
+diff --git a/src/server/init.server.luau b/src/server/init.server.luau
+index 062562c..000b77e 100644
+--- a/src/server/init.server.luau
++++ b/src/server/init.server.luau
+@@ -40,6 +40,7 @@ MonsterSpawnerService.Start()
+ MonsterAIService.Start()
+ NpcSpawnerService.Start()
+ MovementDebugService.Start()
++require(DevRoot:WaitForChild("CustomScalingDebugService")).Start()
+ MonsterDebugService.Start()
+ TestLoadoutService.Start()
+ TrainingDummyService.Start()
+diff --git a/src/server/monster/MonsterAIService.luau b/src/server/monster/MonsterAIService.luau
+index 9542639..8e580fe 100644
+--- a/src/server/monster/MonsterAIService.luau
++++ b/src/server/monster/MonsterAIService.luau
+@@ -147,7 +147,7 @@ local function playCombatIdle(agent: any)
+     stopTrack(agent.attackTrack)
+     local track = agent.combatIdleTrack
+     if track then
+-        local speed = AnimationSpeedScaling.ResolveScaleForModel(agent.model, "combat_idle")
++        local speed = AnimationSpeedScaling.ResolveScaleForAnimation(agent.model, "combat_idle", agent.combatIdleTrack and agent.combatIdleTrack.Animation and agent.combatIdleTrack.Animation.AnimationId)
+         if track.IsPlaying then track:AdjustSpeed(speed) else track:Play(0.08, 1, speed) end
+     end
+     agent.model:SetAttribute("MonsterAnimationState", "combat_idle")
+@@ -163,7 +163,7 @@ local function playRun(agent: any, pursuitMultiplier: number?)
+     stopTrack(agent.attackTrack)
+     local track = agent.runTrack
+     if track then
+-        local speed = AnimationSpeedScaling.ResolveScaleForModel(agent.model, "run") * math.max(1, pursuitMultiplier or 1)
++        local speed = AnimationSpeedScaling.ResolveScaleForAnimation(agent.model, "run", agent.runTrack and agent.runTrack.Animation and agent.runTrack.Animation.AnimationId) * math.max(1, pursuitMultiplier or 1)
+         if track.IsPlaying then track:AdjustSpeed(speed) else track:Play(0.08, 1, speed) end
+     end
+     agent.model:SetAttribute("MonsterAnimationState", "run")
+@@ -327,7 +327,7 @@ local function clearAttackPursuit(agent: any)
+ end
+ 
+ local function attackPursuitPlaybackSpeed(agent: any, movementMultiplier: number?): number
+-    return AnimationSpeedScaling.ResolveScaleForModel(agent.model, "run") * math.max(0.01, movementMultiplier or ATTACK_PURSUIT_SPEED_MULTIPLIER)
++    return AnimationSpeedScaling.ResolveScaleForAnimation(agent.model, "run", agent.runTrack and agent.runTrack.Animation and agent.runTrack.Animation.AnimationId) * math.max(0.01, movementMultiplier or ATTACK_PURSUIT_SPEED_MULTIPLIER)
+ end
+ 
+ local function publishAttackPursuitPlaybackSpeed(agent: any, movementMultiplier: number?)
+@@ -403,7 +403,7 @@ local function beginAttack(agent: any, target: Model)
+     if agent.attacking or os.clock() < agent.nextAttackAt then return end
+     local row = weightedRow(agent.attackRows)
+     if not row then return end
+-    local percent = AnimationSpeedScaling.ResolveForModel(agent.model, "attack")
++    local percent = AnimationSpeedScaling.ResolveForAnimation(agent.model, "attack", row.animationId)
+     local timing = AttackTimelineConfig.ResolveRuntime(row.clipId, percent)
+     if not timing then return end
+ 
+diff --git a/src/server/monster/MonsterSpawnerService.luau b/src/server/monster/MonsterSpawnerService.luau
+index f4759fa..69b7826 100644
+--- a/src/server/monster/MonsterSpawnerService.luau
++++ b/src/server/monster/MonsterSpawnerService.luau
+@@ -198,7 +198,7 @@ local function playTrackAtConfiguredSpeed(model: Model, track: AnimationTrack?,
+     if not track then
+         return
+     end
+-    local percent = animationPlaybackPercent(model, channel)
++    local percent = AnimationSpeedScaling.ResolveForAnimation(model, channel, track.Animation and track.Animation.AnimationId)
+     model:SetAttribute("AnimationPlaybackSpeedPercent", percent)
+     local speed = percent / 100
+     if seam then
+@@ -874,8 +874,8 @@ local function beginDeath(state: any, model: Model, entry: any)
+         warn("[game1][monster-spawn] required death animation track is missing; monster remains Dying")
+         return
+     end
+-    model:SetAttribute("AnimationPlaybackSpeedPercent", animationPlaybackPercent(model, "death"))
+-    DeathAnimationPolicy.Start(track, animationPlaybackScale(model, "death"))
++    model:SetAttribute("AnimationPlaybackSpeedPercent", AnimationSpeedScaling.ResolveForAnimation(model, "death", track.Animation and track.Animation.AnimationId))
++    DeathAnimationPolicy.Start(track, AnimationSpeedScaling.ResolveScaleForAnimation(model, "death", track.Animation and track.Animation.AnimationId))
+ end
+ 
+ local function spawnOne(state: any): Model?
+diff --git a/src/server/npc/NpcAnimationService.luau b/src/server/npc/NpcAnimationService.luau
+index 4adfef5..ebfafa4 100644
+--- a/src/server/npc/NpcAnimationService.luau
++++ b/src/server/npc/NpcAnimationService.luau
+@@ -162,7 +162,7 @@ function NpcAnimationService.Create(entity: Model, visual: Model, profile: any?)
+         -- Do not disarm, detach or drop equipment at death.
+         entity:SetAttribute("NpcAnimationState", "death")
+         entity:SetAttribute("DeathAnimationStartedAt", deathStartedAt)
+-        if death then DeathAnimationPolicy.Start(death, AnimationSpeedScaling.ResolveForModel(entity, "death") / 100) end
++        if death then DeathAnimationPolicy.Start(death, AnimationSpeedScaling.ResolveForAnimation(entity, "death", deathClip and deathClip.row and deathClip.row.animationId) / 100) end
+     end
+ 
+     local function step(delta: number): boolean
+diff --git a/src/server/npc/NpcAnimationTracks.luau b/src/server/npc/NpcAnimationTracks.luau
+index b8ed000..796da03 100644
+--- a/src/server/npc/NpcAnimationTracks.luau
++++ b/src/server/npc/NpcAnimationTracks.luau
+@@ -107,7 +107,10 @@ function NpcAnimationTracks.Play(entity: Model, clip: any?, channel: string, fad
+     if not clip then
+         return false
+     end
+-    local percent = speedPercentOverride or AnimationSpeedScaling.ResolveForModel(entity, channel)
++    local _, isCustom = AnimationSpeedScaling.RuleForAnimation(entity, channel, clip.row and clip.row.animationId)
++    local percent = if isCustom
++        then AnimationSpeedScaling.ResolveForAnimation(entity, channel, clip.row and clip.row.animationId)
++        else (speedPercentOverride or AnimationSpeedScaling.ResolveForModel(entity, channel))
+     entity:SetAttribute("AnimationPlaybackSpeedPercent", percent)
+     local speed = percent / 100
+     local success, failure = pcall(function()
+diff --git a/src/server/npc/NpcCombatAIService.luau b/src/server/npc/NpcCombatAIService.luau
+index f7b51ab..c468270 100644
+--- a/src/server/npc/NpcCombatAIService.luau
++++ b/src/server/npc/NpcCombatAIService.luau
+@@ -192,7 +192,7 @@ local function beginAttack(agent: any, target: Model, continuing: boolean?)
+         row = selection and selection.row or nil
+         agent.currentAttackRow = row
+     end
+-    local scaling = AnimationSpeedScaling.ResolveDetailsForModel(agent.model, "attack")
++    local scaling = AnimationSpeedScaling.ResolveDetailsForModel(agent.model, "attack", nil, row and row.animationId)
+     local percent = if scaling.hasRule then scaling.percent
+         else math.clamp(finite(agent.model:GetAttribute("AttackSpeed"), 100), 1, 400)
+ 
+@@ -424,8 +424,9 @@ function NpcCombatAIService.Start()
+                     if moving then
+                         local equivalent = CharacterMovementConfig.EquivalentRunSpeedForLocomotion(
+                             stat, speed / math.max(0.001, CharacterMovementConfig.RobloxSpeed(nil, stat, "Run")), agent.pursuitChannel == "walk" and "Walk" or "Run")
+-                        local scale = AnimationSpeedScaling.ResolveForModelWithStatValue(
+-                            agent.model, agent.pursuitChannel, equivalent) / 100
++                        local scale = AnimationSpeedScaling.ResolveForAnimation(
++                            agent.model, agent.pursuitChannel,
++                            agent.model:GetAttribute("NpcAttackPursuitAnimationId"), equivalent) / 100
+                         local old = tonumber(agent.model:GetAttribute("NpcAttackPursuitPlaybackSpeed")) or 0
+                         if math.abs(scale - old) >= 0.025 then agent.model:SetAttribute("NpcAttackPursuitPlaybackSpeed", scale) end
+                     end
+diff --git a/src/shared/animation/AnimationSpeedScaling.luau b/src/shared/animation/AnimationSpeedScaling.luau
+index 707c9ea..666da34 100644
+--- a/src/shared/animation/AnimationSpeedScaling.luau
++++ b/src/shared/animation/AnimationSpeedScaling.luau
+@@ -1,4 +1,5 @@
+ local Registry = require(script.Parent:WaitForChild("AnimationSpeedScalingRegistry"))
++local Workspace = game:GetService("Workspace")
+ 
+ local AnimationSpeedScaling = {}
+ 
+@@ -6,6 +7,7 @@ AnimationSpeedScaling.MinPercent = 1
+ AnimationSpeedScaling.MaxPercent = 400
+ AnimationSpeedScaling.MinUnitsPerPercent = 0.001
+ AnimationSpeedScaling.MaxUnitsPerPercent = 1000
++AnimationSpeedScaling.CustomDebugPrefix = "Game1CustomScaling_"
+ AnimationSpeedScaling.DebugUnitsPerPercentPrefix = "MovementDebugAnimationUnitsPerPercent_"
+ local function finite(value: any, fallback: number): number
+     local numeric = tonumber(value)
+@@ -52,10 +54,38 @@ function AnimationSpeedScaling.ResolvePercent(targetType: any, targetId: any, ch
+ end
+ 
+ 
+-function AnimationSpeedScaling.ResolveDetailsForModel(model: Model, channel: any, statValueOverride: any?): any
++-- Clip-level policy has priority over the state-level rule. Roblox asset IDs
++-- are stable through display-name and local filename migrations.
++function AnimationSpeedScaling.AssetId(value: any): string
++    local id = tostring(value or ""):match("(%d+)$")
++    return id or ""
++end
++
++function AnimationSpeedScaling.Catalog(): any
++    return Registry.catalog or {}
++end
++
++function AnimationSpeedScaling.RuleForAnimation(model: Model, channel: any, animationId: any): (any?, boolean)
++    local id = AnimationSpeedScaling.AssetId(animationId)
++    if id ~= "" then
++        local override = Registry.custom and Registry.custom[id]
++        local debugUnits = Workspace:GetAttribute(AnimationSpeedScaling.CustomDebugPrefix .. id)
++        if typeof(debugUnits) == "number" and debugUnits > 0 then
++            local stat = Workspace:GetAttribute(AnimationSpeedScaling.CustomDebugPrefix .. id .. "_Stat")
++            return {stat = if stat == "RunSpeed" then stat else "AttackSpeed", unitsPerPercent = debugUnits}, true
++        end
++        if override then
++            return override, true
++        end
++    end
++    local targetType, targetId = AnimationSpeedScaling.TargetForModel(model)
++    return AnimationSpeedScaling.Rule(targetType, targetId, channel), false
++end
++
++function AnimationSpeedScaling.ResolveDetailsForModel(model: Model, channel: any, statValueOverride: any?, animationId: any?): any
+     local normalizedChannel = string.lower(tostring(channel or ""))
+     local targetType, targetId = AnimationSpeedScaling.TargetForModel(model)
+-    local rule = AnimationSpeedScaling.Rule(targetType, targetId, normalizedChannel)
++    local rule, isCustom = AnimationSpeedScaling.RuleForAnimation(model, normalizedChannel, animationId)
+     if not rule then
+         return {
+             targetType = targetType,
+@@ -70,7 +100,7 @@ function AnimationSpeedScaling.ResolveDetailsForModel(model: Model, channel: any
+     end
+ 
+     local stat = tostring(rule.stat or "")
+-    local rawStatValue = if statValueOverride ~= nil then statValueOverride else model:GetAttribute(stat)
++    local rawStatValue = if statValueOverride ~= nil and not isCustom then statValueOverride else model:GetAttribute(stat)
+     local statValue = math.max(0, finite(rawStatValue, 0))
+     local authoredUnitsPerPercent = math.clamp(
+         finite(rule.unitsPerPercent, 1),
+@@ -80,7 +110,7 @@ function AnimationSpeedScaling.ResolveDetailsForModel(model: Model, channel: any
+     local overrideAttribute = AnimationSpeedScaling.DebugUnitsPerPercentAttribute(normalizedChannel)
+     local debugUnitsPerPercent = tonumber(model:GetAttribute(overrideAttribute))
+     local unitsPerPercent = authoredUnitsPerPercent
+-    if debugUnitsPerPercent ~= nil then
++    if debugUnitsPerPercent ~= nil and not isCustom then
+         unitsPerPercent = math.clamp(
+             finite(debugUnitsPerPercent, authoredUnitsPerPercent),
+             AnimationSpeedScaling.MinUnitsPerPercent,
+@@ -103,6 +133,7 @@ function AnimationSpeedScaling.ResolveDetailsForModel(model: Model, channel: any
+         unitsPerPercent = unitsPerPercent,
+         percent = percent,
+         hasRule = true,
++        custom = isCustom,
+     }
+ end
+ 
+@@ -118,4 +149,31 @@ function AnimationSpeedScaling.ResolveScaleForModel(model: Model, channel: any):
+     return AnimationSpeedScaling.ResolveForModel(model, channel) / 100
+ end
+ 
++function AnimationSpeedScaling.ResolveForAnimation(model: Model, channel: any, animationId: any, statValueOverride: any?): number
++    return AnimationSpeedScaling.ResolveDetailsForModel(model, channel, statValueOverride, animationId).percent
++end
++
++function AnimationSpeedScaling.ResolveScaleForAnimation(model: Model, channel: any, animationId: any, statValueOverride: any?): number
++    return AnimationSpeedScaling.ResolveForAnimation(model, channel, animationId, statValueOverride) / 100
++end
++
++-- Studio debug changes affect already playing tracks without respawning actors.
++-- Animation state controllers remain authoritative for later Play/AdjustSpeed calls.
++function AnimationSpeedScaling.RefreshPlaying(model: Model, animationId: any)
++    local desiredId = AnimationSpeedScaling.AssetId(animationId)
++    if desiredId == "" then return end
++    local metadata = AnimationSpeedScaling.Catalog()[desiredId]
++    local channel = metadata and metadata.channel or "idle"
++    for _, descendant in ipairs(model:GetDescendants()) do
++        if descendant:IsA("Animator") then
++            for _, track in ipairs(descendant:GetPlayingAnimationTracks()) do
++                local trackId = AnimationSpeedScaling.AssetId(track.Animation and track.Animation.AnimationId)
++                if trackId == desiredId and track.Speed > 0 then
++                    track:AdjustSpeed(AnimationSpeedScaling.ResolveScaleForAnimation(model, channel, desiredId))
++                end
++            end
++        end
++    end
++end
++
+ return table.freeze(AnimationSpeedScaling)
+diff --git a/src/shared/animation/AnimationSpeedScalingRegistry.luau b/src/shared/animation/AnimationSpeedScalingRegistry.luau
+index 2a4a675..8c0f330 100644
+--- a/src/shared/animation/AnimationSpeedScalingRegistry.luau
++++ b/src/shared/animation/AnimationSpeedScalingRegistry.luau
+@@ -32,4 +32,112 @@ return table.freeze({
+ 			}),
+ 		}),
+ 	}),
++	custom = table.freeze({
++	}),
++	catalog = table.freeze({
++		["88149431126736"] = table.freeze({
++			label = "character / human_female / 1hs_attack_01",
++			channel = "attack",
++		}),
++		["82563321432420"] = table.freeze({
++			label = "character / human_female / 1hs_attack_02",
++			channel = "attack",
++		}),
++		["86247398285431"] = table.freeze({
++			label = "character / human_female / 1hs_attack_03",
++			channel = "attack",
++		}),
++		["118675119937740"] = table.freeze({
++			label = "character / human_female / 1hs_combat_idle",
++			channel = "combat_idle",
++		}),
++		["128677350129455"] = table.freeze({
++			label = "character / human_female / 1hs_idle",
++			channel = "idle",
++		}),
++		["134065196920987"] = table.freeze({
++			label = "character / human_female / 1hs_run",
++			channel = "run",
++		}),
++		["111055842456450"] = table.freeze({
++			label = "character / human_female / 1hs_walk",
++			channel = "walk",
++		}),
++		["118060400424587"] = table.freeze({
++			label = "character / human_female / base_death",
++			channel = "death",
++		}),
++		["139362684441288"] = table.freeze({
++			label = "character / human_female / base_revive",
++			channel = "revive",
++		}),
++		["101898400862842"] = table.freeze({
++			label = "monster / gremlin / attack_01",
++			channel = "attack",
++		}),
++		["92672041098744"] = table.freeze({
++			label = "monster / gremlin / combat_idle",
++			channel = "combat_idle",
++		}),
++		["127522409398238"] = table.freeze({
++			label = "monster / gremlin / death",
++			channel = "death",
++		}),
++		["137844363101161"] = table.freeze({
++			label = "monster / gremlin / idle",
++			channel = "idle",
++		}),
++		["126252769665114"] = table.freeze({
++			label = "monster / gremlin / idle_special_01",
++			channel = "idle",
++		}),
++		["114060589585488"] = table.freeze({
++			label = "monster / gremlin / run",
++			channel = "run",
++		}),
++		["80922686042611"] = table.freeze({
++			label = "monster / gremlin / walk",
++			channel = "walk",
++		}),
++		["89218860148097"] = table.freeze({
++			label = "npc / guard_01 / attack_01",
++			channel = "attack",
++		}),
++		["125522140536834"] = table.freeze({
++			label = "npc / guard_01 / combat_idle",
++			channel = "combat_idle",
++		}),
++		["140129007932289"] = table.freeze({
++			label = "npc / guard_01 / death",
++			channel = "death",
++		}),
++		["121205302537992"] = table.freeze({
++			label = "npc / guard_01 / idle",
++			channel = "idle",
++		}),
++		["103119318954108"] = table.freeze({
++			label = "npc / guard_01 / idle_special_01",
++			channel = "idle",
++		}),
++		["132123582014306"] = table.freeze({
++			label = "npc / guard_01 / run",
++			channel = "run",
++		}),
++		["116522185625057"] = table.freeze({
++			label = "npc / guard_01 / walk",
++			channel = "walk",
++		}),
++		["88762573361466"] = table.freeze({
++			label = "npc / warsmith / idle",
++			channel = "idle",
++		}),
++		["127366991170629"] = table.freeze({
++			label = "npc / warsmith / idle_special_01",
++			channel = "idle",
++		}),
++		["85866729046732"] = table.freeze({
++			label = "npc / warsmith / idle_special_02",
++			channel = "idle",
++		}),
++	}),
+ })
+diff --git a/system/control-center/animation_speed_scaling_store.py b/system/control-center/animation_speed_scaling_store.py
+index a212884..7201c77 100644
+--- a/system/control-center/animation_speed_scaling_store.py
++++ b/system/control-center/animation_speed_scaling_store.py
+@@ -1,6 +1,7 @@
+ from __future__ import annotations
+ 
+ import json
++import math
+ from copy import deepcopy
+ from pathlib import Path
+ 
+@@ -105,6 +106,7 @@ class AnimationSpeedScalingStore:
+         return json.loads(self.manifest_path.read_text(encoding="utf-8"))
+ 
+     def _validate(self, payload: dict):
++        self._validate_custom(payload)
+         if int(payload.get("schemaVersion") or 0) != 1:
+             raise ValueError("unsupported animation speed scaling schema")
+         profiles = payload.get("profiles")
+@@ -141,6 +143,78 @@ class AnimationSpeedScalingStore:
+         text = format(float(value), ".12g")
+         return text if "." in text else text + ".0"
+ 
++    def catalog(self) -> list[dict]:
++        """Published clips, indexed by permanent Roblox Animation Asset ID.
++
++        UI names are informational; user overrides do not depend on filenames,
++        profile names or the currently selected NPC/Character in Asset Manager.
++        """
++        found: dict[str, dict] = {}
++        for kind, filename in (
++            ("character", "character-animations.json"),
++            ("monster", "monster-animations.json"),
++            ("npc", "npc-animations.json"),
++        ):
++            path = self.root / "assets/manifests" / filename
++            if not path.is_file():
++                continue
++            data = json.loads(path.read_text(encoding="utf-8"))
++            bindings: dict[str, list[dict]] = {}
++            for binding in data.get("bindings", []):
++                bindings.setdefault(str(binding.get("clipId") or binding.get("clip_id") or ""), []).append(binding)
++            for clip in data.get("clips", []):
++                asset_id = str(clip.get("assetId") or clip.get("asset_id") or "")
++                if not asset_id.isdecimal() or int(asset_id) == 0:
++                    continue
++                clip_id = str(clip.get("id") or "")
++                subject = str(clip.get("characterId") or clip.get("monster_slug") or kind)
++                for binding in bindings.get(clip_id, []):
++                    slot = str(binding.get("slot") or "idle").lower()
++                    channel = "idle" if slot == "idle_special" else slot
++                    row = {
++                        "assetId": asset_id,
++                        "clipId": clip_id,
++                        "name": str(clip.get("name") or clip_id),
++                        "kind": kind,
++                        "subject": subject,
++                        "channel": channel,
++                        "stat": "RunSpeed" if channel in {"walk", "run"} else "AttackSpeed",
++                    }
++                    found.setdefault(asset_id, row)
++        return sorted(found.values(), key=lambda r: (r["kind"], r["subject"], r["name"]))
++
++    def _validate_custom(self, payload: dict):
++        rows = payload.get("customScaling", [])
++        if not isinstance(rows, list):
++            raise ValueError("custom scaling must be a list")
++        seen = set()
++        for row in rows:
++            aid = str(row.get("assetId") or "")
++            units = float(row.get("unitsPerPercent") or 0)
++            if not aid.isdecimal() or int(aid) == 0 or aid in seen:
++                raise ValueError("invalid or duplicate custom animation asset id")
++            if not math.isfinite(units) or not 0.001 <= units <= 1000:
++                raise ValueError("custom units must be 0.001..1000")
++            if row.get("stat") not in {"AttackSpeed", "RunSpeed"}:
++                raise ValueError("unsupported custom gameplay stat")
++            seen.add(aid)
++
++    def save_custom(self, request: dict) -> dict:
++        asset_id = str(request.get("assetId") or "").strip()
++        catalog = {r["assetId"]: r for r in self.catalog()}
++        if asset_id not in catalog:
++            raise ValueError("select a published animation from the catalog")
++        payload = self._read()
++        rows = payload.setdefault("customScaling", [])
++        rows[:] = [r for r in rows if r["assetId"] != asset_id]
++        if not bool(request.get("delete")):
++            stat = str(request.get("stat") or catalog[asset_id]["stat"])
++            units = float(request.get("unitsPerPercent") or 0)
++            rows.append({"assetId": asset_id, "stat": stat, "unitsPerPercent": units})
++        rows.sort(key=lambda r: r["assetId"])
++        self._write(payload)
++        return self.snapshot()
++
+     def _write_registry(self, payload: dict):
+         grouped: dict[str, dict[str, dict]] = {"humanoid": {}, "monster": {}}
+         for profile in payload.get("profiles") or []:
+@@ -175,9 +249,30 @@ class AnimationSpeedScalingStore:
+                     ]
+                 lines.append("\t\t\t}),")
+             lines.append("\t\t}),")
++        lines.append("\t}),")
++        lines.append("\tcustom = table.freeze({")
++        for row in payload.get("customScaling", []):
++            aid = row["assetId"]
++            lines += [
++                f"\t\t[{self._lua_string(aid)}] = table.freeze({{",
++                f"\t\t\tstat = {self._lua_string(row['stat'])},",
++                f"\t\t\tunitsPerPercent = {self._lua_number(row['unitsPerPercent'])},",
++                "\t\t}),",
++            ]
++        lines.append("\t}),")
++        lines.append("\tcatalog = table.freeze({")
++        for row in self.catalog():
++            lines += [
++                f"\t\t[{self._lua_string(row['assetId'])}] = table.freeze({{",
++                f"\t\t\tlabel = {self._lua_string(row['kind'] + ' / ' + row['subject'] + ' / ' + row['name'])},",
++                f"\t\t\tchannel = {self._lua_string(row['channel'])},",
++                "\t\t}),",
++            ]
+         lines += ["\t}),", "})", ""]
+         self.registry_path.parent.mkdir(parents=True, exist_ok=True)
+-        self.registry_path.write_text("\n".join(lines), encoding="utf-8")
++        rendered = "\n".join(lines)
++        if not self.registry_path.is_file() or self.registry_path.read_text(encoding="utf-8") != rendered:
++            self.registry_path.write_text(rendered, encoding="utf-8")
+ 
+     def _write(self, payload: dict):
+         self._validate(payload)
+@@ -188,6 +283,8 @@ class AnimationSpeedScalingStore:
+     def snapshot(self) -> dict:
+         payload = self._read()
+         self._validate(payload)
++        self._write_registry(payload)
++        payload["catalog"] = self.catalog()
+         return payload
+ 
+     def update(self, request: dict) -> dict:
+@@ -213,4 +310,4 @@ class AnimationSpeedScalingStore:
+         if not found:
+             raise ValueError("unknown animation speed scaling rule")
+         self._write(payload)
+-        return payload
++        return self.snapshot()
+diff --git a/system/control-center/host_agent.py b/system/control-center/host_agent.py
+index 462e292..bb990d8 100644
+--- a/system/control-center/host_agent.py
++++ b/system/control-center/host_agent.py
+@@ -726,6 +726,11 @@ class Handler(BaseHTTPRequestHandler):
+                 return self.out(200, monster_spawns.validate())
+             except Exception as error:
+                 return self.out(400, {"error": str(error)})
++        if path == "/api/animation-speed-scaling/custom":
++            try:
++                return self.out(200, animation_speed_scaling.save_custom(self.body()))
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
+         if path == "/api/animation-speed-scaling":
+             try:
+                 return self.out(200, animation_speed_scaling.update(self.body()))
+diff --git a/system/control-center/static/animation-speed.js b/system/control-center/static/animation-speed.js
+index 5b19628..aefb0fc 100644
+--- a/system/control-center/static/animation-speed.js
++++ b/system/control-center/static/animation-speed.js
+@@ -1,4 +1,4 @@
+-const animationSpeedState={data:null,saving:new Set()};
++const animationSpeedState={data:null,saving:new Set(),search:""};
+ const animationSpeedChannelMeta={
+   run:{title:'Run',description:'Running movement animations.'},
+   walk:{title:'Walk',description:'Walking movement animations.'},
+@@ -44,11 +44,71 @@ function animationSpeedRender(){
+     input.onkeydown=event=>{if(event.key==='Enter'){event.preventDefault();animationSpeedSave(profile,rule,input)}};
+   }}
+ }
+-async function animationSpeedLoad(){try{animationSpeedState.data=await request('/api/animation-speed-scaling');animationSpeedRender()}catch(error){toast(error.message,true)}}
++async function animationSpeedLoad(){try{animationSpeedState.data=await request('/api/animation-speed-scaling');animationSpeedRender();customScalingRender()}catch(error){toast(error.message,true)}}
+ async function animationSpeedSave(profile,rule,input){
+   const units=Number(input.value);if(!Number.isFinite(units)||units<0.001||units>100000){toast('stat units for +1% playback must be 0.001..100000',true);return}
+   const key=[profile.targetType,profile.targetId,rule.channel].join(':');animationSpeedState.saving.add(key);animationSpeedRender();
+-  try{animationSpeedState.data=await request('/api/animation-speed-scaling',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({targetType:profile.targetType,targetId:profile.targetId,channel:rule.channel,unitsPerPercent:units})});toast(`${profile.displayName||profile.targetId} · ${animationSpeedRuleMeta(rule).title}: +1% playback per ${animationSpeedFormat(units)} ${rule.stat}`)}catch(error){toast(error.message,true)}finally{animationSpeedState.saving.delete(key);animationSpeedRender()}
++  try{animationSpeedState.data=await request('/api/animation-speed-scaling',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({targetType:profile.targetType,targetId:profile.targetId,channel:rule.channel,unitsPerPercent:units})});toast(`${profile.displayName||profile.targetId} · ${animationSpeedRuleMeta(rule).title}: +1% playback per ${animationSpeedFormat(units)} ${rule.stat}`)}catch(error){toast(error.message,true)}finally{animationSpeedState.saving.delete(key);animationSpeedRender();customScalingRender()}
+ }
+ window.game1AnimationSpeedLoad=animationSpeedLoad;
+ $('refresh-animation-speed').onclick=animationSpeedLoad;
++
++// Clip-level overrides. The default state rules are intentionally left untouched.
++function customScalingCatalog(){return animationSpeedState.data?.catalog||[]}
++function customScalingSaved(){return animationSpeedState.data?.customScaling||[]}
++function customScalingInherited(clip){
++  const type=clip.kind==='monster'?'monster':'humanoid';
++  const id=clip.kind==='monster'?clip.subject:'all';
++  const profile=(animationSpeedState.data?.profiles||[]).find(p=>p.targetType===type&&p.targetId===id);
++  const rule=(profile?.rules||[]).find(r=>r.channel===clip.channel);
++  return {stat:rule?.stat||clip.stat||'AttackSpeed',unitsPerPercent:rule?.unitsPerPercent||1};
++}
++function customScalingRender(){
++  const list=$('custom-scaling-rows'), results=$('custom-scaling-results');
++  if(!list||!results)return;
++  const catalog=customScalingCatalog(), saved=customScalingSaved();
++  const byId=new Map(catalog.map(c=>[c.assetId,c]));
++  const term=animationSpeedState.search.trim().toLowerCase();
++  const matches=term?catalog.filter(c=>
++    [c.name,c.subject,c.kind,c.channel,c.assetId,c.clipId].some(x=>String(x||'').toLowerCase().includes(term))
++  ).slice(0,30):[];
++  results.hidden=!term;
++  results.innerHTML=term?(matches.length?matches.map(c=>
++    `<button type="button" data-custom-pick="${esc(c.assetId)}"><b>${esc(c.name)}</b><small>${esc(c.kind)} / ${esc(c.subject)} / ${esc(c.channel)} · ${esc(c.assetId)}</small></button>`
++  ).join(''):'<span class="muted">No published animations match.</span>'):'';
++  for(const button of results.querySelectorAll('[data-custom-pick]'))button.onclick=()=>{
++    const aid=button.dataset.customPick;
++    if(!saved.some(row=>row.assetId===aid))saved.push({assetId:aid,...customScalingInherited(byId.get(aid)),_draft:true});
++    animationSpeedState.search='';$('custom-scaling-search').value='';customScalingRender();
++    list.querySelector(`[data-custom-row="${aid}"]`)?.scrollIntoView({block:'nearest'});
++  };
++  list.innerHTML=saved.length?saved.map(row=>{
++    const c=byId.get(row.assetId);
++    return `<article class="animation-speed-rule" data-custom-row="${esc(row.assetId)}">
++       <div class="animation-speed-rule-head"><div><span>${esc(c?.kind||'published')} / ${esc(c?.subject||'registered')}</span><h4>${esc(c?.name||row.assetId)}</h4><small>${esc(c?.channel||'')} · Roblox Animation ID ${esc(row.assetId)}</small></div><span class="animation-speed-channel">${row._draft?'new':'custom'}</span></div>
++       <div class="animation-speed-fields">
++        <label class="animation-speed-field"><b>Gameplay stat</b><select data-custom-stat><option value="AttackSpeed" ${row.stat==='AttackSpeed'?'selected':''}>AttackSpeed</option><option value="RunSpeed" ${row.stat==='RunSpeed'?'selected':''}>RunSpeed</option></select></label>
++        <label class="animation-speed-field"><b>Stat units for +1% playback</b><input data-custom-units type="number" min="0.001" max="1000" step="0.01" value="${esc(animationSpeedFormat(row.unitsPerPercent))}"></label>
++       </div><div class="animation-speed-rule-actions"><span>override only this animation</span><div class="actions"><button data-custom-remove type="button">${row._draft?'cancel':'remove override'}</button><button data-custom-apply class="primary" type="button">apply</button></div></div>
++    </article>`;
++  }).join(''):'<span class="muted">No custom overrides. Search for a published animation above.</span>';
++  for(const section of list.querySelectorAll('[data-custom-row]')){
++    const aid=section.dataset.customRow;
++    section.querySelector('[data-custom-apply]').onclick=()=>customScalingSave(aid,section,false);
++    section.querySelector('[data-custom-remove]').onclick=()=>customScalingSave(aid,section,true);
++  }
++}
++async function customScalingSave(assetId,section,remove){
++  const entry=customScalingSaved().find(r=>r.assetId===assetId);
++  if(remove&&entry?._draft){animationSpeedState.data.customScaling=customScalingSaved().filter(r=>r!==entry);customScalingRender();return}
++  const stat=section.querySelector('[data-custom-stat]').value;
++  const units=Number(section.querySelector('[data-custom-units]').value);
++  if(!remove&&(!Number.isFinite(units)||units<0.001||units>1000)){toast('units must be 0.001..1000',true);return}
++  const action=section.querySelector('[data-custom-apply]');action.disabled=true;
++  try{
++    animationSpeedState.data=await request('/api/animation-speed-scaling/custom',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({assetId,stat,unitsPerPercent:units,delete:remove})});
++    toast(remove?'Custom override removed; state default restored.':'Custom animation scaling saved.');
++    animationSpeedRender();customScalingRender();
++  }catch(error){toast(error.message,true);action.disabled=false}
++}
++$('custom-scaling-search').oninput=e=>{animationSpeedState.search=e.target.value;customScalingRender()};
+diff --git a/system/control-center/static/asset-manager.css b/system/control-center/static/asset-manager.css
+index b121e86..35699b3 100644
+--- a/system/control-center/static/asset-manager.css
++++ b/system/control-center/static/asset-manager.css
+@@ -50,3 +50,12 @@
+   min-width: 8ch;
+   max-width: 100%;
+ }
++
++/* M74 searchable custom animation rules */
++.custom-scaling-search-label{display:block;max-width:720px;margin:16px 0 4px}
++.custom-scaling-results{max-height:260px;overflow:auto;border:1px solid var(--border, #8885);border-radius:10px;padding:4px;max-width:720px}
++.custom-scaling-results button{width:100%;text-align:left;display:flex;flex-direction:column;gap:3px;margin:2px 0}
++.custom-scaling-results small{opacity:.7}
++.custom-scaling-list{display:grid;gap:12px;margin-top:14px}
++.custom-scaling-list .animation-speed-rule{min-width:0}
++.custom-scaling-list .animation-speed-fields{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+diff --git a/system/control-center/static/index.html b/system/control-center/static/index.html
+index f0f600f..dd86617 100644
+--- a/system/control-center/static/index.html
++++ b/system/control-center/static/index.html
+@@ -154,6 +154,14 @@
+ <div class="section-title"><div><span>animation speed scaling</span><h3>gameplay stat → playback %</h3></div><button id="refresh-animation-speed" type="button">refresh</button></div>
+ <small class="hint">each animation block is configured independently. <b>Gameplay stat</b> selects the runtime stat; <b>Stat units for +1% playback</b> controls its conversion to animation speed. Example: value 2 means every 2 stat points add 1% playback.</small>
+ <div id="animation-speed-profiles" class="details"><span class="muted">loading scaling rules…</span></div>
++<hr class="card-separator">
++<div class="section-title"><div><span>individual clip overrides</span><h3>custom scaling animations</h3></div></div>
++<p class="hint">Search a published Character, NPC or Monster animation. Overrides use its permanent Roblox Animation ID, not its filename. Removing an override immediately restores the state-level scaling rule.</p>
++<label class="custom-scaling-search-label">Search registered animation
++<input type="search" id="custom-scaling-search" autocomplete="off" placeholder="start typing animation, NPC, monster, character or ID">
++</label>
++<div id="custom-scaling-results" class="custom-scaling-results" role="listbox" hidden></div>
++<div id="custom-scaling-rows" class="custom-scaling-list"><span class="muted">No custom overrides.</span></div>
+ </div>
+ </div>
+ 
+@@ -477,7 +485,7 @@
+ </main>
+ <div id="toast" class="toast"></div>
+ <script src="character-assets.js?v=17"></script>
+-<script src="animation-speed.js?v=1"></script>
++<script src="animation-speed.js?v=2"></script>
+ <script src="timelines.js?v=2"></script>
+ <script src="locations.js?v=1"></script>
+ <script src="deco-assets.js?v=4"></script>
+diff --git a/system/verify/test_custom_scaling_m74.py b/system/verify/test_custom_scaling_m74.py
+new file mode 100644
+index 0000000..40394f8
+--- /dev/null
++++ b/system/verify/test_custom_scaling_m74.py
+@@ -0,0 +1,74 @@
++"""M74 contract tests: clip overrides must be safe and reversible."""
++import json
++import shutil
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "system/control-center"))
++from animation_speed_scaling_store import AnimationSpeedScalingStore
++
++
++class CustomScalingTests(unittest.TestCase):
++    def setUp(self):
++        self.temp = tempfile.TemporaryDirectory(prefix="m74-custom-")
++        self.root = Path(self.temp.name)
++        for name in ("character-animations.json", "npc-animations.json", "monster-animations.json"):
++            target = self.root / "assets/manifests" / name
++            target.parent.mkdir(parents=True, exist_ok=True)
++            shutil.copyfile(ROOT / "assets/manifests" / name, target)
++        self.store = AnimationSpeedScalingStore(self.root)
++
++    def tearDown(self):
++        self.temp.cleanup()
++
++    def test_publication_catalog_searchable_and_all_kinds(self):
++        rows = self.store.snapshot()["catalog"]
++        self.assertTrue({"character", "npc", "monster"}.issubset({r["kind"] for r in rows}))
++        self.assertEqual(len(rows), len({r["assetId"] for r in rows}))
++        self.assertTrue(all(row["assetId"].isdigit() for row in rows))
++
++    def test_override_and_remove_preserves_default_profiles_and_ids(self):
++        before = self.store.snapshot()
++        clip = next(r for r in before["catalog"] if r["kind"] == "npc")
++        saved = self.store.save_custom({"assetId": clip["assetId"], "stat": "AttackSpeed", "unitsPerPercent": 3.75})
++        self.assertEqual(saved["customScaling"][0]["unitsPerPercent"], 3.75)
++        self.assertEqual(before["profiles"], saved["profiles"])
++        registry = self.store.registry_path.read_text(encoding="utf8")
++        self.assertIn('custom = table.freeze({', registry)
++        self.assertIn(clip["assetId"], registry)
++        removed = self.store.save_custom({"assetId": clip["assetId"], "delete": True})
++        self.assertEqual(removed["customScaling"], [])
++        self.assertEqual(removed["profiles"], before["profiles"])
++
++    def test_rejects_bad_asset_id_units_and_stat(self):
++        clip = self.store.catalog()[0]
++        for patch in (
++            {"assetId": "9999999999999999", "stat": "RunSpeed", "unitsPerPercent": 1},
++            {"assetId": clip["assetId"], "stat": "UnknownStat", "unitsPerPercent": 1},
++            {"assetId": clip["assetId"], "stat": "RunSpeed", "unitsPerPercent": 0},
++            {"assetId": clip["assetId"], "stat": "RunSpeed", "unitsPerPercent": 1001},
++        ):
++            with self.assertRaises(ValueError):
++                self.store.save_custom(patch)
++
++    def test_runtime_debug_safe_and_no_frame_polling(self):
++        scaling = (ROOT / "src/shared/animation/AnimationSpeedScaling.luau").read_text()
++        studio = (ROOT / "src/server/dev/CustomScalingDebugService.luau").read_text()
++        client = (ROOT / "src/client/dev/CustomScalingDebugController.luau").read_text()
++        npc = (ROOT / "src/server/npc/NpcAnimationTracks.luau").read_text()
++        for token in ("RuleForAnimation", "ResolveForAnimation", "RefreshPlaying", "Registry.custom"):
++            self.assertIn(token, scaling)
++        self.assertIn("RunService:IsStudio()", studio)
++        self.assertIn("GetPlayingAnimationTracks", scaling)
++        self.assertIn("RunService:IsStudio()", client)
++        movement = (ROOT / "src/server/npc/NpcCombatAIService.luau").read_text()
++        self.assertIn('NpcAttackPursuitAnimationId', movement)
++        self.assertIn('AnimationSpeedScaling.ResolveForAnimation(', movement)
++        self.assertIn('speedPercentOverride or AnimationSpeedScaling.ResolveForModel', npc)
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/system/verify/test_npc_attack_loop_shared_speed_m71.py b/system/verify/test_npc_attack_loop_shared_speed_m71.py
+index 09cd6e0..a7bec61 100644
+--- a/system/verify/test_npc_attack_loop_shared_speed_m71.py
++++ b/system/verify/test_npc_attack_loop_shared_speed_m71.py
+@@ -88,8 +88,8 @@ class NpcAttackLoopAndSharedSpeedTests(unittest.TestCase):
+         monster = source("src/server/monster/MonsterAIService.luau")
+         character = source("src/client/character/animation/CharacterAnimationController.luau")
+         npc_tracks = source("src/server/npc/NpcAnimationTracks.luau")
+-        self.assertIn('AnimationSpeedScaling.ResolveForModel', character)
+-        self.assertIn('AnimationSpeedScaling.ResolveScaleForModel', monster)
++        self.assertIn('AnimationSpeedScaling.ResolveForAnimation', character)
++        self.assertIn('AnimationSpeedScaling.ResolveScaleForAnimation', monster)
+         self.assertIn('AnimationSpeedScaling.ResolveForModel(entity, channel)', npc_tracks)
+         self.assertIn('Tracks.Play(entity, run, movementChannel)', source("src/server/npc/NpcAnimationService.luau"))
+         self.assertIn('AttackTimelineConfig.ResolveRuntime(row.clipId, percent)', source("src/server/npc/NpcCombatAIService.luau"))
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index 435b2d7..c273a1e 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -202,7 +202,7 @@ for required in [
+     "AttackTimelineConfig.ResolveRuntime",
+     "CharacterAttackWindow.Resolve",
+     "allowedAttackDescriptor",
+-    "AnimationSpeedScaling.ResolveForModel",
++    "AnimationSpeedScaling.ResolveForAnimation",
+     "activeUntil",
+     'character:SetAttribute("AttackEndsAt"',
+ ]:
+@@ -671,9 +671,9 @@ for required in ["DefaultRunSpeed = 50", "WalkSpeedMultiplier = 0.5", "return ru
+         err(f"direct RunSpeed/walk-half movement contract missing {required}")
+ if 'character:GetAttribute("RunSpeed")' not in rig_text or 'character:GetAttribute("MoveSpeed")' in rig_text:
+     err("character rig initial movement must use RunSpeed directly")
+-if 'AnimationSpeedScaling.ResolveForModel(character, "attack")' not in attack_text:
++if 'AnimationSpeedScaling.ResolveForAnimation(character, "attack", descriptor.animationId)' not in attack_text:
+     err("server attack timeline does not resolve stat-scaled AttackSpeed playback")
+-if 'animationSpeedPercent = animationPlaybackPercent(slot)' not in controller_runtime:
++if 'animationSpeedPercent = animationPlaybackPercent(slot, descriptor.animationId)' not in controller_runtime:
+     err("client attack presentation does not use shared stat-scaled playback")
+ for required in ['animationController.PlayAction("attack")', "action.durationSeconds", "clipId = action.clipId"]:
+     if required not in attack_controller_text:
+@@ -1388,7 +1388,7 @@ if "movementController.LockMovement(attackDuration)" in attack_controller_m22:
+ for required in ["BeginAttackMovement", "movingAtAttackStart", "EndAttackMovement"]:
+     if required not in attack_controller_m22:
+         err(f"attack controller moving-attack contract missing {required}")
+-for required in ["AttackMovementLocomotionMode", "combat_idle", "EquivalentRunSpeedForLocomotion", "ResolveForModelWithStatValue", "AnimationAttackLowerBodySlot"]:
++for required in ["AttackMovementLocomotionMode", "combat_idle", "EquivalentRunSpeedForLocomotion", "ResolveForAnimation", "AnimationAttackLowerBodySlot"]:
+     if required not in animation_controller_m22:
+         err(f"live lower-body attack locomotion missing {required}")
+ for required in ["RobloxSpeedAtRunMultiplier", "EquivalentRunSpeedForLocomotion"]:

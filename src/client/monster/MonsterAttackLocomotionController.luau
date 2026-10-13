@@ -265,7 +265,7 @@ local function step(deltaTime: number)
 						targetBone.Transform = targetBone.Transform:Lerp(sourceBone.Transform, entry.weight)
 					end
 				end
-				ActorLowerBodyPose.AlignToMovement(entry)
+				ActorLowerBodyPose.AlignToMovement(entry, deltaTime)
 			end
 			if entry.weight <= 0 and not wantsComposition then
 				releaseSampler(entry)

@@ -20,6 +20,7 @@ local AnimationSpeedScaling = require(AnimationShared:WaitForChild("AnimationSpe
 local DamageService = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("DamageService"))
 local HitEffectService = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("HitEffectService"))
 local Facing = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorFacingTracker"))
+local AttackPursuit = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorAttackPursuit"))
 
 local MonsterAIService = {}
 local started = false
@@ -34,11 +35,7 @@ local PATH_TARGET_MOVE_THRESHOLD = 3
 local STUCK_CHECK_SECONDS = 0.80
 local STUCK_PROGRESS_STUDS = 0.35
 local WAYPOINT_TOLERANCE = 1.25
-local ATTACK_PURSUIT_STOP_MARGIN = 0.35
 local ATTACK_PURSUIT_SPEED_MULTIPLIER = 1.65
-local ATTACK_PURSUIT_FOLLOW_GAIN = 5.5
-local ATTACK_PURSUIT_MIN_CATCHUP_SPEED = 0.75
-local ATTACK_PURSUIT_IDLE_SPEED = 0.08
 local ATTACK_PURSUIT_PLAYBACK_EPSILON = 0.02
 local ATTACK_ARC_DEGREES = 110
 local VERTICAL_TOLERANCE = 5
@@ -286,10 +283,6 @@ local function faceDirection(agent: any, direction: Vector3)
     local flat = Vector3.new(direction.X, 0, direction.Z)
     if flat.Magnitude <= 0.001 then return end
     agent.facing = flat.Unit
-    if not agent.attacking and agent.root.Parent then
-        local position = agent.root.Position
-        agent.root.CFrame = CFrame.lookAt(position, position + agent.facing, Vector3.yAxis)
-    end
 end
 
 local function aggressive(agent: any): boolean
@@ -326,13 +319,10 @@ local function enterCombat(agent: any, target: Model)
 end
 
 local function clearAttackPursuit(agent: any)
+    agent.attackPursuit:Stop()
     if agent.attackPursuitActive then
-        agent.humanoid:Move(Vector3.zero, false)
-        agent.humanoid.WalkSpeed = 0
         agent.attackPursuitActive = false
         agent.model:SetAttribute("MonsterAttackPursuitActive", false)
-    else
-        agent.attackPursuitActive = false
     end
 end
 
@@ -364,42 +354,14 @@ local function leaveCombat(agent: any)
 end
 
 local function pursueDirectlyDuringAttack(agent: any, targetRoot: BasePart): boolean
-    local offset = horizontalDelta(agent.root.Position, targetRoot.Position)
-    local distance = offset.Magnitude
-    local range = attackRadius(agent)
-    local preferredDistance = math.max(0, range - ATTACK_PURSUIT_STOP_MARGIN)
-    if distance <= 0.001 then
-        clearAttackPursuit(agent)
-        return false
-    end
-
-    local direction = offset.Unit
-    local targetVelocity = horizontalDelta(Vector3.zero, targetRoot.AssemblyLinearVelocity)
-    local targetRetreatSpeed = math.max(0, targetVelocity:Dot(direction))
     local maximumSpeed = runSpeedStuds(agent) * ATTACK_PURSUIT_SPEED_MULTIPLIER
-    local distanceError = math.max(0, distance - preferredDistance)
-    local correctionSpeed = distanceError * ATTACK_PURSUIT_FOLLOW_GAIN
-    local desiredSpeed = math.min(maximumSpeed, targetRetreatSpeed + correctionSpeed)
-    if distance > range then
-        desiredSpeed = math.max(desiredSpeed, math.min(maximumSpeed, targetRetreatSpeed + ATTACK_PURSUIT_MIN_CATCHUP_SPEED))
-    end
-
-    if desiredSpeed <= ATTACK_PURSUIT_IDLE_SPEED then
+    local pursuing, desiredSpeed = agent.attackPursuit:Step(targetRoot, attackRadius(agent), maximumSpeed)
+    if not pursuing then
         clearAttackPursuit(agent)
         return false
     end
-
-    local enteringPursuit = not agent.attackPursuitActive
-    agent.attackPursuitActive = true
-    agent.humanoid.WalkSpeed = desiredSpeed
-    -- Facing yaw is owned by ActorFacingTracker; leave AutoRotate disabled.
-    -- Active-attack pursuit is a continuous velocity command, not a stream of
-    -- MoveTo destinations. Reissuing MoveTo around the attack-radius boundary
-    -- produces visible stop/catch-up pulses when player and monster speeds are
-    -- close. Humanoid:Move keeps one continuous locomotion owner for the attack.
-    agent.humanoid:Move(direction, false)
-    agent.facing = direction
-    if enteringPursuit then
+    if not agent.attackPursuitActive then
+        agent.attackPursuitActive = true
         agent.model:SetAttribute("MonsterAttackPursuitActive", true)
     end
     local baseRunSpeed = math.max(0.001, runSpeedStuds(agent))
@@ -591,6 +553,7 @@ local function bindMonster(model: Model)
             nextAttackAt = 0,
             nextTargetScanAt = 0,
             attackPursuitActive = false,
+            attackPursuit = AttackPursuit.new(root, humanoid),
             facing = root.CFrame.LookVector,
             state = "Idle",
             navigating = false,

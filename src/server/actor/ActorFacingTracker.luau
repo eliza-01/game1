@@ -1,26 +1,35 @@
--- One server-owned yaw tracker shared by NPC and monster attacks.
--- Physics/navigation still owns translation; no per-actor threads or bone hacks.
+-- Physics-owned yaw tracking for actors attacking a moving target.
+-- Never teleport/assign the HumanoidRootPart CFrame on Heartbeat: doing so
+-- fights the Humanoid solver and creates replication corrections at high speed.
 local RunService = game:GetService("RunService")
+
 local Tracker = {}
 local active: {[Model]: any} = {}
 local connected = false
-local TURN_RESPONSE = 10 -- exponential responsiveness (1/s)
-local MAX_TURN_RATE = math.rad(420) -- physical yaw cap in radians/s
 
-local function stop(model: Model)
-    local entry = active[model]
-    if not entry then return end
-    active[model] = nil
+local TURN_RESPONSE = 12
+local MAX_TURN_RATE = math.rad(420)
+local MAX_TORQUE = 10000000
+
+local function release(entry)
+    if entry.align then entry.align:Destroy() end
+    if entry.attachment then entry.attachment:Destroy() end
     if entry.humanoid.Parent then
         entry.humanoid.AutoRotate = entry.autoRotate
     end
 end
 
-local function step(dt: number)
+local function stop(model: Model)
+    local entry = active[model]
+    if not entry then return end
+    active[model] = nil
+    release(entry)
+end
+
+local function step(_dt: number)
     for model, entry in pairs(active) do
         local root = entry.root
-        local target = entry.target
-        local targetRoot = entry.resolve(target)
+        local targetRoot = entry.resolve(entry.target)
         if not root.Parent or not model.Parent or not entry.humanoid.Parent
             or model:GetAttribute("LifeState") ~= "Alive" then
             stop(model)
@@ -29,41 +38,48 @@ local function step(dt: number)
         if not targetRoot or not targetRoot.Parent then continue end
         local delta = targetRoot.Position - root.Position
         local flat = Vector3.new(delta.X, 0, delta.Z)
-        if flat.Magnitude <= 0.01 then continue end
-        local desired = flat.Unit
-        local look = root.CFrame.LookVector
-        local current = Vector3.new(look.X, 0, look.Z)
-        if current.Magnitude <= 0.001 then current = desired else current = current.Unit end
-        local cross = current.X * desired.Z - current.Z * desired.X
-        local dot = math.clamp(current:Dot(desired), -1, 1)
-        local angle = math.atan2(cross, dot)
-        local absolute = math.abs(angle)
-        if absolute <= 0.00001 then continue end
-        local response = 1 - math.exp(-TURN_RESPONSE * math.clamp(dt, 0, 0.25))
-        local stepAngle = math.min(absolute * response, MAX_TURN_RATE * math.max(0, dt))
-        local sign = if angle < 0 then -1 else 1
-        local yaw = CFrame.fromAxisAngle(Vector3.yAxis, -sign * stepAngle)
-        local nextDirection = yaw:VectorToWorldSpace(current)
-        root.CFrame = CFrame.lookAt(root.Position, root.Position + nextDirection, Vector3.yAxis)
+        if flat.Magnitude > 0.01 then
+            -- AlignOrientation performs angular smoothing inside physics.
+            -- Only the *goal* rotates, never the replicated physical root.
+            entry.align.CFrame = CFrame.lookAlong(Vector3.zero, flat.Unit, Vector3.yAxis)
+        end
     end
 end
 
 function Tracker.Track(model: Model, root: BasePart, humanoid: Humanoid, target: Model, resolver: (Model) -> BasePart?)
     local entry = active[model]
     if entry then
-        entry.target = target
-        entry.resolve = resolver
-        return
+        if entry.root ~= root or entry.humanoid ~= humanoid then
+            stop(model)
+        else
+            entry.target = target
+            entry.resolve = resolver
+            return
+        end
     end
+    local attachment = Instance.new("Attachment")
+    attachment.Name = "Game1FacingAttachment"
+    attachment.Parent = root
+    local align = Instance.new("AlignOrientation")
+    align.Name = "Game1AttackFacing"
+    align.Mode = Enum.OrientationAlignmentMode.OneAttachment
+    align.Attachment0 = attachment
+    align.RigidityEnabled = false
+    align.ReactionTorqueEnabled = false
+    align.Responsiveness = TURN_RESPONSE
+    align.MaxAngularVelocity = MAX_TURN_RATE
+    align.MaxTorque = MAX_TORQUE
+    align.CFrame = root.CFrame.Rotation
+    align.Parent = root
+    active[model] = {
+        root = root, humanoid = humanoid, target = target, resolve = resolver,
+        autoRotate = humanoid.AutoRotate, attachment = attachment, align = align,
+    }
+    humanoid.AutoRotate = false
     if not connected then
         connected = true
         RunService.Heartbeat:Connect(step)
     end
-    active[model] = {
-        root = root, humanoid = humanoid, target = target,
-        resolve = resolver, autoRotate = humanoid.AutoRotate,
-    }
-    humanoid.AutoRotate = false
 end
 
 Tracker.Stop = stop

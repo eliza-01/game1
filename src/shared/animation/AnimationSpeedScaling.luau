@@ -1,4 +1,5 @@
 local Registry = require(script.Parent:WaitForChild("AnimationSpeedScalingRegistry"))
+local Workspace = game:GetService("Workspace")
 
 local AnimationSpeedScaling = {}
 
@@ -6,6 +7,7 @@ AnimationSpeedScaling.MinPercent = 1
 AnimationSpeedScaling.MaxPercent = 400
 AnimationSpeedScaling.MinUnitsPerPercent = 0.001
 AnimationSpeedScaling.MaxUnitsPerPercent = 1000
+AnimationSpeedScaling.CustomDebugPrefix = "Game1CustomScaling_"
 AnimationSpeedScaling.DebugUnitsPerPercentPrefix = "MovementDebugAnimationUnitsPerPercent_"
 local function finite(value: any, fallback: number): number
     local numeric = tonumber(value)
@@ -52,10 +54,38 @@ function AnimationSpeedScaling.ResolvePercent(targetType: any, targetId: any, ch
 end
 
 
-function AnimationSpeedScaling.ResolveDetailsForModel(model: Model, channel: any, statValueOverride: any?): any
+-- Clip-level policy has priority over the state-level rule. Roblox asset IDs
+-- are stable through display-name and local filename migrations.
+function AnimationSpeedScaling.AssetId(value: any): string
+    local id = tostring(value or ""):match("(%d+)$")
+    return id or ""
+end
+
+function AnimationSpeedScaling.Catalog(): any
+    return Registry.catalog or {}
+end
+
+function AnimationSpeedScaling.RuleForAnimation(model: Model, channel: any, animationId: any): (any?, boolean)
+    local id = AnimationSpeedScaling.AssetId(animationId)
+    if id ~= "" then
+        local override = Registry.custom and Registry.custom[id]
+        local debugUnits = Workspace:GetAttribute(AnimationSpeedScaling.CustomDebugPrefix .. id)
+        if typeof(debugUnits) == "number" and debugUnits > 0 then
+            local stat = Workspace:GetAttribute(AnimationSpeedScaling.CustomDebugPrefix .. id .. "_Stat")
+            return {stat = if stat == "RunSpeed" then stat else "AttackSpeed", unitsPerPercent = debugUnits}, true
+        end
+        if override then
+            return override, true
+        end
+    end
+    local targetType, targetId = AnimationSpeedScaling.TargetForModel(model)
+    return AnimationSpeedScaling.Rule(targetType, targetId, channel), false
+end
+
+function AnimationSpeedScaling.ResolveDetailsForModel(model: Model, channel: any, statValueOverride: any?, animationId: any?): any
     local normalizedChannel = string.lower(tostring(channel or ""))
     local targetType, targetId = AnimationSpeedScaling.TargetForModel(model)
-    local rule = AnimationSpeedScaling.Rule(targetType, targetId, normalizedChannel)
+    local rule, isCustom = AnimationSpeedScaling.RuleForAnimation(model, normalizedChannel, animationId)
     if not rule then
         return {
             targetType = targetType,
@@ -70,7 +100,7 @@ function AnimationSpeedScaling.ResolveDetailsForModel(model: Model, channel: any
     end
 
     local stat = tostring(rule.stat or "")
-    local rawStatValue = if statValueOverride ~= nil then statValueOverride else model:GetAttribute(stat)
+    local rawStatValue = if statValueOverride ~= nil and not isCustom then statValueOverride else model:GetAttribute(stat)
     local statValue = math.max(0, finite(rawStatValue, 0))
     local authoredUnitsPerPercent = math.clamp(
         finite(rule.unitsPerPercent, 1),
@@ -80,7 +110,7 @@ function AnimationSpeedScaling.ResolveDetailsForModel(model: Model, channel: any
     local overrideAttribute = AnimationSpeedScaling.DebugUnitsPerPercentAttribute(normalizedChannel)
     local debugUnitsPerPercent = tonumber(model:GetAttribute(overrideAttribute))
     local unitsPerPercent = authoredUnitsPerPercent
-    if debugUnitsPerPercent ~= nil then
+    if debugUnitsPerPercent ~= nil and not isCustom then
         unitsPerPercent = math.clamp(
             finite(debugUnitsPerPercent, authoredUnitsPerPercent),
             AnimationSpeedScaling.MinUnitsPerPercent,
@@ -103,6 +133,7 @@ function AnimationSpeedScaling.ResolveDetailsForModel(model: Model, channel: any
         unitsPerPercent = unitsPerPercent,
         percent = percent,
         hasRule = true,
+        custom = isCustom,
     }
 end
 
@@ -116,6 +147,33 @@ end
 
 function AnimationSpeedScaling.ResolveScaleForModel(model: Model, channel: any): number
     return AnimationSpeedScaling.ResolveForModel(model, channel) / 100
+end
+
+function AnimationSpeedScaling.ResolveForAnimation(model: Model, channel: any, animationId: any, statValueOverride: any?): number
+    return AnimationSpeedScaling.ResolveDetailsForModel(model, channel, statValueOverride, animationId).percent
+end
+
+function AnimationSpeedScaling.ResolveScaleForAnimation(model: Model, channel: any, animationId: any, statValueOverride: any?): number
+    return AnimationSpeedScaling.ResolveForAnimation(model, channel, animationId, statValueOverride) / 100
+end
+
+-- Studio debug changes affect already playing tracks without respawning actors.
+-- Animation state controllers remain authoritative for later Play/AdjustSpeed calls.
+function AnimationSpeedScaling.RefreshPlaying(model: Model, animationId: any)
+    local desiredId = AnimationSpeedScaling.AssetId(animationId)
+    if desiredId == "" then return end
+    local metadata = AnimationSpeedScaling.Catalog()[desiredId]
+    local channel = metadata and metadata.channel or "idle"
+    for _, descendant in ipairs(model:GetDescendants()) do
+        if descendant:IsA("Animator") then
+            for _, track in ipairs(descendant:GetPlayingAnimationTracks()) do
+                local trackId = AnimationSpeedScaling.AssetId(track.Animation and track.Animation.AnimationId)
+                if trackId == desiredId and track.Speed > 0 then
+                    track:AdjustSpeed(AnimationSpeedScaling.ResolveScaleForAnimation(model, channel, desiredId))
+                end
+            end
+        end
+    end
 end
 
 return table.freeze(AnimationSpeedScaling)

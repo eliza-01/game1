@@ -93,13 +93,14 @@ local function findAnimator(model: Model): Animator?
 	return if found and found:IsA("Animator") then found else nil
 end
 
-local function animationPlaybackPercent(channel: string): number
+local function animationPlaybackPercent(channel: string, animationId: any?): number
 	if not character then
 		return 100
 	end
 	local normalizedChannel = string.lower(tostring(channel or ""))
 	if normalizedChannel == "death" or normalizedChannel == "revive" then
-		return GameOptions.CharacterLifePlaybackPercent(normalizedChannel)
+		local _, custom = AnimationSpeedScaling.RuleForAnimation(character, normalizedChannel, animationId)
+		if not custom then return GameOptions.CharacterLifePlaybackPercent(normalizedChannel) end
 	end
 	if attackLowerBodyActive and (normalizedChannel == "run" or normalizedChannel == "walk") then
 		local runSpeed = tonumber(character:GetAttribute("RunSpeed")) or CharacterMovementConfig.DefaultRunSpeed
@@ -109,13 +110,13 @@ local function animationPlaybackPercent(channel: string): number
 			multiplier,
 			normalizedChannel == "walk" and "Walk" or "Run"
 		)
-		return AnimationSpeedScaling.ResolveForModelWithStatValue(character, normalizedChannel, equivalentRunSpeed)
+		return AnimationSpeedScaling.ResolveForAnimation(character, normalizedChannel, animationId, equivalentRunSpeed)
 	end
-	return AnimationSpeedScaling.ResolveForModel(character, normalizedChannel)
+	return AnimationSpeedScaling.ResolveForAnimation(character, normalizedChannel, animationId)
 end
 
-local function animationPlaybackScale(channel: string): number
-	return animationPlaybackPercent(channel) / 100
+local function animationPlaybackScale(channel: string, animationId: any?): number
+	return animationPlaybackPercent(channel, animationId) / 100
 end
 
 local function publishPlaybackPercent(channel: string)
@@ -228,7 +229,7 @@ local function applyBackwardPlayback(track: AnimationTrack, slot: string)
 		return
 	end
 	local backward = tostring(character:GetAttribute("AnimationMovementDirection") or "Forward") == "Backward"
-	local playbackScale = animationPlaybackScale(slot)
+	local playbackScale = animationPlaybackScale(slot, track.Animation and track.Animation.AnimationId)
 	if not backward or (slot ~= "walk" and slot ~= "run") then
 		track:AdjustSpeed(playbackScale)
 		return
@@ -264,7 +265,7 @@ refreshLoop = function()
 	end
 
 	local clipId = tostring(descriptor.clipId or "")
-	local playbackScale = animationPlaybackScale(slot)
+	local playbackScale = animationPlaybackScale(slot, descriptor.animationId)
 	local wantsSeam = movementUsesForwardSeam(descriptor, slot)
 	publishPlaybackPercent(slot)
 
@@ -355,7 +356,7 @@ local function playDeath()
 	end
 
 	publishPlaybackPercent("death")
-	DeathAnimationPolicy.Start(track, animationPlaybackScale("death"))
+	DeathAnimationPolicy.Start(track, animationPlaybackScale("death", track.Animation and track.Animation.AnimationId))
 end
 
 local function maintainDeathTerminalPose(deltaTimeSim: number)
@@ -406,7 +407,7 @@ local function playBaseLifeAction(slot: string, onStopped)
 	currentActionSlot = slot
 	currentActionLockedUntil = 0
 	publishPlaybackPercent(slot)
-	local playbackScale = animationPlaybackScale(slot)
+	local playbackScale = animationPlaybackScale(slot, descriptor.animationId)
 	currentActionSeam = createSeam(descriptor, track, false)
 	character:SetAttribute("AnimationActionSlot", slot)
 	character:SetAttribute("AnimationActionClip", tostring(descriptor.clipId or ""))
@@ -553,7 +554,7 @@ function CharacterAnimationController.PlayAction(slot: string)
 	end
 
 	local clipId = tostring(descriptor.clipId or "")
-	local animationSpeedPercent = animationPlaybackPercent(slot)
+	local animationSpeedPercent = animationPlaybackPercent(slot, descriptor.animationId)
 	local playbackSpeed = animationSpeedPercent / 100
 	local timeline = nil
 	local runtimeDuration = 0

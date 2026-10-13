@@ -154,6 +154,14 @@
 <div class="section-title"><div><span>animation speed scaling</span><h3>gameplay stat → playback %</h3></div><button id="refresh-animation-speed" type="button">refresh</button></div>
 <small class="hint">each animation block is configured independently. <b>Gameplay stat</b> selects the runtime stat; <b>Stat units for +1% playback</b> controls its conversion to animation speed. Example: value 2 means every 2 stat points add 1% playback.</small>
 <div id="animation-speed-profiles" class="details"><span class="muted">loading scaling rules…</span></div>
+<hr class="card-separator">
+<div class="section-title"><div><span>individual clip overrides</span><h3>custom scaling animations</h3></div></div>
+<p class="hint">Search a published Character, NPC or Monster animation. Overrides use its permanent Roblox Animation ID, not its filename. Removing an override immediately restores the state-level scaling rule.</p>
+<label class="custom-scaling-search-label">Search registered animation
+<input type="search" id="custom-scaling-search" autocomplete="off" placeholder="start typing animation, NPC, monster, character or ID">
+</label>
+<div id="custom-scaling-results" class="custom-scaling-results" role="listbox" hidden></div>
+<div id="custom-scaling-rows" class="custom-scaling-list"><span class="muted">No custom overrides.</span></div>
 </div>
 </div>
 
@@ -477,7 +485,7 @@
 </main>
 <div id="toast" class="toast"></div>
 <script src="character-assets.js?v=17"></script>
-<script src="animation-speed.js?v=1"></script>
+<script src="animation-speed.js?v=3"></script>
 <script src="timelines.js?v=2"></script>
 <script src="locations.js?v=1"></script>
 <script src="deco-assets.js?v=4"></script>

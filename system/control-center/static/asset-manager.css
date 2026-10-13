@@ -50,3 +50,12 @@
   min-width: 8ch;
   max-width: 100%;
 }
+
+/* M74 searchable custom animation rules */
+.custom-scaling-search-label{display:block;max-width:720px;margin:16px 0 4px}
+.custom-scaling-results{max-height:260px;overflow:auto;border:1px solid var(--border, #8885);border-radius:10px;padding:4px;max-width:720px}
+.custom-scaling-results button{width:100%;text-align:left;display:flex;flex-direction:column;gap:3px;margin:2px 0}
+.custom-scaling-results small{opacity:.7}
+.custom-scaling-list{display:grid;gap:12px;margin-top:14px}
+.custom-scaling-list .animation-speed-rule{min-width:0}
+.custom-scaling-list .animation-speed-fields{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}

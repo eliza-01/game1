@@ -437,7 +437,7 @@ local function attack(player: Player, payload: any)
         return
     end
 
-    local animationSpeedPercent = AnimationSpeedScaling.ResolveForModel(character, "attack")
+    local animationSpeedPercent = AnimationSpeedScaling.ResolveForAnimation(character, "attack", descriptor.animationId)
     local timing = AttackTimelineConfig.ResolveRuntime(clipId, animationSpeedPercent)
     if not timing then
         if Config.DebugLogs then

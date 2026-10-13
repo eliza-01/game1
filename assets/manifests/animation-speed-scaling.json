@@ -79,5 +79,12 @@
         }
       ]
     }
+  ],
+  "customScaling": [
+    {
+      "assetId": "132123582014306",
+      "stat": "RunSpeed",
+      "unitsPerPercent": 1.4
+    }
   ]
 }

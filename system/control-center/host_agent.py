@@ -726,6 +726,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self.out(200, monster_spawns.validate())
             except Exception as error:
                 return self.out(400, {"error": str(error)})
+        if path == "/api/animation-speed-scaling/custom":
+            try:
+                return self.out(200, animation_speed_scaling.save_custom(self.body()))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
         if path == "/api/animation-speed-scaling":
             try:
                 return self.out(200, animation_speed_scaling.update(self.body()))

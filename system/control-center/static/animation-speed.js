@@ -1,4 +1,4 @@
-const animationSpeedState={data:null,saving:new Set()};
+const animationSpeedState={data:null,saving:new Set(),search:""};
 const animationSpeedChannelMeta={
   run:{title:'Run',description:'Running movement animations.'},
   walk:{title:'Walk',description:'Walking movement animations.'},
@@ -44,11 +44,77 @@ function animationSpeedRender(){
     input.onkeydown=event=>{if(event.key==='Enter'){event.preventDefault();animationSpeedSave(profile,rule,input)}};
   }}
 }
-async function animationSpeedLoad(){try{animationSpeedState.data=await request('/api/animation-speed-scaling');animationSpeedRender()}catch(error){toast(error.message,true)}}
+async function animationSpeedLoad(){try{animationSpeedState.data=await request('/api/animation-speed-scaling');animationSpeedRender();customScalingRender()}catch(error){toast(error.message,true)}}
 async function animationSpeedSave(profile,rule,input){
   const units=Number(input.value);if(!Number.isFinite(units)||units<0.001||units>100000){toast('stat units for +1% playback must be 0.001..100000',true);return}
   const key=[profile.targetType,profile.targetId,rule.channel].join(':');animationSpeedState.saving.add(key);animationSpeedRender();
-  try{animationSpeedState.data=await request('/api/animation-speed-scaling',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({targetType:profile.targetType,targetId:profile.targetId,channel:rule.channel,unitsPerPercent:units})});toast(`${profile.displayName||profile.targetId} · ${animationSpeedRuleMeta(rule).title}: +1% playback per ${animationSpeedFormat(units)} ${rule.stat}`)}catch(error){toast(error.message,true)}finally{animationSpeedState.saving.delete(key);animationSpeedRender()}
+  try{animationSpeedState.data=await request('/api/animation-speed-scaling',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({targetType:profile.targetType,targetId:profile.targetId,channel:rule.channel,unitsPerPercent:units})});toast(`${profile.displayName||profile.targetId} · ${animationSpeedRuleMeta(rule).title}: +1% playback per ${animationSpeedFormat(units)} ${rule.stat}`)}catch(error){toast(error.message,true)}finally{animationSpeedState.saving.delete(key);animationSpeedRender();customScalingRender()}
 }
 window.game1AnimationSpeedLoad=animationSpeedLoad;
 $('refresh-animation-speed').onclick=animationSpeedLoad;
+
+// Clip-level overrides. The default state rules are intentionally left untouched.
+function customScalingCatalog(){return animationSpeedState.data?.catalog||[]}
+function customScalingSaved(){
+  if(!animationSpeedState.data)return [];
+  // Newly migrated projects have no customScaling key until the first save.
+  // Keep draft rows in the actual page state, not in a throwaway fallback array.
+  if(!Array.isArray(animationSpeedState.data.customScaling))animationSpeedState.data.customScaling=[];
+  return animationSpeedState.data.customScaling;
+}
+function customScalingInherited(clip){
+  const type=clip.kind==='monster'?'monster':'humanoid';
+  const id=clip.kind==='monster'?clip.subject:'all';
+  const profile=(animationSpeedState.data?.profiles||[]).find(p=>p.targetType===type&&p.targetId===id);
+  const rule=(profile?.rules||[]).find(r=>r.channel===clip.channel);
+  return {stat:rule?.stat||clip.stat||'AttackSpeed',unitsPerPercent:rule?.unitsPerPercent||1};
+}
+function customScalingRender(){
+  const list=$('custom-scaling-rows'), results=$('custom-scaling-results');
+  if(!list||!results)return;
+  const catalog=customScalingCatalog(), saved=customScalingSaved();
+  const byId=new Map(catalog.map(c=>[c.assetId,c]));
+  const term=animationSpeedState.search.trim().toLowerCase();
+  const matches=term?catalog.filter(c=>
+    [c.name,c.subject,c.kind,c.channel,c.assetId,c.clipId].some(x=>String(x||'').toLowerCase().includes(term))
+  ).slice(0,30):[];
+  results.hidden=!term;
+  results.innerHTML=term?(matches.length?matches.map(c=>
+    `<button type="button" data-custom-pick="${esc(c.assetId)}"><b>${esc(c.name)}</b><small>${esc(c.kind)} / ${esc(c.subject)} / ${esc(c.channel)} · ${esc(c.assetId)}</small></button>`
+  ).join(''):'<span class="muted">No published animations match.</span>'):'';
+  for(const button of results.querySelectorAll('[data-custom-pick]'))button.onclick=()=>{
+    const aid=button.dataset.customPick;
+    if(!saved.some(row=>row.assetId===aid))saved.push({assetId:aid,...customScalingInherited(byId.get(aid)),_draft:true});
+    animationSpeedState.search='';$('custom-scaling-search').value='';customScalingRender();
+    list.querySelector(`[data-custom-row="${aid}"]`)?.scrollIntoView({block:'nearest'});
+  };
+  list.innerHTML=saved.length?saved.map(row=>{
+    const c=byId.get(row.assetId);
+    return `<article class="animation-speed-rule" data-custom-row="${esc(row.assetId)}">
+       <div class="animation-speed-rule-head"><div><span>${esc(c?.kind||'published')} / ${esc(c?.subject||'registered')}</span><h4>${esc(c?.name||row.assetId)}</h4><small>${esc(c?.channel||'')} · Roblox Animation ID ${esc(row.assetId)}</small></div><span class="animation-speed-channel">${row._draft?'new':'custom'}</span></div>
+       <div class="animation-speed-fields">
+        <label class="animation-speed-field"><b>Gameplay stat</b><select data-custom-stat><option value="AttackSpeed" ${row.stat==='AttackSpeed'?'selected':''}>AttackSpeed</option><option value="RunSpeed" ${row.stat==='RunSpeed'?'selected':''}>RunSpeed</option></select></label>
+        <label class="animation-speed-field"><b>Stat units for +1% playback</b><input data-custom-units type="number" min="0.001" max="1000" step="0.01" value="${esc(animationSpeedFormat(row.unitsPerPercent))}"></label>
+       </div><div class="animation-speed-rule-actions"><span>override only this animation</span><div class="actions"><button data-custom-remove type="button">${row._draft?'cancel':'remove override'}</button><button data-custom-apply class="primary" type="button">apply</button></div></div>
+    </article>`;
+  }).join(''):'<span class="muted">No custom overrides. Search for a published animation above.</span>';
+  for(const section of list.querySelectorAll('[data-custom-row]')){
+    const aid=section.dataset.customRow;
+    section.querySelector('[data-custom-apply]').onclick=()=>customScalingSave(aid,section,false);
+    section.querySelector('[data-custom-remove]').onclick=()=>customScalingSave(aid,section,true);
+  }
+}
+async function customScalingSave(assetId,section,remove){
+  const entry=customScalingSaved().find(r=>r.assetId===assetId);
+  if(remove&&entry?._draft){animationSpeedState.data.customScaling=customScalingSaved().filter(r=>r!==entry);customScalingRender();return}
+  const stat=section.querySelector('[data-custom-stat]').value;
+  const units=Number(section.querySelector('[data-custom-units]').value);
+  if(!remove&&(!Number.isFinite(units)||units<0.001||units>1000)){toast('units must be 0.001..1000',true);return}
+  const action=section.querySelector('[data-custom-apply]');action.disabled=true;
+  try{
+    animationSpeedState.data=await request('/api/animation-speed-scaling/custom',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({assetId,stat,unitsPerPercent:units,delete:remove})});
+    toast(remove?'Custom override removed; state default restored.':'Custom animation scaling saved.');
+    animationSpeedRender();customScalingRender();
+  }catch(error){toast(error.message,true);action.disabled=false}
+}
+$('custom-scaling-search').oninput=e=>{animationSpeedState.search=e.target.value;customScalingRender()};

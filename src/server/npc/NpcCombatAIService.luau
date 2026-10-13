@@ -192,7 +192,7 @@ local function beginAttack(agent: any, target: Model, continuing: boolean?)
         row = selection and selection.row or nil
         agent.currentAttackRow = row
     end
-    local scaling = AnimationSpeedScaling.ResolveDetailsForModel(agent.model, "attack")
+    local scaling = AnimationSpeedScaling.ResolveDetailsForModel(agent.model, "attack", nil, row and row.animationId)
     local percent = if scaling.hasRule then scaling.percent
         else math.clamp(finite(agent.model:GetAttribute("AttackSpeed"), 100), 1, 400)
 
@@ -424,8 +424,9 @@ function NpcCombatAIService.Start()
                     if moving then
                         local equivalent = CharacterMovementConfig.EquivalentRunSpeedForLocomotion(
                             stat, speed / math.max(0.001, CharacterMovementConfig.RobloxSpeed(nil, stat, "Run")), agent.pursuitChannel == "walk" and "Walk" or "Run")
-                        local scale = AnimationSpeedScaling.ResolveForModelWithStatValue(
-                            agent.model, agent.pursuitChannel, equivalent) / 100
+                        local scale = AnimationSpeedScaling.ResolveForAnimation(
+                            agent.model, agent.pursuitChannel,
+                            agent.model:GetAttribute("NpcAttackPursuitAnimationId"), equivalent) / 100
                         local old = tonumber(agent.model:GetAttribute("NpcAttackPursuitPlaybackSpeed")) or 0
                         if math.abs(scale - old) >= 0.025 then agent.model:SetAttribute("NpcAttackPursuitPlaybackSpeed", scale) end
                     end

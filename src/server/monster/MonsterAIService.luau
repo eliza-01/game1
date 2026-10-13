@@ -147,7 +147,7 @@ local function playCombatIdle(agent: any)
     stopTrack(agent.attackTrack)
     local track = agent.combatIdleTrack
     if track then
-        local speed = AnimationSpeedScaling.ResolveScaleForModel(agent.model, "combat_idle")
+        local speed = AnimationSpeedScaling.ResolveScaleForAnimation(agent.model, "combat_idle", agent.combatIdleTrack and agent.combatIdleTrack.Animation and agent.combatIdleTrack.Animation.AnimationId)
         if track.IsPlaying then track:AdjustSpeed(speed) else track:Play(0.08, 1, speed) end
     end
     agent.model:SetAttribute("MonsterAnimationState", "combat_idle")
@@ -163,7 +163,7 @@ local function playRun(agent: any, pursuitMultiplier: number?)
     stopTrack(agent.attackTrack)
     local track = agent.runTrack
     if track then
-        local speed = AnimationSpeedScaling.ResolveScaleForModel(agent.model, "run") * math.max(1, pursuitMultiplier or 1)
+        local speed = AnimationSpeedScaling.ResolveScaleForAnimation(agent.model, "run", agent.runTrack and agent.runTrack.Animation and agent.runTrack.Animation.AnimationId) * math.max(1, pursuitMultiplier or 1)
         if track.IsPlaying then track:AdjustSpeed(speed) else track:Play(0.08, 1, speed) end
     end
     agent.model:SetAttribute("MonsterAnimationState", "run")
@@ -327,7 +327,7 @@ local function clearAttackPursuit(agent: any)
 end
 
 local function attackPursuitPlaybackSpeed(agent: any, movementMultiplier: number?): number
-    return AnimationSpeedScaling.ResolveScaleForModel(agent.model, "run") * math.max(0.01, movementMultiplier or ATTACK_PURSUIT_SPEED_MULTIPLIER)
+    return AnimationSpeedScaling.ResolveScaleForAnimation(agent.model, "run", agent.runTrack and agent.runTrack.Animation and agent.runTrack.Animation.AnimationId) * math.max(0.01, movementMultiplier or ATTACK_PURSUIT_SPEED_MULTIPLIER)
 end
 
 local function publishAttackPursuitPlaybackSpeed(agent: any, movementMultiplier: number?)
@@ -403,7 +403,7 @@ local function beginAttack(agent: any, target: Model)
     if agent.attacking or os.clock() < agent.nextAttackAt then return end
     local row = weightedRow(agent.attackRows)
     if not row then return end
-    local percent = AnimationSpeedScaling.ResolveForModel(agent.model, "attack")
+    local percent = AnimationSpeedScaling.ResolveForAnimation(agent.model, "attack", row.animationId)
     local timing = AttackTimelineConfig.ResolveRuntime(row.clipId, percent)
     if not timing then return end
 

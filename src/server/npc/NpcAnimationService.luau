@@ -162,7 +162,7 @@ function NpcAnimationService.Create(entity: Model, visual: Model, profile: any?)
         -- Do not disarm, detach or drop equipment at death.
         entity:SetAttribute("NpcAnimationState", "death")
         entity:SetAttribute("DeathAnimationStartedAt", deathStartedAt)
-        if death then DeathAnimationPolicy.Start(death, AnimationSpeedScaling.ResolveForModel(entity, "death") / 100) end
+        if death then DeathAnimationPolicy.Start(death, AnimationSpeedScaling.ResolveForAnimation(entity, "death", deathClip and deathClip.row and deathClip.row.animationId) / 100) end
     end
 
     local function step(delta: number): boolean

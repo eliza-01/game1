@@ -202,7 +202,7 @@ for required in [
     "AttackTimelineConfig.ResolveRuntime",
     "CharacterAttackWindow.Resolve",
     "allowedAttackDescriptor",
-    "AnimationSpeedScaling.ResolveForModel",
+    "AnimationSpeedScaling.ResolveForAnimation",
     "activeUntil",
     'character:SetAttribute("AttackEndsAt"',
 ]:
@@ -671,9 +671,9 @@ for required in ["DefaultRunSpeed = 50", "WalkSpeedMultiplier = 0.5", "return ru
         err(f"direct RunSpeed/walk-half movement contract missing {required}")
 if 'character:GetAttribute("RunSpeed")' not in rig_text or 'character:GetAttribute("MoveSpeed")' in rig_text:
     err("character rig initial movement must use RunSpeed directly")
-if 'AnimationSpeedScaling.ResolveForModel(character, "attack")' not in attack_text:
+if 'AnimationSpeedScaling.ResolveForAnimation(character, "attack", descriptor.animationId)' not in attack_text:
     err("server attack timeline does not resolve stat-scaled AttackSpeed playback")
-if 'animationSpeedPercent = animationPlaybackPercent(slot)' not in controller_runtime:
+if 'animationSpeedPercent = animationPlaybackPercent(slot, descriptor.animationId)' not in controller_runtime:
     err("client attack presentation does not use shared stat-scaled playback")
 for required in ['animationController.PlayAction("attack")', "action.durationSeconds", "clipId = action.clipId"]:
     if required not in attack_controller_text:
@@ -1388,7 +1388,7 @@ if "movementController.LockMovement(attackDuration)" in attack_controller_m22:
 for required in ["BeginAttackMovement", "movingAtAttackStart", "EndAttackMovement"]:
     if required not in attack_controller_m22:
         err(f"attack controller moving-attack contract missing {required}")
-for required in ["AttackMovementLocomotionMode", "combat_idle", "EquivalentRunSpeedForLocomotion", "ResolveForModelWithStatValue", "AnimationAttackLowerBodySlot"]:
+for required in ["AttackMovementLocomotionMode", "combat_idle", "EquivalentRunSpeedForLocomotion", "ResolveForAnimation", "AnimationAttackLowerBodySlot"]:
     if required not in animation_controller_m22:
         err(f"live lower-body attack locomotion missing {required}")
 for required in ["RobloxSpeedAtRunMultiplier", "EquivalentRunSpeedForLocomotion"]:

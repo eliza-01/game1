@@ -107,7 +107,10 @@ function NpcAnimationTracks.Play(entity: Model, clip: any?, channel: string, fad
     if not clip then
         return false
     end
-    local percent = speedPercentOverride or AnimationSpeedScaling.ResolveForModel(entity, channel)
+    local _, isCustom = AnimationSpeedScaling.RuleForAnimation(entity, channel, clip.row and clip.row.animationId)
+    local percent = if isCustom
+        then AnimationSpeedScaling.ResolveForAnimation(entity, channel, clip.row and clip.row.animationId)
+        else (speedPercentOverride or AnimationSpeedScaling.ResolveForModel(entity, channel))
     entity:SetAttribute("AnimationPlaybackSpeedPercent", percent)
     local speed = percent / 100
     local success, failure = pcall(function()

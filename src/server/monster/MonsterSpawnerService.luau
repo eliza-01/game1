@@ -198,7 +198,7 @@ local function playTrackAtConfiguredSpeed(model: Model, track: AnimationTrack?, 
     if not track then
         return
     end
-    local percent = animationPlaybackPercent(model, channel)
+    local percent = AnimationSpeedScaling.ResolveForAnimation(model, channel, track.Animation and track.Animation.AnimationId)
     model:SetAttribute("AnimationPlaybackSpeedPercent", percent)
     local speed = percent / 100
     if seam then
@@ -874,8 +874,8 @@ local function beginDeath(state: any, model: Model, entry: any)
         warn("[game1][monster-spawn] required death animation track is missing; monster remains Dying")
         return
     end
-    model:SetAttribute("AnimationPlaybackSpeedPercent", animationPlaybackPercent(model, "death"))
-    DeathAnimationPolicy.Start(track, animationPlaybackScale(model, "death"))
+    model:SetAttribute("AnimationPlaybackSpeedPercent", AnimationSpeedScaling.ResolveForAnimation(model, "death", track.Animation and track.Animation.AnimationId))
+    DeathAnimationPolicy.Start(track, AnimationSpeedScaling.ResolveScaleForAnimation(model, "death", track.Animation and track.Animation.AnimationId))
 end
 
 local function spawnOne(state: any): Model?

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 from copy import deepcopy
 from pathlib import Path
 
@@ -105,6 +106,7 @@ class AnimationSpeedScalingStore:
         return json.loads(self.manifest_path.read_text(encoding="utf-8"))
 
     def _validate(self, payload: dict):
+        self._validate_custom(payload)
         if int(payload.get("schemaVersion") or 0) != 1:
             raise ValueError("unsupported animation speed scaling schema")
         profiles = payload.get("profiles")
@@ -141,6 +143,78 @@ class AnimationSpeedScalingStore:
         text = format(float(value), ".12g")
         return text if "." in text else text + ".0"
 
+    def catalog(self) -> list[dict]:
+        """Published clips, indexed by permanent Roblox Animation Asset ID.
+
+        UI names are informational; user overrides do not depend on filenames,
+        profile names or the currently selected NPC/Character in Asset Manager.
+        """
+        found: dict[str, dict] = {}
+        for kind, filename in (
+            ("character", "character-animations.json"),
+            ("monster", "monster-animations.json"),
+            ("npc", "npc-animations.json"),
+        ):
+            path = self.root / "assets/manifests" / filename
+            if not path.is_file():
+                continue
+            data = json.loads(path.read_text(encoding="utf-8"))
+            bindings: dict[str, list[dict]] = {}
+            for binding in data.get("bindings", []):
+                bindings.setdefault(str(binding.get("clipId") or binding.get("clip_id") or ""), []).append(binding)
+            for clip in data.get("clips", []):
+                asset_id = str(clip.get("assetId") or clip.get("asset_id") or "")
+                if not asset_id.isdecimal() or int(asset_id) == 0:
+                    continue
+                clip_id = str(clip.get("id") or "")
+                subject = str(clip.get("characterId") or clip.get("monster_slug") or kind)
+                for binding in bindings.get(clip_id, []):
+                    slot = str(binding.get("slot") or "idle").lower()
+                    channel = "idle" if slot == "idle_special" else slot
+                    row = {
+                        "assetId": asset_id,
+                        "clipId": clip_id,
+                        "name": str(clip.get("name") or clip_id),
+                        "kind": kind,
+                        "subject": subject,
+                        "channel": channel,
+                        "stat": "RunSpeed" if channel in {"walk", "run"} else "AttackSpeed",
+                    }
+                    found.setdefault(asset_id, row)
+        return sorted(found.values(), key=lambda r: (r["kind"], r["subject"], r["name"]))
+
+    def _validate_custom(self, payload: dict):
+        rows = payload.get("customScaling", [])
+        if not isinstance(rows, list):
+            raise ValueError("custom scaling must be a list")
+        seen = set()
+        for row in rows:
+            aid = str(row.get("assetId") or "")
+            units = float(row.get("unitsPerPercent") or 0)
+            if not aid.isdecimal() or int(aid) == 0 or aid in seen:
+                raise ValueError("invalid or duplicate custom animation asset id")
+            if not math.isfinite(units) or not 0.001 <= units <= 1000:
+                raise ValueError("custom units must be 0.001..1000")
+            if row.get("stat") not in {"AttackSpeed", "RunSpeed"}:
+                raise ValueError("unsupported custom gameplay stat")
+            seen.add(aid)
+
+    def save_custom(self, request: dict) -> dict:
+        asset_id = str(request.get("assetId") or "").strip()
+        catalog = {r["assetId"]: r for r in self.catalog()}
+        if asset_id not in catalog:
+            raise ValueError("select a published animation from the catalog")
+        payload = self._read()
+        rows = payload.setdefault("customScaling", [])
+        rows[:] = [r for r in rows if r["assetId"] != asset_id]
+        if not bool(request.get("delete")):
+            stat = str(request.get("stat") or catalog[asset_id]["stat"])
+            units = float(request.get("unitsPerPercent") or 0)
+            rows.append({"assetId": asset_id, "stat": stat, "unitsPerPercent": units})
+        rows.sort(key=lambda r: r["assetId"])
+        self._write(payload)
+        return self.snapshot()
+
     def _write_registry(self, payload: dict):
         grouped: dict[str, dict[str, dict]] = {"humanoid": {}, "monster": {}}
         for profile in payload.get("profiles") or []:
@@ -175,9 +249,30 @@ class AnimationSpeedScalingStore:
                     ]
                 lines.append("\t\t\t}),")
             lines.append("\t\t}),")
+        lines.append("\t}),")
+        lines.append("\tcustom = table.freeze({")
+        for row in payload.get("customScaling", []):
+            aid = row["assetId"]
+            lines += [
+                f"\t\t[{self._lua_string(aid)}] = table.freeze({{",
+                f"\t\t\tstat = {self._lua_string(row['stat'])},",
+                f"\t\t\tunitsPerPercent = {self._lua_number(row['unitsPerPercent'])},",
+                "\t\t}),",
+            ]
+        lines.append("\t}),")
+        lines.append("\tcatalog = table.freeze({")
+        for row in self.catalog():
+            lines += [
+                f"\t\t[{self._lua_string(row['assetId'])}] = table.freeze({{",
+                f"\t\t\tlabel = {self._lua_string(row['kind'] + ' / ' + row['subject'] + ' / ' + row['name'])},",
+                f"\t\t\tchannel = {self._lua_string(row['channel'])},",
+                "\t\t}),",
+            ]
         lines += ["\t}),", "})", ""]
         self.registry_path.parent.mkdir(parents=True, exist_ok=True)
-        self.registry_path.write_text("\n".join(lines), encoding="utf-8")
+        rendered = "\n".join(lines)
+        if not self.registry_path.is_file() or self.registry_path.read_text(encoding="utf-8") != rendered:
+            self.registry_path.write_text(rendered, encoding="utf-8")
 
     def _write(self, payload: dict):
         self._validate(payload)
@@ -188,6 +283,8 @@ class AnimationSpeedScalingStore:
     def snapshot(self) -> dict:
         payload = self._read()
         self._validate(payload)
+        self._write_registry(payload)
+        payload["catalog"] = self.catalog()
         return payload
 
     def update(self, request: dict) -> dict:
@@ -213,4 +310,4 @@ class AnimationSpeedScalingStore:
         if not found:
             raise ValueError("unknown animation speed scaling rule")
         self._write(payload)
-        return payload
+        return self.snapshot()

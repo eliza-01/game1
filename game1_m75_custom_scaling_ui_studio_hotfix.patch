@@ -1,0 +1,245 @@
+diff --git a/src/client/dev/CustomScalingDebugController.luau b/src/client/dev/CustomScalingDebugController.luau
+index 6d0f33a..53c2138 100644
+--- a/src/client/dev/CustomScalingDebugController.luau
++++ b/src/client/dev/CustomScalingDebugController.luau
+@@ -65,30 +65,16 @@ function Controller.Start()
+     if not RunService:IsStudio() then return end
+     local player = Players.LocalPlayer
+     if not player then return end
+-    local remote = ReplicatedStorage:WaitForChild("Game1CustomScalingDebug", 20)
+-    if not remote then return end
+-    local apply = remote:WaitForChild("Apply") :: RemoteFunction
+-    local refresh = remote:WaitForChild("Refresh") :: RemoteEvent
+-    refresh.OnClientEvent:Connect(function(assetId, expectedUnits, expectedStat)
+-        -- Attribute replication and the RemoteEvent may arrive in either order.
+-        task.spawn(function()
+-            local key = Scaling.CustomDebugPrefix .. tostring(assetId)
+-            local deadline = os.clock() + 1.5
+-            while os.clock() < deadline do
+-                if Workspace:GetAttribute(key) == expectedUnits
+-                    and Workspace:GetAttribute(key .. "_Stat") == expectedStat then
+-                    break
+-                end
+-                RunService.Heartbeat:Wait()
+-            end
+-            refreshLocally(assetId)
+-        end)
+-    end)
+-    local gui = new("ScreenGui", {Name = "CustomScaling", ResetOnSpawn = false, DisplayOrder = 135}, player:WaitForChild("PlayerGui"))
+-    local toggle = button(gui, "CS", UDim2.fromOffset(16, 635), UDim2.fromOffset(44, 34))
++    local playerGui = player:WaitForChild("PlayerGui")
++    local previous = playerGui:FindFirstChild("CustomScaling")
++    if previous then previous:Destroy() end
++    -- Build the debug UI immediately. Do not silently hide it while waiting
++    -- for a server remote, and never use a fixed Y that may fall off-screen.
++    local gui = new("ScreenGui", {Name = "CustomScaling", ResetOnSpawn = false, DisplayOrder = 135}, playerGui)
++    local toggle = button(gui, "CS", UDim2.new(0, 16, 1, -54), UDim2.fromOffset(44, 34))
+     toggle.BackgroundColor3 = palette.accent
+     local panel = new("Frame", {BackgroundColor3 = palette.background, BorderSizePixel = 0,
+-        Position = UDim2.fromOffset(66, 275), Size = UDim2.fromOffset(350, 395), Visible = false}, gui)
++        Position = UDim2.new(0, 66, 0.5, -197), Size = UDim2.fromOffset(350, 395), Visible = false}, gui)
+     caption(panel, "CustomScaling · Studio Play", 6, 28)
+     caption(panel, "Temporary overrides, not saved to Asset Manager", 34, 18).TextColor3 = palette.muted
+     local search = input(panel, 58, "Search animation / NPC / monster / ID")
+@@ -102,6 +88,54 @@ function Controller.Start()
+     local applyButton = button(panel, "Apply live", UDim2.fromOffset(12, 344), UDim2.fromOffset(156, 32))
+     applyButton.BackgroundColor3 = palette.accent
+     local resetButton = button(panel, "Reset live", UDim2.fromOffset(178, 344), UDim2.fromOffset(160, 32))
++    local applyRemote: RemoteFunction? = nil
++    local OPEN_ATTRIBUTE = "Game1DebugPanelOpen"
++    local PANEL_ID = "CS"
++    local function refreshPanelVisibility()
++        local open = playerGui:GetAttribute(OPEN_ATTRIBUTE) == PANEL_ID
++        panel.Visible = open
++        toggle.Text = if open then "×" else "CS"
++    end
++    toggle.Activated:Connect(function()
++        playerGui:SetAttribute(OPEN_ATTRIBUTE, if panel.Visible then "" else PANEL_ID)
++    end)
++    playerGui:GetAttributeChangedSignal(OPEN_ATTRIBUTE):Connect(refreshPanelVisibility)
++    refreshPanelVisibility()
++
++    -- Remote initialization is asynchronous so a missing server service still
++    -- leaves a visible, diagnosable CS control instead of disappearing.
++    task.spawn(function()
++        local remote = ReplicatedStorage:WaitForChild("Game1CustomScalingDebug", 20)
++        if not remote then
++            selected.Text = "Server CustomScaling service unavailable"
++            warn("[game1][custom-scaling] Studio server debug service was not found")
++            return
++        end
++        local apply = remote:WaitForChild("Apply", 10)
++        local refresh = remote:WaitForChild("Refresh", 10)
++        if not apply or not refresh then
++            selected.Text = "CustomScaling debug remotes incomplete"
++            warn("[game1][custom-scaling] Apply/Refresh remotes missing")
++            return
++        end
++        applyRemote = apply :: RemoteFunction
++        local refreshRemote = refresh :: RemoteEvent
++        refreshRemote.OnClientEvent:Connect(function(assetId, expectedUnits, expectedStat)
++            task.spawn(function()
++                local key = Scaling.CustomDebugPrefix .. tostring(assetId)
++                local deadline = os.clock() + 1.5
++                while os.clock() < deadline do
++                    if Workspace:GetAttribute(key) == expectedUnits
++                        and Workspace:GetAttribute(key .. "_Stat") == expectedStat then
++                        break
++                    end
++                    RunService.Heartbeat:Wait()
++                end
++                refreshLocally(assetId)
++            end)
++        end)
++        print("[game1][custom-scaling] Studio live controls ready")
++    end)
+     local rows = {}
+     for id, entry in pairs(Scaling.Catalog()) do
+         table.insert(rows, {id = id, label = tostring(entry.label), channel = tostring(entry.channel)})
+@@ -136,18 +170,22 @@ function Controller.Start()
+     end
+     search:GetPropertyChangedSignal("Text"):Connect(draw)
+     draw()
+-    toggle.MouseButton1Click:Connect(function() panel.Visible = not panel.Visible end)
++    print("[game1][custom-scaling] CS button visible · catalog entries:", #rows)
+     statButton.MouseButton1Click:Connect(function()
+         stat = if stat == "AttackSpeed" then "RunSpeed" else "AttackSpeed"
+         statButton.Text = "Stat: " .. stat
+     end)
+     local function update(clear: boolean)
+         if not selectedId then selected.Text = "Choose an animation first"; return end
++        if not applyRemote then
++            selected.Text = "Waiting for Studio server CustomScaling service"
++            return
++        end
+         local success, result = pcall(function()
+-            return apply:InvokeServer(selectedId, stat, tonumber(units.Text), clear)
++            return applyRemote:InvokeServer(selectedId, stat, tonumber(units.Text), clear)
+         end)
+-        if not success or not result.ok then
+-            selected.Text = "Error: " .. tostring(if success then result.error else result)
++        if not success or type(result) ~= "table" or result.ok ~= true then
++            selected.Text = "Error: " .. tostring(if success and type(result) == "table" then result.error else result)
+         else
+             refreshLocally(selectedId)
+             local metadata = Scaling.Catalog()[selectedId]
+diff --git a/system/control-center/static/animation-speed.js b/system/control-center/static/animation-speed.js
+index 1ffbb47..e2dcb0e 100644
+--- a/system/control-center/static/animation-speed.js
++++ b/system/control-center/static/animation-speed.js
+@@ -55,7 +55,13 @@ $('refresh-animation-speed').onclick=animationSpeedLoad;
+ 
+ // Clip-level overrides. The default state rules are intentionally left untouched.
+ function customScalingCatalog(){return animationSpeedState.data?.catalog||[]}
+-function customScalingSaved(){return animationSpeedState.data?.customScaling||[]}
++function customScalingSaved(){
++  if(!animationSpeedState.data)return [];
++  // Newly migrated projects have no customScaling key until the first save.
++  // Keep draft rows in the actual page state, not in a throwaway fallback array.
++  if(!Array.isArray(animationSpeedState.data.customScaling))animationSpeedState.data.customScaling=[];
++  return animationSpeedState.data.customScaling;
++}
+ function customScalingInherited(clip){
+   const type=clip.kind==='monster'?'monster':'humanoid';
+   const id=clip.kind==='monster'?clip.subject:'all';
+diff --git a/system/control-center/static/index.html b/system/control-center/static/index.html
+index c9d52d2..ef0ce95 100644
+--- a/system/control-center/static/index.html
++++ b/system/control-center/static/index.html
+@@ -485,7 +485,7 @@
+ </main>
+ <div id="toast" class="toast"></div>
+ <script src="character-assets.js?v=17"></script>
+-<script src="animation-speed.js?v=2"></script>
++<script src="animation-speed.js?v=3"></script>
+ <script src="timelines.js?v=2"></script>
+ <script src="locations.js?v=1"></script>
+ <script src="deco-assets.js?v=4"></script>
+diff --git a/system/verify/test_custom_scaling_hotfix_m75.py b/system/verify/test_custom_scaling_hotfix_m75.py
+new file mode 100644
+index 0000000..20d558b
+--- /dev/null
++++ b/system/verify/test_custom_scaling_hotfix_m75.py
+@@ -0,0 +1,82 @@
++"""M75: first custom override and visible Studio Play control regression checks."""
++import json
++import shutil
++import subprocess
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / 'system/control-center'))
++from animation_speed_scaling_store import AnimationSpeedScalingStore
++
++
++class CustomScalingHotfixTests(unittest.TestCase):
++    def test_existing_catalog_and_initially_missing_override_array(self):
++        with tempfile.TemporaryDirectory(prefix='m75-catalog-') as temp:
++            path = Path(temp)
++            for name in ('character-animations.json', 'monster-animations.json', 'npc-animations.json'):
++                target = path / 'assets/manifests' / name
++                target.parent.mkdir(parents=True, exist_ok=True)
++                shutil.copyfile(ROOT / 'assets/manifests' / name, target)
++            store = AnimationSpeedScalingStore(path)
++            snapshot = store.snapshot()
++            self.assertNotIn('customScaling', snapshot)  # legacy profile before first override
++            self.assertTrue({'character', 'monster', 'npc'} <= {item['kind'] for item in snapshot['catalog']})
++            for item in snapshot['catalog']:
++                self.assertTrue(item['assetId'].isdigit())
++
++    def test_asset_manager_first_search_pick_and_cancel(self):
++        # Execute the actual UI JavaScript with a small DOM stand-in if Node is present.
++        # Python-only installations still exercise the static fallback checks below.
++        js = (ROOT / 'system/control-center/static/animation-speed.js').read_text(encoding='utf-8')
++        self.assertIn('animationSpeedState.data.customScaling=[]', js)
++        self.assertIn('saved.push({assetId:aid', js)
++        node = shutil.which('node')
++        if not node:
++            return
++        script = r'''
++const fs=require('fs'),vm=require('vm');
++let chosen=[];
++const ui={};
++function elem(id){
++  if(!ui[id]) ui[id]={value:'',innerHTML:'',hidden:false,onclick:null,oninput:null,querySelectorAll(selector){
++    if(id==='custom-scaling-results'&&selector==='[data-custom-pick]'){
++      const hits=[...this.innerHTML.matchAll(/data-custom-pick="([0-9]+)"/g)];
++      chosen=hits.map(hit=>({dataset:{customPick:hit[1]},onclick:null}));
++      return chosen;
++    }
++    return [];
++  },querySelector(){return {scrollIntoView(){}}}};
++  return ui[id];
++}
++const context={window:{},$:(id)=>elem(id),esc:v=>String(v),toast:()=>{},request:async()=>({}),console};
++vm.createContext(context);
++vm.runInContext(fs.readFileSync(process.argv[2],'utf8'),context);
++vm.runInContext(`animationSpeedState.data={profiles:[],catalog:[{assetId:'12345678',kind:'npc',name:'guard_attack_01',subject:'guard',channel:'attack'}]};customScalingRender()`,context);
++ui['custom-scaling-search'].oninput({target:{value:'guard'}});
++if(chosen.length!==1 || typeof chosen[0].onclick!=='function') throw Error('search result not clickable');
++chosen[0].onclick();
++const draft=vm.runInContext('animationSpeedState.data.customScaling',context);
++if(draft.length!==1 || draft[0].assetId!=='12345678' || !draft[0]._draft) throw Error('first selection failed to persist in UI state');
++if(!ui['custom-scaling-rows'].innerHTML.includes('guard_attack_01')) throw Error('selected animation not rendered');
++console.log('M75 DOM first-pick passed');
++'''
++        with tempfile.TemporaryDirectory(prefix='m75-node-') as temp:
++            harness = Path(temp) / 'harness.cjs'
++            harness.write_text(script, encoding='utf-8')
++            process = subprocess.run([node, str(harness), str(ROOT / 'system/control-center/static/animation-speed.js')], capture_output=True, text=True)
++            self.assertEqual(process.returncode, 0, process.stdout + '\n' + process.stderr)
++
++    def test_debug_button_not_offscreen_and_remote_nonblocking(self):
++        client = (ROOT / 'src/client/dev/CustomScalingDebugController.luau').read_text(encoding='utf-8')
++        self.assertNotIn('UDim2.fromOffset(16, 635)', client)
++        self.assertIn('UDim2.new(0, 16, 1, -54)', client)
++        self.assertIn('task.spawn(function()', client)
++        self.assertIn('Game1DebugPanelOpen', client)
++        self.assertIn('CS button visible', client)
++        self.assertIn('CustomScaling service unavailable', client)
++
++if __name__ == '__main__':
++    unittest.main()

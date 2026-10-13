@@ -32,4 +32,116 @@ return table.freeze({
 			}),
 		}),
 	}),
+	custom = table.freeze({
+		["132123582014306"] = table.freeze({
+			stat = "RunSpeed",
+			unitsPerPercent = 1.4,
+		}),
+	}),
+	catalog = table.freeze({
+		["88149431126736"] = table.freeze({
+			label = "character / human_female / 1hs_attack_01",
+			channel = "attack",
+		}),
+		["82563321432420"] = table.freeze({
+			label = "character / human_female / 1hs_attack_02",
+			channel = "attack",
+		}),
+		["86247398285431"] = table.freeze({
+			label = "character / human_female / 1hs_attack_03",
+			channel = "attack",
+		}),
+		["118675119937740"] = table.freeze({
+			label = "character / human_female / 1hs_combat_idle",
+			channel = "combat_idle",
+		}),
+		["128677350129455"] = table.freeze({
+			label = "character / human_female / 1hs_idle",
+			channel = "idle",
+		}),
+		["134065196920987"] = table.freeze({
+			label = "character / human_female / 1hs_run",
+			channel = "run",
+		}),
+		["111055842456450"] = table.freeze({
+			label = "character / human_female / 1hs_walk",
+			channel = "walk",
+		}),
+		["118060400424587"] = table.freeze({
+			label = "character / human_female / base_death",
+			channel = "death",
+		}),
+		["139362684441288"] = table.freeze({
+			label = "character / human_female / base_revive",
+			channel = "revive",
+		}),
+		["101898400862842"] = table.freeze({
+			label = "monster / gremlin / attack_01",
+			channel = "attack",
+		}),
+		["92672041098744"] = table.freeze({
+			label = "monster / gremlin / combat_idle",
+			channel = "combat_idle",
+		}),
+		["127522409398238"] = table.freeze({
+			label = "monster / gremlin / death",
+			channel = "death",
+		}),
+		["137844363101161"] = table.freeze({
+			label = "monster / gremlin / idle",
+			channel = "idle",
+		}),
+		["126252769665114"] = table.freeze({
+			label = "monster / gremlin / idle_special_01",
+			channel = "idle",
+		}),
+		["114060589585488"] = table.freeze({
+			label = "monster / gremlin / run",
+			channel = "run",
+		}),
+		["80922686042611"] = table.freeze({
+			label = "monster / gremlin / walk",
+			channel = "walk",
+		}),
+		["89218860148097"] = table.freeze({
+			label = "npc / guard_01 / attack_01",
+			channel = "attack",
+		}),
+		["125522140536834"] = table.freeze({
+			label = "npc / guard_01 / combat_idle",
+			channel = "combat_idle",
+		}),
+		["140129007932289"] = table.freeze({
+			label = "npc / guard_01 / death",
+			channel = "death",
+		}),
+		["121205302537992"] = table.freeze({
+			label = "npc / guard_01 / idle",
+			channel = "idle",
+		}),
+		["103119318954108"] = table.freeze({
+			label = "npc / guard_01 / idle_special_01",
+			channel = "idle",
+		}),
+		["132123582014306"] = table.freeze({
+			label = "npc / guard_01 / run",
+			channel = "run",
+		}),
+		["116522185625057"] = table.freeze({
+			label = "npc / guard_01 / walk",
+			channel = "walk",
+		}),
+		["88762573361466"] = table.freeze({
+			label = "npc / warsmith / idle",
+			channel = "idle",
+		}),
+		["127366991170629"] = table.freeze({
+			label = "npc / warsmith / idle_special_01",
+			channel = "idle",
+		}),
+		["85866729046732"] = table.freeze({
+			label = "npc / warsmith / idle_special_02",
+			channel = "idle",
+		}),
+	}),
 })

@@ -910,7 +910,7 @@ local function spawnOne(state: any): Model?
     state.instances[model] = entry
 
     for _, choice in ipairs(idleChoices) do
-        if choice.role == "special"
+        if choice.role == "special" then
             choice.track.Ended:Connect(function()
                 if state.instances[model] ~= entry or entry.dying or entry.activeIdleSpecial ~= choice then
                     return

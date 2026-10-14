@@ -1,6 +1,7 @@
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
-from urllib.parse import unquote, urlparse, parse_qs
+from types import MappingProxyType
+from urllib.parse import unquote, urlparse
 import base64
 import json
 import re
@@ -44,6 +45,7 @@ from deco_layout_store import DecoLayoutStore
 from studio_save import request_active_studio_save
 from character_core.identity import CharacterIdentityService
 from studio_bridge import run_model_load_bridge, run_monster_spawn_bridge, run_timeline_editor_bridge, run_location_authoring_bridge
+from api.read_dispatch import dispatch as dispatch_read_request
 from source_only_assets import migrate_source_only_assets
 
 migrate_source_only_assets(ROOT, ROOT / ".control-center" / "game1.db")
@@ -453,6 +455,25 @@ if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
     )
 
 
+# Application composition root for read-only HTTP adapters. Built once, not per request.
+READ_SOURCES = MappingProxyType({
+    "characters": store, "animations": animations,
+    "weapons": weapons, "monsters": monsters, "monster_animations": monster_animations,
+    "npcs": npcs, "npc_animations": npc_animations, "npc_equipment": npc_equipment,
+    "location_assets": location_assets, "npc_spawns": npc_spawns,
+    "monster_spawns": monster_spawns, "animation_speed_scaling": animation_speed_scaling,
+    "options": options_store, "timelines": timelines, "locations": locations,
+    "publication_config": publication_config,
+})
+
+
+def read_host_info():
+    return {
+        "build": control_agent_build, "project": "game1", "projectRoot": str(ROOT),
+        "db": str(store.db), "publication": publication_config(),
+    }
+
+
 class Handler(BaseHTTPRequestHandler):
     def out(self, status, obj):
         body = json.dumps(obj, ensure_ascii=False).encode()
@@ -475,112 +496,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if not self.auth():
             return self.out(401, {"error": "unauthorized"})
-        parsed = self.parsed()
-        path = parsed.path
-        if path == "/api/agent/info":
-            return self.out(200, {
-                "build": control_agent_build,
-                "project": "game1",
-                "projectRoot": str(ROOT),
-                "db": str(store.db),
-                "publication": publication_config(),
-            })
-        if path == "/api/characters":
-            snapshot = store.snapshot()
-            snapshot["publication"] = publication_config()
-            return self.out(200, snapshot)
-        if path == "/api/animations":
-            character_id = str((parse_qs(parsed.query).get("character") or [""])[0]).strip().lower()
-            snapshot = animations.snapshot(character_id or store.active_id())
-            snapshot["publication"] = publication_config()
-            return self.out(200, snapshot)
-        if path == "/api/weapons":
-            snapshot = weapons.snapshot()
-            snapshot["publication"] = publication_config()
-            return self.out(200, snapshot)
-        if path == "/api/location-assets":
-            snapshot = location_assets.snapshot()
-            snapshot["publication"] = publication_config()
-            return self.out(200, snapshot)
-        if path == "/api/monsters":
-            snapshot = monsters.snapshot()
-            snapshot["publication"] = publication_config()
-            return self.out(200, snapshot)
-        if path == "/api/monster-animations":
-            slug = str((parse_qs(parsed.query).get("monster") or [""])[0]).strip().lower()
-            snapshot = monster_animations.snapshot(slug)
-            snapshot["publication"] = publication_config()
-            return self.out(200, snapshot)
-        if path == "/api/npcs":
-            snapshot = npcs.snapshot()
-            snapshot["publication"] = publication_config()
-            return self.out(200, snapshot)
-        if path == "/api/npc-equipment":
-            slug = str((parse_qs(parsed.query).get("npc") or [""])[0]).strip().lower()
-            return self.out(200, npc_equipment.snapshot(slug))
-        if path == "/api/npc-animations":
-            slug = str((parse_qs(parsed.query).get("npc") or [""])[0]).strip().lower()
-            snapshot = npc_animations.snapshot(slug)
-            snapshot["publication"] = publication_config()
-            return self.out(200, snapshot)
-        if path == "/api/npc-spawns":
-            try:
-                return self.out(200, npc_spawns.snapshot())
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/monster-spawns":
-            try:
-                return self.out(200, monster_spawns.snapshot())
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/animation-speed-scaling":
-            try:
-                return self.out(200, animation_speed_scaling.snapshot())
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/options":
-            try:
-                return self.out(200, options_store.snapshot())
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/timelines":
-            try:
-                return self.out(200, timelines.snapshot())
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/locations":
-            try:
-                return self.out(200, locations.snapshot())
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/timelines/editor-state":
-            try:
-                session_id = str((parse_qs(parsed.query).get("session") or [""])[0])
-                return self.out(200, timelines.editor_state(session_id))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path.startswith("/api/npcs/") and path.endswith("/publications"):
-            slug = unquote(path[len("/api/npcs/"):-len("/publications")].strip("/"))
-            return self.out(200, {"items": npcs.publications(slug)})
-        monster_prefix = "/api/monsters/"
-        publications_suffix = "/publications"
-        if path.startswith(monster_prefix) and path.endswith(publications_suffix):
-            slug = unquote(path[len(monster_prefix):-len(publications_suffix)].strip("/"))
-            return self.out(200, {"items": monsters.publications(slug)})
-        weapon_prefix = "/api/weapons/"
-        if path.startswith(weapon_prefix) and path.endswith(publications_suffix):
-            slug = unquote(path[len(weapon_prefix):-len(publications_suffix)].strip("/"))
-            return self.out(200, {"items": weapons.publications(slug)})
-        location_asset_prefix = "/api/location-assets/"
-        if path.startswith(location_asset_prefix) and path.endswith(publications_suffix):
-            slug = unquote(path[len(location_asset_prefix):-len(publications_suffix)].strip("/"))
-            return self.out(200, {"items": location_assets.publications(slug)})
-        prefix = "/api/characters/"
-        suffix = "/publications"
-        if path.startswith(prefix) and path.endswith(suffix):
-            character_id = unquote(path[len(prefix):-len(suffix)].strip("/"))
-            return self.out(200, {"items": store.publications(character_id)})
-        return self.out(404, {"error": "not found"})
+        status, payload = dispatch_read_request(self.parsed(), READ_SOURCES, read_host_info)
+        return self.out(status, payload)
 
     def do_POST(self):
         if not self.auth():

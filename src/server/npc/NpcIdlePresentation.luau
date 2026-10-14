@@ -30,6 +30,7 @@ function NpcIdlePresentation.new(entity: Model, animator: Animator, profile: any
         choices = {},
         activeSpecial = nil,
         active = false,
+        specialsAllowed = true,
         elapsedWithoutBase = 0,
         specialStarted = 0,
         connections = {},
@@ -106,7 +107,7 @@ function NpcIdlePresentation:_finishSpecial()
 end
 
 function NpcIdlePresentation:_rollAtIdleBoundary()
-    if not self.active or self.activeSpecial then
+    if not self.active or not self.specialsAllowed or self.activeSpecial then
         return
     end
     local selected = WeightedAnimationChoice.Select(self.choices, selectionRandom)
@@ -132,18 +133,28 @@ function NpcIdlePresentation:_rollAtIdleBoundary()
     end
 end
 
-function NpcIdlePresentation:Start()
+-- Passive idle allows the base stance while disabling specials (e.g. ReturnWait).
+-- Returning home enables specials again without stopping/restarting a live base track.
+function NpcIdlePresentation:Start(allowSpecials: boolean?)
+    local allowed = allowSpecials ~= false
     if self.active then
+        local wasAllowed = self.specialsAllowed
+        self.specialsAllowed = allowed
+        if not allowed and self.activeSpecial then
+            self:_finishSpecial()
+        elseif allowed and not wasAllowed and not self.base then
+            self:_rollAtIdleBoundary()
+        end
         return
     end
     self.active = true
+    self.specialsAllowed = allowed
     self.entity:SetAttribute("NpcAnimationState", "idle")
     self.entity:SetAttribute("NpcIdleVariant", nil)
     if self.base and (tonumber(self.base.row.weight) or 100) > 0 then
         self:_playBase()
-    else
-        -- Special-only profiles work without an idle clip. A disabled base
-        -- (weight 0) is never played just to make selection possible.
+    elseif allowed then
+        -- Special-only profiles can play in peaceful idle, never in ReturnWait.
         self:_rollAtIdleBoundary()
     end
 end

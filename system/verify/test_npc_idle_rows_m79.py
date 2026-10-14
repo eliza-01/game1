@@ -23,8 +23,12 @@ class NpcIdleRowsM79Tests(unittest.TestCase):
 
     def test_debug_services_remain_in_server_startup(self):
         startup = (ROOT / "src/server/init.server.luau").read_text(encoding="utf-8")
-        self.assertIn('CustomScalingDebugService")).Start()', startup)
-        self.assertIn('MonsterDebugService.Start()', startup)
+        catalog = (ROOT / "src/server/bootstrap/ServiceCatalog.luau").read_text(encoding="utf-8")
+        self.assertIn('ServiceBootstrap.StartAll(ServiceCatalog.Build(script)', startup)
+        self.assertIn('name = "CustomScalingDebugService"', catalog)
+        self.assertIn('name = "MonsterDebugService"', catalog)
+        self.assertIn('require(dev:WaitForChild("CustomScalingDebugService")).Start()', catalog)
+        self.assertIn('require(dev:WaitForChild("MonsterDebugService")).Start()', catalog)
 
 
 if __name__ == "__main__":

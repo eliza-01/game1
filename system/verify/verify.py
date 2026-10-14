@@ -301,7 +301,7 @@ plugin_project_text = plugin_project.read_text(encoding="utf-8") if plugin_proje
 if '"$path": "modules/CharacterTemplate.luau"' not in plugin_project_text:
     err("game1 Studio plugin project must package the character template module")
 
-host_agent_text = (ROOT / "system/control-center/host_agent.py").read_text(encoding="utf-8")
+host_agent_text = (ROOT / "system/control-center/host_agent.py").read_text(encoding="utf-8") + "\n" + "\n".join(p.read_text(encoding="utf-8") for p in (ROOT / "system/control-center/api").glob("read_*.py"))
 if "sync_character_to_studio" not in host_agent_text or 'sync_suffix = "/sync"' not in host_agent_text:
     err("character publication must expose reference-style Studio sync")
 
@@ -743,7 +743,7 @@ for required in ["ATTACK RADIUS: OFF", "Game1AttackRadiusPreview", "createAttack
         err(f"Studio Test Loadout attack-radius preview missing {required}")
 if "attackRadiusStuds" not in test_loadout_server:
     err("Studio Test Loadout catalog must expose the registered weapon attack radius")
-server_init_text = (ROOT / "src/server/init.server.luau").read_text(encoding="utf-8")
+server_init_text = (ROOT / "src/server/init.server.luau").read_text(encoding="utf-8") + (ROOT / "src/server/bootstrap/ServiceCatalog.luau").read_text(encoding="utf-8")
 if "TestLoadoutService.Start()" not in server_init_text:
     err("Studio Test Loadout service is not started by the server runtime")
 if "TestLoadoutController.Start()" not in client_init_text:
@@ -1935,7 +1935,7 @@ for removed in [
     if removed in studio_plugin_text:
         err(f"m37 Studio timeline still contains obsolete Workspace/AnimationTrack preview code: {removed}")
 for required in [
-    'path == "/api/timelines"',
+    '"/api/timelines"',
     'path == "/api/timelines/open"',
     'path == "/api/timelines/editor-event"',
     'path == "/api/timelines/save"',
@@ -2028,7 +2028,7 @@ for required in ['id="nav-locations"', 'id="locations-view"', 'location-assets.c
     if required not in index_m35_text:
         err(f"m41 Asset Manager Locations section missing {required}")
 for required in [
-    'path == "/api/locations"',
+    '"/api/locations"',
     'path == "/api/locations/draw"',
     'path == "/api/locations/register"',
     'path == "/api/locations/restore"',
@@ -2553,7 +2553,7 @@ upper_composer_text = (ROOT / "src/client/character/animation/AttackUpperBodyCom
 character_animation_text = (ROOT / "src/client/character/animation/CharacterAnimationController.luau").read_text(encoding="utf-8")
 attack_controller_text = (ROOT / "src/client/combat/AttackController.luau").read_text(encoding="utf-8")
 client_init_text = (ROOT / "src/client/init.client.luau").read_text(encoding="utf-8")
-server_init_text = (ROOT / "src/server/init.server.luau").read_text(encoding="utf-8")
+server_init_text = (ROOT / "src/server/init.server.luau").read_text(encoding="utf-8") + (ROOT / "src/server/bootstrap/ServiceCatalog.luau").read_text(encoding="utf-8")
 for required in ['function AttackUpperBodyComposer.SetPlaybackSpeed', 'sourcePlaybackSpeed <= 0', 'exitBlendRequested = false']:
     if required not in upper_composer_text:
         err(f"m50 upper-body reverse playback support missing {required}")

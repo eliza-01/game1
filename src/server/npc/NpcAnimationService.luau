@@ -60,17 +60,16 @@ function NpcAnimationService.Create(entity: Model, visual: Model, profile: any?)
     local function syncState()
         if dying or disposed then return end
         if returning then
-            -- ReturnWait and Return are one lifecycle state: idle_special must
-            -- remain disabled until the authored spawn pose is restored.
-            idle:Stop()
+            -- ReturnWait is passive (no target): play ordinary idle, never
+            -- combat_idle or idle_special until the authored home pose is restored.
+            Tracks.Stop(combatIdle)
             if returnMoving then
-                Tracks.Stop(combatIdle)
+                idle:Stop()
                 entity:SetAttribute("NpcAnimationState", "run")
                 Tracks.Play(entity, run, movementChannel)
             else
                 Tracks.Stop(run)
-                entity:SetAttribute("NpcAnimationState", "combat_idle")
-                Tracks.Play(entity, combatIdle, "combat_idle")
+                idle:Start(false)
             end
         elseif combatActive then
             idle:Stop()
@@ -90,7 +89,7 @@ function NpcAnimationService.Create(entity: Model, visual: Model, profile: any?)
             Tracks.Stop(currentAttack)
             currentAttack = nil
             stopCombatTracks()
-            idle:Start()
+            idle:Start(true)
         end
     end
 
@@ -169,10 +168,6 @@ function NpcAnimationService.Create(entity: Model, visual: Model, profile: any?)
         if disposed then return false end
         if not dying then
             idle:Step(delta)
-            if combatActive or returning then
-                Tracks.Step(combatIdle, delta)
-                Tracks.Step(run, delta)
-            end
             return false
         end
         if finished then return false end

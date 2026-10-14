@@ -1,0 +1,2152 @@
+diff --git a/src/client/character/animation/AnimationTrackCache.luau b/src/client/character/animation/AnimationTrackCache.luau
+--- a/src/client/character/animation/AnimationTrackCache.luau
++++ b/src/client/character/animation/AnimationTrackCache.luau
+@@ -70,17 +70,6 @@
+ 	return loadTrack(self, descriptor, "primary", "")
+ end
+ 
+-function AnimationTrackCache:GetSeamCompanion(descriptor)
+-	if self.destroyed or not descriptor or descriptor.duplicateFirstFrameAtEnd ~= true then
+-		return nil
+-	end
+-	local track = loadTrack(self, descriptor, "seam", "__seam")
+-	if track then
+-		track.Looped = false
+-	end
+-	return track
+-end
+-
+ function AnimationTrackCache:IsLoaded(track: AnimationTrack?): boolean
+ 	return track ~= nil and (tonumber(track.Length) or 0) > 0.01
+ end
+@@ -118,15 +107,6 @@
+ 		if track and primary then
+ 			table.insert(tracks, track)
+ 			table.insert(animations, primary.animation)
+-			if descriptor.duplicateFirstFrameAtEnd == true then
+-				local companion = self:GetSeamCompanion(descriptor)
+-				local updated = self.entries[clipId]
+-				local seam = updated and updated.seam
+-				if companion and seam then
+-					table.insert(tracks, companion)
+-					table.insert(animations, seam.animation)
+-				end
+-			end
+ 		else
+ 			failed += 1
+ 		end
+diff --git a/src/client/character/animation/CharacterAnimationController.luau b/src/client/character/animation/CharacterAnimationController.luau
+--- a/src/client/character/animation/CharacterAnimationController.luau
++++ b/src/client/character/animation/CharacterAnimationController.luau
+@@ -9,7 +9,6 @@
+ local DeathAnimationPolicy = require(CombatShared:WaitForChild("DeathAnimationPolicy"))
+ local AttackTimelineConfig = require(CombatShared:WaitForChild("AttackTimelineConfig"))
+ local AnimationSpeedScaling = require(AnimationShared:WaitForChild("AnimationSpeedScaling"))
+-local AnimationFirstFrameSeam = require(AnimationShared:WaitForChild("AnimationFirstFrameSeam"))
+ local CharacterMovementConfig = require(CharacterShared:WaitForChild("CharacterMovementConfig"))
+ local GameOptions = require(Shared:WaitForChild("GameOptions"))
+ 
+@@ -25,10 +24,8 @@
+ local animator: Animator? = nil
+ local cache = nil
+ local currentLoop = nil
+-local currentLoopSeam = nil
+ local currentLoopClipId = ""
+ local currentAction = nil
+-local currentActionSeam = nil
+ local currentActionOnComplete = nil
+ local currentActionSlot = ""
+ local currentActionLockedUntil = 0
+@@ -60,10 +57,8 @@
+ 	character = nil
+ 	animator = nil
+ 	currentLoop = nil
+-	currentLoopSeam = nil
+ 	currentLoopClipId = ""
+ 	currentAction = nil
+-	currentActionSeam = nil
+ 	currentActionOnComplete = nil
+ 	currentActionSlot = ""
+ 	currentActionLockedUntil = 0
+@@ -153,12 +148,9 @@
+ end
+ 
+ local function stopCurrentLoop(fadeTime: number?)
+-	if currentLoopSeam then
+-		currentLoopSeam:Stop(fadeTime or 0)
+-	elseif currentLoop and currentLoop.IsPlaying then
++	if currentLoop and currentLoop.IsPlaying then
+ 		currentLoop:Stop(fadeTime or 0)
+ 	end
+-	currentLoopSeam = nil
+ end
+ 
+ local refreshLoop
+@@ -166,12 +158,9 @@
+ local function stopCurrentAction(fadeTime: number?)
+ 	if currentActionComposed then
+ 		AttackUpperBodyComposer.End()
+-	elseif currentActionSeam then
+-		currentActionSeam:Stop(fadeTime or 0)
+ 	elseif currentAction and currentAction.IsPlaying then
+ 		currentAction:Stop(fadeTime or 0)
+ 	end
+-	currentActionSeam = nil
+ 	currentActionOnComplete = nil
+ 	currentActionComposed = false
+ 	currentActionTimeline = nil
+@@ -188,9 +177,6 @@
+ 	currentActionSlot = ""
+ 	if currentActionComposed then
+ 		AttackUpperBodyComposer.End()
+-	elseif currentActionSeam then
+-		currentActionSeam:Stop(0.04)
+-		currentActionSeam = nil
+ 	elseif boundTrack.IsPlaying then
+ 		boundTrack:Stop(0.04)
+ 	end
+@@ -205,25 +191,6 @@
+ 	refreshLoop()
+ end
+ 
+-local function createSeam(descriptor, track: AnimationTrack, looped: boolean)
+-	if not cache or descriptor.duplicateFirstFrameAtEnd ~= true then
+-		return nil
+-	end
+-	local companion = cache:GetSeamCompanion(descriptor)
+-	if not companion then
+-		return nil
+-	end
+-	return AnimationFirstFrameSeam.new(track, companion, looped)
+-end
+-
+-local function movementUsesForwardSeam(descriptor, slot: string): boolean
+-	if descriptor.duplicateFirstFrameAtEnd ~= true then
+-		return false
+-	end
+-	local backward = character and tostring(character:GetAttribute("AnimationMovementDirection") or "Forward") == "Backward"
+-	return not (backward and (slot == "walk" or slot == "run"))
+-end
+-
+ local function applyBackwardPlayback(track: AnimationTrack, slot: string)
+ 	if not character then
+ 		return
+@@ -266,20 +233,11 @@
+ 
+ 	local clipId = tostring(descriptor.clipId or "")
+ 	local playbackScale = animationPlaybackScale(slot, descriptor.animationId)
+-	local wantsSeam = movementUsesForwardSeam(descriptor, slot)
+ 	publishPlaybackPercent(slot)
+ 
+ 	if currentLoop and currentLoopClipId == clipId then
+-		if wantsSeam and currentLoopSeam then
+-			currentLoopSeam:AdjustSpeed(playbackScale)
+-			return
+-		elseif not wantsSeam and not currentLoopSeam then
+-			applyBackwardPlayback(currentLoop, slot)
+-			return
+-		end
+-		-- Direction/runtime seam mode changed for the same clip; restart that
+-		-- presentation path so a frozen companion can never leak across modes.
+-		stopCurrentLoop(0.08)
++		applyBackwardPlayback(currentLoop, slot)
++		return
+ 	end
+ 
+ 	local nextTrack = cache:Get(descriptor)
+@@ -289,16 +247,9 @@
+ 	stopCurrentLoop(0.15)
+ 	currentLoop = nextTrack
+ 	currentLoopClipId = clipId
+-	if wantsSeam then
+-		currentLoopSeam = createSeam(descriptor, nextTrack, true)
+-	end
+-	if currentLoopSeam then
+-		currentLoopSeam:Play(0.15, playbackScale)
+-	else
+-		nextTrack.Looped = descriptor.looped == true
+-		nextTrack:Play(0.15, 1, playbackScale)
+-		applyBackwardPlayback(nextTrack, slot)
+-	end
++	nextTrack.Looped = descriptor.looped == true
++	nextTrack:Play(0.15, 1, playbackScale)
++	applyBackwardPlayback(nextTrack, slot)
+ 	character:SetAttribute("AnimationResolvedSlot", slot)
+ 	character:SetAttribute("AnimationResolvedClip", clipId)
+ end
+@@ -408,14 +359,8 @@
+ 	currentActionLockedUntil = 0
+ 	publishPlaybackPercent(slot)
+ 	local playbackScale = animationPlaybackScale(slot, descriptor.animationId)
+-	currentActionSeam = createSeam(descriptor, track, false)
+ 	character:SetAttribute("AnimationActionSlot", slot)
+ 	character:SetAttribute("AnimationActionClip", tostring(descriptor.clipId or ""))
+-	if currentActionSeam then
+-		currentActionOnComplete = onStopped
+-		currentActionSeam:Play(0.06, playbackScale)
+-		return
+-	end
+ 	track.Looped = false
+ 	track:Play(0.06, 1, playbackScale)
+ 	track.Stopped:Once(function()
+@@ -474,23 +419,7 @@
+ 	end
+ end
+ 
+-local function maintainRuntimeAnimationTails(deltaTimeSim: number)
+-	if currentLoopSeam then
+-		currentLoopSeam:Step(deltaTimeSim)
+-	end
+-	if currentActionSeam then
+-		local completed = currentActionSeam:Step(deltaTimeSim)
+-		if completed and currentActionSlot ~= "attack" and currentActionSlot ~= "death" then
+-			local callback = currentActionOnComplete
+-			currentActionOnComplete = nil
+-			currentActionSeam:Stop(0.04)
+-			currentActionSeam = nil
+-			currentAction = nil
+-			currentActionSlot = ""
+-			currentActionLockedUntil = 0
+-			if callback then callback() end
+-		end
+-	end
++local function maintainDeathPose(deltaTimeSim: number)
+ 	maintainDeathTerminalPose(deltaTimeSim)
+ end
+ 
+@@ -599,14 +528,7 @@
+ 	currentActionClipId = clipId
+ 	if not composed then
+ 		track.Looped = false
+-		currentActionSeam = createSeam(descriptor, track, false)
+-		if currentActionSeam then
+-			currentActionSeam:Play(0.06, playbackSpeed)
+-		else
+-			track:Play(0.06, 1, playbackSpeed)
+-		end
+-	else
+-		currentActionSeam = nil
++		track:Play(0.06, 1, playbackSpeed)
+ 	end
+ 
+ 	character:SetAttribute("AnimationActionSlot", slot)
+@@ -672,10 +594,6 @@
+ 	character:SetAttribute("AnimationActionEndsAt", currentActionLockedUntil)
+ 	character:SetAttribute("AnimationAttackBounced", true)
+ 
+-	if currentActionSeam then
+-		currentActionSeam:Stop(0)
+-		currentActionSeam = nil
+-	end
+ 
+ 	if currentActionComposed then
+ 		AttackUpperBodyComposer.SetPlaybackSpeed(-reverseSpeed)
+@@ -742,7 +660,7 @@
+ 	if localPlayer.Character then
+ 		task.spawn(bindCharacter, localPlayer.Character)
+ 	end
+-	RunService.PreAnimation:Connect(maintainRuntimeAnimationTails)
++	RunService.PreAnimation:Connect(maintainDeathPose)
+ end
+ 
+ return CharacterAnimationController
+diff --git a/src/server/monster/MonsterSpawnerService.luau b/src/server/monster/MonsterSpawnerService.luau
+--- a/src/server/monster/MonsterSpawnerService.luau
++++ b/src/server/monster/MonsterSpawnerService.luau
+@@ -9,7 +9,6 @@
+ local AnimationShared = Shared:WaitForChild("animation")
+ local CharacterMovementConfig = require(CharacterShared:WaitForChild("CharacterMovementConfig"))
+ local AnimationSpeedScaling = require(AnimationShared:WaitForChild("AnimationSpeedScaling"))
+-local AnimationFirstFrameSeam = require(AnimationShared:WaitForChild("AnimationFirstFrameSeam"))
+ local MonsterRegistry = require(MonsterShared:WaitForChild("MonsterRegistry"))
+ local MonsterAnimationRegistry = require(MonsterShared:WaitForChild("MonsterAnimationRegistry"))
+ local CombatRoot = script.Parent.Parent:WaitForChild("combat")
+@@ -183,42 +182,21 @@
+     return animationPlaybackPercent(model, channel) / 100
+ end
+ 
+-local function createRuntimeSeam(animator: Animator?, row: any?, primary: AnimationTrack?, looped: boolean)
+-    if not animator or not row or not primary or row.duplicateFirstFrameAtEnd ~= true then
+-        return nil
+-    end
+-    local companion = loadAnimationTrack(animator, row, false)
+-    if not companion then
+-        return nil
+-    end
+-    return AnimationFirstFrameSeam.new(primary, companion, looped)
+-end
+-
+-local function playTrackAtConfiguredSpeed(model: Model, track: AnimationTrack?, channel: string, fadeTime: number, seam: any?)
++local function playTrackAtConfiguredSpeed(model: Model, track: AnimationTrack?, channel: string, fadeTime: number)
+     if not track then
+         return
+     end
+     local percent = AnimationSpeedScaling.ResolveForAnimation(model, channel, track.Animation and track.Animation.AnimationId)
+     model:SetAttribute("AnimationPlaybackSpeedPercent", percent)
+     local speed = percent / 100
+-    if seam then
+-        if seam:IsPlaying() then
+-            seam:AdjustSpeed(speed)
+-        else
+-            seam:Play(fadeTime, speed)
+-        end
+-    elseif track.IsPlaying then
++    if track.IsPlaying then
+         track:AdjustSpeed(speed)
+     else
+         track:Play(fadeTime, 1, speed)
+     end
+ end
+ 
+-local function stopTrack(track: AnimationTrack?, seam: any?)
+-    if seam then
+-        seam:Stop(0.08)
+-        return
+-    end
++local function stopTrack(track: AnimationTrack?)
+     if not track then
+         return
+     end
+@@ -258,10 +236,10 @@
+ end
+ 
+ local function stopIdleState(entry: any)
+-    stopTrack(entry.idleTrack, entry.idleSeam)
++    stopTrack(entry.idleTrack)
+     for _, choice in ipairs(entry.idleChoices or {}) do
+         if choice.role == "special" then
+-            stopTrack(choice.track, choice.seam)
++            stopTrack(choice.track)
+         end
+     end
+     entry.activeIdleSpecial = nil
+@@ -271,13 +249,13 @@
+     if entry.dying or model:GetAttribute("MonsterCombatActive") == true or model:GetAttribute("InCombat") == true then
+         return
+     end
+-    stopTrack(entry.walkTrack, entry.walkSeam)
+-    stopTrack(entry.runTrack, entry.runSeam)
++    stopTrack(entry.walkTrack)
++    stopTrack(entry.runTrack)
+     model:SetAttribute("MonsterAnimationState", "idle")
+     model:SetAttribute("MonsterIdleVariant", "base")
+     if entry.idleTrack then
+         pcall(function()
+-            playTrackAtConfiguredSpeed(model, entry.idleTrack, "idle", 0.12, entry.idleSeam)
++            playTrackAtConfiguredSpeed(model, entry.idleTrack, "idle", 0.12)
+         end)
+     end
+ end
+@@ -287,19 +265,20 @@
+         return
+     end
+     stopIdleState(entry)
+-    stopTrack(entry.walkTrack, entry.walkSeam)
+-    stopTrack(entry.runTrack, entry.runSeam)
++    stopTrack(entry.walkTrack)
++    stopTrack(entry.runTrack)
+     model:SetAttribute("MonsterAnimationState", "combat_idle")
+     model:SetAttribute("MonsterIdleVariant", "combat")
+     if entry.combatIdleTrack then
+         pcall(function()
+-            playTrackAtConfiguredSpeed(model, entry.combatIdleTrack, "combat_idle", 0.1, entry.combatIdleSeam)
++            playTrackAtConfiguredSpeed(model, entry.combatIdleTrack, "combat_idle", 0.1)
+         end)
+     end
+ end
+ 
+ local function maybePlayIdleSpecial(model: Model, entry: any)
+-    if entry.dying or entry.activeIdleSpecial ~= nil or model:GetAttribute("InCombat") == true then
++    if entry.dying or entry.wandering or entry.activeIdleSpecial ~= nil
++        or model:GetAttribute("InCombat") == true or model:GetAttribute("MonsterCombatActive") == true then
+         return
+     end
+     local choice = weightedIdleChoice(entry.idleChoices or {})
+@@ -307,11 +286,11 @@
+         return
+     end
+     entry.activeIdleSpecial = choice
+-    stopTrack(entry.idleTrack, entry.idleSeam)
++    stopTrack(entry.idleTrack)
+     model:SetAttribute("MonsterAnimationState", "idle")
+     model:SetAttribute("MonsterIdleVariant", ("special_%02d"):format(math.max(1, math.floor(finite(choice.row.variant, 1)))))
+     local ok = pcall(function()
+-        playTrackAtConfiguredSpeed(model, choice.track, "idle", 0.08, choice.seam)
++        playTrackAtConfiguredSpeed(model, choice.track, "idle", 0.08)
+     end)
+     if not ok then
+         entry.activeIdleSpecial = nil
+@@ -588,14 +567,12 @@
+ 
+     local mode = monsterLocomotionMode(model)
+     local activeTrack = locomotionTrackFor(entry, mode)
+-    local activeSeam = if mode == "Run" then (entry.runSeam or entry.walkSeam) else (entry.walkSeam or entry.runSeam)
+     local inactiveTrack = mode == "Run" and entry.walkTrack or entry.runTrack
+-    local inactiveSeam = mode == "Run" and entry.walkSeam or entry.runSeam
+     if inactiveTrack and inactiveTrack ~= activeTrack then
+-        stopTrack(inactiveTrack, inactiveSeam)
++        stopTrack(inactiveTrack)
+     end
+     if activeTrack then
+-        pcall(function() playTrackAtConfiguredSpeed(model, activeTrack, string.lower(mode), 0.1, activeSeam) end)
++        pcall(function() playTrackAtConfiguredSpeed(model, activeTrack, string.lower(mode), 0.1) end)
+     end
+     model:SetAttribute("MonsterAnimationState", string.lower(mode))
+ 
+@@ -618,8 +595,8 @@
+     entry.wandering = false
+     entry.wanderDestination = nil
+     entry.wanderDeadline = nil
+-    stopTrack(entry.walkTrack, entry.walkSeam)
+-    stopTrack(entry.runTrack, entry.runSeam)
++    stopTrack(entry.walkTrack)
++    stopTrack(entry.runTrack)
+     local humanoid = entry.humanoid
+     local navigationRoot = entry.navigationRoot
+     if humanoid and navigationRoot and navigationRoot.Parent then
+@@ -754,7 +731,7 @@
+     DeathLifecycleService.Cancel(model)
+     stopWanderMovement(entry)
+     stopIdleState(entry)
+-    stopTrack(entry.combatIdleTrack, entry.combatIdleSeam)
++    stopTrack(entry.combatIdleTrack)
+     stopTrack(entry.deathTrack)
+     EntityHitboxService.Detach(model)
+     if model.Parent then
+@@ -807,46 +784,6 @@
+     model:SetAttribute("DeathAnimationLength", track.Length)
+     model:SetAttribute("DeathAnimationTerminalTime", terminalTime)
+     enterDeathIdle(state, model, entry)
+-end
+-
+-local function maintainRuntimeAnimationSeams(model: Model, entry: any, deltaTimeSim: number)
+-    if entry.dying or model:GetAttribute("MonsterCombatActive") == true then
+-        return
+-    end
+-
+-    if entry.activeIdleSpecial then
+-        local choice = entry.activeIdleSpecial
+-        if choice.seam then
+-            local completed = choice.seam:Step(deltaTimeSim)
+-            if completed and entry.activeIdleSpecial == choice then
+-                choice.seam:Stop(0.04)
+-                entry.activeIdleSpecial = nil
+-                playBaseIdle(model, entry)
+-            end
+-        end
+-        return
+-    end
+-
+-    if entry.wandering then
+-        local mode = monsterLocomotionMode(model)
+-        local seam = if mode == "Run" then (entry.runSeam or entry.walkSeam) else (entry.walkSeam or entry.runSeam)
+-        if seam then
+-            seam:Step(deltaTimeSim)
+-        end
+-        return
+-    end
+-
+-    if model:GetAttribute("InCombat") == true and entry.combatIdleSeam then
+-        entry.combatIdleSeam:Step(deltaTimeSim)
+-        return
+-    end
+-
+-    if entry.idleSeam then
+-        local _, didLoop = entry.idleSeam:Step(deltaTimeSim)
+-        if didLoop then
+-            maybePlayIdleSpecial(model, entry)
+-        end
+-    end
+ end
+ 
+ local function beginDeath(state: any, model: Model, entry: any)
+@@ -862,7 +799,7 @@
+     model:SetAttribute("DeathTerminalPoseHeld", false)
+     stopWanderMovement(entry)
+     stopIdleState(entry)
+-    stopTrack(entry.combatIdleTrack, entry.combatIdleSeam)
++    stopTrack(entry.combatIdleTrack)
+     if entry.navigationRoot and entry.navigationRoot.Parent then
+         entry.navigationRoot.AssemblyLinearVelocity = Vector3.zero
+         entry.navigationRoot.AssemblyAngularVelocity = Vector3.zero
+@@ -924,18 +861,15 @@
+     local profile = animationProfile(slug)
+     local animator = animatorFor(model, visual)
+     local idleTrack: AnimationTrack? = nil
+-    local idleSeam = nil
+     local idleChoices = {}
+     for _, row in ipairs(publishedRows(profile, "idle")) do
+         local role = idleRole(row)
+         local track = loadAnimationTrack(animator, row, role == "base")
+         if track then
+-            local seam = createRuntimeSeam(animator, row, track, role == "base")
+-            local choice = { row = row, track = track, role = role, seam = seam }
++            local choice = { row = row, track = track, role = role }
+             table.insert(idleChoices, choice)
+             if role == "base" and not idleTrack then
+                 idleTrack = track
+-                idleSeam = seam
+             end
+         end
+     end
+@@ -947,23 +881,16 @@
+     local walkTrack = loadAnimationTrack(animator, walkRow, true)
+     local runTrack = loadAnimationTrack(animator, runRow, true)
+     local deathTrack = loadAnimationTrack(animator, deathRow, false)
+-    local combatIdleSeam = createRuntimeSeam(animator, combatIdleRow, combatIdleTrack, true)
+-    local walkSeam = createRuntimeSeam(animator, walkRow, walkTrack, true)
+-    local runSeam = createRuntimeSeam(animator, runRow, runTrack, true)
+     local entry = {
+         idleTrack = idleTrack,
+-        idleSeam = idleSeam,
+         idleRow = nil,
+         idleChoices = idleChoices,
+         activeIdleSpecial = nil,
+         combatIdleTrack = combatIdleTrack,
+-        combatIdleSeam = combatIdleSeam,
+         combatIdleRow = combatIdleRow,
+         walkTrack = walkTrack,
+-        walkSeam = walkSeam,
+         walkRow = walkRow,
+         runTrack = runTrack,
+-        runSeam = runSeam,
+         runRow = runRow,
+         deathTrack = deathTrack,
+         deathRow = deathRow,
+@@ -983,7 +910,7 @@
+     state.instances[model] = entry
+ 
+     for _, choice in ipairs(idleChoices) do
+-        if choice.role == "special" and not choice.seam then
++        if choice.role == "special"
+             choice.track.Ended:Connect(function()
+                 if state.instances[model] ~= entry or entry.dying or entry.activeIdleSpecial ~= choice then
+                     return
+@@ -993,7 +920,7 @@
+             end)
+         end
+     end
+-    if idleTrack and not idleSeam then
++    if idleTrack then
+         idleTrack.DidLoop:Connect(function()
+             if state.instances[model] == entry then
+                 maybePlayIdleSpecial(model, entry)
+@@ -1010,7 +937,7 @@
+         if model:GetAttribute("MonsterCombatActive") == true then
+             stopWanderMovement(entry)
+             stopIdleState(entry)
+-            stopTrack(entry.combatIdleTrack, entry.combatIdleSeam)
++            stopTrack(entry.combatIdleTrack)
+             model:SetAttribute("MonsterIdleVariant", nil)
+         else
+             stopWanderMovement(entry)
+@@ -1030,7 +957,7 @@
+         if model:GetAttribute("InCombat") == true then
+             playCombatIdleState(model, entry)
+         else
+-            stopTrack(entry.combatIdleTrack, entry.combatIdleSeam)
++            stopTrack(entry.combatIdleTrack)
+             playBaseIdle(model, entry)
+         end
+     end)
+@@ -1128,7 +1055,6 @@
+     RunService.PreAnimation:Connect(function(deltaTimeSim)
+         for _, state in pairs(states) do
+             for model, entry in pairs(state.instances) do
+-                maintainRuntimeAnimationSeams(model, entry, deltaTimeSim)
+                 maintainDeathTerminalPose(state, model, entry, deltaTimeSim)
+             end
+         end
+diff --git a/src/server/npc/NpcAnimationService.luau b/src/server/npc/NpcAnimationService.luau
+--- a/src/server/npc/NpcAnimationService.luau
++++ b/src/server/npc/NpcAnimationService.luau
+@@ -38,7 +38,7 @@
+     local runRow = first("run") or first("walk")
+     local movementChannel = if first("run") then "run" else "walk"
+     local run = Tracks.Load(animator, runRow, true)
+-    local deathClip = Tracks.Load(animator, first("death"), false, false)
++    local deathClip = Tracks.Load(animator, first("death"), false)
+     local death = deathClip and deathClip.track or nil
+     local attackClips: {[string]: any} = {}
+     local dying, finished, disposed = false, false, false
+@@ -47,7 +47,7 @@
+     local deathStartedAt = 0
+ 
+     for _, row in ipairs(Tracks.PublishedRows(profile, "attack", weaponSet)) do
+-        local clip = Tracks.Load(animator, row, true, false)
++        local clip = Tracks.Load(animator, row, true)
+         if clip then attackClips[tostring(row.clipId or row.animationId)] = clip end
+     end
+     local currentAttack: any? = nil
+diff --git a/src/server/npc/NpcAnimationTracks.luau b/src/server/npc/NpcAnimationTracks.luau
+--- a/src/server/npc/NpcAnimationTracks.luau
++++ b/src/server/npc/NpcAnimationTracks.luau
+@@ -1,11 +1,10 @@
+--- Animation registry adapter: loading, priority, playback speed and runtime seam.
++-- Animation registry adapter: loading, priority, playback speed.
+ -- Does not decide which animation to play or when to transition actor state.
+ local ReplicatedStorage = game:GetService("ReplicatedStorage")
+ local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
+ local AnimationShared = Shared:WaitForChild("animation")
+ local NpcConfig = require(Shared:WaitForChild("npc"):WaitForChild("NpcAnimationConfig"))
+ local AnimationSpeedScaling = require(AnimationShared:WaitForChild("AnimationSpeedScaling"))
+-local AnimationFirstFrameSeam = require(AnimationShared:WaitForChild("AnimationFirstFrameSeam"))
+ 
+ local NpcAnimationTracks = {}
+ 
+@@ -85,7 +84,7 @@
+     return result :: AnimationTrack
+ end
+ 
+-function NpcAnimationTracks.Load(animator: Animator, row: any?, looped: boolean, allowSeam: boolean?): any?
++function NpcAnimationTracks.Load(animator: Animator, row: any?, looped: boolean): any?
+     if not row then
+         return nil
+     end
+@@ -96,15 +95,7 @@
+     end
+     track.Looped = looped
+     track.Priority = priorities[tostring(row.priority or "")] or (if looped then Enum.AnimationPriority.Idle else Enum.AnimationPriority.Action)
+-    local seam = nil
+-    if row.duplicateFirstFrameAtEnd == true and allowSeam ~= false then
+-        local companion = load(animator, animationId)
+-        if companion then
+-            companion.Priority = track.Priority
+-            seam = AnimationFirstFrameSeam.new(track, companion, looped)
+-        end
+-    end
+-    return { row = row, track = track, seam = seam }
++    return { row = row, track = track }
+ end
+ 
+ function NpcAnimationTracks.Play(entity: Model, clip: any?, channel: string, fade: number?, speedPercentOverride: number?): boolean
+@@ -118,13 +109,7 @@
+     entity:SetAttribute("AnimationPlaybackSpeedPercent", percent)
+     local speed = percent / 100
+     local success, failure = pcall(function()
+-        if clip.seam then
+-            if clip.seam:IsPlaying() and clip.track.IsPlaying then
+-                clip.seam:AdjustSpeed(speed)
+-            else
+-                clip.seam:Play(fade or NpcConfig.TransitionSeconds, speed)
+-            end
+-        elseif clip.track.IsPlaying then
++        if clip.track.IsPlaying then
+             clip.track:AdjustSpeed(speed)
+         else
+             clip.track:Play(fade or NpcConfig.TransitionSeconds, 1, speed)
+@@ -152,9 +137,7 @@
+         return
+     end
+     local success, failure = pcall(function()
+-        if clip.seam then
+-            clip.seam:Stop(fade or NpcConfig.TransitionSeconds)
+-        elseif clip.track.IsPlaying then
++        if clip.track.IsPlaying then
+             clip.track:Stop(fade or NpcConfig.TransitionSeconds)
+         end
+     end)
+@@ -163,11 +146,4 @@
+     end
+ end
+ 
+-function NpcAnimationTracks.Step(clip: any?, delta: number): (boolean, boolean)
+-    if clip and clip.seam then
+-        return clip.seam:Step(delta)
+-    end
+-    return false, false
+-end
+-
+ return table.freeze(NpcAnimationTracks)
+diff --git a/src/server/npc/NpcIdlePresentation.luau b/src/server/npc/NpcIdlePresentation.luau
+--- a/src/server/npc/NpcIdlePresentation.luau
++++ b/src/server/npc/NpcIdlePresentation.luau
+@@ -44,9 +44,8 @@
+                 self.base = clip
+             end
+             table.insert(self.choices, clip)
+-            if role == "special" and not clip.seam then
+-                -- Stopped is a fallback if a track completes before our frame-step.
+-                -- Ended fires AFTER the fade-out and is too late to prevent rest pose.
++            if role == "special" then
++                -- Finish on stop if the clip ends before the scheduled crossfade.
+                 table.insert(self.connections, clip.track.Stopped:Connect(function()
+                     if self.active and self.activeSpecial == clip then
+                         self:_finishSpecial()
+@@ -55,7 +54,7 @@
+             end
+         end
+     end
+-    if self.base and not self.base.seam then
++    if self.base then
+         table.insert(self.connections, self.base.track.DidLoop:Connect(function()
+             if self.active and not self.activeSpecial then
+                 self:_rollAtIdleBoundary()
+@@ -176,20 +175,13 @@
+             self:_finishSpecial()
+             return
+         end
+-        local completed = Tracks.Step(special, delta)
+-        if completed then
+-            self:_finishSpecial()
+-        elseif special.track.Length <= 0 and os.clock() - self.specialStarted >= Config.UnresolvedSpecialTimeoutSeconds then
++        if special.track.Length <= 0 and os.clock() - self.specialStarted >= Config.UnresolvedSpecialTimeoutSeconds then
+             warn("[game1][npc] special idle asset did not resolve: " .. tostring(special.row.animationId))
+             self:_finishSpecial()
+         end
+         return
+     end
+     if self.base and self.base.track.IsPlaying and self.base.track.Length > 0 then
+-        local _, wrapped = Tracks.Step(self.base, delta)
+-        if wrapped then
+-            self:_rollAtIdleBoundary()
+-        end
+         return
+     end
+     -- No usable base loop: attempt weighted selection at a bounded interval.
+diff --git a/src/shared/animation/AnimationFirstFrameSeam.luau b/src/shared/animation/AnimationFirstFrameSeam.luau
+deleted file mode 100644
+--- a/src/shared/animation/AnimationFirstFrameSeam.luau
++++ /dev/null
+@@ -1,169 +0,0 @@
+--- Runtime-only loop seam for published animations.
+---
+--- The authored/published asset is never rewritten. The primary AnimationTrack
+--- remains the timing source at all times: it stays looped when the descriptor
+--- is looped and keeps the exact playback speed supplied by the caller.
+---
+--- When enabled, a second instance of the same asset is frozen on frame zero.
+--- During only the final authored source frame, weights are blended from the
+--- primary terminal pose toward that frozen first pose. At the natural loop
+--- wrap both tracks represent frame zero, so ownership can return to the primary
+--- without stopping, seeking or restarting it. This makes the seam independent
+--- from RunSpeed / Animation Speed % timing.
+-local AnimationFirstFrameSeam = {}
+-AnimationFirstFrameSeam.__index = AnimationFirstFrameSeam
+-
+-AnimationFirstFrameSeam.SourceFrameSeconds = 1 / 30
+-
+-local function finite(value: any, fallback: number): number
+-    local numeric = tonumber(value)
+-    if numeric == nil or numeric ~= numeric or numeric == math.huge or numeric == -math.huge then
+-        return fallback
+-    end
+-    return numeric
+-end
+-
+-function AnimationFirstFrameSeam.new(primary: AnimationTrack, companion: AnimationTrack, looped: boolean)
+-    return setmetatable({
+-        primary = primary,
+-        companion = companion,
+-        looped = looped == true,
+-        speed = 1,
+-        phase = "idle",
+-        previousTime = 0,
+-        companionActive = false,
+-        completedSignaled = false,
+-    }, AnimationFirstFrameSeam)
+-end
+-
+-function AnimationFirstFrameSeam:IsPlaying(): boolean
+-    return self.phase == "playing" or self.phase == "blend"
+-end
+-
+-function AnimationFirstFrameSeam:_hideCompanion()
+-    if self.companionActive or self.companion.IsPlaying then
+-        self.companion:AdjustWeight(0, 0)
+-        self.companion:Stop(0)
+-    end
+-    self.companionActive = false
+-end
+-
+-function AnimationFirstFrameSeam:_ensureCompanion()
+-    if self.companionActive and self.companion.IsPlaying then
+-        return
+-    end
+-    if self.companion.IsPlaying then
+-        self.companion:Stop(0)
+-    end
+-    self.companion.Looped = false
+-    self.companion:Play(0, 0, 1)
+-    self.companion.TimePosition = 0
+-    self.companion:AdjustSpeed(0)
+-    self.companion:AdjustWeight(0, 0)
+-    self.companionActive = true
+-end
+-
+-function AnimationFirstFrameSeam:_setBlend(progress: number)
+-    local alpha = math.clamp(progress, 0, 1)
+-    self:_ensureCompanion()
+-    -- Only pose weights change. The primary clock and playback speed continue
+-    -- untouched so the seam cannot stretch or stall the animation cycle.
+-    self.primary:AdjustWeight(1 - alpha, 0)
+-    self.companion:AdjustWeight(alpha, 0)
+-    self.phase = "blend"
+-end
+-
+-function AnimationFirstFrameSeam:_restorePrimary()
+-    self.primary:AdjustWeight(1, 0)
+-    self:_hideCompanion()
+-    self.phase = "playing"
+-end
+-
+-function AnimationFirstFrameSeam:Play(fadeTime: number?, playbackSpeed: number?)
+-    self:Stop(0)
+-    self.speed = math.max(0.01, finite(playbackSpeed, 1))
+-    self.previousTime = 0
+-    self.completedSignaled = false
+-    self.phase = "playing"
+-
+-    self.primary.Looped = self.looped
+-    self.companion.Looped = false
+-    self.primary:Play(math.max(0, finite(fadeTime, 0)), 1, self.speed)
+-    self.primary.TimePosition = 0
+-    self.primary:AdjustWeight(1, 0)
+-end
+-
+-function AnimationFirstFrameSeam:AdjustSpeed(playbackSpeed: number?)
+-    self.speed = math.max(0.01, finite(playbackSpeed, self.speed))
+-    if self.primary.IsPlaying then
+-        self.primary:AdjustSpeed(self.speed)
+-    end
+-end
+-
+--- Returns: completedOneShot, completedLoopCycle.
+-function AnimationFirstFrameSeam:Step(_deltaTimeSim: number): (boolean, boolean)
+-    if self.phase ~= "playing" and self.phase ~= "blend" then
+-        return false, false
+-    end
+-
+-    local length = math.max(0, finite(self.primary.Length, 0))
+-    if length <= 0 then
+-        return false, false
+-    end
+-
+-    local current = math.clamp(finite(self.primary.TimePosition, 0), 0, length)
+-    local wrapped = self.looped
+-        and self.primary.IsPlaying
+-        and current + 1e-5 < self.previousTime
+-        and self.previousTime > length * 0.5
+-
+-    if wrapped then
+-        -- The primary has already looped naturally. At this instant the
+-        -- companion and primary are both on frame zero, so restoring weight is
+-        -- visually neutral and does not alter the primary timeline.
+-        self:_restorePrimary()
+-        self.previousTime = current
+-        return false, true
+-    end
+-
+-    local blendStart = math.max(0, length - AnimationFirstFrameSeam.SourceFrameSeconds)
+-    if self.primary.IsPlaying and current >= blendStart then
+-        local span = math.max(1e-5, length - blendStart)
+-        self:_setBlend((current - blendStart) / span)
+-    elseif self.primary.IsPlaying then
+-        if self.phase == "blend" or self.companionActive then
+-            self:_restorePrimary()
+-        end
+-    elseif not self.looped then
+-        -- A one-shot ends on its own schedule. Holding frame zero after natural
+-        -- completion is presentation-only; no synthetic duration is added to
+-        -- gameplay/attack timing.
+-        self:_setBlend(1)
+-        self.phase = "complete"
+-        if not self.completedSignaled then
+-            self.completedSignaled = true
+-            self.previousTime = current
+-            return true, false
+-        end
+-    end
+-
+-    self.previousTime = current
+-    return false, false
+-end
+-
+-function AnimationFirstFrameSeam:Stop(fadeTime: number?)
+-    local fade = math.max(0, finite(fadeTime, 0))
+-    if self.primary.IsPlaying then
+-        self.primary:AdjustWeight(1, 0)
+-        self.primary:Stop(fade)
+-    end
+-    if self.companion.IsPlaying then
+-        self.companion:Stop(fade)
+-    end
+-    self.phase = "idle"
+-    self.previousTime = 0
+-    self.companionActive = false
+-    self.completedSignaled = false
+-end
+-
+-return table.freeze(AnimationFirstFrameSeam)
+diff --git a/src/shared/character/CharacterAnimationRegistry.luau b/src/shared/character/CharacterAnimationRegistry.luau
+--- a/src/shared/character/CharacterAnimationRegistry.luau
++++ b/src/shared/character/CharacterAnimationRegistry.luau
+@@ -15,7 +15,6 @@
+ 						weight = 100,
+ 						looped = false,
+ 						priority = "Action",
+-						duplicateFirstFrameAtEnd = false,
+ 					}),
+ 				}),
+ 				["revive"] = table.freeze({
+@@ -27,7 +26,6 @@
+ 						weight = 100,
+ 						looped = false,
+ 						priority = "Action",
+-						duplicateFirstFrameAtEnd = false,
+ 					}),
+ 				}),
+ 			}),
+@@ -42,7 +40,6 @@
+ 							weight = 100,
+ 							looped = false,
+ 							priority = "Action",
+-							duplicateFirstFrameAtEnd = false,
+ 						}),
+ 						table.freeze({
+ 							clipId = "human_female__weapon__1hs__attack__02",
+@@ -52,7 +49,6 @@
+ 							weight = 100,
+ 							looped = false,
+ 							priority = "Action",
+-							duplicateFirstFrameAtEnd = false,
+ 						}),
+ 						table.freeze({
+ 							clipId = "human_female__weapon__1hs__attack__03",
+@@ -62,7 +58,6 @@
+ 							weight = 100,
+ 							looped = false,
+ 							priority = "Action",
+-							duplicateFirstFrameAtEnd = false,
+ 						}),
+ 					}),
+ 					["combat_idle"] = table.freeze({
+@@ -74,7 +69,6 @@
+ 							weight = 100,
+ 							looped = true,
+ 							priority = "Idle",
+-							duplicateFirstFrameAtEnd = false,
+ 						}),
+ 					}),
+ 					["idle"] = table.freeze({
+@@ -86,7 +80,6 @@
+ 							weight = 100,
+ 							looped = true,
+ 							priority = "Idle",
+-							duplicateFirstFrameAtEnd = false,
+ 						}),
+ 					}),
+ 					["run"] = table.freeze({
+@@ -98,7 +91,6 @@
+ 							weight = 100,
+ 							looped = true,
+ 							priority = "Movement",
+-							duplicateFirstFrameAtEnd = false,
+ 						}),
+ 					}),
+ 					["walk"] = table.freeze({
+@@ -110,7 +102,6 @@
+ 							weight = 100,
+ 							looped = true,
+ 							priority = "Movement",
+-							duplicateFirstFrameAtEnd = false,
+ 						}),
+ 					}),
+ 				}),
+diff --git a/src/shared/monster/MonsterAnimationRegistry.luau b/src/shared/monster/MonsterAnimationRegistry.luau
+--- a/src/shared/monster/MonsterAnimationRegistry.luau
++++ b/src/shared/monster/MonsterAnimationRegistry.luau
+@@ -20,7 +20,6 @@
+ 						disarm = false,
+ 						looped = false,
+ 						priority = "Action",
+-						duplicateFirstFrameAtEnd = false,
+ 					}),
+ 				}),
+ 				["combat_idle"] = table.freeze({
+@@ -37,7 +36,6 @@
+ 						disarm = false,
+ 						looped = true,
+ 						priority = "Idle",
+-						duplicateFirstFrameAtEnd = false,
+ 					}),
+ 				}),
+ 				["death"] = table.freeze({
+@@ -54,7 +52,6 @@
+ 						disarm = false,
+ 						looped = false,
+ 						priority = "Action",
+-						duplicateFirstFrameAtEnd = false,
+ 					}),
+ 				}),
+ 				["idle"] = table.freeze({
+@@ -71,7 +68,6 @@
+ 						disarm = false,
+ 						looped = true,
+ 						priority = "Idle",
+-						duplicateFirstFrameAtEnd = false,
+ 					}),
+ 					table.freeze({
+ 						clipId = "monster__gremlin__idle_special__01",
+@@ -86,7 +82,6 @@
+ 						disarm = false,
+ 						looped = false,
+ 						priority = "Idle",
+-						duplicateFirstFrameAtEnd = false,
+ 					}),
+ 				}),
+ 				["run"] = table.freeze({
+@@ -103,7 +98,6 @@
+ 						disarm = false,
+ 						looped = true,
+ 						priority = "Movement",
+-						duplicateFirstFrameAtEnd = false,
+ 					}),
+ 				}),
+ 				["walk"] = table.freeze({
+@@ -120,7 +114,6 @@
+ 						disarm = false,
+ 						looped = true,
+ 						priority = "Movement",
+-						duplicateFirstFrameAtEnd = false,
+ 					}),
+ 				}),
+ 			}),
+diff --git a/src/shared/npc/NpcAnimationRegistry.luau b/src/shared/npc/NpcAnimationRegistry.luau
+--- a/src/shared/npc/NpcAnimationRegistry.luau
++++ b/src/shared/npc/NpcAnimationRegistry.luau
+@@ -20,7 +20,6 @@
+ 						disarm = false,
+ 						looped = false,
+ 						priority = "Action",
+-						duplicateFirstFrameAtEnd = false,
+ 					}),
+ 				}),
+ 				["combat_idle"] = table.freeze({
+@@ -37,7 +36,6 @@
+ 						disarm = false,
+ 						looped = true,
+ 						priority = "Idle",
+-						duplicateFirstFrameAtEnd = false,
+ 					}),
+ 				}),
+ 				["death"] = table.freeze({
+@@ -54,7 +52,6 @@
+ 						disarm = false,
+ 						looped = false,
+ 						priority = "Action",
+-						duplicateFirstFrameAtEnd = false,
+ 					}),
+ 				}),
+ 				["idle"] = table.freeze({
+@@ -71,7 +68,6 @@
+ 						disarm = false,
+ 						looped = true,
+ 						priority = "Idle",
+-						duplicateFirstFrameAtEnd = false,
+ 					}),
+ 					table.freeze({
+ 						clipId = "npc__guard_01__idle_special__01",
+@@ -86,7 +82,6 @@
+ 						disarm = false,
+ 						looped = false,
+ 						priority = "Idle",
+-						duplicateFirstFrameAtEnd = false,
+ 					}),
+ 				}),
+ 				["run"] = table.freeze({
+@@ -103,7 +98,6 @@
+ 						disarm = false,
+ 						looped = true,
+ 						priority = "Movement",
+-						duplicateFirstFrameAtEnd = false,
+ 					}),
+ 				}),
+ 				["walk"] = table.freeze({
+@@ -120,7 +114,6 @@
+ 						disarm = false,
+ 						looped = true,
+ 						priority = "Movement",
+-						duplicateFirstFrameAtEnd = false,
+ 					}),
+ 				}),
+ 			}),
+@@ -142,7 +135,6 @@
+ 						disarm = false,
+ 						looped = false,
+ 						priority = "Action",
+-						duplicateFirstFrameAtEnd = false,
+ 					}),
+ 					table.freeze({
+ 						clipId = "npc__warsmith__1hs__attack__02",
+@@ -157,7 +149,6 @@
+ 						disarm = false,
+ 						looped = false,
+ 						priority = "Action",
+-						duplicateFirstFrameAtEnd = false,
+ 					}),
+ 				}),
+ 				["combat_idle"] = table.freeze({
+@@ -174,7 +165,6 @@
+ 						disarm = false,
+ 						looped = true,
+ 						priority = "Idle",
+-						duplicateFirstFrameAtEnd = true,
+ 					}),
+ 				}),
+ 				["death"] = table.freeze({
+@@ -191,7 +181,6 @@
+ 						disarm = false,
+ 						looped = false,
+ 						priority = "Action",
+-						duplicateFirstFrameAtEnd = false,
+ 					}),
+ 				}),
+ 				["idle"] = table.freeze({
+@@ -208,7 +197,6 @@
+ 						disarm = false,
+ 						looped = true,
+ 						priority = "Idle",
+-						duplicateFirstFrameAtEnd = false,
+ 					}),
+ 					table.freeze({
+ 						clipId = "npc__warsmith__1hs__idle_special__01",
+@@ -223,7 +211,6 @@
+ 						disarm = false,
+ 						looped = false,
+ 						priority = "Idle",
+-						duplicateFirstFrameAtEnd = false,
+ 					}),
+ 					table.freeze({
+ 						clipId = "npc__warsmith__base__idle_special__01",
+@@ -238,7 +225,6 @@
+ 						disarm = false,
+ 						looped = false,
+ 						priority = "Idle",
+-						duplicateFirstFrameAtEnd = false,
+ 					}),
+ 				}),
+ 				["run"] = table.freeze({
+@@ -255,7 +241,6 @@
+ 						disarm = false,
+ 						looped = true,
+ 						priority = "Movement",
+-						duplicateFirstFrameAtEnd = true,
+ 					}),
+ 				}),
+ 				["walk"] = table.freeze({
+@@ -272,7 +257,6 @@
+ 						disarm = false,
+ 						looped = true,
+ 						priority = "Movement",
+-						duplicateFirstFrameAtEnd = true,
+ 					}),
+ 				}),
+ 			}),
+diff --git a/system/control-center/animation_core/registry.py b/system/control-center/animation_core/registry.py
+--- a/system/control-center/animation_core/registry.py
++++ b/system/control-center/animation_core/registry.py
+@@ -31,7 +31,6 @@
+                 "preparedPath": str(row.get("prepared_path") or ""),
+                 "sha256": str(row.get("sha256") or ""),
+                 "sourceSha256": str(row.get("source_sha256") or ""),
+-                "duplicateFirstFrameAtEnd": bool(row.get("duplicate_first_frame_at_end")),
+                 "assetId": str(row.get("asset_id") or ""),
+                 "publishedSha256": str(row.get("published_sha256") or ""),
+                 "moderationState": str(row.get("moderation_state") or ""),
+@@ -89,7 +88,6 @@
+                 "weight": int(binding["weight"]),
+                 "looped": bool(binding["looped"]),
+                 "priority": str(binding["priority"]),
+-                "duplicateFirstFrameAtEnd": bool(clip.get("duplicate_first_frame_at_end")),
+             }
+             if str(binding["scope"]) == "base":
+                 profile["base"].setdefault(str(binding["slot"]), []).append(descriptor)
+@@ -117,7 +115,6 @@
+                 indent + f"\tweight = {int(row['weight'])},",
+                 indent + f"\tlooped = {'true' if row['looped'] else 'false'},",
+                 indent + f"\tpriority = {lua_string(row['priority'])},",
+-                indent + f"\tduplicateFirstFrameAtEnd = {'true' if row['duplicateFirstFrameAtEnd'] else 'false'},",
+                 indent + "}),",
+             ]
+ 
+diff --git a/system/control-center/animation_core/storage.py b/system/control-center/animation_core/storage.py
+--- a/system/control-center/animation_core/storage.py
++++ b/system/control-center/animation_core/storage.py
+@@ -39,7 +39,6 @@
+                     prepared_path TEXT NOT NULL,
+                     sha256 TEXT NOT NULL,
+                     source_sha256 TEXT NOT NULL DEFAULT '',
+-                    duplicate_first_frame_at_end INTEGER NOT NULL DEFAULT 0,
+                     asset_id TEXT,
+                     published_sha256 TEXT NOT NULL DEFAULT '',
+                     moderation_state TEXT NOT NULL DEFAULT '',
+@@ -83,8 +82,6 @@
+             clip_columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(animation_clips)")}
+             if "source_sha256" not in clip_columns:
+                 connection.execute("ALTER TABLE animation_clips ADD COLUMN source_sha256 TEXT NOT NULL DEFAULT ''")
+-            if "duplicate_first_frame_at_end" not in clip_columns:
+-                connection.execute("ALTER TABLE animation_clips ADD COLUMN duplicate_first_frame_at_end INTEGER NOT NULL DEFAULT 0")
+             if "content_updated_at" not in clip_columns:
+                 connection.execute("ALTER TABLE animation_clips ADD COLUMN content_updated_at REAL NOT NULL DEFAULT 0")
+             connection.execute("UPDATE animation_clips SET source_sha256=sha256 WHERE source_sha256='' OR source_sha256 IS NULL")
+@@ -274,10 +271,10 @@
+         if old_dict is None:
+             connection.execute(
+                 """INSERT INTO animation_clips(
+-                    id,character_id,name,source_path,prepared_path,sha256,source_sha256,duplicate_first_frame_at_end,
++                    id,character_id,name,source_path,prepared_path,sha256,source_sha256,
+                     asset_id,published_sha256,moderation_state,revision,created_at,updated_at,content_updated_at,published_at
+-                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+-                (clip_id, character_id, clip_name, relative_source, relative_prepared, prepared_sha, source_sha, 0, None, "", "", 1, now, now, now, None),
++                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
++                (clip_id, character_id, clip_name, relative_source, relative_prepared, prepared_sha, source_sha, None, "", "", 1, now, now, now, None),
+             )
+             outcome = "created"
+         else:
+@@ -431,7 +428,7 @@
+         with self.connect() as connection:
+             rows = connection.execute(
+                 """SELECT b.id AS binding_id,b.character_id,b.scope,b.weapon_set,b.slot,b.variant,b.clip_id,b.weight,b.looped,b.priority,
+-                          c.name,c.source_path,c.prepared_path,c.sha256,c.source_sha256,c.duplicate_first_frame_at_end,c.asset_id,c.published_sha256,
++                          c.name,c.source_path,c.prepared_path,c.sha256,c.source_sha256,c.asset_id,c.published_sha256,
+                           c.moderation_state,c.revision,c.published_at
+                    FROM animation_bindings b JOIN animation_clips c ON c.id=b.clip_id
+                    WHERE b.character_id=?
+@@ -443,7 +440,6 @@
+             row = dict(raw)
+             row["status"] = self._status(row)
+             row["looped"] = bool(row.get("looped"))
+-            row["duplicate_first_frame_at_end"] = bool(row.get("duplicate_first_frame_at_end"))
+             row["animationId"] = f"rbxassetid://{row['asset_id']}" if str(row.get("asset_id") or "").isdigit() else ""
+             result.append(row)
+         return result
+@@ -485,7 +481,7 @@
+         with self.connect() as connection:
+             row = connection.execute(
+                 """SELECT b.id AS binding_id,b.character_id,b.scope,b.weapon_set,b.slot,b.variant,b.clip_id,b.weight,b.looped,b.priority,
+-                          c.name,c.source_path,c.prepared_path,c.sha256,c.source_sha256,c.duplicate_first_frame_at_end,c.asset_id,c.published_sha256,
++                          c.name,c.source_path,c.prepared_path,c.sha256,c.source_sha256,c.asset_id,c.published_sha256,
+                           c.moderation_state,c.revision,c.published_at
+                    FROM animation_bindings b JOIN animation_clips c ON c.id=b.clip_id WHERE c.id=?""",
+                 (clip_id,),
+@@ -497,21 +493,6 @@
+         value["looped"] = bool(value.get("looped"))
+         return value
+ 
+-
+-    def set_duplicate_first_frame(self, clip_id: str, enabled: bool) -> dict:
+-        # Runtime presentation flag only. Never mutate canonical animation
+-        # bytes, publication checksum, revision, or permanent Roblox asset id.
+-        with self.connect() as connection:
+-            raw = connection.execute("SELECT character_id FROM animation_clips WHERE id=?", (clip_id,)).fetchone()
+-            if not raw:
+-                raise ValueError(f"unknown animation clip: {clip_id}")
+-            connection.execute(
+-                "UPDATE animation_clips SET duplicate_first_frame_at_end=?,updated_at=? WHERE id=?",
+-                (1 if enabled else 0, _now(), clip_id),
+-            )
+-            character_id = str(raw["character_id"])
+-        self.export()
+-        return self.snapshot(character_id)
+ 
+     def set_weight(self, binding_id: str, weight: int) -> dict:
+         weight = max(1, min(10000, int(weight)))
+diff --git a/system/control-center/host_agent.py b/system/control-center/host_agent.py
+--- a/system/control-center/host_agent.py
++++ b/system/control-center/host_agent.py
+@@ -1004,8 +1004,6 @@
+                 if action == "rename":
+                     return self.out(200, npc_animations.rename_npc_binding(
+                         clip_id, str(payload.get("weaponSet") or ""), str(payload.get("filename") or "")))
+-                if action == "duplicate-first-frame":
+-                    return self.out(200, npc_animations.set_duplicate_first_frame(clip_id, bool(payload.get("enabled"))))
+                 if action == "publish-missing":
+                     return self.out(200, npc_animations.publish_missing(clip_id, publication_credentials(str(payload.get("description") or "game1 npc animation"))))
+                 if action == "publish":
+@@ -1058,16 +1056,7 @@
+                 return self.out(400, {"error": str(error)})
+ 
+         monster_animation_prefix = "/api/monster-animations/"
+-        monster_duplicate_suffix = "/duplicate-first-frame"
+-        monster_publish_missing_suffix = "/publish-missing"
+         monster_publish_animation_suffix = "/publish"
+-        if path.startswith(monster_animation_prefix) and path.endswith(monster_duplicate_suffix):
+-            clip_id = unquote(path[len(monster_animation_prefix):-len(monster_duplicate_suffix)].strip("/"))
+-            try:
+-                payload = self.body()
+-                return self.out(200, monster_animations.set_duplicate_first_frame(clip_id, bool(payload.get("enabled"))))
+-            except Exception as error:
+-                return self.out(400, {"error": str(error)})
+         if path.startswith(monster_animation_prefix) and path.endswith(monster_publish_missing_suffix):
+             slug = unquote(path[len(monster_animation_prefix):-len(monster_publish_missing_suffix)].strip("/"))
+             try:
+@@ -1130,16 +1119,7 @@
+         if path == "/api/weapons/active/clear":
+             return self.out(200, weapons.clear_active())
+         animation_prefix = "/api/animations/"
+-        duplicate_suffix = "/duplicate-first-frame"
+-        publish_missing_suffix = "/publish-missing"
+         publish_animation_suffix = "/publish"
+-        if path.startswith(animation_prefix) and path.endswith(duplicate_suffix):
+-            clip_id = unquote(path[len(animation_prefix):-len(duplicate_suffix)].strip("/"))
+-            try:
+-                payload = self.body()
+-                return self.out(200, animations.set_duplicate_first_frame(clip_id, bool(payload.get("enabled"))))
+-            except Exception as error:
+-                return self.out(400, {"error": str(error)})
+         if path.startswith(animation_prefix) and path.endswith(publish_missing_suffix):
+             character_id = unquote(path[len(animation_prefix):-len(publish_missing_suffix)].strip("/"))
+             try:
+diff --git a/system/control-center/monster_animation_store.py b/system/control-center/monster_animation_store.py
+--- a/system/control-center/monster_animation_store.py
++++ b/system/control-center/monster_animation_store.py
+@@ -147,7 +147,6 @@
+                     prepared_path TEXT NOT NULL,
+                     sha256 TEXT NOT NULL,
+                     source_sha256 TEXT NOT NULL DEFAULT '',
+-                    duplicate_first_frame_at_end INTEGER NOT NULL DEFAULT 0,
+                     asset_id TEXT,
+                     published_sha256 TEXT NOT NULL DEFAULT '',
+                     moderation_state TEXT NOT NULL DEFAULT '',
+@@ -189,8 +188,6 @@
+             clip_columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(monster_animation_clips)")}
+             if "source_sha256" not in clip_columns:
+                 connection.execute("ALTER TABLE monster_animation_clips ADD COLUMN source_sha256 TEXT NOT NULL DEFAULT ''")
+-            if "duplicate_first_frame_at_end" not in clip_columns:
+-                connection.execute("ALTER TABLE monster_animation_clips ADD COLUMN duplicate_first_frame_at_end INTEGER NOT NULL DEFAULT 0")
+             if "content_updated_at" not in clip_columns:
+                 connection.execute("ALTER TABLE monster_animation_clips ADD COLUMN content_updated_at REAL NOT NULL DEFAULT 0")
+             connection.execute("UPDATE monster_animation_clips SET source_sha256=sha256 WHERE source_sha256='' OR source_sha256 IS NULL")
+@@ -423,9 +420,9 @@
+         source_sha = digest
+         if old_dict is None:
+             connection.execute(
+-                """INSERT INTO monster_animation_clips(id,monster_slug,name,source_path,prepared_path,sha256,source_sha256,duplicate_first_frame_at_end,asset_id,published_sha256,moderation_state,revision,created_at,updated_at,content_updated_at,published_at)
+-                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+-                (clip_id, slug, stem, source_target.relative_to(self.root).as_posix(), prepared_target.relative_to(self.root).as_posix(), digest, source_sha, 0, None, "", "", 1, now, now, now, None),
++                """INSERT INTO monster_animation_clips(id,monster_slug,name,source_path,prepared_path,sha256,source_sha256,asset_id,published_sha256,moderation_state,revision,created_at,updated_at,content_updated_at,published_at)
++                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
++                (clip_id, slug, stem, source_target.relative_to(self.root).as_posix(), prepared_target.relative_to(self.root).as_posix(), digest, source_sha, None, "", "", 1, now, now, now, None),
+             )
+             outcome = "created"
+         else:
+@@ -551,7 +548,7 @@
+             extra = "b.weapon_set,b.disarm,b.compatible_sets," if self.kind == "npc" else ""
+             rows = connection.execute(
+                 f"""SELECT b.id AS binding_id,b.monster_slug,b.slot,b.variant,b.clip_id,b.weight,b.looped,b.priority,
+-                          {extra}c.name,c.source_path,c.prepared_path,c.sha256,c.source_sha256,c.duplicate_first_frame_at_end,c.asset_id,c.published_sha256,c.moderation_state,c.revision,c.published_at
++                          {extra}c.name,c.source_path,c.prepared_path,c.sha256,c.source_sha256,c.asset_id,c.published_sha256,c.moderation_state,c.revision,c.published_at
+                    FROM monster_animation_bindings b JOIN monster_animation_clips c ON c.id=b.clip_id
+                    WHERE b.monster_slug=? ORDER BY b.slot,b.variant""",
+                 (slug,),
+@@ -569,7 +566,6 @@
+                 value["canonicalFilename"] = npc_filename(slug, value["weapon_set"], value["slot"], value["variant"], Path(value["source_path"]).suffix)
+             value["status"] = self._status(value)
+             value["looped"] = bool(value.get("looped"))
+-            value["duplicate_first_frame_at_end"] = bool(value.get("duplicate_first_frame_at_end"))
+             result.append(value)
+         return result
+ 
+@@ -594,21 +590,6 @@
+             },
+         }
+ 
+-
+-    def set_duplicate_first_frame(self, clip_id: str, enabled: bool) -> dict:
+-        # Runtime presentation flag only. Never mutate canonical animation
+-        # bytes, publication checksum, revision, or permanent Roblox asset id.
+-        with self.connect() as connection:
+-            raw = connection.execute("SELECT monster_slug FROM monster_animation_clips WHERE id=?", (clip_id,)).fetchone()
+-            if not raw:
+-                raise ValueError(f"unknown monster animation clip: {clip_id}")
+-            connection.execute(
+-                "UPDATE monster_animation_clips SET duplicate_first_frame_at_end=?,updated_at=? WHERE id=?",
+-                (1 if enabled else 0, time.time(), clip_id),
+-            )
+-            slug = str(raw["monster_slug"])
+-        self.export()
+-        return self.snapshot(slug)
+ 
+     def set_weight(self, binding_id: str, weight: int) -> dict:
+         weight = max(0 if self.kind == "npc" else 1, min(10000, int(weight)))
+@@ -926,7 +907,6 @@
+                 "clipId": str(clip["id"]), "assetId": str(clip["asset_id"]), "animationId": "rbxassetid://" + str(clip["asset_id"]),
+                 "sourceSlot": internal_slot, "role": role, "variant": int(binding["variant"]), "weight": int(binding["weight"]),
+                 "looped": bool(binding["looped"]), "priority": str(binding["priority"]),
+-                "duplicateFirstFrameAtEnd": bool(clip.get("duplicate_first_frame_at_end")),
+                 "weaponSet": str(binding.get("weapon_set") or "1hs") if self.kind == "npc" else "",
+                 "compatibleWith": self._compatible_for_binding(binding) if self.kind == "npc" else [],
+                 "disarm": bool(binding.get("disarm")) if self.kind == "npc" else False,
+@@ -956,7 +936,6 @@
+                         f"\t\t\t\t\t\tdisarm = {'true' if row['disarm'] else 'false'},",
+                         f"\t\t\t\t\t\tlooped = {'true' if row['looped'] else 'false'},",
+                         f"\t\t\t\t\t\tpriority = {q(row['priority'])},",
+-                        f"\t\t\t\t\t\tduplicateFirstFrameAtEnd = {'true' if row['duplicateFirstFrameAtEnd'] else 'false'},",
+                         "\t\t\t\t\t}),",
+                     ]
+                 lines.append("\t\t\t\t}),")
+diff --git a/system/control-center/schema.sql b/system/control-center/schema.sql
+--- a/system/control-center/schema.sql
++++ b/system/control-center/schema.sql
+@@ -71,7 +71,6 @@
+     prepared_path text not null,
+     sha256 text not null,
+     source_sha256 text not null default '',
+-    duplicate_first_frame_at_end integer not null default 0,
+     asset_id text,
+     published_sha256 text not null default '',
+     moderation_state text not null default '',
+@@ -247,7 +246,6 @@
+     prepared_path text not null,
+     sha256 text not null,
+     source_sha256 text not null default '',
+-    duplicate_first_frame_at_end integer not null default 0,
+     asset_id text,
+     published_sha256 text not null default '',
+     moderation_state text not null default '',
+diff --git a/system/control-center/static/asset-manager.css b/system/control-center/static/asset-manager.css
+--- a/system/control-center/static/asset-manager.css
++++ b/system/control-center/static/asset-manager.css
+@@ -10,7 +10,7 @@
+ 
+ .monster-spawn-workflow{display:grid;grid-template-columns:minmax(360px,.9fr) minmax(560px,1.35fr);gap:14px;margin-top:14px}.monster-spawn-position-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.monster-spawn-settings-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.spawn-enabled{display:flex!important;align-items:center;gap:8px;margin-top:25px!important}.spawn-enabled input{width:auto!important;margin:0!important}.monster-spawn-records{display:grid;gap:7px}.monster-spawn-record{display:grid;grid-template-columns:minmax(190px,.75fr) minmax(300px,1.3fr) auto;gap:12px;align-items:center;width:100%;text-align:left;background:var(--panel2)}.monster-spawn-record.active{border-color:var(--mint);background:#42d6b112}.monster-spawn-record span{min-width:0}.monster-spawn-record strong,.monster-spawn-record small,.monster-spawn-record b{display:block;overflow-wrap:anywhere}.monster-spawn-record small{margin-top:3px;color:var(--muted);font-size:10px}.monster-spawn-record i{font-style:normal;font-size:10px;letter-spacing:.06em;border:1px solid var(--line);border-radius:999px;padding:4px 7px}.monster-spawn-record i.synced{color:var(--mint);border-color:#42d6b166}.monster-spawn-record i.stale{color:var(--orange);border-color:#ff9f4366}.monster-spawn-record i.error{color:var(--danger);border-color:#ff657766}#monster-spawn-readiness span,#monster-spawn-operation span{display:block}.blocked{color:var(--danger)!important}@media(max-width:1150px){.monster-spawn-workflow{grid-template-columns:1fr}}@media(max-width:700px){.monster-spawn-position-grid,.monster-spawn-settings-grid{grid-template-columns:1fr}.monster-spawn-record{grid-template-columns:1fr}.spawn-enabled{margin-top:5px!important}}
+ .folder-picker{text-align:left}.folder-explorer{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}.folder-explorer input{width:100%;min-width:0;font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace}.folder-explorer button{white-space:nowrap}.folder-picker small{margin-top:8px!important;word-break:normal!important;overflow-wrap:anywhere}@media(max-width:650px){.folder-explorer{grid-template-columns:1fr}.folder-explorer button{width:100%}}
+-.character-stats-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.seam-toggle{display:flex;align-items:center;justify-content:center}.seam-toggle input{width:auto!important;margin:0!important;padding:0;accent-color:var(--mint)}@media(max-width:650px){.character-stats-grid{grid-template-columns:1fr}}
++.character-stats-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}@media(max-width:650px){.character-stats-grid{grid-template-columns:1fr}}
+ .animation-source-path{display:block;width:150px;max-width:150px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;direction:rtl;text-align:left}
+ 
+ .weapon-attack-movement-rules{display:grid;gap:8px;margin-top:12px}.weapon-attack-movement-row{display:grid;grid-template-columns:minmax(90px,.7fr) minmax(110px,1fr) minmax(100px,.8fr) minmax(130px,1fr) auto;gap:8px;align-items:end;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--panel2)}.weapon-attack-movement-row label{margin:0}.weapon-attack-movement-row strong{align-self:center;text-transform:uppercase;font-size:11px;letter-spacing:.06em}.weapon-attack-movement-row button{height:34px}@media(max-width:900px){.weapon-attack-movement-row{grid-template-columns:1fr 1fr}.weapon-attack-movement-row button{grid-column:1/-1}}
+@@ -71,3 +71,5 @@
+ .npc-options-controls{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+ .npc-options-controls label{display:grid;gap:6px}
+ .npc-options-controls input[type=number]{width:100%;min-width:0}
++
++.inline-check{display:flex;align-items:center;justify-content:center}.inline-check input{width:auto!important;margin:0!important;padding:0;accent-color:var(--mint)}
+diff --git a/system/control-center/static/character-assets.js b/system/control-center/static/character-assets.js
+--- a/system/control-center/static/character-assets.js
++++ b/system/control-center/static/character-assets.js
+@@ -97,16 +97,16 @@
+ }
+ function renderAnimationRows(){
+   const body=$('animation-rows');body.innerHTML='';const items=(state.animations?.items||[]).filter(animationFilterMatch);$('animation-filter-label').textContent=state.animationFilter.replace('weapon:','');
+-  for(const item of items){const tr=document.createElement('tr');tr.className=item.binding_id===state.animationSelected?'active':'';const context=animationContext(item);const publishable=item.status==='LOCAL_ONLY'&&state.animations?.publication?.configured;const changed=item.status==='CHANGED';tr.innerHTML=`<td><span class="context-chip ${esc(item.scope)}">${esc(context)}</span></td><td><b>${esc(item.slot)}</b></td><td>${item.variant?String(item.variant).padStart(2,'0'):'—'}</td><td>${esc(item.name)}<br><small class="animation-source-path" title="${esc(item.source_path)}">${esc(item.source_path)}</small></td><td>${item.asset_id?esc(item.asset_id):'—'}</td><td>${statusTag(item.status)}</td><td><input data-weight class="weight-input" type="number" min="1" max="10000" value="${esc(item.weight||100)}"></td><td><label class="seam-toggle" title="runtime-only: blend the animation terminal pose into frame zero without modifying the asset"><input data-duplicate type="checkbox" ${item.duplicate_first_frame_at_end?'checked':''}></label></td><td><div class="row-actions"><button data-open>details</button><button data-publish ${publishable?'':'disabled'}>${changed?'keep id':'publish'}</button><button data-delete class="danger">remove</button></div></td>`;
++  for(const item of items){const tr=document.createElement('tr');tr.className=item.binding_id===state.animationSelected?'active':'';const context=animationContext(item);const publishable=item.status==='LOCAL_ONLY'&&state.animations?.publication?.configured;const changed=item.status==='CHANGED';tr.innerHTML=`<td><span class="context-chip ${esc(item.scope)}">${esc(context)}</span></td><td><b>${esc(item.slot)}</b></td><td>${item.variant?String(item.variant).padStart(2,'0'):'—'}</td><td>${esc(item.name)}<br><small class="animation-source-path" title="${esc(item.source_path)}">${esc(item.source_path)}</small></td><td>${item.asset_id?esc(item.asset_id):'—'}</td><td>${statusTag(item.status)}</td><td><input data-weight class="weight-input" type="number" min="1" max="10000" value="${esc(item.weight||100)}"></td><td><div class="row-actions"><button data-open>details</button><button data-publish ${publishable?'':'disabled'}>${changed?'keep id':'publish'}</button><button data-delete class="danger">remove</button></div></td>`;
+     tr.querySelector('[data-open]').onclick=()=>{state.animationSelected=item.binding_id;renderAnimations()};
+-    tr.querySelector('[data-weight]').onchange=e=>setAnimationWeight(item.binding_id,e.target.value);tr.querySelector('[data-duplicate]').onchange=e=>setAnimationDuplicate(item.clip_id,e.target.checked);
++    tr.querySelector('[data-weight]').onchange=e=>setAnimationWeight(item.binding_id,e.target.value);
+     tr.querySelector('[data-publish]').onclick=()=>publishAnimation(item.clip_id);
+     tr.querySelector('[data-delete]').onclick=()=>removeAnimationBinding(item.binding_id);
+     body.appendChild(tr)
+   }
+   if(!items.length)body.innerHTML='<tr><td colspan="9" class="muted">no registered clips in this section.</td></tr>';
+ }
+-function renderAnimationDetails(){const host=$('animation-details');const row=(state.animations?.items||[]).find(x=>x.binding_id===state.animationSelected);if(!row){host.innerHTML='<span class="muted">select a clip.</span>';return}host.innerHTML=`<div class="section-title"><div><span>selected clip</span><h3>${esc(row.name)}</h3></div>${statusTag(row.status)}</div><div class="details-grid"><div><b>semantic binding</b><span>${esc(row.scope)} · ${esc(row.weapon_set||'base')} · ${esc(row.slot)} · variant ${esc(row.variant||0)}</span></div><div><b>runtime</b><span>looped ${row.looped?'yes':'no'} · priority ${esc(row.priority)} · playback scaling from Animation Speed</span></div><div><b>canonical asset</b><span>${esc(row.source_path||row.prepared_path)}</span></div><div><b>end-frame seam</b><span>${row.duplicate_first_frame_at_end?'first keyframe duplicated at end':'disabled'}</span></div><div><b>asset id</b><span>${esc(row.asset_id||'not published')}</span></div><div><b>sha256</b><span>${esc(row.sha256||'')}</span></div></div>`}
++function renderAnimationDetails(){const host=$('animation-details');const row=(state.animations?.items||[]).find(x=>x.binding_id===state.animationSelected);if(!row){host.innerHTML='<span class="muted">select a clip.</span>';return}host.innerHTML=`<div class="section-title"><div><span>selected clip</span><h3>${esc(row.name)}</h3></div>${statusTag(row.status)}</div><div class="details-grid"><div><b>semantic binding</b><span>${esc(row.scope)} · ${esc(row.weapon_set||'base')} · ${esc(row.slot)} · variant ${esc(row.variant||0)}</span></div><div><b>runtime</b><span>looped ${row.looped?'yes':'no'} · priority ${esc(row.priority)} · playback scaling from Animation Speed</span></div><div><b>canonical asset</b><span>${esc(row.source_path||row.prepared_path)}</span></div><div><b>asset id</b><span>${esc(row.asset_id||'not published')}</span></div><div><b>sha256</b><span>${esc(row.sha256||'')}</span></div></div>`}
+ function renderFilenameRules(){
+   const host=$('animation-filename-rules');if(!host)return;
+   const rows=state.animations?.filenameRules||[];if(!rows.length){host.innerHTML='<span class="muted">no filename rules returned by backend.</span>';return}
+@@ -136,7 +136,6 @@
+ async function checkRobloxAnimationAssets(){if(state.animationPublishing)return;try{state.animationPublishing=true;renderAnimations();const monsterButton=$('check-roblox-monster-animations');if(monsterButton)monsterButton.disabled=true;toast('checking newer Roblox animation asset versions…');const result=await request('/api/animations/check-roblox-assets',{method:'POST'});await loadAnimations();if(window.game1MonsterAnimationsLoad)await window.game1MonsterAnimationsLoad();const requested=Number(result.requested||0),confirmed=Number(result.confirmed||0),pending=Number(result.pending||0),failed=Number(result.failed||0);if(!requested)toast('Roblox animation check · no CHANGED assets');else toast(`Roblox animation check · confirmed ${confirmed} · pending ${pending} · failed ${failed}`,failed>0)}catch(error){toast(error.message,true)}finally{state.animationPublishing=false;renderAnimations();const monsterButton=$('check-roblox-monster-animations');if(monsterButton)monsterButton.disabled=false}}
+ window.game1CheckRobloxAnimations=checkRobloxAnimationAssets;
+ async function setAnimationWeight(bindingId,weight){try{state.animations=await request('/api/animation-bindings/'+encodeURIComponent(bindingId)+'/weight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({weight:Number(weight)})});state.animations.publication=state.data?.publication||{};renderAnimations()}catch(error){toast(error.message,true)}}
+-async function setAnimationDuplicate(clipId,enabled){try{state.animations=await request('/api/animations/'+encodeURIComponent(clipId)+'/duplicate-first-frame',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:!!enabled})});state.animations.publication=state.data?.publication||{};renderAnimations();toast(enabled?'runtime first-frame tail enabled; asset bytes are unchanged':'runtime first-frame tail disabled; asset bytes are unchanged')}catch(error){await loadAnimations();toast(error.message,true)}}
+ async function removeAnimationBinding(bindingId){if(!confirm('Remove this character animation registration? Source files and Roblox Cloud assets are preserved. On the next folder scan it will register as NEW / LOCAL_ONLY (without its old published ID).'))return;try{state.animations=await request('/api/animation-bindings/'+encodeURIComponent(bindingId),{method:'DELETE'});state.animations.publication=state.data?.publication||{};if(state.animationSelected===bindingId)state.animationSelected=null;renderAnimations();toast('animation binding removed')}catch(error){toast(error.message,true)}}
+ 
+ function restoreAssetManagerView(){let saved='characters';try{saved=localStorage.getItem(ASSET_MANAGER_VIEW_KEY)||'characters'}catch{}setView(ASSET_MANAGER_VIEWS.has(saved)?saved:'characters')}
+diff --git a/system/control-center/static/index.html b/system/control-center/static/index.html
+--- a/system/control-center/static/index.html
++++ b/system/control-center/static/index.html
+@@ -139,7 +139,7 @@
+ <div class="panel character-card">
+ <div class="section-title"><div><span>semantic animation profile</span><h3 id="animation-table-title">registered clips</h3></div><span id="animation-filter-label" class="pill">all</span></div>
+ <div class="animation-legend"><span><b>base</b> locomotion / posture</span><span><b>weapon</b> hands / 1hs / bow contexts</span><span><b>variant</b> alternate visuals of the same action</span></div>
+-<div class="table-wrap animation-table-wrap"><table><thead><tr><th>context</th><th>slot</th><th>variant</th><th>clip</th><th>asset</th><th>status</th><th>weight</th><th>first→end</th><th>actions</th></tr></thead><tbody id="animation-rows"></tbody></table></div>
++<div class="table-wrap animation-table-wrap"><table><thead><tr><th>context</th><th>slot</th><th>variant</th><th>clip</th><th>asset</th><th>status</th><th>weight</th><th>actions</th></tr></thead><tbody id="animation-rows"></tbody></table></div>
+ <div id="animation-details" class="details"><span class="muted">select a clip.</span></div>
+ </div>
+ </div>
+@@ -342,7 +342,7 @@
+ <div class="panel character-card">
+ <div class="section-title"><div><span>selected monster animations</span><h3 id="monster-animation-table-title">registered animations</h3></div></div>
+ <small class="hint">only animations already registered for the selected monster are listed here. <code>idle_special_01..n</code> are shown as variants of state <code>idle</code>. weight is relative inside one state. playback speed is configured globally in the Animation Speed section.</small>
+-<div class="table-wrap animation-table-wrap"><table><thead><tr><th>state</th><th>variant</th><th>clip</th><th>asset</th><th>status</th><th>weight</th><th>first→end</th><th>actions</th></tr></thead><tbody id="monster-animation-rows"></tbody></table></div>
++<div class="table-wrap animation-table-wrap"><table><thead><tr><th>state</th><th>variant</th><th>clip</th><th>asset</th><th>status</th><th>weight</th><th>actions</th></tr></thead><tbody id="monster-animation-rows"></tbody></table></div>
+ </div>
+ </div>
+ 
+@@ -445,7 +445,7 @@
+ <div class="panel character-card">
+ <div class="section-title"><div><span>selected npc animations</span><h3 id="npc-animation-table-title">registered animations</h3></div></div>
+ <small class="hint">only animations already registered for the selected npc are listed here. <code>idle_special_01..n</code> are shown as variants of state <code>idle</code>. Weight is relative within idle (base + specials); 0 disables selection of that clip. Specials are selected at the end of a base idle cycle, or periodically if base idle is missing. playback speed is configured globally in the Animation Speed section.</small>
+-<div class="table-wrap animation-table-wrap"><table><thead><tr><th>state</th><th>variant</th><th>type</th><th>canonical filename / rename</th><th>asset</th><th>status</th><th>weight</th><th>disarm</th><th>first→end</th><th>actions</th></tr></thead><tbody id="npc-animation-rows"></tbody></table></div>
++<div class="table-wrap animation-table-wrap"><table><thead><tr><th>state</th><th>variant</th><th>type</th><th>canonical filename / rename</th><th>asset</th><th>status</th><th>weight</th><th>disarm</th><th>actions</th></tr></thead><tbody id="npc-animation-rows"></tbody></table></div>
+ <dialog id="npc-animation-options-dialog" class="npc-animation-options-dialog" aria-label="NPC animation options">
+  <div class="npc-options-head"><div><small>NPC ANIMATION OPTIONS</small><h3 data-npc-options-name></h3><span>Animation type: <strong data-npc-options-type></strong></span></div><button type="button" onclick="this.closest('dialog').close()" aria-label="Close">✕</button></div>
+  <div class="npc-options-inner"><label>Compatible With</label><button type="button" data-npc-options-toggle-all>select all</button>
+diff --git a/system/control-center/static/monster-assets.js b/system/control-center/static/monster-assets.js
+--- a/system/control-center/static/monster-assets.js
++++ b/system/control-center/static/monster-assets.js
+@@ -32,7 +32,7 @@
+ async function monsterSync(slug){try{toast('syncing monster into serverstorage…');const result=await request('/api/monsters/'+encodeURIComponent(slug)+'/sync',{method:'POST'});await monsterLoad();toast(`studio synced: ${result.studio?.destination||slug}`)}catch(error){toast(error.message,true)}}
+ async function monsterDelete(slug){if(!confirm(`delete monster ${slug} and its animation profile from game1 registry? roblox cloud assets are not deleted.`))return;try{await request('/api/monsters/'+encodeURIComponent(slug),{method:'DELETE'});if(monsterState.selected===slug)monsterState.selected=null;if(monsterState.animationMonster===slug){monsterState.animationMonster=null;monsterRememberAnimationTarget(null);monsterState.animations=null}await monsterLoad();monsterSetForm(null);toast('monster registry row deleted')}catch(error){toast(error.message,true)}}
+ function monsterRenderFilenameRules(){const host=$('monster-animation-filename-rules');if(!host)return;const rules=monsterState.animations?.filenameRules||[];if(!rules.length){host.innerHTML='<span class="muted">select a monster.</span>';return}host.innerHTML=`<div class="filename-rule-group"><div class="filename-rule-context">MONSTER</div><div class="filename-rule-table"><div class="filename-rule-head"><span>state</span><span>canonical filename</span><span>variant</span></div>${rules.map(rule=>`<div class="filename-rule-row"><code>${esc(rule.state)}</code><code>${esc(rule.canonicalFilename)}</code><span>${esc(rule.variantPattern||'—')}</span></div>`).join('')}</div></div>`}
+-function monsterRenderAnimationRows(){const body=$('monster-animation-rows');if(!body)return;body.innerHTML='';const rows=monsterState.animations?.items||[];if(!rows.length){body.innerHTML=`<tr><td colspan="8"><span class="muted">no registered animations for ${esc(monsterAnimationSelected()?.slug||'selected monster')}.</span></td></tr>`;return}for(const row of rows){const tr=document.createElement('tr');tr.innerHTML=`<td><b>${esc(row.state||row.slot)}</b></td><td>${row.variant?String(row.variant).padStart(2,'0'):'—'}</td><td>${esc(row.name)}</td><td>${esc(row.asset_id||'local')}</td><td>${monsterStatusTag(row.status)}</td><td><input data-weight class="weight-input" type="number" min="1" max="10000" value="${esc(row.weight)}"></td><td><label class="seam-toggle" title="runtime-only: blend the animation terminal pose into frame zero without modifying the asset"><input data-duplicate type="checkbox" ${row.duplicate_first_frame_at_end?'checked':''}></label></td><td><div class="row-actions"><button data-publish>publish</button><button data-remove class="danger">remove</button></div></td>`;const weight=tr.querySelector('[data-weight]');weight.onchange=()=>monsterSetAnimationWeight(row.binding_id,weight.value);tr.querySelector('[data-duplicate]').onchange=e=>monsterSetAnimationDuplicate(row.clip_id,e.target.checked);tr.querySelector('[data-publish]').disabled=row.status==='PUBLISHED';tr.querySelector('[data-publish]').onclick=()=>monsterPublishAnimation(row.clip_id);tr.querySelector('[data-remove]').onclick=()=>monsterRemoveAnimation(row.binding_id);body.appendChild(tr)}}
++function monsterRenderAnimationRows(){const body=$('monster-animation-rows');if(!body)return;body.innerHTML='';const rows=monsterState.animations?.items||[];if(!rows.length){body.innerHTML=`<tr><td colspan="7"><span class="muted">no registered animations for ${esc(monsterAnimationSelected()?.slug||'selected monster')}.</span></td></tr>`;return}for(const row of rows){const tr=document.createElement('tr');tr.innerHTML=`<td><b>${esc(row.state||row.slot)}</b></td><td>${row.variant?String(row.variant).padStart(2,'0'):'—'}</td><td>${esc(row.name)}</td><td>${esc(row.asset_id||'local')}</td><td>${monsterStatusTag(row.status)}</td><td><input data-weight class="weight-input" type="number" min="1" max="10000" value="${esc(row.weight)}"></td><td><div class="row-actions"><button data-publish>publish</button><button data-remove class="danger">remove</button></div></td>`;const weight=tr.querySelector('[data-weight]');weight.onchange=()=>monsterSetAnimationWeight(row.binding_id,weight.value);tr.querySelector('[data-publish]').disabled=row.status==='PUBLISHED';tr.querySelector('[data-publish]').onclick=()=>monsterPublishAnimation(row.clip_id);tr.querySelector('[data-remove]').onclick=()=>monsterRemoveAnimation(row.binding_id);body.appendChild(tr)}}
+ function monsterRenderUnassigned(){const host=$('monster-animation-unassigned');if(!host)return;const rows=monsterState.lastScan?.unassigned||[];if(!rows.length){host.innerHTML='';return}const defs=monsterState.animations?.slotCatalog||[];host.innerHTML=`<details open><summary>unassigned files · ${rows.length} · assign manually</summary><div class="unassigned-list">${rows.slice(0,100).map((row,index)=>`<div class="unassigned-row monster-unassigned-row" data-monster-unassigned="${index}"><div class="unassigned-file"><b>${esc(row.filename)}</b><small>${esc(row.reason)}</small></div><label>state<select data-slot>${defs.map(def=>`<option value="${esc(def.slot)}">${esc(def.label||def.slot)}</option>`).join('')}</select></label><label>variant<input data-variant type="number" min="0" max="999" value="0"></label><button data-assign class="primary" type="button">assign</button></div>`).join('')}</div></details>`;for(const node of host.querySelectorAll('[data-monster-unassigned]')){const row=rows[Number(node.dataset.monsterUnassigned)];const slot=node.querySelector('[data-slot]'),variant=node.querySelector('[data-variant]');const update=()=>{const def=defs.find(x=>x.slot===slot.value);variant.disabled=!def?.variants;if(def?.variants&&Number(variant.value)<=0)variant.value='1';if(!def?.variants)variant.value='0'};slot.onchange=update;update();node.querySelector('[data-assign]').onclick=()=>monsterAssignAnimation(row,node)}}
+ function monsterRenderAnimations(){monsterRenderAnimationTarget();monsterRenderAnimationFolderControls();const data=monsterState.animations;if(!data)return;monsterRenderFilenameRules();monsterRenderAnimationRows();monsterRenderUnassigned();const selected=monsterAnimationSelected();$('monster-animation-profile-state').className='runtime-state '+(selected&&data.skeletonCompatible?'registered':'bootstrap');$('monster-animation-profile-state').innerHTML=selected?`<strong>animations · ${esc(selected.name_en)} · ${esc(selected.slug)}</strong><span>${data.skeletonCompatible?'skeleton compatible':'skeleton changed'} · ${esc(data.profile?.skeleton_signature||'no skeleton signature')}</span>`:'<strong>no monster selected</strong><span>choose a registered monster below.</span>';$('publish-missing-monster-animations').disabled=monsterState.animationPublishing||!selected||!data.publication?.configured||!(data.items||[]).some(row=>row.status==='LOCAL_ONLY');$('check-roblox-monster-animations').disabled=monsterState.animationPublishing||!data.publication?.configured;$('monster-animation-table-title').textContent=`${selected?.slug||'monster'} · registered animations`;monsterRenderAnimationFolderControls()}
+ async function monsterLoadAnimations(){try{monsterEnsureAnimationTarget();const slug=monsterState.animationMonster||'';monsterState.animations=await request('/api/monster-animations?monster='+encodeURIComponent(slug));const profileRoot=monsterNormalizeAnimationFolderPath(monsterState.animations.profile?.scan_root||'');if(!monsterState.animationFolder&&profileRoot)monsterSetAnimationFolder(profileRoot,true);monsterRenderAnimations()}catch(error){toast(error.message,true)}}
+@@ -41,7 +41,6 @@
+ async function monsterAssignAnimation(row,node){try{const slot=node.querySelector('[data-slot]').value,variant=Number(node.querySelector('[data-variant]').value||0);await request('/api/monster-animations/assign',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({monsterSlug:monsterState.animationMonster,sourcePath:row.path,slot,variant})});monsterState.lastScan.unassigned=(monsterState.lastScan.unassigned||[]).filter(item=>item.path!==row.path);await monsterLoadAnimations();monsterRenderUnassigned();toast(`assigned ${row.filename} → ${slot}`)}catch(error){toast(error.message,true)}}
+ async function monsterPublishAnimation(clipId){try{await request('/api/monster-animations/'+encodeURIComponent(clipId)+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:$('monster-animation-publication-description').value})});await monsterLoadAnimations();toast('monster animation published')}catch(error){toast(error.message,true)}}
+ async function monsterPublishMissingAnimations(){if(monsterState.animationPublishing)return;let published=0;try{const queue=(monsterState.animations?.items||[]).filter(row=>row.status==='LOCAL_ONLY');if(!queue.length)return;monsterState.animationPublishing=true;monsterRenderAnimations();const host=$('monster-animation-publish-progress'),bar=$('monster-animation-publish-bar'),count=$('monster-animation-publish-count'),current=$('monster-animation-publish-current');host.hidden=false;bar.max=queue.length;bar.value=0;for(let index=0;index<queue.length;index++){const row=queue[index];current.textContent=`${row.name} · ${row.state||row.slot}`;count.textContent=`${index} / ${queue.length}`;await request('/api/monster-animations/'+encodeURIComponent(row.clip_id)+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:$('monster-animation-publication-description').value})});published=index+1;bar.value=published;count.textContent=`${published} / ${queue.length}`;}current.textContent='publication queue complete';toast(`published ${published} monster animation assets`)}catch(error){toast(`published ${published}; stopped: ${error.message}`,true)}finally{monsterState.animationPublishing=false;await monsterLoadAnimations();monsterRenderAnimations()}}
+-async function monsterSetAnimationDuplicate(clipId,enabled){try{monsterState.animations=await request('/api/monster-animations/'+encodeURIComponent(clipId)+'/duplicate-first-frame',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:!!enabled})});monsterState.animations.publication=monsterState.data?.publication||{};monsterRenderAnimations();toast(enabled?'runtime first-frame tail enabled; asset bytes are unchanged':'runtime first-frame tail disabled; asset bytes are unchanged')}catch(error){await monsterLoadAnimations();toast(error.message,true)}}
+ async function monsterSetAnimationWeight(bindingId,weight){try{monsterState.animations=await request('/api/monster-animation-bindings/'+encodeURIComponent(bindingId)+'/weight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({weight:Number(weight)})});monsterState.animations.publication=monsterState.data?.publication||{};monsterRenderAnimations()}catch(error){toast(error.message,true)}}
+ async function monsterRemoveAnimation(bindingId){if(!confirm('Remove this monster animation registration? Source files and Roblox Cloud assets are preserved. On the next folder scan it will register as NEW / LOCAL_ONLY (without its old published ID).'))return;try{monsterState.animations=await request('/api/monster-animation-bindings/'+encodeURIComponent(bindingId),{method:'DELETE'});monsterState.animations.publication=monsterState.data?.publication||{};monsterRenderAnimations();toast('monster animation binding removed')}catch(error){toast(error.message,true)}}
+ function initMonsterFilenameDisclosure(){const guide=$('monster-animation-filename-guide');if(!guide)return;try{const saved=localStorage.getItem(MONSTER_FILENAME_GUIDE_KEY);if(saved!==null)guide.open=saved==='1'}catch{}guide.addEventListener('toggle',()=>{try{localStorage.setItem(MONSTER_FILENAME_GUIDE_KEY,guide.open?'1':'0')}catch{}})}
+diff --git a/system/control-center/static/npc-assets.js b/system/control-center/static/npc-assets.js
+--- a/system/control-center/static/npc-assets.js
++++ b/system/control-center/static/npc-assets.js
+@@ -45,15 +45,13 @@
+       <td><input data-filename style="min-width:220px" value="${esc(row.canonicalFilename||proposed(currentSet))}" aria-label="animation filename"><br><small class="hint">rename validates the type and keeps publication ID</small></td>
+       <td>${esc(row.asset_id||'local')}</td><td>${npcStatusTag(row.status)}</td>
+       <td><input data-weight class="weight-input" type="number" min="0" max="10000" value="${esc(row.weight)}"></td>
+-      <td><label class="seam-toggle" title="temporarily remove equipped weapons for this idle special"><input data-disarm type="checkbox" ${row.disarm?'checked':''} ${row.slot==='idle_special'?'':'disabled'}></label></td>
+-      <td><label class="seam-toggle" title="first frame -> end"><input data-duplicate type="checkbox" ${row.duplicate_first_frame_at_end?'checked':''}></label></td>
++      <td><label class="inline-check" title="temporarily remove equipped weapons for this idle special"><input data-disarm type="checkbox" ${row.disarm?'checked':''} ${row.slot==='idle_special'?'':'disabled'}></label></td>
+       <td><div class="row-actions"><button data-options type="button">options</button><button data-rename type="button">rename / migrate</button><button data-publish>publish</button><button data-remove class="danger">remove</button></div></td>`;
+     tr.querySelector('[data-set]').onchange=event=>{tr.querySelector('[data-filename]').value=proposed(event.target.value)};
+     tr.querySelector('[data-options]').onclick=()=>npcOpenAnimationOptions(row);
+     tr.querySelector('[data-rename]').onclick=()=>npcRenameAnimation(row.binding_id,tr.querySelector('[data-set]').value,tr.querySelector('[data-filename]').value);
+     tr.querySelector('[data-weight]').onchange=e=>npcSetAnimationWeight(row.binding_id,e.target.value);
+     tr.querySelector('[data-disarm]').onchange=e=>npcSetAnimationDisarm(row.binding_id,e.target.checked);
+-    tr.querySelector('[data-duplicate]').onchange=e=>npcSetAnimationDuplicate(row.clip_id,e.target.checked);
+     tr.querySelector('[data-publish]').disabled=row.status==='PUBLISHED';
+     tr.querySelector('[data-publish]').onclick=()=>npcPublishAnimation(row.clip_id);
+     tr.querySelector('[data-remove]').onclick=()=>npcRemoveAnimation(row.binding_id);
+@@ -105,7 +103,6 @@
+ async function npcAssignAnimation(row,node){try{const slot=node.querySelector('[data-slot]').value,variant=Number(node.querySelector('[data-variant]').value||0);await request('/api/npc-animations/assign',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({npcSlug:npcState.animationNpc,sourcePath:row.path,slot,variant,weaponSet:node.querySelector('[data-set]').value})});npcState.lastScan.unassigned=(npcState.lastScan.unassigned||[]).filter(item=>item.path!==row.path);await npcLoadAnimations();npcRenderUnassigned();toast(`assigned ${row.filename} → ${slot}`)}catch(error){toast(error.message,true)}}
+ async function npcPublishAnimation(clipId){try{await request('/api/npc-animations/'+encodeURIComponent(clipId)+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:$('npc-animation-publication-description').value})});await npcLoadAnimations();toast('npc animation published')}catch(error){toast(error.message,true)}}
+ async function npcPublishMissingAnimations(){if(npcState.animationPublishing)return;let published=0;try{const queue=(npcState.animations?.items||[]).filter(row=>row.status==='LOCAL_ONLY');if(!queue.length)return;npcState.animationPublishing=true;npcRenderAnimations();const host=$('npc-animation-publish-progress'),bar=$('npc-animation-publish-bar'),count=$('npc-animation-publish-count'),current=$('npc-animation-publish-current');host.hidden=false;bar.max=queue.length;bar.value=0;for(let index=0;index<queue.length;index++){const row=queue[index];current.textContent=`${row.name} · ${row.state||row.slot}`;count.textContent=`${index} / ${queue.length}`;await request('/api/npc-animations/'+encodeURIComponent(row.clip_id)+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:$('npc-animation-publication-description').value})});published=index+1;bar.value=published;count.textContent=`${published} / ${queue.length}`;}current.textContent='publication queue complete';toast(`published ${published} npc animation assets`)}catch(error){toast(`published ${published}; stopped: ${error.message}`,true)}finally{npcState.animationPublishing=false;await npcLoadAnimations();npcRenderAnimations()}}
+-async function npcSetAnimationDuplicate(clipId,enabled){try{npcState.animations=await request('/api/npc-animations/'+encodeURIComponent(clipId)+'/duplicate-first-frame',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:!!enabled})});npcState.animations.publication=npcState.data?.publication||{};npcRenderAnimations();toast(enabled?'runtime first-frame tail enabled; asset bytes are unchanged':'runtime first-frame tail disabled; asset bytes are unchanged')}catch(error){await npcLoadAnimations();toast(error.message,true)}}
+ async function npcSetAnimationWeight(bindingId,weight){try{npcState.animations=await request('/api/npc-animation-bindings/'+encodeURIComponent(bindingId)+'/weight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({weight:Number(weight)})});npcState.animations.publication=npcState.data?.publication||{};npcRenderAnimations()}catch(error){toast(error.message,true)}}
+ async function npcRemoveAnimation(bindingId){if(!confirm('Remove this NPC animation registration? Source files and Roblox Cloud assets are preserved. On the next folder scan it will register as NEW / LOCAL_ONLY (without its old published ID).'))return;try{npcState.animations=await request('/api/npc-animation-bindings/'+encodeURIComponent(bindingId),{method:'DELETE'});npcState.animations.publication=npcState.data?.publication||{};npcRenderAnimations();toast('npc animation binding removed')}catch(error){toast(error.message,true)}}
+ async function npcRenameAnimation(bindingId,weaponSet,filename){
+diff --git a/system/verify/test_animation_native_playback_m81.py b/system/verify/test_animation_native_playback_m81.py
+new file mode 100644
+--- /dev/null
++++ b/system/verify/test_animation_native_playback_m81.py
+@@ -0,0 +1,42 @@
++"""Native playback contracts for Character, NPC and Monster animation loops."""
++from pathlib import Path
++import unittest
++
++ROOT = Path(__file__).resolve().parents[2]
++
++
++def source(path: str) -> str:
++    return (ROOT / path).read_text(encoding="utf-8")
++
++
++class NativeAnimationPlaybackTests(unittest.TestCase):
++    def test_npc_has_one_playback_track_per_clip_and_keeps_time_on_speed_change(self):
++        tracks = source("src/server/npc/NpcAnimationTracks.luau")
++        self.assertEqual(tracks.count("animator:LoadAnimation(animation)"), 1)
++        self.assertIn("if clip.track.IsPlaying then", tracks)
++        self.assertIn("clip.track:AdjustSpeed(speed)", tracks)
++        self.assertIn("clip.track:Play(fade or NpcConfig.TransitionSeconds, 1, speed)", tracks)
++        self.assertIn("clip.track:Stop(fade or NpcConfig.TransitionSeconds)", tracks)
++
++    def test_idle_cycles_use_native_events_without_extra_pose_tracks(self):
++        npc = source("src/server/npc/NpcIdlePresentation.luau")
++        monster = source("src/server/monster/MonsterSpawnerService.luau")
++        self.assertIn("self.base.track.DidLoop:Connect", npc)
++        self.assertIn("clip.track.Stopped:Connect", npc)
++        self.assertIn("Tracks.SecondsRemaining(special)", npc)
++        self.assertIn("idleTrack.DidLoop:Connect", monster)
++        self.assertIn("choice.track.Ended:Connect", monster)
++        self.assertIn("playTrackAtConfiguredSpeed(model, choice.track", monster)
++
++    def test_character_prewarms_single_track_and_death_hold_is_preserved(self):
++        cache = source("src/client/character/animation/AnimationTrackCache.luau")
++        controller = source("src/client/character/animation/CharacterAnimationController.luau")
++        self.assertIn('loadTrack(self, descriptor, "primary", "")', cache)
++        self.assertIn("table.insert(tracks, track)", cache)
++        self.assertIn("nextTrack:Play(0.15, 1, playbackScale)", controller)
++        self.assertIn("RunService.PreAnimation:Connect(maintainDeathPose)", controller)
++        self.assertIn("maintainDeathTerminalPose(deltaTimeSim)", controller)
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/system/verify/test_npc_attack_loop_shared_speed_m71.py b/system/verify/test_npc_attack_loop_shared_speed_m71.py
+--- a/system/verify/test_npc_attack_loop_shared_speed_m71.py
++++ b/system/verify/test_npc_attack_loop_shared_speed_m71.py
+@@ -75,7 +75,7 @@
+         self.assertIn('beginAttack(agent, target, true)', continuous)
+         self.assertNotIn('EndAttack()', continuous)
+         self.assertIn('agent.presentation.ContinueAttack(percent)', attack)
+-        self.assertIn('local clip = Tracks.Load(animator, row, true, false)', presentation)
++        self.assertIn('local clip = Tracks.Load(animator, row, true)', presentation)
+         self.assertIn('Tracks.Play(entity, currentAttack, "attack", nil, speedPercent)', presentation)
+         self.assertIn('if combatActive then', presentation.replace('elseif combatActive then', 'if combatActive then'))
+         self.assertNotIn('GetAttributeChangedSignal("InCombat")', presentation)
+diff --git a/system/verify/test_npc_pipeline.py b/system/verify/test_npc_pipeline.py
+--- a/system/verify/test_npc_pipeline.py
++++ b/system/verify/test_npc_pipeline.py
+@@ -269,8 +269,8 @@
+         ui = (repo / "system/control-center/static/npc-assets.js").read_text()
+         self.assertIn('WeightedAnimationChoice.Select(self.choices, selectionRandom)', idle)
+         self.assertIn('self.base.track.DidLoop:Connect', idle)
+-        self.assertIn('Tracks.Step(self.base, delta)', idle)
+-        self.assertIn('Tracks.Step(special, delta)', idle)
++        self.assertIn('Tracks.SecondsRemaining(special)', idle)
++        self.assertIn('clip.track.Stopped:Connect', idle)
+         self.assertIn('self.activeSpecial', idle)
+         self.assertIn('IdleVariant', idle)
+         self.assertIn('weight > 0', chooser)
+diff --git a/system/verify/test_npc_seam_continuity_m80.py b/system/verify/test_npc_seam_continuity_m80.py
+deleted file mode 100644
+--- a/system/verify/test_npc_seam_continuity_m80.py
++++ /dev/null
+@@ -1,23 +0,0 @@
+-"""Regression: recurrent NPC presentation sync must not rewind seam-enabled clips."""
+-from pathlib import Path
+-import unittest
+-
+-ROOT = Path(__file__).resolve().parents[2]
+-TRACKS = ROOT / 'src/server/npc/NpcAnimationTracks.luau'
+-SEAM = ROOT / 'src/shared/animation/AnimationFirstFrameSeam.luau'
+-
+-class NpcSeamContinuityTests(unittest.TestCase):
+-    def test_repeated_play_only_adjusts_speed(self):
+-        source = TRACKS.read_text(encoding='utf-8')
+-        self.assertIn('clip.seam:IsPlaying() and clip.track.IsPlaying', source)
+-        self.assertIn('clip.seam:AdjustSpeed(speed)', source)
+-        self.assertIn('clip.seam:Play(fade or NpcConfig.TransitionSeconds, speed)', source)
+-        self.assertLess(source.index('clip.seam:AdjustSpeed(speed)'),source.index('clip.seam:Play(fade or NpcConfig.TransitionSeconds, speed)'))
+-    def test_seam_supports_speed_update_without_rewind(self):
+-        source = SEAM.read_text(encoding='utf-8')
+-        self.assertIn('function AnimationFirstFrameSeam:AdjustSpeed', source)
+-        body = source.split('function AnimationFirstFrameSeam:AdjustSpeed',1)[1].split('\nend',1)[0]
+-        self.assertIn('self.primary:AdjustSpeed(self.speed)', body)
+-        self.assertNotIn('TimePosition = 0',body)
+-
+-if __name__=='__main__': unittest.main()
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -195,7 +195,7 @@
+ ]:
+     if required not in attack_timeline_text:
+         err(f"attack animation timeline config missing {required}")
+-for forbidden in ["ResultTypes", "melee_damage", "runtimeTailDuration", "_duplicateFirstFrameAtEnd"]:
++for forbidden in ["ResultTypes", "melee_damage", "runtimeTailDuration"]:
+     if forbidden in attack_timeline_text:
+         err(f"obsolete attack timeline runtime field remains: {forbidden}")
+ for required in [
+@@ -1142,7 +1142,7 @@
+     "DeathAnimationPolicy.Start",
+     "DeathAnimationPolicy.LatchVisibleTerminalPose",
+     "DeathTerminalReached",
+-    "RunService.PreAnimation:Connect(maintainRuntimeAnimationTails)",
++    "RunService.PreAnimation:Connect(maintainDeathPose)",
+     "maintainDeathTerminalPose(deltaTimeSim)",
+     "DeathTerminalPoseHeld",
+ ]:
+@@ -1212,7 +1212,7 @@
+         if clip_id and f'["{clip_id}"]' not in attack_timeline_data_text:
+             err(f"registered attack clip has no authoritative timeline: {clip_id}")
+ 
+-# m13+ starting stats; m15 runtime-only first-frame seam contract.
++# m13+ starting stats.
+ character_manifest = json.loads((ROOT / "assets/manifests/character-archetypes.json").read_text(encoding="utf-8"))
+ character_options = character_manifest.get("archetypes") or []
+ for row in character_options:
+@@ -1227,73 +1227,6 @@
+ for required in ["row.stats", 'value("RunSpeed")', 'value("AttackSpeed")']:
+     if required not in (stats_service_text + character_service_text):
+         err(f"character runtime starting-stat contract missing {required}")
+-
+-# The first->end checkbox is metadata only. It must never rewrite an .rbxm,
+-# change publication checksums, revisions, or permanent asset ids.
+-transform_path = ROOT / "system/control-center/animation_keyframe_transform.py"
+-if transform_path.exists():
+-    err("legacy physical animation_keyframe_transform.py must be removed; first-frame seam is runtime-only")
+-for store_file in [ROOT / "system/control-center/animation_core/storage.py", ROOT / "system/control-center/monster_animation_store.py"]:
+-    text = store_file.read_text(encoding="utf-8") if store_file.is_file() else ""
+-    for required in ["source_sha256", "duplicate_first_frame_at_end", "set_duplicate_first_frame", "_normalize_source_only_files", "shutil.copy2"]:
+-        if required not in text:
+-            err(f"runtime animation seam storage contract missing {required} in {store_file.name}")
+-    if "prepare_animation_file" in text or "animation_keyframe_transform" in text:
+-        err(f"physical animation seam transformer is still referenced by {store_file.name}")
+-    setter = text.split("def set_duplicate_first_frame", 1)[1].split("def ", 1)[0] if "def set_duplicate_first_frame" in text else ""
+-    for forbidden in ["sha256=?", "source_sha256=?", "revision=?", "copy2(", "prepare_animation_file"]:
+-        if forbidden in setter:
+-            err(f"first-frame checkbox mutates animation content/revision in {store_file.name}: {forbidden}")
+-for required in ["duplicate-first-frame", "set_duplicate_first_frame"]:
+-    if required not in host_agent_text:
+-        err(f"animation seam API missing {required}")
+-for required in ["data-duplicate", "setAnimationDuplicate", "runtime first-frame tail"]:
+-    if required not in character_js_text:
+-        err(f"character animation seam UI missing {required}")
+-if "data-duplicate" not in monster_assets_js_early or "monsterSetAnimationDuplicate" not in monster_assets_js_early or "runtime first-frame tail" not in monster_assets_js_early:
+-    err("monster animation seam UI is missing/runtime wording is stale")
+-
+-runtime_seam_path = ROOT / "src/shared/animation/AnimationFirstFrameSeam.luau"
+-runtime_seam_text = runtime_seam_path.read_text(encoding="utf-8") if runtime_seam_path.is_file() else ""
+-for required in ["SourceFrameSeconds", "companion", "AdjustWeight", "TimePosition = 0", "completedLoopCycle", "self.primary.Looped = self.looped", "self.primary:AdjustSpeed(self.speed)", "self.primary:AdjustWeight(1 - alpha, 0)", "current + 1e-5 < self.previousTime"]:
+-    if required not in runtime_seam_text:
+-        err(f"runtime first-frame seam policy missing {required}")
+-for forbidden in ["RuntimeTailSeconds", "_beginTail", "projected =", "self.primary:AdjustSpeed(0)"]:
+-    if forbidden in runtime_seam_text:
+-        err(f"runtime first-frame seam must not stall/restart the primary timeline: {forbidden}")
+-character_animation_controller_text = (ROOT / "src/client/character/animation/CharacterAnimationController.luau").read_text(encoding="utf-8")
+-character_track_cache_text = (ROOT / "src/client/character/animation/AnimationTrackCache.luau").read_text(encoding="utf-8")
+-monster_spawner_text_m15 = (ROOT / "src/server/monster/MonsterSpawnerService.luau").read_text(encoding="utf-8")
+-for required in ["AnimationFirstFrameSeam", "GetSeamCompanion", "duplicateFirstFrameAtEnd"]:
+-    if required not in (character_animation_controller_text + character_track_cache_text):
+-        err(f"character runtime seam integration missing {required}")
+-for required in ["AnimationFirstFrameSeam", "createRuntimeSeam", "maintainRuntimeAnimationSeams", "duplicateFirstFrameAtEnd"]:
+-    if required not in monster_spawner_text_m15:
+-        err(f"monster runtime seam integration missing {required}")
+-attack_runtime_text = attack_timeline_text + (ROOT / "src/server/combat/AttackService.luau").read_text(encoding="utf-8")
+-if "AnimationFirstFrameSeam.RuntimeTailSeconds" in attack_runtime_text:
+-    err("runtime seam must not extend attack duration or event timing")
+-if "duplicateFirstFrameAtEnd" in attack_timeline_text:
+-    err("attack timing resolver must not depend on presentation seam flags")
+-
+-for animation_manifest_name in ["character-animations.json", "monster-animations.json"]:
+-    path = ROOT / "assets/manifests" / animation_manifest_name
+-    if not path.is_file():
+-        continue
+-    payload = json.loads(path.read_text(encoding="utf-8"))
+-    clips = payload.get("clips") or []
+-    for clip in clips:
+-        duplicate = clip.get("duplicateFirstFrameAtEnd", clip.get("duplicate_first_frame_at_end"))
+-        source_sha = clip.get("sourceSha256", clip.get("source_sha256"))
+-        if duplicate is None:
+-            err(f"animation manifest clip missing duplicate-first-frame runtime flag: {animation_manifest_name} / {clip.get('id')}")
+-        if source_sha is None:
+-            err(f"animation manifest clip missing canonical source sha: {animation_manifest_name} / {clip.get('id')}")
+-
+-for registry_name in ["src/shared/character/CharacterAnimationRegistry.luau", "src/shared/monster/MonsterAnimationRegistry.luau"]:
+-    registry_text = (ROOT / registry_name).read_text(encoding="utf-8")
+-    if "duplicateFirstFrameAtEnd" not in registry_text:
+-        err(f"runtime animation registry does not export first-frame seam flag: {registry_name}")
+ 
+ # m18 manual animation reimport verification lives in Asset Manager and mirrors
+ # RobloxLineage: scan detects local SHA changes, Studio reimport remains manual,
+diff --git a/docs/NPC_ARCHITECTURE_M59_RU.md b/docs/NPC_ARCHITECTURE_M59_RU.md
+--- a/docs/NPC_ARCHITECTURE_M59_RU.md
++++ b/docs/NPC_ARCHITECTURE_M59_RU.md
+@@ -31,8 +31,8 @@
+ 
+ ## M63 · Анимационное состояние NPC и веса idle
+ 
+-- `NpcAnimationTracks` — адаптер опубликованных `NpcAnimationRegistry` rows для профиля оружия из `NpcAnimationConfig`. Создаёт `AnimationTrack`, управляет приоритетами, скоростью и optional runtime-only `AnimationFirstFrameSeam`. Не знает про боевые состояния или популяцию.
+-- `NpcIdlePresentation` — самостоятельный контроллер мирного idle. Идентифицирует base/special по `role`/`sourceSlot`, выбирает варианты из весов через общий `WeightedAnimationChoice`, запускает special на границе завершения base idle и возвращается к base после special. Для base с включённым `first→end` граница определяется seam; иначе — `DidLoop`. При отсутствии работающего base idle выбор выполняется с интервалом `MissingBaseIdleCycleSeconds`.
++- `NpcAnimationTracks` — адаптер опубликованных `NpcAnimationRegistry` rows для профиля оружия из `NpcAnimationConfig`. Создаёт `AnimationTrack`, управляет приоритетами и скоростью. Не знает про боевые состояния или популяцию.
++- `NpcIdlePresentation` — самостоятельный контроллер мирного idle. Идентифицирует base/special по `role`/`sourceSlot`, выбирает варианты из весов через общий `WeightedAnimationChoice`, запускает special на границе завершения base idle и возвращается к base после special. Граница базового цикла определяется `DidLoop`. При отсутствии работающего base idle выбор выполняется с интервалом `MissingBaseIdleCycleSeconds`.
+ - `NpcAnimationService` — оркестрация состояний `idle ↔ combat_idle → death`. Переход в бой и смерть останавливает special, смерть управляется `DeathAnimationPolicy`; сервис предоставляет `Step`/`Destroy` и не создаёт/не удаляет NPC.
+ - `NpcSpawnerService` владеет экземплярами NPC и вызывает `presentation.Step` до завершения жизни, а `presentation.Destroy` при очистке. Без AI NPC не атакуют.
+ - Веса NPC от `0` до `10000`. Значение `0` исключает вариант из выбора. Веса пропорциональны: при base=300, special_01=25 и special_02=0 вероятность special_01 при очередном выборе равна `25/(300+25)`; special_02 не выбирается. Существующая шкала monsters (`1..10000`) не изменяется.
+diff --git a/assets/manifests/character-animations.json b/assets/manifests/character-animations.json
+--- a/assets/manifests/character-animations.json
++++ b/assets/manifests/character-animations.json
+@@ -22,7 +22,6 @@
+       "preparedPath": "assets/source/characters/human/female/human_female/animations/weapons/1hs/1hs_attack_01.rbxm",
+       "sha256": "c5a9f66cb9873ca0c2d3a9b14c690b36f7be3f36e76e3888741808bd219a901e",
+       "sourceSha256": "c5a9f66cb9873ca0c2d3a9b14c690b36f7be3f36e76e3888741808bd219a901e",
+-      "duplicateFirstFrameAtEnd": false,
+       "assetId": "88149431126736",
+       "publishedSha256": "c5a9f66cb9873ca0c2d3a9b14c690b36f7be3f36e76e3888741808bd219a901e",
+       "moderationState": "Approved",
+@@ -37,7 +36,6 @@
+       "preparedPath": "assets/source/characters/human/female/human_female/animations/weapons/1hs/1hs_attack_02.rbxm",
+       "sha256": "b95a86fb5d9286775299ac211f4be2d267b72d87cf92545fd4adf206058d996f",
+       "sourceSha256": "b95a86fb5d9286775299ac211f4be2d267b72d87cf92545fd4adf206058d996f",
+-      "duplicateFirstFrameAtEnd": false,
+       "assetId": "82563321432420",
+       "publishedSha256": "b95a86fb5d9286775299ac211f4be2d267b72d87cf92545fd4adf206058d996f",
+       "moderationState": "Approved",
+@@ -52,7 +50,6 @@
+       "preparedPath": "assets/source/characters/human/female/human_female/animations/weapons/1hs/1hs_attack_03.rbxm",
+       "sha256": "c365f5510f3fa4671208fa3a6f2f04e7a0cff3994776b7f08f6604f022e52286",
+       "sourceSha256": "c365f5510f3fa4671208fa3a6f2f04e7a0cff3994776b7f08f6604f022e52286",
+-      "duplicateFirstFrameAtEnd": false,
+       "assetId": "86247398285431",
+       "publishedSha256": "c365f5510f3fa4671208fa3a6f2f04e7a0cff3994776b7f08f6604f022e52286",
+       "moderationState": "Approved",
+@@ -67,7 +64,6 @@
+       "preparedPath": "assets/source/characters/human/female/human_female/animations/weapons/1hs/1hs_combat_idle.rbxm",
+       "sha256": "a4d7cfd53f4aa796ad87258ebc0ffbc967d5bc2ad3849e5284b949aabaf498ee",
+       "sourceSha256": "a4d7cfd53f4aa796ad87258ebc0ffbc967d5bc2ad3849e5284b949aabaf498ee",
+-      "duplicateFirstFrameAtEnd": false,
+       "assetId": "118675119937740",
+       "publishedSha256": "a4d7cfd53f4aa796ad87258ebc0ffbc967d5bc2ad3849e5284b949aabaf498ee",
+       "moderationState": "Approved",
+@@ -82,7 +78,6 @@
+       "preparedPath": "assets/source/characters/human/female/human_female/animations/weapons/1hs/1hs_idle.rbxm",
+       "sha256": "b2374a57e07aacdbe82ffbb0e8cffe6302f616f982df9f31dc7606b9df78c103",
+       "sourceSha256": "b2374a57e07aacdbe82ffbb0e8cffe6302f616f982df9f31dc7606b9df78c103",
+-      "duplicateFirstFrameAtEnd": false,
+       "assetId": "128677350129455",
+       "publishedSha256": "b2374a57e07aacdbe82ffbb0e8cffe6302f616f982df9f31dc7606b9df78c103",
+       "moderationState": "Approved",
+@@ -97,7 +92,6 @@
+       "preparedPath": "assets/source/characters/human/female/human_female/animations/weapons/1hs/1hs_run.rbxm",
+       "sha256": "f8ac796ce05859442fbde385cb709063674f5ff4d8fd899606f2f4d512b40003",
+       "sourceSha256": "f8ac796ce05859442fbde385cb709063674f5ff4d8fd899606f2f4d512b40003",
+-      "duplicateFirstFrameAtEnd": false,
+       "assetId": "134065196920987",
+       "publishedSha256": "f8ac796ce05859442fbde385cb709063674f5ff4d8fd899606f2f4d512b40003",
+       "moderationState": "Approved",
+@@ -112,7 +106,6 @@
+       "preparedPath": "assets/source/characters/human/female/human_female/animations/weapons/1hs/1hs_walk.rbxm",
+       "sha256": "1c5ba24831eb3a254aae2f9b6322427ef839b33b86c4b00af73301c23d35eebc",
+       "sourceSha256": "1c5ba24831eb3a254aae2f9b6322427ef839b33b86c4b00af73301c23d35eebc",
+-      "duplicateFirstFrameAtEnd": false,
+       "assetId": "111055842456450",
+       "publishedSha256": "1c5ba24831eb3a254aae2f9b6322427ef839b33b86c4b00af73301c23d35eebc",
+       "moderationState": "Approved",
+@@ -127,7 +120,6 @@
+       "preparedPath": "assets/source/characters/human/female/human_female/animations/base/base_death.rbxm",
+       "sha256": "478e5846dba60fd3f0080d0ba5fa26f6c4ed610282e3cd9e5bf058dfad23baf9",
+       "sourceSha256": "478e5846dba60fd3f0080d0ba5fa26f6c4ed610282e3cd9e5bf058dfad23baf9",
+-      "duplicateFirstFrameAtEnd": false,
+       "assetId": "118060400424587",
+       "publishedSha256": "478e5846dba60fd3f0080d0ba5fa26f6c4ed610282e3cd9e5bf058dfad23baf9",
+       "moderationState": "Approved",
+@@ -142,7 +134,6 @@
+       "preparedPath": "assets/source/characters/human/female/human_female/animations/base/base_revive.rbxm",
+       "sha256": "182b26be7333359e7ea290f1e3a282666e18f41600d658438cb1526ad4f0cab6",
+       "sourceSha256": "182b26be7333359e7ea290f1e3a282666e18f41600d658438cb1526ad4f0cab6",
+-      "duplicateFirstFrameAtEnd": false,
+       "assetId": "139362684441288",
+       "publishedSha256": "182b26be7333359e7ea290f1e3a282666e18f41600d658438cb1526ad4f0cab6",
+       "moderationState": "Approved",
+diff --git a/assets/manifests/monster-animations.json b/assets/manifests/monster-animations.json
+--- a/assets/manifests/monster-animations.json
++++ b/assets/manifests/monster-animations.json
+@@ -99,7 +99,6 @@
+       "updated_at": 1791258572.2218688,
+       "published_at": 1791256082.2987773,
+       "source_sha256": "cb6cced731a23b52a29264e3644af0af7a95810b206d5f798ae0cea05cc5f715",
+-      "duplicate_first_frame_at_end": 0,
+       "content_updated_at": 1791258572.2218688,
+       "status": "PUBLISHED"
+     },
+@@ -118,7 +117,6 @@
+       "updated_at": 1791258577.830591,
+       "published_at": 1791258577.830591,
+       "source_sha256": "072097c294ae36d47ad08404dac0eb78e5f0771e1ded26611343c12824a78840",
+-      "duplicate_first_frame_at_end": 0,
+       "content_updated_at": 1791258577.830591,
+       "status": "PUBLISHED"
+     },
+@@ -137,7 +135,6 @@
+       "updated_at": 1791258572.2218688,
+       "published_at": 1791256085.5388856,
+       "source_sha256": "631a8b3b567295d9831130916a642c01f7493af71e64d887e6750ecceb387ede",
+-      "duplicate_first_frame_at_end": 0,
+       "content_updated_at": 1791258572.2218688,
+       "status": "PUBLISHED"
+     },
+@@ -156,7 +153,6 @@
+       "updated_at": 1791258572.2218688,
+       "published_at": 1791256088.776485,
+       "source_sha256": "48be1402bf6ac36fb287a46e85e5512c288bc73da2037ed06b30be86b9267c14",
+-      "duplicate_first_frame_at_end": 0,
+       "content_updated_at": 1791258572.2218688,
+       "status": "PUBLISHED"
+     },
+@@ -175,7 +171,6 @@
+       "updated_at": 1791258572.2218688,
+       "published_at": 1791256092.0373774,
+       "source_sha256": "f72958550a227f50b8f9d5205458ef84e193f23698e8cfb974a67c9b06424c5e",
+-      "duplicate_first_frame_at_end": 0,
+       "content_updated_at": 1791258572.2218688,
+       "status": "PUBLISHED"
+     },
+@@ -194,7 +189,6 @@
+       "updated_at": 1791258572.2218688,
+       "published_at": 1791256095.062003,
+       "source_sha256": "d738335e499683195dacdf154494cb972e423342d814f8dfe165cf5726b955e2",
+-      "duplicate_first_frame_at_end": 0,
+       "content_updated_at": 1791258572.2218688,
+       "status": "PUBLISHED"
+     },
+@@ -213,7 +207,6 @@
+       "updated_at": 1791258572.2218688,
+       "published_at": 1791256098.1514924,
+       "source_sha256": "184231f8faa24486146ee7cf6e562dc3744754303996143112fa0fef2fed72ff",
+-      "duplicate_first_frame_at_end": 0,
+       "content_updated_at": 1791258572.2218688,
+       "status": "PUBLISHED"
+     }
+diff --git a/assets/manifests/npc-animations.json b/assets/manifests/npc-animations.json
+--- a/assets/manifests/npc-animations.json
++++ b/assets/manifests/npc-animations.json
+@@ -105,7 +105,6 @@
+       "prepared_path": "assets/source/npcs/guard_01/animations/attack_01.rbxm",
+       "sha256": "3e555e72a2a7b4e11f94b9c4930364e28b0b56d39280ab4c732611ab26f964fd",
+       "source_sha256": "3e555e72a2a7b4e11f94b9c4930364e28b0b56d39280ab4c732611ab26f964fd",
+-      "duplicate_first_frame_at_end": 0,
+       "asset_id": "89218860148097",
+       "published_sha256": "3e555e72a2a7b4e11f94b9c4930364e28b0b56d39280ab4c732611ab26f964fd",
+       "moderation_state": "Approved",
+@@ -124,7 +123,6 @@
+       "prepared_path": "assets/source/npcs/guard_01/animations/combat_idle.rbxm",
+       "sha256": "c12f193d98b7b76e7221c1602b1b52678e652f50ee73e678b62afbda8d03618c",
+       "source_sha256": "c12f193d98b7b76e7221c1602b1b52678e652f50ee73e678b62afbda8d03618c",
+-      "duplicate_first_frame_at_end": 0,
+       "asset_id": "125522140536834",
+       "published_sha256": "c12f193d98b7b76e7221c1602b1b52678e652f50ee73e678b62afbda8d03618c",
+       "moderation_state": "Approved",
+@@ -143,7 +141,6 @@
+       "prepared_path": "assets/source/npcs/guard_01/animations/death.rbxm",
+       "sha256": "69cf780206c554fe94580458d2e5cd968498920af8fd0f0bbd050795c3373bb9",
+       "source_sha256": "69cf780206c554fe94580458d2e5cd968498920af8fd0f0bbd050795c3373bb9",
+-      "duplicate_first_frame_at_end": 0,
+       "asset_id": "140129007932289",
+       "published_sha256": "69cf780206c554fe94580458d2e5cd968498920af8fd0f0bbd050795c3373bb9",
+       "moderation_state": "Approved",
+@@ -162,7 +159,6 @@
+       "prepared_path": "assets/source/npcs/guard_01/animations/idle.rbxm",
+       "sha256": "e738ce38559995fa159a723606b3995cd27b07a029e2a71f5f724b81fc90854f",
+       "source_sha256": "e738ce38559995fa159a723606b3995cd27b07a029e2a71f5f724b81fc90854f",
+-      "duplicate_first_frame_at_end": 0,
+       "asset_id": "121205302537992",
+       "published_sha256": "e738ce38559995fa159a723606b3995cd27b07a029e2a71f5f724b81fc90854f",
+       "moderation_state": "Approved",
+@@ -181,7 +177,6 @@
+       "prepared_path": "assets/source/npcs/guard_01/animations/idle_special_01.rbxm",
+       "sha256": "a2a2b69fd3cc2b83373ca0c619771108e405269ae0275693080d9546d802994e",
+       "source_sha256": "a2a2b69fd3cc2b83373ca0c619771108e405269ae0275693080d9546d802994e",
+-      "duplicate_first_frame_at_end": 0,
+       "asset_id": "103119318954108",
+       "published_sha256": "a2a2b69fd3cc2b83373ca0c619771108e405269ae0275693080d9546d802994e",
+       "moderation_state": "Approved",
+@@ -200,7 +195,6 @@
+       "prepared_path": "assets/source/npcs/guard_01/animations/run.rbxm",
+       "sha256": "4086f777b47a388d3a5c010760979f787e7d3c9cae78e91922cc4d7e868cd8c6",
+       "source_sha256": "4086f777b47a388d3a5c010760979f787e7d3c9cae78e91922cc4d7e868cd8c6",
+-      "duplicate_first_frame_at_end": 0,
+       "asset_id": "132123582014306",
+       "published_sha256": "4086f777b47a388d3a5c010760979f787e7d3c9cae78e91922cc4d7e868cd8c6",
+       "moderation_state": "Approved",
+@@ -219,7 +213,6 @@
+       "prepared_path": "assets/source/npcs/guard_01/animations/walk.rbxm",
+       "sha256": "f3e97ab268e4b1ccfc6a055c534ff1fea02f6147d27188dbc6fde8d3ed35b9d4",
+       "source_sha256": "f3e97ab268e4b1ccfc6a055c534ff1fea02f6147d27188dbc6fde8d3ed35b9d4",
+-      "duplicate_first_frame_at_end": 0,
+       "asset_id": "116522185625057",
+       "published_sha256": "f3e97ab268e4b1ccfc6a055c534ff1fea02f6147d27188dbc6fde8d3ed35b9d4",
+       "moderation_state": "Approved",
+@@ -238,7 +231,6 @@
+       "prepared_path": "assets/source/npcs/warsmith/animations/1hs_attack_01.rbxm",
+       "sha256": "f3615bdc1b713c44a740f50e532fb2fc2d7ee2557a694c2da4d42fe6ac6dc419",
+       "source_sha256": "f3615bdc1b713c44a740f50e532fb2fc2d7ee2557a694c2da4d42fe6ac6dc419",
+-      "duplicate_first_frame_at_end": 0,
+       "asset_id": "126131232511753",
+       "published_sha256": "f3615bdc1b713c44a740f50e532fb2fc2d7ee2557a694c2da4d42fe6ac6dc419",
+       "moderation_state": "Approved",
+@@ -257,7 +249,6 @@
+       "prepared_path": "assets/source/npcs/warsmith/animations/1hs_attack_02.rbxm",
+       "sha256": "d6bc74cc51010fec0a1164f719de0f4e0adb8604c0dfab258e713efbfbc6d004",
+       "source_sha256": "d6bc74cc51010fec0a1164f719de0f4e0adb8604c0dfab258e713efbfbc6d004",
+-      "duplicate_first_frame_at_end": 0,
+       "asset_id": "88602283895871",
+       "published_sha256": "d6bc74cc51010fec0a1164f719de0f4e0adb8604c0dfab258e713efbfbc6d004",
+       "moderation_state": "Approved",
+@@ -276,7 +267,6 @@
+       "prepared_path": "assets/source/npcs/warsmith/animations/1hs_combat_idle.rbxm",
+       "sha256": "d6d000a3d8ce5b293d9d61731bd8729821e2c75c2651b3c7d04dd71bfb5c785c",
+       "source_sha256": "d6d000a3d8ce5b293d9d61731bd8729821e2c75c2651b3c7d04dd71bfb5c785c",
+-      "duplicate_first_frame_at_end": 1,
+       "asset_id": "137839979654028",
+       "published_sha256": "d6d000a3d8ce5b293d9d61731bd8729821e2c75c2651b3c7d04dd71bfb5c785c",
+       "moderation_state": "Approved",
+@@ -295,7 +285,6 @@
+       "prepared_path": "assets/source/npcs/warsmith/animations/1hs_idle_special_01.rbxm",
+       "sha256": "61fcbf1bb80f9432b44f9bbc5a3fc801f338af46afac64b82a4a8b7222d5b38e",
+       "source_sha256": "61fcbf1bb80f9432b44f9bbc5a3fc801f338af46afac64b82a4a8b7222d5b38e",
+-      "duplicate_first_frame_at_end": 0,
+       "asset_id": "113100282026807",
+       "published_sha256": "61fcbf1bb80f9432b44f9bbc5a3fc801f338af46afac64b82a4a8b7222d5b38e",
+       "moderation_state": "Approved",
+@@ -314,7 +303,6 @@
+       "prepared_path": "assets/source/npcs/warsmith/animations/1hs_run.rbxm",
+       "sha256": "da6b148e140413354f07f890f03d0fe110addd75ad9de45650b0b84d529f078b",
+       "source_sha256": "da6b148e140413354f07f890f03d0fe110addd75ad9de45650b0b84d529f078b",
+-      "duplicate_first_frame_at_end": 1,
+       "asset_id": "127890642558312",
+       "published_sha256": "da6b148e140413354f07f890f03d0fe110addd75ad9de45650b0b84d529f078b",
+       "moderation_state": "Approved",
+@@ -333,7 +321,6 @@
+       "prepared_path": "assets/source/npcs/warsmith/animations/1hs_walk.rbxm",
+       "sha256": "ee881b93f19278247720a406a218d6f8c8c6ba834df6371b81f112b18402048a",
+       "source_sha256": "ee881b93f19278247720a406a218d6f8c8c6ba834df6371b81f112b18402048a",
+-      "duplicate_first_frame_at_end": 1,
+       "asset_id": "94161736966964",
+       "published_sha256": "ee881b93f19278247720a406a218d6f8c8c6ba834df6371b81f112b18402048a",
+       "moderation_state": "Approved",
+@@ -352,7 +339,6 @@
+       "prepared_path": "assets/source/npcs/warsmith/animations/base_death.rbxm",
+       "sha256": "4e8936d6e6f1a9c668255f21f61dea0222d6fd58d4f088f3a3e6db2af403e447",
+       "source_sha256": "4e8936d6e6f1a9c668255f21f61dea0222d6fd58d4f088f3a3e6db2af403e447",
+-      "duplicate_first_frame_at_end": 0,
+       "asset_id": "130597315389018",
+       "published_sha256": "4e8936d6e6f1a9c668255f21f61dea0222d6fd58d4f088f3a3e6db2af403e447",
+       "moderation_state": "Approved",
+@@ -371,7 +357,6 @@
+       "prepared_path": "assets/source/npcs/warsmith/animations/base_idle.rbxm",
+       "sha256": "4be51f92da7936d046a51da8cedf97f08fa29e0077f50d10856061e03a7ed2d2",
+       "source_sha256": "4be51f92da7936d046a51da8cedf97f08fa29e0077f50d10856061e03a7ed2d2",
+-      "duplicate_first_frame_at_end": 0,
+       "asset_id": "117666830429058",
+       "published_sha256": "4be51f92da7936d046a51da8cedf97f08fa29e0077f50d10856061e03a7ed2d2",
+       "moderation_state": "Approved",
+@@ -390,7 +375,6 @@
+       "prepared_path": "assets/source/npcs/warsmith/animations/base_idle_special_01.rbxm",
+       "sha256": "6c10e0f276856dc1a4d8d5b05f841378b33ac6fabfd0a9fa37c0ccb364cd533b",
+       "source_sha256": "6c10e0f276856dc1a4d8d5b05f841378b33ac6fabfd0a9fa37c0ccb364cd533b",
+-      "duplicate_first_frame_at_end": 0,
+       "asset_id": "102811681394699",
+       "published_sha256": "6c10e0f276856dc1a4d8d5b05f841378b33ac6fabfd0a9fa37c0ccb364cd533b",
+       "moderation_state": "Approved",
+diff --git a/assets/reimported/source-only-migration/20261009T212759Z/manifests-before/character-animations.json b/assets/reimported/source-only-migration/20261009T212759Z/manifests-before/character-animations.json
+--- a/assets/reimported/source-only-migration/20261009T212759Z/manifests-before/character-animations.json
++++ b/assets/reimported/source-only-migration/20261009T212759Z/manifests-before/character-animations.json
+@@ -22,7 +22,6 @@
+       "preparedPath": "assets/prepared/characters/human/female/human_female/animations/weapons/1hs/1hs_attack_01.rbxm",
+       "sha256": "c5a9f66cb9873ca0c2d3a9b14c690b36f7be3f36e76e3888741808bd219a901e",
+       "sourceSha256": "c5a9f66cb9873ca0c2d3a9b14c690b36f7be3f36e76e3888741808bd219a901e",
+-      "duplicateFirstFrameAtEnd": false,
+       "assetId": "88149431126736",
+       "publishedSha256": "c5a9f66cb9873ca0c2d3a9b14c690b36f7be3f36e76e3888741808bd219a901e",
+       "moderationState": "Approved",
+@@ -37,7 +36,6 @@
+       "preparedPath": "assets/prepared/characters/human/female/human_female/animations/weapons/1hs/1hs_attack_02.rbxm",
+       "sha256": "b95a86fb5d9286775299ac211f4be2d267b72d87cf92545fd4adf206058d996f",
+       "sourceSha256": "b95a86fb5d9286775299ac211f4be2d267b72d87cf92545fd4adf206058d996f",
+-      "duplicateFirstFrameAtEnd": false,
+       "assetId": "82563321432420",
+       "publishedSha256": "b95a86fb5d9286775299ac211f4be2d267b72d87cf92545fd4adf206058d996f",
+       "moderationState": "Approved",
+@@ -52,7 +50,6 @@
+       "preparedPath": "assets/prepared/characters/human/female/human_female/animations/weapons/1hs/1hs_attack_03.rbxm",
+       "sha256": "c365f5510f3fa4671208fa3a6f2f04e7a0cff3994776b7f08f6604f022e52286",
+       "sourceSha256": "c365f5510f3fa4671208fa3a6f2f04e7a0cff3994776b7f08f6604f022e52286",
+-      "duplicateFirstFrameAtEnd": false,
+       "assetId": "86247398285431",
+       "publishedSha256": "c365f5510f3fa4671208fa3a6f2f04e7a0cff3994776b7f08f6604f022e52286",
+       "moderationState": "Approved",
+@@ -67,7 +64,6 @@
+       "preparedPath": "assets/prepared/characters/human/female/human_female/animations/weapons/1hs/1hs_combat_idle.rbxm",
+       "sha256": "a4d7cfd53f4aa796ad87258ebc0ffbc967d5bc2ad3849e5284b949aabaf498ee",
+       "sourceSha256": "a4d7cfd53f4aa796ad87258ebc0ffbc967d5bc2ad3849e5284b949aabaf498ee",
+-      "duplicateFirstFrameAtEnd": false,
+       "assetId": "118675119937740",
+       "publishedSha256": "a4d7cfd53f4aa796ad87258ebc0ffbc967d5bc2ad3849e5284b949aabaf498ee",
+       "moderationState": "Approved",
+@@ -82,7 +78,6 @@
+       "preparedPath": "assets/prepared/characters/human/female/human_female/animations/weapons/1hs/1hs_idle.rbxm",
+       "sha256": "b2374a57e07aacdbe82ffbb0e8cffe6302f616f982df9f31dc7606b9df78c103",
+       "sourceSha256": "b2374a57e07aacdbe82ffbb0e8cffe6302f616f982df9f31dc7606b9df78c103",
+-      "duplicateFirstFrameAtEnd": false,
+       "assetId": "128677350129455",
+       "publishedSha256": "b2374a57e07aacdbe82ffbb0e8cffe6302f616f982df9f31dc7606b9df78c103",
+       "moderationState": "Approved",
+@@ -97,7 +92,6 @@
+       "preparedPath": "assets/prepared/characters/human/female/human_female/animations/weapons/1hs/1hs_run.rbxm",
+       "sha256": "f8ac796ce05859442fbde385cb709063674f5ff4d8fd899606f2f4d512b40003",
+       "sourceSha256": "f8ac796ce05859442fbde385cb709063674f5ff4d8fd899606f2f4d512b40003",
+-      "duplicateFirstFrameAtEnd": false,
+       "assetId": "134065196920987",
+       "publishedSha256": "f8ac796ce05859442fbde385cb709063674f5ff4d8fd899606f2f4d512b40003",
+       "moderationState": "Approved",
+@@ -112,7 +106,6 @@
+       "preparedPath": "assets/prepared/characters/human/female/human_female/animations/weapons/1hs/1hs_walk.rbxm",
+       "sha256": "1c5ba24831eb3a254aae2f9b6322427ef839b33b86c4b00af73301c23d35eebc",
+       "sourceSha256": "1c5ba24831eb3a254aae2f9b6322427ef839b33b86c4b00af73301c23d35eebc",
+-      "duplicateFirstFrameAtEnd": false,
+       "assetId": "111055842456450",
+       "publishedSha256": "1c5ba24831eb3a254aae2f9b6322427ef839b33b86c4b00af73301c23d35eebc",
+       "moderationState": "Approved",
+@@ -127,7 +120,6 @@
+       "preparedPath": "assets/prepared/characters/human/female/human_female/animations/base/base_death.rbxm",
+       "sha256": "478e5846dba60fd3f0080d0ba5fa26f6c4ed610282e3cd9e5bf058dfad23baf9",
+       "sourceSha256": "478e5846dba60fd3f0080d0ba5fa26f6c4ed610282e3cd9e5bf058dfad23baf9",
+-      "duplicateFirstFrameAtEnd": false,
+       "assetId": "118060400424587",
+       "publishedSha256": "478e5846dba60fd3f0080d0ba5fa26f6c4ed610282e3cd9e5bf058dfad23baf9",
+       "moderationState": "Approved",
+@@ -142,7 +134,6 @@
+       "preparedPath": "assets/prepared/characters/human/female/human_female/animations/base/base_revive.rbxm",
+       "sha256": "182b26be7333359e7ea290f1e3a282666e18f41600d658438cb1526ad4f0cab6",
+       "sourceSha256": "182b26be7333359e7ea290f1e3a282666e18f41600d658438cb1526ad4f0cab6",
+-      "duplicateFirstFrameAtEnd": false,
+       "assetId": "139362684441288",
+       "publishedSha256": "182b26be7333359e7ea290f1e3a282666e18f41600d658438cb1526ad4f0cab6",
+       "moderationState": "Approved",
+diff --git a/assets/reimported/source-only-migration/20261009T212759Z/manifests-before/monster-animations.json b/assets/reimported/source-only-migration/20261009T212759Z/manifests-before/monster-animations.json
+--- a/assets/reimported/source-only-migration/20261009T212759Z/manifests-before/monster-animations.json
++++ b/assets/reimported/source-only-migration/20261009T212759Z/manifests-before/monster-animations.json
+@@ -98,7 +98,6 @@
+       "updated_at": 1791258572.2218688,
+       "published_at": 1791256082.2987773,
+       "source_sha256": "cb6cced731a23b52a29264e3644af0af7a95810b206d5f798ae0cea05cc5f715",
+-      "duplicate_first_frame_at_end": 0,
+       "content_updated_at": 1791258572.2218688,
+       "status": "PUBLISHED"
+     },
+@@ -117,7 +116,6 @@
+       "updated_at": 1791258577.830591,
+       "published_at": 1791258577.830591,
+       "source_sha256": "072097c294ae36d47ad08404dac0eb78e5f0771e1ded26611343c12824a78840",
+-      "duplicate_first_frame_at_end": 0,
+       "content_updated_at": 1791258577.830591,
+       "status": "PUBLISHED"
+     },
+@@ -136,7 +134,6 @@
+       "updated_at": 1791258572.2218688,
+       "published_at": 1791256085.5388856,
+       "source_sha256": "631a8b3b567295d9831130916a642c01f7493af71e64d887e6750ecceb387ede",
+-      "duplicate_first_frame_at_end": 0,
+       "content_updated_at": 1791258572.2218688,
+       "status": "PUBLISHED"
+     },
+@@ -155,7 +152,6 @@
+       "updated_at": 1791258572.2218688,
+       "published_at": 1791256088.776485,
+       "source_sha256": "48be1402bf6ac36fb287a46e85e5512c288bc73da2037ed06b30be86b9267c14",
+-      "duplicate_first_frame_at_end": 0,
+       "content_updated_at": 1791258572.2218688,
+       "status": "PUBLISHED"
+     },
+@@ -174,7 +170,6 @@
+       "updated_at": 1791258572.2218688,
+       "published_at": 1791256092.0373774,
+       "source_sha256": "f72958550a227f50b8f9d5205458ef84e193f23698e8cfb974a67c9b06424c5e",
+-      "duplicate_first_frame_at_end": 0,
+       "content_updated_at": 1791258572.2218688,
+       "status": "PUBLISHED"
+     },
+@@ -193,7 +188,6 @@
+       "updated_at": 1791258572.2218688,
+       "published_at": 1791256095.062003,
+       "source_sha256": "d738335e499683195dacdf154494cb972e423342d814f8dfe165cf5726b955e2",
+-      "duplicate_first_frame_at_end": 0,
+       "content_updated_at": 1791258572.2218688,
+       "status": "PUBLISHED"
+     },
+@@ -212,7 +206,6 @@
+       "updated_at": 1791258572.2218688,
+       "published_at": 1791256098.1514924,
+       "source_sha256": "184231f8faa24486146ee7cf6e562dc3744754303996143112fa0fef2fed72ff",
+-      "duplicate_first_frame_at_end": 0,
+       "content_updated_at": 1791258572.2218688,
+       "status": "PUBLISHED"
+     }

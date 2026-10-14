@@ -36,9 +36,9 @@ return table.freeze({
 			nameEn = "Warsmith",
 			nameRu = "Кузнец",
 			status = "PUBLISHED",
-			modelAssetId = "124938004268790",
+			modelAssetId = "94000088091746",
 			serverStoragePath = "ServerStorage.npcs.warsmith.model.warsmith",
-			skeletonSignature = "41228d5fef9590754d49b9a5f3dff78d0fd060c38705980dd9a1092fad91d7f7",
+			skeletonSignature = "f72cbdcfa8c465b044b58822eabafb11531387e0188b62cfd0ca9c34a90ec692",
 			behavior = table.freeze({
 				retaliateWhenAttacked = true,
 				pursuitRadiusStuds = 70,
@@ -49,7 +49,7 @@ return table.freeze({
 				["MaxHP"] = 1000,
 				["Damage"] = 10,
 				["AttackSpeed"] = 200,
-				["RunSpeed"] = 200,
+				["RunSpeed"] = 70,
 				["CritChance"] = 20,
 			}),
 			textures = table.freeze({

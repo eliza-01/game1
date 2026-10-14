@@ -4,7 +4,7 @@ local WeaponAttackMovement = {}
 
 local FALLBACK = table.freeze({
     weaponType = "hands",
-    animationSet = "hands",
+    animationSet = "unarmed",
     locomotionMode = "Run",
     runSpeedMultiplier = 1,
 })

@@ -75,7 +75,7 @@ class NpcAttackLoopAndSharedSpeedTests(unittest.TestCase):
         self.assertIn('beginAttack(agent, target, true)', continuous)
         self.assertNotIn('EndAttack()', continuous)
         self.assertIn('agent.presentation.ContinueAttack(percent)', attack)
-        self.assertIn('local clip = Tracks.Load(animator, row, true, false)', presentation)
+        self.assertIn('local clip = Tracks.Load(animator, row, true)', presentation)
         self.assertIn('Tracks.Play(entity, currentAttack, "attack", nil, speedPercent)', presentation)
         self.assertIn('if combatActive then', presentation.replace('elseif combatActive then', 'if combatActive then'))
         self.assertNotIn('GetAttributeChangedSignal("InCombat")', presentation)

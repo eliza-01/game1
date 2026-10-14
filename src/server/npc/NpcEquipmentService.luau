@@ -9,7 +9,9 @@ local WeaponEquipService = require(script.Parent.Parent:WaitForChild("weapon"):W
 local NpcEquipmentService = {}
 function NpcEquipmentService.Equip(entity: Model, npcSlug: string): string
     local loadout = (Loadouts.loadouts or {})[npcSlug] or {}
-    local set = "1hs" -- backward-compatible fallback for already registered NPC clips
+    -- Unarmed is an equipment context with its own idle, combat and attack clips.
+    -- Combat damage is still the normal server-authoritative NPC damage path.
+    local set = WeaponAttackMovement.AnimationSetForType("hands")
     local preferredHand = { "right", "left" }
     local hasWeapon = false
     local primaryType = "hands"

@@ -8,7 +8,11 @@ import shutil
 import time
 
 from sqlite_connection import connect as connect_sqlite
-from npc_animation_taxonomy import WEAPON_SETS, filename as npc_filename, parse as npc_parse, validate_rename
+from animation_retirement import retire_unbound_clip, retire_legacy_orphans
+from npc_animation_taxonomy import (
+    WEAPON_SETS, EQUIPMENT_SETS, default_compatibility, validate_compatibility,
+    filename as npc_filename, parse as npc_parse, validate_rename,
+)
 
 from opencloud_assets import create_animation_asset, wait_for_operation
 from animation_reimport_check import find_confirmed_manual_reimport
@@ -66,6 +70,7 @@ def classify(path: Path, slug: str, npc: bool = False) -> dict | None:
         "attack": "attack",
         "atk": "attack",
         "combat_idle": "combat_idle",
+        "idle_combat": "combat_idle",  # accepted filename alias; internal slot remains combat_idle
         "attack_wait": "combat_idle",  # legacy filename compatibility only
         "atkwait": "combat_idle",
         "death": "death",
@@ -142,7 +147,6 @@ class MonsterAnimationStore:
                     prepared_path TEXT NOT NULL,
                     sha256 TEXT NOT NULL,
                     source_sha256 TEXT NOT NULL DEFAULT '',
-                    duplicate_first_frame_at_end INTEGER NOT NULL DEFAULT 0,
                     asset_id TEXT,
                     published_sha256 TEXT NOT NULL DEFAULT '',
                     moderation_state TEXT NOT NULL DEFAULT '',
@@ -184,8 +188,6 @@ class MonsterAnimationStore:
             clip_columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(monster_animation_clips)")}
             if "source_sha256" not in clip_columns:
                 connection.execute("ALTER TABLE monster_animation_clips ADD COLUMN source_sha256 TEXT NOT NULL DEFAULT ''")
-            if "duplicate_first_frame_at_end" not in clip_columns:
-                connection.execute("ALTER TABLE monster_animation_clips ADD COLUMN duplicate_first_frame_at_end INTEGER NOT NULL DEFAULT 0")
             if "content_updated_at" not in clip_columns:
                 connection.execute("ALTER TABLE monster_animation_clips ADD COLUMN content_updated_at REAL NOT NULL DEFAULT 0")
             connection.execute("UPDATE monster_animation_clips SET source_sha256=sha256 WHERE source_sha256='' OR source_sha256 IS NULL")
@@ -205,6 +207,10 @@ class MonsterAnimationStore:
             self._migrate_combat_idle(connection)
             if self.kind == "npc":
                 self._migrate_npc_categories(connection)
+                self._migrate_npc_compatibility(connection)
+            # Previous Remove left published clips without any binding. Archive
+            # those before a Scan Folder can associate an old Asset ID again.
+            retire_legacy_orphans(connection, self.kind)
         self._normalize_source_only_files()
 
     @staticmethod
@@ -234,6 +240,24 @@ class MonsterAnimationStore:
             FROM monster_animation_bindings""")
         connection.execute("DROP TABLE monster_animation_bindings")
         connection.execute("ALTER TABLE monster_animation_bindings_m67 RENAME TO monster_animation_bindings")
+
+    @staticmethod
+    def _migrate_npc_compatibility(connection) -> None:
+        """Nullable explicit override; NULL keeps the subtype's default.
+
+        No existing publication, clip ID or binding ID changes. A type rename
+        automatically adopts the new default only when no override was authored.
+        """
+        cols = {str(row[1]) for row in connection.execute("PRAGMA table_info(monster_animation_bindings)")}
+        if "compatible_sets" not in cols:
+            connection.execute("ALTER TABLE monster_animation_bindings ADD COLUMN compatible_sets TEXT")
+
+    @staticmethod
+    def _compatible_for_binding(row: dict) -> list[str]:
+        explicit = row.get("compatible_sets")
+        if explicit is None:
+            return default_compatibility(str(row.get("weapon_set") or "1hs"))
+        return validate_compatibility(json.loads(str(explicit)))
 
     def _normalize_source_only_files(self) -> None:
         """Keep canonical monster animation metadata bound to assets/source only."""
@@ -396,9 +420,9 @@ class MonsterAnimationStore:
         source_sha = digest
         if old_dict is None:
             connection.execute(
-                """INSERT INTO monster_animation_clips(id,monster_slug,name,source_path,prepared_path,sha256,source_sha256,duplicate_first_frame_at_end,asset_id,published_sha256,moderation_state,revision,created_at,updated_at,content_updated_at,published_at)
-                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (clip_id, slug, stem, source_target.relative_to(self.root).as_posix(), prepared_target.relative_to(self.root).as_posix(), digest, source_sha, 0, None, "", "", 1, now, now, now, None),
+                """INSERT INTO monster_animation_clips(id,monster_slug,name,source_path,prepared_path,sha256,source_sha256,asset_id,published_sha256,moderation_state,revision,created_at,updated_at,content_updated_at,published_at)
+                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (clip_id, slug, stem, source_target.relative_to(self.root).as_posix(), prepared_target.relative_to(self.root).as_posix(), digest, source_sha, None, "", "", 1, now, now, now, None),
             )
             outcome = "created"
         else:
@@ -449,7 +473,13 @@ class MonsterAnimationStore:
         for path in files:
             binding = classify(path, slug, npc=self.kind == "npc")
             if binding is None:
-                unassigned.append({"path": str(path), "filename": path.name, "reason": "name does not match a monster animation state"})
+                unassigned.append({
+                    "path": str(path),
+                    "filename": path.name,
+                    "reason": ("name does not match an NPC animation type/state; "
+                               "expected <npc>_<type>_<state>[_01].rbxm")
+                    if self.kind == "npc" else "name does not match a monster animation state",
+                })
                 continue
             coordinate = (binding.get("weaponSet", ""), binding["slot"], int(binding["variant"]))
             if coordinate in coordinates:
@@ -515,10 +545,10 @@ class MonsterAnimationStore:
         if not slug:
             return []
         with self.connect() as connection:
-            extra = "b.weapon_set,b.disarm," if self.kind == "npc" else ""
+            extra = "b.weapon_set,b.disarm,b.compatible_sets," if self.kind == "npc" else ""
             rows = connection.execute(
                 f"""SELECT b.id AS binding_id,b.monster_slug,b.slot,b.variant,b.clip_id,b.weight,b.looped,b.priority,
-                          {extra}c.name,c.source_path,c.prepared_path,c.sha256,c.source_sha256,c.duplicate_first_frame_at_end,c.asset_id,c.published_sha256,c.moderation_state,c.revision,c.published_at
+                          {extra}c.name,c.source_path,c.prepared_path,c.sha256,c.source_sha256,c.asset_id,c.published_sha256,c.moderation_state,c.revision,c.published_at
                    FROM monster_animation_bindings b JOIN monster_animation_clips c ON c.id=b.clip_id
                    WHERE b.monster_slug=? ORDER BY b.slot,b.variant""",
                 (slug,),
@@ -532,10 +562,10 @@ class MonsterAnimationStore:
             if self.kind == "npc":
                 value["weaponSet"] = value["weapon_set"]
                 value["disarm"] = bool(value["disarm"])
+                value["compatibleWith"] = self._compatible_for_binding(value)
                 value["canonicalFilename"] = npc_filename(slug, value["weapon_set"], value["slot"], value["variant"], Path(value["source_path"]).suffix)
             value["status"] = self._status(value)
             value["looped"] = bool(value.get("looped"))
-            value["duplicate_first_frame_at_end"] = bool(value.get("duplicate_first_frame_at_end"))
             result.append(value)
         return result
 
@@ -552,6 +582,7 @@ class MonsterAnimationStore:
         return {
             "schemaVersion": SCHEMA_VERSION, "project": PROJECT, "monsterSlug": selected, "monsters": monsters,
             "profile": profile, "skeletonCompatible": compatible, "slotCatalog": SLOT_CATALOG, "weaponSets": (list(WEAPON_SETS) if self.kind == "npc" else []),
+            "equipmentSets": (list(EQUIPMENT_SETS) if self.kind == "npc" else []),
             "filenameRules": filename_rules(selected, npc=self.kind == "npc"), "items": items,
             "summary": {
                 "registered": len(items), "published": sum(row["status"] == "PUBLISHED" for row in items),
@@ -559,21 +590,6 @@ class MonsterAnimationStore:
             },
         }
 
-
-    def set_duplicate_first_frame(self, clip_id: str, enabled: bool) -> dict:
-        # Runtime presentation flag only. Never mutate canonical animation
-        # bytes, publication checksum, revision, or permanent Roblox asset id.
-        with self.connect() as connection:
-            raw = connection.execute("SELECT monster_slug FROM monster_animation_clips WHERE id=?", (clip_id,)).fetchone()
-            if not raw:
-                raise ValueError(f"unknown monster animation clip: {clip_id}")
-            connection.execute(
-                "UPDATE monster_animation_clips SET duplicate_first_frame_at_end=?,updated_at=? WHERE id=?",
-                (1 if enabled else 0, time.time(), clip_id),
-            )
-            slug = str(raw["monster_slug"])
-        self.export()
-        return self.snapshot(slug)
 
     def set_weight(self, binding_id: str, weight: int) -> dict:
         weight = max(0 if self.kind == "npc" else 1, min(10000, int(weight)))
@@ -599,6 +615,60 @@ class MonsterAnimationStore:
                 raise ValueError("disarm is only available for idle_special")
             connection.execute("UPDATE monster_animation_bindings SET disarm=?,updated_at=? WHERE id=?",
                                (int(bool(enabled)), time.time(), binding_id))
+            slug = str(row["monster_slug"])
+        self.export()
+        return self.snapshot(slug)
+
+    def set_animation_options(self, binding_id: str, compatible_with: object,
+                              weight: object, disarm: object) -> dict:
+        """Commit authored compatibility and presentation options atomically.
+
+        Publication identity and source animation bytes are never modified.
+        """
+        if self.kind != "npc":
+            raise ValueError("animation options apply to NPC animation bindings")
+        values = validate_compatibility(compatible_with)
+        if isinstance(weight, bool):
+            raise ValueError("weight must be an integer between 0 and 10000")
+        try:
+            parsed_weight = int(weight)
+        except (TypeError, ValueError, OverflowError) as error:
+            raise ValueError("weight must be an integer between 0 and 10000") from error
+        if str(weight).strip() != str(parsed_weight) or not 0 <= parsed_weight <= 10000:
+            raise ValueError("weight must be an integer between 0 and 10000")
+        if not isinstance(disarm, bool):
+            raise ValueError("disarm must be a boolean")
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT monster_slug,slot FROM monster_animation_bindings WHERE id=?", (binding_id,)
+            ).fetchone()
+            if not row:
+                raise ValueError("unknown NPC animation binding")
+            if disarm and str(row["slot"]) != "idle_special":
+                raise ValueError("disarm is only available for idle_special")
+            connection.execute("""UPDATE monster_animation_bindings
+                SET compatible_sets=?,weight=?,disarm=?,updated_at=? WHERE id=?""",
+                (json.dumps(values, separators=(",", ":")), parsed_weight,
+                 int(disarm), time.time(), binding_id),
+            )
+            slug = str(row["monster_slug"])
+        self.export()
+        return self.snapshot(slug)
+
+    def set_compatibility(self, binding_id: str, compatible_with: object) -> dict:
+        if self.kind != "npc":
+            raise ValueError("compatibility applies to NPC animation bindings")
+        values = validate_compatibility(compatible_with)
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT monster_slug FROM monster_animation_bindings WHERE id=?", (binding_id,)
+            ).fetchone()
+            if not row:
+                raise ValueError("unknown NPC animation binding")
+            connection.execute(
+                "UPDATE monster_animation_bindings SET compatible_sets=?,updated_at=? WHERE id=?",
+                (json.dumps(values, separators=(",", ":")), time.time(), binding_id),
+            )
             slug = str(row["monster_slug"])
         self.export()
         return self.snapshot(slug)
@@ -681,9 +751,9 @@ class MonsterAnimationStore:
                 raise ValueError(f"unknown monster animation binding: {binding_id}")
             slug, clip_id = str(row["monster_slug"]), str(row["clip_id"])
             connection.execute("DELETE FROM monster_animation_bindings WHERE id=?", (binding_id,))
-            still = int(connection.execute("SELECT COUNT(*) FROM monster_animation_bindings WHERE clip_id=?", (clip_id,)).fetchone()[0])
-            if still == 0:
-                connection.execute("DELETE FROM monster_animation_clips WHERE id=? AND (asset_id IS NULL OR asset_id='')", (clip_id,))
+            # Remove the active clip even if it was published. Retain the
+            # publication audit in the archive, never in the new registration.
+            retire_unbound_clip(connection, self.kind, clip_id)
         self.export()
         return self.snapshot(slug)
 
@@ -837,8 +907,8 @@ class MonsterAnimationStore:
                 "clipId": str(clip["id"]), "assetId": str(clip["asset_id"]), "animationId": "rbxassetid://" + str(clip["asset_id"]),
                 "sourceSlot": internal_slot, "role": role, "variant": int(binding["variant"]), "weight": int(binding["weight"]),
                 "looped": bool(binding["looped"]), "priority": str(binding["priority"]),
-                "duplicateFirstFrameAtEnd": bool(clip.get("duplicate_first_frame_at_end")),
                 "weaponSet": str(binding.get("weapon_set") or "1hs") if self.kind == "npc" else "",
+                "compatibleWith": self._compatible_for_binding(binding) if self.kind == "npc" else [],
                 "disarm": bool(binding.get("disarm")) if self.kind == "npc" else False,
             })
         for profile in profiles_map.values():
@@ -860,12 +930,12 @@ class MonsterAnimationStore:
                         f"\t\t\t\t\t\tsourceSlot = {q(row['sourceSlot'])},",
                         f"\t\t\t\t\t\trole = {q(row['role'])},",
                         f"\t\t\t\t\t\tweaponSet = {q(row['weaponSet'])},",
+                        "\t\t\t\t\t\tcompatibleWith = table.freeze({" + ", ".join(q(value) for value in row["compatibleWith"]) + "}),",
                         f"\t\t\t\t\t\tvariant = {row['variant']},",
                         f"\t\t\t\t\t\tweight = {row['weight']},",
                         f"\t\t\t\t\t\tdisarm = {'true' if row['disarm'] else 'false'},",
                         f"\t\t\t\t\t\tlooped = {'true' if row['looped'] else 'false'},",
                         f"\t\t\t\t\t\tpriority = {q(row['priority'])},",
-                        f"\t\t\t\t\t\tduplicateFirstFrameAtEnd = {'true' if row['duplicateFirstFrameAtEnd'] else 'false'},",
                         "\t\t\t\t\t}),",
                     ]
                 lines.append("\t\t\t\t}),")

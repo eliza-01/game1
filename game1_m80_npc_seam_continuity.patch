@@ -1,0 +1,41 @@
+--- a/src/server/npc/NpcAnimationTracks.luau
++++ b/src/server/npc/NpcAnimationTracks.luau
+@@ -119,7 +119,11 @@
+     local speed = percent / 100
+     local success, failure = pcall(function()
+         if clip.seam then
+-            clip.seam:Play(fade or NpcConfig.TransitionSeconds, speed)
++            if clip.seam:IsPlaying() and clip.track.IsPlaying then
++                clip.seam:AdjustSpeed(speed)
++            else
++                clip.seam:Play(fade or NpcConfig.TransitionSeconds, speed)
++            end
+         elseif clip.track.IsPlaying then
+             clip.track:AdjustSpeed(speed)
+         else
+--- a/system/verify/test_npc_seam_continuity_m80.py
++++ b/system/verify/test_npc_seam_continuity_m80.py
+@@ -0,0 +1,23 @@
++"""Regression: recurrent NPC presentation sync must not rewind seam-enabled clips."""
++from pathlib import Path
++import unittest
++
++ROOT = Path(__file__).resolve().parents[2]
++TRACKS = ROOT / 'src/server/npc/NpcAnimationTracks.luau'
++SEAM = ROOT / 'src/shared/animation/AnimationFirstFrameSeam.luau'
++
++class NpcSeamContinuityTests(unittest.TestCase):
++    def test_repeated_play_only_adjusts_speed(self):
++        source = TRACKS.read_text(encoding='utf-8')
++        self.assertIn('clip.seam:IsPlaying() and clip.track.IsPlaying', source)
++        self.assertIn('clip.seam:AdjustSpeed(speed)', source)
++        self.assertIn('clip.seam:Play(fade or NpcConfig.TransitionSeconds, speed)', source)
++        self.assertLess(source.index('clip.seam:AdjustSpeed(speed)'),source.index('clip.seam:Play(fade or NpcConfig.TransitionSeconds, speed)'))
++    def test_seam_supports_speed_update_without_rewind(self):
++        source = SEAM.read_text(encoding='utf-8')
++        self.assertIn('function AnimationFirstFrameSeam:AdjustSpeed', source)
++        body = source.split('function AnimationFirstFrameSeam:AdjustSpeed',1)[1].split('\nend',1)[0]
++        self.assertIn('self.primary:AdjustSpeed(self.speed)', body)
++        self.assertNotIn('TimePosition = 0',body)
++
++if __name__=='__main__': unittest.main()

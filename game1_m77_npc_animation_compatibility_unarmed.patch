@@ -1,0 +1,652 @@
+diff --git a/docs/NPC_ANIMATION_COMPATIBILITY_M77_RU.md b/docs/NPC_ANIMATION_COMPATIBILITY_M77_RU.md
+new file mode 100644
+index 0000000..e454bd8
+--- /dev/null
++++ b/docs/NPC_ANIMATION_COMPATIBILITY_M77_RU.md
+@@ -0,0 +1,22 @@
++# M77 · NPC Animation Compatibility / Unarmed
++
++## Контракт
++
++* `weaponSet` — исходная классификация анимации и координата файла/публикации (`base`, `unarmed`, `1hs`, `2hs`, `bow`). Не используется вместо совместимости.
++* `compatibleWith` — список **контекстов экипировки**, которые разрешают воспроизведение. `base` не является контекстом экипировки. В M77 контексты: `unarmed`, `1hs`, `2hs`, `bow`.
++* `NULL` в `monster_animation_bindings.compatible_sets` означает *вычислять исходную совместимость по типу*: `base` → **все**, остальные → собственный тип. Это позволяет безопасно мигрировать старые базы; `[]` означает сознательный запрет во всех контекстах.
++* Каждое редактирование Options атомарно сохраняет `compatible_sets`, `weight`, `disarm` и не меняет Clip ID, Roblox Asset ID или историю публикации. Повторное сканирование сохраняет эти поля.
++* Rename/Migrate меняет исходный тип и метаданные файла, но сохраняет явное `compatible_sets`. Если ручной совместимости не было — вычисляется новый default.
++* `Disarm` разрешён только для `idle_special`: временно скрывает оружие. Ни реальная экипировка, ни условия совместимости из-за Disarm не меняются.
++
++## Runtime
++
++`NpcEquipmentService` выводит контекст из реально экипированного оружия. При отсутствии оружия это `unarmed`, а не `1hs`. Серверный `NpcCombatAIService` продолжает наносить рукопашный урон через свой `DamageService.Apply` и проверку дистанции: оружейный volume для NPC не используется. Анимация `unarmed_attack_01` необязательна для самого факта удара, но, если опубликована и совместима, проигрывается как обычный цикл атаки.
++
++`AnimationCompatibility` — общий чистый семантический резолвер, а `NpcAnimationTracks` — адаптер NPC, фильтрующий опубликованные записи. Для обычной стойки приоритет свой тип → `base` → другой совместимый тип. В одном weighted pool для `idle_special` участвуют **все** совместимые специальные варианты независимо от исходного типа. `death` предпочитает совместимый `base_death`. Нет hardcode по NPC slug.
++
++Реестр анимаций Character сейчас не переводится автоматически на NPC-схему: это отдельный этап миграции типов персонажей, не нужно нарушать существующие опубликованные анимации ради M77.
++
++## UI / проверка
++
++Asset Manager → NPC Animations → **options** рядом с записью. Кнопка **select all** выбирает все типы экипировки, при повторном нажатии **clear all** снимает их все. **Apply** сохраняет совместимости, `Weight` и `Disarm` одной транзакцией; повторный вход в Options отражает сохранённые значения. Изменения начнут действовать в новой игровой сессии после обновления генерируемого NPC Animation Registry через Rojo.
+diff --git a/src/server/npc/NpcAnimationService.luau b/src/server/npc/NpcAnimationService.luau
+index 32ad826..32c3c12 100644
+--- a/src/server/npc/NpcAnimationService.luau
++++ b/src/server/npc/NpcAnimationService.luau
+@@ -28,7 +28,7 @@ function NpcAnimationService.Create(entity: Model, visual: Model, profile: any?)
+         animator.Parent = controller
+     end
+ 
+-    local weaponSet = tostring(entity:GetAttribute("NpcWeaponSet") or "1hs")
++    local weaponSet = tostring(entity:GetAttribute("NpcWeaponSet") or "unarmed")
+     local function first(slot: string): any?
+         return Tracks.PublishedRows(profile, slot, weaponSet)[1]
+     end
+diff --git a/src/server/npc/NpcAnimationTracks.luau b/src/server/npc/NpcAnimationTracks.luau
+index 765d8d2..da24ee1 100644
+--- a/src/server/npc/NpcAnimationTracks.luau
++++ b/src/server/npc/NpcAnimationTracks.luau
+@@ -18,53 +18,57 @@ local priorities = {
+     Action4 = Enum.AnimationPriority.Action4,
+ }
+ 
++local Compatibility = require(AnimationShared:WaitForChild("AnimationCompatibility"))
++
+ function NpcAnimationTracks.PublishedRows(profile: any?, slot: string, weaponSet: string?): {any}
+     local slots = profile and profile.slots
+     local rows = slots and slots[slot]
+     if typeof(rows) ~= "table" then return {} end
+-    local activeSet = tostring(weaponSet or NpcConfig.WeaponSet)
+-    local preferred = {}
+-    local common = {}
++    local activeSet = tostring(weaponSet or "unarmed")
++    local valid = {}
+     for _, row in ipairs(rows) do
+-        if tostring(row.animationId or ""):match("^rbxassetid://%d+$") then
+-            local set = tostring(row.weaponSet or "1hs")
+-            if set == activeSet then
+-                table.insert(preferred, row)
+-            elseif set == "base" then
+-                table.insert(common, row)
+-            end
++        if tostring(row.animationId or ""):match("^rbxassetid://%d+$")
++            and Compatibility.Allowed(row, activeSet) then
++            table.insert(valid, row)
+         end
+     end
+-    -- Special idles are independent actions, so generic variants participate
+-    -- in the same weighted choice as equipment-specific special variants.
++    table.sort(valid, function(a, b)
++        local rankA = Compatibility.Rank(a, activeSet)
++        local rankB = Compatibility.Rank(b, activeSet)
++        if rankA ~= rankB then return rankA < rankB end
++        return tostring(a.clipId or a.animationId) < tostring(b.clipId or b.animationId)
++    end)
+     if slot == "idle" then
++        -- A single preferred stance, plus all compatible weighted specials.
+         local result = {}
+-        local hasBase = false
+-        for _, row in ipairs(preferred) do
+-            if row.role == "base" then hasBase = true end
+-            table.insert(result, row)
+-        end
+-        for _, row in ipairs(common) do
+-            if row.role == "special" or not hasBase then
++        local baseFound = false
++        for _, row in ipairs(valid) do
++            if row.role == "special" or row.sourceSlot == "idle_special" then
+                 table.insert(result, row)
++            elseif not baseFound then
++                table.insert(result, row, 1)
++                baseFound = true
+             end
+         end
+         return result
+     end
+-    -- Death is a universal terminal state. Prefer an explicitly tagged base
+-    -- death, then this weapon profile, then a legacy death from any old set.
+     if slot == "death" then
+-        if #common > 0 then return common end
+-        if #preferred > 0 then return preferred end
+-        for _, row in ipairs(rows) do
+-            if tostring(row.animationId or ""):match("^rbxassetid://%d+$") then
+-                return { row }
+-            end
++        -- Terminal state prefers an authored reusable base death.
++        for _, row in ipairs(valid) do
++            if row.weaponSet == "base" then return {row} end
++        end
++    end
++    if #valid == 0 then return {} end
++    -- Stance/actions pick a single matching subtype family before cross-type
++    -- fallback. Variant attacks within that family retain weighted selection.
++    local firstRank = Compatibility.Rank(valid[1], activeSet)
++    local result = {}
++    for _, row in ipairs(valid) do
++        if Compatibility.Rank(row, activeSet) == firstRank then
++            table.insert(result, row)
+         end
+-        return {}
+     end
+-    -- Weapon-specific action overrides common action; otherwise use base.
+-    return if #preferred > 0 then preferred else common
++    return result
+ end
+ 
+ local function load(animator: Animator, animationId: string): AnimationTrack?
+diff --git a/src/server/npc/NpcCombatAIService.luau b/src/server/npc/NpcCombatAIService.luau
+index 20440ec..5173e08 100644
+--- a/src/server/npc/NpcCombatAIService.luau
++++ b/src/server/npc/NpcCombatAIService.luau
+@@ -347,7 +347,7 @@ function NpcCombatAIService.Bind(model: Model, root: BasePart, presentation: any
+     local attackRadius = math.max(0, finite(behavior.attackRadiusStuds, 3))
+     local returnDelaySeconds = math.clamp(finite(behavior.returnDelaySeconds, 10), 0, 600)
+     local profile = (NpcAnimationRegistry.profiles or {})[tostring(model:GetAttribute("NpcSlug") or "")]
+-    local weaponSet = tostring(model:GetAttribute("NpcWeaponSet") or "1hs")
++    local weaponSet = tostring(model:GetAttribute("NpcWeaponSet") or "unarmed")
+     local policy = WeaponAttackMovement.Resolve(model:GetAttribute("NpcWeaponType"))
+     local home = root.CFrame
+     local agent = {
+diff --git a/src/server/npc/NpcEquipmentService.luau b/src/server/npc/NpcEquipmentService.luau
+index 72780fa..ce13eb6 100644
+--- a/src/server/npc/NpcEquipmentService.luau
++++ b/src/server/npc/NpcEquipmentService.luau
+@@ -9,7 +9,9 @@ local WeaponEquipService = require(script.Parent.Parent:WaitForChild("weapon"):W
+ local NpcEquipmentService = {}
+ function NpcEquipmentService.Equip(entity: Model, npcSlug: string): string
+     local loadout = (Loadouts.loadouts or {})[npcSlug] or {}
+-    local set = "1hs" -- backward-compatible fallback for already registered NPC clips
++    -- Unarmed is an equipment context with its own idle, combat and attack clips.
++    -- Combat damage is still the normal server-authoritative NPC damage path.
++    local set = WeaponAttackMovement.AnimationSetForType("hands")
+     local preferredHand = { "right", "left" }
+     local hasWeapon = false
+     local primaryType = "hands"
+diff --git a/src/shared/animation/AnimationCompatibility.luau b/src/shared/animation/AnimationCompatibility.luau
+new file mode 100644
+index 0000000..a93baf8
+--- /dev/null
++++ b/src/shared/animation/AnimationCompatibility.luau
+@@ -0,0 +1,32 @@
++-- Equipment context resolves compatibility, without owning the animation state
++-- machine, equip/unequip, attack timing or published asset identity.
++local AnimationCompatibility = {}
++
++function AnimationCompatibility.Allowed(row: any, context: string): boolean
++    local selected = tostring(context or "unarmed")
++    local authored = row.compatibleWith
++    if typeof(authored) == "table" then
++        -- Empty authored arrays are intentionally valid: disable the clip.
++        for _, weaponSet in ipairs(authored) do
++            if tostring(weaponSet) == selected then return true end
++        end
++        return false
++    end
++    -- Compatibility for pre-M77 profiles (new exports include compatibleWith).
++    local kind = tostring(row.weaponSet or "1hs")
++    if kind == "base" then
++        -- Defaults adapt to future equipment contexts without a second enum.
++        return selected ~= "" and selected ~= "base"
++    end
++    return kind == selected
++end
++
++function AnimationCompatibility.Rank(row: any, context: string): number
++    -- Prefer authored equipment stance, then reusable base, then other
++    -- explicitly compatible clips. Specials are pooled independently.
++    if tostring(row.weaponSet) == context then return 1 end
++    if tostring(row.weaponSet) == "base" then return 2 end
++    return 3
++end
++
++return table.freeze(AnimationCompatibility)
+diff --git a/src/shared/weapon/WeaponAttackMovement.luau b/src/shared/weapon/WeaponAttackMovement.luau
+index 33d5a6b..69fa899 100644
+--- a/src/shared/weapon/WeaponAttackMovement.luau
++++ b/src/shared/weapon/WeaponAttackMovement.luau
+@@ -4,7 +4,7 @@ local WeaponAttackMovement = {}
+ 
+ local FALLBACK = table.freeze({
+     weaponType = "hands",
+-    animationSet = "hands",
++    animationSet = "unarmed",
+     locomotionMode = "Run",
+     runSpeedMultiplier = 1,
+ })
+diff --git a/system/control-center/host_agent.py b/system/control-center/host_agent.py
+index a7d0ae9..4f9070f 100644
+--- a/system/control-center/host_agent.py
++++ b/system/control-center/host_agent.py
+@@ -1012,6 +1012,20 @@ class Handler(BaseHTTPRequestHandler):
+                     return self.out(200, npc_animations.publish_clip(clip_id, publication_credentials(str(payload.get("description") or "game1 npc animation"))))
+             except Exception as error:
+                 return self.out(400, {"error": str(error)})
++        if path.startswith("/api/npc-animation-bindings/") and path.endswith("/options"):
++            try:
++                key = unquote(path[len("/api/npc-animation-bindings/"):-len("/options")].strip("/"))
++                payload = self.body()
++                return self.out(200, npc_animations.set_animation_options(
++                    key, payload.get("compatibleWith"), payload.get("weight"), payload.get("disarm")))
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
++        if path.startswith("/api/npc-animation-bindings/") and path.endswith("/compatibility"):
++            try:
++                key = unquote(path[len("/api/npc-animation-bindings/"):-len("/compatibility")].strip("/"))
++                return self.out(200, npc_animations.set_compatibility(key, self.body().get("compatibleWith")))
++            except Exception as error:
++                return self.out(400, {"error": str(error)})
+         if path.startswith("/api/npc-animation-bindings/") and path.endswith("/disarm"):
+             try:
+                 key = unquote(path[len("/api/npc-animation-bindings/"):-len("/disarm")].strip("/"))
+diff --git a/system/control-center/monster_animation_store.py b/system/control-center/monster_animation_store.py
+index d31b58f..fa9e61e 100644
+--- a/system/control-center/monster_animation_store.py
++++ b/system/control-center/monster_animation_store.py
+@@ -8,7 +8,10 @@ import shutil
+ import time
+ 
+ from sqlite_connection import connect as connect_sqlite
+-from npc_animation_taxonomy import WEAPON_SETS, filename as npc_filename, parse as npc_parse, validate_rename
++from npc_animation_taxonomy import (
++    WEAPON_SETS, EQUIPMENT_SETS, default_compatibility, validate_compatibility,
++    filename as npc_filename, parse as npc_parse, validate_rename,
++)
+ 
+ from opencloud_assets import create_animation_asset, wait_for_operation
+ from animation_reimport_check import find_confirmed_manual_reimport
+@@ -206,6 +209,7 @@ class MonsterAnimationStore:
+             self._migrate_combat_idle(connection)
+             if self.kind == "npc":
+                 self._migrate_npc_categories(connection)
++                self._migrate_npc_compatibility(connection)
+         self._normalize_source_only_files()
+ 
+     @staticmethod
+@@ -236,6 +240,24 @@ class MonsterAnimationStore:
+         connection.execute("DROP TABLE monster_animation_bindings")
+         connection.execute("ALTER TABLE monster_animation_bindings_m67 RENAME TO monster_animation_bindings")
+ 
++    @staticmethod
++    def _migrate_npc_compatibility(connection) -> None:
++        """Nullable explicit override; NULL keeps the subtype's default.
++
++        No existing publication, clip ID or binding ID changes. A type rename
++        automatically adopts the new default only when no override was authored.
++        """
++        cols = {str(row[1]) for row in connection.execute("PRAGMA table_info(monster_animation_bindings)")}
++        if "compatible_sets" not in cols:
++            connection.execute("ALTER TABLE monster_animation_bindings ADD COLUMN compatible_sets TEXT")
++
++    @staticmethod
++    def _compatible_for_binding(row: dict) -> list[str]:
++        explicit = row.get("compatible_sets")
++        if explicit is None:
++            return default_compatibility(str(row.get("weapon_set") or "1hs"))
++        return validate_compatibility(json.loads(str(explicit)))
++
+     def _normalize_source_only_files(self) -> None:
+         """Keep canonical monster animation metadata bound to assets/source only."""
+         updates = []
+@@ -522,7 +544,7 @@ class MonsterAnimationStore:
+         if not slug:
+             return []
+         with self.connect() as connection:
+-            extra = "b.weapon_set,b.disarm," if self.kind == "npc" else ""
++            extra = "b.weapon_set,b.disarm,b.compatible_sets," if self.kind == "npc" else ""
+             rows = connection.execute(
+                 f"""SELECT b.id AS binding_id,b.monster_slug,b.slot,b.variant,b.clip_id,b.weight,b.looped,b.priority,
+                           {extra}c.name,c.source_path,c.prepared_path,c.sha256,c.source_sha256,c.duplicate_first_frame_at_end,c.asset_id,c.published_sha256,c.moderation_state,c.revision,c.published_at
+@@ -539,6 +561,7 @@ class MonsterAnimationStore:
+             if self.kind == "npc":
+                 value["weaponSet"] = value["weapon_set"]
+                 value["disarm"] = bool(value["disarm"])
++                value["compatibleWith"] = self._compatible_for_binding(value)
+                 value["canonicalFilename"] = npc_filename(slug, value["weapon_set"], value["slot"], value["variant"], Path(value["source_path"]).suffix)
+             value["status"] = self._status(value)
+             value["looped"] = bool(value.get("looped"))
+@@ -559,6 +582,7 @@ class MonsterAnimationStore:
+         return {
+             "schemaVersion": SCHEMA_VERSION, "project": PROJECT, "monsterSlug": selected, "monsters": monsters,
+             "profile": profile, "skeletonCompatible": compatible, "slotCatalog": SLOT_CATALOG, "weaponSets": (list(WEAPON_SETS) if self.kind == "npc" else []),
++            "equipmentSets": (list(EQUIPMENT_SETS) if self.kind == "npc" else []),
+             "filenameRules": filename_rules(selected, npc=self.kind == "npc"), "items": items,
+             "summary": {
+                 "registered": len(items), "published": sum(row["status"] == "PUBLISHED" for row in items),
+@@ -610,6 +634,60 @@ class MonsterAnimationStore:
+         self.export()
+         return self.snapshot(slug)
+ 
++    def set_animation_options(self, binding_id: str, compatible_with: object,
++                              weight: object, disarm: object) -> dict:
++        """Commit authored compatibility and presentation options atomically.
++
++        Publication identity and source animation bytes are never modified.
++        """
++        if self.kind != "npc":
++            raise ValueError("animation options apply to NPC animation bindings")
++        values = validate_compatibility(compatible_with)
++        if isinstance(weight, bool):
++            raise ValueError("weight must be an integer between 0 and 10000")
++        try:
++            parsed_weight = int(weight)
++        except (TypeError, ValueError, OverflowError) as error:
++            raise ValueError("weight must be an integer between 0 and 10000") from error
++        if str(weight).strip() != str(parsed_weight) or not 0 <= parsed_weight <= 10000:
++            raise ValueError("weight must be an integer between 0 and 10000")
++        if not isinstance(disarm, bool):
++            raise ValueError("disarm must be a boolean")
++        with self.connect() as connection:
++            row = connection.execute(
++                "SELECT monster_slug,slot FROM monster_animation_bindings WHERE id=?", (binding_id,)
++            ).fetchone()
++            if not row:
++                raise ValueError("unknown NPC animation binding")
++            if disarm and str(row["slot"]) != "idle_special":
++                raise ValueError("disarm is only available for idle_special")
++            connection.execute("""UPDATE monster_animation_bindings
++                SET compatible_sets=?,weight=?,disarm=?,updated_at=? WHERE id=?""",
++                (json.dumps(values, separators=(",", ":")), parsed_weight,
++                 int(disarm), time.time(), binding_id),
++            )
++            slug = str(row["monster_slug"])
++        self.export()
++        return self.snapshot(slug)
++
++    def set_compatibility(self, binding_id: str, compatible_with: object) -> dict:
++        if self.kind != "npc":
++            raise ValueError("compatibility applies to NPC animation bindings")
++        values = validate_compatibility(compatible_with)
++        with self.connect() as connection:
++            row = connection.execute(
++                "SELECT monster_slug FROM monster_animation_bindings WHERE id=?", (binding_id,)
++            ).fetchone()
++            if not row:
++                raise ValueError("unknown NPC animation binding")
++            connection.execute(
++                "UPDATE monster_animation_bindings SET compatible_sets=?,updated_at=? WHERE id=?",
++                (json.dumps(values, separators=(",", ":")), time.time(), binding_id),
++            )
++            slug = str(row["monster_slug"])
++        self.export()
++        return self.snapshot(slug)
++
+     def rename_npc_binding(self, binding_id: str, weapon_set: str, proposed_filename: str) -> dict:
+         """Move canonical source and atomically migrate its coordinate metadata.
+ 
+@@ -846,6 +924,7 @@ class MonsterAnimationStore:
+                 "looped": bool(binding["looped"]), "priority": str(binding["priority"]),
+                 "duplicateFirstFrameAtEnd": bool(clip.get("duplicate_first_frame_at_end")),
+                 "weaponSet": str(binding.get("weapon_set") or "1hs") if self.kind == "npc" else "",
++                "compatibleWith": self._compatible_for_binding(binding) if self.kind == "npc" else [],
+                 "disarm": bool(binding.get("disarm")) if self.kind == "npc" else False,
+             })
+         for profile in profiles_map.values():
+@@ -867,6 +946,7 @@ class MonsterAnimationStore:
+                         f"\t\t\t\t\t\tsourceSlot = {q(row['sourceSlot'])},",
+                         f"\t\t\t\t\t\trole = {q(row['role'])},",
+                         f"\t\t\t\t\t\tweaponSet = {q(row['weaponSet'])},",
++                        "\t\t\t\t\t\tcompatibleWith = table.freeze({" + ", ".join(q(value) for value in row["compatibleWith"]) + "}),",
+                         f"\t\t\t\t\t\tvariant = {row['variant']},",
+                         f"\t\t\t\t\t\tweight = {row['weight']},",
+                         f"\t\t\t\t\t\tdisarm = {'true' if row['disarm'] else 'false'},",
+diff --git a/system/control-center/npc_animation_taxonomy.py b/system/control-center/npc_animation_taxonomy.py
+index ffe188f..a2c376d 100644
+--- a/system/control-center/npc_animation_taxonomy.py
++++ b/system/control-center/npc_animation_taxonomy.py
+@@ -10,7 +10,30 @@ from pathlib import Path
+ # Weapon sets are the same public animation sets supported by WeaponRegistry.
+ # Adding a new gameplay weapon set requires adding its name here and in the
+ # canonical weapon attack-movement registry, not branching by NPC slug.
+-WEAPON_SETS = ("base", "1hs", "2hs", "bow")
++WEAPON_SETS = ("base", "unarmed", "1hs", "2hs", "bow")
++EQUIPMENT_SETS = tuple(item for item in WEAPON_SETS if item != "base")
++
++
++def default_compatibility(weapon_set: str) -> list[str]:
++    """Base means reusable by default, not "without weapon".
++
++    Explicit per-binding compatibility may narrow or expand this set, including
++    an intentionally empty set. Legacy bindings resolve through this function.
++    """
++    if weapon_set not in WEAPON_SETS:
++        raise ValueError(f"unknown NPC animation type: {weapon_set}")
++    return list(EQUIPMENT_SETS if weapon_set == "base" else (weapon_set,))
++
++
++def validate_compatibility(values: object) -> list[str]:
++    if not isinstance(values, list) or any(not isinstance(value, str) for value in values):
++        raise ValueError("compatibleWith must be a list of equipment types")
++    if any(value not in EQUIPMENT_SETS for value in values):
++        raise ValueError(f"compatibleWith accepts only: {', '.join(EQUIPMENT_SETS)}")
++    if len(set(values)) != len(values):
++        raise ValueError("compatibleWith must not contain duplicates")
++    return [item for item in EQUIPMENT_SETS if item in values]
++
+ SLOTS = {
+     "idle": False, "idle_special": True, "walk": False, "run": False,
+     "combat_idle": False, "attack": True, "death": False,
+diff --git a/system/control-center/static/asset-manager.css b/system/control-center/static/asset-manager.css
+index a06ad1a..546bda6 100644
+--- a/system/control-center/static/asset-manager.css
++++ b/system/control-center/static/asset-manager.css
+@@ -59,3 +59,15 @@
+ .custom-scaling-list{display:grid;gap:12px;margin-top:14px}
+ .custom-scaling-list .animation-speed-rule{min-width:0}
+ .custom-scaling-list .animation-speed-fields{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
++
++/* M77: accessible options editor, scoped to NPC animations. */
++.npc-animation-options-dialog{max-width:min(540px,calc(100vw - 24px));width:520px;border:1px solid var(--line,#64748b);border-radius:12px;background:var(--panel,#18212c);color:var(--text,#eef2f7);padding:20px;box-shadow:0 20px 65px #0009}
++.npc-animation-options-dialog::backdrop{background:#000a}
++.npc-options-head,.npc-options-actions{display:flex;align-items:center;justify-content:space-between;gap:12px}
++.npc-options-head h3{font-size:16px;overflow-wrap:anywhere;margin:5px 0}
++.npc-options-inner{display:grid;gap:12px;padding:18px 0}
++.npc-compat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
++.npc-compat-option{display:flex;align-items:center;gap:9px;padding:9px;border:1px solid #64748b55;border-radius:8px}
++.npc-options-controls{display:grid;grid-template-columns:1fr 1fr;gap:14px}
++.npc-options-controls label{display:grid;gap:6px}
++.npc-options-controls input[type=number]{width:100%;min-width:0}
+diff --git a/system/control-center/static/index.html b/system/control-center/static/index.html
+index ef0ce95..e4efdee 100644
+--- a/system/control-center/static/index.html
++++ b/system/control-center/static/index.html
+@@ -431,7 +431,7 @@
+ <label>npc<select id="npc-animation-npc"></select><small class="hint">this is the npc whose animation files will be scanned, registered and published.</small></label>
+ <hr class="card-separator">
+ <h3 class="subheading">animation folder</h3>
+-<details id="npc-animation-filename-guide" class="naming-guide" open><summary>filename rules · npc states</summary><div id="npc-animation-filename-rules" class="filename-rules"><span class="muted">select a npc.</span></div><small class="hint">canonical names use <code>{npc_slug}_{type}_{state}</code>, e.g. <code>blacksmith_base_idle_special_01.rbxm</code>. Change type and rename a registered clip together to migrate it without losing its published asset ID. <code>idle_special_01</code>, <code>idle_special_02</code>, … are variants inside <code>idle</code>; <code>combat_idle</code> is the waiting pose while already in combat; <code>attack_01</code>, <code>attack_02</code>, … are variants inside <code>attack</code>.</small></details>
++<details id="npc-animation-filename-guide" class="naming-guide" open><summary>filename rules · npc states</summary><div id="npc-animation-filename-rules" class="filename-rules"><span class="muted">select a npc.</span></div><small class="hint">canonical names use <code>{npc_slug}_{type}_{state}</code>, e.g. <code>blacksmith_base_idle_special_01.rbxm</code>. Change type and rename a registered clip together to migrate it without losing its published asset ID. The base type defaults to all equipment contexts, including unarmed. Use animation options to customize compatibility. <code>idle_special_01</code>, <code>idle_special_02</code>, … are variants inside <code>idle</code>; <code>combat_idle</code> is the waiting pose while already in combat; <code>attack_01</code>, <code>attack_02</code>, … are variants inside <code>attack</code>.</small></details>
+ <div class="picker folder-picker"><div class="folder-explorer"><input id="npc-animation-folder-path" type="text" autocomplete="off" spellcheck="false" placeholder="C:\path\to\npc-animations"><button id="choose-npc-animation-folder" type="button">explore…</button></div><small>paste a folder path or choose it in Explorer · the last npc animation folder is remembered</small></div>
+ <div class="actions"><button id="scan-npc-animations" class="primary wide" type="button" disabled>scan folder</button></div>
+ <div id="npc-animation-scan-status" class="status-box"><strong>nothing scanned yet</strong><span>unrecognized files can be assigned manually.</span></div>
+@@ -446,6 +446,14 @@
+ <div class="section-title"><div><span>selected npc animations</span><h3 id="npc-animation-table-title">registered animations</h3></div></div>
+ <small class="hint">only animations already registered for the selected npc are listed here. <code>idle_special_01..n</code> are shown as variants of state <code>idle</code>. Weight is relative within idle (base + specials); 0 disables selection of that clip. Specials are selected at the end of a base idle cycle, or periodically if base idle is missing. playback speed is configured globally in the Animation Speed section.</small>
+ <div class="table-wrap animation-table-wrap"><table><thead><tr><th>state</th><th>variant</th><th>type</th><th>canonical filename / rename</th><th>asset</th><th>status</th><th>weight</th><th>disarm</th><th>first→end</th><th>actions</th></tr></thead><tbody id="npc-animation-rows"></tbody></table></div>
++<dialog id="npc-animation-options-dialog" class="npc-animation-options-dialog" aria-label="NPC animation options">
++ <div class="npc-options-head"><div><small>NPC ANIMATION OPTIONS</small><h3 data-npc-options-name></h3><span>Animation type: <strong data-npc-options-type></strong></span></div><button type="button" onclick="this.closest('dialog').close()" aria-label="Close">✕</button></div>
++ <div class="npc-options-inner"><label>Compatible With</label><button type="button" data-npc-options-toggle-all>select all</button>
++ <div class="npc-compat-grid" data-npc-options-compat></div>
++ <small>Unarmed is a separate equipment context; base defaults to all equipment types. An empty selection disables this animation.</small>
++ <div class="npc-options-controls"><label>Weight<input data-npc-options-weight type="number" min="0" max="10000" step="1" value="100"></label><label>Disarm <input data-npc-options-disarm type="checkbox"></label></div></div>
++ <div class="npc-options-actions"><button type="button" onclick="this.closest('dialog').close()">cancel</button><button type="button" class="primary" data-npc-options-save>apply</button></div>
++</dialog>
+ </div>
+ </div>
+ 
+diff --git a/system/control-center/static/npc-assets.js b/system/control-center/static/npc-assets.js
+index a217bde..9fc0070 100644
+--- a/system/control-center/static/npc-assets.js
++++ b/system/control-center/static/npc-assets.js
+@@ -47,8 +47,9 @@ function npcRenderAnimationRows(){
+       <td><input data-weight class="weight-input" type="number" min="0" max="10000" value="${esc(row.weight)}"></td>
+       <td><label class="seam-toggle" title="temporarily remove equipped weapons for this idle special"><input data-disarm type="checkbox" ${row.disarm?'checked':''} ${row.slot==='idle_special'?'':'disabled'}></label></td>
+       <td><label class="seam-toggle" title="first frame -> end"><input data-duplicate type="checkbox" ${row.duplicate_first_frame_at_end?'checked':''}></label></td>
+-      <td><div class="row-actions"><button data-rename type="button">rename / migrate</button><button data-publish>publish</button><button data-remove class="danger">remove</button></div></td>`;
++      <td><div class="row-actions"><button data-options type="button">options</button><button data-rename type="button">rename / migrate</button><button data-publish>publish</button><button data-remove class="danger">remove</button></div></td>`;
+     tr.querySelector('[data-set]').onchange=event=>{tr.querySelector('[data-filename]').value=proposed(event.target.value)};
++    tr.querySelector('[data-options]').onclick=()=>npcOpenAnimationOptions(row);
+     tr.querySelector('[data-rename]').onclick=()=>npcRenameAnimation(row.binding_id,tr.querySelector('[data-set]').value,tr.querySelector('[data-filename]').value);
+     tr.querySelector('[data-weight]').onchange=e=>npcSetAnimationWeight(row.binding_id,e.target.value);
+     tr.querySelector('[data-disarm]').onchange=e=>npcSetAnimationDisarm(row.binding_id,e.target.checked);
+@@ -60,6 +61,42 @@ function npcRenderAnimationRows(){
+   }
+ }
+ 
++
++// M77: semantic compatibility belongs to a binding, never to a filename or NPC name.
++function npcOpenAnimationOptions(row){
++ const dialog=$('npc-animation-options-dialog');if(!dialog)return;
++ const sets=npcState.animations?.equipmentSets||['unarmed','1hs','2hs','bow'];
++ const selected=new Set(row.compatibleWith||[]);
++ dialog.querySelector('[data-npc-options-name]').textContent=row.canonicalFilename||row.name;
++ dialog.querySelector('[data-npc-options-type]').textContent=row.weaponSet||'base';
++ const list=dialog.querySelector('[data-npc-options-compat]');
++ list.innerHTML=sets.map(item=>`<label class="npc-compat-option"><input type="checkbox" value="${esc(item)}" ${selected.has(item)?'checked':''}> ${esc(item)}</label>`).join('');
++ const all=dialog.querySelector('[data-npc-options-toggle-all]');
++ const inputs=()=>Array.from(list.querySelectorAll('input[type=checkbox]'));
++ const update=()=>{all.textContent=inputs().every(node=>node.checked)?'clear all':'select all'};
++ all.onclick=()=>{const enable=!inputs().every(node=>node.checked);inputs().forEach(node=>node.checked=enable);update()};
++ list.onchange=update;update();
++ dialog.querySelector('[data-npc-options-weight]').value=row.weight;
++ dialog.querySelector('[data-npc-options-disarm]').checked=!!row.disarm;
++ dialog.querySelector('[data-npc-options-disarm]').disabled=row.slot!=='idle_special';
++ const save=dialog.querySelector('[data-npc-options-save]');
++ save.onclick=async()=>{
++  save.disabled=true;
++  try{
++   const compatibility=inputs().filter(node=>node.checked).map(node=>node.value);
++   const weight=Number(dialog.querySelector('[data-npc-options-weight]').value);
++   if(!Number.isInteger(weight)||weight<0||weight>10000)throw Error('Weight must be 0..10000');
++   await request('/api/npc-animation-bindings/'+encodeURIComponent(row.binding_id)+'/options',{
++    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
++     compatibleWith:compatibility,weight,
++     disarm:row.slot==='idle_special'&&dialog.querySelector('[data-npc-options-disarm]').checked
++    })});
++   dialog.close();await npcLoadAnimations();toast('animation compatibility applied');
++  }catch(error){toast(error.message,true);await npcLoadAnimations()}
++  finally{save.disabled=false}
++ };
++ dialog.showModal();
++}
+ function npcRenderUnassigned(){const host=$('npc-animation-unassigned');if(!host)return;const rows=npcState.lastScan?.unassigned||[];if(!rows.length){host.innerHTML='';return}const defs=npcState.animations?.slotCatalog||[];host.innerHTML=`<details open><summary>unassigned files · ${rows.length} · assign manually</summary><div class="unassigned-list">${rows.slice(0,100).map((row,index)=>`<div class="unassigned-row npc-unassigned-row" data-npc-unassigned="${index}"><div class="unassigned-file"><b>${esc(row.filename)}</b><small>${esc(row.reason)}</small></div><label>type<select data-set>${(npcState.animations?.weaponSets||['base','1hs']).map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('')}</select></label><label>state<select data-slot>${defs.map(def=>`<option value="${esc(def.slot)}">${esc(def.label||def.slot)}</option>`).join('')}</select></label><label>variant<input data-variant type="number" min="0" max="999" value="0"></label><button data-assign class="primary" type="button">assign</button></div>`).join('')}</div></details>`;for(const node of host.querySelectorAll('[data-npc-unassigned]')){const row=rows[Number(node.dataset.npcUnassigned)];const slot=node.querySelector('[data-slot]'),variant=node.querySelector('[data-variant]');const update=()=>{const def=defs.find(x=>x.slot===slot.value);variant.disabled=!def?.variants;if(def?.variants&&Number(variant.value)<=0)variant.value='1';if(!def?.variants)variant.value='0'};slot.onchange=update;update();node.querySelector('[data-assign]').onclick=()=>npcAssignAnimation(row,node)}}
+ function npcRenderAnimations(){npcRenderAnimationTarget();npcRenderAnimationFolderControls();const data=npcState.animations;if(!data)return;npcRenderFilenameRules();npcRenderAnimationRows();npcRenderUnassigned();const selected=npcAnimationSelected();$('npc-animation-profile-state').className='runtime-state '+(selected&&data.skeletonCompatible?'registered':'bootstrap');$('npc-animation-profile-state').innerHTML=selected?`<strong>animations · ${esc(selected.name_en)} · ${esc(selected.slug)}</strong><span>${data.skeletonCompatible?'skeleton compatible':'skeleton changed'} · ${esc(data.profile?.skeleton_signature||'no skeleton signature')}</span>`:'<strong>no npc selected</strong><span>choose a registered npc below.</span>';$('publish-missing-npc-animations').disabled=npcState.animationPublishing||!selected||!data.publication?.configured||!(data.items||[]).some(row=>row.status==='LOCAL_ONLY');$('check-roblox-npc-animations').disabled=npcState.animationPublishing||!data.publication?.configured;$('npc-animation-table-title').textContent=`${selected?.slug||'npc'} · registered animations`;npcRenderAnimationFolderControls()}
+ async function npcLoadAnimations(){try{npcEnsureAnimationTarget();const slug=npcState.animationNpc||'';npcState.animations=await request('/api/npc-animations?npc='+encodeURIComponent(slug));const profileRoot=npcNormalizeAnimationFolderPath(npcState.animations.profile?.scan_root||'');if(!npcState.animationFolder&&profileRoot)npcSetAnimationFolder(profileRoot,true);npcRenderAnimations()}catch(error){toast(error.message,true)}}
+diff --git a/system/verify/test_npc_animation_compatibility_m77.py b/system/verify/test_npc_animation_compatibility_m77.py
+new file mode 100644
+index 0000000..6fc90f1
+--- /dev/null
++++ b/system/verify/test_npc_animation_compatibility_m77.py
+@@ -0,0 +1,116 @@
++"""M77: NPC equipment-context compatibility and unarmed melee; no per-NPC hacks."""
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'control-center'))
++from monster_store import MonsterStore
++from monster_animation_store import MonsterAnimationStore
++from npc_animation_taxonomy import WEAPON_SETS, EQUIPMENT_SETS, parse
++
++ROOT = Path(__file__).resolve().parents[2]
++
++class M77CompatibilityTests(unittest.TestCase):
++    def setUp(self):
++        self.temp = tempfile.TemporaryDirectory(prefix='game1-m77-')
++        self.root = Path(self.temp.name)
++        self.npcs = MonsterStore(self.root, kind='npc')
++        with self.npcs.connect() as db:
++            db.execute("""INSERT INTO monsters(slug,name_en,model_source_path,model_asset_id,
++                model_sha256,model_published_sha256,created_at,updated_at,skeleton_signature)
++                VALUES ('generic','Generic','assets/source/npcs/generic/model/generic.fbx','123','sha','sha',0,0,'sig')""")
++        self.anim = MonsterAnimationStore(self.root, kind='npc')
++        inbox = self.root / 'inbox'
++        inbox.mkdir()
++        for name in ('generic_base_idle_special_01.rbxm','generic_1hs_idle_special_01.rbxm',
++                     'generic_unarmed_attack_01.rbxm','generic_base_death.rbxm'):
++            (inbox / name).write_bytes(name.encode())
++        self.anim.scan_folder('generic', str(inbox))
++
++    def tearDown(self):
++        self.temp.cleanup()
++
++    def find(self, set_name, slot):
++        return next(r for r in self.anim.snapshot('generic')['items']
++                    if r['weaponSet'] == set_name and r['slot'] == slot)
++
++    def test_defaults_and_explicit_empty_are_distinct(self):
++        base = self.find('base','idle_special')
++        one = self.find('1hs','idle_special')
++        self.assertEqual(set(base['compatibleWith']), set(EQUIPMENT_SETS))
++        self.assertEqual(one['compatibleWith'], ['1hs'])
++        self.anim.set_compatibility(base['binding_id'], ['unarmed','1hs'])
++        self.assertEqual(self.find('base','idle_special')['compatibleWith'], ['unarmed','1hs'])
++        self.anim.set_compatibility(base['binding_id'], [])
++        self.assertEqual(self.find('base','idle_special')['compatibleWith'], [])
++        self.anim = MonsterAnimationStore(self.root, kind='npc')
++        self.assertEqual(self.find('base','idle_special')['compatibleWith'], [])
++
++    def test_atomic_options_and_validation(self):
++        row = self.find('base','idle_special')
++        binding = row['binding_id']
++        self.anim.set_animation_options(binding,['1hs','unarmed'],75,False)
++        updated = self.find('base','idle_special')
++        self.assertEqual(updated['compatibleWith'], ['unarmed','1hs'])
++        self.assertEqual(updated['weight'],75)
++        self.assertFalse(updated['disarm'])
++        for bad in (['base'],['1hs','1hs']):
++            with self.assertRaises(ValueError):
++                self.anim.set_animation_options(binding,bad,42,True)
++        with self.assertRaises(ValueError):
++            self.anim.set_animation_options(binding,['bow'],-1,True)
++        with self.assertRaises(ValueError):
++            self.anim.set_animation_options(self.find('base','death')['binding_id'],['bow'],99,True)
++        self.assertEqual(self.find('base','idle_special')['weight'],75)
++        self.assertEqual(self.find('base','idle_special')['compatibleWith'], ['unarmed','1hs'])
++
++    def test_invalid_input_fails_closed(self):
++        binding = self.find('base','idle_special')['binding_id']
++        for bad in ('all', ['base'], ['1hs','1hs'], ['unknown'], [123], None):
++            with self.assertRaises(ValueError, msg=f'invalid {bad!r}'):
++                self.anim.set_compatibility(binding,bad)
++        self.assertEqual(set(self.find('base','idle_special')['compatibleWith']), set(EQUIPMENT_SETS))
++
++    def test_export_keeps_published_ids_weight_and_disarm(self):
++        row = self.find('base','idle_special')
++        with self.anim.connect() as db:
++            db.execute("UPDATE monster_animation_clips SET asset_id='123456',published_sha256=sha256 WHERE id=?",(row['clip_id'],))
++        self.anim.set_weight(row['binding_id'],75)
++        self.anim.set_disarm(row['binding_id'],False)
++        self.anim.set_compatibility(row['binding_id'],['1hs','unarmed'])
++        published = self.find('base','idle_special')
++        self.assertEqual(published['asset_id'],'123456')
++        self.assertEqual(published['weight'],75)
++        self.assertFalse(published['disarm'])
++        self.assertEqual(published['compatibleWith'],['unarmed','1hs'])
++        generated = (self.root/'src/shared/npc/NpcAnimationRegistry.luau').read_text()
++        self.assertIn('compatibleWith = table.freeze({"unarmed", "1hs"})',generated)
++        self.assertIn('weight = 75',generated)
++        self.assertIn('rbxassetid://123456',generated)
++
++    def test_unarmed_is_own_animation_set_with_melee_damage(self):
++        self.assertIn('unarmed',WEAPON_SETS)
++        self.assertEqual(parse('generic_unarmed_attack_01.rbxm','generic')['weaponSet'],'unarmed')
++        self.assertEqual(self.find('unarmed','attack')['compatibleWith'],['unarmed'])
++        equipment = (ROOT/'src/server/npc/NpcEquipmentService.luau').read_text()
++        self.assertIn('WeaponAttackMovement.AnimationSetForType("hands")',equipment)
++        movement = (ROOT/'src/shared/weapon/WeaponAttackMovement.luau').read_text()
++        self.assertIn('animationSet = "unarmed"',movement)
++        combat = (ROOT/'src/server/npc/NpcCombatAIService.luau').read_text()
++        self.assertIn('DamageService.Apply(agent.model, target',combat)
++        self.assertNotIn('local weaponSet = tostring(model:GetAttribute("NpcWeaponSet") or "1hs")',combat)
++
++    def test_repeated_scan_retains_custom_compatibility(self):
++        row = self.find('base','idle_special')
++        self.anim.set_compatibility(row['binding_id'],['unarmed','bow'])
++        self.anim.scan_folder('generic',str(self.root/'inbox'))
++        self.assertEqual(self.find('base','idle_special')['compatibleWith'],['unarmed','bow'])
++
++    def test_compatibility_resolver_is_shared_and_runtime_consumed(self):
++        resolver=(ROOT/'src/shared/animation/AnimationCompatibility.luau').read_text()
++        adapter=(ROOT/'src/server/npc/NpcAnimationTracks.luau').read_text()
++        self.assertIn('function AnimationCompatibility.Allowed',resolver)
++        self.assertIn('Compatibility.Allowed(row, activeSet)',adapter)
++        self.assertNotIn('if set == activeSet',adapter)
++
++if __name__=='__main__': unittest.main(verbosity=2)

@@ -9,7 +9,6 @@ local CharacterShared = Shared:WaitForChild("character")
 local DeathAnimationPolicy = require(CombatShared:WaitForChild("DeathAnimationPolicy"))
 local AttackTimelineConfig = require(CombatShared:WaitForChild("AttackTimelineConfig"))
 local AnimationSpeedScaling = require(AnimationShared:WaitForChild("AnimationSpeedScaling"))
-local AnimationFirstFrameSeam = require(AnimationShared:WaitForChild("AnimationFirstFrameSeam"))
 local CharacterMovementConfig = require(CharacterShared:WaitForChild("CharacterMovementConfig"))
 local GameOptions = require(Shared:WaitForChild("GameOptions"))
 
@@ -25,10 +24,8 @@ local character: Model? = nil
 local animator: Animator? = nil
 local cache = nil
 local currentLoop = nil
-local currentLoopSeam = nil
 local currentLoopClipId = ""
 local currentAction = nil
-local currentActionSeam = nil
 local currentActionOnComplete = nil
 local currentActionSlot = ""
 local currentActionLockedUntil = 0
@@ -60,10 +57,8 @@ local function clearCharacter()
 	character = nil
 	animator = nil
 	currentLoop = nil
-	currentLoopSeam = nil
 	currentLoopClipId = ""
 	currentAction = nil
-	currentActionSeam = nil
 	currentActionOnComplete = nil
 	currentActionSlot = ""
 	currentActionLockedUntil = 0
@@ -153,12 +148,9 @@ local function movementSlot(): string
 end
 
 local function stopCurrentLoop(fadeTime: number?)
-	if currentLoopSeam then
-		currentLoopSeam:Stop(fadeTime or 0)
-	elseif currentLoop and currentLoop.IsPlaying then
+	if currentLoop and currentLoop.IsPlaying then
 		currentLoop:Stop(fadeTime or 0)
 	end
-	currentLoopSeam = nil
 end
 
 local refreshLoop
@@ -166,12 +158,9 @@ local refreshLoop
 local function stopCurrentAction(fadeTime: number?)
 	if currentActionComposed then
 		AttackUpperBodyComposer.End()
-	elseif currentActionSeam then
-		currentActionSeam:Stop(fadeTime or 0)
 	elseif currentAction and currentAction.IsPlaying then
 		currentAction:Stop(fadeTime or 0)
 	end
-	currentActionSeam = nil
 	currentActionOnComplete = nil
 	currentActionComposed = false
 	currentActionTimeline = nil
@@ -188,9 +177,6 @@ local function finishAttackPresentation(boundCharacter: Model, boundTrack: Anima
 	currentActionSlot = ""
 	if currentActionComposed then
 		AttackUpperBodyComposer.End()
-	elseif currentActionSeam then
-		currentActionSeam:Stop(0.04)
-		currentActionSeam = nil
 	elseif boundTrack.IsPlaying then
 		boundTrack:Stop(0.04)
 	end
@@ -203,25 +189,6 @@ local function finishAttackPresentation(boundCharacter: Model, boundTrack: Anima
 	boundCharacter:SetAttribute("AnimationAttackUpperBodyComposed", false)
 	boundCharacter:SetAttribute("AnimationAttackLowerBodySlot", nil)
 	refreshLoop()
-end
-
-local function createSeam(descriptor, track: AnimationTrack, looped: boolean)
-	if not cache or descriptor.duplicateFirstFrameAtEnd ~= true then
-		return nil
-	end
-	local companion = cache:GetSeamCompanion(descriptor)
-	if not companion then
-		return nil
-	end
-	return AnimationFirstFrameSeam.new(track, companion, looped)
-end
-
-local function movementUsesForwardSeam(descriptor, slot: string): boolean
-	if descriptor.duplicateFirstFrameAtEnd ~= true then
-		return false
-	end
-	local backward = character and tostring(character:GetAttribute("AnimationMovementDirection") or "Forward") == "Backward"
-	return not (backward and (slot == "walk" or slot == "run"))
 end
 
 local function applyBackwardPlayback(track: AnimationTrack, slot: string)
@@ -266,20 +233,11 @@ refreshLoop = function()
 
 	local clipId = tostring(descriptor.clipId or "")
 	local playbackScale = animationPlaybackScale(slot, descriptor.animationId)
-	local wantsSeam = movementUsesForwardSeam(descriptor, slot)
 	publishPlaybackPercent(slot)
 
 	if currentLoop and currentLoopClipId == clipId then
-		if wantsSeam and currentLoopSeam then
-			currentLoopSeam:AdjustSpeed(playbackScale)
-			return
-		elseif not wantsSeam and not currentLoopSeam then
-			applyBackwardPlayback(currentLoop, slot)
-			return
-		end
-		-- Direction/runtime seam mode changed for the same clip; restart that
-		-- presentation path so a frozen companion can never leak across modes.
-		stopCurrentLoop(0.08)
+		applyBackwardPlayback(currentLoop, slot)
+		return
 	end
 
 	local nextTrack = cache:Get(descriptor)
@@ -289,16 +247,9 @@ refreshLoop = function()
 	stopCurrentLoop(0.15)
 	currentLoop = nextTrack
 	currentLoopClipId = clipId
-	if wantsSeam then
-		currentLoopSeam = createSeam(descriptor, nextTrack, true)
-	end
-	if currentLoopSeam then
-		currentLoopSeam:Play(0.15, playbackScale)
-	else
-		nextTrack.Looped = descriptor.looped == true
-		nextTrack:Play(0.15, 1, playbackScale)
-		applyBackwardPlayback(nextTrack, slot)
-	end
+	nextTrack.Looped = descriptor.looped == true
+	nextTrack:Play(0.15, 1, playbackScale)
+	applyBackwardPlayback(nextTrack, slot)
 	character:SetAttribute("AnimationResolvedSlot", slot)
 	character:SetAttribute("AnimationResolvedClip", clipId)
 end
@@ -408,14 +359,8 @@ local function playBaseLifeAction(slot: string, onStopped)
 	currentActionLockedUntil = 0
 	publishPlaybackPercent(slot)
 	local playbackScale = animationPlaybackScale(slot, descriptor.animationId)
-	currentActionSeam = createSeam(descriptor, track, false)
 	character:SetAttribute("AnimationActionSlot", slot)
 	character:SetAttribute("AnimationActionClip", tostring(descriptor.clipId or ""))
-	if currentActionSeam then
-		currentActionOnComplete = onStopped
-		currentActionSeam:Play(0.06, playbackScale)
-		return
-	end
 	track.Looped = false
 	track:Play(0.06, 1, playbackScale)
 	track.Stopped:Once(function()
@@ -474,23 +419,7 @@ local function handleLifeState()
 	end
 end
 
-local function maintainRuntimeAnimationTails(deltaTimeSim: number)
-	if currentLoopSeam then
-		currentLoopSeam:Step(deltaTimeSim)
-	end
-	if currentActionSeam then
-		local completed = currentActionSeam:Step(deltaTimeSim)
-		if completed and currentActionSlot ~= "attack" and currentActionSlot ~= "death" then
-			local callback = currentActionOnComplete
-			currentActionOnComplete = nil
-			currentActionSeam:Stop(0.04)
-			currentActionSeam = nil
-			currentAction = nil
-			currentActionSlot = ""
-			currentActionLockedUntil = 0
-			if callback then callback() end
-		end
-	end
+local function maintainDeathPose(deltaTimeSim: number)
 	maintainDeathTerminalPose(deltaTimeSim)
 end
 
@@ -599,14 +528,7 @@ function CharacterAnimationController.PlayAction(slot: string)
 	currentActionClipId = clipId
 	if not composed then
 		track.Looped = false
-		currentActionSeam = createSeam(descriptor, track, false)
-		if currentActionSeam then
-			currentActionSeam:Play(0.06, playbackSpeed)
-		else
-			track:Play(0.06, 1, playbackSpeed)
-		end
-	else
-		currentActionSeam = nil
+		track:Play(0.06, 1, playbackSpeed)
 	end
 
 	character:SetAttribute("AnimationActionSlot", slot)
@@ -672,10 +594,6 @@ function CharacterAnimationController.BounceCurrentAttack(clipId: string, revers
 	character:SetAttribute("AnimationActionEndsAt", currentActionLockedUntil)
 	character:SetAttribute("AnimationAttackBounced", true)
 
-	if currentActionSeam then
-		currentActionSeam:Stop(0)
-		currentActionSeam = nil
-	end
 
 	if currentActionComposed then
 		AttackUpperBodyComposer.SetPlaybackSpeed(-reverseSpeed)
@@ -742,7 +660,7 @@ function CharacterAnimationController.Start()
 	if localPlayer.Character then
 		task.spawn(bindCharacter, localPlayer.Character)
 	end
-	RunService.PreAnimation:Connect(maintainRuntimeAnimationTails)
+	RunService.PreAnimation:Connect(maintainDeathPose)
 end
 
 return CharacterAnimationController

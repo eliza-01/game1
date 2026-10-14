@@ -1,0 +1,375 @@
+diff --git a/docs/ANIMATION_REMOVE_RESCAN_M78_RU.md b/docs/ANIMATION_REMOVE_RESCAN_M78_RU.md
+new file mode 100644
+index 0000000..ca00d9f
+--- /dev/null
++++ b/docs/ANIMATION_REMOVE_RESCAN_M78_RU.md
+@@ -0,0 +1,26 @@
++# M78 · Remove / Scan Folder · жизненный цикл регистрации анимаций
++
++**Remove** снимает семантическую привязку анимации в Asset Manager. Если
++это последняя привязка к клипу, активная регистрация клипа завершается.
++Физический `.rbxm/.rbxmx` **не удаляется** и опубликованный Roblox Asset **не удаляется**.
++
++История последней регистрации и публикаций архивируется в SQLite-таблицу
++`animation_registration_archive` (с указанием типа сущности, clip ID, прежнего
++Asset ID, полных метаданных и истории публикаций). Она не участвует в
++генерации реестров, повторном сканировании и публикации.
++
++- `Scan Folder` после `Remove` вновь регистрирует исходный файл, если он
++  всё ещё находится в папке. Новый активный клип получает `LOCAL_ONLY`,
++  `asset_id = NULL`, `revision = 1` и требует отдельной публикации.
++- Неиспользуемые опубликованные клипы, оставшиеся после старого `Remove`,
++  автоматически архивируются при запуске соответствующего хранилища.
++- Действующие привязки и их публикации **не затрагиваются** при миграции.
++  Поэтому уже повторно зарегистрированный с прежним ID клип нужно снять
++  через `Remove` один раз после M78, затем повторить `Scan Folder`.
++- Переименование и изменение совместимости существующей привязки по-прежнему
++  сохраняют её Clip ID и Roblox Asset ID.
++- Никаких операций удаления в Roblox Cloud и удаления файлов на диске нет.
++
++Механизм архивирования общий для Character, NPC и Monster и находится в
++`system/control-center/animation_retirement.py`. Сервисные Store-модули
++отвечают за свои таблицы и вызовы на жизненном цикле регистрации.
+diff --git a/system/control-center/animation_core/storage.py b/system/control-center/animation_core/storage.py
+index da64a3a..4d5ad59 100644
+--- a/system/control-center/animation_core/storage.py
++++ b/system/control-center/animation_core/storage.py
+@@ -5,6 +5,8 @@ import hashlib
+ import shutil
+ import sqlite3
+ 
++from animation_retirement import retire_unbound_clip, retire_legacy_orphans
++
+ from .common import (
+     ANIMATION_EXTENSIONS, BASE_SLOT_CATALOG, BOW_EXTRA_SLOTS, MAX_SCAN_FILES, NAMING_EXAMPLES, PROJECT, filename_rule_catalog,
+     SCHEMA_VERSION, WEAPON_SETS, WEAPON_SLOT_CATALOG, _binding_id, _canonical_file_stem,
+@@ -114,8 +116,9 @@ class AnimationStorageMixin:
+                     "SELECT 1 FROM animation_bindings WHERE clip_id=? LIMIT 1", (clip_id,)
+                 ).fetchone()
+                 if still_used is None:
+-                    connection.execute("DELETE FROM animation_publications WHERE clip_id=?", (clip_id,))
+-                    connection.execute("DELETE FROM animation_clips WHERE id=?", (clip_id,))
++                    retire_unbound_clip(connection, "character", clip_id)
++            # Old removes may have left publication rows without a clip.
++            retire_legacy_orphans(connection, "character")
+         self._normalize_source_only_files()
+ 
+     def _normalize_source_only_files(self) -> None:
+@@ -531,6 +534,6 @@ class AnimationStorageMixin:
+             connection.execute("DELETE FROM animation_bindings WHERE id=?", (binding_id,))
+             other = connection.execute("SELECT 1 FROM animation_bindings WHERE clip_id=? LIMIT 1", (clip_id,)).fetchone()
+             if other is None:
+-                connection.execute("DELETE FROM animation_clips WHERE id=?", (clip_id,))
++                retire_unbound_clip(connection, "character", clip_id)
+         self.export()
+         return self.snapshot(character_id)
+diff --git a/system/control-center/animation_retirement.py b/system/control-center/animation_retirement.py
+new file mode 100644
+index 0000000..a99687c
+--- /dev/null
++++ b/system/control-center/animation_retirement.py
+@@ -0,0 +1,91 @@
++"""Archive retired animation registrations without touching Roblox Cloud assets.
++
++A removed binding must not be able to revive a published clip/asset ID when
++its original source file is encountered by a subsequent folder scan. This is
++a registry lifecycle concern, not a publication or file-deletion operation.
++"""
++from __future__ import annotations
++
++import json
++import time
++
++
++_TABLES = {
++    "character": ("animation_clips", "animation_bindings", "animation_publications"),
++    "monster": ("monster_animation_clips", "monster_animation_bindings", "monster_animation_publications"),
++    "npc": ("monster_animation_clips", "monster_animation_bindings", "monster_animation_publications"),
++}
++
++
++def _tables(kind: str) -> tuple[str, str, str]:
++    try:
++        return _TABLES[kind]
++    except KeyError as exc:
++        raise ValueError(f"unsupported animation registration kind: {kind}") from exc
++
++
++def ensure_archive(connection) -> None:
++    connection.execute("""
++        CREATE TABLE IF NOT EXISTS animation_registration_archive (
++            id INTEGER PRIMARY KEY AUTOINCREMENT,
++            kind TEXT NOT NULL,
++            clip_id TEXT NOT NULL,
++            asset_id TEXT NOT NULL DEFAULT '',
++            clip_json TEXT NOT NULL,
++            publications_json TEXT NOT NULL,
++            retired_at REAL NOT NULL
++        )
++    """)
++
++
++def retire_unbound_clip(connection, kind: str, clip_id: str) -> bool:
++    """Atomically archive and remove an unbound clip and its publication links.
++
++    Raw animation files are never removed. The archived publication records
++    preserve their permanent Roblox IDs but cannot participate in a new scan.
++    """
++    clips, bindings, publications = _tables(kind)
++    if connection.execute(f"SELECT 1 FROM {bindings} WHERE clip_id=? LIMIT 1", (clip_id,)).fetchone():
++        return False
++    row = connection.execute(f"SELECT * FROM {clips} WHERE id=?", (clip_id,)).fetchone()
++    history = [dict(r) for r in connection.execute(
++        f"SELECT * FROM {publications} WHERE clip_id=? ORDER BY id", (clip_id,)
++    )]
++    if row is None and not history:
++        return False
++    ensure_archive(connection)
++    clip = dict(row) if row is not None else {}
++    connection.execute(
++        """INSERT INTO animation_registration_archive
++           (kind,clip_id,asset_id,clip_json,publications_json,retired_at)
++           VALUES(?,?,?,?,?,?)""",
++        (
++            kind, clip_id, str(clip.get("asset_id") or ""),
++            json.dumps(clip, ensure_ascii=False),
++            json.dumps(history, ensure_ascii=False), time.time(),
++        ),
++    )
++    connection.execute(f"DELETE FROM {publications} WHERE clip_id=?", (clip_id,))
++    connection.execute(f"DELETE FROM {clips} WHERE id=?", (clip_id,))
++    return True
++
++
++def retire_legacy_orphans(connection, kind: str) -> int:
++    """Migrate orphaned records left by older Remove implementations.
++
++    This is deliberately limited to clips with no active binding and to
++    history rows whose clip is already missing. Active clips are untouched.
++    """
++    clips, bindings, publications = _tables(kind)
++    ids = [str(r[0]) for r in connection.execute(
++        f"SELECT c.id FROM {clips} c WHERE NOT EXISTS "
++        f"(SELECT 1 FROM {bindings} b WHERE b.clip_id=c.id)"
++    )]
++    ids.extend(str(r[0]) for r in connection.execute(
++        f"SELECT DISTINCT p.clip_id FROM {publications} p "
++        f"WHERE NOT EXISTS (SELECT 1 FROM {clips} c WHERE c.id=p.clip_id)"
++    ))
++    count = 0
++    for clip_id in dict.fromkeys(ids):
++        count += retire_unbound_clip(connection, kind, clip_id)
++    return count
+diff --git a/system/control-center/monster_animation_store.py b/system/control-center/monster_animation_store.py
+index fa9e61e..611cc3a 100644
+--- a/system/control-center/monster_animation_store.py
++++ b/system/control-center/monster_animation_store.py
+@@ -8,6 +8,7 @@ import shutil
+ import time
+ 
+ from sqlite_connection import connect as connect_sqlite
++from animation_retirement import retire_unbound_clip, retire_legacy_orphans
+ from npc_animation_taxonomy import (
+     WEAPON_SETS, EQUIPMENT_SETS, default_compatibility, validate_compatibility,
+     filename as npc_filename, parse as npc_parse, validate_rename,
+@@ -210,6 +211,9 @@ class MonsterAnimationStore:
+             if self.kind == "npc":
+                 self._migrate_npc_categories(connection)
+                 self._migrate_npc_compatibility(connection)
++            # Previous Remove left published clips without any binding. Archive
++            # those before a Scan Folder can associate an old Asset ID again.
++            retire_legacy_orphans(connection, self.kind)
+         self._normalize_source_only_files()
+ 
+     @staticmethod
+@@ -766,9 +770,9 @@ class MonsterAnimationStore:
+                 raise ValueError(f"unknown monster animation binding: {binding_id}")
+             slug, clip_id = str(row["monster_slug"]), str(row["clip_id"])
+             connection.execute("DELETE FROM monster_animation_bindings WHERE id=?", (binding_id,))
+-            still = int(connection.execute("SELECT COUNT(*) FROM monster_animation_bindings WHERE clip_id=?", (clip_id,)).fetchone()[0])
+-            if still == 0:
+-                connection.execute("DELETE FROM monster_animation_clips WHERE id=? AND (asset_id IS NULL OR asset_id='')", (clip_id,))
++            # Remove the active clip even if it was published. Retain the
++            # publication audit in the archive, never in the new registration.
++            retire_unbound_clip(connection, self.kind, clip_id)
+         self.export()
+         return self.snapshot(slug)
+ 
+diff --git a/system/control-center/static/character-assets.js b/system/control-center/static/character-assets.js
+index 35f36b6..93e6def 100644
+--- a/system/control-center/static/character-assets.js
++++ b/system/control-center/static/character-assets.js
+@@ -137,7 +137,7 @@ async function checkRobloxAnimationAssets(){if(state.animationPublishing)return;
+ window.game1CheckRobloxAnimations=checkRobloxAnimationAssets;
+ async function setAnimationWeight(bindingId,weight){try{state.animations=await request('/api/animation-bindings/'+encodeURIComponent(bindingId)+'/weight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({weight:Number(weight)})});state.animations.publication=state.data?.publication||{};renderAnimations()}catch(error){toast(error.message,true)}}
+ async function setAnimationDuplicate(clipId,enabled){try{state.animations=await request('/api/animations/'+encodeURIComponent(clipId)+'/duplicate-first-frame',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:!!enabled})});state.animations.publication=state.data?.publication||{};renderAnimations();toast(enabled?'runtime first-frame tail enabled; asset bytes are unchanged':'runtime first-frame tail disabled; asset bytes are unchanged')}catch(error){await loadAnimations();toast(error.message,true)}}
+-async function removeAnimationBinding(bindingId){if(!confirm('remove this semantic animation binding from game1? canonical source files are preserved.'))return;try{state.animations=await request('/api/animation-bindings/'+encodeURIComponent(bindingId),{method:'DELETE'});state.animations.publication=state.data?.publication||{};if(state.animationSelected===bindingId)state.animationSelected=null;renderAnimations();toast('animation binding removed')}catch(error){toast(error.message,true)}}
++async function removeAnimationBinding(bindingId){if(!confirm('Remove this character animation registration? Source files and Roblox Cloud assets are preserved. On the next folder scan it will register as NEW / LOCAL_ONLY (without its old published ID).'))return;try{state.animations=await request('/api/animation-bindings/'+encodeURIComponent(bindingId),{method:'DELETE'});state.animations.publication=state.data?.publication||{};if(state.animationSelected===bindingId)state.animationSelected=null;renderAnimations();toast('animation binding removed')}catch(error){toast(error.message,true)}}
+ 
+ function restoreAssetManagerView(){let saved='characters';try{saved=localStorage.getItem(ASSET_MANAGER_VIEW_KEY)||'characters'}catch{}setView(ASSET_MANAGER_VIEWS.has(saved)?saved:'characters')}
+ window.addEventListener('load',restoreAssetManagerView);
+diff --git a/system/control-center/static/monster-assets.js b/system/control-center/static/monster-assets.js
+index ee4cd19..cf1f9fd 100644
+--- a/system/control-center/static/monster-assets.js
++++ b/system/control-center/static/monster-assets.js
+@@ -43,7 +43,7 @@ async function monsterPublishAnimation(clipId){try{await request('/api/monster-a
+ async function monsterPublishMissingAnimations(){if(monsterState.animationPublishing)return;let published=0;try{const queue=(monsterState.animations?.items||[]).filter(row=>row.status==='LOCAL_ONLY');if(!queue.length)return;monsterState.animationPublishing=true;monsterRenderAnimations();const host=$('monster-animation-publish-progress'),bar=$('monster-animation-publish-bar'),count=$('monster-animation-publish-count'),current=$('monster-animation-publish-current');host.hidden=false;bar.max=queue.length;bar.value=0;for(let index=0;index<queue.length;index++){const row=queue[index];current.textContent=`${row.name} · ${row.state||row.slot}`;count.textContent=`${index} / ${queue.length}`;await request('/api/monster-animations/'+encodeURIComponent(row.clip_id)+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:$('monster-animation-publication-description').value})});published=index+1;bar.value=published;count.textContent=`${published} / ${queue.length}`;}current.textContent='publication queue complete';toast(`published ${published} monster animation assets`)}catch(error){toast(`published ${published}; stopped: ${error.message}`,true)}finally{monsterState.animationPublishing=false;await monsterLoadAnimations();monsterRenderAnimations()}}
+ async function monsterSetAnimationDuplicate(clipId,enabled){try{monsterState.animations=await request('/api/monster-animations/'+encodeURIComponent(clipId)+'/duplicate-first-frame',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:!!enabled})});monsterState.animations.publication=monsterState.data?.publication||{};monsterRenderAnimations();toast(enabled?'runtime first-frame tail enabled; asset bytes are unchanged':'runtime first-frame tail disabled; asset bytes are unchanged')}catch(error){await monsterLoadAnimations();toast(error.message,true)}}
+ async function monsterSetAnimationWeight(bindingId,weight){try{monsterState.animations=await request('/api/monster-animation-bindings/'+encodeURIComponent(bindingId)+'/weight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({weight:Number(weight)})});monsterState.animations.publication=monsterState.data?.publication||{};monsterRenderAnimations()}catch(error){toast(error.message,true)}}
+-async function monsterRemoveAnimation(bindingId){if(!confirm('remove this monster animation binding? canonical source files are preserved.'))return;try{monsterState.animations=await request('/api/monster-animation-bindings/'+encodeURIComponent(bindingId),{method:'DELETE'});monsterState.animations.publication=monsterState.data?.publication||{};monsterRenderAnimations();toast('monster animation binding removed')}catch(error){toast(error.message,true)}}
++async function monsterRemoveAnimation(bindingId){if(!confirm('Remove this monster animation registration? Source files and Roblox Cloud assets are preserved. On the next folder scan it will register as NEW / LOCAL_ONLY (without its old published ID).'))return;try{monsterState.animations=await request('/api/monster-animation-bindings/'+encodeURIComponent(bindingId),{method:'DELETE'});monsterState.animations.publication=monsterState.data?.publication||{};monsterRenderAnimations();toast('monster animation binding removed')}catch(error){toast(error.message,true)}}
+ function initMonsterFilenameDisclosure(){const guide=$('monster-animation-filename-guide');if(!guide)return;try{const saved=localStorage.getItem(MONSTER_FILENAME_GUIDE_KEY);if(saved!==null)guide.open=saved==='1'}catch{}guide.addEventListener('toggle',()=>{try{localStorage.setItem(MONSTER_FILENAME_GUIDE_KEY,guide.open?'1':'0')}catch{}})}
+ window.game1MonstersLoad=monsterLoad;window.game1MonsterAnimationsLoad=monsterLoadAnimations;
+ initMonsterAnimationFolderExplorer();
+diff --git a/system/control-center/static/npc-assets.js b/system/control-center/static/npc-assets.js
+index 9fc0070..ffa1225 100644
+--- a/system/control-center/static/npc-assets.js
++++ b/system/control-center/static/npc-assets.js
+@@ -107,7 +107,7 @@ async function npcPublishAnimation(clipId){try{await request('/api/npc-animation
+ async function npcPublishMissingAnimations(){if(npcState.animationPublishing)return;let published=0;try{const queue=(npcState.animations?.items||[]).filter(row=>row.status==='LOCAL_ONLY');if(!queue.length)return;npcState.animationPublishing=true;npcRenderAnimations();const host=$('npc-animation-publish-progress'),bar=$('npc-animation-publish-bar'),count=$('npc-animation-publish-count'),current=$('npc-animation-publish-current');host.hidden=false;bar.max=queue.length;bar.value=0;for(let index=0;index<queue.length;index++){const row=queue[index];current.textContent=`${row.name} · ${row.state||row.slot}`;count.textContent=`${index} / ${queue.length}`;await request('/api/npc-animations/'+encodeURIComponent(row.clip_id)+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:$('npc-animation-publication-description').value})});published=index+1;bar.value=published;count.textContent=`${published} / ${queue.length}`;}current.textContent='publication queue complete';toast(`published ${published} npc animation assets`)}catch(error){toast(`published ${published}; stopped: ${error.message}`,true)}finally{npcState.animationPublishing=false;await npcLoadAnimations();npcRenderAnimations()}}
+ async function npcSetAnimationDuplicate(clipId,enabled){try{npcState.animations=await request('/api/npc-animations/'+encodeURIComponent(clipId)+'/duplicate-first-frame',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:!!enabled})});npcState.animations.publication=npcState.data?.publication||{};npcRenderAnimations();toast(enabled?'runtime first-frame tail enabled; asset bytes are unchanged':'runtime first-frame tail disabled; asset bytes are unchanged')}catch(error){await npcLoadAnimations();toast(error.message,true)}}
+ async function npcSetAnimationWeight(bindingId,weight){try{npcState.animations=await request('/api/npc-animation-bindings/'+encodeURIComponent(bindingId)+'/weight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({weight:Number(weight)})});npcState.animations.publication=npcState.data?.publication||{};npcRenderAnimations()}catch(error){toast(error.message,true)}}
+-async function npcRemoveAnimation(bindingId){if(!confirm('remove this npc animation binding? canonical source files are preserved.'))return;try{npcState.animations=await request('/api/npc-animation-bindings/'+encodeURIComponent(bindingId),{method:'DELETE'});npcState.animations.publication=npcState.data?.publication||{};npcRenderAnimations();toast('npc animation binding removed')}catch(error){toast(error.message,true)}}
++async function npcRemoveAnimation(bindingId){if(!confirm('Remove this NPC animation registration? Source files and Roblox Cloud assets are preserved. On the next folder scan it will register as NEW / LOCAL_ONLY (without its old published ID).'))return;try{npcState.animations=await request('/api/npc-animation-bindings/'+encodeURIComponent(bindingId),{method:'DELETE'});npcState.animations.publication=npcState.data?.publication||{};npcRenderAnimations();toast('npc animation binding removed')}catch(error){toast(error.message,true)}}
+ async function npcRenameAnimation(bindingId,weaponSet,filename){
+  try{npcState.animations=await request('/api/npc-animations/'+encodeURIComponent(bindingId)+'/rename',{
+  method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({weaponSet,filename})});
+diff --git a/system/verify/test_animation_remove_rescan_m78.py b/system/verify/test_animation_remove_rescan_m78.py
+new file mode 100644
+index 0000000..08ae7bd
+--- /dev/null
++++ b/system/verify/test_animation_remove_rescan_m78.py
+@@ -0,0 +1,133 @@
++"""M78: Remove must not resurrect old published IDs after Scan Folder."""
++from __future__ import annotations
++
++import json
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++
++sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "control-center"))
++from animation_retirement import retire_unbound_clip
++from monster_store import MonsterStore
++from monster_animation_store import MonsterAnimationStore
++
++
++class RemoveRescanTests(unittest.TestCase):
++    def setUp(self):
++        self.tmp = tempfile.TemporaryDirectory(prefix="game1-m78-")
++        self.root = Path(self.tmp.name)
++        self.folder = self.root / "inbox"
++        self.folder.mkdir()
++
++    def tearDown(self):
++        self.tmp.cleanup()
++
++    def actor_store(self, kind):
++        actors = MonsterStore(self.root, kind=kind)
++        with actors.connect() as db:
++            db.execute("""INSERT INTO monsters(slug,name_en,model_source_path,model_asset_id,
++                model_sha256,model_published_sha256,created_at,updated_at,skeleton_signature)
++                VALUES('sample','Sample','placeholder','123','a','a',0,0,'s')""")
++        return MonsterAnimationStore(self.root, kind=kind)
++
++    def seed_clip(self, animations, kind):
++        name = 'sample_1hs_idle_special_01.rbxm' if kind == 'npc' else 'sample_idle_special_01.rbxm'
++        source = self.folder / name
++        source.write_bytes(b'original published bytes')
++        scan = animations.scan_folder('sample', str(self.folder))
++        self.assertEqual(scan['created'], 1)
++        row = animations.snapshot('sample')['items'][0]
++        with animations.connect() as db:
++            db.execute("""UPDATE monster_animation_clips SET asset_id='987654321',
++                published_sha256=sha256 WHERE id=?""", (row['clip_id'],))
++            db.execute("""INSERT INTO monster_animation_publications
++                (clip_id,clip_revision,asset_id,operation_path,sha256,published_at)
++                VALUES(?,1,'987654321','publish-operation',(SELECT sha256 FROM monster_animation_clips WHERE id=?),1)""",
++                (row['clip_id'],row['clip_id']))
++        animations.export()
++        return row, source
++
++    def test_remove_and_rescan_is_fresh_registration_for_npc_and_monster(self):
++        for kind in ('npc','monster'):
++            with self.subTest(kind=kind):
++                # A fresh temp directory per subtest avoids cross-kind database conflicts.
++                with tempfile.TemporaryDirectory(prefix=f'game1-m78-{kind}-') as directory:
++                    original_root, original_folder = self.root, self.folder
++                    try:
++                        self.root = Path(directory)
++                        self.folder = self.root / 'inbox'
++                        self.folder.mkdir()
++                        animations = self.actor_store(kind)
++                        row, source = self.seed_clip(animations,kind)
++                        animations.delete_binding(row['binding_id'])
++                        self.assertEqual(animations.snapshot('sample')['items'], [])
++                        with animations.connect() as db:
++                            retired = db.execute('SELECT * FROM animation_registration_archive').fetchall()
++                            self.assertEqual(len(retired),1)
++                            self.assertEqual(retired[0]['asset_id'],'987654321')
++                            self.assertEqual(json.loads(retired[0]['publications_json'])[0]['asset_id'],'987654321')
++                            self.assertEqual(db.execute('SELECT COUNT(*) FROM monster_animation_publications').fetchone()[0],0)
++                        self.assertTrue(source.exists())
++                        rescanned = animations.scan_folder('sample',str(self.folder))
++                        self.assertEqual((rescanned['created'],rescanned['changed']), (1,0))
++                        fresh = animations.snapshot('sample')['items'][0]
++                        self.assertEqual(fresh['status'],'LOCAL_ONLY')
++                        self.assertIsNone(fresh['asset_id'])
++                        self.assertEqual(fresh['revision'],1)
++                        self.assertEqual(len(animations.snapshot('sample')['items']),1)
++                    finally:
++                        self.root, self.folder = original_root, original_folder
++
++    def test_startup_migrates_preexisting_published_orphan_but_not_active_binding(self):
++        animations = self.actor_store('npc')
++        old, source = self.seed_clip(animations,'npc')
++        # Simulate the historical (M77) Remove behavior: binding is gone but
++        # the published clip and its old cloud ID remain in the active table.
++        with animations.connect() as db:
++            db.execute('DELETE FROM monster_animation_bindings WHERE id=?', (old['binding_id'],))
++        animations.export()
++        self.assertEqual(animations.snapshot('sample')['items'], [])
++        animations = MonsterAnimationStore(self.root,kind='npc')
++        with animations.connect() as db:
++            self.assertEqual(db.execute('SELECT COUNT(*) FROM monster_animation_clips').fetchone()[0],0)
++            archive = db.execute('SELECT asset_id FROM animation_registration_archive').fetchone()
++            self.assertEqual(archive['asset_id'],'987654321')
++        scan = animations.scan_folder('sample',str(self.folder))
++        self.assertEqual(scan['created'],1)
++        self.assertEqual(animations.snapshot('sample')['items'][0]['status'],'LOCAL_ONLY')
++        # A new application boot must not archive an active registration.
++        animations = MonsterAnimationStore(self.root,kind='npc')
++        self.assertEqual(len(animations.snapshot('sample')['items']),1)
++
++    def test_retirement_refuses_to_remove_shared_clip_still_in_use(self):
++        animations = self.actor_store('npc')
++        row, _ = self.seed_clip(animations,'npc')
++        with animations.connect() as db:
++            self.assertFalse(retire_unbound_clip(db,'npc',row['clip_id']))
++            self.assertEqual(db.execute('SELECT COUNT(*) FROM monster_animation_clips').fetchone()[0],1)
++
++    def test_character_retirement_and_old_publication_history(self):
++        import sqlite3
++        from animation_retirement import retire_legacy_orphans
++        db = sqlite3.connect(':memory:')
++        db.row_factory=sqlite3.Row
++        try:
++            db.executescript('''
++                CREATE TABLE animation_clips(id TEXT PRIMARY KEY, asset_id TEXT);
++                CREATE TABLE animation_bindings(clip_id TEXT);
++                CREATE TABLE animation_publications(id INTEGER PRIMARY KEY, clip_id TEXT, asset_id TEXT);
++                INSERT INTO animation_clips VALUES ('clip','111');
++                INSERT INTO animation_publications VALUES (1,'clip','111');
++                INSERT INTO animation_publications VALUES (2,'removed-without-clip','222');
++            ''')
++            self.assertEqual(retire_legacy_orphans(db,'character'),2)
++            self.assertEqual(db.execute('SELECT COUNT(*) FROM animation_clips').fetchone()[0],0)
++            self.assertEqual(db.execute('SELECT COUNT(*) FROM animation_publications').fetchone()[0],0)
++            self.assertEqual(db.execute('SELECT COUNT(*) FROM animation_registration_archive').fetchone()[0],2)
++        finally:
++            db.close()
++
++
++if __name__ == '__main__':
++    unittest.main(verbosity=2)

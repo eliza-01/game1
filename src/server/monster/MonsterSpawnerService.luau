@@ -9,7 +9,6 @@ local CharacterShared = Shared:WaitForChild("character")
 local AnimationShared = Shared:WaitForChild("animation")
 local CharacterMovementConfig = require(CharacterShared:WaitForChild("CharacterMovementConfig"))
 local AnimationSpeedScaling = require(AnimationShared:WaitForChild("AnimationSpeedScaling"))
-local AnimationFirstFrameSeam = require(AnimationShared:WaitForChild("AnimationFirstFrameSeam"))
 local MonsterRegistry = require(MonsterShared:WaitForChild("MonsterRegistry"))
 local MonsterAnimationRegistry = require(MonsterShared:WaitForChild("MonsterAnimationRegistry"))
 local CombatRoot = script.Parent.Parent:WaitForChild("combat")
@@ -183,42 +182,21 @@ local function animationPlaybackScale(model: Model, channel: string): number
     return animationPlaybackPercent(model, channel) / 100
 end
 
-local function createRuntimeSeam(animator: Animator?, row: any?, primary: AnimationTrack?, looped: boolean)
-    if not animator or not row or not primary or row.duplicateFirstFrameAtEnd ~= true then
-        return nil
-    end
-    local companion = loadAnimationTrack(animator, row, false)
-    if not companion then
-        return nil
-    end
-    return AnimationFirstFrameSeam.new(primary, companion, looped)
-end
-
-local function playTrackAtConfiguredSpeed(model: Model, track: AnimationTrack?, channel: string, fadeTime: number, seam: any?)
+local function playTrackAtConfiguredSpeed(model: Model, track: AnimationTrack?, channel: string, fadeTime: number)
     if not track then
         return
     end
     local percent = AnimationSpeedScaling.ResolveForAnimation(model, channel, track.Animation and track.Animation.AnimationId)
     model:SetAttribute("AnimationPlaybackSpeedPercent", percent)
     local speed = percent / 100
-    if seam then
-        if seam:IsPlaying() then
-            seam:AdjustSpeed(speed)
-        else
-            seam:Play(fadeTime, speed)
-        end
-    elseif track.IsPlaying then
+    if track.IsPlaying then
         track:AdjustSpeed(speed)
     else
         track:Play(fadeTime, 1, speed)
     end
 end
 
-local function stopTrack(track: AnimationTrack?, seam: any?)
-    if seam then
-        seam:Stop(0.08)
-        return
-    end
+local function stopTrack(track: AnimationTrack?)
     if not track then
         return
     end
@@ -258,10 +236,10 @@ local function weightedIdleChoice(choices: {any}): any?
 end
 
 local function stopIdleState(entry: any)
-    stopTrack(entry.idleTrack, entry.idleSeam)
+    stopTrack(entry.idleTrack)
     for _, choice in ipairs(entry.idleChoices or {}) do
         if choice.role == "special" then
-            stopTrack(choice.track, choice.seam)
+            stopTrack(choice.track)
         end
     end
     entry.activeIdleSpecial = nil
@@ -271,13 +249,13 @@ local function playBaseIdle(model: Model, entry: any)
     if entry.dying or model:GetAttribute("MonsterCombatActive") == true or model:GetAttribute("InCombat") == true then
         return
     end
-    stopTrack(entry.walkTrack, entry.walkSeam)
-    stopTrack(entry.runTrack, entry.runSeam)
+    stopTrack(entry.walkTrack)
+    stopTrack(entry.runTrack)
     model:SetAttribute("MonsterAnimationState", "idle")
     model:SetAttribute("MonsterIdleVariant", "base")
     if entry.idleTrack then
         pcall(function()
-            playTrackAtConfiguredSpeed(model, entry.idleTrack, "idle", 0.12, entry.idleSeam)
+            playTrackAtConfiguredSpeed(model, entry.idleTrack, "idle", 0.12)
         end)
     end
 end
@@ -287,19 +265,20 @@ local function playCombatIdleState(model: Model, entry: any)
         return
     end
     stopIdleState(entry)
-    stopTrack(entry.walkTrack, entry.walkSeam)
-    stopTrack(entry.runTrack, entry.runSeam)
+    stopTrack(entry.walkTrack)
+    stopTrack(entry.runTrack)
     model:SetAttribute("MonsterAnimationState", "combat_idle")
     model:SetAttribute("MonsterIdleVariant", "combat")
     if entry.combatIdleTrack then
         pcall(function()
-            playTrackAtConfiguredSpeed(model, entry.combatIdleTrack, "combat_idle", 0.1, entry.combatIdleSeam)
+            playTrackAtConfiguredSpeed(model, entry.combatIdleTrack, "combat_idle", 0.1)
         end)
     end
 end
 
 local function maybePlayIdleSpecial(model: Model, entry: any)
-    if entry.dying or entry.activeIdleSpecial ~= nil or model:GetAttribute("InCombat") == true then
+    if entry.dying or entry.wandering or entry.activeIdleSpecial ~= nil
+        or model:GetAttribute("InCombat") == true or model:GetAttribute("MonsterCombatActive") == true then
         return
     end
     local choice = weightedIdleChoice(entry.idleChoices or {})
@@ -307,11 +286,11 @@ local function maybePlayIdleSpecial(model: Model, entry: any)
         return
     end
     entry.activeIdleSpecial = choice
-    stopTrack(entry.idleTrack, entry.idleSeam)
+    stopTrack(entry.idleTrack)
     model:SetAttribute("MonsterAnimationState", "idle")
     model:SetAttribute("MonsterIdleVariant", ("special_%02d"):format(math.max(1, math.floor(finite(choice.row.variant, 1)))))
     local ok = pcall(function()
-        playTrackAtConfiguredSpeed(model, choice.track, "idle", 0.08, choice.seam)
+        playTrackAtConfiguredSpeed(model, choice.track, "idle", 0.08)
     end)
     if not ok then
         entry.activeIdleSpecial = nil
@@ -588,14 +567,12 @@ local function refreshWanderLocomotion(model: Model, entry: any)
 
     local mode = monsterLocomotionMode(model)
     local activeTrack = locomotionTrackFor(entry, mode)
-    local activeSeam = if mode == "Run" then (entry.runSeam or entry.walkSeam) else (entry.walkSeam or entry.runSeam)
     local inactiveTrack = mode == "Run" and entry.walkTrack or entry.runTrack
-    local inactiveSeam = mode == "Run" and entry.walkSeam or entry.runSeam
     if inactiveTrack and inactiveTrack ~= activeTrack then
-        stopTrack(inactiveTrack, inactiveSeam)
+        stopTrack(inactiveTrack)
     end
     if activeTrack then
-        pcall(function() playTrackAtConfiguredSpeed(model, activeTrack, string.lower(mode), 0.1, activeSeam) end)
+        pcall(function() playTrackAtConfiguredSpeed(model, activeTrack, string.lower(mode), 0.1) end)
     end
     model:SetAttribute("MonsterAnimationState", string.lower(mode))
 
@@ -618,8 +595,8 @@ local function stopWanderMovement(entry: any)
     entry.wandering = false
     entry.wanderDestination = nil
     entry.wanderDeadline = nil
-    stopTrack(entry.walkTrack, entry.walkSeam)
-    stopTrack(entry.runTrack, entry.runSeam)
+    stopTrack(entry.walkTrack)
+    stopTrack(entry.runTrack)
     local humanoid = entry.humanoid
     local navigationRoot = entry.navigationRoot
     if humanoid and navigationRoot and navigationRoot.Parent then
@@ -754,7 +731,7 @@ local function releaseInstance(state: any, model: Model, scheduleRespawn: boolea
     DeathLifecycleService.Cancel(model)
     stopWanderMovement(entry)
     stopIdleState(entry)
-    stopTrack(entry.combatIdleTrack, entry.combatIdleSeam)
+    stopTrack(entry.combatIdleTrack)
     stopTrack(entry.deathTrack)
     EntityHitboxService.Detach(model)
     if model.Parent then
@@ -809,46 +786,6 @@ local function maintainDeathTerminalPose(state: any, model: Model, entry: any, d
     enterDeathIdle(state, model, entry)
 end
 
-local function maintainRuntimeAnimationSeams(model: Model, entry: any, deltaTimeSim: number)
-    if entry.dying or model:GetAttribute("MonsterCombatActive") == true then
-        return
-    end
-
-    if entry.activeIdleSpecial then
-        local choice = entry.activeIdleSpecial
-        if choice.seam then
-            local completed = choice.seam:Step(deltaTimeSim)
-            if completed and entry.activeIdleSpecial == choice then
-                choice.seam:Stop(0.04)
-                entry.activeIdleSpecial = nil
-                playBaseIdle(model, entry)
-            end
-        end
-        return
-    end
-
-    if entry.wandering then
-        local mode = monsterLocomotionMode(model)
-        local seam = if mode == "Run" then (entry.runSeam or entry.walkSeam) else (entry.walkSeam or entry.runSeam)
-        if seam then
-            seam:Step(deltaTimeSim)
-        end
-        return
-    end
-
-    if model:GetAttribute("InCombat") == true and entry.combatIdleSeam then
-        entry.combatIdleSeam:Step(deltaTimeSim)
-        return
-    end
-
-    if entry.idleSeam then
-        local _, didLoop = entry.idleSeam:Step(deltaTimeSim)
-        if didLoop then
-            maybePlayIdleSpecial(model, entry)
-        end
-    end
-end
-
 local function beginDeath(state: any, model: Model, entry: any)
     if entry.dying then
         return
@@ -862,7 +799,7 @@ local function beginDeath(state: any, model: Model, entry: any)
     model:SetAttribute("DeathTerminalPoseHeld", false)
     stopWanderMovement(entry)
     stopIdleState(entry)
-    stopTrack(entry.combatIdleTrack, entry.combatIdleSeam)
+    stopTrack(entry.combatIdleTrack)
     if entry.navigationRoot and entry.navigationRoot.Parent then
         entry.navigationRoot.AssemblyLinearVelocity = Vector3.zero
         entry.navigationRoot.AssemblyAngularVelocity = Vector3.zero
@@ -924,18 +861,15 @@ local function spawnOne(state: any): Model?
     local profile = animationProfile(slug)
     local animator = animatorFor(model, visual)
     local idleTrack: AnimationTrack? = nil
-    local idleSeam = nil
     local idleChoices = {}
     for _, row in ipairs(publishedRows(profile, "idle")) do
         local role = idleRole(row)
         local track = loadAnimationTrack(animator, row, role == "base")
         if track then
-            local seam = createRuntimeSeam(animator, row, track, role == "base")
-            local choice = { row = row, track = track, role = role, seam = seam }
+            local choice = { row = row, track = track, role = role }
             table.insert(idleChoices, choice)
             if role == "base" and not idleTrack then
                 idleTrack = track
-                idleSeam = seam
             end
         end
     end
@@ -947,23 +881,16 @@ local function spawnOne(state: any): Model?
     local walkTrack = loadAnimationTrack(animator, walkRow, true)
     local runTrack = loadAnimationTrack(animator, runRow, true)
     local deathTrack = loadAnimationTrack(animator, deathRow, false)
-    local combatIdleSeam = createRuntimeSeam(animator, combatIdleRow, combatIdleTrack, true)
-    local walkSeam = createRuntimeSeam(animator, walkRow, walkTrack, true)
-    local runSeam = createRuntimeSeam(animator, runRow, runTrack, true)
     local entry = {
         idleTrack = idleTrack,
-        idleSeam = idleSeam,
         idleRow = nil,
         idleChoices = idleChoices,
         activeIdleSpecial = nil,
         combatIdleTrack = combatIdleTrack,
-        combatIdleSeam = combatIdleSeam,
         combatIdleRow = combatIdleRow,
         walkTrack = walkTrack,
-        walkSeam = walkSeam,
         walkRow = walkRow,
         runTrack = runTrack,
-        runSeam = runSeam,
         runRow = runRow,
         deathTrack = deathTrack,
         deathRow = deathRow,
@@ -983,7 +910,7 @@ local function spawnOne(state: any): Model?
     state.instances[model] = entry
 
     for _, choice in ipairs(idleChoices) do
-        if choice.role == "special" and not choice.seam then
+        if choice.role == "special"
             choice.track.Ended:Connect(function()
                 if state.instances[model] ~= entry or entry.dying or entry.activeIdleSpecial ~= choice then
                     return
@@ -993,7 +920,7 @@ local function spawnOne(state: any): Model?
             end)
         end
     end
-    if idleTrack and not idleSeam then
+    if idleTrack then
         idleTrack.DidLoop:Connect(function()
             if state.instances[model] == entry then
                 maybePlayIdleSpecial(model, entry)
@@ -1010,7 +937,7 @@ local function spawnOne(state: any): Model?
         if model:GetAttribute("MonsterCombatActive") == true then
             stopWanderMovement(entry)
             stopIdleState(entry)
-            stopTrack(entry.combatIdleTrack, entry.combatIdleSeam)
+            stopTrack(entry.combatIdleTrack)
             model:SetAttribute("MonsterIdleVariant", nil)
         else
             stopWanderMovement(entry)
@@ -1030,7 +957,7 @@ local function spawnOne(state: any): Model?
         if model:GetAttribute("InCombat") == true then
             playCombatIdleState(model, entry)
         else
-            stopTrack(entry.combatIdleTrack, entry.combatIdleSeam)
+            stopTrack(entry.combatIdleTrack)
             playBaseIdle(model, entry)
         end
     end)
@@ -1128,7 +1055,6 @@ function MonsterSpawnerService.Start()
     RunService.PreAnimation:Connect(function(deltaTimeSim)
         for _, state in pairs(states) do
             for model, entry in pairs(state.instances) do
-                maintainRuntimeAnimationSeams(model, entry, deltaTimeSim)
                 maintainDeathTerminalPose(state, model, entry, deltaTimeSim)
             end
         end

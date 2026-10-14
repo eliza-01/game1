@@ -28,7 +28,7 @@ function NpcAnimationService.Create(entity: Model, visual: Model, profile: any?)
         animator.Parent = controller
     end
 
-    local weaponSet = tostring(entity:GetAttribute("NpcWeaponSet") or "1hs")
+    local weaponSet = tostring(entity:GetAttribute("NpcWeaponSet") or "unarmed")
     local function first(slot: string): any?
         return Tracks.PublishedRows(profile, slot, weaponSet)[1]
     end
@@ -38,7 +38,7 @@ function NpcAnimationService.Create(entity: Model, visual: Model, profile: any?)
     local runRow = first("run") or first("walk")
     local movementChannel = if first("run") then "run" else "walk"
     local run = Tracks.Load(animator, runRow, true)
-    local deathClip = Tracks.Load(animator, first("death"), false, false)
+    local deathClip = Tracks.Load(animator, first("death"), false)
     local death = deathClip and deathClip.track or nil
     local attackClips: {[string]: any} = {}
     local dying, finished, disposed = false, false, false
@@ -47,7 +47,7 @@ function NpcAnimationService.Create(entity: Model, visual: Model, profile: any?)
     local deathStartedAt = 0
 
     for _, row in ipairs(Tracks.PublishedRows(profile, "attack", weaponSet)) do
-        local clip = Tracks.Load(animator, row, true, false)
+        local clip = Tracks.Load(animator, row, true)
         if clip then attackClips[tostring(row.clipId or row.animationId)] = clip end
     end
     local currentAttack: any? = nil

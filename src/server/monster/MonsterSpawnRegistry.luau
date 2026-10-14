@@ -1,4 +1,4 @@
 -- generated. do not edit by hand.
 local HttpService = game:GetService("HttpService")
-local data = HttpService:JSONDecode([==[{"project":"game1","records":[{"enabled":true,"mapKey":"main","maxAlive":5,"monsterSlug":"gremlin","placeId":0,"position":{"x":495.868,"y":-56.261,"z":-256.499},"respawnSeconds":10.0,"spawnId":"spawn-fac90ce78ecf465ebde466e02a73c485","spawnRadius":15.0,"yawDegrees":289.9486906384912}],"schemaVersion":1,"sourceDigest":"4f4b532224ec8c7c764720abb8d8ae3193afbfb7142a291829911499eaa07022"}]==])
+local data = HttpService:JSONDecode([==[{"project":"game1","records":[],"schemaVersion":1,"sourceDigest":"4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}]==])
 return table.freeze(data)

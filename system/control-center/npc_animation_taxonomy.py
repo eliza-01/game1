@@ -10,14 +10,37 @@ from pathlib import Path
 # Weapon sets are the same public animation sets supported by WeaponRegistry.
 # Adding a new gameplay weapon set requires adding its name here and in the
 # canonical weapon attack-movement registry, not branching by NPC slug.
-WEAPON_SETS = ("base", "1hs", "2hs", "bow")
+WEAPON_SETS = ("base", "unarmed", "1hs", "2hs", "bow")
+EQUIPMENT_SETS = tuple(item for item in WEAPON_SETS if item != "base")
+
+
+def default_compatibility(weapon_set: str) -> list[str]:
+    """Base means reusable by default, not "without weapon".
+
+    Explicit per-binding compatibility may narrow or expand this set, including
+    an intentionally empty set. Legacy bindings resolve through this function.
+    """
+    if weapon_set not in WEAPON_SETS:
+        raise ValueError(f"unknown NPC animation type: {weapon_set}")
+    return list(EQUIPMENT_SETS if weapon_set == "base" else (weapon_set,))
+
+
+def validate_compatibility(values: object) -> list[str]:
+    if not isinstance(values, list) or any(not isinstance(value, str) for value in values):
+        raise ValueError("compatibleWith must be a list of equipment types")
+    if any(value not in EQUIPMENT_SETS for value in values):
+        raise ValueError(f"compatibleWith accepts only: {', '.join(EQUIPMENT_SETS)}")
+    if len(set(values)) != len(values):
+        raise ValueError("compatibleWith must not contain duplicates")
+    return [item for item in EQUIPMENT_SETS if item in values]
+
 SLOTS = {
     "idle": False, "idle_special": True, "walk": False, "run": False,
     "combat_idle": False, "attack": True, "death": False,
 }
 ALIAS = {
     "special_idle": "idle_special", "sp_wait": "idle_special", "wait_idle": "idle",
-    "attack_wait": "combat_idle", "atkwait": "combat_idle",
+    "attack_wait": "combat_idle", "atkwait": "combat_idle", "idle_combat": "combat_idle",
     "dead": "death", "die": "death", "atk": "attack", "wait": "idle",
 }
 

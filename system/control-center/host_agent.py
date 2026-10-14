@@ -1004,12 +1004,24 @@ class Handler(BaseHTTPRequestHandler):
                 if action == "rename":
                     return self.out(200, npc_animations.rename_npc_binding(
                         clip_id, str(payload.get("weaponSet") or ""), str(payload.get("filename") or "")))
-                if action == "duplicate-first-frame":
-                    return self.out(200, npc_animations.set_duplicate_first_frame(clip_id, bool(payload.get("enabled"))))
                 if action == "publish-missing":
                     return self.out(200, npc_animations.publish_missing(clip_id, publication_credentials(str(payload.get("description") or "game1 npc animation"))))
                 if action == "publish":
                     return self.out(200, npc_animations.publish_clip(clip_id, publication_credentials(str(payload.get("description") or "game1 npc animation"))))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path.startswith("/api/npc-animation-bindings/") and path.endswith("/options"):
+            try:
+                key = unquote(path[len("/api/npc-animation-bindings/"):-len("/options")].strip("/"))
+                payload = self.body()
+                return self.out(200, npc_animations.set_animation_options(
+                    key, payload.get("compatibleWith"), payload.get("weight"), payload.get("disarm")))
+            except Exception as error:
+                return self.out(400, {"error": str(error)})
+        if path.startswith("/api/npc-animation-bindings/") and path.endswith("/compatibility"):
+            try:
+                key = unquote(path[len("/api/npc-animation-bindings/"):-len("/compatibility")].strip("/"))
+                return self.out(200, npc_animations.set_compatibility(key, self.body().get("compatibleWith")))
             except Exception as error:
                 return self.out(400, {"error": str(error)})
         if path.startswith("/api/npc-animation-bindings/") and path.endswith("/disarm"):
@@ -1044,16 +1056,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.out(400, {"error": str(error)})
 
         monster_animation_prefix = "/api/monster-animations/"
-        monster_duplicate_suffix = "/duplicate-first-frame"
-        monster_publish_missing_suffix = "/publish-missing"
         monster_publish_animation_suffix = "/publish"
-        if path.startswith(monster_animation_prefix) and path.endswith(monster_duplicate_suffix):
-            clip_id = unquote(path[len(monster_animation_prefix):-len(monster_duplicate_suffix)].strip("/"))
-            try:
-                payload = self.body()
-                return self.out(200, monster_animations.set_duplicate_first_frame(clip_id, bool(payload.get("enabled"))))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
         if path.startswith(monster_animation_prefix) and path.endswith(monster_publish_missing_suffix):
             slug = unquote(path[len(monster_animation_prefix):-len(monster_publish_missing_suffix)].strip("/"))
             try:
@@ -1116,16 +1119,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/weapons/active/clear":
             return self.out(200, weapons.clear_active())
         animation_prefix = "/api/animations/"
-        duplicate_suffix = "/duplicate-first-frame"
-        publish_missing_suffix = "/publish-missing"
         publish_animation_suffix = "/publish"
-        if path.startswith(animation_prefix) and path.endswith(duplicate_suffix):
-            clip_id = unquote(path[len(animation_prefix):-len(duplicate_suffix)].strip("/"))
-            try:
-                payload = self.body()
-                return self.out(200, animations.set_duplicate_first_frame(clip_id, bool(payload.get("enabled"))))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
         if path.startswith(animation_prefix) and path.endswith(publish_missing_suffix):
             character_id = unquote(path[len(animation_prefix):-len(publish_missing_suffix)].strip("/"))
             try:

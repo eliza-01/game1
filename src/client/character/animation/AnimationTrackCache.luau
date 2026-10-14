@@ -70,17 +70,6 @@ function AnimationTrackCache:Get(descriptor)
 	return loadTrack(self, descriptor, "primary", "")
 end
 
-function AnimationTrackCache:GetSeamCompanion(descriptor)
-	if self.destroyed or not descriptor or descriptor.duplicateFirstFrameAtEnd ~= true then
-		return nil
-	end
-	local track = loadTrack(self, descriptor, "seam", "__seam")
-	if track then
-		track.Looped = false
-	end
-	return track
-end
-
 function AnimationTrackCache:IsLoaded(track: AnimationTrack?): boolean
 	return track ~= nil and (tonumber(track.Length) or 0) > 0.01
 end
@@ -118,15 +107,6 @@ function AnimationTrackCache:Prewarm(descriptors, timeoutSeconds: number?)
 		if track and primary then
 			table.insert(tracks, track)
 			table.insert(animations, primary.animation)
-			if descriptor.duplicateFirstFrameAtEnd == true then
-				local companion = self:GetSeamCompanion(descriptor)
-				local updated = self.entries[clipId]
-				local seam = updated and updated.seam
-				if companion and seam then
-					table.insert(tracks, companion)
-					table.insert(animations, seam.animation)
-				end
-			end
 		else
 			failed += 1
 		end

@@ -45,14 +45,13 @@ function npcRenderAnimationRows(){
       <td><input data-filename style="min-width:220px" value="${esc(row.canonicalFilename||proposed(currentSet))}" aria-label="animation filename"><br><small class="hint">rename validates the type and keeps publication ID</small></td>
       <td>${esc(row.asset_id||'local')}</td><td>${npcStatusTag(row.status)}</td>
       <td><input data-weight class="weight-input" type="number" min="0" max="10000" value="${esc(row.weight)}"></td>
-      <td><label class="seam-toggle" title="temporarily remove equipped weapons for this idle special"><input data-disarm type="checkbox" ${row.disarm?'checked':''} ${row.slot==='idle_special'?'':'disabled'}></label></td>
-      <td><label class="seam-toggle" title="first frame -> end"><input data-duplicate type="checkbox" ${row.duplicate_first_frame_at_end?'checked':''}></label></td>
-      <td><div class="row-actions"><button data-rename type="button">rename / migrate</button><button data-publish>publish</button><button data-remove class="danger">remove</button></div></td>`;
+      <td><label class="inline-check" title="temporarily remove equipped weapons for this idle special"><input data-disarm type="checkbox" ${row.disarm?'checked':''} ${row.slot==='idle_special'?'':'disabled'}></label></td>
+      <td><div class="row-actions"><button data-options type="button">options</button><button data-rename type="button">rename / migrate</button><button data-publish>publish</button><button data-remove class="danger">remove</button></div></td>`;
     tr.querySelector('[data-set]').onchange=event=>{tr.querySelector('[data-filename]').value=proposed(event.target.value)};
+    tr.querySelector('[data-options]').onclick=()=>npcOpenAnimationOptions(row);
     tr.querySelector('[data-rename]').onclick=()=>npcRenameAnimation(row.binding_id,tr.querySelector('[data-set]').value,tr.querySelector('[data-filename]').value);
     tr.querySelector('[data-weight]').onchange=e=>npcSetAnimationWeight(row.binding_id,e.target.value);
     tr.querySelector('[data-disarm]').onchange=e=>npcSetAnimationDisarm(row.binding_id,e.target.checked);
-    tr.querySelector('[data-duplicate]').onchange=e=>npcSetAnimationDuplicate(row.clip_id,e.target.checked);
     tr.querySelector('[data-publish]').disabled=row.status==='PUBLISHED';
     tr.querySelector('[data-publish]').onclick=()=>npcPublishAnimation(row.clip_id);
     tr.querySelector('[data-remove]').onclick=()=>npcRemoveAnimation(row.binding_id);
@@ -60,6 +59,42 @@ function npcRenderAnimationRows(){
   }
 }
 
+
+// M77: semantic compatibility belongs to a binding, never to a filename or NPC name.
+function npcOpenAnimationOptions(row){
+ const dialog=$('npc-animation-options-dialog');if(!dialog)return;
+ const sets=npcState.animations?.equipmentSets||['unarmed','1hs','2hs','bow'];
+ const selected=new Set(row.compatibleWith||[]);
+ dialog.querySelector('[data-npc-options-name]').textContent=row.canonicalFilename||row.name;
+ dialog.querySelector('[data-npc-options-type]').textContent=row.weaponSet||'base';
+ const list=dialog.querySelector('[data-npc-options-compat]');
+ list.innerHTML=sets.map(item=>`<label class="npc-compat-option"><input type="checkbox" value="${esc(item)}" ${selected.has(item)?'checked':''}> ${esc(item)}</label>`).join('');
+ const all=dialog.querySelector('[data-npc-options-toggle-all]');
+ const inputs=()=>Array.from(list.querySelectorAll('input[type=checkbox]'));
+ const update=()=>{all.textContent=inputs().every(node=>node.checked)?'clear all':'select all'};
+ all.onclick=()=>{const enable=!inputs().every(node=>node.checked);inputs().forEach(node=>node.checked=enable);update()};
+ list.onchange=update;update();
+ dialog.querySelector('[data-npc-options-weight]').value=row.weight;
+ dialog.querySelector('[data-npc-options-disarm]').checked=!!row.disarm;
+ dialog.querySelector('[data-npc-options-disarm]').disabled=row.slot!=='idle_special';
+ const save=dialog.querySelector('[data-npc-options-save]');
+ save.onclick=async()=>{
+  save.disabled=true;
+  try{
+   const compatibility=inputs().filter(node=>node.checked).map(node=>node.value);
+   const weight=Number(dialog.querySelector('[data-npc-options-weight]').value);
+   if(!Number.isInteger(weight)||weight<0||weight>10000)throw Error('Weight must be 0..10000');
+   await request('/api/npc-animation-bindings/'+encodeURIComponent(row.binding_id)+'/options',{
+    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+     compatibleWith:compatibility,weight,
+     disarm:row.slot==='idle_special'&&dialog.querySelector('[data-npc-options-disarm]').checked
+    })});
+   dialog.close();await npcLoadAnimations();toast('animation compatibility applied');
+  }catch(error){toast(error.message,true);await npcLoadAnimations()}
+  finally{save.disabled=false}
+ };
+ dialog.showModal();
+}
 function npcRenderUnassigned(){const host=$('npc-animation-unassigned');if(!host)return;const rows=npcState.lastScan?.unassigned||[];if(!rows.length){host.innerHTML='';return}const defs=npcState.animations?.slotCatalog||[];host.innerHTML=`<details open><summary>unassigned files · ${rows.length} · assign manually</summary><div class="unassigned-list">${rows.slice(0,100).map((row,index)=>`<div class="unassigned-row npc-unassigned-row" data-npc-unassigned="${index}"><div class="unassigned-file"><b>${esc(row.filename)}</b><small>${esc(row.reason)}</small></div><label>type<select data-set>${(npcState.animations?.weaponSets||['base','1hs']).map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('')}</select></label><label>state<select data-slot>${defs.map(def=>`<option value="${esc(def.slot)}">${esc(def.label||def.slot)}</option>`).join('')}</select></label><label>variant<input data-variant type="number" min="0" max="999" value="0"></label><button data-assign class="primary" type="button">assign</button></div>`).join('')}</div></details>`;for(const node of host.querySelectorAll('[data-npc-unassigned]')){const row=rows[Number(node.dataset.npcUnassigned)];const slot=node.querySelector('[data-slot]'),variant=node.querySelector('[data-variant]');const update=()=>{const def=defs.find(x=>x.slot===slot.value);variant.disabled=!def?.variants;if(def?.variants&&Number(variant.value)<=0)variant.value='1';if(!def?.variants)variant.value='0'};slot.onchange=update;update();node.querySelector('[data-assign]').onclick=()=>npcAssignAnimation(row,node)}}
 function npcRenderAnimations(){npcRenderAnimationTarget();npcRenderAnimationFolderControls();const data=npcState.animations;if(!data)return;npcRenderFilenameRules();npcRenderAnimationRows();npcRenderUnassigned();const selected=npcAnimationSelected();$('npc-animation-profile-state').className='runtime-state '+(selected&&data.skeletonCompatible?'registered':'bootstrap');$('npc-animation-profile-state').innerHTML=selected?`<strong>animations · ${esc(selected.name_en)} · ${esc(selected.slug)}</strong><span>${data.skeletonCompatible?'skeleton compatible':'skeleton changed'} · ${esc(data.profile?.skeleton_signature||'no skeleton signature')}</span>`:'<strong>no npc selected</strong><span>choose a registered npc below.</span>';$('publish-missing-npc-animations').disabled=npcState.animationPublishing||!selected||!data.publication?.configured||!(data.items||[]).some(row=>row.status==='LOCAL_ONLY');$('check-roblox-npc-animations').disabled=npcState.animationPublishing||!data.publication?.configured;$('npc-animation-table-title').textContent=`${selected?.slug||'npc'} · registered animations`;npcRenderAnimationFolderControls()}
 async function npcLoadAnimations(){try{npcEnsureAnimationTarget();const slug=npcState.animationNpc||'';npcState.animations=await request('/api/npc-animations?npc='+encodeURIComponent(slug));const profileRoot=npcNormalizeAnimationFolderPath(npcState.animations.profile?.scan_root||'');if(!npcState.animationFolder&&profileRoot)npcSetAnimationFolder(profileRoot,true);npcRenderAnimations()}catch(error){toast(error.message,true)}}
@@ -68,9 +103,8 @@ async function npcScanAnimations(){try{npcSetAnimationFolder($('npc-animation-fo
 async function npcAssignAnimation(row,node){try{const slot=node.querySelector('[data-slot]').value,variant=Number(node.querySelector('[data-variant]').value||0);await request('/api/npc-animations/assign',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({npcSlug:npcState.animationNpc,sourcePath:row.path,slot,variant,weaponSet:node.querySelector('[data-set]').value})});npcState.lastScan.unassigned=(npcState.lastScan.unassigned||[]).filter(item=>item.path!==row.path);await npcLoadAnimations();npcRenderUnassigned();toast(`assigned ${row.filename} → ${slot}`)}catch(error){toast(error.message,true)}}
 async function npcPublishAnimation(clipId){try{await request('/api/npc-animations/'+encodeURIComponent(clipId)+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:$('npc-animation-publication-description').value})});await npcLoadAnimations();toast('npc animation published')}catch(error){toast(error.message,true)}}
 async function npcPublishMissingAnimations(){if(npcState.animationPublishing)return;let published=0;try{const queue=(npcState.animations?.items||[]).filter(row=>row.status==='LOCAL_ONLY');if(!queue.length)return;npcState.animationPublishing=true;npcRenderAnimations();const host=$('npc-animation-publish-progress'),bar=$('npc-animation-publish-bar'),count=$('npc-animation-publish-count'),current=$('npc-animation-publish-current');host.hidden=false;bar.max=queue.length;bar.value=0;for(let index=0;index<queue.length;index++){const row=queue[index];current.textContent=`${row.name} · ${row.state||row.slot}`;count.textContent=`${index} / ${queue.length}`;await request('/api/npc-animations/'+encodeURIComponent(row.clip_id)+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:$('npc-animation-publication-description').value})});published=index+1;bar.value=published;count.textContent=`${published} / ${queue.length}`;}current.textContent='publication queue complete';toast(`published ${published} npc animation assets`)}catch(error){toast(`published ${published}; stopped: ${error.message}`,true)}finally{npcState.animationPublishing=false;await npcLoadAnimations();npcRenderAnimations()}}
-async function npcSetAnimationDuplicate(clipId,enabled){try{npcState.animations=await request('/api/npc-animations/'+encodeURIComponent(clipId)+'/duplicate-first-frame',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:!!enabled})});npcState.animations.publication=npcState.data?.publication||{};npcRenderAnimations();toast(enabled?'runtime first-frame tail enabled; asset bytes are unchanged':'runtime first-frame tail disabled; asset bytes are unchanged')}catch(error){await npcLoadAnimations();toast(error.message,true)}}
 async function npcSetAnimationWeight(bindingId,weight){try{npcState.animations=await request('/api/npc-animation-bindings/'+encodeURIComponent(bindingId)+'/weight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({weight:Number(weight)})});npcState.animations.publication=npcState.data?.publication||{};npcRenderAnimations()}catch(error){toast(error.message,true)}}
-async function npcRemoveAnimation(bindingId){if(!confirm('remove this npc animation binding? canonical source files are preserved.'))return;try{npcState.animations=await request('/api/npc-animation-bindings/'+encodeURIComponent(bindingId),{method:'DELETE'});npcState.animations.publication=npcState.data?.publication||{};npcRenderAnimations();toast('npc animation binding removed')}catch(error){toast(error.message,true)}}
+async function npcRemoveAnimation(bindingId){if(!confirm('Remove this NPC animation registration? Source files and Roblox Cloud assets are preserved. On the next folder scan it will register as NEW / LOCAL_ONLY (without its old published ID).'))return;try{npcState.animations=await request('/api/npc-animation-bindings/'+encodeURIComponent(bindingId),{method:'DELETE'});npcState.animations.publication=npcState.data?.publication||{};npcRenderAnimations();toast('npc animation binding removed')}catch(error){toast(error.message,true)}}
 async function npcRenameAnimation(bindingId,weaponSet,filename){
  try{npcState.animations=await request('/api/npc-animations/'+encodeURIComponent(bindingId)+'/rename',{
  method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({weaponSet,filename})});

@@ -347,7 +347,7 @@ function NpcCombatAIService.Bind(model: Model, root: BasePart, presentation: any
     local attackRadius = math.max(0, finite(behavior.attackRadiusStuds, 3))
     local returnDelaySeconds = math.clamp(finite(behavior.returnDelaySeconds, 10), 0, 600)
     local profile = (NpcAnimationRegistry.profiles or {})[tostring(model:GetAttribute("NpcSlug") or "")]
-    local weaponSet = tostring(model:GetAttribute("NpcWeaponSet") or "1hs")
+    local weaponSet = tostring(model:GetAttribute("NpcWeaponSet") or "unarmed")
     local policy = WeaponAttackMovement.Resolve(model:GetAttribute("NpcWeaponType"))
     local home = root.CFrame
     local agent = {

@@ -5,6 +5,8 @@ import hashlib
 import shutil
 import sqlite3
 
+from animation_retirement import retire_unbound_clip, retire_legacy_orphans
+
 from .common import (
     ANIMATION_EXTENSIONS, BASE_SLOT_CATALOG, BOW_EXTRA_SLOTS, MAX_SCAN_FILES, NAMING_EXAMPLES, PROJECT, filename_rule_catalog,
     SCHEMA_VERSION, WEAPON_SETS, WEAPON_SLOT_CATALOG, _binding_id, _canonical_file_stem,
@@ -37,7 +39,6 @@ class AnimationStorageMixin:
                     prepared_path TEXT NOT NULL,
                     sha256 TEXT NOT NULL,
                     source_sha256 TEXT NOT NULL DEFAULT '',
-                    duplicate_first_frame_at_end INTEGER NOT NULL DEFAULT 0,
                     asset_id TEXT,
                     published_sha256 TEXT NOT NULL DEFAULT '',
                     moderation_state TEXT NOT NULL DEFAULT '',
@@ -81,8 +82,6 @@ class AnimationStorageMixin:
             clip_columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(animation_clips)")}
             if "source_sha256" not in clip_columns:
                 connection.execute("ALTER TABLE animation_clips ADD COLUMN source_sha256 TEXT NOT NULL DEFAULT ''")
-            if "duplicate_first_frame_at_end" not in clip_columns:
-                connection.execute("ALTER TABLE animation_clips ADD COLUMN duplicate_first_frame_at_end INTEGER NOT NULL DEFAULT 0")
             if "content_updated_at" not in clip_columns:
                 connection.execute("ALTER TABLE animation_clips ADD COLUMN content_updated_at REAL NOT NULL DEFAULT 0")
             connection.execute("UPDATE animation_clips SET source_sha256=sha256 WHERE source_sha256='' OR source_sha256 IS NULL")
@@ -114,8 +113,9 @@ class AnimationStorageMixin:
                     "SELECT 1 FROM animation_bindings WHERE clip_id=? LIMIT 1", (clip_id,)
                 ).fetchone()
                 if still_used is None:
-                    connection.execute("DELETE FROM animation_publications WHERE clip_id=?", (clip_id,))
-                    connection.execute("DELETE FROM animation_clips WHERE id=?", (clip_id,))
+                    retire_unbound_clip(connection, "character", clip_id)
+            # Old removes may have left publication rows without a clip.
+            retire_legacy_orphans(connection, "character")
         self._normalize_source_only_files()
 
     def _normalize_source_only_files(self) -> None:
@@ -271,10 +271,10 @@ class AnimationStorageMixin:
         if old_dict is None:
             connection.execute(
                 """INSERT INTO animation_clips(
-                    id,character_id,name,source_path,prepared_path,sha256,source_sha256,duplicate_first_frame_at_end,
+                    id,character_id,name,source_path,prepared_path,sha256,source_sha256,
                     asset_id,published_sha256,moderation_state,revision,created_at,updated_at,content_updated_at,published_at
-                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (clip_id, character_id, clip_name, relative_source, relative_prepared, prepared_sha, source_sha, 0, None, "", "", 1, now, now, now, None),
+                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (clip_id, character_id, clip_name, relative_source, relative_prepared, prepared_sha, source_sha, None, "", "", 1, now, now, now, None),
             )
             outcome = "created"
         else:
@@ -428,7 +428,7 @@ class AnimationStorageMixin:
         with self.connect() as connection:
             rows = connection.execute(
                 """SELECT b.id AS binding_id,b.character_id,b.scope,b.weapon_set,b.slot,b.variant,b.clip_id,b.weight,b.looped,b.priority,
-                          c.name,c.source_path,c.prepared_path,c.sha256,c.source_sha256,c.duplicate_first_frame_at_end,c.asset_id,c.published_sha256,
+                          c.name,c.source_path,c.prepared_path,c.sha256,c.source_sha256,c.asset_id,c.published_sha256,
                           c.moderation_state,c.revision,c.published_at
                    FROM animation_bindings b JOIN animation_clips c ON c.id=b.clip_id
                    WHERE b.character_id=?
@@ -440,7 +440,6 @@ class AnimationStorageMixin:
             row = dict(raw)
             row["status"] = self._status(row)
             row["looped"] = bool(row.get("looped"))
-            row["duplicate_first_frame_at_end"] = bool(row.get("duplicate_first_frame_at_end"))
             row["animationId"] = f"rbxassetid://{row['asset_id']}" if str(row.get("asset_id") or "").isdigit() else ""
             result.append(row)
         return result
@@ -482,7 +481,7 @@ class AnimationStorageMixin:
         with self.connect() as connection:
             row = connection.execute(
                 """SELECT b.id AS binding_id,b.character_id,b.scope,b.weapon_set,b.slot,b.variant,b.clip_id,b.weight,b.looped,b.priority,
-                          c.name,c.source_path,c.prepared_path,c.sha256,c.source_sha256,c.duplicate_first_frame_at_end,c.asset_id,c.published_sha256,
+                          c.name,c.source_path,c.prepared_path,c.sha256,c.source_sha256,c.asset_id,c.published_sha256,
                           c.moderation_state,c.revision,c.published_at
                    FROM animation_bindings b JOIN animation_clips c ON c.id=b.clip_id WHERE c.id=?""",
                 (clip_id,),
@@ -494,21 +493,6 @@ class AnimationStorageMixin:
         value["looped"] = bool(value.get("looped"))
         return value
 
-
-    def set_duplicate_first_frame(self, clip_id: str, enabled: bool) -> dict:
-        # Runtime presentation flag only. Never mutate canonical animation
-        # bytes, publication checksum, revision, or permanent Roblox asset id.
-        with self.connect() as connection:
-            raw = connection.execute("SELECT character_id FROM animation_clips WHERE id=?", (clip_id,)).fetchone()
-            if not raw:
-                raise ValueError(f"unknown animation clip: {clip_id}")
-            connection.execute(
-                "UPDATE animation_clips SET duplicate_first_frame_at_end=?,updated_at=? WHERE id=?",
-                (1 if enabled else 0, _now(), clip_id),
-            )
-            character_id = str(raw["character_id"])
-        self.export()
-        return self.snapshot(character_id)
 
     def set_weight(self, binding_id: str, weight: int) -> dict:
         weight = max(1, min(10000, int(weight)))
@@ -531,6 +515,6 @@ class AnimationStorageMixin:
             connection.execute("DELETE FROM animation_bindings WHERE id=?", (binding_id,))
             other = connection.execute("SELECT 1 FROM animation_bindings WHERE clip_id=? LIMIT 1", (clip_id,)).fetchone()
             if other is None:
-                connection.execute("DELETE FROM animation_clips WHERE id=?", (clip_id,))
+                retire_unbound_clip(connection, "character", clip_id)
         self.export()
         return self.snapshot(character_id)

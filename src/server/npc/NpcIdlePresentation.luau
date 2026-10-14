@@ -44,9 +44,8 @@ function NpcIdlePresentation.new(entity: Model, animator: Animator, profile: any
                 self.base = clip
             end
             table.insert(self.choices, clip)
-            if role == "special" and not clip.seam then
-                -- Stopped is a fallback if a track completes before our frame-step.
-                -- Ended fires AFTER the fade-out and is too late to prevent rest pose.
+            if role == "special" then
+                -- Finish on stop if the clip ends before the scheduled crossfade.
                 table.insert(self.connections, clip.track.Stopped:Connect(function()
                     if self.active and self.activeSpecial == clip then
                         self:_finishSpecial()
@@ -55,7 +54,7 @@ function NpcIdlePresentation.new(entity: Model, animator: Animator, profile: any
             end
         end
     end
-    if self.base and not self.base.seam then
+    if self.base then
         table.insert(self.connections, self.base.track.DidLoop:Connect(function()
             if self.active and not self.activeSpecial then
                 self:_rollAtIdleBoundary()
@@ -176,20 +175,13 @@ function NpcIdlePresentation:Step(delta: number)
             self:_finishSpecial()
             return
         end
-        local completed = Tracks.Step(special, delta)
-        if completed then
-            self:_finishSpecial()
-        elseif special.track.Length <= 0 and os.clock() - self.specialStarted >= Config.UnresolvedSpecialTimeoutSeconds then
+        if special.track.Length <= 0 and os.clock() - self.specialStarted >= Config.UnresolvedSpecialTimeoutSeconds then
             warn("[game1][npc] special idle asset did not resolve: " .. tostring(special.row.animationId))
             self:_finishSpecial()
         end
         return
     end
     if self.base and self.base.track.IsPlaying and self.base.track.Length > 0 then
-        local _, wrapped = Tracks.Step(self.base, delta)
-        if wrapped then
-            self:_rollAtIdleBoundary()
-        end
         return
     end
     -- No usable base loop: attempt weighted selection at a bounded interval.

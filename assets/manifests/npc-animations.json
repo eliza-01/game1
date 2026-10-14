@@ -75,6 +75,7 @@
   ],
   "weaponSets": [
     "base",
+    "unarmed",
     "1hs",
     "2hs",
     "bow"
@@ -89,10 +90,10 @@
     },
     {
       "monster_slug": "warsmith",
-      "skeleton_signature": "458247f952aa119b674fdb46b737de3f45e22b7aec812cc4d9a42b19f944357f",
+      "skeleton_signature": "f72cbdcfa8c465b044b58822eabafb11531387e0188b62cfd0ca9c34a90ec692",
       "scan_root": "E:\\RobloxProjects\\RobloxExport\\game1\\animations\\warsmith",
       "created_at": 1791699301.5820084,
-      "updated_at": 1791700992.746519
+      "updated_at": 1791882917.9476323
     }
   ],
   "clips": [
@@ -104,7 +105,6 @@
       "prepared_path": "assets/source/npcs/guard_01/animations/attack_01.rbxm",
       "sha256": "3e555e72a2a7b4e11f94b9c4930364e28b0b56d39280ab4c732611ab26f964fd",
       "source_sha256": "3e555e72a2a7b4e11f94b9c4930364e28b0b56d39280ab4c732611ab26f964fd",
-      "duplicate_first_frame_at_end": 0,
       "asset_id": "89218860148097",
       "published_sha256": "3e555e72a2a7b4e11f94b9c4930364e28b0b56d39280ab4c732611ab26f964fd",
       "moderation_state": "Approved",
@@ -123,7 +123,6 @@
       "prepared_path": "assets/source/npcs/guard_01/animations/combat_idle.rbxm",
       "sha256": "c12f193d98b7b76e7221c1602b1b52678e652f50ee73e678b62afbda8d03618c",
       "source_sha256": "c12f193d98b7b76e7221c1602b1b52678e652f50ee73e678b62afbda8d03618c",
-      "duplicate_first_frame_at_end": 0,
       "asset_id": "125522140536834",
       "published_sha256": "c12f193d98b7b76e7221c1602b1b52678e652f50ee73e678b62afbda8d03618c",
       "moderation_state": "Approved",
@@ -142,7 +141,6 @@
       "prepared_path": "assets/source/npcs/guard_01/animations/death.rbxm",
       "sha256": "69cf780206c554fe94580458d2e5cd968498920af8fd0f0bbd050795c3373bb9",
       "source_sha256": "69cf780206c554fe94580458d2e5cd968498920af8fd0f0bbd050795c3373bb9",
-      "duplicate_first_frame_at_end": 0,
       "asset_id": "140129007932289",
       "published_sha256": "69cf780206c554fe94580458d2e5cd968498920af8fd0f0bbd050795c3373bb9",
       "moderation_state": "Approved",
@@ -161,7 +159,6 @@
       "prepared_path": "assets/source/npcs/guard_01/animations/idle.rbxm",
       "sha256": "e738ce38559995fa159a723606b3995cd27b07a029e2a71f5f724b81fc90854f",
       "source_sha256": "e738ce38559995fa159a723606b3995cd27b07a029e2a71f5f724b81fc90854f",
-      "duplicate_first_frame_at_end": 0,
       "asset_id": "121205302537992",
       "published_sha256": "e738ce38559995fa159a723606b3995cd27b07a029e2a71f5f724b81fc90854f",
       "moderation_state": "Approved",
@@ -180,7 +177,6 @@
       "prepared_path": "assets/source/npcs/guard_01/animations/idle_special_01.rbxm",
       "sha256": "a2a2b69fd3cc2b83373ca0c619771108e405269ae0275693080d9546d802994e",
       "source_sha256": "a2a2b69fd3cc2b83373ca0c619771108e405269ae0275693080d9546d802994e",
-      "duplicate_first_frame_at_end": 0,
       "asset_id": "103119318954108",
       "published_sha256": "a2a2b69fd3cc2b83373ca0c619771108e405269ae0275693080d9546d802994e",
       "moderation_state": "Approved",
@@ -199,7 +195,6 @@
       "prepared_path": "assets/source/npcs/guard_01/animations/run.rbxm",
       "sha256": "4086f777b47a388d3a5c010760979f787e7d3c9cae78e91922cc4d7e868cd8c6",
       "source_sha256": "4086f777b47a388d3a5c010760979f787e7d3c9cae78e91922cc4d7e868cd8c6",
-      "duplicate_first_frame_at_end": 0,
       "asset_id": "132123582014306",
       "published_sha256": "4086f777b47a388d3a5c010760979f787e7d3c9cae78e91922cc4d7e868cd8c6",
       "moderation_state": "Approved",
@@ -218,7 +213,6 @@
       "prepared_path": "assets/source/npcs/guard_01/animations/walk.rbxm",
       "sha256": "f3e97ab268e4b1ccfc6a055c534ff1fea02f6147d27188dbc6fde8d3ed35b9d4",
       "source_sha256": "f3e97ab268e4b1ccfc6a055c534ff1fea02f6147d27188dbc6fde8d3ed35b9d4",
-      "duplicate_first_frame_at_end": 0,
       "asset_id": "116522185625057",
       "published_sha256": "f3e97ab268e4b1ccfc6a055c534ff1fea02f6147d27188dbc6fde8d3ed35b9d4",
       "moderation_state": "Approved",
@@ -227,63 +221,6 @@
       "updated_at": 1791812316.0862262,
       "content_updated_at": 1791812271.1105022,
       "published_at": 1791812316.0862262,
-      "status": "PUBLISHED"
-    },
-    {
-      "id": "npc__warsmith__idle__00",
-      "monster_slug": "warsmith",
-      "name": "idle",
-      "source_path": "assets/source/npcs/warsmith/animations/idle.rbxm",
-      "prepared_path": "assets/source/npcs/warsmith/animations/idle.rbxm",
-      "sha256": "4be51f92da7936d046a51da8cedf97f08fa29e0077f50d10856061e03a7ed2d2",
-      "source_sha256": "4be51f92da7936d046a51da8cedf97f08fa29e0077f50d10856061e03a7ed2d2",
-      "duplicate_first_frame_at_end": 0,
-      "asset_id": "88762573361466",
-      "published_sha256": "4be51f92da7936d046a51da8cedf97f08fa29e0077f50d10856061e03a7ed2d2",
-      "moderation_state": "Approved",
-      "revision": 1,
-      "created_at": 1791700992.746519,
-      "updated_at": 1791701036.7070396,
-      "content_updated_at": 1791700992.746519,
-      "published_at": 1791701036.7070396,
-      "status": "PUBLISHED"
-    },
-    {
-      "id": "npc__warsmith__idle_special__01",
-      "monster_slug": "warsmith",
-      "name": "idle_special_01",
-      "source_path": "assets/source/npcs/warsmith/animations/idle_special_01.rbxm",
-      "prepared_path": "assets/source/npcs/warsmith/animations/idle_special_01.rbxm",
-      "sha256": "4a7ca2771deb792d041a8282a220a506915a5f1bd60ab33fe93b71f77be93933",
-      "source_sha256": "4a7ca2771deb792d041a8282a220a506915a5f1bd60ab33fe93b71f77be93933",
-      "duplicate_first_frame_at_end": 0,
-      "asset_id": "127366991170629",
-      "published_sha256": "4a7ca2771deb792d041a8282a220a506915a5f1bd60ab33fe93b71f77be93933",
-      "moderation_state": "Approved",
-      "revision": 1,
-      "created_at": 1791700992.746519,
-      "updated_at": 1791701040.1629527,
-      "content_updated_at": 1791700992.746519,
-      "published_at": 1791701040.1629527,
-      "status": "PUBLISHED"
-    },
-    {
-      "id": "npc__warsmith__idle_special__02",
-      "monster_slug": "warsmith",
-      "name": "idle_special_02",
-      "source_path": "assets/source/npcs/warsmith/animations/idle_special_02.rbxm",
-      "prepared_path": "assets/source/npcs/warsmith/animations/idle_special_02.rbxm",
-      "sha256": "1b5b869e7fff0566834d72de5d20a669412228cb2c1e445f3b91cf1837600af4",
-      "source_sha256": "1b5b869e7fff0566834d72de5d20a669412228cb2c1e445f3b91cf1837600af4",
-      "duplicate_first_frame_at_end": 0,
-      "asset_id": "85866729046732",
-      "published_sha256": "1b5b869e7fff0566834d72de5d20a669412228cb2c1e445f3b91cf1837600af4",
-      "moderation_state": "Approved",
-      "revision": 1,
-      "created_at": 1791700992.746519,
-      "updated_at": 1791701043.5392632,
-      "content_updated_at": 1791700992.746519,
-      "published_at": 1791701043.5392632,
       "status": "PUBLISHED"
     }
   ],
@@ -300,7 +237,8 @@
       "created_at": 1791812271.1105022,
       "updated_at": 1791812271.1105022,
       "weapon_set": "1hs",
-      "disarm": 0
+      "disarm": 0,
+      "compatible_sets": null
     },
     {
       "id": "binding__npc__guard_01__combat_idle__00",
@@ -314,7 +252,8 @@
       "created_at": 1791812271.1105022,
       "updated_at": 1791812271.1105022,
       "weapon_set": "1hs",
-      "disarm": 0
+      "disarm": 0,
+      "compatible_sets": null
     },
     {
       "id": "binding__npc__guard_01__death__00",
@@ -328,7 +267,8 @@
       "created_at": 1791812271.1105022,
       "updated_at": 1791812271.1105022,
       "weapon_set": "1hs",
-      "disarm": 0
+      "disarm": 0,
+      "compatible_sets": null
     },
     {
       "id": "binding__npc__guard_01__idle__00",
@@ -342,7 +282,8 @@
       "created_at": 1791812271.1105022,
       "updated_at": 1791812271.1105022,
       "weapon_set": "1hs",
-      "disarm": 0
+      "disarm": 0,
+      "compatible_sets": null
     },
     {
       "id": "binding__npc__guard_01__idle_special__01",
@@ -356,7 +297,8 @@
       "created_at": 1791812271.1105022,
       "updated_at": 1791812347.5396872,
       "weapon_set": "1hs",
-      "disarm": 0
+      "disarm": 0,
+      "compatible_sets": null
     },
     {
       "id": "binding__npc__guard_01__run__00",
@@ -370,7 +312,8 @@
       "created_at": 1791812271.1105022,
       "updated_at": 1791812271.1105022,
       "weapon_set": "1hs",
-      "disarm": 0
+      "disarm": 0,
+      "compatible_sets": null
     },
     {
       "id": "binding__npc__guard_01__walk__00",
@@ -384,49 +327,8 @@
       "created_at": 1791812271.1105022,
       "updated_at": 1791812271.1105022,
       "weapon_set": "1hs",
-      "disarm": 0
-    },
-    {
-      "id": "binding__npc__warsmith__idle__00",
-      "monster_slug": "warsmith",
-      "slot": "idle",
-      "variant": 0,
-      "clip_id": "npc__warsmith__idle__00",
-      "weight": 100,
-      "looped": 1,
-      "priority": "Idle",
-      "created_at": 1791700992.746519,
-      "updated_at": 1791700992.746519,
-      "weapon_set": "1hs",
-      "disarm": 0
-    },
-    {
-      "id": "binding__npc__warsmith__idle_special__01",
-      "monster_slug": "warsmith",
-      "slot": "idle_special",
-      "variant": 1,
-      "clip_id": "npc__warsmith__idle_special__01",
-      "weight": 40,
-      "looped": 0,
-      "priority": "Idle",
-      "created_at": 1791700992.746519,
-      "updated_at": 1791701022.8479013,
-      "weapon_set": "1hs",
-      "disarm": 0
-    },
-    {
-      "id": "binding__npc__warsmith__idle_special__02",
-      "monster_slug": "warsmith",
-      "slot": "idle_special",
-      "variant": 2,
-      "clip_id": "npc__warsmith__idle_special__02",
-      "weight": 30,
-      "looped": 0,
-      "priority": "Idle",
-      "created_at": 1791700992.746519,
-      "updated_at": 1791701014.0438545,
-      "weapon_set": "1hs",
-      "disarm": 0
+      "disarm": 0,
+      "compatible_sets": null
     }
   ]
 }

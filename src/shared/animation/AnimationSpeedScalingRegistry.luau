@@ -131,16 +131,40 @@ return table.freeze({
 			label = "npc / guard_01 / walk",
 			channel = "walk",
 		}),
-		["88762573361466"] = table.freeze({
-			label = "npc / warsmith / idle",
+		["126131232511753"] = table.freeze({
+			label = "npc / warsmith / 1hs_attack_01",
+			channel = "attack",
+		}),
+		["88602283895871"] = table.freeze({
+			label = "npc / warsmith / 1hs_attack_02",
+			channel = "attack",
+		}),
+		["137839979654028"] = table.freeze({
+			label = "npc / warsmith / 1hs_combat_idle",
+			channel = "combat_idle",
+		}),
+		["113100282026807"] = table.freeze({
+			label = "npc / warsmith / 1hs_idle_special_01",
 			channel = "idle",
 		}),
-		["127366991170629"] = table.freeze({
-			label = "npc / warsmith / idle_special_01",
+		["127890642558312"] = table.freeze({
+			label = "npc / warsmith / 1hs_run",
+			channel = "run",
+		}),
+		["94161736966964"] = table.freeze({
+			label = "npc / warsmith / 1hs_walk",
+			channel = "walk",
+		}),
+		["130597315389018"] = table.freeze({
+			label = "npc / warsmith / base_death",
+			channel = "death",
+		}),
+		["117666830429058"] = table.freeze({
+			label = "npc / warsmith / base_idle",
 			channel = "idle",
 		}),
-		["85866729046732"] = table.freeze({
-			label = "npc / warsmith / idle_special_02",
+		["102811681394699"] = table.freeze({
+			label = "npc / warsmith / base_idle_special_01",
 			channel = "idle",
 		}),
 	}),

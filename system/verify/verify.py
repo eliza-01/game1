@@ -195,7 +195,7 @@ for required in [
 ]:
     if required not in attack_timeline_text:
         err(f"attack animation timeline config missing {required}")
-for forbidden in ["ResultTypes", "melee_damage", "runtimeTailDuration", "_duplicateFirstFrameAtEnd"]:
+for forbidden in ["ResultTypes", "melee_damage", "runtimeTailDuration"]:
     if forbidden in attack_timeline_text:
         err(f"obsolete attack timeline runtime field remains: {forbidden}")
 for required in [
@@ -1142,7 +1142,7 @@ for required in [
     "DeathAnimationPolicy.Start",
     "DeathAnimationPolicy.LatchVisibleTerminalPose",
     "DeathTerminalReached",
-    "RunService.PreAnimation:Connect(maintainRuntimeAnimationTails)",
+    "RunService.PreAnimation:Connect(maintainDeathPose)",
     "maintainDeathTerminalPose(deltaTimeSim)",
     "DeathTerminalPoseHeld",
 ]:
@@ -1212,7 +1212,7 @@ for manifest_name in ["character-animations.json", "monster-animations.json"]:
         if clip_id and f'["{clip_id}"]' not in attack_timeline_data_text:
             err(f"registered attack clip has no authoritative timeline: {clip_id}")
 
-# m13+ starting stats; m15 runtime-only first-frame seam contract.
+# m13+ starting stats.
 character_manifest = json.loads((ROOT / "assets/manifests/character-archetypes.json").read_text(encoding="utf-8"))
 character_options = character_manifest.get("archetypes") or []
 for row in character_options:
@@ -1227,73 +1227,6 @@ for required in ["character_stats", "set_stats", "defaultStats", '"stats": row.g
 for required in ["row.stats", 'value("RunSpeed")', 'value("AttackSpeed")']:
     if required not in (stats_service_text + character_service_text):
         err(f"character runtime starting-stat contract missing {required}")
-
-# The first->end checkbox is metadata only. It must never rewrite an .rbxm,
-# change publication checksums, revisions, or permanent asset ids.
-transform_path = ROOT / "system/control-center/animation_keyframe_transform.py"
-if transform_path.exists():
-    err("legacy physical animation_keyframe_transform.py must be removed; first-frame seam is runtime-only")
-for store_file in [ROOT / "system/control-center/animation_core/storage.py", ROOT / "system/control-center/monster_animation_store.py"]:
-    text = store_file.read_text(encoding="utf-8") if store_file.is_file() else ""
-    for required in ["source_sha256", "duplicate_first_frame_at_end", "set_duplicate_first_frame", "_normalize_source_only_files", "shutil.copy2"]:
-        if required not in text:
-            err(f"runtime animation seam storage contract missing {required} in {store_file.name}")
-    if "prepare_animation_file" in text or "animation_keyframe_transform" in text:
-        err(f"physical animation seam transformer is still referenced by {store_file.name}")
-    setter = text.split("def set_duplicate_first_frame", 1)[1].split("def ", 1)[0] if "def set_duplicate_first_frame" in text else ""
-    for forbidden in ["sha256=?", "source_sha256=?", "revision=?", "copy2(", "prepare_animation_file"]:
-        if forbidden in setter:
-            err(f"first-frame checkbox mutates animation content/revision in {store_file.name}: {forbidden}")
-for required in ["duplicate-first-frame", "set_duplicate_first_frame"]:
-    if required not in host_agent_text:
-        err(f"animation seam API missing {required}")
-for required in ["data-duplicate", "setAnimationDuplicate", "runtime first-frame tail"]:
-    if required not in character_js_text:
-        err(f"character animation seam UI missing {required}")
-if "data-duplicate" not in monster_assets_js_early or "monsterSetAnimationDuplicate" not in monster_assets_js_early or "runtime first-frame tail" not in monster_assets_js_early:
-    err("monster animation seam UI is missing/runtime wording is stale")
-
-runtime_seam_path = ROOT / "src/shared/animation/AnimationFirstFrameSeam.luau"
-runtime_seam_text = runtime_seam_path.read_text(encoding="utf-8") if runtime_seam_path.is_file() else ""
-for required in ["SourceFrameSeconds", "companion", "AdjustWeight", "TimePosition = 0", "completedLoopCycle", "self.primary.Looped = self.looped", "self.primary:AdjustSpeed(self.speed)", "self.primary:AdjustWeight(1 - alpha, 0)", "current + 1e-5 < self.previousTime"]:
-    if required not in runtime_seam_text:
-        err(f"runtime first-frame seam policy missing {required}")
-for forbidden in ["RuntimeTailSeconds", "_beginTail", "projected =", "self.primary:AdjustSpeed(0)"]:
-    if forbidden in runtime_seam_text:
-        err(f"runtime first-frame seam must not stall/restart the primary timeline: {forbidden}")
-character_animation_controller_text = (ROOT / "src/client/character/animation/CharacterAnimationController.luau").read_text(encoding="utf-8")
-character_track_cache_text = (ROOT / "src/client/character/animation/AnimationTrackCache.luau").read_text(encoding="utf-8")
-monster_spawner_text_m15 = (ROOT / "src/server/monster/MonsterSpawnerService.luau").read_text(encoding="utf-8")
-for required in ["AnimationFirstFrameSeam", "GetSeamCompanion", "duplicateFirstFrameAtEnd"]:
-    if required not in (character_animation_controller_text + character_track_cache_text):
-        err(f"character runtime seam integration missing {required}")
-for required in ["AnimationFirstFrameSeam", "createRuntimeSeam", "maintainRuntimeAnimationSeams", "duplicateFirstFrameAtEnd"]:
-    if required not in monster_spawner_text_m15:
-        err(f"monster runtime seam integration missing {required}")
-attack_runtime_text = attack_timeline_text + (ROOT / "src/server/combat/AttackService.luau").read_text(encoding="utf-8")
-if "AnimationFirstFrameSeam.RuntimeTailSeconds" in attack_runtime_text:
-    err("runtime seam must not extend attack duration or event timing")
-if "duplicateFirstFrameAtEnd" in attack_timeline_text:
-    err("attack timing resolver must not depend on presentation seam flags")
-
-for animation_manifest_name in ["character-animations.json", "monster-animations.json"]:
-    path = ROOT / "assets/manifests" / animation_manifest_name
-    if not path.is_file():
-        continue
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    clips = payload.get("clips") or []
-    for clip in clips:
-        duplicate = clip.get("duplicateFirstFrameAtEnd", clip.get("duplicate_first_frame_at_end"))
-        source_sha = clip.get("sourceSha256", clip.get("source_sha256"))
-        if duplicate is None:
-            err(f"animation manifest clip missing duplicate-first-frame runtime flag: {animation_manifest_name} / {clip.get('id')}")
-        if source_sha is None:
-            err(f"animation manifest clip missing canonical source sha: {animation_manifest_name} / {clip.get('id')}")
-
-for registry_name in ["src/shared/character/CharacterAnimationRegistry.luau", "src/shared/monster/MonsterAnimationRegistry.luau"]:
-    registry_text = (ROOT / registry_name).read_text(encoding="utf-8")
-    if "duplicateFirstFrameAtEnd" not in registry_text:
-        err(f"runtime animation registry does not export first-frame seam flag: {registry_name}")
 
 # m18 manual animation reimport verification lives in Asset Manager and mirrors
 # RobloxLineage: scan detects local SHA changes, Studio reimport remains manual,

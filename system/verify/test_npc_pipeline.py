@@ -99,6 +99,40 @@ class NpcPipelineTests(unittest.TestCase):
         self.assertIn("base", self.npc_animations.snapshot("blacksmith")["weaponSets"])
         self.assertIn("1hs", self.npc_animations.snapshot("blacksmith")["weaponSets"])
 
+    def test_idle_combat_filename_alias_keeps_canonical_state(self):
+        # Imported names may say idle_combat; the shared runtime state is combat_idle.
+        from npc_animation_taxonomy import parse, filename
+
+        legacy = "blacksmith_1hs_idle_combat.rbxm"
+        self.assertEqual(parse(legacy, "blacksmith"), {
+            "weaponSet": "1hs", "slot": "combat_idle", "variant": 0,
+        })
+        self.assertEqual(classify(Path(legacy), "blacksmith", npc=True)["slot"], "combat_idle")
+        self.assertEqual(classify(Path("goblin_idle_combat.rbxm"), "goblin")["slot"], "combat_idle")
+        self.assertEqual(filename("blacksmith", "1hs", "combat_idle", 0),
+                         "blacksmith_1hs_combat_idle.rbxm")
+
+        self.seed_npc()
+        folder = self.root / "animation-inbox"
+        folder.mkdir()
+        (folder / legacy).write_bytes(b"fake-rbxm-contract-only")
+        result = self.npc_animations.scan_folder("blacksmith", str(folder))
+        self.assertEqual(result["recognized"], 1)
+        self.assertEqual(result["unassigned"], [])
+        self.assertEqual(result["items"][0]["slot"], "combat_idle")
+        self.assertTrue((self.root / "assets/source/npcs/blacksmith/animations/1hs_combat_idle.rbxm").is_file())
+
+    def test_unassigned_npc_message_is_not_labeled_monster(self):
+        self.seed_npc()
+        folder = self.root / "animation-inbox"
+        folder.mkdir()
+        (folder / "blacksmith_1hs_nonexistent.rbxm").write_bytes(b"test")
+        result = self.npc_animations.scan_folder("blacksmith", str(folder))
+        self.assertEqual(result["recognized"], 0)
+        self.assertEqual(len(result["unassigned"]), 1)
+        self.assertIn("NPC animation", result["unassigned"][0]["reason"])
+        self.assertNotIn("monster", result["unassigned"][0]["reason"])
+
     def test_npc_spawns_without_any_animations(self):
         self.seed_npc()
         readiness = self.spawns.readiness("blacksmith")
@@ -235,8 +269,8 @@ class NpcPipelineTests(unittest.TestCase):
         ui = (repo / "system/control-center/static/npc-assets.js").read_text()
         self.assertIn('WeightedAnimationChoice.Select(self.choices, selectionRandom)', idle)
         self.assertIn('self.base.track.DidLoop:Connect', idle)
-        self.assertIn('Tracks.Step(self.base, delta)', idle)
-        self.assertIn('Tracks.Step(special, delta)', idle)
+        self.assertIn('Tracks.SecondsRemaining(special)', idle)
+        self.assertIn('clip.track.Stopped:Connect', idle)
         self.assertIn('self.activeSpecial', idle)
         self.assertIn('IdleVariant', idle)
         self.assertIn('weight > 0', chooser)

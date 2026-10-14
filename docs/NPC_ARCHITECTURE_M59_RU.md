@@ -31,8 +31,8 @@
 
 ## M63 · Анимационное состояние NPC и веса idle
 
-- `NpcAnimationTracks` — адаптер опубликованных `NpcAnimationRegistry` rows для профиля оружия из `NpcAnimationConfig`. Создаёт `AnimationTrack`, управляет приоритетами, скоростью и optional runtime-only `AnimationFirstFrameSeam`. Не знает про боевые состояния или популяцию.
-- `NpcIdlePresentation` — самостоятельный контроллер мирного idle. Идентифицирует base/special по `role`/`sourceSlot`, выбирает варианты из весов через общий `WeightedAnimationChoice`, запускает special на границе завершения base idle и возвращается к base после special. Для base с включённым `first→end` граница определяется seam; иначе — `DidLoop`. При отсутствии работающего base idle выбор выполняется с интервалом `MissingBaseIdleCycleSeconds`.
+- `NpcAnimationTracks` — адаптер опубликованных `NpcAnimationRegistry` rows для профиля оружия из `NpcAnimationConfig`. Создаёт `AnimationTrack`, управляет приоритетами и скоростью. Не знает про боевые состояния или популяцию.
+- `NpcIdlePresentation` — самостоятельный контроллер мирного idle. Идентифицирует base/special по `role`/`sourceSlot`, выбирает варианты из весов через общий `WeightedAnimationChoice`, запускает special на границе завершения base idle и возвращается к base после special. Граница базового цикла определяется `DidLoop`. При отсутствии работающего base idle выбор выполняется с интервалом `MissingBaseIdleCycleSeconds`.
 - `NpcAnimationService` — оркестрация состояний `idle ↔ combat_idle → death`. Переход в бой и смерть останавливает special, смерть управляется `DeathAnimationPolicy`; сервис предоставляет `Step`/`Destroy` и не создаёт/не удаляет NPC.
 - `NpcSpawnerService` владеет экземплярами NPC и вызывает `presentation.Step` до завершения жизни, а `presentation.Destroy` при очистке. Без AI NPC не атакуют.
 - Веса NPC от `0` до `10000`. Значение `0` исключает вариант из выбора. Веса пропорциональны: при base=300, special_01=25 и special_02=0 вероятность special_01 при очередном выборе равна `25/(300+25)`; special_02 не выбирается. Существующая шкала monsters (`1..10000`) не изменяется.

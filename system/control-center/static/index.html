@@ -139,7 +139,7 @@
 <div class="panel character-card">
 <div class="section-title"><div><span>semantic animation profile</span><h3 id="animation-table-title">registered clips</h3></div><span id="animation-filter-label" class="pill">all</span></div>
 <div class="animation-legend"><span><b>base</b> locomotion / posture</span><span><b>weapon</b> hands / 1hs / bow contexts</span><span><b>variant</b> alternate visuals of the same action</span></div>
-<div class="table-wrap animation-table-wrap"><table><thead><tr><th>context</th><th>slot</th><th>variant</th><th>clip</th><th>asset</th><th>status</th><th>weight</th><th>first→end</th><th>actions</th></tr></thead><tbody id="animation-rows"></tbody></table></div>
+<div class="table-wrap animation-table-wrap"><table><thead><tr><th>context</th><th>slot</th><th>variant</th><th>clip</th><th>asset</th><th>status</th><th>weight</th><th>actions</th></tr></thead><tbody id="animation-rows"></tbody></table></div>
 <div id="animation-details" class="details"><span class="muted">select a clip.</span></div>
 </div>
 </div>
@@ -342,7 +342,7 @@
 <div class="panel character-card">
 <div class="section-title"><div><span>selected monster animations</span><h3 id="monster-animation-table-title">registered animations</h3></div></div>
 <small class="hint">only animations already registered for the selected monster are listed here. <code>idle_special_01..n</code> are shown as variants of state <code>idle</code>. weight is relative inside one state. playback speed is configured globally in the Animation Speed section.</small>
-<div class="table-wrap animation-table-wrap"><table><thead><tr><th>state</th><th>variant</th><th>clip</th><th>asset</th><th>status</th><th>weight</th><th>first→end</th><th>actions</th></tr></thead><tbody id="monster-animation-rows"></tbody></table></div>
+<div class="table-wrap animation-table-wrap"><table><thead><tr><th>state</th><th>variant</th><th>clip</th><th>asset</th><th>status</th><th>weight</th><th>actions</th></tr></thead><tbody id="monster-animation-rows"></tbody></table></div>
 </div>
 </div>
 
@@ -431,7 +431,7 @@
 <label>npc<select id="npc-animation-npc"></select><small class="hint">this is the npc whose animation files will be scanned, registered and published.</small></label>
 <hr class="card-separator">
 <h3 class="subheading">animation folder</h3>
-<details id="npc-animation-filename-guide" class="naming-guide" open><summary>filename rules · npc states</summary><div id="npc-animation-filename-rules" class="filename-rules"><span class="muted">select a npc.</span></div><small class="hint">canonical names use <code>{npc_slug}_{type}_{state}</code>, e.g. <code>blacksmith_base_idle_special_01.rbxm</code>. Change type and rename a registered clip together to migrate it without losing its published asset ID. <code>idle_special_01</code>, <code>idle_special_02</code>, … are variants inside <code>idle</code>; <code>combat_idle</code> is the waiting pose while already in combat; <code>attack_01</code>, <code>attack_02</code>, … are variants inside <code>attack</code>.</small></details>
+<details id="npc-animation-filename-guide" class="naming-guide" open><summary>filename rules · npc states</summary><div id="npc-animation-filename-rules" class="filename-rules"><span class="muted">select a npc.</span></div><small class="hint">canonical names use <code>{npc_slug}_{type}_{state}</code>, e.g. <code>blacksmith_base_idle_special_01.rbxm</code>. Change type and rename a registered clip together to migrate it without losing its published asset ID. The base type defaults to all equipment contexts, including unarmed. Use animation options to customize compatibility. <code>idle_special_01</code>, <code>idle_special_02</code>, … are variants inside <code>idle</code>; <code>combat_idle</code> is the waiting pose while already in combat; <code>attack_01</code>, <code>attack_02</code>, … are variants inside <code>attack</code>.</small></details>
 <div class="picker folder-picker"><div class="folder-explorer"><input id="npc-animation-folder-path" type="text" autocomplete="off" spellcheck="false" placeholder="C:\path\to\npc-animations"><button id="choose-npc-animation-folder" type="button">explore…</button></div><small>paste a folder path or choose it in Explorer · the last npc animation folder is remembered</small></div>
 <div class="actions"><button id="scan-npc-animations" class="primary wide" type="button" disabled>scan folder</button></div>
 <div id="npc-animation-scan-status" class="status-box"><strong>nothing scanned yet</strong><span>unrecognized files can be assigned manually.</span></div>
@@ -445,7 +445,15 @@
 <div class="panel character-card">
 <div class="section-title"><div><span>selected npc animations</span><h3 id="npc-animation-table-title">registered animations</h3></div></div>
 <small class="hint">only animations already registered for the selected npc are listed here. <code>idle_special_01..n</code> are shown as variants of state <code>idle</code>. Weight is relative within idle (base + specials); 0 disables selection of that clip. Specials are selected at the end of a base idle cycle, or periodically if base idle is missing. playback speed is configured globally in the Animation Speed section.</small>
-<div class="table-wrap animation-table-wrap"><table><thead><tr><th>state</th><th>variant</th><th>type</th><th>canonical filename / rename</th><th>asset</th><th>status</th><th>weight</th><th>disarm</th><th>first→end</th><th>actions</th></tr></thead><tbody id="npc-animation-rows"></tbody></table></div>
+<div class="table-wrap animation-table-wrap"><table><thead><tr><th>state</th><th>variant</th><th>type</th><th>canonical filename / rename</th><th>asset</th><th>status</th><th>weight</th><th>disarm</th><th>actions</th></tr></thead><tbody id="npc-animation-rows"></tbody></table></div>
+<dialog id="npc-animation-options-dialog" class="npc-animation-options-dialog" aria-label="NPC animation options">
+ <div class="npc-options-head"><div><small>NPC ANIMATION OPTIONS</small><h3 data-npc-options-name></h3><span>Animation type: <strong data-npc-options-type></strong></span></div><button type="button" onclick="this.closest('dialog').close()" aria-label="Close">✕</button></div>
+ <div class="npc-options-inner"><label>Compatible With</label><button type="button" data-npc-options-toggle-all>select all</button>
+ <div class="npc-compat-grid" data-npc-options-compat></div>
+ <small>Unarmed is a separate equipment context; base defaults to all equipment types. An empty selection disables this animation.</small>
+ <div class="npc-options-controls"><label>Weight<input data-npc-options-weight type="number" min="0" max="10000" step="1" value="100"></label><label>Disarm <input data-npc-options-disarm type="checkbox"></label></div></div>
+ <div class="npc-options-actions"><button type="button" onclick="this.closest('dialog').close()">cancel</button><button type="button" class="primary" data-npc-options-save>apply</button></div>
+</dialog>
 </div>
 </div>
 

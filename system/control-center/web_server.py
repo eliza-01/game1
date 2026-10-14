@@ -2,6 +2,7 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 from pathlib import Path
+from static_paths import resolve_static_file
 import json
 import mimetypes
 import os
@@ -15,9 +16,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path.startswith("/api/"):
             return self.proxy()
-        relative = self.path.split("?", 1)[0].lstrip("/")
-        path = STATIC / ("index.html" if not relative else relative)
-        if not path.is_file():
+        path = resolve_static_file(STATIC, self.path)
+        if path is None:
             self.send_error(404)
             return
         body = path.read_bytes()

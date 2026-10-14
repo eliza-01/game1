@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from animation_scan_conflicts import partition_scan_candidates
 import hashlib
 import json
 import re
@@ -468,8 +469,7 @@ class MonsterAnimationStore:
         )
         if len(files) > MAX_SCAN_FILES:
             raise ValueError(f"monster animation scan found more than {MAX_SCAN_FILES} files; choose a narrower folder")
-        recognized, unassigned = [], []
-        coordinates = {}
+        candidates, unassigned = [], []
         for path in files:
             binding = classify(path, slug, npc=self.kind == "npc")
             if binding is None:
@@ -481,11 +481,11 @@ class MonsterAnimationStore:
                     if self.kind == "npc" else "name does not match a monster animation state",
                 })
                 continue
-            coordinate = (binding.get("weaponSet", ""), binding["slot"], int(binding["variant"]))
-            if coordinate in coordinates:
-                raise ValueError(f"monster animation scan is ambiguous: {coordinates[coordinate].name} and {path.name} map to {coordinate[0]} {coordinate[1]:02d}")
-            coordinates[coordinate] = path
-            recognized.append((path, binding))
+            candidates.append((path, binding))
+        # A duplicate semantic slot must never overwrite a surviving registration.
+        # Report both files for explicit assignment instead of guessing which wins.
+        recognized, conflicts = partition_scan_candidates(candidates, kind=self.kind)
+        unassigned.extend(conflicts)
         created = changed = unchanged = 0
         imported = []
         now = time.time()

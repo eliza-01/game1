@@ -46,6 +46,7 @@ from studio_save import request_active_studio_save
 from character_core.identity import CharacterIdentityService
 from studio_bridge import run_model_load_bridge, run_monster_spawn_bridge, run_timeline_editor_bridge, run_location_authoring_bridge
 from api.read_dispatch import dispatch as dispatch_read_request
+from api.write_dispatch import dispatch_post as dispatch_write_request, dispatch_delete as dispatch_delete_request
 from source_only_assets import migrate_source_only_assets
 
 migrate_source_only_assets(ROOT, ROOT / ".control-center" / "game1.db")
@@ -467,6 +468,47 @@ READ_SOURCES = MappingProxyType({
 })
 
 
+# Explicit application dependencies for write-side domain routes. Routes do not
+# import host_agent or instantiate production stores, so unit tests can replace
+# these with in-memory fakes without touching SQLite, Roblox, or the filesystem.
+WRITE_SOURCES = MappingProxyType({
+    "animation_speed_scaling": animation_speed_scaling,
+    "animations": animations,
+    "character_identity": character_identity,
+    "choose_animation_folder": choose_animation_folder,
+    "choose_character_fbx": choose_character_fbx,
+    "choose_location_asset_fbx": choose_location_asset_fbx,
+    "choose_location_asset_texture": choose_location_asset_texture,
+    "choose_monster_fbx": choose_monster_fbx,
+    "choose_monster_textures": choose_monster_textures,
+    "choose_weapon_fbx": choose_weapon_fbx,
+    "choose_weapon_textures": choose_weapon_textures,
+    "deco_layouts": deco_layouts,
+    "location_assets": location_assets,
+    "locations": locations,
+    "monster_animations": monster_animations,
+    "monster_spawns": monster_spawns,
+    "monsters": monsters,
+    "npc_animations": npc_animations,
+    "npc_equipment": npc_equipment,
+    "npc_place_spawn": npc_place_spawn,
+    "npc_register_spawn": npc_register_spawn,
+    "npc_spawns": npc_spawns,
+    "npcs": npcs,
+    "options_store": options_store,
+    "publication_credentials": publication_credentials,
+    "request_active_studio_save": request_active_studio_save,
+    "run_timeline_editor_bridge": run_timeline_editor_bridge,
+    "store": store,
+    "sync_character_to_studio": sync_character_to_studio,
+    "sync_monster_to_studio": sync_monster_to_studio,
+    "sync_weapon_to_studio": sync_weapon_to_studio,
+    "timelines": timelines,
+    "weapons": weapons,
+    "write_animation_export": write_animation_export,
+})
+
+
 def read_host_info():
     return {
         "build": control_agent_build, "project": "game1", "projectRoot": str(ROOT),
@@ -502,648 +544,14 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if not self.auth():
             return self.out(401, {"error": "unauthorized"})
-        path = self.parsed().path
-        if path == "/api/animation-export/write":
-            try:
-                return self.out(200, write_animation_export(self.body()))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/files/choose-character-model":
-            try:
-                return self.out(200, {"path": choose_character_fbx()})
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/files/choose-animation-folder":
-            try:
-                payload = self.body()
-                return self.out(200, {"path": choose_animation_folder(str(payload.get("initialPath") or ""))})
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/files/choose-npc-model":
-            try:
-                return self.out(200, {"path": choose_monster_fbx()})
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/files/choose-npc-textures":
-            try:
-                return self.out(200, {"paths": choose_monster_textures()})
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/files/choose-monster-model":
-            try:
-                return self.out(200, {"path": choose_monster_fbx()})
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/files/choose-monster-textures":
-            try:
-                return self.out(200, {"paths": choose_monster_textures()})
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/files/choose-weapon-model":
-            try:
-                return self.out(200, {"path": choose_weapon_fbx()})
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/files/choose-weapon-textures":
-            try:
-                return self.out(200, {"paths": choose_weapon_textures()})
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/files/choose-location-asset-model":
-            try:
-                return self.out(200, {"path": choose_location_asset_fbx()})
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/files/choose-location-asset-texture":
-            try:
-                return self.out(200, {"path": choose_location_asset_texture()})
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/characters":
-            try:
-                return self.out(200, store.register(self.body()))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/weapons":
-            try:
-                return self.out(200, weapons.register(self.body()))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/location-assets":
-            try:
-                return self.out(200, location_assets.register(self.body()))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/location-assets/layout":
-            try:
-                payload = self.body()
-                result = deco_layouts.save(payload)
-                result["studioSave"] = request_active_studio_save()
-                return self.out(200, result)
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/weapons/attack-movement":
-            try:
-                return self.out(200, weapons.update_attack_movement(self.body()))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/npcs":
-            try:
-                return self.out(200, npcs.register(self.body()))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        npc_spawn_actions = {
-            "/api/npc-spawns/place": lambda body: npc_place_spawn(body),
-            "/api/npc-spawns/register": lambda body: npc_register_spawn(body),
-            "/api/npc-spawns/select": lambda body: npc_spawns.select(body),
-            "/api/npc-spawns/delete": lambda body: npc_spawns.delete(body),
-            "/api/npc-spawns/restore": lambda body: npc_spawns.restore(),
-            "/api/npc-spawns/validate": lambda body: npc_spawns.validate(),
-        }
-        if path in npc_spawn_actions:
-            try:
-                return self.out(200, npc_spawn_actions[path](self.body()))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/monsters":
-            try:
-                return self.out(200, monsters.register(self.body()))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/monster-spawns/place":
-            try:
-                return self.out(200, monster_spawns.place(self.body()))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/monster-spawns/register":
-            try:
-                payload = self.body()
-                slug = str(payload.get("monsterSlug") or "").strip().lower()
-                sync_monster_to_studio(slug)
-                return self.out(200, monster_spawns.register(payload))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/monster-spawns/select":
-            try:
-                return self.out(200, monster_spawns.select(self.body()))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/monster-spawns/delete":
-            try:
-                return self.out(200, monster_spawns.delete(self.body()))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/monster-spawns/restore":
-            try:
-                return self.out(200, monster_spawns.restore())
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/monster-spawns/validate":
-            try:
-                return self.out(200, monster_spawns.validate())
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/animation-speed-scaling/custom":
-            try:
-                return self.out(200, animation_speed_scaling.save_custom(self.body()))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/animation-speed-scaling":
-            try:
-                return self.out(200, animation_speed_scaling.update(self.body()))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/options":
-            try:
-                return self.out(200, options_store.update(self.body()))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-
-        if path == "/api/locations/draw":
-            try:
-                return self.out(200, locations.draw(self.body()))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/locations/register":
-            try:
-                return self.out(200, locations.register(self.body()))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/locations/select":
-            try:
-                return self.out(200, locations.select(self.body()))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/locations/restore":
-            try:
-                return self.out(200, locations.restore())
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/locations/delete":
-            try:
-                return self.out(200, locations.delete(self.body()))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/locations/validate":
-            try:
-                return self.out(200, locations.validate())
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-
-        if path == "/api/timelines/open":
-            try:
-                payload = self.body()
-                session = timelines.begin_editor_session(str(payload.get("clipId") or ""))
-                studio = run_timeline_editor_bridge(session, timelines.event_catalog_for_subject(session["subjectType"]))
-                duration = float(studio.get("duration") or 0)
-                if duration > 0:
-                    timelines.update_editor_state({"sessionId": session["sessionId"], "action": "ready", "duration": duration})
-                return self.out(200, {"session": timelines.editor_state(session["sessionId"]), "studio": studio})
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/timelines/editor-event":
-            try:
-                return self.out(200, timelines.update_editor_state(self.body()))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/timelines/save":
-            try:
-                return self.out(200, timelines.save(self.body()))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-
-        if path == "/api/animations/check-roblox-assets":
-            try:
-                credentials = publication_credentials()
-                character = animations.check_manual_reimports(credentials)
-                monster = monster_animations.check_manual_reimports(credentials)
-                npc = npc_animations.check_manual_reimports(credentials)
-                return self.out(200, {
-                    "schemaVersion": 1,
-                    "project": "game1",
-                    "requested": int(character.get("requested") or 0) + int(monster.get("requested") or 0) + int(npc.get("requested") or 0),
-                    "confirmed": int(character.get("confirmed") or 0) + int(monster.get("confirmed") or 0) + int(npc.get("confirmed") or 0),
-                    "pending": int(character.get("pending") or 0) + int(monster.get("pending") or 0) + int(npc.get("pending") or 0),
-                    "failed": int(character.get("failed") or 0) + int(monster.get("failed") or 0) + int(npc.get("failed") or 0),
-                    "character": character,
-                    "monster": monster,
-                    "npc": npc,
-                })
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-
-        if path == "/api/monster-animations/scan":
-            try:
-                payload = self.body()
-                return self.out(200, monster_animations.scan_folder(str(payload.get("monsterSlug") or ""), str(payload.get("rootPath") or "")))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/monster-animations/assign":
-            try:
-                payload = self.body()
-                return self.out(200, monster_animations.assign_file(
-                    str(payload.get("monsterSlug") or ""), str(payload.get("sourcePath") or ""),
-                    str(payload.get("slot") or ""), int(payload.get("variant") or 0),
-                ))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/npc-equipment":
-            try:
-                payload = self.body()
-                return self.out(200, npc_equipment.set_loadout(
-                    str(payload.get("npcSlug") or ""),str(payload.get("right") or ""),str(payload.get("left") or "")))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/npc-equipment/sync":
-            try:
-                slug = str(self.body().get("npcSlug") or "").strip().lower()
-                if not npcs.get(slug):
-                    raise ValueError("unknown NPC: " + slug)
-                loadout = npc_equipment.snapshot(slug)["loadout"]
-                synced = []
-                for weapon_slug in sorted({loadout["right"], loadout["left"]} - {""}):
-                    sync_weapon_to_studio(weapon_slug)
-                    synced.append(weapon_slug)
-                return self.out(200, {"ok": True, "weapons": synced})
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/npc-animations/scan":
-            try:
-                payload = self.body()
-                return self.out(200, npc_animations.scan_folder(str(payload.get("npcSlug") or ""), str(payload.get("rootPath") or "")))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/npc-animations/assign":
-            try:
-                payload = self.body()
-                return self.out(200, npc_animations.assign_file(
-                    str(payload.get("npcSlug") or ""), str(payload.get("sourcePath") or ""),
-                    str(payload.get("slot") or ""), int(payload.get("variant") or 0),
-                    str(payload.get("weaponSet") or "1hs")))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/animations/scan":
-            try:
-                payload = self.body()
-                return self.out(200, animations.scan_folder(str(payload.get("characterId") or ""), str(payload.get("rootPath") or "")))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-
-        if path == "/api/animations/assign":
-            try:
-                payload = self.body()
-                return self.out(200, animations.assign_file(
-                    str(payload.get("characterId") or ""),
-                    str(payload.get("sourcePath") or ""),
-                    str(payload.get("scope") or ""),
-                    str(payload.get("weaponSet") or ""),
-                    str(payload.get("slot") or ""),
-                    int(payload.get("variant") or 0),
-                ))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-
-        prefix = "/api/characters/"
-        identity_suffix = "/identity"
-        stats_suffix = "/stats"
-        replace_model_suffix = "/replace-model"
-        model_suffix = "/model"
-        activate_suffix = "/activate"
-        publish_suffix = "/publish"
-        sync_suffix = "/sync"
-        if path.startswith(prefix) and path.endswith(stats_suffix):
-            character_id = unquote(path[len(prefix):-len(stats_suffix)].strip("/"))
-            try:
-                return self.out(200, store.set_stats(character_id, self.body()))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path.startswith(prefix) and path.endswith(identity_suffix):
-            character_id = unquote(path[len(prefix):-len(identity_suffix)].strip("/"))
-            try:
-                return self.out(200, character_identity.update(character_id, self.body()))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path.startswith(prefix) and path.endswith(replace_model_suffix):
-            character_id = unquote(path[len(prefix):-len(replace_model_suffix)].strip("/"))
-            try:
-                payload = self.body()
-                source_path = str(payload.get("sourcePath") or "").strip()
-                if not source_path:
-                    raise ValueError("choose a replacement FBX first")
-                before = store.get(character_id)
-                if not before:
-                    raise ValueError(f"unknown character archetype: {character_id}")
-                previous_asset_id = str(before.get("model_asset_id") or "").strip()
-
-                # Stage/analyze the new canonical FBX while the old Roblox asset
-                # remains assigned. publish() creates a NEW asset for changed
-                # character content and switches the archetype id only on success.
-                store.register({
-                    "existingId": character_id,
-                    "id": character_id,
-                    "displayName": before.get("display_name") or "",
-                    "race": before.get("race") or "",
-                    "gender": before.get("gender") or "",
-                    "sourcePath": source_path,
-                    # Replace is explicit user intent. Never collapse it into the
-                    # unchanged-content no-op used by ordinary Publish.
-                    "forceReplacement": True,
-                })
-                credentials = publication_credentials(str(payload.get("description") or "game1 character model"))
-                published = store.publish(character_id, credentials)
-                result = {"character": published, "studio": None, "studioError": ""}
-                try:
-                    synced = sync_character_to_studio(character_id)
-                    result["studio"] = synced.get("studio")
-                except Exception as studio_error:
-                    # Publication already succeeded and the new asset id is now
-                    # canonical. Do not report the whole replacement as failed
-                    # merely because Studio refresh needs a retry.
-                    result["studioError"] = str(studio_error)
-                result["previousAssetId"] = previous_asset_id
-                result["newAssetId"] = str(published.get("model_asset_id") or "")
-                result["assetReplaced"] = bool(
-                    result["newAssetId"] and result["newAssetId"] != previous_asset_id
-                )
-                if previous_asset_id and not result["assetReplaced"]:
-                    raise RuntimeError(
-                        "replace model did not create a new Roblox asset id; old asset remains assigned"
-                    )
-                return self.out(200, result)
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path.startswith(prefix) and path.endswith(model_suffix):
-            character_id = unquote(path[len(prefix):-len(model_suffix)].strip("/"))
-            try:
-                payload = self.body()
-                source_character_id = str(payload.get("sourceCharacterId") or "").strip().lower()
-                return self.out(200, store.assign_model(character_id, source_character_id))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path.startswith(prefix) and path.endswith(activate_suffix):
-            character_id = unquote(path[len(prefix):-len(activate_suffix)].strip("/"))
-            try:
-                return self.out(200, store.set_active(character_id))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path.startswith(prefix) and path.endswith(publish_suffix):
-            character_id = unquote(path[len(prefix):-len(publish_suffix)].strip("/"))
-            try:
-                payload = self.body()
-                credentials = publication_credentials(str(payload.get("description") or ""))
-                row = store.publish(character_id, credentials)
-                return self.out(200, sync_character_to_studio(str(row["id"])))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path.startswith(prefix) and path.endswith(sync_suffix):
-            character_id = unquote(path[len(prefix):-len(sync_suffix)].strip("/"))
-            try:
-                return self.out(200, sync_character_to_studio(character_id))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/characters/active/clear":
-            return self.out(200, store.clear_active())
-
-        if path.startswith("/api/npcs/"):
-            slug, _, action = unquote(path[len("/api/npcs/"):]).rpartition("/")
-            try:
-                if action == "publish":
-                    credentials = publication_credentials(str(self.body().get("description") or "game1 npc"))
-                    return self.out(200, npcs.publish(slug, credentials))
-                if action == "sync":
-                    return self.out(200, sync_monster_to_studio(slug, kind="npc"))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path.startswith("/api/npc-animations/"):
-            clip_id, _, action = unquote(path[len("/api/npc-animations/"):]).rpartition("/")
-            try:
-                payload = self.body()
-                if action == "rename":
-                    return self.out(200, npc_animations.rename_npc_binding(
-                        clip_id, str(payload.get("weaponSet") or ""), str(payload.get("filename") or "")))
-                if action == "publish-missing":
-                    return self.out(200, npc_animations.publish_missing(clip_id, publication_credentials(str(payload.get("description") or "game1 npc animation"))))
-                if action == "publish":
-                    return self.out(200, npc_animations.publish_clip(clip_id, publication_credentials(str(payload.get("description") or "game1 npc animation"))))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path.startswith("/api/npc-animation-bindings/") and path.endswith("/options"):
-            try:
-                key = unquote(path[len("/api/npc-animation-bindings/"):-len("/options")].strip("/"))
-                payload = self.body()
-                return self.out(200, npc_animations.set_animation_options(
-                    key, payload.get("compatibleWith"), payload.get("weight"), payload.get("disarm")))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path.startswith("/api/npc-animation-bindings/") and path.endswith("/compatibility"):
-            try:
-                key = unquote(path[len("/api/npc-animation-bindings/"):-len("/compatibility")].strip("/"))
-                return self.out(200, npc_animations.set_compatibility(key, self.body().get("compatibleWith")))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path.startswith("/api/npc-animation-bindings/") and path.endswith("/disarm"):
-            try:
-                key = unquote(path[len("/api/npc-animation-bindings/"):-len("/disarm")].strip("/"))
-                return self.out(200, npc_animations.set_disarm(key, bool(self.body().get("enabled"))))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path.startswith("/api/npc-animation-bindings/") and path.endswith("/weight"):
-            try:
-                key = unquote(path[len("/api/npc-animation-bindings/"):-len("/weight")].strip("/"))
-                payload = self.body()
-                return self.out(200, npc_animations.set_weight(key, int(payload.get("weight", 100))))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        monster_prefix = "/api/monsters/"
-        monster_publish_suffix = "/publish"
-        monster_sync_suffix = "/sync"
-        if path.startswith(monster_prefix) and path.endswith(monster_publish_suffix):
-            slug = unquote(path[len(monster_prefix):-len(monster_publish_suffix)].strip("/"))
-            try:
-                payload = self.body()
-                credentials = publication_credentials(str(payload.get("description") or "game1 monster"))
-                return self.out(200, monsters.publish(slug, credentials))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path.startswith(monster_prefix) and path.endswith(monster_sync_suffix):
-            slug = unquote(path[len(monster_prefix):-len(monster_sync_suffix)].strip("/"))
-            try:
-                return self.out(200, sync_monster_to_studio(slug))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-
-        monster_animation_prefix = "/api/monster-animations/"
-        monster_publish_animation_suffix = "/publish"
-        if path.startswith(monster_animation_prefix) and path.endswith(monster_publish_missing_suffix):
-            slug = unquote(path[len(monster_animation_prefix):-len(monster_publish_missing_suffix)].strip("/"))
-            try:
-                payload = self.body()
-                credentials = publication_credentials(str(payload.get("description") or "game1 monster animation"))
-                return self.out(200, monster_animations.publish_missing(slug, credentials))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path.startswith(monster_animation_prefix) and path.endswith(monster_publish_animation_suffix):
-            clip_id = unquote(path[len(monster_animation_prefix):-len(monster_publish_animation_suffix)].strip("/"))
-            try:
-                payload = self.body()
-                credentials = publication_credentials(str(payload.get("description") or "game1 monster animation"))
-                return self.out(200, monster_animations.publish_clip(clip_id, credentials))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        monster_binding_prefix = "/api/monster-animation-bindings/"
-        if path.startswith(monster_binding_prefix) and path.endswith("/weight"):
-            binding_id = unquote(path[len(monster_binding_prefix):-len("/weight")].strip("/"))
-            try:
-                payload = self.body()
-                return self.out(200, monster_animations.set_weight(binding_id, int(payload.get("weight") or 100)))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        location_asset_prefix = "/api/location-assets/"
-        location_asset_publish_suffix = "/publish"
-        if path.startswith(location_asset_prefix) and path.endswith(location_asset_publish_suffix):
-            slug = unquote(path[len(location_asset_prefix):-len(location_asset_publish_suffix)].strip("/"))
-            try:
-                payload = self.body()
-                credentials = publication_credentials(str(payload.get("description") or "game1 location asset"))
-                return self.out(200, location_assets.publish(slug, credentials))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-
-        weapon_prefix = "/api/weapons/"
-        weapon_publish_suffix = "/publish"
-        weapon_sync_suffix = "/sync"
-        weapon_activate_suffix = "/activate"
-        if path.startswith(weapon_prefix) and path.endswith(weapon_publish_suffix):
-            slug = unquote(path[len(weapon_prefix):-len(weapon_publish_suffix)].strip("/"))
-            try:
-                payload = self.body()
-                credentials = publication_credentials(str(payload.get("description") or "game1 weapon"))
-                return self.out(200, weapons.publish(slug, credentials))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path.startswith(weapon_prefix) and path.endswith(weapon_sync_suffix):
-            slug = unquote(path[len(weapon_prefix):-len(weapon_sync_suffix)].strip("/"))
-            try:
-                return self.out(200, sync_weapon_to_studio(slug))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path.startswith(weapon_prefix) and path.endswith(weapon_activate_suffix):
-            slug = unquote(path[len(weapon_prefix):-len(weapon_activate_suffix)].strip("/"))
-            try:
-                return self.out(200, weapons.set_active(slug))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path == "/api/weapons/active/clear":
-            return self.out(200, weapons.clear_active())
-        animation_prefix = "/api/animations/"
-        publish_animation_suffix = "/publish"
-        if path.startswith(animation_prefix) and path.endswith(publish_missing_suffix):
-            character_id = unquote(path[len(animation_prefix):-len(publish_missing_suffix)].strip("/"))
-            try:
-                payload = self.body()
-                credentials = publication_credentials(str(payload.get("description") or "game1 character animation"))
-                return self.out(200, animations.publish_missing(character_id, credentials))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path.startswith(animation_prefix) and path.endswith(publish_animation_suffix):
-            clip_id = unquote(path[len(animation_prefix):-len(publish_animation_suffix)].strip("/"))
-            try:
-                payload = self.body()
-                credentials = publication_credentials(str(payload.get("description") or "game1 character animation"))
-                return self.out(200, animations.publish_clip(clip_id, credentials))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-
-        binding_prefix = "/api/animation-bindings/"
-        weight_suffix = "/weight"
-        if path.startswith(binding_prefix) and path.endswith(weight_suffix):
-            binding_id = unquote(path[len(binding_prefix):-len(weight_suffix)].strip("/"))
-            try:
-                payload = self.body()
-                return self.out(200, animations.set_weight(binding_id, int(payload.get("weight") or 100)))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        return self.out(404, {"error": "not found"})
+        status, payload = dispatch_write_request(self.parsed().path, self.body, WRITE_SOURCES)
+        return self.out(status, payload)
 
     def do_DELETE(self):
         if not self.auth():
             return self.out(401, {"error": "unauthorized"})
-        path = self.parsed().path
-        binding_prefix = "/api/animation-bindings/"
-        if path.startswith(binding_prefix):
-            try:
-                return self.out(200, animations.delete_binding(unquote(path[len(binding_prefix):])))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path.startswith("/api/npc-animation-bindings/"):
-            try:
-                return self.out(200, npc_animations.delete_binding(unquote(path[len("/api/npc-animation-bindings/"):])))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        if path.startswith("/api/npcs/"):
-            slug = unquote(path[len("/api/npcs/"):])
-            try:
-                used = npc_spawns.monster_usage(slug)
-                if used:
-                    raise ValueError("delete NPC spawn points first: " + ", ".join(used[:8]))
-                npc_animations.delete_profile(slug)
-                npcs.delete(slug)
-                npc_equipment.delete(slug)
-                return self.out(200, {"ok": True})
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        monster_binding_prefix = "/api/monster-animation-bindings/"
-        if path.startswith(monster_binding_prefix):
-            try:
-                return self.out(200, monster_animations.delete_binding(unquote(path[len(monster_binding_prefix):])))
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        monster_prefix = "/api/monsters/"
-        if path.startswith(monster_prefix):
-            slug = unquote(path[len(monster_prefix):])
-            try:
-                spawn_ids = monster_spawns.monster_usage(slug)
-                if spawn_ids:
-                    raise ValueError("delete monster spawns first: " + ", ".join(spawn_ids[:8]))
-                monster_animations.delete_profile(slug)
-                monsters.delete(slug)
-                return self.out(200, {"ok": True})
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        location_asset_prefix = "/api/location-assets/"
-        if path.startswith(location_asset_prefix):
-            slug = unquote(path[len(location_asset_prefix):])
-            try:
-                location_assets.delete(slug)
-                return self.out(200, {"ok": True})
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        weapon_prefix = "/api/weapons/"
-        if path.startswith(weapon_prefix):
-            slug = unquote(path[len(weapon_prefix):])
-            try:
-                users = npc_equipment.users_of_weapon(slug)
-                if users:
-                    raise ValueError("weapon is equipped by NPC(s): " + ", ".join(users) + "; unequip before deleting")
-                weapons.delete(slug)
-                return self.out(200, {"ok": True})
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        prefix = "/api/characters/"
-        if path.startswith(prefix):
-            character_id = unquote(path[len(prefix):])
-            try:
-                usage = animations.character_usage(character_id)
-                if usage["clips"] or usage["bindings"]:
-                    raise ValueError(
-                        f"delete the character animation profile first: {usage['clips']} clip(s), {usage['bindings']} binding(s)"
-                    )
-                store.delete(character_id)
-                animations.delete_empty_profile(character_id)
-                return self.out(200, {"ok": True})
-            except Exception as error:
-                return self.out(400, {"error": str(error)})
-        return self.out(404, {"error": "not found"})
+        status, payload = dispatch_delete_request(self.parsed().path, self.body, WRITE_SOURCES)
+        return self.out(status, payload)
 
     def log_message(self, fmt, *args):
         print("[host-agent]", fmt % args)

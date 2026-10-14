@@ -4,6 +4,7 @@ No production SQLite or Roblox services are imported: handlers are extracted
 from the current host_agent.py with injected fake application dependencies.
 """
 import ast
+from collections import defaultdict
 from http.client import HTTPConnection
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
@@ -17,6 +18,8 @@ from urllib.parse import urlparse, unquote
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'system/control-center'))
 from api.read_dispatch import dispatch
+from api.write_dispatch import dispatch_post, dispatch_delete
+from api.write_dispatch import dispatch_post, dispatch_delete
 
 
 class FakeRepository:
@@ -45,6 +48,14 @@ class FakeRepository:
         self.calls.append(('register', payload))
         return {'saved': payload}
 
+    def publish_missing(self, ident, credentials):
+        self.calls.append(('publish_missing', ident, credentials))
+        return {'published': ident, 'credentials': credentials}
+
+    def set_weight(self, ident, weight):
+        self.calls.append(('set_weight', ident, weight))
+        return {'binding': ident, 'weight': weight}
+
     def delete_binding(self, name):
         self.calls.append(('delete', name))
         return {'removed': name}
@@ -67,6 +78,12 @@ class HostApiContractsM85(unittest.TestCase):
             'BaseHTTPRequestHandler': BaseHTTPRequestHandler,
             'json': json, 'urlparse': urlparse, 'unquote': unquote, 'token': 'test-token',
             'dispatch_read_request': dispatch,
+            'dispatch_write_request': dispatch_post,
+            'dispatch_delete_request': dispatch_delete,
+            'WRITE_SOURCES': defaultdict(lambda: FakeRepository('test-stub'), {**repositories,
+                'publication_credentials': lambda description='': {'description': description}}),
+            'dispatch_write_request': dispatch_post,
+            'dispatch_delete_request': dispatch_delete,
             'control_agent_build': 'm85-contract', 'ROOT': ROOT,
             'publication_config': lambda: {'configured': True},
         }
@@ -153,6 +170,20 @@ class HostApiContractsM85(unittest.TestCase):
             self.assertEqual(self.request('GET', '/api/options'), (400, {'error': 'test read failure'}))
         finally:
             self.repositories['options_store'].fail = False
+
+    def test_publish_missing_and_binding_error_over_http(self):
+        for path, identifier in (
+            ('/api/animations/hero/publish-missing', 'hero'),
+            ('/api/monster-animations/wolf/publish-missing', 'wolf'),
+        ):
+            with self.subTest(path=path):
+                status, value = self.request('POST', path, {'description': 'contract'})
+                self.assertEqual((status, value['published']), (200, identifier))
+                self.assertEqual(value['credentials']['description'], 'contract')
+        status, value = self.request('POST', '/api/npc-animation-bindings/key/weight', {'weight': 'not a number'})
+        self.assertEqual(status, 400)
+        self.assertIn('invalid literal', value['error'])
+        self.assertEqual(self.request('POST', '/api/write-unknown'), (404, {'error': 'not found'}))
 
     def test_legacy_write_endpoints_still_dispatch(self):
         status, payload = self.request('POST', '/api/characters', {'id': 'example'})

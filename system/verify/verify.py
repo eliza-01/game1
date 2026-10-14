@@ -301,7 +301,7 @@ plugin_project_text = plugin_project.read_text(encoding="utf-8") if plugin_proje
 if '"$path": "modules/CharacterTemplate.luau"' not in plugin_project_text:
     err("game1 Studio plugin project must package the character template module")
 
-host_agent_text = (ROOT / "system/control-center/host_agent.py").read_text(encoding="utf-8") + "\n" + "\n".join(p.read_text(encoding="utf-8") for p in (ROOT / "system/control-center/api").glob("read_*.py"))
+host_agent_text = (ROOT / "system/control-center/host_agent.py").read_text(encoding="utf-8") + "\n" + "\n".join(p.read_text(encoding="utf-8") for p in (ROOT / "system/control-center/api").glob("*.py"))
 if "sync_character_to_studio" not in host_agent_text or 'sync_suffix = "/sync"' not in host_agent_text:
     err("character publication must expose reference-style Studio sync")
 

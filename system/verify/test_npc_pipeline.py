@@ -265,7 +265,7 @@ class NpcPipelineTests(unittest.TestCase):
         tracks = (npc_root / "NpcAnimationTracks.luau").read_text()
         chooser = (repo / "src/shared/animation/WeightedAnimationChoice.luau").read_text()
         spawner = (npc_root / "NpcSpawnerService.luau").read_text()
-        host = (repo / "system/control-center/host_agent.py").read_text()
+        host = (repo / "system/control-center/api/write_animations.py").read_text()
         ui = (repo / "system/control-center/static/npc-assets.js").read_text()
         self.assertIn('WeightedAnimationChoice.Select(self.choices, selectionRandom)', idle)
         self.assertIn('self.base.track.DidLoop:Connect', idle)

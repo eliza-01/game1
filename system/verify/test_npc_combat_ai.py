@@ -40,11 +40,11 @@ class NpcCombatTests(unittest.TestCase):
             self.assertEqual(monsters.list(), [])
 
     def test_asset_manager_accepts_npc_retaliation(self):
-        api = source("system/control-center/host_agent.py")
+        api = source("system/control-center/api/write_actors.py")
         html = source("system/control-center/static/index.html")
         js = source("system/control-center/static/npc-assets.js")
-        self.assertIn('npcs.register(self.body())', api)
-        self.assertNotIn('npcs.register({**self.body(), "behavior":', api)
+        self.assertIn('npcs.register(body())', api)
+        self.assertNotIn('npcs.register({**body(), "behavior":', api)
         self.assertIn('id="npc-behavior-retaliate" type="checkbox"', html)
         self.assertIn('id="npc-behavior-pursuit-radius" type="number"', html)
         self.assertIn('id="npc-behavior-return-delay" type="number"', html)

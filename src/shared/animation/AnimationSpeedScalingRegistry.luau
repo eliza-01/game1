@@ -33,45 +33,49 @@ return table.freeze({
 		}),
 	}),
 	custom = table.freeze({
+		["122295588324584"] = table.freeze({
+			stat = "RunSpeed",
+			unitsPerPercent = 2.4,
+		}),
 		["132123582014306"] = table.freeze({
 			stat = "RunSpeed",
 			unitsPerPercent = 1.4,
 		}),
 	}),
 	catalog = table.freeze({
-		["88149431126736"] = table.freeze({
+		["122840035798169"] = table.freeze({
 			label = "character / human_female / 1hs_attack_01",
 			channel = "attack",
 		}),
-		["82563321432420"] = table.freeze({
+		["111523407571664"] = table.freeze({
 			label = "character / human_female / 1hs_attack_02",
 			channel = "attack",
 		}),
-		["86247398285431"] = table.freeze({
+		["132390395868663"] = table.freeze({
 			label = "character / human_female / 1hs_attack_03",
 			channel = "attack",
 		}),
-		["118675119937740"] = table.freeze({
+		["78672231936532"] = table.freeze({
 			label = "character / human_female / 1hs_combat_idle",
 			channel = "combat_idle",
 		}),
-		["128677350129455"] = table.freeze({
+		["104882544264186"] = table.freeze({
 			label = "character / human_female / 1hs_idle",
 			channel = "idle",
 		}),
-		["134065196920987"] = table.freeze({
+		["70447016661017"] = table.freeze({
 			label = "character / human_female / 1hs_run",
 			channel = "run",
 		}),
-		["111055842456450"] = table.freeze({
+		["82213044013946"] = table.freeze({
 			label = "character / human_female / 1hs_walk",
 			channel = "walk",
 		}),
-		["118060400424587"] = table.freeze({
+		["81644864777234"] = table.freeze({
 			label = "character / human_female / base_death",
 			channel = "death",
 		}),
-		["139362684441288"] = table.freeze({
+		["83724299950111"] = table.freeze({
 			label = "character / human_female / base_revive",
 			channel = "revive",
 		}),

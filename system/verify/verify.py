@@ -1039,7 +1039,9 @@ monster_attributes_text = (ROOT / "src/server/monster/MonsterInitialAttributes.l
 # M91: wander / death implementations moved out of the population coordinator.
 monster_wander_text = (ROOT / "src/server/monster/MonsterWanderController.luau").read_text(encoding="utf-8")
 monster_death_text = (ROOT / "src/server/monster/MonsterDeathLifecycle.luau").read_text(encoding="utf-8")
-monster_runtime_text = "\n".join((monster_spawner_text, monster_rig_text, monster_geometry_text, monster_track_factory_text, monster_attributes_text, monster_wander_text, monster_death_text))
+# M92: idle/combat-idle presentation, native track callbacks and idle RNG moved out of spawner.
+monster_idle_presentation_text = (ROOT / "src/server/monster/MonsterIdlePresentation.luau").read_text(encoding="utf-8")
+monster_runtime_text = "\n".join((monster_spawner_text, monster_rig_text, monster_geometry_text, monster_track_factory_text, monster_attributes_text, monster_wander_text, monster_death_text, monster_idle_presentation_text))
 if 'finite(stats.RunSpeed, CharacterMovementConfig.DefaultRunSpeed)' not in monster_runtime_text:
     err("monster RunSpeed fallback must use the shared direct-speed contract")
 for required in ["MonsterSpawnRegistry", "MonsterRegistry", "MonsterAnimationRegistry", "spawnRadius", "maxAlive", "respawnSeconds", "math.sqrt", "Workspace:Raycast", "EntityHitboxService.Attach", 'GetAttributeChangedSignal("LifeState")', '== "Dying"', 'publishedRows(profile, "idle")', 'weightedIdleChoice', 'MonsterAnimationState', 'MonsterIdleVariant', 'idleTrack.DidLoop', 'choice.track.Ended', 'playBaseIdle']:

@@ -86,7 +86,9 @@ class MonsterLifecycleM91Tests(unittest.TestCase):
 
     def test_all_per_instance_event_connections_are_owned_and_released(self):
         spawner = source("MonsterSpawnerService")
-        self.assertEqual(spawner.count('watch(entry, '), 9)
+        self.assertEqual(spawner.count('watch(entry, '), 8)
+        self.assertIn('watch(entry, signal, callback)', spawner)
+        self.assertIn('idlePresentation.BindIdleEvents(model, entry, function(signal, callback)', spawner)
         self.assertIn('entry.connections = {}', spawner)
         self.assertIn('table.insert(entry.connections, connection)', spawner)
         self.assertIn('for _, connection in ipairs(entry.connections or {}) do', spawner)

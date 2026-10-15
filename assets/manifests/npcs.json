@@ -89,9 +89,9 @@
       "model_asset_id": "94000088091746",
       "model_published_sha256": "9e1268331b788a9ca96e94d781b3419068a1b348b471bf2bc5f64c32f6c496d3",
       "moderation_state": "Approved",
-      "revision": 7,
+      "revision": 8,
       "created_at": 1791699297.6290648,
-      "updated_at": 1791895890.6653895,
+      "updated_at": 1792107774.8230324,
       "published_at": 1791867381.949085,
       "armature_name": "warsmith_01_armature",
       "bone_count": 73,
@@ -121,7 +121,7 @@
         "MaxHP": 1000,
         "Damage": 10,
         "AttackSpeed": 200,
-        "RunSpeed": 70,
+        "RunSpeed": 110,
         "CritChance": 20
       },
       "behavior": {

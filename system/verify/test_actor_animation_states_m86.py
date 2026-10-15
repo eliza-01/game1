@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 class ActorAnimationStateTests(unittest.TestCase):
     def test_monster_special_connection_has_complete_luau_if(self):
-        script = (ROOT / "src/server/monster/MonsterSpawnerService.luau").read_text(encoding="utf-8")
+        script = (ROOT / "src/server/monster/MonsterIdlePresentation.luau").read_text(encoding="utf-8")
         self.assertIn('if choice.role == "special" then', script)
         self.assertNotIn('if choice.role == "special"\n', script)
 

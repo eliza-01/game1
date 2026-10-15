@@ -20,6 +20,7 @@ local MonsterAnimationTrackFactory = require(script.Parent:WaitForChild("Monster
 local MonsterInitialAttributes = require(script.Parent:WaitForChild("MonsterInitialAttributes"))
 local MonsterWanderController = require(script.Parent:WaitForChild("MonsterWanderController"))
 local MonsterDeathLifecycle = require(script.Parent:WaitForChild("MonsterDeathLifecycle"))
+local MonsterIdlePresentation = require(script.Parent:WaitForChild("MonsterIdlePresentation"))
 local MonsterSpawnerService = {}
 local started = false
 local spawnRandom = Random.new()
@@ -74,118 +75,10 @@ local function monsterDefinition(slug: string): any?
     return monsters and monsters[slug] or nil
 end
 
-local function playTrackAtConfiguredSpeed(model: Model, track: AnimationTrack?, channel: string, fadeTime: number)
-    if not track then
-        return
-    end
-    local percent = AnimationSpeedScaling.ResolveForAnimation(model, channel, track.Animation and track.Animation.AnimationId)
-    model:SetAttribute("AnimationPlaybackSpeedPercent", percent)
-    local speed = percent / 100
-    if track.IsPlaying then
-        track:AdjustSpeed(speed)
-    else
-        track:Play(fadeTime, 1, speed)
-    end
-end
-
-local function stopTrack(track: AnimationTrack?)
-    if not track then
-        return
-    end
-    pcall(function()
-        track:Stop(0.08)
-    end)
-end
-
-local function weightedIdleChoice(choices: {any}): any?
-    local total = 0
-    for _, choice in ipairs(choices) do
-        total += math.max(1, finite(choice.row and choice.row.weight, 100))
-    end
-    if total <= 0 then
-        return nil
-    end
-    local roll = spawnRandom:NextNumber(0, total)
-    local cursor = 0
-    for _, choice in ipairs(choices) do
-        cursor += math.max(1, finite(choice.row and choice.row.weight, 100))
-        if roll <= cursor then
-            return choice
-        end
-    end
-    return choices[#choices]
-end
-
-local function stopIdleState(entry: any)
-    stopTrack(entry.idleTrack)
-    for _, choice in ipairs(entry.idleChoices or {}) do
-        if choice.role == "special" then
-            stopTrack(choice.track)
-        end
-    end
-    entry.activeIdleSpecial = nil
-end
-
-local function playBaseIdle(model: Model, entry: any)
-    if entry.dying or model:GetAttribute("MonsterCombatActive") == true or model:GetAttribute("InCombat") == true then
-        return
-    end
-    stopTrack(entry.walkTrack)
-    stopTrack(entry.runTrack)
-    model:SetAttribute("MonsterAnimationState", "idle")
-    model:SetAttribute("MonsterIdleVariant", "base")
-    if entry.idleTrack then
-        pcall(function()
-            playTrackAtConfiguredSpeed(model, entry.idleTrack, "idle", 0.12)
-        end)
-    end
-end
-
-local function playCombatIdleState(model: Model, entry: any)
-    if entry.dying or model:GetAttribute("MonsterCombatActive") == true then
-        return
-    end
-    stopIdleState(entry)
-    stopTrack(entry.walkTrack)
-    stopTrack(entry.runTrack)
-    model:SetAttribute("MonsterAnimationState", "combat_idle")
-    model:SetAttribute("MonsterIdleVariant", "combat")
-    if entry.combatIdleTrack then
-        pcall(function()
-            playTrackAtConfiguredSpeed(model, entry.combatIdleTrack, "combat_idle", 0.1)
-        end)
-    end
-end
-
-local wanderController = MonsterWanderController.new(spawnRandom, spawnGeometry, {
-    stopTrack = stopTrack,
-    stopIdleState = stopIdleState,
-    playBaseIdle = playBaseIdle,
-    playCombatIdleState = playCombatIdleState,
-    playTrackAtConfiguredSpeed = playTrackAtConfiguredSpeed,
-})
-
-local function maybePlayIdleSpecial(model: Model, entry: any)
-    if entry.dying or entry.wandering or entry.activeIdleSpecial ~= nil
-        or model:GetAttribute("InCombat") == true or model:GetAttribute("MonsterCombatActive") == true then
-        return
-    end
-    local choice = weightedIdleChoice(entry.idleChoices or {})
-    if not choice or choice.role ~= "special" then
-        return
-    end
-    entry.activeIdleSpecial = choice
-    stopTrack(entry.idleTrack)
-    model:SetAttribute("MonsterAnimationState", "idle")
-    model:SetAttribute("MonsterIdleVariant", ("special_%02d"):format(math.max(1, math.floor(finite(choice.row.variant, 1)))))
-    local ok = pcall(function()
-        playTrackAtConfiguredSpeed(model, choice.track, "idle", 0.08)
-    end)
-    if not ok then
-        entry.activeIdleSpecial = nil
-        playBaseIdle(model, entry)
-    end
-end
+-- The same RNG is shared with spawn geometry and wander. Presentation consumes it
+-- only on idle loop events, preserving M90/M91 random-draw ordering.
+local idlePresentation = MonsterIdlePresentation.new(spawnRandom)
+local wanderController = MonsterWanderController.new(spawnRandom, spawnGeometry, idlePresentation)
 
 local function releaseInstance(state: any, model: Model, scheduleRespawn: boolean, externallyDestroying: boolean?)
     local entry = state.instances[model]
@@ -199,9 +92,9 @@ local function releaseInstance(state: any, model: Model, scheduleRespawn: boolea
         connection:Disconnect()
     end
     table.clear(entry.connections or {})
-    stopIdleState(entry)
-    stopTrack(entry.combatIdleTrack)
-    stopTrack(entry.deathTrack)
+    idlePresentation.stopIdleState(entry)
+    idlePresentation.stopTrack(entry.combatIdleTrack)
+    idlePresentation.stopTrack(entry.deathTrack)
     if externallyDestroying then
         -- Deferred Destroying signals can run after the instance is locked.
         -- Detach removes its hitbox binding first; remaining attribute writes are best effort.
@@ -224,8 +117,8 @@ end
 
 local deathLifecycle = MonsterDeathLifecycle.new({
     stopWanderMovement = function(entry: any) wanderController:Stop(entry) end,
-    stopIdleState = stopIdleState,
-    stopTrack = stopTrack,
+    stopIdleState = idlePresentation.stopIdleState,
+    stopTrack = idlePresentation.stopTrack,
     releaseInstance = releaseInstance,
 })
 
@@ -287,29 +180,16 @@ local function spawnOne(state: any): Model?
     entry.dying = false
     entry.deathPoseHeld = false
     entry.connections = {}
-    local idleTrack = entry.idleTrack
-    local idleChoices = entry.idleChoices
     state.instances[model] = entry
 
-    for _, choice in ipairs(idleChoices) do
-        if choice.role == "special" then
-            watch(entry, choice.track.Ended, function()
-                if state.instances[model] ~= entry or entry.dying or entry.activeIdleSpecial ~= choice then
-                    return
-                end
-                entry.activeIdleSpecial = nil
-                playBaseIdle(model, entry)
-            end)
-        end
-    end
-    if idleTrack then
-        watch(entry, idleTrack.DidLoop, function()
-            if state.instances[model] == entry then
-                maybePlayIdleSpecial(model, entry)
-            end
-        end)
-    end
-    playBaseIdle(model, entry)
+    -- Presentation owns idle clip callbacks; the instance still owns/disconnects
+    -- the underlying RBXScriptConnections through the M91 watch registry.
+    idlePresentation.BindIdleEvents(model, entry, function(signal, callback)
+        watch(entry, signal, callback)
+    end, function()
+        return state.instances[model] == entry
+    end)
+    idlePresentation.playBaseIdle(model, entry)
     wanderController:Start(state, model, entry)
 
     watch(entry, model:GetAttributeChangedSignal("MonsterCombatActive"), function()
@@ -318,15 +198,15 @@ local function spawnOne(state: any): Model?
         end
         if model:GetAttribute("MonsterCombatActive") == true then
             wanderController:Stop(entry)
-            stopIdleState(entry)
-            stopTrack(entry.combatIdleTrack)
+            idlePresentation.stopIdleState(entry)
+            idlePresentation.stopTrack(entry.combatIdleTrack)
             model:SetAttribute("MonsterIdleVariant", nil)
         else
             wanderController:Stop(entry)
             if model:GetAttribute("InCombat") == true then
-                playCombatIdleState(model, entry)
+                idlePresentation.playCombatIdleState(model, entry)
             else
-                playBaseIdle(model, entry)
+                idlePresentation.playBaseIdle(model, entry)
             end
         end
     end)
@@ -337,10 +217,10 @@ local function spawnOne(state: any): Model?
         end
         wanderController:Stop(entry)
         if model:GetAttribute("InCombat") == true then
-            playCombatIdleState(model, entry)
+            idlePresentation.playCombatIdleState(model, entry)
         else
-            stopTrack(entry.combatIdleTrack)
-            playBaseIdle(model, entry)
+            idlePresentation.stopTrack(entry.combatIdleTrack)
+            idlePresentation.playBaseIdle(model, entry)
         end
     end)
 

@@ -53,7 +53,8 @@ class MonsterModuleBoundaryTests(unittest.TestCase):
         spawner, geometry = read("MonsterSpawnerService"), read("MonsterSpawnGeometry")
         self.assertEqual(spawner.count('Random.new()'), 1)
         self.assertIn('MonsterSpawnGeometry.new(spawnRandom, ensureMonstersFolder)', spawner)
-        self.assertIn('spawnRandom:NextNumber(0, total)', spawner)
+        self.assertIn('MonsterIdlePresentation.new(spawnRandom)', spawner)
+        self.assertIn('spawnRandom:NextNumber(0, total)', read('MonsterIdlePresentation'))
         self.assertIn('spawnRandom:NextNumber(0.35, 1.35)', read('MonsterWanderController'))
         self.assertIn('self.random:NextNumber(0, math.pi * 2)', geometry)
         self.assertIn('math.sqrt(self.random:NextNumber(0, 1)) * radius', geometry)
@@ -74,8 +75,10 @@ class MonsterModuleBoundaryTests(unittest.TestCase):
         self.assertIn('loadAnimationTrack(animator, deathRow, false)', clips)
         self.assertIn('track.Looped = looped', clips)
         self.assertIn('track.Priority = animationPriority(row.priority)', clips)
-        self.assertIn('watch(entry, idleTrack.DidLoop, function()', spawner)
-        self.assertIn('watch(entry, choice.track.Ended, function()', spawner)
+        presentation = read("MonsterIdlePresentation")
+        self.assertIn('registerSignal(idleTrack.DidLoop, function()', presentation)
+        self.assertIn('registerSignal(choice.track.Ended, function()', presentation)
+        self.assertIn('watch(entry, signal, callback)', spawner)
         self.assertIn('DeathAnimationPolicy.LatchVisibleTerminalPose', read('MonsterDeathLifecycle'))
 
     def test_attributes_still_separate_authored_and_runtime_behavior(self):

@@ -1,0 +1,1358 @@
+diff --git a/docs/ARCHITECTURE_REFACTOR_M90_RU.md b/docs/ARCHITECTURE_REFACTOR_M90_RU.md
+new file mode 100644
+index 0000000..940b6c3
+--- /dev/null
++++ b/docs/ARCHITECTURE_REFACTOR_M90_RU.md
+@@ -0,0 +1,42 @@
++# M90 — первый этап декомпозиции MonsterSpawnerService
++
++Основа: M89. Область изменений: `src/server/monster`, проверки `system/verify`. Схема SQLite, манифесты, HTTP API, Studio Bridge, AI и RemoteEvent не меняются.
++
++## Границы ответственности
++
++| Модуль | Владеет | Не владеет |
++| --- | --- | --- |
++| `MonsterSpawnerService` | Оркестрация спавна, популяция, таймеры, блуждание, переходы анимационных состояний, смерть и респавн | Создание физического рига, выбор точки на земле, декодирование слотов клипов, начальные атрибуты |
++| `MonsterRigBuilder` | Подготовка визуальной модели, нейтральный RootBone, GroundAlign, NavigationRoot/RootCollider/Humanoid | AI, анимационные события, урон, популяция |
++| `MonsterSpawnGeometry` | Выбор случайной точки в круге, raycast поверхности, выбор блуждающей цели и горизонтальная дистанция | Собственный RNG, самовольное создание папки, AI |
++| `MonsterAnimationTrackFactory` | Отбор опубликованных клипов, загрузка штатных AnimationTrack, fallback слотов и приоритетов, конструирование треков для entry | `Play/Stop`, тайминг idle_special, death, состояние боя |
++| `MonsterInitialAttributes` | Чтение параметров published definition и начальная установка runtime-атрибутов | Бой, сетевые события, физика, регистры/БД |
++
++## Совместимость
++
++* У `MonsterSpawnerService.Start()` тот же контракт и bootstrap-зависимости.
++* **Тот же `spawnRandom`** передается в `MonsterSpawnGeometry`; вызовы `NextNumber` и `NextInteger` остались на прежних этапах. Выбор `idle_special` использует тот же RNG.
++* Внутренняя raycast-политика не меняется: исходные высоты 96/384, `RespectCanCollide=false`, папка `Workspace.Monsters` исключена из запроса.
++* Выравнивание к земле, RootBone, единственный weld к визуальному корню, навигационный Humanoid и коллайдер не меняются.
++* Порядок: клонирование → подготовка visual → RootBone → координата/yaw → GroundAlign → атрибуты → navigation rig → hitbox → native animation tracks → подписки → idle → wander.
++* Слоты анимаций и fallback `combat_idle→idle`, `walk↔run` не меняются; death по-прежнему одноразовый.
++* Не вводятся новые постоянные циклы, RemoteEvent, кеши моделей или глобальные состояния.
++* Миграции данных не требуются, файлов ассетов и Roblox Animation ID нет в diff.
++
++## Проверки
++
++1. `python system/verify/verify.py`
++2. `python -W error::ResourceWarning -m unittest discover -s system/verify -p 'test_*.py' -q`
++3. `git apply --check` к дереву после M89.
++4. **Обязательно в Roblox Studio Play (сервер):** разместить минимум один действующий spawn монстра и проверить:
++   - появление с правильной высотой/поворотом/коллизиями, `CombatHitboxCount`;
++   - idle + idle_special, паузы и блуждание внутри authored radius;
++   - начало боя, Chase/Attack и возврат к обычному состоянию;
++   - получение смертельного урона, death terminal hold, утопление трупа и респавн с `maxAlive`;
++   - изменение RunSpeed и MonsterLocomotionMode через Debug при блуждании.
++
++Статические Python-проверки **не воспроизводят физику Roblox, Animator или PreAnimation**. Если активных `MonsterSpawnRegistry.records` нет, зелёный запуск Play не проверяет эти ветви; для проверки нужен хотя бы один тестовый monster spawn.
++
++## Следующий шаг
++
++M91: вынести state machine блуждания/locomotion и смерть/респавн в отдельные сервисы с явным lifecycle cleanup, а `MonsterSpawnerService` оставить владельцем популяции. Делать отдельно от изменений поведения боёвки.
+diff --git a/src/server/monster/MonsterAnimationTrackFactory.luau b/src/server/monster/MonsterAnimationTrackFactory.luau
+new file mode 100644
+index 0000000..1d93b9d
+--- /dev/null
++++ b/src/server/monster/MonsterAnimationTrackFactory.luau
+@@ -0,0 +1,159 @@
++-- Loads one native AnimationTrack per published monster clip.
++-- The caller owns playback state, connections, cleanup, AI and death.
++local MonsterAnimationTrackFactory = {}
++local function finite(value: any, fallback: number): number
++    local number = tonumber(value)
++    if number == nil or number ~= number or number == math.huge or number == -math.huge then
++        return fallback
++    end
++    return number
++end
++
++local function publishedRows(profile: any?, slot: string): {any}
++    local slots = profile and profile.slots
++    local rows = slots and slots[slot]
++    if typeof(rows) ~= "table" then
++        return {}
++    end
++    local result = {}
++    for _, row in ipairs(rows) do
++        if tostring(row.animationId or ""):match("^rbxassetid://%d+$") then
++            table.insert(result, row)
++        end
++    end
++    return result
++end
++
++local function firstPublishedTrack(profile: any?, slot: string): any?
++    return publishedRows(profile, slot)[1]
++end
++
++local function animatorFor(runtimeModel: Model, visual: Model): Animator
++    -- Keep the animation host inside the visual rig, separate from the navigation
++    -- Humanoid on the runtime wrapper. This mirrors the RobloxLineage contract:
++    -- Humanoid owns locomotion of the wrapper; AnimationController owns the bones.
++    local controller = visual:FindFirstChildOfClass("AnimationController")
++        or visual:FindFirstChildWhichIsA("AnimationController", true)
++        or runtimeModel:FindFirstChildOfClass("AnimationController")
++        or runtimeModel:FindFirstChildWhichIsA("AnimationController", true)
++    if not controller then
++        controller = Instance.new("AnimationController")
++        controller.Name = "AnimationController"
++        controller.Parent = visual
++    elseif controller.Parent ~= visual then
++        controller.Parent = visual
++    end
++
++    for _, descendant in ipairs(runtimeModel:GetDescendants()) do
++        if descendant:IsA("AnimationController") and descendant ~= controller then
++            descendant:Destroy()
++        end
++    end
++
++    local animator = controller:FindFirstChildOfClass("Animator")
++    if not animator then
++        animator = Instance.new("Animator")
++        animator.Name = "Animator"
++        animator.Parent = controller
++    end
++    return animator
++end
++
++local function animationPriority(value: any): Enum.AnimationPriority
++    local name = tostring(value or "")
++    if name == "Idle" then
++        return Enum.AnimationPriority.Idle
++    elseif name == "Movement" then
++        return Enum.AnimationPriority.Movement
++    elseif name == "Action2" then
++        return Enum.AnimationPriority.Action2
++    elseif name == "Action3" then
++        return Enum.AnimationPriority.Action3
++    elseif name == "Action4" then
++        return Enum.AnimationPriority.Action4
++    end
++    return Enum.AnimationPriority.Action
++end
++
++local function loadAnimationTrack(animator: Animator?, row: any?, looped: boolean): AnimationTrack?
++    if not animator or not row then
++        return nil
++    end
++    local animationId = tostring(row.animationId or "")
++    if not animationId:match("^rbxassetid://%d+$") then
++        return nil
++    end
++    local animation = Instance.new("Animation")
++    animation.AnimationId = animationId
++    local ok, result = pcall(function()
++        return animator:LoadAnimation(animation)
++    end)
++    animation:Destroy()
++    if not ok then
++        warn("[game1][monster-spawn] animation load failed: " .. tostring(result))
++        return nil
++    end
++    local track = result :: AnimationTrack
++    track.Looped = looped
++    track.Priority = animationPriority(row.priority)
++    return track
++end
++
++local function idleRole(row: any): string
++    local role = tostring(row.role or "")
++    if role ~= "" then
++        return role
++    end
++    if tostring(row.sourceSlot or "") == "idle_special" or finite(row.variant, 0) > 0 then
++        return "special"
++    end
++    return "base"
++end
++
++
++function MonsterAnimationTrackFactory.Load(profile: any?, runtimeModel: Model, visual: Model): any
++    local animator = animatorFor(runtimeModel, visual)
++    local idleTrack: AnimationTrack? = nil
++    local idleChoices = {}
++    for _, row in ipairs(publishedRows(profile, "idle")) do
++        local role = idleRole(row)
++        local track = loadAnimationTrack(animator, row, role == "base")
++        if track then
++            local choice = { row = row, track = track, role = role }
++            table.insert(idleChoices, choice)
++            if role == "base" and not idleTrack then
++                idleTrack = track
++            end
++        end
++    end
++    local combatIdleRow = firstPublishedTrack(profile, "combat_idle") or firstPublishedTrack(profile, "idle")
++    local walkRow = firstPublishedTrack(profile, "walk") or firstPublishedTrack(profile, "run")
++    local runRow = firstPublishedTrack(profile, "run") or firstPublishedTrack(profile, "walk")
++    local deathRow = firstPublishedTrack(profile, "death")
++    local combatIdleTrack = loadAnimationTrack(animator, combatIdleRow, true)
++    local walkTrack = loadAnimationTrack(animator, walkRow, true)
++    local runTrack = loadAnimationTrack(animator, runRow, true)
++    local deathTrack = loadAnimationTrack(animator, deathRow, false)
++    local entry = {
++        idleTrack = idleTrack,
++        idleRow = nil,
++        idleChoices = idleChoices,
++        activeIdleSpecial = nil,
++        combatIdleTrack = combatIdleTrack,
++        combatIdleRow = combatIdleRow,
++        walkTrack = walkTrack,
++        walkRow = walkRow,
++        runTrack = runTrack,
++        runRow = runRow,
++        deathTrack = deathTrack,
++        deathRow = deathRow,
++    }
++    for _, choice in ipairs(idleChoices) do
++        if choice.role == "base" and choice.track == idleTrack then
++            entry.idleRow = choice.row
++            break
++        end
++    end
++    return entry
++end
++return table.freeze(MonsterAnimationTrackFactory)
+diff --git a/src/server/monster/MonsterInitialAttributes.luau b/src/server/monster/MonsterInitialAttributes.luau
+new file mode 100644
+index 0000000..7ba910e
+--- /dev/null
++++ b/src/server/monster/MonsterInitialAttributes.luau
+@@ -0,0 +1,51 @@
++-- Applies published stat/behavior policy to a fresh monster clone.
++-- Does not create rigs, play clips or schedule population.
++local ReplicatedStorage = game:GetService("ReplicatedStorage")
++local Workspace = game:GetService("Workspace")
++local CharacterMovementConfig = require(ReplicatedStorage:WaitForChild("Game1Shared"):WaitForChild("character"):WaitForChild("CharacterMovementConfig"))
++local MonsterInitialAttributes = {}
++local function finite(value: any, fallback: number): number
++    local number = tonumber(value)
++    if number == nil or number ~= number or number == math.huge or number == -math.huge then
++        return fallback
++    end
++    return number
++end
++
++local function applyMonsterAttributes(model: Model, definition: any, record: any, instanceId: string)
++    local stats = definition.stats or {}
++    local behavior = definition.behavior or {}
++    local maxHP = math.max(1, finite(stats.MaxHP, 100))
++    model:SetAttribute("Game1MonsterRuntime", true)
++    model:SetAttribute("MonsterSlug", tostring(definition.slug or record.monsterSlug or ""))
++    model:SetAttribute("SpawnId", tostring(record.spawnId or ""))
++    model:SetAttribute("MonsterInstanceId", instanceId)
++    model:SetAttribute("Damageable", true)
++    model:SetAttribute("LifeState", "Alive")
++    model:SetAttribute("InCombat", false)
++    model:SetAttribute("CombatState", "Peace")
++    model:SetAttribute("CombatUntilServerTime", 0)
++    model:SetAttribute("MaxHP", maxHP)
++    model:SetAttribute("HP", maxHP)
++    model:SetAttribute("Damage", math.max(0, finite(stats.Damage, 10)))
++    model:SetAttribute("AttackSpeed", math.max(1, finite(stats.AttackSpeed, 100)))
++    model:SetAttribute("RunSpeed", math.max(0, finite(stats.RunSpeed, CharacterMovementConfig.DefaultRunSpeed)))
++    local debugLocomotion = tostring(Workspace:GetAttribute("Game1MonsterDebugLocomotionMode") or "Walk")
++    model:SetAttribute("MonsterLocomotionMode", string.lower(debugLocomotion) == "run" and "Run" or "Walk")
++    model:SetAttribute("CritChance", math.clamp(finite(stats.CritChance, 0), 0, 100))
++    model:SetAttribute("Defense", math.max(0, finite(stats.Defense, 0)))
++    local aggressive = behavior.aggressive == true
++    local aggroRadius = math.max(0, finite(behavior.aggroRadiusStuds, 16))
++    local attackRadius = math.max(0, finite(behavior.attackRadiusStuds, 3))
++    model:SetAttribute("MonsterAuthoredAggressive", aggressive)
++    model:SetAttribute("MonsterAuthoredAggroRadius", aggroRadius)
++    model:SetAttribute("MonsterAuthoredAttackRadius", attackRadius)
++    model:SetAttribute("MonsterAggressive", aggressive)
++    model:SetAttribute("MonsterAggroRadius", aggroRadius)
++    model:SetAttribute("MonsterAttackRadius", attackRadius)
++    model:SetAttribute("MonsterCombatActive", false)
++    model:SetAttribute("MonsterAttackPursuitActive", false)
++end
++
++MonsterInitialAttributes.Apply = applyMonsterAttributes
++return table.freeze(MonsterInitialAttributes)
+diff --git a/src/server/monster/MonsterRigBuilder.luau b/src/server/monster/MonsterRigBuilder.luau
+new file mode 100644
+index 0000000..bb9b66f
+--- /dev/null
++++ b/src/server/monster/MonsterRigBuilder.luau
+@@ -0,0 +1,191 @@
++-- Visual rig preparation and physics navigation shell for a spawned monster.
++-- This module does not own AI, animation playback, population or death.
++local ActorCollisionPolicy = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorCollisionPolicy"))
++local MonsterRigBuilder = {}
++local NAVIGATION_ROOT_SIZE = Vector3.new(2, 2, 1)
++local NAVIGATION_HIP_HEIGHT = 1.8
++
++local function visibleBounds(model: Model): (CFrame, Vector3)
++    local minimum = Vector3.new(math.huge, math.huge, math.huge)
++    local maximum = Vector3.new(-math.huge, -math.huge, -math.huge)
++    local found = false
++    for _, descendant in ipairs(model:GetDescendants()) do
++        if descendant:IsA("BasePart") and descendant.Name ~= "RootPart" and descendant.Name ~= "RootCollider" then
++            found = true
++            local half = descendant.Size * 0.5
++            for x = -1, 1, 2 do
++                for y = -1, 1, 2 do
++                    for z = -1, 1, 2 do
++                        local corner = descendant.CFrame:PointToWorldSpace(Vector3.new(half.X * x, half.Y * y, half.Z * z))
++                        minimum = Vector3.new(math.min(minimum.X, corner.X), math.min(minimum.Y, corner.Y), math.min(minimum.Z, corner.Z))
++                        maximum = Vector3.new(math.max(maximum.X, corner.X), math.max(maximum.Y, corner.Y), math.max(maximum.Z, corner.Z))
++                    end
++                end
++            end
++        end
++    end
++    if not found then
++        return model:GetBoundingBox()
++    end
++    local size = maximum - minimum
++    return CFrame.new((minimum + maximum) * 0.5), size
++end
++
++local function ensureRuntimeAnimationRoot(visual: Model): number
++    -- Studio's Animation Editor exports skinned FBX clips with a synthetic
++    -- RootBone pose above the authored skeleton root. Runtime Animator ignores
++    -- animation on a Bone that is itself the root of a MeshPart hierarchy.
++    -- Materialize that neutral RootBone in the runtime clone so the authored
++    -- root bone (for example `spine`) becomes an ordinary animated child.
++    --
++    -- The helper is identity-only and is added before tracks are loaded. Existing
++    -- authored Bone world/rest transforms are therefore unchanged. The navigation
++    -- wrapper remains responsible only for world locomotion/yaw; animation owns
++    -- the complete authored bone pose, including root-bone translation/rotation.
++    local bridged = 0
++    for _, descendant in ipairs(visual:GetDescendants()) do
++        if descendant:IsA("MeshPart") then
++            local directBones = {}
++            local animationRoot: Bone? = nil
++            for _, child in ipairs(descendant:GetChildren()) do
++                if child:IsA("Bone") then
++                    if child.Name == "RootBone" then
++                        animationRoot = child
++                    else
++                        table.insert(directBones, child)
++                    end
++                end
++            end
++
++            if #directBones > 0 then
++                if not animationRoot then
++                    animationRoot = Instance.new("Bone")
++                    animationRoot.Name = "RootBone"
++                    animationRoot.CFrame = CFrame.identity
++                    animationRoot.Parent = descendant
++                    animationRoot:SetAttribute("Game1RuntimeAnimationRoot", true)
++                    bridged += 1
++                end
++
++                for _, bone in ipairs(directBones) do
++                    -- Preserve the authored rest/world transform even if a source
++                    -- asset already supplied a non-identity RootBone.
++                    local authoredMeshLocal = bone.CFrame
++                    bone.Parent = animationRoot
++                    bone.CFrame = animationRoot.CFrame:Inverse() * authoredMeshLocal
++                end
++            end
++        end
++    end
++
++    visual:SetAttribute("Game1RuntimeAnimationRootBridgeCount", bridged)
++    return bridged
++end
++
++local function prepareVisual(runtimeModel: Model): (Model, BasePart?)
++    local visual = runtimeModel:FindFirstChild("ImportedRig")
++    if not visual or not visual:IsA("Model") then
++        visual = runtimeModel
++    end
++    for _, descendant in ipairs(runtimeModel:GetDescendants()) do
++        if descendant:IsA("BasePart") then
++            descendant.Anchored = false
++            descendant.CanCollide = false
++            descendant.CanTouch = false
++            descendant.CanQuery = false
++            descendant.Massless = true
++        elseif descendant:IsA("Humanoid") then
++            descendant:Destroy()
++        end
++    end
++    local visualRoot = visual:FindFirstChild("RootPart", true)
++        or visual.PrimaryPart
++        or visual:FindFirstChildWhichIsA("MeshPart", true)
++        or visual:FindFirstChildWhichIsA("BasePart", true)
++    return visual :: Model, if visualRoot and visualRoot:IsA("BasePart") then visualRoot else nil
++end
++
++local function createNavigationRig(runtimeModel: Model, visual: Model, visualRoot: BasePart, surface: Vector3, yawRadians: number): (BasePart?, Humanoid?)
++    -- Never weld every visual BasePart to the navigation root. Doing so turns an
++    -- articulated Motor6D rig into one rigid physics assembly and can also fight
++    -- imported rig constraints. Move the monster through one visual root only;
++    -- all Bone/Motor6D articulation below that root remains animation-owned.
++    local navigationRoot = Instance.new("Part")
++    navigationRoot.Name = "HumanoidRootPart"
++    navigationRoot.Size = NAVIGATION_ROOT_SIZE
++    navigationRoot.CFrame = CFrame.new(
++        surface + Vector3.new(0, NAVIGATION_ROOT_SIZE.Y * 0.5 + NAVIGATION_HIP_HEIGHT, 0)
++    ) * CFrame.Angles(0, yawRadians, 0)
++    navigationRoot.Transparency = 1
++    navigationRoot.CastShadow = false
++    navigationRoot.Anchored = false
++    ActorCollisionPolicy.Assign(navigationRoot)
++    navigationRoot.CanTouch = false
++    navigationRoot.CanQuery = false
++    navigationRoot.Massless = false
++    navigationRoot.Parent = runtimeModel
++
++    local boxCFrame, boxSize = visibleBounds(visual)
++    local root = Instance.new("Part")
++    root.Name = "RootCollider"
++    -- Movement collider only. Combat uses precomputed bone-local mesh bounds.
++    root.Size = Vector3.new(math.max(0.5, boxSize.X), math.max(0.5, boxSize.Y), math.max(0.5, boxSize.Z))
++    root.CFrame = boxCFrame
++    root.Transparency = 1
++    root.CastShadow = false
++    root.Anchored = false
++    root.CanCollide = false
++    root.CanTouch = false
++    root.CanQuery = true
++    root.Massless = true
++    root.Parent = runtimeModel
++
++    local rootWeld = Instance.new("WeldConstraint")
++    rootWeld.Name = "RootColliderWeld"
++    rootWeld.Part0 = navigationRoot
++    rootWeld.Part1 = root
++    rootWeld.Parent = navigationRoot
++
++    local visualWeld = Instance.new("WeldConstraint")
++    visualWeld.Name = "VisualRootWeld"
++    visualWeld.Part0 = root
++    visualWeld.Part1 = visualRoot
++    visualWeld.Parent = root
++
++    local humanoid = Instance.new("Humanoid")
++    humanoid.Name = "Humanoid"
++    humanoid.RequiresNeck = false
++    humanoid.BreakJointsOnDeath = false
++    humanoid.AutoRotate = true
++    humanoid.HipHeight = NAVIGATION_HIP_HEIGHT
++    humanoid.UseJumpPower = false
++    humanoid.JumpHeight = 0
++    humanoid.MaxSlopeAngle = 89
++    humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
++    humanoid.WalkSpeed = 0
++    humanoid.MaxHealth = 1
++    humanoid.Health = 1
++    humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
++    humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
++    humanoid.NameDisplayDistance = 0
++    humanoid.Parent = runtimeModel
++
++    runtimeModel.PrimaryPart = navigationRoot
++    pcall(function() navigationRoot:SetNetworkOwner(nil) end)
++    return navigationRoot, humanoid
++end
++
++local function groundAlign(model: Model, surface: Vector3, yawRadians: number)
++    local sourcePivot = model:GetPivot()
++    local sourceRotation = sourcePivot.Rotation
++    model:PivotTo(CFrame.new(surface) * CFrame.Angles(0, yawRadians, 0) * sourceRotation)
++    local boxCFrame, boxSize = visibleBounds(model)
++    local bottomY = boxCFrame.Position.Y - boxSize.Y * 0.5
++    model:PivotTo(model:GetPivot() + Vector3.new(0, surface.Y - bottomY, 0))
++end
++
++MonsterRigBuilder.PrepareVisual = prepareVisual
++MonsterRigBuilder.EnsureRuntimeAnimationRoot = ensureRuntimeAnimationRoot
++MonsterRigBuilder.CreateNavigationRig = createNavigationRig
++MonsterRigBuilder.GroundAlign = groundAlign
++return table.freeze(MonsterRigBuilder)
+diff --git a/src/server/monster/MonsterSpawnGeometry.luau b/src/server/monster/MonsterSpawnGeometry.luau
+new file mode 100644
+index 0000000..7462d06
+--- /dev/null
++++ b/src/server/monster/MonsterSpawnGeometry.luau
+@@ -0,0 +1,94 @@
++-- Spawn-circle sampling and terrain projection for monster navigation.
++-- Random and folder provider are injected so the shared RNG stream and
++-- Workspace.Monsters raycast exclusion retain their original behavior.
++local Workspace = game:GetService("Workspace")
++local MonsterSpawnGeometry = {}
++local GROUND_RAY_START = 96
++local GROUND_RAY_LENGTH = 384
++
++local function finite(value: any, fallback: number): number
++    local number = tonumber(value)
++    if number == nil or number ~= number or number == math.huge or number == -math.huge then
++        return fallback
++    end
++    return number
++end
++
++local function spawnCenter(record: any): Vector3
++    local position = record.position or {}
++    return Vector3.new(finite(position.x, 0), finite(position.y, 0), finite(position.z, 0))
++end
++
++local function surfacePoint(self: any, candidate: Vector3): Vector3
++    local params = RaycastParams.new()
++    params.FilterType = Enum.RaycastFilterType.Exclude
++    params.FilterDescendantsInstances = { self.ensureMonstersFolder() }
++    params.IgnoreWater = false
++    params.RespectCanCollide = false
++    local origin = candidate + Vector3.new(0, GROUND_RAY_START, 0)
++    local hit = Workspace:Raycast(origin, Vector3.new(0, -GROUND_RAY_LENGTH, 0), params)
++    return if hit then hit.Position else candidate
++end
++
++local function randomSpawnPoint(self: any, record: any): Vector3
++    local center = spawnCenter(record)
++    local radius = math.max(0, finite(record.spawnRadius, 0))
++    local candidate = center
++    if radius > 0 then
++        local angle = self.random:NextNumber(0, math.pi * 2)
++        local distance = math.sqrt(self.random:NextNumber(0, 1)) * radius
++        candidate = center + Vector3.new(math.cos(angle) * distance, 0, math.sin(angle) * distance)
++    end
++    return surfacePoint(self, candidate)
++end
++
++local function horizontalDistance(left: Vector3, right: Vector3): number
++    return Vector3.new(right.X - left.X, 0, right.Z - left.Z).Magnitude
++end
++
++local function chooseWanderTarget(self: any, record: any, current: Vector3): (Vector3?, number, boolean)
++    local center = spawnCenter(record)
++    local radius = math.max(0, finite(record.spawnRadius, 0))
++    if radius <= 0 then
++        return nil, 0, false
++    end
++
++    local toCenter = Vector3.new(center.X - current.X, 0, center.Z - current.Z)
++    local distanceToCenter = toCenter.Magnitude
++    local outsideSpawn = distanceToCenter > radius
++    local maximumLength = radius * 2
++    local direction: Vector3
++    if outsideSpawn and distanceToCenter > 0.001 then
++        -- Same contract as RobloxLineage: if a straight wander route ended outside
++        -- the authored circle, the next route is forced inward and cannot pass the center.
++        direction = toCenter.Unit
++        maximumLength = math.min(maximumLength, distanceToCenter)
++    else
++        local angle = self.random:NextNumber(0, math.pi * 2)
++        direction = Vector3.new(math.cos(angle), 0, math.sin(angle))
++    end
++    if maximumLength <= 0.001 then
++        return nil, 0, outsideSpawn
++    end
++
++    local routeLength = self.random:NextNumber(0, maximumLength)
++    local flatDestination = current + direction * routeLength
++    local destination = surfacePoint(self, Vector3.new(flatDestination.X, current.Y, flatDestination.Z))
++    return destination, routeLength, outsideSpawn
++end
++
++
++function MonsterSpawnGeometry.new(random: Random, ensureFolder: () -> Folder)
++    assert(random ~= nil and ensureFolder ~= nil, "MonsterSpawnGeometry requires RNG and folder provider")
++    local context = { random = random, ensureMonstersFolder = ensureFolder }
++    return table.freeze({
++        RandomSpawnPoint = function(_, record: any): Vector3
++            return randomSpawnPoint(context, record)
++        end,
++        ChooseWanderTarget = function(_, record: any, current: Vector3): (Vector3?, number, boolean)
++            return chooseWanderTarget(context, record, current)
++        end,
++    })
++end
++MonsterSpawnGeometry.HorizontalDistance = horizontalDistance
++return table.freeze(MonsterSpawnGeometry)
+diff --git a/src/server/monster/MonsterSpawnerService.luau b/src/server/monster/MonsterSpawnerService.luau
+index 08d2dfe..54cfade 100644
+--- a/src/server/monster/MonsterSpawnerService.luau
++++ b/src/server/monster/MonsterSpawnerService.luau
+@@ -17,17 +17,16 @@ local DeathLifecycleService = require(CombatRoot:WaitForChild("DeathLifecycleSer
+ local DeathAnimationPolicy = require(Shared:WaitForChild("combat"):WaitForChild("DeathAnimationPolicy"))
+ local SpawnRegistry = require(script.Parent:WaitForChild("MonsterSpawnRegistry"))
+ 
+-local ActorCollisionPolicy = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorCollisionPolicy"))
++local MonsterRigBuilder = require(script.Parent:WaitForChild("MonsterRigBuilder"))
++local MonsterSpawnGeometry = require(script.Parent:WaitForChild("MonsterSpawnGeometry"))
++local MonsterAnimationTrackFactory = require(script.Parent:WaitForChild("MonsterAnimationTrackFactory"))
++local MonsterInitialAttributes = require(script.Parent:WaitForChild("MonsterInitialAttributes"))
+ local MonsterSpawnerService = {}
+ local started = false
+ local spawnRandom = Random.new()
+ local states = {}
+ local monstersFolder: Folder? = nil
+ 
+-local GROUND_RAY_START = 96
+-local GROUND_RAY_LENGTH = 384
+-local NAVIGATION_ROOT_SIZE = Vector3.new(2, 2, 1)
+-local NAVIGATION_HIP_HEIGHT = 1.8
+ local WANDER_PAUSE_MIN_SECONDS = 3
+ local WANDER_PAUSE_MAX_SECONDS = 10
+ local WANDER_MOVE_REFRESH_SECONDS = 1
+@@ -55,6 +54,8 @@ local function ensureMonstersFolder(): Folder
+     return monstersFolder
+ end
+ 
++local spawnGeometry = MonsterSpawnGeometry.new(spawnRandom, ensureMonstersFolder)
++
+ local function resolvePath(path: string): Instance?
+     local parts = string.split(path, ".")
+     local current: Instance? = nil
+@@ -79,109 +80,6 @@ local function monsterDefinition(slug: string): any?
+     return monsters and monsters[slug] or nil
+ end
+ 
+-local function animationProfile(slug: string): any?
+-    local profiles = MonsterAnimationRegistry.profiles
+-    return profiles and profiles[slug] or nil
+-end
+-
+-local function publishedRows(profile: any?, slot: string): {any}
+-    local slots = profile and profile.slots
+-    local rows = slots and slots[slot]
+-    if typeof(rows) ~= "table" then
+-        return {}
+-    end
+-    local result = {}
+-    for _, row in ipairs(rows) do
+-        if tostring(row.animationId or ""):match("^rbxassetid://%d+$") then
+-            table.insert(result, row)
+-        end
+-    end
+-    return result
+-end
+-
+-local function firstPublishedTrack(profile: any?, slot: string): any?
+-    return publishedRows(profile, slot)[1]
+-end
+-
+-local function animatorFor(runtimeModel: Model, visual: Model): Animator
+-    -- Keep the animation host inside the visual rig, separate from the navigation
+-    -- Humanoid on the runtime wrapper. This mirrors the RobloxLineage contract:
+-    -- Humanoid owns locomotion of the wrapper; AnimationController owns the bones.
+-    local controller = visual:FindFirstChildOfClass("AnimationController")
+-        or visual:FindFirstChildWhichIsA("AnimationController", true)
+-        or runtimeModel:FindFirstChildOfClass("AnimationController")
+-        or runtimeModel:FindFirstChildWhichIsA("AnimationController", true)
+-    if not controller then
+-        controller = Instance.new("AnimationController")
+-        controller.Name = "AnimationController"
+-        controller.Parent = visual
+-    elseif controller.Parent ~= visual then
+-        controller.Parent = visual
+-    end
+-
+-    for _, descendant in ipairs(runtimeModel:GetDescendants()) do
+-        if descendant:IsA("AnimationController") and descendant ~= controller then
+-            descendant:Destroy()
+-        end
+-    end
+-
+-    local animator = controller:FindFirstChildOfClass("Animator")
+-    if not animator then
+-        animator = Instance.new("Animator")
+-        animator.Name = "Animator"
+-        animator.Parent = controller
+-    end
+-    return animator
+-end
+-
+-local function animationPriority(value: any): Enum.AnimationPriority
+-    local name = tostring(value or "")
+-    if name == "Idle" then
+-        return Enum.AnimationPriority.Idle
+-    elseif name == "Movement" then
+-        return Enum.AnimationPriority.Movement
+-    elseif name == "Action2" then
+-        return Enum.AnimationPriority.Action2
+-    elseif name == "Action3" then
+-        return Enum.AnimationPriority.Action3
+-    elseif name == "Action4" then
+-        return Enum.AnimationPriority.Action4
+-    end
+-    return Enum.AnimationPriority.Action
+-end
+-
+-local function loadAnimationTrack(animator: Animator?, row: any?, looped: boolean): AnimationTrack?
+-    if not animator or not row then
+-        return nil
+-    end
+-    local animationId = tostring(row.animationId or "")
+-    if not animationId:match("^rbxassetid://%d+$") then
+-        return nil
+-    end
+-    local animation = Instance.new("Animation")
+-    animation.AnimationId = animationId
+-    local ok, result = pcall(function()
+-        return animator:LoadAnimation(animation)
+-    end)
+-    animation:Destroy()
+-    if not ok then
+-        warn("[game1][monster-spawn] animation load failed: " .. tostring(result))
+-        return nil
+-    end
+-    local track = result :: AnimationTrack
+-    track.Looped = looped
+-    track.Priority = animationPriority(row.priority)
+-    return track
+-end
+-
+-local function animationPlaybackPercent(model: Model, channel: string): number
+-    return AnimationSpeedScaling.ResolveForModel(model, channel)
+-end
+-
+-local function animationPlaybackScale(model: Model, channel: string): number
+-    return animationPlaybackPercent(model, channel) / 100
+-end
+-
+ local function playTrackAtConfiguredSpeed(model: Model, track: AnimationTrack?, channel: string, fadeTime: number)
+     if not track then
+         return
+@@ -205,17 +103,6 @@ local function stopTrack(track: AnimationTrack?)
+     end)
+ end
+ 
+-local function idleRole(row: any): string
+-    local role = tostring(row.role or "")
+-    if role ~= "" then
+-        return role
+-    end
+-    if tostring(row.sourceSlot or "") == "idle_special" or finite(row.variant, 0) > 0 then
+-        return "special"
+-    end
+-    return "base"
+-end
+-
+ local function weightedIdleChoice(choices: {any}): any?
+     local total = 0
+     for _, choice in ipairs(choices) do
+@@ -298,217 +185,6 @@ local function maybePlayIdleSpecial(model: Model, entry: any)
+     end
+ end
+ 
+-local function visibleBounds(model: Model): (CFrame, Vector3)
+-    local minimum = Vector3.new(math.huge, math.huge, math.huge)
+-    local maximum = Vector3.new(-math.huge, -math.huge, -math.huge)
+-    local found = false
+-    for _, descendant in ipairs(model:GetDescendants()) do
+-        if descendant:IsA("BasePart") and descendant.Name ~= "RootPart" and descendant.Name ~= "RootCollider" then
+-            found = true
+-            local half = descendant.Size * 0.5
+-            for x = -1, 1, 2 do
+-                for y = -1, 1, 2 do
+-                    for z = -1, 1, 2 do
+-                        local corner = descendant.CFrame:PointToWorldSpace(Vector3.new(half.X * x, half.Y * y, half.Z * z))
+-                        minimum = Vector3.new(math.min(minimum.X, corner.X), math.min(minimum.Y, corner.Y), math.min(minimum.Z, corner.Z))
+-                        maximum = Vector3.new(math.max(maximum.X, corner.X), math.max(maximum.Y, corner.Y), math.max(maximum.Z, corner.Z))
+-                    end
+-                end
+-            end
+-        end
+-    end
+-    if not found then
+-        return model:GetBoundingBox()
+-    end
+-    local size = maximum - minimum
+-    return CFrame.new((minimum + maximum) * 0.5), size
+-end
+-
+-local function ensureRuntimeAnimationRoot(visual: Model): number
+-    -- Studio's Animation Editor exports skinned FBX clips with a synthetic
+-    -- RootBone pose above the authored skeleton root. Runtime Animator ignores
+-    -- animation on a Bone that is itself the root of a MeshPart hierarchy.
+-    -- Materialize that neutral RootBone in the runtime clone so the authored
+-    -- root bone (for example `spine`) becomes an ordinary animated child.
+-    --
+-    -- The helper is identity-only and is added before tracks are loaded. Existing
+-    -- authored Bone world/rest transforms are therefore unchanged. The navigation
+-    -- wrapper remains responsible only for world locomotion/yaw; animation owns
+-    -- the complete authored bone pose, including root-bone translation/rotation.
+-    local bridged = 0
+-    for _, descendant in ipairs(visual:GetDescendants()) do
+-        if descendant:IsA("MeshPart") then
+-            local directBones = {}
+-            local animationRoot: Bone? = nil
+-            for _, child in ipairs(descendant:GetChildren()) do
+-                if child:IsA("Bone") then
+-                    if child.Name == "RootBone" then
+-                        animationRoot = child
+-                    else
+-                        table.insert(directBones, child)
+-                    end
+-                end
+-            end
+-
+-            if #directBones > 0 then
+-                if not animationRoot then
+-                    animationRoot = Instance.new("Bone")
+-                    animationRoot.Name = "RootBone"
+-                    animationRoot.CFrame = CFrame.identity
+-                    animationRoot.Parent = descendant
+-                    animationRoot:SetAttribute("Game1RuntimeAnimationRoot", true)
+-                    bridged += 1
+-                end
+-
+-                for _, bone in ipairs(directBones) do
+-                    -- Preserve the authored rest/world transform even if a source
+-                    -- asset already supplied a non-identity RootBone.
+-                    local authoredMeshLocal = bone.CFrame
+-                    bone.Parent = animationRoot
+-                    bone.CFrame = animationRoot.CFrame:Inverse() * authoredMeshLocal
+-                end
+-            end
+-        end
+-    end
+-
+-    visual:SetAttribute("Game1RuntimeAnimationRootBridgeCount", bridged)
+-    return bridged
+-end
+-
+-local function prepareVisual(runtimeModel: Model): (Model, BasePart?)
+-    local visual = runtimeModel:FindFirstChild("ImportedRig")
+-    if not visual or not visual:IsA("Model") then
+-        visual = runtimeModel
+-    end
+-    for _, descendant in ipairs(runtimeModel:GetDescendants()) do
+-        if descendant:IsA("BasePart") then
+-            descendant.Anchored = false
+-            descendant.CanCollide = false
+-            descendant.CanTouch = false
+-            descendant.CanQuery = false
+-            descendant.Massless = true
+-        elseif descendant:IsA("Humanoid") then
+-            descendant:Destroy()
+-        end
+-    end
+-    local visualRoot = visual:FindFirstChild("RootPart", true)
+-        or visual.PrimaryPart
+-        or visual:FindFirstChildWhichIsA("MeshPart", true)
+-        or visual:FindFirstChildWhichIsA("BasePart", true)
+-    return visual :: Model, if visualRoot and visualRoot:IsA("BasePart") then visualRoot else nil
+-end
+-
+-local function createNavigationRig(runtimeModel: Model, visual: Model, visualRoot: BasePart, surface: Vector3, yawRadians: number): (BasePart?, Humanoid?)
+-    -- Never weld every visual BasePart to the navigation root. Doing so turns an
+-    -- articulated Motor6D rig into one rigid physics assembly and can also fight
+-    -- imported rig constraints. Move the monster through one visual root only;
+-    -- all Bone/Motor6D articulation below that root remains animation-owned.
+-    local navigationRoot = Instance.new("Part")
+-    navigationRoot.Name = "HumanoidRootPart"
+-    navigationRoot.Size = NAVIGATION_ROOT_SIZE
+-    navigationRoot.CFrame = CFrame.new(
+-        surface + Vector3.new(0, NAVIGATION_ROOT_SIZE.Y * 0.5 + NAVIGATION_HIP_HEIGHT, 0)
+-    ) * CFrame.Angles(0, yawRadians, 0)
+-    navigationRoot.Transparency = 1
+-    navigationRoot.CastShadow = false
+-    navigationRoot.Anchored = false
+-    ActorCollisionPolicy.Assign(navigationRoot)
+-    navigationRoot.CanTouch = false
+-    navigationRoot.CanQuery = false
+-    navigationRoot.Massless = false
+-    navigationRoot.Parent = runtimeModel
+-
+-    local boxCFrame, boxSize = visibleBounds(visual)
+-    local root = Instance.new("Part")
+-    root.Name = "RootCollider"
+-    -- Movement collider only. Combat uses precomputed bone-local mesh bounds.
+-    root.Size = Vector3.new(math.max(0.5, boxSize.X), math.max(0.5, boxSize.Y), math.max(0.5, boxSize.Z))
+-    root.CFrame = boxCFrame
+-    root.Transparency = 1
+-    root.CastShadow = false
+-    root.Anchored = false
+-    root.CanCollide = false
+-    root.CanTouch = false
+-    root.CanQuery = true
+-    root.Massless = true
+-    root.Parent = runtimeModel
+-
+-    local rootWeld = Instance.new("WeldConstraint")
+-    rootWeld.Name = "RootColliderWeld"
+-    rootWeld.Part0 = navigationRoot
+-    rootWeld.Part1 = root
+-    rootWeld.Parent = navigationRoot
+-
+-    local visualWeld = Instance.new("WeldConstraint")
+-    visualWeld.Name = "VisualRootWeld"
+-    visualWeld.Part0 = root
+-    visualWeld.Part1 = visualRoot
+-    visualWeld.Parent = root
+-
+-    local humanoid = Instance.new("Humanoid")
+-    humanoid.Name = "Humanoid"
+-    humanoid.RequiresNeck = false
+-    humanoid.BreakJointsOnDeath = false
+-    humanoid.AutoRotate = true
+-    humanoid.HipHeight = NAVIGATION_HIP_HEIGHT
+-    humanoid.UseJumpPower = false
+-    humanoid.JumpHeight = 0
+-    humanoid.MaxSlopeAngle = 89
+-    humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
+-    humanoid.WalkSpeed = 0
+-    humanoid.MaxHealth = 1
+-    humanoid.Health = 1
+-    humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
+-    humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+-    humanoid.NameDisplayDistance = 0
+-    humanoid.Parent = runtimeModel
+-
+-    runtimeModel.PrimaryPart = navigationRoot
+-    pcall(function() navigationRoot:SetNetworkOwner(nil) end)
+-    return navigationRoot, humanoid
+-end
+-
+-local function spawnCenter(record: any): Vector3
+-    local position = record.position or {}
+-    return Vector3.new(finite(position.x, 0), finite(position.y, 0), finite(position.z, 0))
+-end
+-
+-local function surfacePoint(candidate: Vector3): Vector3
+-    local params = RaycastParams.new()
+-    params.FilterType = Enum.RaycastFilterType.Exclude
+-    params.FilterDescendantsInstances = { ensureMonstersFolder() }
+-    params.IgnoreWater = false
+-    params.RespectCanCollide = false
+-    local origin = candidate + Vector3.new(0, GROUND_RAY_START, 0)
+-    local hit = Workspace:Raycast(origin, Vector3.new(0, -GROUND_RAY_LENGTH, 0), params)
+-    return if hit then hit.Position else candidate
+-end
+-
+-local function randomSpawnPoint(record: any): Vector3
+-    local center = spawnCenter(record)
+-    local radius = math.max(0, finite(record.spawnRadius, 0))
+-    local candidate = center
+-    if radius > 0 then
+-        local angle = spawnRandom:NextNumber(0, math.pi * 2)
+-        local distance = math.sqrt(spawnRandom:NextNumber(0, 1)) * radius
+-        candidate = center + Vector3.new(math.cos(angle) * distance, 0, math.sin(angle) * distance)
+-    end
+-    return surfacePoint(candidate)
+-end
+-
+-local function groundAlign(model: Model, surface: Vector3, yawRadians: number)
+-    local sourcePivot = model:GetPivot()
+-    local sourceRotation = sourcePivot.Rotation
+-    model:PivotTo(CFrame.new(surface) * CFrame.Angles(0, yawRadians, 0) * sourceRotation)
+-    local boxCFrame, boxSize = visibleBounds(model)
+-    local bottomY = boxCFrame.Position.Y - boxSize.Y * 0.5
+-    model:PivotTo(model:GetPivot() + Vector3.new(0, surface.Y - bottomY, 0))
+-end
+-
+-local function horizontalDistance(left: Vector3, right: Vector3): number
+-    return Vector3.new(right.X - left.X, 0, right.Z - left.Z).Magnitude
+-end
+-
+ local function monsterLocomotionMode(model: Model): string
+     return string.lower(tostring(model:GetAttribute("MonsterLocomotionMode") or "Walk")) == "run" and "Run" or "Walk"
+ end
+@@ -524,37 +200,6 @@ local function locomotionTrackFor(entry: any, mode: string): AnimationTrack?
+     return entry.walkTrack or entry.runTrack
+ end
+ 
+-local function chooseWanderTarget(record: any, current: Vector3): (Vector3?, number, boolean)
+-    local center = spawnCenter(record)
+-    local radius = math.max(0, finite(record.spawnRadius, 0))
+-    if radius <= 0 then
+-        return nil, 0, false
+-    end
+-
+-    local toCenter = Vector3.new(center.X - current.X, 0, center.Z - current.Z)
+-    local distanceToCenter = toCenter.Magnitude
+-    local outsideSpawn = distanceToCenter > radius
+-    local maximumLength = radius * 2
+-    local direction: Vector3
+-    if outsideSpawn and distanceToCenter > 0.001 then
+-        -- Same contract as RobloxLineage: if a straight wander route ended outside
+-        -- the authored circle, the next route is forced inward and cannot pass the center.
+-        direction = toCenter.Unit
+-        maximumLength = math.min(maximumLength, distanceToCenter)
+-    else
+-        local angle = spawnRandom:NextNumber(0, math.pi * 2)
+-        direction = Vector3.new(math.cos(angle), 0, math.sin(angle))
+-    end
+-    if maximumLength <= 0.001 then
+-        return nil, 0, outsideSpawn
+-    end
+-
+-    local routeLength = spawnRandom:NextNumber(0, maximumLength)
+-    local flatDestination = current + direction * routeLength
+-    local destination = surfacePoint(Vector3.new(flatDestination.X, current.Y, flatDestination.Z))
+-    return destination, routeLength, outsideSpawn
+-end
+-
+ local function refreshWanderLocomotion(model: Model, entry: any)
+     if not entry.wandering or entry.dying or model:GetAttribute("MonsterCombatActive") == true or model:GetAttribute("InCombat") == true then
+         return
+@@ -584,7 +229,7 @@ local function refreshWanderLocomotion(model: Model, entry: any)
+         if speed <= 0.001 then
+             entry.wanderDeadline = math.huge
+         else
+-            local remaining = horizontalDistance(navigationRoot.Position, destination)
++            local remaining = MonsterSpawnGeometry.HorizontalDistance(navigationRoot.Position, destination)
+             entry.wanderDeadline = os.clock() + math.max(8, remaining / speed + 4)
+         end
+         humanoid:MoveTo(destination)
+@@ -630,7 +275,7 @@ local function startWanderLoop(state: any, model: Model, entry: any)
+             if not navigationRoot or not navigationRoot.Parent or not humanoid or not humanoid.Parent then
+                 break
+             end
+-            local destination, routeLength, outsideSpawn = chooseWanderTarget(state.record, navigationRoot.Position)
++            local destination, routeLength, outsideSpawn = spawnGeometry:ChooseWanderTarget(state.record, navigationRoot.Position)
+             if not destination or routeLength <= WANDER_ARRIVAL_TOLERANCE then
+                 continue
+             end
+@@ -659,7 +304,7 @@ local function startWanderLoop(state: any, model: Model, entry: any)
+                 and os.clock() < (entry.wanderDeadline or math.huge)
+             do
+                 task.wait(0.1)
+-                if horizontalDistance(navigationRoot.Position, destination) <= WANDER_ARRIVAL_TOLERANCE then
++                if MonsterSpawnGeometry.HorizontalDistance(navigationRoot.Position, destination) <= WANDER_ARRIVAL_TOLERANCE then
+                     finished = true
+                     break
+                 end
+@@ -687,41 +332,6 @@ local function startWanderLoop(state: any, model: Model, entry: any)
+     end)
+ end
+ 
+-local function applyMonsterAttributes(model: Model, definition: any, record: any, instanceId: string)
+-    local stats = definition.stats or {}
+-    local behavior = definition.behavior or {}
+-    local maxHP = math.max(1, finite(stats.MaxHP, 100))
+-    model:SetAttribute("Game1MonsterRuntime", true)
+-    model:SetAttribute("MonsterSlug", tostring(definition.slug or record.monsterSlug or ""))
+-    model:SetAttribute("SpawnId", tostring(record.spawnId or ""))
+-    model:SetAttribute("MonsterInstanceId", instanceId)
+-    model:SetAttribute("Damageable", true)
+-    model:SetAttribute("LifeState", "Alive")
+-    model:SetAttribute("InCombat", false)
+-    model:SetAttribute("CombatState", "Peace")
+-    model:SetAttribute("CombatUntilServerTime", 0)
+-    model:SetAttribute("MaxHP", maxHP)
+-    model:SetAttribute("HP", maxHP)
+-    model:SetAttribute("Damage", math.max(0, finite(stats.Damage, 10)))
+-    model:SetAttribute("AttackSpeed", math.max(1, finite(stats.AttackSpeed, 100)))
+-    model:SetAttribute("RunSpeed", math.max(0, finite(stats.RunSpeed, CharacterMovementConfig.DefaultRunSpeed)))
+-    local debugLocomotion = tostring(Workspace:GetAttribute("Game1MonsterDebugLocomotionMode") or "Walk")
+-    model:SetAttribute("MonsterLocomotionMode", string.lower(debugLocomotion) == "run" and "Run" or "Walk")
+-    model:SetAttribute("CritChance", math.clamp(finite(stats.CritChance, 0), 0, 100))
+-    model:SetAttribute("Defense", math.max(0, finite(stats.Defense, 0)))
+-    local aggressive = behavior.aggressive == true
+-    local aggroRadius = math.max(0, finite(behavior.aggroRadiusStuds, 16))
+-    local attackRadius = math.max(0, finite(behavior.attackRadiusStuds, 3))
+-    model:SetAttribute("MonsterAuthoredAggressive", aggressive)
+-    model:SetAttribute("MonsterAuthoredAggroRadius", aggroRadius)
+-    model:SetAttribute("MonsterAuthoredAttackRadius", attackRadius)
+-    model:SetAttribute("MonsterAggressive", aggressive)
+-    model:SetAttribute("MonsterAggroRadius", aggroRadius)
+-    model:SetAttribute("MonsterAttackRadius", attackRadius)
+-    model:SetAttribute("MonsterCombatActive", false)
+-    model:SetAttribute("MonsterAttackPursuitActive", false)
+-end
+-
+ local function releaseInstance(state: any, model: Model, scheduleRespawn: boolean)
+     local entry = state.instances[model]
+     if entry == nil then
+@@ -837,19 +447,19 @@ local function spawnOne(state: any): Model?
+     local instanceId = tostring(record.spawnId or "spawn") .. "-" .. tostring(math.floor(os.clock() * 1000)) .. "-" .. tostring(spawnRandom:NextInteger(1000, 9999))
+     model.Name = slug .. "_" .. instanceId:sub(-4)
+     model.Parent = ensureMonstersFolder()
+-    local visual, visualRoot = prepareVisual(model)
++    local visual, visualRoot = MonsterRigBuilder.PrepareVisual(model)
+     if not visualRoot then
+         model:Destroy()
+         warn("[game1][monster-spawn] monster contains no usable BasePart: " .. slug)
+         return nil
+     end
+-    local animationRootBridgeCount = ensureRuntimeAnimationRoot(visual)
++    local animationRootBridgeCount = MonsterRigBuilder.EnsureRuntimeAnimationRoot(visual)
+     model:SetAttribute("RuntimeAnimationRootBridgeCount", animationRootBridgeCount)
+-    local surface = randomSpawnPoint(record)
++    local surface = spawnGeometry:RandomSpawnPoint(record)
+     local yaw = spawnRandom:NextNumber(0, math.pi * 2)
+-    groundAlign(model, surface, yaw)
+-    applyMonsterAttributes(model, definition, record, instanceId)
+-    local navigationRoot, humanoid = createNavigationRig(model, visual, visualRoot, surface, yaw)
++    MonsterRigBuilder.GroundAlign(model, surface, yaw)
++    MonsterInitialAttributes.Apply(model, definition, record, instanceId)
++    local navigationRoot, humanoid = MonsterRigBuilder.CreateNavigationRig(model, visual, visualRoot, surface, yaw)
+     if not navigationRoot or not humanoid then
+         model:Destroy()
+         warn("[game1][monster-spawn] monster navigation rig could not be created: " .. slug)
+@@ -858,55 +468,17 @@ local function spawnOne(state: any): Model?
+     local hitbox = EntityHitboxService.Attach(model, visual)
+     model:SetAttribute("CombatHitboxCount", hitbox.count)
+ 
+-    local profile = animationProfile(slug)
+-    local animator = animatorFor(model, visual)
+-    local idleTrack: AnimationTrack? = nil
+-    local idleChoices = {}
+-    for _, row in ipairs(publishedRows(profile, "idle")) do
+-        local role = idleRole(row)
+-        local track = loadAnimationTrack(animator, row, role == "base")
+-        if track then
+-            local choice = { row = row, track = track, role = role }
+-            table.insert(idleChoices, choice)
+-            if role == "base" and not idleTrack then
+-                idleTrack = track
+-            end
+-        end
+-    end
+-    local combatIdleRow = firstPublishedTrack(profile, "combat_idle") or firstPublishedTrack(profile, "idle")
+-    local walkRow = firstPublishedTrack(profile, "walk") or firstPublishedTrack(profile, "run")
+-    local runRow = firstPublishedTrack(profile, "run") or firstPublishedTrack(profile, "walk")
+-    local deathRow = firstPublishedTrack(profile, "death")
+-    local combatIdleTrack = loadAnimationTrack(animator, combatIdleRow, true)
+-    local walkTrack = loadAnimationTrack(animator, walkRow, true)
+-    local runTrack = loadAnimationTrack(animator, runRow, true)
+-    local deathTrack = loadAnimationTrack(animator, deathRow, false)
+-    local entry = {
+-        idleTrack = idleTrack,
+-        idleRow = nil,
+-        idleChoices = idleChoices,
+-        activeIdleSpecial = nil,
+-        combatIdleTrack = combatIdleTrack,
+-        combatIdleRow = combatIdleRow,
+-        walkTrack = walkTrack,
+-        walkRow = walkRow,
+-        runTrack = runTrack,
+-        runRow = runRow,
+-        deathTrack = deathTrack,
+-        deathRow = deathRow,
+-        visual = visual,
+-        navigationRoot = navigationRoot,
+-        humanoid = humanoid,
+-        wandering = false,
+-        dying = false,
+-        deathPoseHeld = false,
+-    }
+-    for _, choice in ipairs(idleChoices) do
+-        if choice.role == "base" and choice.track == idleTrack then
+-            entry.idleRow = choice.row
+-            break
+-        end
+-    end
++    local entry = MonsterAnimationTrackFactory.Load(
++        MonsterAnimationRegistry.profiles and MonsterAnimationRegistry.profiles[slug], model, visual
++    )
++    entry.visual = visual
++    entry.navigationRoot = navigationRoot
++    entry.humanoid = humanoid
++    entry.wandering = false
++    entry.dying = false
++    entry.deathPoseHeld = false
++    local idleTrack = entry.idleTrack
++    local idleChoices = entry.idleChoices
+     state.instances[model] = entry
+ 
+     for _, choice in ipairs(idleChoices) do
+diff --git a/system/verify/test_monster_decomposition_m90.py b/system/verify/test_monster_decomposition_m90.py
+new file mode 100644
+index 0000000..96eacda
+--- /dev/null
++++ b/system/verify/test_monster_decomposition_m90.py
+@@ -0,0 +1,92 @@
++"""M90: module ownership, spawn ordering, and behavior-preserving source contracts."""
++from pathlib import Path
++import re
++import unittest
++
++ROOT = Path(__file__).resolve().parents[2]
++MONSTER = ROOT / "src/server/monster"
++
++
++def read(name):
++    return (MONSTER / (name + ".luau")).read_text(encoding="utf-8")
++
++
++class MonsterModuleBoundaryTests(unittest.TestCase):
++    def test_all_modules_have_named_apis_and_no_circular_spawner_dependency(self):
++        spawner = read("MonsterSpawnerService")
++        for name in ("MonsterRigBuilder", "MonsterSpawnGeometry", "MonsterAnimationTrackFactory", "MonsterInitialAttributes"):
++            source = read(name)
++            self.assertIn('WaitForChild("' + name + '")', spawner)
++            self.assertIn("return table.freeze(" + name + ")", source)
++            self.assertNotIn('WaitForChild("MonsterSpawnerService")', source)
++            self.assertNotIn('require(script.Parent:WaitForChild("MonsterAIService"))', source)
++        self.assertNotIn('Instance.new("Humanoid")', spawner)
++        self.assertNotIn('animator:LoadAnimation(', spawner)
++        self.assertNotIn('Workspace:Raycast(', spawner)
++
++    def test_rig_build_order_and_identity_policy(self):
++        spawner, rig = read("MonsterSpawnerService"), read("MonsterRigBuilder")
++        ordered = [
++            'MonsterRigBuilder.PrepareVisual(model)',
++            'MonsterRigBuilder.EnsureRuntimeAnimationRoot(visual)',
++            'spawnGeometry:RandomSpawnPoint(record)',
++            'MonsterRigBuilder.GroundAlign(model, surface, yaw)',
++            'MonsterInitialAttributes.Apply(model, definition, record, instanceId)',
++            'MonsterRigBuilder.CreateNavigationRig(model, visual, visualRoot, surface, yaw)',
++            'EntityHitboxService.Attach(model, visual)',
++            'MonsterAnimationTrackFactory.Load(',
++        ]
++        self.assertEqual(sorted(map(spawner.index, ordered)), list(map(spawner.index, ordered)))
++        for required in (
++            'animationRoot.Name = "RootBone"',
++            'animationRoot.CFrame = CFrame.identity',
++            'bone.CFrame = animationRoot.CFrame:Inverse() * authoredMeshLocal',
++            'ActorCollisionPolicy.Assign(navigationRoot)',
++            'root.Name = "RootCollider"',
++            'visualWeld.Part1 = visualRoot',
++            'humanoid.HipHeight = NAVIGATION_HIP_HEIGHT',
++            'navigationRoot:SetNetworkOwner(nil)',
++        ):
++            self.assertIn(required, rig)
++
++    def test_geometry_maintains_shared_rng_and_raycast_contract(self):
++        spawner, geometry = read("MonsterSpawnerService"), read("MonsterSpawnGeometry")
++        self.assertEqual(spawner.count('Random.new()'), 1)
++        self.assertIn('MonsterSpawnGeometry.new(spawnRandom, ensureMonstersFolder)', spawner)
++        self.assertIn('spawnRandom:NextNumber(0, total)', spawner)
++        self.assertIn('spawnRandom:NextNumber(0.35, 1.35)', spawner)
++        self.assertIn('self.random:NextNumber(0, math.pi * 2)', geometry)
++        self.assertIn('math.sqrt(self.random:NextNumber(0, 1)) * radius', geometry)
++        self.assertIn('self.random:NextNumber(0, maximumLength)', geometry)
++        self.assertIn('params.FilterDescendantsInstances = { self.ensureMonstersFolder() }', geometry)
++        self.assertIn('params.RespectCanCollide = false', geometry)
++        self.assertIn('Workspace:Raycast(origin, Vector3.new(0, -GROUND_RAY_LENGTH, 0), params)', geometry)
++        self.assertIn('maximumLength = math.min(maximumLength, distanceToCenter)', geometry)
++        self.assertIn('spawnGeometry:ChooseWanderTarget(', spawner)
++
++    def test_clip_selection_priority_and_oneshot_are_unchanged(self):
++        clips, spawner = read("MonsterAnimationTrackFactory"), read("MonsterSpawnerService")
++        self.assertIn('publishedRows(profile, "idle")', clips)
++        self.assertIn('if role == "base" and not idleTrack then', clips)
++        self.assertIn('firstPublishedTrack(profile, "combat_idle") or firstPublishedTrack(profile, "idle")', clips)
++        self.assertIn('firstPublishedTrack(profile, "walk") or firstPublishedTrack(profile, "run")', clips)
++        self.assertIn('firstPublishedTrack(profile, "run") or firstPublishedTrack(profile, "walk")', clips)
++        self.assertIn('loadAnimationTrack(animator, deathRow, false)', clips)
++        self.assertIn('track.Looped = looped', clips)
++        self.assertIn('track.Priority = animationPriority(row.priority)', clips)
++        self.assertIn('idleTrack.DidLoop:Connect', spawner)
++        self.assertIn('choice.track.Ended:Connect', spawner)
++        self.assertIn('DeathAnimationPolicy.LatchVisibleTerminalPose', spawner)
++
++    def test_attributes_still_separate_authored_and_runtime_behavior(self):
++        attrs = read("MonsterInitialAttributes")
++        for key in ('MonsterAuthoredAggressive', 'MonsterAuthoredAggroRadius', 'MonsterAuthoredAttackRadius',
++                    'MonsterAggressive', 'MonsterAggroRadius', 'MonsterAttackRadius', 'MonsterCombatActive',
++                    'MonsterAttackPursuitActive', 'CombatUntilServerTime', 'Game1MonsterRuntime'):
++            self.assertIn('SetAttribute("' + key + '"', attrs)
++        self.assertIn('finite(stats.RunSpeed, CharacterMovementConfig.DefaultRunSpeed)', attrs)
++        self.assertNotIn('AnimationTrack', attrs)
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/system/verify/test_npc_retaliation_collision_dump.py b/system/verify/test_npc_retaliation_collision_dump.py
+index ab293a8..1b6f714 100644
+--- a/system/verify/test_npc_retaliation_collision_dump.py
++++ b/system/verify/test_npc_retaliation_collision_dump.py
+@@ -84,7 +84,7 @@ class M69Tests(unittest.TestCase):
+         self.assertIn('CollisionGroupSetCollidable(GROUP, GROUP, true)', policy)
+         self.assertIn('root.CanCollide = true', policy)
+         for path,root in [('src/server/character/CharacterRigService.luau','navigationRoot'),
+-                          ('src/server/monster/MonsterSpawnerService.luau','navigationRoot'),
++                          ('src/server/monster/MonsterRigBuilder.luau','navigationRoot'),
+                           ('src/server/npc/NpcRigFactory.luau','root')]:
+             self.assertIn('ActorCollisionPolicy.Assign('+root+')',source(path))
+         self.assertIn('pinAtRest(agent, true)',source('src/server/npc/NpcCombatAIService.luau'))
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+index c31a6c0..ee0352b 100644
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -129,6 +129,10 @@ required_runtime = [
+     "src/server/dev/TrainingDummyService.luau",
+     "src/server/dev/MovementDebugService.luau",
+     "src/server/monster/MonsterSpawnerService.luau",
++    "src/server/monster/MonsterRigBuilder.luau",
++    "src/server/monster/MonsterSpawnGeometry.luau",
++    "src/server/monster/MonsterAnimationTrackFactory.luau",
++    "src/server/monster/MonsterInitialAttributes.luau",
+     "src/server/monster/MonsterSpawnRegistry.luau",
+     "src/client/character/MovementController.luau",
+     "src/client/character/CameraController.luau",
+@@ -1026,13 +1030,20 @@ for required in ["monster-spawn", "Game1MonsterSpawnMarker", "Game1Authoring", "
+ 
+ monster_spawner_path = ROOT / "src/server/monster/MonsterSpawnerService.luau"
+ monster_spawner_text = monster_spawner_path.read_text(encoding="utf-8") if monster_spawner_path.is_file() else ""
+-if 'finite(stats.RunSpeed, CharacterMovementConfig.DefaultRunSpeed)' not in monster_spawner_text:
++# M90: validate the monster runtime as several bounded modules rather than
++# assuming every implementation detail remains inside the orchestrator.
++monster_rig_text = (ROOT / "src/server/monster/MonsterRigBuilder.luau").read_text(encoding="utf-8")
++monster_geometry_text = (ROOT / "src/server/monster/MonsterSpawnGeometry.luau").read_text(encoding="utf-8")
++monster_track_factory_text = (ROOT / "src/server/monster/MonsterAnimationTrackFactory.luau").read_text(encoding="utf-8")
++monster_attributes_text = (ROOT / "src/server/monster/MonsterInitialAttributes.luau").read_text(encoding="utf-8")
++monster_runtime_text = "\n".join((monster_spawner_text, monster_rig_text, monster_geometry_text, monster_track_factory_text, monster_attributes_text))
++if 'finite(stats.RunSpeed, CharacterMovementConfig.DefaultRunSpeed)' not in monster_runtime_text:
+     err("monster RunSpeed fallback must use the shared direct-speed contract")
+ for required in ["MonsterSpawnRegistry", "MonsterRegistry", "MonsterAnimationRegistry", "spawnRadius", "maxAlive", "respawnSeconds", "math.sqrt", "Workspace:Raycast", "EntityHitboxService.Attach", 'GetAttributeChangedSignal("LifeState")', '== "Dying"', 'publishedRows(profile, "idle")', 'weightedIdleChoice', 'MonsterAnimationState', 'MonsterIdleVariant', 'idleTrack.DidLoop', 'choice.track.Ended', 'playBaseIdle']:
+-    if required not in monster_spawner_text:
++    if required not in monster_runtime_text:
+         err(f"monster runtime spawner missing {required}")
+ for required in ["HumanoidRootPart", 'Instance.new("Humanoid")', "humanoid:MoveTo", "MoveToFinished", "WANDER_PAUSE_MIN_SECONDS", "WANDER_PAUSE_MAX_SECONDS", "WANDER_MOVE_REFRESH_SECONDS", "CharacterMovementConfig.RobloxSpeed", 'firstPublishedTrack(profile, "walk")', "MonsterWanderEnabled"]:
+-    if required not in monster_spawner_text:
++    if required not in monster_runtime_text:
+         err(f"monster random-wander runtime missing {required}")
+ for required in [
+     'firstPublishedTrack(profile, "run")',
+@@ -1045,17 +1056,17 @@ for required in [
+     "AnimationPlaybackSpeedPercent",
+     "AnimationSpeedScaling",
+ ]:
+-    if required not in monster_spawner_text:
++    if required not in monster_runtime_text:
+         err(f"monster live movement-debug locomotion missing {required}")
+-for required in ['VisualRootWeld', 'animatorFor(model, visual)', 'controller.Parent = visual']:
+-    if required not in monster_spawner_text:
++for required in ['VisualRootWeld', 'animatorFor(runtimeModel, visual)', 'controller.Parent = visual']:
++    if required not in monster_runtime_text:
+         err(f"monster animated-navigation bridge missing {required}")
+-if "Game1MonsterVisualWeld" in monster_spawner_text:
++if "Game1MonsterVisualWeld" in monster_runtime_text:
+     err("monster navigation must never rigid-weld every visual BasePart; weld only the rig root")
+ for required in ['Workspace:FindFirstChild("Game1Authoring")', 'authoring:FindFirstChild("MonsterSpawns")', "monsterSpawns:Destroy()", "removeAuthoringVisualsFromSimulation"]:
+-    if required not in monster_spawner_text:
++    if required not in monster_runtime_text:
+         err(f"Play/Run monster-spawn authoring-visual cleanup missing {required}")
+-if "RunService.Heartbeat" in monster_spawner_text:
++if "RunService.Heartbeat" in monster_runtime_text:
+     err("monster spawn/wander runtime must not use a permanent Heartbeat loop")
+ if "MonsterSpawnerService.Start()" not in server_init_text:
+     err("monster spawner is not started by the server runtime")
+@@ -1122,7 +1133,7 @@ for required in [
+     "RunService.PreAnimation:Connect",
+     "deathPoseHeld",
+ ]:
+-    if required not in monster_spawner_text:
++    if required not in monster_runtime_text:
+         err(f"monster death terminal-pose lifecycle missing {required}")
+ 
+ for required in [
+@@ -1132,7 +1143,7 @@ for required in [
+     "bone.Parent = animationRoot",
+     "RuntimeAnimationRootBridgeCount",
+ ]:
+-    if required not in monster_spawner_text:
++    if required not in monster_runtime_text:
+         err(f"monster root-bone animation bridge missing {required}")
+ 
+ character_animation_text = (ROOT / "src/client/character/animation/CharacterAnimationController.luau").read_text(encoding="utf-8")
+@@ -1386,7 +1397,7 @@ for required in ["Aggro", "Chase", "Attack", "pursueDirectlyDuringAttack", "atta
+     if required not in monster_ai_m23:
+         err(f"RobloxLineage monster combat AI contract missing {required}")
+ for required in ["MonsterAuthoredAggressive", "MonsterAuthoredAggroRadius", "MonsterAuthoredAttackRadius", "MonsterCombatActive"]:
+-    if required not in spawner_m23:
++    if required not in (spawner_m23 + monster_attributes_text):
+         err(f"monster spawner behavior bridge missing {required}")
+ monster_locomotion_m23 = (ROOT / "src/client/monster/MonsterAttackLocomotionController.luau").read_text(encoding="utf-8")
+ for required in ["MonsterAttackPursuitActive", "MonsterAttackPursuitPlaybackSpeed", "lowerPaths", "PreSimulation"]:
+@@ -1510,7 +1521,7 @@ character_animation_m26 = (ROOT / "src/client/character/animation/CharacterAnima
+ for required in ['GetAttribute("InCombat") == true', 'return "combat_idle"', "GameOptions.CharacterLifePlaybackPercent"]:
+     if required not in character_animation_m26:
+         err(f"m26 character combat/life animation contract missing {required}")
+-monster_spawner_m26 = (ROOT / "src/server/monster/MonsterSpawnerService.luau").read_text(encoding="utf-8")
++monster_spawner_m26 = monster_runtime_text
+ for required in ["playCombatIdleState", "combatIdleTrack", 'GetAttribute("InCombat")', 'MonsterAnimationState", "combat_idle"']:
+     if required not in monster_spawner_m26:
+         err(f"m26 monster combat-idle contract missing {required}")

@@ -20,12 +20,29 @@ try {
 
 if(-not (Test-Path $Temp)){throw 'Rojo did not create the plugin build'}
 $BuiltText=Get-Content $Temp -Raw
-foreach($Marker in @('Game1ControlCenter','model bridge v24','Game1AttackTimeline_v2','TimelinePreviewWorld','location-authoring','Game1LocationMarker','Game1DecoManager_v1','DecoPreviewWorld','Save Assets Data','Game1DecoAssets')){
+# Validate the command API used by Asset Manager, not the removed Control Center toolbar button.
+# The installer must reject old builds that lack the Monster/NPC Spawn command handler.
+foreach($Marker in @(
+    'model bridge v24',
+    'local function checkAgent()',
+    'local function handleMonsterSpawn(',
+    'data.command == "monster-spawn"',
+    'Game1MonsterSpawnMarker',
+    'Game1NpcSpawnMarker',
+    'Game1AttackTimeline_v2',
+    'TimelinePreviewWorld',
+    'location-authoring',
+    'Game1LocationMarker',
+    'Game1DecoManager_v1',
+    'DecoPreviewWorld',
+    'Save Assets Data',
+    'Game1DecoAssets'
+)){
     if(-not $BuiltText.Contains($Marker)){
         throw "Studio bridge build is stale or incomplete; missing marker: $Marker"
     }
 }
-foreach($RemovedMarker in @('Game1CheckAnimations','Check Roblox Assets Animations','KeyframeSequenceProvider','/api/studio/animation-check')){
+foreach($RemovedMarker in @('Game1ControlCenter','Game1CheckAnimations','Check Roblox Assets Animations','KeyframeSequenceProvider','/api/studio/animation-check')){
     if($BuiltText.Contains($RemovedMarker)){
         throw "Studio bridge still contains removed animation-check code: $RemovedMarker"
     }

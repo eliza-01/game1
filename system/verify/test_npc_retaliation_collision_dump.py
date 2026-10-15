@@ -84,7 +84,7 @@ class M69Tests(unittest.TestCase):
         self.assertIn('CollisionGroupSetCollidable(GROUP, GROUP, true)', policy)
         self.assertIn('root.CanCollide = true', policy)
         for path,root in [('src/server/character/CharacterRigService.luau','navigationRoot'),
-                          ('src/server/monster/MonsterSpawnerService.luau','navigationRoot'),
+                          ('src/server/monster/MonsterRigBuilder.luau','navigationRoot'),
                           ('src/server/npc/NpcRigFactory.luau','root')]:
             self.assertIn('ActorCollisionPolicy.Assign('+root+')',source(path))
         self.assertIn('pinAtRest(agent, true)',source('src/server/npc/NpcCombatAIService.luau'))

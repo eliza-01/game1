@@ -4,13 +4,13 @@ return table.freeze({
 	project = "game1",
 	profiles = table.freeze({
 		["human_female"] = table.freeze({
-			skeletonSignature = "587cde8efc22c1b5c256abb86f803452db3a7508eb823e758821a4767246f676",
+			skeletonSignature = "6b825a0cd2cdeaf700fca3c853fb52d41e9f170020b012d7d1188d4f9352210c",
 			base = table.freeze({
 				["death"] = table.freeze({
 					table.freeze({
 						clipId = "human_female__base__death__00",
-						assetId = "118060400424587",
-						animationId = "rbxassetid://118060400424587",
+						assetId = "81644864777234",
+						animationId = "rbxassetid://81644864777234",
 						variant = 0,
 						weight = 100,
 						looped = false,
@@ -20,8 +20,8 @@ return table.freeze({
 				["revive"] = table.freeze({
 					table.freeze({
 						clipId = "human_female__base__revive__00",
-						assetId = "139362684441288",
-						animationId = "rbxassetid://139362684441288",
+						assetId = "83724299950111",
+						animationId = "rbxassetid://83724299950111",
 						variant = 0,
 						weight = 100,
 						looped = false,
@@ -34,8 +34,8 @@ return table.freeze({
 					["attack"] = table.freeze({
 						table.freeze({
 							clipId = "human_female__weapon__1hs__attack__01",
-							assetId = "88149431126736",
-							animationId = "rbxassetid://88149431126736",
+							assetId = "122840035798169",
+							animationId = "rbxassetid://122840035798169",
 							variant = 1,
 							weight = 100,
 							looped = false,
@@ -43,8 +43,8 @@ return table.freeze({
 						}),
 						table.freeze({
 							clipId = "human_female__weapon__1hs__attack__02",
-							assetId = "82563321432420",
-							animationId = "rbxassetid://82563321432420",
+							assetId = "111523407571664",
+							animationId = "rbxassetid://111523407571664",
 							variant = 2,
 							weight = 100,
 							looped = false,
@@ -52,8 +52,8 @@ return table.freeze({
 						}),
 						table.freeze({
 							clipId = "human_female__weapon__1hs__attack__03",
-							assetId = "86247398285431",
-							animationId = "rbxassetid://86247398285431",
+							assetId = "132390395868663",
+							animationId = "rbxassetid://132390395868663",
 							variant = 3,
 							weight = 100,
 							looped = false,
@@ -63,8 +63,8 @@ return table.freeze({
 					["combat_idle"] = table.freeze({
 						table.freeze({
 							clipId = "human_female__weapon__1hs__combat_idle__00",
-							assetId = "118675119937740",
-							animationId = "rbxassetid://118675119937740",
+							assetId = "78672231936532",
+							animationId = "rbxassetid://78672231936532",
 							variant = 0,
 							weight = 100,
 							looped = true,
@@ -74,8 +74,8 @@ return table.freeze({
 					["idle"] = table.freeze({
 						table.freeze({
 							clipId = "human_female__weapon__1hs__idle__00",
-							assetId = "128677350129455",
-							animationId = "rbxassetid://128677350129455",
+							assetId = "104882544264186",
+							animationId = "rbxassetid://104882544264186",
 							variant = 0,
 							weight = 100,
 							looped = true,
@@ -85,8 +85,8 @@ return table.freeze({
 					["run"] = table.freeze({
 						table.freeze({
 							clipId = "human_female__weapon__1hs__run__00",
-							assetId = "134065196920987",
-							animationId = "rbxassetid://134065196920987",
+							assetId = "70447016661017",
+							animationId = "rbxassetid://70447016661017",
 							variant = 0,
 							weight = 100,
 							looped = true,
@@ -96,8 +96,8 @@ return table.freeze({
 					["walk"] = table.freeze({
 						table.freeze({
 							clipId = "human_female__weapon__1hs__walk__00",
-							assetId = "111055842456450",
-							animationId = "rbxassetid://111055842456450",
+							assetId = "82213044013946",
+							animationId = "rbxassetid://82213044013946",
 							variant = 0,
 							weight = 100,
 							looped = true,

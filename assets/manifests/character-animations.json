@@ -10,7 +10,7 @@
   "profiles": [
     {
       "characterId": "human_female",
-      "skeletonSignature": "587cde8efc22c1b5c256abb86f803452db3a7508eb823e758821a4767246f676"
+      "skeletonSignature": "6b825a0cd2cdeaf700fca3c853fb52d41e9f170020b012d7d1188d4f9352210c"
     }
   ],
   "clips": [
@@ -20,12 +20,12 @@
       "name": "1hs_attack_01",
       "sourcePath": "assets/source/characters/human/female/human_female/animations/weapons/1hs/1hs_attack_01.rbxm",
       "preparedPath": "assets/source/characters/human/female/human_female/animations/weapons/1hs/1hs_attack_01.rbxm",
-      "sha256": "c5a9f66cb9873ca0c2d3a9b14c690b36f7be3f36e76e3888741808bd219a901e",
-      "sourceSha256": "c5a9f66cb9873ca0c2d3a9b14c690b36f7be3f36e76e3888741808bd219a901e",
-      "assetId": "88149431126736",
-      "publishedSha256": "c5a9f66cb9873ca0c2d3a9b14c690b36f7be3f36e76e3888741808bd219a901e",
+      "sha256": "87e05f7fda328c589054b0fe83bed4599bedbc15f5db638cd318d80689b549fb",
+      "sourceSha256": "87e05f7fda328c589054b0fe83bed4599bedbc15f5db638cd318d80689b549fb",
+      "assetId": "122840035798169",
+      "publishedSha256": "87e05f7fda328c589054b0fe83bed4599bedbc15f5db638cd318d80689b549fb",
       "moderationState": "Approved",
-      "revision": 2,
+      "revision": 1,
       "status": "PUBLISHED"
     },
     {
@@ -34,12 +34,12 @@
       "name": "1hs_attack_02",
       "sourcePath": "assets/source/characters/human/female/human_female/animations/weapons/1hs/1hs_attack_02.rbxm",
       "preparedPath": "assets/source/characters/human/female/human_female/animations/weapons/1hs/1hs_attack_02.rbxm",
-      "sha256": "b95a86fb5d9286775299ac211f4be2d267b72d87cf92545fd4adf206058d996f",
-      "sourceSha256": "b95a86fb5d9286775299ac211f4be2d267b72d87cf92545fd4adf206058d996f",
-      "assetId": "82563321432420",
-      "publishedSha256": "b95a86fb5d9286775299ac211f4be2d267b72d87cf92545fd4adf206058d996f",
+      "sha256": "69991cca14d690bea0eea7eef222687aa9d1e44fdb2779c9da114981fb41612c",
+      "sourceSha256": "69991cca14d690bea0eea7eef222687aa9d1e44fdb2779c9da114981fb41612c",
+      "assetId": "111523407571664",
+      "publishedSha256": "69991cca14d690bea0eea7eef222687aa9d1e44fdb2779c9da114981fb41612c",
       "moderationState": "Approved",
-      "revision": 2,
+      "revision": 1,
       "status": "PUBLISHED"
     },
     {
@@ -48,12 +48,12 @@
       "name": "1hs_attack_03",
       "sourcePath": "assets/source/characters/human/female/human_female/animations/weapons/1hs/1hs_attack_03.rbxm",
       "preparedPath": "assets/source/characters/human/female/human_female/animations/weapons/1hs/1hs_attack_03.rbxm",
-      "sha256": "c365f5510f3fa4671208fa3a6f2f04e7a0cff3994776b7f08f6604f022e52286",
-      "sourceSha256": "c365f5510f3fa4671208fa3a6f2f04e7a0cff3994776b7f08f6604f022e52286",
-      "assetId": "86247398285431",
-      "publishedSha256": "c365f5510f3fa4671208fa3a6f2f04e7a0cff3994776b7f08f6604f022e52286",
+      "sha256": "56b945ff4ce2b19b2f33ae9c59bb2f20c4dbf89b6ef8fd13d0db056495d5f269",
+      "sourceSha256": "56b945ff4ce2b19b2f33ae9c59bb2f20c4dbf89b6ef8fd13d0db056495d5f269",
+      "assetId": "132390395868663",
+      "publishedSha256": "56b945ff4ce2b19b2f33ae9c59bb2f20c4dbf89b6ef8fd13d0db056495d5f269",
       "moderationState": "Approved",
-      "revision": 2,
+      "revision": 1,
       "status": "PUBLISHED"
     },
     {
@@ -62,12 +62,12 @@
       "name": "1hs_combat_idle",
       "sourcePath": "assets/source/characters/human/female/human_female/animations/weapons/1hs/1hs_combat_idle.rbxm",
       "preparedPath": "assets/source/characters/human/female/human_female/animations/weapons/1hs/1hs_combat_idle.rbxm",
-      "sha256": "a4d7cfd53f4aa796ad87258ebc0ffbc967d5bc2ad3849e5284b949aabaf498ee",
-      "sourceSha256": "a4d7cfd53f4aa796ad87258ebc0ffbc967d5bc2ad3849e5284b949aabaf498ee",
-      "assetId": "118675119937740",
-      "publishedSha256": "a4d7cfd53f4aa796ad87258ebc0ffbc967d5bc2ad3849e5284b949aabaf498ee",
+      "sha256": "fc3d896a3b2eb516d8da2961416ac8f88c160149d2d06c6f16a06d71aa69b5df",
+      "sourceSha256": "fc3d896a3b2eb516d8da2961416ac8f88c160149d2d06c6f16a06d71aa69b5df",
+      "assetId": "78672231936532",
+      "publishedSha256": "fc3d896a3b2eb516d8da2961416ac8f88c160149d2d06c6f16a06d71aa69b5df",
       "moderationState": "Approved",
-      "revision": 3,
+      "revision": 1,
       "status": "PUBLISHED"
     },
     {
@@ -76,12 +76,12 @@
       "name": "1hs_idle",
       "sourcePath": "assets/source/characters/human/female/human_female/animations/weapons/1hs/1hs_idle.rbxm",
       "preparedPath": "assets/source/characters/human/female/human_female/animations/weapons/1hs/1hs_idle.rbxm",
-      "sha256": "b2374a57e07aacdbe82ffbb0e8cffe6302f616f982df9f31dc7606b9df78c103",
-      "sourceSha256": "b2374a57e07aacdbe82ffbb0e8cffe6302f616f982df9f31dc7606b9df78c103",
-      "assetId": "128677350129455",
-      "publishedSha256": "b2374a57e07aacdbe82ffbb0e8cffe6302f616f982df9f31dc7606b9df78c103",
+      "sha256": "3e5c15c8290a35139cc334c6a2a9cbfa14e34f9f23abe5e137d89d4100f83169",
+      "sourceSha256": "3e5c15c8290a35139cc334c6a2a9cbfa14e34f9f23abe5e137d89d4100f83169",
+      "assetId": "104882544264186",
+      "publishedSha256": "3e5c15c8290a35139cc334c6a2a9cbfa14e34f9f23abe5e137d89d4100f83169",
       "moderationState": "Approved",
-      "revision": 4,
+      "revision": 1,
       "status": "PUBLISHED"
     },
     {
@@ -90,12 +90,12 @@
       "name": "1hs_run",
       "sourcePath": "assets/source/characters/human/female/human_female/animations/weapons/1hs/1hs_run.rbxm",
       "preparedPath": "assets/source/characters/human/female/human_female/animations/weapons/1hs/1hs_run.rbxm",
-      "sha256": "f8ac796ce05859442fbde385cb709063674f5ff4d8fd899606f2f4d512b40003",
-      "sourceSha256": "f8ac796ce05859442fbde385cb709063674f5ff4d8fd899606f2f4d512b40003",
-      "assetId": "134065196920987",
-      "publishedSha256": "f8ac796ce05859442fbde385cb709063674f5ff4d8fd899606f2f4d512b40003",
+      "sha256": "f70e1715636f63a9bab598dc53b1fb2b05b358846b4c9b1320252b1aa1e1e064",
+      "sourceSha256": "f70e1715636f63a9bab598dc53b1fb2b05b358846b4c9b1320252b1aa1e1e064",
+      "assetId": "70447016661017",
+      "publishedSha256": "f70e1715636f63a9bab598dc53b1fb2b05b358846b4c9b1320252b1aa1e1e064",
       "moderationState": "Approved",
-      "revision": 4,
+      "revision": 1,
       "status": "PUBLISHED"
     },
     {
@@ -104,12 +104,12 @@
       "name": "1hs_walk",
       "sourcePath": "assets/source/characters/human/female/human_female/animations/weapons/1hs/1hs_walk.rbxm",
       "preparedPath": "assets/source/characters/human/female/human_female/animations/weapons/1hs/1hs_walk.rbxm",
-      "sha256": "1c5ba24831eb3a254aae2f9b6322427ef839b33b86c4b00af73301c23d35eebc",
-      "sourceSha256": "1c5ba24831eb3a254aae2f9b6322427ef839b33b86c4b00af73301c23d35eebc",
-      "assetId": "111055842456450",
-      "publishedSha256": "1c5ba24831eb3a254aae2f9b6322427ef839b33b86c4b00af73301c23d35eebc",
+      "sha256": "3069bc5e625016df257e0ada2b09d10642c19b6ac4364c13b076a6d7144d8593",
+      "sourceSha256": "3069bc5e625016df257e0ada2b09d10642c19b6ac4364c13b076a6d7144d8593",
+      "assetId": "82213044013946",
+      "publishedSha256": "3069bc5e625016df257e0ada2b09d10642c19b6ac4364c13b076a6d7144d8593",
       "moderationState": "Approved",
-      "revision": 4,
+      "revision": 1,
       "status": "PUBLISHED"
     },
     {
@@ -118,12 +118,12 @@
       "name": "base_death",
       "sourcePath": "assets/source/characters/human/female/human_female/animations/base/base_death.rbxm",
       "preparedPath": "assets/source/characters/human/female/human_female/animations/base/base_death.rbxm",
-      "sha256": "478e5846dba60fd3f0080d0ba5fa26f6c4ed610282e3cd9e5bf058dfad23baf9",
-      "sourceSha256": "478e5846dba60fd3f0080d0ba5fa26f6c4ed610282e3cd9e5bf058dfad23baf9",
-      "assetId": "118060400424587",
-      "publishedSha256": "478e5846dba60fd3f0080d0ba5fa26f6c4ed610282e3cd9e5bf058dfad23baf9",
+      "sha256": "9bbfc87d978e921290418bdd80a99ead6b3c0939035f573dea1b8517070d616c",
+      "sourceSha256": "9bbfc87d978e921290418bdd80a99ead6b3c0939035f573dea1b8517070d616c",
+      "assetId": "81644864777234",
+      "publishedSha256": "9bbfc87d978e921290418bdd80a99ead6b3c0939035f573dea1b8517070d616c",
       "moderationState": "Approved",
-      "revision": 3,
+      "revision": 1,
       "status": "PUBLISHED"
     },
     {
@@ -132,12 +132,12 @@
       "name": "base_revive",
       "sourcePath": "assets/source/characters/human/female/human_female/animations/base/base_revive.rbxm",
       "preparedPath": "assets/source/characters/human/female/human_female/animations/base/base_revive.rbxm",
-      "sha256": "182b26be7333359e7ea290f1e3a282666e18f41600d658438cb1526ad4f0cab6",
-      "sourceSha256": "182b26be7333359e7ea290f1e3a282666e18f41600d658438cb1526ad4f0cab6",
-      "assetId": "139362684441288",
-      "publishedSha256": "182b26be7333359e7ea290f1e3a282666e18f41600d658438cb1526ad4f0cab6",
+      "sha256": "15fdd0a86c9f1a7fffe755bba7885a98dcf0a92e2f8f09372b7d306468154337",
+      "sourceSha256": "15fdd0a86c9f1a7fffe755bba7885a98dcf0a92e2f8f09372b7d306468154337",
+      "assetId": "83724299950111",
+      "publishedSha256": "15fdd0a86c9f1a7fffe755bba7885a98dcf0a92e2f8f09372b7d306468154337",
       "moderationState": "Approved",
-      "revision": 3,
+      "revision": 1,
       "status": "PUBLISHED"
     }
   ],

@@ -129,6 +129,10 @@ required_runtime = [
     "src/server/dev/TrainingDummyService.luau",
     "src/server/dev/MovementDebugService.luau",
     "src/server/monster/MonsterSpawnerService.luau",
+    "src/server/monster/MonsterRigBuilder.luau",
+    "src/server/monster/MonsterSpawnGeometry.luau",
+    "src/server/monster/MonsterAnimationTrackFactory.luau",
+    "src/server/monster/MonsterInitialAttributes.luau",
     "src/server/monster/MonsterSpawnRegistry.luau",
     "src/client/character/MovementController.luau",
     "src/client/character/CameraController.luau",
@@ -1026,13 +1030,20 @@ for required in ["monster-spawn", "Game1MonsterSpawnMarker", "Game1Authoring", "
 
 monster_spawner_path = ROOT / "src/server/monster/MonsterSpawnerService.luau"
 monster_spawner_text = monster_spawner_path.read_text(encoding="utf-8") if monster_spawner_path.is_file() else ""
-if 'finite(stats.RunSpeed, CharacterMovementConfig.DefaultRunSpeed)' not in monster_spawner_text:
+# M90: validate the monster runtime as several bounded modules rather than
+# assuming every implementation detail remains inside the orchestrator.
+monster_rig_text = (ROOT / "src/server/monster/MonsterRigBuilder.luau").read_text(encoding="utf-8")
+monster_geometry_text = (ROOT / "src/server/monster/MonsterSpawnGeometry.luau").read_text(encoding="utf-8")
+monster_track_factory_text = (ROOT / "src/server/monster/MonsterAnimationTrackFactory.luau").read_text(encoding="utf-8")
+monster_attributes_text = (ROOT / "src/server/monster/MonsterInitialAttributes.luau").read_text(encoding="utf-8")
+monster_runtime_text = "\n".join((monster_spawner_text, monster_rig_text, monster_geometry_text, monster_track_factory_text, monster_attributes_text))
+if 'finite(stats.RunSpeed, CharacterMovementConfig.DefaultRunSpeed)' not in monster_runtime_text:
     err("monster RunSpeed fallback must use the shared direct-speed contract")
 for required in ["MonsterSpawnRegistry", "MonsterRegistry", "MonsterAnimationRegistry", "spawnRadius", "maxAlive", "respawnSeconds", "math.sqrt", "Workspace:Raycast", "EntityHitboxService.Attach", 'GetAttributeChangedSignal("LifeState")', '== "Dying"', 'publishedRows(profile, "idle")', 'weightedIdleChoice', 'MonsterAnimationState', 'MonsterIdleVariant', 'idleTrack.DidLoop', 'choice.track.Ended', 'playBaseIdle']:
-    if required not in monster_spawner_text:
+    if required not in monster_runtime_text:
         err(f"monster runtime spawner missing {required}")
 for required in ["HumanoidRootPart", 'Instance.new("Humanoid")', "humanoid:MoveTo", "MoveToFinished", "WANDER_PAUSE_MIN_SECONDS", "WANDER_PAUSE_MAX_SECONDS", "WANDER_MOVE_REFRESH_SECONDS", "CharacterMovementConfig.RobloxSpeed", 'firstPublishedTrack(profile, "walk")', "MonsterWanderEnabled"]:
-    if required not in monster_spawner_text:
+    if required not in monster_runtime_text:
         err(f"monster random-wander runtime missing {required}")
 for required in [
     'firstPublishedTrack(profile, "run")',
@@ -1045,17 +1056,17 @@ for required in [
     "AnimationPlaybackSpeedPercent",
     "AnimationSpeedScaling",
 ]:
-    if required not in monster_spawner_text:
+    if required not in monster_runtime_text:
         err(f"monster live movement-debug locomotion missing {required}")
-for required in ['VisualRootWeld', 'animatorFor(model, visual)', 'controller.Parent = visual']:
-    if required not in monster_spawner_text:
+for required in ['VisualRootWeld', 'animatorFor(runtimeModel, visual)', 'controller.Parent = visual']:
+    if required not in monster_runtime_text:
         err(f"monster animated-navigation bridge missing {required}")
-if "Game1MonsterVisualWeld" in monster_spawner_text:
+if "Game1MonsterVisualWeld" in monster_runtime_text:
     err("monster navigation must never rigid-weld every visual BasePart; weld only the rig root")
 for required in ['Workspace:FindFirstChild("Game1Authoring")', 'authoring:FindFirstChild("MonsterSpawns")', "monsterSpawns:Destroy()", "removeAuthoringVisualsFromSimulation"]:
-    if required not in monster_spawner_text:
+    if required not in monster_runtime_text:
         err(f"Play/Run monster-spawn authoring-visual cleanup missing {required}")
-if "RunService.Heartbeat" in monster_spawner_text:
+if "RunService.Heartbeat" in monster_runtime_text:
     err("monster spawn/wander runtime must not use a permanent Heartbeat loop")
 if "MonsterSpawnerService.Start()" not in server_init_text:
     err("monster spawner is not started by the server runtime")
@@ -1122,7 +1133,7 @@ for required in [
     "RunService.PreAnimation:Connect",
     "deathPoseHeld",
 ]:
-    if required not in monster_spawner_text:
+    if required not in monster_runtime_text:
         err(f"monster death terminal-pose lifecycle missing {required}")
 
 for required in [
@@ -1132,7 +1143,7 @@ for required in [
     "bone.Parent = animationRoot",
     "RuntimeAnimationRootBridgeCount",
 ]:
-    if required not in monster_spawner_text:
+    if required not in monster_runtime_text:
         err(f"monster root-bone animation bridge missing {required}")
 
 character_animation_text = (ROOT / "src/client/character/animation/CharacterAnimationController.luau").read_text(encoding="utf-8")
@@ -1386,7 +1397,7 @@ for required in ["Aggro", "Chase", "Attack", "pursueDirectlyDuringAttack", "atta
     if required not in monster_ai_m23:
         err(f"RobloxLineage monster combat AI contract missing {required}")
 for required in ["MonsterAuthoredAggressive", "MonsterAuthoredAggroRadius", "MonsterAuthoredAttackRadius", "MonsterCombatActive"]:
-    if required not in spawner_m23:
+    if required not in (spawner_m23 + monster_attributes_text):
         err(f"monster spawner behavior bridge missing {required}")
 monster_locomotion_m23 = (ROOT / "src/client/monster/MonsterAttackLocomotionController.luau").read_text(encoding="utf-8")
 for required in ["MonsterAttackPursuitActive", "MonsterAttackPursuitPlaybackSpeed", "lowerPaths", "PreSimulation"]:
@@ -1510,7 +1521,7 @@ character_animation_m26 = (ROOT / "src/client/character/animation/CharacterAnima
 for required in ['GetAttribute("InCombat") == true', 'return "combat_idle"', "GameOptions.CharacterLifePlaybackPercent"]:
     if required not in character_animation_m26:
         err(f"m26 character combat/life animation contract missing {required}")
-monster_spawner_m26 = (ROOT / "src/server/monster/MonsterSpawnerService.luau").read_text(encoding="utf-8")
+monster_spawner_m26 = monster_runtime_text
 for required in ["playCombatIdleState", "combatIdleTrack", 'GetAttribute("InCombat")', 'MonsterAnimationState", "combat_idle"']:
     if required not in monster_spawner_m26:
         err(f"m26 monster combat-idle contract missing {required}")

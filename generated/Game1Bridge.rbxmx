@@ -26,13 +26,6 @@ local NpcSpawnPreview = require(script.Parent.modules.NpcSpawnPreview)
 local NpcSpawnPlacement = require(script.Parent.modules.NpcSpawnPlacement)
 
 local toolbar = plugin:CreateToolbar("game1")
-local button = toolbar:CreateButton(
-    "Game1ControlCenter",
-    "Check the game1 local Control Center host agent",
-    "",
-    "Control Center"
-)
-button.ClickableWhenViewportHidden = true
 local AGENT_BASE_URL = "http://127.0.0.1:43821"
 local AGENT_URL = AGENT_BASE_URL .. "/api/agent/info"
 local AGENT_TOKEN = "Game1LocalControlV1"
@@ -187,7 +180,6 @@ local function checkAgent()
         print("[game1 plugin] connected")
     end
 end
-button.Click:Connect(checkAgent)
 
 
 local function validSegment(value: any): string

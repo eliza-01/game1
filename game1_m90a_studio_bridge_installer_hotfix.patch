@@ -1,0 +1,95 @@
+diff --git a/system/studio-plugin/install.ps1 b/system/studio-plugin/install.ps1
+index b741a5e..4815b7e 100644
+--- a/system/studio-plugin/install.ps1
++++ b/system/studio-plugin/install.ps1
+@@ -20,12 +20,29 @@ try {
+ 
+ if(-not (Test-Path $Temp)){throw 'Rojo did not create the plugin build'}
+ $BuiltText=Get-Content $Temp -Raw
+-foreach($Marker in @('Game1ControlCenter','model bridge v24','Game1AttackTimeline_v2','TimelinePreviewWorld','location-authoring','Game1LocationMarker','Game1DecoManager_v1','DecoPreviewWorld','Save Assets Data','Game1DecoAssets')){
++# Validate the command API used by Asset Manager, not the removed Control Center toolbar button.
++# The installer must reject old builds that lack the Monster/NPC Spawn command handler.
++foreach($Marker in @(
++    'model bridge v24',
++    'local function checkAgent()',
++    'local function handleMonsterSpawn(',
++    'data.command == "monster-spawn"',
++    'Game1MonsterSpawnMarker',
++    'Game1NpcSpawnMarker',
++    'Game1AttackTimeline_v2',
++    'TimelinePreviewWorld',
++    'location-authoring',
++    'Game1LocationMarker',
++    'Game1DecoManager_v1',
++    'DecoPreviewWorld',
++    'Save Assets Data',
++    'Game1DecoAssets'
++)){
+     if(-not $BuiltText.Contains($Marker)){
+         throw "Studio bridge build is stale or incomplete; missing marker: $Marker"
+     }
+ }
+-foreach($RemovedMarker in @('Game1CheckAnimations','Check Roblox Assets Animations','KeyframeSequenceProvider','/api/studio/animation-check')){
++foreach($RemovedMarker in @('Game1ControlCenter','Game1CheckAnimations','Check Roblox Assets Animations','KeyframeSequenceProvider','/api/studio/animation-check')){
+     if($BuiltText.Contains($RemovedMarker)){
+         throw "Studio bridge still contains removed animation-check code: $RemovedMarker"
+     }
+diff --git a/system/verify/test_studio_bridge_installer_m90a.py b/system/verify/test_studio_bridge_installer_m90a.py
+new file mode 100644
+index 0000000..cc9b8e7
+--- /dev/null
++++ b/system/verify/test_studio_bridge_installer_m90a.py
+@@ -0,0 +1,53 @@
++"""Contract checks for the built Studio bridge and the installer marker policy."""
++from pathlib import Path
++import re
++import json
++import unittest
++
++
++ROOT = Path(__file__).resolve().parents[2]
++PLUGIN = ROOT / "system/studio-plugin/Game1Bridge.server.luau"
++INSTALLER = ROOT / "system/studio-plugin/install.ps1"
++
++
++class StudioBridgeInstallerContract(unittest.TestCase):
++    def test_all_installer_required_markers_exist_in_plugin_source(self):
++        # The Rojo bundle also contains modules listed in plugin.project.json.
++        project = json.loads((PLUGIN.parent / "plugin.project.json").read_text(encoding="utf-8"))
++        def bundled_paths(node):
++            if isinstance(node, dict):
++                if "$path" in node:
++                    yield PLUGIN.parent / node["$path"]
++                else:
++                    for child in node.values():
++                        yield from bundled_paths(child)
++        source = "\n".join(path.read_text(encoding="utf-8") for path in bundled_paths(project["tree"]))
++        installer = INSTALLER.read_text(encoding="utf-8")
++        match = re.search(r"foreach\(\$Marker in @\((.*?)\)\)\s*\{", installer, re.S)
++        self.assertIsNotNone(match, "Installer required-marker check missing")
++        markers = re.findall(r"'([^']+)'", match.group(1))
++        self.assertGreaterEqual(len(markers), 10)
++        for marker in markers:
++            with self.subTest(marker=marker):
++                self.assertIn(marker, source)
++        self.assertNotIn("Game1ControlCenter", markers)
++
++    def test_removed_toolbar_button_is_rejected_and_legacy_check_is_preserved(self):
++        source = PLUGIN.read_text(encoding="utf-8")
++        installer = INSTALLER.read_text(encoding="utf-8")
++        forbidden = re.search(r"foreach\(\$RemovedMarker in @\((.*?)\)\)\s*\{", installer, re.S)
++        self.assertIsNotNone(forbidden)
++        self.assertIn("'Game1ControlCenter'", forbidden.group(1))
++        self.assertNotIn('"Game1ControlCenter"', source)
++        self.assertIn("local function checkAgent()", source)
++
++    def test_monster_spawn_command_is_routed_in_edit_mode(self):
++        source = PLUGIN.read_text(encoding="utf-8")
++        self.assertIn('elseif data.command == "monster-spawn" then', source)
++        self.assertIn('handleMonsterSpawn(data)', source)
++        self.assertIn('local function handleMonsterSpawn(', source)
++        self.assertIn('if RunService:IsRunning() then', source)
++
++
++if __name__ == "__main__":
++    unittest.main()

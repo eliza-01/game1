@@ -24,8 +24,8 @@ class NativeAnimationPlaybackTests(unittest.TestCase):
         self.assertIn("self.base.track.DidLoop:Connect", npc)
         self.assertIn("clip.track.Stopped:Connect", npc)
         self.assertIn("Tracks.SecondsRemaining(special)", npc)
-        self.assertIn("idleTrack.DidLoop:Connect", monster)
-        self.assertIn("choice.track.Ended:Connect", monster)
+        self.assertIn("watch(entry, idleTrack.DidLoop, function()", monster)
+        self.assertIn("watch(entry, choice.track.Ended, function()", monster)
         self.assertIn("playTrackAtConfiguredSpeed(model, choice.track", monster)
 
     def test_character_prewarms_single_track_and_death_hold_is_preserved(self):

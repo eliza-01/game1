@@ -16,7 +16,7 @@ return table.freeze({
 				MaxHP = 100,
 				Damage = 10,
 				Defense = 0,
-				AttackSpeed = 100,
+				AttackSpeed = 200,
 				RunSpeed = 300,
 				CritChance = 10,
 			}),

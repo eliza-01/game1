@@ -54,7 +54,7 @@ class MonsterModuleBoundaryTests(unittest.TestCase):
         self.assertEqual(spawner.count('Random.new()'), 1)
         self.assertIn('MonsterSpawnGeometry.new(spawnRandom, ensureMonstersFolder)', spawner)
         self.assertIn('spawnRandom:NextNumber(0, total)', spawner)
-        self.assertIn('spawnRandom:NextNumber(0.35, 1.35)', spawner)
+        self.assertIn('spawnRandom:NextNumber(0.35, 1.35)', read('MonsterWanderController'))
         self.assertIn('self.random:NextNumber(0, math.pi * 2)', geometry)
         self.assertIn('math.sqrt(self.random:NextNumber(0, 1)) * radius', geometry)
         self.assertIn('self.random:NextNumber(0, maximumLength)', geometry)
@@ -62,7 +62,7 @@ class MonsterModuleBoundaryTests(unittest.TestCase):
         self.assertIn('params.RespectCanCollide = false', geometry)
         self.assertIn('Workspace:Raycast(origin, Vector3.new(0, -GROUND_RAY_LENGTH, 0), params)', geometry)
         self.assertIn('maximumLength = math.min(maximumLength, distanceToCenter)', geometry)
-        self.assertIn('spawnGeometry:ChooseWanderTarget(', spawner)
+        self.assertIn('spawnGeometry:ChooseWanderTarget(', read('MonsterWanderController'))
 
     def test_clip_selection_priority_and_oneshot_are_unchanged(self):
         clips, spawner = read("MonsterAnimationTrackFactory"), read("MonsterSpawnerService")
@@ -74,9 +74,9 @@ class MonsterModuleBoundaryTests(unittest.TestCase):
         self.assertIn('loadAnimationTrack(animator, deathRow, false)', clips)
         self.assertIn('track.Looped = looped', clips)
         self.assertIn('track.Priority = animationPriority(row.priority)', clips)
-        self.assertIn('idleTrack.DidLoop:Connect', spawner)
-        self.assertIn('choice.track.Ended:Connect', spawner)
-        self.assertIn('DeathAnimationPolicy.LatchVisibleTerminalPose', spawner)
+        self.assertIn('watch(entry, idleTrack.DidLoop, function()', spawner)
+        self.assertIn('watch(entry, choice.track.Ended, function()', spawner)
+        self.assertIn('DeathAnimationPolicy.LatchVisibleTerminalPose', read('MonsterDeathLifecycle'))
 
     def test_attributes_still_separate_authored_and_runtime_behavior(self):
         attrs = read("MonsterInitialAttributes")

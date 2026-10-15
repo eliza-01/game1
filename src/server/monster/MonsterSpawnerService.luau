@@ -5,32 +5,26 @@ local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local MonsterShared = Shared:WaitForChild("monster")
-local CharacterShared = Shared:WaitForChild("character")
 local AnimationShared = Shared:WaitForChild("animation")
-local CharacterMovementConfig = require(CharacterShared:WaitForChild("CharacterMovementConfig"))
 local AnimationSpeedScaling = require(AnimationShared:WaitForChild("AnimationSpeedScaling"))
 local MonsterRegistry = require(MonsterShared:WaitForChild("MonsterRegistry"))
 local MonsterAnimationRegistry = require(MonsterShared:WaitForChild("MonsterAnimationRegistry"))
 local CombatRoot = script.Parent.Parent:WaitForChild("combat")
 local EntityHitboxService = require(CombatRoot:WaitForChild("EntityHitboxService"))
 local DeathLifecycleService = require(CombatRoot:WaitForChild("DeathLifecycleService"))
-local DeathAnimationPolicy = require(Shared:WaitForChild("combat"):WaitForChild("DeathAnimationPolicy"))
 local SpawnRegistry = require(script.Parent:WaitForChild("MonsterSpawnRegistry"))
 
 local MonsterRigBuilder = require(script.Parent:WaitForChild("MonsterRigBuilder"))
 local MonsterSpawnGeometry = require(script.Parent:WaitForChild("MonsterSpawnGeometry"))
 local MonsterAnimationTrackFactory = require(script.Parent:WaitForChild("MonsterAnimationTrackFactory"))
 local MonsterInitialAttributes = require(script.Parent:WaitForChild("MonsterInitialAttributes"))
+local MonsterWanderController = require(script.Parent:WaitForChild("MonsterWanderController"))
+local MonsterDeathLifecycle = require(script.Parent:WaitForChild("MonsterDeathLifecycle"))
 local MonsterSpawnerService = {}
 local started = false
 local spawnRandom = Random.new()
 local states = {}
 local monstersFolder: Folder? = nil
-
-local WANDER_PAUSE_MIN_SECONDS = 3
-local WANDER_PAUSE_MAX_SECONDS = 10
-local WANDER_MOVE_REFRESH_SECONDS = 1
-local WANDER_ARRIVAL_TOLERANCE = 1.25
 
 local function finite(value: any, fallback: number): number
     local number = tonumber(value)
@@ -163,6 +157,14 @@ local function playCombatIdleState(model: Model, entry: any)
     end
 end
 
+local wanderController = MonsterWanderController.new(spawnRandom, spawnGeometry, {
+    stopTrack = stopTrack,
+    stopIdleState = stopIdleState,
+    playBaseIdle = playBaseIdle,
+    playCombatIdleState = playCombatIdleState,
+    playTrackAtConfiguredSpeed = playTrackAtConfiguredSpeed,
+})
+
 local function maybePlayIdleSpecial(model: Model, entry: any)
     if entry.dying or entry.wandering or entry.activeIdleSpecial ~= nil
         or model:GetAttribute("InCombat") == true or model:GetAttribute("MonsterCombatActive") == true then
@@ -185,166 +187,29 @@ local function maybePlayIdleSpecial(model: Model, entry: any)
     end
 end
 
-local function monsterLocomotionMode(model: Model): string
-    return string.lower(tostring(model:GetAttribute("MonsterLocomotionMode") or "Walk")) == "run" and "Run" or "Walk"
-end
-
-local function locomotionSpeedFor(model: Model): number
-    return CharacterMovementConfig.RobloxSpeed(nil, model:GetAttribute("RunSpeed"), monsterLocomotionMode(model))
-end
-
-local function locomotionTrackFor(entry: any, mode: string): AnimationTrack?
-    if mode == "Run" then
-        return entry.runTrack or entry.walkTrack
-    end
-    return entry.walkTrack or entry.runTrack
-end
-
-local function refreshWanderLocomotion(model: Model, entry: any)
-    if not entry.wandering or entry.dying or model:GetAttribute("MonsterCombatActive") == true or model:GetAttribute("InCombat") == true then
-        return
-    end
-    local humanoid = entry.humanoid
-    local navigationRoot = entry.navigationRoot
-    if not humanoid or not humanoid.Parent or not navigationRoot or not navigationRoot.Parent then
-        return
-    end
-
-    local mode = monsterLocomotionMode(model)
-    local activeTrack = locomotionTrackFor(entry, mode)
-    local inactiveTrack = mode == "Run" and entry.walkTrack or entry.runTrack
-    if inactiveTrack and inactiveTrack ~= activeTrack then
-        stopTrack(inactiveTrack)
-    end
-    if activeTrack then
-        pcall(function() playTrackAtConfiguredSpeed(model, activeTrack, string.lower(mode), 0.1) end)
-    end
-    model:SetAttribute("MonsterAnimationState", string.lower(mode))
-
-    local speed = math.max(0, locomotionSpeedFor(model))
-    humanoid.WalkSpeed = speed
-    humanoid.AutoRotate = true
-    local destination = entry.wanderDestination
-    if destination then
-        if speed <= 0.001 then
-            entry.wanderDeadline = math.huge
-        else
-            local remaining = MonsterSpawnGeometry.HorizontalDistance(navigationRoot.Position, destination)
-            entry.wanderDeadline = os.clock() + math.max(8, remaining / speed + 4)
-        end
-        humanoid:MoveTo(destination)
-    end
-end
-
-local function stopWanderMovement(entry: any)
-    entry.wandering = false
-    entry.wanderDestination = nil
-    entry.wanderDeadline = nil
-    stopTrack(entry.walkTrack)
-    stopTrack(entry.runTrack)
-    local humanoid = entry.humanoid
-    local navigationRoot = entry.navigationRoot
-    if humanoid and navigationRoot and navigationRoot.Parent then
-        humanoid.WalkSpeed = 0
-        humanoid.AutoRotate = false
-        humanoid:Move(Vector3.zero, false)
-        humanoid:MoveTo(navigationRoot.Position)
-    end
-end
-
-local function startWanderLoop(state: any, model: Model, entry: any)
-    local radius = math.max(0, finite(state.record.spawnRadius, 0))
-    if radius <= 0 or not entry.humanoid or not entry.navigationRoot then
-        model:SetAttribute("MonsterWanderEnabled", false)
-        return
-    end
-    model:SetAttribute("MonsterWanderEnabled", true)
-    task.spawn(function()
-        task.wait(spawnRandom:NextNumber(0.35, 1.35))
-        while state.instances[model] == entry and model.Parent and not entry.dying do
-            task.wait(spawnRandom:NextNumber(WANDER_PAUSE_MIN_SECONDS, WANDER_PAUSE_MAX_SECONDS))
-            if state.instances[model] ~= entry or not model.Parent or entry.dying then
-                break
-            end
-            if model:GetAttribute("MonsterCombatActive") == true or model:GetAttribute("InCombat") == true then
-                continue
-            end
-
-            local navigationRoot = entry.navigationRoot
-            local humanoid = entry.humanoid
-            if not navigationRoot or not navigationRoot.Parent or not humanoid or not humanoid.Parent then
-                break
-            end
-            local destination, routeLength, outsideSpawn = spawnGeometry:ChooseWanderTarget(state.record, navigationRoot.Position)
-            if not destination or routeLength <= WANDER_ARRIVAL_TOLERANCE then
-                continue
-            end
-
-            stopIdleState(entry)
-            entry.wandering = true
-            entry.wanderDestination = destination
-            model:SetAttribute("MonsterIdleVariant", nil)
-            model:SetAttribute("MonsterWanderTargetX", destination.X)
-            model:SetAttribute("MonsterWanderTargetZ", destination.Z)
-            model:SetAttribute("MonsterWanderRouteLength", routeLength)
-            model:SetAttribute("MonsterWanderOutsideSpawn", outsideSpawn)
-            refreshWanderLocomotion(model, entry)
-
-            local finished = false
-            local moveConnection = humanoid.MoveToFinished:Connect(function()
-                finished = true
-            end)
-            local nextRefresh = os.clock() + WANDER_MOVE_REFRESH_SECONDS
-            while not finished
-                and state.instances[model] == entry
-                and model.Parent
-                and not entry.dying
-                and model:GetAttribute("MonsterCombatActive") ~= true
-                and model:GetAttribute("InCombat") ~= true
-                and os.clock() < (entry.wanderDeadline or math.huge)
-            do
-                task.wait(0.1)
-                if MonsterSpawnGeometry.HorizontalDistance(navigationRoot.Position, destination) <= WANDER_ARRIVAL_TOLERANCE then
-                    finished = true
-                    break
-                end
-                if os.clock() >= nextRefresh then
-                    nextRefresh = os.clock() + WANDER_MOVE_REFRESH_SECONDS
-                    -- Same destination is reissued before Humanoid's internal MoveTo timeout.
-                    -- Roblox physics owns the continuous motion; game1 never CFrames the monster per frame.
-                    humanoid:MoveTo(destination)
-                end
-            end
-            moveConnection:Disconnect()
-
-            if state.instances[model] == entry and model.Parent and not entry.dying then
-                stopWanderMovement(entry)
-                model:SetAttribute("MonsterWanderRouteLength", 0)
-                if model:GetAttribute("MonsterCombatActive") ~= true then
-                    if model:GetAttribute("InCombat") == true then
-                        playCombatIdleState(model, entry)
-                    else
-                        playBaseIdle(model, entry)
-                    end
-                end
-            end
-        end
-    end)
-end
-
-local function releaseInstance(state: any, model: Model, scheduleRespawn: boolean)
+local function releaseInstance(state: any, model: Model, scheduleRespawn: boolean, externallyDestroying: boolean?)
     local entry = state.instances[model]
     if entry == nil then
         return
     end
     state.instances[model] = nil
     DeathLifecycleService.Cancel(model)
-    stopWanderMovement(entry)
+    wanderController:Dispose(entry)
+    for _, connection in ipairs(entry.connections or {}) do
+        connection:Disconnect()
+    end
+    table.clear(entry.connections or {})
     stopIdleState(entry)
     stopTrack(entry.combatIdleTrack)
     stopTrack(entry.deathTrack)
-    EntityHitboxService.Detach(model)
-    if model.Parent then
+    if externallyDestroying then
+        -- Deferred Destroying signals can run after the instance is locked.
+        -- Detach removes its hitbox binding first; remaining attribute writes are best effort.
+        pcall(EntityHitboxService.Detach, model)
+    else
+        EntityHitboxService.Detach(model)
+    end
+    if model.Parent and not externallyDestroying then
         model:Destroy()
     end
     if scheduleRespawn and state.enabled then
@@ -357,72 +222,16 @@ local function releaseInstance(state: any, model: Model, scheduleRespawn: boolea
     end
 end
 
-local function enterDeathIdle(state: any, model: Model, entry: any)
-    if entry.deathPoseHeld or state.instances[model] ~= entry or not model.Parent then
-        return
-    end
-    entry.deathPoseHeld = true
-    model:SetAttribute("MonsterAnimationState", "death_idle")
-    model:SetAttribute("DeathTerminalPoseHeld", true)
-    model:SetAttribute("DeathTerminalPoseHeldAt", os.clock())
-    local started = DeathLifecycleService.BeginDeathIdle(model, entry.navigationRoot, entry.visual, function()
-        releaseInstance(state, model, true)
-    end)
-    assert(started, "DeathIdle lifecycle must start exactly once after the terminal Death pose")
-end
+local deathLifecycle = MonsterDeathLifecycle.new({
+    stopWanderMovement = function(entry: any) wanderController:Stop(entry) end,
+    stopIdleState = stopIdleState,
+    stopTrack = stopTrack,
+    releaseInstance = releaseInstance,
+})
 
-local function maintainDeathTerminalPose(state: any, model: Model, entry: any, deltaTimeSim: number)
-    if not entry.dying
-        or entry.deathPoseHeld
-        or state.instances[model] ~= entry
-        or not model.Parent
-        or tostring(model:GetAttribute("LifeState") or "") ~= "Dying"
-    then
-        return
-    end
-
-    local track = entry.deathTrack
-    if not track then
-        return
-    end
-
-    local reached, terminalTime = DeathAnimationPolicy.LatchVisibleTerminalPose(track, deltaTimeSim)
-    if not reached then
-        return
-    end
-
-    model:SetAttribute("DeathAnimationLength", track.Length)
-    model:SetAttribute("DeathAnimationTerminalTime", terminalTime)
-    enterDeathIdle(state, model, entry)
-end
-
-local function beginDeath(state: any, model: Model, entry: any)
-    if entry.dying then
-        return
-    end
-    entry.dying = true
-    entry.deathPoseHeld = false
-    model:SetAttribute("Damageable", false)
-    model:SetAttribute("MonsterAnimationState", "death")
-    model:SetAttribute("MonsterIdleVariant", nil)
-    model:SetAttribute("DeathAnimationStartedAt", os.clock())
-    model:SetAttribute("DeathTerminalPoseHeld", false)
-    stopWanderMovement(entry)
-    stopIdleState(entry)
-    stopTrack(entry.combatIdleTrack)
-    if entry.navigationRoot and entry.navigationRoot.Parent then
-        entry.navigationRoot.AssemblyLinearVelocity = Vector3.zero
-        entry.navigationRoot.AssemblyAngularVelocity = Vector3.zero
-        entry.navigationRoot.Anchored = true
-    end
-
-    local track = entry.deathTrack
-    if not track then
-        warn("[game1][monster-spawn] required death animation track is missing; monster remains Dying")
-        return
-    end
-    model:SetAttribute("AnimationPlaybackSpeedPercent", AnimationSpeedScaling.ResolveForAnimation(model, "death", track.Animation and track.Animation.AnimationId))
-    DeathAnimationPolicy.Start(track, AnimationSpeedScaling.ResolveScaleForAnimation(model, "death", track.Animation and track.Animation.AnimationId))
+local function watch(entry: any, signal: RBXScriptSignal, callback: (...any) -> ())
+    local connection = signal:Connect(callback)
+    table.insert(entry.connections, connection)
 end
 
 local function spawnOne(state: any): Model?
@@ -477,13 +286,14 @@ local function spawnOne(state: any): Model?
     entry.wandering = false
     entry.dying = false
     entry.deathPoseHeld = false
+    entry.connections = {}
     local idleTrack = entry.idleTrack
     local idleChoices = entry.idleChoices
     state.instances[model] = entry
 
     for _, choice in ipairs(idleChoices) do
         if choice.role == "special" then
-            choice.track.Ended:Connect(function()
+            watch(entry, choice.track.Ended, function()
                 if state.instances[model] ~= entry or entry.dying or entry.activeIdleSpecial ~= choice then
                     return
                 end
@@ -493,26 +303,26 @@ local function spawnOne(state: any): Model?
         end
     end
     if idleTrack then
-        idleTrack.DidLoop:Connect(function()
+        watch(entry, idleTrack.DidLoop, function()
             if state.instances[model] == entry then
                 maybePlayIdleSpecial(model, entry)
             end
         end)
     end
     playBaseIdle(model, entry)
-    startWanderLoop(state, model, entry)
+    wanderController:Start(state, model, entry)
 
-    model:GetAttributeChangedSignal("MonsterCombatActive"):Connect(function()
+    watch(entry, model:GetAttributeChangedSignal("MonsterCombatActive"), function()
         if state.instances[model] ~= entry or entry.dying then
             return
         end
         if model:GetAttribute("MonsterCombatActive") == true then
-            stopWanderMovement(entry)
+            wanderController:Stop(entry)
             stopIdleState(entry)
             stopTrack(entry.combatIdleTrack)
             model:SetAttribute("MonsterIdleVariant", nil)
         else
-            stopWanderMovement(entry)
+            wanderController:Stop(entry)
             if model:GetAttribute("InCombat") == true then
                 playCombatIdleState(model, entry)
             else
@@ -521,11 +331,11 @@ local function spawnOne(state: any): Model?
         end
     end)
 
-    model:GetAttributeChangedSignal("InCombat"):Connect(function()
+    watch(entry, model:GetAttributeChangedSignal("InCombat"), function()
         if state.instances[model] ~= entry or entry.dying or model:GetAttribute("MonsterCombatActive") == true then
             return
         end
-        stopWanderMovement(entry)
+        wanderController:Stop(entry)
         if model:GetAttribute("InCombat") == true then
             playCombatIdleState(model, entry)
         else
@@ -534,34 +344,35 @@ local function spawnOne(state: any): Model?
         end
     end)
 
-    model:GetAttributeChangedSignal("RunSpeed"):Connect(function()
+    watch(entry, model:GetAttributeChangedSignal("RunSpeed"), function()
         if state.instances[model] == entry then
-            refreshWanderLocomotion(model, entry)
+            wanderController:Refresh(model, entry)
         end
     end)
-    model:GetAttributeChangedSignal("MonsterLocomotionMode"):Connect(function()
+    watch(entry, model:GetAttributeChangedSignal("MonsterLocomotionMode"), function()
         if state.instances[model] == entry then
-            refreshWanderLocomotion(model, entry)
+            wanderController:Refresh(model, entry)
         end
     end)
     for _, channel in ipairs({ "run", "walk" }) do
-        model:GetAttributeChangedSignal(AnimationSpeedScaling.DebugUnitsPerPercentAttribute(channel)):Connect(function()
+        watch(entry, model:GetAttributeChangedSignal(AnimationSpeedScaling.DebugUnitsPerPercentAttribute(channel)), function()
             if state.instances[model] == entry then
-                refreshWanderLocomotion(model, entry)
+                wanderController:Refresh(model, entry)
             end
         end)
     end
-    model:GetAttributeChangedSignal("LifeState"):Connect(function()
+    watch(entry, model:GetAttributeChangedSignal("LifeState"), function()
         if state.instances[model] ~= entry then
             return
         end
         if tostring(model:GetAttribute("LifeState") or "") == "Dying" then
-            beginDeath(state, model, entry)
+            deathLifecycle:Begin(state, model, entry)
         end
     end)
-    model.Destroying:Connect(function()
+    watch(entry, model.Destroying, function()
+        -- External Model:Destroy must release connections, tracks and hitbox too.
         if state.instances[model] == entry then
-            state.instances[model] = nil
+            releaseInstance(state, model, false, true)
         end
     end)
     return model
@@ -627,7 +438,7 @@ function MonsterSpawnerService.Start()
     RunService.PreAnimation:Connect(function(deltaTimeSim)
         for _, state in pairs(states) do
             for model, entry in pairs(state.instances) do
-                maintainDeathTerminalPose(state, model, entry, deltaTimeSim)
+                deathLifecycle:Maintain(state, model, entry, deltaTimeSim)
             end
         end
     end)

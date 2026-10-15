@@ -11,7 +11,7 @@ local DamageService = {}
 local criticalRandom = Random.new()
 local CRITICAL_DAMAGE_MULTIPLIER = 2
 
-function DamageService.Apply(attacker: Model?, target: Model, rawDamage: number): (number, boolean)
+function DamageService.Apply(attacker: Model?, target: Model, rawDamage: number, headshot: boolean?): (number, boolean)
     if target:GetAttribute("Damageable") ~= true or target:GetAttribute("LifeState") ~= "Alive" then
         if AttackConfig.DebugLogs then
             print(("[game1][DAMAGE] REJECT target=%s damageable=%s lifeState=%s"):format(
@@ -56,7 +56,7 @@ function DamageService.Apply(attacker: Model?, target: Model, rawDamage: number)
     end
 
     ActorDamageSignals.Publish(attacker, target, normalizedRawDamage, finalDamage, killed)
-    CombatFeedbackService.PublishDamage(attacker, target, finalDamage, critical)
+    CombatFeedbackService.PublishDamage(attacker, target, finalDamage, critical, headshot == true)
 
     if AttackConfig.DebugLogs then
         print(("[game1][DAMAGE] target=%s raw=%d crit=%s chance=%.1f defense=%d final=%d hp=%d->%d killed=%s"):format(

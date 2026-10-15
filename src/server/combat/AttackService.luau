@@ -158,7 +158,7 @@ local function applyDamageInVolume(
             local hitDistance = (hitPosition - root.Position).Magnitude
             local damageMultiplier = if isHeadshot then Config.HeadshotDamageMultiplier else 1
             local rawDamage = (tonumber(character:GetAttribute("Damage")) or 0) * damageMultiplier
-            local finalDamage, killed = DamageService.Apply(character, model, rawDamage)
+            local finalDamage, killed = DamageService.Apply(character, model, rawDamage, isHeadshot)
 
             model:SetAttribute("LastHitZone", hitZone)
             model:SetAttribute("LastHeadshot", isHeadshot)

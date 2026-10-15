@@ -10,6 +10,7 @@ local DAMAGE_ABOVE_TARGET_STUDS = 2.9
 local CRITICAL_LIFETIME = 0.82
 local CRITICAL_RISE_STUDS = 0.9
 local CRITICAL_ABOVE_TARGET_STUDS = 2.15
+local HEADSHOT_ABOVE_TARGET_STUDS = 4.0
 local floatingSerial = 0
 
 local function targetRoot(target: any): BasePart?
@@ -142,6 +143,55 @@ function CombatFloatingText.ShowCritical(target: any, fallbackPosition: Vector3)
     label.TextSize = 15
     label.TextStrokeColor3 = Color3.fromRGB(20, 17, 13)
     label.TextStrokeTransparency = 0.22
+    label.Parent = gui
+
+    local scale = Instance.new("UIScale")
+    scale.Scale = 0.78
+    scale.Parent = gui
+    TweenService:Create(scale, TweenInfo.new(0.13, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+
+    task.delay(0.16, function()
+        if not gui.Parent then
+            return
+        end
+        TweenService:Create(gui, TweenInfo.new(CRITICAL_LIFETIME - 0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            StudsOffsetWorldSpace = offset + Vector3.new(0, CRITICAL_RISE_STUDS, 0),
+        }):Play()
+        TweenService:Create(label, TweenInfo.new(CRITICAL_LIFETIME - 0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+            TextTransparency = 1,
+            TextStrokeTransparency = 1,
+        }):Play()
+    end)
+
+    cleanupBillboard(gui, parent, root, CRITICAL_LIFETIME + 0.05)
+end
+
+
+-- Headshots are a separate aim-region result, not a random critical hit.
+-- Keep their marker above the damage number and Critical! to avoid overlap.
+function CombatFloatingText.ShowHeadshot(target: any, fallbackPosition: Vector3)
+    local parent, root, offset = targetAnchor(target, fallbackPosition, HEADSHOT_ABOVE_TARGET_STUDS)
+
+    local gui = Instance.new("BillboardGui")
+    gui.Name = "HeadshotBillboard"
+    gui.Adornee = root or (parent:IsA("BasePart") and parent or nil)
+    gui.Size = UDim2.fromOffset(140, 30)
+    gui.StudsOffsetWorldSpace = offset
+    gui.AlwaysOnTop = true
+    gui.LightInfluence = 0
+    gui.MaxDistance = MAX_DISTANCE
+    gui.Parent = parent
+
+    local label = Instance.new("TextLabel")
+    label.Name = "Label"
+    label.BackgroundTransparency = 1
+    label.Size = UDim2.fromScale(1, 1)
+    label.Font = Enum.Font.GothamBold
+    label.Text = "Headshot!"
+    label.TextColor3 = Color3.fromRGB(255, 133, 83)
+    label.TextSize = 17
+    label.TextStrokeColor3 = Color3.fromRGB(42, 12, 8)
+    label.TextStrokeTransparency = 0.12
     label.Parent = gui
 
     local scale = Instance.new("UIScale")

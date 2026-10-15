@@ -28,7 +28,7 @@ local function rootOf(model: Model?): BasePart?
     return if root and root:IsA("BasePart") then root else nil
 end
 
-function CombatFeedbackService.PublishDamage(attacker: Model?, target: Model, damage: number, critical: boolean)
+function CombatFeedbackService.PublishDamage(attacker: Model?, target: Model, damage: number, critical: boolean, headshot: boolean?)
     if not started or not remote or damage <= 0 then return end
     local root = rootOf(target)
     if not root then return end
@@ -38,6 +38,7 @@ function CombatFeedbackService.PublishDamage(attacker: Model?, target: Model, da
         position = root.Position,
         damage = damage,
         critical = critical == true,
+        headshot = headshot == true,
     }
     local sent = {}
     local attackerPlayer = attacker and Players:GetPlayerFromCharacter(attacker) or nil

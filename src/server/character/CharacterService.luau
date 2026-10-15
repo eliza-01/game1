@@ -185,13 +185,13 @@ local function beginPlayerDeathIdle(player: Player)
         return
     end
     local lifecycleStarted = DeathLifecycleService.BeginDeathIdle(character, context.navigationRoot, context.visual, function(expiredCharacter: Model)
-        -- Player death no longer auto-respawns. The corpse presentation may finish
-        -- and sink, but the player stays dead until explicitly choosing Return to Town.
+        -- Players stay at the terminal death pose above ground and do not
+        -- auto-respawn; only Return to Town creates the replacement character.
         if player.Parent == Players and player.Character == expiredCharacter then
             deathContexts[player] = nil
             expiredCharacter:SetAttribute("ReturnToTownAvailable", true)
         end
-    end)
+    end, { sink = false })
     assert(lifecycleStarted, "DeathIdle lifecycle must start exactly once after the player terminal Death pose")
     character:SetAttribute("DeathIdleLifecycleStarted", true)
     character:SetAttribute("ReturnToTownAvailable", true)

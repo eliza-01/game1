@@ -37,7 +37,8 @@ function DeathLifecycleService.BeginDeathIdle(
     entity: Model,
     root: BasePart,
     visual: Model?,
-    onExpired: ((Model) -> ())?
+    onExpired: ((Model) -> ())?,
+    options: { sink: boolean }?
 ): boolean
     if not entity.Parent or not root.Parent or active[entity] then
         return false
@@ -56,6 +57,22 @@ function DeathLifecycleService.BeginDeathIdle(
     entity:SetAttribute("DeathIdleStartedAt", os.clock())
     entity:SetAttribute("DeathIdleDuration", Config.DeathIdleSeconds)
     entity:SetAttribute("DeathSinkStartedAt", nil)
+
+    -- Characters remain visible in their held terminal Death pose until the
+    -- player chooses Return to Town. Monsters and dummies keep the sink tween.
+    if options and options.sink == false then
+        task.delay(Config.DeathIdleSeconds, function()
+            if active[entity] ~= record or not entity.Parent or not root.Parent then
+                return
+            end
+            active[entity] = nil
+            entity:SetAttribute("DeathIdleExpiredAt", os.clock())
+            if type(onExpired) == "function" then
+                onExpired(entity)
+            end
+        end)
+        return true
+    end
 
     task.delay(Config.DeathIdleSurfaceSeconds, function()
         if active[entity] ~= record or not entity.Parent or not root.Parent then

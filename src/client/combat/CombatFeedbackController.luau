@@ -37,6 +37,9 @@ function CombatFeedbackController.Start()
         if critical then
             CombatFloatingText.ShowCritical(payload.target, position)
         end
+        if payload.headshot == true then
+            CombatFloatingText.ShowHeadshot(payload.target, position)
+        end
     end)
 end
 

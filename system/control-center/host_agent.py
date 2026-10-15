@@ -2,12 +2,8 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from types import MappingProxyType
 from urllib.parse import unquote, urlparse
-import base64
 import json
-import re
 import os
-import shutil
-import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -45,6 +41,13 @@ from deco_layout_store import DecoLayoutStore
 from studio_save import request_active_studio_save
 from character_core.identity import CharacterIdentityService
 from studio_bridge import run_model_load_bridge, run_monster_spawn_bridge, run_timeline_editor_bridge, run_location_authoring_bridge
+from services.studio_asset_sync import StudioAssetSyncService
+from services.animation_export import write_animation_export
+from services.native_pickers import (
+    choose_animation_folder, choose_character_fbx, choose_location_asset_fbx,
+    choose_location_asset_texture, choose_monster_fbx, choose_monster_textures,
+    choose_weapon_fbx, choose_weapon_textures,
+)
 from api.read_dispatch import dispatch as dispatch_read_request
 from api.write_dispatch import dispatch_post as dispatch_write_request, dispatch_delete as dispatch_delete_request
 from source_only_assets import migrate_source_only_assets
@@ -74,6 +77,10 @@ locations = LocationStore(ROOT, run_location_authoring_bridge)
 location_assets = LocationAssetStore(ROOT)
 deco_layouts = DecoLayoutStore(ROOT)
 character_identity = CharacterIdentityService(ROOT, store, animations)
+studio_asset_sync = StudioAssetSyncService(
+    characters=store, weapons=weapons, monsters=monsters, npcs=npcs,
+    load_model=run_model_load_bridge,
+)
 
 
 def npc_place_spawn(payload: dict):
@@ -82,13 +89,13 @@ def npc_place_spawn(payload: dict):
     slug = str(payload.get("monsterSlug") or "").strip().lower()
     if not npc_spawns.readiness(slug)["ready"]:
         return npc_spawns.place(payload)  # Preserve the store's readiness error.
-    sync_monster_to_studio(slug, kind="npc")
+    studio_asset_sync.sync_monster_to_studio(slug, kind="npc")
     return npc_spawns.place(payload)
 
 
 def npc_register_spawn(payload: dict):
     slug = str(payload.get("monsterSlug") or "").strip().lower()
-    sync_monster_to_studio(slug, kind="npc")
+    studio_asset_sync.sync_monster_to_studio(slug, kind="npc")
     return npc_spawns.register(payload)
 
 
@@ -116,344 +123,6 @@ def publication_credentials(description: str = ""):
         "creatorId": config["creatorId"],
         "description": description,
     }
-
-
-def sync_character_to_studio(character_id: str):
-    row = store.get(character_id)
-    if not row:
-        raise ValueError(f"unknown character archetype: {character_id}")
-    asset_id = str(row.get("model_asset_id") or "").strip()
-    if not asset_id:
-        raise ValueError("publish the character model before syncing it to Studio")
-    destination = [
-        "characters",
-        str(row.get("race") or ""),
-        str(row.get("gender") or ""),
-        str(row.get("id") or ""),
-        "model",
-    ]
-    result = run_model_load_bridge(asset_id, destination, wrapper_name=str(row.get("id") or ""))
-    stats = result.get("rigStats") or {}
-    if int(stats.get("baseParts") or 0) <= 0 or int(stats.get("bones") or 0) + int(stats.get("motor6Ds") or 0) <= 0:
-        raise ValueError("Studio loaded a character asset without articulated BasePart geometry")
-
-    try:
-        expected_analysis = json.loads(str(row.get("skeleton_json") or "{}"))
-    except Exception:
-        expected_analysis = {}
-    expected_names = {
-        str(item.get("name") or "")
-        for item in (expected_analysis.get("bones") or [])
-        if str(item.get("name") or "")
-    }
-    actual_names = {str(name) for name in (stats.get("boneNames") or []) if str(name)}
-    if expected_names and actual_names:
-        missing = sorted(expected_names - actual_names, key=str.casefold)
-        if missing:
-            preview = ", ".join(missing[:20])
-            suffix = " …" if len(missing) > 20 else ""
-            raise ValueError(
-                f"Roblox publication stripped {len(missing)} of {len(expected_names)} registered bones: {preview}{suffix}"
-            )
-    elif expected_names and int(stats.get("bones") or 0) < len(expected_names):
-        raise ValueError(
-            f"Roblox publication returned only {int(stats.get('bones') or 0)} of {len(expected_names)} registered bones"
-        )
-    return {"character": row, "studio": result}
-
-
-
-def sync_weapon_to_studio(slug: str):
-    row = weapons.get(slug)
-    if not row:
-        raise ValueError(f"unknown weapon: {slug}")
-    asset_id = str(row.get("model_asset_id") or "").strip()
-    if not asset_id:
-        raise ValueError("publish the weapon model before syncing it to Studio")
-    texture_assets = [
-        {"slot": str(item.get("slot") or ""), "assetId": str(item.get("asset_id") or "")}
-        for item in (row.get("textures") or [])
-        if str(item.get("asset_id") or "").isdigit()
-    ]
-    destination = ["weapons", str(row.get("storage_type") or row.get("weapon_type") or ""), str(row.get("slug") or ""), "model"]
-    result = run_model_load_bridge(
-        asset_id,
-        destination,
-        wrapper_name=str(row.get("slug") or ""),
-        placement_mode="weapon-pivot",
-        metadata={
-            "weaponSlug": str(row.get("slug") or ""),
-            "weaponType": str(row.get("weapon_type") or ""),
-            "rarity": str(row.get("rarity") or ""),
-            "textures": texture_assets,
-        },
-    )
-    return {"weapon": row, "studio": result}
-
-
-def sync_monster_to_studio(slug: str, kind: str = "monster"):
-    actor_store = npcs if kind == "npc" else monsters
-    row = actor_store.get(slug)
-    if not row:
-        raise ValueError(f"unknown {kind}: {slug}")
-    asset_id = str(row.get("model_asset_id") or "").strip()
-    if not asset_id:
-        raise ValueError(f"publish the {kind} model before syncing it to Studio")
-    texture_assets = [
-        {"slot": str(item.get("slot") or ""), "assetId": str(item.get("asset_id") or "")}
-        for item in (row.get("textures") or [])
-        if str(item.get("asset_id") or "").isdigit()
-    ]
-    destination = [f"{kind}s", str(row.get("slug") or ""), "model"]
-    result = run_model_load_bridge(
-        asset_id,
-        destination,
-        wrapper_name=str(row.get("slug") or ""),
-        placement_mode="monster-rig",
-        metadata={
-            "monsterSlug": str(row.get("slug") or ""),
-            "entityKind": kind,
-            "expectedBones": [
-                str(item.get("name"))
-                for item in json.loads(str(row.get("skeleton_json") or "{}" )).get("bones", [])
-                if str(item.get("name") or "")
-            ],
-            "textures": texture_assets,
-        },
-    )
-    stats = result.get("rigStats") or {}
-    if int(stats.get("baseParts") or 0) <= 0 or int(stats.get("bones") or 0) + int(stats.get("motor6Ds") or 0) <= 0:
-        raise ValueError("Studio loaded a monster asset without an articulated rig")
-
-    try:
-        expected_analysis = json.loads(str(row.get("skeleton_json") or "{}"))
-    except Exception:
-        expected_analysis = {}
-    expected_names = {
-        str(item.get("name") or "")
-        for item in (expected_analysis.get("bones") or [])
-        if str(item.get("name") or "")
-    }
-    actual_names = {str(name) for name in (stats.get("boneNames") or []) if str(name)}
-    if expected_names and actual_names:
-        missing = sorted(expected_names - actual_names, key=str.casefold)
-        if missing:
-            preview = ", ".join(missing[:20])
-            suffix = " …" if len(missing) > 20 else ""
-            raise ValueError(
-                f"Roblox monster publication stripped {len(missing)} of {len(expected_names)} registered bones: {preview}{suffix}"
-            )
-    elif expected_names and int(stats.get("bones") or 0) < len(expected_names):
-        raise ValueError(
-            f"Roblox monster publication returned only {int(stats.get('bones') or 0)} of {len(expected_names)} registered bones"
-        )
-
-    texture_stats = ((result.get("monsterStats") or {}).get("textures") or {})
-    if texture_assets and int(texture_stats.get("applied") or 0) <= 0:
-        raise ValueError("Studio loaded the monster rig but did not apply any published monster textures")
-    return {"monster": row, "studio": result}
-
-def _powershell_picker(script: str, extra_env: dict | None = None) -> str:
-    powershell = shutil.which("powershell.exe") or shutil.which("powershell")
-    if not powershell:
-        raise RuntimeError("powershell was not found for the native picker")
-    picker_env = os.environ.copy()
-    if extra_env:
-        picker_env.update({str(key): str(value) for key, value in extra_env.items()})
-    completed = subprocess.run(
-        [powershell, "-NoProfile", "-STA", "-Command", script],
-        capture_output=True,
-        text=True,
-        timeout=120,
-        env=picker_env,
-    )
-    if completed.returncode != 0:
-        raise RuntimeError((completed.stderr or completed.stdout or "picker failed").strip())
-    lines = [line.strip() for line in completed.stdout.splitlines() if line.strip()]
-    return lines[-1] if lines else ""
-
-
-def choose_character_fbx() -> str:
-    return _powershell_picker(
-        r'''
-Add-Type -AssemblyName System.Windows.Forms
-$dialog = New-Object System.Windows.Forms.OpenFileDialog
-$dialog.Title = 'game1 · choose character fbx'
-$dialog.Filter = 'fbx character model (*.fbx)|*.fbx'
-$dialog.Multiselect = $false
-if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-    Write-Output $dialog.FileName
-}
-'''
-    )
-
-
-
-def choose_weapon_fbx() -> str:
-    return _powershell_picker(
-        r'''
-Add-Type -AssemblyName System.Windows.Forms
-$dialog = New-Object System.Windows.Forms.OpenFileDialog
-$dialog.Title = 'game1 · choose weapon fbx'
-$dialog.Filter = 'fbx weapon model (*.fbx)|*.fbx'
-$dialog.Multiselect = $false
-if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-    Write-Output $dialog.FileName
-}
-'''
-    )
-
-
-def choose_location_asset_fbx() -> str:
-    return _powershell_picker(
-        r'''
-Add-Type -AssemblyName System.Windows.Forms
-$dialog = New-Object System.Windows.Forms.OpenFileDialog
-$dialog.Title = 'game1 · choose location asset fbx'
-$dialog.Filter = 'fbx location asset model (*.fbx)|*.fbx'
-$dialog.Multiselect = $false
-if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-    Write-Output $dialog.FileName
-}
-'''
-    )
-
-
-def choose_location_asset_texture() -> str:
-    return _powershell_picker(
-        r'''
-Add-Type -AssemblyName System.Windows.Forms
-$dialog = New-Object System.Windows.Forms.OpenFileDialog
-$dialog.Title = 'game1 · choose location asset texture'
-$dialog.Filter = 'texture (*.png;*.jpg;*.jpeg)|*.png;*.jpg;*.jpeg|png texture (*.png)|*.png|jpeg texture (*.jpg;*.jpeg)|*.jpg;*.jpeg'
-$dialog.Multiselect = $false
-if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-    Write-Output $dialog.FileName
-}
-'''
-    )
-
-
-def choose_monster_fbx() -> str:
-    return _powershell_picker(
-        r'''
-Add-Type -AssemblyName System.Windows.Forms
-$dialog = New-Object System.Windows.Forms.OpenFileDialog
-$dialog.Title = 'game1 · choose monster fbx'
-$dialog.Filter = 'fbx monster model (*.fbx)|*.fbx'
-$dialog.Multiselect = $false
-if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-    Write-Output $dialog.FileName
-}
-'''
-    )
-
-
-def choose_monster_textures() -> list[str]:
-    raw = _powershell_picker(
-        r'''
-Add-Type -AssemblyName System.Windows.Forms
-$dialog = New-Object System.Windows.Forms.OpenFileDialog
-$dialog.Title = 'game1 · choose monster textures'
-$dialog.Filter = 'monster textures (*.png;*.jpg;*.jpeg;*.webp)|*.png;*.jpg;*.jpeg;*.webp'
-$dialog.Multiselect = $true
-if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-    Write-Output ($dialog.FileNames -join [char]31)
-}
-'''
-    )
-    return [item for item in raw.split(chr(31)) if item]
-
-
-def choose_weapon_textures() -> list[str]:
-    raw = _powershell_picker(
-        r'''
-Add-Type -AssemblyName System.Windows.Forms
-$dialog = New-Object System.Windows.Forms.OpenFileDialog
-$dialog.Title = 'game1 · choose weapon textures'
-$dialog.Filter = 'weapon textures (*.png;*.jpg;*.jpeg;*.webp)|*.png;*.jpg;*.jpeg;*.webp'
-$dialog.Multiselect = $true
-if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-    Write-Output ($dialog.FileNames -join [char]31)
-}
-'''
-    )
-    return [item for item in raw.split(chr(31)) if item]
-
-def write_animation_export(payload: dict):
-    output_dir = str(payload.get("outputDir") or "").strip()
-    clip_name = str(payload.get("name") or "").strip()
-    encoded = str(payload.get("rbxmBase64") or "").strip()
-
-    if not output_dir:
-        raise ValueError("animation export outputDir is required")
-    if not clip_name:
-        raise ValueError("animation export name is required")
-    if not encoded:
-        raise ValueError("animation export rbxmBase64 is required")
-
-    directory = Path(output_dir).expanduser()
-    if not directory.is_absolute():
-        raise ValueError("animation export directory must be an absolute path")
-
-    # Keep Unicode animation names, but remove characters Windows cannot use
-    # in a filename and normalize trailing dots/spaces.
-    safe_name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '_', clip_name).strip().rstrip('. ')
-    if not safe_name:
-        safe_name = "animation"
-    if not safe_name.lower().endswith(".rbxm"):
-        safe_name += ".rbxm"
-
-    try:
-        raw = base64.b64decode(encoded, validate=True)
-    except Exception as error:
-        raise ValueError(f"invalid animation rbxmBase64: {error}") from error
-    if not raw:
-        raise ValueError("serialized animation is empty")
-    if len(raw) > 64 * 1024 * 1024:
-        raise ValueError("serialized animation exceeds 64 MiB")
-
-    directory.mkdir(parents=True, exist_ok=True)
-    destination = directory / safe_name
-    overwrote = destination.exists()
-    temp = destination.with_suffix(destination.suffix + ".tmp")
-    temp.write_bytes(raw)
-    temp.replace(destination)
-    return {
-        "ok": True,
-        "path": str(destination),
-        "filename": destination.name,
-        "overwrote": overwrote,
-        "bytes": len(raw),
-    }
-
-
-def choose_animation_folder(initial_path: str = "") -> str:
-    initial_path = str(initial_path or "").strip().strip('"')
-    return _powershell_picker(
-        r'''
-Add-Type -AssemblyName System.Windows.Forms
-$dialog = New-Object System.Windows.Forms.FolderBrowserDialog
-$dialog.Description = 'game1 · choose folder containing exported animations (.rbxm/.rbxmx)'
-$dialog.ShowNewFolderButton = $false
-$initialPath = $env:GAME1_ANIMATION_PICKER_INITIAL_PATH
-if ($initialPath -and [System.IO.Directory]::Exists($initialPath)) {
-    $dialog.SelectedPath = $initialPath
-}
-if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-    Write-Output $dialog.SelectedPath
-}
-'''
-        , {"GAME1_ANIMATION_PICKER_INITIAL_PATH": initial_path}
-    )
 
 
 # Application composition root for read-only HTTP adapters. Built once, not per request.
@@ -500,9 +169,9 @@ WRITE_SOURCES = MappingProxyType({
     "request_active_studio_save": request_active_studio_save,
     "run_timeline_editor_bridge": run_timeline_editor_bridge,
     "store": store,
-    "sync_character_to_studio": sync_character_to_studio,
-    "sync_monster_to_studio": sync_monster_to_studio,
-    "sync_weapon_to_studio": sync_weapon_to_studio,
+    "sync_character_to_studio": studio_asset_sync.sync_character_to_studio,
+    "sync_monster_to_studio": studio_asset_sync.sync_monster_to_studio,
+    "sync_weapon_to_studio": studio_asset_sync.sync_weapon_to_studio,
     "timelines": timelines,
     "weapons": weapons,
     "write_animation_export": write_animation_export,

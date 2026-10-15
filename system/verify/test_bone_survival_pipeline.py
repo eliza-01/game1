@@ -67,7 +67,7 @@ class BoneSurvivalTests(unittest.TestCase):
 
     def test_studio_checks_authored_bones_before_replacing_template(self):
         plugin = (ROOT / 'system/studio-plugin/Game1Bridge.server.luau').read_text(encoding='utf-8')
-        host = (ROOT / 'system/control-center/host_agent.py').read_text(encoding='utf-8')
+        host = (ROOT / 'system/control-center/services/studio_asset_sync.py').read_text(encoding='utf-8')
         self.assertIn('assertExpectedBones(importedRig, metadata.expectedBones)', plugin)
         section = plugin[plugin.index('local function placeMonsterRig'):]
         self.assertLess(section.index('assertExpectedBones('), section.index('previousRig.Name = "ImportedRig_Previous"'))

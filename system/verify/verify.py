@@ -301,7 +301,7 @@ plugin_project_text = plugin_project.read_text(encoding="utf-8") if plugin_proje
 if '"$path": "modules/CharacterTemplate.luau"' not in plugin_project_text:
     err("game1 Studio plugin project must package the character template module")
 
-host_agent_text = (ROOT / "system/control-center/host_agent.py").read_text(encoding="utf-8") + "\n" + "\n".join(p.read_text(encoding="utf-8") for p in (ROOT / "system/control-center/api").glob("*.py"))
+host_agent_text = (ROOT / "system/control-center/host_agent.py").read_text(encoding="utf-8") + "\n" + "\n".join(p.read_text(encoding="utf-8") for folder in ("api", "services") for p in (ROOT / "system/control-center" / folder).glob("*.py"))
 if "sync_character_to_studio" not in host_agent_text or 'sync_suffix = "/sync"' not in host_agent_text:
     err("character publication must expose reference-style Studio sync")
 
@@ -393,7 +393,7 @@ if "transform_apply" in publication_preparer_text:
 for required in ["prepare_character_publication_fbx", "_assert_publication_skeleton_matches"]:
     if required not in analysis_text + store_text:
         err(f"character publication skeleton safety missing {required}")
-if "boneNames" not in plugin_text or "Roblox publication stripped" not in host_agent_text:
+if "boneNames" not in plugin_text or 'validate_published_rig(result, row, kind="character")' not in host_agent_text or 'f"{label} stripped' not in host_agent_text:
     err("Studio character sync must report exact bones stripped by Roblox publication")
 
 # m5.1 character animation contract

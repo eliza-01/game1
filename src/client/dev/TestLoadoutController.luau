@@ -1,12 +1,13 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local CombatShared = Shared:WaitForChild("combat")
 local WeaponAttackVolume = require(CombatShared:WaitForChild("WeaponAttackVolume"))
+
+local StudioDebugDock = require(script.Parent:WaitForChild("StudioDebugDock"))
 
 local TestLoadoutController = {}
 local started = false
@@ -15,8 +16,6 @@ local player = Players.LocalPlayer
 local PANEL_WIDTH = 320
 local PANEL_EXPANDED_HEIGHT = 482
 local PANEL_COLLAPSED_SIZE = 44
-local PANEL_X = 16
-local PANEL_Y = 150
 local CONTENT_WIDTH = PANEL_WIDTH - 32
 local DEBUG_PANEL_OPEN_ATTRIBUTE = "Game1DebugPanelOpen"
 local DEBUG_PANEL_ID = "TL"
@@ -476,12 +475,18 @@ local function createGui()
     gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     gui.Parent = playerGui
 
+    local launcher = button(gui, "TL")
+    launcher.Position = StudioDebugDock.ButtonPosition(DEBUG_PANEL_ID)
+    launcher.Size = UDim2.fromOffset(PANEL_COLLAPSED_SIZE, PANEL_COLLAPSED_SIZE)
+    launcher.Font = Enum.Font.GothamSemibold
+
     local panel = Instance.new("Frame")
     panel.BackgroundColor3 = COLORS.panel
     panel.BackgroundTransparency = 0.025
     panel.BorderSizePixel = 0
-    panel.Position = UDim2.fromOffset(PANEL_X, PANEL_Y)
-    panel.Size = UDim2.fromOffset(PANEL_COLLAPSED_SIZE, PANEL_COLLAPSED_SIZE)
+    panel.Position = StudioDebugDock.WindowPosition(DEBUG_PANEL_ID, PANEL_WIDTH)
+    panel.Size = UDim2.fromOffset(PANEL_WIDTH, PANEL_EXPANDED_HEIGHT)
+    panel.Visible = false
     panel.Parent = gui
     corner(panel, 10)
     stroke(panel, 0.12)
@@ -526,12 +531,19 @@ local function createGui()
     meta.Size = UDim2.new(1, -2, 0, 16)
 
     sectionCaption(body, "Test attack radius · studs", 194)
+    local radiusMinus = button(body, "−")
+    radiusMinus.Position = UDim2.fromOffset(0, 212)
+    radiusMinus.Size = UDim2.fromOffset(42, 32)
     local radiusBox = numericBox(body, "7")
-    radiusBox.Position = UDim2.fromOffset(0, 212)
-    radiusBox.Size = UDim2.new(1, -82, 0, 32)
+    radiusBox.Position = UDim2.fromOffset(48, 212)
+    radiusBox.Size = UDim2.new(1, -96, 0, 32)
+    radiusBox.TextXAlignment = Enum.TextXAlignment.Center
+    local radiusPlus = button(body, "+")
+    radiusPlus.Position = UDim2.new(1, -42, 0, 212)
+    radiusPlus.Size = UDim2.fromOffset(42, 32)
     local radiusReset = button(body, "RESET")
-    radiusReset.Position = UDim2.new(1, -74, 0, 212)
-    radiusReset.Size = UDim2.fromOffset(74, 32)
+    radiusReset.Position = UDim2.new(1, -52, 0, 194)
+    radiusReset.Size = UDim2.fromOffset(52, 16)
     radiusReset.TextSize = 9
     radiusReset.Font = Enum.Font.GothamSemibold
 
@@ -584,19 +596,16 @@ local function createGui()
         header.Visible = not collapsed
         subtitle.Visible = not collapsed
         accent.Visible = not collapsed
-        if collapsed then
-            collapse.Text = "TL"
-            collapse.Position = UDim2.fromOffset(0, 0)
-            collapse.Size = UDim2.fromOffset(PANEL_COLLAPSED_SIZE, PANEL_COLLAPSED_SIZE)
-        else
-            collapse.Text = "–"
-            collapse.Position = UDim2.fromOffset(PANEL_WIDTH - 42, 7)
-            collapse.Size = UDim2.fromOffset(28, 28)
-        end
-        TweenService:Create(panel, TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            Size = UDim2.fromOffset(collapsed and PANEL_COLLAPSED_SIZE or PANEL_WIDTH, collapsed and PANEL_COLLAPSED_SIZE or PANEL_EXPANDED_HEIGHT),
-        }):Play()
+        collapse.Text = "×"
+        collapse.Position = UDim2.fromOffset(PANEL_WIDTH - 42, 7)
+        collapse.Size = UDim2.fromOffset(28, 28)
+        launcher.BackgroundColor3 = if collapsed then COLORS.control else COLORS.controlSelected
+        launcher.TextColor3 = if collapsed then COLORS.text else COLORS.accent
+        panel.Visible = not collapsed
     end
+    launcher.Activated:Connect(function()
+        playerGui:SetAttribute(DEBUG_PANEL_OPEN_ATTRIBUTE, collapsed and DEBUG_PANEL_ID or "")
+    end)
     collapse.Activated:Connect(function()
         playerGui:SetAttribute(DEBUG_PANEL_OPEN_ATTRIBUTE, collapsed and DEBUG_PANEL_ID or "")
     end)
@@ -605,7 +614,7 @@ local function createGui()
     end)
     setCollapsed(playerGui:GetAttribute(DEBUG_PANEL_OPEN_ATTRIBUTE) ~= DEBUG_PANEL_ID)
 
-    return gui, character, category, weapon, meta, radiusBox, radiusReset, radiusToggle, volumeToggle, targetHitboxToggle, apply, status, statusDot
+    return gui, character, category, weapon, meta, radiusBox, radiusMinus, radiusPlus, radiusReset, radiusToggle, volumeToggle, targetHitboxToggle, apply, status, statusDot
 end
 
 function TestLoadoutController.Start()
@@ -626,7 +635,7 @@ function TestLoadoutController.Start()
             return
         end
 
-        local gui, characterDropdown, categorySelector, weaponDropdown, meta, radiusBox, radiusReset, radiusToggle, volumeToggle, targetHitboxToggle, applyButton, status, statusDot = createGui()
+        local gui, characterDropdown, categorySelector, weaponDropdown, meta, radiusBox, radiusMinus, radiusPlus, radiusReset, radiusToggle, volumeToggle, targetHitboxToggle, applyButton, status, statusDot = createGui()
         local catalog = catalogRemote:InvokeServer()
         local weaponRows = catalog.weapons or {}
         local weaponBySlug = {}
@@ -848,6 +857,14 @@ function TestLoadoutController.Start()
                 syncRadiusBox(currentCharacter and currentCharacter:GetAttribute("AttackRadius") or 7)
             end
         end)
+        local function changeRadiusBy(delta: number)
+            local character = player.Character
+            local current = tonumber(radiusBox.Text) or (character and tonumber(character:GetAttribute("AttackRadius"))) or 7
+            -- Server remains authoritative and clamps to the supported range.
+            applyRadiusValue(current + delta)
+        end
+        radiusMinus.Activated:Connect(function() changeRadiusBy(-0.5) end)
+        radiusPlus.Activated:Connect(function() changeRadiusBy(0.5) end)
         radiusReset.Activated:Connect(function()
             applyRadiusValue("default")
         end)

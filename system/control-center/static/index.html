@@ -44,6 +44,7 @@
 <hr class="rail-separator">
 <div class="section-title"><div><span>weapon registry</span><h3>weapons</h3></div><span id="weapon-rail-count">0</span></div>
 <div class="tree-actions"><button id="new-weapon" class="primary" type="button">new</button><button id="refresh-weapons" type="button">refresh</button></div>
+<label class="weapon-list-filter">type filter<select id="weapon-list-type"><option value="all">all types</option></select></label>
 <div id="weapon-tree" class="tree"></div>
 </div>
 <div id="npc-rail" hidden>
@@ -243,7 +244,7 @@
 <small id="weapon-publication-hint" class="hint">select a registered weapon.</small>
 </div>
 <div class="panel character-card">
-<div class="section-title"><div><span>versioned registry</span><h3>registered weapons</h3></div><button id="validate-weapons" type="button">refresh</button></div>
+<div class="section-title"><div><span>versioned registry</span><h3>registered weapons <small id="weapon-visible-count" class="muted"></small></h3></div><div class="weapon-list-actions"><label>type filter<select id="weapon-table-type"><option value="all">all types</option></select></label><button id="validate-weapons" type="button">refresh</button></div></div>
 <div class="table-wrap weapon-table-wrap"><table><thead><tr><th>active</th><th>weapon</th><th>type</th><th>rarity</th><th>stats</th><th>assets</th><th>status</th><th>actions</th></tr></thead><tbody id="weapon-rows"></tbody></table></div>
 <div id="weapon-details" class="details"><span class="muted">select a weapon.</span></div>
 </div>

@@ -72,7 +72,8 @@ console.log('M75 DOM first-pick passed');
     def test_debug_button_not_offscreen_and_remote_nonblocking(self):
         client = (ROOT / 'src/client/dev/CustomScalingDebugController.luau').read_text(encoding='utf-8')
         self.assertNotIn('UDim2.fromOffset(16, 635)', client)
-        self.assertIn('UDim2.new(0, 16, 1, -54)', client)
+        self.assertIn('StudioDebugDock.ButtonPosition("CS")', client)
+        self.assertIn('StudioDebugDock.WindowPosition("CS", 350)', client)
         self.assertIn('task.spawn(function()', client)
         self.assertIn('Game1DebugPanelOpen', client)
         self.assertIn('CS button visible', client)

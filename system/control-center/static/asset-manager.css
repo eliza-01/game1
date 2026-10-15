@@ -73,3 +73,11 @@
 .npc-options-controls input[type=number]{width:100%;min-width:0}
 
 .inline-check{display:flex;align-items:center;justify-content:center}.inline-check input{width:auto!important;margin:0!important;padding:0;accent-color:var(--mint)}
+
+/* Register Weapon: one persisted type filter controls both sorted lists. */
+.weapon-list-filter{display:grid;gap:5px;margin:10px 0;font-size:11px;color:var(--muted)}
+.weapon-list-filter select{width:100%}
+.weapon-list-actions{display:flex;gap:10px;align-items:end;flex-wrap:wrap}
+.weapon-list-actions label{display:grid;gap:3px;font-size:11px;color:var(--muted)}
+.weapon-list-actions select{min-width:130px}
+@media(max-width:650px){.weapon-list-actions{width:100%}.weapon-list-actions label{flex:1}}

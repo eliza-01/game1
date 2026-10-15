@@ -4,6 +4,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local Scaling = require(ReplicatedStorage:WaitForChild("Game1Shared"):WaitForChild("animation"):WaitForChild("AnimationSpeedScaling"))
+local StudioDebugDock = require(script.Parent:WaitForChild("StudioDebugDock"))
 local Controller = {}
 local palette = {
     background = Color3.fromRGB(16, 22, 31),
@@ -71,10 +72,10 @@ function Controller.Start()
     -- Build the debug UI immediately. Do not silently hide it while waiting
     -- for a server remote, and never use a fixed Y that may fall off-screen.
     local gui = new("ScreenGui", {Name = "CustomScaling", ResetOnSpawn = false, DisplayOrder = 135}, playerGui)
-    local toggle = button(gui, "CS", UDim2.new(0, 16, 1, -54), UDim2.fromOffset(44, 34))
+    local toggle = button(gui, "CS", StudioDebugDock.ButtonPosition("CS"), UDim2.fromOffset(44, 44))
     toggle.BackgroundColor3 = palette.accent
     local panel = new("Frame", {BackgroundColor3 = palette.background, BorderSizePixel = 0,
-        Position = UDim2.new(0, 66, 0.5, -197), Size = UDim2.fromOffset(350, 395), Visible = false}, gui)
+        Position = StudioDebugDock.WindowPosition("CS", 350), Size = UDim2.fromOffset(350, 395), Visible = false}, gui)
     caption(panel, "CustomScaling · Studio Play", 6, 28)
     caption(panel, "Temporary overrides, not saved to Asset Manager", 34, 18).TextColor3 = palette.muted
     local search = input(panel, 58, "Search animation / NPC / monster / ID")
@@ -94,7 +95,8 @@ function Controller.Start()
     local function refreshPanelVisibility()
         local open = playerGui:GetAttribute(OPEN_ATTRIBUTE) == PANEL_ID
         panel.Visible = open
-        toggle.Text = if open then "×" else "CS"
+        toggle.Text = "CS"
+        toggle.BackgroundColor3 = if open then palette.background else palette.accent
     end
     toggle.Activated:Connect(function()
         playerGui:SetAttribute(OPEN_ATTRIBUTE, if panel.Visible then "" else PANEL_ID)

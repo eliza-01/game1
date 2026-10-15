@@ -1,8 +1,9 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
+
+local StudioDebugDock = require(script.Parent:WaitForChild("StudioDebugDock"))
 
 local MovementDebugController = {}
 local started = false
@@ -11,8 +12,6 @@ local player = Players.LocalPlayer
 local PANEL_WIDTH = 336
 local PANEL_EXPANDED_HEIGHT = 486
 local PANEL_COLLAPSED_SIZE = 44
-local PANEL_X = 16
-local PANEL_Y = 202
 local CONTENT_WIDTH = PANEL_WIDTH - 32
 local DEBUG_PANEL_OPEN_ATTRIBUTE = "Game1DebugPanelOpen"
 local DEBUG_PANEL_ID = "MV"
@@ -265,12 +264,18 @@ local function createGui()
     gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     gui.Parent = playerGui
 
+    local launcher = button(gui, "MV")
+    launcher.Position = StudioDebugDock.ButtonPosition(DEBUG_PANEL_ID)
+    launcher.Size = UDim2.fromOffset(PANEL_COLLAPSED_SIZE, PANEL_COLLAPSED_SIZE)
+    launcher.Font = Enum.Font.GothamSemibold
+
     local panel = Instance.new("Frame")
     panel.BackgroundColor3 = COLORS.panel
     panel.BackgroundTransparency = 0.025
     panel.BorderSizePixel = 0
-    panel.Position = UDim2.fromOffset(PANEL_X, PANEL_Y)
-    panel.Size = UDim2.fromOffset(PANEL_COLLAPSED_SIZE, PANEL_COLLAPSED_SIZE)
+    panel.Position = StudioDebugDock.WindowPosition(DEBUG_PANEL_ID, PANEL_WIDTH)
+    panel.Size = UDim2.fromOffset(PANEL_WIDTH, PANEL_EXPANDED_HEIGHT)
+    panel.Visible = false
     panel.Parent = gui
     corner(panel, 10)
     stroke(panel, 0.12)
@@ -368,20 +373,16 @@ local function createGui()
         header.Visible = not collapsed
         subtitle.Visible = not collapsed
         accent.Visible = not collapsed
-        if collapsed then
-            collapse.Text = "MV"
-            collapse.Position = UDim2.fromOffset(0, 0)
-            collapse.Size = UDim2.fromOffset(PANEL_COLLAPSED_SIZE, PANEL_COLLAPSED_SIZE)
-        else
-            collapse.Text = "–"
-            collapse.Position = UDim2.fromOffset(PANEL_WIDTH - 42, 7)
-            collapse.Size = UDim2.fromOffset(28, 28)
-        end
-        TweenService:Create(panel, TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            Size = UDim2.fromOffset(collapsed and PANEL_COLLAPSED_SIZE or PANEL_WIDTH, collapsed and PANEL_COLLAPSED_SIZE or PANEL_EXPANDED_HEIGHT),
-        }):Play()
+        collapse.Text = "×"
+        collapse.Position = UDim2.fromOffset(PANEL_WIDTH - 42, 7)
+        collapse.Size = UDim2.fromOffset(28, 28)
+        launcher.BackgroundColor3 = if collapsed then COLORS.control else COLORS.controlSelected
+        launcher.TextColor3 = if collapsed then COLORS.text else COLORS.accent
+        panel.Visible = not collapsed
     end
-
+    launcher.Activated:Connect(function()
+        playerGui:SetAttribute(DEBUG_PANEL_OPEN_ATTRIBUTE, collapsed and DEBUG_PANEL_ID or "")
+    end)
     collapse.Activated:Connect(function()
         playerGui:SetAttribute(DEBUG_PANEL_OPEN_ATTRIBUTE, collapsed and DEBUG_PANEL_ID or "")
     end)

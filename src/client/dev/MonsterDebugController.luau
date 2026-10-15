@@ -1,8 +1,9 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
+
+local StudioDebugDock = require(script.Parent:WaitForChild("StudioDebugDock"))
 
 local MonsterDebugController = {}
 local started = false
@@ -11,8 +12,6 @@ local player = Players.LocalPlayer
 local PANEL_WIDTH = 336
 local PANEL_HEIGHT = 354
 local COLLAPSED = 44
-local PANEL_X = 16
-local PANEL_Y = 254
 local OPEN_ATTRIBUTE = "Game1DebugPanelOpen"
 local PANEL_ID = "MO"
 local POLL_SECONDS = 0.65
@@ -68,7 +67,10 @@ local function createGui()
     local playerGui = player:WaitForChild("PlayerGui")
     local old = playerGui:FindFirstChild("Game1MonsterDebugGui"); if old then old:Destroy() end
     local gui = Instance.new("ScreenGui"); gui.Name="Game1MonsterDebugGui"; gui.ResetOnSpawn=false; gui.DisplayOrder=22; gui.Parent=playerGui
-    local panel = Instance.new("Frame"); panel.BackgroundColor3=COLORS.panel; panel.BorderSizePixel=0; panel.Position=UDim2.fromOffset(PANEL_X,PANEL_Y); panel.Size=UDim2.fromOffset(COLLAPSED,COLLAPSED); panel.Parent=gui; corner(panel,10); stroke(panel)
+    local launcher=button(gui,"MO")
+    launcher.Position=StudioDebugDock.ButtonPosition(PANEL_ID)
+    launcher.Size=UDim2.fromOffset(COLLAPSED,COLLAPSED)
+    local panel = Instance.new("Frame"); panel.BackgroundColor3=COLORS.panel; panel.BorderSizePixel=0; panel.Position=StudioDebugDock.WindowPosition(PANEL_ID,PANEL_WIDTH); panel.Size=UDim2.fromOffset(PANEL_WIDTH,PANEL_HEIGHT); panel.Visible=false; panel.Parent=gui; corner(panel,10); stroke(panel)
     local toggle=button(panel,"MO"); toggle.Position=UDim2.fromOffset(0,0); toggle.Size=UDim2.fromOffset(COLLAPSED,COLLAPSED)
     local title=label(panel,"MONSTER DEBUG",11,true); title.Position=UDim2.fromOffset(16,6); title.Size=UDim2.fromOffset(180,16)
     local subtitle=label(panel,"aggro + combat sandbox",9,false); subtitle.TextColor3=COLORS.muted; subtitle.Position=UDim2.fromOffset(16,22); subtitle.Size=UDim2.fromOffset(200,14)
@@ -102,10 +104,15 @@ local function createGui()
     local function setCollapsed(value:boolean)
         collapsed=value
         body.Visible=not value; title.Visible=not value; subtitle.Visible=not value
-        toggle.Text=value and "MO" or "×"; toggle.Position=value and UDim2.fromOffset(0,0) or UDim2.fromOffset(PANEL_WIDTH-COLLAPSED,0)
-        TweenService:Create(panel,TweenInfo.new(0.14,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Size=value and UDim2.fromOffset(COLLAPSED,COLLAPSED) or UDim2.fromOffset(PANEL_WIDTH,PANEL_HEIGHT)}):Play()
+        toggle.Text="×"; toggle.Position=UDim2.fromOffset(PANEL_WIDTH-COLLAPSED,0)
+        launcher.BackgroundColor3=if value then COLORS.control else COLORS.selected
+        launcher.TextColor3=if value then COLORS.text else COLORS.accent
+        panel.Visible=not value
         aggroFolder.Parent=if value then nil else Workspace; attackFolder.Parent=if value then nil else Workspace
     end
+    launcher.Activated:Connect(function()
+        if collapsed then playerGui:SetAttribute(OPEN_ATTRIBUTE,PANEL_ID) else playerGui:SetAttribute(OPEN_ATTRIBUTE,"") end
+    end)
     toggle.Activated:Connect(function()
         if collapsed then playerGui:SetAttribute(OPEN_ATTRIBUTE,PANEL_ID) else playerGui:SetAttribute(OPEN_ATTRIBUTE,"") end
     end)

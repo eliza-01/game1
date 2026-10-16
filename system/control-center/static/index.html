@@ -99,7 +99,7 @@
 <div class="actions"><button id="save-archetype" type="button" disabled>save archetype</button><button id="register-character" class="primary" type="button">register character</button><button id="clear-form" type="button">clear form</button></div>
 <hr class="card-separator">
 <span class="eyebrow">02 · publication</span><h3 class="subheading">roblox model asset</h3><p>first publish creates a model asset id. existing character model assets are never updated in place. publication builds a temporary bone-safe FBX without moving rest bones, then uploads it as a brand-new asset; the previous id remains assigned until the new upload succeeds.</p>
-<label>description<input id="publication-description" value="game1 character model"></label>
+<label>description<input id="publication-description" value="Game1 Character Model"></label>
 <div class="actions"><button id="publish-character" class="primary" type="button" disabled>publish model</button><button id="sync-character" type="button" disabled>sync studio</button><button id="activate-character" type="button" disabled>activate</button></div>
 <small id="publication-hint" class="hint">select a registered character.</small>
 </div>
@@ -132,7 +132,7 @@
 <hr class="card-separator">
 <span class="eyebrow">02 · publication queue</span><h3 class="subheading">roblox animation assets</h3>
 <p><b>publish missing</b> creates one permanent asset id per local clip. for <b>CHANGED</b>, reimport the animation manually into the existing asset in Roblox Studio, then use <b>Check Roblox Assets Animations</b>; the Asset Manager confirms a newer Approved Roblox version and keeps the same asset id.</p>
-<label>description<input id="animation-publication-description" value="game1 character animation"></label>
+<label>description<input id="animation-publication-description" value="Game1 Character Animation"></label>
 <div class="actions"><button id="publish-missing-animations" class="primary" type="button" disabled>publish missing</button><button id="check-roblox-animations" type="button">Check Roblox Assets Animations</button><button id="refresh-animations" type="button">refresh</button></div>
 <div id="animation-publish-progress" class="queue-progress" hidden><strong id="animation-publish-current">publication queue</strong><span id="animation-publish-count">0 / 0</span><progress id="animation-publish-bar" value="0" max="1"></progress></div>
 <div id="animation-unassigned" class="unassigned"></div>
@@ -239,7 +239,7 @@
 <div class="actions"><button id="register-weapon" class="primary" type="button">register weapon</button><button id="clear-weapon-form" type="button">clear form</button></div>
 <hr class="card-separator">
 <span class="eyebrow">03 · publication and studio</span><h3 class="subheading">roblox assets</h3>
-<label>description<input id="weapon-publication-description" value="game1 weapon"></label>
+<label>description<input id="weapon-publication-description" value="Game1 Weapon"></label>
 <div class="actions"><button id="publish-weapon" class="primary" type="button" disabled>publish all changed</button><button id="sync-weapon" type="button" disabled>sync studio</button><button id="activate-weapon" type="button" disabled>set startup</button><button id="clear-active-weapon" type="button">unarmed startup</button></div>
 <small id="weapon-publication-hint" class="hint">select a registered weapon.</small>
 </div>
@@ -273,7 +273,7 @@
 <div class="actions"><button id="register-location-asset" class="primary" type="button">register asset</button><button id="clear-location-asset-form" type="button">clear form</button><button id="delete-location-asset" class="danger" type="button" disabled>delete</button></div>
 <hr class="card-separator">
 <span class="eyebrow">03 · publication</span><h3 class="subheading">Roblox model + image</h3>
-<label>description<input id="location-asset-publication-description" value="game1 location asset"><small class="hint">the asset name is appended automatically in Roblox, for example <code>game1 location asset · Oak Tree</code>.</small></label>
+<label>description<input id="location-asset-publication-description" value="Game1 Location Asset"><small class="hint">filled automatically from the selected asset, for example <code>Game1 Location Asset Oak Tree</code>.</small></label>
 <div class="actions"><button id="publish-location-asset" class="primary" type="button" disabled>publish all changed</button></div>
 <small id="location-asset-publication-hint" class="hint">select a registered location asset.</small>
 </div>
@@ -310,7 +310,7 @@
 <div class="actions"><button id="register-monster" class="primary" type="button">register monster</button><button id="clear-monster-form" type="button">clear form</button></div>
 <hr class="card-separator">
 <span class="eyebrow">03 · publication and studio</span><h3 class="subheading">roblox assets</h3>
-<label>description<input id="monster-publication-description" value="game1 monster"></label>
+<label>description<input id="monster-publication-description" value="Game1 Monster"></label>
 <div class="actions"><button id="publish-monster" class="primary" type="button" disabled>publish all changed</button><button id="sync-monster" type="button" disabled>sync studio</button></div>
 <small id="monster-publication-hint" class="hint">select a registered monster.</small>
 </div>
@@ -337,7 +337,7 @@
 <div id="monster-animation-scan-status" class="status-box"><strong>nothing scanned yet</strong><span>unrecognized files can be assigned manually.</span></div>
 <hr class="card-separator">
 <span class="eyebrow">05 · publication queue</span><h3 class="subheading">roblox animation assets</h3>
-<label>description<input id="monster-animation-publication-description" value="game1 monster animation"></label>
+<label>description<input id="monster-animation-publication-description" value="Game1 Monster Animation"></label>
 <div class="actions"><button id="publish-missing-monster-animations" class="primary" type="button" disabled>publish missing</button><button id="check-roblox-monster-animations" type="button">Check Roblox Assets Animations</button><button id="refresh-monster-animations" type="button">refresh</button></div>
 <div id="monster-animation-publish-progress" class="queue-progress" hidden><strong id="monster-animation-publish-current">publication queue</strong><span id="monster-animation-publish-count">0 / 0</span><progress id="monster-animation-publish-bar" value="0" max="1"></progress></div>
 <div id="monster-animation-unassigned" class="unassigned"></div>
@@ -367,7 +367,7 @@
 </div>
 <div class="panel character-card">
 <span class="eyebrow">08 · population</span><h3>spawn settings</h3>
-<div class="monster-spawn-settings-grid"><label>respawn sec<input id="monster-spawn-respawn" type="number" min="0" max="86400" step="0.1" value="10"></label><label>spawn radius<input id="monster-spawn-radius" type="number" min="0" max="10000" step="0.1" value="0"></label><label>max alive<input id="monster-spawn-max-alive" type="number" min="1" max="1000" step="1" value="1"></label></div>
+<div class="monster-spawn-settings-grid"><label>respawn sec<input id="monster-spawn-respawn" type="number" min="0" max="86400" step="0.1" value="10"></label><label>spawn radius<input id="monster-spawn-radius" type="number" min="0" max="10000" step="0.1" value="15"></label><label>max alive<input id="monster-spawn-max-alive" type="number" min="1" max="1000" step="1" value="3"></label></div>
 <label class="spawn-enabled"><input id="monster-spawn-enabled" type="checkbox" checked><span>enabled · runtime maintains this population</span></label>
 <small id="monster-spawn-radius-hint" class="hint">radius is the random ground area around the authored point. max alive is the population cap for this record.</small>
 <div class="actions"><button id="monster-spawn-register" class="primary" type="button" disabled>register spawn</button><button id="monster-spawn-new" type="button">new spawn</button><button id="monster-spawn-delete" class="danger" type="button" disabled>delete</button></div>
@@ -403,7 +403,7 @@
 <div class="actions"><button id="register-npc" class="primary" type="button">register npc</button><button id="clear-npc-form" type="button">clear form</button></div>
 <hr class="card-separator">
 <span class="eyebrow">03 · publication and studio</span><h3 class="subheading">roblox assets</h3>
-<label>description<input id="npc-publication-description" value="game1 npc"></label>
+<label>description<input id="npc-publication-description" value="Game1 NPC"></label>
 <div class="actions"><button id="publish-npc" class="primary" type="button" disabled>publish all changed</button><button id="sync-npc" type="button" disabled>sync studio</button></div>
 <small id="npc-publication-hint" class="hint">select a registered npc.</small>
 </div>
@@ -440,7 +440,7 @@
 <div id="npc-animation-scan-status" class="status-box"><strong>nothing scanned yet</strong><span>unrecognized files can be assigned manually.</span></div>
 <hr class="card-separator">
 <span class="eyebrow">05 · publication queue</span><h3 class="subheading">roblox animation assets</h3>
-<label>description<input id="npc-animation-publication-description" value="game1 npc animation"></label>
+<label>description<input id="npc-animation-publication-description" value="Game1 NPC Animation"></label>
 <div class="actions"><button id="publish-missing-npc-animations" class="primary" type="button" disabled>publish missing</button><button id="check-roblox-npc-animations" type="button">Check Roblox Assets Animations</button><button id="refresh-npc-animations" type="button">refresh</button></div>
 <div id="npc-animation-publish-progress" class="queue-progress" hidden><strong id="npc-animation-publish-current">publication queue</strong><span id="npc-animation-publish-count">0 / 0</span><progress id="npc-animation-publish-bar" value="0" max="1"></progress></div>
 <div id="npc-animation-unassigned" class="unassigned"></div>
@@ -479,7 +479,7 @@
 </div>
 <div class="panel character-card">
 <span class="eyebrow">08 · population</span><h3>spawn settings</h3>
-<div class="npc-spawn-settings-grid monster-spawn-settings-grid"><label>respawn sec<input id="npc-spawn-respawn" type="number" min="0" max="86400" step="0.1" value="10"></label><label>spawn radius<input id="npc-spawn-radius" type="number" min="0" max="10000" step="0.1" value="0"></label><label>max alive<input id="npc-spawn-max-alive" type="number" min="1" max="1000" step="1" value="1"></label></div>
+<div class="npc-spawn-settings-grid monster-spawn-settings-grid"><label>respawn sec<input id="npc-spawn-respawn" type="number" min="0" max="86400" step="0.1" value="10"></label><label>spawn radius<input id="npc-spawn-radius" type="number" min="0" max="10000" step="0.1" value="15"></label><label>max alive<input id="npc-spawn-max-alive" type="number" min="1" max="1000" step="1" value="3"></label></div>
 <label class="spawn-enabled"><input id="npc-spawn-enabled" type="checkbox" checked><span>enabled · runtime maintains this population</span></label>
 <small id="npc-spawn-radius-hint" class="hint">radius is the random ground area around the authored point. max alive is the population cap for this record.</small>
 <div class="actions"><button id="npc-spawn-register" class="primary" type="button" disabled>register spawn</button><button id="npc-spawn-new" type="button">new spawn</button><button id="npc-spawn-delete" class="danger" type="button" disabled>delete</button></div>
@@ -495,6 +495,7 @@
 </section>
 </main>
 <div id="toast" class="toast"></div>
+<script src="publication-descriptions.js?v=1"></script>
 <script src="character-assets.js?v=17"></script>
 <script src="animation-speed.js?v=3"></script>
 <script src="timelines.js?v=2"></script>

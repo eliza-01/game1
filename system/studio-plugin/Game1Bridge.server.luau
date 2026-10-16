@@ -12,11 +12,13 @@ local Workspace = game:GetService("Workspace")
 
 local CharacterTemplate = require(script.Parent.modules.CharacterTemplate)
 local LocationCommands = require(script.Parent.modules.LocationCommands)
+local StudioMarkerVisibility = require(script.Parent.modules.StudioMarkerVisibility)
 local DecoManager = require(script.Parent.modules.DecoManager)
 local NpcSpawnPreview = require(script.Parent.modules.NpcSpawnPreview)
 local NpcSpawnPlacement = require(script.Parent.modules.NpcSpawnPlacement)
 
 local toolbar = plugin:CreateToolbar("game1")
+local markerVisibility = StudioMarkerVisibility.new(plugin, toolbar, Workspace)
 local AGENT_BASE_URL = "http://127.0.0.1:43821"
 local AGENT_URL = AGENT_BASE_URL .. "/api/agent/info"
 local AGENT_TOKEN = "Game1LocalControlV1"

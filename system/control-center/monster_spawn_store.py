@@ -196,7 +196,7 @@ class MonsterSpawnStore:
             "records": records,
             "recordCount": len(records),
             "monsters": monster_rows,
-            "defaults": {"mapKey": "main", "respawnSeconds": 10, "spawnRadius": 0, "maxAlive": 1},
+            "defaults": {"mapKey": "main", "respawnSeconds": 10, "spawnRadius": 15, "maxAlive": 3},
             "manifestPath": self.manifest_path.relative_to(self.root).as_posix(),
             "registryPath": self.registry_path.relative_to(self.root).as_posix(),
         }

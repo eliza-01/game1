@@ -33,6 +33,9 @@
       },
       "NpcSpawnPlacement": {
         "$path": "modules/NpcSpawnPlacement.luau"
+      },
+      "StudioMarkerVisibility": {
+        "$path": "modules/StudioMarkerVisibility.luau"
       }
     }
   }

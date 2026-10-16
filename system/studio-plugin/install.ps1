@@ -36,7 +36,9 @@ foreach($Marker in @(
     'Game1DecoManager_v1',
     'DecoPreviewWorld',
     'Save Assets Data',
-    'Game1DecoAssets'
+    'Game1DecoAssets',
+    'Game1AuthoringMarkers',
+    'StudioMarkerVisibility'
 )){
     if(-not $BuiltText.Contains($Marker)){
         throw "Studio bridge build is stale or incomplete; missing marker: $Marker"
@@ -55,7 +57,7 @@ $InstalledHash=(Get-FileHash $Installed -Algorithm SHA256).Hash
 if($GeneratedHash -ne $InstalledHash){throw 'Installed Studio bridge hash does not match generated bridge hash'}
 Remove-Item $Temp -Force -ErrorAction SilentlyContinue
 
-Write-Host ("Game1Bridge installed with DecoManager identity placement + Locations authoring + Attack Timeline preview: {0}" -f $Installed)
+Write-Host ("Game1Bridge installed with DecoManager + authoring-marker visibility + Locations + Attack Timeline: {0}" -f $Installed)
 Write-Host ("SHA256: {0}" -f $InstalledHash)
 Write-Host 'DecoManager places published Location Assets; Locations draw from Asset Manager / Locations; Attack Timeline opens from Asset Manager / Timelines.'
 Write-Host 'Fully close every Roblox Studio window, then reopen Studio once.'

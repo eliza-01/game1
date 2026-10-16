@@ -47,6 +47,7 @@ function decoAssetStatusTag(status) {
 }
 
 function decoAssetSyncSlug() {
+  game1SyncPublicationDescription("location-asset-publication-description", "Location Asset", $("location-asset-name").value);
   if (!decoAssetState.selected) {
     $('location-asset-slug').value = decoAssetSlugify($('location-asset-name').value);
   }
@@ -89,6 +90,7 @@ function decoAssetSetForm(row) {
     $('picked-location-asset-texture').textContent = 'PNG/JPG not selected';
   }
 
+  game1SyncPublicationDescription("location-asset-publication-description", "Location Asset", row?.name_en || "");
   decoAssetRender();
 }
 

@@ -20,12 +20,14 @@ class MonsterChaseNavigationM104(unittest.TestCase):
         cls.nav = read("MonsterChaseNavigation.luau")
         cls.attack = read("MonsterAttackExecutor.luau")
         cls.wander = read("MonsterWanderController.luau")
+        cls.lifecycle = read("MonsterAgentLifecycle.luau")
 
     def test_navigator_is_only_owner_of_general_chase_path(self):
         self.assertIn('require(script.Parent:WaitForChild("MonsterChaseNavigation"))', self.ai)
-        for method in ("ClearPath", "StopNavigation", "RunSpeedStuds", "NavigateTo"):
+        for method in ("StopNavigation", "RunSpeedStuds", "NavigateTo"):
             self.assertIn(f"Navigation.{method}", self.ai)
-        self.assertIn('Navigation.Initialize(agent)', self.ai)
+        self.assertIn("Navigation.ClearPath", self.lifecycle)
+        self.assertIn('Navigation.Initialize(agent)', self.lifecycle)
         for token in ('PathfindingService', 'CreatePath(', 'ComputeAsync(', 'pathBlockedConnection =',
                       'local function rebuildPath(', 'local function navigateTo('):
             self.assertNotIn(token, self.ai)
@@ -72,13 +74,13 @@ class MonsterChaseNavigationM104(unittest.TestCase):
         self.assertIn('agent.humanoid.AutoRotate = true', self.nav)
 
     def test_state_initialized_before_agent_registration(self):
-        self.assertLess(self.ai.index('Navigation.Initialize(agent)'), self.ai.index('agents[model] = agent'))
+        self.assertLess(self.lifecycle.index('Navigation.Initialize(agent)'), self.lifecycle.index('agents[model] = agent'))
         self.assertIn('agent.lastProgressPosition = agent.root.Position', self.nav)
         self.assertIn('agent.lastProgressAt = os.clock()', self.nav)
         for name in ('navigating', 'navigationMode', 'nextPathAt', 'pathWaypoints',
                      'pathBlockedConnection', 'lastProgressAt'):
             self.assertIn('agent.' + name, self.nav)
-            self.assertNotIn('            ' + name + ' = ', self.ai)
+            self.assertNotIn('            ' + name + ' = ', self.lifecycle)
 
     def test_ai_uses_exclusive_movement_ownership_during_attack(self):
         active = self.ai.split('if action == "AttackActive" then', 1)[1].split('elseif action == "BeginAttack"', 1)[0]
@@ -94,13 +96,14 @@ class MonsterChaseNavigationM104(unittest.TestCase):
 
     def test_lifecycle_cleans_up_path_and_targets(self):
         leave = self.ai.split('local function leaveCombat(', 1)[1].split('local function updateTarget(', 1)[0]
-        death = self.ai.split('GetAttributeChangedSignal("LifeState")', 1)[1].split('model.Destroying:Connect(', 1)[0]
-        destroy = self.ai.split('model.Destroying:Connect(', 1)[1].split('task.spawn(runAgent', 1)[0]
+        death = self.lifecycle.split('local function stopOnDeath(', 1)[1].split('local function registerModel(', 1)[0]
+        destroy = self.lifecycle.split('local function releaseAgent(', 1)[1].split('local function stopOnDeath(', 1)[0]
+        self.assertIn('stopNavigation(agent)', leave)
+        self.assertIn('Navigation.StopNavigation(agent)', death)
         for body in (leave, death):
-            self.assertIn('stopNavigation(agent)', body)
             self.assertIn('AttackExecutor.ClearPursuit(agent)', body)
-        self.assertIn('clearPath(agent)', destroy)
-        self.assertIn('CombatState.ClearPursuit(agent)', destroy)
+        self.assertIn('Navigation.ClearPath(agent)', destroy)
+        self.assertIn('CombatState.ClearTarget(agent)', destroy)
         self.assertIn('agent.active = false', destroy)
 
     def test_wander_and_attack_pursuit_are_not_replaced(self):

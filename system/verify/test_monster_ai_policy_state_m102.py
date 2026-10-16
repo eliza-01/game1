@@ -22,6 +22,7 @@ class MonsterAiM102Contracts(unittest.TestCase):
         cls.attack = read('MonsterAttackExecutor.luau')
         cls.presentation = read('MonsterCombatPresentation.luau')
         cls.navigation = read('MonsterChaseNavigation.luau')
+        cls.lifecycle = read('MonsterAgentLifecycle.luau')
 
     def test_service_uses_two_narrow_modules(self):
         self.assertIn('require(script.Parent:WaitForChild("MonsterTargetPolicy"))', self.ai)
@@ -92,15 +93,15 @@ class MonsterAiM102Contracts(unittest.TestCase):
         self.assertNotIn('ActorChaseNavigator', self.ai)
 
     def test_death_destruction_and_loop_end_clear_pursuit(self):
-        run_end = self.ai.split('local function runAgent(', 1)[1].split('local function bindMonster(', 1)[0]
-        self.assertIn('CombatState.ClearPursuit(agent)', run_end)
-        death = self.ai.split('GetAttributeChangedSignal("LifeState")', 1)[1].split('model.Destroying:Connect(', 1)[0]
-        destroy = self.ai.split('model.Destroying:Connect(', 1)[1].split('task.spawn(runAgent', 1)[0]
+        run_end = self.ai.split('local function runAgent(', 1)[1].split('function MonsterAIService.Start()', 1)[0]
+        self.assertIn('Lifecycle.Release(agent)', run_end)
+        death = self.lifecycle.split('local function stopOnDeath(', 1)[1].split('local function registerModel(', 1)[0]
+        destroy = self.lifecycle.split('local function releaseAgent(', 1)[1].split('local function stopOnDeath(', 1)[0]
         self.assertIn('CombatState.ClearTarget(agent)', death)
         self.assertIn('agent.attackSerial += 1', death)
-        self.assertIn('CombatState.ClearPursuit(agent)', destroy)
-        self.assertIn('Facing.Stop(agent.model)', death)
-        self.assertIn('Facing.Stop(agent.model)', destroy)
+        self.assertIn('CombatState.ClearTarget(agent)', destroy)
+        self.assertIn('Facing.Stop(model)', death)
+        self.assertIn('Facing.Stop(model)', destroy)
 
     def test_modules_keep_server_ownership_boundaries(self):
         for text in (self.state, self.targets, self.attack, self.presentation):

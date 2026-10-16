@@ -1455,6 +1455,7 @@ for required in ["☑ AGGRESSIVE", "☐ PASSIVE", "AGGRO RADIUS", "ATTACK RADIUS
 
 monster_ai_m23 = (ROOT / "src/server/monster/MonsterAIService.luau").read_text(encoding="utf-8")
 monster_chase_navigation_m104 = (ROOT / "src/server/monster/MonsterChaseNavigation.luau").read_text(encoding="utf-8")
+monster_agent_lifecycle_m105 = (ROOT / "src/server/monster/MonsterAgentLifecycle.luau").read_text(encoding="utf-8")
 spawner_m23 = (ROOT / "src/server/monster/MonsterSpawnerService.luau").read_text(encoding="utf-8")
 monster_target_policy_m102 = (ROOT / "src/server/monster/MonsterTargetPolicy.luau").read_text(encoding="utf-8")
 monster_state_m102 = (ROOT / "src/server/monster/MonsterCombatState.luau").read_text(encoding="utf-8")
@@ -1468,6 +1469,18 @@ for required in ["PathfindingService:CreatePath", "path:ComputeAsync", "path.Blo
         err(f"M104 chase navigation contract missing {required}")
 if "PathfindingService" in monster_ai_m23:
     err("M104: MonsterAIService must delegate Pathfinding to MonsterChaseNavigation")
+for required in ['require(script.Parent:WaitForChild("MonsterAgentLifecycle"))', 'Lifecycle.Start(runAgent, random)', 'Lifecycle.Release(agent)']:
+    if required not in monster_ai_m23:
+        err(f"M105: MonsterAIService must delegate lifecycle: {required}")
+for required in ['pending[model] = true', 'model:GetAttributeChangedSignal("LifeState")', 'model.Destroying:Connect(',
+                 'model.AncestryChanged:Connect(', 'Navigation.Initialize(agent)', 'Presentation.Initialize(agent, runRow, random',
+                 'CombatState.ClearTarget(agent)', 'Navigation.ClearPath(agent)', 'connection:Disconnect()',
+                 'xpcall(runAgent, debug.traceback, agent)']:
+    if required not in monster_agent_lifecycle_m105:
+        err(f"M105: MonsterAgentLifecycle contract missing {required}")
+if 'if not agent.active then return end' not in monster_chase_navigation_m104:
+    err("M105: cancelled ComputeAsync must not reconnect Path.Blocked")
+
 for required in ["pursueDirectlyDuringAttack", "MonsterAttackPursuitActive", "AttackTimelineConfig.ResolveRuntime", "TargetPolicy.AttackStillConnects", "DamageService.Apply("]:
     if required not in monster_attack_m103:
         err(f"MonsterAttackExecutor contract missing {required}")

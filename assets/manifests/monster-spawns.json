@@ -2,54 +2,29 @@
   "schemaVersion": 1,
   "project": "game1",
   "records": {
-    "spawn-cbbd99fa2c2d4c71b2668f9be3f36b93": {
-      "spawnId": "spawn-cbbd99fa2c2d4c71b2668f9be3f36b93",
+    "spawn-e1edd5ddbc894a78beda150fcd162af5": {
+      "spawnId": "spawn-e1edd5ddbc894a78beda150fcd162af5",
       "monsterSlug": "gremlin",
       "mapKey": "main",
       "placeId": 0,
       "position": {
-        "x": 300.249,
-        "y": -58.0,
-        "z": -250.363
-      },
-      "yawDegrees": 177.14982682110426,
-      "respawnSeconds": 10.0,
-      "spawnRadius": 11.0,
-      "maxAlive": 1,
-      "enabled": true,
-      "createdAtUtc": "2026-10-14T08:45:56.100712Z",
-      "updatedAtUtc": "2026-10-14T08:45:56.100712Z",
-      "studioSync": {
-        "status": "synced",
-        "recordFingerprint": "5b199c889912bacd27a56d02c7c8ca67de56998831209a014e781eebf5a23cb8",
-        "placeId": 0,
-        "markerPath": "Workspace.Game1Authoring.MonsterSpawns.Gremlin_cbbd99fa",
-        "syncedAtUtc": "2026-10-14T08:45:57.142954Z"
-      }
-    },
-    "spawn-98f452f2dcd1461ba9972a2679f3aaae": {
-      "spawnId": "spawn-98f452f2dcd1461ba9972a2679f3aaae",
-      "monsterSlug": "gremlin",
-      "mapKey": "main",
-      "placeId": 0,
-      "position": {
-        "x": 455.318,
+        "x": 370.323,
         "y": -54.0,
-        "z": -289.78
+        "z": -239.236
       },
-      "yawDegrees": 198.38802228564762,
+      "yawDegrees": 25.58122885258422,
       "respawnSeconds": 10.0,
       "spawnRadius": 15.0,
       "maxAlive": 3,
       "enabled": true,
-      "createdAtUtc": "2026-10-16T09:27:46.119245Z",
-      "updatedAtUtc": "2026-10-16T09:27:46.119245Z",
+      "createdAtUtc": "2026-10-16T12:45:15.169359Z",
+      "updatedAtUtc": "2026-10-16T12:45:15.169359Z",
       "studioSync": {
         "status": "synced",
-        "recordFingerprint": "53b18a6fbe98c1c4920541aa82a7352a4da7c1a22cd2c6cb557cac0e6e2f2023",
+        "recordFingerprint": "f7493c5bb4aba1e3ad19bfa5e6d38725261004b7252e3ae2f8f1cd4bf43bff71",
         "placeId": 0,
-        "markerPath": "Workspace.Game1Authoring.MonsterSpawns.Gremlin_98f452f2",
-        "syncedAtUtc": "2026-10-16T09:27:47.156576Z"
+        "markerPath": "Workspace.Game1Authoring.MonsterSpawns.Gremlin_e1edd5dd",
+        "syncedAtUtc": "2026-10-16T12:45:16.212222Z"
       }
     }
   }

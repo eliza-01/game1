@@ -67,6 +67,8 @@ local function rebuildPath(agent: any, destination: Vector3, speed: number)
     agent.humanoid.AutoRotate = true
     local path = PathfindingService:CreatePath({AgentRadius = 1, AgentHeight = 4, AgentCanJump = false, WaypointSpacing = 3})
     local ok = pcall(function() path:ComputeAsync(agent.root.Position, destination) end)
+    -- ComputeAsync yields: a removed agent must not reconnect Path.Blocked.
+    if not agent.active then return end
     if ok and path.Status == Enum.PathStatus.Success then
         agent.path = path
         agent.pathWaypoints = path:GetWaypoints()

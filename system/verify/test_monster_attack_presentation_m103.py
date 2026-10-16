@@ -19,6 +19,7 @@ class MonsterM103Tests(unittest.TestCase):
         cls.navigation = read('MonsterChaseNavigation.luau')
         cls.target = read('MonsterTargetPolicy.luau')
         cls.state = read('MonsterCombatState.luau')
+        cls.lifecycle = read('MonsterAgentLifecycle.luau')
 
     def test_coordinator_delegates_without_owning_damage_or_presentation(self):
         self.assertIn('require(script.Parent:WaitForChild("MonsterCombatPresentation"))', self.ai)
@@ -92,14 +93,14 @@ class MonsterM103Tests(unittest.TestCase):
 
     def test_exit_and_death_cancel_late_hits_and_clear_state(self):
         leave = self.ai.split('local function leaveCombat(', 1)[1].split('local function updateTarget(', 1)[0]
-        death = self.ai.split('GetAttributeChangedSignal("LifeState")', 1)[1].split('model.Destroying:Connect(', 1)[0]
+        death = self.lifecycle.split('local function stopOnDeath(', 1)[1].split('local function registerModel(', 1)[0]
         for text in (leave, death):
             self.assertIn('agent.attackSerial += 1', text)
             self.assertIn('AttackExecutor.ClearPursuit(agent)', text)
             self.assertIn('CombatState.ClearTarget(agent)', text)
             self.assertIn('Presentation.Stop(agent)', text)
         self.assertIn('CombatState.FinishExit(agent)', leave)
-        self.assertIn('CombatState.ClearPursuit(agent)', self.ai)
+        self.assertIn('CombatState.ClearTarget(agent)', self.lifecycle)
         self.assertIn('HostilePursuitRegistry.SetTarget(agent.model, target)', self.state)
 
     def test_all_new_modules_are_narrow(self):

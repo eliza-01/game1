@@ -21,6 +21,7 @@ class MonsterAiM102Contracts(unittest.TestCase):
         cls.state = read('MonsterCombatState.luau')
         cls.attack = read('MonsterAttackExecutor.luau')
         cls.presentation = read('MonsterCombatPresentation.luau')
+        cls.navigation = read('MonsterChaseNavigation.luau')
 
     def test_service_uses_two_narrow_modules(self):
         self.assertIn('require(script.Parent:WaitForChild("MonsterTargetPolicy"))', self.ai)
@@ -85,8 +86,9 @@ class MonsterAiM102Contracts(unittest.TestCase):
         self.assertIn('navigateTo(agent, targetRoot.Position, runSpeedStuds(agent))', self.ai)
         self.assertIn('maintainAttackPursuit(agent, target, serial, movement)', self.attack)
         self.assertIn('agent.attackPursuit:Step(targetRoot, attackRadius(agent), maximumSpeed)', self.attack)
-        self.assertIn('PathfindingService:CreatePath({AgentRadius = 1, AgentHeight = 4, AgentCanJump = false, WaypointSpacing = 3})', self.ai)
-        self.assertIn('issueDirectMove(agent, destination, speed)', self.ai)
+        self.assertIn('PathfindingService:CreatePath({AgentRadius = 1, AgentHeight = 4, AgentCanJump = false, WaypointSpacing = 3})', self.navigation)
+        self.assertIn('issueDirectMove(agent, destination, speed)', self.navigation)
+        self.assertNotIn('PathfindingService', self.ai)
         self.assertNotIn('ActorChaseNavigator', self.ai)
 
     def test_death_destruction_and_loop_end_clear_pursuit(self):

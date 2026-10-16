@@ -1454,14 +1454,20 @@ for required in ["☑ AGGRESSIVE", "☐ PASSIVE", "AGGRO RADIUS", "ATTACK RADIUS
         err(f"Monster Debug client UI missing {required}")
 
 monster_ai_m23 = (ROOT / "src/server/monster/MonsterAIService.luau").read_text(encoding="utf-8")
+monster_chase_navigation_m104 = (ROOT / "src/server/monster/MonsterChaseNavigation.luau").read_text(encoding="utf-8")
 spawner_m23 = (ROOT / "src/server/monster/MonsterSpawnerService.luau").read_text(encoding="utf-8")
 monster_target_policy_m102 = (ROOT / "src/server/monster/MonsterTargetPolicy.luau").read_text(encoding="utf-8")
 monster_state_m102 = (ROOT / "src/server/monster/MonsterCombatState.luau").read_text(encoding="utf-8")
 monster_attack_m103 = (ROOT / "src/server/monster/MonsterAttackExecutor.luau").read_text(encoding="utf-8")
 monster_presentation_m103 = (ROOT / "src/server/monster/MonsterCombatPresentation.luau").read_text(encoding="utf-8")
-for required in ["PathfindingService", "CombatState.Decide", 'AttackExecutor.Begin(agent, target, AttackMovement, random)', "MonsterAttackExecutor"]:
+for required in ['require(script.Parent:WaitForChild("MonsterChaseNavigation"))', "CombatState.Decide", 'AttackExecutor.Begin(agent, target, AttackMovement, random)', "MonsterAttackExecutor"]:
     if required not in monster_ai_m23:
         err(f"RobloxLineage monster AI coordinator missing {required}")
+for required in ["PathfindingService:CreatePath", "path:ComputeAsync", "path.Blocked:Connect", "issueDirectMove(agent, destination, speed)", "MonsterChaseNavigation.Initialize"]:
+    if required not in monster_chase_navigation_m104:
+        err(f"M104 chase navigation contract missing {required}")
+if "PathfindingService" in monster_ai_m23:
+    err("M104: MonsterAIService must delegate Pathfinding to MonsterChaseNavigation")
 for required in ["pursueDirectlyDuringAttack", "MonsterAttackPursuitActive", "AttackTimelineConfig.ResolveRuntime", "TargetPolicy.AttackStillConnects", "DamageService.Apply("]:
     if required not in monster_attack_m103:
         err(f"MonsterAttackExecutor contract missing {required}")

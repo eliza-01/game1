@@ -16,6 +16,7 @@ class MonsterM103Tests(unittest.TestCase):
         cls.ai = read('MonsterAIService.luau')
         cls.presentation = read('MonsterCombatPresentation.luau')
         cls.attack = read('MonsterAttackExecutor.luau')
+        cls.navigation = read('MonsterChaseNavigation.luau')
         cls.target = read('MonsterTargetPolicy.luau')
         cls.state = read('MonsterCombatState.luau')
 
@@ -29,13 +30,15 @@ class MonsterM103Tests(unittest.TestCase):
         self.assertNotIn('task.delay(hitTime', self.ai)
         self.assertNotIn('animator:LoadAnimation(', self.ai)
 
-    def test_legacy_movement_remains_coordinator_owned(self):
+    def test_legacy_movement_is_separately_owned_without_algorithm_changes(self):
         for token in ('PathfindingService:CreatePath({AgentRadius = 1, AgentHeight = 4, AgentCanJump = false, WaypointSpacing = 3})',
                       'path:ComputeAsync(agent.root.Position, destination)',
                       'agent.humanoid:MoveTo(destination)',
-                      'local function navigateTo(',
-                      'navigateTo(agent, targetRoot.Position, runSpeedStuds(agent))'):
-            self.assertIn(token, self.ai)
+                      'local function navigateTo('):
+            self.assertIn(token, self.navigation)
+        self.assertIn('navigateTo(agent, targetRoot.Position, runSpeedStuds(agent))', self.ai)
+        self.assertIn('require(script.Parent:WaitForChild("MonsterChaseNavigation"))', self.ai)
+        self.assertNotIn('PathfindingService', self.ai)
         self.assertIn('RunSpeedStuds = runSpeedStuds', self.ai)
         self.assertIn('StopNavigation = stopNavigation', self.ai)
         self.assertNotIn('PathfindingService', self.attack)

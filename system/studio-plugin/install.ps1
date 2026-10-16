@@ -42,6 +42,11 @@ foreach($Marker in @(
     'StudioDebugPreferenceBridge',
     'StudioModelLoadCommands',
     'StudioActorSpawnCommands'
+    'StudioTimelineEditorCommands'
+    'StudioTimelineWidget'
+    'StudioTimelinePreview'
+    'StudioTimelinePoseSampler'
+    'StudioTimelineTransport'
 )){
     if(-not $BuiltText.Contains($Marker)){
         throw "Studio bridge build is stale or incomplete; missing marker: $Marker"

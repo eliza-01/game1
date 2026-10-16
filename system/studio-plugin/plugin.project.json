@@ -45,6 +45,21 @@
       },
       "StudioActorSpawnCommands": {
         "$path": "modules/StudioActorSpawnCommands.luau"
+      },
+      "StudioTimelineEditorCommands": {
+        "$path": "modules/StudioTimelineEditorCommands.luau"
+      },
+      "StudioTimelineWidget": {
+        "$path": "modules/StudioTimelineWidget.luau"
+      },
+      "StudioTimelinePreview": {
+        "$path": "modules/StudioTimelinePreview.luau"
+      },
+      "StudioTimelinePoseSampler": {
+        "$path": "modules/StudioTimelinePoseSampler.luau"
+      },
+      "StudioTimelineTransport": {
+        "$path": "modules/StudioTimelineTransport.luau"
       }
     }
   }

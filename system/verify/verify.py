@@ -1300,6 +1300,14 @@ fingerprint_path = ROOT / "system/control-center/animation_fingerprint.py"
 if fingerprint_path.exists():
     err("Studio content fingerprint checker must be removed; reimport confirmation is Open Cloud version based")
 studio_plugin_text = (ROOT / "system/studio-plugin/Game1Bridge.server.luau").read_text(encoding="utf-8")
+# M101: Timeline source is packaged as independently testable Studio modules.
+studio_plugin_text += "\n" + "\n".join(
+    (ROOT / "system/studio-plugin/modules" / (name + ".luau")).read_text(encoding="utf-8")
+    for name in (
+        "StudioTimelineEditorCommands", "StudioTimelineWidget", "StudioTimelinePreview",
+        "StudioTimelinePoseSampler", "StudioTimelineTransport",
+    )
+)
 generated_plugin_text = (ROOT / "generated/Game1Bridge.rbxmx").read_text(encoding="utf-8") if (ROOT / "generated/Game1Bridge.rbxmx").is_file() else ""
 for forbidden in ["Game1CheckAnimations", "Check Animations", "Game1CheckRobloxAssetsAnimations", "KeyframeSequenceProvider", "fingerprintKeyframeSequence", "/api/studio/animation-check"]:
     if forbidden in studio_plugin_text or forbidden in generated_plugin_text:

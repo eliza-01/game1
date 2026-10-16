@@ -88,8 +88,9 @@ class StudioBridgeDecompositionM100(unittest.TestCase):
         self.assertIn('Get-FileHash $Installed -Algorithm SHA256', installer)
         self.assertIn("'model bridge v24'", installer)
 
-    def test_timeline_and_deco_remain_owned_by_existing_modules(self):
-        self.assertIn('local function handleTimelineEditor(data: any)', MAIN)
+    def test_timeline_is_delegated_and_deco_remains_unchanged(self):
+        self.assertIn('local handleTimelineEditor = StudioTimelineEditorCommands({', MAIN)
+        self.assertIn('local function handleTimelineEditor(data: any)', (PLUGIN / "modules/StudioTimelineEditorCommands.luau").read_text(encoding="utf-8"))
         self.assertIn('local decoManager = DecoManager.new({', MAIN)
         self.assertIn('StudioMarkerVisibility.new(plugin, toolbar, Workspace)', MAIN)
 

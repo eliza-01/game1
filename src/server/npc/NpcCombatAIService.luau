@@ -9,6 +9,7 @@ local NpcRegistry = require(Shared:WaitForChild("npc"):WaitForChild("NpcRegistry
 local NpcAnimationRegistry = require(Shared:WaitForChild("npc"):WaitForChild("NpcAnimationRegistry"))
 local AnimationSpeedScaling = require(Shared:WaitForChild("animation"):WaitForChild("AnimationSpeedScaling"))
 local CharacterMovementConfig = require(Shared:WaitForChild("character"):WaitForChild("CharacterMovementConfig"))
+local NpcMovementPolicy = require(Shared:WaitForChild("npc"):WaitForChild("NpcMovementPolicy"))
 local AttackTimelineConfig = require(Shared:WaitForChild("combat"):WaitForChild("AttackTimelineConfig"))
 local WeightedAnimationChoice = require(Shared:WaitForChild("animation"):WaitForChild("WeightedAnimationChoice"))
 local DamageService = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("DamageService"))
@@ -18,6 +19,7 @@ local CombatStateService = require(script.Parent.Parent:WaitForChild("combat"):W
 local Navigator = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorChaseNavigator"))
 local Queries = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorCombatTargeting"))
 local Tracks = require(script.Parent:WaitForChild("NpcAnimationTracks"))
+local NpcCombatRecovery = require(script.Parent:WaitForChild("NpcCombatRecovery"))
 local WeaponAttackMovement = require(Shared:WaitForChild("weapon"):WaitForChild("WeaponAttackMovement"))
 local Facing = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorFacingTracker"))
 local AttackPursuit = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorAttackPursuit"))
@@ -80,20 +82,44 @@ local function clearTarget(agent: any)
     if agent.model.Parent then CombatStateService.Clear(agent.model) end
 end
 
+-- Target eliminated: retain combat stance for two seconds, WITHOUT a target.
+-- Re-engagement is allowed during recovery; no delayed callbacks can survive it.
+local function beginRecovery(agent: any)
+    stopAttack(agent)
+    agent.navigator:Stop()
+    agent.target = nil
+    agent.model:SetAttribute("NpcTargetUserId", 0)
+    agent.presentation.SetCombatMoving(false)
+    agent.presentation.SetReturnMoving(false)
+    agent.presentation.SetReturnActive(false)
+    agent.presentation.SetCombatActive(true)
+    if agent.model.Parent then CombatStateService.Activate(agent.model) end
+    agent.returnAt = agent.recovery:Begin(agent.targetKilledAt or os.clock())
+    agent.targetKilledAt = nil
+    agent.model:SetAttribute("NpcReturnAt", agent.returnAt)
+    setState(agent, "Recover")
+    pinAtRest(agent, true)
+end
+
 local function startReturn(agent: any, targetKilled: boolean)
-    -- Mark the entire return lifecycle BEFORE clearing combat. Otherwise the
-    -- InCombat change briefly reactivates idle_special during ReturnWait.
+    if targetKilled then
+        beginRecovery(agent)
+        return
+    end
+    agent.recovery:Cancel()
+    -- Mark the return lifecycle BEFORE clearing combat so idle_special stays
+    -- suppressed until the authored home pose has been restored.
     agent.presentation.SetReturnActive(true)
     clearTarget(agent)
-    -- Only killing/losing a dead target waits; a pursuit leash break returns now.
-    local halfSteps = math.max(0, math.floor(agent.returnDelaySeconds * 2 + 0.0001))
-    agent.returnAt = os.clock() + (if targetKilled then rng:NextInteger(0, halfSteps) / 2 else 0)
-    agent.model:SetAttribute("NpcReturnAt", agent.returnAt)
+    agent.returnAt = 0
+    agent.model:SetAttribute("NpcReturnAt", 0)
     setState(agent, "ReturnWait")
     pinAtRest(agent, true)
 end
 
 local function enterCombat(agent: any, target: Model)
+    agent.recovery:Cancel()
+    agent.targetKilledAt = nil
     clearTarget(agent)
     agent.returnAt = 0
     agent.target = target
@@ -127,7 +153,7 @@ local function returnHome(agent: any, now: number)
     pinAtRest(agent, false)
     setState(agent, "Return")
     agent.presentation.SetReturnMoving(true)
-    local speed = CharacterMovementConfig.RobloxSpeed(nil, agent.model:GetAttribute("RunSpeed"), "Run")
+    local speed = NpcMovementPolicy.SpeedFor(agent.model:GetAttribute("RunSpeed"), "Peace")
     agent.navigator:Chase(agent.home.Position, speed)
 end
 
@@ -236,7 +262,10 @@ local function beginAttack(agent: any, target: Model, continuing: boolean?)
                     HitEffectService.Publish(agent.model, target, target:GetAttribute("LastCritical") == true,
                         if targetRoot then targetRoot.Position else nil)
                 end
-                if killed then agent.returnAfterAttack = true end
+                if killed then
+                    agent.returnAfterAttack = true
+                    agent.targetKilledAt = os.clock() -- two seconds measured from the confirmed kill
+                end
             else
                 agent.model:SetAttribute("NpcLastAttackDamage", 0)
                 agent.model:SetAttribute("NpcAttackPhase", "Miss")
@@ -276,6 +305,14 @@ end
 
 local function tickAgent(agent: any, now: number)
     if not agent.model.Parent or agent.model:GetAttribute("LifeState") ~= "Alive" then return end
+    if agent.recovery:Pending() then
+        if agent.recovery:Ready(now) then
+            -- Exactly two seconds after target loss, clear combat and walk home.
+            startReturn(agent, false)
+        else
+            return -- combat_idle with no target; never chase a dead character
+        end
+    end
     if not agent.retaliate then
         if agent.target then startReturn(agent, false) end
         return
@@ -288,7 +325,7 @@ local function tickAgent(agent: any, now: number)
         local targetRoot = Queries.Root(target)
         if not targetRoot or not Queries.Valid(target) then
             startReturn(agent, true)
-            target = nil
+            return -- do not enter Return while the combat recovery gate is pending
         elseif Queries.Distance(agent.home.Position, targetRoot.Position) > agent.pursuitRadius then
             startReturn(agent, false)
             target = nil
@@ -313,7 +350,7 @@ local function tickAgent(agent: any, now: number)
     else
         setState(agent, "Chase")
         agent.presentation.SetCombatMoving(true)
-        local speed = CharacterMovementConfig.RobloxSpeed(nil, agent.model:GetAttribute("RunSpeed"), "Run")
+        local speed = NpcMovementPolicy.SpeedFor(agent.model:GetAttribute("RunSpeed"), "Combat")
         agent.navigator:Chase(targetRoot.Position, speed)
     end
 end
@@ -345,7 +382,6 @@ function NpcCombatAIService.Bind(model: Model, root: BasePart, presentation: any
     local retaliate = behavior.retaliateWhenAttacked == true
     local pursuitRadius = math.max(0, finite(behavior.pursuitRadiusStuds, 16))
     local attackRadius = math.max(0, finite(behavior.attackRadiusStuds, 3))
-    local returnDelaySeconds = math.clamp(finite(behavior.returnDelaySeconds, 10), 0, 600)
     local profile = (NpcAnimationRegistry.profiles or {})[tostring(model:GetAttribute("NpcSlug") or "")]
     local weaponSet = tostring(model:GetAttribute("NpcWeaponSet") or "unarmed")
     local policy = WeaponAttackMovement.Resolve(model:GetAttribute("NpcWeaponType"))
@@ -355,10 +391,10 @@ function NpcCombatAIService.Bind(model: Model, root: BasePart, presentation: any
         navigator = Navigator.new(root, humanoid), pursuit = AttackPursuit.new(root, humanoid),
         policy = policy, target = nil, state = "Idle",
         retaliate = retaliate, pursuitRadius = pursuitRadius, attackRadius = attackRadius,
-        returnDelaySeconds = returnDelaySeconds, returnAt = 0, home = home,
+        recovery = NpcCombatRecovery.new(), returnAt = 0, home = home,
         attackRows = Tracks.PublishedRows(profile, "attack", weaponSet),
         attacking = false, active = true, serial = 0, nextAttackAt = 0,
-        returnAfterAttack = false, currentAttackRow = nil, currentAttackTrack = nil,
+        returnAfterAttack = false, targetKilledAt = nil, currentAttackRow = nil, currentAttackTrack = nil,
     }
     agents[model] = agent
     model:SetAttribute("NpcAIState", "Idle")
@@ -366,17 +402,17 @@ function NpcCombatAIService.Bind(model: Model, root: BasePart, presentation: any
     model:SetAttribute("NpcAttackPhase", "")
     model:SetAttribute("NpcRetaliateWhenAttacked", retaliate)
     model:SetAttribute("NpcPursuitRadius", pursuitRadius)
-    model:SetAttribute("NpcReturnDelayMaxSeconds", returnDelaySeconds)
+    model:SetAttribute("NpcReturnDelayMaxSeconds", NpcMovementPolicy.RecoverySeconds)
     model:SetAttribute("NpcAttackRadius", attackRadius)
     model:SetAttribute("NpcAttackPursuitActive", false)
-    model:SetAttribute("NpcAttackPursuitMode", policy.locomotionMode)
+    model:SetAttribute("NpcAttackPursuitMode", NpcMovementPolicy.ModeFor("Combat"))
     model:SetAttribute("NpcAttackPursuitAnimationId", "")
     model:SetAttribute("NpcAttackPursuitPlaybackSpeed", 1)
     model:SetAttribute("NpcAttackPursuitPhase", rng:NextNumber(0, 0.999))
-    local movementSlot = string.lower(policy.locomotionMode)
+    local movementSlot = string.lower(NpcMovementPolicy.ModeFor("Combat"))
     local rows = Tracks.PublishedRows(profile, movementSlot, weaponSet)
     if #rows == 0 then
-        movementSlot = if movementSlot == "walk" then "run" else "walk"
+        movementSlot = "walk" -- published-clip fallback; not a change to combat speed
         rows = Tracks.PublishedRows(profile, movementSlot, weaponSet)
     end
     agent.pursuitChannel = movementSlot
@@ -391,6 +427,7 @@ function NpcCombatAIService.Unbind(model: Model)
     local agent = agents[model]
     if not agent then return end
     agent.active = false
+    agent.recovery:Cancel()
     agent.serial += 1
     Facing.Stop(agent.model)
     agent.pursuit:Stop()

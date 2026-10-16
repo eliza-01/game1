@@ -50,7 +50,8 @@ class AttackMovementM72Tests(unittest.TestCase):
         self.assertIn('entity:SetAttribute("NpcWeaponType", primaryType)', equip)
         self.assertIn('WeaponAttackMovement.Resolve(model:GetAttribute("NpcWeaponType"))', ai)
         self.assertIn('policy.runSpeedMultiplier', ai)
-        self.assertIn('policy.locomotionMode', ai)
+        self.assertIn('NpcMovementPolicy.ModeFor("Combat")', ai)
+        self.assertNotIn('string.lower(policy.locomotionMode)', ai) # M94: all combat locomotion uses Run
         self.assertIn('EquivalentRunSpeedForLocomotion', ai)
         self.assertIn('NpcAttackPursuitAnimationId', ai)
         self.assertIn('function WeaponAttackMovement.Resolve(', policy)

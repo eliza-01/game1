@@ -4,9 +4,11 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local DeathAnimationPolicy = require(Shared:WaitForChild("combat"):WaitForChild("DeathAnimationPolicy"))
+local NpcMovementPolicy = require(Shared:WaitForChild("npc"):WaitForChild("NpcMovementPolicy"))
 local AnimationSpeedScaling = require(Shared:WaitForChild("animation"):WaitForChild("AnimationSpeedScaling"))
 local WeaponPresentationState = require(script.Parent.Parent:WaitForChild("weapon"):WaitForChild("WeaponPresentationState"))
 local NpcIdlePresentation = require(script.Parent:WaitForChild("NpcIdlePresentation"))
+local NpcLocomotionPresentation = require(script.Parent:WaitForChild("NpcLocomotionPresentation"))
 local Tracks = require(script.Parent:WaitForChild("NpcAnimationTracks"))
 
 local NpcAnimationService = {}
@@ -35,9 +37,7 @@ function NpcAnimationService.Create(entity: Model, visual: Model, profile: any?)
     local weaponPresentation = WeaponPresentationState.new(entity)
     local idle = NpcIdlePresentation.new(entity, animator, profile, weaponSet, weaponPresentation)
     local combatIdle = Tracks.Load(animator, first("combat_idle") or first("idle"), true)
-    local runRow = first("run") or first("walk")
-    local movementChannel = if first("run") then "run" else "walk"
-    local run = Tracks.Load(animator, runRow, true)
+    local locomotion = NpcLocomotionPresentation.new(entity, animator, profile, weaponSet)
     local deathClip = Tracks.Load(animator, first("death"), false)
     local death = deathClip and deathClip.track or nil
     local attackClips: {[string]: any} = {}
@@ -54,7 +54,7 @@ function NpcAnimationService.Create(entity: Model, visual: Model, profile: any?)
 
     local function stopCombatTracks()
         Tracks.Stop(combatIdle)
-        Tracks.Stop(run)
+        locomotion:Stop()
     end
 
     local function syncState()
@@ -65,10 +65,9 @@ function NpcAnimationService.Create(entity: Model, visual: Model, profile: any?)
             Tracks.Stop(combatIdle)
             if returnMoving then
                 idle:Stop()
-                entity:SetAttribute("NpcAnimationState", "run")
-                Tracks.Play(entity, run, movementChannel)
+                locomotion:Play(NpcMovementPolicy.ModeFor("Peace"))
             else
-                Tracks.Stop(run)
+                locomotion:Stop()
                 idle:Start(false)
             end
         elseif combatActive then
@@ -76,10 +75,9 @@ function NpcAnimationService.Create(entity: Model, visual: Model, profile: any?)
             if attacking then return end
             if moving then
                 Tracks.Stop(combatIdle)
-                entity:SetAttribute("NpcAnimationState", "run")
-                Tracks.Play(entity, run, movementChannel)
+                locomotion:Play(NpcMovementPolicy.ModeFor("Combat"))
             else
-                Tracks.Stop(run)
+                locomotion:Stop()
                 entity:SetAttribute("NpcAnimationState", "combat_idle")
                 Tracks.Play(entity, combatIdle, "combat_idle")
             end
@@ -205,6 +203,7 @@ function NpcAnimationService.Create(entity: Model, visual: Model, profile: any?)
         idle:Destroy()
         weaponPresentation:Destroy()
         stopCombatTracks()
+        locomotion:Destroy()
         Tracks.Stop(currentAttack)
         Tracks.Stop(deathClip)
         for _, clip in pairs(attackClips) do Tracks.Stop(clip) end

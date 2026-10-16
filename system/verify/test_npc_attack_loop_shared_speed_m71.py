@@ -81,7 +81,8 @@ class NpcAttackLoopAndSharedSpeedTests(unittest.TestCase):
         self.assertNotIn('GetAttributeChangedSignal("InCombat")', presentation)
         self.assertIn('SetCombatActive(true)', ai)
         self.assertIn('SetCombatActive(false)', ai)
-        self.assertIn('if killed then agent.returnAfterAttack = true end', attack)
+        self.assertIn('agent.returnAfterAttack = true', attack)
+        self.assertIn('agent.targetKilledAt = os.clock()', attack)
         self.assertIn('if hit then', ai)
 
     def test_monster_ai_and_character_animation_controller_still_use_common_runtime(self):
@@ -91,7 +92,9 @@ class NpcAttackLoopAndSharedSpeedTests(unittest.TestCase):
         self.assertIn('AnimationSpeedScaling.ResolveForAnimation', character)
         self.assertIn('AnimationSpeedScaling.ResolveScaleForAnimation', monster)
         self.assertIn('AnimationSpeedScaling.ResolveForModel(entity, channel)', npc_tracks)
-        self.assertIn('Tracks.Play(entity, run, movementChannel)', source("src/server/npc/NpcAnimationService.luau"))
+        self.assertIn('locomotion:Play(NpcMovementPolicy.ModeFor("Peace"))', source("src/server/npc/NpcAnimationService.luau"))
+        self.assertIn('locomotion:Play(NpcMovementPolicy.ModeFor("Combat"))', source("src/server/npc/NpcAnimationService.luau"))
+        self.assertIn('Tracks.Play(self.entity, clip, channel)', source("src/server/npc/NpcLocomotionPresentation.luau"))
         self.assertIn('AttackTimelineConfig.ResolveRuntime(row.clipId, percent)', source("src/server/npc/NpcCombatAIService.luau"))
 
 

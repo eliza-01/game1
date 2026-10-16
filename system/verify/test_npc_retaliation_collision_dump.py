@@ -75,7 +75,9 @@ class M69Tests(unittest.TestCase):
         self.assertIn('DamageSignals.Event:Connect(onDamage)', ai)
         self.assertNotIn('Queries.ClosestPlayer(', ai)
         self.assertIn('Queries.Distance(agent.home.Position, root.Position) <= agent.pursuitRadius', ai)
-        self.assertIn('rng:NextInteger(0, halfSteps) / 2', ai)
+        self.assertNotIn('rng:NextInteger(0, halfSteps) / 2', ai)
+        self.assertIn('agent.recovery:Begin(agent.targetKilledAt or os.clock())', ai)
+        self.assertIn('NpcMovementPolicy.RecoverySeconds', ai)
         self.assertIn('agent.root.CFrame = agent.home', ai)
         self.assertIn('startReturn(agent, true)', ai)
 

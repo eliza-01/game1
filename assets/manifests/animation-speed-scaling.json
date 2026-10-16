@@ -82,6 +82,11 @@
   ],
   "customScaling": [
     {
+      "assetId": "116868377220889",
+      "stat": "RunSpeed",
+      "unitsPerPercent": 5.0
+    },
+    {
       "assetId": "122295588324584",
       "stat": "RunSpeed",
       "unitsPerPercent": 2.4

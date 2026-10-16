@@ -33,6 +33,10 @@ return table.freeze({
 		}),
 	}),
 	custom = table.freeze({
+		["116868377220889"] = table.freeze({
+			stat = "RunSpeed",
+			unitsPerPercent = 5.0,
+		}),
 		["122295588324584"] = table.freeze({
 			stat = "RunSpeed",
 			unitsPerPercent = 2.4,

@@ -151,6 +151,9 @@ required_runtime = [
     "src/shared/character/CharacterAnimationRegistry.luau",
     "src/shared/character/CharacterStatsConfig.luau",
     "src/shared/animation/AnimationSpeedScaling.luau",
+    "src/shared/animation/AnimationScalingFormula.luau",
+    "src/shared/animation/AnimationScalingPolicy.luau",
+    "src/shared/animation/AnimationScalingDebugOverrides.luau",
     "src/shared/animation/AnimationSpeedScalingRegistry.luau",
     "src/shared/combat/AttackConfig.luau",
     "src/shared/combat/AttackTimelineConfig.luau",
@@ -865,9 +868,19 @@ animation_scaling_store = animation_scaling_store_path.read_text(encoding="utf-8
 animation_scaling_js = animation_scaling_js_path.read_text(encoding="utf-8") if animation_scaling_js_path.is_file() else ""
 monster_assets_js_early = (ROOT / "system/control-center/static/monster-assets.js").read_text(encoding="utf-8")
 monster_animation_registry_early = (ROOT / "src/shared/monster/MonsterAnimationRegistry.luau").read_text(encoding="utf-8")
-for required in ["ResolveForModel", "ResolveDetailsForModel", "TargetForModel", "unitsPerPercent", "value / unitsPerPercent", "DebugUnitsPerPercentAttribute", "authoredUnitsPerPercent", "debugUnitsPerPercent"]:
+for required in ["ResolveForModel", "ResolveDetailsForModel", "TargetForModel", "unitsPerPercent", "Formula.DetailsPercent", "DebugUnitsPerPercentAttribute", "authoredUnitsPerPercent", "debugUnitsPerPercent"]:
     if required not in animation_scaling_runtime:
         err(f"animation speed scaling runtime missing {required}")
+for owner, required in {
+    "AnimationScalingFormula.luau": ["value / unitsPerPercent", "Formula.RulePercent", "Formula.DetailsPercent"],
+    "AnimationScalingPolicy.luau": ["Registry.custom", 'return "monster"', 'return "humanoid", "all"'],
+    "AnimationScalingDebugOverrides.luau": ["Workspace:GetAttribute", "Overrides.ModelUnits", "Overrides.ClipRule"],
+}.items():
+    owner_path = ROOT / "src/shared/animation" / owner
+    owner_source = owner_path.read_text(encoding="utf-8") if owner_path.is_file() else ""
+    for fragment in required:
+        if fragment not in owner_source:
+            err(f"animation scaling component {owner} missing {fragment}")
 if "DebugOverrideAttribute" in animation_scaling_runtime or "MovementDebugAnimationSpeedPercentOverride" in animation_scaling_runtime:
     err("animation speed scaling must not support an absolute playback-percent debug override")
 for required in ['["humanoid"]', '["all"]', 'unitsPerPercent = 2.0', '["gremlin"]', 'unitsPerPercent = 0.6']:

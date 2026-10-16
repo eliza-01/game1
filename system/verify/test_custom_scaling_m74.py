@@ -59,8 +59,9 @@ class CustomScalingTests(unittest.TestCase):
         studio = (ROOT / "src/server/dev/CustomScalingDebugService.luau").read_text()
         client = (ROOT / "src/client/dev/CustomScalingDebugController.luau").read_text()
         npc = (ROOT / "src/server/npc/NpcAnimationTracks.luau").read_text()
-        for token in ("RuleForAnimation", "ResolveForAnimation", "RefreshPlaying", "Registry.custom"):
+        for token in ("RuleForAnimation", "ResolveForAnimation", "RefreshPlaying", "Policy.CustomRule"):
             self.assertIn(token, scaling)
+        self.assertIn("Registry.custom", (ROOT / "src/shared/animation/AnimationScalingPolicy.luau").read_text())
         self.assertIn("RunService:IsStudio()", studio)
         self.assertIn("GetPlayingAnimationTracks", scaling)
         self.assertIn("RunService:IsStudio()", client)

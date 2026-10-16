@@ -314,6 +314,11 @@ template_module = ROOT / "system/studio-plugin/modules/CharacterTemplate.luau"
 if not bridge.is_file() or "run_model_load_bridge" not in bridge.read_text(encoding="utf-8"):
     err("reference-style Studio model load bridge is missing")
 plugin_text = plugin.read_text(encoding="utf-8") if plugin.is_file() else ""
+# M100: model import and Studio preference contracts reside in packaged modules.
+plugin_text += "\n" + "\n".join(
+    (ROOT / "system/studio-plugin/modules" / name).read_text(encoding="utf-8")
+    for name in ("StudioModelLoadCommands.luau", "StudioActorSpawnCommands.luau", "StudioDebugPreferenceBridge.luau")
+)
 template_text = template_module.read_text(encoding="utf-8") if template_module.is_file() else ""
 for required in ["AssetService:LoadAssetAsync", "ImportedRig", "AnimationController", "Game1CharacterRig", "CharacterTemplate.EnsureCanonicalRoot"]:
     if required not in plugin_text:

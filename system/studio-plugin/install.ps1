@@ -38,7 +38,10 @@ foreach($Marker in @(
     'Save Assets Data',
     'Game1DecoAssets',
     'Game1AuthoringMarkers',
-    'StudioMarkerVisibility'
+    'StudioMarkerVisibility',
+    'StudioDebugPreferenceBridge',
+    'StudioModelLoadCommands',
+    'StudioActorSpawnCommands'
 )){
     if(-not $BuiltText.Contains($Marker)){
         throw "Studio bridge build is stale or incomplete; missing marker: $Marker"

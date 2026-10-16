@@ -45,7 +45,7 @@ class StudioBridgeInstallerContract(unittest.TestCase):
         source = PLUGIN.read_text(encoding="utf-8")
         self.assertIn('elseif data.command == "monster-spawn" then', source)
         self.assertIn('handleMonsterSpawn(data)', source)
-        self.assertIn('local function handleMonsterSpawn(', source)
+        self.assertIn('local function handleMonsterSpawn(', (PLUGIN.parent / 'modules/StudioActorSpawnCommands.luau').read_text(encoding='utf-8'))
         self.assertIn('if RunService:IsRunning() then', source)
 
 

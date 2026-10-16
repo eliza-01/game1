@@ -109,6 +109,51 @@
       "server_storage_path": "ServerStorage.weapons.dagger.newbie_dagger.model.newbie_dagger"
     },
     {
+      "slug": "newbie_sword_01",
+      "name_en": "Newbie Sword 01",
+      "name_ru": "Меч Новичка 01",
+      "weapon_type": "dagger",
+      "rarity": "common",
+      "model_source_path": "assets/source/weapons/dagger/newbie_sword_01/model/newbie_sword_01.fbx",
+      "model_prepared_path": "assets/source/weapons/dagger/newbie_sword_01/model/newbie_sword_01.fbx",
+      "model_sha256": "a66598b608e2dfff43c7fc430ae80d636a2e6f5797adb1b8aee5fadcb7ff9642",
+      "model_asset_id": "89658066107896",
+      "model_published_sha256": "a66598b608e2dfff43c7fc430ae80d636a2e6f5797adb1b8aee5fadcb7ff9642",
+      "moderation_state": "Approved",
+      "revision": 13,
+      "created_at": 1792040068.8236647,
+      "updated_at": 1792143826.5559435,
+      "published_at": 1792143826.5559435,
+      "grip_rot_x": 0.0,
+      "grip_rot_y": 0.0,
+      "grip_rot_z": 0.0,
+      "attack_radius_studs": 4.0,
+      "textures": [
+        {
+          "id": "newbie_sword_01__newbie_sword_01",
+          "weapon_slug": "newbie_sword_01",
+          "slot": "newbie_sword_01",
+          "source_path": "assets/source/weapons/sword/newbie_sword_01/textures/newbie_sword_01.png",
+          "prepared_path": "assets/source/weapons/sword/newbie_sword_01/textures/newbie_sword_01.png",
+          "sha256": "2ad6323ed05598ff5d88a1ffadb904e867f99eeaf7e2751557e8b349657626f1",
+          "asset_id": "127316574053686",
+          "published_sha256": "2ad6323ed05598ff5d88a1ffadb904e867f99eeaf7e2751557e8b349657626f1",
+          "moderation_state": "Reviewing",
+          "revision": 1,
+          "created_at": 1792040068.8236647,
+          "updated_at": 1792040095.5343783,
+          "published_at": 1792040095.5343783
+        }
+      ],
+      "stat_modifiers": {
+        "AttackSpeed": 0,
+        "Damage": 0
+      },
+      "status": "PUBLISHED",
+      "storage_type": "dagger",
+      "server_storage_path": "ServerStorage.weapons.dagger.newbie_sword_01.model.newbie_sword_01"
+    },
+    {
       "slug": "newbie_axe",
       "name_en": "Newbie Axe",
       "name_ru": "Топор Новичка",
@@ -154,40 +199,40 @@
       "server_storage_path": "ServerStorage.weapons.1hs.newbie_axe.model.newbie_axe"
     },
     {
-      "slug": "newbie_sword_01",
-      "name_en": "Newbie Sword 01",
-      "name_ru": "Меч Новичка 01",
+      "slug": "newbie_saber_01",
+      "name_en": "Newbie Saber 01",
+      "name_ru": "Сабля Новичка 01",
       "weapon_type": "sword",
       "rarity": "common",
-      "model_source_path": "assets/source/weapons/sword/newbie_sword_01/model/newbie_sword_01.fbx",
-      "model_prepared_path": "assets/source/weapons/sword/newbie_sword_01/model/newbie_sword_01.fbx",
-      "model_sha256": "151108671fe3944db24a0003aa3719cdfa74beb82e32437a13e91937219db9c9",
-      "model_asset_id": "89658066107896",
-      "model_published_sha256": "151108671fe3944db24a0003aa3719cdfa74beb82e32437a13e91937219db9c9",
+      "model_source_path": "assets/source/weapons/sword/newbie_saber_01/model/newbie_saber_01.fbx",
+      "model_prepared_path": "assets/source/weapons/sword/newbie_saber_01/model/newbie_saber_01.fbx",
+      "model_sha256": "53b72bf0866b8cc35e1699b176a16a729c86e46ac15ea72ac0cbfaa6846b9be2",
+      "model_asset_id": "133697974148732",
+      "model_published_sha256": "53b72bf0866b8cc35e1699b176a16a729c86e46ac15ea72ac0cbfaa6846b9be2",
       "moderation_state": "Approved",
-      "revision": 10,
-      "created_at": 1792040068.8236647,
-      "updated_at": 1792056799.698326,
-      "published_at": 1792056799.698326,
+      "revision": 2,
+      "created_at": 1792142980.2237952,
+      "updated_at": 1792143154.6576238,
+      "published_at": 1792143154.6576238,
       "grip_rot_x": 0.0,
       "grip_rot_y": 0.0,
       "grip_rot_z": 0.0,
-      "attack_radius_studs": 4.0,
+      "attack_radius_studs": 7.0,
       "textures": [
         {
-          "id": "newbie_sword_01__newbie_sword_01",
-          "weapon_slug": "newbie_sword_01",
-          "slot": "newbie_sword_01",
-          "source_path": "assets/source/weapons/sword/newbie_sword_01/textures/newbie_sword_01.png",
-          "prepared_path": "assets/source/weapons/sword/newbie_sword_01/textures/newbie_sword_01.png",
-          "sha256": "2ad6323ed05598ff5d88a1ffadb904e867f99eeaf7e2751557e8b349657626f1",
-          "asset_id": "127316574053686",
-          "published_sha256": "2ad6323ed05598ff5d88a1ffadb904e867f99eeaf7e2751557e8b349657626f1",
+          "id": "newbie_saber_01__newbie_saber_01",
+          "weapon_slug": "newbie_saber_01",
+          "slot": "newbie_saber_01",
+          "source_path": "assets/source/weapons/sword/newbie_saber_01/textures/newbie_saber_01.png",
+          "prepared_path": "assets/source/weapons/sword/newbie_saber_01/textures/newbie_saber_01.png",
+          "sha256": "7418213fbe4c769f72e3bcbeb35ee0e8909ae28b09ae959324ad210b108d9d68",
+          "asset_id": "98409980598157",
+          "published_sha256": "7418213fbe4c769f72e3bcbeb35ee0e8909ae28b09ae959324ad210b108d9d68",
           "moderation_state": "Reviewing",
           "revision": 1,
-          "created_at": 1792040068.8236647,
-          "updated_at": 1792040095.5343783,
-          "published_at": 1792040095.5343783
+          "created_at": 1792142980.2237952,
+          "updated_at": 1792142994.2438982,
+          "published_at": 1792142994.2438982
         }
       ],
       "stat_modifiers": {
@@ -196,7 +241,7 @@
       },
       "status": "PUBLISHED",
       "storage_type": "sword",
-      "server_storage_path": "ServerStorage.weapons.sword.newbie_sword_01.model.newbie_sword_01"
+      "server_storage_path": "ServerStorage.weapons.sword.newbie_saber_01.model.newbie_saber_01"
     },
     {
       "slug": "dragon_divider",
@@ -319,8 +364,8 @@
     }
   ],
   "summary": {
-    "registered": 6,
-    "published": 6,
+    "registered": 7,
+    "published": 7,
     "active": 1
   }
 }

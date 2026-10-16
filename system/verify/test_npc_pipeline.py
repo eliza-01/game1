@@ -192,7 +192,7 @@ class NpcPipelineTests(unittest.TestCase):
         self.assertIn("NpcSpawnPreview", modules)
         place_code = (plugin_root / "modules/NpcSpawnPlacement.luau").read_text(encoding="utf-8")
         preview_code = (plugin_root / "modules/NpcSpawnPreview.luau").read_text(encoding="utf-8")
-        bridge_code = (plugin_root / "Game1Bridge.server.luau").read_text(encoding="utf-8")
+        bridge_code = (plugin_root / "modules/StudioActorSpawnCommands.luau").read_text(encoding="utf-8")
         self.assertIn("mouse.Button1Down:Connect", place_code)
         self.assertIn("mouse.Button1Up:Connect", place_code)
         self.assertIn("mouse.X - initialX", place_code)

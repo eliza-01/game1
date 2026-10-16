@@ -36,6 +36,15 @@
       },
       "StudioMarkerVisibility": {
         "$path": "modules/StudioMarkerVisibility.luau"
+      },
+      "StudioDebugPreferenceBridge": {
+        "$path": "modules/StudioDebugPreferenceBridge.luau"
+      },
+      "StudioModelLoadCommands": {
+        "$path": "modules/StudioModelLoadCommands.luau"
+      },
+      "StudioActorSpawnCommands": {
+        "$path": "modules/StudioActorSpawnCommands.luau"
       }
     }
   }

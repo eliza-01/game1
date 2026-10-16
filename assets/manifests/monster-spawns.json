@@ -26,6 +26,31 @@
         "markerPath": "Workspace.Game1Authoring.MonsterSpawns.Gremlin_cbbd99fa",
         "syncedAtUtc": "2026-10-14T08:45:57.142954Z"
       }
+    },
+    "spawn-98f452f2dcd1461ba9972a2679f3aaae": {
+      "spawnId": "spawn-98f452f2dcd1461ba9972a2679f3aaae",
+      "monsterSlug": "gremlin",
+      "mapKey": "main",
+      "placeId": 0,
+      "position": {
+        "x": 455.318,
+        "y": -54.0,
+        "z": -289.78
+      },
+      "yawDegrees": 198.38802228564762,
+      "respawnSeconds": 10.0,
+      "spawnRadius": 15.0,
+      "maxAlive": 3,
+      "enabled": true,
+      "createdAtUtc": "2026-10-16T09:27:46.119245Z",
+      "updatedAtUtc": "2026-10-16T09:27:46.119245Z",
+      "studioSync": {
+        "status": "synced",
+        "recordFingerprint": "53b18a6fbe98c1c4920541aa82a7352a4da7c1a22cd2c6cb557cac0e6e2f2023",
+        "placeId": 0,
+        "markerPath": "Workspace.Game1Authoring.MonsterSpawns.Gremlin_98f452f2",
+        "syncedAtUtc": "2026-10-16T09:27:47.156576Z"
+      }
     }
   }
 }

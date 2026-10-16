@@ -17,6 +17,7 @@ class WeaponBounceAfterContactTests(unittest.TestCase):
         cls.monster = read('src/server/monster/MonsterAIService.luau')
         cls.npc = read('src/server/npc/NpcCombatAIService.luau')
         cls.collision = read('src/server/combat/WeaponEnvironmentCollision.luau')
+        cls.session = read('src/server/combat/AttackSessionStore.luau')
 
     def test_collision_query_is_unconditional_and_precedes_bounce_rule(self):
         sweep = self.attack.split('local function applyAnimatedWeaponSweep', 1)[1].split('local function clearAttackState', 1)[0]
@@ -33,7 +34,8 @@ class WeaponBounceAfterContactTests(unittest.TestCase):
 
     def test_damage_window_and_sweep_have_not_been_rewritten(self):
         self.assertIn('local damageWindow = CharacterAttackWindow.Resolve(timing)', self.attack)
-        self.assertIn('activeDamageWindows[player] = damageWindow', self.attack)
+        self.assertIn('AttackSessionStore.Begin(player, character, serial, clientAttackId, now + attackDuration, damageWindow)', self.attack)
+        self.assertIn('damageWindow = damageWindow', self.session)
         self.assertIn('WeaponAttackVolume.Build(root.Position, sampledBoxCFrame, boxSize, attackRange, weaponBoneBoxLocalPosition)', self.attack)
         self.assertIn('hitCount += applyDamageInVolume(', self.attack)
         self.assertIn('local environmentContact = WeaponEnvironmentCollision.Query(previousVolume, volume)', self.attack)

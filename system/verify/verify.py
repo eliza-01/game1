@@ -212,7 +212,7 @@ for required in [
     "CharacterAttackWindow.Resolve",
     "allowedAttackDescriptor",
     "AnimationSpeedScaling.ResolveForAnimation",
-    "activeUntil",
+    "AttackSessionStore.IsCoolingDown",
     'character:SetAttribute("AttackEndsAt"',
 ]:
     if required not in attack_text:
@@ -1590,7 +1590,7 @@ for required in [
     "animated_weapon_sweep",
     "WeaponAttackVolume.Build",
     'poseEvent.Name = "AttackWeaponPose"',
-    "weaponSweepStates",
+    "AttackSessionStore.EnsureSweep",
 ]:
     if required not in attack_service_m27:
         err(f"m27 server weapon-volume/multi-target contract missing {required}")
@@ -1614,7 +1614,7 @@ for required in [
 # one-hit-per-target deduplication. m32 narrows that sweep to the pre-Hit window.
 attack_service_m29 = (ROOT / "src/server/combat/AttackService.luau").read_text(encoding="utf-8")
 for required in [
-    "activeHitTargets",
+    "AttackSessionStore.HitTargets",
     "applyAnimatedWeaponSweep",
     "animated_weapon_sweep",
     "lastBoxCFrame",
@@ -1781,7 +1781,7 @@ attack_service_m33 = (ROOT / "src/server/combat/AttackService.luau").read_text(e
 attack_damage_m33 = (ROOT / "src/server/combat/AttackDamageResolver.luau").read_text(encoding="utf-8")
 attack_aim_m33 = (ROOT / "src/shared/combat/AttackAimGeometry.luau").read_text(encoding="utf-8")
 for required in [
-    "activeHeadshotTarget",
+    "AttackSessionStore.HeadshotTarget",
     "sampledAimOrigin",
     "sampledAimDirection",
     "lastAimOrigin",
@@ -1864,13 +1864,13 @@ for required in [
 
 attack_service_m38 = (ROOT / "src/server/combat/AttackService.luau").read_text(encoding="utf-8")
 for required in [
-    "activeDamageWindows",
+    "session.damageWindow",
     "CharacterAttackWindow.Resolve(timing)",
     'SetAttribute("AttackDamageStartsAt"',
     'SetAttribute("AttackDamageEndsAt"',
     "elapsed + 1e-4 < damageWindow.startTime",
     "elapsed > damageWindow.endTime + 1e-4",
-    "weaponSweepStates",
+    "AttackSessionStore.EnsureSweep",
 ]:
     if required not in attack_service_m38:
         err(f"m38 server HitStart/HitEnd damage gate missing {required}")
@@ -2588,15 +2588,18 @@ if weapon_bounce_controller_path.is_file():
             err(f"m50 WeaponBounceController presentation missing {required}")
 
 attack_service_text = (ROOT / "src/server/combat/AttackService.luau").read_text(encoding="utf-8")
+attack_session_text = (ROOT / "src/server/combat/AttackSessionStore.luau").read_text(encoding="utf-8")
 for required in [
     'WeaponEnvironmentCollision.Query(previousVolume, volume)',
-    'activeEnvironmentBlocked[player] = true',
-    'activeDamageWindows[player] = nil',
+    'AttackSessionStore.BlockForBounce(',
     'WeaponBounceService.Publish(player, {',
     'LastAttackBounced',
 ]:
     if required not in attack_service_text:
         err(f"m50 AttackService environment-bounce integration missing {required}")
+for required in ['session.environmentBlocked = true', 'session.damageWindow = nil', 'session.sweepState = nil']:
+    if required not in attack_session_text:
+        err(f"m50 AttackSessionStore bounce invalidation missing {required}")
 if attack_service_text.find('WeaponEnvironmentCollision.Query(previousVolume, volume)') > attack_service_text.find('hitCount += applyDamageInVolume', attack_service_text.find('local function applyAnimatedWeaponSweep')):
     err("m50 environment collision must resolve before damage in each weapon sweep substep")
 

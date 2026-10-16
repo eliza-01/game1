@@ -15,19 +15,11 @@ local CharacterAnimationRegistry = require(CharacterShared:WaitForChild("Charact
 local AttackAimGeometry = require(CombatShared:WaitForChild("AttackAimGeometry"))
 local WeaponEnvironmentCollision = require(script.Parent:WaitForChild("WeaponEnvironmentCollision"))
 local AttackDamageResolver = require(script.Parent:WaitForChild("AttackDamageResolver"))
+local AttackSessionStore = require(script.Parent:WaitForChild("AttackSessionStore"))
 local HostilePursuitRegistry = require(script.Parent:WaitForChild("HostilePursuitRegistry"))
 local WeaponBounceService = require(script.Parent:WaitForChild("WeaponBounceService"))
 
 local AttackService = {}
-local activeUntil: { [Player]: number } = {}
-local activeSerial: { [Player]: number } = {}
-local activeClientAttackId: { [Player]: number } = {}
-local weaponSweepStates: { [Player]: any } = {}
-local activeHitTargets: { [Player]: { [Model]: boolean } } = {}
-local activeDamageWindows: { [Player]: any } = {}
-local activeHeadshotTarget: { [Player]: Model } = {}
-local activeEnvironmentBlocked: { [Player]: boolean } = {}
-local suppressedBounceLogged: { [Player]: boolean } = {}
 
 local function rowsForEquippedAttack(character: Model): any
     local profileId = tostring(character:GetAttribute("AnimationProfileId") or character:GetAttribute("CharacterArchetype") or "")
@@ -83,9 +75,9 @@ local function applyDamageInVolume(
         aimOrigin = aimOrigin,
         aimDirection = aimDirection,
         attackRange = attackRange,
-        headshotTarget = activeHeadshotTarget[player],
+        headshotTarget = AttackSessionStore.HeadshotTarget(player),
     })
-    activeHeadshotTarget[player] = headshotTarget
+    AttackSessionStore.SetHeadshotTarget(player, headshotTarget)
     return hitCount
 end
 
@@ -111,10 +103,9 @@ local function applyAnimatedWeaponSweep(
 ): (number, boolean)
     local attackRange = math.clamp(tonumber(character:GetAttribute("AttackRadius")) or Config.Range, 1, Config.MaxAimDistance)
     local weaponBoneBoxLocalPosition = WeaponAttackVolume.ReadWeaponBoneBoxLocalPosition(weapon)
-    local hitTargets = activeHitTargets[player]
+    local hitTargets = AttackSessionStore.HitTargets(player, character, serial, clientAttackId)
     if not hitTargets then
-        hitTargets = {}
-        activeHitTargets[player] = hitTargets
+        return 0, false
     end
 
     local steps = 1
@@ -159,8 +150,7 @@ local function applyAnimatedWeaponSweep(
                 local pursuerCount = HostilePursuitRegistry.Count(character)
                 if character:GetAttribute("InCombat") == true or pursuerCount > 0 then
                     -- One informative line per affected attack, no Command Bar script.
-                    if Config.DebugLogs and not suppressedBounceLogged[player] then
-                        suppressedBounceLogged[player] = true
+                    if Config.DebugLogs and AttackSessionStore.FirstBounceSuppression(player) then
                         print(("[game1][weapon-bounce] suppressed player=%s combat=%s pursuers=%d")
                             :format(player.Name, tostring(character:GetAttribute("InCombat")), pursuerCount))
                     end
@@ -206,32 +196,21 @@ local function clearAttackState(
     clientAttackId: number,
     reportMiss: boolean
 ): boolean
-    if activeSerial[player] ~= serial or activeClientAttackId[player] ~= clientAttackId then
+    local finished = AttackSessionStore.Finish(player, character, serial, clientAttackId)
+    if not finished then
         return false
     end
 
     if reportMiss
         and Config.DebugLogs
-        and activeEnvironmentBlocked[player] ~= true
-        and next(activeHitTargets[player] or {}) == nil
+        and finished.environmentBlocked ~= true
+        and next(finished.hitTargets) == nil
     then
         local attackRange = math.clamp(tonumber(character:GetAttribute("AttackRadius")) or Config.Range, 1, Config.MaxAimDistance)
         print(("[game1][attack] miss player=%s range=%.1f serial=%d source=animated_weapon_sweep")
             :format(player.Name, attackRange, serial))
     end
 
-    activeUntil[player] = nil
-    activeSerial[player] = nil
-    activeClientAttackId[player] = nil
-    activeHitTargets[player] = nil
-    activeDamageWindows[player] = nil
-    activeHeadshotTarget[player] = nil
-    activeEnvironmentBlocked[player] = nil
-    suppressedBounceLogged[player] = nil
-    local sweepState = weaponSweepStates[player]
-    if sweepState and sweepState.clientAttackId == clientAttackId then
-        weaponSweepStates[player] = nil
-    end
     if character.Parent and tonumber(character:GetAttribute("AttackSerial")) == serial then
         character:SetAttribute("AttackEndsAt", nil)
         character:SetAttribute("AttackDamageStartsAt", nil)
@@ -263,16 +242,9 @@ triggerWeaponBounce = function(
     elapsed: number,
     contact: any
 ): boolean
-    if activeEnvironmentBlocked[player] == true
-        or activeSerial[player] ~= serial
-        or activeClientAttackId[player] ~= clientAttackId
-    then
+    if not AttackSessionStore.CanBounce(player, character, serial, clientAttackId) then
         return false
     end
-
-    activeEnvironmentBlocked[player] = true
-    activeDamageWindows[player] = nil
-    weaponSweepStates[player] = nil
 
     local reverseSeconds = math.max(0, elapsed) / math.max(0.1, WeaponBounceConfig.ReverseSpeedMultiplier)
     local recoverySeconds = math.max(
@@ -280,7 +252,9 @@ triggerWeaponBounce = function(
         reverseSeconds + WeaponBounceConfig.RecoverySeconds
     )
     local now = os.clock()
-    activeUntil[player] = now + recoverySeconds
+    if not AttackSessionStore.BlockForBounce(player, character, serial, clientAttackId, now + recoverySeconds) then
+        return false
+    end
     character:SetAttribute("AttackEndsAt", now + recoverySeconds)
     character:SetAttribute("AttackDamageEndsAt", now)
     character:SetAttribute("LastAttackBounced", true)
@@ -361,21 +335,13 @@ local function attack(player: Player, payload: any)
     end
 
     local now = os.clock()
-    if now < (activeUntil[player] or 0) then
+    if AttackSessionStore.IsCoolingDown(player, now) then
         return
     end
 
     local attackDuration = timing.duration
     local serial = (tonumber(character:GetAttribute("AttackSerial")) or 0) + 1
-    activeSerial[player] = serial
-    activeClientAttackId[player] = clientAttackId
-    activeUntil[player] = now + attackDuration
-    activeHitTargets[player] = {}
-    activeHeadshotTarget[player] = nil
-    activeEnvironmentBlocked[player] = false
-    suppressedBounceLogged[player] = false
-    activeDamageWindows[player] = damageWindow
-    weaponSweepStates[player] = nil
+    AttackSessionStore.Begin(player, character, serial, clientAttackId, now + attackDuration, damageWindow)
     character:SetAttribute("AttackSerial", serial)
     character:SetAttribute("AttackClipId", clipId)
     character:SetAttribute("AttackStartedAt", now)
@@ -415,9 +381,11 @@ local function recordWeaponPose(player: Player, payload: any)
     end
 
     local elapsed = math.max(0, tonumber(payload.elapsed) or 0)
-    local damageWindow = activeDamageWindows[player]
-    if activeClientAttackId[player] ~= clientAttackId
-        or activeSerial[player] == nil
+    local session = AttackSessionStore.Get(player)
+    local damageWindow = session and session.damageWindow
+    if not session
+        or session.character ~= character
+        or session.clientAttackId ~= clientAttackId
         or damageWindow == nil
         or elapsed + 1e-4 < damageWindow.startTime
         or elapsed > damageWindow.endTime + 1e-4
@@ -437,19 +405,12 @@ local function recordWeaponPose(player: Player, payload: any)
 
     local aimOrigin, aimDirection = AttackAimGeometry.Normalize(root.Position, payload.aimOrigin, payload.aimDirection)
 
-    local sweepState = weaponSweepStates[player]
-    if not sweepState or sweepState.character ~= character or sweepState.clientAttackId ~= clientAttackId then
-        sweepState = {
-            character = character,
-            clientAttackId = clientAttackId,
-        }
-        weaponSweepStates[player] = sweepState
-    end
+    local sweepState = AttackSessionStore.EnsureSweep(session)
 
     -- Accepted poses sweep continuously only inside HitStart -> HitEnd. There is
     -- no buffered terminal Hit checkpoint anymore; each accepted pose belongs to
     -- the active authored window and is resolved immediately.
-    local serial = activeSerial[player]
+    local serial = session.serial
     local lastElapsed = tonumber(sweepState.lastElapsed)
     if serial and (lastElapsed == nil or elapsed + 1e-4 >= lastElapsed) then
         local previousBoxCFrame = if typeof(sweepState.lastBoxCFrame) == "CFrame" then sweepState.lastBoxCFrame else nil
@@ -473,11 +434,8 @@ local function recordWeaponPose(player: Player, payload: any)
             aimOrigin,
             aimDirection
         )
-        if not bounced and weaponSweepStates[player] == sweepState then
-            sweepState.lastElapsed = elapsed
-            sweepState.lastBoxCFrame = payload.boxCFrame
-            sweepState.lastAimOrigin = aimOrigin
-            sweepState.lastAimDirection = aimDirection
+        if not bounced then
+            AttackSessionStore.CommitSweep(session, sweepState, elapsed, payload.boxCFrame, aimOrigin, aimDirection)
         end
     end
 end
@@ -497,17 +455,7 @@ function AttackService.Start()
     poseEvent.Parent = remotes
     poseEvent.OnServerEvent:Connect(recordWeaponPose)
 
-    Players.PlayerRemoving:Connect(function(player)
-        activeUntil[player] = nil
-        activeSerial[player] = nil
-        activeClientAttackId[player] = nil
-        activeHitTargets[player] = nil
-        activeDamageWindows[player] = nil
-        activeHeadshotTarget[player] = nil
-        activeEnvironmentBlocked[player] = nil
-        suppressedBounceLogged[player] = nil
-        weaponSweepStates[player] = nil
-    end)
+    Players.PlayerRemoving:Connect(AttackSessionStore.Forget)
 end
 
 return table.freeze(AttackService)

@@ -20,17 +20,17 @@ class CombatRefactorM97Tests(unittest.TestCase):
         cls.damage = source("src/server/combat/AttackDamageResolver.luau")
         cls.aim = source("src/shared/combat/AttackAimGeometry.luau")
         cls.shared_config = source("src/shared/combat/AttackConfig.luau")
+        cls.session = source("src/server/combat/AttackSessionStore.luau")
 
-    def test_attack_service_is_orchestrator_and_owns_session_state(self):
+    def test_attack_service_is_orchestrator_and_delegates_session_state(self):
         for token in (
             'require(CombatShared:WaitForChild("AttackAimGeometry"))',
             'require(script.Parent:WaitForChild("AttackDamageResolver"))',
             'poseEvent.Name = "AttackWeaponPose"',
             'event.Name = "AttackIntent"',
-            'activeHeadshotTarget[player] = nil',
-            'activeHitTargets[player] = {}',
-            'activeDamageWindows[player] = damageWindow',
-            'activeHeadshotTarget[player] = headshotTarget',
+            'AttackSessionStore.Begin(player, character, serial, clientAttackId, now + attackDuration, damageWindow)',
+            'AttackSessionStore.HitTargets(player, character, serial, clientAttackId)',
+            'AttackSessionStore.SetHeadshotTarget(player, headshotTarget)',
         ):
             self.assertIn(token, self.attack)
         self.assertNotIn('DamageService.Apply(', self.attack)
@@ -71,7 +71,7 @@ class CombatRefactorM97Tests(unittest.TestCase):
         self.assertIn('and aimedRegion.model == model', self.damage)
         self.assertIn('headshotTarget = model', self.damage)
         self.assertIn('return hitCount, headshotTarget', self.damage)
-        self.assertIn('headshotTarget = activeHeadshotTarget[player]', self.attack)
+        self.assertIn('headshotTarget = AttackSessionStore.HeadshotTarget(player)', self.attack)
 
     def test_hit_effects_damage_and_attributes_not_lost(self):
         for token in (
@@ -103,7 +103,8 @@ class CombatRefactorM97Tests(unittest.TestCase):
             'elapsed + 1e-4 < damageWindow.startTime',
             'elapsed > damageWindow.endTime + 1e-4',
             'Config.WeaponPoseValidationSlack',
-            'activeClientAttackId[player] ~= clientAttackId',
+            'session.clientAttackId ~= clientAttackId',
+            'session.character ~= character',
             'WeaponAttackVolume.ReadWeaponBox(weapon)',
             'WeaponAttackVolume.Build(',
             'AttackAimGeometry.Normalize(root.Position, payload.aimOrigin, payload.aimDirection)',

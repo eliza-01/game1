@@ -12,7 +12,6 @@ local MonsterAnimationRegistry = require(MonsterShared:WaitForChild("MonsterAnim
 local CombatRoot = script.Parent.Parent:WaitForChild("combat")
 local EntityHitboxService = require(CombatRoot:WaitForChild("EntityHitboxService"))
 local DeathLifecycleService = require(CombatRoot:WaitForChild("DeathLifecycleService"))
-local SpawnRegistry = require(script.Parent:WaitForChild("MonsterSpawnRegistry"))
 
 local MonsterRigBuilder = require(script.Parent:WaitForChild("MonsterRigBuilder"))
 local MonsterSpawnGeometry = require(script.Parent:WaitForChild("MonsterSpawnGeometry"))
@@ -21,19 +20,12 @@ local MonsterInitialAttributes = require(script.Parent:WaitForChild("MonsterInit
 local MonsterWanderController = require(script.Parent:WaitForChild("MonsterWanderController"))
 local MonsterDeathLifecycle = require(script.Parent:WaitForChild("MonsterDeathLifecycle"))
 local MonsterIdlePresentation = require(script.Parent:WaitForChild("MonsterIdlePresentation"))
+local MonsterPopulationController = require(script.Parent:WaitForChild("MonsterPopulationController"))
+local MonsterSpawnPresentation = require(script.Parent:WaitForChild("MonsterSpawnPresentation"))
 local MonsterSpawnerService = {}
 local started = false
 local spawnRandom = Random.new()
-local states = {}
 local monstersFolder: Folder? = nil
-
-local function finite(value: any, fallback: number): number
-    local number = tonumber(value)
-    if number == nil or number ~= number or number == math.huge or number == -math.huge then
-        return fallback
-    end
-    return number
-end
 
 local function ensureMonstersFolder(): Folder
     local existing = Workspace:FindFirstChild("Monsters")
@@ -77,6 +69,7 @@ end
 
 -- The same RNG is shared with spawn geometry and wander. Presentation consumes it
 -- only on idle loop events, preserving M90/M91 random-draw ordering.
+local population: any -- Initialized after spawnOne; release callbacks share the same population.
 local idlePresentation = MonsterIdlePresentation.new(spawnRandom)
 local wanderController = MonsterWanderController.new(spawnRandom, spawnGeometry, idlePresentation)
 
@@ -85,8 +78,11 @@ local function releaseInstance(state: any, model: Model, scheduleRespawn: boolea
     if entry == nil then
         return
     end
-    state.instances[model] = nil
+    population:UnregisterInstance(state, model)
     DeathLifecycleService.Cancel(model)
+    if entry.spawnPresentation then
+        entry.spawnPresentation:Cancel()
+    end
     wanderController:Dispose(entry)
     for _, connection in ipairs(entry.connections or {}) do
         connection:Disconnect()
@@ -105,13 +101,8 @@ local function releaseInstance(state: any, model: Model, scheduleRespawn: boolea
     if model.Parent and not externallyDestroying then
         model:Destroy()
     end
-    if scheduleRespawn and state.enabled then
-        local delaySeconds = math.max(0, finite(state.record.respawnSeconds, 10))
-        task.delay(delaySeconds, function()
-            if state.enabled then
-                state.fill()
-            end
-        end)
+    if scheduleRespawn then
+        population:ScheduleRespawn(state, entry.diedAt)
     end
 end
 
@@ -167,6 +158,8 @@ local function spawnOne(state: any): Model?
         warn("[game1][monster-spawn] monster navigation rig could not be created: " .. slug)
         return nil
     end
+    local riseFromGround = definition.behavior and definition.behavior.riseFromGround == true
+    local spawnPresentation = MonsterSpawnPresentation.Prepare(model, visual, navigationRoot, humanoid, riseFromGround)
     local hitbox = EntityHitboxService.Attach(model, visual)
     model:SetAttribute("CombatHitboxCount", hitbox.count)
 
@@ -180,7 +173,8 @@ local function spawnOne(state: any): Model?
     entry.dying = false
     entry.deathPoseHeld = false
     entry.connections = {}
-    state.instances[model] = entry
+    entry.spawnPresentation = spawnPresentation
+    population:RegisterInstance(state, model, entry)
 
     -- Presentation owns idle clip callbacks; the instance still owns/disconnects
     -- the underlying RBXScriptConnections through the M91 watch registry.
@@ -190,7 +184,11 @@ local function spawnOne(state: any): Model?
         return state.instances[model] == entry
     end)
     idlePresentation.playBaseIdle(model, entry)
-    wanderController:Start(state, model, entry)
+    spawnPresentation:Start(function()
+        if state.instances[model] == entry and not entry.dying then
+            wanderController:Start(state, model, entry)
+        end
+    end)
 
     watch(entry, model:GetAttributeChangedSignal("MonsterCombatActive"), function()
         if state.instances[model] ~= entry or entry.dying then
@@ -246,6 +244,8 @@ local function spawnOne(state: any): Model?
             return
         end
         if tostring(model:GetAttribute("LifeState") or "") == "Dying" then
+            entry.diedAt = os.clock()
+            spawnPresentation:Cancel()
             deathLifecycle:Begin(state, model, entry)
         end
     end)
@@ -258,35 +258,9 @@ local function spawnOne(state: any): Model?
     return model
 end
 
-local function stateFill(state: any)
-    if not state.enabled then
-        return
-    end
-    local target = math.max(1, math.floor(finite(state.record.maxAlive, 1)))
-    local alive = 0
-    for model in pairs(state.instances) do
-        -- Dying/DeathIdle still occupies its spawn slot until the corpse is fully
-        -- underground and released. Do not spawn a replacement on the HP=0 frame.
-        if model.Parent then
-            alive += 1
-        end
-    end
-    while alive < target do
-        local model = spawnOne(state)
-        if not model then
-            break
-        end
-        alive += 1
-    end
-end
-
-local function recordAppliesHere(record: any): boolean
-    if record.enabled == false then
-        return false
-    end
-    local placeId = math.floor(finite(record.placeId, 0))
-    return placeId == 0 or game.PlaceId == 0 or placeId == game.PlaceId
-end
+-- Population owns spawn records, live slots, maxAlive and delayed respawns.
+-- The callback is injected to keep instance construction and presentation in Spawner.
+population = MonsterPopulationController.new(spawnOne)
 
 local function removeAuthoringVisualsFromSimulation()
     local authoring = Workspace:FindFirstChild("Game1Authoring")
@@ -316,29 +290,14 @@ function MonsterSpawnerService.Start()
     -- would reach/pass AnimationTrack.Length and freezes the already-evaluated
     -- visible pose. DeathIdle must never seek into a terminal reset sample.
     RunService.PreAnimation:Connect(function(deltaTimeSim)
-        for _, state in pairs(states) do
+        for _, state in pairs(population:States()) do
             for model, entry in pairs(state.instances) do
                 deathLifecycle:Maintain(state, model, entry, deltaTimeSim)
             end
         end
     end)
 
-    local count = 0
-    for _, record in ipairs(SpawnRegistry.records or {}) do
-        if recordAppliesHere(record) then
-            local state = {
-                record = record,
-                enabled = true,
-                instances = {},
-            }
-            state.fill = function()
-                stateFill(state)
-            end
-            states[tostring(record.spawnId or count + 1)] = state
-            stateFill(state)
-            count += 1
-        end
-    end
+    local count = population:Start()
     print(("[game1][monster-spawn] %d authored spawn(s) active"):format(count))
 end
 

@@ -17,8 +17,20 @@
   },
   "weapons": [
     {
+      "slug": "newbie_dagger",
+      "nameEn": "Newbie Dagger",
+      "weaponType": "dagger",
+      "status": "PUBLISHED"
+    },
+    {
       "slug": "newbie_axe",
       "nameEn": "Newbie Axe",
+      "weaponType": "sword",
+      "status": "PUBLISHED"
+    },
+    {
+      "slug": "newbie_sword_01",
+      "nameEn": "Newbie Sword 01",
       "weaponType": "sword",
       "status": "PUBLISHED"
     },

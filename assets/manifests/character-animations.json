@@ -62,12 +62,12 @@
       "name": "1hs_combat_idle",
       "sourcePath": "assets/source/characters/human/female/human_female/animations/weapons/1hs/1hs_combat_idle.rbxm",
       "preparedPath": "assets/source/characters/human/female/human_female/animations/weapons/1hs/1hs_combat_idle.rbxm",
-      "sha256": "476549c29e358e840e1d8847c99db47c900b41d373f39ebf4aed072f0a6398d0",
-      "sourceSha256": "476549c29e358e840e1d8847c99db47c900b41d373f39ebf4aed072f0a6398d0",
+      "sha256": "910d08c04edaba07a9d5aa305209e7a8d13548ec6dcb880d284e7fa973ef5de0",
+      "sourceSha256": "910d08c04edaba07a9d5aa305209e7a8d13548ec6dcb880d284e7fa973ef5de0",
       "assetId": "78672231936532",
-      "publishedSha256": "476549c29e358e840e1d8847c99db47c900b41d373f39ebf4aed072f0a6398d0",
+      "publishedSha256": "910d08c04edaba07a9d5aa305209e7a8d13548ec6dcb880d284e7fa973ef5de0",
       "moderationState": "Approved",
-      "revision": 2,
+      "revision": 3,
       "status": "PUBLISHED"
     },
     {

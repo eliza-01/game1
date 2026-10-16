@@ -299,6 +299,8 @@
 <div class="monster-stats-grid"><label>HP<input id="monster-stat-hp" type="number" min="0" step="1" value="100"></label><label>attack<input id="monster-stat-damage" type="number" min="0" step="1" value="10"></label><label>attack speed<input id="monster-stat-attack-speed" type="number" min="0" step="1" value="100"></label><label>run speed<input id="monster-stat-run-speed" type="number" min="0" step="1" value="50"></label><label>critical chance %<input id="monster-stat-crit-chance" type="number" min="0" max="100" step="0.1" value="0"></label></div>
 <small class="hint">monster stats are absolute runtime values. critical chance is 0..100 percent.</small>
 <div class="monster-stats-grid"><label class="spawn-enabled"><input id="monster-behavior-aggressive" type="checkbox"><span>aggressive · unchecked = passive</span></label><label>aggro radius · studs<input id="monster-behavior-aggro-radius" type="number" min="0" step="0.1" value="16"></label><label>attack radius · studs<input id="monster-behavior-attack-radius" type="number" min="0" step="0.1" value="3"></label></div>
+<label class="spawn-enabled"><input id="monster-behavior-rise-from-ground" type="checkbox"><span>rise from ground when spawning</span></label>
+<small class="hint">Every spawn fades in. With this option checked, the monster also rises from below the surface. The setting belongs to the monster asset and does not require FBX republishing.</small>
 <small class="hint">behavior is authored here; Monster Debug can override these values only for the current Play session.</small>
 <hr class="card-separator">
 <span class="eyebrow">02 · source assets</span>
@@ -500,7 +502,7 @@
 <script src="deco-assets.js?v=4"></script>
 <script src="options.js?v=1"></script>
 <script src="weapon-assets.js?v=3"></script>
-<script src="monster-assets.js?v=4"></script>
+<script src="monster-assets.js?v=5"></script>
 <script src="npc-assets.js?v=2"></script>
 <script src="npc-spawns.js?v=3"></script>
 <script src="monster-spawns.js?v=1"></script>

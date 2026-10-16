@@ -76,7 +76,7 @@ class MonsterIdlePresentationM92Tests(unittest.TestCase):
         spawner, idle = read("MonsterSpawnerService"), read("MonsterIdlePresentation")
         ordered = (
             'entry.connections = {}',
-            'state.instances[model] = entry',
+            'population:RegisterInstance(state, model, entry)',
             'idlePresentation.BindIdleEvents(model, entry, function(signal, callback)',
             'idlePresentation.playBaseIdle(model, entry)',
             'wanderController:Start(state, model, entry)',
@@ -85,7 +85,7 @@ class MonsterIdlePresentationM92Tests(unittest.TestCase):
         self.assertIn('watch(entry, signal, callback)', spawner)
         self.assertIn('table.insert(entry.connections, connection)', spawner)
         self.assertIn('connection:Disconnect()', spawner)
-        self.assertLess(spawner.index('state.instances[model] = nil'), spawner.index('for _, connection in ipairs(entry.connections or {}) do'))
+        self.assertLess(spawner.index('population:UnregisterInstance(state, model)'), spawner.index('for _, connection in ipairs(entry.connections or {}) do'))
         self.assertIn('registerSignal(choice.track.Ended, function()', idle)
         self.assertIn('registerSignal(idleTrack.DidLoop, function()', idle)
         self.assertIn('if not isCurrent() or entry.dying or entry.activeIdleSpecial ~= choice then', idle)

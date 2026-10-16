@@ -485,6 +485,10 @@ local function runAgent(agent: any)
             leaveCombat(agent)
             break
         end
+        -- The rig can be temporarily anchored below terrain during spawn reveal.
+        if agent.model:GetAttribute("MonsterSpawning") == true then
+            continue
+        end
         if not aggressive(agent) then
             if agent.target or agent.model:GetAttribute("MonsterCombatActive") == true then leaveCombat(agent) end
             continue

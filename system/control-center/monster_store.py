@@ -38,6 +38,7 @@ DEFAULT_BEHAVIOR = {
     "aggressive": False,
     "aggroRadiusStuds": 16.0,
     "attackRadiusStuds": 3.0,
+    "riseFromGround": False,
 }
 NPC_DEFAULT_BEHAVIOR = {
     "retaliateWhenAttacked": False,
@@ -161,6 +162,10 @@ class MonsterStore:
                 connection.execute(
                     "ALTER TABLE monsters ADD COLUMN publication_pipeline TEXT NOT NULL DEFAULT ''"
                 )
+            if self.kind == "monster":
+                behavior_columns = {row[1] for row in connection.execute("PRAGMA table_info(monster_behavior)")}
+                if "rise_from_ground" not in behavior_columns:
+                    connection.execute("ALTER TABLE monster_behavior ADD COLUMN rise_from_ground INTEGER NOT NULL DEFAULT 0")
             if self.kind == "npc":
                 behavior_columns = {row[1] for row in connection.execute("PRAGMA table_info(monster_behavior)")}
                 if "retaliate_when_attacked" not in behavior_columns:
@@ -203,13 +208,14 @@ class MonsterStore:
             return result
         result = dict(DEFAULT_BEHAVIOR)
         row = connection.execute(
-            "SELECT aggressive,aggro_radius_studs,attack_radius_studs FROM monster_behavior WHERE monster_slug=?",
+            "SELECT aggressive,aggro_radius_studs,attack_radius_studs,rise_from_ground FROM monster_behavior WHERE monster_slug=?",
             (slug,),
         ).fetchone()
         if row:
             result["aggressive"] = bool(row["aggressive"])
             result["aggroRadiusStuds"] = float(row["aggro_radius_studs"])
             result["attackRadiusStuds"] = float(row["attack_radius_studs"])
+            result["riseFromGround"] = bool(row["rise_from_ground"])
         return result
 
     def _stats(self, connection, slug: str) -> dict[str, float]:
@@ -310,10 +316,14 @@ class MonsterStore:
             aggressive = aggressive.strip().lower() in {"1", "true", "yes", "on", "aggressive"}
         aggro_radius = float(incoming.get("aggroRadiusStuds", previous.get("aggroRadiusStuds", DEFAULT_BEHAVIOR["aggroRadiusStuds"])))
         attack_radius = float(incoming.get("attackRadiusStuds", previous.get("attackRadiusStuds", DEFAULT_BEHAVIOR["attackRadiusStuds"])))
-        if aggro_radius < 0 or attack_radius < 0:
-            raise ValueError("monster aggro/attack radii cannot be negative")
+        if not math.isfinite(aggro_radius) or not math.isfinite(attack_radius) or aggro_radius < 0 or attack_radius < 0:
+            raise ValueError("monster aggro/attack radii must be finite and nonnegative")
+        rise = incoming.get("riseFromGround", previous.get("riseFromGround", DEFAULT_BEHAVIOR["riseFromGround"]))
+        if isinstance(rise, str):
+            rise = rise.strip().lower() in {"1", "true", "yes", "on"}
         return {
             "aggressive": bool(aggressive),
+            "riseFromGround": bool(rise),
             "aggroRadiusStuds": aggro_radius,
             "attackRadiusStuds": attack_radius,
         }
@@ -390,8 +400,8 @@ class MonsterStore:
                 )
             else:
                 connection.execute(
-                    "INSERT OR REPLACE INTO monster_behavior(monster_slug,aggressive,aggro_radius_studs,attack_radius_studs) VALUES(?,?,?,?)",
-                    (slug, 1 if behavior["aggressive"] else 0, behavior["aggroRadiusStuds"], behavior["attackRadiusStuds"]),
+                    "INSERT OR REPLACE INTO monster_behavior(monster_slug,aggressive,aggro_radius_studs,attack_radius_studs,rise_from_ground) VALUES(?,?,?,?,?)",
+                    (slug, 1 if behavior["aggressive"] else 0, behavior["aggroRadiusStuds"], behavior["attackRadiusStuds"], int(behavior["riseFromGround"])),
                 )
 
             for raw in texture_paths:
@@ -576,6 +586,7 @@ class MonsterStore:
                 ] if self.kind == 'npc' else [
                     f"\t\t\t\taggressive = {str(bool(row.get('behavior', {}).get('aggressive'))).lower()},",
                     f"\t\t\t\taggroRadiusStuds = {self._lua_number(row.get('behavior', {}).get('aggroRadiusStuds', 16))},",
+                    f"\t\t\t\triseFromGround = {str(bool(row.get('behavior', {}).get('riseFromGround', False))).lower()},",
                 ]),
                 f"\t\t\t\tattackRadiusStuds = {self._lua_number(row.get('behavior', {}).get('attackRadiusStuds', 3))},",
                 "\t\t\t}),",

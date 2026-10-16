@@ -251,7 +251,34 @@ if "getAssetTemplate" not in character_service_text:
     err("published registered character fallback is missing")
 
 hitbox_text = (ROOT / "src/server/combat/EntityHitboxService.luau").read_text(encoding="utf-8")
+hitbox_geometry_text = (ROOT / "src/server/combat/HitboxMeshGeometryCache.luau").read_text(encoding="utf-8")
+hitbox_builder_text = (ROOT / "src/server/combat/HitboxDefinitionBuilder.luau").read_text(encoding="utf-8")
+hitbox_frames_text = (ROOT / "src/server/combat/HitboxRuntimeFrames.luau").read_text(encoding="utf-8")
+hitbox_queries_text = (ROOT / "src/server/combat/HitboxSpatialQueries.luau").read_text(encoding="utf-8")
+hitbox_implementation_text = "\n".join((hitbox_text, hitbox_geometry_text, hitbox_builder_text, hitbox_frames_text, hitbox_queries_text))
 head_resolver_text = (ROOT / "src/shared/combat/SkeletonHeadResolver.luau").read_text(encoding="utf-8")
+# M99: expensive mesh loading/definition, per-frame transforms and spatial
+# queries have distinct owners. Runtime coordination remains in the facade.
+for required in (
+    'HitboxMeshGeometryCache.Read(meshPart)',
+    'HitboxDefinitionBuilder.Resolve(binding)',
+    'HitboxSpatialQueries.BoxContact(binding, boxCFrame, boxSize, originPosition, frameSerial)',
+    'HitboxSpatialQueries.AimContact(binding, rayOrigin, direction, distanceLimit, frameSerial)',
+):
+    if required not in hitbox_text:
+        err(f"m99 hitbox facade missing delegation {required}")
+for forbidden in ('CreateEditableMeshAsync', 'local function obbIntersects(', 'local function buildDefinition(', 'definitionCache ='):
+    if forbidden in hitbox_text:
+        err(f"m99 facade still owns separate concern: {forbidden}")
+for module_name, module_text, required in (
+    ("geometry cache", hitbox_geometry_text, ("geometryCache", "CreateEditableMeshAsync", "GetVertexBones")),
+    ("definition builder", hitbox_builder_text, ("definitionCache", "buildDefinition", "strongestInfluence")),
+    ("frame cache", hitbox_frames_text, ("worldFrameSerial", "TransformedBoneFrame", "Refresh")),
+    ("spatial queries", hitbox_queries_text, ("obbIntersects", "rayBoxDistance", "BoxContact", "AimContact")),
+):
+    for token in required:
+        if token not in module_text:
+            err(f"m99 {module_name} missing {token}")
 for required in [
     "CreateEditableMeshAsync",
     "GetVertexBones",
@@ -263,7 +290,7 @@ for required in [
     "strongestInfluence",
     "excludedTargets",
 ]:
-    if required not in hitbox_text:
+    if required not in hitbox_implementation_text:
         err(f"precomputed combat-hitbox runtime missing {required}")
 for forbidden in [
     "triangleBoxIntersectionCentroid",
@@ -1637,7 +1664,7 @@ for required in [
 
 # m31 precomputed tight hitboxes. Mesh geometry is read only while the rig is
 # loaded; attack-time work is limited to cached bone transforms and OBB tests.
-entity_hitbox_m31 = (ROOT / "src/server/combat/EntityHitboxService.luau").read_text(encoding="utf-8")
+entity_hitbox_m31 = hitbox_implementation_text
 for required in [
     "definitionCache",
     "buildDefinition",
@@ -1762,11 +1789,11 @@ for required in [
 if "aim = target" in attack_controller_m33:
     err("m33 obsolete one-shot AttackIntent aim payload remains")
 
-entity_hitbox_m33 = (ROOT / "src/server/combat/EntityHitboxService.luau").read_text(encoding="utf-8")
+entity_hitbox_m33 = hitbox_implementation_text
 for required in [
     "rayBoxDistance",
     "raySegmentNearSphere",
-    "queryAimBinding",
+    "function HitboxSpatialQueries.AimContact(",
     "EntityHitboxService.RaycastAimRegions",
     'geometryRole = "head"',
     'geometryRole = "body"',

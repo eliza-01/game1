@@ -183,9 +183,10 @@ for required in ["CritChance", "CRITICAL_DAMAGE_MULTIPLIER = 2", "criticalRandom
 
 attack_text = (ROOT / "src/server/combat/AttackService.luau").read_text(encoding="utf-8")
 dummy_text = (ROOT / "src/server/dev/TrainingDummyService.luau").read_text(encoding="utf-8")
-if "[game1][attack] hit" not in attack_text or "[game1][attack] miss" not in attack_text:
+damage_resolver_text = (ROOT / "src/server/combat/AttackDamageResolver.luau").read_text(encoding="utf-8")
+if "[game1][attack] hit" not in damage_resolver_text or "[game1][attack] miss" not in attack_text:
     err("attack smoke-test logging contract missing")
-if "EntityHitboxService.QueryDamageablesInBox" not in attack_text:
+if "EntityHitboxService.QueryDamageablesInBox" not in damage_resolver_text:
     err("attack service must resolve melee damage through authoritative target hitboxes")
 attack_timeline_path = ROOT / "src/shared/combat/AttackTimelineConfig.luau"
 attack_timeline_text = attack_timeline_path.read_text(encoding="utf-8") if attack_timeline_path.is_file() else ""
@@ -1228,7 +1229,7 @@ for required in ["HitEffectPool", "BurstCapacity", "OnClientEvent"]:
 for required in ["ImpactSpark", "Beam", "NormalSparkCount", "CriticalSparkCount"]:
     if required not in hit_sparks:
         err(f"pooled hit sparks missing {required}")
-if "HitEffectService.Publish" not in (ROOT / "src/server/combat/AttackService.luau").read_text(encoding="utf-8"):
+if "HitEffectService.Publish" not in damage_resolver_text:
     err("confirmed melee hits do not publish hit sparks")
 
 # Every registered attack animation is required to have an authoritative timeline.
@@ -1590,11 +1591,12 @@ for required in [
     "WeaponAttackVolume.Build",
     'poseEvent.Name = "AttackWeaponPose"',
     "weaponSweepStates",
-    "hitCount += 1",
 ]:
     if required not in attack_service_m27:
         err(f"m27 server weapon-volume/multi-target contract missing {required}")
-if "local best: Model?" in attack_service_m27:
+if "hitCount += 1" not in damage_resolver_text:
+    err("m27 melee contact resolver must count each damageable target")
+if "local best: Model?" in attack_service_m27 or "local best: Model?" in damage_resolver_text:
     err("m27 melee damage must not collapse an animated weapon volume to one best target")
 
 test_loadout_m27 = (ROOT / "src/client/dev/TestLoadoutController.luau").read_text(encoding="utf-8")
@@ -1617,10 +1619,12 @@ for required in [
     "animated_weapon_sweep",
     "lastBoxCFrame",
     "previousBoxCFrame:Lerp",
-    "and (not hitTargets or hitTargets[model] ~= true)",
 ]:
     if required not in attack_service_m29:
         err(f"m29 continuous weapon-contact sweep missing {required}")
+
+if "and (not hitTargets or hitTargets[model] ~= true)" not in damage_resolver_text:
+    err("m29 one-hit-per-target damage deduplication missing")
 
 attack_config_m29 = (ROOT / "src/shared/combat/AttackConfig.luau").read_text(encoding="utf-8")
 for required in [
@@ -1659,13 +1663,14 @@ for forbidden in [
         err(f"m31 obsolete runtime hit geometry remains: {forbidden}")
 
 attack_service_m31 = (ROOT / "src/server/combat/AttackService.luau").read_text(encoding="utf-8")
+attack_damage_m31 = (ROOT / "src/server/combat/AttackDamageResolver.luau").read_text(encoding="utf-8")
 for required in [
     "HeadshotDamageMultiplier",
     'SetAttribute("LastHeadshot"',
     'SetAttribute("LastAttackHeadshot"',
     "QueryDamageablesInBox(character, boxCFrame, boxSize, hitTargets)",
 ]:
-    if required not in attack_service_m31:
+    if required not in attack_damage_m31:
         err(f"m31 combat-hitbox integration missing {required}")
 for forbidden in ["fallbackAimVolume", "unarmed_fallback"]:
     if forbidden in attack_service_m31:
@@ -1773,22 +1778,36 @@ for forbidden in ['hitZone = "head"', 'hitZone = "body"']:
         err(f"m33 weapon contact still classifies headshot directly: {forbidden}")
 
 attack_service_m33 = (ROOT / "src/server/combat/AttackService.luau").read_text(encoding="utf-8")
+attack_damage_m33 = (ROOT / "src/server/combat/AttackDamageResolver.luau").read_text(encoding="utf-8")
+attack_aim_m33 = (ROOT / "src/shared/combat/AttackAimGeometry.luau").read_text(encoding="utf-8")
 for required in [
     "activeHeadshotTarget",
-    "normalizeAimSample",
-    "buildHeadshotAimSegment",
-    "RaycastAimRegions",
-    'aimedRegion.zone == "head"',
-    "aimedRegion.model == model",
-    "damageMultiplier = if isHeadshot",
     "sampledAimOrigin",
     "sampledAimDirection",
     "lastAimOrigin",
     "lastAimDirection",
+    "AttackAimGeometry.Normalize",
+    "AttackDamageResolver.Apply",
 ]:
     if required not in attack_service_m33:
-        err(f"m33 reticle-gated headshot integration missing {required}")
-if "hit.hitZone" in attack_service_m33:
+        err(f"m33 attack-session aim orchestration missing {required}")
+for required in [
+    "function AttackAimGeometry.Normalize",
+    "function AttackAimGeometry.HeadshotSegment",
+    "function AttackAimGeometry.InterpolateDirection",
+    "HeadshotAimOriginMaxDistance",
+]:
+    if required not in attack_aim_m33:
+        err(f"m33 server aim geometry missing {required}")
+for required in [
+    "RaycastAimRegions",
+    'aimedRegion.zone == "head"',
+    "aimedRegion.model == model",
+    "damageMultiplier = if isHeadshot",
+]:
+    if required not in attack_damage_m33:
+        err(f"m33 reticle-gated damage resolution missing {required}")
+if "hit.hitZone" in attack_damage_m33:
     err("m33 headshot must not come from weapon-contact hitZone")
 
 attack_config_m33 = (ROOT / "src/shared/combat/AttackConfig.luau").read_text(encoding="utf-8")

@@ -11,10 +11,10 @@ def read(path: str) -> str:
 
 class HeadshotCharacterDeathHotfixTest(unittest.TestCase):
     def test_headshot_uses_per_hit_server_feedback_not_async_target_attributes(self):
-        attack = read("src/server/combat/AttackService.luau")
+        resolver = read("src/server/combat/AttackDamageResolver.luau")
         damage = read("src/server/combat/DamageService.luau")
         feedback = read("src/server/combat/CombatFeedbackService.luau")
-        self.assertIn("DamageService.Apply(character, model, rawDamage, isHeadshot)", attack)
+        self.assertIn("DamageService.Apply(character, model, rawDamage, isHeadshot)", resolver)
         self.assertIn("headshot: boolean?", damage)
         self.assertIn("PublishDamage(attacker, target, finalDamage, critical, headshot == true)", damage)
         self.assertIn("headshot = headshot == true", feedback)

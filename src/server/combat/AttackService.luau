@@ -12,10 +12,9 @@ local WeaponAttackVolume = require(CombatShared:WaitForChild("WeaponAttackVolume
 local WeaponBounceConfig = require(CombatShared:WaitForChild("WeaponBounceConfig"))
 local AnimationSpeedScaling = require(AnimationShared:WaitForChild("AnimationSpeedScaling"))
 local CharacterAnimationRegistry = require(CharacterShared:WaitForChild("CharacterAnimationRegistry"))
-local DamageService = require(script.Parent:WaitForChild("DamageService"))
-local HitEffectService = require(script.Parent:WaitForChild("HitEffectService"))
-local EntityHitboxService = require(script.Parent:WaitForChild("EntityHitboxService"))
+local AttackAimGeometry = require(CombatShared:WaitForChild("AttackAimGeometry"))
 local WeaponEnvironmentCollision = require(script.Parent:WaitForChild("WeaponEnvironmentCollision"))
+local AttackDamageResolver = require(script.Parent:WaitForChild("AttackDamageResolver"))
 local HostilePursuitRegistry = require(script.Parent:WaitForChild("HostilePursuitRegistry"))
 local WeaponBounceService = require(script.Parent:WaitForChild("WeaponBounceService"))
 
@@ -59,63 +58,6 @@ local function allowedAttackDescriptor(character: Model, clipId: string): any?
     return nil
 end
 
-local function finiteNumber(value: number): boolean
-    return value == value and value > -math.huge and value < math.huge
-end
-
-local function finiteVector(value: Vector3): boolean
-    return finiteNumber(value.X) and finiteNumber(value.Y) and finiteNumber(value.Z)
-end
-
-local function normalizeAimSample(rootPosition: Vector3, aimOrigin: any, aimDirection: any): (Vector3?, Vector3?)
-    if typeof(aimOrigin) ~= "Vector3"
-        or typeof(aimDirection) ~= "Vector3"
-        or not finiteVector(aimOrigin)
-        or not finiteVector(aimDirection)
-        or (aimOrigin - rootPosition).Magnitude > Config.HeadshotAimOriginMaxDistance
-    then
-        return nil, nil
-    end
-
-    local magnitude = aimDirection.Magnitude
-    if magnitude <= 1e-6 then
-        return nil, nil
-    end
-    return aimOrigin, aimDirection / magnitude
-end
-
-local function buildHeadshotAimSegment(
-    rootPosition: Vector3,
-    aimOrigin: any,
-    aimDirection: any,
-    attackRange: number
-): (Vector3?, Vector3?)
-    local origin, direction = normalizeAimSample(rootPosition, aimOrigin, aimDirection)
-    if not origin or not direction then
-        return nil, nil
-    end
-
-    -- Camera distance must not consume melee range. Keep the exact center-screen
-    -- line, but rebase its finite segment to the point on that line closest to
-    -- the attacker. The segment then extends exactly AttackRadius forward.
-    local closestAlongRay = math.max(0, (rootPosition - origin):Dot(direction))
-    return origin + direction * closestAlongRay, direction
-end
-
-local function interpolateAimDirection(previous: Vector3?, current: Vector3?, alpha: number): Vector3?
-    if typeof(current) ~= "Vector3" then
-        return nil
-    end
-    if typeof(previous) ~= "Vector3" then
-        return current
-    end
-    local blended = previous:Lerp(current, alpha)
-    if blended.Magnitude <= 1e-6 then
-        return current
-    end
-    return blended.Unit
-end
-
 local function applyDamageInVolume(
     player: Player,
     character: Model,
@@ -129,72 +71,21 @@ local function applyDamageInVolume(
     aimDirection: Vector3?,
     attackRange: number
 ): number
-    local hitCount = 0
-    local contacts = EntityHitboxService.QueryDamageablesInBox(character, boxCFrame, boxSize, hitTargets)
-
-    -- Weapon contact and headshot classification are deliberately independent.
-    -- The blade OBB decides which targets take melee damage. A finite reticle ray
-    -- only decides whether ONE of those contacts is upgraded to a headshot.
-    local aimedRegion = nil
-    if #contacts > 0 and activeHeadshotTarget[player] == nil then
-        local rayStart, rayDirection = buildHeadshotAimSegment(root.Position, aimOrigin, aimDirection, attackRange)
-        if rayStart and rayDirection then
-            aimedRegion = EntityHitboxService.RaycastAimRegions(character, rayStart, rayDirection, attackRange)
-        end
-    end
-
-    for _, target in ipairs(contacts) do
-        local model = target.model
-        local hit = target.hit or {}
-        if model
-            and model:IsA("Model")
-            and model:GetAttribute("Damageable") == true
-            and (not hitTargets or hitTargets[model] ~= true)
-        then
-            local isHeadshot = activeHeadshotTarget[player] == nil
-                and aimedRegion ~= nil
-                and aimedRegion.zone == "head"
-                and aimedRegion.model == model
-            local hitZone = if isHeadshot then "head" else "body"
-            local hitPosition = if typeof(hit.hitPosition) == "Vector3" then hit.hitPosition else root.Position
-            local hitDistance = (hitPosition - root.Position).Magnitude
-            local damageMultiplier = if isHeadshot then Config.HeadshotDamageMultiplier else 1
-            local rawDamage = (tonumber(character:GetAttribute("Damage")) or 0) * damageMultiplier
-            local finalDamage, killed = DamageService.Apply(character, model, rawDamage, isHeadshot)
-
-            model:SetAttribute("LastHitZone", hitZone)
-            model:SetAttribute("LastHeadshot", isHeadshot)
-            if isHeadshot then
-                activeHeadshotTarget[player] = model
-                character:SetAttribute("LastAttackHitZone", "head")
-                character:SetAttribute("LastAttackHeadshot", true)
-            elseif character:GetAttribute("LastAttackHitZone") == nil then
-                character:SetAttribute("LastAttackHitZone", "body")
-            end
-            if hitTargets then
-                hitTargets[model] = true
-            end
-            HitEffectService.Publish(character, model, model:GetAttribute("LastCritical") == true, hitPosition)
-            hitCount += 1
-            if Config.DebugLogs then
-                print(("[game1][attack] hit player=%s target=%s zone=%s distance=%.2f damage=%d targethp=%s killed=%s serial=%d source=%s hitbox=%s contact=%s")
-                    :format(
-                        player.Name,
-                        model.Name,
-                        hitZone,
-                        hitDistance,
-                        finalDamage,
-                        tostring(model:GetAttribute("HP")),
-                        tostring(killed),
-                        serial,
-                        sourceLabel,
-                        tostring(target.mode or "unknown"),
-                        tostring(hit.geometryRole or "unknown")
-                    ))
-            end
-        end
-    end
-
+    local hitCount, headshotTarget = AttackDamageResolver.Apply({
+        player = player,
+        character = character,
+        root = root,
+        serial = serial,
+        boxCFrame = boxCFrame,
+        boxSize = boxSize,
+        sourceLabel = sourceLabel,
+        hitTargets = hitTargets,
+        aimOrigin = aimOrigin,
+        aimDirection = aimDirection,
+        attackRange = attackRange,
+        headshotTarget = activeHeadshotTarget[player],
+    })
+    activeHeadshotTarget[player] = headshotTarget
     return hitCount
 end
 
@@ -255,7 +146,7 @@ local function applyAnimatedWeaponSweep(
         local sampledAimOrigin = if typeof(previousAimOrigin) == "Vector3" and typeof(currentAimOrigin) == "Vector3"
             then previousAimOrigin:Lerp(currentAimOrigin, alpha)
             else currentAimOrigin
-        local sampledAimDirection = interpolateAimDirection(previousAimDirection, currentAimDirection, alpha)
+        local sampledAimDirection = AttackAimGeometry.InterpolateDirection(previousAimDirection, currentAimDirection, alpha)
         local sampledElapsed = if previousElapsed ~= nil
             then previousElapsed + (currentElapsed - previousElapsed) * alpha
             else currentElapsed
@@ -544,7 +435,7 @@ local function recordWeaponPose(player: Player, payload: any)
         return
     end
 
-    local aimOrigin, aimDirection = normalizeAimSample(root.Position, payload.aimOrigin, payload.aimDirection)
+    local aimOrigin, aimDirection = AttackAimGeometry.Normalize(root.Position, payload.aimOrigin, payload.aimDirection)
 
     local sweepState = weaponSweepStates[player]
     if not sweepState or sweepState.character ~= character or sweepState.clientAttackId ~= clientAttackId then

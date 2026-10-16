@@ -1455,9 +1455,17 @@ for required in ["☑ AGGRESSIVE", "☐ PASSIVE", "AGGRO RADIUS", "ATTACK RADIUS
 
 monster_ai_m23 = (ROOT / "src/server/monster/MonsterAIService.luau").read_text(encoding="utf-8")
 spawner_m23 = (ROOT / "src/server/monster/MonsterSpawnerService.luau").read_text(encoding="utf-8")
-for required in ["Aggro", "Chase", "Attack", "pursueDirectlyDuringAttack", "attackStillConnects", "PathfindingService", "MonsterAttackPursuitActive", "AttackTimelineConfig.ResolveRuntime"]:
+monster_target_policy_m102 = (ROOT / "src/server/monster/MonsterTargetPolicy.luau").read_text(encoding="utf-8")
+monster_state_m102 = (ROOT / "src/server/monster/MonsterCombatState.luau").read_text(encoding="utf-8")
+for required in ["pursueDirectlyDuringAttack", "PathfindingService", "MonsterAttackPursuitActive", "AttackTimelineConfig.ResolveRuntime", "TargetPolicy.AttackStillConnects", "CombatState.Decide"]:
     if required not in monster_ai_m23:
         err(f"RobloxLineage monster combat AI contract missing {required}")
+for required in ['local function attackStillConnects(', 'local function acquireNearestTarget(', 'Workspace:Raycast(']:
+    if required not in monster_target_policy_m102:
+        err(f"Monster target policy contract missing {required}")
+for required in ['setState(agent, "Aggro")', 'setState(agent, "Idle")', 'HostilePursuitRegistry.SetTarget(agent.model, target)', 'HostilePursuitRegistry.Clear(agent.model)']:
+    if required not in monster_state_m102:
+        err(f"Monster state contract missing {required}")
 for required in ["MonsterAuthoredAggressive", "MonsterAuthoredAggroRadius", "MonsterAuthoredAttackRadius", "MonsterCombatActive"]:
     if required not in (spawner_m23 + monster_attributes_text):
         err(f"monster spawner behavior bridge missing {required}")

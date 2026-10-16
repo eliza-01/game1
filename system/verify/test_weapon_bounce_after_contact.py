@@ -15,6 +15,7 @@ class WeaponBounceAfterContactTests(unittest.TestCase):
         cls.attack = read('src/server/combat/AttackService.luau')
         cls.registry = read('src/server/combat/HostilePursuitRegistry.luau')
         cls.monster = read('src/server/monster/MonsterAIService.luau')
+        cls.monster_state = read('src/server/monster/MonsterCombatState.luau')
         cls.npc = read('src/server/npc/NpcCombatAIService.luau')
         cls.collision = read('src/server/combat/WeaponEnvironmentCollision.luau')
         cls.session = read('src/server/combat/AttackSessionStore.luau')
@@ -50,9 +51,13 @@ class WeaponBounceAfterContactTests(unittest.TestCase):
         self.assertIn('function HostilePursuitRegistry.Count(character: Model): number', self.registry)
 
     def test_monster_npc_publish_target_transitions(self):
-        self.assertIn('HostilePursuitRegistry.SetTarget(agent.model, target)', self.monster)
+        self.assertIn('HostilePursuitRegistry.SetTarget(agent.model, target)', self.monster_state)
+        self.assertIn('CombatState.Enter(agent, target)', self.monster)
         self.assertIn('HostilePursuitRegistry.SetTarget(agent.model, target)', self.npc)
-        self.assertGreaterEqual(self.monster.count('HostilePursuitRegistry.Clear('), 4)
+        self.assertIn('HostilePursuitRegistry.Clear(agent.model)', self.monster_state)
+        self.assertGreaterEqual(self.monster.count('CombatState.ClearTarget(agent)'), 2)
+        self.assertGreaterEqual(self.monster.count('CombatState.ClearPursuit(agent)'), 2)
+        self.assertIn('CombatState.FinishExit(agent)', self.monster)
         self.assertGreaterEqual(self.npc.count('HostilePursuitRegistry.Clear('), 3)
 
     def test_environment_detection_implementation_unchanged(self):

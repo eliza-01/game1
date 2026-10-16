@@ -3,7 +3,6 @@
 -- a target that leaves weapon range is pursued directly without cancelling the
 -- attack; the live target position is validated again on the Hit timeline event.
 local PathfindingService = game:GetService("PathfindingService")
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
@@ -18,10 +17,11 @@ local AttackTimelineConfig = require(CombatShared:WaitForChild("AttackTimelineCo
 local CharacterMovementConfig = require(CharacterShared:WaitForChild("CharacterMovementConfig"))
 local AnimationSpeedScaling = require(AnimationShared:WaitForChild("AnimationSpeedScaling"))
 local DamageService = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("DamageService"))
-local HostilePursuitRegistry = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("HostilePursuitRegistry"))
 local HitEffectService = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("HitEffectService"))
 local Facing = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorFacingTracker"))
 local AttackPursuit = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorAttackPursuit"))
+local TargetPolicy = require(script.Parent:WaitForChild("MonsterTargetPolicy"))
+local CombatState = require(script.Parent:WaitForChild("MonsterCombatState"))
 
 local MonsterAIService = {}
 local started = false
@@ -38,8 +38,6 @@ local STUCK_PROGRESS_STUDS = 0.35
 local WAYPOINT_TOLERANCE = 1.25
 local ATTACK_PURSUIT_SPEED_MULTIPLIER = 1.65
 local ATTACK_PURSUIT_PLAYBACK_EPSILON = 0.02
-local ATTACK_ARC_DEGREES = 110
-local VERTICAL_TOLERANCE = 5
 
 local function finite(value: any, fallback: number): number
     local n = tonumber(value)
@@ -47,32 +45,13 @@ local function finite(value: any, fallback: number): number
     return n
 end
 
-local function horizontalDelta(left: Vector3, right: Vector3): Vector3
-    return Vector3.new(right.X - left.X, 0, right.Z - left.Z)
-end
-
-local function horizontalDistance(left: Vector3, right: Vector3): number
-    return horizontalDelta(left, right).Magnitude
-end
-
-local function rootOf(model: Model?): BasePart?
-    if not model then return nil end
-    local root = model:FindFirstChild("RootCollider") or model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
-    return if root and root:IsA("BasePart") then root else nil
-end
-
-local function navigationRootOf(model: Model): BasePart?
-    local root = model:FindFirstChild("HumanoidRootPart")
-    return if root and root:IsA("BasePart") then root else rootOf(model)
-end
-
-local function targetIsValid(target: Model?): boolean
-    return target ~= nil
-        and target.Parent ~= nil
-        and target:GetAttribute("Damageable") == true
-        and tostring(target:GetAttribute("LifeState") or "") == "Alive"
-        and rootOf(target) ~= nil
-end
+local rootOf = TargetPolicy.RootOf
+local navigationRootOf = TargetPolicy.NavigationRootOf
+local targetIsValid = TargetPolicy.IsValid
+local horizontalDelta = TargetPolicy.HorizontalDelta
+local horizontalDistance = TargetPolicy.HorizontalDistance
+local aggressive = TargetPolicy.IsAggressive
+local attackRadius = TargetPolicy.AttackRadius
 
 local function publishedRows(slug: string, slot: string): {any}
     local profile = MonsterAnimationRegistry.profiles and MonsterAnimationRegistry.profiles[slug]
@@ -170,11 +149,7 @@ local function playRun(agent: any, pursuitMultiplier: number?)
     agent.model:SetAttribute("MonsterAnimationState", "run")
 end
 
-local function setState(agent: any, state: string)
-    if agent.state == state then return end
-    agent.state = state
-    agent.model:SetAttribute("MonsterAIState", state)
-end
+local setState = CombatState.SetState
 
 local function clearPath(agent: any)
     if agent.pathBlockedConnection then agent.pathBlockedConnection:Disconnect(); agent.pathBlockedConnection = nil end
@@ -266,58 +241,10 @@ local function navigateTo(agent: any, destination: Vector3, speed: number)
     end
 end
 
-local function hasLineOfSight(agent: any, target: Model): boolean
-    local targetRoot = rootOf(target)
-    if not targetRoot then return false end
-    local origin = agent.root.Position + Vector3.new(0, 1, 0)
-    local destination = targetRoot.Position + Vector3.new(0, 0.6, 0)
-    local params = RaycastParams.new()
-    params.FilterType = Enum.RaycastFilterType.Exclude
-    params.FilterDescendantsInstances = {agent.model}
-    params.IgnoreWater = false
-    params.RespectCanCollide = false
-    local result = Workspace:Raycast(origin, destination - origin, params)
-    return result == nil or result.Instance:IsDescendantOf(target)
-end
-
 local function faceDirection(agent: any, direction: Vector3)
     local flat = Vector3.new(direction.X, 0, direction.Z)
     if flat.Magnitude <= 0.001 then return end
     agent.facing = flat.Unit
-end
-
-local function aggressive(agent: any): boolean
-    return agent.model:GetAttribute("MonsterAggressive") == true
-end
-local function aggroRadius(agent: any): number
-    return math.max(0, finite(agent.model:GetAttribute("MonsterAggroRadius"), 16))
-end
-local function attackRadius(agent: any): number
-    return math.max(0, finite(agent.model:GetAttribute("MonsterAttackRadius"), 3))
-end
-
-local function acquireNearestTarget(agent: any): Model?
-    local closest: Model? = nil
-    local closestDistance = aggroRadius(agent)
-    for _, player in ipairs(Players:GetPlayers()) do
-        local character = player.Character
-        local targetRoot = rootOf(character)
-        if targetIsValid(character) and targetRoot then
-            local distance = horizontalDistance(agent.root.Position, targetRoot.Position)
-            if distance <= closestDistance then closestDistance = distance; closest = character end
-        end
-    end
-    return closest
-end
-
-local function enterCombat(agent: any, target: Model)
-    agent.target = target
-    HostilePursuitRegistry.SetTarget(agent.model, target)
-    agent.model:SetAttribute("MonsterCombatActive", true)
-    agent.model:SetAttribute("MonsterTargetName", target.Name)
-    local player = Players:GetPlayerFromCharacter(target)
-    agent.model:SetAttribute("MonsterTargetUserId", player and player.UserId or 0)
-    setState(agent, "Aggro")
 end
 
 local function clearAttackPursuit(agent: any)
@@ -342,18 +269,13 @@ end
 
 local function leaveCombat(agent: any)
     Facing.Stop(agent.model)
-    agent.target = nil
-    HostilePursuitRegistry.Clear(agent.model)
+    CombatState.ClearTarget(agent)
     agent.attacking = false
     agent.attackSerial += 1
     clearAttackPursuit(agent)
     stopNavigation(agent)
     stopPresentation(agent)
-    agent.model:SetAttribute("MonsterTargetName", "")
-    agent.model:SetAttribute("MonsterTargetUserId", 0)
-    agent.model:SetAttribute("MonsterCombatActive", false)
-    agent.model:SetAttribute("MonsterAttackPhase", "")
-    setState(agent, "Idle")
+    CombatState.FinishExit(agent)
 end
 
 local function pursueDirectlyDuringAttack(agent: any, targetRoot: BasePart): boolean
@@ -389,17 +311,6 @@ local function maintainAttackPursuit(agent: any, target: Model, serial: number)
             RunService.Heartbeat:Wait()
         end
     end)
-end
-
-local function attackStillConnects(agent: any, target: Model): boolean
-    local targetRoot = rootOf(target)
-    if not targetIsValid(target) or not targetRoot then return false end
-    local delta = horizontalDelta(agent.root.Position, targetRoot.Position)
-    if delta.Magnitude > attackRadius(agent) or math.abs(targetRoot.Position.Y - agent.root.Position.Y) > VERTICAL_TOLERANCE then return false end
-    if delta.Magnitude > 0.001 then
-        if agent.root.CFrame.LookVector:Dot(delta.Unit) < math.cos(math.rad(ATTACK_ARC_DEGREES * 0.5)) then return false end
-    end
-    return hasLineOfSight(agent, target)
 end
 
 local function beginAttack(agent: any, target: Model)
@@ -444,7 +355,7 @@ local function beginAttack(agent: any, target: Model)
             if flatDirection.Magnitude > 0.001 then agent.facing = flatDirection.Unit end
             -- Do not snap yaw on Hit: shared tracker already follows the target.
         end
-        if attackStillConnects(agent, target) then
+        if TargetPolicy.AttackStillConnects(agent, target) then
             local damage, killed = DamageService.Apply(agent.model, target, finite(agent.model:GetAttribute("Damage"), 0))
             HitEffectService.Publish(agent.model, target, target:GetAttribute("LastCritical") == true, rootOf(target) and rootOf(target).Position or nil)
             agent.model:SetAttribute("LastMonsterAttackDamage", damage)
@@ -476,8 +387,8 @@ local function updateTarget(agent: any, now: number)
     if agent.target then leaveCombat(agent) end
     if not aggressive(agent) or now < agent.nextTargetScanAt then return end
     agent.nextTargetScanAt = now + TARGET_SCAN_INTERVAL
-    local target = acquireNearestTarget(agent)
-    if target then enterCombat(agent, target) end
+    local target = TargetPolicy.AcquireNearestTarget(agent)
+    if target then CombatState.Enter(agent, target) end
 end
 
 local function runAgent(agent: any)
@@ -500,29 +411,28 @@ local function runAgent(agent: any)
         updateTarget(agent, now)
         local target = agent.target
         local targetRoot = rootOf(target)
-        if target and targetRoot then
-            local distance = horizontalDistance(agent.root.Position, targetRoot.Position)
-            if agent.attacking then
-                -- Active-attack movement is owned by maintainAttackPursuit().
-                -- The slower AI decision loop must not issue competing MoveTo calls.
-                setState(agent, "Attack")
-            elseif distance <= attackRadius(agent) then
-                stopNavigation(agent)
-                faceDirection(agent, targetRoot.Position - agent.root.Position)
-                playCombatIdle(agent)
-                beginAttack(agent, target)
-            else
-                setState(agent, "Chase")
-                clearAttackPursuit(agent)
-                playRun(agent)
-                navigateTo(agent, targetRoot.Position, runSpeedStuds(agent))
-            end
+        local distance = if targetRoot then horizontalDistance(agent.root.Position, targetRoot.Position) else 0
+        local action = CombatState.Decide(agent.attacking, targetRoot ~= nil, distance, attackRadius(agent))
+        if action == "AttackActive" then
+            -- Active-attack movement is owned by maintainAttackPursuit().
+            -- The slower AI decision loop must not issue competing MoveTo calls.
+            setState(agent, "Attack")
+        elseif action == "BeginAttack" then
+            stopNavigation(agent)
+            faceDirection(agent, targetRoot.Position - agent.root.Position)
+            playCombatIdle(agent)
+            beginAttack(agent, target)
+        elseif action == "Chase" then
+            setState(agent, "Chase")
+            clearAttackPursuit(agent)
+            playRun(agent)
+            navigateTo(agent, targetRoot.Position, runSpeedStuds(agent))
         elseif agent.model:GetAttribute("MonsterCombatActive") == true then
             leaveCombat(agent)
         end
     end
     agent.active = false
-    HostilePursuitRegistry.Clear(agent.model)
+    CombatState.ClearPursuit(agent)
 end
 
 local function bindMonster(model: Model)
@@ -589,8 +499,7 @@ local function bindMonster(model: Model)
                 agent.attackSerial += 1
                 Facing.Stop(agent.model)
                 agent.attacking = false
-                agent.target = nil
-                HostilePursuitRegistry.Clear(model)
+                CombatState.ClearTarget(agent)
                 clearAttackPursuit(agent)
                 stopNavigation(agent)
                 stopPresentation(agent)
@@ -600,7 +509,7 @@ local function bindMonster(model: Model)
         model.Destroying:Connect(function()
             if agents[model] == agent then
                 agent.active = false
-                HostilePursuitRegistry.Clear(model)
+                CombatState.ClearPursuit(agent)
                 Facing.Stop(agent.model)
                 clearPath(agent)
                 agents[model] = nil

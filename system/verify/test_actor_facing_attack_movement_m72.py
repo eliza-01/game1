@@ -28,7 +28,8 @@ class AttackMovementM72Tests(unittest.TestCase):
         self.assertIn('Facing.Stop(agent.model)', monster)
         self.assertIn('Facing.Stop(agent.model)', npc)
         self.assertNotIn('agent.root.CFrame = CFrame.lookAt', npc)
-        self.assertIn('agent.root.CFrame.LookVector:Dot', monster)
+        self.assertIn('TargetPolicy.AttackStillConnects(agent, target)', monster)
+        self.assertIn('agent.root.CFrame.LookVector:Dot', read('src/server/monster/MonsterTargetPolicy.luau'))
 
     def test_attack_chase_keeps_hit_animation_owner(self):
         npc = read('src/server/npc/NpcCombatAIService.luau')

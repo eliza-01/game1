@@ -18,6 +18,7 @@ local AttackTimelineConfig = require(CombatShared:WaitForChild("AttackTimelineCo
 local CharacterMovementConfig = require(CharacterShared:WaitForChild("CharacterMovementConfig"))
 local AnimationSpeedScaling = require(AnimationShared:WaitForChild("AnimationSpeedScaling"))
 local DamageService = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("DamageService"))
+local HostilePursuitRegistry = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("HostilePursuitRegistry"))
 local HitEffectService = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("HitEffectService"))
 local Facing = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorFacingTracker"))
 local AttackPursuit = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorAttackPursuit"))
@@ -311,6 +312,7 @@ end
 
 local function enterCombat(agent: any, target: Model)
     agent.target = target
+    HostilePursuitRegistry.SetTarget(agent.model, target)
     agent.model:SetAttribute("MonsterCombatActive", true)
     agent.model:SetAttribute("MonsterTargetName", target.Name)
     local player = Players:GetPlayerFromCharacter(target)
@@ -341,6 +343,7 @@ end
 local function leaveCombat(agent: any)
     Facing.Stop(agent.model)
     agent.target = nil
+    HostilePursuitRegistry.Clear(agent.model)
     agent.attacking = false
     agent.attackSerial += 1
     clearAttackPursuit(agent)
@@ -519,6 +522,7 @@ local function runAgent(agent: any)
         end
     end
     agent.active = false
+    HostilePursuitRegistry.Clear(agent.model)
 end
 
 local function bindMonster(model: Model)
@@ -586,6 +590,7 @@ local function bindMonster(model: Model)
                 Facing.Stop(agent.model)
                 agent.attacking = false
                 agent.target = nil
+                HostilePursuitRegistry.Clear(model)
                 clearAttackPursuit(agent)
                 stopNavigation(agent)
                 stopPresentation(agent)
@@ -595,6 +600,7 @@ local function bindMonster(model: Model)
         model.Destroying:Connect(function()
             if agents[model] == agent then
                 agent.active = false
+                HostilePursuitRegistry.Clear(model)
                 Facing.Stop(agent.model)
                 clearPath(agent)
                 agents[model] = nil

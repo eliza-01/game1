@@ -16,6 +16,7 @@ local DamageService = require(script.Parent.Parent:WaitForChild("combat"):WaitFo
 local DamageSignals = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("ActorDamageSignals"))
 local HitEffectService = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("HitEffectService"))
 local CombatStateService = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("CombatStateService"))
+local HostilePursuitRegistry = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("HostilePursuitRegistry"))
 local Navigator = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorChaseNavigator"))
 local Queries = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorCombatTargeting"))
 local Tracks = require(script.Parent:WaitForChild("NpcAnimationTracks"))
@@ -78,6 +79,7 @@ local function clearTarget(agent: any)
     agent.presentation.SetReturnMoving(false)
     agent.presentation.SetCombatActive(false)
     agent.target = nil
+    HostilePursuitRegistry.Clear(agent.model)
     agent.model:SetAttribute("NpcTargetUserId", 0)
     if agent.model.Parent then CombatStateService.Clear(agent.model) end
 end
@@ -88,6 +90,7 @@ local function beginRecovery(agent: any)
     stopAttack(agent)
     agent.navigator:Stop()
     agent.target = nil
+    HostilePursuitRegistry.Clear(agent.model)
     agent.model:SetAttribute("NpcTargetUserId", 0)
     agent.presentation.SetCombatMoving(false)
     agent.presentation.SetReturnMoving(false)
@@ -123,6 +126,7 @@ local function enterCombat(agent: any, target: Model)
     clearTarget(agent)
     agent.returnAt = 0
     agent.target = target
+    HostilePursuitRegistry.SetTarget(agent.model, target)
     pinAtRest(agent, false)
     local player = game:GetService("Players"):GetPlayerFromCharacter(target)
     agent.model:SetAttribute("NpcTargetUserId", if player then player.UserId else 0)
@@ -427,6 +431,7 @@ function NpcCombatAIService.Unbind(model: Model)
     local agent = agents[model]
     if not agent then return end
     agent.active = false
+    HostilePursuitRegistry.Clear(model)
     agent.recovery:Cancel()
     agent.serial += 1
     Facing.Stop(agent.model)

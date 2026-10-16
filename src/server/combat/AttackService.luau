@@ -16,6 +16,7 @@ local DamageService = require(script.Parent:WaitForChild("DamageService"))
 local HitEffectService = require(script.Parent:WaitForChild("HitEffectService"))
 local EntityHitboxService = require(script.Parent:WaitForChild("EntityHitboxService"))
 local WeaponEnvironmentCollision = require(script.Parent:WaitForChild("WeaponEnvironmentCollision"))
+local HostilePursuitRegistry = require(script.Parent:WaitForChild("HostilePursuitRegistry"))
 local WeaponBounceService = require(script.Parent:WaitForChild("WeaponBounceService"))
 
 local AttackService = {}
@@ -27,6 +28,7 @@ local activeHitTargets: { [Player]: { [Model]: boolean } } = {}
 local activeDamageWindows: { [Player]: any } = {}
 local activeHeadshotTarget: { [Player]: Model } = {}
 local activeEnvironmentBlocked: { [Player]: boolean } = {}
+local suppressedBounceLogged: { [Player]: boolean } = {}
 
 local function rowsForEquippedAttack(character: Model): any
     local profileId = tostring(character:GetAttribute("AnimationProfileId") or character:GetAttribute("CharacterArchetype") or "")
@@ -259,19 +261,31 @@ local function applyAnimatedWeaponSweep(
             else currentElapsed
         local volume = WeaponAttackVolume.Build(root.Position, sampledBoxCFrame, boxSize, attackRange, weaponBoneBoxLocalPosition)
         if volume then
+            -- Keep the authored HitStart -> HitEnd environment query unchanged.
+            -- Combat/pursuit suppresses only the bounce RESPONSE to a real contact.
             local environmentContact = WeaponEnvironmentCollision.Query(previousVolume, volume)
             if environmentContact then
-                local bounced = triggerWeaponBounce(
-                    player,
-                    character,
-                    serial,
-                    clientAttackId,
-                    clipId,
-                    sampledElapsed,
-                    environmentContact
-                )
-                if bounced then
-                    return hitCount, true
+                local pursuerCount = HostilePursuitRegistry.Count(character)
+                if character:GetAttribute("InCombat") == true or pursuerCount > 0 then
+                    -- One informative line per affected attack, no Command Bar script.
+                    if Config.DebugLogs and not suppressedBounceLogged[player] then
+                        suppressedBounceLogged[player] = true
+                        print(("[game1][weapon-bounce] suppressed player=%s combat=%s pursuers=%d")
+                            :format(player.Name, tostring(character:GetAttribute("InCombat")), pursuerCount))
+                    end
+                else
+                    local bounced = triggerWeaponBounce(
+                        player,
+                        character,
+                        serial,
+                        clientAttackId,
+                        clipId,
+                        sampledElapsed,
+                        environmentContact
+                    )
+                    if bounced then
+                        return hitCount, true
+                    end
                 end
             end
 
@@ -322,6 +336,7 @@ local function clearAttackState(
     activeDamageWindows[player] = nil
     activeHeadshotTarget[player] = nil
     activeEnvironmentBlocked[player] = nil
+    suppressedBounceLogged[player] = nil
     local sweepState = weaponSweepStates[player]
     if sweepState and sweepState.clientAttackId == clientAttackId then
         weaponSweepStates[player] = nil
@@ -467,6 +482,7 @@ local function attack(player: Player, payload: any)
     activeHitTargets[player] = {}
     activeHeadshotTarget[player] = nil
     activeEnvironmentBlocked[player] = false
+    suppressedBounceLogged[player] = false
     activeDamageWindows[player] = damageWindow
     weaponSweepStates[player] = nil
     character:SetAttribute("AttackSerial", serial)
@@ -598,6 +614,7 @@ function AttackService.Start()
         activeDamageWindows[player] = nil
         activeHeadshotTarget[player] = nil
         activeEnvironmentBlocked[player] = nil
+        suppressedBounceLogged[player] = nil
         weaponSweepStates[player] = nil
     end)
 end

@@ -15,19 +15,24 @@ local started = false
 local definitionsByModel: { [Model]: any } = {}
 local registeredModels: { Model } = {}
 local registryRevision = 0
-local rootConnections: { RBXScriptConnection } = {}
+local workspaceConnections: { RBXScriptConnection } = {}
+local registeredAttributeConnections: { [Model]: RBXScriptConnection } = {}
 
 local function clearConnections()
-    for _, connection in ipairs(rootConnections) do
+    for _, connection in ipairs(workspaceConnections) do
         connection:Disconnect()
     end
-    table.clear(rootConnections)
+    table.clear(workspaceConnections)
+    for model, connection in pairs(registeredAttributeConnections) do
+        connection:Disconnect()
+        registeredAttributeConnections[model] = nil
+    end
 end
 
 local function rebuildRegisteredModels()
     local nextModels = {}
     for model in pairs(definitionsByModel) do
-        if model.Parent ~= nil then
+        if model:IsDescendantOf(Workspace) then
             table.insert(nextModels, model)
         end
     end
@@ -55,12 +60,21 @@ local function unregisterModel(model: Model, deferRebuild: boolean?)
         return
     end
     definitionsByModel[model] = nil
+    local connection = registeredAttributeConnections[model]
+    if connection then
+        connection:Disconnect()
+        registeredAttributeConnections[model] = nil
+    end
     if deferRebuild ~= true then
         rebuildRegisteredModels()
     end
 end
 
 local function registerModel(model: Model, deferRebuild: boolean?)
+    if not model:IsDescendantOf(Workspace) then
+        unregisterModel(model, deferRebuild)
+        return
+    end
     local locationAssetId = tostring(model:GetAttribute(LOCATION_ASSET_ID_ATTRIBUTE) or "")
     if locationAssetId == "" then
         unregisterModel(model, deferRebuild)
@@ -75,7 +89,18 @@ local function registerModel(model: Model, deferRebuild: boolean?)
         return
     end
 
+    local previousDefinition = definitionsByModel[model]
+    if previousDefinition == definition then
+        return
+    end
     definitionsByModel[model] = definition
+    -- Only published location assets own a listener. This avoids per-NPC/model
+    -- connections across Workspace while supporting changes to registered slugs.
+    if registeredAttributeConnections[model] == nil then
+        registeredAttributeConnections[model] = model:GetAttributeChangedSignal(LOCATION_ASSET_ID_ATTRIBUTE):Connect(function()
+            registerModel(model)
+        end)
+    end
     EnvironmentAssetVisuals.ApplyModel(model, definition)
     applyStaticRuntimePhysics(model)
     if deferRebuild ~= true then
@@ -83,9 +108,9 @@ local function registerModel(model: Model, deferRebuild: boolean?)
     end
 end
 
-local function scanRoot(root: Instance)
+local function scanWorkspace()
     table.clear(definitionsByModel)
-    for _, descendant in ipairs(root:GetDescendants()) do
+    for _, descendant in ipairs(Workspace:GetDescendants()) do
         if descendant:IsA("Model") and tostring(descendant:GetAttribute(LOCATION_ASSET_ID_ATTRIBUTE) or "") ~= "" then
             registerModel(descendant, true)
         end
@@ -133,22 +158,43 @@ function EnvironmentAssetService.Start()
         root.Parent = Workspace
     end
 
-    scanRoot(root)
-    table.insert(rootConnections, root.DescendantAdded:Connect(function(descendant)
+    -- Game1DecoAssets remains the authoring default, not a gameplay boundary.
+    -- Published location identity is the Game1DecoAssetSlug attribute anywhere
+    -- under Workspace, including arbitrarily nested folders.
+    scanWorkspace()
+    table.insert(workspaceConnections, Workspace.DescendantAdded:Connect(function(descendant)
         if descendant:IsA("Model") and tostring(descendant:GetAttribute(LOCATION_ASSET_ID_ATTRIBUTE) or "") ~= "" then
             registerModel(descendant)
         elseif descendant:IsA("BasePart") then
-            local model = descendant:FindFirstAncestorOfClass("Model")
-            if model and definitionsByModel[model] then
-                EnvironmentAssetVisuals.ApplyPart(descendant, definitionsByModel[model])
-                descendant.Anchored = true
-                descendant.CanQuery = true
+            local cursor: Instance? = descendant.Parent
+            while cursor and cursor ~= Workspace do
+                if cursor:IsA("Model") and definitionsByModel[cursor] then
+                    EnvironmentAssetVisuals.ApplyPart(descendant, definitionsByModel[cursor])
+                    descendant.Anchored = true
+                    descendant.CanQuery = true
+                    break
+                end
+                cursor = cursor.Parent
             end
         end
     end))
-    table.insert(rootConnections, root.DescendantRemoving:Connect(function(descendant)
+    table.insert(workspaceConnections, Workspace.DescendantRemoving:Connect(function(descendant)
         if descendant:IsA("Model") and definitionsByModel[descendant] then
             unregisterModel(descendant)
+        end
+        -- Removing a containing folder may move a whole authored subtree out
+        -- of Workspace. Expire its entries without rescanning all Workspace.
+        if descendant:IsA("Folder") then
+            local changed = false
+            for model in pairs(definitionsByModel) do
+                if model:IsDescendantOf(descendant) then
+                    unregisterModel(model, true)
+                    changed = true
+                end
+            end
+            if changed then
+                rebuildRegisteredModels()
+            end
         end
     end))
 

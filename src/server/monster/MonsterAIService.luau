@@ -4,24 +4,16 @@
 -- attack; the live target position is validated again on the Hit timeline event.
 local PathfindingService = game:GetService("PathfindingService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
-local MonsterShared = Shared:WaitForChild("monster")
-local CombatShared = Shared:WaitForChild("combat")
 local CharacterShared = Shared:WaitForChild("character")
-local AnimationShared = Shared:WaitForChild("animation")
-local MonsterAnimationRegistry = require(MonsterShared:WaitForChild("MonsterAnimationRegistry"))
-local AttackTimelineConfig = require(CombatShared:WaitForChild("AttackTimelineConfig"))
 local CharacterMovementConfig = require(CharacterShared:WaitForChild("CharacterMovementConfig"))
-local AnimationSpeedScaling = require(AnimationShared:WaitForChild("AnimationSpeedScaling"))
-local DamageService = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("DamageService"))
-local HitEffectService = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("HitEffectService"))
 local Facing = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorFacingTracker"))
-local AttackPursuit = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorAttackPursuit"))
 local TargetPolicy = require(script.Parent:WaitForChild("MonsterTargetPolicy"))
 local CombatState = require(script.Parent:WaitForChild("MonsterCombatState"))
+local Presentation = require(script.Parent:WaitForChild("MonsterCombatPresentation"))
+local AttackExecutor = require(script.Parent:WaitForChild("MonsterAttackExecutor"))
 
 local MonsterAIService = {}
 local started = false
@@ -36,8 +28,6 @@ local PATH_TARGET_MOVE_THRESHOLD = 3
 local STUCK_CHECK_SECONDS = 0.80
 local STUCK_PROGRESS_STUDS = 0.35
 local WAYPOINT_TOLERANCE = 1.25
-local ATTACK_PURSUIT_SPEED_MULTIPLIER = 1.65
-local ATTACK_PURSUIT_PLAYBACK_EPSILON = 0.02
 
 local function finite(value: any, fallback: number): number
     local n = tonumber(value)
@@ -48,106 +38,9 @@ end
 local rootOf = TargetPolicy.RootOf
 local navigationRootOf = TargetPolicy.NavigationRootOf
 local targetIsValid = TargetPolicy.IsValid
-local horizontalDelta = TargetPolicy.HorizontalDelta
 local horizontalDistance = TargetPolicy.HorizontalDistance
 local aggressive = TargetPolicy.IsAggressive
 local attackRadius = TargetPolicy.AttackRadius
-
-local function publishedRows(slug: string, slot: string): {any}
-    local profile = MonsterAnimationRegistry.profiles and MonsterAnimationRegistry.profiles[slug]
-    local rows = profile and profile.slots and profile.slots[slot]
-    local result = {}
-    for _, row in ipairs(typeof(rows) == "table" and rows or {}) do
-        if tostring(row.animationId or ""):match("^rbxassetid://%d+$") then
-            table.insert(result, row)
-        end
-    end
-    return result
-end
-
-local function weightedRow(rows: {any}): any?
-    local total = 0
-    for _, row in ipairs(rows) do total += math.max(1, finite(row.weight, 100)) end
-    if total <= 0 then return rows[1] end
-    local roll = random:NextNumber(0, total)
-    local cursor = 0
-    for _, row in ipairs(rows) do
-        cursor += math.max(1, finite(row.weight, 100))
-        if roll <= cursor then return row end
-    end
-    return rows[#rows]
-end
-
-local function animationPriority(value: any): Enum.AnimationPriority
-    local name = tostring(value or "")
-    if name == "Idle" then return Enum.AnimationPriority.Idle end
-    if name == "Movement" then return Enum.AnimationPriority.Movement end
-    if name == "Action2" then return Enum.AnimationPriority.Action2 end
-    if name == "Action3" then return Enum.AnimationPriority.Action3 end
-    if name == "Action4" then return Enum.AnimationPriority.Action4 end
-    return Enum.AnimationPriority.Action
-end
-
-local function animatorOf(model: Model): Animator?
-    local animator = model:FindFirstChildWhichIsA("Animator", true)
-    return if animator and animator:IsA("Animator") then animator else nil
-end
-
-local function loadTrack(animator: Animator, row: any, looped: boolean): AnimationTrack?
-    local animationId = tostring(row and row.animationId or "")
-    if not animationId:match("^rbxassetid://%d+$") then return nil end
-    local animation = Instance.new("Animation")
-    animation.AnimationId = animationId
-    local ok, result = pcall(function() return animator:LoadAnimation(animation) end)
-    animation:Destroy()
-    if not ok then
-        warn("[game1][monster-ai] animation load failed: " .. tostring(result))
-        return nil
-    end
-    local track = result :: AnimationTrack
-    track.Looped = looped
-    track.Priority = animationPriority(row.priority)
-    return track
-end
-
-local function stopTrack(track: AnimationTrack?, fade: number?)
-    if track and track.IsPlaying then pcall(function() track:Stop(fade or 0.08) end) end
-end
-
-local function stopPresentation(agent: any)
-    stopTrack(agent.runTrack)
-    stopTrack(agent.combatIdleTrack)
-    stopTrack(agent.attackTrack)
-    agent.attackTrack = nil
-end
-
-local function playCombatIdle(agent: any)
-    if agent.attacking or not agent.active then return end
-    stopTrack(agent.runTrack)
-    stopTrack(agent.attackTrack)
-    local track = agent.combatIdleTrack
-    if track then
-        local speed = AnimationSpeedScaling.ResolveScaleForAnimation(agent.model, "combat_idle", agent.combatIdleTrack and agent.combatIdleTrack.Animation and agent.combatIdleTrack.Animation.AnimationId)
-        if track.IsPlaying then track:AdjustSpeed(speed) else track:Play(0.08, 1, speed) end
-    end
-    agent.model:SetAttribute("MonsterAnimationState", "combat_idle")
-end
-
-local function playRun(agent: any, pursuitMultiplier: number?)
-    if agent.attacking then
-        -- During active attack the full-body attack keeps ownership. A client
-        -- compositor samples Run and writes only the lower-body bones.
-        return
-    end
-    stopTrack(agent.combatIdleTrack)
-    stopTrack(agent.attackTrack)
-    local track = agent.runTrack
-    if track then
-        local speed = AnimationSpeedScaling.ResolveScaleForAnimation(agent.model, "run", agent.runTrack and agent.runTrack.Animation and agent.runTrack.Animation.AnimationId) * math.max(1, pursuitMultiplier or 1)
-        if track.IsPlaying then track:AdjustSpeed(speed) else track:Play(0.08, 1, speed) end
-    end
-    agent.model:SetAttribute("MonsterAnimationState", "run")
-end
 
 local setState = CombatState.SetState
 
@@ -241,145 +134,20 @@ local function navigateTo(agent: any, destination: Vector3, speed: number)
     end
 end
 
-local function faceDirection(agent: any, direction: Vector3)
-    local flat = Vector3.new(direction.X, 0, direction.Z)
-    if flat.Magnitude <= 0.001 then return end
-    agent.facing = flat.Unit
-end
-
-local function clearAttackPursuit(agent: any)
-    agent.attackPursuit:Stop()
-    if agent.attackPursuitActive then
-        agent.attackPursuitActive = false
-        agent.model:SetAttribute("MonsterAttackPursuitActive", false)
-    end
-end
-
-local function attackPursuitPlaybackSpeed(agent: any, movementMultiplier: number?): number
-    return AnimationSpeedScaling.ResolveScaleForAnimation(agent.model, "run", agent.runTrack and agent.runTrack.Animation and agent.runTrack.Animation.AnimationId) * math.max(0.01, movementMultiplier or ATTACK_PURSUIT_SPEED_MULTIPLIER)
-end
-
-local function publishAttackPursuitPlaybackSpeed(agent: any, movementMultiplier: number?)
-    local desired = attackPursuitPlaybackSpeed(agent, movementMultiplier)
-    local current = tonumber(agent.model:GetAttribute("MonsterAttackPursuitPlaybackSpeed"))
-    if current == nil or math.abs(current - desired) > ATTACK_PURSUIT_PLAYBACK_EPSILON then
-        agent.model:SetAttribute("MonsterAttackPursuitPlaybackSpeed", desired)
-    end
-end
+local AttackMovement = table.freeze({
+    StopNavigation = stopNavigation,
+    RunSpeedStuds = runSpeedStuds,
+})
 
 local function leaveCombat(agent: any)
     Facing.Stop(agent.model)
     CombatState.ClearTarget(agent)
     agent.attacking = false
     agent.attackSerial += 1
-    clearAttackPursuit(agent)
+    AttackExecutor.ClearPursuit(agent)
     stopNavigation(agent)
-    stopPresentation(agent)
+    Presentation.Stop(agent)
     CombatState.FinishExit(agent)
-end
-
-local function pursueDirectlyDuringAttack(agent: any, targetRoot: BasePart): boolean
-    local maximumSpeed = runSpeedStuds(agent) * ATTACK_PURSUIT_SPEED_MULTIPLIER
-    local pursuing, desiredSpeed = agent.attackPursuit:Step(targetRoot, attackRadius(agent), maximumSpeed)
-    if not pursuing then
-        clearAttackPursuit(agent)
-        return false
-    end
-    if not agent.attackPursuitActive then
-        agent.attackPursuitActive = true
-        agent.model:SetAttribute("MonsterAttackPursuitActive", true)
-    end
-    local baseRunSpeed = math.max(0.001, runSpeedStuds(agent))
-    publishAttackPursuitPlaybackSpeed(agent, desiredSpeed / baseRunSpeed)
-    return true
-end
-
-local function maintainAttackPursuit(agent: any, target: Model, serial: number)
-    task.spawn(function()
-        while agent.active
-            and agent.attacking
-            and agent.attackSerial == serial
-            and agent.target == target
-            and tostring(agent.model:GetAttribute("LifeState") or "") == "Alive" do
-            local liveRoot = rootOf(target)
-            if not targetIsValid(target) or not liveRoot then
-                clearAttackPursuit(agent)
-                return
-            end
-            local pursuing = pursueDirectlyDuringAttack(agent, liveRoot)
-            -- Facing is updated continuously by the shared tracker even at rest.
-            RunService.Heartbeat:Wait()
-        end
-    end)
-end
-
-local function beginAttack(agent: any, target: Model)
-    if agent.attacking or os.clock() < agent.nextAttackAt then return end
-    local row = weightedRow(agent.attackRows)
-    if not row then return end
-    local percent = AnimationSpeedScaling.ResolveForAnimation(agent.model, "attack", row.animationId)
-    local timing = AttackTimelineConfig.ResolveRuntime(row.clipId, percent)
-    if not timing then return end
-
-    agent.attacking = true
-    Facing.Track(agent.model, agent.root, agent.humanoid, target, rootOf)
-    agent.attackSerial += 1
-    local serial = agent.attackSerial
-    local duration = math.max(0.05, finite(timing.duration, 0.05))
-    local now = os.clock()
-    agent.attackEndsAt = now + duration
-    agent.nextAttackAt = agent.attackEndsAt
-    setState(agent, "Attack")
-    stopNavigation(agent)
-    stopTrack(agent.runTrack)
-    stopTrack(agent.combatIdleTrack)
-    stopTrack(agent.attackTrack)
-    agent.attackTrack = loadTrack(agent.animator, row, false)
-    if agent.attackTrack then agent.attackTrack:Play(0.05, 1, math.max(0.01, percent / 100)) end
-    agent.model:SetAttribute("MonsterAnimationState", "attack")
-    agent.model:SetAttribute("AnimationPlaybackSpeedPercent", percent)
-    agent.model:SetAttribute("MonsterAttackClipId", tostring(row.clipId or ""))
-    agent.model:SetAttribute("MonsterAttackPhase", "Windup")
-    local targetRoot = rootOf(target)
-    if targetRoot then faceDirection(agent, targetRoot.Position - agent.root.Position) end
-    maintainAttackPursuit(agent, target, serial)
-
-    local hit = timing.events and timing.events.Hit
-    local hitTime = math.max(0, finite(hit and hit.time, duration * 0.5))
-    task.delay(hitTime, function()
-        if not agent.active or agent.attackSerial ~= serial or agent.target ~= target or tostring(agent.model:GetAttribute("LifeState") or "") ~= "Alive" then return end
-        local liveRoot = rootOf(target)
-        if liveRoot then
-            local direction = liveRoot.Position - agent.root.Position
-            local flatDirection = horizontalDelta(Vector3.zero, direction)
-            if flatDirection.Magnitude > 0.001 then agent.facing = flatDirection.Unit end
-            -- Do not snap yaw on Hit: shared tracker already follows the target.
-        end
-        if TargetPolicy.AttackStillConnects(agent, target) then
-            local damage, killed = DamageService.Apply(agent.model, target, finite(agent.model:GetAttribute("Damage"), 0))
-            HitEffectService.Publish(agent.model, target, target:GetAttribute("LastCritical") == true, rootOf(target) and rootOf(target).Position or nil)
-            agent.model:SetAttribute("LastMonsterAttackDamage", damage)
-            agent.model:SetAttribute("MonsterAttackPhase", if damage > 0 then "Hit" else "Miss")
-            if killed then clearAttackPursuit(agent) end
-        else
-            agent.model:SetAttribute("LastMonsterAttackDamage", 0)
-            agent.model:SetAttribute("MonsterAttackPhase", "Miss")
-        end
-    end)
-
-    task.delay(duration, function()
-        if not agent.active or agent.attackSerial ~= serial then return end
-        agent.attacking = false
-        agent.attackEndsAt = 0
-        Facing.Stop(agent.model)
-        clearAttackPursuit(agent)
-        stopTrack(agent.attackTrack)
-        agent.attackTrack = nil
-        if agent.target == target and targetIsValid(target) and aggressive(agent) then
-            agent.model:SetAttribute("MonsterAttackPhase", "Cooldown")
-            playCombatIdle(agent)
-        end
-    end)
 end
 
 local function updateTarget(agent: any, now: number)
@@ -419,13 +187,13 @@ local function runAgent(agent: any)
             setState(agent, "Attack")
         elseif action == "BeginAttack" then
             stopNavigation(agent)
-            faceDirection(agent, targetRoot.Position - agent.root.Position)
-            playCombatIdle(agent)
-            beginAttack(agent, target)
+            AttackExecutor.FaceDirection(agent, targetRoot.Position - agent.root.Position)
+            Presentation.PlayCombatIdle(agent)
+            AttackExecutor.Begin(agent, target, AttackMovement, random)
         elseif action == "Chase" then
             setState(agent, "Chase")
-            clearAttackPursuit(agent)
-            playRun(agent)
+            AttackExecutor.ClearPursuit(agent)
+            Presentation.PlayRun(agent)
             navigateTo(agent, targetRoot.Position, runSpeedStuds(agent))
         elseif agent.model:GetAttribute("MonsterCombatActive") == true then
             leaveCombat(agent)
@@ -445,12 +213,12 @@ local function bindMonster(model: Model)
         if not model.Parent or model:GetAttribute("Game1MonsterRuntime") ~= true or agents[model] then return end
         local root = navigationRootOf(model) or model:WaitForChild("HumanoidRootPart", 5)
         local humanoid = model:FindFirstChildOfClass("Humanoid") or model:WaitForChild("Humanoid", 5)
-        local animator = animatorOf(model)
+        local animator = Presentation.AnimatorOf(model)
         if not root or not root:IsA("BasePart") or not humanoid or not humanoid:IsA("Humanoid") or not animator then return end
         local slug = string.lower(tostring(model:GetAttribute("MonsterSlug") or ""))
-        local runRow = publishedRows(slug, "run")[1] or publishedRows(slug, "walk")[1]
-        local combatIdleRow = publishedRows(slug, "combat_idle")[1] or publishedRows(slug, "idle")[1]
-        local attackRows = publishedRows(slug, "attack")
+        local runRow = Presentation.PublishedRows(slug, "run")[1] or Presentation.PublishedRows(slug, "walk")[1]
+        local combatIdleRow = Presentation.PublishedRows(slug, "combat_idle")[1] or Presentation.PublishedRows(slug, "idle")[1]
+        local attackRows = Presentation.PublishedRows(slug, "attack")
         if #attackRows == 0 then
             warn("[game1][monster-ai] no published attack animation for " .. slug)
         end
@@ -460,8 +228,8 @@ local function bindMonster(model: Model)
             humanoid = humanoid,
             animator = animator,
             attackRows = attackRows,
-            runTrack = runRow and loadTrack(animator, runRow, true) or nil,
-            combatIdleTrack = combatIdleRow and loadTrack(animator, combatIdleRow, true) or nil,
+            runTrack = runRow and Presentation.LoadTrack(animator, runRow, true) or nil,
+            combatIdleTrack = combatIdleRow and Presentation.LoadTrack(animator, combatIdleRow, true) or nil,
             attackTrack = nil,
             target = nil,
             active = true,
@@ -471,7 +239,7 @@ local function bindMonster(model: Model)
             nextAttackAt = 0,
             nextTargetScanAt = 0,
             attackPursuitActive = false,
-            attackPursuit = AttackPursuit.new(root, humanoid),
+            attackPursuit = AttackExecutor.NewPursuit(root, humanoid),
             facing = root.CFrame.LookVector,
             state = "Idle",
             navigating = false,
@@ -487,11 +255,7 @@ local function bindMonster(model: Model)
             lastProgressAt = os.clock(),
         }
         agents[model] = agent
-        if runRow then
-            model:SetAttribute("MonsterRunAnimationId", tostring(runRow.assetId or tostring(runRow.animationId):match("(%d+)$") or ""))
-            model:SetAttribute("MonsterAnimationPhase", random:NextNumber(0, 0.999))
-            publishAttackPursuitPlaybackSpeed(agent, ATTACK_PURSUIT_SPEED_MULTIPLIER)
-        end
+        Presentation.Initialize(agent, runRow, random, AttackExecutor.PursuitSpeedMultiplier)
         model:SetAttribute("MonsterAttackPursuitActive", false)
         model:SetAttribute("MonsterAIState", "Idle")
         model:GetAttributeChangedSignal("LifeState"):Connect(function()
@@ -500,9 +264,9 @@ local function bindMonster(model: Model)
                 Facing.Stop(agent.model)
                 agent.attacking = false
                 CombatState.ClearTarget(agent)
-                clearAttackPursuit(agent)
+                AttackExecutor.ClearPursuit(agent)
                 stopNavigation(agent)
-                stopPresentation(agent)
+                Presentation.Stop(agent)
                 model:SetAttribute("MonsterCombatActive", false)
             end
         end)

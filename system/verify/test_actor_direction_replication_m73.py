@@ -28,7 +28,7 @@ class ActorDirectionReplicationTests(unittest.TestCase):
 
     def test_monster_and_npc_share_damped_move_authority(self):
         shared = source('src/server/actor/ActorAttackPursuit.luau')
-        monster = source('src/server/monster/MonsterAIService.luau')
+        monster = source('src/server/monster/MonsterAttackExecutor.luau')
         npc = source('src/server/npc/NpcCombatAIService.luau')
         self.assertIn('targetRoot.AssemblyLinearVelocity', shared)
         self.assertIn('math.exp(-TARGET_FILTER_RESPONSE', shared)
@@ -43,7 +43,7 @@ class ActorDirectionReplicationTests(unittest.TestCase):
             self.assertIn('Facing.Track(', actor)
             self.assertIn('Facing.Stop(', actor)
         self.assertNotIn('agent.root.CFrame = CFrame.lookAt', monster)
-        self.assertIn('maintainAttackPursuit(agent, target, serial)', monster)
+        self.assertIn('maintainAttackPursuit(agent, target, serial, movement)', monster)
         self.assertIn('beginAttack(agent, target, true)', npc)
 
     def test_legs_follow_motion_without_looking_at_target(self):
@@ -60,7 +60,7 @@ class ActorDirectionReplicationTests(unittest.TestCase):
 
     def test_existing_attack_owner_and_root_home_snap_are_untouched(self):
         npc = source('src/server/npc/NpcCombatAIService.luau')
-        monster = source('src/server/monster/MonsterAIService.luau')
+        monster = source('src/server/monster/MonsterAttackExecutor.luau')
         self.assertIn('agent.presentation.ContinueAttack(percent)', npc)
         self.assertIn('beginAttack(agent, target, true)', npc)
         self.assertIn('agent.root.CFrame = agent.home', npc)

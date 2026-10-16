@@ -1457,9 +1457,17 @@ monster_ai_m23 = (ROOT / "src/server/monster/MonsterAIService.luau").read_text(e
 spawner_m23 = (ROOT / "src/server/monster/MonsterSpawnerService.luau").read_text(encoding="utf-8")
 monster_target_policy_m102 = (ROOT / "src/server/monster/MonsterTargetPolicy.luau").read_text(encoding="utf-8")
 monster_state_m102 = (ROOT / "src/server/monster/MonsterCombatState.luau").read_text(encoding="utf-8")
-for required in ["pursueDirectlyDuringAttack", "PathfindingService", "MonsterAttackPursuitActive", "AttackTimelineConfig.ResolveRuntime", "TargetPolicy.AttackStillConnects", "CombatState.Decide"]:
+monster_attack_m103 = (ROOT / "src/server/monster/MonsterAttackExecutor.luau").read_text(encoding="utf-8")
+monster_presentation_m103 = (ROOT / "src/server/monster/MonsterCombatPresentation.luau").read_text(encoding="utf-8")
+for required in ["PathfindingService", "CombatState.Decide", 'AttackExecutor.Begin(agent, target, AttackMovement, random)', "MonsterAttackExecutor"]:
     if required not in monster_ai_m23:
-        err(f"RobloxLineage monster combat AI contract missing {required}")
+        err(f"RobloxLineage monster AI coordinator missing {required}")
+for required in ["pursueDirectlyDuringAttack", "MonsterAttackPursuitActive", "AttackTimelineConfig.ResolveRuntime", "TargetPolicy.AttackStillConnects", "DamageService.Apply("]:
+    if required not in monster_attack_m103:
+        err(f"MonsterAttackExecutor contract missing {required}")
+for required in ["MonsterCombatPresentation.PlayAttack", "MonsterCombatPresentation.PlayRun", "MonsterCombatPresentation.PlayCombatIdle"]:
+    if required not in monster_presentation_m103:
+        err(f"MonsterCombatPresentation contract missing {required}")
 for required in ['local function attackStillConnects(', 'local function acquireNearestTarget(', 'Workspace:Raycast(']:
     if required not in monster_target_policy_m102:
         err(f"Monster target policy contract missing {required}")
@@ -1495,7 +1503,7 @@ if "CombatFeedbackService.PublishDamage" not in damage_m23:
     err("DamageService does not publish authoritative damage feedback")
 
 # m25 / m73: continuous attack pursuit is now shared by monsters and NPCs.
-monster_ai_m25 = (ROOT / "src/server/monster/MonsterAIService.luau").read_text(encoding="utf-8")
+monster_ai_m25 = (ROOT / "src/server/monster/MonsterAttackExecutor.luau").read_text(encoding="utf-8")
 actor_pursuit_m73 = (ROOT / "src/server/actor/ActorAttackPursuit.luau").read_text(encoding="utf-8")
 for required in [
     'RunService.Heartbeat:Wait()',

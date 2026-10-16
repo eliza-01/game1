@@ -14,7 +14,7 @@ def read(path):
 class AttackMovementM72Tests(unittest.TestCase):
     def test_monster_and_npc_share_smooth_server_facing(self):
         tracker = read('src/server/actor/ActorFacingTracker.luau')
-        monster = read('src/server/monster/MonsterAIService.luau')
+        monster = read('src/server/monster/MonsterAttackExecutor.luau')
         npc = read('src/server/npc/NpcCombatAIService.luau')
         self.assertIn('RunService.Heartbeat:Connect(step)', tracker)
         self.assertIn('humanoid.AutoRotate = false', tracker)

@@ -19,6 +19,8 @@ class MonsterAiM102Contracts(unittest.TestCase):
         cls.ai = read('MonsterAIService.luau')
         cls.targets = read('MonsterTargetPolicy.luau')
         cls.state = read('MonsterCombatState.luau')
+        cls.attack = read('MonsterAttackExecutor.luau')
+        cls.presentation = read('MonsterCombatPresentation.luau')
 
     def test_service_uses_two_narrow_modules(self):
         self.assertIn('require(script.Parent:WaitForChild("MonsterTargetPolicy"))', self.ai)
@@ -46,7 +48,7 @@ class MonsterAiM102Contracts(unittest.TestCase):
                       'Workspace:Raycast(origin, destination - origin, params)',
                       'return hasLineOfSight(agent, target)'):
             self.assertIn(token, self.targets)
-        hit = self.ai.split('task.delay(hitTime, function()', 1)[1].split('task.delay(duration, function()', 1)[0]
+        hit = self.attack.split('task.delay(hitTime, function()', 1)[1].split('task.delay(duration, function()', 1)[0]
         self.assertLess(hit.index('TargetPolicy.AttackStillConnects(agent, target)'),
                         hit.index('DamageService.Apply('))
         self.assertIn('agent.attackSerial ~= serial', hit)
@@ -78,11 +80,11 @@ class MonsterAiM102Contracts(unittest.TestCase):
         self.assertIn('if action == "AttackActive" then', self.ai)
         self.assertIn('setState(agent, "Attack")', self.ai)
         self.assertIn('elseif action == "BeginAttack" then', self.ai)
-        self.assertIn('beginAttack(agent, target)', self.ai)
+        self.assertIn('AttackExecutor.Begin(agent, target, AttackMovement, random)', self.ai)
         self.assertIn('elseif action == "Chase" then', self.ai)
         self.assertIn('navigateTo(agent, targetRoot.Position, runSpeedStuds(agent))', self.ai)
-        self.assertIn('maintainAttackPursuit(agent, target, serial)', self.ai)
-        self.assertIn('agent.attackPursuit:Step(targetRoot, attackRadius(agent), maximumSpeed)', self.ai)
+        self.assertIn('maintainAttackPursuit(agent, target, serial, movement)', self.attack)
+        self.assertIn('agent.attackPursuit:Step(targetRoot, attackRadius(agent), maximumSpeed)', self.attack)
         self.assertIn('PathfindingService:CreatePath({AgentRadius = 1, AgentHeight = 4, AgentCanJump = false, WaypointSpacing = 3})', self.ai)
         self.assertIn('issueDirectMove(agent, destination, speed)', self.ai)
         self.assertNotIn('ActorChaseNavigator', self.ai)
@@ -99,12 +101,13 @@ class MonsterAiM102Contracts(unittest.TestCase):
         self.assertIn('Facing.Stop(agent.model)', destroy)
 
     def test_modules_keep_server_ownership_boundaries(self):
-        for text in (self.state, self.targets):
+        for text in (self.state, self.targets, self.attack, self.presentation):
             self.assertIn('return table.freeze(', text)
             self.assertNotIn('RemoteEvent', text)
             self.assertNotIn('DataStoreService', text)
             self.assertNotIn('PathfindingService', text)
-            self.assertNotIn('DamageService', text)
+            if text is not self.attack:
+                self.assertNotIn('DamageService', text)
         self.assertNotIn('HostilePursuitRegistry', self.targets)
         self.assertNotIn('Workspace:Raycast', self.state)
 

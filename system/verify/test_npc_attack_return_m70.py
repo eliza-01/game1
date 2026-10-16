@@ -57,11 +57,13 @@ class NpcMonsterAttackContracts(unittest.TestCase):
         self.assertIn('SetReturnActive = setReturnActive', animation)
         self.assertIn('SetReturnMoving = setReturnMoving', animation)
 
-    def test_monster_attack_ai_is_unmodified(self):
-        monster = read("src/server/monster/MonsterAIService.luau")
+    def test_monster_attack_runtime_is_preserved(self):
+        monster = read("src/server/monster/MonsterAttackExecutor.luau")
+        service = read("src/server/monster/MonsterAIService.luau")
         self.assertIn('local function maintainAttackPursuit', monster)
         self.assertIn('local timing = AttackTimelineConfig.ResolveRuntime', monster)
-        self.assertIn('local function beginAttack(agent: any, target: Model)', monster)
+        self.assertIn('function MonsterAttackExecutor.Begin(agent: any, target: Model', monster)
+        self.assertIn('AttackExecutor.Begin(agent, target, AttackMovement, random)', service)
 
 
 if __name__ == "__main__":

@@ -87,7 +87,7 @@ class NpcAttackLoopAndSharedSpeedTests(unittest.TestCase):
         self.assertIn('if hit then', ai)
 
     def test_monster_ai_and_character_animation_controller_still_use_common_runtime(self):
-        monster = source("src/server/monster/MonsterAIService.luau")
+        monster = source("src/server/monster/MonsterCombatPresentation.luau")
         character = source("src/client/character/animation/CharacterAnimationController.luau")
         npc_tracks = source("src/server/npc/NpcAnimationTracks.luau")
         self.assertIn('AnimationSpeedScaling.ResolveForAnimation', character)

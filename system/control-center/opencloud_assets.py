@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from urllib import error, request
+from http.client import HTTPException
 import json
 import time
 import uuid
@@ -80,6 +81,11 @@ def _json_http(req: request.Request, timeout: float) -> dict:
         raise OpenCloudAssetError(f"roblox open cloud http {exc.code}: {detail[:4000]}") from exc
     except error.URLError as exc:
         raise OpenCloudAssetError(f"roblox open cloud request failed: {exc.reason}") from exc
+    except (TimeoutError, OSError, HTTPException) as exc:
+        raise OpenCloudAssetError(
+            f"roblox open cloud connection failed ({type(exc).__name__}): {exc}. "
+            "If this was a create request, check Roblox before submitting again."
+        ) from exc
     try:
         value = json.loads(raw.decode("utf-8"))
     except Exception as exc:

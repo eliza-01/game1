@@ -5,9 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" href="data:,">
 <title>game1 · asset manager</title>
-<link rel="stylesheet" href="asset-manager.css?v=9">
+<link rel="stylesheet" href="asset-manager.css?v=10">
 <link rel="stylesheet" href="location-assets.css?v=1">
 <link rel="stylesheet" href="deco-assets.css?v=4">
+<link rel="stylesheet" href="real-estate.css?v=6">
 </head>
 <body>
 <header>
@@ -26,6 +27,7 @@
 <button id="nav-monsters" class="asset-section" type="button"><b>monsters</b><small>rigs · stats · animations</small></button>
 <button id="nav-locations" class="asset-section" type="button"><b>locations</b><small>polygon registry · studio authoring</small></button>
 <button id="nav-location-assets" class="asset-section" type="button"><b>location assets</b><small>trees · bushes · rocks · lights · fences · decorations · ladders · flowers · buildings</small></button>
+<button id="nav-real-estate" class="asset-section" type="button"><b>real estate</b><small>houses · any mesh rigs · textures</small></button>
 <button id="nav-timelines" class="asset-section" type="button"><b>timelines</b><small>attack animation events</small></button>
 <button id="nav-options" class="asset-section" type="button"><b>options</b><small>common runtime settings</small></button>
 </div>
@@ -65,6 +67,12 @@
 <div class="section-title"><div><span>deco registry</span><h3>location assets</h3></div><span id="location-asset-rail-count">0</span></div>
 <div class="tree-actions"><button id="new-location-asset" class="primary" type="button">new</button><button id="refresh-location-assets" type="button">refresh</button></div>
 <div id="location-asset-tree" class="tree"></div>
+</div>
+<div id="real-estate-rail" hidden>
+<hr class="rail-separator">
+<div class="section-title"><div><span>property registry</span><h3>real estate</h3></div><span id="real-estate-count">0</span></div>
+<div class="tree-actions"><button id="real-estate-new" class="primary" type="button">new</button><button id="real-estate-refresh" type="button">refresh</button></div>
+<div id="real-estate-tree" class="tree"></div>
 </div>
 </aside>
 <section class="content">
@@ -168,6 +176,32 @@
 </div>
 
 
+<div id="real-estate-view" hidden>
+<div class="panel hero"><div><span class="eyebrow">property authoring · Real Estate</span><h2>real estate</h2>
+<p>Register an FBX containing the <code>house</code> mesh and any number of additional meshes (e.g. <code>door</code>, <code>repair</code>, <code>stone_fence_01_kit</code>). Each mesh gets its own texture and independent published Model Asset. The <code>house_armature</code> is required for the house. Door and interaction bones are optional.</p></div></div>
+<div class="real-estate-workflow">
+<div class="panel character-card">
+<span class="eyebrow">01 · house identity</span><h3>register house</h3>
+<p>Select <code>house_level1_01.fbx</code> to auto-fill the type, level and variant. You may edit them before registration. Supported JPG, JPEG, PNG and WebP textures appear after Blender inspects its meshes. Use Browse to choose from other folders.</p>
+<div class="actions"><button id="real-estate-choose" type="button">choose FBX…</button><span id="real-estate-fbx" class="muted">no FBX selected</span></div>
+<div class="character-grid"><label>house type<input id="real-estate-type" type="text" value="house" maxlength="48"></label><label>house level<input id="real-estate-level" type="number" min="1" value="1" step="1"></label><label>variant<input id="real-estate-variant" type="text" value="01" maxlength="8"></label></div>
+<div class="details">asset slug: <strong id="real-estate-slug">house_level1_01</strong></div>
+<div class="character-grid"><label>purchase price<input id="real-estate-purchase" type="number" min="1" value="1" step="1"></label><label>minimum purchase level<input id="real-estate-min-level" type="number" min="1" value="1" step="1"></label><label>sale price<input id="real-estate-sale" type="number" min="1" value="1" step="1"></label></div>
+<hr class="card-separator"><span class="eyebrow">02 · mesh textures</span><h3>per-mesh textures</h3>
+<p class="hint">Select one texture for each inspected mesh. Choose <code>.webp</code>, <code>.png</code>, <code>.jpg</code> or <code>.jpeg</code> from the FBX folder or Windows Explorer. WebP is converted to PNG when publishing.</p>
+<div id="real-estate-mesh-textures" class="real-estate-texture-list"></div>
+<div id="real-estate-rig-warnings" class="real-estate-rig-warnings" hidden></div>
+<details id="real-estate-rig-details" class="real-estate-bone-details"><summary id="real-estate-rig">choose an FBX to inspect its mesh bones</summary><div id="real-estate-bone-list" class="real-estate-bone-list"></div></details>
+<div class="actions"><button id="real-estate-register" class="primary" type="button">register / save</button></div>
+</div>
+<div class="panel character-card"><span class="eyebrow">03 · publication</span><h3>Roblox model + images</h3>
+<p>Before uploading, each authored mesh is exported as a separately verified Model Asset. The house must contain house_armature; other armatures and bones are optional. The canonical source FBX is not modified. Image asset IDs are stored per mesh.</p>
+<label>description<input id="real-estate-description" type="text" value="Game1 Real Estate house"></label>
+<div id="real-estate-publish-status" class="status-box">register a house first</div>
+<div class="actions"><button id="real-estate-publish" class="primary" type="button" disabled>publish changed assets</button><button id="real-estate-sync" type="button" disabled>sync Studio → ServerStorage</button></div>
+<small class="hint">After publishing, Sync Studio imports the complete house model with its selected textures into ServerStorage/real_estate/&lt;slug&gt;/model. House ownership/placement are future stages.</small>
+<div class="real-estate-library"><div class="section-title"><div><span>registered library</span><h3>houses <small id="real-estate-library-count">0</small></h3></div><button id="real-estate-library-refresh" type="button">refresh</button></div><div class="table-wrap"><table><thead><tr><th>house</th><th>economy</th><th>source textures</th><th>assets</th><th>actions</th></tr></thead><tbody id="real-estate-library-rows"></tbody></table></div><small class="hint">Replace FBX or either texture independently. Each replacement is saved immediately. Publish the changed Model/Image as a NEW Roblox Asset ID; other published IDs remain unchanged. Sync Studio after every present mesh and its texture is current.</small></div>
+</div></div></div>
 <div id="locations-view" hidden></div>
 
 <div id="timelines-view" hidden>
@@ -507,6 +541,7 @@
 <script src="monster-assets.js?v=6"></script>
 <script src="npc-assets.js?v=3"></script>
 <script src="npc-spawns.js?v=3"></script>
+<script src="real-estate.js?v=10"></script>
 <script src="monster-spawns.js?v=1"></script>
 </body>
 </html>

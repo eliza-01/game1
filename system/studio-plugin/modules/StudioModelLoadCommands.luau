@@ -1,6 +1,7 @@
 -- Studio model-sync command: validates and imports Character, Monster/NPC and Weapon models.
 -- Transport/AssetService dependencies are passed by the Game1Bridge composition root.
 local CharacterTemplate = require(script.Parent.CharacterTemplate)
+local StudioRealEstateModel = require(script.Parent.StudioRealEstateModel)
 
 return function(services)
     local AssetService = services.AssetService
@@ -426,7 +427,7 @@ return function(services)
                 error("invalid game1 model load command")
             end
             local placementMode = tostring(data.placementMode or "")
-            if placementMode ~= "character-controller" and placementMode ~= "weapon-pivot" and placementMode ~= "monster-rig" then
+            if placementMode ~= "character-controller" and placementMode ~= "weapon-pivot" and placementMode ~= "monster-rig" and placementMode ~= "real-estate-rig" then
                 error("unsupported game1 model placement mode")
             end
             local assetId = tonumber(data.assetId)
@@ -463,7 +464,16 @@ return function(services)
 
             local destination = modelLoadDestination(data.destinationFolders or {})
             local normalizedModel = canonicalRigModel(importedRig)
-            if placementMode == "weapon-pivot" then
+            if placementMode == "real-estate-rig" then
+                local wrapper, estateStats = StudioRealEstateModel.Place(
+                    normalizedModel, destination, tostring(data.wrapperName or ""), assetId,
+                    data.metadata or {}, AssetService
+                )
+                result.destination = wrapper:GetFullName()
+                result.wrapperName = wrapper.Name
+                result.realEstateStats = estateStats
+                result.importedCount = #wrapper:GetDescendants()
+            elseif placementMode == "weapon-pivot" then
                 local wrapper, textureStats = placeWeaponModel(
                     normalizedModel,
                     destination,

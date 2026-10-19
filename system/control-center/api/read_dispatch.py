@@ -1,8 +1,11 @@
 """HTTP GET dispatch. Does not know HTTP transports or persistence implementations."""
-from . import read_catalog, read_world
+from . import read_catalog, read_world, real_estate
 
 
 def dispatch(parsed, sources, info):
+    response = real_estate.read(parsed, sources)
+    if response is not None:
+        return response
     response = read_world.route(parsed, sources, info)
     if response is not None:
         return response

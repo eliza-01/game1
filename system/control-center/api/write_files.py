@@ -14,6 +14,8 @@ def route(path, body, deps):
 
     choose_animation_folder = deps["choose_animation_folder"]
     choose_character_fbx = deps["choose_character_fbx"]
+    choose_real_estate_fbx = deps["choose_real_estate_fbx"]
+    choose_real_estate_texture = deps["choose_real_estate_texture"]
     choose_location_asset_fbx = deps["choose_location_asset_fbx"]
     choose_location_asset_texture = deps["choose_location_asset_texture"]
     choose_monster_fbx = deps["choose_monster_fbx"]
@@ -25,6 +27,19 @@ def route(path, body, deps):
     if path == "/api/animation-export/write":
         try:
             return out(200, write_animation_export(body()))
+        except Exception as error:
+            return out(400, {"error": str(error)})
+
+    if path == "/api/files/choose-real-estate-texture":
+        try:
+            payload = body()
+            return out(200, {"path": choose_real_estate_texture(str(payload.get("initialPath") or ""))})
+        except (OSError, RuntimeError, ValueError) as error:
+            return out(400, {"error": str(error)})
+
+    if path == "/api/files/choose-real-estate-model":
+        try:
+            return out(200, {"path": choose_real_estate_fbx()})
         except Exception as error:
             return out(400, {"error": str(error)})
 

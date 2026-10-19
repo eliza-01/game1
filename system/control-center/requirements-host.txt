@@ -1,0 +1,3 @@
+# Host Agent only (system/control-center/host_agent.py).
+# Decode WebP as a temporary PNG for Real Estate publication.
+Pillow>=12,<13

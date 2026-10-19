@@ -161,3 +161,44 @@ if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
 '''
         , {"GAME1_ANIMATION_PICKER_INITIAL_PATH": initial_path}
     )
+
+
+def choose_real_estate_texture(initial_path: str = "") -> str:
+    """Choose one texture using Windows Explorer, starting near the selected FBX."""
+    return _powershell_picker(
+        r'''
+Add-Type -AssemblyName System.Windows.Forms
+$dialog = New-Object System.Windows.Forms.OpenFileDialog
+$dialog.Title = 'game1 · choose Real Estate texture'
+$dialog.Filter = 'supported textures (*.webp;*.png;*.jpg;*.jpeg)|*.webp;*.png;*.jpg;*.jpeg|WebP (*.webp)|*.webp|PNG (*.png)|*.png|JPEG (*.jpg;*.jpeg)|*.jpg;*.jpeg'
+$dialog.Multiselect = $false
+$initialPath = $env:GAME1_REAL_ESTATE_PICKER_INITIAL_PATH
+if ($initialPath -and [System.IO.File]::Exists($initialPath)) {
+    $initialPath = [System.IO.Path]::GetDirectoryName($initialPath)
+}
+if ($initialPath -and [System.IO.Directory]::Exists($initialPath)) {
+    $dialog.InitialDirectory = $initialPath
+}
+if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    Write-Output $dialog.FileName
+}
+''',
+        {"GAME1_REAL_ESTATE_PICKER_INITIAL_PATH": str(initial_path or "")},
+    )
+
+
+def choose_real_estate_fbx() -> str:
+    return _powershell_picker(
+        r'''
+Add-Type -AssemblyName System.Windows.Forms
+$dialog = New-Object System.Windows.Forms.OpenFileDialog
+$dialog.Title = 'game1 · choose Real Estate FBX'
+$dialog.Filter = 'real estate model (*.fbx)|*.fbx'
+$dialog.Multiselect = $false
+if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    Write-Output $dialog.FileName
+}
+'''
+    )

@@ -43,6 +43,9 @@
       "StudioModelLoadCommands": {
         "$path": "modules/StudioModelLoadCommands.luau"
       },
+      "StudioRealEstateModel": {
+        "$path": "modules/StudioRealEstateModel.luau"
+      },
       "StudioActorSpawnCommands": {
         "$path": "modules/StudioActorSpawnCommands.luau"
       },

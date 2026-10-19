@@ -37,6 +37,8 @@ from options_store import OptionsStore
 from timeline_store import TimelineStore
 from location_store import LocationStore
 from location_asset_store import LocationAssetStore
+from real_estate.store import RealEstateStore
+from real_estate.studio_sync import RealEstateStudioSync
 from deco_layout_store import DecoLayoutStore
 from studio_save import request_active_studio_save
 from character_core.identity import CharacterIdentityService
@@ -46,11 +48,12 @@ from services.animation_export import write_animation_export
 from services.native_pickers import (
     choose_animation_folder, choose_character_fbx, choose_location_asset_fbx,
     choose_location_asset_texture, choose_monster_fbx, choose_monster_textures,
-    choose_weapon_fbx, choose_weapon_textures,
+    choose_weapon_fbx, choose_weapon_textures, choose_real_estate_fbx, choose_real_estate_texture,
 )
 from api.read_dispatch import dispatch as dispatch_read_request
 from api.write_dispatch import dispatch_post as dispatch_write_request, dispatch_delete as dispatch_delete_request
 from source_only_assets import migrate_source_only_assets
+from real_estate.jobs import RealEstatePublicationJobs
 
 migrate_source_only_assets(ROOT, ROOT / ".control-center" / "game1.db")
 
@@ -75,8 +78,11 @@ options_store = OptionsStore(ROOT)
 timelines = TimelineStore(ROOT, store, animations, monsters, monster_animations)
 locations = LocationStore(ROOT, run_location_authoring_bridge)
 location_assets = LocationAssetStore(ROOT)
+real_estate = RealEstateStore(ROOT, location_assets=location_assets)
+real_estate_publications = RealEstatePublicationJobs(real_estate)
 deco_layouts = DecoLayoutStore(ROOT)
 character_identity = CharacterIdentityService(ROOT, store, animations)
+real_estate_studio_sync = RealEstateStudioSync(real_estate, run_model_load_bridge)
 studio_asset_sync = StudioAssetSyncService(
     characters=store, weapons=weapons, monsters=monsters, npcs=npcs,
     load_model=run_model_load_bridge,
@@ -130,7 +136,8 @@ READ_SOURCES = MappingProxyType({
     "characters": store, "animations": animations,
     "weapons": weapons, "monsters": monsters, "monster_animations": monster_animations,
     "npcs": npcs, "npc_animations": npc_animations, "npc_equipment": npc_equipment,
-    "location_assets": location_assets, "npc_spawns": npc_spawns,
+    "location_assets": location_assets, "real_estate": real_estate,
+    "real_estate_publications": real_estate_publications, "npc_spawns": npc_spawns,
     "monster_spawns": monster_spawns, "animation_speed_scaling": animation_speed_scaling,
     "options": options_store, "timelines": timelines, "locations": locations,
     "publication_config": publication_config,
@@ -148,6 +155,11 @@ WRITE_SOURCES = MappingProxyType({
     "choose_character_fbx": choose_character_fbx,
     "choose_location_asset_fbx": choose_location_asset_fbx,
     "choose_location_asset_texture": choose_location_asset_texture,
+    "choose_real_estate_fbx": choose_real_estate_fbx,
+    "choose_real_estate_texture": choose_real_estate_texture,
+    "real_estate": real_estate,
+    "real_estate_publications": real_estate_publications,
+    "sync_real_estate_to_studio": real_estate_studio_sync.sync,
     "choose_monster_fbx": choose_monster_fbx,
     "choose_monster_textures": choose_monster_textures,
     "choose_weapon_fbx": choose_weapon_fbx,
@@ -213,7 +225,12 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if not self.auth():
             return self.out(401, {"error": "unauthorized"})
-        status, payload = dispatch_write_request(self.parsed().path, self.body, WRITE_SOURCES)
+        try:
+            status, payload = dispatch_write_request(self.parsed().path, self.body, WRITE_SOURCES)
+        except Exception:
+            import traceback
+            traceback.print_exc()
+            return self.out(500, {"error": "Host Agent failed to process the request; check its console log"})
         return self.out(status, payload)
 
     def do_DELETE(self):

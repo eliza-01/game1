@@ -15,6 +15,7 @@ local StudioModelLoadCommands = require(script.Parent.modules.StudioModelLoadCom
 local StudioActorSpawnCommands = require(script.Parent.modules.StudioActorSpawnCommands)
 local StudioTimelineEditorCommands = require(script.Parent.modules.StudioTimelineEditorCommands)
 local DecoManager = require(script.Parent.modules.DecoManager)
+local StudioDecoSyncCommands = require(script.Parent.modules.StudioDecoSyncCommands)
 
 local toolbar = plugin:CreateToolbar("game1")
 local markerVisibility = StudioMarkerVisibility.new(plugin, toolbar, Workspace)
@@ -107,6 +108,13 @@ local handleTimelineEditor = StudioTimelineEditorCommands({
     bridgeToken = BRIDGE_TOKEN,
 })
 
+local handleDecoRefresh = StudioDecoSyncCommands({
+    HttpService = HttpService,
+    decoManager = decoManager,
+    bridgeUrl = BRIDGE_URL,
+    bridgeToken = BRIDGE_TOKEN,
+})
+
 local function pollBridge()
     if RunService:IsRunning() then
         return
@@ -131,6 +139,8 @@ local function pollBridge()
         handleTimelineEditor(data)
     elseif data.command == "location-authoring" then
         locationCommands.handle(data)
+    elseif data.command == "deco-refresh" then
+        handleDecoRefresh(data)
     end
 end
 

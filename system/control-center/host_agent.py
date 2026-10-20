@@ -43,6 +43,7 @@ from deco_layout_store import DecoLayoutStore
 from studio_save import request_active_studio_save
 from character_core.identity import CharacterIdentityService
 from studio_bridge import run_model_load_bridge, run_monster_spawn_bridge, run_timeline_editor_bridge, run_location_authoring_bridge
+from services.studio_deco_bridge import run_deco_refresh_bridge
 from services.studio_asset_sync import StudioAssetSyncService
 from services.animation_export import write_animation_export
 from services.native_pickers import (
@@ -166,6 +167,7 @@ WRITE_SOURCES = MappingProxyType({
     "choose_weapon_textures": choose_weapon_textures,
     "deco_layouts": deco_layouts,
     "location_assets": location_assets,
+    "sync_location_assets_to_studio": run_deco_refresh_bridge,
     "locations": locations,
     "monster_animations": monster_animations,
     "monster_spawns": monster_spawns,

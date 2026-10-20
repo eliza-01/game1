@@ -28,6 +28,9 @@
       "DecoManager": {
         "$path": "modules/DecoManager.luau"
       },
+      "StudioDecoSyncCommands": {
+        "$path": "modules/StudioDecoSyncCommands.luau"
+      },
       "NpcSpawnPreview": {
         "$path": "modules/NpcSpawnPreview.luau"
       },

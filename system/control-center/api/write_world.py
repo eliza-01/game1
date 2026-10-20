@@ -26,6 +26,12 @@ def route(path, body, deps):
     sync_monster_to_studio = deps["sync_monster_to_studio"]
     timelines = deps["timelines"]
 
+    if path == "/api/location-assets/studio-sync":
+        try:
+            return out(200, {"studio": deps["sync_location_assets_to_studio"]()})
+        except Exception as error:
+            return out(400, {"error": str(error)})
+
     if path == "/api/location-assets":
         try:
             return out(200, location_assets.register(body()))

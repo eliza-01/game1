@@ -292,7 +292,7 @@
 <div><span class="eyebrow">environment library · published decor</span><h2>location assets</h2><p>register a static decoration with one FBX and either a new PNG/JPG texture or a texture already registered by another location asset. replacing an owned texture publishes a new Roblox Image Asset ID; assets reusing that texture follow the owner's new ID automatically. publish the required assets, then place published variants through Studio DecoManager. placed instances belong to the place; registry publication and placement backups stay separate.</p><div class="deco-category-strip"><span>trees</span><span>bushes</span><span>rocks</span><span>lights</span><span>fences</span><span>decorations</span><span>ladders</span><span>flowers</span><span>buildings</span></div></div>
 <div class="metrics"><div><b id="location-asset-metric-total">0</b><span>registered</span></div><div><b id="location-asset-metric-published">0</b><span>published</span></div><div><b id="location-asset-metric-changed">0</b><span>changed</span></div></div>
 </div>
-<div class="panel runtime-card"><div class="runtime-state registered"><strong>DecoManager registry</strong><span>Studio reads published entries directly from Asset Manager. No ServerStorage sync is required.</span></div><div id="location-asset-publication-state" class="publication-missing">open cloud: checking…</div></div>
+<div class="panel runtime-card"><div class="runtime-state registered"><strong>DecoManager registry</strong><span>Sync Studio refreshes DecoManager and the textures/SurfaceAppearance of already placed decorations. New assets are placed through DecoManager; no ServerStorage import.</span></div><div id="location-asset-publication-state" class="publication-missing">open cloud: checking…</div></div>
 <div class="deco-asset-workflow">
 <div class="panel character-card">
 <div class="section-title"><div><span>01 · identity</span><h3>register location asset</h3></div><button id="new-location-asset-main" type="button">new asset</button></div>
@@ -309,7 +309,7 @@
 <hr class="card-separator">
 <span class="eyebrow">03 · publication</span><h3 class="subheading">Roblox model + image</h3>
 <label>description<input id="location-asset-publication-description" value="Game1 Location Asset"><small class="hint">filled automatically from the selected asset, for example <code>Game1 Location Asset Oak Tree</code>.</small></label>
-<div class="actions"><button id="publish-location-asset" class="primary" type="button" disabled>publish all changed</button></div>
+<div class="actions"><button id="publish-location-asset" class="primary" type="button" disabled>publish all changed</button><button id="sync-location-assets" type="button" disabled>sync studio</button></div>
 <small id="location-asset-publication-hint" class="hint">select a registered location asset.</small>
 </div>
 <div class="panel character-card">
@@ -535,7 +535,7 @@
 <script src="animation-speed.js?v=3"></script>
 <script src="timelines.js?v=2"></script>
 <script src="locations.js?v=1"></script>
-<script src="deco-assets.js?v=5"></script>
+<script src="deco-assets.js?v=6"></script>
 <script src="options.js?v=1"></script>
 <script src="weapon-assets.js?v=3"></script>
 <script src="monster-assets.js?v=6"></script>

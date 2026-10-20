@@ -24,6 +24,7 @@ local StudioModelLoadCommands = require(script.Parent.modules.StudioModelLoadCom
 local StudioActorSpawnCommands = require(script.Parent.modules.StudioActorSpawnCommands)
 local StudioTimelineEditorCommands = require(script.Parent.modules.StudioTimelineEditorCommands)
 local DecoManager = require(script.Parent.modules.DecoManager)
+local StudioDecoSyncCommands = require(script.Parent.modules.StudioDecoSyncCommands)
 
 local toolbar = plugin:CreateToolbar("game1")
 local markerVisibility = StudioMarkerVisibility.new(plugin, toolbar, Workspace)
@@ -116,6 +117,13 @@ local handleTimelineEditor = StudioTimelineEditorCommands({
     bridgeToken = BRIDGE_TOKEN,
 })
 
+local handleDecoRefresh = StudioDecoSyncCommands({
+    HttpService = HttpService,
+    decoManager = decoManager,
+    bridgeUrl = BRIDGE_URL,
+    bridgeToken = BRIDGE_TOKEN,
+})
+
 local function pollBridge()
     if RunService:IsRunning() then
         return
@@ -140,6 +148,8 @@ local function pollBridge()
         handleTimelineEditor(data)
     elseif data.command == "location-authoring" then
         locationCommands.handle(data)
+    elseif data.command == "deco-refresh" then
+        handleDecoRefresh(data)
     end
 end
 
@@ -712,7 +722,7 @@ function DecoManager:refreshRegistry()
         self.registry = nil
         self:_clearPreview()
         self:_setStatus("Asset Manager unavailable · " .. tostring(result))
-        return
+        return nil, tostring(result)
     end
     self.registry = result
     local syncResult = DecoPlacedAssetSync.RefreshTextures(self.Workspace, result)
@@ -725,7 +735,10 @@ function DecoManager:refreshRegistry()
             syncResult.models,
             syncResult.parts
         ))
+    else
+        self:_setStatus("Registry refreshed · placed textures are already current")
     end
+    return { models = syncResult.models, parts = syncResult.parts, registryItems = #result.items }
 end
 
 function DecoManager:_placeCurrent()
@@ -2537,6 +2550,51 @@ end
       </Item>
       <Item class="ModuleScript" referent="14">
         <Properties>
+          <string name="Name">StudioDecoSyncCommands</string>
+          <string name="Source"><![CDATA[-- Transport-only adapter for DecoManager's existing registry/material refresh.
+-- Never imports models into ServerStorage or modifies published asset identities.
+return function(config: any)
+    return function(command: any)
+        if command.project ~= "game1" or command.schemaVersion ~= 1
+            or type(command.operationId) ~= "string" or command.operationId == "" then
+            warn("[game1] invalid deco-refresh command")
+            return
+        end
+        local ok, report, refreshError = pcall(function()
+            return config.decoManager:refreshRegistry()
+        end)
+        local payload = {
+            project = "game1",
+            command = "deco-refresh",
+            schemaVersion = 1,
+            operationId = command.operationId,
+        }
+        if ok and report ~= nil then
+            payload.models = report.models
+            payload.parts = report.parts
+            payload.registryItems = report.registryItems
+        else
+            payload.error = tostring(if ok then refreshError else report)
+        end
+        local posted, response = pcall(config.HttpService.RequestAsync, config.HttpService, {
+            Url = config.bridgeUrl .. "/deco-refresh-result",
+            Method = "POST",
+            Headers = {
+                ["X-Game1-Token"] = config.bridgeToken,
+                ["Content-Type"] = "application/json",
+            },
+            Body = config.HttpService:JSONEncode(payload),
+        })
+        if not posted or not response.Success then
+            warn("[game1] deco-refresh result could not be reported: " .. tostring(if posted then response.Body else response))
+        end
+    end
+end
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="15">
+        <Properties>
           <string name="Name">StudioMarkerVisibility</string>
           <string name="Source"><![CDATA[-- Studio-only presentation toggle. No movement of markers, no metadata edits.
 -- Visibility is re-applied from authored marker defaults after Studio restart.
@@ -2679,7 +2737,7 @@ return table.freeze(Visibility)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="15">
+      <Item class="ModuleScript" referent="16">
         <Properties>
           <string name="Name">StudioModelLoadCommands</string>
           <string name="Source"><![CDATA[-- Studio model-sync command: validates and imports Character, Monster/NPC and Weapon models.
@@ -3224,7 +3282,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="16">
+      <Item class="ModuleScript" referent="17">
         <Properties>
           <string name="Name">StudioRealEstateModel</string>
           <string name="Source"><![CDATA[-- Studio assembly for any number of independent Real Estate MeshPart rigs.
@@ -3423,7 +3481,7 @@ return table.freeze(StudioRealEstateModel)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="17">
+      <Item class="ModuleScript" referent="18">
         <Properties>
           <string name="Name">StudioTextureAppearance</string>
           <string name="Source"><![CDATA[-- Shared Studio-side material binding for all authored MeshParts.
@@ -3485,7 +3543,7 @@ return table.freeze(StudioTextureAppearance)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="18">
+      <Item class="ModuleScript" referent="19">
         <Properties>
           <string name="Name">StudioTimelineEditorCommands</string>
           <string name="Source"><![CDATA[-- Timeline authoring session: validates requests, binds UI events and reports results.
@@ -3774,7 +3832,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="19">
+      <Item class="ModuleScript" referent="20">
         <Properties>
           <string name="Name">StudioTimelinePoseSampler</string>
           <string name="Source"><![CDATA[-- Offline pose extraction and interpolation for a preview rig. No UI or HTTP dependencies.
@@ -3953,7 +4011,7 @@ return table.freeze(StudioTimelinePoseSampler)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="20">
+      <Item class="ModuleScript" referent="21">
         <Properties>
           <string name="Name">StudioTimelinePreview</string>
           <string name="Source"><![CDATA[-- Owns the isolated ViewportFrame rig, camera interaction and animation-asset retrieval.
@@ -4169,7 +4227,7 @@ return table.freeze(StudioTimelinePreview)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="21">
+      <Item class="ModuleScript" referent="22">
         <Properties>
           <string name="Name">StudioTimelineTransport</string>
           <string name="Source"><![CDATA[-- HTTP boundary for the Timeline editor. No UI, animation or Studio model access.
@@ -4227,7 +4285,7 @@ return table.freeze(StudioTimelineTransport)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="22">
+      <Item class="ModuleScript" referent="23">
         <Properties>
           <string name="Name">StudioTimelineWidget</string>
           <string name="Source"><![CDATA[-- Timeline editor view. Builds the dock widget and exposes only its controls.

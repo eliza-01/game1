@@ -210,6 +210,7 @@ function decoAssetRender() {
   }
 
   $('publish-location-asset').disabled = !selected || !publication.configured;
+  $('sync-location-assets').disabled = !(decoAssetState.data.items || []).some(row => row.status === 'PUBLISHED');
   $('delete-location-asset').disabled = !selected;
   $('location-asset-publication-hint').textContent = selected
     ? (selected.status === 'PUBLISHED'
@@ -331,6 +332,24 @@ async function decoAssetPublish() {
   }
 }
 
+// DecoManager is the owner of Studio placement. Sync refreshes its registry
+// and rebinds the material on placed instances; it never imports duplicates.
+async function decoAssetSyncStudio() {
+  const button = $('sync-location-assets');
+  if (button.disabled) return;
+  button.disabled = true;
+  try {
+    toast('syncing DecoManager and placed asset textures in Studio…');
+    const result = await request('/api/location-assets/studio-sync', { method: 'POST' });
+    const studio = result.studio || {};
+    toast(`Studio synced · ${Number(studio.models || 0)} placed model(s), ${Number(studio.parts || 0)} MeshPart(s) updated · ${Number(studio.registryItems || 0)} registered`);
+  } catch (error) {
+    toast(error.message, true);
+  } finally {
+    decoAssetRender();
+  }
+}
+
 async function decoAssetDelete() {
   const row = decoAssetSelected();
   if (!row || !confirm(`delete ${row.name_en} from the game1 location asset registry? placed Studio instances are not removed.`)) {
@@ -383,4 +402,5 @@ $('location-asset-category').onchange = () => {
 $('register-location-asset').onclick = decoAssetRegister;
 $('clear-location-asset-form').onclick = decoAssetBeginNew;
 $('publish-location-asset').onclick = decoAssetPublish;
+$('sync-location-assets').onclick = decoAssetSyncStudio;
 $('delete-location-asset').onclick = decoAssetDelete;

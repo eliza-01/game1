@@ -324,7 +324,7 @@ function DecoManager:refreshRegistry()
         self.registry = nil
         self:_clearPreview()
         self:_setStatus("Asset Manager unavailable · " .. tostring(result))
-        return
+        return nil, tostring(result)
     end
     self.registry = result
     local syncResult = DecoPlacedAssetSync.RefreshTextures(self.Workspace, result)
@@ -337,7 +337,10 @@ function DecoManager:refreshRegistry()
             syncResult.models,
             syncResult.parts
         ))
+    else
+        self:_setStatus("Registry refreshed · placed textures are already current")
     end
+    return { models = syncResult.models, parts = syncResult.parts, registryItems = #result.items }
 end
 
 function DecoManager:_placeCurrent()

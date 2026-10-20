@@ -1,6 +1,7 @@
 """Sync published Real Estate templates using the existing Game1Bridge model-load command."""
 from pathlib import Path
 from .contracts import present_parts
+from services.texture_alpha import texture_binding
 
 
 class RealEstateStudioSync:
@@ -31,7 +32,7 @@ class RealEstateStudioSync:
                 for part in row['skeleton']['meshes']
             },
             'textures': [
-                {'slot': name, 'assetId': data['assetId']}
+                texture_binding(name, data['assetId'], getattr(self.store, 'root', None), data.get('path') or '')
                 for name, data in row['textures'].items()
             ],
         }

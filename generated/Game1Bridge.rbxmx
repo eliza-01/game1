@@ -267,7 +267,8 @@ return CharacterTemplate
       <Item class="ModuleScript" referent="4">
         <Properties>
           <string name="Name">DecoAssetLoader</string>
-          <string name="Source"><![CDATA[local DecoAssetLoader = {}
+          <string name="Source"><![CDATA[local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
+local DecoAssetLoader = {}
 DecoAssetLoader.__index = DecoAssetLoader
 
 local function canonicalModel(loaded: Instance): Model
@@ -304,7 +305,7 @@ local function sanitize(model: Model)
     end
 end
 
-local function applyTexture(model: Model, textureAssetId: string)
+local function applyTexture(model: Model, textureAssetId: string, usesAlpha: any)
     local numericId = tonumber(textureAssetId)
     if numericId == nil or numericId <= 0 then
         return 0
@@ -313,7 +314,7 @@ local function applyTexture(model: Model, textureAssetId: string)
     local applied = 0
     for _, descendant in ipairs(model:GetDescendants()) do
         if descendant:IsA("MeshPart") then
-            descendant.TextureID = uri
+            StudioTextureAppearance.Apply(descendant, uri, usesAlpha)
             applied += 1
         end
     end
@@ -374,7 +375,7 @@ function DecoAssetLoader:loadPublished(row: any): Model
     local model = canonicalModel(loaded)
     model.Name = tostring(row.slug or "deco_asset")
     sanitize(model)
-    applyTexture(model, tostring(row.texture_asset_id or ""))
+    applyTexture(model, tostring(row.texture_asset_id or ""), row.textureUsesAlpha)
     return model
 end
 
@@ -877,7 +878,8 @@ return DecoManager
       <Item class="ModuleScript" referent="6">
         <Properties>
           <string name="Name">DecoPlacedAssetSync</string>
-          <string name="Source"><![CDATA[local DecoPlacedAssetSync = {}
+          <string name="Source"><![CDATA[local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
+local DecoPlacedAssetSync = {}
 
 local ROOT_NAME = "Game1DecoAssets"
 local ASSET_SLUG_ATTRIBUTE = "Game1DecoAssetSlug"
@@ -914,8 +916,7 @@ function DecoPlacedAssetSync.RefreshTextures(workspace: Workspace, registry: any
                 local uri = "rbxassetid://" .. tostring(math.floor(numericId))
                 local modelChanged = false
                 for _, part in ipairs(descendant:GetDescendants()) do
-                    if part:IsA("MeshPart") and part.TextureID ~= uri then
-                        part.TextureID = uri
+                    if part:IsA("MeshPart") and StudioTextureAppearance.Apply(part, uri, row.textureUsesAlpha) then
                         changedParts += 1
                         modelChanged = true
                     end
@@ -2685,6 +2686,7 @@ return table.freeze(Visibility)
 -- Transport/AssetService dependencies are passed by the Game1Bridge composition root.
 local CharacterTemplate = require(script.Parent.CharacterTemplate)
 local StudioRealEstateModel = require(script.Parent.StudioRealEstateModel)
+local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
 
 return function(services)
     local AssetService = services.AssetService
@@ -2940,6 +2942,7 @@ return function(services)
                 table.insert(validTextures, {
                     slot = string.lower(tostring(row.slot or "")),
                     assetId = tostring(math.floor(assetId)),
+                    usesAlpha = row.usesAlpha,
                 })
             end
         end
@@ -2949,7 +2952,7 @@ return function(services)
         if #validTextures == 1 then
             local uri = "rbxassetid://" .. validTextures[1].assetId
             for _, mesh in ipairs(meshParts) do
-                mesh.TextureID = uri
+                StudioTextureAppearance.Apply(mesh, uri, validTextures[1].usesAlpha)
                 applied += 1
             end
         elseif #validTextures > 1 then
@@ -2958,13 +2961,13 @@ return function(services)
                 for _, mesh in ipairs(meshParts) do
                     local meshName = string.lower(mesh.Name)
                     if texture.slot ~= "" and string.find(meshName, texture.slot, 1, true) then
-                        mesh.TextureID = "rbxassetid://" .. texture.assetId
+                        StudioTextureAppearance.Apply(mesh, "rbxassetid://" .. texture.assetId, texture.usesAlpha)
                         matched = true
                         applied += 1
                     end
                 end
                 if not matched and #validTextures == #meshParts and meshParts[index] then
-                    meshParts[index].TextureID = "rbxassetid://" .. texture.assetId
+                    StudioTextureAppearance.Apply(meshParts[index], "rbxassetid://" .. texture.assetId, texture.usesAlpha)
                     matched = true
                     applied += 1
                 end
@@ -3227,6 +3230,7 @@ end
           <string name="Source"><![CDATA[-- Studio assembly for any number of independent Real Estate MeshPart rigs.
 -- This adapter validates the complete template before touching ServerStorage.
 local HttpService = game:GetService("HttpService")
+local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
 local StudioRealEstateModel = {}
 
 local function findMesh(root: Instance, expected: string): MeshPart
@@ -3332,11 +3336,13 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
         error("Studio Sync requires published Model Asset IDs for every Real Estate mesh")
     end
     local imageAssets = {}
+    local imageAlpha = {}
     for _, entry in metadata.textures or {} do
         local part = tostring(entry.slot or "")
         local id = tonumber(entry.assetId)
         if id and id > 0 and manifests[part] ~= nil then
             imageAssets[part] = tostring(math.floor(id))
+            imageAlpha[part] = entry.usesAlpha
         end
     end
     local seenModels = {}
@@ -3390,7 +3396,7 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
         local rigName = part:sub(1, 1):upper() .. part:sub(2) .. "Rig"
         entry.rig.Name = rigName
         entry.rig.Parent = wrapper
-        meshes[part].TextureID = "rbxassetid://" .. imageAssets[part]
+        StudioTextureAppearance.Apply(meshes[part], "rbxassetid://" .. imageAssets[part], imageAlpha[part])
     end
     wrapper:SetAttribute("Game1RealEstateTemplate", true)
     wrapper:SetAttribute("Game1ModelAssetId", tostring(assetId))
@@ -3418,6 +3424,68 @@ return table.freeze(StudioRealEstateModel)
         </Properties>
       </Item>
       <Item class="ModuleScript" referent="17">
+        <Properties>
+          <string name="Name">StudioTextureAppearance</string>
+          <string name="Source"><![CDATA[-- Shared Studio-side material binding for all authored MeshParts.
+-- Keep TextureID even when SurfaceAppearance owns ColorMap: imported skinned
+-- rigs in the previous project required this compatibility invariant.
+local StudioTextureAppearance = {}
+
+function StudioTextureAppearance.Apply(mesh: MeshPart, uri: string, usesAlpha: any): boolean
+    if uri == "" then
+        return false
+    end
+    local surface = mesh:FindFirstChildOfClass("SurfaceAppearance")
+    local desiredMode = if usesAlpha == true then Enum.AlphaMode.Transparency else Enum.AlphaMode.Overlay
+    local modeKnown = typeof(usesAlpha) == "boolean"
+    local alreadyCurrent = mesh.TextureID == uri
+        and surface ~= nil and surface.ColorMap == uri
+        and (not modeKnown or surface.AlphaMode == desiredMode)
+    if alreadyCurrent then
+        return false
+    end
+
+    -- Do not change normals, roughness, metalness, mesh geometry or physics.
+    -- Parent a new appearance only after its properties have been set.
+    local created = false
+    if surface == nil then
+        surface = Instance.new("SurfaceAppearance")
+        surface.Name = "SurfaceAppearance"
+        created = true
+    end
+    local previousTexture = mesh.TextureID
+    local previousMap = surface.ColorMap
+    local previousMode = surface.AlphaMode
+    local ok, reason = pcall(function()
+        mesh.TextureID = uri
+        surface.ColorMap = uri
+        if modeKnown then
+            surface.AlphaMode = desiredMode
+        end
+        if created then
+            surface.Parent = mesh
+        end
+    end)
+    if not ok then
+        pcall(function()
+            mesh.TextureID = previousTexture
+            if created then
+                surface:Destroy()
+            else
+                surface.ColorMap = previousMap
+                surface.AlphaMode = previousMode
+            end
+        end)
+        error("SurfaceAppearance binding failed for " .. mesh:GetFullName() .. ": " .. tostring(reason), 2)
+    end
+    return true
+end
+
+return table.freeze(StudioTextureAppearance)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="18">
         <Properties>
           <string name="Name">StudioTimelineEditorCommands</string>
           <string name="Source"><![CDATA[-- Timeline authoring session: validates requests, binds UI events and reports results.
@@ -3706,7 +3774,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="18">
+      <Item class="ModuleScript" referent="19">
         <Properties>
           <string name="Name">StudioTimelinePoseSampler</string>
           <string name="Source"><![CDATA[-- Offline pose extraction and interpolation for a preview rig. No UI or HTTP dependencies.
@@ -3885,7 +3953,7 @@ return table.freeze(StudioTimelinePoseSampler)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="19">
+      <Item class="ModuleScript" referent="20">
         <Properties>
           <string name="Name">StudioTimelinePreview</string>
           <string name="Source"><![CDATA[-- Owns the isolated ViewportFrame rig, camera interaction and animation-asset retrieval.
@@ -4101,7 +4169,7 @@ return table.freeze(StudioTimelinePreview)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="20">
+      <Item class="ModuleScript" referent="21">
         <Properties>
           <string name="Name">StudioTimelineTransport</string>
           <string name="Source"><![CDATA[-- HTTP boundary for the Timeline editor. No UI, animation or Studio model access.
@@ -4159,7 +4227,7 @@ return table.freeze(StudioTimelineTransport)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="21">
+      <Item class="ModuleScript" referent="22">
         <Properties>
           <string name="Name">StudioTimelineWidget</string>
           <string name="Source"><![CDATA[-- Timeline editor view. Builds the dock widget and exposes only its controls.

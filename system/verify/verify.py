@@ -2308,7 +2308,7 @@ deco_loader_text = deco_loader_path.read_text(encoding="utf-8") if deco_loader_p
 for required in [
     'self.AssetService:LoadAssetAsync(assetId)',
     'row.status or ""',
-    'descendant.TextureID = uri',
+    'StudioTextureAppearance.Apply(descendant, uri, usesAlpha)',
     'Url = self.agentBaseUrl .. "/api/location-assets"',
 ]:
     if required not in deco_loader_text:
@@ -2737,7 +2737,7 @@ for required in [
 ]:
     if required not in (index_m43_text + deco_assets_js_text):
         err(f"m51 Location Assets UI publication identity missing {required}")
-for required in ["Game1DecoAssetSlug", "part.TextureID = uri", "RefreshTextures"]:
+for required in ["Game1DecoAssetSlug", "StudioTextureAppearance.Apply(part, uri, row.textureUsesAlpha)", "RefreshTextures"]:
     if required not in deco_placed_sync_text:
         err(f"m51 DecoManager placed-texture sync missing {required}")
 for required in ["DecoPlacedAssetSync.RefreshTextures", "Refresh Deco Asset Textures"]:
@@ -2745,7 +2745,7 @@ for required in ["DecoPlacedAssetSync.RefreshTextures", "Refresh Deco Asset Text
         err(f"m51 DecoManager registry refresh integration missing {required}")
 if '"DecoPlacedAssetSync"' not in plugin_project_text:
     err("m51 Studio plugin project is missing DecoPlacedAssetSync")
-for required in ["textureAssetId", "part.TextureID = uri", "ApplyModel", "ApplyPart"]:
+for required in ["textureAssetId", "mesh.TextureID = uri", "surface.ColorMap = uri", "ApplyModel", "ApplyPart"]:
     if required not in environment_visuals_text:
         err(f"m51 runtime environment texture hydration missing {required}")
 for required in ["EnvironmentAssetVisuals.ApplyModel", "EnvironmentAssetVisuals.ApplyPart"]:

@@ -43,6 +43,9 @@
       "StudioModelLoadCommands": {
         "$path": "modules/StudioModelLoadCommands.luau"
       },
+      "StudioTextureAppearance": {
+        "$path": "modules/StudioTextureAppearance.luau"
+      },
       "StudioRealEstateModel": {
         "$path": "modules/StudioRealEstateModel.luau"
       },

@@ -8,6 +8,7 @@ import shutil
 import time
 
 from sqlite_connection import connect as connect_sqlite
+from services.texture_alpha import texture_uses_alpha
 
 from opencloud_assets import (
     create_image_asset,
@@ -239,6 +240,10 @@ class LocationAssetStore:
         result["texture_filename"] = (
             str(result.get("texture_filename") or "")
             or Path(str(result.get("texture_path") or "")).name
+        )
+        result["textureUsesAlpha"] = (
+            texture_uses_alpha(self.root, str(result.get("texture_path") or ""))
+            if self._texture_current(result) else None
         )
         result["status"] = self._status(result)
         result["category_label"] = CATEGORY_LABELS.get(result.get("category"), str(result.get("category") or ""))
@@ -568,6 +573,9 @@ class LocationAssetStore:
                 f"\t\t\tstatus = {self._lua_string(row['status'])},",
                 f"\t\t\tmodelAssetId = {self._lua_string(row.get('model_asset_id') or '')},",
                 f"\t\t\ttextureAssetId = {self._lua_string(row.get('texture_asset_id') or '')},",
+                ("\t\t\ttextureUsesAlpha = " + (
+                    "nil" if row.get('textureUsesAlpha') is None else
+                    str(row['textureUsesAlpha']).lower()) + ","),
                 f"\t\t\ttextureOwnerSlug = {self._lua_string(row.get('texture_owner_slug') or '')},",
                 f"\t\t\ttextureShared = {str(bool(row.get('texture_shared'))).lower()},",
                 f"\t\t\tdestructible = {str(bool(row.get('destructible'))).lower()},",

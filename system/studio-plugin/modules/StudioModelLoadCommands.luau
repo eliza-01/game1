@@ -2,6 +2,7 @@
 -- Transport/AssetService dependencies are passed by the Game1Bridge composition root.
 local CharacterTemplate = require(script.Parent.CharacterTemplate)
 local StudioRealEstateModel = require(script.Parent.StudioRealEstateModel)
+local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
 
 return function(services)
     local AssetService = services.AssetService
@@ -257,6 +258,7 @@ return function(services)
                 table.insert(validTextures, {
                     slot = string.lower(tostring(row.slot or "")),
                     assetId = tostring(math.floor(assetId)),
+                    usesAlpha = row.usesAlpha,
                 })
             end
         end
@@ -266,7 +268,7 @@ return function(services)
         if #validTextures == 1 then
             local uri = "rbxassetid://" .. validTextures[1].assetId
             for _, mesh in ipairs(meshParts) do
-                mesh.TextureID = uri
+                StudioTextureAppearance.Apply(mesh, uri, validTextures[1].usesAlpha)
                 applied += 1
             end
         elseif #validTextures > 1 then
@@ -275,13 +277,13 @@ return function(services)
                 for _, mesh in ipairs(meshParts) do
                     local meshName = string.lower(mesh.Name)
                     if texture.slot ~= "" and string.find(meshName, texture.slot, 1, true) then
-                        mesh.TextureID = "rbxassetid://" .. texture.assetId
+                        StudioTextureAppearance.Apply(mesh, "rbxassetid://" .. texture.assetId, texture.usesAlpha)
                         matched = true
                         applied += 1
                     end
                 end
                 if not matched and #validTextures == #meshParts and meshParts[index] then
-                    meshParts[index].TextureID = "rbxassetid://" .. texture.assetId
+                    StudioTextureAppearance.Apply(meshParts[index], "rbxassetid://" .. texture.assetId, texture.usesAlpha)
                     matched = true
                     applied += 1
                 end

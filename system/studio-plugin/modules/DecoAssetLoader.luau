@@ -1,3 +1,4 @@
+local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
 local DecoAssetLoader = {}
 DecoAssetLoader.__index = DecoAssetLoader
 
@@ -35,7 +36,7 @@ local function sanitize(model: Model)
     end
 end
 
-local function applyTexture(model: Model, textureAssetId: string)
+local function applyTexture(model: Model, textureAssetId: string, usesAlpha: any)
     local numericId = tonumber(textureAssetId)
     if numericId == nil or numericId <= 0 then
         return 0
@@ -44,7 +45,7 @@ local function applyTexture(model: Model, textureAssetId: string)
     local applied = 0
     for _, descendant in ipairs(model:GetDescendants()) do
         if descendant:IsA("MeshPart") then
-            descendant.TextureID = uri
+            StudioTextureAppearance.Apply(descendant, uri, usesAlpha)
             applied += 1
         end
     end
@@ -105,7 +106,7 @@ function DecoAssetLoader:loadPublished(row: any): Model
     local model = canonicalModel(loaded)
     model.Name = tostring(row.slug or "deco_asset")
     sanitize(model)
-    applyTexture(model, tostring(row.texture_asset_id or ""))
+    applyTexture(model, tostring(row.texture_asset_id or ""), row.textureUsesAlpha)
     return model
 end
 

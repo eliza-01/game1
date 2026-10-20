@@ -65,6 +65,7 @@
       "texture_filename": "smithy.png",
       "texture_owner_slug": "smithy",
       "texture_shared": true,
+      "textureUsesAlpha": false,
       "status": "PUBLISHED",
       "category_label": "Buildings"
     },
@@ -91,6 +92,7 @@
       "texture_filename": "smithy.png",
       "texture_owner_slug": "smithy",
       "texture_shared": false,
+      "textureUsesAlpha": false,
       "status": "PUBLISHED",
       "category_label": "Buildings"
     },
@@ -117,6 +119,7 @@
       "texture_filename": "christmas_tree.jpg",
       "texture_owner_slug": "christmas_tree",
       "texture_shared": true,
+      "textureUsesAlpha": false,
       "status": "PUBLISHED",
       "category_label": "Bushes"
     },
@@ -143,6 +146,7 @@
       "texture_filename": "main_statue.jpg",
       "texture_owner_slug": "main_statue",
       "texture_shared": true,
+      "textureUsesAlpha": false,
       "status": "PUBLISHED",
       "category_label": "Decorations"
     },
@@ -169,6 +173,7 @@
       "texture_filename": "wooden_post_kit.png",
       "texture_owner_slug": "wooden_post_01",
       "texture_shared": false,
+      "textureUsesAlpha": true,
       "status": "PUBLISHED",
       "category_label": "Decorations"
     },
@@ -195,6 +200,7 @@
       "texture_filename": "stone_fence_01.jpg",
       "texture_owner_slug": "stone_fence_01",
       "texture_shared": false,
+      "textureUsesAlpha": false,
       "status": "PUBLISHED",
       "category_label": "Fences"
     },
@@ -221,6 +227,7 @@
       "texture_filename": "stone_fence_01.jpg",
       "texture_owner_slug": "stone_fence_01",
       "texture_shared": true,
+      "textureUsesAlpha": false,
       "status": "PUBLISHED",
       "category_label": "Fences"
     },
@@ -247,6 +254,7 @@
       "texture_filename": "stone_fence_01.jpg",
       "texture_owner_slug": "stone_fence_01",
       "texture_shared": true,
+      "textureUsesAlpha": false,
       "status": "PUBLISHED",
       "category_label": "Fences"
     },
@@ -273,6 +281,7 @@
       "texture_filename": "stone_fence_01.jpg",
       "texture_owner_slug": "stone_fence_01",
       "texture_shared": true,
+      "textureUsesAlpha": false,
       "status": "PUBLISHED",
       "category_label": "Fences"
     },
@@ -299,6 +308,7 @@
       "texture_filename": "stone_fence_01.jpg",
       "texture_owner_slug": "stone_fence_01",
       "texture_shared": true,
+      "textureUsesAlpha": false,
       "status": "PUBLISHED",
       "category_label": "Ladders"
     },
@@ -318,13 +328,14 @@
       "texture_moderation_state": "Reviewing",
       "texture_reference_slug": "",
       "destructible": false,
-      "revision": 1,
+      "revision": 2,
       "created_at": 1792407624.9011502,
-      "updated_at": 1792407644.3949478,
+      "updated_at": 1792471908.6507244,
       "published_at": 1792407644.3949478,
       "texture_filename": "wooden_post_kit.png",
       "texture_owner_slug": "wooden_bridge_bar_01",
       "texture_shared": false,
+      "textureUsesAlpha": true,
       "status": "PUBLISHED",
       "category_label": "Ladders"
     },
@@ -351,6 +362,7 @@
       "texture_filename": "wall_torch_01.jpg",
       "texture_owner_slug": "wall_torch_01",
       "texture_shared": true,
+      "textureUsesAlpha": false,
       "status": "PUBLISHED",
       "category_label": "Lights"
     },
@@ -377,6 +389,7 @@
       "texture_filename": "wall_torch_01.jpg",
       "texture_owner_slug": "wall_torch_01",
       "texture_shared": true,
+      "textureUsesAlpha": false,
       "status": "PUBLISHED",
       "category_label": "Lights"
     },
@@ -403,6 +416,7 @@
       "texture_filename": "wall_torch_01.jpg",
       "texture_owner_slug": "wall_torch_01",
       "texture_shared": true,
+      "textureUsesAlpha": false,
       "status": "PUBLISHED",
       "category_label": "Lights"
     },
@@ -429,6 +443,7 @@
       "texture_filename": "main_statue.jpg",
       "texture_owner_slug": "main_statue",
       "texture_shared": true,
+      "textureUsesAlpha": false,
       "status": "PUBLISHED",
       "category_label": "Lights"
     },
@@ -455,6 +470,7 @@
       "texture_filename": "wooden_post_kit.png",
       "texture_owner_slug": "wooden_bridge_bar_01",
       "texture_shared": true,
+      "textureUsesAlpha": true,
       "status": "PUBLISHED",
       "category_label": "Lights"
     },
@@ -481,6 +497,7 @@
       "texture_filename": "wall_torch_01.jpg",
       "texture_owner_slug": "wall_torch_01",
       "texture_shared": false,
+      "textureUsesAlpha": false,
       "status": "PUBLISHED",
       "category_label": "Lights"
     },
@@ -507,6 +524,7 @@
       "texture_filename": "wall_torch_01.jpg",
       "texture_owner_slug": "wall_torch_01",
       "texture_shared": true,
+      "textureUsesAlpha": false,
       "status": "PUBLISHED",
       "category_label": "Lights"
     },
@@ -533,6 +551,7 @@
       "texture_filename": "wall_torch_01.jpg",
       "texture_owner_slug": "wall_torch_01",
       "texture_shared": true,
+      "textureUsesAlpha": false,
       "status": "PUBLISHED",
       "category_label": "Lights"
     },
@@ -559,6 +578,7 @@
       "texture_filename": "main_statue.jpg",
       "texture_owner_slug": "main_statue",
       "texture_shared": false,
+      "textureUsesAlpha": false,
       "status": "PUBLISHED",
       "category_label": "Rocks"
     },
@@ -585,6 +605,7 @@
       "texture_filename": "christmas_tree.jpg",
       "texture_owner_slug": "christmas_tree",
       "texture_shared": true,
+      "textureUsesAlpha": false,
       "status": "PUBLISHED",
       "category_label": "Trees"
     },
@@ -611,6 +632,7 @@
       "texture_filename": "christmas_tree.jpg",
       "texture_owner_slug": "christmas_tree",
       "texture_shared": true,
+      "textureUsesAlpha": false,
       "status": "PUBLISHED",
       "category_label": "Trees"
     },
@@ -637,6 +659,7 @@
       "texture_filename": "christmas_tree.jpg",
       "texture_owner_slug": "christmas_tree",
       "texture_shared": false,
+      "textureUsesAlpha": false,
       "status": "PUBLISHED",
       "category_label": "Trees"
     }

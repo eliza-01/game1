@@ -1,6 +1,7 @@
 -- Studio assembly for any number of independent Real Estate MeshPart rigs.
 -- This adapter validates the complete template before touching ServerStorage.
 local HttpService = game:GetService("HttpService")
+local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
 local StudioRealEstateModel = {}
 
 local function findMesh(root: Instance, expected: string): MeshPart
@@ -106,11 +107,13 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
         error("Studio Sync requires published Model Asset IDs for every Real Estate mesh")
     end
     local imageAssets = {}
+    local imageAlpha = {}
     for _, entry in metadata.textures or {} do
         local part = tostring(entry.slot or "")
         local id = tonumber(entry.assetId)
         if id and id > 0 and manifests[part] ~= nil then
             imageAssets[part] = tostring(math.floor(id))
+            imageAlpha[part] = entry.usesAlpha
         end
     end
     local seenModels = {}
@@ -164,7 +167,7 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
         local rigName = part:sub(1, 1):upper() .. part:sub(2) .. "Rig"
         entry.rig.Name = rigName
         entry.rig.Parent = wrapper
-        meshes[part].TextureID = "rbxassetid://" .. imageAssets[part]
+        StudioTextureAppearance.Apply(meshes[part], "rbxassetid://" .. imageAssets[part], imageAlpha[part])
     end
     wrapper:SetAttribute("Game1RealEstateTemplate", true)
     wrapper:SetAttribute("Game1ModelAssetId", tostring(assetId))

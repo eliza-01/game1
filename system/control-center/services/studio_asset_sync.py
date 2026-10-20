@@ -5,6 +5,7 @@ All storage and Bridge I/O arrive through constructor injection.
 """
 import json
 from .studio_rig_validation import validate_published_rig
+from .texture_alpha import texture_binding
 
 
 class StudioAssetSyncService:
@@ -42,7 +43,10 @@ class StudioAssetSyncService:
         if not asset_id:
             raise ValueError("publish the weapon model before syncing it to Studio")
         texture_assets = [
-            {"slot": str(item.get("slot") or ""), "assetId": str(item.get("asset_id") or "")}
+            texture_binding(item.get("slot") or "", item.get("asset_id") or "",
+                            getattr(self._weapons, "root", None), item.get("source_path") or "",
+                            registered_sha256=item.get("sha256") or "",
+                            published_sha256=item.get("published_sha256") or "")
             for item in (row.get("textures") or [])
             if str(item.get("asset_id") or "").isdigit()
         ]
@@ -70,7 +74,10 @@ class StudioAssetSyncService:
         if not asset_id:
             raise ValueError(f"publish the {kind} model before syncing it to Studio")
         texture_assets = [
-            {"slot": str(item.get("slot") or ""), "assetId": str(item.get("asset_id") or "")}
+            texture_binding(item.get("slot") or "", item.get("asset_id") or "",
+                            getattr(actor_store, "root", None), item.get("source_path") or "",
+                            registered_sha256=item.get("sha256") or "",
+                            published_sha256=item.get("published_sha256") or "")
             for item in (row.get("textures") or [])
             if str(item.get("asset_id") or "").isdigit()
         ]

@@ -42,6 +42,7 @@ foreach($Marker in @(
     'StudioDebugPreferenceBridge',
     'StudioModelLoadCommands',
     'StudioRealEstateModel',
+    'StudioTextureAppearance',
     'StudioActorSpawnCommands'
     'StudioTimelineEditorCommands'
     'StudioTimelineWidget'

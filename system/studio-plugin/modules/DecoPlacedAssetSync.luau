@@ -1,3 +1,4 @@
+local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
 local DecoPlacedAssetSync = {}
 
 local ROOT_NAME = "Game1DecoAssets"
@@ -35,8 +36,7 @@ function DecoPlacedAssetSync.RefreshTextures(workspace: Workspace, registry: any
                 local uri = "rbxassetid://" .. tostring(math.floor(numericId))
                 local modelChanged = false
                 for _, part in ipairs(descendant:GetDescendants()) do
-                    if part:IsA("MeshPart") and part.TextureID ~= uri then
-                        part.TextureID = uri
+                    if part:IsA("MeshPart") and StudioTextureAppearance.Apply(part, uri, row.textureUsesAlpha) then
                         changedParts += 1
                         modelChanged = true
                     end

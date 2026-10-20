@@ -57,3 +57,17 @@
 
 /* Estate selectors use their option content, never overflow the panel. */
 #real-estate-view select { width:max-content; max-width:100%; min-width:0; field-sizing:content; }
+
+/* Split each registered mesh into independent, readable model/image identities. */
+.real-estate-assets-cell { min-width:240px; }
+.real-estate-asset-part { display:grid; gap:6px; min-width:0; padding:9px 10px; border:1px solid var(--line); border-radius:9px; background:var(--panel2); }
+.real-estate-asset-part + .real-estate-asset-part { margin-top:8px; }
+.real-estate-asset-part-name { font-size:11px; color:var(--text); overflow-wrap:anywhere; }
+.real-estate-asset-identities { display:flex; flex-wrap:wrap; gap:6px; }
+.real-estate-asset-id { display:inline-flex; align-items:baseline; gap:7px; min-width:0; max-width:100%; padding:5px 8px; border-radius:6px; border:1px solid var(--line); font-size:10px; }
+.real-estate-asset-id span { font-weight:700; }
+.real-estate-asset-id code { font:inherit; overflow-wrap:anywhere; word-break:break-word; }
+.real-estate-asset-model { border-color:color-mix(in srgb, var(--mint) 32%, var(--line)); background:color-mix(in srgb, var(--mint) 7%, transparent); }
+.real-estate-asset-model span { color:var(--mint); }
+.real-estate-asset-image { border-color:color-mix(in srgb, var(--orange) 32%, var(--line)); background:color-mix(in srgb, var(--orange) 7%, transparent); }
+.real-estate-asset-image span { color:var(--orange); }

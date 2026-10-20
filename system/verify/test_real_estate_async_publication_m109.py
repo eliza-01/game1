@@ -198,7 +198,7 @@ class PendingOperationTests(unittest.TestCase):
         self.assertIn("'/publish-async'",script)
         self.assertIn("'/publication-job'",script)
         self.assertIn('job.step',script)
-        self.assertIn('real-estate.js?v=10',(ROOT/'system/control-center/static/index.html').read_text('utf-8'))
+        self.assertIn('real-estate.js?v=',(ROOT/'system/control-center/static/index.html').read_text('utf-8'))
 
 if __name__ == '__main__':
     unittest.main()

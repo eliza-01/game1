@@ -86,7 +86,9 @@ class RealEstateStore:
                     continue
                 # Location Store resolves shared assets to their canonical owner.
                 choices.append({'reference': 'location:' + row['slug'],
-                    'label': f"{row.get('name_en') or row['slug']} · {row['slug']}",
+                    'label': row.get('name_en') or row['slug'],
+                    'slug': row['slug'],
+                    'filename': row.get('texture_filename') or Path(row['texture_path']).name,
                     'group': 'location', 'category': str(row.get('category') or 'other'),
                     'categoryLabel': str(row.get('category_label') or row.get('category') or 'Other'),
                     'path': row['texture_path'], 'sha256': row['texture_sha256'],
@@ -102,6 +104,8 @@ class RealEstateStore:
                     continue
                 choices.append({'reference': f"estate:{row['slug']}:{part}",
                     'label': f"{row['slug']} / {part}",
+                    'slug': row['slug'],
+                    'filename': data.get('filename') or Path(data['path']).name,
                     'group': 'estate', 'category': '', 'categoryLabel': '',
                     'path': data['path'], 'sha256': data['sha256'],
                     'assetId': str(data['assetId'])})
@@ -238,13 +242,18 @@ class RealEstateStore:
                 # Record the shared identity, not a duplicate upload. Effective
                 # Image Asset IDs are resolved from the owner on every read.
                 texture_rows[part] = {'reuseReference': reference, 'path':'',
-                    'sha256':'', 'assetId':'', 'publishedSha256':'', 'publicationFormat':''}
+                    'sha256':'', 'assetId':'', 'publishedSha256':'', 'publicationFormat':'', 'filename':''}
                 continue
             target = destination_textures[part]
             target.parent.mkdir(parents=True, exist_ok=True)
             if texture_sources[part] != target:
                 shutil.copy2(texture_sources[part], target)
+            # A regular edit supplies the already-canonical file again. Keep
+            # the original authoring filename instead of replacing it with
+            # house.png / door.jpg on every metadata-only save.
+            filename = (old.get('filename') or target.name) if texture_sources[part] == target else texture_sources[part].name
             texture_rows[part] = {'path': str(target.relative_to(self.root)).replace('\\', '/'),
+                'filename': filename,
                 'sha256': texture_hashes[part],
                 'reuseReference':'',
                 # Preserve old public Asset ID until the replacement upload

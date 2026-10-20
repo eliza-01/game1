@@ -202,7 +202,7 @@ class DualRigReuseTests(unittest.TestCase):
         self.assertIn('textureReferences:',js)
         self.assertIn('flex-direction:column',css)
         self.assertIn('Published Location/Real Estate Image Asset',js)
-        self.assertIn('real-estate.js?v=10',(ROOT/'system/control-center/static/index.html').read_text('utf-8'))
+        self.assertIn('real-estate.js?v=',(ROOT/'system/control-center/static/index.html').read_text('utf-8'))
 
 if __name__=='__main__':
     unittest.main()

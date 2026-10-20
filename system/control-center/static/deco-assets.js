@@ -42,6 +42,12 @@ function decoAssetCategoryLabel(category) {
   return item?.label || category || '';
 }
 
+// The API resolves shared textures to the canonical owner. Only fall back to
+// its canonical path for records registered before filename metadata existed.
+function decoAssetTextureFilename(row) {
+  return row?.texture_filename || String(row?.texture_path || '').split(/[\\/]/).pop() || '';
+}
+
 function decoAssetStatusTag(status) {
   return `<span class="tag ${String(status || '').toLowerCase()}">${esc(status || '')}</span>`;
 }
@@ -75,8 +81,8 @@ function decoAssetSetForm(row) {
     $('location-asset-destructible').checked = row.destructible === true || Number(row.destructible || 0) === 1;
     $('picked-location-asset-model').textContent = 'keep current fbx or choose a replacement';
     $('picked-location-asset-texture').textContent = row.texture_shared
-      ? `reusing ${row.texture_owner_slug || row.texture_reference_slug}`
-      : 'keep current texture or choose a PNG/JPG replacement';
+      ? `reusing ${row.texture_owner_slug || row.texture_reference_slug} · ${decoAssetTextureFilename(row)}`
+      : `${decoAssetTextureFilename(row) || 'no texture'} · keep or choose a PNG/JPG replacement`;
   } else {
     $('location-asset-name').value = '';
     $('location-asset-slug').value = '';
@@ -111,7 +117,7 @@ function decoAssetRenderTree() {
     for (const row of rows) {
       const button = document.createElement('button');
       button.className = row.slug === decoAssetState.selected ? 'active' : '';
-      button.innerHTML = `<span>${esc(row.name_en)}<small>${esc(row.slug)}</small></span><small>${esc(row.status)}</small>`;
+      button.innerHTML = `<span>${esc(row.name_en)}<small>${esc(row.slug)}</small><small class="deco-texture-filename">${esc(decoAssetTextureFilename(row) || 'no texture')}</small></span><small>${esc(row.status)}</small>`;
       button.onclick = () => decoAssetSetForm(row);
       host.appendChild(button);
     }
@@ -133,7 +139,7 @@ function decoAssetRenderTextureReferences() {
     const option = document.createElement('option');
     option.value = row.texture_owner_slug;
     const owner = (decoAssetState.data?.items || []).find((item) => item.slug === row.texture_owner_slug) || row;
-    option.textContent = `${owner.name_en || owner.slug} · ${owner.texture_asset_id || 'not published'}`;
+    option.textContent = `${owner.name_en || owner.slug} · ${owner.texture_asset_id || 'not published'} · ${decoAssetTextureFilename(owner) || 'no texture'}`;
     select.appendChild(option);
   }
   select.value = current;
@@ -196,8 +202,8 @@ function decoAssetRender() {
   const status = $('location-asset-model-status');
   if (selected) {
     const textureInfo = selected.texture_shared
-      ? `shared texture from ${esc(selected.texture_owner_slug || selected.texture_reference_slug)} · ${esc(selected.texture_asset_id || 'not published')}`
-      : `texture ${esc(selected.texture_asset_id || 'not published')}`;
+      ? `shared texture from ${esc(selected.texture_owner_slug || selected.texture_reference_slug)} · ${esc(decoAssetTextureFilename(selected))} · ${esc(selected.texture_asset_id || 'not published')}`
+      : `texture ${esc(decoAssetTextureFilename(selected))} · ${esc(selected.texture_asset_id || 'not published')}`;
     status.innerHTML = `<strong>${esc(selected.name_en)} · ${decoAssetStatusTag(selected.status)}</strong><span>${esc(decoAssetCategoryLabel(selected.category))} · model ${esc(selected.model_asset_id || 'not published')} · ${textureInfo}</span>`;
   } else {
     status.innerHTML = '<strong>not registered</strong><span>choose FBX + PNG/JPG, then register the location asset.</span>';
@@ -219,7 +225,7 @@ function decoAssetRender() {
   for (const row of libraryRows) {
     const tr = document.createElement('tr');
     const contactPolicy = (row.destructible === true || Number(row.destructible || 0) === 1) ? '<span class="tag">destructible</span>' : '<span class="tag published">solid · bounce</span>';
-    tr.innerHTML = `<td><b>${esc(row.name_en)}</b><small>${esc(row.slug)}</small></td><td>${esc(decoAssetCategoryLabel(row.category))}</td><td>${contactPolicy}</td><td><small>model ${esc(row.model_asset_id || '—')}</small><small>${row.texture_shared ? `shared ${esc(row.texture_owner_slug || row.texture_reference_slug)} · ` : 'texture '}${esc(row.texture_asset_id || '—')}</small></td><td>${decoAssetStatusTag(row.status)}</td><td><button data-select type="button">edit</button></td>`;
+    tr.innerHTML = `<td><b>${esc(row.name_en)}</b><small>${esc(row.slug)}</small><small class="deco-texture-filename">${esc(decoAssetTextureFilename(row) || 'no texture')}</small></td><td>${esc(decoAssetCategoryLabel(row.category))}</td><td>${contactPolicy}</td><td><small>model ${esc(row.model_asset_id || '—')}</small><small>${row.texture_shared ? `shared ${esc(row.texture_owner_slug || row.texture_reference_slug)} · ` : 'texture '}${esc(row.texture_asset_id || '—')}</small></td><td>${decoAssetStatusTag(row.status)}</td><td><button data-select type="button">edit</button></td>`;
     tr.querySelector('[data-select]').onclick = () => decoAssetSetForm(row);
     rows.appendChild(tr);
   }
@@ -354,7 +360,8 @@ $('location-asset-texture-reference').onchange = () => {
   decoAssetState.textureReferenceSlug = $('location-asset-texture-reference').value;
   if (decoAssetState.textureReferenceSlug) {
     decoAssetState.texturePath = '';
-    $('picked-location-asset-texture').textContent = `reusing ${decoAssetState.textureReferenceSlug}`;
+    const owner = (decoAssetState.data?.items || []).find(row => row.slug === decoAssetState.textureReferenceSlug);
+    $('picked-location-asset-texture').textContent = `reusing ${decoAssetState.textureReferenceSlug} · ${decoAssetTextureFilename(owner)}`;
   } else if (!decoAssetState.selected) {
     $('picked-location-asset-texture').textContent = 'PNG/JPG not selected';
   }

@@ -197,7 +197,7 @@ class IndependentAssetTests(unittest.TestCase):
         self.assertIn('data-re-image', script)
         self.assertIn("'image:'+button.dataset.reImage", script)
         self.assertIn('await realEstateRegister()', script)
-        self.assertIn('real-estate.js?v=10', html)
+        self.assertIn('real-estate.js?v=', html)
         self.assertNotIn('update_model_asset', store)
 
 

@@ -5,8 +5,9 @@ import hashlib
 import json
 import re
 import shutil
-import sqlite3
 import time
+
+from sqlite_connection import connect as connect_sqlite
 
 from opencloud_assets import (
     create_image_asset,
@@ -71,9 +72,9 @@ class LocationAssetStore:
         self.export()
 
     def connect(self):
-        connection = sqlite3.connect(self.db)
-        connection.row_factory = sqlite3.Row
-        return connection
+        # Shared closing connection commits/rolls back AND releases the file handle.
+        # sqlite3.Connection.__exit__ alone leaves the database open on Windows.
+        return connect_sqlite(self.db)
 
     def _init(self):
         with self.connect() as connection:
@@ -88,6 +89,7 @@ class LocationAssetStore:
                     model_published_sha256 TEXT NOT NULL DEFAULT '',
                     model_moderation_state TEXT NOT NULL DEFAULT '',
                     texture_path TEXT NOT NULL DEFAULT '',
+                    texture_filename TEXT NOT NULL DEFAULT '',
                     texture_sha256 TEXT NOT NULL DEFAULT '',
                     texture_asset_id TEXT,
                     texture_published_sha256 TEXT NOT NULL DEFAULT '',
@@ -101,9 +103,14 @@ class LocationAssetStore:
                 )"""
             )
             columns = {row[1] for row in connection.execute("PRAGMA table_info(location_assets)").fetchall()}
+            # Metadata only: preserve the name the author selected before the
+            # texture is copied to its stable slug-based canonical path.
+            if "texture_filename" not in columns:
+                connection.execute("ALTER TABLE location_assets ADD COLUMN texture_filename TEXT NOT NULL DEFAULT ''")
+                columns.add("texture_filename")
             required = {
                 "slug", "name_en", "category", "model_path", "model_sha256", "model_asset_id",
-                "model_published_sha256", "model_moderation_state", "texture_path", "texture_sha256",
+                "model_published_sha256", "model_moderation_state", "texture_path", "texture_filename", "texture_sha256",
                 "texture_asset_id", "texture_published_sha256", "texture_moderation_state",
                 "texture_reference_slug", "destructible", "revision", "created_at", "updated_at", "published_at",
             }
@@ -220,12 +227,19 @@ class LocationAssetStore:
         if owner is not None and owner.get("slug") != result.get("slug"):
             for field in (
                 "texture_path",
+                "texture_filename",
                 "texture_sha256",
                 "texture_asset_id",
                 "texture_published_sha256",
                 "texture_moderation_state",
             ):
                 result[field] = owner.get(field)
+        # Shared consumers must inherit the owner's filename, including for
+        # legacy owners with no saved original basename.
+        result["texture_filename"] = (
+            str(result.get("texture_filename") or "")
+            or Path(str(result.get("texture_path") or "")).name
+        )
         result["status"] = self._status(result)
         result["category_label"] = CATEGORY_LABELS.get(result.get("category"), str(result.get("category") or ""))
         return result
@@ -311,6 +325,7 @@ class LocationAssetStore:
             "texture_path": str(old.get("texture_path") or "") if old else "",
             "texture_sha256": str(old.get("texture_sha256") or "") if old else "",
         }
+        texture_filename = str(old.get("texture_filename") or "") if old else ""
         texture_asset_id = old.get("texture_asset_id") if old else None
         texture_published_sha256 = str(old.get("texture_published_sha256") or "") if old else ""
         texture_moderation_state = str(old.get("texture_moderation_state") or "") if old else ""
@@ -345,6 +360,7 @@ class LocationAssetStore:
             shutil.copy2(selected, canonical_target)
             values["texture_path"] = canonical_target.relative_to(self.root).as_posix()
             values["texture_sha256"] = self._sha256(canonical_target)
+            texture_filename = selected.name
             old_texture_sha256 = str(old.get("texture_sha256") or "") if old else ""
             texture_replaced = old is None or bool(old_reference) or values["texture_sha256"] != old_texture_sha256
             if texture_replaced:
@@ -361,6 +377,7 @@ class LocationAssetStore:
                 self._retire_replaced_file(str(old.get("texture_path") or ""), slug, old_revision, set())
             values["texture_path"] = ""
             values["texture_sha256"] = ""
+            texture_filename = ""  # Owner supplies the displayed filename.
             texture_asset_id = None
             texture_published_sha256 = ""
             texture_moderation_state = ""
@@ -371,16 +388,16 @@ class LocationAssetStore:
                 """INSERT OR REPLACE INTO location_assets(
                     slug,name_en,category,
                     model_path,model_sha256,model_asset_id,model_published_sha256,model_moderation_state,
-                    texture_path,texture_sha256,texture_asset_id,texture_published_sha256,texture_moderation_state,texture_reference_slug,destructible,
+                    texture_path,texture_filename,texture_sha256,texture_asset_id,texture_published_sha256,texture_moderation_state,texture_reference_slug,destructible,
                     revision,created_at,updated_at,published_at
-                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     slug, name_en, category,
                     values["model_path"], values["model_sha256"],
                     old.get("model_asset_id") if old else None,
                     str(old.get("model_published_sha256") or "") if old else "",
                     str(old.get("model_moderation_state") or "") if old else "",
-                    values["texture_path"], values["texture_sha256"],
+                    values["texture_path"], texture_filename, values["texture_sha256"],
                     texture_asset_id, texture_published_sha256, texture_moderation_state, stored_reference, 1 if destructible else 0,
                     revision,
                     old.get("created_at") if old else now,

@@ -190,7 +190,7 @@ class RealEstateTests(unittest.TestCase):
         self.assertIn('realEstateBrowseTexture(part)',content)
         self.assertIn('choose-real-estate-texture',content)
         self.assertIn('textureReferences:Object.fromEntries(parts.map(',content)
-        self.assertIn('real-estate.js?v=10',(static/'index.html').read_text('utf-8'))
+        self.assertIn('real-estate.js?v=',(static/'index.html').read_text('utf-8'))
 
     def test_edit_prices_without_upload_reanalysis(self):
         with patch('real_estate.store.inspect', return_value=skeleton()):

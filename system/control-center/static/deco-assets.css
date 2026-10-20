@@ -125,3 +125,7 @@
   .deco-library-controls select,
   .deco-library-controls button { width: 100%; }
 }
+
+/* Keep the uploaded texture basename identifiable under the asset slug. */
+.deco-texture-filename { color:var(--muted); overflow-wrap:anywhere; word-break:break-word; }
+#location-asset-rows .deco-texture-filename { color:var(--mint); }

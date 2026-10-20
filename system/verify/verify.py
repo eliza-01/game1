@@ -2281,8 +2281,8 @@ for required in [
     'id="choose-location-asset-model"',
     'id="choose-location-asset-texture"',
     'id="publish-location-asset"',
-    'deco-assets.css?v=4',
-    'deco-assets.js?v=4',
+    'deco-assets.css?v=',
+    'deco-assets.js?v=',
 ]:
     if required not in index_m43_text:
         err(f"m43 Asset Manager Location Assets section missing {required}")

@@ -80,19 +80,32 @@ function realEstateLocationCategories(){
   const categories=new Map(entries.map(e=>[e.category||'other',e.categoryLabel||e.category||'Other']));
   return [...categories.entries()].sort((a,b)=>a[1].localeCompare(b[1]));
 }
+// Display identity and file metadata are deliberately separate from the
+// stable reuse reference: changing how options look cannot change ownership.
+function realEstateReuseLabel(entry){
+  return [entry.label, entry.filename||String(entry.path||'').split(/[\\/]/).pop()||'unknown file', entry.assetId].join(' · ');
+}
+function realEstateLocalHouseAtlasLabel(){
+  const owner=realEstateSelected()?.textures?.house||{};
+  const current=realEstateState.textures.house||'';
+  const source=(realEstateState.data?.textureReferences||[]).find(e=>e.reference===realEstateState.textureRefs.house);
+  const filename=(source?.filename || (current && current!==owner.path?current.split(/[\\/]/).pop():'') ||
+    owner.filename || current.split(/[\\/]/).pop() || String(owner.path||'').split(/[\\/]/).pop() || 'no texture selected');
+  return ['this Estate / house', filename, source?.assetId||owner.assetId||'not published'].join(' · ');
+}
 function realEstateReuseOptions(part){
   const all=realEstateState.data?.textureReferences||[];
   const active=realEstateState.textureRefs[part]||'';
   const filter=realEstateState.reuseFilters[part]||{category:'',query:''};
   const query=(filter.query||'').trim().toLocaleLowerCase();
   const matching=e=>e.reference===active||(!query||
-    [e.label,e.reference,e.categoryLabel,e.assetId].some(v=>String(v||'').toLocaleLowerCase().includes(query)));
+    [e.label,e.slug,e.filename,e.path,e.reference,e.categoryLabel,e.assetId].some(v=>String(v||'').toLocaleLowerCase().includes(query)));
   const location=all.filter(e=>(e.group==='location'||e.reference.startsWith('location:'))&&
     (e.reference===active||!filter.category||e.category===filter.category)&&matching(e));
   const estates=all.filter(e=>(e.group==='estate'||e.reference.startsWith('estate:'))&&matching(e));
-  const option=e=>`<option value="${esc(e.reference)}">${esc(e.label)} · ${esc(e.assetId)}</option>`;
+  const option=e=>`<option value="${esc(e.reference)}">${esc(realEstateReuseLabel(e))}</option>`;
   const result=['<option value="">choose reuse source…</option>'];
-  if(part!=='house')result.push('<optgroup label="This Estate"><option value="mesh:house">house atlas · selected file or registered source</option></optgroup>');
+  if(part!=='house')result.push(`<optgroup label="This Estate"><option value="mesh:house">${esc(realEstateLocalHouseAtlasLabel())}</option></optgroup>`);
   const categories=new Map();
   for(const e of location){
     const key=e.category||'other';
@@ -146,7 +159,7 @@ function realEstateRenderTextures(){
       </div>
       <div id="real-estate-shared-${esc(part)}" class="real-estate-texture-shared" ${reuse?'':'hidden'}>
         <div class="real-estate-reuse-filters">
-          <input type="search" id="real-estate-reuse-search-${esc(part)}" aria-label="Search ${esc(part)} reuse" placeholder="search name, slug or ID…" value="${esc(filters.query)}">
+          <input type="search" id="real-estate-reuse-search-${esc(part)}" aria-label="Search ${esc(part)} reuse" placeholder="search asset, filename, slug or ID…" value="${esc(filters.query)}">
           <select id="real-estate-reuse-category-${esc(part)}" aria-label="${esc(part)} Location category">${categoryChoices.join('')}</select>
         </div>
         <select aria-label="${esc(part)} reused texture" id="real-estate-reference-${esc(part)}"></select>
@@ -325,15 +338,20 @@ function realEstateRender(){
     const canPublish=Boolean(realEstateState.data?.publication?.configured);
     const isBusy=realEstatePublicationBusy(item.slug);
     const asset=(id,ready)=>id?`${esc(id)}${ready?'':' · changed'}`:'not published';
-    const textureLines=parts.map(part=>`<div><strong>${esc(part)}</strong>: ${esc(textures[part]?.reuseReference||textures[part]?.path?.split('/').pop()||'—')}</div>`).join('');
-    const assetLines=parts.map(part=>`<div>${esc(part)}Rig ${asset(rigs[part]?.assetId,live.model)} · image ${asset(textures[part]?.assetId,live[part])}</div>`).join('');
+    const textureLines=parts.map(part=>`<div><strong>${esc(part)}</strong>: ${esc(textures[part]?.reuseReference||textures[part]?.filename||textures[part]?.path?.split('/').pop()||'—')}</div>`).join('');
+    const assetLines=parts.map(part=>`<div class="real-estate-asset-part">
+      <strong class="real-estate-asset-part-name">${esc(part)}</strong>
+      <div class="real-estate-asset-identities">
+        <span class="real-estate-asset-id real-estate-asset-model"><span>model</span><code>${asset(rigs[part]?.assetId,live.model)}</code></span>
+        <span class="real-estate-asset-id real-estate-asset-image"><span>image</span><code>${asset(textures[part]?.assetId,live[part])}</code></span>
+      </div></div>`).join('');
     const controls=parts.map(part=>{
       const shared=Boolean(textures[part]?.reuseReference);
       return `<button type="button" data-re-texture="${esc(part)}">${esc(part)} texture</button>`+
         `<button type="button" data-re-image="${esc(part)}" ${!canPublish||isBusy||live[part]||shared?'disabled':''}>${shared?'reused · '+esc(part):'publish '+esc(part)+' image'}</button>`+
         `<button type="button" data-re-rig="${esc(part)}" ${!canPublish||isBusy?'disabled':''}>republish ${esc(part)} rig</button>`;
     }).join('');
-    return `<tr class="${item.slug===realEstateState.selected?'active':''}" data-house="${esc(item.slug)}"><td><b>${esc(item.slug)}</b><br><small>level ${esc(item.house_level)} · variant ${esc(item.variant)}</small></td><td><small>buy ${esc(item.purchase_price)} · sell ${esc(item.sale_price)}<br>level required ${esc(item.min_level)}</small></td><td><small>${textureLines}</small></td><td><small>${assetLines}</small></td><td><div class="real-estate-row-actions"><button type="button" data-re-edit>edit</button><button type="button" data-re-fbx>replace FBX</button>${controls}<button type="button" data-re-pub-model ${!canPublish||isBusy||live.model?'disabled':''}>publish FBX</button><button type="button" data-re-publish ${!canPublish||isBusy||item.status==='PUBLISHED'?'disabled':''}>publish changed</button><button type="button" data-re-sync ${isBusy||item.status!=='PUBLISHED'?'disabled':''}>sync Studio</button></div></td></tr>`;
+    return `<tr class="${item.slug===realEstateState.selected?'active':''}" data-house="${esc(item.slug)}"><td><b>${esc(item.slug)}</b><br><small>level ${esc(item.house_level)} · variant ${esc(item.variant)}</small></td><td><small>buy ${esc(item.purchase_price)} · sell ${esc(item.sale_price)}<br>level required ${esc(item.min_level)}</small></td><td><small>${textureLines}</small></td><td class="real-estate-assets-cell">${assetLines}</td><td><div class="real-estate-row-actions"><button type="button" data-re-edit>edit</button><button type="button" data-re-fbx>replace FBX</button>${controls}<button type="button" data-re-pub-model ${!canPublish||isBusy||live.model?'disabled':''}>publish FBX</button><button type="button" data-re-publish ${!canPublish||isBusy||item.status==='PUBLISHED'?'disabled':''}>publish changed</button><button type="button" data-re-sync ${isBusy||item.status!=='PUBLISHED'?'disabled':''}>sync Studio</button></div></td></tr>`;
   }).join('')||'<tr><td colspan="5" class="muted">No registered houses yet.</td></tr>';
   for(const tr of tbody.querySelectorAll('[data-house]')){
     const row=rows.find(item=>item.slug===tr.dataset.house);

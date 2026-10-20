@@ -340,6 +340,33 @@
       "category_label": "Ladders"
     },
     {
+      "slug": "campfirte_01",
+      "name_en": "Campfirte 01",
+      "category": "light",
+      "model_path": "assets/source/location-assets/light/campfirte_01/model/campfirte_01.fbx",
+      "model_sha256": "244c7131a9d4b740c74ad1b940ba661391f6941522131a7a1296945293c13ef3",
+      "model_asset_id": "119790979739015",
+      "model_published_sha256": "244c7131a9d4b740c74ad1b940ba661391f6941522131a7a1296945293c13ef3",
+      "model_moderation_state": "Approved",
+      "texture_path": "assets/source/location-assets/decoration/campfirte_01/textures/campfirte_01.png",
+      "texture_sha256": "75581e14ef29d79ec770681d4052b0aed172fd6595c02ebdb03727f794a546ef",
+      "texture_asset_id": "73384502057808",
+      "texture_published_sha256": "75581e14ef29d79ec770681d4052b0aed172fd6595c02ebdb03727f794a546ef",
+      "texture_moderation_state": "Approved",
+      "texture_reference_slug": "",
+      "destructible": false,
+      "revision": 3,
+      "created_at": 1792517965.2518861,
+      "updated_at": 1792520909.0187018,
+      "published_at": 1792520909.0187018,
+      "texture_filename": "campfire_01_atlas.png",
+      "texture_owner_slug": "campfirte_01",
+      "texture_shared": false,
+      "textureUsesAlpha": true,
+      "status": "PUBLISHED",
+      "category_label": "Lights"
+    },
+    {
       "slug": "ground_torch_01",
       "name_en": "Ground Torch 01",
       "category": "light",
@@ -665,8 +692,8 @@
     }
   ],
   "summary": {
-    "registered": 23,
-    "published": 23,
+    "registered": 24,
+    "published": 24,
     "changed": 0
   }
 }

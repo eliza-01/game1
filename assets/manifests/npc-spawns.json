@@ -2,31 +2,6 @@
   "schemaVersion": 1,
   "project": "game1",
   "records": {
-    "spawn-de7d477ee069408eb1de4d7895a03f9d": {
-      "spawnId": "spawn-de7d477ee069408eb1de4d7895a03f9d",
-      "monsterSlug": "guard_01",
-      "mapKey": "main",
-      "placeId": 0,
-      "position": {
-        "x": 429.823,
-        "y": -54.0,
-        "z": -306.622
-      },
-      "yawDegrees": 321.0,
-      "respawnSeconds": 10.0,
-      "spawnRadius": 0.0,
-      "maxAlive": 1,
-      "enabled": true,
-      "createdAtUtc": "2026-10-12T13:40:29.967084Z",
-      "updatedAtUtc": "2026-10-12T13:40:29.967084Z",
-      "studioSync": {
-        "status": "synced",
-        "recordFingerprint": "139e901294ad13a3e494b240c20bcdbd38379b97f4658256fdebea7b050172d6",
-        "placeId": 0,
-        "markerPath": "Workspace.Game1Authoring.NpcSpawns.Guard_01_de7d477e",
-        "syncedAtUtc": "2026-10-12T13:40:31.011484Z"
-      }
-    },
     "spawn-6de4624d878b4e7b9e7a4d77406b071b": {
       "spawnId": "spawn-6de4624d878b4e7b9e7a4d77406b071b",
       "monsterSlug": "warsmith",
@@ -50,6 +25,31 @@
         "placeId": 0,
         "markerPath": "Workspace.Game1Authoring.NpcSpawns.Warsmith_6de4624d",
         "syncedAtUtc": "2026-10-13T00:41:54.324905Z"
+      }
+    },
+    "spawn-38958a5b9dad4a54aed942733e768686": {
+      "spawnId": "spawn-38958a5b9dad4a54aed942733e768686",
+      "monsterSlug": "guard_01",
+      "mapKey": "main",
+      "placeId": 0,
+      "position": {
+        "x": 429.285,
+        "y": -54.0,
+        "z": -303.099
+      },
+      "yawDegrees": 319.7,
+      "respawnSeconds": 10.0,
+      "spawnRadius": 1.0,
+      "maxAlive": 1,
+      "enabled": true,
+      "createdAtUtc": "2026-10-20T18:50:59.680529Z",
+      "updatedAtUtc": "2026-10-20T18:50:59.680529Z",
+      "studioSync": {
+        "status": "synced",
+        "recordFingerprint": "57a70fc119a9f55ebb15ffecc968dfadc061bcf6d6e442a9d9ebc54eea408506",
+        "placeId": 0,
+        "markerPath": "Workspace.Game1Authoring.NpcSpawns.Guard_01_38958a5b",
+        "syncedAtUtc": "2026-10-20T18:51:00.728679Z"
       }
     }
   }

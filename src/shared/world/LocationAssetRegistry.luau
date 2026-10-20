@@ -135,6 +135,18 @@ return table.freeze({
 			textureShared = false,
 			destructible = false,
 		}),
+		["campfirte_01"] = table.freeze({
+			slug = "campfirte_01",
+			name = "Campfirte 01",
+			category = "light",
+			status = "PUBLISHED",
+			modelAssetId = "119790979739015",
+			textureAssetId = "73384502057808",
+			textureUsesAlpha = true,
+			textureOwnerSlug = "campfirte_01",
+			textureShared = false,
+			destructible = false,
+		}),
 		["ground_torch_01"] = table.freeze({
 			slug = "ground_torch_01",
 			name = "Ground Torch 01",

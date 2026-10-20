@@ -40,6 +40,18 @@
       "StudioMarkerVisibility": {
         "$path": "modules/StudioMarkerVisibility.luau"
       },
+      "StudioPlotsCatalog": {
+        "$path": "modules/StudioPlotsCatalog.luau"
+      },
+      "StudioPlotsVisibility": {
+        "$path": "modules/StudioPlotsVisibility.luau"
+      },
+      "StudioPlotsPartPolicy": {
+        "$path": "modules/StudioPlotsPartPolicy.luau"
+      },
+      "StudioPlotsSelectionFilter": {
+        "$path": "modules/StudioPlotsSelectionFilter.luau"
+      },
       "StudioDebugPreferenceBridge": {
         "$path": "modules/StudioDebugPreferenceBridge.luau"
       },

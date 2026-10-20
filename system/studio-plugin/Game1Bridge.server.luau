@@ -10,6 +10,7 @@ local Workspace = game:GetService("Workspace")
 
 local LocationCommands = require(script.Parent.modules.LocationCommands)
 local StudioMarkerVisibility = require(script.Parent.modules.StudioMarkerVisibility)
+local StudioPlotsVisibility = require(script.Parent.modules.StudioPlotsVisibility)
 local StudioDebugPreferenceBridge = require(script.Parent.modules.StudioDebugPreferenceBridge)
 local StudioModelLoadCommands = require(script.Parent.modules.StudioModelLoadCommands)
 local StudioActorSpawnCommands = require(script.Parent.modules.StudioActorSpawnCommands)
@@ -19,6 +20,16 @@ local StudioDecoSyncCommands = require(script.Parent.modules.StudioDecoSyncComma
 
 local toolbar = plugin:CreateToolbar("game1")
 local markerVisibility = StudioMarkerVisibility.new(plugin, toolbar, Workspace)
+local plotsVisibility = StudioPlotsVisibility.new({
+    plugin = plugin,
+    toolbar = toolbar,
+    Workspace = Workspace,
+    CoreGui = game:GetService("CoreGui"),
+    TweenService = game:GetService("TweenService"),
+    RunService = RunService,
+    Selection = Selection,
+    PhysicsService = game:GetService("PhysicsService"),
+})
 local AGENT_BASE_URL = "http://127.0.0.1:43821"
 local AGENT_URL = AGENT_BASE_URL .. "/api/agent/info"
 local AGENT_TOKEN = "Game1LocalControlV1"

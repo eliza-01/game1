@@ -262,7 +262,23 @@ class MonsterStore:
 
     def list(self) -> list[dict]:
         with self.connect() as connection:
-            rows = connection.execute("SELECT * FROM monsters ORDER BY name_en,slug").fetchall()
+            if self.kind == "npc":
+                # Latest successful model/texture publication, not registration or
+                # metadata edit time. Unpublished NPCs are listed after published.
+                # The publication journal is already present in legacy databases.
+                rows = connection.execute("""
+                    SELECT m.*,
+                        COALESCE((
+                            SELECT MAX(p.published_at)
+                            FROM monster_publications AS p
+                            WHERE p.monster_slug = m.slug AND p.kind IN ('model', 'texture')
+                        ), m.published_at) AS last_published_at
+                    FROM monsters AS m
+                    ORDER BY last_published_at IS NULL, last_published_at DESC,
+                             m.name_en COLLATE NOCASE, m.slug
+                """).fetchall()
+            else:
+                rows = connection.execute("SELECT * FROM monsters ORDER BY name_en,slug").fetchall()
             return [self._decorate(connection, row) for row in rows]
 
     def get(self, slug: str) -> dict | None:

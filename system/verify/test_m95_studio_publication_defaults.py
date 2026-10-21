@@ -42,18 +42,20 @@ class M95Contracts(unittest.TestCase):
             self.assertNotIn('};const current=rows.find(', function_body)
             self.assertTrue(function_body.strip().endswith('}'))
 
-    def test_06_population_defaults_do_not_rewrite_existing_records(self):
+    def test_06_monster_population_keeps_defaults_npc_is_fixed(self):
         backend = read('system/control-center/monster_spawn_store.py')
         self.assertIn('"spawnRadius": 15, "maxAlive": 3', backend)
-        for kind in ('monster', 'npc'):
-            html = read('system/control-center/static/index.html')
-            self.assertIn(f'id="{kind}-spawn-radius" type="number" min="0" max="10000" step="0.1" value="15"', html)
-            self.assertIn(f'id="{kind}-spawn-max-alive" type="number" min="1" max="1000" step="1" value="3"', html)
-            front = read(f'system/control-center/static/{kind}-spawns.js')
-            self.assertIn(f"$('{kind}-spawn-radius').value=defaults.spawnRadius??15", front)
-            self.assertIn(f"$('{kind}-spawn-max-alive').value=defaults.maxAlive??3", front)
-        self.assertIn('existing.get("spawnRadius", 0)', backend)
-        self.assertIn('existing.get("maxAlive", 1)', backend)
+        html = read('system/control-center/static/index.html')
+        monster_js = read('system/control-center/static/monster-spawns.js')
+        npc_js = read('system/control-center/static/npc-spawns.js')
+        for suffix in ('radius', 'max-alive'):
+            self.assertIn(f'id="monster-spawn-{suffix}"', html)
+            self.assertNotIn(f'id="npc-spawn-{suffix}"', html)
+            self.assertIn(f"$('monster-spawn-{suffix}')", monster_js)
+            self.assertNotIn(f"$('npc-spawn-{suffix}')", npc_js)
+        self.assertIn('if self.kind == "npc"', backend)
+        self.assertIn('else {"mapKey": "main", "respawnSeconds": 10, "spawnRadius": 15, "maxAlive": 3}', backend)
+
 
 if __name__ == "__main__":
     unittest.main()

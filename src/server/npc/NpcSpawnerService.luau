@@ -54,30 +54,10 @@ local function finite(value: any, fallback: number): number
     return if n and n == n and n > -math.huge and n < math.huge then n else fallback
 end
 
-local function spawnSurface(record: any): Vector3
+local function spawnPosition(record: any): Vector3
+    -- NPCs occupy the exact authored point, including underground rooms.
     local point = record.position or {}
-    local center = Vector3.new(finite(point.x, 0), finite(point.y, 0), finite(point.z, 0))
-    local radius = math.max(0, finite(record.spawnRadius, 0))
-    if radius > 0 then
-        local angle = random:NextNumber(0, 2 * math.pi)
-        local distance = radius * math.sqrt(random:NextNumber())
-        center += Vector3.new(math.cos(angle) * distance, 0, math.sin(angle) * distance)
-    end
-    local params = RaycastParams.new()
-    params.FilterType = Enum.RaycastFilterType.Exclude
-    local ignore: {Instance} = { folder() }
-    local authoring = Workspace:FindFirstChild("Game1Authoring")
-    if authoring then
-        table.insert(ignore, authoring)
-    end
-    local monsters = Workspace:FindFirstChild("Monsters")
-    if monsters then
-        table.insert(ignore, monsters)
-    end
-    params.FilterDescendantsInstances = ignore
-    params.RespectCanCollide = true
-    local hit = Workspace:Raycast(center + Vector3.new(0, 96, 0), Vector3.new(0, -384, 0), params)
-    return if hit then hit.Position else center
+    return Vector3.new(finite(point.x, 0), finite(point.y, 0), finite(point.z, 0))
 end
 
 local function release(state: any, entity: Model, scheduleRespawn: boolean)
@@ -120,7 +100,7 @@ local function spawnOne(state: any): boolean
     local entity = template:Clone()
     entity.Name = slug .. "_" .. tostring(random:NextInteger(100000, 999999))
     entity.Parent = folder()
-    local visual, root = NpcRigFactory.Create(entity, spawnSurface(record), finite(record.yawDegrees, 0))
+    local visual, root = NpcRigFactory.Create(entity, spawnPosition(record), finite(record.yawDegrees, 0))
     if not visual or not root then
         entity:Destroy()
         warn("[game1][npc] published model has no usable visual rig: " .. slug)
@@ -163,7 +143,7 @@ local function spawnOne(state: any): boolean
         end
     end)
     entity.Destroying:Connect(function()
-        -- External removals still restore the authored population cap.
+        -- External removals still schedule a single replacement at the same point.
         if state.instances[entity] == entry then
             release(state, entity, true)
         end
@@ -176,15 +156,10 @@ local function fill(state: any)
         return
     end
     state.filling = true
-    local count = 0
-    for entity in pairs(state.instances) do
-        if entity.Parent then
-            count += 1
-        end
-    end
-    local target = math.clamp(math.floor(finite(state.record.maxAlive, 1)), 1, 1000)
-    while count < target and spawnOne(state) do
-        count += 1
+    -- Exactly one living/dying NPC per authored spawn record. Legacy
+    -- maxAlive/spawnRadius values from older manifests are ignored.
+    if next(state.instances) == nil then
+        spawnOne(state)
     end
     state.filling = false
 end

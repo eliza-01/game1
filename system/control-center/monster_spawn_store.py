@@ -60,9 +60,9 @@ class MonsterSpawnStore:
         return value
 
     @staticmethod
-    def _core(record: dict) -> dict:
+    def _core(record: dict, *, npc: bool = False) -> dict:
         position = record.get("position") or {}
-        return {
+        result = {
             "spawnId": str(record.get("spawnId") or ""),
             "monsterSlug": str(record.get("monsterSlug") or ""),
             "mapKey": str(record.get("mapKey") or ""),
@@ -74,14 +74,15 @@ class MonsterSpawnStore:
             },
             "yawDegrees": float(record.get("yawDegrees") or 0),
             "respawnSeconds": float(record.get("respawnSeconds") or 0),
-            "spawnRadius": float(record.get("spawnRadius") or 0),
-            "maxAlive": int(record.get("maxAlive") or 1),
             "enabled": record.get("enabled") is not False,
         }
+        if not npc:
+            result["spawnRadius"] = float(record.get("spawnRadius") or 0)
+            result["maxAlive"] = int(record.get("maxAlive") or 1)
+        return result
 
-    @classmethod
-    def _fingerprint(cls, record: dict) -> str:
-        source = json.dumps(cls._core(record), sort_keys=True, separators=(",", ":"))
+    def _fingerprint(self, record: dict) -> str:
+        source = json.dumps(self._core(record, npc=self.kind == "npc"), sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(source.encode("utf-8")).hexdigest()
 
     def _monster(self, slug: str) -> dict:
@@ -135,16 +136,17 @@ class MonsterSpawnStore:
         position = {axis: _finite(source_position.get(axis), axis.upper()) for axis in ("x", "y", "z")}
         yaw = _finite(payload.get("yawDegrees", 0), "Yaw") % 360
         respawn = _finite(payload.get("respawnSeconds", 10), "Respawn Seconds")
-        radius = _finite(payload.get("spawnRadius", 0), "Spawn Radius")
-        max_alive = _finite(payload.get("maxAlive", 1), "Max Alive")
         if respawn < 0 or respawn > 86400:
             raise ValueError("Respawn Seconds must be 0..86400")
-        if radius < 0 or radius > 10000:
-            raise ValueError("Spawn Radius must be 0..10000 studs")
-        if not max_alive.is_integer() or max_alive < 1 or max_alive > 1000:
-            raise ValueError("Max Alive must be an integer 1..1000")
+        if self.kind == "monster":
+            radius = _finite(payload.get("spawnRadius", 0), "Spawn Radius")
+            max_alive = _finite(payload.get("maxAlive", 1), "Max Alive")
+            if radius < 0 or radius > 10000:
+                raise ValueError("Spawn Radius must be 0..10000 studs")
+            if not max_alive.is_integer() or max_alive < 1 or max_alive > 1000:
+                raise ValueError("Max Alive must be an integer 1..1000")
         now = utc_now()
-        return {
+        result = {
             "spawnId": spawn_id,
             "monsterSlug": str(monster["slug"]),
             "mapKey": map_key,
@@ -152,15 +154,32 @@ class MonsterSpawnStore:
             "position": position,
             "yawDegrees": yaw,
             "respawnSeconds": respawn,
-            "spawnRadius": radius,
-            "maxAlive": int(max_alive),
             "enabled": payload.get("enabled") is not False,
             "createdAtUtc": str(payload.get("createdAtUtc") or now),
             "updatedAtUtc": now,
         }
+        if self.kind == "npc":
+            # Studio placement is distinct from model publication and registration.
+            # Legacy records have only createdAtUtc: retain that historical date.
+            placed = str(payload.get("placedAtUtc") or payload.get("createdAtUtc") or now)
+            try:
+                parsed = datetime.fromisoformat(placed.replace("Z", "+00:00"))
+                if parsed.tzinfo is None:
+                    raise ValueError("timestamp lacks timezone")
+            except ValueError as exc:
+                raise ValueError("NPC placedAtUtc must be an ISO-8601 UTC timestamp") from exc
+            result["placedAtUtc"] = parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+        else:
+            result["spawnRadius"] = radius
+            result["maxAlive"] = int(max_alive)
+        return result
 
     def _record_view(self, record: dict) -> dict:
         value = json.loads(json.dumps(record))
+        if self.kind == "npc":
+            value.pop("spawnRadius", None)
+            value.pop("maxAlive", None)
+            value["placedAtUtc"] = value.get("placedAtUtc") or value.get("createdAtUtc")
         monster = self._monster(record.get("monsterSlug"))
         value["monster"] = {
             "slug": str(monster["slug"]),
@@ -190,13 +209,16 @@ class MonsterSpawnStore:
                 "missingAnimationSlots": ready["missingAnimationSlots"],
             })
         records = [self._record_view(row) for _, row in sorted(manifest["records"].items())]
+        if self.kind == "npc":
+            records.sort(key=lambda row: (row.get("placedAtUtc") or "", row["spawnId"]), reverse=True)
         return {
             "schemaVersion": SCHEMA_VERSION,
             "project": PROJECT,
             "records": records,
             "recordCount": len(records),
             "monsters": monster_rows,
-            "defaults": {"mapKey": "main", "respawnSeconds": 10, "spawnRadius": 15, "maxAlive": 3},
+            "defaults": ({"mapKey": "main", "respawnSeconds": 10} if self.kind == "npc"
+                         else {"mapKey": "main", "respawnSeconds": 10, "spawnRadius": 15, "maxAlive": 3}),
             "manifestPath": self.manifest_path.relative_to(self.root).as_posix(),
             "registryPath": self.registry_path.relative_to(self.root).as_posix(),
         }
@@ -218,8 +240,8 @@ class MonsterSpawnStore:
             place_id=int(payload.get("placeId") or existing.get("placeId") or 0),
             position=payload.get("position") if isinstance(payload.get("position"), dict) else existing.get("position"),
             yaw_degrees=payload.get("yawDegrees", existing.get("yawDegrees", 0)),
-            spawn_radius=payload.get("spawnRadius", existing.get("spawnRadius", 0)),
-            max_alive=payload.get("maxAlive", existing.get("maxAlive", 1)),
+            spawn_radius=(payload.get("spawnRadius", existing.get("spawnRadius", 0)) if self.kind == "monster" else 0),
+            max_alive=(payload.get("maxAlive", existing.get("maxAlive", 1)) if self.kind == "monster" else 1),
             enabled=payload.get("enabled", existing.get("enabled", True)),
             timeout_seconds=300,
         )
@@ -232,10 +254,15 @@ class MonsterSpawnStore:
             "position": result.get("position") or {},
             "yawDegrees": float(result.get("yawDegrees") or 0),
             "respawnSeconds": float(payload.get("respawnSeconds", existing.get("respawnSeconds", 10))),
-            "spawnRadius": float(payload.get("spawnRadius", existing.get("spawnRadius", 0))),
-            "maxAlive": int(payload.get("maxAlive", existing.get("maxAlive", 1))),
             "enabled": payload.get("enabled", existing.get("enabled", True)) is not False,
         }
+        if self.kind == "npc":
+            draft.pop("spawnRadius", None)
+            draft.pop("maxAlive", None)
+            draft["placedAtUtc"] = utc_now()
+        else:
+            draft["spawnRadius"] = float(payload.get("spawnRadius", existing.get("spawnRadius", 0)))
+            draft["maxAlive"] = int(payload.get("maxAlive", existing.get("maxAlive", 1)))
         return {"ok": True, "draft": draft, "studio": result, "readiness": ready}
 
     def register(self, payload: dict) -> dict:
@@ -254,7 +281,8 @@ class MonsterSpawnStore:
                 "upsert", operation_id=str(uuid.uuid4()), spawn_id=record["spawnId"],
                 monster_slug=record["monsterSlug"], monster_name=str(monster.get("name_en") or record["monsterSlug"]),
                 map_key=record["mapKey"], place_id=record["placeId"], position=record["position"],
-                yaw_degrees=record["yawDegrees"], spawn_radius=record["spawnRadius"], max_alive=record["maxAlive"],
+                yaw_degrees=record["yawDegrees"],
+                spawn_radius=record.get("spawnRadius", 0), max_alive=record.get("maxAlive", 1),
                 enabled=record["enabled"], timeout_seconds=30,
             )
             record["studioSync"] = {
@@ -296,7 +324,7 @@ class MonsterSpawnStore:
         records = []
         for record in manifest["records"].values():
             monster = self._monster(record["monsterSlug"])
-            records.append({**self._core(record), "monsterName": str(monster.get("name_en") or record["monsterSlug"])})
+            records.append({**self._core(record, npc=self.kind == "npc"), "monsterName": str(monster.get("name_en") or record["monsterSlug"])})
         result = self.bridge("sync", operation_id=str(uuid.uuid4()), records=records, timeout_seconds=45)
         synced = {str(value) for value in result.get("syncedSpawnIds") or []}
         now = utc_now()
@@ -328,7 +356,7 @@ class MonsterSpawnStore:
         return [str(row.get("spawnId") or "") for row in self._load()["records"].values() if str(row.get("monsterSlug") or "") == slug]
 
     def _write_registry(self, manifest: dict):
-        records = [self._core(row) for _, row in sorted(manifest["records"].items())]
+        records = [self._core(row, npc=self.kind == "npc") for _, row in sorted(manifest["records"].items())]
         digest = hashlib.sha256(json.dumps(records, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
         payload = {"schemaVersion": 1, "project": PROJECT, "sourceDigest": digest, "records": records}
         encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))

@@ -157,6 +157,9 @@ def run_monster_spawn_bridge(
         "enabled": bool(enabled),
         "records": list(records or []),
     }
+    if entity_kind == "npc":
+        command.pop("spawnRadius", None)
+        command.pop("maxAlive", None)
     result: dict | None = None
     command_claimed = False
     command_claimed_at: float | None = None

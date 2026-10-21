@@ -144,7 +144,7 @@ class NpcPipelineTests(unittest.TestCase):
         self.assertTrue(choice["ready"])
         self.assertFalse(choice["animationReady"])
         draft = self.spawns.place({"monsterSlug": "blacksmith"})["draft"]
-        self.spawns.register({**draft, "respawnSeconds": 2, "maxAlive": 1})
+        self.spawns.register({**draft, "respawnSeconds": 2})
         self.assertTrue(self.spawns.validate()["ok"])
 
     def test_model_still_required_and_monster_rules_unchanged(self):
@@ -320,30 +320,82 @@ class NpcPipelineTests(unittest.TestCase):
             spawner.index("NpcAnimationService.Create(entity, visual, profile)"),
         )
 
-    def test_spawn_contract_delete_and_population_limits(self):
+    def test_spawn_contract_one_npc_and_placement_timestamp(self):
         self.seed_npc()
         self.seed_clips()
         draft = self.spawns.place({"monsterSlug": "blacksmith", "mapKey": "main"})["draft"]
         self.assertTrue(draft["spawnId"].startswith("spawn-"))
-        result = self.spawns.register({**draft, "respawnSeconds": 7, "spawnRadius": 4, "maxAlive": 2})
-        self.assertEqual(result["record"]["maxAlive"], 2)
+        self.assertIsNotNone(draft.get("placedAtUtc"))
+        # Old clients/manifests may carry obsolete population settings.
+        record = self.spawns.register({**draft, "respawnSeconds": 7, "spawnRadius": 4, "maxAlive": 2})["record"]
+        self.assertNotIn("maxAlive", record)
+        self.assertNotIn("spawnRadius", record)
+        self.assertEqual(record["placedAtUtc"], draft["placedAtUtc"])
         self.assertEqual(self.spawns.snapshot()["recordCount"], 1)
         self.assertEqual(len(self.spawns.monster_usage("blacksmith")), 1)
         manifest = json.loads((self.root / "assets/manifests/npc-spawns.json").read_text())
-        self.assertEqual(len(manifest["records"]), 1)
+        saved = manifest["records"][draft["spawnId"]]
+        self.assertNotIn("maxAlive", saved)
+        self.assertNotIn("spawnRadius", saved)
         registry = (self.root / "src/server/npc/NpcSpawnRegistry.luau").read_text()
         self.assertIn('"respawnSeconds":7.0', registry)
-        self.assertIn('"maxAlive":2', registry)
+        self.assertNotIn('"maxAlive"', registry)
+        self.assertNotIn('"spawnRadius"', registry)
         self.assertTrue(self.spawns.validate()["ok"])
+        self.assertEqual(self.bridge_calls[-1][1]["max_alive"], 1)
+        self.assertEqual(self.bridge_calls[-1][1]["spawn_radius"], 0)
+        # Metadata edits preserve the original placement event.
+        saved2 = self.spawns.register({**saved, "respawnSeconds": 12})["record"]
+        self.assertEqual(saved2["placedAtUtc"], draft["placedAtUtc"])
         self.spawns.delete({"spawnId": draft["spawnId"]})
         self.assertEqual(self.spawns.snapshot()["recordCount"], 0)
+
+    def test_legacy_manifest_keeps_ids_and_uses_single_spawn(self):
+        self.seed_npc()
+        self.seed_clips()
+        draft = self.spawns.place({"monsterSlug": "blacksmith"})["draft"]
+        result = self.spawns.register(draft)
+        spawn_id = result["record"]["spawnId"]
+        path = self.root / "assets/manifests/npc-spawns.json"
+        legacy = json.loads(path.read_text())
+        row = legacy["records"][spawn_id]
+        row["spawnRadius"] = 30.0
+        row["maxAlive"] = 9
+        row.pop("placedAtUtc")
+        path.write_text(json.dumps(legacy))
+        # No background rewrite of an existing manifest; legacy fields are
+        # intentionally tolerated and omitted from API/registry/wire formats.
+        snapshot = self.spawns.snapshot()
+        self.assertEqual(snapshot["records"][0]["spawnId"], spawn_id)
+        self.assertEqual(snapshot["records"][0]["placedAtUtc"], row["createdAtUtc"])
+        self.assertNotIn("spawnRadius", snapshot["records"][0])
+        self.assertNotIn("maxAlive", snapshot["records"][0])
+        self.spawns.restore()
+        records = self.bridge_calls[-1][1]["records"]
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["spawnId"], spawn_id)
+        self.assertNotIn("spawnRadius", records[0])
+        self.assertNotIn("maxAlive", records[0])
+        updated = self.spawns.register({**row, "respawnSeconds": 6})["record"]
+        self.assertEqual(updated["spawnId"], spawn_id)
+        self.assertEqual(updated["placedAtUtc"], row["createdAtUtc"])
+        self.assertNotIn("maxAlive", json.loads(path.read_text())["records"][spawn_id])
+
+    def test_monster_population_still_configurable(self):
+        self.seed_npc()
+        self.seed_clips()
+        monsters = MonsterSpawnStore(self.root, self.npcs, self.npc_animations, self.spawns.bridge, kind="monster")
+        result = monsters._core({"spawnRadius": 6, "maxAlive": 7})
+        self.assertEqual(result["spawnRadius"], 6)
+        self.assertEqual(result["maxAlive"], 7)
 
     def test_invalid_input_fails_closed(self):
         self.seed_npc()
         self.seed_clips()
         draft = self.spawns.place({"monsterSlug": "blacksmith"})["draft"]
-        for changes in ({"maxAlive": 0}, {"maxAlive": 1001}, {"spawnRadius": -1},
-                        {"respawnSeconds": -1}, {"position": {"x": float("nan"), "y": 0, "z": 1}}):
+        for changes in ({"respawnSeconds": -1},
+                        {"position": {"x": float("nan"), "y": 0, "z": 1}},
+                        {"placedAtUtc": "not an ISO date"}):
             with self.subTest(changes=changes), self.assertRaises(ValueError):
                 self.spawns.register({**draft, **changes})
         self.assertEqual(self.spawns.snapshot()["recordCount"], 0)

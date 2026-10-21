@@ -143,8 +143,10 @@ return function(services)
         marker:SetAttribute("MapKey", tostring(data.mapKey or "main"))
         marker:SetAttribute("PlaceId", tonumber(data.placeId) or game.PlaceId)
         marker:SetAttribute("YawDegrees", tonumber(data.yawDegrees) or 0)
-        marker:SetAttribute("SpawnRadius", tonumber(data.spawnRadius) or 0)
-        marker:SetAttribute("MaxAlive", tonumber(data.maxAlive) or 1)
+        if kind == "monster" then
+            marker:SetAttribute("SpawnRadius", tonumber(data.spawnRadius) or 0)
+            marker:SetAttribute("MaxAlive", tonumber(data.maxAlive) or 1)
+        end
         marker:SetAttribute("Enabled", data.enabled ~= false)
         marker.Parent = folder
 
@@ -152,7 +154,7 @@ return function(services)
         point.Shape = Enum.PartType.Cylinder
         safeMonsterSpawnMarkerPart(marker, "Direction", Vector3.new(0.22, 0.12, 3.2), world * CFrame.new(0, 0.18, -1.6), color, 0.12)
         local radius = math.max(0, tonumber(data.spawnRadius) or 0)
-        if radius > 0.01 then
+        if kind == "monster" and radius > 0.01 then
             local area = safeMonsterSpawnMarkerPart(marker, "Radius", Vector3.new(0.06, radius * 2, radius * 2), world * CFrame.Angles(0, 0, math.rad(90)), color, 0.84)
             area.Shape = Enum.PartType.Cylinder
         end
@@ -174,7 +176,11 @@ return function(services)
         text.TextColor3 = Color3.fromRGB(246, 248, 251)
         text.TextSize = 14
         text.TextWrapped = true
-        text.Text = string.format("%s\n%s · max %d%s", tostring(data.monsterName or data.monsterSlug or "Monster"), tostring(data.spawnId or ""), tonumber(data.maxAlive) or 1, preview and " · PREVIEW" or "")
+        if kind == "npc" then
+            text.Text = string.format("%s\n%s%s", tostring(data.monsterName or data.monsterSlug or "NPC"), tostring(data.spawnId or ""), preview and " · PREVIEW" or "")
+        else
+            text.Text = string.format("%s\n%s · max %d%s", tostring(data.monsterName or data.monsterSlug or "Monster"), tostring(data.spawnId or ""), tonumber(data.maxAlive) or 1, preview and " · PREVIEW" or "")
+        end
         text.Parent = billboard
         local corner = Instance.new("UICorner")
         corner.CornerRadius = UDim.new(0, 7)

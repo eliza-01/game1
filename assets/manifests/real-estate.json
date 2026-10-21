@@ -653,6 +653,18 @@
       "assetId": "140279314813624"
     },
     {
+      "reference": "location:campfirte_01",
+      "label": "Campfirte 01",
+      "slug": "campfirte_01",
+      "filename": "campfire_01_atlas.png",
+      "group": "location",
+      "category": "light",
+      "categoryLabel": "Lights",
+      "path": "assets/source/location-assets/decoration/campfirte_01/textures/campfirte_01.png",
+      "sha256": "75581e14ef29d79ec770681d4052b0aed172fd6595c02ebdb03727f794a546ef",
+      "assetId": "73384502057808"
+    },
+    {
       "reference": "location:ground_torch_01",
       "label": "Ground Torch 01",
       "slug": "ground_torch_01",

@@ -280,7 +280,7 @@
 </div>
 <div class="panel character-card">
 <div class="section-title"><div><span>versioned registry</span><h3>registered weapons <small id="weapon-visible-count" class="muted"></small></h3></div><div class="weapon-list-actions"><label>type filter<select id="weapon-table-type"><option value="all">all types</option></select></label><button id="validate-weapons" type="button">refresh</button></div></div>
-<div class="table-wrap weapon-table-wrap"><table><thead><tr><th>active</th><th>weapon</th><th>type</th><th>rarity</th><th>stats</th><th>assets</th><th>status</th><th>actions</th></tr></thead><tbody id="weapon-rows"></tbody></table></div>
+<div class="table-wrap weapon-table-wrap"><table><thead><tr><th>active</th><th>weapon</th><th>type</th><th>rarity</th><th>stats</th><th>assets</th><th>published at</th><th>status</th><th>actions</th></tr></thead><tbody id="weapon-rows"></tbody></table></div>
 <div id="weapon-details" class="details"><span class="muted">select a weapon.</span></div>
 </div>
 </div>
@@ -444,7 +444,7 @@
 </div>
 <div class="panel character-card">
 <div class="section-title"><div><span>versioned registry</span><h3>registered npcs</h3></div><button id="validate-npcs" type="button">refresh</button></div>
-<div class="table-wrap weapon-table-wrap"><table><thead><tr><th>npc</th><th>stats</th><th>skeleton</th><th>assets</th><th>status</th><th>actions</th></tr></thead><tbody id="npc-rows"></tbody></table></div>
+<div class="table-wrap weapon-table-wrap"><table><thead><tr><th>npc</th><th>stats</th><th>skeleton</th><th>assets</th><th>published at</th><th>spawn placed at</th><th>status</th><th>actions</th></tr></thead><tbody id="npc-rows"></tbody></table></div>
 <div id="npc-details" class="details"><span class="muted">select a npc.</span></div>
 </div>
 </div>
@@ -513,16 +513,16 @@
 <small class="hint">Studio: hover over the ground to preview the published NPC. Hold LMB to lock position, drag horizontally to rotate, release LMB to place. Esc cancels. Register spawn to save the lightweight marker.</small>
 </div>
 <div class="panel character-card">
-<span class="eyebrow">08 · population</span><h3>spawn settings</h3>
-<div class="npc-spawn-settings-grid monster-spawn-settings-grid"><label>respawn sec<input id="npc-spawn-respawn" type="number" min="0" max="86400" step="0.1" value="10"></label><label>spawn radius<input id="npc-spawn-radius" type="number" min="0" max="10000" step="0.1" value="15"></label><label>max alive<input id="npc-spawn-max-alive" type="number" min="1" max="1000" step="1" value="3"></label></div>
-<label class="spawn-enabled"><input id="npc-spawn-enabled" type="checkbox" checked><span>enabled · runtime maintains this population</span></label>
-<small id="npc-spawn-radius-hint" class="hint">radius is the random ground area around the authored point. max alive is the population cap for this record.</small>
+<span class="eyebrow">08 · fixed npc</span><h3>spawn settings</h3>
+<div class="npc-spawn-settings-grid monster-spawn-settings-grid"><label>respawn sec<input id="npc-spawn-respawn" type="number" min="0" max="86400" step="0.1" value="10"></label></div>
+<label class="spawn-enabled"><input id="npc-spawn-enabled" type="checkbox" checked><span>enabled · one NPC at the exact registered point</span></label>
+<small class="hint">One NPC per spawn marker. When it dies, a replacement appears at the same coordinates after the respawn delay.</small>
 <div class="actions"><button id="npc-spawn-register" class="primary" type="button" disabled>register spawn</button><button id="npc-spawn-new" type="button">new spawn</button><button id="npc-spawn-delete" class="danger" type="button" disabled>delete</button></div>
 <div id="npc-spawn-operation" class="status-box"><strong>ready</strong><span>place a point in Studio.</span></div>
 <hr class="card-separator">
 <div class="section-title"><div><span>versioned spawn registry</span><h3>registered points</h3></div><div class="row-actions"><button id="npc-spawn-restore" type="button">restore markers</button><button id="npc-spawn-validate" type="button">validate</button><button id="npc-spawn-refresh" type="button">refresh</button></div></div>
 <div id="npc-spawn-records" class="npc-spawn-records monster-spawn-records"><span class="muted">no registered spawns.</span></div>
-<details class="naming-guide"><summary>manifest and runtime rule</summary><div id="npc-spawn-manifest" class="details"></div><small class="hint">each death frees one population slot; after respawn seconds exactly one replacement is created, never above max alive. radius 0 means all instances use the authored point.</small></details>
+<details class="naming-guide"><summary>manifest and runtime rule</summary><div id="npc-spawn-manifest" class="details"></div><small class="hint">one NPC is spawned at the exact registered X/Y/Z and yaw; after death it respawns at that same point.</small></details>
 </div>
 </div>
 </div>
@@ -539,8 +539,8 @@
 <script src="options.js?v=1"></script>
 <script src="weapon-assets.js?v=3"></script>
 <script src="monster-assets.js?v=6"></script>
-<script src="npc-assets.js?v=3"></script>
-<script src="npc-spawns.js?v=3"></script>
+<script src="npc-assets.js?v=5"></script>
+<script src="npc-spawns.js?v=4"></script>
 <script src="real-estate.js?v=11"></script>
 <script src="monster-spawns.js?v=1"></script>
 </body>

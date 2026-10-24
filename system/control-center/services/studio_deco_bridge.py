@@ -13,7 +13,8 @@ import uuid
 from studio_bridge import PORT, PROJECT, TOKEN, StudioBridgeError
 
 
-def run_deco_refresh_bridge(*, timeout_seconds: float = 75.0) -> dict:
+def run_deco_refresh_bridge(*, timeout_seconds: float = 75.0,
+                            slug: str = '', binding_revision: int | None = None) -> dict:
     operation_id = uuid.uuid4().hex
     command = {
         "project": PROJECT,
@@ -21,6 +22,10 @@ def run_deco_refresh_bridge(*, timeout_seconds: float = 75.0) -> dict:
         "schemaVersion": 1,
         "operationId": operation_id,
     }
+    if slug:
+        if not isinstance(binding_revision, int) or binding_revision < 1:
+            raise ValueError('targeted deco refresh needs binding revision')
+        command.update(schemaVersion=2, targetSlug=slug, bindingRevision=binding_revision)
     state = {"claimed": False, "result": None}
 
     class Handler(BaseHTTPRequestHandler):
@@ -61,8 +66,10 @@ def run_deco_refresh_bridge(*, timeout_seconds: float = 75.0) -> dict:
                 if (not isinstance(incoming, dict)
                         or incoming.get("project") != PROJECT
                         or incoming.get("command") != "deco-refresh"
-                        or incoming.get("schemaVersion") != 1
-                        or incoming.get("operationId") != operation_id):
+                        or incoming.get("schemaVersion") != command["schemaVersion"]
+                        or incoming.get("operationId") != operation_id
+                        or (slug and (incoming.get("targetSlug") != slug
+                                      or incoming.get("bindingRevision") != binding_revision))):
                     raise ValueError("invalid deco-refresh result identity")
                 if not state["claimed"]:
                     raise ValueError("command has not been claimed")
@@ -102,4 +109,7 @@ def run_deco_refresh_bridge(*, timeout_seconds: float = 75.0) -> dict:
         if type(value) is not int or value < 0:
             raise StudioBridgeError(f"invalid Studio deco-refresh result field: {field}")
         values[field] = value
+    if slug:
+        values.update(targetSlug=slug, bindingRevision=binding_revision,
+                      matchedModels=int(result.get('matchedModels', 0)))
     return values

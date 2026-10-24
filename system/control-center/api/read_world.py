@@ -7,6 +7,10 @@ def route(parsed, sources, info):
     if path == "/api/agent/info":
         return 200, info()
 
+    if path == "/api/texture-atlases":
+        search = str((parse_qs(parsed.query).get('search') or [''])[0])
+        return 200, {'families': sources['location_assets'].atlases.catalog(search)}
+
     if path == "/api/location-assets":
         snapshot = sources["location_assets"].snapshot()
         snapshot["publication"] = sources["publication_config"]()

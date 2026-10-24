@@ -37,6 +37,10 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         self.proxy()
 
+    def do_PUT(self):
+        # M126: forward atlas-binding writes without changing the HTTP method.
+        self.proxy()
+
     def do_DELETE(self):
         self.proxy()
 

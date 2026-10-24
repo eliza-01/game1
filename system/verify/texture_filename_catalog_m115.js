@@ -17,7 +17,7 @@ function evaluate(script) {
   const context = vm.createContext({
     $:get, esc:(value)=>String(value??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'),
     window:{}, localStorage:{getItem(){return null;},setItem(){},removeItem(){}},
-    document:{createElement(tag){return {tag,innerHTML:'',value:'',textContent:'',className:'',children:[],appendChild(item){this.children.push(item);},querySelector(){return {onclick:null}}};}},
+    document:{createElement(tag){return {tag,innerHTML:'',value:'',textContent:'',className:'',children:[],appendChild(item){this.children.push(item);},querySelector(selector){return selector === "[data-retry]" ? null : {onclick:null};},querySelectorAll(){return []}};}},
     request(){},toast(){},game1SyncPublicationDescription(){},
   });
   vm.runInContext(fs.readFileSync(path.join(root,script),'utf8'),context,{filename:script});
@@ -68,8 +68,9 @@ function evaluate(script) {
   vm.runInContext('decoAssetRenderTextureReferences()',context);
   const options=get('location-asset-texture-reference').children;
   assert.equal(options.length,1);
-  assert.equal(options[0].value,'granite_wall');
-  assert.equal(options[0].textContent,'Granite Wall · 12345 · Atlas (Original).png');
+  assert.equal(options[0].label, 'Legacy texture reuse (compatibility only)');
+  assert.equal(options[0].children[0].value,'legacy:granite_wall');
+  assert.match(options[0].children[0].textContent,/Atlas \(Original\)\.png · 12345/);
   vm.runInContext('decoAssetRender()',context);
   assert.match(get('location-asset-rows').children[0].innerHTML, /Granite Wall<\/b><small>granite_wall<\/small><small class="deco-texture-filename">Atlas \(Original\)\.png/);
 }

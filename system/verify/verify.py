@@ -2434,7 +2434,7 @@ for required in [
 for required in [
     'id="location-asset-texture-reference"',
     'decorations</span>',
-    'reuse registered texture',
+    'atlas variant',
 ]:
     if required not in index_m43_text:
         err(f"m46 Location Assets UI missing {required}")
@@ -2732,7 +2732,7 @@ for required in [
 if "update_image_asset" in location_asset_store_text:
     err("m51 Location Assets still contain legacy in-place Image Asset updates")
 for required in [
-    "replacing an owned texture publishes a new Roblox Image Asset ID",
+    "central atlas reuse never does",
     "texture ${published.texture_asset_id || '—'}",
 ]:
     if required not in (index_m43_text + deco_assets_js_text):

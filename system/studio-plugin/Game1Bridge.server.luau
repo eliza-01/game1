@@ -52,6 +52,7 @@ local decoManager = DecoManager.new({
     HttpService = HttpService,
     AssetService = AssetService,
     Workspace = Workspace,
+    ServerStorage = ServerStorage,
     ChangeHistoryService = ChangeHistoryService,
     UserInputService = UserInputService,
     agentBaseUrl = AGENT_BASE_URL,
@@ -122,6 +123,7 @@ local handleTimelineEditor = StudioTimelineEditorCommands({
 local handleDecoRefresh = StudioDecoSyncCommands({
     HttpService = HttpService,
     decoManager = decoManager,
+    RunService = RunService,
     bridgeUrl = BRIDGE_URL,
     bridgeToken = BRIDGE_TOKEN,
 })

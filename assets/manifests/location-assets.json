@@ -41,6 +41,75 @@
       }
     ]
   },
+  "atlases": [
+    {
+      "atlasKey": "big_tree_01",
+      "variants": [
+        {
+          "id": 1,
+          "family_id": 1,
+          "width": 256,
+          "height": 512,
+          "filename": "big_tree_01_256x512_atlas.png",
+          "original_filename": "big_tree_01_256x512_atlas.png",
+          "source_path": "assets/source/texture-atlases/big_tree_01/256x512/big_tree_01_256x512_atlas.png",
+          "source_sha256": "3ab5e47e22c6dd4153fd6b90672308335cdc70ec7711d904581f14855edee8df",
+          "uses_alpha": true,
+          "published_id": "134024944101662",
+          "published_sha256": "3ab5e47e22c6dd4153fd6b90672308335cdc70ec7711d904581f14855edee8df",
+          "moderation_state": "Reviewing",
+          "published_at": 1792864909.8548038,
+          "created_at": 1792864890.8597076,
+          "atlas_key": "big_tree_01",
+          "current": true,
+          "resolution": "256x512"
+        },
+        {
+          "id": 2,
+          "family_id": 1,
+          "width": 128,
+          "height": 256,
+          "filename": "big_tree_01_128x256_atlas.png",
+          "original_filename": "big_tree_01_128x256_atlas.png",
+          "source_path": "assets/source/texture-atlases/big_tree_01/128x256/big_tree_01_128x256_atlas.png",
+          "source_sha256": "9f1f34f8b364e8a3d034e774a71daf9b270bded836068202d769611a8fc12050",
+          "uses_alpha": true,
+          "published_id": "100679979096136",
+          "published_sha256": "9f1f34f8b364e8a3d034e774a71daf9b270bded836068202d769611a8fc12050",
+          "moderation_state": "Reviewing",
+          "published_at": 1792864977.6703994,
+          "created_at": 1792864962.0061045,
+          "atlas_key": "big_tree_01",
+          "current": true,
+          "resolution": "128x256"
+        }
+      ]
+    },
+    {
+      "atlasKey": "lantern_01",
+      "variants": [
+        {
+          "id": 3,
+          "family_id": 2,
+          "width": 64,
+          "height": 128,
+          "filename": "lantern_01_64x128_atlas.png",
+          "original_filename": "lantern_01_64x128_atlas.png",
+          "source_path": "assets/source/texture-atlases/lantern_01/64x128/lantern_01_64x128_atlas.png",
+          "source_sha256": "ca9a12aacf3ad5305a6baa34baa728198a272b8d81188ae7163f915f7e1d992e",
+          "uses_alpha": true,
+          "published_id": "111478705558346",
+          "published_sha256": "ca9a12aacf3ad5305a6baa34baa728198a272b8d81188ae7163f915f7e1d992e",
+          "moderation_state": "Reviewing",
+          "published_at": 1792869836.3859174,
+          "created_at": 1792869829.3721356,
+          "atlas_key": "lantern_01",
+          "current": true,
+          "resolution": "64x128"
+        }
+      ]
+    }
+  ],
   "items": [
     {
       "slug": "weapon_shop",
@@ -66,6 +135,8 @@
       "texture_owner_slug": "smithy",
       "texture_shared": true,
       "textureUsesAlpha": false,
+      "atlasVariants": [],
+      "atlasLegacyWarning": true,
       "status": "PUBLISHED",
       "category_label": "Buildings"
     },
@@ -93,6 +164,8 @@
       "texture_owner_slug": "smithy",
       "texture_shared": false,
       "textureUsesAlpha": false,
+      "atlasVariants": [],
+      "atlasLegacyWarning": true,
       "status": "PUBLISHED",
       "category_label": "Buildings"
     },
@@ -120,6 +193,8 @@
       "texture_owner_slug": "christmas_tree",
       "texture_shared": true,
       "textureUsesAlpha": false,
+      "atlasVariants": [],
+      "atlasLegacyWarning": true,
       "status": "PUBLISHED",
       "category_label": "Bushes"
     },
@@ -147,6 +222,8 @@
       "texture_owner_slug": "main_statue",
       "texture_shared": true,
       "textureUsesAlpha": false,
+      "atlasVariants": [],
+      "atlasLegacyWarning": true,
       "status": "PUBLISHED",
       "category_label": "Decorations"
     },
@@ -174,6 +251,8 @@
       "texture_owner_slug": "wooden_post_01",
       "texture_shared": false,
       "textureUsesAlpha": true,
+      "atlasVariants": [],
+      "atlasLegacyWarning": true,
       "status": "PUBLISHED",
       "category_label": "Decorations"
     },
@@ -201,6 +280,8 @@
       "texture_owner_slug": "stone_fence_01",
       "texture_shared": false,
       "textureUsesAlpha": false,
+      "atlasVariants": [],
+      "atlasLegacyWarning": true,
       "status": "PUBLISHED",
       "category_label": "Fences"
     },
@@ -228,6 +309,8 @@
       "texture_owner_slug": "stone_fence_01",
       "texture_shared": true,
       "textureUsesAlpha": false,
+      "atlasVariants": [],
+      "atlasLegacyWarning": true,
       "status": "PUBLISHED",
       "category_label": "Fences"
     },
@@ -255,6 +338,8 @@
       "texture_owner_slug": "stone_fence_01",
       "texture_shared": true,
       "textureUsesAlpha": false,
+      "atlasVariants": [],
+      "atlasLegacyWarning": true,
       "status": "PUBLISHED",
       "category_label": "Fences"
     },
@@ -282,6 +367,8 @@
       "texture_owner_slug": "stone_fence_01",
       "texture_shared": true,
       "textureUsesAlpha": false,
+      "atlasVariants": [],
+      "atlasLegacyWarning": true,
       "status": "PUBLISHED",
       "category_label": "Fences"
     },
@@ -309,6 +396,8 @@
       "texture_owner_slug": "stone_fence_01",
       "texture_shared": true,
       "textureUsesAlpha": false,
+      "atlasVariants": [],
+      "atlasLegacyWarning": true,
       "status": "PUBLISHED",
       "category_label": "Ladders"
     },
@@ -336,6 +425,8 @@
       "texture_owner_slug": "wooden_bridge_bar_01",
       "texture_shared": false,
       "textureUsesAlpha": true,
+      "atlasVariants": [],
+      "atlasLegacyWarning": true,
       "status": "PUBLISHED",
       "category_label": "Ladders"
     },
@@ -363,6 +454,8 @@
       "texture_owner_slug": "campfirte_01",
       "texture_shared": false,
       "textureUsesAlpha": true,
+      "atlasVariants": [],
+      "atlasLegacyWarning": true,
       "status": "PUBLISHED",
       "category_label": "Lights"
     },
@@ -390,6 +483,8 @@
       "texture_owner_slug": "wall_torch_01",
       "texture_shared": true,
       "textureUsesAlpha": false,
+      "atlasVariants": [],
+      "atlasLegacyWarning": true,
       "status": "PUBLISHED",
       "category_label": "Lights"
     },
@@ -417,6 +512,8 @@
       "texture_owner_slug": "wall_torch_01",
       "texture_shared": true,
       "textureUsesAlpha": false,
+      "atlasVariants": [],
+      "atlasLegacyWarning": true,
       "status": "PUBLISHED",
       "category_label": "Lights"
     },
@@ -444,6 +541,8 @@
       "texture_owner_slug": "wall_torch_01",
       "texture_shared": true,
       "textureUsesAlpha": false,
+      "atlasVariants": [],
+      "atlasLegacyWarning": true,
       "status": "PUBLISHED",
       "category_label": "Lights"
     },
@@ -452,25 +551,52 @@
       "name_en": "Lantern 01",
       "category": "light",
       "model_path": "assets/source/location-assets/light/lantern_01/model/lantern_01.fbx",
-      "model_sha256": "e28c6d576377773896d76829cf1fa6e34ddf5f9e0bbb2b84ee3dd6b6cdaaa53b",
+      "model_sha256": "88c44761751d2441d054f2a0d3f28dce243fbfd7d5b878ead9fe939fe8084da5",
       "model_asset_id": "73103457893390",
-      "model_published_sha256": "e28c6d576377773896d76829cf1fa6e34ddf5f9e0bbb2b84ee3dd6b6cdaaa53b",
+      "model_published_sha256": "88c44761751d2441d054f2a0d3f28dce243fbfd7d5b878ead9fe939fe8084da5",
       "model_moderation_state": "Approved",
-      "texture_path": "assets/source/location-assets/rock/main_statue/textures/main_statue.jpg",
-      "texture_sha256": "8f8ade9148ff40e8b5933c6abeb5e2c55e68a95d89147d6b317cee7412c5e8bf",
-      "texture_asset_id": "128890927196285",
-      "texture_published_sha256": "8f8ade9148ff40e8b5933c6abeb5e2c55e68a95d89147d6b317cee7412c5e8bf",
+      "texture_path": "assets/source/texture-atlases/lantern_01/64x128/lantern_01_64x128_atlas.png",
+      "texture_sha256": "ca9a12aacf3ad5305a6baa34baa728198a272b8d81188ae7163f915f7e1d992e",
+      "texture_asset_id": "111478705558346",
+      "texture_published_sha256": "ca9a12aacf3ad5305a6baa34baa728198a272b8d81188ae7163f915f7e1d992e",
       "texture_moderation_state": "Reviewing",
-      "texture_reference_slug": "main_statue",
+      "texture_reference_slug": "",
       "destructible": false,
-      "revision": 1,
+      "revision": 2,
       "created_at": 1791577146.911755,
-      "updated_at": 1791577162.6724987,
-      "published_at": 1791577162.6724987,
-      "texture_filename": "main_statue.jpg",
-      "texture_owner_slug": "main_statue",
-      "texture_shared": true,
-      "textureUsesAlpha": false,
+      "updated_at": 1792869859.5723166,
+      "published_at": 1792869859.5723166,
+      "texture_filename": "lantern_01_64x128_atlas.png",
+      "texture_owner_slug": "",
+      "texture_shared": false,
+      "atlasVariantId": 3,
+      "atlasFamily": "lantern_01",
+      "atlasResolution": "64x128",
+      "bindingRevision": 1,
+      "studioSyncStatus": "synced",
+      "atlasVariants": [
+        {
+          "id": 3,
+          "family_id": 2,
+          "width": 64,
+          "height": 128,
+          "filename": "lantern_01_64x128_atlas.png",
+          "original_filename": "lantern_01_64x128_atlas.png",
+          "source_path": "assets/source/texture-atlases/lantern_01/64x128/lantern_01_64x128_atlas.png",
+          "source_sha256": "ca9a12aacf3ad5305a6baa34baa728198a272b8d81188ae7163f915f7e1d992e",
+          "uses_alpha": true,
+          "published_id": "111478705558346",
+          "published_sha256": "ca9a12aacf3ad5305a6baa34baa728198a272b8d81188ae7163f915f7e1d992e",
+          "moderation_state": "Reviewing",
+          "published_at": 1792869836.3859174,
+          "created_at": 1792869829.3721356,
+          "atlas_key": "lantern_01",
+          "current": true,
+          "resolution": "64x128"
+        }
+      ],
+      "textureUsesAlpha": true,
+      "atlasLegacyWarning": false,
       "status": "PUBLISHED",
       "category_label": "Lights"
     },
@@ -498,6 +624,8 @@
       "texture_owner_slug": "wooden_bridge_bar_01",
       "texture_shared": true,
       "textureUsesAlpha": true,
+      "atlasVariants": [],
+      "atlasLegacyWarning": true,
       "status": "PUBLISHED",
       "category_label": "Lights"
     },
@@ -525,6 +653,8 @@
       "texture_owner_slug": "wall_torch_01",
       "texture_shared": false,
       "textureUsesAlpha": false,
+      "atlasVariants": [],
+      "atlasLegacyWarning": true,
       "status": "PUBLISHED",
       "category_label": "Lights"
     },
@@ -552,6 +682,8 @@
       "texture_owner_slug": "wall_torch_01",
       "texture_shared": true,
       "textureUsesAlpha": false,
+      "atlasVariants": [],
+      "atlasLegacyWarning": true,
       "status": "PUBLISHED",
       "category_label": "Lights"
     },
@@ -579,6 +711,8 @@
       "texture_owner_slug": "wall_torch_01",
       "texture_shared": true,
       "textureUsesAlpha": false,
+      "atlasVariants": [],
+      "atlasLegacyWarning": true,
       "status": "PUBLISHED",
       "category_label": "Lights"
     },
@@ -606,8 +740,83 @@
       "texture_owner_slug": "main_statue",
       "texture_shared": false,
       "textureUsesAlpha": false,
+      "atlasVariants": [],
+      "atlasLegacyWarning": true,
       "status": "PUBLISHED",
       "category_label": "Rocks"
+    },
+    {
+      "slug": "big_tree_01",
+      "name_en": "Big Tree 01",
+      "category": "tree",
+      "model_path": "assets/source/location-assets/tree/big_tree_01/model/big_tree_01.fbx",
+      "model_sha256": "56f4ad09d2d468139b6b343a5d2fc7c94ffc8811bb24a45d666d8ec42775467d",
+      "model_asset_id": "77517628720686",
+      "model_published_sha256": "56f4ad09d2d468139b6b343a5d2fc7c94ffc8811bb24a45d666d8ec42775467d",
+      "model_moderation_state": "Approved",
+      "texture_path": "assets/source/texture-atlases/big_tree_01/256x512/big_tree_01_256x512_atlas.png",
+      "texture_sha256": "3ab5e47e22c6dd4153fd6b90672308335cdc70ec7711d904581f14855edee8df",
+      "texture_asset_id": "134024944101662",
+      "texture_published_sha256": "3ab5e47e22c6dd4153fd6b90672308335cdc70ec7711d904581f14855edee8df",
+      "texture_moderation_state": "Reviewing",
+      "texture_reference_slug": "",
+      "destructible": true,
+      "revision": 1,
+      "created_at": 1792864890.9769711,
+      "updated_at": 1792864905.9361415,
+      "published_at": 1792864905.9361415,
+      "texture_filename": "big_tree_01_256x512_atlas.png",
+      "texture_owner_slug": "",
+      "texture_shared": false,
+      "atlasVariantId": 1,
+      "atlasFamily": "big_tree_01",
+      "atlasResolution": "256x512",
+      "bindingRevision": 3,
+      "studioSyncStatus": "synced",
+      "atlasVariants": [
+        {
+          "id": 1,
+          "family_id": 1,
+          "width": 256,
+          "height": 512,
+          "filename": "big_tree_01_256x512_atlas.png",
+          "original_filename": "big_tree_01_256x512_atlas.png",
+          "source_path": "assets/source/texture-atlases/big_tree_01/256x512/big_tree_01_256x512_atlas.png",
+          "source_sha256": "3ab5e47e22c6dd4153fd6b90672308335cdc70ec7711d904581f14855edee8df",
+          "uses_alpha": true,
+          "published_id": "134024944101662",
+          "published_sha256": "3ab5e47e22c6dd4153fd6b90672308335cdc70ec7711d904581f14855edee8df",
+          "moderation_state": "Reviewing",
+          "published_at": 1792864909.8548038,
+          "created_at": 1792864890.8597076,
+          "atlas_key": "big_tree_01",
+          "current": true,
+          "resolution": "256x512"
+        },
+        {
+          "id": 2,
+          "family_id": 1,
+          "width": 128,
+          "height": 256,
+          "filename": "big_tree_01_128x256_atlas.png",
+          "original_filename": "big_tree_01_128x256_atlas.png",
+          "source_path": "assets/source/texture-atlases/big_tree_01/128x256/big_tree_01_128x256_atlas.png",
+          "source_sha256": "9f1f34f8b364e8a3d034e774a71daf9b270bded836068202d769611a8fc12050",
+          "uses_alpha": true,
+          "published_id": "100679979096136",
+          "published_sha256": "9f1f34f8b364e8a3d034e774a71daf9b270bded836068202d769611a8fc12050",
+          "moderation_state": "Reviewing",
+          "published_at": 1792864977.6703994,
+          "created_at": 1792864962.0061045,
+          "atlas_key": "big_tree_01",
+          "current": true,
+          "resolution": "128x256"
+        }
+      ],
+      "textureUsesAlpha": true,
+      "atlasLegacyWarning": false,
+      "status": "PUBLISHED",
+      "category_label": "Trees"
     },
     {
       "slug": "birch_01",
@@ -633,6 +842,8 @@
       "texture_owner_slug": "christmas_tree",
       "texture_shared": true,
       "textureUsesAlpha": false,
+      "atlasVariants": [],
+      "atlasLegacyWarning": true,
       "status": "PUBLISHED",
       "category_label": "Trees"
     },
@@ -660,6 +871,8 @@
       "texture_owner_slug": "christmas_tree",
       "texture_shared": true,
       "textureUsesAlpha": false,
+      "atlasVariants": [],
+      "atlasLegacyWarning": true,
       "status": "PUBLISHED",
       "category_label": "Trees"
     },
@@ -687,13 +900,15 @@
       "texture_owner_slug": "christmas_tree",
       "texture_shared": false,
       "textureUsesAlpha": false,
+      "atlasVariants": [],
+      "atlasLegacyWarning": true,
       "status": "PUBLISHED",
       "category_label": "Trees"
     }
   ],
   "summary": {
-    "registered": 24,
-    "published": 24,
+    "registered": 25,
+    "published": 25,
     "changed": 0
   }
 }

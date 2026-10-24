@@ -4,6 +4,8 @@ const decoAssetState = {
   modelPath: '',
   texturePath: '',
   textureReferenceSlug: '',
+  atlasVariantId: 0,
+  atlasBusy: false,
   libraryCategory: 'all',
 };
 
@@ -70,7 +72,8 @@ function decoAssetSetForm(row) {
   decoAssetRemember(DECO_SELECTED_ASSET_KEY, decoAssetState.selected || '');
   decoAssetState.modelPath = '';
   decoAssetState.texturePath = '';
-  decoAssetState.textureReferenceSlug = row?.texture_reference_slug || '';
+  decoAssetState.textureReferenceSlug = row?.atlasVariantId ? '' : (row?.texture_reference_slug || '');
+  decoAssetState.atlasVariantId = Number(row?.atlasVariantId || 0);
 
   if (row) {
     $('location-asset-name').value = row.name_en || '';
@@ -81,7 +84,7 @@ function decoAssetSetForm(row) {
     $('location-asset-destructible').checked = row.destructible === true || Number(row.destructible || 0) === 1;
     $('picked-location-asset-model').textContent = 'keep current fbx or choose a replacement';
     $('picked-location-asset-texture').textContent = row.texture_shared
-      ? `reusing ${row.texture_owner_slug || row.texture_reference_slug} · ${decoAssetTextureFilename(row)}`
+      ? `legacy reuse ${row.texture_owner_slug || row.texture_reference_slug} · ${decoAssetTextureFilename(row)}`
       : `${decoAssetTextureFilename(row) || 'no texture'} · keep or choose a PNG/JPG replacement`;
   } else {
     $('location-asset-name').value = '';
@@ -100,49 +103,100 @@ function decoAssetSetForm(row) {
   decoAssetRender();
 }
 
-function decoAssetRenderTree() {
-  const host = $('location-asset-tree');
-  const items = decoAssetState.data?.items || [];
-  host.innerHTML = '';
-
-  for (const category of decoAssetState.data?.options?.categories || []) {
-    const rows = items.filter((row) => row.category === category.id);
-    if (!rows.length) continue;
-
-    const group = document.createElement('div');
-    group.className = 'deco-tree-group';
-    group.innerHTML = `<small>${esc(category.label)}</small>`;
-    host.appendChild(group);
-
-    for (const row of rows) {
-      const button = document.createElement('button');
-      button.className = row.slug === decoAssetState.selected ? 'active' : '';
-      button.innerHTML = `<span>${esc(row.name_en)}<small>${esc(row.slug)}</small><small class="deco-texture-filename">${esc(decoAssetTextureFilename(row) || 'no texture')}</small></span><small>${esc(row.status)}</small>`;
-      button.onclick = () => decoAssetSetForm(row);
-      host.appendChild(button);
+// Legacy compatibility: can still reuse a registered texture by owner slug.
+// A single catalog is shared by every Location Asset. Never list owners as
+// independent copies of the same published atlas variant.
+function decoAssetRenderTextureReferences() {
+  const select = $('location-asset-texture-reference');
+  const query = $('location-asset-atlas-search').value.trim().toLowerCase();
+  const selectedValue = decoAssetState.atlasVariantId
+    ? `variant:${decoAssetState.atlasVariantId}`
+    : (decoAssetState.textureReferenceSlug ? `legacy:${decoAssetState.textureReferenceSlug}` : '');
+  select.innerHTML = '<option value="">own / new PNG/JPG atlas</option>';
+  for (const family of decoAssetState.data?.atlases || []) {
+    const group = document.createElement('optgroup');
+    group.label = family.atlasKey;
+    for (const variant of family.variants || []) {
+      if (query && !`${family.atlasKey} ${variant.resolution} ${variant.filename}`.toLowerCase().includes(query)) continue;
+      const option = document.createElement('option');
+      option.value = `variant:${variant.id}`;
+      option.textContent = `${variant.resolution} · ${variant.filename} · ${variant.current ? variant.published_id : 'publish required'}`;
+      group.appendChild(option);
     }
+    if (group.children.length) select.appendChild(group);
   }
+  const legacy = document.createElement('optgroup');
+  legacy.label = 'Legacy texture reuse (compatibility only)';
+  for (const row of decoAssetState.data?.items || []) {
+    if (row.slug === decoAssetState.selected || row.atlasVariantId || row.texture_owner_slug !== row.slug || !row.texture_path) continue;
+    if (query && !`${row.slug} ${decoAssetTextureFilename(row)}`.toLowerCase().includes(query)) continue;
+    const option = document.createElement('option');
+    option.value = `legacy:${row.slug}`;
+    option.textContent = `${decoAssetTextureFilename(row)} · ${row.texture_asset_id || 'unpublished'} (legacy)`;
+    legacy.appendChild(option);
+  }
+  if (legacy.children.length) select.appendChild(legacy);
+  select.value = selectedValue;
+  $('publish-location-atlas-variant').disabled = !decoAssetState.atlasVariantId || !decoAssetState.data?.publication?.configured;
+}
 
-  if (!items.length) {
-    host.innerHTML = '<span class="muted">no location assets.</span>';
+const DECO_ATLAS_COLORS = ['#d9ac43', '#a47bdf', '#4f95ee', '#54b991', '#939ba8'];
+
+function decoAtlasWarning(row) {
+  return row.atlasLegacyWarning
+    ? `<span class="deco-atlas-warning" title="Legacy filename. Expected &lt;atlas_key&gt;_&lt;width&gt;x&lt;height&gt;_atlas.png" aria-label="Legacy atlas filename">⚠️</span>`
+    : '';
+}
+
+function decoAtlasDots(row) {
+  // Gold is always leftmost: rank by actual pixel count, not insertion order.
+  const variants = [...(row.atlasVariants || [])].sort((a, b) =>
+    (Number(b.width) * Number(b.height) - Number(a.width) * Number(a.height)) ||
+    (Number(b.width) - Number(a.width)) ||
+    (Number(b.height) - Number(a.height)) ||
+    (Number(a.id) - Number(b.id))
+  );
+  if (!variants.length) return '';
+  const render = (variant, index) => {
+    const current = Number(row.atlasVariantId) === Number(variant.id);
+    const valid = Boolean(variant.current);
+    const tip = `${variant.filename} · ${variant.resolution}${valid ? '' : ' · publish first'}`;
+    return `<button type="button" class="deco-atlas-dot ${current ? 'is-active' : ''}" style="--dot-color:${DECO_ATLAS_COLORS[Math.min(index,4)]}" data-atlas-variant="${Number(variant.id)}" title="${esc(tip)}" aria-label="${esc(tip)}" aria-pressed="${current}" ${(!valid || decoAssetState.atlasBusy) ? 'disabled' : ''}><span></span></button>`;
+  };
+  return `<div class="deco-atlas-dots" aria-label="Registered atlas resolutions">${variants.slice(0,5).map(render).join('')}${variants.length>5 ? `<details class="deco-atlas-more"><summary>+${variants.length-5}</summary><div>${variants.slice(5).map((v,i)=>render(v,i+5)).join('')}</div></details>` : ''}</div>`;
+}
+
+async function decoAssetChooseAtlasVariant(row, id) {
+  if (decoAssetState.atlasBusy || Number(row.atlasVariantId) === Number(id)) return;
+  decoAssetState.atlasBusy = true;
+  decoAssetRender();
+  try {
+    await request(`/api/location-assets/${encodeURIComponent(row.slug)}/atlas-binding`, {
+      method: 'PUT', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({variantId: id, expectedRevision: Number(row.bindingRevision || 0)}),
+    });
+    await decoAssetLoad();
+    await decoAssetRetrySync(row.slug);
+  } catch (error) {
+    toast(`Atlas change: ${error.message}`, true);
+    await decoAssetLoad();
+  } finally {
+    decoAssetState.atlasBusy = false;
+    decoAssetRender();
   }
 }
 
-function decoAssetRenderTextureReferences() {
-  const select = $('location-asset-texture-reference');
-  const current = decoAssetState.textureReferenceSlug || '';
-  const selectedSlug = decoAssetState.selected || '';
-  select.innerHTML = '<option value="">own / new PNG/JPG texture</option>';
-  for (const row of decoAssetState.data?.items || []) {
-    if (row.slug === selectedSlug || row.texture_owner_slug !== row.slug) continue;
-    if (!row.texture_path) continue;
-    const option = document.createElement('option');
-    option.value = row.texture_owner_slug;
-    const owner = (decoAssetState.data?.items || []).find((item) => item.slug === row.texture_owner_slug) || row;
-    option.textContent = `${owner.name_en || owner.slug} · ${owner.texture_asset_id || 'not published'} · ${decoAssetTextureFilename(owner) || 'no texture'}`;
-    select.appendChild(option);
+async function decoAssetRetrySync(slug) {
+  try {
+    const result = await request('/api/location-assets/studio-sync', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({slug}),
+    });
+    toast(`Studio synced · ${Number(result.studio?.matchedModels || 0)} matched · ${Number(result.studio?.parts || 0)} parts updated. Save Place in Studio.`);
+  } catch (error) {
+    toast(`Atlas saved; Studio sync pending: ${error.message}. Use Retry.`, true);
   }
-  select.value = current;
+  await decoAssetLoad();
 }
 
 function decoAssetUseCategory(category, { updateEditor = true } = {}) {
@@ -174,7 +228,6 @@ function decoAssetRender() {
 
   const selected = decoAssetSelected();
   const summary = decoAssetState.data.summary || {};
-  $('location-asset-rail-count').textContent = String(summary.registered || 0);
   $('location-asset-metric-total').textContent = String(summary.registered || 0);
   $('location-asset-metric-published').textContent = String(summary.published || 0);
   $('location-asset-metric-changed').textContent = String(summary.changed || 0);
@@ -189,7 +242,6 @@ function decoAssetRender() {
     }
   }
 
-  decoAssetRenderTree();
   decoAssetRenderTextureReferences();
   decoAssetRenderLibraryFilter();
   $('register-location-asset').textContent = selected ? 'save asset changes' : 'register asset';
@@ -204,7 +256,7 @@ function decoAssetRender() {
     const textureInfo = selected.texture_shared
       ? `shared texture from ${esc(selected.texture_owner_slug || selected.texture_reference_slug)} · ${esc(decoAssetTextureFilename(selected))} · ${esc(selected.texture_asset_id || 'not published')}`
       : `texture ${esc(decoAssetTextureFilename(selected))} · ${esc(selected.texture_asset_id || 'not published')}`;
-    status.innerHTML = `<strong>${esc(selected.name_en)} · ${decoAssetStatusTag(selected.status)}</strong><span>${esc(decoAssetCategoryLabel(selected.category))} · model ${esc(selected.model_asset_id || 'not published')} · ${textureInfo}</span>`;
+    status.innerHTML = `<strong>${esc(selected.name_en)} ${decoAtlasWarning(selected)} · ${decoAssetStatusTag(selected.status)}</strong><span>${esc(decoAssetCategoryLabel(selected.category))} · model ${esc(selected.model_asset_id || 'not published')} · ${textureInfo}</span>`;
   } else {
     status.innerHTML = '<strong>not registered</strong><span>choose FBX + PNG/JPG, then register the location asset.</span>';
   }
@@ -226,8 +278,13 @@ function decoAssetRender() {
   for (const row of libraryRows) {
     const tr = document.createElement('tr');
     const contactPolicy = (row.destructible === true || Number(row.destructible || 0) === 1) ? '<span class="tag">destructible</span>' : '<span class="tag published">solid · bounce</span>';
-    tr.innerHTML = `<td><b>${esc(row.name_en)}</b><small>${esc(row.slug)}</small><small class="deco-texture-filename">${esc(decoAssetTextureFilename(row) || 'no texture')}</small></td><td>${esc(decoAssetCategoryLabel(row.category))}</td><td>${contactPolicy}</td><td><small>model ${esc(row.model_asset_id || '—')}</small><small>${row.texture_shared ? `shared ${esc(row.texture_owner_slug || row.texture_reference_slug)} · ` : 'texture '}${esc(row.texture_asset_id || '—')}</small></td><td>${decoAssetStatusTag(row.status)}</td><td><button data-select type="button">edit</button></td>`;
+    tr.innerHTML = `<td><b>${esc(row.name_en)}</b><small>${esc(row.slug)}</small><small class="deco-texture-filename">${esc(decoAssetTextureFilename(row) || 'no texture')} ${decoAtlasWarning(row)}</small>${decoAtlasDots(row)}${row.studioSyncStatus === 'pending_studio_sync' ? '<button class="deco-atlas-retry" data-retry type="button">Sync pending · retry</button>' : ''}</td><td>${esc(decoAssetCategoryLabel(row.category))}</td><td>${contactPolicy}</td><td><small>model ${esc(row.model_asset_id || '—')}</small><small>${row.texture_shared ? `shared ${esc(row.texture_owner_slug || row.texture_reference_slug)} · ` : 'texture '}${esc(row.texture_asset_id || '—')}</small></td><td>${decoAssetStatusTag(row.status)}</td><td><button data-select type="button">edit</button></td>`;
     tr.querySelector('[data-select]').onclick = () => decoAssetSetForm(row);
+    tr.querySelectorAll('[data-atlas-variant]').forEach((button) => {
+      button.onclick = () => decoAssetChooseAtlasVariant(row, Number(button.dataset.atlasVariant));
+    });
+    const retry = tr.querySelector('[data-retry]');
+    if (retry) retry.onclick = () => decoAssetRetrySync(row.slug);
     rows.appendChild(tr);
   }
   if (!libraryRows.length) {
@@ -276,6 +333,7 @@ async function decoAssetChooseTexture() {
     if (!result.path) return;
     decoAssetState.texturePath = result.path;
     decoAssetState.textureReferenceSlug = '';
+    decoAssetState.atlasVariantId = 0;
     $('location-asset-texture-reference').value = '';
     $('picked-location-asset-texture').textContent = result.path;
   } catch (error) {
@@ -293,13 +351,14 @@ async function decoAssetRegister() {
       modelSourcePath: decoAssetState.modelPath,
       textureSourcePath: decoAssetState.texturePath,
       textureReferenceSlug: decoAssetState.textureReferenceSlug,
+      atlasVariantId: decoAssetState.atlasVariantId,
       destructible: $('location-asset-destructible').checked,
     };
     if (!selected && !payload.modelSourcePath) {
       throw Error('choose FBX');
     }
-    if (!selected && !payload.textureSourcePath && !payload.textureReferenceSlug) {
-      throw Error('choose PNG/JPG or reuse a registered texture');
+    if (!selected && !payload.textureSourcePath && !payload.textureReferenceSlug && !payload.atlasVariantId) {
+      throw Error('choose PNG/JPG or a registered atlas variant');
     }
 
     const row = await request('/api/location-assets', {
@@ -369,21 +428,42 @@ async function decoAssetDelete() {
 decoAssetRestorePreferences();
 window.game1LocationAssetsLoad = decoAssetLoad;
 $('location-asset-name').oninput = decoAssetSyncSlug;
-$('new-location-asset').onclick = decoAssetBeginNew;
 $('new-location-asset-main').onclick = decoAssetBeginNew;
-$('refresh-location-assets').onclick = decoAssetLoad;
 $('refresh-location-assets-table').onclick = decoAssetLoad;
 $('choose-location-asset-model').onclick = decoAssetChooseModel;
 $('choose-location-asset-texture').onclick = decoAssetChooseTexture;
+$('location-asset-atlas-search').oninput = decoAssetRenderTextureReferences;
 $('location-asset-texture-reference').onchange = () => {
-  decoAssetState.textureReferenceSlug = $('location-asset-texture-reference').value;
-  if (decoAssetState.textureReferenceSlug) {
+  const selection = $('location-asset-texture-reference').value;
+  decoAssetState.atlasVariantId = selection.startsWith('variant:') ? Number(selection.slice(8)) : 0;
+  decoAssetState.textureReferenceSlug = selection.startsWith('legacy:') ? selection.slice(7) : '';
+  if (selection) {
     decoAssetState.texturePath = '';
-    const owner = (decoAssetState.data?.items || []).find(row => row.slug === decoAssetState.textureReferenceSlug);
-    $('picked-location-asset-texture').textContent = `reusing ${decoAssetState.textureReferenceSlug} · ${decoAssetTextureFilename(owner)}`;
-  } else if (!decoAssetState.selected) {
-    $('picked-location-asset-texture').textContent = 'PNG/JPG not selected';
+    $('picked-location-asset-texture').textContent = `using ${$('location-asset-texture-reference').selectedOptions[0].textContent}`;
   }
+  decoAssetRenderTextureReferences();
+};
+$('register-location-atlas-variant').onclick = async () => {
+  if (!decoAssetState.texturePath) return toast('Choose PNG/JPG first', true);
+  try {
+    const variant = await request('/api/texture-atlases/variants', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({sourcePath:decoAssetState.texturePath}),
+    });
+    decoAssetState.texturePath = '';
+    decoAssetState.atlasVariantId = variant.id;
+    decoAssetState.textureReferenceSlug = '';
+    await decoAssetLoad();
+    toast(`Atlas variant registered · ${variant.atlas_key} ${variant.resolution}`);
+  } catch (error) { toast(error.message, true); }
+};
+$('publish-location-atlas-variant').onclick = async () => {
+  if (!decoAssetState.atlasVariantId) return;
+  try {
+    await request(`/api/texture-atlases/variants/${decoAssetState.atlasVariantId}/publish`, {method:'POST'});
+    await decoAssetLoad();
+    toast('Atlas published (or reused existing Image Asset ID)');
+  } catch (error) { toast(error.message, true); }
 };
 $('location-asset-library-category').onchange = () => {
   const category = $('location-asset-library-category').value || 'all';

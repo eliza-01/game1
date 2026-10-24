@@ -235,6 +235,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.out(500, {"error": "Host Agent failed to process the request; check its console log"})
         return self.out(status, payload)
 
+    def do_PUT(self):
+        # Same authenticated authoring route, explicit idempotent binding operation.
+        return self.do_POST()
+
     def do_DELETE(self):
         if not self.auth():
             return self.out(401, {"error": "unauthorized"})

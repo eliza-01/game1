@@ -70,6 +70,7 @@ function DecoManager.new(config: any)
     self.HttpService = config.HttpService
     self.AssetService = config.AssetService
     self.Workspace = config.Workspace
+    self.ServerStorage = config.ServerStorage
     self.ChangeHistoryService = config.ChangeHistoryService
     self.UserInputService = config.UserInputService
     self.registry = nil
@@ -315,7 +316,7 @@ function DecoManager:_setCategory(category: string)
     self:_showCurrent()
 end
 
-function DecoManager:refreshRegistry()
+function DecoManager:refreshRegistry(targetSlug: string?)
     self:_setStatus("Refreshing Location Assets registry…")
     local ok, result = pcall(function()
         return self.loader:fetchRegistry()
@@ -327,7 +328,7 @@ function DecoManager:refreshRegistry()
         return nil, tostring(result)
     end
     self.registry = result
-    local syncResult = DecoPlacedAssetSync.RefreshTextures(self.Workspace, result)
+    local syncResult = DecoPlacedAssetSync.RefreshTextures(self.Workspace, result, targetSlug, self.ServerStorage)
     if syncResult.parts > 0 then
         self.ChangeHistoryService:SetWaypoint("Refresh Deco Asset Textures")
     end
@@ -340,7 +341,7 @@ function DecoManager:refreshRegistry()
     else
         self:_setStatus("Registry refreshed · placed textures are already current")
     end
-    return { models = syncResult.models, parts = syncResult.parts, registryItems = #result.items }
+    return { models = syncResult.models, parts = syncResult.parts, matchedModels = syncResult.matchedModels, registryItems = #result.items }
 end
 
 function DecoManager:_placeCurrent()

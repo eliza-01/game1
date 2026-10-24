@@ -129,3 +129,16 @@
 /* Keep the uploaded texture basename identifiable under the asset slug. */
 .deco-texture-filename { color:var(--muted); overflow-wrap:anywhere; word-break:break-word; }
 #location-asset-rows .deco-texture-filename { color:var(--mint); }
+
+/* Central atlas variants: rank colors are relative within each family. */
+.deco-atlas-dots { display:flex; align-items:center; gap:3px; margin:4px 0 2px; flex-wrap:wrap; }
+.deco-atlas-dot { width:14px; height:14px; border-radius:50%; border:1px solid transparent; background:transparent; display:inline-grid; place-items:center; cursor:pointer; padding:0; }
+.deco-atlas-dot span { display:block; width:7px; height:7px; border-radius:50%; background:var(--dot-color); opacity:.65; }
+.deco-atlas-dot:is(:hover,:focus-visible,.is-active) { border-color:var(--dot-color); }
+.deco-atlas-dot.is-active span { opacity:1; box-shadow:0 0 4px var(--dot-color); }
+.deco-atlas-dot:disabled { opacity:.35; cursor:not-allowed; }
+.deco-atlas-more { display:inline-flex; align-items:center; position:relative; font-size:11px; }
+.deco-atlas-more summary { cursor:pointer; color:var(--mint); }
+.deco-atlas-more > div { display:flex; gap:5px; flex-wrap:wrap; padding:5px; }
+.deco-atlas-warning { cursor:help; font-size:12px; }
+.deco-atlas-retry { font-size:11px; margin-top:5px; }

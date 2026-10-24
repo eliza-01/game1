@@ -6,7 +6,7 @@ from urllib.parse import unquote
 
 
 def route(path, body, deps):
-    if not path.startswith(('/api/location-assets', '/api/npc-spawns', '/api/monster-spawns', '/api/options', '/api/locations', '/api/timelines',)):
+    if not path.startswith(('/api/texture-atlases', '/api/location-assets', '/api/npc-spawns', '/api/monster-spawns', '/api/options', '/api/locations', '/api/timelines',)):
         return None
 
     def out(status, payload):
@@ -28,7 +28,39 @@ def route(path, body, deps):
 
     if path == "/api/location-assets/studio-sync":
         try:
-            return out(200, {"studio": deps["sync_location_assets_to_studio"]()})
+            payload = body()
+            slug = str(payload.get('slug') or '').strip().lower()
+            if slug:
+                revision = location_assets.atlases.active_revisions("location_asset", slug).get(slug)
+                if revision is None:
+                    raise ValueError('atlas binding not found')
+                studio = deps["sync_location_assets_to_studio"](slug=slug, binding_revision=revision)
+                location_assets.atlases.mark_synced("location_asset", slug, revision)
+                location_assets.export()
+            else:
+                revisions = (location_assets.atlases.active_revisions("location_asset")
+                             if hasattr(location_assets, 'atlases') else {})
+                studio = deps["sync_location_assets_to_studio"]()
+                if revisions:
+                    location_assets.atlases.mark_all_synced("location_asset", revisions)
+                    location_assets.export()
+            return out(200, {"studio": studio})
+        except Exception as error:
+            return out(400, {"error": str(error)})
+
+    if path == "/api/texture-atlases/variants":
+        try:
+            return out(200, location_assets.atlases.register_file(str(body().get('sourcePath') or '')))
+        except Exception as error:
+            return out(400, {"error": str(error)})
+
+    if path.startswith('/api/texture-atlases/variants/') and path.endswith('/publish'):
+        try:
+            variant_id = int(path[len('/api/texture-atlases/variants/'):-len('/publish')].strip('/'))
+            credentials = publication_credentials('game1 atlas')
+            result = location_assets.atlases.ensure_published(variant_id, credentials, 'game1 atlas')
+            location_assets.export()
+            return out(200, result)
         except Exception as error:
             return out(400, {"error": str(error)})
 
@@ -168,6 +200,16 @@ def route(path, body, deps):
             return out(400, {"error": str(error)})
 
     location_asset_prefix = "/api/location-assets/"
+    if path.startswith(location_asset_prefix) and path.endswith('/atlas-binding'):
+        slug = unquote(path[len(location_asset_prefix):-len('/atlas-binding')].strip('/'))
+        try:
+            payload = body()
+            return out(200, location_assets.select_atlas(
+                slug, int(payload.get('variantId') or 0),
+                int(payload.get('expectedRevision') or 0)))
+        except Exception as error:
+            return out(400, {"error": str(error)})
+
 
     location_asset_publish_suffix = "/publish"
 

@@ -6,7 +6,7 @@ local DecoPlacedAssetSync = require(script.Parent.DecoPlacedAssetSync)
 local DecoManager = {}
 DecoManager.__index = DecoManager
 
-local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building" }
+local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building", "prop" }
 local CATEGORY_LABELS = {
     tree = "Trees",
     bush = "Bushes",
@@ -17,6 +17,7 @@ local CATEGORY_LABELS = {
     ladder = "Ladders",
     flower = "Flowers",
     building = "Buildings",
+    prop = "Props",
 }
 
 local function newLabel(parent: Instance, text: string, size: UDim2, position: UDim2, textSize: number, bold: boolean?): TextLabel

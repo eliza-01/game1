@@ -20,7 +20,7 @@ from opencloud_assets import (
 
 SCHEMA_VERSION = 4
 PROJECT = "game1"
-CATEGORIES = ("tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building")
+CATEGORIES = ("tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building", "prop")
 TEXTURE_SUFFIXES = (".png", ".jpg", ".jpeg")
 CATEGORY_LABELS = {
     "tree": "Trees",
@@ -32,6 +32,7 @@ CATEGORY_LABELS = {
     "ladder": "Ladders",
     "flower": "Flowers",
     "building": "Buildings",
+    "prop": "Props",
 }
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_]{0,63}$")
 
@@ -342,7 +343,7 @@ class LocationAssetStore:
         category = str(payload.get("category") or (old.get("category") if old else "") or "").strip().lower()
         destructible = parse_bool(payload.get("destructible"), bool(old.get("destructible")) if old else False)
         if category not in CATEGORIES:
-            raise ValueError("location asset category must be tree, bush, rock, light, fence, decoration, ladder, flower or building")
+            raise ValueError("location asset category must be one of: " + ", ".join(CATEGORIES))
 
         selected_model = str(payload.get("modelSourcePath") or "").strip()
         selected_texture = str(payload.get("textureSourcePath") or "").strip()

@@ -2229,13 +2229,16 @@ if location_asset_manifest_path.is_file():
     if location_asset_manifest.get("schemaVersion") != 4 or location_asset_manifest.get("project") != "game1":
         err("m43 location-assets.json schema/project is invalid")
     category_ids = [row.get("id") for row in ((location_asset_manifest.get("options") or {}).get("categories") or [])]
-    if category_ids != ["tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building"]:
-        err("m46 Location Assets categories must be tree/bush/rock/light/fence/decoration/ladder/flower/building in canonical order")
+    # Generated manifests may still have the previous category set until
+    # the first Control Center startup re-exports them from LocationAssetStore.
+    expected_categories = ["tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building"]
+    if category_ids not in (expected_categories, expected_categories + ["prop"]):
+        err("m128 Location Assets manifest categories have invalid canonical order")
 
 location_asset_store_text = location_asset_store_path.read_text(encoding="utf-8") if location_asset_store_path.is_file() else ""
 for required in [
     "class LocationAssetStore",
-    'CATEGORIES = ("tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building")',
+    'CATEGORIES = ("tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building", "prop")',
     "assets/source/location-assets",
     "model_path TEXT NOT NULL DEFAULT ''",
     "texture_path TEXT NOT NULL DEFAULT ''",
@@ -2344,7 +2347,7 @@ for required in [
     'DecoPreviewWorld',
     '"Save Assets Data"',
     'self.agentBaseUrl .. "/api/location-assets/layout"',
-    'local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building" }',
+    'local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building", "prop" }',
 ]:
     if required not in deco_manager_text:
         err(f"m43 DecoManager missing {required}")
@@ -2450,7 +2453,7 @@ for required in [
     'decoration = "Decorations"',
     'ladder = "Ladders"',
     'flower = "Flowers"',
-    'local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building" }',
+    'local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building", "prop" }',
     'local row = math.floor((index - 1) / 4)',
 ]:
     if required not in deco_manager_text:
@@ -2923,7 +2926,7 @@ for required in [
 for required in [
     'ladder = "Ladders"',
     'flower = "Flowers"',
-    'local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building" }',
+    'local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building", "prop" }',
     'local column = (index - 1) % 4',
 ]:
     if required not in deco_manager_text:
@@ -2944,6 +2947,17 @@ for required in [
 ]:
     if required not in location_asset_store_text and required not in deco_manager_text and required not in deco_placement_text and required not in index_m43_text and required not in deco_assets_js_text:
         err(f"m55 Buildings/category synchronization missing {required}")
+# m128 Props category is backed by the API, browser controls, and DecoManager.
+for required, source in [
+    ('"prop": "Props"', location_asset_store_text),
+    ('prop = "Props"', deco_manager_text),
+    ('prop = "Props"', deco_placement_text),
+    ('props</span>', index_m43_text),
+    ('buildings · props</small>', index_m43_text),
+]:
+    if required not in source:
+        err(f"m128 Location Assets Props integration missing {required}")
+
 if 'category filter<select id="location-asset-library-category"' not in index_m43_text:
     err("m55 library category filter label missing")
 if "decoAssetUseCategory($('location-asset-category').value, { updateEditor: false })" not in deco_assets_js_text:

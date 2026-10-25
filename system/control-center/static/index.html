@@ -26,7 +26,7 @@
 <button id="nav-npcs" class="asset-section" type="button"><b>NPCs</b><small>1hs rigs · animations · spawns</small></button>
 <button id="nav-monsters" class="asset-section" type="button"><b>monsters</b><small>rigs · stats · animations</small></button>
 <button id="nav-locations" class="asset-section" type="button"><b>locations</b><small>polygon registry · studio authoring</small></button>
-<button id="nav-location-assets" class="asset-section" type="button"><b>location assets</b><small>trees · bushes · rocks · lights · fences · decorations · ladders · flowers · buildings</small></button>
+<button id="nav-location-assets" class="asset-section" type="button"><b>location assets</b><small>trees · bushes · rocks · lights · fences · decorations · ladders · flowers · buildings · props</small></button>
 <button id="nav-real-estate" class="asset-section" type="button"><b>real estate</b><small>houses · any mesh rigs · textures</small></button>
 <button id="nav-timelines" class="asset-section" type="button"><b>timelines</b><small>attack animation events</small></button>
 <button id="nav-options" class="asset-section" type="button"><b>options</b><small>common runtime settings</small></button>
@@ -283,7 +283,7 @@
 
 <div id="location-assets-view" hidden>
 <div class="panel hero">
-<div><span class="eyebrow">environment library · published decor</span><h2>location assets</h2><p>register a static decoration with one FBX and a texture atlas. New atlas names follow &lt;atlas_key&gt;_&lt;width&gt;x&lt;height&gt;_atlas.png; reused variants share exactly one published Image Asset ID. publish the required assets, then place published variants through Studio DecoManager. placed instances belong to the place; registry publication and placement backups stay separate.</p><div class="deco-category-strip"><span>trees</span><span>bushes</span><span>rocks</span><span>lights</span><span>fences</span><span>decorations</span><span>ladders</span><span>flowers</span><span>buildings</span></div></div>
+<div><span class="eyebrow">environment library · published decor</span><h2>location assets</h2><p>register a static decoration with one FBX and a texture atlas. New atlas names follow &lt;atlas_key&gt;_&lt;width&gt;x&lt;height&gt;_atlas.png; reused variants share exactly one published Image Asset ID. publish the required assets, then place published variants through Studio DecoManager. placed instances belong to the place; registry publication and placement backups stay separate.</p><div class="deco-category-strip"><span>trees</span><span>bushes</span><span>rocks</span><span>lights</span><span>fences</span><span>decorations</span><span>ladders</span><span>flowers</span><span>buildings</span><span>props</span></div></div>
 <div class="metrics"><div><b id="location-asset-metric-total">0</b><span>registered</span></div><div><b id="location-asset-metric-published">0</b><span>published</span></div><div><b id="location-asset-metric-changed">0</b><span>changed</span></div></div>
 </div>
 <div class="panel runtime-card"><div class="runtime-state registered"><strong>DecoManager registry</strong><span>Sync Studio refreshes DecoManager and the textures/SurfaceAppearance of already placed decorations. New assets are placed through DecoManager; no ServerStorage import.</span></div><div id="location-asset-publication-state" class="publication-missing">open cloud: checking…</div></div>

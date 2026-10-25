@@ -38,6 +38,10 @@
       {
         "id": "building",
         "label": "Buildings"
+      },
+      {
+        "id": "prop",
+        "label": "Props"
       }
     ]
   },
@@ -106,6 +110,30 @@
           "atlas_key": "lantern_01",
           "current": true,
           "resolution": "64x128"
+        }
+      ]
+    },
+    {
+      "atlasKey": "restoration_01",
+      "variants": [
+        {
+          "id": 4,
+          "family_id": 3,
+          "width": 2048,
+          "height": 2048,
+          "filename": "restoration_01_2048x2048_atlas.png",
+          "original_filename": "restoration_01_2048x2048_atlas.png",
+          "source_path": "assets/source/texture-atlases/restoration_01/2048x2048/restoration_01_2048x2048_atlas.png",
+          "source_sha256": "84376cbe3d9c96bcc1508917503c13b9a470b8e94180773c083430184c5a3973",
+          "uses_alpha": true,
+          "published_id": "110200384853583",
+          "published_sha256": "84376cbe3d9c96bcc1508917503c13b9a470b8e94180773c083430184c5a3973",
+          "moderation_state": "Reviewing",
+          "published_at": 1792931175.5397944,
+          "created_at": 1792931156.6928835,
+          "atlas_key": "restoration_01",
+          "current": true,
+          "resolution": "2048x2048"
         }
       ]
     }
@@ -717,6 +745,60 @@
       "category_label": "Lights"
     },
     {
+      "slug": "test_window_01",
+      "name_en": "Test Window 01",
+      "category": "prop",
+      "model_path": "assets/source/location-assets/prop/test_window_01/model/test_window_01.fbx",
+      "model_sha256": "ec33078ac962fe274a0a49d4e88542c886e3997e7d9df2867497e2790289fd37",
+      "model_asset_id": "113417670397719",
+      "model_published_sha256": "ec33078ac962fe274a0a49d4e88542c886e3997e7d9df2867497e2790289fd37",
+      "model_moderation_state": "Approved",
+      "texture_path": "assets/source/texture-atlases/restoration_01/2048x2048/restoration_01_2048x2048_atlas.png",
+      "texture_sha256": "84376cbe3d9c96bcc1508917503c13b9a470b8e94180773c083430184c5a3973",
+      "texture_asset_id": "110200384853583",
+      "texture_published_sha256": "84376cbe3d9c96bcc1508917503c13b9a470b8e94180773c083430184c5a3973",
+      "texture_moderation_state": "Reviewing",
+      "texture_reference_slug": "",
+      "destructible": false,
+      "revision": 1,
+      "created_at": 1792931156.8872106,
+      "updated_at": 1792931169.0824056,
+      "published_at": 1792931169.0824056,
+      "texture_filename": "restoration_01_2048x2048_atlas.png",
+      "texture_owner_slug": "",
+      "texture_shared": false,
+      "atlasVariantId": 4,
+      "atlasFamily": "restoration_01",
+      "atlasResolution": "2048x2048",
+      "bindingRevision": 1,
+      "studioSyncStatus": "synced",
+      "atlasVariants": [
+        {
+          "id": 4,
+          "family_id": 3,
+          "width": 2048,
+          "height": 2048,
+          "filename": "restoration_01_2048x2048_atlas.png",
+          "original_filename": "restoration_01_2048x2048_atlas.png",
+          "source_path": "assets/source/texture-atlases/restoration_01/2048x2048/restoration_01_2048x2048_atlas.png",
+          "source_sha256": "84376cbe3d9c96bcc1508917503c13b9a470b8e94180773c083430184c5a3973",
+          "uses_alpha": true,
+          "published_id": "110200384853583",
+          "published_sha256": "84376cbe3d9c96bcc1508917503c13b9a470b8e94180773c083430184c5a3973",
+          "moderation_state": "Reviewing",
+          "published_at": 1792931175.5397944,
+          "created_at": 1792931156.6928835,
+          "atlas_key": "restoration_01",
+          "current": true,
+          "resolution": "2048x2048"
+        }
+      ],
+      "textureUsesAlpha": true,
+      "atlasLegacyWarning": false,
+      "status": "PUBLISHED",
+      "category_label": "Props"
+    },
+    {
       "slug": "main_statue",
       "name_en": "Main Statue",
       "category": "rock",
@@ -907,8 +989,8 @@
     }
   ],
   "summary": {
-    "registered": 25,
-    "published": 25,
+    "registered": 26,
+    "published": 26,
     "changed": 0
   }
 }

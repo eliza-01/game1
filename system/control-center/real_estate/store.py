@@ -18,6 +18,7 @@ from .contracts import identity, parse_name, prices, present_parts, validate_ana
 from .textures import available_textures, resolve_texture
 from .fbx import inspect, prepare_publication
 from .publication_textures import prepare_texture, published_format
+from services.texture_atlas_registry import AtlasRegistry, parse_filename
 
 
 def _sha(path: Path) -> str:
@@ -37,6 +38,7 @@ class RealEstateStore:
         self.location_assets = location_assets
         self.db = self.root / '.control-center' / 'game1_real_estate.db'
         self.db.parent.mkdir(parents=True, exist_ok=True)
+        self.atlases = (getattr(location_assets, "atlases", None) or AtlasRegistry(self.root))
         with self.connect() as db:
             db.execute('''CREATE TABLE IF NOT EXISTS real_estate (
                 slug TEXT PRIMARY KEY, house_type TEXT NOT NULL, house_level INTEGER NOT NULL,
@@ -65,7 +67,23 @@ class RealEstateStore:
                 db.execute("UPDATE real_estate SET model_published_hash=model_sha256 "
                            "WHERE model_asset_id != '' AND model_published_hash != ''")
                 db.execute('PRAGMA user_version = 2')
+        self._index_legacy_texture_publications()
         self.export()
+
+    def _index_legacy_texture_publications(self) -> None:
+        # Historical image IDs remain records, not active per-Estate bindings.
+        # Conflicting IDs with the same bytes must never be silently chosen.
+        records = []
+        with self.connect() as db:
+            for row in db.execute('SELECT slug,textures_json FROM real_estate'):
+                for part, texture in json.loads(row['textures_json']).items():
+                    if texture.get('reuseReference') or not texture.get('assetId'):
+                        continue
+                    if texture.get('sha256') != texture.get('publishedSha256'):
+                        continue
+                    records.append({'id': f"{row['slug']}:{part}",
+                        'sha256': texture['sha256'], 'imageId': texture['assetId']})
+        self.atlases.import_legacy_publications('real_estate', records)
 
     def connect(self):
         return connect(self.db)
@@ -109,11 +127,72 @@ class RealEstateStore:
                     'group': 'estate', 'category': '', 'categoryLabel': '',
                     'path': data['path'], 'sha256': data['sha256'],
                     'assetId': str(data['assetId'])})
+        # Published shared variants belong to the central atlas catalog,
+        # independently of any Estate or Location Asset that selected them.
+        for family in self.atlases.catalog():
+            for variant in family['variants']:
+                if not variant['current']:
+                    continue
+                choices.append({'reference': f"atlas:{variant['id']}",
+                    'label': family['atlasKey'], 'slug': '',
+                    'filename': variant['filename'], 'group': 'atlas',
+                    'category': '', 'categoryLabel': '',
+                    'path': variant['source_path'], 'sha256': variant['source_sha256'],
+                    'assetId': str(variant['published_id'])})
         return choices
+
+    def _atlas_metadata(self, slug: str, part: str, texture: dict,
+                        catalog: dict[str, dict]) -> dict:
+        binding = self.atlases.binding('real_estate', f'{slug}:{part}')
+        result = dict(texture)
+        if binding:
+            result.update(path=binding['source_path'], filename=binding['filename'],
+                sha256=binding['source_sha256'], assetId=binding['published_id'] or '',
+                publishedSha256=binding['published_sha256'] or '',
+                publicationFormat=published_format(Path(binding['source_path'])),
+                atlasVariantId=binding['variant_id'], atlasKey=binding['atlas_key'],
+                atlasBindingRevision=binding['revision'], atlasSyncStatus=binding['syncStatus'])
+        else:
+            result.update(atlasVariantId=None, atlasKey='', atlasBindingRevision=0,
+                atlasSyncStatus='')
+        parsed = parse_filename(str(result.get('filename') or Path(result.get('path') or '').name))
+        result['atlasLegacyWarning'] = parsed is None
+        key = binding['atlas_key'] if binding else (parsed['atlasKey'] if parsed else '')
+        family = catalog.get(key)
+        result['atlasVariants'] = family['variants'] if family else []
+        result['atlasCurrent'] = binding['current'] if binding else None
+        return result
+
+    def select_atlas(self, slug: str, part: str, variant_id: int, expected_revision: int | None) -> dict:
+        row = self.get(slug)
+        if not row or part not in row['meshParts']:
+            raise ValueError('unknown Real Estate mesh')
+        # A mesh with a shared/local-house reference must first be given its
+        # own variant choice. Only the selected mesh changes; other bindings live.
+        selected = self.atlases.get_variant(variant_id)
+        if not selected or not selected['current']:
+            raise ValueError('select a published atlas variant')
+        current_key = row['textures'][part].get('atlasKey')
+        if current_key and selected['atlas_key'] != current_key:
+            raise ValueError('select a resolution from the same atlas family')
+        self.atlases.bind('real_estate', f'{slug}:{part}', variant_id,
+            expected_revision=expected_revision)
+        # An explicit resolution choice supersedes a prior owner reference.
+        # Keep the historical owned ID and source intact for rollback/audit.
+        with self.connect() as db:
+            old = db.execute('SELECT textures_json FROM real_estate WHERE slug=?', (slug,)).fetchone()
+            textures = json.loads(old['textures_json'])
+            if textures[part].get('reuseReference'):
+                textures[part]['reuseReference'] = ''
+                db.execute('UPDATE real_estate SET textures_json=?,updated_at=? WHERE slug=?',
+                           (json.dumps(textures, ensure_ascii=False), time.time(), slug))
+        self.export()
+        return self.get(slug)
 
     def list(self):
         rows = self._raw_rows()
         references = {option['reference']: option for option in self.texture_references(rows)}
+        atlas_catalog = {group['atlasKey']: group for group in self.atlases.catalog()}
         result = []
         for row in rows:
             row['skeleton'] = json.loads(row.pop('skeleton_json'))
@@ -132,6 +211,7 @@ class RealEstateStore:
                 row['rigAssets'][part].get('publishedSha256') == row['model_sha256']
                 for part in active)}
             for part in active:
+                row['textures'][part] = self._atlas_metadata(row['slug'], part, row['textures'][part], atlas_catalog)
                 texture = row['textures'][part]
                 reference = texture.get('reuseReference')
                 if reference:
@@ -145,6 +225,12 @@ class RealEstateStore:
                             row['textures'][part] = {**texture, **{
                                 key: owner.get(key, '') for key in
                                 ('path', 'sha256', 'assetId', 'publishedSha256', 'publicationFormat')}}
+                        # Expose the actual shared atlas metadata for the door,
+                        # without creating a second publication or binding.
+                        row['textures'][part] = {**row['textures'][part], **{
+                            k: owner.get(k) for k in ('filename', 'atlasVariantId', 'atlasKey',
+                                'atlasBindingRevision', 'atlasSyncStatus', 'atlasVariants',
+                                'atlasLegacyWarning', 'atlasCurrent')}}
                         current[part] = bool(current['house'])
                     else:
                         owner = references.get(reference)
@@ -155,9 +241,10 @@ class RealEstateStore:
                                 'publicationFormat':published_format(Path(owner['path']))}}
                         current[part] = owner is not None
                 else:
-                    current[part] = bool(texture.get('assetId') and
+                    current[part] = (bool(texture['atlasCurrent']) if texture['atlasCurrent'] is not None
+                        else bool(texture.get('assetId') and
                         texture.get('publishedSha256') == texture['sha256'] and
-                        texture.get('publicationFormat', 'source') == published_format(Path(texture['path'])))
+                        texture.get('publicationFormat', 'source') == published_format(Path(texture['path']))))
             row['publicationCurrent'] = current
             row['status'] = ('PUBLISHED' if all(current.values()) else
                              'LOCAL_ONLY' if not row['model_asset_id'] and
@@ -207,6 +294,14 @@ class RealEstateStore:
         catalog = {option['reference']:option for option in self.texture_references()}
         chosen_refs = {part: str(references.get(part) or '').strip() for part in active}
         for part, reference in chosen_refs.items():
+            if reference.startswith('atlas:'):
+                try:
+                    variant = self.atlases.get_variant(int(reference[6:]))
+                except ValueError:
+                    variant = None
+                if not variant or not variant['current']:
+                    raise ValueError(f'{part}: select an existing published atlas variant')
+                continue
             if reference == 'mesh:house':
                 if part == 'house':
                     raise ValueError('The house mesh cannot reuse its own atlas')
@@ -220,9 +315,19 @@ class RealEstateStore:
         }
         canonical = self.root / 'assets' / 'source' / 'real-estate' / slug
         destination_model = canonical / 'model' / f'{slug}.fbx'
+        # Resolve standard-named sources once into the shared atlas catalog.
+        # Reused variants are REFERENCES ONLY: no copy and no Open Cloud upload.
+        atlas_selections = {}
+        for part in active:
+            ref = chosen_refs[part]
+            if ref.startswith('atlas:'):
+                atlas_selections[part] = self.atlases.get_variant(int(ref[6:]))
+            elif texture_sources[part] is not None and parse_filename(texture_sources[part].name):
+                atlas_selections[part] = self.atlases.register_file(str(texture_sources[part]))
         destination_textures = {
             part: canonical / 'textures' / f'{part}{path.suffix.lower()}'
-            for part, path in texture_sources.items() if path is not None
+            for part, path in texture_sources.items()
+            if path is not None and part not in atlas_selections
         }
         model_hash = _sha(source)
         texture_hashes = {part: _sha(path) for part, path in texture_sources.items() if path is not None}
@@ -238,6 +343,17 @@ class RealEstateStore:
         for part in active:
             old = (existing or {}).get('textures', {}).get(part, {})
             reference = chosen_refs[part]
+            if part in atlas_selections:
+                variant = atlas_selections[part]
+                texture_rows[part] = {'path': variant['source_path'],
+                    'filename': variant['filename'], 'sha256': variant['source_sha256'],
+                    'reuseReference': '',
+                    # Historic fields remain for auditing; effective publication
+                    # comes ONLY from the shared AtlasRegistry binding.
+                    'assetId': old.get('assetId') or '',
+                    'publishedSha256': old.get('publishedSha256') or '',
+                    'publicationFormat': old.get('publicationFormat') or ''}
+                continue
             if reference:
                 # Record the shared identity, not a duplicate upload. Effective
                 # Image Asset IDs are resolved from the owner on every read.
@@ -284,6 +400,14 @@ class RealEstateStore:
                 textures_json=excluded.textures_json,model_asset_id=excluded.model_asset_id,
                 model_published_hash=excluded.model_published_hash,model_moderation=excluded.model_moderation,
                 revision=excluded.revision,updated_at=excluded.updated_at''', row)
+        # Record binding changes only after the Estate row exists. Re-saving
+        # a legacy house does not silently migrate/re-publish its texture.
+        for part in active:
+            if part in atlas_selections:
+                self.atlases.bind('real_estate', f'{slug}:{part}',
+                    atlas_selections[part]['id'], allow_unpublished=True)
+            else:
+                self.atlases.unbind('real_estate', f'{slug}:{part}')
         self.export()
         return self.get(slug)
 
@@ -388,6 +512,13 @@ class RealEstateStore:
             if row['publicationCurrent'][part]:
                 continue
             data = row['textures'][part]
+            if data.get('atlasVariantId'):
+                # Central publication owns the one Image Asset ID; Real Estate
+                # never uploads an image already present in the catalog.
+                progress(f'Publishing shared atlas for {part} (deduplicated)')
+                self.atlases.ensure_published(data['atlasVariantId'], credentials, description)
+                self.export()
+                continue
             if data.get('reuseReference'):
                 raise ValueError(f'{part} reused texture owner must publish first')
             progress(f'Preparing {part} image')
@@ -415,6 +546,7 @@ class RealEstateStore:
                     (json.dumps(textures, ensure_ascii=False), now, slug))
                 db.execute('UPDATE real_estate_publications SET asset_id=?,published_at=? WHERE id=?',
                            (str(result.asset_id), now, pending_id))
+            self._index_legacy_texture_publications()
             self.export()
         return self.get(slug)
 

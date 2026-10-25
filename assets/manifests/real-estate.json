@@ -74,7 +74,14 @@
           "reuseReference": "",
           "assetId": "102868434686869",
           "publishedSha256": "db637b108fc593c41c4d61601b4246ea56f32333b8560a05cfd26d31442fef90",
-          "publicationFormat": "png"
+          "publicationFormat": "png",
+          "atlasVariantId": null,
+          "atlasKey": "",
+          "atlasBindingRevision": 0,
+          "atlasSyncStatus": "",
+          "atlasLegacyWarning": true,
+          "atlasVariants": [],
+          "atlasCurrent": null
         }
       },
       "rigAssets": {
@@ -269,14 +276,28 @@
           "sha256": "3d6afd16fbed440a061b42d905ffafa57582bf1df755c849b7be1fde7dc8eec6",
           "assetId": "99301388099631",
           "publishedSha256": "3d6afd16fbed440a061b42d905ffafa57582bf1df755c849b7be1fde7dc8eec6",
-          "publicationFormat": "png"
+          "publicationFormat": "png",
+          "atlasVariantId": null,
+          "atlasKey": "",
+          "atlasBindingRevision": 0,
+          "atlasSyncStatus": "",
+          "atlasLegacyWarning": true,
+          "atlasVariants": [],
+          "atlasCurrent": null
         },
         "door": {
           "path": "assets/source/real-estate/house_level2_01/textures/door.png",
           "sha256": "5d9feb07eaca9a27d4f46b6891aff4a0abe8befc2cb0d58729e4c0b70004c9c9",
           "assetId": "86927818099561",
           "publishedSha256": "5d9feb07eaca9a27d4f46b6891aff4a0abe8befc2cb0d58729e4c0b70004c9c9",
-          "publicationFormat": "source"
+          "publicationFormat": "source",
+          "atlasVariantId": null,
+          "atlasKey": "",
+          "atlasBindingRevision": 0,
+          "atlasSyncStatus": "",
+          "atlasLegacyWarning": true,
+          "atlasVariants": [],
+          "atlasCurrent": null
         }
       },
       "rigAssets": {},
@@ -464,7 +485,14 @@
           "reuseReference": "",
           "assetId": "137011316577762",
           "publishedSha256": "7ff84ce5562c7571f4a94df379ea2881364d2f4b193beee7bf135da7a22c4d1e",
-          "publicationFormat": "source"
+          "publicationFormat": "source",
+          "atlasVariantId": null,
+          "atlasKey": "",
+          "atlasBindingRevision": 0,
+          "atlasSyncStatus": "",
+          "atlasLegacyWarning": true,
+          "atlasVariants": [],
+          "atlasCurrent": null
         },
         "door": {
           "path": "assets/source/real-estate/house_level5_01/textures/door.png",
@@ -472,7 +500,14 @@
           "reuseReference": "",
           "assetId": "98387048887358",
           "publishedSha256": "bb0b9bacd9336b86be8cc0affcc54cec67e98ec3a7ee10df74ed4b9a3d20c6eb",
-          "publicationFormat": "source"
+          "publicationFormat": "source",
+          "atlasVariantId": null,
+          "atlasKey": "",
+          "atlasBindingRevision": 0,
+          "atlasSyncStatus": "",
+          "atlasLegacyWarning": true,
+          "atlasVariants": [],
+          "atlasCurrent": null
         },
         "repair": {
           "path": "assets/source/real-estate/house_level5_01/textures/repair.png",
@@ -480,7 +515,14 @@
           "reuseReference": "",
           "assetId": "122977374372900",
           "publishedSha256": "bb0b9bacd9336b86be8cc0affcc54cec67e98ec3a7ee10df74ed4b9a3d20c6eb",
-          "publicationFormat": "source"
+          "publicationFormat": "source",
+          "atlasVariantId": null,
+          "atlasKey": "",
+          "atlasBindingRevision": 0,
+          "atlasSyncStatus": "",
+          "atlasLegacyWarning": true,
+          "atlasVariants": [],
+          "atlasCurrent": null
         },
         "stone_fence_01_kit": {
           "reuseReference": "location:stone_fence_01",
@@ -488,7 +530,14 @@
           "sha256": "2f41320116f4b423de010f4c906b5b16eabc981c055bb4fc478c84437a95bb88",
           "assetId": "119920676388867",
           "publishedSha256": "2f41320116f4b423de010f4c906b5b16eabc981c055bb4fc478c84437a95bb88",
-          "publicationFormat": "source"
+          "publicationFormat": "source",
+          "atlasVariantId": null,
+          "atlasKey": "",
+          "atlasBindingRevision": 0,
+          "atlasSyncStatus": "",
+          "atlasLegacyWarning": true,
+          "atlasVariants": [],
+          "atlasCurrent": null
         }
       },
       "rigAssets": {
@@ -704,13 +753,13 @@
       "reference": "location:lantern_01",
       "label": "Lantern 01",
       "slug": "lantern_01",
-      "filename": "main_statue.jpg",
+      "filename": "lantern_01_64x128_atlas.png",
       "group": "location",
       "category": "light",
       "categoryLabel": "Lights",
-      "path": "assets/source/location-assets/rock/main_statue/textures/main_statue.jpg",
-      "sha256": "8f8ade9148ff40e8b5933c6abeb5e2c55e68a95d89147d6b317cee7412c5e8bf",
-      "assetId": "128890927196285"
+      "path": "assets/source/texture-atlases/lantern_01/64x128/lantern_01_64x128_atlas.png",
+      "sha256": "ca9a12aacf3ad5305a6baa34baa728198a272b8d81188ae7163f915f7e1d992e",
+      "assetId": "111478705558346"
     },
     {
       "reference": "location:lantern_02",
@@ -891,6 +940,42 @@
       "path": "assets/source/real-estate/house_level5_01/textures/repair.png",
       "sha256": "bb0b9bacd9336b86be8cc0affcc54cec67e98ec3a7ee10df74ed4b9a3d20c6eb",
       "assetId": "122977374372900"
+    },
+    {
+      "reference": "atlas:1",
+      "label": "big_tree_01",
+      "slug": "",
+      "filename": "big_tree_01_256x512_atlas.png",
+      "group": "atlas",
+      "category": "",
+      "categoryLabel": "",
+      "path": "assets/source/texture-atlases/big_tree_01/256x512/big_tree_01_256x512_atlas.png",
+      "sha256": "3ab5e47e22c6dd4153fd6b90672308335cdc70ec7711d904581f14855edee8df",
+      "assetId": "134024944101662"
+    },
+    {
+      "reference": "atlas:2",
+      "label": "big_tree_01",
+      "slug": "",
+      "filename": "big_tree_01_128x256_atlas.png",
+      "group": "atlas",
+      "category": "",
+      "categoryLabel": "",
+      "path": "assets/source/texture-atlases/big_tree_01/128x256/big_tree_01_128x256_atlas.png",
+      "sha256": "9f1f34f8b364e8a3d034e774a71daf9b270bded836068202d769611a8fc12050",
+      "assetId": "100679979096136"
+    },
+    {
+      "reference": "atlas:3",
+      "label": "lantern_01",
+      "slug": "",
+      "filename": "lantern_01_64x128_atlas.png",
+      "group": "atlas",
+      "category": "",
+      "categoryLabel": "",
+      "path": "assets/source/texture-atlases/lantern_01/64x128/lantern_01_64x128_atlas.png",
+      "sha256": "ca9a12aacf3ad5305a6baa34baa728198a272b8d81188ae7163f915f7e1d992e",
+      "assetId": "111478705558346"
     }
   ],
   "summary": {

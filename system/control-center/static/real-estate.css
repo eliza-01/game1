@@ -71,3 +71,8 @@
 .real-estate-asset-model span { color:var(--mint); }
 .real-estate-asset-image { border-color:color-mix(in srgb, var(--orange) 32%, var(--line)); background:color-mix(in srgb, var(--orange) 7%, transparent); }
 .real-estate-asset-image span { color:var(--orange); }
+
+/* Shared atlas dots use the exact Location Assets colors and dimensions. */
+.real-estate-texture-line { padding:2px 0 6px; overflow-wrap:anywhere; }
+.real-estate-texture-filename { color:var(--mint); }
+.real-estate-atlas-dots { margin:2px 0 0; }

@@ -3952,6 +3952,31 @@ local function orderedParts(manifests: any): {string}
     return result
 end
 
+-- Texture-only refresh for managed Estate copies already placed in Workspace.
+-- Never replace models or touch pivots/part transforms during atlas selection.
+local function refreshPlaced(slug: string, imageAssets: {[string]: string}, imageAlpha: {[string]: any}): number
+    local changed = 0
+    for _, instance in workspace:GetDescendants() do
+        if instance:IsA("Model") and instance:GetAttribute("Game1RealEstateSlug") == slug then
+            local applied = false
+            for _, child in instance:GetDescendants() do
+                if child:IsA("MeshPart") then
+                    local part = string.lower(child.Name)
+                    if imageAssets[part] then
+                        StudioTextureAppearance.Apply(child, "rbxassetid://" .. imageAssets[part], imageAlpha[part])
+                        applied = true
+                    end
+                end
+            end
+            if applied then
+                instance:SetAttribute("Game1TextureAssetIds", HttpService:JSONEncode(imageAssets))
+                changed += 1
+            end
+        end
+    end
+    return changed
+end
+
 function StudioRealEstateModel.Place(imported: Model, destination: Instance, slug: string,
     assetId: number, metadata: any, assetService: any): (Model, any)
     if slug == "" or slug == "." or slug == ".." or slug:find("[/\\]") then
@@ -4043,8 +4068,10 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
     if previous then
         previous:Destroy()
     end
+    local placedUpdated = refreshPlaced(slug, imageAssets, imageAlpha)
     return wrapper, {bonesValidated = true, rigsValidated = #parts,
-        texturesApplied = #parts, boneCount = bones, rigWarnings = rigWarnings}
+        texturesApplied = #parts, workspaceModelsUpdated = placedUpdated,
+        boneCount = bones, rigWarnings = rigWarnings}
 end
 
 return table.freeze(StudioRealEstateModel)

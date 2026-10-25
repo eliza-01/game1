@@ -46,4 +46,11 @@ class RealEstateStudioSync:
             raise ValueError('Studio failed to validate the expected Real Estate rigs')
         if result.get('realEstateStats', {}).get('texturesApplied') != len(parts):
             raise ValueError('Studio did not apply the expected published house textures')
-        return {'realEstate': row, 'studio': result}
+        # Acknowledgement belongs to this consumer, not to the atlas itself;
+        # one house sync must not mark another house as synchronized.
+        for part in parts:
+            texture = row['textures'][part]
+            if texture.get('atlasVariantId') and texture.get('atlasBindingRevision'):
+                self.store.atlases.mark_synced('real_estate', f'{slug}:{part}',
+                    texture['atlasBindingRevision'])
+        return {'realEstate': self.store.get(slug), 'studio': result}

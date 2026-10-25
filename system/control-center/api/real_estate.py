@@ -28,6 +28,21 @@ def write(path, body, deps):
             return 200, store.inspect(str(body().get('sourcePath') or ''))
         if path == '/api/real-estate':
             return 200, store.register(body())
+        if path.startswith('/api/real-estate/') and path.endswith('/atlas-binding'):
+            # A saved binding is authoritative even if Studio is offline.
+            # Sync failures remain visible and retryable, never rolled back
+            # into a different published ID.
+            slug = unquote(path[len('/api/real-estate/'):-len('/atlas-binding')].strip('/'))
+            payload = body()
+            part = str(payload.get('part') or '').strip()
+            updated = store.select_atlas(slug, part, int(payload['variantId']),
+                int(payload.get('expectedRevision', 0)))
+            try:
+                studio = deps['sync_real_estate_to_studio'](slug)
+                return 200, {'item': updated, 'studio': studio['studio'], 'studioSyncStatus': 'synced'}
+            except (RuntimeError, ValueError, OSError, KeyError) as exc:
+                return 200, {'item': updated, 'studioSyncStatus': 'pending_studio_sync',
+                    'studioError': str(exc)}
         if path.startswith('/api/real-estate/') and path.endswith('/sync'):
             slug = unquote(path[len('/api/real-estate/'):-len('/sync')].strip('/'))
             return 200, deps['sync_real_estate_to_studio'](slug)

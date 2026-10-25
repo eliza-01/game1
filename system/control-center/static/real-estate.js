@@ -1,5 +1,5 @@
 /* Real Estate registry view. Global request(), toast(), esc(), $ provided by Character Assets. */
-const realEstateState = {data:null, selected:null, inspect:null, textures:{}, textureRefs:{}, reuseEnabled:{}, reuseFilters:{}, acceptWarnings:false};
+const realEstateState = {data:null, selected:null, inspect:null, textures:{}, textureRefs:{}, reuseEnabled:{}, reuseFilters:{}, acceptWarnings:false, atlasBusy:false};
 const REAL_ESTATE_SELECTED = 'game1.realEstate.selected';
 let realEstatePublicationPoll = null;
 function realEstatePublicationBusy(slug){
@@ -323,6 +323,37 @@ async function realEstateReplaceTexture(row,part){
   realEstateForm(row);
   if(await realEstateBrowseTexture(part))await realEstateRegister();
 }
+// Central Atlas Registry presentation; one independent binding per Estate mesh.
+// Colors are relative ranks, never absolute resolution thresholds.
+const REAL_ESTATE_ATLAS_COLORS = ['#d9ac43','#a47bdf','#4f95ee','#54b991','#939ba8'];
+function realEstateAtlasDots(texture, part){
+  const variants=[...(texture?.atlasVariants||[])].sort((a,b)=>(Number(b.width)*Number(b.height)-Number(a.width)*Number(a.height))||Number(b.width)-Number(a.width)||Number(b.height)-Number(a.height));
+  if(!variants.length)return '';
+  const dots=variants.map((variant,index)=>{
+    const active=Number(texture.atlasVariantId)===Number(variant.id);
+    const name=variant.filename||`${variant.atlas_key}_${variant.resolution}_atlas.png`;
+    const hint=`${variant.resolution} · ${name}${variant.current?'':' · publish first'}`;
+    return `<button type="button" class="deco-atlas-dot ${active?'is-active':''}" style="--dot-color:${REAL_ESTATE_ATLAS_COLORS[Math.min(index,4)]}" data-re-atlas-part="${esc(part)}" data-re-atlas-id="${Number(variant.id)}" title="${esc(hint)}" aria-label="${esc(hint)}" aria-pressed="${active}" ${(!variant.current||realEstateState.atlasBusy)?'disabled':''}><span></span></button>`;
+  });
+  return `<div class="deco-atlas-dots real-estate-atlas-dots" aria-label="Registered atlas resolutions">${dots.slice(0,5).join('')}${dots.length>5?`<details class="deco-atlas-more"><summary>+${dots.length-5}</summary><div>${dots.slice(5).join('')}</div></details>`:''}</div>`;
+}
+async function realEstateChooseAtlas(row,part,variantId){
+  const texture=row.textures?.[part];
+  if(!texture||realEstateState.atlasBusy||Number(texture.atlasVariantId)===Number(variantId))return;
+  realEstateState.atlasBusy=true;
+  realEstateRender();
+  try{
+    const result=await request(`/api/real-estate/${encodeURIComponent(row.slug)}/atlas-binding`,{
+      method:'PUT',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({part,variantId,expectedRevision:texture.reuseReference?0:Number(texture.atlasBindingRevision||0)})
+    });
+    await realEstateLoad();
+    if(result.studioSyncStatus==='pending_studio_sync'){
+      toast(`Atlas selected · Studio sync pending: ${result.studioError||'Studio unavailable'}`,true);
+    }else toast(`${row.slug} / ${part} · atlas changed and Studio synced`);
+  }catch(error){toast(`Atlas change: ${error.message}`,true);await realEstateLoad();}
+  finally{realEstateState.atlasBusy=false;realEstateRender();}
+}
 function realEstateRender(){
   const rows=realEstateRows();
   $('real-estate-count').textContent=rows.length;
@@ -338,7 +369,11 @@ function realEstateRender(){
     const canPublish=Boolean(realEstateState.data?.publication?.configured);
     const isBusy=realEstatePublicationBusy(item.slug);
     const asset=(id,ready)=>id?`${esc(id)}${ready?'':' · changed'}`:'not published';
-    const textureLines=parts.map(part=>`<div><strong>${esc(part)}</strong>: ${esc(textures[part]?.reuseReference||textures[part]?.filename||textures[part]?.path?.split('/').pop()||'—')}</div>`).join('');
+    const textureLines=parts.map(part=>{
+      const tex=textures[part]||{};
+      const filename=tex.filename||tex.path?.split('/').pop()||tex.reuseReference||'—';
+      return `<div class="real-estate-texture-line"><strong>${esc(part)}</strong>: <span class="real-estate-texture-filename">${esc(filename)}</span>${tex.atlasLegacyWarning?'<span class="deco-atlas-warning" title="Expected &lt;atlas_key&gt;_&lt;width&gt;x&lt;height&gt;_atlas.png"> ⚠️</span>':''}${realEstateAtlasDots(tex,part)}${tex.atlasSyncStatus==='pending_studio_sync'?'<button type="button" data-re-atlas-retry="'+esc(part)+'" class="deco-atlas-retry">Sync pending · retry</button>':''}</div>`;
+    }).join('');
     const assetLines=parts.map(part=>`<div class="real-estate-asset-part">
       <strong class="real-estate-asset-part-name">${esc(part)}</strong>
       <div class="real-estate-asset-identities">
@@ -374,6 +409,12 @@ function realEstateRender(){
     tr.querySelector('[data-re-pub-model]').onclick=async()=>{realEstateForm(row);await realEstatePublish('model');};
     tr.querySelector('[data-re-publish]').onclick=async()=>{realEstateForm(row);await realEstatePublish('all');};
     tr.querySelector('[data-re-sync]').onclick=()=>realEstateSync(row.slug);
+    for(const button of tr.querySelectorAll('[data-re-atlas-id]')){
+      button.onclick=()=>realEstateChooseAtlas(row,button.dataset.reAtlasPart,Number(button.dataset.reAtlasId));
+    }
+    for(const button of tr.querySelectorAll('[data-re-atlas-retry]')){
+      button.onclick=()=>realEstateSync(row.slug).then(()=>realEstateLoad());
+    }
   }
   const row=realEstateSelected();
   const busy=row&&realEstatePublicationBusy(row.slug);

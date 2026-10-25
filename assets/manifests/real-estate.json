@@ -810,6 +810,18 @@
       "assetId": "133426040591241"
     },
     {
+      "reference": "location:test_window_01",
+      "label": "Test Window 01",
+      "slug": "test_window_01",
+      "filename": "restoration_01_2048x2048_atlas.png",
+      "group": "location",
+      "category": "prop",
+      "categoryLabel": "Props",
+      "path": "assets/source/texture-atlases/restoration_01/2048x2048/revisions/2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683/restoration_01_2048x2048_atlas.png",
+      "sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
+      "assetId": "138456659862372"
+    },
+    {
       "reference": "location:main_statue",
       "label": "Main Statue",
       "slug": "main_statue",
@@ -976,6 +988,18 @@
       "path": "assets/source/texture-atlases/lantern_01/64x128/lantern_01_64x128_atlas.png",
       "sha256": "ca9a12aacf3ad5305a6baa34baa728198a272b8d81188ae7163f915f7e1d992e",
       "assetId": "111478705558346"
+    },
+    {
+      "reference": "atlas:4",
+      "label": "restoration_01",
+      "slug": "",
+      "filename": "restoration_01_2048x2048_atlas.png",
+      "group": "atlas",
+      "category": "",
+      "categoryLabel": "",
+      "path": "assets/source/texture-atlases/restoration_01/2048x2048/revisions/2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683/restoration_01_2048x2048_atlas.png",
+      "sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
+      "assetId": "138456659862372"
     }
   ],
   "summary": {

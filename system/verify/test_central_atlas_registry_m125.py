@@ -53,8 +53,10 @@ class CentralAtlasM125(TestCase):
         self.assertEqual(first['id'], same['id'])
         self.assertEqual(len(self.location.atlases.catalog()),1)
         Image.new('RGB', (128, 256), 'red').save(self.image)
-        with self.assertRaisesRegex(ValueError,'different pixels'):
-            self.location.atlases.register_file(str(self.image))
+        staged = self.location.atlases.register_file(str(self.image))
+        self.assertEqual(first['id'], staged['id'])
+        self.assertTrue(staged['replacementPending'])
+        # The active variant remains unchanged until publication succeeds.
         saved = self.root / first['source_path']
         self.assertTrue(saved.is_file())
         self.assertEqual(self.location.atlases.get_variant(first['id'])['source_sha256'], first['source_sha256'])

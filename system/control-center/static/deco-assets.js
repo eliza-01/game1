@@ -5,6 +5,7 @@ const decoAssetState = {
   texturePath: '',
   textureReferenceSlug: '',
   atlasVariantId: 0,
+  replacementPath: '',
   atlasBusy: false,
   libraryCategory: 'all',
 };
@@ -72,6 +73,7 @@ function decoAssetSetForm(row) {
   decoAssetRemember(DECO_SELECTED_ASSET_KEY, decoAssetState.selected || '');
   decoAssetState.modelPath = '';
   decoAssetState.texturePath = '';
+  decoAssetState.replacementPath = '';
   decoAssetState.textureReferenceSlug = row?.atlasVariantId ? '' : (row?.texture_reference_slug || '');
   decoAssetState.atlasVariantId = Number(row?.atlasVariantId || 0);
 
@@ -103,6 +105,26 @@ function decoAssetSetForm(row) {
   decoAssetRender();
 }
 
+// An atlas family/size is one variant, regardless of which models reuse it.
+// A changed file with the same canonical filename selects that variant for
+// Republish instead of pretending to be a new model-owned texture.
+function decoAssetMatchingVariant(path) {
+  const filename = String(path || '').split(/[\\/]/).pop();
+  const match = filename.match(/^(.+)_([1-9][0-9]*)x([1-9][0-9]*)_atlas\.(png|jpe?g)$/i);
+  if (!match) return null;
+  const family = (decoAssetState.data?.atlases || []).find(
+    (item) => item.atlasKey.toLowerCase() === match[1].toLowerCase());
+  return family?.variants?.find(
+    (variant) => Number(variant.width) === Number(match[2])
+      && Number(variant.height) === Number(match[3])) || null;
+}
+
+function decoAssetAtlasRepublishMode() {
+  const variant = (decoAssetState.data?.atlases || []).flatMap((group) => group.variants || [])
+    .find((item) => Number(item.id) === decoAssetState.atlasVariantId);
+  return Boolean(decoAssetState.replacementPath || variant?.replacementPending);
+}
+
 // Legacy compatibility: can still reuse a registered texture by owner slug.
 // A single catalog is shared by every Location Asset. Never list owners as
 // independent copies of the same published atlas variant.
@@ -117,7 +139,8 @@ function decoAssetRenderTextureReferences() {
     const group = document.createElement('optgroup');
     group.label = family.atlasKey;
     for (const variant of family.variants || []) {
-      if (query && !`${family.atlasKey} ${variant.resolution} ${variant.filename}`.toLowerCase().includes(query)) continue;
+      if (query && !`${family.atlasKey} ${variant.resolution} ${variant.filename}`.toLowerCase().includes(query)
+          && Number(variant.id) !== decoAssetState.atlasVariantId) continue;
       const option = document.createElement('option');
       option.value = `variant:${variant.id}`;
       option.textContent = `${variant.resolution} · ${variant.filename} · ${variant.current ? variant.published_id : 'publish required'}`;
@@ -137,7 +160,12 @@ function decoAssetRenderTextureReferences() {
   }
   if (legacy.children.length) select.appendChild(legacy);
   select.value = selectedValue;
-  $('publish-location-atlas-variant').disabled = !decoAssetState.atlasVariantId || !decoAssetState.data?.publication?.configured;
+  const republish = decoAssetAtlasRepublishMode();
+  const publishButton = $('publish-location-atlas-variant');
+  publishButton.textContent = republish ? 'Republish atlas · new Roblox ID' : 'Publish selected atlas';
+  publishButton.disabled = decoAssetState.atlasBusy || !decoAssetState.atlasVariantId || !decoAssetState.data?.publication?.configured;
+  $('register-location-atlas-variant').disabled = decoAssetState.atlasBusy || !decoAssetState.texturePath;
+
 }
 
 const DECO_ATLAS_COLORS = ['#d9ac43', '#a47bdf', '#4f95ee', '#54b991', '#939ba8'];
@@ -331,11 +359,15 @@ async function decoAssetChooseTexture() {
   try {
     const result = await request('/api/files/choose-location-asset-texture', { method: 'POST' });
     if (!result.path) return;
-    decoAssetState.texturePath = result.path;
+    const matched = decoAssetMatchingVariant(result.path);
+    decoAssetState.texturePath = matched ? '' : result.path;
+    decoAssetState.replacementPath = matched ? result.path : '';
     decoAssetState.textureReferenceSlug = '';
-    decoAssetState.atlasVariantId = 0;
-    $('location-asset-texture-reference').value = '';
-    $('picked-location-asset-texture').textContent = result.path;
+    decoAssetState.atlasVariantId = matched ? Number(matched.id) : 0;
+    $('picked-location-asset-texture').textContent = matched
+      ? `Republish candidate · ${result.path} · current Roblox ID ${matched.published_id || 'not published'}`
+      : result.path;
+    decoAssetRenderTextureReferences();
   } catch (error) {
     toast(error.message, true);
   }
@@ -437,6 +469,7 @@ $('location-asset-texture-reference').onchange = () => {
   const selection = $('location-asset-texture-reference').value;
   decoAssetState.atlasVariantId = selection.startsWith('variant:') ? Number(selection.slice(8)) : 0;
   decoAssetState.textureReferenceSlug = selection.startsWith('legacy:') ? selection.slice(7) : '';
+  decoAssetState.replacementPath = '';
   if (selection) {
     decoAssetState.texturePath = '';
     $('picked-location-asset-texture').textContent = `using ${$('location-asset-texture-reference').selectedOptions[0].textContent}`;
@@ -451,6 +484,7 @@ $('register-location-atlas-variant').onclick = async () => {
       body: JSON.stringify({sourcePath:decoAssetState.texturePath}),
     });
     decoAssetState.texturePath = '';
+    decoAssetState.replacementPath = '';
     decoAssetState.atlasVariantId = variant.id;
     decoAssetState.textureReferenceSlug = '';
     await decoAssetLoad();
@@ -458,12 +492,34 @@ $('register-location-atlas-variant').onclick = async () => {
   } catch (error) { toast(error.message, true); }
 };
 $('publish-location-atlas-variant').onclick = async () => {
-  if (!decoAssetState.atlasVariantId) return;
+  if (!decoAssetState.atlasVariantId || decoAssetState.atlasBusy) return;
+  const id = decoAssetState.atlasVariantId;
+  const path = decoAssetState.replacementPath;
+  const republish = decoAssetAtlasRepublishMode();
+  if (republish && !confirm('Republish this atlas? Roblox will assign a NEW Image Asset ID. All models using this resolution will switch to the new ID.')) return;
+  decoAssetState.atlasBusy = true;
+  decoAssetRenderTextureReferences();
   try {
-    await request(`/api/texture-atlases/variants/${decoAssetState.atlasVariantId}/publish`, {method:'POST'});
+    const result = await request(`/api/texture-atlases/variants/${id}/${republish ? 'republish' : 'publish'}`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(republish ? {sourcePath:path} : {}),
+    });
+    decoAssetState.replacementPath = '';
     await decoAssetLoad();
-    toast('Atlas published (or reused existing Image Asset ID)');
-  } catch (error) { toast(error.message, true); }
+    if (republish) {
+      if (result.unchanged) toast('Atlas bytes unchanged · existing Image Asset ID kept (no upload)');
+      else {
+        const message = `Atlas republished · NEW Roblox Image ID ${result.variant.published_id} · ${result.syncedConsumers || 0} Studio sync(s) · ${result.pendingConsumers || 0} pending`;
+        toast(result.studioErrors?.length ? `${message} · ${result.studioErrors.join('; ')}` : message, Boolean(result.studioErrors?.length));
+      }
+    } else toast(`Atlas published · Roblox Image ID ${result.published_id}`);
+  } catch (error) {
+    toast(`Atlas publication: ${error.message}`, true);
+    await decoAssetLoad();
+  } finally {
+    decoAssetState.atlasBusy = false;
+    decoAssetRenderTextureReferences();
+  }
 };
 $('location-asset-library-category').onchange = () => {
   const category = $('location-asset-library-category').value || 'all';

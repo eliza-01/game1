@@ -3,6 +3,9 @@
 Dependencies are supplied by the composition root; unhandled paths return None.
 """
 from urllib.parse import unquote
+from pathlib import Path
+
+from services.texture_atlas_registry import parse_filename
 
 
 def route(path, body, deps):
@@ -53,6 +56,67 @@ def route(path, body, deps):
             return out(200, location_assets.atlases.register_file(str(body().get('sourcePath') or '')))
         except Exception as error:
             return out(400, {"error": str(error)})
+
+    if path.startswith('/api/texture-atlases/variants/') and path.endswith('/republish'):
+        try:
+            variant_id = int(path[len('/api/texture-atlases/variants/'):-len('/republish')].strip('/'))
+            payload = body()
+            source_path = str(payload.get('sourcePath') or '')
+            previous = location_assets.atlases.get_variant(variant_id)
+            if not previous:
+                raise ValueError('unknown atlas variant')
+            if source_path:
+                parsed = parse_filename(Path(source_path).name)
+                if not parsed or (parsed['atlasKey'], parsed['width'], parsed['height']) != (
+                        previous['atlas_key'], previous['width'], previous['height']):
+                    raise ValueError('replacement file must match this atlas name and resolution')
+                staged = location_assets.atlases.register_file(source_path)
+                if staged['id'] != variant_id:
+                    raise ValueError('replacement file must match this atlas name and resolution')
+            else:
+                staged = location_assets.atlases.get_variant(variant_id)
+            # No Open Cloud request for byte-for-byte identical sources.
+            if not staged['replacementPending']:
+                if not staged['current']:
+                    raise ValueError('atlas not yet published; use Publish instead')
+                return out(200, {'unchanged': True, 'variant': staged,
+                                 'syncedConsumers': 0, 'pendingConsumers': 0})
+            credentials = publication_credentials('game1 atlas republish')
+            result = location_assets.atlases.ensure_published(variant_id, credentials, 'game1 atlas republish')
+            # Both domains consume the same publication; export both registries
+            # before asking Studio to refresh templates and placed instances.
+            location_assets.export()
+            deps['real_estate'].export()
+            consumers = location_assets.atlases.consumers(variant_id)
+            synced = 0
+            errors = []
+            location_consumers = [item for item in consumers if item['consumer_type'] == 'location_asset']
+            if location_consumers:
+                try:
+                    deps['sync_location_assets_to_studio']()
+                    for item in location_consumers:
+                        if location_assets.atlases.mark_synced('location_asset', item['consumer_id'], item['revision']):
+                            synced += 1
+                except Exception as exc:
+                    errors.append('Location Assets Studio Sync: ' + str(exc))
+            houses = sorted({item['consumer_id'].rsplit(':', 1)[0] for item in consumers
+                             if item['consumer_type'] == 'real_estate'})
+            for slug in houses:
+                try:
+                    deps['sync_real_estate_to_studio'](slug)
+                    synced += sum(1 for item in consumers if item['consumer_type'] == 'real_estate'
+                                  and item['consumer_id'].rsplit(':', 1)[0] == slug
+                                  and location_assets.atlases.binding('real_estate', item['consumer_id'])['syncStatus'] == 'synced')
+                except Exception as exc:
+                    errors.append('Real Estate ' + slug + ' Studio Sync: ' + str(exc))
+            if synced:
+                location_assets.export()
+                deps['real_estate'].export()
+            return out(200, {'variant': result, 'syncedConsumers': synced,
+                             'pendingConsumers': max(0,len(consumers)-synced),
+                             'studioErrors': errors})
+        except Exception as error:
+            return out(400, {'error': str(error)})
 
     if path.startswith('/api/texture-atlases/variants/') and path.endswith('/publish'):
         try:

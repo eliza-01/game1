@@ -65,7 +65,9 @@
           "published_at": 1792864909.8548038,
           "created_at": 1792864890.8597076,
           "atlas_key": "big_tree_01",
+          "replacement_sha256": null,
           "current": true,
+          "replacementPending": false,
           "resolution": "256x512"
         },
         {
@@ -84,7 +86,9 @@
           "published_at": 1792864977.6703994,
           "created_at": 1792864962.0061045,
           "atlas_key": "big_tree_01",
+          "replacement_sha256": null,
           "current": true,
+          "replacementPending": false,
           "resolution": "128x256"
         }
       ]
@@ -108,7 +112,9 @@
           "published_at": 1792869836.3859174,
           "created_at": 1792869829.3721356,
           "atlas_key": "lantern_01",
+          "replacement_sha256": null,
           "current": true,
+          "replacementPending": false,
           "resolution": "64x128"
         }
       ]
@@ -123,16 +129,18 @@
           "height": 2048,
           "filename": "restoration_01_2048x2048_atlas.png",
           "original_filename": "restoration_01_2048x2048_atlas.png",
-          "source_path": "assets/source/texture-atlases/restoration_01/2048x2048/restoration_01_2048x2048_atlas.png",
-          "source_sha256": "84376cbe3d9c96bcc1508917503c13b9a470b8e94180773c083430184c5a3973",
+          "source_path": "assets/source/texture-atlases/restoration_01/2048x2048/revisions/2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683/restoration_01_2048x2048_atlas.png",
+          "source_sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
           "uses_alpha": true,
-          "published_id": "110200384853583",
-          "published_sha256": "84376cbe3d9c96bcc1508917503c13b9a470b8e94180773c083430184c5a3973",
+          "published_id": "138456659862372",
+          "published_sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
           "moderation_state": "Reviewing",
-          "published_at": 1792931175.5397944,
+          "published_at": 1792938075.6938567,
           "created_at": 1792931156.6928835,
           "atlas_key": "restoration_01",
+          "replacement_sha256": null,
           "current": true,
+          "replacementPending": false,
           "resolution": "2048x2048"
         }
       ]
@@ -619,7 +627,9 @@
           "published_at": 1792869836.3859174,
           "created_at": 1792869829.3721356,
           "atlas_key": "lantern_01",
+          "replacement_sha256": null,
           "current": true,
+          "replacementPending": false,
           "resolution": "64x128"
         }
       ],
@@ -753,10 +763,10 @@
       "model_asset_id": "113417670397719",
       "model_published_sha256": "ec33078ac962fe274a0a49d4e88542c886e3997e7d9df2867497e2790289fd37",
       "model_moderation_state": "Approved",
-      "texture_path": "assets/source/texture-atlases/restoration_01/2048x2048/restoration_01_2048x2048_atlas.png",
-      "texture_sha256": "84376cbe3d9c96bcc1508917503c13b9a470b8e94180773c083430184c5a3973",
-      "texture_asset_id": "110200384853583",
-      "texture_published_sha256": "84376cbe3d9c96bcc1508917503c13b9a470b8e94180773c083430184c5a3973",
+      "texture_path": "assets/source/texture-atlases/restoration_01/2048x2048/revisions/2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683/restoration_01_2048x2048_atlas.png",
+      "texture_sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
+      "texture_asset_id": "138456659862372",
+      "texture_published_sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
       "texture_moderation_state": "Reviewing",
       "texture_reference_slug": "",
       "destructible": false,
@@ -770,7 +780,7 @@
       "atlasVariantId": 4,
       "atlasFamily": "restoration_01",
       "atlasResolution": "2048x2048",
-      "bindingRevision": 1,
+      "bindingRevision": 2,
       "studioSyncStatus": "synced",
       "atlasVariants": [
         {
@@ -780,16 +790,18 @@
           "height": 2048,
           "filename": "restoration_01_2048x2048_atlas.png",
           "original_filename": "restoration_01_2048x2048_atlas.png",
-          "source_path": "assets/source/texture-atlases/restoration_01/2048x2048/restoration_01_2048x2048_atlas.png",
-          "source_sha256": "84376cbe3d9c96bcc1508917503c13b9a470b8e94180773c083430184c5a3973",
+          "source_path": "assets/source/texture-atlases/restoration_01/2048x2048/revisions/2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683/restoration_01_2048x2048_atlas.png",
+          "source_sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
           "uses_alpha": true,
-          "published_id": "110200384853583",
-          "published_sha256": "84376cbe3d9c96bcc1508917503c13b9a470b8e94180773c083430184c5a3973",
+          "published_id": "138456659862372",
+          "published_sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
           "moderation_state": "Reviewing",
-          "published_at": 1792931175.5397944,
+          "published_at": 1792938075.6938567,
           "created_at": 1792931156.6928835,
           "atlas_key": "restoration_01",
+          "replacement_sha256": null,
           "current": true,
+          "replacementPending": false,
           "resolution": "2048x2048"
         }
       ],
@@ -872,7 +884,9 @@
           "published_at": 1792864909.8548038,
           "created_at": 1792864890.8597076,
           "atlas_key": "big_tree_01",
+          "replacement_sha256": null,
           "current": true,
+          "replacementPending": false,
           "resolution": "256x512"
         },
         {
@@ -891,7 +905,9 @@
           "published_at": 1792864977.6703994,
           "created_at": 1792864962.0061045,
           "atlas_key": "big_tree_01",
+          "replacement_sha256": null,
           "current": true,
+          "replacementPending": false,
           "resolution": "128x256"
         }
       ],

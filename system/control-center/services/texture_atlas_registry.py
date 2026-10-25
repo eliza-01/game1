@@ -85,6 +85,10 @@ class AtlasRegistry:
                     moderation_state TEXT NOT NULL DEFAULT '',
                     published_at REAL, created_at REAL NOT NULL,
                     UNIQUE(family_id,width,height));
+                CREATE TABLE IF NOT EXISTS texture_atlas_replacements (
+                    variant_id INTEGER PRIMARY KEY REFERENCES texture_atlas_variants(id),
+                    source_path TEXT NOT NULL, source_sha256 TEXT NOT NULL,
+                    uses_alpha INTEGER NOT NULL, staged_at REAL NOT NULL);
                 CREATE TABLE IF NOT EXISTS texture_atlas_pending_uploads (
                     variant_id INTEGER PRIMARY KEY REFERENCES texture_atlas_variants(id),
                     source_sha256 TEXT NOT NULL,
@@ -132,13 +136,17 @@ class AtlasRegistry:
 
     def get_variant(self, variant_id: int) -> dict | None:
         with self.connect() as db:
-            row = db.execute('''SELECT v.*, f.atlas_key FROM texture_atlas_variants v
-                JOIN texture_atlas_families f ON f.id=v.family_id WHERE v.id=?''', (int(variant_id),)).fetchone()
+            row = db.execute('''SELECT v.*, f.atlas_key, r.source_sha256 AS replacement_sha256
+                FROM texture_atlas_variants v
+                JOIN texture_atlas_families f ON f.id=v.family_id
+                LEFT JOIN texture_atlas_replacements r ON r.variant_id=v.id
+                WHERE v.id=?''', (int(variant_id),)).fetchone()
         return self._variant(dict(row)) if row else None
 
     @staticmethod
     def _variant(row: dict) -> dict:
         row['current'] = bool(row.get('published_id') and row['published_sha256'] == row['source_sha256'])
+        row['replacementPending'] = bool(row.get('replacement_sha256') and row['replacement_sha256'] != row['source_sha256'])
         row['uses_alpha'] = bool(row.get('uses_alpha'))
         row['resolution'] = f"{row['width']}x{row['height']}"
         return row
@@ -146,8 +154,10 @@ class AtlasRegistry:
     def catalog(self, search: str = '') -> list[dict]:
         search = str(search or '').strip().lower()
         with self.connect() as db:
-            rows = db.execute('''SELECT v.*, f.atlas_key FROM texture_atlas_variants v
+            rows = db.execute('''SELECT v.*, f.atlas_key, r.source_sha256 AS replacement_sha256
+                FROM texture_atlas_variants v
                 JOIN texture_atlas_families f ON f.id=v.family_id
+                LEFT JOIN texture_atlas_replacements r ON r.variant_id=v.id
                 ORDER BY f.atlas_key, v.width*v.height DESC, v.width DESC, v.height DESC, v.id''').fetchall()
         result: dict[str, dict] = {}
         for row in rows:
@@ -174,6 +184,13 @@ class AtlasRegistry:
         result['syncStatus'] = ('synced' if result['synced_revision'] >= result['revision'] else 'pending_studio_sync')
         return result
 
+    def consumers(self, variant_id: int) -> list[dict]:
+        """All consumers of this published atlas resolution."""
+        with self.connect() as db:
+            rows = db.execute('''SELECT consumer_type,consumer_id,revision FROM texture_atlas_bindings
+                WHERE variant_id=? ORDER BY consumer_type,consumer_id''', (int(variant_id),)).fetchall()
+        return [dict(row) for row in rows]
+
     def register_file(self, source_path: str) -> dict:
         path = Path(str(source_path)).expanduser().resolve()
         if not path.is_file() or path.suffix.lower() not in ('.png', '.jpg', '.jpeg'):
@@ -193,9 +210,33 @@ class AtlasRegistry:
                 existing = db.execute('SELECT id,source_sha256 FROM texture_atlas_variants WHERE family_id=? AND width=? AND height=?',
                                       (family_id, parsed['width'], parsed['height'])).fetchone()
                 if existing:
-                    if existing['source_sha256'] != sha:
-                        raise ValueError('resolution variant already exists with different pixels; explicit versioned replacement is required')
-                    return self.get_variant(existing['id'])
+                    variant_id = existing['id']
+                    unresolved = db.execute('SELECT 1 FROM texture_atlas_pending_uploads WHERE variant_id=?',
+                                            (variant_id,)).fetchone()
+                    if existing['source_sha256'] == sha:
+                        if not unresolved:
+                            db.execute('DELETE FROM texture_atlas_replacements WHERE variant_id=?', (variant_id,))
+                        db.commit()
+                        return self.get_variant(variant_id)
+                    if unresolved:
+                        raise ValueError('previous atlas upload is unresolved; cannot replace its source')
+                    # Content-addressed archive. Do not overwrite the old version.
+                    directory = (self.root / 'assets/source/texture-atlases' / parsed['atlasKey']
+                                 / f"{parsed['width']}x{parsed['height']}" / 'revisions' / sha)
+                    directory.mkdir(parents=True, exist_ok=True)
+                    destination = directory / parsed['filename']
+                    if destination.is_file() and digest(destination) != sha:
+                        raise ValueError('stored replacement source checksum mismatch')
+                    if not destination.exists():
+                        shutil.copy2(path, destination)
+                    db.execute('''INSERT INTO texture_atlas_replacements
+                        (variant_id,source_path,source_sha256,uses_alpha,staged_at) VALUES (?,?,?,?,?)
+                        ON CONFLICT(variant_id) DO UPDATE SET source_path=excluded.source_path,
+                        source_sha256=excluded.source_sha256,uses_alpha=excluded.uses_alpha,
+                        staged_at=excluded.staged_at''',
+                        (variant_id,destination.relative_to(self.root).as_posix(),sha,int(alpha),now))
+                    db.commit()
+                    return self.get_variant(variant_id)
                 directory = self.root / 'assets/source/texture-atlases' / parsed['atlasKey'] / f"{parsed['width']}x{parsed['height']}"
                 directory.mkdir(parents=True, exist_ok=True)
                 destination = directory / parsed['filename']
@@ -262,43 +303,49 @@ class AtlasRegistry:
             self.mark_synced(consumer_type, consumer_id, revision)
 
     def ensure_published(self, variant_id: int, credentials: dict, description: str) -> dict:
+        """Publish a new variant or a replacement as a NEW Roblox Image Asset ID.
+
+        No image reimport. Previously published IDs and sources remain in history.
+        All consumers move to the new ID only after a successful publication.
+        """
         with _UPLOAD_LOCK:
             variant = self.get_variant(variant_id)
             if not variant:
                 raise ValueError('unknown atlas variant')
-            if variant['current']:
+            with self.connect() as db:
+                replacement = db.execute('SELECT * FROM texture_atlas_replacements WHERE variant_id=?',
+                                         (variant_id,)).fetchone()
+                pending = db.execute('SELECT 1 FROM texture_atlas_pending_uploads WHERE variant_id=?',
+                                     (variant_id,)).fetchone()
+            if pending:
+                raise ValueError('atlas publication is unresolved; inspect Open Cloud operation before retrying (upload blocked)')
+            if variant['current'] and not replacement:
                 return variant
-            path = (self.root / variant['source_path']).resolve()
-            if not path.is_file() or not path.is_relative_to(self.root) or digest(path) != variant['source_sha256']:
+
+            new_path = replacement['source_path'] if replacement else variant['source_path']
+            new_sha = replacement['source_sha256'] if replacement else variant['source_sha256']
+            path = (self.root / new_path).resolve()
+            if not path.is_relative_to(self.root) or not path.is_file() or digest(path) != new_sha:
                 raise ValueError('atlas source missing or changed; refusing to publish')
-            # Deduplicate by verified bytes, never by model-owner name.
+            # Deduplicate genuinely identical bytes, never by matching filename.
             with self.connect() as db:
                 ids = {r[0] for r in db.execute('''SELECT published_id FROM texture_atlas_variants
-                    WHERE source_sha256=? AND published_sha256=? AND published_id IS NOT NULL''',
-                    (variant['source_sha256'], variant['source_sha256']))}
-                # Legacy adapters import their publication metadata into the
-                # shared index; publication has no model-domain dependency.
+                    WHERE source_sha256=? AND published_sha256=? AND published_id IS NOT NULL''', (new_sha,new_sha))}
                 ids |= {r[0] for r in db.execute('''SELECT image_asset_id
-                    FROM texture_atlas_legacy_publications WHERE source_sha256=?''',
-                    (variant['source_sha256'],))}
+                    FROM texture_atlas_legacy_publications WHERE source_sha256=?''', (new_sha,))}
                 if len(ids) > 1:
                     raise ValueError('legacy atlas publication conflict: multiple Image Asset IDs for identical bytes; choose canonical ID explicitly before continuing (no upload performed)')
                 adopted = next(iter(ids)) if ids else None
             if adopted:
-                operation_path = 'reuse:published-sha256'
-                moderation = ''
+                operation_path, moderation = 'reuse:published-sha256', ''
             else:
                 if not (credentials.get('apiKey') and credentials.get('creatorType') and credentials.get('creatorId')):
-                    raise ValueError('Open Cloud credentials required to publish an unpublished atlas')
-                # Persist intent BEFORE the network call. A crash/ambiguous API
-                # response must not cause an automatic second Roblox Image upload.
+                    raise ValueError('Open Cloud credentials required to publish an atlas')
+                # Persist upload intent before contacting Roblox. Never retry an
+                # ambiguous upload until reconciled by its operation ID.
                 with self.connect() as db:
-                    pending = db.execute('SELECT operation_path FROM texture_atlas_pending_uploads WHERE variant_id=?',
-                                         (variant_id,)).fetchone()
-                    if pending:
-                        raise ValueError('atlas publication is unresolved; inspect Open Cloud operation before retrying (upload blocked)')
                     db.execute('INSERT INTO texture_atlas_pending_uploads(variant_id,source_sha256,started_at) VALUES(?,?,?)',
-                               (variant_id,variant['source_sha256'],time.time()))
+                               (variant_id,new_sha,time.time()))
                 op = create_image_asset(path, display_name=variant['atlas_key'] + ' atlas ' + variant['resolution'],
                     description=description, creator_type=str(credentials.get('creatorType') or ''),
                     creator_id=str(credentials.get('creatorId') or ''), api_key=str(credentials.get('apiKey') or ''))
@@ -309,11 +356,26 @@ class AtlasRegistry:
                 adopted, operation_path, moderation = result.asset_id, result.operation_path, result.moderation_state or ''
             if not str(adopted).isdigit() or int(adopted) <= 0:
                 raise ValueError('Open Cloud returned an invalid Image Asset ID')
+            if replacement and str(adopted) == str(variant['published_id']):
+                raise ValueError('replacement must receive a different Roblox Image Asset ID')
             with self.connect() as db:
                 now = time.time()
-                db.execute('''UPDATE texture_atlas_variants SET published_id=?,published_sha256=?,moderation_state=?,published_at=? WHERE id=?''',
-                    (adopted,variant['source_sha256'],moderation,now,variant_id))
-                db.execute('''INSERT INTO texture_atlas_publications(variant_id,image_asset_id,sha256,operation_path,moderation_state,published_at)
-                    VALUES(?,?,?,?,?,?)''', (variant_id,adopted,variant['source_sha256'],operation_path,moderation,now))
+                if replacement:
+                    db.execute('''UPDATE texture_atlas_variants SET source_path=?,source_sha256=?,uses_alpha=?,
+                        published_id=?,published_sha256=?,moderation_state=?,published_at=? WHERE id=?''',
+                        (new_path,new_sha,int(replacement['uses_alpha']),str(adopted),new_sha,moderation,now,variant_id))
+                    # Updating a shared variant invalidates every consumer's
+                    # acknowledgement, in Location Assets AND Real Estate.
+                    db.execute('''UPDATE texture_atlas_bindings SET revision=revision+1,changed_at=?
+                        WHERE variant_id=?''', (now,variant_id))
+                    db.execute('DELETE FROM texture_atlas_replacements WHERE variant_id=?', (variant_id,))
+                else:
+                    db.execute('''UPDATE texture_atlas_variants SET published_id=?,published_sha256=?,
+                        moderation_state=?,published_at=? WHERE id=?''',
+                        (str(adopted),new_sha,moderation,now,variant_id))
+                db.execute('''INSERT INTO texture_atlas_publications
+                    (variant_id,image_asset_id,sha256,operation_path,moderation_state,published_at)
+                    VALUES(?,?,?,?,?,?)''',
+                    (variant_id,str(adopted),new_sha,operation_path,moderation,now))
                 db.execute('DELETE FROM texture_atlas_pending_uploads WHERE variant_id=?', (variant_id,))
             return self.get_variant(variant_id)

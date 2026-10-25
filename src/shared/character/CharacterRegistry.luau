@@ -10,14 +10,14 @@ return table.freeze({
 			race = "human",
 			gender = "female",
 			status = "CHANGED",
-			revision = 33,
+			revision = 34,
 			stats = table.freeze({
 				Level = 1,
 				MaxHP = 100,
 				Damage = 10,
 				Defense = 0,
 				AttackSpeed = 200,
-				RunSpeed = 300,
+				RunSpeed = 150,
 				CritChance = 10,
 			}),
 			model = table.freeze({

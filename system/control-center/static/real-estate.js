@@ -41,12 +41,21 @@ function realEstateForm(row){
     glass:row?.meshOptions?.[part]?.glass ?? realEstateMeshDefaults(part).glass,
     noCollide:row?.meshOptions?.[part]?.noCollide ?? realEstateMeshDefaults(part).noCollide
   }]));
+  // A central AtlasRegistry binding is reuse even when the legacy Estate
+  // texture row has reuseReference="". The binding, not the local source path,
+  // determines the active published Image Asset ID.
+  const referenceForPart=part=>{
+    const texture=row?.textures?.[part]||{};
+    if(texture.reuseReference)return texture.reuseReference;
+    return texture.atlasVariantId && texture.atlasCurrent
+      ? `atlas:${texture.atlasVariantId}` : '';
+  };
   realEstateState.textureRefs=Object.fromEntries(
-    meshNames.map(part=>[part,row?.textures?.[part]?.reuseReference||'']));
+    meshNames.map(part=>[part,referenceForPart(part)]));
   realEstateState.reuseEnabled=Object.fromEntries(
-    meshNames.map(part=>[part,Boolean(row?.textures?.[part]?.reuseReference)]));
+    meshNames.map(part=>[part,Boolean(referenceForPart(part))]));
   realEstateState.textures=Object.fromEntries(
-    meshNames.map(part=>[part,row?.textures?.[part]?.reuseReference?'':(row?.textures?.[part]?.path||'')]));
+    meshNames.map(part=>[part,referenceForPart(part)?'':(row?.textures?.[part]?.path||'')]));
   $('real-estate-fbx').textContent=row?`${row.model_path} · choose FBX to replace`:'no FBX selected';
   $('real-estate-type').value=row?.house_type||'house';
   $('real-estate-level').value=row?.house_level??1;
@@ -119,6 +128,31 @@ function realEstateLocalHouseAtlasLabel(){
     owner.filename || current.split(/[\\/]/).pop() || String(owner.path||'').split(/[\\/]/).pop() || 'no texture selected');
   return ['this Estate / house', filename, source?.assetId||owner.assetId||'not published'].join(' · ');
 }
+// The Atlas Registry catalog is authoritative for published atlas variants.
+// textureReferences is a convenience projection that may omit modern atlases
+// in an older Host Agent response; never make the reuse picker depend on it.
+function realEstatePublishedAtlasChoices(){
+  const choices=new Map();
+  for(const entry of realEstateState.data?.textureReferences||[]){
+    if((entry.group==='atlas'||String(entry.reference||'').startsWith('atlas:')) && entry.assetId){
+      choices.set(entry.reference,entry);
+    }
+  }
+  for(const family of realEstateState.data?.atlasCatalog||[]){
+    for(const variant of family.variants||[]){
+      if(!variant.current||!variant.published_id)continue;
+      const reference=`atlas:${variant.id}`;
+      choices.set(reference,{
+        reference,group:'atlas',label:family.atlasKey,slug:'',
+        filename:variant.filename,path:variant.source_path,
+        assetId:String(variant.published_id),category:'',categoryLabel:''
+      });
+    }
+  }
+  return [...choices.values()].sort((a,b)=>
+    String(a.label||'').localeCompare(String(b.label||'')) ||
+    String(a.filename||'').localeCompare(String(b.filename||'')));
+}
 function realEstateReuseOptions(part){
   const all=realEstateState.data?.textureReferences||[];
   const active=realEstateState.textureRefs[part]||'';
@@ -129,9 +163,15 @@ function realEstateReuseOptions(part){
   const location=all.filter(e=>(e.group==='location'||e.reference.startsWith('location:'))&&
     (e.reference===active||!filter.category||e.category===filter.category)&&matching(e));
   const estates=all.filter(e=>(e.group==='estate'||e.reference.startsWith('estate:'))&&matching(e));
+  // AtlasRegistry is the canonical owner of new Location/Real Estate atlases.
+  // Do not infer ownership from an Estate row: a shared atlas may have no
+  // legacy per-mesh image publication at all (e.g. house_level4_01).
+  const atlases=realEstatePublishedAtlasChoices().filter(matching);
   const option=e=>`<option value="${esc(e.reference)}">${esc(realEstateReuseLabel(e))}</option>`;
   const result=['<option value="">choose reuse source…</option>'];
   if(part!=='house')result.push(`<optgroup label="This Estate"><option value="mesh:house">${esc(realEstateLocalHouseAtlasLabel())}</option></optgroup>`);
+  // Show modern shared atlases before the long legacy owner lists.
+  if(atlases.length)result.push(`<optgroup label="Shared Atlas Registry · published">${atlases.map(option).join('')}</optgroup>`);
   const categories=new Map();
   for(const e of location){
     const key=e.category||'other';
@@ -196,7 +236,7 @@ function realEstateRenderTextures(){
       <div class="real-estate-mesh-switches" role="group" aria-label="${esc(part)} mesh settings">
         <label class="real-estate-glass-toggle" title="Studio MeshPart Transparency = 0.02 (if checked)"><input type="checkbox" id="real-estate-glass-${esc(part)}" ${flags.glass?'checked':''}> Glass · 0.02</label>
         <label class="real-estate-physics-toggle" title="Disable physics collisions, touch events, and spatial queries for this mesh"><input type="checkbox" id="real-estate-nocollide-${esc(part)}" ${flags.noCollide?'checked':''}> No Collide</label>
-        <label class="real-estate-reuse-toggle" title="Reuse a published texture instead of selecting a local file"><input type="checkbox" id="real-estate-reuse-${esc(part)}" ${reuse?'checked':''}> Reuse atlas</label>
+        <label class="real-estate-reuse-toggle" title="Bind this mesh to an existing published Atlas Registry variant. Reuse never uploads another Roblox Image Asset."><input type="checkbox" id="real-estate-reuse-${esc(part)}" ${reuse?'checked':''}> Reuse atlas</label>
       </div>
       <div id="real-estate-owned-${esc(part)}" class="real-estate-texture-owned" ${reuse?'hidden':''}>
         <select aria-label="${esc(part)} texture" id="real-estate-texture-${esc(part)}">${choices.join('')}</select>
@@ -209,7 +249,7 @@ function realEstateRenderTextures(){
           <select id="real-estate-reuse-category-${esc(part)}" aria-label="${esc(part)} Location category">${categoryChoices.join('')}</select>
         </div>
         <select aria-label="${esc(part)} reused texture" id="real-estate-reference-${esc(part)}"></select>
-        <small class="hint">Published Location/Real Estate Image Asset · or atlas from this Estate</small>
+        <small class="hint">Published Location/Real Estate Image Asset · Shared Atlas Registry (existing Roblox ID, no upload). For changed pixels, use Republish instead.</small>
       </div></div>`;
   }).join('');
   for(const part of parts){

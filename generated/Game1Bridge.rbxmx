@@ -3644,6 +3644,7 @@ function PlotsVisibility.new(config: any)
     end))
 
     self:_refresh()
+    print("[game1][plots] toolbar ready · button=Game1Plots · initial=hidden")
     return self
 end
 
@@ -4252,11 +4253,13 @@ function Sync.Update(template: Model, slug: string): (number, {string})
                 end
                 local clone: Model? = nil
                 local ok, problem = pcall(function()
-                    clone = source:Clone()
-                    -- Models may have no PrimaryPart. PivotTo keeps internal
-                    -- bone and MeshPart offsets aligned with the placed house.
-                    (clone :: Model):PivotTo(relative * source:GetPivot())
-                    (clone :: Model).Parent = root
+                    local staged = source:Clone()
+                    clone = staged
+                    -- A named, non-optional Model avoids an ambiguous Luau
+                    -- statement starting with '(' after the Clone() call.
+                    -- PivotTo preserves offsets inside the placed collision rig.
+                    staged:PivotTo(relative * source:GetPivot())
+                    staged.Parent = root
                 end)
                 if not ok then
                     if clone then clone:Destroy() end

@@ -28,6 +28,11 @@ foreach($SourceFile in (Get-ChildItem (Join-Path $PSScriptRoot 'modules') -Filte
     }
 }
 
+# Rojo does not parse Luau. Catch dangerous source before replacing the
+# working installed Game1Bridge; the previous M134 syntax issue hid all tools.
+& python (Join-Path $PSScriptRoot 'validate_luau.py')
+if($LASTEXITCODE -ne 0){throw 'Studio Luau preflight failed; installed plugin was not replaced'}
+
 Push-Location $PSScriptRoot
 try {
     rojo build plugin.project.json -o $Temp

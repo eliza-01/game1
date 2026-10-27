@@ -11,7 +11,7 @@ local DOOR_CHILD_SOCKETS = {
     door_01_padlock_01_socket = true,
 }
 
-local function findMesh(root: Model, expected: string): MeshPart
+function Validation.FindMesh(root: Model, expected: string): MeshPart
     local match: MeshPart? = nil
     for _, instance in root:GetDescendants() do
         if instance:IsA("MeshPart") then
@@ -35,7 +35,7 @@ function Validation.Verify(root: Model, part: string, expected: any): (MeshPart,
         error("Missing registered mesh manifest for " .. part)
     end
 
-    local mesh = findMesh(root, part)
+    local mesh = Validation.FindMesh(root, part)
     local authored: {[string]: boolean} = {}
     local socketCount = 0
     for _, name in expected do

@@ -67,6 +67,15 @@
       "StudioRealEstateRigValidation": {
         "$path": "modules/StudioRealEstateRigValidation.luau"
       },
+      "StudioRealEstateSocketRecovery": {
+        "$path": "modules/StudioRealEstateSocketRecovery.luau"
+      },
+      "StudioRealEstateCollisionPolicy": {
+        "$path": "modules/StudioRealEstateCollisionPolicy.luau"
+      },
+      "StudioRealEstatePlacedCollisionSync": {
+        "$path": "modules/StudioRealEstatePlacedCollisionSync.luau"
+      },
       "StudioActorSpawnCommands": {
         "$path": "modules/StudioActorSpawnCommands.luau"
       },

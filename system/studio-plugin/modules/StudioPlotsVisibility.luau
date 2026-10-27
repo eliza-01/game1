@@ -62,6 +62,7 @@ function PlotsVisibility.new(config: any)
     end))
 
     self:_refresh()
+    print("[game1][plots] toolbar ready · button=Game1Plots · initial=hidden")
     return self
 end
 

@@ -86,7 +86,9 @@ class OptionalRigTests(unittest.TestCase):
         self.assertIn('window.confirm',js)
         self.assertIn('acceptWarnings:',js)
         self.assertIn('<details id="real-estate-rig-details"',html)
-        self.assertIn('grid-template-columns:112px minmax(0,1fr)',css)
+        self.assertIn('real-estate-mesh-switches',css)
+        self.assertIn('display:flex; flex-direction:column; align-items:stretch;',css)
+        self.assertNotIn('grid-template-columns:112px minmax(0,1fr)',css)
         self.assertNotIn('must contain item_XX_bone', (ROOT/'system/control-center/real_estate/contracts.py').read_text('utf-8'))
         self.assertNotIn('or #list == 0', (ROOT/'system/studio-plugin/modules/StudioRealEstateModel.luau').read_text('utf-8'))
 

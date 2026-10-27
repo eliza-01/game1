@@ -64,7 +64,9 @@
       ],
       "meshOptions": {
         "house": {
-          "glass": false
+          "glass": false,
+          "noCollide": true,
+          "collisionMesh": false
         }
       },
       "textures": {
@@ -272,10 +274,14 @@
       ],
       "meshOptions": {
         "house": {
-          "glass": false
+          "glass": false,
+          "noCollide": true,
+          "collisionMesh": false
         },
         "door": {
-          "glass": false
+          "glass": false,
+          "noCollide": true,
+          "collisionMesh": false
         }
       },
       "textures": {
@@ -599,16 +605,24 @@
       ],
       "meshOptions": {
         "house": {
-          "glass": false
+          "glass": false,
+          "noCollide": true,
+          "collisionMesh": false
         },
         "door": {
-          "glass": false
+          "glass": false,
+          "noCollide": true,
+          "collisionMesh": false
         },
         "restoration": {
-          "glass": false
+          "glass": false,
+          "noCollide": true,
+          "collisionMesh": false
         },
         "window_frames_glass": {
-          "glass": true
+          "glass": true,
+          "noCollide": true,
+          "collisionMesh": false
         }
       },
       "textures": {
@@ -623,7 +637,7 @@
           "atlasVariantId": 5,
           "atlasKey": "house_level4_01",
           "atlasBindingRevision": 1,
-          "atlasSyncStatus": "pending_studio_sync",
+          "atlasSyncStatus": "synced",
           "atlasLegacyWarning": false,
           "atlasVariants": [
             {
@@ -898,16 +912,24 @@
       ],
       "meshOptions": {
         "house": {
-          "glass": false
+          "glass": false,
+          "noCollide": true,
+          "collisionMesh": false
         },
         "door": {
-          "glass": false
+          "glass": false,
+          "noCollide": true,
+          "collisionMesh": false
         },
         "repair": {
-          "glass": false
+          "glass": false,
+          "noCollide": true,
+          "collisionMesh": false
         },
         "stone_fence_01_kit": {
-          "glass": false
+          "glass": false,
+          "noCollide": true,
+          "collisionMesh": false
         }
       },
       "textures": {

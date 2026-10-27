@@ -11,6 +11,23 @@ New-Item -ItemType Directory -Force (Split-Path $Generated)|Out-Null
 New-Item -ItemType Directory -Force $Plugins|Out-Null
 Remove-Item $Temp -Force -ErrorAction SilentlyContinue
 
+# Verify every source module is mapped into the Rojo build. Marker checks alone
+# can pass even when an unrelated editor tool was accidentally left out.
+$Project=Get-Content (Join-Path $PSScriptRoot 'plugin.project.json') -Raw | ConvertFrom-Json
+$Declared=@($Project.tree.modules.PSObject.Properties | Where-Object { $_.Name -ne '$className' })
+$DeclaredNames=@($Declared | ForEach-Object { $_.Name })
+foreach($Entry in $Declared){
+    $Source=Join-Path $PSScriptRoot $Entry.Value.'$path'
+    if(-not (Test-Path $Source -PathType Leaf)){
+        throw "Studio plugin module is declared but missing: $($Entry.Name) ($Source)"
+    }
+}
+foreach($SourceFile in (Get-ChildItem (Join-Path $PSScriptRoot 'modules') -Filter '*.luau' -File)){
+    if($SourceFile.BaseName -notin $DeclaredNames){
+        throw "Studio plugin module is present but not in Rojo manifest: $($SourceFile.Name)"
+    }
+}
+
 Push-Location $PSScriptRoot
 try {
     rojo build plugin.project.json -o $Temp
@@ -20,6 +37,20 @@ try {
 
 if(-not (Test-Path $Temp)){throw 'Rojo did not create the plugin build'}
 $BuiltText=Get-Content $Temp -Raw
+# Audit real compiled ModuleScript instances, not just Lua identifier strings.
+# A Lua require may mention a missing module even when Rojo omitted the Item.
+try { [xml]$BuiltXml=$BuiltText } catch { throw "Rojo output is not valid rbxmx XML: $_" }
+$PackagedNames=@($BuiltXml.SelectNodes('//Item[@class="ModuleScript"]/Properties/string[@name="Name"]') | ForEach-Object { $_.InnerText })
+foreach($ModuleName in $DeclaredNames){
+    if($ModuleName -notin $PackagedNames){
+        throw "Studio plugin built without declared module: $ModuleName"
+    }
+}
+foreach($ModuleName in $PackagedNames){
+    if($ModuleName -notin $DeclaredNames){
+        throw "Studio plugin contains unexpected module: $ModuleName"
+    }
+}
 # Validate the command API used by Asset Manager, not the removed Control Center toolbar button.
 # The installer must reject old builds that lack the Monster/NPC Spawn command handler.
 foreach($Marker in @(
@@ -43,11 +74,15 @@ foreach($Marker in @(
     'StudioPlotsVisibility',
     'StudioPlotsPartPolicy',
     'StudioPlotsSelectionFilter',
+    'Game1Plots',
     'Game1PlotsPreview',
     'StudioDebugPreferenceBridge',
     'StudioModelLoadCommands',
     'StudioRealEstateModel',
     'StudioRealEstateRigValidation',
+    'StudioRealEstateSocketRecovery',
+    'StudioRealEstateCollisionPolicy',
+    'StudioRealEstatePlacedCollisionSync',
     'StudioDecoSyncCommands',
     'StudioTextureAppearance',
     'StudioActorSpawnCommands'
@@ -77,4 +112,5 @@ Remove-Item $Temp -Force -ErrorAction SilentlyContinue
 Write-Host ("Game1Bridge installed with DecoManager + authoring-marker visibility + Locations + Attack Timeline: {0}" -f $Installed)
 Write-Host ("SHA256: {0}" -f $InstalledHash)
 Write-Host 'DecoManager places published Location Assets; Locations draw from Asset Manager / Locations; Attack Timeline opens from Asset Manager / Timelines.'
+Write-Host ("Studio modules: {0}; toolbar: Markers, Plots, DecoManager" -f $Declared.Count)
 Write-Host 'Fully close every Roblox Studio window, then reopen Studio once.'

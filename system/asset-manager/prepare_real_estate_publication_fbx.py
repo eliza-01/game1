@@ -7,6 +7,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bone_weight_survival import plan_publication_weights
 from real_estate_skin_policy import check_rigid_hinge, HINGE
 from real_estate_rig_discovery import find_mesh, find_rig
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "control-center"))
+from real_estate.collision_policy import is_collision_mesh
 
 
 def main(source, output, texture_config):
@@ -79,7 +81,11 @@ def main(source, output, texture_config):
             reports[part] = report
         else:
             reports[part] = {'status': 'no_bones', 'preservedBones': 0}
-        # Material assignment is mesh-specific, without changing scene geometry.
+        # Collision geometry is published as a Model Asset only. Never attach
+        # a fake image / atlas merely to get a physics mesh through Open Cloud.
+        if is_collision_mesh(part):
+            mesh.data.materials.clear()
+            continue
         image = bpy.data.images.load(str(texture_config[part]), check_existing=True)
         material = bpy.data.materials.new(name=f'Game1_{part}')
         material.use_nodes = True

@@ -19,6 +19,7 @@ from .contracts import identity, parse_name, prices, present_parts, validate_ana
 from .textures import available_textures, resolve_texture
 from .fbx import inspect, prepare_publication
 from .publication_textures import prepare_texture, published_format
+from .collision_policy import is_collision_mesh, requires_texture, default_no_collide
 from services.texture_atlas_registry import AtlasRegistry, parse_filename
 
 
@@ -27,13 +28,20 @@ def glass_default(part: str) -> bool:
 
 
 def mesh_options(parts, raw: dict | None) -> dict:
-    """Preserve explicit checkbox choices; default glass-like meshes to 0.02."""
+    """Effective authoring flags. Legacy rows get defaults without a DB rewrite."""
     source = raw if isinstance(raw, dict) else {}
     result = {}
     for part in parts:
         entry = source.get(part)
-        value = entry.get('glass') if isinstance(entry, dict) else None
-        result[part] = {'glass': value if type(value) is bool else glass_default(part)}
+        entry = entry if isinstance(entry, dict) else {}
+        glass = entry.get('glass')
+        no_collide = entry.get('noCollide')
+        result[part] = {
+            'glass': (glass if type(glass) is bool else glass_default(part))
+                     if requires_texture(part) else False,
+            'noCollide': no_collide if type(no_collide) is bool else default_no_collide(part),
+            'collisionMesh': is_collision_mesh(part),
+        }
     return result
 
 
@@ -185,6 +193,8 @@ class RealEstateStore:
         row = self.get(slug)
         if not row or part not in row['meshParts']:
             raise ValueError('unknown Real Estate mesh')
+        if is_collision_mesh(part):
+            raise ValueError('collision-only mesh does not use a texture atlas')
         # A mesh with a shared/local-house reference must first be given its
         # own variant choice. Only the selected mesh changes; other bindings live.
         selected = self.atlases.get_variant(variant_id)
@@ -230,6 +240,13 @@ class RealEstateStore:
                 row['rigAssets'][part].get('publishedSha256') == row['model_sha256']
                 for part in active)}
             for part in active:
+                # Physics geometry has a Model Asset but never needs an Image
+                # Asset. Historical texture records are preserved for audit.
+                if is_collision_mesh(part):
+                    row['textures'].setdefault(part, {'path':'', 'filename':'', 'sha256':'',
+                        'assetId':'', 'publishedSha256':'', 'reuseReference':''})
+                    current[part] = True
+                    continue
                 row['textures'][part] = self._atlas_metadata(row['slug'], part, row['textures'][part], atlas_catalog)
                 texture = row['textures'][part]
                 reference = texture.get('reuseReference')
@@ -313,6 +330,10 @@ class RealEstateStore:
         catalog = {option['reference']:option for option in self.texture_references()}
         chosen_refs = {part: str(references.get(part) or '').strip() for part in active}
         for part, reference in chosen_refs.items():
+            if is_collision_mesh(part):
+                if reference:
+                    raise ValueError(f'{part}: collision mesh must not select a texture reference')
+                continue
             if reference.startswith('atlas:'):
                 try:
                     variant = self.atlases.get_variant(int(reference[6:]))
@@ -333,7 +354,7 @@ class RealEstateStore:
             if isinstance(incoming_options, dict) else previous_options)
         texture_sources = {
             part: (resolve_texture(self.root, selections.get(part), part=part)
-                   if not chosen_refs[part] else None)
+                   if requires_texture(part) and not chosen_refs[part] else None)
             for part in active
         }
         canonical = self.root / 'assets' / 'source' / 'real-estate' / slug
@@ -366,6 +387,13 @@ class RealEstateStore:
         for part in active:
             old = (existing or {}).get('textures', {}).get(part, {})
             reference = chosen_refs[part]
+            if is_collision_mesh(part):
+                # Store no new image binding or source for geometry-only mesh.
+                # Existing Roblox image publication history is never deleted.
+                texture_rows[part] = {'path':'', 'filename':'', 'sha256':'',
+                    'reuseReference':'', 'assetId':'', 'publishedSha256':'',
+                    'publicationFormat':''}
+                continue
             if part in atlas_selections:
                 variant = atlas_selections[part]
                 texture_rows[part] = {'path': variant['source_path'],
@@ -510,11 +538,15 @@ class RealEstateStore:
                 raise ValueError(f'Invalid publication scope: {force_model_part} mesh is absent from this house')
         elif scope not in ('all', 'model') and image_part not in active:
             raise ValueError(f'Invalid publication scope: {image_part} mesh is absent from this house')
+        if image_part is not None and is_collision_mesh(image_part):
+            raise ValueError(f'{image_part}: collision geometry has no Image Asset to publish')
         description = str(credentials.get('description') or f'Game1 Real Estate {slug}')
         common = dict(display_name=slug, description=description,
                       creator_type=credentials['creatorType'], creator_id=credentials['creatorId'],
                       api_key=credentials['apiKey'])
         for part in active:
+            if is_collision_mesh(part):
+                continue
             reference = row['textures'][part].get('reuseReference')
             if reference == 'mesh:house':
                 # 'all' publishes house before door. 'model' only needs a
@@ -532,7 +564,7 @@ class RealEstateStore:
                 # otherwise Roblox collapses both rigs under one RootPart.
                 images = {
                     part: prepare_texture(self.root, part, _source(self.root, data['path']), staging)
-                    for part, data in row['textures'].items()
+                    for part, data in row['textures'].items() if requires_texture(part)
                 }
                 rigs = staging / 'rigs'
                 prepare_publication(self.root, _source(self.root, row['model_path']), rigs,
@@ -575,6 +607,10 @@ class RealEstateStore:
                 self.export()
         for part in active:
             if scope != 'all' and image_part != part:
+                continue
+            if is_collision_mesh(part):
+                if image_part == part:
+                    raise ValueError(f'{part}: collision geometry has no Image Asset to publish')
                 continue
             # Refresh after each successful upload to preserve earlier progress.
             row = self.get(slug)

@@ -157,8 +157,8 @@ class BlenderErrorReporting(unittest.TestCase):
         self.assertIn('for part in parts:',prepare)
         self.assertIn('for _, part in parts do',plugin)
         self.assertIn('rigsValidated = #parts',plugin)
-        self.assertIn('host.innerHTML=parts.map(part=>',js)
-        self.assertIn('textureReferences:Object.fromEntries(parts.map(',js)
+        self.assertIn('parts.map(part=>',js)
+        self.assertIn('textureReferences:Object.fromEntries(parts.filter(part=>!realEstateIsCollider(part)).map(',js)
 
 
 if __name__=='__main__':unittest.main()

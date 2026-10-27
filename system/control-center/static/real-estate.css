@@ -1,13 +1,7 @@
-.real-estate-workflow { display:grid; grid-template-columns: minmax(0,1.3fr) minmax(0,1fr); gap:16px; }
+.real-estate-workflow { display:grid; grid-template-columns:minmax(340px,1fr) minmax(540px,1.25fr); gap:16px; }
 .real-estate-workflow #real-estate-fbx { overflow-wrap:anywhere; font-size:12px; }
 .real-estate-workflow #real-estate-rig { white-space:normal; overflow-wrap:anywhere; max-height:220px; overflow-y:auto; }
 #real-estate-tree button { overflow-wrap:anywhere; text-align:left; width:100%; }
-.real-estate-texture-row { min-width:0; display:grid; grid-template-columns:minmax(180px,1fr) auto; gap:8px; align-items:end; }
-.real-estate-texture-row label { min-width:0; }
-.real-estate-texture-path { grid-column:1 / -1; font-size:11px; overflow-wrap:anywhere; }
-@media(max-width:980px){ .real-estate-workflow{grid-template-columns:minmax(0,1fr)} }
-
-.real-estate-workflow { grid-template-columns:minmax(340px,1fr) minmax(540px,1.25fr); }
 .real-estate-library { margin-top:20px; }
 .real-estate-library table { width:100%; }
 .real-estate-library td { vertical-align:top; }
@@ -15,29 +9,55 @@
 .real-estate-row-actions button { white-space:nowrap; font-size:11px; }
 @media(max-width:1200px) {.real-estate-workflow {grid-template-columns:minmax(0,1fr)}}
 
-/* Each inspected mesh gets one vertical editor with independent reuse mode. */
-#real-estate-mesh-textures { display:flex; flex-direction:column; gap:12px; }
-.real-estate-texture-row { display:flex; flex-direction:column; align-items:stretch; gap:8px; min-width:0; padding:12px; border:1px solid var(--border, #34434c); border-radius:9px; }
-.real-estate-texture-heading { display:flex; justify-content:space-between; align-items:center; gap:12px; }
-.real-estate-reuse-toggle { display:inline-flex; align-items:center; gap:6px; }
-.real-estate-texture-owned { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:end; }
-.real-estate-texture-owned label, .real-estate-texture-shared label { min-width:0; }
-.real-estate-texture-shared { display:flex; flex-direction:column; gap:6px; }
+/* Per-mesh editors: the heading, flags and atlas picker each own a full row.
+   Never put mesh labels in a fixed-width grid column: long names must wrap. */
+#real-estate-mesh-textures { display:flex; flex-direction:column; gap:9px; min-width:0; }
+#real-estate-mesh-textures .real-estate-texture-row {
+  display:flex; flex-direction:column; align-items:stretch;
+  gap:9px; min-width:0; max-width:100%; padding:11px 12px;
+  border:1px solid var(--line); border-radius:10px;
+}
 .real-estate-texture-row [hidden] { display:none !important; }
-
-/* M108: compact aligned per-mesh rows; retained vertical list of meshes. */
-#real-estate-mesh-textures { gap:6px; }
-.real-estate-texture-row { display:grid; grid-template-columns:112px minmax(0,1fr); gap:8px 12px; align-items:center; padding:7px 10px; border-radius:7px; }
-.real-estate-texture-heading { align-items:center; gap:8px; width:100%; min-width:0; }
-.real-estate-texture-heading strong { font-size:12px; min-width:0; flex:1 1 auto; overflow-wrap:anywhere; word-break:break-word; }
-.real-estate-reuse-toggle { font-size:11px; white-space:nowrap; flex:0 0 auto; margin-left:auto; }
-.real-estate-reuse-toggle input { flex:none; width:auto; margin:0; }
-.real-estate-texture-owned { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:4px 7px; align-items:center; }
-.real-estate-texture-owned select, .real-estate-texture-shared select { width:max-content; max-width:100%; min-width:0; field-sizing:content; }
-.real-estate-texture-owned button { padding:5px 9px; white-space:nowrap; }
-.real-estate-texture-shared { gap:3px; }
-.real-estate-texture-shared .hint { font-size:10px; }
-.real-estate-texture-path { grid-column:1 / -1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; }
+.real-estate-texture-heading {
+  display:flex; align-items:baseline; flex-wrap:wrap; gap:5px 10px;
+  min-width:0; padding-bottom:2px;
+}
+.real-estate-texture-heading .real-estate-mesh-name {
+  display:block; flex:1 1 130px; min-width:0;
+  color:var(--text); font-size:13px; font-weight:750;
+  overflow-wrap:anywhere; word-break:normal;
+}
+.real-estate-mesh-kind { font-size:10px; color:var(--muted); white-space:nowrap; }
+.real-estate-mesh-switches { display:flex; flex-wrap:wrap; gap:6px 8px; min-width:0; }
+#real-estate-mesh-textures .real-estate-mesh-switches label {
+  display:inline-flex; align-items:center; justify-content:flex-start;
+  gap:6px; width:auto; max-width:100%; min-width:0; margin:0;
+  padding:6px 9px; border:1px solid var(--line); border-radius:7px;
+  background:var(--panel2); color:var(--text); font-size:11px;
+  line-height:1.25; white-space:nowrap; cursor:pointer;
+}
+#real-estate-mesh-textures .real-estate-mesh-switches input[type="checkbox"] {
+  appearance:auto; display:inline-block; flex:0 0 auto;
+  width:14px; height:14px; min-width:14px; margin:0; padding:0;
+  accent-color:var(--mint);
+}
+.real-estate-texture-owned {
+  display:grid; grid-template-columns:minmax(0,1fr) auto;
+  gap:6px 8px; align-items:center; min-width:0;
+}
+#real-estate-view .real-estate-texture-owned select,
+#real-estate-view .real-estate-texture-shared select {
+  display:block; width:100%; max-width:100%; min-width:0;
+  field-sizing:fixed;
+}
+.real-estate-texture-owned button { width:auto; max-width:100%; padding:7px 10px; white-space:nowrap; }
+.real-estate-texture-path {
+  grid-column:1 / -1; display:block; min-width:0; max-width:100%;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  margin:0; font-size:10px; line-height:1.4; color:var(--muted);
+}
+.real-estate-texture-shared { display:flex; flex-direction:column; gap:6px; min-width:0; }
+.real-estate-texture-shared .hint { font-size:10px; margin:0; line-height:1.5; }
 .real-estate-bone-details { padding:8px 10px; border:1px solid var(--border, #34434c); border-radius:7px; }
 .real-estate-bone-details summary { cursor:pointer; font-size:12px; }
 .real-estate-bone-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(155px,1fr)); gap:8px; margin-top:9px; }
@@ -45,14 +65,13 @@
 .real-estate-rig-warnings { padding:9px 11px; border:1px solid #bd9357; border-radius:7px; font-size:12px; }
 .real-estate-rig-warnings ul { margin:5px 0; padding-left:18px; }
 .real-estate-rig-warnings[hidden] { display:none !important; }
-@media(max-width:640px){ .real-estate-texture-row { grid-template-columns:minmax(0,1fr); gap:6px; } .real-estate-texture-heading { justify-content:space-between; } }
 
 /* Reuse source filtering stays compact, including in narrow editors. */
 .real-estate-reuse-filters { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:6px; }
 .real-estate-reuse-filters input { min-width:0; width:100%; box-sizing:border-box; }
-.real-estate-reuse-filters select { min-width:0; width:max-content; max-width:100%; field-sizing:content; }
+.real-estate-reuse-filters select { min-width:0; max-width:100%; }
 .real-estate-texture-shared > select { min-width:0; }
-@media(max-width:580px){ .real-estate-reuse-filters { grid-template-columns:minmax(0,1fr); } }
+@media(max-width:580px){ .real-estate-reuse-filters { grid-template-columns:minmax(0,1fr); } .real-estate-texture-owned { grid-template-columns:minmax(0,1fr); } .real-estate-texture-owned button { justify-self:start; } }
 
 
 /* Estate selectors use their option content, never overflow the panel. */
@@ -82,11 +101,16 @@
 .real-estate-atlas-filters label {display:grid;gap:4px;font-size:12px;min-width:180px;}
 .real-estate-atlas-filters select {max-width:300px;width:100%;}
 .real-estate-atlas-filters + .table-wrap table {width:100%;}
-.real-estate-glass-toggle {display:inline-flex;align-items:center;gap:4px;font-size:11px;white-space:nowrap;}
-.real-estate-glass-toggle input {width:auto;flex:none;margin:0;}
 .real-estate-delete {border-color:#9a5454;color:#df9999;}
-@media(max-width:740px) {.real-estate-texture-heading {flex-wrap:wrap;} .real-estate-atlas-filters label {flex:1;}}
+@media(max-width:740px) {.real-estate-atlas-filters label {flex:1;}}
 
 /* M131: FBX socket roles (read-only authoring diagnostics). */
 .real-estate-rig-mode { display:block; color:var(--text-muted,#9da9b3); font-size:11px; margin-top:5px; }
 .real-estate-bone-role { display:inline-block; margin-left:6px; padding:0 4px; border:1px solid var(--border,#34434c); border-radius:4px; font-size:10px; color:var(--text-muted,#9da9b3); }
+
+/* M134: Physics-only meshes are distinct from atlas consumers. */
+.real-estate-physics-badge { color:var(--mint); font-size:10px; font-weight:700; white-space:nowrap; }
+#real-estate-mesh-textures .real-estate-collider-row { border-style:dashed; background:color-mix(in srgb,var(--mint) 5%,transparent); }
+.real-estate-collider-note { display:block; margin:0; color:var(--muted); font-size:11px; line-height:1.5; }
+
+.real-estate-physics-caution { font-size: 12px; line-height: 1.4; color: var(--warning, #d0a351); }

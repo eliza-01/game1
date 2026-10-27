@@ -28,7 +28,7 @@ class StudioRealEstateOptionalSocketsM132(unittest.TestCase):
     def test_validation_is_separate_from_template_assembly(self):
         self.assertIn('StudioRealEstateRigValidation.Verify(rig, part, manifests[part])', self.assembler)
         self.assertNotIn('authored socket ', self.assembler)
-        self.assertIn('local function findMesh(', self.validator)
+        self.assertIn('function Validation.FindMesh(', self.validator)
 
     def test_only_missing_hinge_blocks_sync(self):
         self.assertIn('required hinge Bone', self.validator)
@@ -54,7 +54,7 @@ class StudioRealEstateOptionalSocketsM132(unittest.TestCase):
         self.assertIn('missingSockets = missingSockets, rigWarnings = rigWarnings', self.assembler)
         ui = (ROOT / 'system/control-center/static/real-estate.js').read_text(encoding='utf-8')
         self.assertIn('const missing=stats.missingSockets||[];', ui)
-        self.assertIn('socket(s) missing from published models', ui)
+        self.assertIn('socket(s) unavailable', ui)
 
     def test_failed_sync_only_removes_new_empty_destination_folders(self):
         self.assertIn('local createdFolders: {Folder} = {}', self.loader)

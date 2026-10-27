@@ -172,7 +172,7 @@
 
 <div id="real-estate-view" hidden>
 <div class="panel hero"><div><span class="eyebrow">property authoring · Real Estate</span><h2>real estate</h2>
-<p>Register an FBX containing the <code>house</code> mesh and any number of additional meshes (e.g. <code>door</code>, <code>restoration</code>, <code>glass</code>, <code>stone_fence_01_kit</code>). Each mesh gets its own texture and independent published Model Asset. The <code>house_armature</code> is required for the house. Door and interaction bones are optional.</p></div></div>
+<p>Register an FBX containing the <code>house</code> mesh and any number of additional meshes (e.g. <code>door</code>, <code>restoration</code>, <code>glass</code>, <code>stone_fence_01_kit</code>). Visual meshes use atlases, while <code>COL_</code> meshes use a physics-only Model Asset with no texture. The <code>house_armature</code> is required for the house. Door and interaction bones are optional.</p></div></div>
 <div class="real-estate-workflow">
 <div class="panel character-card">
 <span class="eyebrow">01 · house identity</span><h3>register house</h3>
@@ -182,7 +182,7 @@
 <div class="details">asset slug: <strong id="real-estate-slug">house_level1_01</strong></div>
 <div class="character-grid"><label>purchase price<input id="real-estate-purchase" type="number" min="1" value="1" step="1"></label><label>minimum purchase level<input id="real-estate-min-level" type="number" min="1" value="1" step="1"></label><label>sale price<input id="real-estate-sale" type="number" min="1" value="1" step="1"></label></div>
 <hr class="card-separator"><span class="eyebrow">02 · mesh textures</span><h3>per-mesh textures</h3>
-<p class="hint">Select one texture for each inspected mesh. Choose <code>.webp</code>, <code>.png</code>, <code>.jpg</code> or <code>.jpeg</code> from the FBX folder or Windows Explorer. WebP is converted to PNG when publishing.</p>
+<p class="hint">Choose an atlas for each visual mesh, or enable <strong>Reuse atlas</strong>. <code>COL_</code> / <code>_col</code> meshes are physics-only: they have no texture and default to collision enabled. All other meshes default to <strong>No Collide</strong>.</p>
 <div id="real-estate-mesh-textures" class="real-estate-texture-list"></div>
 <div id="real-estate-rig-warnings" class="real-estate-rig-warnings" hidden></div>
 <details id="real-estate-rig-details" class="real-estate-bone-details"><summary id="real-estate-rig">choose an FBX to inspect its mesh bones</summary><div id="real-estate-bone-list" class="real-estate-bone-list"></div></details>

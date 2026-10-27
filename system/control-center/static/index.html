@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="asset-manager.css?v=10">
 <link rel="stylesheet" href="location-assets.css?v=1">
 <link rel="stylesheet" href="deco-assets.css?v=5">
-<link rel="stylesheet" href="real-estate.css?v=8">
+<link rel="stylesheet" href="real-estate.css?v=9">
 </head>
 <body>
 <header>
@@ -172,7 +172,7 @@
 
 <div id="real-estate-view" hidden>
 <div class="panel hero"><div><span class="eyebrow">property authoring · Real Estate</span><h2>real estate</h2>
-<p>Register an FBX containing the <code>house</code> mesh and any number of additional meshes (e.g. <code>door</code>, <code>repair</code>, <code>stone_fence_01_kit</code>). Each mesh gets its own texture and independent published Model Asset. The <code>house_armature</code> is required for the house. Door and interaction bones are optional.</p></div></div>
+<p>Register an FBX containing the <code>house</code> mesh and any number of additional meshes (e.g. <code>door</code>, <code>restoration</code>, <code>glass</code>, <code>stone_fence_01_kit</code>). Each mesh gets its own texture and independent published Model Asset. The <code>house_armature</code> is required for the house. Door and interaction bones are optional.</p></div></div>
 <div class="real-estate-workflow">
 <div class="panel character-card">
 <span class="eyebrow">01 · house identity</span><h3>register house</h3>
@@ -194,6 +194,10 @@
 <div id="real-estate-publish-status" class="status-box">register a house first</div>
 <div class="actions"><button id="real-estate-publish" class="primary" type="button" disabled>publish changed assets</button><button id="real-estate-sync" type="button" disabled>sync Studio → ServerStorage</button></div>
 <small class="hint">After publishing, Sync Studio imports the complete house model with its selected textures into ServerStorage/real_estate/&lt;slug&gt;/model. House ownership/placement are future stages.</small>
+<div class="real-estate-library"><div class="section-title"><div><span>central atlas registry</span><h3>uploaded atlases <small id="real-estate-atlas-count">0</small></h3></div></div>
+<p class="hint">Shared across Location Assets and Real Estate. Republish always creates a NEW Roblox Image Asset ID; current consumers switch after successful upload. Legacy texture names must first be migrated to standard-named atlas variants.</p>
+<div class="real-estate-atlas-filters"><label>house<select id="real-estate-atlas-house"><option value="">all houses</option></select></label><label>show<select id="real-estate-atlas-mode"><option value="all">all registered atlases</option><option value="used">used by this house</option><option value="related">used or named for this house</option></select></label></div>
+<div class="table-wrap"><table><thead><tr><th>atlas / filename</th><th>resolution</th><th>Roblox Image ID</th><th>Real Estate users</th><th>action</th></tr></thead><tbody id="real-estate-atlas-rows"></tbody></table></div></div>
 <div class="real-estate-library"><div class="section-title"><div><span>registered library</span><h3>houses <small id="real-estate-library-count">0</small></h3></div><button id="real-estate-library-refresh" type="button">refresh</button></div><div class="table-wrap"><table><thead><tr><th>house</th><th>economy</th><th>source textures</th><th>assets</th><th>actions</th></tr></thead><tbody id="real-estate-library-rows"></tbody></table></div><small class="hint">Replace FBX or either texture independently. Each replacement is saved immediately. Publish the changed Model/Image as a NEW Roblox Asset ID; other published IDs remain unchanged. Sync Studio after every present mesh and its texture is current.</small></div>
 </div></div></div>
 <div id="locations-view" hidden></div>
@@ -535,7 +539,7 @@
 <script src="monster-assets.js?v=6"></script>
 <script src="npc-assets.js?v=5"></script>
 <script src="npc-spawns.js?v=4"></script>
-<script src="real-estate.js?v=12"></script>
+<script src="real-estate.js?v=13"></script>
 <script src="monster-spawns.js?v=1"></script>
 </body>
 </html>

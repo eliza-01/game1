@@ -68,7 +68,7 @@ if(cx.realEstatePublicationBusy('house_level5_01')!==false)process.exit(4);
         self.assertIn('for _, part in parts do',lua)
         self.assertIn('pcall(function()',lua)
         self.assertIn('wrapper.Parent = destination',lua)
-        self.assertLess(lua.index('verifyRig(rig, part, manifests)'),lua.index('wrapper.Parent = destination'))
+        self.assertLess(lua.index('StudioRealEstateRigValidation.Verify(rig, part, manifests[part])'),lua.index('wrapper.Parent = destination'))
         self.assertIn('Game1RigAssetIds',lua)
 
 

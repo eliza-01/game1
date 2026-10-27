@@ -1,0 +1,414 @@
+{
+  "$schema": "Eyesland Custom Character Skeleton Contract v1 (internal)",
+  "version": "1.0.0",
+  "role": "BIND_POSE_AND_SWAP_CONTRACT",
+  "master_armature": "ARM_EYESLAND",
+  "source_axes": {
+    "up": "+Z",
+    "forward": "-Y",
+    "left": "+X",
+    "mirror_plane": "X=0",
+    "left_suffix": ".L",
+    "right_suffix": ".R"
+  },
+  "source_units": "meters",
+  "reference_height_m": 1.7,
+  "reference_rest_pose": "symmetric_A_pose_20_to_30_degree",
+  "max_bone_influences_per_vertex": 4,
+  "root_has_no_weights": true,
+  "default_texture_atlas_max_px": [
+    1024,
+    1024
+  ],
+  "bones": [
+    {
+      "name": "root",
+      "parent": null,
+      "deform": false,
+      "role": "world_anchor"
+    },
+    {
+      "name": "pelvis",
+      "parent": "root",
+      "deform": true,
+      "role": "deform"
+    },
+    {
+      "name": "spine_01",
+      "parent": "pelvis",
+      "deform": true,
+      "role": "deform"
+    },
+    {
+      "name": "spine_02",
+      "parent": "spine_01",
+      "deform": true,
+      "role": "deform"
+    },
+    {
+      "name": "neck",
+      "parent": "spine_02",
+      "deform": true,
+      "role": "deform"
+    },
+    {
+      "name": "head",
+      "parent": "neck",
+      "deform": true,
+      "role": "deform"
+    },
+    {
+      "name": "hair_mount",
+      "parent": "head",
+      "deform": false,
+      "role": "attachment"
+    },
+    {
+      "name": "cape_mount",
+      "parent": "spine_02",
+      "deform": false,
+      "role": "attachment"
+    },
+    {
+      "name": "cape_clasp.L",
+      "parent": "cape_mount",
+      "deform": false,
+      "role": "attachment",
+      "side": "L"
+    },
+    {
+      "name": "cape_clasp.R",
+      "parent": "cape_mount",
+      "deform": false,
+      "role": "attachment",
+      "side": "R"
+    },
+    {
+      "name": "back_mount",
+      "parent": "spine_02",
+      "deform": false,
+      "role": "attachment"
+    },
+    {
+      "name": "clavicle.L",
+      "parent": "spine_02",
+      "deform": true,
+      "role": "deform",
+      "side": "L"
+    },
+    {
+      "name": "upper_arm.L",
+      "parent": "clavicle.L",
+      "deform": true,
+      "role": "deform",
+      "side": "L"
+    },
+    {
+      "name": "forearm.L",
+      "parent": "upper_arm.L",
+      "deform": true,
+      "role": "deform",
+      "side": "L"
+    },
+    {
+      "name": "hand.L",
+      "parent": "forearm.L",
+      "deform": true,
+      "role": "deform",
+      "side": "L"
+    },
+    {
+      "name": "weapon_grip.L",
+      "parent": "hand.L",
+      "deform": false,
+      "role": "attachment",
+      "side": "L"
+    },
+    {
+      "name": "shield_mount.L",
+      "parent": "forearm.L",
+      "deform": false,
+      "role": "attachment",
+      "side": "L"
+    },
+    {
+      "name": "shoulder_mount.L",
+      "parent": "upper_arm.L",
+      "deform": false,
+      "role": "attachment",
+      "side": "L"
+    },
+    {
+      "name": "thigh.L",
+      "parent": "pelvis",
+      "deform": true,
+      "role": "deform",
+      "side": "L"
+    },
+    {
+      "name": "shin.L",
+      "parent": "thigh.L",
+      "deform": true,
+      "role": "deform",
+      "side": "L"
+    },
+    {
+      "name": "foot.L",
+      "parent": "shin.L",
+      "deform": true,
+      "role": "deform",
+      "side": "L"
+    },
+    {
+      "name": "toe.L",
+      "parent": "foot.L",
+      "deform": true,
+      "role": "deform",
+      "side": "L"
+    },
+    {
+      "name": "clavicle.R",
+      "parent": "spine_02",
+      "deform": true,
+      "role": "deform",
+      "side": "R"
+    },
+    {
+      "name": "upper_arm.R",
+      "parent": "clavicle.R",
+      "deform": true,
+      "role": "deform",
+      "side": "R"
+    },
+    {
+      "name": "forearm.R",
+      "parent": "upper_arm.R",
+      "deform": true,
+      "role": "deform",
+      "side": "R"
+    },
+    {
+      "name": "hand.R",
+      "parent": "forearm.R",
+      "deform": true,
+      "role": "deform",
+      "side": "R"
+    },
+    {
+      "name": "weapon_grip.R",
+      "parent": "hand.R",
+      "deform": false,
+      "role": "attachment",
+      "side": "R"
+    },
+    {
+      "name": "shield_mount.R",
+      "parent": "forearm.R",
+      "deform": false,
+      "role": "attachment",
+      "side": "R"
+    },
+    {
+      "name": "shoulder_mount.R",
+      "parent": "upper_arm.R",
+      "deform": false,
+      "role": "attachment",
+      "side": "R"
+    },
+    {
+      "name": "thigh.R",
+      "parent": "pelvis",
+      "deform": true,
+      "role": "deform",
+      "side": "R"
+    },
+    {
+      "name": "shin.R",
+      "parent": "thigh.R",
+      "deform": true,
+      "role": "deform",
+      "side": "R"
+    },
+    {
+      "name": "foot.R",
+      "parent": "shin.R",
+      "deform": true,
+      "role": "deform",
+      "side": "R"
+    },
+    {
+      "name": "toe.R",
+      "parent": "foot.R",
+      "deform": true,
+      "role": "deform",
+      "side": "R"
+    }
+  ],
+  "base_meshes": [
+    {
+      "name": "B_HEAD",
+      "default_weight_bones": [
+        "head",
+        "neck"
+      ],
+      "centered": true
+    },
+    {
+      "name": "B_TORSO",
+      "default_weight_bones": [
+        "spine_01",
+        "spine_02",
+        "neck",
+        "clavicle.L",
+        "clavicle.R"
+      ],
+      "centered": true
+    },
+    {
+      "name": "B_HIPS",
+      "default_weight_bones": [
+        "pelvis",
+        "spine_01",
+        "thigh.L",
+        "thigh.R"
+      ],
+      "centered": true
+    },
+    {
+      "name": "B_UPPER_ARM.L",
+      "default_weight_bones": [
+        "clavicle.L",
+        "upper_arm.L",
+        "forearm.L"
+      ],
+      "centered": false,
+      "side": "L"
+    },
+    {
+      "name": "B_UPPER_ARM.R",
+      "default_weight_bones": [
+        "clavicle.R",
+        "upper_arm.R",
+        "forearm.R"
+      ],
+      "centered": false,
+      "side": "R"
+    },
+    {
+      "name": "B_FOREARM.L",
+      "default_weight_bones": [
+        "upper_arm.L",
+        "forearm.L",
+        "hand.L"
+      ],
+      "centered": false,
+      "side": "L"
+    },
+    {
+      "name": "B_FOREARM.R",
+      "default_weight_bones": [
+        "upper_arm.R",
+        "forearm.R",
+        "hand.R"
+      ],
+      "centered": false,
+      "side": "R"
+    },
+    {
+      "name": "B_HAND.L",
+      "default_weight_bones": [
+        "hand.L"
+      ],
+      "centered": false,
+      "side": "L"
+    },
+    {
+      "name": "B_HAND.R",
+      "default_weight_bones": [
+        "hand.R"
+      ],
+      "centered": false,
+      "side": "R"
+    },
+    {
+      "name": "B_THIGH.L",
+      "default_weight_bones": [
+        "pelvis",
+        "thigh.L",
+        "shin.L"
+      ],
+      "centered": false,
+      "side": "L"
+    },
+    {
+      "name": "B_THIGH.R",
+      "default_weight_bones": [
+        "pelvis",
+        "thigh.R",
+        "shin.R"
+      ],
+      "centered": false,
+      "side": "R"
+    },
+    {
+      "name": "B_SHIN.L",
+      "default_weight_bones": [
+        "thigh.L",
+        "shin.L",
+        "foot.L"
+      ],
+      "centered": false,
+      "side": "L"
+    },
+    {
+      "name": "B_SHIN.R",
+      "default_weight_bones": [
+        "thigh.R",
+        "shin.R",
+        "foot.R"
+      ],
+      "centered": false,
+      "side": "R"
+    },
+    {
+      "name": "B_FOOT.L",
+      "default_weight_bones": [
+        "foot.L",
+        "toe.L"
+      ],
+      "centered": false,
+      "side": "L"
+    },
+    {
+      "name": "B_FOOT.R",
+      "default_weight_bones": [
+        "foot.R",
+        "toe.R"
+      ],
+      "centered": false,
+      "side": "R"
+    }
+  ],
+  "required_exported_production_mesh_count": 15,
+  "attach_rules": {
+    "weapon_grip.L": "hand.L",
+    "weapon_grip.R": "hand.R",
+    "shield_mount.L": "forearm.L",
+    "shield_mount.R": "forearm.R",
+    "shoulder_mount.L": "upper_arm.L",
+    "shoulder_mount.R": "upper_arm.R",
+    "cape_mount": "spine_02",
+    "cape_clasp.L": "cape_mount",
+    "cape_clasp.R": "cape_mount",
+    "hair_mount": "head",
+    "back_mount": "spine_02"
+  },
+  "acceptance": {
+    "pair_mesh_xyz_mirror_max_distance_source_units": 1e-05,
+    "pair_bone_mirror_max_distance_source_units": 1e-05,
+    "pair_skin_weights_abs_diff_max": 0.0001,
+    "weight_sum_abs_diff_max": 0.0001,
+    "critical_tests_must_have_evidence": true
+  },
+  "authoring_note": "Contract defines names & parents; actual bind matrices, pivot positions and local attachment orientations must be created in Blender and exported into attachment_local_frames.json. Do not invent a claim of original L2 client bone nomenclature."
+}

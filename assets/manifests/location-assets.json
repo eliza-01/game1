@@ -94,6 +94,32 @@
       ]
     },
     {
+      "atlasKey": "house_level4_01",
+      "variants": [
+        {
+          "id": 5,
+          "family_id": 4,
+          "width": 4096,
+          "height": 4096,
+          "filename": "house_level4_01_4096x4096_atlas.png",
+          "original_filename": "house_level4_01_4096x4096_atlas.png",
+          "source_path": "assets/source/texture-atlases/house_level4_01/4096x4096/house_level4_01_4096x4096_atlas.png",
+          "source_sha256": "a6a63fa8cb93d67995da16d3c211357f698535dc0118b55be357e23d3424c307",
+          "uses_alpha": false,
+          "published_id": "92116826074029",
+          "published_sha256": "a6a63fa8cb93d67995da16d3c211357f698535dc0118b55be357e23d3424c307",
+          "moderation_state": "Reviewing",
+          "published_at": 1793090925.4210222,
+          "created_at": 1793090824.8330345,
+          "atlas_key": "house_level4_01",
+          "replacement_sha256": null,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "4096x4096"
+        }
+      ]
+    },
+    {
       "atlasKey": "lantern_01",
       "variants": [
         {

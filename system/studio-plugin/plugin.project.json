@@ -64,6 +64,9 @@
       "StudioRealEstateModel": {
         "$path": "modules/StudioRealEstateModel.luau"
       },
+      "StudioRealEstateRigValidation": {
+        "$path": "modules/StudioRealEstateRigValidation.luau"
+      },
       "StudioActorSpawnCommands": {
         "$path": "modules/StudioActorSpawnCommands.luau"
       },

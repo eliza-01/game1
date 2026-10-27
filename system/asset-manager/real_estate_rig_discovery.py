@@ -25,13 +25,6 @@ def find_rig(bpy, mesh, part):
         raise RuntimeError(f"'{part}' references more than one armature. Use one armature per mesh.")
     if unique:
         return unique[0]
-    candidates = [obj for obj in bpy.context.scene.objects if obj.type == 'ARMATURE']
-    expected = part + '_armature'
-    exact = [obj for obj in candidates if obj.name.casefold() == expected]
-    if len(exact) == 1:
-        return exact[0]
-    prefixed = [obj for obj in candidates if obj.name.casefold().startswith(expected + '.')]
-    if len(prefixed) == 1:
-        return prefixed[0]
-    # No unambiguous owner: do not guess and accidentally merge independent rigs.
+    # A similarly named armature is NOT a link. In particular, a separate
+    # chest/door rig in the same Blender scene must never be adopted by name.
     return None

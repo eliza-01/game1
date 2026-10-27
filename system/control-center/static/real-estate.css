@@ -76,3 +76,17 @@
 .real-estate-texture-line { padding:2px 0 6px; overflow-wrap:anywhere; }
 .real-estate-texture-filename { color:var(--mint); }
 .real-estate-atlas-dots { margin:2px 0 0; }
+
+/* M130 · Shared atlas list, glass mesh options, safe retirement. */
+.real-estate-atlas-filters {display:flex;flex-wrap:wrap;gap:12px;margin:10px 0;}
+.real-estate-atlas-filters label {display:grid;gap:4px;font-size:12px;min-width:180px;}
+.real-estate-atlas-filters select {max-width:300px;width:100%;}
+.real-estate-atlas-filters + .table-wrap table {width:100%;}
+.real-estate-glass-toggle {display:inline-flex;align-items:center;gap:4px;font-size:11px;white-space:nowrap;}
+.real-estate-glass-toggle input {width:auto;flex:none;margin:0;}
+.real-estate-delete {border-color:#9a5454;color:#df9999;}
+@media(max-width:740px) {.real-estate-texture-heading {flex-wrap:wrap;} .real-estate-atlas-filters label {flex:1;}}
+
+/* M131: FBX socket roles (read-only authoring diagnostics). */
+.real-estate-rig-mode { display:block; color:var(--text-muted,#9da9b3); font-size:11px; margin-top:5px; }
+.real-estate-bone-role { display:inline-block; margin-left:6px; padding:0 4px; border:1px solid var(--border,#34434c); border-radius:4px; font-size:10px; color:var(--text-muted,#9da9b3); }

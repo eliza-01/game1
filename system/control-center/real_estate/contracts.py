@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import re
 
+from .rig_features import feature_warnings
+
 HOUSE_NAME = re.compile(r"^(?P<kind>[a-z][a-z0-9_]*)_level(?P<level>[1-9][0-9]*)_(?P<variant>[0-9]+)$")
 SLUG = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 REQUIRED_MESH = "house"
@@ -79,16 +81,12 @@ def warnings_for_analysis(value: dict) -> list[dict]:
              'Required house_armature is missing or not assigned to mesh house.')
     if door is None:
         warn('door', 'missing_door', 'Optional mesh door is missing. Houses without doors are supported.')
-    else:
-        if not door.get('armature'):
-            warn('door', 'missing_door_armature', 'door is present without door_armature (optional).')
-        else:
-            door_bones = {b.get('name') for b in door.get('bones', []) if isinstance(b, dict)}
-            if 'door_bone' not in door_bones:
-                warn('door', 'missing_door_bone', 'door_armature has no door_bone (optional).')
-    house_bones = {b.get('name') for b in (house or {}).get('bones', []) if isinstance(b, dict)}
-    if house is not None and 'chimney_bone' not in house_bones:
-        warn('house', 'missing_chimney_bone', 'house_armature has no chimney_bone (optional).')
+    elif not door.get('armature'):
+        warn('door', 'missing_door_armature', 'door is present without a linked door_armature (optional).')
+    # New standard: sockets describe attachment/interaction sites; a missing
+    # socket is not itself proof that an optional feature is authored. In a
+    # hinge-enabled door, however, hierarchy and rigid skinning must agree.
+    warnings.extend(feature_warnings(value))
 
     for name in value.get('unassignedArmatures', []):
         warn('', 'unassigned_armature',
@@ -189,5 +187,7 @@ def assert_rig_survived(expected: dict, actual: dict, part: str) -> None:
             for x,y in zip(before['matrixLocal'],after['matrixLocal'])
         ):
             raise ValueError(f'staged {part} changed rest pose for {name}')
-        if name not in new.get('influencedBones', []):
+        # Unweighted sockets are valid. Never inject artificial skin weights
+        # into a rigid hinge door merely to satisfy a stage-only assertion.
+        if name in old.get('influencedBones', []) and name not in new.get('influencedBones', []):
             raise ValueError(f'staged {part} lost weighted bone {name}')

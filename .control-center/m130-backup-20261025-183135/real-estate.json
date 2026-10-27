@@ -1,0 +1,1010 @@
+{
+  "schemaVersion": 2,
+  "items": [
+    {
+      "slug": "house_level1_01",
+      "house_type": "house",
+      "house_level": 1,
+      "variant": "01",
+      "purchase_price": 1,
+      "min_level": 1,
+      "sale_price": 1,
+      "model_path": "assets/source/real-estate/house_level1_01/model/house_level1_01.fbx",
+      "model_sha256": "43245d3b532c85dd2122a8499c58f6c8a1da4c355d10802ad5cb46830dd279a5",
+      "model_asset_id": "136874509194507",
+      "model_published_hash": "43245d3b532c85dd2122a8499c58f6c8a1da4c355d10802ad5cb46830dd279a5",
+      "model_moderation": "Approved",
+      "revision": 1,
+      "created_at": 1792373196.1647449,
+      "updated_at": 1792373232.730398,
+      "skeleton": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "house",
+            "armature": "house_armature",
+            "vertices": 1097,
+            "bones": [
+              {
+                "name": "sit_bone_01",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  -5e-07,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.5,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": []
+          }
+        ]
+      },
+      "rigWarnings": [
+        {
+          "part": "door",
+          "code": "missing_door",
+          "message": "Optional mesh door is missing. Houses without doors are supported."
+        },
+        {
+          "part": "house",
+          "code": "missing_chimney_bone",
+          "message": "house_armature has no chimney_bone (optional)."
+        }
+      ],
+      "meshParts": [
+        "house"
+      ],
+      "textures": {
+        "house": {
+          "path": "assets/source/real-estate/house_level1_01/textures/house.webp",
+          "sha256": "db637b108fc593c41c4d61601b4246ea56f32333b8560a05cfd26d31442fef90",
+          "reuseReference": "",
+          "assetId": "102868434686869",
+          "publishedSha256": "db637b108fc593c41c4d61601b4246ea56f32333b8560a05cfd26d31442fef90",
+          "publicationFormat": "png",
+          "atlasVariantId": null,
+          "atlasKey": "",
+          "atlasBindingRevision": 0,
+          "atlasSyncStatus": "",
+          "atlasLegacyWarning": true,
+          "atlasVariants": [],
+          "atlasCurrent": null
+        }
+      },
+      "rigAssets": {
+        "house": {
+          "assetId": "136874509194507",
+          "publishedSha256": "43245d3b532c85dd2122a8499c58f6c8a1da4c355d10802ad5cb46830dd279a5"
+        }
+      },
+      "publicationCurrent": {
+        "model": true,
+        "house": true
+      },
+      "status": "PUBLISHED"
+    },
+    {
+      "slug": "house_level2_01",
+      "house_type": "house",
+      "house_level": 2,
+      "variant": "01",
+      "purchase_price": 1,
+      "min_level": 1,
+      "sale_price": 1,
+      "model_path": "assets/source/real-estate/house_level2_01/model/house_level2_01.fbx",
+      "model_sha256": "3887982ea007cfc57939da8b8bc12f19519cc1b71e338a1abbe5fc0b255a1610",
+      "model_asset_id": "126480085682449",
+      "model_published_hash": "3887982ea007cfc57939da8b8bc12f19519cc1b71e338a1abbe5fc0b255a1610",
+      "model_moderation": "Approved",
+      "revision": 6,
+      "created_at": 1792210226.0261047,
+      "updated_at": 1792227826.390311,
+      "skeleton": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "house",
+            "armature": "house_armature",
+            "vertices": 5944,
+            "bones": [
+              {
+                "name": "chimney_bone",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  2e-07,
+                  64.1126862,
+                  2e-07,
+                  0.0,
+                  -1.0,
+                  35.8664856,
+                  0.0,
+                  1.0,
+                  0.0,
+                  184.2377625,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "item_01_bone",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  -43.9291611,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  -46.5865059,
+                  0.0,
+                  1.0,
+                  0.0,
+                  15.4885721,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "item_02_bone",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  2e-07,
+                  -89.8789368,
+                  2e-07,
+                  0.0,
+                  -1.0,
+                  33.6192131,
+                  0.0,
+                  1.0,
+                  0.0,
+                  37.5335159,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "item_03_bone",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  -76.9106903,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  -47.2023735,
+                  0.0,
+                  1.0,
+                  0.0,
+                  25.5473862,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "window_01_bone",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  -47.8788605,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  -26.9819794,
+                  0.0,
+                  1.0,
+                  0.0,
+                  54.7597847,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": []
+          },
+          {
+            "name": "door",
+            "armature": "door_armature",
+            "vertices": 232,
+            "bones": [
+              {
+                "name": "door_bone",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  -1.9e-06,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -1.9e-06,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": []
+          }
+        ]
+      },
+      "rigWarnings": [],
+      "meshParts": [
+        "house",
+        "door"
+      ],
+      "textures": {
+        "house": {
+          "path": "assets/source/real-estate/house_level2_01/textures/house.webp",
+          "sha256": "3d6afd16fbed440a061b42d905ffafa57582bf1df755c849b7be1fde7dc8eec6",
+          "assetId": "99301388099631",
+          "publishedSha256": "3d6afd16fbed440a061b42d905ffafa57582bf1df755c849b7be1fde7dc8eec6",
+          "publicationFormat": "png",
+          "atlasVariantId": null,
+          "atlasKey": "",
+          "atlasBindingRevision": 0,
+          "atlasSyncStatus": "",
+          "atlasLegacyWarning": true,
+          "atlasVariants": [],
+          "atlasCurrent": null
+        },
+        "door": {
+          "path": "assets/source/real-estate/house_level2_01/textures/door.png",
+          "sha256": "5d9feb07eaca9a27d4f46b6891aff4a0abe8befc2cb0d58729e4c0b70004c9c9",
+          "assetId": "86927818099561",
+          "publishedSha256": "5d9feb07eaca9a27d4f46b6891aff4a0abe8befc2cb0d58729e4c0b70004c9c9",
+          "publicationFormat": "source",
+          "atlasVariantId": null,
+          "atlasKey": "",
+          "atlasBindingRevision": 0,
+          "atlasSyncStatus": "",
+          "atlasLegacyWarning": true,
+          "atlasVariants": [],
+          "atlasCurrent": null
+        }
+      },
+      "rigAssets": {},
+      "publicationCurrent": {
+        "model": false,
+        "house": true,
+        "door": true
+      },
+      "status": "UPDATE_AVAILABLE"
+    },
+    {
+      "slug": "house_level5_01",
+      "house_type": "house",
+      "house_level": 5,
+      "variant": "01",
+      "purchase_price": 1,
+      "min_level": 1,
+      "sale_price": 1,
+      "model_path": "assets/source/real-estate/house_level5_01/model/house_level5_01.fbx",
+      "model_sha256": "46128429087153328602b202c8742e3c3523d8de3ab7f2ccdd59dfa7fe1b2f82",
+      "model_asset_id": "97310733558805",
+      "model_published_hash": "46128429087153328602b202c8742e3c3523d8de3ab7f2ccdd59dfa7fe1b2f82",
+      "model_moderation": "Approved",
+      "revision": 5,
+      "created_at": 1792326272.1038847,
+      "updated_at": 1792375388.0347662,
+      "skeleton": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "house",
+            "armature": "house_armature",
+            "vertices": 11115,
+            "bones": [
+              {
+                "name": "chimney_bone",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  -13.8282785,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  3.5811627,
+                  0.0,
+                  1.0,
+                  0.0,
+                  41.5055847,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "elevator_bone",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  2e-07,
+                  -7.481102,
+                  2e-07,
+                  0.0,
+                  -1.0,
+                  -7.4839854,
+                  0.0,
+                  1.0,
+                  0.0,
+                  17.2694283,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "floor1_spawn",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  -1.2143809,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  -3.0976295,
+                  0.0,
+                  1.0,
+                  0.0,
+                  6.3109736,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "floor2_spawn",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  -6.9595084,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  5.3698416,
+                  0.0,
+                  1.0,
+                  0.0,
+                  18.246315,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": []
+          },
+          {
+            "name": "door",
+            "armature": "door_armature",
+            "vertices": 479,
+            "bones": [
+              {
+                "name": "door_bone",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  4.365665,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  8.0041466,
+                  0.0,
+                  1.0,
+                  0.0,
+                  9.4761391,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [
+              "door_bone"
+            ]
+          },
+          {
+            "name": "repair",
+            "armature": "",
+            "vertices": 9495,
+            "bones": [],
+            "influencedBones": []
+          },
+          {
+            "name": "stone_fence_01_kit",
+            "armature": "",
+            "vertices": 14362,
+            "bones": [],
+            "influencedBones": []
+          }
+        ]
+      },
+      "rigWarnings": [],
+      "meshParts": [
+        "house",
+        "door",
+        "repair",
+        "stone_fence_01_kit"
+      ],
+      "textures": {
+        "house": {
+          "path": "assets/source/real-estate/house_level5_01/textures/house.png",
+          "sha256": "7ff84ce5562c7571f4a94df379ea2881364d2f4b193beee7bf135da7a22c4d1e",
+          "reuseReference": "",
+          "assetId": "137011316577762",
+          "publishedSha256": "7ff84ce5562c7571f4a94df379ea2881364d2f4b193beee7bf135da7a22c4d1e",
+          "publicationFormat": "source",
+          "atlasVariantId": null,
+          "atlasKey": "",
+          "atlasBindingRevision": 0,
+          "atlasSyncStatus": "",
+          "atlasLegacyWarning": true,
+          "atlasVariants": [],
+          "atlasCurrent": null
+        },
+        "door": {
+          "path": "assets/source/real-estate/house_level5_01/textures/door.png",
+          "sha256": "bb0b9bacd9336b86be8cc0affcc54cec67e98ec3a7ee10df74ed4b9a3d20c6eb",
+          "reuseReference": "",
+          "assetId": "98387048887358",
+          "publishedSha256": "bb0b9bacd9336b86be8cc0affcc54cec67e98ec3a7ee10df74ed4b9a3d20c6eb",
+          "publicationFormat": "source",
+          "atlasVariantId": null,
+          "atlasKey": "",
+          "atlasBindingRevision": 0,
+          "atlasSyncStatus": "",
+          "atlasLegacyWarning": true,
+          "atlasVariants": [],
+          "atlasCurrent": null
+        },
+        "repair": {
+          "path": "assets/source/real-estate/house_level5_01/textures/repair.png",
+          "sha256": "bb0b9bacd9336b86be8cc0affcc54cec67e98ec3a7ee10df74ed4b9a3d20c6eb",
+          "reuseReference": "",
+          "assetId": "122977374372900",
+          "publishedSha256": "bb0b9bacd9336b86be8cc0affcc54cec67e98ec3a7ee10df74ed4b9a3d20c6eb",
+          "publicationFormat": "source",
+          "atlasVariantId": null,
+          "atlasKey": "",
+          "atlasBindingRevision": 0,
+          "atlasSyncStatus": "",
+          "atlasLegacyWarning": true,
+          "atlasVariants": [],
+          "atlasCurrent": null
+        },
+        "stone_fence_01_kit": {
+          "reuseReference": "location:stone_fence_01",
+          "path": "assets/source/location-assets/fence/stone_fence_01/textures/stone_fence_01.jpg",
+          "sha256": "2f41320116f4b423de010f4c906b5b16eabc981c055bb4fc478c84437a95bb88",
+          "assetId": "119920676388867",
+          "publishedSha256": "2f41320116f4b423de010f4c906b5b16eabc981c055bb4fc478c84437a95bb88",
+          "publicationFormat": "source",
+          "atlasVariantId": null,
+          "atlasKey": "",
+          "atlasBindingRevision": 0,
+          "atlasSyncStatus": "",
+          "atlasLegacyWarning": true,
+          "atlasVariants": [],
+          "atlasCurrent": null
+        }
+      },
+      "rigAssets": {
+        "house": {
+          "assetId": "97310733558805",
+          "publishedSha256": "46128429087153328602b202c8742e3c3523d8de3ab7f2ccdd59dfa7fe1b2f82"
+        },
+        "door": {
+          "assetId": "71416945560950",
+          "publishedSha256": "46128429087153328602b202c8742e3c3523d8de3ab7f2ccdd59dfa7fe1b2f82"
+        },
+        "repair": {
+          "assetId": "128617718019866",
+          "publishedSha256": "46128429087153328602b202c8742e3c3523d8de3ab7f2ccdd59dfa7fe1b2f82"
+        },
+        "stone_fence_01_kit": {
+          "assetId": "76571004839323",
+          "publishedSha256": "46128429087153328602b202c8742e3c3523d8de3ab7f2ccdd59dfa7fe1b2f82"
+        }
+      },
+      "publicationCurrent": {
+        "model": true,
+        "house": true,
+        "door": true,
+        "repair": true,
+        "stone_fence_01_kit": true
+      },
+      "status": "PUBLISHED"
+    }
+  ],
+  "textureReferences": [
+    {
+      "reference": "location:weapon_shop",
+      "label": "Weapon Shop",
+      "slug": "weapon_shop",
+      "filename": "smithy.png",
+      "group": "location",
+      "category": "building",
+      "categoryLabel": "Buildings",
+      "path": "assets/source/location-assets/decoration/smithy/textures/smithy.png",
+      "sha256": "d5a4d7b01345f0ad009f62e9ec3e90cf0b8dd206840dbc82c1691f3f8d0d7872",
+      "assetId": "85123253798993"
+    },
+    {
+      "reference": "location:smithy",
+      "label": "smithy",
+      "slug": "smithy",
+      "filename": "smithy.png",
+      "group": "location",
+      "category": "building",
+      "categoryLabel": "Buildings",
+      "path": "assets/source/location-assets/decoration/smithy/textures/smithy.png",
+      "sha256": "d5a4d7b01345f0ad009f62e9ec3e90cf0b8dd206840dbc82c1691f3f8d0d7872",
+      "assetId": "85123253798993"
+    },
+    {
+      "reference": "location:bush_01",
+      "label": "bush_01",
+      "slug": "bush_01",
+      "filename": "christmas_tree.jpg",
+      "group": "location",
+      "category": "bush",
+      "categoryLabel": "Bushes",
+      "path": "assets/source/location-assets/tree/christmas_tree/textures/christmas_tree.jpg",
+      "sha256": "9de5d31b2ae82633f6f91ee9705040c4fd5c03d579424189faa9bafe03ce6386",
+      "assetId": "130407188742566"
+    },
+    {
+      "reference": "location:pillar_with_lantern",
+      "label": "Pillar with Lantern",
+      "slug": "pillar_with_lantern",
+      "filename": "main_statue.jpg",
+      "group": "location",
+      "category": "decoration",
+      "categoryLabel": "Decorations",
+      "path": "assets/source/location-assets/rock/main_statue/textures/main_statue.jpg",
+      "sha256": "8f8ade9148ff40e8b5933c6abeb5e2c55e68a95d89147d6b317cee7412c5e8bf",
+      "assetId": "128890927196285"
+    },
+    {
+      "reference": "location:wooden_post_01",
+      "label": "Wooden Post 01",
+      "slug": "wooden_post_01",
+      "filename": "wooden_post_kit.png",
+      "group": "location",
+      "category": "decoration",
+      "categoryLabel": "Decorations",
+      "path": "assets/source/location-assets/decoration/wooden_post_01/textures/wooden_post_01.png",
+      "sha256": "39bee931b1c93f1d6f0d00d32746676eb35f93eaf30c44ab2e1369cbd78bb119",
+      "assetId": "126928306131485"
+    },
+    {
+      "reference": "location:stone_fence_01",
+      "label": "Stone Fence 01",
+      "slug": "stone_fence_01",
+      "filename": "stone_fence_01.jpg",
+      "group": "location",
+      "category": "fence",
+      "categoryLabel": "Fences",
+      "path": "assets/source/location-assets/fence/stone_fence_01/textures/stone_fence_01.jpg",
+      "sha256": "2f41320116f4b423de010f4c906b5b16eabc981c055bb4fc478c84437a95bb88",
+      "assetId": "119920676388867"
+    },
+    {
+      "reference": "location:stone_fence_pillar_01",
+      "label": "Stone Fence Pillar 01",
+      "slug": "stone_fence_pillar_01",
+      "filename": "stone_fence_01.jpg",
+      "group": "location",
+      "category": "fence",
+      "categoryLabel": "Fences",
+      "path": "assets/source/location-assets/fence/stone_fence_01/textures/stone_fence_01.jpg",
+      "sha256": "2f41320116f4b423de010f4c906b5b16eabc981c055bb4fc478c84437a95bb88",
+      "assetId": "119920676388867"
+    },
+    {
+      "reference": "location:wooden_fence_01",
+      "label": "Wooden Fence 01",
+      "slug": "wooden_fence_01",
+      "filename": "stone_fence_01.jpg",
+      "group": "location",
+      "category": "fence",
+      "categoryLabel": "Fences",
+      "path": "assets/source/location-assets/fence/stone_fence_01/textures/stone_fence_01.jpg",
+      "sha256": "2f41320116f4b423de010f4c906b5b16eabc981c055bb4fc478c84437a95bb88",
+      "assetId": "119920676388867"
+    },
+    {
+      "reference": "location:wooden_fence_pillar_01",
+      "label": "Wooden Fence Pillar 01",
+      "slug": "wooden_fence_pillar_01",
+      "filename": "stone_fence_01.jpg",
+      "group": "location",
+      "category": "fence",
+      "categoryLabel": "Fences",
+      "path": "assets/source/location-assets/fence/stone_fence_01/textures/stone_fence_01.jpg",
+      "sha256": "2f41320116f4b423de010f4c906b5b16eabc981c055bb4fc478c84437a95bb88",
+      "assetId": "119920676388867"
+    },
+    {
+      "reference": "location:stone_ladder_01",
+      "label": "Stone Ladder 01",
+      "slug": "stone_ladder_01",
+      "filename": "stone_fence_01.jpg",
+      "group": "location",
+      "category": "ladder",
+      "categoryLabel": "Ladders",
+      "path": "assets/source/location-assets/fence/stone_fence_01/textures/stone_fence_01.jpg",
+      "sha256": "2f41320116f4b423de010f4c906b5b16eabc981c055bb4fc478c84437a95bb88",
+      "assetId": "119920676388867"
+    },
+    {
+      "reference": "location:wooden_bridge_bar_01",
+      "label": "Wooden Bridge Bar 01",
+      "slug": "wooden_bridge_bar_01",
+      "filename": "wooden_post_kit.png",
+      "group": "location",
+      "category": "ladder",
+      "categoryLabel": "Ladders",
+      "path": "assets/source/location-assets/ladder/wooden_bridge_bar_01/textures/wooden_bridge_bar_01.png",
+      "sha256": "39bee931b1c93f1d6f0d00d32746676eb35f93eaf30c44ab2e1369cbd78bb119",
+      "assetId": "140279314813624"
+    },
+    {
+      "reference": "location:campfirte_01",
+      "label": "Campfirte 01",
+      "slug": "campfirte_01",
+      "filename": "campfire_01_atlas.png",
+      "group": "location",
+      "category": "light",
+      "categoryLabel": "Lights",
+      "path": "assets/source/location-assets/decoration/campfirte_01/textures/campfirte_01.png",
+      "sha256": "75581e14ef29d79ec770681d4052b0aed172fd6595c02ebdb03727f794a546ef",
+      "assetId": "73384502057808"
+    },
+    {
+      "reference": "location:ground_torch_01",
+      "label": "Ground Torch 01",
+      "slug": "ground_torch_01",
+      "filename": "wall_torch_01.jpg",
+      "group": "location",
+      "category": "light",
+      "categoryLabel": "Lights",
+      "path": "assets/source/location-assets/light/wall_torch_01/textures/wall_torch_01.jpg",
+      "sha256": "f2e5349b2b7de2cac11340d2fb091ebd9bae397672e7cdcdba462db9466ec104",
+      "assetId": "133426040591241"
+    },
+    {
+      "reference": "location:ground_torch_02",
+      "label": "Ground Torch 02",
+      "slug": "ground_torch_02",
+      "filename": "wall_torch_01.jpg",
+      "group": "location",
+      "category": "light",
+      "categoryLabel": "Lights",
+      "path": "assets/source/location-assets/light/wall_torch_01/textures/wall_torch_01.jpg",
+      "sha256": "f2e5349b2b7de2cac11340d2fb091ebd9bae397672e7cdcdba462db9466ec104",
+      "assetId": "133426040591241"
+    },
+    {
+      "reference": "location:ground_torch_03",
+      "label": "Ground Torch 03",
+      "slug": "ground_torch_03",
+      "filename": "wall_torch_01.jpg",
+      "group": "location",
+      "category": "light",
+      "categoryLabel": "Lights",
+      "path": "assets/source/location-assets/light/wall_torch_01/textures/wall_torch_01.jpg",
+      "sha256": "f2e5349b2b7de2cac11340d2fb091ebd9bae397672e7cdcdba462db9466ec104",
+      "assetId": "133426040591241"
+    },
+    {
+      "reference": "location:lantern_01",
+      "label": "Lantern 01",
+      "slug": "lantern_01",
+      "filename": "lantern_01_64x128_atlas.png",
+      "group": "location",
+      "category": "light",
+      "categoryLabel": "Lights",
+      "path": "assets/source/texture-atlases/lantern_01/64x128/lantern_01_64x128_atlas.png",
+      "sha256": "ca9a12aacf3ad5305a6baa34baa728198a272b8d81188ae7163f915f7e1d992e",
+      "assetId": "111478705558346"
+    },
+    {
+      "reference": "location:lantern_02",
+      "label": "Lantern 02",
+      "slug": "lantern_02",
+      "filename": "wooden_post_kit.png",
+      "group": "location",
+      "category": "light",
+      "categoryLabel": "Lights",
+      "path": "assets/source/location-assets/ladder/wooden_bridge_bar_01/textures/wooden_bridge_bar_01.png",
+      "sha256": "39bee931b1c93f1d6f0d00d32746676eb35f93eaf30c44ab2e1369cbd78bb119",
+      "assetId": "140279314813624"
+    },
+    {
+      "reference": "location:wall_torch_01",
+      "label": "Wall Torch 01",
+      "slug": "wall_torch_01",
+      "filename": "wall_torch_01.jpg",
+      "group": "location",
+      "category": "light",
+      "categoryLabel": "Lights",
+      "path": "assets/source/location-assets/light/wall_torch_01/textures/wall_torch_01.jpg",
+      "sha256": "f2e5349b2b7de2cac11340d2fb091ebd9bae397672e7cdcdba462db9466ec104",
+      "assetId": "133426040591241"
+    },
+    {
+      "reference": "location:wall_torch_02",
+      "label": "Wall Torch 02",
+      "slug": "wall_torch_02",
+      "filename": "wall_torch_01.jpg",
+      "group": "location",
+      "category": "light",
+      "categoryLabel": "Lights",
+      "path": "assets/source/location-assets/light/wall_torch_01/textures/wall_torch_01.jpg",
+      "sha256": "f2e5349b2b7de2cac11340d2fb091ebd9bae397672e7cdcdba462db9466ec104",
+      "assetId": "133426040591241"
+    },
+    {
+      "reference": "location:wall_torch_03",
+      "label": "Wall Torch 03",
+      "slug": "wall_torch_03",
+      "filename": "wall_torch_01.jpg",
+      "group": "location",
+      "category": "light",
+      "categoryLabel": "Lights",
+      "path": "assets/source/location-assets/light/wall_torch_01/textures/wall_torch_01.jpg",
+      "sha256": "f2e5349b2b7de2cac11340d2fb091ebd9bae397672e7cdcdba462db9466ec104",
+      "assetId": "133426040591241"
+    },
+    {
+      "reference": "location:test_window_01",
+      "label": "Test Window 01",
+      "slug": "test_window_01",
+      "filename": "restoration_01_2048x2048_atlas.png",
+      "group": "location",
+      "category": "prop",
+      "categoryLabel": "Props",
+      "path": "assets/source/texture-atlases/restoration_01/2048x2048/revisions/2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683/restoration_01_2048x2048_atlas.png",
+      "sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
+      "assetId": "138456659862372"
+    },
+    {
+      "reference": "location:main_statue",
+      "label": "Main Statue",
+      "slug": "main_statue",
+      "filename": "main_statue.jpg",
+      "group": "location",
+      "category": "rock",
+      "categoryLabel": "Rocks",
+      "path": "assets/source/location-assets/rock/main_statue/textures/main_statue.jpg",
+      "sha256": "8f8ade9148ff40e8b5933c6abeb5e2c55e68a95d89147d6b317cee7412c5e8bf",
+      "assetId": "128890927196285"
+    },
+    {
+      "reference": "location:big_tree_01",
+      "label": "Big Tree 01",
+      "slug": "big_tree_01",
+      "filename": "big_tree_01_256x512_atlas.png",
+      "group": "location",
+      "category": "tree",
+      "categoryLabel": "Trees",
+      "path": "assets/source/texture-atlases/big_tree_01/256x512/big_tree_01_256x512_atlas.png",
+      "sha256": "3ab5e47e22c6dd4153fd6b90672308335cdc70ec7711d904581f14855edee8df",
+      "assetId": "134024944101662"
+    },
+    {
+      "reference": "location:birch_01",
+      "label": "Birch 01",
+      "slug": "birch_01",
+      "filename": "christmas_tree.jpg",
+      "group": "location",
+      "category": "tree",
+      "categoryLabel": "Trees",
+      "path": "assets/source/location-assets/tree/christmas_tree/textures/christmas_tree.jpg",
+      "sha256": "9de5d31b2ae82633f6f91ee9705040c4fd5c03d579424189faa9bafe03ce6386",
+      "assetId": "130407188742566"
+    },
+    {
+      "reference": "location:birch_02",
+      "label": "Birch 02",
+      "slug": "birch_02",
+      "filename": "christmas_tree.jpg",
+      "group": "location",
+      "category": "tree",
+      "categoryLabel": "Trees",
+      "path": "assets/source/location-assets/tree/christmas_tree/textures/christmas_tree.jpg",
+      "sha256": "9de5d31b2ae82633f6f91ee9705040c4fd5c03d579424189faa9bafe03ce6386",
+      "assetId": "130407188742566"
+    },
+    {
+      "reference": "location:christmas_tree",
+      "label": "Christmas Tree",
+      "slug": "christmas_tree",
+      "filename": "christmas_tree.jpg",
+      "group": "location",
+      "category": "tree",
+      "categoryLabel": "Trees",
+      "path": "assets/source/location-assets/tree/christmas_tree/textures/christmas_tree.jpg",
+      "sha256": "9de5d31b2ae82633f6f91ee9705040c4fd5c03d579424189faa9bafe03ce6386",
+      "assetId": "130407188742566"
+    },
+    {
+      "reference": "estate:house_level1_01:house",
+      "label": "house_level1_01 / house",
+      "slug": "house_level1_01",
+      "filename": "house.webp",
+      "group": "estate",
+      "category": "",
+      "categoryLabel": "",
+      "path": "assets/source/real-estate/house_level1_01/textures/house.webp",
+      "sha256": "db637b108fc593c41c4d61601b4246ea56f32333b8560a05cfd26d31442fef90",
+      "assetId": "102868434686869"
+    },
+    {
+      "reference": "estate:house_level2_01:house",
+      "label": "house_level2_01 / house",
+      "slug": "house_level2_01",
+      "filename": "house.webp",
+      "group": "estate",
+      "category": "",
+      "categoryLabel": "",
+      "path": "assets/source/real-estate/house_level2_01/textures/house.webp",
+      "sha256": "3d6afd16fbed440a061b42d905ffafa57582bf1df755c849b7be1fde7dc8eec6",
+      "assetId": "99301388099631"
+    },
+    {
+      "reference": "estate:house_level2_01:door",
+      "label": "house_level2_01 / door",
+      "slug": "house_level2_01",
+      "filename": "door.png",
+      "group": "estate",
+      "category": "",
+      "categoryLabel": "",
+      "path": "assets/source/real-estate/house_level2_01/textures/door.png",
+      "sha256": "5d9feb07eaca9a27d4f46b6891aff4a0abe8befc2cb0d58729e4c0b70004c9c9",
+      "assetId": "86927818099561"
+    },
+    {
+      "reference": "estate:house_level5_01:house",
+      "label": "house_level5_01 / house",
+      "slug": "house_level5_01",
+      "filename": "house.png",
+      "group": "estate",
+      "category": "",
+      "categoryLabel": "",
+      "path": "assets/source/real-estate/house_level5_01/textures/house.png",
+      "sha256": "7ff84ce5562c7571f4a94df379ea2881364d2f4b193beee7bf135da7a22c4d1e",
+      "assetId": "137011316577762"
+    },
+    {
+      "reference": "estate:house_level5_01:door",
+      "label": "house_level5_01 / door",
+      "slug": "house_level5_01",
+      "filename": "door.png",
+      "group": "estate",
+      "category": "",
+      "categoryLabel": "",
+      "path": "assets/source/real-estate/house_level5_01/textures/door.png",
+      "sha256": "bb0b9bacd9336b86be8cc0affcc54cec67e98ec3a7ee10df74ed4b9a3d20c6eb",
+      "assetId": "98387048887358"
+    },
+    {
+      "reference": "estate:house_level5_01:repair",
+      "label": "house_level5_01 / repair",
+      "slug": "house_level5_01",
+      "filename": "repair.png",
+      "group": "estate",
+      "category": "",
+      "categoryLabel": "",
+      "path": "assets/source/real-estate/house_level5_01/textures/repair.png",
+      "sha256": "bb0b9bacd9336b86be8cc0affcc54cec67e98ec3a7ee10df74ed4b9a3d20c6eb",
+      "assetId": "122977374372900"
+    },
+    {
+      "reference": "atlas:1",
+      "label": "big_tree_01",
+      "slug": "",
+      "filename": "big_tree_01_256x512_atlas.png",
+      "group": "atlas",
+      "category": "",
+      "categoryLabel": "",
+      "path": "assets/source/texture-atlases/big_tree_01/256x512/big_tree_01_256x512_atlas.png",
+      "sha256": "3ab5e47e22c6dd4153fd6b90672308335cdc70ec7711d904581f14855edee8df",
+      "assetId": "134024944101662"
+    },
+    {
+      "reference": "atlas:2",
+      "label": "big_tree_01",
+      "slug": "",
+      "filename": "big_tree_01_128x256_atlas.png",
+      "group": "atlas",
+      "category": "",
+      "categoryLabel": "",
+      "path": "assets/source/texture-atlases/big_tree_01/128x256/big_tree_01_128x256_atlas.png",
+      "sha256": "9f1f34f8b364e8a3d034e774a71daf9b270bded836068202d769611a8fc12050",
+      "assetId": "100679979096136"
+    },
+    {
+      "reference": "atlas:3",
+      "label": "lantern_01",
+      "slug": "",
+      "filename": "lantern_01_64x128_atlas.png",
+      "group": "atlas",
+      "category": "",
+      "categoryLabel": "",
+      "path": "assets/source/texture-atlases/lantern_01/64x128/lantern_01_64x128_atlas.png",
+      "sha256": "ca9a12aacf3ad5305a6baa34baa728198a272b8d81188ae7163f915f7e1d992e",
+      "assetId": "111478705558346"
+    },
+    {
+      "reference": "atlas:4",
+      "label": "restoration_01",
+      "slug": "",
+      "filename": "restoration_01_2048x2048_atlas.png",
+      "group": "atlas",
+      "category": "",
+      "categoryLabel": "",
+      "path": "assets/source/texture-atlases/restoration_01/2048x2048/revisions/2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683/restoration_01_2048x2048_atlas.png",
+      "sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
+      "assetId": "138456659862372"
+    }
+  ],
+  "summary": {
+    "registered": 3,
+    "published": 2,
+    "changed": 1
+  }
+}

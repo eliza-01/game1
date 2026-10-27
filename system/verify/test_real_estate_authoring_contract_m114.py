@@ -26,7 +26,7 @@ class HouseAuthoringContract(unittest.TestCase):
         without_door = {'meshes': [source['meshes'][0]]}
         self.assertIs(validate_analysis(without_door), without_door)
         self.assertEqual({w['code'] for w in warnings_for_analysis(without_door)},
-                         {'missing_door', 'missing_chimney_bone'})
+                         {'missing_door'})
         for wrong in ('', 'another_armature', None):
             modified = copy(without_door)
             modified['meshes'][0]['armature'] = wrong
@@ -37,7 +37,7 @@ class HouseAuthoringContract(unittest.TestCase):
                 validate_analysis(no_house)
             self.assertIn('missing_house', {w['code'] for w in warnings_for_analysis(no_house)})
 
-    def test_door_states_and_chimney_bone_produce_specific_advisories(self):
+    def test_optional_door_and_legacy_bones_do_not_generate_false_advisories(self):
         base = skeleton()
         self.assertEqual(warnings_for_analysis(base), [])
         without_door = copy(base)
@@ -50,15 +50,15 @@ class HouseAuthoringContract(unittest.TestCase):
         bare_rig = copy(base)
         bare_rig['meshes'][1]['bones'] = []
         self.assertEqual([w['code'] for w in warnings_for_analysis(bare_rig)],
-                         ['missing_door_bone'])
+                         [])
         no_chimney = copy(base)
         no_chimney['meshes'][0]['bones'] = []
         self.assertEqual([w['code'] for w in warnings_for_analysis(no_chimney)],
-                         ['missing_chimney_bone'])
+                         [])
         other_bone = copy(base)
         other_bone['meshes'][0]['bones'] = [{'name':'arbitrary_bone'}]
         self.assertEqual([w['code'] for w in warnings_for_analysis(other_bone)],
-                         ['missing_chimney_bone'])
+                         [])
         unassigned = copy(base)
         unassigned['unassignedArmatures'] = ['UnusedRig']
         self.assertIn('unassigned_armature',
@@ -80,7 +80,9 @@ class HouseAuthoringContract(unittest.TestCase):
         for text in (analyze,prepare):
             self.assertIn("rig.name.casefold() != 'house_armature'",text)
         self.assertIn('rigWarnings = rigWarnings',studio)
-        self.assertIn('return findMesh(root, part), count, warnings',studio)
+        validator = (ROOT/'system/studio-plugin/modules/StudioRealEstateRigValidation.luau').read_text('utf-8')
+        self.assertIn('return mesh, {', validator)
+        self.assertIn('StudioRealEstateRigValidation.Verify(rig, part, manifests[part])', studio)
         self.assertNotIn('error(part .. " rig lost bone',studio)
         self.assertIn('Studio import warnings',js)
         self.assertIn('white-space:nowrap; flex:0 0 auto',css)

@@ -11,6 +11,7 @@ from pathlib import Path
 import shutil
 import tempfile
 import time
+from datetime import datetime, timezone
 
 from opencloud_assets import create_model_asset, create_image_asset, wait_for_operation
 from sqlite_connection import connect
@@ -19,6 +20,21 @@ from .textures import available_textures, resolve_texture
 from .fbx import inspect, prepare_publication
 from .publication_textures import prepare_texture, published_format
 from services.texture_atlas_registry import AtlasRegistry, parse_filename
+
+
+def glass_default(part: str) -> bool:
+    return 'glass' in part.casefold()
+
+
+def mesh_options(parts, raw: dict | None) -> dict:
+    """Preserve explicit checkbox choices; default glass-like meshes to 0.02."""
+    source = raw if isinstance(raw, dict) else {}
+    result = {}
+    for part in parts:
+        entry = source.get(part)
+        value = entry.get('glass') if isinstance(entry, dict) else None
+        result[part] = {'glass': value if type(value) is bool else glass_default(part)}
+    return result
 
 
 def _sha(path: Path) -> str:
@@ -57,6 +73,8 @@ class RealEstateStore:
             columns = {column[1] for column in db.execute('PRAGMA table_info(real_estate)')}
             if 'model_rigs_json' not in columns:
                 db.execute("ALTER TABLE real_estate ADD COLUMN model_rigs_json TEXT NOT NULL DEFAULT '{}'")
+            if 'mesh_options_json' not in columns:
+                db.execute("ALTER TABLE real_estate ADD COLUMN mesh_options_json TEXT NOT NULL DEFAULT '{}'")
             # M107 v2: old model_published_hash stored a bundle fingerprint of
             # FBX + both texture files. Migrate ONCE to the model-only hash.
             # An old fingerprint cannot reveal whether an earlier unpublished
@@ -199,6 +217,7 @@ class RealEstateStore:
             row['rigWarnings'] = warnings_for_analysis(row['skeleton'])
             active = present_parts(row['skeleton'])
             row['meshParts'] = list(active)
+            row['meshOptions'] = mesh_options(active, json.loads(row.pop('mesh_options_json') or '{}'))
             # Legacy records may still store door assets after the FBX is
             # replaced with a doorless house; they are publication history,
             # not active resources for the current template.
@@ -308,6 +327,10 @@ class RealEstateStore:
                 continue  # Owner is the current house, not a published catalog entry.
             if reference and (reference not in catalog or reference == f'estate:{slug}:{part}'):
                 raise ValueError(f'{part}: unknown or unpublished reusable texture {reference}')
+        previous_options = (existing or {}).get('meshOptions', {})
+        incoming_options = payload.get('meshOptions')
+        merged_options = mesh_options(active, {**previous_options, **incoming_options}
+            if isinstance(incoming_options, dict) else previous_options)
         texture_sources = {
             part: (resolve_texture(self.root, selections.get(part), part=part)
                    if not chosen_refs[part] else None)
@@ -400,6 +423,9 @@ class RealEstateStore:
                 textures_json=excluded.textures_json,model_asset_id=excluded.model_asset_id,
                 model_published_hash=excluded.model_published_hash,model_moderation=excluded.model_moderation,
                 revision=excluded.revision,updated_at=excluded.updated_at''', row)
+        with self.connect() as db:
+            db.execute('UPDATE real_estate SET mesh_options_json=? WHERE slug=?',
+                (json.dumps(merged_options, ensure_ascii=False), slug))
         # Record binding changes only after the Estate row exists. Re-saving
         # a legacy house does not silently migrate/re-publish its texture.
         for part in active:
@@ -410,6 +436,49 @@ class RealEstateStore:
                 self.atlases.unbind('real_estate', f'{slug}:{part}')
         self.export()
         return self.get(slug)
+
+    def delete(self, slug: str) -> dict:
+        """Retire the authoring registration, not uploaded Roblox assets or shared atlases.
+
+        An on-disk JSON audit copy is created before database changes. Source
+        FBX/PNGs remain on disk, so retirement never loses local authoring work.
+        """
+        row = self.get(slug)
+        if not row:
+            raise ValueError('unknown registered house')
+        for candidate in self._raw_rows():
+            if candidate['slug'] == slug:
+                continue
+            for part, texture in json.loads(candidate['textures_json']).items():
+                if str(texture.get('reuseReference') or '').startswith(f'estate:{slug}:'):
+                    raise ValueError(f"{slug} is reused by {candidate['slug']} / {part}; change the dependent texture first")
+        with self.connect() as db:
+            unfinished = db.execute(
+                "SELECT COUNT(*) FROM real_estate_publications WHERE house_slug=? AND asset_id='' AND operation!=''",
+                (slug,)).fetchone()[0]
+            if unfinished:
+                raise ValueError('house has an unresolved Roblox publication; resolve it before deleting')
+            raw = dict(db.execute('SELECT * FROM real_estate WHERE slug=?', (slug,)).fetchone())
+            publications = [dict(r) for r in db.execute(
+                'SELECT * FROM real_estate_publications WHERE house_slug=? ORDER BY id', (slug,))]
+        archive = self.root / '.control-center' / 'real-estate-retired'
+        archive.mkdir(parents=True, exist_ok=True)
+        target = archive / (slug + '_' + datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ') + '.json')
+        # Exclusive creation guarantees that an old archive cannot be replaced.
+        with target.open('x', encoding='utf-8') as file:
+            json.dump({'house': raw, 'publications': publications, 'sourceFilesPreserved': True},
+                      file, ensure_ascii=False, indent=2)
+        with self.connect() as db:
+            db.execute('DELETE FROM real_estate_publications WHERE house_slug=?', (slug,))
+            cursor = db.execute('DELETE FROM real_estate WHERE slug=?', (slug,))
+            if cursor.rowcount != 1:
+                raise ValueError('house changed during retirement; archive preserved')
+        for part in json.loads(raw['skeleton_json']).get('meshes', []):
+            if isinstance(part, dict) and isinstance(part.get('name'), str):
+                self.atlases.unbind('real_estate', f"{slug}:{part['name']}")
+        self.export()
+        return {'ok': True, 'archived': target.relative_to(self.root).as_posix(),
+                'sourceFilesPreserved': True, 'studioTemplatesUnchanged': True}
 
     def publish(self, slug: str, credentials: dict, *, scope: str = 'all', on_progress=None):
         """Create new Asset IDs for only the requested changed resources.
@@ -575,7 +644,7 @@ class RealEstateStore:
 
     def snapshot(self):
         rows = self.list()
-        return {'schemaVersion': 2, 'items': rows,
+        return {'schemaVersion': 2, 'items': rows, 'atlasCatalog': self.atlases.catalog(),
                 'textureReferences':self.texture_references(), 'summary': {
             'registered': len(rows), 'published': sum(r['status'] == 'PUBLISHED' for r in rows),
             'changed': sum(r['status'] == 'UPDATE_AVAILABLE' for r in rows)}}

@@ -2,56 +2,12 @@
 -- This adapter validates the complete template before touching ServerStorage.
 local HttpService = game:GetService("HttpService")
 local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
+local StudioRealEstateRigValidation = require(script.Parent.StudioRealEstateRigValidation)
 local StudioRealEstateModel = {}
 
-local function findMesh(root: Instance, expected: string): MeshPart
-    local match: MeshPart? = nil
-    for _, instance in root:GetDescendants() do
-        if instance:IsA("MeshPart") then
-            if string.lower(instance.Name) ~= string.lower(expected) then
-                error("Real Estate " .. expected .. " rig contains unexpected mesh " .. instance.Name)
-            end
-            if match then
-                error("Real Estate rig contains duplicate mesh " .. expected)
-            end
-            match = instance
-        end
-    end
-    if match == nil then
-        error("Published Real Estate rig is missing mesh " .. expected)
-    end
-    return match :: MeshPart
-end
-
-local function verifyRig(root: Model, part: string, manifests: any): (MeshPart, number, {string})
-    local expected = manifests[part]
-    if typeof(expected) ~= "table" then
-        error("Missing registered mesh manifest for " .. part)
-    end
-    -- The FBX registry records authored bones for diagnostics. Roblox can
-    -- omit optional interaction bones on import, so this is not a sync gate.
-    local found = {}
-    local count = 0
-    for _, descendant in root:GetDescendants() do
-        if descendant:IsA("Bone") then
-            count += 1
-            found[descendant.Name] = true
-        end
-    end
-    local warnings = {}
-    -- Only named interaction hints are reported; arbitrary bones are optional.
-    local advisoryBone = nil
-    if part == "house" then
-        advisoryBone = "chimney_bone"
-    elseif part == "door" then
-        advisoryBone = "door_bone"
-    end
-    if advisoryBone and not found[advisoryBone] then
-        table.insert(warnings, part .. ": optional " .. advisoryBone
-            .. " is missing from the published Roblox Model Asset")
-    end
-    return findMesh(root, part), count, warnings
-end
+-- A hinge must survive import. Missing optional unweighted sockets are
+-- reported by the separate validator, not treated as broken Model Assets.
+local DOOR_HINGE = "door_01_hinge_socket"
 
 local function loadIndependentRig(assetService: any, assetId: number, part: string): Model
     local lastError = ""
@@ -97,7 +53,17 @@ end
 
 -- Texture-only refresh for managed Estate copies already placed in Workspace.
 -- Never replace models or touch pivots/part transforms during atlas selection.
-local function refreshPlaced(slug: string, imageAssets: {[string]: string}, imageAlpha: {[string]: any}): number
+local function setGlassAppearance(mesh: MeshPart, enabled: boolean)
+    if enabled then
+        mesh.Transparency = 0.02
+        mesh:SetAttribute('Game1RealEstateGlassApplied', true)
+    elseif mesh:GetAttribute('Game1RealEstateGlassApplied') == true then
+        mesh.Transparency = 0
+        mesh:SetAttribute('Game1RealEstateGlassApplied', nil)
+    end
+end
+
+local function refreshPlaced(slug: string, imageAssets: {[string]: string}, imageAlpha: {[string]: any}, meshOptions: any): number
     local changed = 0
     for _, instance in workspace:GetDescendants() do
         if instance:IsA("Model") and instance:GetAttribute("Game1RealEstateSlug") == slug then
@@ -107,6 +73,8 @@ local function refreshPlaced(slug: string, imageAssets: {[string]: string}, imag
                     local part = string.lower(child.Name)
                     if imageAssets[part] then
                         StudioTextureAppearance.Apply(child, "rbxassetid://" .. imageAssets[part], imageAlpha[part])
+                        local settings = meshOptions[part]
+                        setGlassAppearance(child, typeof(settings) == 'table' and settings.glass == true)
                         applied = true
                     end
                 end
@@ -131,6 +99,7 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
     if typeof(rigIds) ~= "table" or tonumber(rigIds.house) ~= assetId then
         error("Studio Sync requires published Model Asset IDs for every Real Estate mesh")
     end
+    local meshOptions = typeof(metadata.meshOptions) == 'table' and metadata.meshOptions or {}
     local imageAssets = {}
     local imageAlpha = {}
     for _, entry in metadata.textures or {} do
@@ -159,6 +128,8 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
     local meshes = {}
     local bones = 0
     local rigWarnings = {}
+    local missingSockets = {}
+    local socketCount = 0
     local activePart = "house"
     local ok, problem = pcall(function()
         for _, part in parts do
@@ -166,10 +137,14 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
             local rig = part == "house" and imported
                 or loadIndependentRig(assetService, tonumber(rigIds[part]) :: number, part)
             table.insert(staged, {part = part, rig = rig})
-            local mesh, count, warnings = verifyRig(rig, part, manifests)
+            local mesh, inspection = StudioRealEstateRigValidation.Verify(rig, part, manifests[part])
             meshes[part] = mesh
-            bones += count
-            for _, warning in warnings do
+            bones += inspection.boneCount
+            socketCount += inspection.socketCount
+            for _, name in inspection.missingSockets do
+                table.insert(missingSockets, part .. "/" .. name)
+            end
+            for _, warning in inspection.warnings do
                 table.insert(rigWarnings, warning)
             end
         end
@@ -185,15 +160,38 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
             .. ": " .. detail, 0)
     end
 
+    table.sort(missingSockets)
     local wrapper = Instance.new("Model")
     wrapper.Name = slug
     for _, entry in staged do
         local part = entry.part
         local rigName = part:sub(1, 1):upper() .. part:sub(2) .. "Rig"
         entry.rig.Name = rigName
-        entry.rig.Parent = wrapper
+        -- DoorAssembly is the only moving unit. Do not edit Bone.Transform:
+        -- the hinge Bone identifies the world-space pivot for Model:PivotTo().
+        if part == "door" and meshes[part]:FindFirstChild(DOOR_HINGE, true) then
+            local hinge = meshes[part]:FindFirstChild(DOOR_HINGE, true) :: Bone
+            local assembly = Instance.new("Model")
+            assembly.Name = "DoorAssembly"
+            assembly.Parent = wrapper
+            entry.rig.Parent = assembly
+            -- New Model has no PrimaryPart: WorldPivot sets the pivot without
+            -- displacing any MeshPart or changing an authored bone pose.
+            assembly.WorldPivot = hinge.TransformedWorldCFrame
+            assembly:SetAttribute("Game1DoorHingeSocket", DOOR_HINGE)
+            assembly:SetAttribute("Game1DoorPivotMode", "rigid_model")
+            local closedLocal = meshes.house.CFrame:ToObjectSpace(assembly:GetPivot())
+            assembly:SetAttribute("Game1DoorClosedLocalPivot",
+                HttpService:JSONEncode({closedLocal:GetComponents()}))
+        else
+            entry.rig.Parent = wrapper
+        end
         StudioTextureAppearance.Apply(meshes[part], "rbxassetid://" .. imageAssets[part], imageAlpha[part])
+        local settings = meshOptions[part]
+        setGlassAppearance(meshes[part], typeof(settings) == 'table' and settings.glass == true)
     end
+    wrapper:SetAttribute("Game1RealEstateSocketContractComplete", #missingSockets == 0)
+    wrapper:SetAttribute("Game1MissingRealEstateSockets", HttpService:JSONEncode(missingSockets))
     wrapper:SetAttribute("Game1RealEstateTemplate", true)
     wrapper:SetAttribute("Game1ModelAssetId", tostring(assetId))
     wrapper:SetAttribute("Game1HouseModelAssetId", tostring(assetId))
@@ -211,10 +209,12 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
     if previous then
         previous:Destroy()
     end
-    local placedUpdated = refreshPlaced(slug, imageAssets, imageAlpha)
+    local placedUpdated = refreshPlaced(slug, imageAssets, imageAlpha, meshOptions)
     return wrapper, {bonesValidated = true, rigsValidated = #parts,
         texturesApplied = #parts, workspaceModelsUpdated = placedUpdated,
-        boneCount = bones, rigWarnings = rigWarnings}
+        boneCount = bones, socketCount = socketCount,
+        socketContractComplete = #missingSockets == 0,
+        missingSockets = missingSockets, rigWarnings = rigWarnings}
 end
 
 return table.freeze(StudioRealEstateModel)

@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bone_weight_survival import plan_publication_weights
+from real_estate_skin_policy import check_rigid_hinge, HINGE
 from real_estate_rig_discovery import find_mesh, find_rig
 
 
@@ -45,25 +46,32 @@ def main(source, output, texture_config):
             for vertex in mesh.data.vertices:
                 weights = {by_index[g.group]: float(g.weight) for g in vertex.groups
                            if g.group in by_index and g.weight > 0}
-                if not weights:
+                if not weights and not (part == 'door' and HINGE in names):
                     weights = {root_bone: 1.0}
                 vertices.append({'object': mesh, 'index': vertex.index, 'mesh': mesh.name,
                                  'position': tuple(mesh.matrix_world @ vertex.co), 'weights': weights})
-            heads = {b.name: tuple(rig.matrix_world @ b.head_local) for b in bones}
-            # Roblox may cull tiny/single-vertex bone influences even when the
-            # FBX round-trip preserves the full skeleton. Keep three distinct
-            # vertices per authored bone with significant normalized weights.
-            report = plan_publication_weights(
-                heads, vertices, min_covered_vertices=3,
-                minimum_weight=0.20, anchor_weight=0.30,
-            )
-            for v in vertices:
-                for group in mesh.vertex_groups:
-                    if group.name in names:
-                        group.remove([v['index']])
-                for name, weight in v['weights'].items():
-                    group = mesh.vertex_groups.get(name) or mesh.vertex_groups.new(name=name)
-                    group.add([v['index']], weight, 'REPLACE')
+            if part == 'door' and HINGE in names:
+                # The authored door is a rigid 1.0 hinge skin. Do NOT borrow
+                # visible vertices to keep child sockets alive on import.
+                # All sockets remain in the FBX bone tree; staged round-trip
+                # and Studio-side checks verify that they really survive.
+                report = check_rigid_hinge([v['weights'] for v in vertices], names)
+            else:
+                heads = {b.name: tuple(rig.matrix_world @ b.head_local) for b in bones}
+                # Legacy/unweighted non-door rigs still need import anchors.
+                # This modifies only the temporary staged export, never the
+                # artist's canonical FBX file or Blender project.
+                report = plan_publication_weights(
+                    heads, vertices, min_covered_vertices=3,
+                    minimum_weight=0.20, anchor_weight=0.30,
+                )
+                for v in vertices:
+                    for group in mesh.vertex_groups:
+                        if group.name in names:
+                            group.remove([v['index']])
+                    for name, weight in v['weights'].items():
+                        group = mesh.vertex_groups.get(name) or mesh.vertex_groups.new(name=name)
+                        group.add([v['index']], weight, 'REPLACE')
             after = {bone.name: (bone.parent.name if bone.parent else '',
                         tuple(float(v) for row in bone.matrix_local for v in row)) for bone in bones}
             if before != after:

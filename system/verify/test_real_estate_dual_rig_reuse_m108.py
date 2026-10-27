@@ -192,7 +192,7 @@ class DualRigReuseTests(unittest.TestCase):
         self.assertIn('part:sub(1, 1):upper()',plugin)
         self.assertIn('metadata.rigAssetIds',plugin)
         self.assertIn('local parts = orderedParts(manifests)',plugin)
-        self.assertIn('verifyRig',plugin)
+        self.assertIn('StudioRealEstateRigValidation.Verify',plugin)
 
     def test_ui_offers_vertical_reuse_with_registered_texture_catalog(self):
         js=(ROOT/'system/control-center/static/real-estate.js').read_text('utf-8')

@@ -6,11 +6,22 @@ from urllib.parse import unquote
 
 
 def route(path, body, deps):
-    if not path.startswith(('/api/animation-bindings/', '/api/npc-animation-bindings/', '/api/npcs/', '/api/monster-animation-bindings/', '/api/monsters/', '/api/location-assets/', '/api/weapons/', '/api/characters/',)):
+    if not path.startswith(('/api/animation-bindings/', '/api/npc-animation-bindings/', '/api/npcs/', '/api/monster-animation-bindings/', '/api/monsters/', '/api/location-assets/', '/api/weapons/', '/api/characters/', '/api/real-estate/',)):
         return None
 
     def out(status, payload):
         return status, payload
+
+    if path.startswith('/api/real-estate/'):
+        slug = unquote(path[len('/api/real-estate/'):].strip('/'))
+        try:
+            job = deps['real_estate_publications'].get(slug)
+            if job and job['status'] in ('queued', 'running'):
+                raise ValueError('house publication is running; wait until it completes')
+            return out(200, deps['real_estate'].delete(slug))
+        except (ValueError, OSError, KeyError) as error:
+            return out(400, {'error': str(error)})
+
 
     animations = deps["animations"]
     location_assets = deps["location_assets"]

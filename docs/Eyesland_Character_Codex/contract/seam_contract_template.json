@@ -1,0 +1,118 @@
+{
+  "version": "1.0.0",
+  "seams": [
+    {
+      "between": [
+        "B_HEAD",
+        "B_TORSO"
+      ],
+      "protocol": "paired_exposed_loops_plus_hidden_overlap_under_cuff",
+      "marker_id": "B_HEAD__B_TORSO"
+    },
+    {
+      "between": [
+        "B_TORSO",
+        "B_HIPS"
+      ],
+      "protocol": "paired_exposed_loops_plus_hidden_overlap_under_cuff",
+      "marker_id": "B_TORSO__B_HIPS"
+    },
+    {
+      "between": [
+        "B_TORSO",
+        "B_UPPER_ARM.L"
+      ],
+      "protocol": "paired_exposed_loops_plus_hidden_overlap_under_cuff",
+      "marker_id": "B_TORSO__B_UPPER_ARM.L"
+    },
+    {
+      "between": [
+        "B_UPPER_ARM.L",
+        "B_FOREARM.L"
+      ],
+      "protocol": "paired_exposed_loops_plus_hidden_overlap_under_cuff",
+      "marker_id": "B_UPPER_ARM.L__B_FOREARM.L"
+    },
+    {
+      "between": [
+        "B_FOREARM.L",
+        "B_HAND.L"
+      ],
+      "protocol": "paired_exposed_loops_plus_hidden_overlap_under_cuff",
+      "marker_id": "B_FOREARM.L__B_HAND.L"
+    },
+    {
+      "between": [
+        "B_HIPS",
+        "B_THIGH.L"
+      ],
+      "protocol": "paired_exposed_loops_plus_hidden_overlap_under_cuff",
+      "marker_id": "B_HIPS__B_THIGH.L"
+    },
+    {
+      "between": [
+        "B_THIGH.L",
+        "B_SHIN.L"
+      ],
+      "protocol": "paired_exposed_loops_plus_hidden_overlap_under_cuff",
+      "marker_id": "B_THIGH.L__B_SHIN.L"
+    },
+    {
+      "between": [
+        "B_SHIN.L",
+        "B_FOOT.L"
+      ],
+      "protocol": "paired_exposed_loops_plus_hidden_overlap_under_cuff",
+      "marker_id": "B_SHIN.L__B_FOOT.L"
+    },
+    {
+      "between": [
+        "B_TORSO",
+        "B_UPPER_ARM.R"
+      ],
+      "protocol": "paired_exposed_loops_plus_hidden_overlap_under_cuff",
+      "marker_id": "B_TORSO__B_UPPER_ARM.R"
+    },
+    {
+      "between": [
+        "B_UPPER_ARM.R",
+        "B_FOREARM.R"
+      ],
+      "protocol": "paired_exposed_loops_plus_hidden_overlap_under_cuff",
+      "marker_id": "B_UPPER_ARM.R__B_FOREARM.R"
+    },
+    {
+      "between": [
+        "B_FOREARM.R",
+        "B_HAND.R"
+      ],
+      "protocol": "paired_exposed_loops_plus_hidden_overlap_under_cuff",
+      "marker_id": "B_FOREARM.R__B_HAND.R"
+    },
+    {
+      "between": [
+        "B_HIPS",
+        "B_THIGH.R"
+      ],
+      "protocol": "paired_exposed_loops_plus_hidden_overlap_under_cuff",
+      "marker_id": "B_HIPS__B_THIGH.R"
+    },
+    {
+      "between": [
+        "B_THIGH.R",
+        "B_SHIN.R"
+      ],
+      "protocol": "paired_exposed_loops_plus_hidden_overlap_under_cuff",
+      "marker_id": "B_THIGH.R__B_SHIN.R"
+    },
+    {
+      "between": [
+        "B_SHIN.R",
+        "B_FOOT.R"
+      ],
+      "protocol": "paired_exposed_loops_plus_hidden_overlap_under_cuff",
+      "marker_id": "B_SHIN.R__B_FOOT.R"
+    }
+  ],
+  "note": "Codex MUST generate filled seam profiles with actual rest ring coordinates, vertex indices, bone weights and mirrored correspondence using Blender, not only this template."
+}

@@ -25,20 +25,20 @@ class OptionalRigTests(unittest.TestCase):
             mesh['influencedBones'] = []
         validate_analysis(src)
         self.assertEqual({w['code'] for w in warnings_for_analysis(src)},
-                         {'missing_door_bone', 'missing_chimney_bone'})
+                         set())
         src['meshes'][1]['armature'] = ''
         validate_analysis(src)
         self.assertEqual({w['code'] for w in warnings_for_analysis(src)},
-                         {'missing_door_armature', 'missing_chimney_bone'})
+                         {'missing_door_armature'})
         for part in ('house','door'):
             assert_rig_survived(src, {'meshes':[next(x for x in src['meshes'] if x['name']==part)]}, part)
 
-    def test_desired_bones_are_advisory_and_legacy_alias_is_warned(self):
+    def test_old_bone_names_do_not_generate_false_warnings(self):
         src = skeleton()
         src['meshes'][0]['bones'] = [{'name':'other', 'parent':'','matrixLocal':[1.0]*16}]
         src['meshes'][1]['bones'] = [{'name':'doot_bone','parent':'','matrixLocal':[1.0]*16}]
         validate_analysis(src)
-        self.assertEqual([x['code'] for x in warnings_for_analysis(src)], ['missing_door_bone','missing_chimney_bone'])
+        self.assertEqual([x['code'] for x in warnings_for_analysis(src)], [])
 
     def test_present_bones_still_must_survive_publication(self):
         src = skeleton()
@@ -63,12 +63,12 @@ class OptionalRigTests(unittest.TestCase):
                      'textures':{'house':str(folder/'house.png'),'door':str(folder/'door.png')}}
             with patch('real_estate.store.inspect',return_value=empty):
                 inspected=store.inspect(str(fbx))
-                self.assertEqual(len(inspected['warnings']),2)
-                with self.assertRaisesRegex(ValueError,'optional rig warnings'):
-                    store.register(payload)
-                row=store.register({**payload,'acceptWarnings':True})
+                self.assertEqual(inspected['warnings'], [])
+                # Socket features are optional. Do not require confirmation simply
+                # because an older house has no chimney_bone / door_bone.
+                row=store.register(payload)
             self.assertEqual(row['slug'],'house_level5_01')
-            self.assertEqual(len(store.get(row['slug'])['rigWarnings']),2)
+            self.assertEqual(store.get(row['slug'])['rigWarnings'], [])
             self.assertEqual(store.get(row['slug'])['skeleton']['meshes'][0]['bones'],[])
 
     def test_armature_owner_resolved_from_links_not_naming(self):

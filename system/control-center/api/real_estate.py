@@ -27,7 +27,18 @@ def write(path, body, deps):
         if path == '/api/real-estate/inspect':
             return 200, store.inspect(str(body().get('sourcePath') or ''))
         if path == '/api/real-estate':
-            return 200, store.register(body())
+            payload = body()
+            previous = store.get(str(payload.get('existingSlug') or '')) if payload.get('existingSlug') else None
+            updated = store.register(payload)
+            if (previous and previous.get('meshOptions') != updated.get('meshOptions')
+                    and updated['status'] == 'PUBLISHED'):
+                try:
+                    deps['sync_real_estate_to_studio'](updated['slug'])
+                    updated['studioSyncStatus'] = 'synced'
+                except (RuntimeError, ValueError, OSError, KeyError) as exc:
+                    updated['studioSyncStatus'] = 'pending_studio_sync'
+                    updated['studioError'] = str(exc)
+            return 200, updated
         if path.startswith('/api/real-estate/') and path.endswith('/atlas-binding'):
             # A saved binding is authoritative even if Studio is offline.
             # Sync failures remain visible and retryable, never rolled back

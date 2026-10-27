@@ -19,7 +19,7 @@ return function(services)
         return segment
     end
 
-    local function modelLoadDestination(folders: { any }): Instance
+    local function modelLoadDestination(folders: { any }, created: {Folder}): Instance
         local node: Instance = ServerStorage
         for _, raw in ipairs(folders) do
             local name = validSegment(raw)
@@ -28,6 +28,7 @@ return function(services)
                 child = Instance.new("Folder")
                 child.Name = name
                 child.Parent = node
+                table.insert(created, child)
             elseif not child:IsA("Folder") then
                 error("ServerStorage destination contains a non-Folder named " .. name)
             end
@@ -424,6 +425,8 @@ return function(services)
             schemaVersion = 1,
             assetId = tostring(data.assetId or ""),
         }
+        local createdFolders: {Folder} = {}
+        local importedSession: Model? = nil
         local ok, operationError = xpcall(function()
             if tostring(data.project or "") ~= "game1" or tonumber(data.schemaVersion) ~= 1 then
                 error("invalid game1 model load command")
@@ -464,8 +467,9 @@ return function(services)
                 loaded:Destroy()
             end
 
-            local destination = modelLoadDestination(data.destinationFolders or {})
+            local destination = modelLoadDestination(data.destinationFolders or {}, createdFolders)
             local normalizedModel = canonicalRigModel(importedRig)
+            importedSession = normalizedModel
             if placementMode == "real-estate-rig" then
                 local wrapper, estateStats = StudioRealEstateModel.Place(
                     normalizedModel, destination, tostring(data.wrapperName or ""), assetId,
@@ -526,6 +530,18 @@ return function(services)
         end, debug.traceback)
 
         if not ok then
+            -- Do not leave misleading empty ServerStorage paths when an asset
+            -- fails validation. Never delete folders that existed beforehand,
+            -- folders containing data, or an existing managed template.
+            for index = #createdFolders, 1, -1 do
+                local folder = createdFolders[index]
+                if folder.Parent ~= nil and #folder:GetChildren() == 0 then
+                    folder:Destroy()
+                end
+            end
+            if importedSession and importedSession.Parent == nil then
+                importedSession:Destroy()
+            end
             result.error = tostring(operationError)
         end
         local postOk, postError = pcall(postModelLoadResult, result)

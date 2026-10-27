@@ -1,0 +1,81 @@
+{
+  "version": "1.0.0",
+  "render_rule": "ONE visible outer replacement per covered region; hidden base mesh on coverage; attachments separate",
+  "same_mesh_and_uv": "texture_or_material_variant",
+  "different_silhouette": "different_skinned_mesh_same_rig_bind",
+  "region_ownership": "resolve declared priority, reject invalid conflicts and honor requires/excludes",
+  "slots": {
+    "CHEST": {
+      "base_regions": [
+        "B_TORSO"
+      ],
+      "optional": [
+        "B_UPPER_ARM.L",
+        "B_UPPER_ARM.R"
+      ],
+      "render_priority": 30
+    },
+    "LEGS": {
+      "base_regions": [
+        "B_HIPS",
+        "B_THIGH.L",
+        "B_THIGH.R",
+        "B_SHIN.L",
+        "B_SHIN.R"
+      ],
+      "render_priority": 30
+    },
+    "GLOVES": {
+      "base_regions": [
+        "B_HAND.L",
+        "B_HAND.R"
+      ],
+      "optional": [
+        "B_FOREARM.L",
+        "B_FOREARM.R"
+      ],
+      "render_priority": 50
+    },
+    "BOOTS": {
+      "base_regions": [
+        "B_FOOT.L",
+        "B_FOOT.R"
+      ],
+      "optional": [
+        "B_SHIN.L",
+        "B_SHIN.R"
+      ],
+      "render_priority": 50
+    },
+    "SHOULDERS": {
+      "attachment_pair": [
+        "shoulder_mount.L",
+        "shoulder_mount.R"
+      ]
+    },
+    "CAPE": {
+      "attachment": "cape_mount",
+      "extra_anchors": [
+        "cape_clasp.L",
+        "cape_clasp.R"
+      ]
+    },
+    "HAIR": {
+      "attachment": "hair_mount"
+    },
+    "SHIELD.L": {
+      "attachment": "shield_mount.L",
+      "not_weapon_grip": true
+    },
+    "SHIELD.R": {
+      "attachment": "shield_mount.R",
+      "not_weapon_grip": true
+    },
+    "WEAPON.L": {
+      "attachment": "weapon_grip.L"
+    },
+    "WEAPON.R": {
+      "attachment": "weapon_grip.R"
+    }
+  }
+}

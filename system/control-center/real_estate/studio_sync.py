@@ -31,6 +31,7 @@ class RealEstateStudioSync:
                 part['name']: [bone['name'] for bone in part['bones']]
                 for part in row['skeleton']['meshes']
             },
+            'meshOptions': row.get('meshOptions') or {},
             'textures': [
                 texture_binding(name, data['assetId'], getattr(self.store, 'root', None), data.get('path') or '')
                 for name, data in row['textures'].items()

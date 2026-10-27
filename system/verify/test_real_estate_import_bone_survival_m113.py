@@ -62,7 +62,7 @@ class BoneImportCoverage(unittest.TestCase):
         self.assertIn('assert_rig_survived', (ROOT / 'system/control-center/real_estate/fbx.py').read_text())
         studio = (ROOT / 'system/studio-plugin/modules/StudioRealEstateModel.luau').read_text()
         self.assertIn('rigWarnings = rigWarnings', studio)
-        self.assertIn('advisoryBone = "chimney_bone"', studio)
+        self.assertIn('DOOR_HINGE = "door_01_hinge_socket"', studio)
         self.assertIn('Model Asset', studio)
 
 

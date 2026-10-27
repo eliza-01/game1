@@ -114,3 +114,17 @@
 .real-estate-collider-note { display:block; margin:0; color:var(--muted); font-size:11px; line-height:1.5; }
 
 .real-estate-physics-caution { font-size: 12px; line-height: 1.4; color: var(--warning, #d0a351); }
+
+/* M140: per-mesh FBX actions stay with the Model Asset ID, not in the
+   already crowded whole-house action column. */
+.real-estate-mesh-update { margin-top: 5px; max-width: 100%; }
+.real-estate-mesh-update > summary { cursor: pointer; font-size: 0.8rem; opacity: .85; }
+.real-estate-mesh-update-controls { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px; }
+.real-estate-mesh-update-controls button { white-space: normal; font-size: 0.76rem; }
+
+/* M141: version choice is separate from resolution dots; never squeeze filenames. */
+.real-estate-atlas-version-tag { margin-left:5px; font-size:10px; color:var(--muted); white-space:nowrap; }
+.real-estate-atlas-version-picker { display:inline-flex; align-items:center; flex-wrap:wrap; gap:5px;
+  margin:5px 0 2px; color:var(--muted); font-size:10px; max-width:100%; }
+#real-estate-view .real-estate-atlas-version-picker select { width:auto; max-width:100%; min-width:145px;
+  font-size:11px; padding:4px 6px; }

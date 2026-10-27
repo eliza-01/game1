@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from real_estate_rig_discovery import find_mesh, find_rig
 
 
-def analyze(source, only_part=None):
+def analyze(source, only_part=None, extract=False):
     bpy.ops.object.select_all(action='SELECT')
     bpy.ops.object.delete(use_global=False)
     bpy.ops.import_scene.fbx(filepath=str(source), use_anim=False)
@@ -20,7 +20,9 @@ def analyze(source, only_part=None):
         present, key=lambda name: (name != 'house', name.casefold(), name))
     if not present or (only_part is None and 'house' not in present):
         raise RuntimeError(f"Required mesh house is missing. Found: {', '.join(present) or 'none'}.")
-    if only_part is not None and (present != [only_part]):
+    if only_part is not None and only_part not in present:
+        raise RuntimeError(f"Expected mesh {only_part} is absent; found: {', '.join(present)}")
+    if only_part is not None and not extract and (present != [only_part]):
         raise RuntimeError(f"Expected only staged mesh {only_part}; found: {', '.join(present)}.")
     if len({name.casefold() for name in present}) != len(present):
         raise RuntimeError("FBX contains mesh names that differ only by case.")
@@ -49,6 +51,6 @@ def analyze(source, only_part=None):
 
 
 args = sys.argv[sys.argv.index('--') + 1:]
-if len(args) not in (2, 3):
+if len(args) not in (2, 3, 4):
     raise RuntimeError('usage: blender ... -- source.fbx analysis.json [mesh_name]')
-Path(args[1]).write_text(json.dumps(analyze(Path(args[0]), args[2] if len(args) == 3 else None), ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+Path(args[1]).write_text(json.dumps(analyze(Path(args[0]), args[2] if len(args) >= 3 else None, len(args) == 4 and args[3] == "extract"), ensure_ascii=False, indent=2) + '\n', encoding='utf-8')

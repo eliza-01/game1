@@ -24,6 +24,16 @@ def write(path, body, deps):
         return None
     store = deps['real_estate']
     try:
+        if path.startswith('/api/real-estate/') and path.endswith('/mesh-inspect'):
+            slug = unquote(path[len('/api/real-estate/'):-len('/mesh-inspect')].strip('/'))
+            payload = body()
+            return 200, store.inspect_mesh(slug, str(payload.get('part') or ''), str(payload.get('sourcePath') or ''))
+        if path.startswith('/api/real-estate/') and path.endswith('/mesh-source'):
+            slug = unquote(path[len('/api/real-estate/'):-len('/mesh-source')].strip('/'))
+            payload = body()
+            updated = store.replace_mesh(slug, str(payload.get('part') or ''),
+                str(payload.get('sourcePath') or ''), expected_revision=int(payload.get('expectedRevision', 0)))
+            return 200, updated
         if path == '/api/real-estate/inspect':
             return 200, store.inspect(str(body().get('sourcePath') or ''))
         if path == '/api/real-estate':
@@ -56,7 +66,8 @@ def write(path, body, deps):
                     'studioError': str(exc)}
         if path.startswith('/api/real-estate/') and path.endswith('/sync'):
             slug = unquote(path[len('/api/real-estate/'):-len('/sync')].strip('/'))
-            return 200, deps['sync_real_estate_to_studio'](slug)
+            part = str(body().get('part') or '').strip()
+            return 200, deps['sync_real_estate_to_studio'](slug, part=part or None)
         if path.startswith('/api/real-estate/') and path.endswith('/publish-async'):
             slug = unquote(path[len('/api/real-estate/'):-len('/publish-async')].strip('/'))
             payload = body()

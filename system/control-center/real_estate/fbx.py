@@ -67,7 +67,15 @@ def inspect(root: Path, source: Path) -> dict:
     return validate_analysis(analysis)
 
 
-def prepare_publication(root: Path, source: Path, target: Path, expected: dict, textures: dict) -> dict:
+def inspect_selected(root: Path, source: Path, part: str) -> dict:
+    """Inspect a named mesh from either a single-mesh or a complete house FBX."""
+    with tempfile.TemporaryDirectory(prefix='game1-estate-mesh-inspect-') as temp:
+        report = Path(temp) / 'analysis.json'
+        return _run(root, 'analyze_real_estate_fbx.py',
+                    (source, report, part, 'extract'), report_path=report)
+
+
+def prepare_publication(root: Path, source: Path, target: Path, expected: dict, textures: dict, *, only_part: str | None = None) -> dict:
     """Export every present FBX Model Asset and verify each rig independently."""
     from .contracts import assert_rig_survived
     target.mkdir(parents=True, exist_ok=True)
@@ -76,8 +84,9 @@ def prepare_publication(root: Path, source: Path, target: Path, expected: dict, 
         config.write_text(json.dumps(textures), encoding='utf-8')
         report_path = Path(temp) / 'report.json'
         report = _run(root, 'prepare_real_estate_publication_fbx.py',
+                      (source, target, config, report_path, only_part) if only_part else
                       (source, target, config, report_path), report_path=report_path)
-    parts = present_parts(expected)
+    parts = (only_part,) if only_part else present_parts(expected)
     if report.get('schemaVersion') != 2 or set(report.get('rigAssets', {})) != set(parts):
         raise ValueError('Real Estate preparation did not produce the expected independent rigs')
     for part in parts:

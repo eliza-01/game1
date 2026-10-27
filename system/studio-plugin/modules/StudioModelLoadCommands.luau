@@ -2,6 +2,7 @@
 -- Transport/AssetService dependencies are passed by the Game1Bridge composition root.
 local CharacterTemplate = require(script.Parent.CharacterTemplate)
 local StudioRealEstateModel = require(script.Parent.StudioRealEstateModel)
+local StudioRealEstatePartSync = require(script.Parent.StudioRealEstatePartSync)
 local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
 
 return function(services)
@@ -471,10 +472,15 @@ return function(services)
             local normalizedModel = canonicalRigModel(importedRig)
             importedSession = normalizedModel
             if placementMode == "real-estate-rig" then
-                local wrapper, estateStats = StudioRealEstateModel.Place(
-                    normalizedModel, destination, tostring(data.wrapperName or ""), assetId,
-                    data.metadata or {}, AssetService
-                )
+                local metadata = data.metadata or {}
+                local wrapper, estateStats
+                if typeof(metadata.syncPart) == "string" and metadata.syncPart ~= "" then
+                    wrapper, estateStats = StudioRealEstatePartSync.Place(
+                        normalizedModel, destination, tostring(data.wrapperName or ""), assetId, metadata)
+                else
+                    wrapper, estateStats = StudioRealEstateModel.Place(
+                        normalizedModel, destination, tostring(data.wrapperName or ""), assetId, metadata, AssetService)
+                end
                 result.destination = wrapper:GetFullName()
                 result.wrapperName = wrapper.Name
                 result.realEstateStats = estateStats

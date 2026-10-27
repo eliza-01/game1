@@ -10,17 +10,23 @@ class RealEstateStudioSync:
         self.store = store
         self.load_model = load_model
 
-    def sync(self, slug: str) -> dict:
+    def sync(self, slug: str, *, part: str | None = None) -> dict:
         row = self.store.get(slug)
         if not row:
             raise ValueError('unknown registered house')
-        if row['status'] != 'PUBLISHED':
+        if part is not None and part not in row['meshParts']:
+            raise ValueError('unknown mesh for targeted Studio Sync')
+        if part is None and row['status'] != 'PUBLISHED':
             raise ValueError('publish all changed house assets before syncing to Studio')
         rigs = row.get('rigAssets') or {}
         parts = present_parts(row['skeleton'])
-        if not all(rigs.get(part, {}).get('assetId') for part in parts):
+        if part is not None and (not rigs.get(part, {}).get('assetId') or
+                rigs[part].get('publishedSha256') != row['rigSourceHashes'][part]):
+            raise ValueError('publish the changed mesh Model Asset before targeted Studio Sync')
+        if not all(rigs.get(p, {}).get('assetId') for p in parts):
             raise ValueError('publish each present Real Estate Model Asset before Studio Sync')
         metadata = {
+            'syncPart': part or '',
             'houseSlug': row['slug'],
             'rigAssetIds': {part: str(rigs[part]['assetId']) for part in parts},
             'doorModelAssetId': rigs.get('door', {}).get('assetId', ''),  # legacy Studio integration
@@ -44,20 +50,20 @@ class RealEstateStudioSync:
             ],
         }
         result = self.load_model(
-            str(rigs['house']['assetId']), ['real_estate', row['slug'], 'model'],
+            str(rigs[part or 'house']['assetId']), ['real_estate', row['slug'], 'model'],
             wrapper_name=row['slug'], placement_mode='real-estate-rig', metadata=metadata,
         )
         if result.get('realEstateStats', {}).get('bonesValidated') is not True:
             raise ValueError('Studio did not confirm all published Real Estate mesh rigs')
-        if result.get('realEstateStats', {}).get('rigsValidated') != len(parts):
+        if result.get('realEstateStats', {}).get('rigsValidated') != (1 if part else len(parts)):
             raise ValueError('Studio failed to validate the expected Real Estate rigs')
-        if result.get('realEstateStats', {}).get('texturesApplied') != sum(requires_texture(p) for p in parts):
+        if result.get('realEstateStats', {}).get('texturesApplied') != sum(requires_texture(p) for p in ((part,) if part else parts)):
             raise ValueError('Studio did not apply the expected published house textures')
         # Acknowledgement belongs to this consumer, not to the atlas itself;
         # one house sync must not mark another house as synchronized.
-        for part in parts:
-            texture = row['textures'][part]
+        for part_name in ((part,) if part else parts):
+            texture = row['textures'][part_name]
             if texture.get('atlasVariantId') and texture.get('atlasBindingRevision'):
-                self.store.atlases.mark_synced('real_estate', f'{slug}:{part}',
+                self.store.atlases.mark_synced('real_estate', f'{slug}:{part_name}',
                     texture['atlasBindingRevision'])
         return {'realEstate': self.store.get(slug), 'studio': result}

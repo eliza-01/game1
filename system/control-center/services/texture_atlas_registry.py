@@ -23,6 +23,27 @@ _NAME = re.compile(r"^(?P<key>[^\/\\:*?\"<>|\x00-\x1f]{1,96})_(?P<w>[1-9][0-9]*)
 _SAFE_KEY = re.compile(r"^[\w][\w .-]{0,95}$", re.UNICODE)
 _WINDOWS_RESERVED = {'con','prn','aux','nul', *(f'com{i}' for i in range(1,10)), *(f'lpt{i}' for i in range(1,10))}
 _UPLOAD_LOCK = threading.RLock()
+_ATLAS_VERSION = re.compile(r'^(?P<base>.+)_(?P<version>[0-9]{2,})$')
+
+
+def atlas_version(key: str) -> tuple[str, str]:
+    """Atlas revision is the rightmost _01/_02 suffix, not image resolution.
+
+    Family identity still includes the revision. Legacy unversioned Location
+    Assets remain valid, and no existing atlas IDs are re-keyed by this view.
+    """
+    match = _ATLAS_VERSION.fullmatch(str(key or ''))
+    return (match['base'], match['version']) if match else (str(key or ''), '')
+
+
+def same_atlas_series(current: str, candidate: str) -> bool:
+    """Allow a deliberate Real Estate atlas revision change, not any family."""
+    if current == candidate:
+        return True
+    current_base, current_version = atlas_version(current)
+    candidate_base, candidate_version = atlas_version(candidate)
+    return bool(current_version and candidate_version and current_base == candidate_base)
+
 
 
 def parse_filename(name: str) -> dict | None:
@@ -38,7 +59,8 @@ def parse_filename(name: str) -> dict | None:
     key = unicodedata.normalize('NFKC', m['key']).strip().casefold()
     if not _SAFE_KEY.fullmatch(key) or key.split('.')[0] in _WINDOWS_RESERVED:
         return None
-    return {'atlasKey': key, 'width': w, 'height': h,
+    base, version = atlas_version(key)
+    return {'atlasKey': key, 'baseKey': base, 'version': version, 'width': w, 'height': h,
             'extension': m['ext'].lower(), 'filename': str(name)}
 
 
@@ -149,6 +171,7 @@ class AtlasRegistry:
         row['replacementPending'] = bool(row.get('replacement_sha256') and row['replacement_sha256'] != row['source_sha256'])
         row['uses_alpha'] = bool(row.get('uses_alpha'))
         row['resolution'] = f"{row['width']}x{row['height']}"
+        row['baseKey'], row['version'] = atlas_version(row['atlas_key'])
         return row
 
     def catalog(self, search: str = '') -> list[dict]:
@@ -164,7 +187,9 @@ class AtlasRegistry:
             item = self._variant(dict(row))
             if search and search not in item['atlas_key'] and search not in item['filename'].lower():
                 continue
-            group = result.setdefault(item['atlas_key'], {'atlasKey': item['atlas_key'], 'variants': []})
+            group = result.setdefault(item['atlas_key'], {
+                'atlasKey': item['atlas_key'], 'baseKey': item['baseKey'],
+                'version': item['version'], 'variants': []})
             group['variants'].append(item)
         return list(result.values())
 

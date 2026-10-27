@@ -18,9 +18,10 @@ from sqlite_connection import connect
 from .contracts import identity, parse_name, prices, present_parts, validate_analysis, warnings_for_analysis
 from .textures import available_textures, resolve_texture
 from .fbx import inspect, prepare_publication
+from .mesh_revisions import inspect_revision, save_immutable
 from .publication_textures import prepare_texture, published_format
 from .collision_policy import is_collision_mesh, requires_texture, default_no_collide
-from services.texture_atlas_registry import AtlasRegistry, parse_filename
+from services.texture_atlas_registry import AtlasRegistry, parse_filename, atlas_version, same_atlas_series
 
 
 def glass_default(part: str) -> bool:
@@ -81,6 +82,8 @@ class RealEstateStore:
             columns = {column[1] for column in db.execute('PRAGMA table_info(real_estate)')}
             if 'model_rigs_json' not in columns:
                 db.execute("ALTER TABLE real_estate ADD COLUMN model_rigs_json TEXT NOT NULL DEFAULT '{}'")
+            if 'mesh_sources_json' not in columns:
+                db.execute("ALTER TABLE real_estate ADD COLUMN mesh_sources_json TEXT NOT NULL DEFAULT '{}'")
             if 'mesh_options_json' not in columns:
                 db.execute("ALTER TABLE real_estate ADD COLUMN mesh_options_json TEXT NOT NULL DEFAULT '{}'")
             # M107 v2: old model_published_hash stored a bundle fingerprint of
@@ -167,6 +170,33 @@ class RealEstateStore:
                     'assetId': str(variant['published_id'])})
         return choices
 
+    @staticmethod
+    def _atlas_presentation(texture: dict, catalog: dict[str, dict]) -> dict:
+        """Resolve display metadata AFTER reuse references have supplied a filename.
+
+        Versions (_01, _02) are independent families sharing a mesh atlas series.
+        Never infer a published ID or a binding merely from a filename.
+        """
+        filename = str(texture.get('filename') or Path(texture.get('path') or '').name)
+        parsed = parse_filename(filename)
+        key = texture.get('atlasKey') or (parsed['atlasKey'] if parsed else '')
+        family = catalog.get(key)
+        base, version = atlas_version(key)
+        result = dict(texture)
+        result['atlasLegacyWarning'] = parsed is None
+        result['atlasKey'] = key
+        result['atlasVersion'] = version
+        result['atlasVariants'] = family['variants'] if family else []
+        # Include all resolution options from every published/registered version.
+        # The currently bound variant identity is never derived from a name.
+        choices = [dict(variant, atlasKey=group['atlasKey'])
+                   for group in catalog.values()
+                   if version and group.get('version') and group.get('baseKey') == base
+                   for variant in group['variants']]
+        choices.sort(key=lambda v: (int(v['version']), -int(v['width'])*int(v['height']), v['id']))
+        result['atlasVersionChoices'] = choices
+        return result
+
     def _atlas_metadata(self, slug: str, part: str, texture: dict,
                         catalog: dict[str, dict]) -> dict:
         binding = self.atlases.binding('real_estate', f'{slug}:{part}')
@@ -181,11 +211,7 @@ class RealEstateStore:
         else:
             result.update(atlasVariantId=None, atlasKey='', atlasBindingRevision=0,
                 atlasSyncStatus='')
-        parsed = parse_filename(str(result.get('filename') or Path(result.get('path') or '').name))
-        result['atlasLegacyWarning'] = parsed is None
-        key = binding['atlas_key'] if binding else (parsed['atlasKey'] if parsed else '')
-        family = catalog.get(key)
-        result['atlasVariants'] = family['variants'] if family else []
+        result = self._atlas_presentation(result, catalog)
         result['atlasCurrent'] = binding['current'] if binding else None
         return result
 
@@ -201,8 +227,8 @@ class RealEstateStore:
         if not selected or not selected['current']:
             raise ValueError('select a published atlas variant')
         current_key = row['textures'][part].get('atlasKey')
-        if current_key and selected['atlas_key'] != current_key:
-            raise ValueError('select a resolution from the same atlas family')
+        if current_key and not same_atlas_series(current_key, selected['atlas_key']):
+            raise ValueError('select an atlas resolution or version from the same mesh series')
         self.atlases.bind('real_estate', f'{slug}:{part}', variant_id,
             expected_revision=expected_revision)
         # An explicit resolution choice supersedes a prior owner reference.
@@ -227,6 +253,8 @@ class RealEstateStore:
             row['rigWarnings'] = warnings_for_analysis(row['skeleton'])
             active = present_parts(row['skeleton'])
             row['meshParts'] = list(active)
+            row['meshSources'] = json.loads(row.pop('mesh_sources_json') or '{}')
+            row['rigSourceHashes'] = {part: row['meshSources'].get(part, {}).get('sha256') or row['model_sha256'] for part in active}
             row['meshOptions'] = mesh_options(active, json.loads(row.pop('mesh_options_json') or '{}'))
             # Legacy records may still store door assets after the FBX is
             # replaced with a doorless house; they are publication history,
@@ -237,7 +265,7 @@ class RealEstateStore:
                 json.loads(row.pop('model_rigs_json') or '{}').items() if part in active}
             current = {'model': all(
                 row['rigAssets'].get(part, {}).get('assetId') and
-                row['rigAssets'][part].get('publishedSha256') == row['model_sha256']
+                row['rigAssets'][part].get('publishedSha256') == row['rigSourceHashes'][part]
                 for part in active)}
             for part in active:
                 # Physics geometry has a Model Asset but never needs an Image
@@ -266,15 +294,16 @@ class RealEstateStore:
                         row['textures'][part] = {**row['textures'][part], **{
                             k: owner.get(k) for k in ('filename', 'atlasVariantId', 'atlasKey',
                                 'atlasBindingRevision', 'atlasSyncStatus', 'atlasVariants',
-                                'atlasLegacyWarning', 'atlasCurrent')}}
+                                'atlasLegacyWarning', 'atlasVersion', 'atlasVersionChoices', 'atlasCurrent')}}
                         current[part] = bool(current['house'])
                     else:
                         owner = references.get(reference)
                         if owner:
-                            row['textures'][part] = {**texture, **{
-                                'path':owner['path'], 'sha256':owner['sha256'],
-                                'assetId':owner['assetId'], 'publishedSha256':owner['sha256'],
-                                'publicationFormat':published_format(Path(owner['path']))}}
+                            effective = {**texture, 'path': owner['path'],
+                                'filename': owner['filename'], 'sha256': owner['sha256'],
+                                'assetId': owner['assetId'], 'publishedSha256': owner['sha256'],
+                                'publicationFormat': published_format(Path(owner['path']))}
+                            row['textures'][part] = self._atlas_presentation(effective, atlas_catalog)
                         current[part] = owner is not None
                 else:
                     current[part] = (bool(texture['atlasCurrent']) if texture['atlasCurrent'] is not None
@@ -374,6 +403,8 @@ class RealEstateStore:
             if path is not None and part not in atlas_selections
         }
         model_hash = _sha(source)
+        if existing and existing.get('meshSources') and raw_source and model_hash != existing['model_sha256']:
+            raise ValueError('This Estate uses independent FBX mesh revisions. Replace each chosen mesh from the full FBX via Mesh source / Studio sync; whole-house replacement would overwrite their separate skeleton contracts.')
         texture_hashes = {part: _sha(path) for part, path in texture_sources.items() if path is not None}
         # Prevent overwriting canonical source with a different mesh hierarchy silently.
         source_change = not existing or existing['model_sha256'] != model_hash
@@ -464,6 +495,49 @@ class RealEstateStore:
                 self.atlases.unbind('real_estate', f'{slug}:{part}')
         self.export()
         return self.get(slug)
+
+    def inspect_mesh(self, slug: str, part: str, source_path: str) -> dict:
+        row = self.get(slug)
+        if not row or part not in row['meshParts']:
+            raise ValueError('select a registered Real Estate mesh')
+        source = Path(str(source_path or '')).expanduser().resolve()
+        mesh = inspect_revision(self.root, source, part)
+        return {'slug': slug, 'part': part, 'sourcePath': str(source),
+                'mesh': mesh, 'sourceSha256': _sha(source),
+                'currentSha256': row['rigSourceHashes'][part]}
+
+    def replace_mesh(self, slug: str, part: str, source_path: str,
+                     *, expected_revision: int) -> dict:
+        """Replace only one named mesh; no Model or Image publication here."""
+        row = self.get(slug)
+        if row is None or part not in row['meshParts']:
+            raise ValueError('unknown Real Estate mesh')
+        if row['revision'] != expected_revision:
+            raise ValueError('house changed since inspection; refresh before replacing a mesh')
+        if self._pending_publication_for_house(slug):
+            raise ValueError('cannot replace a mesh during an unresolved publication')
+        source = Path(str(source_path or '')).expanduser().resolve()
+        new_mesh = inspect_revision(self.root, source, part)
+        snapshot = save_immutable(self.root, slug, part, source)
+        new_skeleton = dict(row['skeleton'])
+        new_skeleton['meshes'] = [new_mesh if old['name'] == part else old
+                                   for old in row['skeleton']['meshes']]
+        new_sources = dict(row['meshSources'])
+        new_sources[part] = snapshot
+        with self.connect() as db:
+            cursor = db.execute("""UPDATE real_estate SET skeleton_json=?,mesh_sources_json=?,
+                revision=revision+1,updated_at=? WHERE slug=? AND revision=?""",
+                (json.dumps(new_skeleton, ensure_ascii=False),
+                 json.dumps(new_sources, ensure_ascii=False), time.time(), slug, expected_revision))
+            if cursor.rowcount != 1:
+                raise ValueError('concurrent house revision change; refresh and retry')
+        self.export()
+        return self.get(slug)
+
+    def _pending_publication_for_house(self, slug: str) -> bool:
+        with self.connect() as db:
+            return bool(db.execute("""SELECT 1 FROM real_estate_publications
+                WHERE house_slug=? AND asset_id='' AND operation!='' LIMIT 1""", (slug,)).fetchone())
 
     def delete(self, slug: str) -> dict:
         """Retire the authoring registration, not uploaded Roblox assets or shared atlases.
@@ -556,48 +630,51 @@ class RealEstateStore:
                 continue
             if reference and not row['publicationCurrent'][part]:
                 raise ValueError(f'{part} reused texture owner must publish first')
-        if (scope in ('all', 'model') and not row['publicationCurrent']['model']) or force_model_part:
-            progress('Preparing ' + ' and '.join(part + ' rig' for part in active) + ' in Blender')
-            with tempfile.TemporaryDirectory(prefix='game1-house-model-') as temp:
+        # Once an Estate has mesh-specific sources, stage every requested
+        # changed rig independently. A full-FBX edit may be published one part
+        # at a time without replacing the other Model Asset IDs.
+        scoped_parts = [part for part in active if (
+            (force_model_part == part) or
+            (force_model_part is None and scope in ('all', 'model')
+             and (row['rigAssets'].get(part, {}).get('publishedSha256') != row['rigSourceHashes'][part]
+                  or not row['rigAssets'].get(part, {}).get('assetId'))))]
+        if row['meshSources'] and scoped_parts:
+            with tempfile.TemporaryDirectory(prefix='game1-estate-mesh-revision-') as temp:
                 staging = Path(temp)
-                # Each skeleton is published as its own Roblox Model Asset;
-                # otherwise Roblox collapses both rigs under one RootPart.
-                images = {
-                    part: prepare_texture(self.root, part, _source(self.root, data['path']), staging)
-                    for part, data in row['textures'].items() if requires_texture(part)
-                }
                 rigs = staging / 'rigs'
-                prepare_publication(self.root, _source(self.root, row['model_path']), rigs,
-                    row['skeleton'], {part: str(path) for part, path in images.items()})
-                for part in active:
-                    if force_model_part is not None and part != force_model_part:
-                        continue
+                for part in scoped_parts:
                     row = self.get(slug)
-                    saved = row['rigAssets'].get(part, {})
-                    if force_model_part is None and saved.get('assetId') and saved.get('publishedSha256') == row['model_sha256']:
-                        continue  # Retry after partial success must not duplicate assets.
-                    kind = 'model:'+part
-                    progress(f'Publishing {part} rig · Roblox Open Cloud')
-                    pending = self._pending_publication(slug, kind, row['model_sha256'])
+                    pinned = row['meshSources'].get(part) or {
+                        'path':row['model_path'], 'sha256':row['model_sha256']}
+                    fingerprint = pinned['sha256']
+                    pinned_source = _source(self.root, pinned['path'])
+                    if not pinned_source.is_file() or _sha(pinned_source) != fingerprint:
+                        raise ValueError(f'{part}: immutable FBX revision source is missing or changed; refusing publication')
+                    progress(f'Preparing only {part} from its authoring FBX source')
+                    texture = row['textures'].get(part, {})
+                    images = ({part: str(prepare_texture(self.root, part,
+                        _source(self.root, texture['path']), staging))}
+                        if requires_texture(part) else {})
+                    selected = next(m for m in row['skeleton']['meshes'] if m['name'] == part)
+                    prepare_publication(self.root, pinned_source, rigs,
+                        {'schemaVersion': 1, 'meshes': [selected]}, images, only_part=part)
+                    pending = self._pending_publication(slug, 'model:' + part, fingerprint)
                     if pending:
-                        operation = pending['operation']
-                        pending_id = pending['id']
+                        operation, pending_id = pending['operation'], pending['id']
                     else:
-                        operation = create_model_asset(rigs / f'{part}.fbx',
+                        operation = create_model_asset(rigs / (part + '.fbx'),
                             **{**common, 'display_name':f'{slug} {part}'})
-                        pending_id = self._remember_operation(slug, kind, row['model_sha256'], operation)
-                    progress(f'Waiting for Roblox to process {part} rig')
+                        pending_id = self._remember_operation(slug, 'model:' + part, fingerprint, operation)
+                    progress(f'Waiting for Roblox to process only {part}')
                     result = wait_for_operation(operation, api_key=credentials['apiKey'])
-                    model_rigs = row['rigAssets']
-                    model_rigs[part] = {'assetId':str(result.asset_id),
-                                        'publishedSha256':row['model_sha256']}
-                    now = time.time()
+                    rigs_data = self.get(slug)['rigAssets']
+                    rigs_data[part] = {'assetId':str(result.asset_id), 'publishedSha256':fingerprint}
                     with self.connect() as db:
                         db.execute('UPDATE real_estate SET model_rigs_json=?,model_asset_id=?,model_moderation=?,updated_at=? WHERE slug=?',
-                            (json.dumps(model_rigs), model_rigs.get('house',{}).get('assetId') or row['model_asset_id'],
-                             result.moderation_state or '', now, slug))
+                            (json.dumps(rigs_data), rigs_data.get('house',{}).get('assetId') or row['model_asset_id'],
+                             result.moderation_state or '', time.time(), slug))
                         db.execute('UPDATE real_estate_publications SET asset_id=?,published_at=? WHERE id=?',
-                            (str(result.asset_id), now, pending_id))
+                                   (str(result.asset_id), time.time(), pending_id))
                     self.export()
             row = self.get(slug)
             if row['publicationCurrent']['model']:
@@ -605,6 +682,56 @@ class RealEstateStore:
                     db.execute('UPDATE real_estate SET model_published_hash=? WHERE slug=?',
                                (row['model_sha256'], slug))
                 self.export()
+        else:
+            if (scope in ('all', 'model') and not row['publicationCurrent']['model']) or force_model_part:
+                progress('Preparing ' + ' and '.join(part + ' rig' for part in active) + ' in Blender')
+                with tempfile.TemporaryDirectory(prefix='game1-house-model-') as temp:
+                    staging = Path(temp)
+                    # Each skeleton is published as its own Roblox Model Asset;
+                    # otherwise Roblox collapses both rigs under one RootPart.
+                    images = {
+                        part: prepare_texture(self.root, part, _source(self.root, data['path']), staging)
+                        for part, data in row['textures'].items() if requires_texture(part)
+                    }
+                    rigs = staging / 'rigs'
+                    prepare_publication(self.root, _source(self.root, row['model_path']), rigs,
+                        row['skeleton'], {part: str(path) for part, path in images.items()})
+                    for part in active:
+                        if force_model_part is not None and part != force_model_part:
+                            continue
+                        row = self.get(slug)
+                        saved = row['rigAssets'].get(part, {})
+                        if force_model_part is None and saved.get('assetId') and saved.get('publishedSha256') == row['model_sha256']:
+                            continue  # Retry after partial success must not duplicate assets.
+                        kind = 'model:'+part
+                        progress(f'Publishing {part} rig · Roblox Open Cloud')
+                        pending = self._pending_publication(slug, kind, row['model_sha256'])
+                        if pending:
+                            operation = pending['operation']
+                            pending_id = pending['id']
+                        else:
+                            operation = create_model_asset(rigs / f'{part}.fbx',
+                                **{**common, 'display_name':f'{slug} {part}'})
+                            pending_id = self._remember_operation(slug, kind, row['model_sha256'], operation)
+                        progress(f'Waiting for Roblox to process {part} rig')
+                        result = wait_for_operation(operation, api_key=credentials['apiKey'])
+                        model_rigs = row['rigAssets']
+                        model_rigs[part] = {'assetId':str(result.asset_id),
+                                            'publishedSha256':row['model_sha256']}
+                        now = time.time()
+                        with self.connect() as db:
+                            db.execute('UPDATE real_estate SET model_rigs_json=?,model_asset_id=?,model_moderation=?,updated_at=? WHERE slug=?',
+                                (json.dumps(model_rigs), model_rigs.get('house',{}).get('assetId') or row['model_asset_id'],
+                                 result.moderation_state or '', now, slug))
+                            db.execute('UPDATE real_estate_publications SET asset_id=?,published_at=? WHERE id=?',
+                                (str(result.asset_id), now, pending_id))
+                        self.export()
+                row = self.get(slug)
+                if row['publicationCurrent']['model']:
+                    with self.connect() as db:
+                        db.execute('UPDATE real_estate SET model_published_hash=? WHERE slug=?',
+                                   (row['model_sha256'], slug))
+                    self.export()
         for part in active:
             if scope != 'all' and image_part != part:
                 continue

@@ -84,6 +84,7 @@ foreach($Marker in @(
     'StudioDebugPreferenceBridge',
     'StudioModelLoadCommands',
     'StudioRealEstateModel',
+    'StudioRealEstatePartSync',
     'StudioRealEstateRigValidation',
     'StudioRealEstateSocketRecovery',
     'StudioRealEstateCollisionPolicy',

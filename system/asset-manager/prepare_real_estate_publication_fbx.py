@@ -11,16 +11,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "control-center"))
 from real_estate.collision_policy import is_collision_mesh
 
 
-def main(source, output, texture_config):
+def main(source, output, texture_config, selected_part=None):
     bpy.ops.object.select_all(action='SELECT')
     bpy.ops.object.delete(use_global=False)
     bpy.ops.import_scene.fbx(filepath=str(source), use_anim=False)
     reports = {}
     rigs = {}
     authored = [obj.name for obj in bpy.context.scene.objects if obj.type == 'MESH']
-    if 'house' not in authored:
+    if selected_part is None and 'house' not in authored:
         raise RuntimeError('The FBX must contain a mesh named house')
-    parts = tuple(sorted(authored, key=lambda name: (name != 'house', name.casefold(), name)))
+    if selected_part is not None and selected_part not in authored:
+        raise RuntimeError('Selected mesh ' + selected_part + ' not present in the FBX')
+    parts = (selected_part,) if selected_part else tuple(sorted(authored, key=lambda name: (name != 'house', name.casefold(), name)))
     for part in parts:
         mesh = find_mesh(bpy, part)
         rig = find_rig(bpy, mesh, part)
@@ -120,7 +122,7 @@ def main(source, output, texture_config):
             'rigAssets': {part: f'{part}.fbx' for part in parts}}
 
 args = sys.argv[sys.argv.index('--') + 1:]
-if len(args) != 4:
+if len(args) not in (4, 5):
     raise RuntimeError('usage: blender ... -- source.fbx target.fbx textures.json report.json')
-report = main(Path(args[0]), Path(args[1]), json.loads(Path(args[2]).read_text(encoding='utf-8')))
+report = main(Path(args[0]), Path(args[1]), json.loads(Path(args[2]).read_text(encoding='utf-8')), args[4] if len(args) == 5 else None)
 Path(args[3]).write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')

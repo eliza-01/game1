@@ -48,6 +48,8 @@
   "atlases": [
     {
       "atlasKey": "big_tree_01",
+      "baseKey": "big_tree",
+      "version": "01",
       "variants": [
         {
           "id": 1,
@@ -68,7 +70,9 @@
           "replacement_sha256": null,
           "current": true,
           "replacementPending": false,
-          "resolution": "256x512"
+          "resolution": "256x512",
+          "baseKey": "big_tree",
+          "version": "01"
         },
         {
           "id": 2,
@@ -89,12 +93,16 @@
           "replacement_sha256": null,
           "current": true,
           "replacementPending": false,
-          "resolution": "128x256"
+          "resolution": "128x256",
+          "baseKey": "big_tree",
+          "version": "01"
         }
       ]
     },
     {
       "atlasKey": "house_level4_01",
+      "baseKey": "house_level4",
+      "version": "01",
       "variants": [
         {
           "id": 5,
@@ -115,12 +123,16 @@
           "replacement_sha256": null,
           "current": true,
           "replacementPending": false,
-          "resolution": "4096x4096"
+          "resolution": "4096x4096",
+          "baseKey": "house_level4",
+          "version": "01"
         }
       ]
     },
     {
       "atlasKey": "lantern_01",
+      "baseKey": "lantern",
+      "version": "01",
       "variants": [
         {
           "id": 3,
@@ -141,12 +153,16 @@
           "replacement_sha256": null,
           "current": true,
           "replacementPending": false,
-          "resolution": "64x128"
+          "resolution": "64x128",
+          "baseKey": "lantern",
+          "version": "01"
         }
       ]
     },
     {
       "atlasKey": "restoration_01",
+      "baseKey": "restoration",
+      "version": "01",
       "variants": [
         {
           "id": 4,
@@ -167,7 +183,9 @@
           "replacement_sha256": null,
           "current": true,
           "replacementPending": false,
-          "resolution": "2048x2048"
+          "resolution": "2048x2048",
+          "baseKey": "restoration",
+          "version": "01"
         }
       ]
     }
@@ -656,7 +674,9 @@
           "replacement_sha256": null,
           "current": true,
           "replacementPending": false,
-          "resolution": "64x128"
+          "resolution": "64x128",
+          "baseKey": "lantern",
+          "version": "01"
         }
       ],
       "textureUsesAlpha": true,
@@ -828,7 +848,9 @@
           "replacement_sha256": null,
           "current": true,
           "replacementPending": false,
-          "resolution": "2048x2048"
+          "resolution": "2048x2048",
+          "baseKey": "restoration",
+          "version": "01"
         }
       ],
       "textureUsesAlpha": true,
@@ -913,7 +935,9 @@
           "replacement_sha256": null,
           "current": true,
           "replacementPending": false,
-          "resolution": "256x512"
+          "resolution": "256x512",
+          "baseKey": "big_tree",
+          "version": "01"
         },
         {
           "id": 2,
@@ -934,7 +958,9 @@
           "replacement_sha256": null,
           "current": true,
           "replacementPending": false,
-          "resolution": "128x256"
+          "resolution": "128x256",
+          "baseKey": "big_tree",
+          "version": "01"
         }
       ],
       "textureUsesAlpha": true,

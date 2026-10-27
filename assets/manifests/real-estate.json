@@ -62,6 +62,10 @@
       "meshParts": [
         "house"
       ],
+      "meshSources": {},
+      "rigSourceHashes": {
+        "house": "43245d3b532c85dd2122a8499c58f6c8a1da4c355d10802ad5cb46830dd279a5"
+      },
       "meshOptions": {
         "house": {
           "glass": false,
@@ -82,7 +86,9 @@
           "atlasBindingRevision": 0,
           "atlasSyncStatus": "",
           "atlasLegacyWarning": true,
+          "atlasVersion": "",
           "atlasVariants": [],
+          "atlasVersionChoices": [],
           "atlasCurrent": null
         }
       },
@@ -272,6 +278,11 @@
         "house",
         "door"
       ],
+      "meshSources": {},
+      "rigSourceHashes": {
+        "house": "3887982ea007cfc57939da8b8bc12f19519cc1b71e338a1abbe5fc0b255a1610",
+        "door": "3887982ea007cfc57939da8b8bc12f19519cc1b71e338a1abbe5fc0b255a1610"
+      },
       "meshOptions": {
         "house": {
           "glass": false,
@@ -296,7 +307,9 @@
           "atlasBindingRevision": 0,
           "atlasSyncStatus": "",
           "atlasLegacyWarning": true,
+          "atlasVersion": "",
           "atlasVariants": [],
+          "atlasVersionChoices": [],
           "atlasCurrent": null
         },
         "door": {
@@ -310,7 +323,9 @@
           "atlasBindingRevision": 0,
           "atlasSyncStatus": "",
           "atlasLegacyWarning": true,
+          "atlasVersion": "",
           "atlasVariants": [],
+          "atlasVersionChoices": [],
           "atlasCurrent": null
         }
       },
@@ -611,6 +626,14 @@
         "restoration",
         "window_frames_glass"
       ],
+      "meshSources": {},
+      "rigSourceHashes": {
+        "house": "08fbbd5917f497e1f38d5b330f33ff69abdf215b5e87ecc5891fb74d7901ef35",
+        "col_mesh": "08fbbd5917f497e1f38d5b330f33ff69abdf215b5e87ecc5891fb74d7901ef35",
+        "door": "08fbbd5917f497e1f38d5b330f33ff69abdf215b5e87ecc5891fb74d7901ef35",
+        "restoration": "08fbbd5917f497e1f38d5b330f33ff69abdf215b5e87ecc5891fb74d7901ef35",
+        "window_frames_glass": "08fbbd5917f497e1f38d5b330f33ff69abdf215b5e87ecc5891fb74d7901ef35"
+      },
       "meshOptions": {
         "house": {
           "glass": false,
@@ -652,6 +675,7 @@
           "atlasBindingRevision": 1,
           "atlasSyncStatus": "synced",
           "atlasLegacyWarning": false,
+          "atlasVersion": "01",
           "atlasVariants": [
             {
               "id": 5,
@@ -672,7 +696,35 @@
               "replacement_sha256": null,
               "current": true,
               "replacementPending": false,
-              "resolution": "4096x4096"
+              "resolution": "4096x4096",
+              "baseKey": "house_level4",
+              "version": "01"
+            }
+          ],
+          "atlasVersionChoices": [
+            {
+              "id": 5,
+              "family_id": 4,
+              "width": 4096,
+              "height": 4096,
+              "filename": "house_level4_01_4096x4096_atlas.png",
+              "original_filename": "house_level4_01_4096x4096_atlas.png",
+              "source_path": "assets/source/texture-atlases/house_level4_01/4096x4096/house_level4_01_4096x4096_atlas.png",
+              "source_sha256": "a6a63fa8cb93d67995da16d3c211357f698535dc0118b55be357e23d3424c307",
+              "uses_alpha": false,
+              "published_id": "92116826074029",
+              "published_sha256": "a6a63fa8cb93d67995da16d3c211357f698535dc0118b55be357e23d3424c307",
+              "moderation_state": "Reviewing",
+              "published_at": 1793090925.4210222,
+              "created_at": 1793090824.8330345,
+              "atlas_key": "house_level4_01",
+              "replacement_sha256": null,
+              "current": true,
+              "replacementPending": false,
+              "resolution": "4096x4096",
+              "baseKey": "house_level4",
+              "version": "01",
+              "atlasKey": "house_level4_01"
             }
           ],
           "atlasCurrent": true
@@ -693,13 +745,64 @@
           "assetId": "138456659862372",
           "publishedSha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
           "publicationFormat": "source",
-          "filename": "",
+          "filename": "restoration_01_2048x2048_atlas.png",
           "atlasVariantId": null,
-          "atlasKey": "",
+          "atlasKey": "restoration_01",
           "atlasBindingRevision": 0,
           "atlasSyncStatus": "",
-          "atlasLegacyWarning": true,
-          "atlasVariants": [],
+          "atlasLegacyWarning": false,
+          "atlasVersion": "01",
+          "atlasVariants": [
+            {
+              "id": 4,
+              "family_id": 3,
+              "width": 2048,
+              "height": 2048,
+              "filename": "restoration_01_2048x2048_atlas.png",
+              "original_filename": "restoration_01_2048x2048_atlas.png",
+              "source_path": "assets/source/texture-atlases/restoration_01/2048x2048/revisions/2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683/restoration_01_2048x2048_atlas.png",
+              "source_sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
+              "uses_alpha": true,
+              "published_id": "138456659862372",
+              "published_sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
+              "moderation_state": "Reviewing",
+              "published_at": 1792938075.6938567,
+              "created_at": 1792931156.6928835,
+              "atlas_key": "restoration_01",
+              "replacement_sha256": null,
+              "current": true,
+              "replacementPending": false,
+              "resolution": "2048x2048",
+              "baseKey": "restoration",
+              "version": "01"
+            }
+          ],
+          "atlasVersionChoices": [
+            {
+              "id": 4,
+              "family_id": 3,
+              "width": 2048,
+              "height": 2048,
+              "filename": "restoration_01_2048x2048_atlas.png",
+              "original_filename": "restoration_01_2048x2048_atlas.png",
+              "source_path": "assets/source/texture-atlases/restoration_01/2048x2048/revisions/2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683/restoration_01_2048x2048_atlas.png",
+              "source_sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
+              "uses_alpha": true,
+              "published_id": "138456659862372",
+              "published_sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
+              "moderation_state": "Reviewing",
+              "published_at": 1792938075.6938567,
+              "created_at": 1792931156.6928835,
+              "atlas_key": "restoration_01",
+              "replacement_sha256": null,
+              "current": true,
+              "replacementPending": false,
+              "resolution": "2048x2048",
+              "baseKey": "restoration",
+              "version": "01",
+              "atlasKey": "restoration_01"
+            }
+          ],
           "atlasCurrent": null
         },
         "restoration": {
@@ -709,13 +812,64 @@
           "assetId": "138456659862372",
           "publishedSha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
           "publicationFormat": "source",
-          "filename": "",
+          "filename": "restoration_01_2048x2048_atlas.png",
           "atlasVariantId": null,
-          "atlasKey": "",
+          "atlasKey": "restoration_01",
           "atlasBindingRevision": 0,
           "atlasSyncStatus": "",
-          "atlasLegacyWarning": true,
-          "atlasVariants": [],
+          "atlasLegacyWarning": false,
+          "atlasVersion": "01",
+          "atlasVariants": [
+            {
+              "id": 4,
+              "family_id": 3,
+              "width": 2048,
+              "height": 2048,
+              "filename": "restoration_01_2048x2048_atlas.png",
+              "original_filename": "restoration_01_2048x2048_atlas.png",
+              "source_path": "assets/source/texture-atlases/restoration_01/2048x2048/revisions/2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683/restoration_01_2048x2048_atlas.png",
+              "source_sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
+              "uses_alpha": true,
+              "published_id": "138456659862372",
+              "published_sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
+              "moderation_state": "Reviewing",
+              "published_at": 1792938075.6938567,
+              "created_at": 1792931156.6928835,
+              "atlas_key": "restoration_01",
+              "replacement_sha256": null,
+              "current": true,
+              "replacementPending": false,
+              "resolution": "2048x2048",
+              "baseKey": "restoration",
+              "version": "01"
+            }
+          ],
+          "atlasVersionChoices": [
+            {
+              "id": 4,
+              "family_id": 3,
+              "width": 2048,
+              "height": 2048,
+              "filename": "restoration_01_2048x2048_atlas.png",
+              "original_filename": "restoration_01_2048x2048_atlas.png",
+              "source_path": "assets/source/texture-atlases/restoration_01/2048x2048/revisions/2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683/restoration_01_2048x2048_atlas.png",
+              "source_sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
+              "uses_alpha": true,
+              "published_id": "138456659862372",
+              "published_sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
+              "moderation_state": "Reviewing",
+              "published_at": 1792938075.6938567,
+              "created_at": 1792931156.6928835,
+              "atlas_key": "restoration_01",
+              "replacement_sha256": null,
+              "current": true,
+              "replacementPending": false,
+              "resolution": "2048x2048",
+              "baseKey": "restoration",
+              "version": "01",
+              "atlasKey": "restoration_01"
+            }
+          ],
           "atlasCurrent": null
         },
         "window_frames_glass": {
@@ -725,13 +879,64 @@
           "assetId": "138456659862372",
           "publishedSha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
           "publicationFormat": "source",
-          "filename": "",
+          "filename": "restoration_01_2048x2048_atlas.png",
           "atlasVariantId": null,
-          "atlasKey": "",
+          "atlasKey": "restoration_01",
           "atlasBindingRevision": 0,
           "atlasSyncStatus": "",
-          "atlasLegacyWarning": true,
-          "atlasVariants": [],
+          "atlasLegacyWarning": false,
+          "atlasVersion": "01",
+          "atlasVariants": [
+            {
+              "id": 4,
+              "family_id": 3,
+              "width": 2048,
+              "height": 2048,
+              "filename": "restoration_01_2048x2048_atlas.png",
+              "original_filename": "restoration_01_2048x2048_atlas.png",
+              "source_path": "assets/source/texture-atlases/restoration_01/2048x2048/revisions/2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683/restoration_01_2048x2048_atlas.png",
+              "source_sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
+              "uses_alpha": true,
+              "published_id": "138456659862372",
+              "published_sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
+              "moderation_state": "Reviewing",
+              "published_at": 1792938075.6938567,
+              "created_at": 1792931156.6928835,
+              "atlas_key": "restoration_01",
+              "replacement_sha256": null,
+              "current": true,
+              "replacementPending": false,
+              "resolution": "2048x2048",
+              "baseKey": "restoration",
+              "version": "01"
+            }
+          ],
+          "atlasVersionChoices": [
+            {
+              "id": 4,
+              "family_id": 3,
+              "width": 2048,
+              "height": 2048,
+              "filename": "restoration_01_2048x2048_atlas.png",
+              "original_filename": "restoration_01_2048x2048_atlas.png",
+              "source_path": "assets/source/texture-atlases/restoration_01/2048x2048/revisions/2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683/restoration_01_2048x2048_atlas.png",
+              "source_sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
+              "uses_alpha": true,
+              "published_id": "138456659862372",
+              "published_sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
+              "moderation_state": "Reviewing",
+              "published_at": 1792938075.6938567,
+              "created_at": 1792931156.6928835,
+              "atlas_key": "restoration_01",
+              "replacement_sha256": null,
+              "current": true,
+              "replacementPending": false,
+              "resolution": "2048x2048",
+              "baseKey": "restoration",
+              "version": "01",
+              "atlasKey": "restoration_01"
+            }
+          ],
           "atlasCurrent": null
         }
       },
@@ -937,6 +1142,13 @@
         "repair",
         "stone_fence_01_kit"
       ],
+      "meshSources": {},
+      "rigSourceHashes": {
+        "house": "46128429087153328602b202c8742e3c3523d8de3ab7f2ccdd59dfa7fe1b2f82",
+        "door": "46128429087153328602b202c8742e3c3523d8de3ab7f2ccdd59dfa7fe1b2f82",
+        "repair": "46128429087153328602b202c8742e3c3523d8de3ab7f2ccdd59dfa7fe1b2f82",
+        "stone_fence_01_kit": "46128429087153328602b202c8742e3c3523d8de3ab7f2ccdd59dfa7fe1b2f82"
+      },
       "meshOptions": {
         "house": {
           "glass": false,
@@ -972,7 +1184,9 @@
           "atlasBindingRevision": 0,
           "atlasSyncStatus": "",
           "atlasLegacyWarning": true,
+          "atlasVersion": "",
           "atlasVariants": [],
+          "atlasVersionChoices": [],
           "atlasCurrent": null
         },
         "door": {
@@ -987,7 +1201,9 @@
           "atlasBindingRevision": 0,
           "atlasSyncStatus": "",
           "atlasLegacyWarning": true,
+          "atlasVersion": "",
           "atlasVariants": [],
+          "atlasVersionChoices": [],
           "atlasCurrent": null
         },
         "repair": {
@@ -1002,7 +1218,9 @@
           "atlasBindingRevision": 0,
           "atlasSyncStatus": "",
           "atlasLegacyWarning": true,
+          "atlasVersion": "",
           "atlasVariants": [],
+          "atlasVersionChoices": [],
           "atlasCurrent": null
         },
         "stone_fence_01_kit": {
@@ -1017,8 +1235,11 @@
           "atlasBindingRevision": 0,
           "atlasSyncStatus": "",
           "atlasLegacyWarning": true,
+          "atlasVersion": "",
           "atlasVariants": [],
-          "atlasCurrent": null
+          "atlasVersionChoices": [],
+          "atlasCurrent": null,
+          "filename": "stone_fence_01.jpg"
         }
       },
       "rigAssets": {
@@ -1052,6 +1273,8 @@
   "atlasCatalog": [
     {
       "atlasKey": "big_tree_01",
+      "baseKey": "big_tree",
+      "version": "01",
       "variants": [
         {
           "id": 1,
@@ -1072,7 +1295,9 @@
           "replacement_sha256": null,
           "current": true,
           "replacementPending": false,
-          "resolution": "256x512"
+          "resolution": "256x512",
+          "baseKey": "big_tree",
+          "version": "01"
         },
         {
           "id": 2,
@@ -1093,12 +1318,16 @@
           "replacement_sha256": null,
           "current": true,
           "replacementPending": false,
-          "resolution": "128x256"
+          "resolution": "128x256",
+          "baseKey": "big_tree",
+          "version": "01"
         }
       ]
     },
     {
       "atlasKey": "house_level4_01",
+      "baseKey": "house_level4",
+      "version": "01",
       "variants": [
         {
           "id": 5,
@@ -1119,12 +1348,16 @@
           "replacement_sha256": null,
           "current": true,
           "replacementPending": false,
-          "resolution": "4096x4096"
+          "resolution": "4096x4096",
+          "baseKey": "house_level4",
+          "version": "01"
         }
       ]
     },
     {
       "atlasKey": "lantern_01",
+      "baseKey": "lantern",
+      "version": "01",
       "variants": [
         {
           "id": 3,
@@ -1145,12 +1378,16 @@
           "replacement_sha256": null,
           "current": true,
           "replacementPending": false,
-          "resolution": "64x128"
+          "resolution": "64x128",
+          "baseKey": "lantern",
+          "version": "01"
         }
       ]
     },
     {
       "atlasKey": "restoration_01",
+      "baseKey": "restoration",
+      "version": "01",
       "variants": [
         {
           "id": 4,
@@ -1171,7 +1408,9 @@
           "replacement_sha256": null,
           "current": true,
           "replacementPending": false,
-          "resolution": "2048x2048"
+          "resolution": "2048x2048",
+          "baseKey": "restoration",
+          "version": "01"
         }
       ]
     }

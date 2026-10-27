@@ -51,4 +51,4 @@ assert.match(selected,/<option value="atlas:5">/);
 
     def test_index_script_version_bumped(self):
         html=(ROOT/'system/control-center/static/index.html').read_text(encoding='utf-8')
-        self.assertIn('real-estate.js?v=14',html)
+        self.assertRegex(html, r'real-estate\.js\?v=(?:1[4-9]|[2-9][0-9])')

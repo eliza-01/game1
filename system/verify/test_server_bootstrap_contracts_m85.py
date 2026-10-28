@@ -18,7 +18,9 @@ class ServerBootstrapContractsM85(unittest.TestCase):
     def test_all_services_unique_and_dependencies_precede_consumers(self):
         entries = self.entries()
         names = [name for name, _, _ in entries]
-        self.assertEqual(len(entries), 15)
+        self.assertGreaterEqual(len(entries), 15)
+        self.assertIn("HouseSocketService", names)
+        self.assertIn("HouseSocketDebugService", names)
         self.assertEqual(len(set(names)), len(names))
         ready = set()
         for name, _, deps in entries:

@@ -3,14 +3,13 @@
 local HttpService = game:GetService("HttpService")
 local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
 local StudioRealEstateRigValidation = require(script.Parent.StudioRealEstateRigValidation)
-local StudioRealEstateSocketRecovery = require(script.Parent.StudioRealEstateSocketRecovery)
 local StudioRealEstateCollisionPolicy = require(script.Parent.StudioRealEstateCollisionPolicy)
 local StudioRealEstatePlacedCollisionSync = require(script.Parent.StudioRealEstatePlacedCollisionSync)
 local StudioRealEstatePlacedVisualSync = require(script.Parent.StudioRealEstatePlacedVisualSync)
+local PlacedTargets = require(script.Parent.StudioRealEstatePlacedTargets)
 local StudioRealEstateModel = {}
 
--- A hinge must survive import. Missing optional unweighted sockets are
--- reported by the separate validator, not treated as broken Model Assets.
+-- Every authored bone must survive publication before a template is replaced.
 local DOOR_HINGE = "door_01_hinge_socket"
 
 local function loadIndependentRig(assetService: any, assetId: number, part: string): Model
@@ -67,31 +66,29 @@ local function setGlassAppearance(mesh: MeshPart, enabled: boolean)
     end
 end
 
-local function refreshPlaced(slug: string, imageAssets: {[string]: string}, imageAlpha: {[string]: any}, meshOptions: any): (number,number)
+local function refreshPlaced(slug: string, imageAssets: {[string]: string}, imageAlpha: {[string]: any}, meshOptions: any, placedTargets: {Model}): (number,number)
     local changed = 0
     local found = 0
-    for _, instance in workspace:GetDescendants() do
-        if instance:IsA("Model") and instance:GetAttribute("Game1RealEstateSlug") == slug then
-            found += 1
-            local applied = false
-            for _, child in instance:GetDescendants() do
-                if child:IsA("MeshPart") then
-                    local part = string.lower(child.Name)
-                    local settings = meshOptions[part]
-                    if imageAssets[part] then
-                        StudioTextureAppearance.Apply(child, "rbxassetid://" .. imageAssets[part], imageAlpha[part])
-                        setGlassAppearance(child, typeof(settings) == 'table' and settings.glass == true)
-                    end
-                    if imageAssets[part] or StudioRealEstateCollisionPolicy.IsCollider(part) then
-                        StudioRealEstateCollisionPolicy.Apply(child, part, settings)
-                        applied = true
-                    end
+    for _, instance in placedTargets do
+        found += 1
+        local applied = false
+        for _, child in instance:GetDescendants() do
+            if child:IsA("MeshPart") then
+                local part = string.lower(child.Name)
+                local settings = meshOptions[part]
+                if imageAssets[part] then
+                    StudioTextureAppearance.Apply(child, "rbxassetid://" .. imageAssets[part], imageAlpha[part])
+                    setGlassAppearance(child, typeof(settings) == 'table' and settings.glass == true)
+                end
+                if imageAssets[part] or StudioRealEstateCollisionPolicy.IsCollider(part) then
+                    StudioRealEstateCollisionPolicy.Apply(child, part, settings)
+                    applied = true
                 end
             end
-            if applied then
-                instance:SetAttribute("Game1TextureAssetIds", HttpService:JSONEncode(imageAssets))
-                changed += 1
-            end
+        end
+        if applied then
+            instance:SetAttribute("Game1TextureAssetIds", HttpService:JSONEncode(imageAssets))
+            changed += 1
         end
     end
     return changed, found
@@ -142,8 +139,6 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
     local missingSockets = {}
     local socketCount = 0
     local textureCount = 0
-    local reconstructedSockets = {}
-    local socketRecoveryWarnings = {}
     local activePart = "house"
     local ok, problem = pcall(function()
         for _, part in parts do
@@ -151,21 +146,6 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
             local rig = part == "house" and imported
                 or loadIndependentRig(assetService, tonumber(rigIds[part]) :: number, part)
             table.insert(staged, {part = part, rig = rig})
-            -- Restore missing *child* sockets using authored rest-pose offsets
-            -- relative to Bones that actually survived the Roblox import.
-            -- Never modify hinge weights, poses, or any existing imported Bone.
-            local authored = (typeof(metadata.authoredBones) == "table"
-                and metadata.authoredBones[part]) or nil
-            local candidate = StudioRealEstateRigValidation.FindMesh(rig, part)
-            if authored then
-                local recovered, diagnostics = StudioRealEstateSocketRecovery.Restore(candidate, authored)
-                for _, name in recovered do
-                    table.insert(reconstructedSockets, part .. "/" .. name)
-                end
-                for _, message in diagnostics do
-                    table.insert(socketRecoveryWarnings, part .. ": " .. message)
-                end
-            end
             local mesh, inspection = StudioRealEstateRigValidation.Verify(rig, part, manifests[part])
             meshes[part] = mesh
             bones += inspection.boneCount
@@ -190,10 +170,6 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
     end
 
     table.sort(missingSockets)
-    table.sort(reconstructedSockets)
-    for _, message in socketRecoveryWarnings do
-        table.insert(rigWarnings, message)
-    end
     local wrapper = Instance.new("Model")
     wrapper.Name = slug
     for _, entry in staged do
@@ -233,7 +209,6 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
     end
     wrapper:SetAttribute("Game1RealEstateSocketContractComplete", #missingSockets == 0)
     wrapper:SetAttribute("Game1MissingRealEstateSockets", HttpService:JSONEncode(missingSockets))
-    wrapper:SetAttribute("Game1RecoveredRealEstateSockets", HttpService:JSONEncode(reconstructedSockets))
     wrapper:SetAttribute("Game1RealEstateTemplate", true)
     wrapper:SetAttribute("Game1ModelAssetId", tostring(assetId))
     wrapper:SetAttribute("Game1HouseModelAssetId", tostring(assetId))
@@ -253,26 +228,26 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
     end
     -- Retrofit managed physics rigs into existing placed houses, preserving
     -- their CFrame and all user-owned models / furnishings.
-    local collisionUpdated, collisionWarnings = StudioRealEstatePlacedCollisionSync.Update(wrapper, slug)
+    local placedTargets = PlacedTargets.List(slug)
+    local collisionUpdated, collisionWarnings = StudioRealEstatePlacedCollisionSync.Update(wrapper, slug, placedTargets)
     for _, warning in collisionWarnings do
         table.insert(rigWarnings, warning)
     end
-    local visualUpdated, visualFound, visualWarnings = StudioRealEstatePlacedVisualSync.Update(wrapper, slug)
+    local visualUpdated, visualFound, visualWarnings = StudioRealEstatePlacedVisualSync.Update(wrapper, slug, placedTargets)
     for _, warning in visualWarnings do
         table.insert(rigWarnings, warning)
     end
     -- Apply appearance independently; visual replacement may have been skipped
     -- safely for an incomplete/unmanaged placed house.
-    local textureUpdated = select(1, refreshPlaced(slug, imageAssets, imageAlpha, meshOptions))
+    local textureUpdated = select(1, refreshPlaced(slug, imageAssets, imageAlpha, meshOptions, placedTargets))
     return wrapper, {bonesValidated = true, rigsValidated = #parts,
-        texturesApplied = textureCount, workspaceModelsUpdated = visualUpdated,
+        texturesApplied = textureCount, placedSyncVersion = 2, workspaceModelsUpdated = visualUpdated,
         workspaceModelsFound = visualFound,
         workspaceTextureModelsUpdated = textureUpdated,
         workspaceCollisionRigsUpdated = collisionUpdated,
         boneCount = bones, socketCount = socketCount,
         socketContractComplete = #missingSockets == 0,
-        missingSockets = missingSockets, rigWarnings = rigWarnings,
-        recoveredSockets = reconstructedSockets}
+        missingSockets = missingSockets, rigWarnings = rigWarnings}
 end
 
 return table.freeze(StudioRealEstateModel)

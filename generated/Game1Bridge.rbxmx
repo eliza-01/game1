@@ -3940,14 +3940,13 @@ return table.freeze(Policy)
 local HttpService = game:GetService("HttpService")
 local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
 local StudioRealEstateRigValidation = require(script.Parent.StudioRealEstateRigValidation)
-local StudioRealEstateSocketRecovery = require(script.Parent.StudioRealEstateSocketRecovery)
 local StudioRealEstateCollisionPolicy = require(script.Parent.StudioRealEstateCollisionPolicy)
 local StudioRealEstatePlacedCollisionSync = require(script.Parent.StudioRealEstatePlacedCollisionSync)
 local StudioRealEstatePlacedVisualSync = require(script.Parent.StudioRealEstatePlacedVisualSync)
+local PlacedTargets = require(script.Parent.StudioRealEstatePlacedTargets)
 local StudioRealEstateModel = {}
 
--- A hinge must survive import. Missing optional unweighted sockets are
--- reported by the separate validator, not treated as broken Model Assets.
+-- Every authored bone must survive publication before a template is replaced.
 local DOOR_HINGE = "door_01_hinge_socket"
 
 local function loadIndependentRig(assetService: any, assetId: number, part: string): Model
@@ -4004,31 +4003,29 @@ local function setGlassAppearance(mesh: MeshPart, enabled: boolean)
     end
 end
 
-local function refreshPlaced(slug: string, imageAssets: {[string]: string}, imageAlpha: {[string]: any}, meshOptions: any): (number,number)
+local function refreshPlaced(slug: string, imageAssets: {[string]: string}, imageAlpha: {[string]: any}, meshOptions: any, placedTargets: {Model}): (number,number)
     local changed = 0
     local found = 0
-    for _, instance in workspace:GetDescendants() do
-        if instance:IsA("Model") and instance:GetAttribute("Game1RealEstateSlug") == slug then
-            found += 1
-            local applied = false
-            for _, child in instance:GetDescendants() do
-                if child:IsA("MeshPart") then
-                    local part = string.lower(child.Name)
-                    local settings = meshOptions[part]
-                    if imageAssets[part] then
-                        StudioTextureAppearance.Apply(child, "rbxassetid://" .. imageAssets[part], imageAlpha[part])
-                        setGlassAppearance(child, typeof(settings) == 'table' and settings.glass == true)
-                    end
-                    if imageAssets[part] or StudioRealEstateCollisionPolicy.IsCollider(part) then
-                        StudioRealEstateCollisionPolicy.Apply(child, part, settings)
-                        applied = true
-                    end
+    for _, instance in placedTargets do
+        found += 1
+        local applied = false
+        for _, child in instance:GetDescendants() do
+            if child:IsA("MeshPart") then
+                local part = string.lower(child.Name)
+                local settings = meshOptions[part]
+                if imageAssets[part] then
+                    StudioTextureAppearance.Apply(child, "rbxassetid://" .. imageAssets[part], imageAlpha[part])
+                    setGlassAppearance(child, typeof(settings) == 'table' and settings.glass == true)
+                end
+                if imageAssets[part] or StudioRealEstateCollisionPolicy.IsCollider(part) then
+                    StudioRealEstateCollisionPolicy.Apply(child, part, settings)
+                    applied = true
                 end
             end
-            if applied then
-                instance:SetAttribute("Game1TextureAssetIds", HttpService:JSONEncode(imageAssets))
-                changed += 1
-            end
+        end
+        if applied then
+            instance:SetAttribute("Game1TextureAssetIds", HttpService:JSONEncode(imageAssets))
+            changed += 1
         end
     end
     return changed, found
@@ -4079,8 +4076,6 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
     local missingSockets = {}
     local socketCount = 0
     local textureCount = 0
-    local reconstructedSockets = {}
-    local socketRecoveryWarnings = {}
     local activePart = "house"
     local ok, problem = pcall(function()
         for _, part in parts do
@@ -4088,21 +4083,6 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
             local rig = part == "house" and imported
                 or loadIndependentRig(assetService, tonumber(rigIds[part]) :: number, part)
             table.insert(staged, {part = part, rig = rig})
-            -- Restore missing *child* sockets using authored rest-pose offsets
-            -- relative to Bones that actually survived the Roblox import.
-            -- Never modify hinge weights, poses, or any existing imported Bone.
-            local authored = (typeof(metadata.authoredBones) == "table"
-                and metadata.authoredBones[part]) or nil
-            local candidate = StudioRealEstateRigValidation.FindMesh(rig, part)
-            if authored then
-                local recovered, diagnostics = StudioRealEstateSocketRecovery.Restore(candidate, authored)
-                for _, name in recovered do
-                    table.insert(reconstructedSockets, part .. "/" .. name)
-                end
-                for _, message in diagnostics do
-                    table.insert(socketRecoveryWarnings, part .. ": " .. message)
-                end
-            end
             local mesh, inspection = StudioRealEstateRigValidation.Verify(rig, part, manifests[part])
             meshes[part] = mesh
             bones += inspection.boneCount
@@ -4127,10 +4107,6 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
     end
 
     table.sort(missingSockets)
-    table.sort(reconstructedSockets)
-    for _, message in socketRecoveryWarnings do
-        table.insert(rigWarnings, message)
-    end
     local wrapper = Instance.new("Model")
     wrapper.Name = slug
     for _, entry in staged do
@@ -4170,7 +4146,6 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
     end
     wrapper:SetAttribute("Game1RealEstateSocketContractComplete", #missingSockets == 0)
     wrapper:SetAttribute("Game1MissingRealEstateSockets", HttpService:JSONEncode(missingSockets))
-    wrapper:SetAttribute("Game1RecoveredRealEstateSockets", HttpService:JSONEncode(reconstructedSockets))
     wrapper:SetAttribute("Game1RealEstateTemplate", true)
     wrapper:SetAttribute("Game1ModelAssetId", tostring(assetId))
     wrapper:SetAttribute("Game1HouseModelAssetId", tostring(assetId))
@@ -4190,26 +4165,26 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
     end
     -- Retrofit managed physics rigs into existing placed houses, preserving
     -- their CFrame and all user-owned models / furnishings.
-    local collisionUpdated, collisionWarnings = StudioRealEstatePlacedCollisionSync.Update(wrapper, slug)
+    local placedTargets = PlacedTargets.List(slug)
+    local collisionUpdated, collisionWarnings = StudioRealEstatePlacedCollisionSync.Update(wrapper, slug, placedTargets)
     for _, warning in collisionWarnings do
         table.insert(rigWarnings, warning)
     end
-    local visualUpdated, visualFound, visualWarnings = StudioRealEstatePlacedVisualSync.Update(wrapper, slug)
+    local visualUpdated, visualFound, visualWarnings = StudioRealEstatePlacedVisualSync.Update(wrapper, slug, placedTargets)
     for _, warning in visualWarnings do
         table.insert(rigWarnings, warning)
     end
     -- Apply appearance independently; visual replacement may have been skipped
     -- safely for an incomplete/unmanaged placed house.
-    local textureUpdated = select(1, refreshPlaced(slug, imageAssets, imageAlpha, meshOptions))
+    local textureUpdated = select(1, refreshPlaced(slug, imageAssets, imageAlpha, meshOptions, placedTargets))
     return wrapper, {bonesValidated = true, rigsValidated = #parts,
-        texturesApplied = textureCount, workspaceModelsUpdated = visualUpdated,
+        texturesApplied = textureCount, placedSyncVersion = 2, workspaceModelsUpdated = visualUpdated,
         workspaceModelsFound = visualFound,
         workspaceTextureModelsUpdated = textureUpdated,
         workspaceCollisionRigsUpdated = collisionUpdated,
         boneCount = bones, socketCount = socketCount,
         socketContractComplete = #missingSockets == 0,
-        missingSockets = missingSockets, rigWarnings = rigWarnings,
-        recoveredSockets = reconstructedSockets}
+        missingSockets = missingSockets, rigWarnings = rigWarnings}
 end
 
 return table.freeze(StudioRealEstateModel)
@@ -4223,9 +4198,9 @@ return table.freeze(StudioRealEstateModel)
 -- Other rigs, their Asset IDs, and their placed transforms are never rebuilt.
 local HttpService = game:GetService("HttpService")
 local Validation = require(script.Parent.StudioRealEstateRigValidation)
-local Recovery = require(script.Parent.StudioRealEstateSocketRecovery)
 local Collision = require(script.Parent.StudioRealEstateCollisionPolicy)
 local Texture = require(script.Parent.StudioTextureAppearance)
+local PlacedTargets = require(script.Parent.StudioRealEstatePlacedTargets)
 
 local PartSync = {}
 
@@ -4283,11 +4258,6 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
     local old = existingPart(wrapper, part)
     if not old then
         error("Targeted rig " .. part .. " not found in template; run full Sync Studio first")
-    end
-    local candidate = Validation.FindMesh(imported, part)
-    local recovered = {}
-    if typeof(metadata.authoredBones) == "table" and metadata.authoredBones[part] then
-        recovered = select(1, Recovery.Restore(candidate, metadata.authoredBones[part]))
     end
     local mesh, check = Validation.Verify(imported, part, manifests[part])
     local imageId, usesAlpha = nil, nil
@@ -4368,45 +4338,63 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
     local placedFound = 0
     local warnings = {}
     local referenceHouse = houseMesh(wrapper)
-    if referenceHouse then
-        for _, root in workspace:GetDescendants() do
-            if root:IsA("Model") and root:GetAttribute("Game1RealEstateSlug") == slug
-                and root:GetAttribute("Game1RealEstateTemplate") ~= true then
-                placedFound += 1
-                local placed = houseMesh(root)
-                local placedOld = existingPart(root, part)
-                if placed and placedOld then
-                    local transform = placed.CFrame * referenceHouse.CFrame:Inverse()
-                    local cloned: Model? = nil
-                    local success, cause = pcall(function()
-                        local staged = replacement:Clone()
-                        cloned = staged
-                        -- A targeted door update must not unexpectedly close
-                        -- an already-open door in the authoring scene.
-                        local target = if part == "door" then placedOld:GetPivot()
-                            else transform * replacement:GetPivot()
-                        staged:PivotTo(target)
-                        staged.Name = placedOld.Name
-                        staged.Parent = root
-                    end)
-                    if success then
-                        placedOld:Destroy()
-                        placedCount += 1
-                    else
-                        if cloned then cloned:Destroy() end
-                        table.insert(warnings, root:GetFullName() .. ": " .. tostring(cause))
-                    end
-                else
-                    table.insert(warnings, root:GetFullName() .. ": part or house anchor not managed")
-                end
+    if not referenceHouse then
+        table.insert(warnings, "Template house anchor missing or ambiguous; placed rigs not updated")
+    end
+    for _, root in PlacedTargets.List(slug) do
+        placedFound += 1
+        local placed = houseMesh(root)
+        local placedOld = existingPart(root, part)
+        if not referenceHouse or not placed or not placedOld then
+            table.insert(warnings, root:GetFullName() .. ": target rig or house anchor missing")
+            continue
+        end
+        local transform = placed.CFrame * referenceHouse.CFrame:Inverse()
+        local cloned: Model? = nil
+        local success, cause = pcall(function()
+            local staged = replacement:Clone()
+            cloned = staged
+            -- Preserve the placed door's current pivot/open state. Do not
+            -- introduce new socket offsets or rewrite Blender-authored poses.
+            local target = if part == "door" then placedOld:GetPivot()
+                else transform * replacement:GetPivot()
+            staged:PivotTo(target)
+            local originalName = placedOld.Name
+            local backupName = originalName .. "_M152_Previous"
+            if root:FindFirstChild(backupName) then
+                error("Unresolved previous staged rig: " .. backupName)
             end
+            placedOld.Name = backupName
+            staged.Name = originalName
+            local attached, attachError = pcall(function() staged.Parent = root end)
+            if not attached then
+                placedOld.Name = originalName
+                error(attachError)
+            end
+        end)
+        if success then
+            placedOld:Destroy()
+            PlacedTargets.MarkPlaced(root)
+            local placedIds = decodeMap(root:GetAttribute("Game1RigAssetIds"))
+            placedIds[part] = tostring(assetId)
+            root:SetAttribute("Game1RigAssetIds", HttpService:JSONEncode(placedIds))
+            if part == "door" then
+                root:SetAttribute("Game1DoorModelAssetId", tostring(assetId))
+            elseif part == "house" then
+                root:SetAttribute("Game1HouseModelAssetId", tostring(assetId))
+                root:SetAttribute("Game1ModelAssetId", tostring(assetId))
+            end
+            placedCount += 1
+        else
+            if cloned then cloned:Destroy() end
+            table.insert(warnings, root:GetFullName() .. ": " .. tostring(cause))
         end
     end
     return wrapper, {bonesValidated = true, rigsValidated = 1,
         texturesApplied = if imageId then 1 else 0,
-        partialSync = true, part = part, workspaceModelsUpdated = placedCount,
+        partialSync = true, part = part, placedSyncVersion = 2, workspaceModelsUpdated = placedCount,
         workspaceModelsFound = placedFound,
-        boneCount = check.boneCount, recoveredSockets = recovered,
+        boneCount = check.boneCount,
         missingSockets = check.missingSockets, rigWarnings = warnings}
 end
 
@@ -4422,6 +4410,7 @@ return table.freeze(PartSync)
 -- buildings walking on the obsolete visual-mesh collision approximation.
 -- No repositioning / replacement of visual house, door, or edited props.
 local CollisionPolicy = require(script.Parent.StudioRealEstateCollisionPolicy)
+local Targets = require(script.Parent.StudioRealEstatePlacedTargets)
 local Sync = {}
 
 local function findHouse(root: Instance): MeshPart?
@@ -4448,7 +4437,7 @@ local function authoredRigs(template: Model): {[string]: Model}
     return result
 end
 
-function Sync.Update(template: Model, slug: string): (number, {string})
+function Sync.Update(template: Model, slug: string, placedTargets: {Model}?): (number, {string})
     local physicsRigs = authoredRigs(template)
     if next(physicsRigs) == nil then return 0, {} end
     local referenceHouse = findHouse(template)
@@ -4457,42 +4446,38 @@ function Sync.Update(template: Model, slug: string): (number, {string})
     end
     local changed = 0
     local warnings = {}
-    for _, root in workspace:GetDescendants() do
-        if root:IsA("Model") and root:GetAttribute("Game1RealEstateSlug") == slug then
-            local placedHouse = findHouse(root)
-            if not placedHouse then
-                table.insert(warnings, "collision sync skipped for " .. root:GetFullName()
-                    .. ": placed house anchor missing or ambiguous")
+    local targets = placedTargets or Targets.List(slug)
+    for _, root in targets do
+        local placedHouse = findHouse(root)
+        if not placedHouse then
+            table.insert(warnings, "collision sync skipped for " .. root:GetFullName()
+                .. ": placed house anchor missing or ambiguous")
+            continue
+        end
+        local relative = placedHouse.CFrame * referenceHouse.CFrame:Inverse()
+        for part, source in physicsRigs do
+            local old = root:FindFirstChild(source.Name)
+            if old and (not old:IsA("Model") or old:GetAttribute("Game1RealEstatePhysicsRig") ~= true
+                or old:GetAttribute("Game1RealEstatePhysicsMeshName") ~= part) then
+                table.insert(warnings, "collision rig " .. source.Name
+                    .. " already exists but is not managed in " .. root:GetFullName())
                 continue
             end
-            local relative = placedHouse.CFrame * referenceHouse.CFrame:Inverse()
-            for part, source in physicsRigs do
-                local old = root:FindFirstChild(source.Name)
-                if old and (not old:IsA("Model") or old:GetAttribute("Game1RealEstatePhysicsRig") ~= true
-                    or old:GetAttribute("Game1RealEstatePhysicsMeshName") ~= part) then
-                    table.insert(warnings, "collision rig " .. source.Name
-                        .. " already exists but is not managed in " .. root:GetFullName())
-                    continue
-                end
-                local clone: Model? = nil
-                local ok, problem = pcall(function()
-                    local staged = source:Clone()
-                    clone = staged
-                    -- A named, non-optional Model avoids an ambiguous Luau
-                    -- statement starting with '(' after the Clone() call.
-                    -- PivotTo preserves offsets inside the placed collision rig.
-                    staged:PivotTo(relative * source:GetPivot())
-                    staged.Parent = root
-                end)
-                if not ok then
-                    if clone then clone:Destroy() end
-                    table.insert(warnings, "collision rig " .. part .. " could not be staged in "
-                        .. root:GetFullName() .. ": " .. tostring(problem))
-                    continue
-                end
-                if old then old:Destroy() end
-                changed += 1
+            local clone: Model? = nil
+            local ok, problem = pcall(function()
+                local staged = source:Clone()
+                clone = staged
+                staged:PivotTo(relative * source:GetPivot())
+                staged.Parent = root
+            end)
+            if not ok then
+                if clone then clone:Destroy() end
+                table.insert(warnings, "collision rig " .. part .. " could not be staged in "
+                    .. root:GetFullName() .. ": " .. tostring(problem))
+                continue
             end
+            if old then old:Destroy() end
+            changed += 1
         end
     end
     return changed, warnings
@@ -4504,10 +4489,56 @@ return table.freeze(Sync)
       </Item>
       <Item class="ModuleScript" referent="25">
         <Properties>
+          <string name="Name">StudioRealEstatePlacedTargets</string>
+          <string name="Source"><![CDATA[-- One authoritative definition of a placed Real Estate instance.
+-- ServerStorage owns the publishing template. Any matching Model *inside*
+-- Workspace is a placed copy, even when cloned with the template flag intact.
+-- Run only on explicit Studio Sync commands, never per frame.
+local Targets = {}
+
+function Targets.List(slug: string): {Model}
+    local matches = {}
+    if slug == "" then return matches end
+    for _, instance in workspace:GetDescendants() do
+        if instance:IsA("Model") and instance:GetAttribute("Game1RealEstateSlug") == slug then
+            -- Do not count nested models with a duplicate slug twice.
+            local ancestor = instance.Parent
+            local nested = false
+            while ancestor and ancestor ~= workspace do
+                if ancestor:IsA("Model") and ancestor:GetAttribute("Game1RealEstateSlug") == slug then
+                    nested = true
+                    break
+                end
+                ancestor = ancestor.Parent
+            end
+            if not nested then
+                table.insert(matches, instance)
+            end
+        end
+    end
+    table.sort(matches, function(a, b) return a:GetFullName() < b:GetFullName() end)
+    return matches
+end
+
+function Targets.MarkPlaced(root: Model)
+    -- A template clone moved to Workspace must no longer claim to be the
+    -- ServerStorage template. Do this only after a successful model swap.
+    if root:GetAttribute("Game1RealEstateTemplate") == true then
+        root:SetAttribute("Game1RealEstateTemplate", nil)
+    end
+end
+
+return table.freeze(Targets)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="26">
+        <Properties>
           <string name="Name">StudioRealEstatePlacedVisualSync</string>
           <string name="Source"><![CDATA[-- Full Real Estate sync: refresh visual rigs on *all managed placed* houses.
 -- Preserve the house transform, existing door opening pivot, and any unmanaged
 -- player-owned objects. Collision rigs have an independent synchronizer.
+local Targets = require(script.Parent.StudioRealEstatePlacedTargets)
 local VisualSync = {}
 
 local function houseAnchor(root: Instance): MeshPart?
@@ -4536,18 +4567,15 @@ local function visuals(template: Model): {Model}
     return result
 end
 
-function VisualSync.Update(template: Model, slug: string): (number, number, {string})
+function VisualSync.Update(template: Model, slug: string, placedTargets: {Model}?): (number, number, {string})
+    local targets = placedTargets or Targets.List(slug)
     local sourceHouse = houseAnchor(template)
-    if not sourceHouse then return 0, 0, {"Full visual sync skipped: template house anchor missing or ambiguous"} end
+    if not sourceHouse then return 0, #targets, {"Full visual sync skipped: template house anchor missing or ambiguous"} end
     local sources = visuals(template)
     local changed = 0
     local found = 0
     local warnings = {}
-    for _, root in workspace:GetDescendants() do
-        if not root:IsA("Model") or root:GetAttribute("Game1RealEstateSlug") ~= slug
-            or root:GetAttribute("Game1RealEstateTemplate") == true then
-            continue
-        end
+    for _, root in targets do
         found += 1
         local placedHouse = houseAnchor(root)
         if not placedHouse then
@@ -4604,6 +4632,13 @@ function VisualSync.Update(template: Model, slug: string): (number, number, {str
             continue
         end
         for _, stage in committed do stage.old:Destroy() end
+        Targets.MarkPlaced(root)
+        -- Keep published IDs on the placed instance consistent with its
+        -- actual copied rigs; do not touch player-owned children or pivots.
+        root:SetAttribute("Game1RigAssetIds", template:GetAttribute("Game1RigAssetIds"))
+        root:SetAttribute("Game1HouseModelAssetId", template:GetAttribute("Game1HouseModelAssetId"))
+        root:SetAttribute("Game1DoorModelAssetId", template:GetAttribute("Game1DoorModelAssetId"))
+        root:SetAttribute("Game1ModelAssetId", template:GetAttribute("Game1ModelAssetId"))
         changed += 1
     end
     return changed, found, warnings
@@ -4613,13 +4648,12 @@ return table.freeze(VisualSync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="26">
+      <Item class="ModuleScript" referent="27">
         <Properties>
           <string name="Name">StudioRealEstateRigValidation</string>
           <string name="Source"><![CDATA[-- Validate an already-published Real Estate Model Asset as actually loaded by Roblox.
 -- Blender/FBX manifests are authoring expectations, not proof of what survived
--- publication. Optional spatial sockets may disappear without skin weights.
--- A rigid door hinge is required for a safe DoorAssembly pivot, however.
+-- publication. All authored bones are required, including unweighted source sockets.
 local Validation = {}
 
 local DOOR_HINGE = "door_01_hinge_socket"
@@ -4666,17 +4700,18 @@ function Validation.Verify(root: Model, part: string, expected: any): (MeshPart,
         end
     end
 
-    local imported: {[string]: Attachment} = {}
+    local imported: {[string]: Bone} = {}
     local boneNames = {}
     local boneCount = 0
     for _, instance in root:GetDescendants() do
-        -- Bone derives from Attachment. An imported spatial marker may be an
-        -- ordinary Attachment: that is sufficient for a position-only socket.
         if instance:IsA("Bone") then
             boneCount += 1
             table.insert(boneNames, instance.Name)
         end
-        if instance:IsA("Attachment") and authored[instance.Name] then
+        if instance:IsA("Bone") and authored[instance.Name] then
+            if not instance:IsDescendantOf(mesh) then
+                error(part .. ": bone outside expected mesh " .. instance.Name)
+            end
             if imported[instance.Name] then
                 error(part .. ": duplicate imported marker " .. instance.Name)
             end
@@ -4686,12 +4721,16 @@ function Validation.Verify(root: Model, part: string, expected: any): (MeshPart,
     table.sort(boneNames)
     local missing = {}
     for name in authored do
-        if name:sub(-7) == "_socket" and not imported[name] then
+        if not imported[name] then
             table.insert(missing, name)
         end
     end
     table.sort(missing)
 
+    if #missing > 0 then
+        error(part .. ": published Model Asset lost authored Bones: " .. table.concat(missing, ", ")
+            .. "; republish the model before Studio Sync")
+    end
     local warnings = {}
     -- Hinge is structural: without the imported Bone, PivotTo would use a
     -- fabricated origin. Never replace a working template in that situation.
@@ -4715,19 +4754,9 @@ function Validation.Verify(root: Model, part: string, expected: any): (MeshPart,
             end
         end
     elseif part == "door" then
-        table.insert(warnings, "door: legacy rig without hinge pivot; DoorAssembly not created")
+        table.insert(warnings, "door: no authored hinge pivot; DoorAssembly not created")
     end
 
-    -- Non-hinge sockets describe optional authoring features. Their absence
-    -- must be visible to the author, but must not block loading the geometry
-    -- or hinge. Missing sockets are NOT synthesized at guessed positions.
-    for _, name in missing do
-        if name ~= DOOR_HINGE then
-            table.insert(warnings, part .. ": " .. name
-                .. " is absent from published Model Asset; interaction at this socket is unavailable"
-                .. " (imported Bones: " .. table.concat(boneNames, ", ") .. ")")
-        end
-    end
     return mesh, {
         boneCount = boneCount,
         socketCount = socketCount,
@@ -4737,146 +4766,6 @@ function Validation.Verify(root: Model, part: string, expected: any): (MeshPart,
 end
 
 return table.freeze(Validation)
-]]></string>
-        </Properties>
-      </Item>
-      <Item class="ModuleScript" referent="27">
-        <Properties>
-          <string name="Name">StudioRealEstateSocketRecovery</string>
-          <string name="Source"><![CDATA[-- Rebuild authored but unweighted socket Bones after Roblox Model Asset import.
--- Roblox may cull Bones with zero skinned vertices. The registered FBX rest
--- matrices provide parent-relative transforms; imported weighted Bones anchor
--- these transforms in the actual loaded rig. No vertex weights are changed.
--- Never guess locations if an authored transform or imported anchor is missing.
-local Recovery = {}
-
-local MAX_BONES = 128
-local MAX_COORDINATE = 100000
-local MAX_OFFSET = 10000
-local REST_TOLERANCE = 0.02
-
-local function authoredCFrame(values: any): CFrame?
-    if typeof(values) ~= "table" or #values ~= 16 then
-        return nil
-    end
-    local n = table.create(16)
-    for i = 1, 16 do
-        local value = values[i]
-        if typeof(value) ~= "number" or value ~= value or math.abs(value) > MAX_COORDINATE then
-            return nil
-        end
-        n[i] = value
-    end
-    if math.abs(n[13]) > 0.001 or math.abs(n[14]) > 0.001
-        or math.abs(n[15]) > 0.001 or math.abs(n[16] - 1) > 0.001 then
-        return nil
-    end
-    local x = Vector3.new(n[1], n[5], n[9])
-    local y = Vector3.new(n[2], n[6], n[10])
-    local z = Vector3.new(n[3], n[7], n[11])
-    if math.abs(x.Magnitude - 1) > REST_TOLERANCE
-        or math.abs(y.Magnitude - 1) > REST_TOLERANCE
-        or math.abs(z.Magnitude - 1) > REST_TOLERANCE
-        or math.abs(x:Dot(y)) > REST_TOLERANCE
-        or math.abs(x:Dot(z)) > REST_TOLERANCE
-        or math.abs(y:Dot(z)) > REST_TOLERANCE
-        or (x:Cross(y) - z).Magnitude > REST_TOLERANCE then
-        return nil
-    end
-    return CFrame.fromMatrix(Vector3.new(n[4], n[8], n[12]), x, y, z)
-end
-
-local function collect(mesh: MeshPart, authored: any): ({[string]: any}, {[string]: Attachment}, {string})
-    local specs: {[string]: any} = {}
-    local present: {[string]: Attachment} = {}
-    local problems = {}
-    if typeof(authored) ~= "table" or #authored > MAX_BONES then
-        return specs, present, {"no trustworthy FBX rest-pose manifest"}
-    end
-    for _, entry in authored do
-        if typeof(entry) == "table" and typeof(entry.name) == "string"
-            and entry.name:sub(-7) == "_socket" then
-            if specs[entry.name] then
-                table.insert(problems, "duplicate authored socket " .. entry.name)
-            else
-                local frame = authoredCFrame(entry.matrixLocal)
-                if frame == nil then
-                    table.insert(problems, "invalid rest transform for " .. entry.name)
-                else
-                    specs[entry.name] = {parent = entry.parent or "", frame = frame}
-                end
-            end
-        end
-    end
-    for _, instance in mesh:GetDescendants() do
-        if instance:IsA("Attachment") and specs[instance.Name] then
-            if present[instance.Name] then
-                table.insert(problems, "duplicate imported socket " .. instance.Name)
-            else
-                present[instance.Name] = instance
-            end
-        end
-    end
-    return specs, present, problems
-end
-
--- The required parent is an already imported Bone or one reconstructed in
--- this pass. Using its imported CFrame avoids inventing a Roblox world origin
--- or deriving transforms from a resized/rotated external Model root.
-function Recovery.Restore(mesh: MeshPart, authored: any): ({string}, {string})
-    local specs, present, problems = collect(mesh, authored)
-    if #problems > 0 then
-        return {}, problems
-    end
-    local restored = {}
-    local remaining = {}
-    for name in specs do
-        if not present[name] then
-            remaining[name] = true
-        end
-    end
-
-    -- Any already imported Attachment is a valid spatial socket. Preserve it
-    -- rather than creating a duplicate name in the published rig.
-    -- Imported armature roots with positive weights (e.g. door hinge) provide
-    -- an absolute Roblox reference. Child offsets are authored in Blender's
-    -- shared bone-local coordinate basis, so global FBX axis changes cancel.
-    for _ = 1, MAX_BONES do
-        local advanced = false
-        for name in remaining do
-            local spec = specs[name]
-            local parent = present[spec.parent]
-            if parent and parent:IsA("Bone") and specs[spec.parent] then
-                local localFrame = specs[spec.parent].frame:ToObjectSpace(spec.frame)
-                if localFrame.Position.Magnitude > MAX_OFFSET then
-                    table.insert(problems, name .. ": authored offset exceeds safety limit")
-                else
-                    local replacement = Instance.new("Bone")
-                    replacement.Name = name
-                    replacement.CFrame = localFrame
-                    replacement:SetAttribute("Game1RecoveredFromFBXRestPose", true)
-                    replacement.Parent = parent
-                    present[name] = replacement
-                    table.insert(restored, name)
-                    advanced = true
-                end
-                remaining[name] = nil
-            end
-        end
-        if not advanced then break end
-    end
-    -- Other roots/branches cannot be reconstructed safely without a surviving
-    -- imported parent. Leave them missing and let the existing validator show
-    -- a warning. In particular, do NOT use fake world coordinates for house.
-    for name in remaining do
-        table.insert(problems, name .. ": imported parent bone unavailable; cannot restore exactly")
-    end
-    table.sort(restored)
-    table.sort(problems)
-    return restored, problems
-end
-
-return table.freeze(Recovery)
 ]]></string>
         </Properties>
       </Item>

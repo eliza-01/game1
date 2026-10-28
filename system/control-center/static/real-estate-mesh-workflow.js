@@ -161,9 +161,10 @@ function realEstateMeshWorkflowRender(){
       realEstateMeshWorkflowMessage(`Template updated · placed houses ${Number(stats.workspaceModelsUpdated||0)}/${Number(stats.workspaceModelsFound||0)}${(stats.rigWarnings||[]).length?' · warnings: '+stats.rigWarnings.join(' | '):''}`,Boolean((stats.rigWarnings||[]).length));}
     else realEstateMeshWorkflowMessage('Studio Sync failed · see notification.',true);
   }));
-  if(!collider){
+  // Atlas inputs only exist in the texture tab. The model tab has no picker.
+  if(!collider && !modelTab){
     const picker=dialog.querySelector('[data-mw-atlas]');
-    picker.onchange=()=>{realEstateMeshWorkflow.chosenAtlasId=Number(String(picker.value).split(':')[1]||0);realEstateMeshWorkflowRender();};
+    if(picker)picker.onchange=()=>{realEstateMeshWorkflow.chosenAtlasId=Number(String(picker.value).split(':')[1]||0);realEstateMeshWorkflowRender();};
     bind('use-atlas',()=>realEstateMeshWorkflowRun('Applying existing atlas',async()=>{
       if(!realEstateMeshWorkflow.chosenAtlasId)throw Error('Choose a published atlas');
       const changed=await realEstateChooseAtlas(row,part,realEstateMeshWorkflow.chosenAtlasId);

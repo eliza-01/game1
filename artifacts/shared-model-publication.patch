@@ -1,0 +1,1936 @@
+diff --git a/docs/SHARED_MODEL_PUBLICATION_M153_RU.md b/docs/SHARED_MODEL_PUBLICATION_M153_RU.md
+new file mode 100644
+--- /dev/null
++++ b/docs/SHARED_MODEL_PUBLICATION_M153_RU.md
+@@ -0,0 +1,41 @@
++# Общая подготовка Model FBX — M153
++
++## Границы
++
++Удалены StudioRealEstateSocketRecovery, его вызовы, метаданные authoredBones, статистика восстановления и отдельная real_estate_skin_policy. Studio больше не создаёт потерянные кости.
++
++Общий `system/asset-manager/model_publication.py` владеет подготовкой весов, проверкой rest pose и настройками FBX. `bone_weight_survival.py` остаётся единственным чистым алгоритмом распределения влияний. Characters, monsters/NPC, real estate, location assets и weapons используют общий механизм. HTTP create/update уже был общим в opencloud_assets. Хранилища по-прежнему отвечают за IDs, историю публикаций и транзакции.
++
++Real Estate экспортирует отдельный Model Asset для каждой детали: это граница независимых скелетов, а не отдельный алгоритм сохранения костей. Публикация дома целиком и выбранной детали использует одну подготовку.
++
++## Контракт
++
++Политика совпадает с characters: исходно невзвешенная кость получает влияние минимум 0.05 на одной вершине временной копии; назначаемый вес — 0.055, максимум четыре влияния на вершину. Имена, родители, rest pose и исходный FBX сохраняются. Это подготовка skin в публикационном FBX, а не настройка Roblox или реконструкция в Studio. Исключений по имени двери или дома нет.
++
++Экспорт не запекает анимацию и не применяет трансформации объектов. Все авторские кости экспортируются без leaf bones, оси -Z/Y, масштаб FBX_SCALE_UNITS. Staging выполняется в отдельных background-процессах Blender. Location/weapon staging ограничен 240 секундами и удаляется после передачи файла HTTP-загрузчику, включая ошибки. Выходной FBX повторно импортируется для проверки скелета. Characters и Real Estate сохраняют свои проверки выходного файла.
++
++Studio требует каждую зарегистрированную кость как Bone под нужным MeshPart. Потеря кости, подмена Attachment или неверная иерархия двери прекращают синхронизацию до замены шаблона. Пустой авторский скелет допустим для статических мешей.
++
++База, манифесты и опубликованные IDs в задаче не изменялись. Старые облачные файлы автоматически не обновляются. Неполный Real Estate asset нужно перепубликовать штатной командой детали и затем синхронизировать. Семантика create/update и определения актуальности публикации сохранена: location assets публикуют модель при изменении исходного hash.
++
++## Проверки
++
++- 524 unittest: успешно, один пропущен; включён ResourceWarning-as-error.
++- Полный реальный FBX house_level4_01: экспортированы и повторно импортированы house, col_mesh, door, restoration, window_frames_glass.
++- Актуальный отдельный FBX двери: сохранены четыре кости, родители и rest-матрицы; три исходно невзвешенных сокета получили влияния. Тот же источник проверен через characters и общий Model staging.
++- Статический col_mesh прошёл общий staging без создания скелета.
++- SHA-256 исходных FBX не изменились.
++- Дверь: 1968 вершин, 3954 треугольника, максимальная разница evaluated rest-геометрии 9.54e-7.
++- Studio MCP Edit на изолированной модели: полный скелет принят; потерянная кость, Attachment и неверный родитель отвергнуты. PivotTo сохраняет локальную позу сокета. Тестовые Instances удалены.
++- Rojo собрал generated/Game1Bridge.rbxmx без модуля восстановления.
++- verify.py сообщает три ошибки путей текстур: lantern_01, test_window_01, big_tree_01. Эти данные задачей не изменялись.
++
++Проверка реального upload через Roblox Open Cloud и Play-регрессия обновлённого облачного ассета не выполнялись. FBX round-trip не доказывает результат обработки Roblox. Установленный плагин и работающий Host Agent не заменялись.
++
++QA исходной и выходной двери одинаково отмечает 282 ребра с inconsistent winding, отдельную одноточечную компоненту, non-manifold края и UV overlap. Геометрия не исправлялась в задаче публикации. Сокеты теперь участвуют в skin, как у characters: будущая анимация Bone.Transform сокета может затронуть его вершину. Текущее движение двери через Model:PivotTo не анимирует сокеты.
++
++## Применение и восстановление
++
++Патч построен относительно рабочей версии в начале задачи, включая предыдущие незакоммиченные изменения пользователя. Перед применением: git apply --check. В текущем workspace изменения уже внесены; проверяется git apply --reverse --check. Обратный патч откатывает только эту задачу. Миграции и откат данных не нужны.
++
++После установки кода необходимо перезапустить только Host Agent/Asset Manager и обновить Game1Bridge штатным system/studio-plugin/install.ps1. Rojo перезапускать не нужно. Применение патча не перепубликовывает ассеты.
+diff --git a/generated/Game1Bridge.rbxmx b/generated/Game1Bridge.rbxmx
+--- a/generated/Game1Bridge.rbxmx
++++ b/generated/Game1Bridge.rbxmx
+@@ -3940,15 +3940,13 @@
+ local HttpService = game:GetService("HttpService")
+ local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
+ local StudioRealEstateRigValidation = require(script.Parent.StudioRealEstateRigValidation)
+-local StudioRealEstateSocketRecovery = require(script.Parent.StudioRealEstateSocketRecovery)
+ local StudioRealEstateCollisionPolicy = require(script.Parent.StudioRealEstateCollisionPolicy)
+ local StudioRealEstatePlacedCollisionSync = require(script.Parent.StudioRealEstatePlacedCollisionSync)
+ local StudioRealEstatePlacedVisualSync = require(script.Parent.StudioRealEstatePlacedVisualSync)
+ local PlacedTargets = require(script.Parent.StudioRealEstatePlacedTargets)
+ local StudioRealEstateModel = {}
+ 
+--- A hinge must survive import. Missing optional unweighted sockets are
+--- reported by the separate validator, not treated as broken Model Assets.
++-- Every authored bone must survive publication before a template is replaced.
+ local DOOR_HINGE = "door_01_hinge_socket"
+ 
+ local function loadIndependentRig(assetService: any, assetId: number, part: string): Model
+@@ -4078,8 +4076,6 @@
+     local missingSockets = {}
+     local socketCount = 0
+     local textureCount = 0
+-    local reconstructedSockets = {}
+-    local socketRecoveryWarnings = {}
+     local activePart = "house"
+     local ok, problem = pcall(function()
+         for _, part in parts do
+@@ -4087,21 +4083,6 @@
+             local rig = part == "house" and imported
+                 or loadIndependentRig(assetService, tonumber(rigIds[part]) :: number, part)
+             table.insert(staged, {part = part, rig = rig})
+-            -- Restore missing *child* sockets using authored rest-pose offsets
+-            -- relative to Bones that actually survived the Roblox import.
+-            -- Never modify hinge weights, poses, or any existing imported Bone.
+-            local authored = (typeof(metadata.authoredBones) == "table"
+-                and metadata.authoredBones[part]) or nil
+-            local candidate = StudioRealEstateRigValidation.FindMesh(rig, part)
+-            if authored then
+-                local recovered, diagnostics = StudioRealEstateSocketRecovery.Restore(candidate, authored)
+-                for _, name in recovered do
+-                    table.insert(reconstructedSockets, part .. "/" .. name)
+-                end
+-                for _, message in diagnostics do
+-                    table.insert(socketRecoveryWarnings, part .. ": " .. message)
+-                end
+-            end
+             local mesh, inspection = StudioRealEstateRigValidation.Verify(rig, part, manifests[part])
+             meshes[part] = mesh
+             bones += inspection.boneCount
+@@ -4126,10 +4107,6 @@
+     end
+ 
+     table.sort(missingSockets)
+-    table.sort(reconstructedSockets)
+-    for _, message in socketRecoveryWarnings do
+-        table.insert(rigWarnings, message)
+-    end
+     local wrapper = Instance.new("Model")
+     wrapper.Name = slug
+     for _, entry in staged do
+@@ -4169,7 +4146,6 @@
+     end
+     wrapper:SetAttribute("Game1RealEstateSocketContractComplete", #missingSockets == 0)
+     wrapper:SetAttribute("Game1MissingRealEstateSockets", HttpService:JSONEncode(missingSockets))
+-    wrapper:SetAttribute("Game1RecoveredRealEstateSockets", HttpService:JSONEncode(reconstructedSockets))
+     wrapper:SetAttribute("Game1RealEstateTemplate", true)
+     wrapper:SetAttribute("Game1ModelAssetId", tostring(assetId))
+     wrapper:SetAttribute("Game1HouseModelAssetId", tostring(assetId))
+@@ -4208,8 +4184,7 @@
+         workspaceCollisionRigsUpdated = collisionUpdated,
+         boneCount = bones, socketCount = socketCount,
+         socketContractComplete = #missingSockets == 0,
+-        missingSockets = missingSockets, rigWarnings = rigWarnings,
+-        recoveredSockets = reconstructedSockets}
++        missingSockets = missingSockets, rigWarnings = rigWarnings}
+ end
+ 
+ return table.freeze(StudioRealEstateModel)
+@@ -4223,7 +4198,6 @@
+ -- Other rigs, their Asset IDs, and their placed transforms are never rebuilt.
+ local HttpService = game:GetService("HttpService")
+ local Validation = require(script.Parent.StudioRealEstateRigValidation)
+-local Recovery = require(script.Parent.StudioRealEstateSocketRecovery)
+ local Collision = require(script.Parent.StudioRealEstateCollisionPolicy)
+ local Texture = require(script.Parent.StudioTextureAppearance)
+ local PlacedTargets = require(script.Parent.StudioRealEstatePlacedTargets)
+@@ -4284,11 +4258,6 @@
+     local old = existingPart(wrapper, part)
+     if not old then
+         error("Targeted rig " .. part .. " not found in template; run full Sync Studio first")
+-    end
+-    local candidate = Validation.FindMesh(imported, part)
+-    local recovered = {}
+-    if typeof(metadata.authoredBones) == "table" and metadata.authoredBones[part] then
+-        recovered = select(1, Recovery.Restore(candidate, metadata.authoredBones[part]))
+     end
+     local mesh, check = Validation.Verify(imported, part, manifests[part])
+     local imageId, usesAlpha = nil, nil
+@@ -4425,7 +4394,7 @@
+         texturesApplied = if imageId then 1 else 0,
+         partialSync = true, part = part, placedSyncVersion = 2, workspaceModelsUpdated = placedCount,
+         workspaceModelsFound = placedFound,
+-        boneCount = check.boneCount, recoveredSockets = recovered,
++        boneCount = check.boneCount,
+         missingSockets = check.missingSockets, rigWarnings = warnings}
+ end
+ 
+@@ -4684,8 +4653,7 @@
+           <string name="Name">StudioRealEstateRigValidation</string>
+           <string name="Source"><![CDATA[-- Validate an already-published Real Estate Model Asset as actually loaded by Roblox.
+ -- Blender/FBX manifests are authoring expectations, not proof of what survived
+--- publication. Optional spatial sockets may disappear without skin weights.
+--- A rigid door hinge is required for a safe DoorAssembly pivot, however.
++-- publication. All authored bones are required, including unweighted source sockets.
+ local Validation = {}
+ 
+ local DOOR_HINGE = "door_01_hinge_socket"
+@@ -4732,17 +4700,18 @@
+         end
+     end
+ 
+-    local imported: {[string]: Attachment} = {}
++    local imported: {[string]: Bone} = {}
+     local boneNames = {}
+     local boneCount = 0
+     for _, instance in root:GetDescendants() do
+-        -- Bone derives from Attachment. An imported spatial marker may be an
+-        -- ordinary Attachment: that is sufficient for a position-only socket.
+         if instance:IsA("Bone") then
+             boneCount += 1
+             table.insert(boneNames, instance.Name)
+         end
+-        if instance:IsA("Attachment") and authored[instance.Name] then
++        if instance:IsA("Bone") and authored[instance.Name] then
++            if not instance:IsDescendantOf(mesh) then
++                error(part .. ": bone outside expected mesh " .. instance.Name)
++            end
+             if imported[instance.Name] then
+                 error(part .. ": duplicate imported marker " .. instance.Name)
+             end
+@@ -4752,12 +4721,16 @@
+     table.sort(boneNames)
+     local missing = {}
+     for name in authored do
+-        if name:sub(-7) == "_socket" and not imported[name] then
++        if not imported[name] then
+             table.insert(missing, name)
+         end
+     end
+     table.sort(missing)
+ 
++    if #missing > 0 then
++        error(part .. ": published Model Asset lost authored Bones: " .. table.concat(missing, ", ")
++            .. "; republish the model before Studio Sync")
++    end
+     local warnings = {}
+     -- Hinge is structural: without the imported Bone, PivotTo would use a
+     -- fabricated origin. Never replace a working template in that situation.
+@@ -4781,19 +4754,9 @@
+             end
+         end
+     elseif part == "door" then
+-        table.insert(warnings, "door: legacy rig without hinge pivot; DoorAssembly not created")
+-    end
+-
+-    -- Non-hinge sockets describe optional authoring features. Their absence
+-    -- must be visible to the author, but must not block loading the geometry
+-    -- or hinge. Missing sockets are NOT synthesized at guessed positions.
+-    for _, name in missing do
+-        if name ~= DOOR_HINGE then
+-            table.insert(warnings, part .. ": " .. name
+-                .. " is absent from published Model Asset; interaction at this socket is unavailable"
+-                .. " (imported Bones: " .. table.concat(boneNames, ", ") .. ")")
+-        end
+-    end
++        table.insert(warnings, "door: no authored hinge pivot; DoorAssembly not created")
++    end
++
+     return mesh, {
+         boneCount = boneCount,
+         socketCount = socketCount,
+@@ -4807,146 +4770,6 @@
+         </Properties>
+       </Item>
+       <Item class="ModuleScript" referent="28">
+-        <Properties>
+-          <string name="Name">StudioRealEstateSocketRecovery</string>
+-          <string name="Source"><![CDATA[-- Rebuild authored but unweighted socket Bones after Roblox Model Asset import.
+--- Roblox may cull Bones with zero skinned vertices. The registered FBX rest
+--- matrices provide parent-relative transforms; imported weighted Bones anchor
+--- these transforms in the actual loaded rig. No vertex weights are changed.
+--- Never guess locations if an authored transform or imported anchor is missing.
+-local Recovery = {}
+-
+-local MAX_BONES = 128
+-local MAX_COORDINATE = 100000
+-local MAX_OFFSET = 10000
+-local REST_TOLERANCE = 0.02
+-
+-local function authoredCFrame(values: any): CFrame?
+-    if typeof(values) ~= "table" or #values ~= 16 then
+-        return nil
+-    end
+-    local n = table.create(16)
+-    for i = 1, 16 do
+-        local value = values[i]
+-        if typeof(value) ~= "number" or value ~= value or math.abs(value) > MAX_COORDINATE then
+-            return nil
+-        end
+-        n[i] = value
+-    end
+-    if math.abs(n[13]) > 0.001 or math.abs(n[14]) > 0.001
+-        or math.abs(n[15]) > 0.001 or math.abs(n[16] - 1) > 0.001 then
+-        return nil
+-    end
+-    local x = Vector3.new(n[1], n[5], n[9])
+-    local y = Vector3.new(n[2], n[6], n[10])
+-    local z = Vector3.new(n[3], n[7], n[11])
+-    if math.abs(x.Magnitude - 1) > REST_TOLERANCE
+-        or math.abs(y.Magnitude - 1) > REST_TOLERANCE
+-        or math.abs(z.Magnitude - 1) > REST_TOLERANCE
+-        or math.abs(x:Dot(y)) > REST_TOLERANCE
+-        or math.abs(x:Dot(z)) > REST_TOLERANCE
+-        or math.abs(y:Dot(z)) > REST_TOLERANCE
+-        or (x:Cross(y) - z).Magnitude > REST_TOLERANCE then
+-        return nil
+-    end
+-    return CFrame.fromMatrix(Vector3.new(n[4], n[8], n[12]), x, y, z)
+-end
+-
+-local function collect(mesh: MeshPart, authored: any): ({[string]: any}, {[string]: Attachment}, {string})
+-    local specs: {[string]: any} = {}
+-    local present: {[string]: Attachment} = {}
+-    local problems = {}
+-    if typeof(authored) ~= "table" or #authored > MAX_BONES then
+-        return specs, present, {"no trustworthy FBX rest-pose manifest"}
+-    end
+-    for _, entry in authored do
+-        if typeof(entry) == "table" and typeof(entry.name) == "string"
+-            and entry.name:sub(-7) == "_socket" then
+-            if specs[entry.name] then
+-                table.insert(problems, "duplicate authored socket " .. entry.name)
+-            else
+-                local frame = authoredCFrame(entry.matrixLocal)
+-                if frame == nil then
+-                    table.insert(problems, "invalid rest transform for " .. entry.name)
+-                else
+-                    specs[entry.name] = {parent = entry.parent or "", frame = frame}
+-                end
+-            end
+-        end
+-    end
+-    for _, instance in mesh:GetDescendants() do
+-        if instance:IsA("Attachment") and specs[instance.Name] then
+-            if present[instance.Name] then
+-                table.insert(problems, "duplicate imported socket " .. instance.Name)
+-            else
+-                present[instance.Name] = instance
+-            end
+-        end
+-    end
+-    return specs, present, problems
+-end
+-
+--- The required parent is an already imported Bone or one reconstructed in
+--- this pass. Using its imported CFrame avoids inventing a Roblox world origin
+--- or deriving transforms from a resized/rotated external Model root.
+-function Recovery.Restore(mesh: MeshPart, authored: any): ({string}, {string})
+-    local specs, present, problems = collect(mesh, authored)
+-    if #problems > 0 then
+-        return {}, problems
+-    end
+-    local restored = {}
+-    local remaining = {}
+-    for name in specs do
+-        if not present[name] then
+-            remaining[name] = true
+-        end
+-    end
+-
+-    -- Any already imported Attachment is a valid spatial socket. Preserve it
+-    -- rather than creating a duplicate name in the published rig.
+-    -- Imported armature roots with positive weights (e.g. door hinge) provide
+-    -- an absolute Roblox reference. Child offsets are authored in Blender's
+-    -- shared bone-local coordinate basis, so global FBX axis changes cancel.
+-    for _ = 1, MAX_BONES do
+-        local advanced = false
+-        for name in remaining do
+-            local spec = specs[name]
+-            local parent = present[spec.parent]
+-            if parent and parent:IsA("Bone") and specs[spec.parent] then
+-                local localFrame = specs[spec.parent].frame:ToObjectSpace(spec.frame)
+-                if localFrame.Position.Magnitude > MAX_OFFSET then
+-                    table.insert(problems, name .. ": authored offset exceeds safety limit")
+-                else
+-                    local replacement = Instance.new("Bone")
+-                    replacement.Name = name
+-                    replacement.CFrame = localFrame
+-                    replacement:SetAttribute("Game1RecoveredFromFBXRestPose", true)
+-                    replacement.Parent = parent
+-                    present[name] = replacement
+-                    table.insert(restored, name)
+-                    advanced = true
+-                end
+-                remaining[name] = nil
+-            end
+-        end
+-        if not advanced then break end
+-    end
+-    -- Other roots/branches cannot be reconstructed safely without a surviving
+-    -- imported parent. Leave them missing and let the existing validator show
+-    -- a warning. In particular, do NOT use fake world coordinates for house.
+-    for name in remaining do
+-        table.insert(problems, name .. ": imported parent bone unavailable; cannot restore exactly")
+-    end
+-    table.sort(restored)
+-    table.sort(problems)
+-    return restored, problems
+-end
+-
+-return table.freeze(Recovery)
+-]]></string>
+-        </Properties>
+-      </Item>
+-      <Item class="ModuleScript" referent="29">
+         <Properties>
+           <string name="Name">StudioTextureAppearance</string>
+           <string name="Source"><![CDATA[-- Shared Studio-side material binding for all authored MeshParts.
+@@ -5008,7 +4831,7 @@
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="30">
++      <Item class="ModuleScript" referent="29">
+         <Properties>
+           <string name="Name">StudioTimelineEditorCommands</string>
+           <string name="Source"><![CDATA[-- Timeline authoring session: validates requests, binds UI events and reports results.
+@@ -5297,7 +5120,7 @@
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="31">
++      <Item class="ModuleScript" referent="30">
+         <Properties>
+           <string name="Name">StudioTimelinePoseSampler</string>
+           <string name="Source"><![CDATA[-- Offline pose extraction and interpolation for a preview rig. No UI or HTTP dependencies.
+@@ -5476,7 +5299,7 @@
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="32">
++      <Item class="ModuleScript" referent="31">
+         <Properties>
+           <string name="Name">StudioTimelinePreview</string>
+           <string name="Source"><![CDATA[-- Owns the isolated ViewportFrame rig, camera interaction and animation-asset retrieval.
+@@ -5692,7 +5515,7 @@
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="33">
++      <Item class="ModuleScript" referent="32">
+         <Properties>
+           <string name="Name">StudioTimelineTransport</string>
+           <string name="Source"><![CDATA[-- HTTP boundary for the Timeline editor. No UI, animation or Studio model access.
+@@ -5750,7 +5573,7 @@
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="34">
++      <Item class="ModuleScript" referent="33">
+         <Properties>
+           <string name="Name">StudioTimelineWidget</string>
+           <string name="Source"><![CDATA[-- Timeline editor view. Builds the dock widget and exposes only its controls.
+diff --git a/system/asset-manager/bone_weight_survival.py b/system/asset-manager/bone_weight_survival.py
+--- a/system/asset-manager/bone_weight_survival.py
++++ b/system/asset-manager/bone_weight_survival.py
+@@ -33,9 +33,8 @@
+ ) -> dict:
+     """Normalize skin weights and keep every bone above an explicit coverage policy.
+ 
+-    Defaults preserve the legacy NPC/character publication policy. Estate rigs
+-    can request redundant, stronger influence anchors because Roblox's importer
+-    may cull interaction bones with only one tiny weighted vertex.
++    All model domains use these defaults. Coverage settings are algorithm inputs,
++    not asset-name exceptions; no domain adapter overrides them.
+     """
+     if not bone_heads or not vertices:
+         raise ValueError("publication requires an armature and skinned vertices")
+diff --git a/system/asset-manager/model_publication.py b/system/asset-manager/model_publication.py
+new file mode 100644
+--- /dev/null
++++ b/system/asset-manager/model_publication.py
+@@ -0,0 +1,170 @@
++"""Shared Blender mechanism for every Roblox Model FBX publication.
++
++Only staging scenes may call this module. Source FBX and artist scenes stay intact.
++The policy matches character publication: all authored bones get >=5% coverage
++on at least one vertex; at most four influences. Rest transforms never change.
++"""
++import bpy
++from pathlib import Path
++from bone_weight_survival import MAX_INFLUENCES, SURVIVAL_WEIGHT, plan_publication_weights
++
++POSITIVE_EPSILON = 1e-8
++ROBLOX_MAX_INFLUENCES = MAX_INFLUENCES
++
++def clean_scene():
++    bpy.ops.object.select_all(action="SELECT")
++    bpy.ops.object.delete(use_global=False)
++    for collection in (bpy.data.armatures, bpy.data.meshes, bpy.data.materials):
++        for item in list(collection):
++            collection.remove(item)
++
++
++def linked_meshes(armature):
++    result = []
++    for obj in bpy.context.scene.objects:
++        if obj.type != "MESH":
++            continue
++        linked = obj.parent == armature
++        if not linked:
++            linked = any(
++                mod.type == "ARMATURE" and getattr(mod, "object", None) == armature
++                for mod in obj.modifiers
++            )
++        if linked:
++            result.append(obj)
++    return sorted(result, key=lambda obj: obj.name.casefold())
++
++
++def rest_snapshot(armature):
++    snapshot = {}
++    for bone in armature.data.bones:
++        snapshot[bone.name] = {
++            "parent": bone.parent.name if bone.parent else "",
++            "head": tuple(float(v) for v in bone.head_local),
++            "tail": tuple(float(v) for v in bone.tail_local),
++            "matrix": tuple(float(v) for row in bone.matrix_local for v in row),
++        }
++    return snapshot
++
++
++def assert_rest_unchanged(armature, before):
++    after = rest_snapshot(armature)
++    if before.keys() != after.keys():
++        raise RuntimeError("publication preparation changed the bone set")
++    for name, old in before.items():
++        new = after[name]
++        if old["parent"] != new["parent"]:
++            raise RuntimeError(f"publication preparation changed parent of bone {name!r}")
++        for field in ("head", "tail", "matrix"):
++            if any(abs(a - b) > 1e-10 for a, b in zip(old[field], new[field])):
++                raise RuntimeError(
++                    f"publication preparation changed rest transform of bone {name!r} ({field})"
++                )
++
++
++def active_bone_weights(mesh_obj, vertex, index_to_name):
++    result = {}
++    for membership in vertex.groups:
++        bone_name = index_to_name.get(membership.group)
++        if bone_name is None:
++            continue
++        weight = float(membership.weight)
++        if weight > POSITIVE_EPSILON:
++            result[bone_name] = weight
++    return result
++
++
++def count_over_limit(armature, meshes):
++    bone_names = {bone.name for bone in armature.data.bones}
++    total = 0
++    for mesh_obj in meshes:
++        index_to_name = {
++            group.index: group.name
++            for group in mesh_obj.vertex_groups
++            if group.name in bone_names
++        }
++        for vertex in mesh_obj.data.vertices:
++            weights = active_bone_weights(mesh_obj, vertex, index_to_name)
++            if len(weights) > ROBLOX_MAX_INFLUENCES:
++                total += 1
++    return total
++
++
++def prepare_publication_weights(armature, meshes):
++    bones = list(armature.data.bones)
++    names = {bone.name for bone in bones}
++    heads = {
++        bone.name: tuple(armature.matrix_world @ bone.head_local)
++        for bone in bones
++    }
++    vertices = []
++    for mesh in meshes:
++        group_names = {
++            group.index: group.name for group in mesh.vertex_groups
++            if group.name in names
++        }
++        for vertex in mesh.data.vertices:
++            weights = active_bone_weights(mesh, vertex, group_names)
++            vertices.append({
++                'mesh': mesh.name,
++                'index': vertex.index,
++                'object': mesh,
++                'position': tuple(mesh.matrix_world @ vertex.co),
++                'original': weights,
++                'weights': dict(weights),
++            })
++
++    report = plan_publication_weights(heads, vertices)
++    for bone in bones:
++        bone.use_deform = True
++    for vertex in vertices:
++        old = vertex['original']
++        new = vertex['weights']
++        if old == new:
++            continue
++        mesh = vertex['object']
++        index = vertex['index']
++        # Remove dropped influences, including the fifth/seventh FBX weight.
++        # Never touch non-armature vertex groups.
++        for name in old.keys() - new.keys():
++            group = mesh.vertex_groups.get(name)
++            if group:
++                group.remove([index])
++        for name, weight in new.items():
++            group = mesh.vertex_groups.get(name)
++            if group is None:
++                group = mesh.vertex_groups.new(name=name)
++            if not old.get(name) or abs(old[name] - weight) > 1e-7:
++                group.add([index], weight, 'REPLACE')
++    if count_over_limit(armature, meshes) != 0:
++        raise RuntimeError('publication skin still exceeds four influences per vertex')
++    return report
++
++
++def prepare_rig(armature, meshes):
++    before = rest_snapshot(armature)
++    if not meshes:
++        raise ValueError(f"Armature {armature.name} has no linked mesh")
++    report = prepare_publication_weights(armature, meshes)
++    assert_rest_unchanged(armature, before)
++    return report
++
++
++def export_model(output, objects, *, embed_textures=False):
++    """One export contract for characters, estates and other model assets."""
++    output = Path(output)
++    bpy.ops.object.select_all(action="DESELECT")
++    for obj in objects:
++        obj.select_set(True)
++    bpy.context.view_layer.objects.active = objects[0]
++    output.parent.mkdir(parents=True, exist_ok=True)
++    result = bpy.ops.export_scene.fbx(
++        filepath=str(output), use_selection=True, object_types={"ARMATURE", "MESH"},
++        bake_anim=False, add_leaf_bones=False, use_armature_deform_only=False,
++        axis_forward="-Z", axis_up="Y", global_scale=1.0,
++        apply_unit_scale=True, apply_scale_options="FBX_SCALE_UNITS",
++        use_space_transform=True, bake_space_transform=False,
++        path_mode="COPY" if embed_textures else "AUTO", embed_textures=embed_textures,
++    )
++    if result != {'FINISHED'} or not output.is_file() or output.stat().st_size <= 0:
++        raise RuntimeError("publication FBX was not written")
+diff --git a/system/asset-manager/prepare_character_publication_fbx.py b/system/asset-manager/prepare_character_publication_fbx.py
+--- a/system/asset-manager/prepare_character_publication_fbx.py
++++ b/system/asset-manager/prepare_character_publication_fbx.py
+@@ -12,148 +12,18 @@
+ from pathlib import Path
+ 
+ sys.path.insert(0, str(Path(__file__).resolve().parent))
+-from bone_weight_survival import (
+-    MAX_INFLUENCES, SURVIVAL_WEIGHT, plan_publication_weights,
++from model_publication import (
++    SURVIVAL_WEIGHT, clean_scene, linked_meshes, rest_snapshot,
++    assert_rest_unchanged, count_over_limit, prepare_rig, export_model,
+ )
+-
+-COMPARE_EPSILON = 1e-6
+-POSITIVE_EPSILON = 1e-8
+-ROBLOX_MAX_INFLUENCES = MAX_INFLUENCES
+-
+-def clean_scene():
+-    bpy.ops.object.select_all(action="SELECT")
+-    bpy.ops.object.delete(use_global=False)
+-    for collection in (bpy.data.armatures, bpy.data.meshes, bpy.data.materials):
+-        for item in list(collection):
+-            collection.remove(item)
+-
+-
+-def linked_meshes(armature):
+-    result = []
+-    for obj in bpy.context.scene.objects:
+-        if obj.type != "MESH":
+-            continue
+-        linked = obj.parent == armature
+-        if not linked:
+-            linked = any(
+-                mod.type == "ARMATURE" and getattr(mod, "object", None) == armature
+-                for mod in obj.modifiers
+-            )
+-        if linked:
+-            result.append(obj)
+-    return sorted(result, key=lambda obj: obj.name.casefold())
+-
+-
+-def rest_snapshot(armature):
+-    snapshot = {}
+-    for bone in armature.data.bones:
+-        snapshot[bone.name] = {
+-            "parent": bone.parent.name if bone.parent else "",
+-            "head": tuple(float(v) for v in bone.head_local),
+-            "tail": tuple(float(v) for v in bone.tail_local),
+-            "matrix": tuple(float(v) for row in bone.matrix_local for v in row),
+-        }
+-    return snapshot
+-
+-
+-def assert_rest_unchanged(armature, before):
+-    after = rest_snapshot(armature)
+-    if before.keys() != after.keys():
+-        raise RuntimeError("publication preparation changed the bone set")
+-    for name, old in before.items():
+-        new = after[name]
+-        if old["parent"] != new["parent"]:
+-            raise RuntimeError(f"publication preparation changed parent of bone {name!r}")
+-        for field in ("head", "tail", "matrix"):
+-            if any(abs(a - b) > 1e-10 for a, b in zip(old[field], new[field])):
+-                raise RuntimeError(
+-                    f"publication preparation changed rest transform of bone {name!r} ({field})"
+-                )
+-
+-
+-def active_bone_weights(mesh_obj, vertex, index_to_name):
+-    result = {}
+-    for membership in vertex.groups:
+-        bone_name = index_to_name.get(membership.group)
+-        if bone_name is None:
+-            continue
+-        weight = float(membership.weight)
+-        if weight > POSITIVE_EPSILON:
+-            result[bone_name] = weight
+-    return result
+-
+-
+-def count_over_limit(armature, meshes):
+-    bone_names = {bone.name for bone in armature.data.bones}
+-    total = 0
+-    for mesh_obj in meshes:
+-        index_to_name = {
+-            group.index: group.name
+-            for group in mesh_obj.vertex_groups
+-            if group.name in bone_names
+-        }
+-        for vertex in mesh_obj.data.vertices:
+-            weights = active_bone_weights(mesh_obj, vertex, index_to_name)
+-            if len(weights) > ROBLOX_MAX_INFLUENCES:
+-                total += 1
+-    return total
+-
+-
+-def prepare_publication_weights(armature, meshes):
+-    bones = list(armature.data.bones)
+-    names = {bone.name for bone in bones}
+-    heads = {
+-        bone.name: tuple(armature.matrix_world @ bone.head_local)
+-        for bone in bones
+-    }
+-    vertices = []
+-    for mesh in meshes:
+-        group_names = {
+-            group.index: group.name for group in mesh.vertex_groups
+-            if group.name in names
+-        }
+-        for vertex in mesh.data.vertices:
+-            weights = active_bone_weights(mesh, vertex, group_names)
+-            vertices.append({
+-                'mesh': mesh.name,
+-                'index': vertex.index,
+-                'object': mesh,
+-                'position': tuple(mesh.matrix_world @ vertex.co),
+-                'original': weights,
+-                'weights': dict(weights),
+-            })
+-
+-    report = plan_publication_weights(heads, vertices)
+-    for bone in bones:
+-        bone.use_deform = True
+-    for vertex in vertices:
+-        old = vertex['original']
+-        new = vertex['weights']
+-        if old == new:
+-            continue
+-        mesh = vertex['object']
+-        index = vertex['index']
+-        # Remove dropped influences, including the fifth/seventh FBX weight.
+-        # Never touch non-armature vertex groups.
+-        for name in old.keys() - new.keys():
+-            group = mesh.vertex_groups.get(name)
+-            if group:
+-                group.remove([index])
+-        for name, weight in new.items():
+-            group = mesh.vertex_groups.get(name)
+-            if group is None:
+-                group = mesh.vertex_groups.new(name=name)
+-            if not old.get(name) or abs(old[name] - weight) > 1e-7:
+-                group.add([index], weight, 'REPLACE')
+-    if count_over_limit(armature, meshes) != 0:
+-        raise RuntimeError('publication skin still exceeds four influences per vertex')
+-    return report
+ 
+ 
+ def main(source: Path, output: Path, report_path: Path):
+     source = source.resolve()
+     output = output.resolve()
+     report_path = report_path.resolve()
++    if source == output:
++        raise ValueError("publication output must differ from source")
+     if not source.is_file() or source.suffix.lower() != ".fbx":
+         raise RuntimeError("character publication preparation requires an FBX file")
+ 
+@@ -173,33 +43,11 @@
+ 
+     before = rest_snapshot(armature)
+     over_limit_before = count_over_limit(armature, meshes)
+-    report = prepare_publication_weights(armature, meshes)
++    report = prepare_rig(armature, meshes)
+     over_limit_after = count_over_limit(armature, meshes)
+     assert_rest_unchanged(armature, before)
+ 
+-    bpy.ops.object.select_all(action="DESELECT")
+-    for obj in [armature, *meshes]:
+-        obj.select_set(True)
+-    bpy.context.view_layer.objects.active = armature
+-
+-    output.parent.mkdir(parents=True, exist_ok=True)
+-    bpy.ops.export_scene.fbx(
+-        filepath=str(output),
+-        use_selection=True,
+-        object_types={"ARMATURE", "MESH"},
+-        bake_anim=False,
+-        add_leaf_bones=False,
+-        use_armature_deform_only=False,
+-        axis_forward="-Z",
+-        axis_up="Y",
+-        global_scale=1.0,
+-        apply_unit_scale=True,
+-        apply_scale_options="FBX_SCALE_UNITS",
+-        use_space_transform=True,
+-        bake_space_transform=False,
+-    )
+-    if not output.is_file() or output.stat().st_size <= 0:
+-        raise RuntimeError("publication FBX was not written")
++    export_model(output, [armature, *meshes])
+ 
+     report_path.write_text(
+         json.dumps(
+diff --git a/system/asset-manager/prepare_model_publication_fbx.py b/system/asset-manager/prepare_model_publication_fbx.py
+new file mode 100644
+--- /dev/null
++++ b/system/asset-manager/prepare_model_publication_fbx.py
+@@ -0,0 +1,63 @@
++"""Background staging for static or rigged model assets (location assets/weapons)."""
++import json
++import sys
++from pathlib import Path
++import bpy
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++from model_publication import clean_scene, linked_meshes, prepare_rig, export_model, rest_snapshot
++
++
++def snapshot():
++    return {o.name: rest_snapshot(o) for o in bpy.context.scene.objects if o.type == 'ARMATURE'}
++
++
++def main(source, output, report_path):
++    if source.resolve() == output.resolve():
++        raise ValueError('publication output must differ from source')
++    clean_scene()
++    bpy.ops.import_scene.fbx(filepath=str(source), use_anim=False)
++    objects = sorted((o for o in bpy.context.scene.objects if o.type in {'MESH', 'ARMATURE'}),
++                     key=lambda o: o.name)
++    if not any(o.type == 'MESH' for o in objects):
++        raise ValueError('Model FBX has no mesh')
++    before = snapshot()
++    reports = {}
++    for rig in objects:
++        if rig.type == 'ARMATURE' and len(rig.data.bones):
++            reports[rig.name] = prepare_rig(rig, linked_meshes(rig))
++    export_model(output, objects, embed_textures=True)
++    # Round-trip the actual staged file, not just the pre-export Python objects.
++    clean_scene()
++    bpy.ops.import_scene.fbx(filepath=str(output), use_anim=False)
++    after = snapshot()
++    if before.keys() != after.keys():
++        raise ValueError('publication changed armatures')
++    for name, bones in before.items():
++        if bones.keys() != after[name].keys():
++            raise ValueError(f'publication changed bone set: {name}')
++        rig = bpy.data.objects[name]
++        influenced = set()
++        for mesh in linked_meshes(rig):
++            groups = {g.index: g.name for g in mesh.vertex_groups if g.name in bones}
++            for vertex in mesh.data.vertices:
++                weights = [g for g in vertex.groups if g.group in groups and g.weight > 0]
++                if len(weights) > 4:
++                    raise ValueError('publication exceeds four bone influences')
++                influenced.update(groups[g.group] for g in weights)
++        if set(bones) - influenced:
++            raise ValueError(f'publication lost bone influences: {name}')
++        for bone, old in bones.items():
++            new = after[name][bone]
++            if old['parent'] != new['parent'] or any(
++                abs(a-b) > 0.0001 for a,b in zip(old['matrix'], new['matrix'])
++            ):
++                raise ValueError(f'publication changed rest pose: {name}/{bone}')
++    report_path.write_text(json.dumps({'schemaVersion': 1, 'rigs': reports,
++                                      'restTransformsChanged': False}), encoding='utf-8')
++
++
++if __name__ == '__main__':
++    args = sys.argv[sys.argv.index('--') + 1:]
++    if len(args) != 3:
++        raise ValueError('expected source.fbx output.fbx report.json')
++    main(*map(Path, args))
+diff --git a/system/asset-manager/prepare_real_estate_publication_fbx.py b/system/asset-manager/prepare_real_estate_publication_fbx.py
+--- a/system/asset-manager/prepare_real_estate_publication_fbx.py
++++ b/system/asset-manager/prepare_real_estate_publication_fbx.py
+@@ -4,8 +4,7 @@
+ import sys
+ from pathlib import Path
+ sys.path.insert(0, str(Path(__file__).resolve().parent))
+-from bone_weight_survival import plan_publication_weights
+-from real_estate_skin_policy import check_rigid_hinge, HINGE
++from model_publication import prepare_rig, export_model
+ from real_estate_rig_discovery import find_mesh, find_rig
+ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "control-center"))
+ from real_estate.collision_policy import is_collision_mesh
+@@ -34,53 +33,10 @@
+         # do not synthesize dummy bones for meshes with no rig / empty rig.
+         bones = list(rig.data.bones) if rig else []
+         if bones:
+-            for bone in bones:
+-                bone.use_deform = True
+             if not any(mod.type == 'ARMATURE' and mod.object == rig for mod in mesh.modifiers):
+                 mod = mesh.modifiers.new(name='Game1RealEstateRig', type='ARMATURE')
+                 mod.object = rig
+-            before = {bone.name: (bone.parent.name if bone.parent else '',
+-                        tuple(float(v) for row in bone.matrix_local for v in row)) for bone in bones}
+-            root_bone = next((b.name for b in bones if b.parent is None), None)
+-            if root_bone is None:
+-                raise RuntimeError(f'{part}: the armature has no root bone. Check the bone hierarchy in Blender.')
+-            names = {b.name for b in bones}
+-            by_index = {g.index: g.name for g in mesh.vertex_groups if g.name in names}
+-            vertices = []
+-            for vertex in mesh.data.vertices:
+-                weights = {by_index[g.group]: float(g.weight) for g in vertex.groups
+-                           if g.group in by_index and g.weight > 0}
+-                if not weights and not (part == 'door' and HINGE in names):
+-                    weights = {root_bone: 1.0}
+-                vertices.append({'object': mesh, 'index': vertex.index, 'mesh': mesh.name,
+-                                 'position': tuple(mesh.matrix_world @ vertex.co), 'weights': weights})
+-            if part == 'door' and HINGE in names:
+-                # The authored door is a rigid 1.0 hinge skin. Do NOT borrow
+-                # visible vertices to keep child sockets alive on import.
+-                # All sockets remain in the FBX bone tree; staged round-trip
+-                # and Studio-side checks verify that they really survive.
+-                report = check_rigid_hinge([v['weights'] for v in vertices], names)
+-            else:
+-                heads = {b.name: tuple(rig.matrix_world @ b.head_local) for b in bones}
+-                # Legacy/unweighted non-door rigs still need import anchors.
+-                # This modifies only the temporary staged export, never the
+-                # artist's canonical FBX file or Blender project.
+-                report = plan_publication_weights(
+-                    heads, vertices, min_covered_vertices=3,
+-                    minimum_weight=0.20, anchor_weight=0.30,
+-                )
+-                for v in vertices:
+-                    for group in mesh.vertex_groups:
+-                        if group.name in names:
+-                            group.remove([v['index']])
+-                    for name, weight in v['weights'].items():
+-                        group = mesh.vertex_groups.get(name) or mesh.vertex_groups.new(name=name)
+-                        group.add([v['index']], weight, 'REPLACE')
+-            after = {bone.name: (bone.parent.name if bone.parent else '',
+-                        tuple(float(v) for row in bone.matrix_local for v in row)) for bone in bones}
+-            if before != after:
+-                raise RuntimeError(f'{rig_name} rest pose changed')
+-            reports[part] = report
++            reports[part] = prepare_rig(rig, [mesh])
+         else:
+             reports[part] = {'status': 'no_bones', 'preservedBones': 0}
+         # Collision geometry is published as a Model Asset only. Never attach
+@@ -102,22 +58,10 @@
+     # RootPart. Publish each mesh/armature pair as a SEPARATE Model Asset.
+     output.mkdir(parents=True, exist_ok=True)
+     for part in parts:
+-        bpy.ops.object.select_all(action='DESELECT')
+         mesh = find_mesh(bpy, part)
+         rig = rigs[part]
+-        mesh.select_set(True)
+-        if rig and len(rig.data.bones):
+-            rig.select_set(True)
+-        bpy.context.view_layer.objects.active = mesh
+-        target = output / f'{part}.fbx'
+-        bpy.ops.export_scene.fbx(filepath=str(target), use_selection=True,
+-            object_types={'MESH','ARMATURE'}, bake_anim=False, add_leaf_bones=False,
+-            use_armature_deform_only=False, axis_forward='-Z', axis_up='Y', global_scale=1.0,
+-            apply_unit_scale=True, apply_scale_options='FBX_SCALE_UNITS',
+-            use_space_transform=True, bake_space_transform=False,
+-            path_mode='COPY', embed_textures=True)
+-        if not target.is_file() or target.stat().st_size == 0:
+-            raise RuntimeError(f'Real Estate {part} FBX was not written')
++        objects = [mesh, rig] if rig and len(rig.data.bones) else [mesh]
++        export_model(output / f'{part}.fbx', objects, embed_textures=True)
+     return {'schemaVersion': 2, 'parts': reports, 'textureMode': 'embedded',
+             'rigAssets': {part: f'{part}.fbx' for part in parts}}
+ 
+diff --git a/system/asset-manager/real_estate_skin_policy.py b/system/asset-manager/real_estate_skin_policy.py
+deleted file mode 100644
+--- a/system/asset-manager/real_estate_skin_policy.py
++++ /dev/null
+@@ -1,27 +0,0 @@
+-"""Non-destructive skinning policy for a hinge-driven rigid Estate door.
+-
+-The door is moved in Roblox as a Model (PivotTo); its hinge bone is a pivot
+-marker. A publication staging pass must not redistribute this rigid mesh's
+-weights onto handle/padlock sockets merely for bone-survival anchoring.
+-"""
+-
+-HINGE = 'door_01_hinge_socket'
+-
+-
+-def check_rigid_hinge(vertex_weights: list[dict], available_bones: set[str]) -> dict:
+-    if HINGE not in available_bones:
+-        raise ValueError('door is missing hinge for rigid-hinge skin check')
+-    if not vertex_weights:
+-        raise ValueError('door has no vertices')
+-    for index, groups in enumerate(vertex_weights):
+-        hinge = groups.get(HINGE, 0)
+-        others = {name: amount for name, amount in groups.items()
+-                  if name != HINGE and amount > 1e-6}
+-        if abs(hinge - 1.0) > 1e-4 or others:
+-            raise ValueError(
+-                f'door vertex {index} must have weight 1.0 only on {HINGE}; '
+-                f'other influences: {sorted(others)}'
+-            )
+-    return {'status': 'rigid_hinge_preserved', 'preservedBones': len(available_bones),
+-            'protectedVertexCount': len(vertex_weights), 'modifiedVertexCount': 0,
+-            'weightPolicy': 'original_1_0_hinge', 'socketWeightInjection': False}
+diff --git a/system/control-center/blender_runtime.py b/system/control-center/blender_runtime.py
+new file mode 100644
+--- /dev/null
++++ b/system/control-center/blender_runtime.py
+@@ -0,0 +1,45 @@
++"""Blender executable discovery shared by authoring adapters."""
++from pathlib import Path
++import os
++import shutil
++
++def _blender_candidates() -> list[Path]:
++    values: list[Path] = []
++    explicit = str(os.environ.get("blender_exe") or os.environ.get("BLENDER_EXE") or "").strip()
++    if explicit:
++        values.append(Path(explicit).expanduser())
++
++    resolved = shutil.which("blender")
++    if resolved:
++        values.append(Path(resolved))
++
++    program_files = Path(os.environ.get("ProgramFiles", r"C:\Program Files"))
++    foundation = program_files / "Blender Foundation"
++    if foundation.is_dir():
++        for directory in sorted(foundation.glob("Blender *"), reverse=True):
++            values.append(directory / "blender.exe")
++
++    seen = set()
++    result = []
++    for value in values:
++        try:
++            key = str(value.resolve()).casefold()
++        except Exception:
++            key = str(value).casefold()
++        if key in seen:
++            continue
++        seen.add(key)
++        result.append(value)
++    return result
++
++
++def blender_executable() -> Path:
++    for candidate in _blender_candidates():
++        if candidate.is_file():
++            return candidate.resolve()
++    raise RuntimeError(
++        "blender was not found. install blender or set BLENDER_EXE in .env.local before registering an FBX."
++    )
++
++
++
+diff --git a/system/control-center/character_analysis.py b/system/control-center/character_analysis.py
+--- a/system/control-center/character_analysis.py
++++ b/system/control-center/character_analysis.py
+@@ -2,7 +2,6 @@
+ 
+ from pathlib import Path
+ import json
+-import os
+ import shutil
+ import subprocess
+ import tempfile
+@@ -12,44 +11,7 @@
+     pass
+ 
+ 
+-def _blender_candidates() -> list[Path]:
+-    values: list[Path] = []
+-    explicit = str(os.environ.get("blender_exe") or os.environ.get("BLENDER_EXE") or "").strip()
+-    if explicit:
+-        values.append(Path(explicit).expanduser())
+-
+-    resolved = shutil.which("blender")
+-    if resolved:
+-        values.append(Path(resolved))
+-
+-    program_files = Path(os.environ.get("ProgramFiles", r"C:\Program Files"))
+-    foundation = program_files / "Blender Foundation"
+-    if foundation.is_dir():
+-        for directory in sorted(foundation.glob("Blender *"), reverse=True):
+-            values.append(directory / "blender.exe")
+-
+-    seen = set()
+-    result = []
+-    for value in values:
+-        try:
+-            key = str(value.resolve()).casefold()
+-        except Exception:
+-            key = str(value).casefold()
+-        if key in seen:
+-            continue
+-        seen.add(key)
+-        result.append(value)
+-    return result
+-
+-
+-def blender_executable() -> Path:
+-    for candidate in _blender_candidates():
+-        if candidate.is_file():
+-            return candidate.resolve()
+-    raise CharacterAnalysisError(
+-        "blender was not found. install blender or set BLENDER_EXE in .env.local before registering an FBX."
+-    )
+-
++from blender_runtime import blender_executable
+ 
+ 
+ def prepare_character_fbx(project_root: Path, source: Path, output: Path) -> dict:
+diff --git a/system/control-center/location_asset_store.py b/system/control-center/location_asset_store.py
+--- a/system/control-center/location_asset_store.py
++++ b/system/control-center/location_asset_store.py
+@@ -1,4 +1,6 @@
+ from __future__ import annotations
++
++from model_publication_service import staged_model
+ 
+ from pathlib import Path
+ import hashlib
+@@ -519,25 +521,26 @@
+ 
+         if str(row.get("model_published_sha256") or "") != str(row.get("model_sha256") or ""):
+             current_asset_id = str(row.get("model_asset_id") or "").strip()
+-            if current_asset_id:
+-                operation = update_model_asset(
+-                    model,
+-                    asset_id=current_asset_id,
+-                    display_name=row["name_en"],
+-                    description=description,
+-                    creator_type=creator_type,
+-                    creator_id=creator_id,
+-                    api_key=api_key,
+-                )
+-            else:
+-                operation = create_model_asset(
+-                    model,
+-                    display_name=row["name_en"],
+-                    description=description,
+-                    creator_type=creator_type,
+-                    creator_id=creator_id,
+-                    api_key=api_key,
+-                )
++            with staged_model(self.root, model) as publication:
++                if current_asset_id:
++                    operation = update_model_asset(
++                        publication,
++                        asset_id=current_asset_id,
++                        display_name=row["name_en"],
++                        description=description,
++                        creator_type=creator_type,
++                        creator_id=creator_id,
++                        api_key=api_key,
++                    )
++                else:
++                    operation = create_model_asset(
++                        publication,
++                        display_name=row["name_en"],
++                        description=description,
++                        creator_type=creator_type,
++                        creator_id=creator_id,
++                        api_key=api_key,
++                    )
+             result = wait_for_operation(operation, api_key=api_key)
+             now = time.time()
+             with self.connect() as connection:
+diff --git a/system/control-center/model_publication_service.py b/system/control-center/model_publication_service.py
+new file mode 100644
+--- /dev/null
++++ b/system/control-center/model_publication_service.py
+@@ -0,0 +1,31 @@
++"""Temporary model publication staging; no persistence or upload ownership."""
++from contextlib import contextmanager
++import json
++from pathlib import Path
++import subprocess
++import tempfile
++from blender_runtime import blender_executable
++
++
++@contextmanager
++def staged_model(project_root: Path, source: Path):
++    source = source.resolve()
++    if not source.is_file() or source.suffix.lower() != '.fbx':
++        raise ValueError('model publication requires an FBX file')
++    with tempfile.TemporaryDirectory(prefix='game1-model-publication-') as directory:
++        output = Path(directory) / source.name
++        report = Path(directory) / 'report.json'
++        script = project_root / 'system/asset-manager/prepare_model_publication_fbx.py'
++        completed = subprocess.run(
++            [str(blender_executable()), '--background', '--factory-startup',
++             '--python-exit-code', '1', '--python', str(script), '--',
++             str(source), str(output), str(report)],
++            capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=240,
++        )
++        if completed.returncode or not output.is_file() or not report.is_file():
++            detail = (completed.stderr or completed.stdout or 'missing output').strip()
++            raise ValueError('Model publication preparation failed: ' + detail[-1500:])
++        result = json.loads(report.read_text(encoding='utf-8'))
++        if result.get('schemaVersion') != 1 or result.get('restTransformsChanged') is not False:
++            raise ValueError('Invalid model publication preparation report')
++        yield output
+diff --git a/system/control-center/real_estate/contracts.py b/system/control-center/real_estate/contracts.py
+--- a/system/control-center/real_estate/contracts.py
++++ b/system/control-center/real_estate/contracts.py
+@@ -187,7 +187,5 @@
+             for x,y in zip(before['matrixLocal'],after['matrixLocal'])
+         ):
+             raise ValueError(f'staged {part} changed rest pose for {name}')
+-        # Unweighted sockets are valid. Never inject artificial skin weights
+-        # into a rigid hinge door merely to satisfy a stage-only assertion.
+-        if name in old.get('influencedBones', []) and name not in new.get('influencedBones', []):
++        if name not in new.get('influencedBones', []):
+             raise ValueError(f'staged {part} lost weighted bone {name}')
+diff --git a/system/control-center/real_estate/fbx.py b/system/control-center/real_estate/fbx.py
+--- a/system/control-center/real_estate/fbx.py
++++ b/system/control-center/real_estate/fbx.py
+@@ -7,7 +7,7 @@
+ import subprocess
+ import tempfile
+ 
+-from character_analysis import blender_executable
++from blender_runtime import blender_executable
+ from .contracts import validate_analysis, present_parts
+ 
+ 
+diff --git a/system/control-center/real_estate/studio_sync.py b/system/control-center/real_estate/studio_sync.py
+--- a/system/control-center/real_estate/studio_sync.py
++++ b/system/control-center/real_estate/studio_sync.py
+@@ -38,11 +38,6 @@
+                 part['name']: [bone['name'] for bone in part['bones']]
+                 for part in row['skeleton']['meshes']
+             },
+-            # Authoritative rest transforms already saved at FBX registration.
+-            # Only Studio child-Bone recovery consumes these; no reupload needed.
+-            'authoredBones': {
+-                part['name']: part['bones'] for part in row['skeleton']['meshes']
+-            },
+             'meshOptions': row.get('meshOptions') or {},
+             'textures': [
+                 texture_binding(name, data['assetId'], getattr(self.store, 'root', None), data.get('path') or '')
+diff --git a/system/control-center/static/real-estate.js b/system/control-center/static/real-estate.js
+--- a/system/control-center/static/real-estate.js
++++ b/system/control-center/static/real-estate.js
+@@ -406,7 +406,6 @@
+     }
+     const warnings=stats.rigWarnings||[];
+     const missing=stats.missingSockets||[];
+-    const recovered=stats.recoveredSockets||[];
+     const found=Number(stats.workspaceModelsFound||0);
+     const updated=Number(stats.workspaceModelsUpdated||0);
+     const physics=Number(stats.workspaceCollisionRigsUpdated||0);
+@@ -415,7 +414,6 @@
+       ? `Studio template updated · NO matching placed houses found (0/0)`
+       : `Studio template updated · placed houses ${updated}/${found}`)+
+       (physics?` · collision rigs ${physics}`:'')+
+-      (recovered.length?` · sockets recovered ${recovered.length}`:'')+
+       (missing.length?` · sockets missing ${missing.length}`:'')+
+       (warnings.length?` · ${warnings.length} warning(s)`:'');
+     toast(summary,incomplete);
+diff --git a/system/control-center/weapon_store.py b/system/control-center/weapon_store.py
+--- a/system/control-center/weapon_store.py
++++ b/system/control-center/weapon_store.py
+@@ -1,4 +1,6 @@
+ from __future__ import annotations
++
++from model_publication_service import staged_model
+ 
+ from pathlib import Path
+ import hashlib
+@@ -480,16 +482,17 @@
+         description = str(credentials.get("description") or "game1 weapon").strip()
+ 
+         current_asset_id = str(row.get("model_asset_id") or "").strip()
+-        if current_asset_id:
+-            operation = update_model_asset(
+-                model, asset_id=current_asset_id, display_name=row["name_en"], description=description,
+-                creator_type=creator_type, creator_id=creator_id, api_key=api_key,
+-            )
+-        else:
+-            operation = create_model_asset(
+-                model, display_name=row["name_en"], description=description,
+-                creator_type=creator_type, creator_id=creator_id, api_key=api_key,
+-            )
++        with staged_model(self.root, model) as publication:
++            if current_asset_id:
++                operation = update_model_asset(
++                    publication, asset_id=current_asset_id, display_name=row["name_en"], description=description,
++                    creator_type=creator_type, creator_id=creator_id, api_key=api_key,
++                )
++            else:
++                operation = create_model_asset(
++                    publication, display_name=row["name_en"], description=description,
++                    creator_type=creator_type, creator_id=creator_id, api_key=api_key,
++                )
+         result = wait_for_operation(operation, api_key=api_key)
+         now = time.time()
+         with self.connect() as connection:
+diff --git a/system/studio-plugin/install.ps1 b/system/studio-plugin/install.ps1
+--- a/system/studio-plugin/install.ps1
++++ b/system/studio-plugin/install.ps1
+@@ -86,7 +86,6 @@
+     'StudioRealEstateModel',
+     'StudioRealEstatePartSync',
+     'StudioRealEstateRigValidation',
+-    'StudioRealEstateSocketRecovery',
+     'StudioRealEstateCollisionPolicy',
+     'StudioRealEstatePlacedCollisionSync',
+     'StudioRealEstatePlacedVisualSync',
+diff --git a/system/studio-plugin/modules/StudioRealEstateModel.luau b/system/studio-plugin/modules/StudioRealEstateModel.luau
+--- a/system/studio-plugin/modules/StudioRealEstateModel.luau
++++ b/system/studio-plugin/modules/StudioRealEstateModel.luau
+@@ -3,15 +3,13 @@
+ local HttpService = game:GetService("HttpService")
+ local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
+ local StudioRealEstateRigValidation = require(script.Parent.StudioRealEstateRigValidation)
+-local StudioRealEstateSocketRecovery = require(script.Parent.StudioRealEstateSocketRecovery)
+ local StudioRealEstateCollisionPolicy = require(script.Parent.StudioRealEstateCollisionPolicy)
+ local StudioRealEstatePlacedCollisionSync = require(script.Parent.StudioRealEstatePlacedCollisionSync)
+ local StudioRealEstatePlacedVisualSync = require(script.Parent.StudioRealEstatePlacedVisualSync)
+ local PlacedTargets = require(script.Parent.StudioRealEstatePlacedTargets)
+ local StudioRealEstateModel = {}
+ 
+--- A hinge must survive import. Missing optional unweighted sockets are
+--- reported by the separate validator, not treated as broken Model Assets.
++-- Every authored bone must survive publication before a template is replaced.
+ local DOOR_HINGE = "door_01_hinge_socket"
+ 
+ local function loadIndependentRig(assetService: any, assetId: number, part: string): Model
+@@ -141,8 +139,6 @@
+     local missingSockets = {}
+     local socketCount = 0
+     local textureCount = 0
+-    local reconstructedSockets = {}
+-    local socketRecoveryWarnings = {}
+     local activePart = "house"
+     local ok, problem = pcall(function()
+         for _, part in parts do
+@@ -150,21 +146,6 @@
+             local rig = part == "house" and imported
+                 or loadIndependentRig(assetService, tonumber(rigIds[part]) :: number, part)
+             table.insert(staged, {part = part, rig = rig})
+-            -- Restore missing *child* sockets using authored rest-pose offsets
+-            -- relative to Bones that actually survived the Roblox import.
+-            -- Never modify hinge weights, poses, or any existing imported Bone.
+-            local authored = (typeof(metadata.authoredBones) == "table"
+-                and metadata.authoredBones[part]) or nil
+-            local candidate = StudioRealEstateRigValidation.FindMesh(rig, part)
+-            if authored then
+-                local recovered, diagnostics = StudioRealEstateSocketRecovery.Restore(candidate, authored)
+-                for _, name in recovered do
+-                    table.insert(reconstructedSockets, part .. "/" .. name)
+-                end
+-                for _, message in diagnostics do
+-                    table.insert(socketRecoveryWarnings, part .. ": " .. message)
+-                end
+-            end
+             local mesh, inspection = StudioRealEstateRigValidation.Verify(rig, part, manifests[part])
+             meshes[part] = mesh
+             bones += inspection.boneCount
+@@ -189,10 +170,6 @@
+     end
+ 
+     table.sort(missingSockets)
+-    table.sort(reconstructedSockets)
+-    for _, message in socketRecoveryWarnings do
+-        table.insert(rigWarnings, message)
+-    end
+     local wrapper = Instance.new("Model")
+     wrapper.Name = slug
+     for _, entry in staged do
+@@ -232,7 +209,6 @@
+     end
+     wrapper:SetAttribute("Game1RealEstateSocketContractComplete", #missingSockets == 0)
+     wrapper:SetAttribute("Game1MissingRealEstateSockets", HttpService:JSONEncode(missingSockets))
+-    wrapper:SetAttribute("Game1RecoveredRealEstateSockets", HttpService:JSONEncode(reconstructedSockets))
+     wrapper:SetAttribute("Game1RealEstateTemplate", true)
+     wrapper:SetAttribute("Game1ModelAssetId", tostring(assetId))
+     wrapper:SetAttribute("Game1HouseModelAssetId", tostring(assetId))
+@@ -271,8 +247,7 @@
+         workspaceCollisionRigsUpdated = collisionUpdated,
+         boneCount = bones, socketCount = socketCount,
+         socketContractComplete = #missingSockets == 0,
+-        missingSockets = missingSockets, rigWarnings = rigWarnings,
+-        recoveredSockets = reconstructedSockets}
++        missingSockets = missingSockets, rigWarnings = rigWarnings}
+ end
+ 
+ return table.freeze(StudioRealEstateModel)
+diff --git a/system/studio-plugin/modules/StudioRealEstatePartSync.luau b/system/studio-plugin/modules/StudioRealEstatePartSync.luau
+--- a/system/studio-plugin/modules/StudioRealEstatePartSync.luau
++++ b/system/studio-plugin/modules/StudioRealEstatePartSync.luau
+@@ -2,7 +2,6 @@
+ -- Other rigs, their Asset IDs, and their placed transforms are never rebuilt.
+ local HttpService = game:GetService("HttpService")
+ local Validation = require(script.Parent.StudioRealEstateRigValidation)
+-local Recovery = require(script.Parent.StudioRealEstateSocketRecovery)
+ local Collision = require(script.Parent.StudioRealEstateCollisionPolicy)
+ local Texture = require(script.Parent.StudioTextureAppearance)
+ local PlacedTargets = require(script.Parent.StudioRealEstatePlacedTargets)
+@@ -63,11 +62,6 @@
+     local old = existingPart(wrapper, part)
+     if not old then
+         error("Targeted rig " .. part .. " not found in template; run full Sync Studio first")
+-    end
+-    local candidate = Validation.FindMesh(imported, part)
+-    local recovered = {}
+-    if typeof(metadata.authoredBones) == "table" and metadata.authoredBones[part] then
+-        recovered = select(1, Recovery.Restore(candidate, metadata.authoredBones[part]))
+     end
+     local mesh, check = Validation.Verify(imported, part, manifests[part])
+     local imageId, usesAlpha = nil, nil
+@@ -204,7 +198,7 @@
+         texturesApplied = if imageId then 1 else 0,
+         partialSync = true, part = part, placedSyncVersion = 2, workspaceModelsUpdated = placedCount,
+         workspaceModelsFound = placedFound,
+-        boneCount = check.boneCount, recoveredSockets = recovered,
++        boneCount = check.boneCount,
+         missingSockets = check.missingSockets, rigWarnings = warnings}
+ end
+ 
+diff --git a/system/studio-plugin/modules/StudioRealEstateRigValidation.luau b/system/studio-plugin/modules/StudioRealEstateRigValidation.luau
+--- a/system/studio-plugin/modules/StudioRealEstateRigValidation.luau
++++ b/system/studio-plugin/modules/StudioRealEstateRigValidation.luau
+@@ -1,7 +1,6 @@
+ -- Validate an already-published Real Estate Model Asset as actually loaded by Roblox.
+ -- Blender/FBX manifests are authoring expectations, not proof of what survived
+--- publication. Optional spatial sockets may disappear without skin weights.
+--- A rigid door hinge is required for a safe DoorAssembly pivot, however.
++-- publication. All authored bones are required, including unweighted source sockets.
+ local Validation = {}
+ 
+ local DOOR_HINGE = "door_01_hinge_socket"
+@@ -48,17 +47,18 @@
+         end
+     end
+ 
+-    local imported: {[string]: Attachment} = {}
++    local imported: {[string]: Bone} = {}
+     local boneNames = {}
+     local boneCount = 0
+     for _, instance in root:GetDescendants() do
+-        -- Bone derives from Attachment. An imported spatial marker may be an
+-        -- ordinary Attachment: that is sufficient for a position-only socket.
+         if instance:IsA("Bone") then
+             boneCount += 1
+             table.insert(boneNames, instance.Name)
+         end
+-        if instance:IsA("Attachment") and authored[instance.Name] then
++        if instance:IsA("Bone") and authored[instance.Name] then
++            if not instance:IsDescendantOf(mesh) then
++                error(part .. ": bone outside expected mesh " .. instance.Name)
++            end
+             if imported[instance.Name] then
+                 error(part .. ": duplicate imported marker " .. instance.Name)
+             end
+@@ -68,12 +68,16 @@
+     table.sort(boneNames)
+     local missing = {}
+     for name in authored do
+-        if name:sub(-7) == "_socket" and not imported[name] then
++        if not imported[name] then
+             table.insert(missing, name)
+         end
+     end
+     table.sort(missing)
+ 
++    if #missing > 0 then
++        error(part .. ": published Model Asset lost authored Bones: " .. table.concat(missing, ", ")
++            .. "; republish the model before Studio Sync")
++    end
+     local warnings = {}
+     -- Hinge is structural: without the imported Bone, PivotTo would use a
+     -- fabricated origin. Never replace a working template in that situation.
+@@ -97,19 +101,9 @@
+             end
+         end
+     elseif part == "door" then
+-        table.insert(warnings, "door: legacy rig without hinge pivot; DoorAssembly not created")
++        table.insert(warnings, "door: no authored hinge pivot; DoorAssembly not created")
+     end
+ 
+-    -- Non-hinge sockets describe optional authoring features. Their absence
+-    -- must be visible to the author, but must not block loading the geometry
+-    -- or hinge. Missing sockets are NOT synthesized at guessed positions.
+-    for _, name in missing do
+-        if name ~= DOOR_HINGE then
+-            table.insert(warnings, part .. ": " .. name
+-                .. " is absent from published Model Asset; interaction at this socket is unavailable"
+-                .. " (imported Bones: " .. table.concat(boneNames, ", ") .. ")")
+-        end
+-    end
+     return mesh, {
+         boneCount = boneCount,
+         socketCount = socketCount,
+diff --git a/system/studio-plugin/modules/StudioRealEstateSocketRecovery.luau b/system/studio-plugin/modules/StudioRealEstateSocketRecovery.luau
+deleted file mode 100644
+--- a/system/studio-plugin/modules/StudioRealEstateSocketRecovery.luau
++++ /dev/null
+@@ -1,134 +0,0 @@
+--- Rebuild authored but unweighted socket Bones after Roblox Model Asset import.
+--- Roblox may cull Bones with zero skinned vertices. The registered FBX rest
+--- matrices provide parent-relative transforms; imported weighted Bones anchor
+--- these transforms in the actual loaded rig. No vertex weights are changed.
+--- Never guess locations if an authored transform or imported anchor is missing.
+-local Recovery = {}
+-
+-local MAX_BONES = 128
+-local MAX_COORDINATE = 100000
+-local MAX_OFFSET = 10000
+-local REST_TOLERANCE = 0.02
+-
+-local function authoredCFrame(values: any): CFrame?
+-    if typeof(values) ~= "table" or #values ~= 16 then
+-        return nil
+-    end
+-    local n = table.create(16)
+-    for i = 1, 16 do
+-        local value = values[i]
+-        if typeof(value) ~= "number" or value ~= value or math.abs(value) > MAX_COORDINATE then
+-            return nil
+-        end
+-        n[i] = value
+-    end
+-    if math.abs(n[13]) > 0.001 or math.abs(n[14]) > 0.001
+-        or math.abs(n[15]) > 0.001 or math.abs(n[16] - 1) > 0.001 then
+-        return nil
+-    end
+-    local x = Vector3.new(n[1], n[5], n[9])
+-    local y = Vector3.new(n[2], n[6], n[10])
+-    local z = Vector3.new(n[3], n[7], n[11])
+-    if math.abs(x.Magnitude - 1) > REST_TOLERANCE
+-        or math.abs(y.Magnitude - 1) > REST_TOLERANCE
+-        or math.abs(z.Magnitude - 1) > REST_TOLERANCE
+-        or math.abs(x:Dot(y)) > REST_TOLERANCE
+-        or math.abs(x:Dot(z)) > REST_TOLERANCE
+-        or math.abs(y:Dot(z)) > REST_TOLERANCE
+-        or (x:Cross(y) - z).Magnitude > REST_TOLERANCE then
+-        return nil
+-    end
+-    return CFrame.fromMatrix(Vector3.new(n[4], n[8], n[12]), x, y, z)
+-end
+-
+-local function collect(mesh: MeshPart, authored: any): ({[string]: any}, {[string]: Attachment}, {string})
+-    local specs: {[string]: any} = {}
+-    local present: {[string]: Attachment} = {}
+-    local problems = {}
+-    if typeof(authored) ~= "table" or #authored > MAX_BONES then
+-        return specs, present, {"no trustworthy FBX rest-pose manifest"}
+-    end
+-    for _, entry in authored do
+-        if typeof(entry) == "table" and typeof(entry.name) == "string"
+-            and entry.name:sub(-7) == "_socket" then
+-            if specs[entry.name] then
+-                table.insert(problems, "duplicate authored socket " .. entry.name)
+-            else
+-                local frame = authoredCFrame(entry.matrixLocal)
+-                if frame == nil then
+-                    table.insert(problems, "invalid rest transform for " .. entry.name)
+-                else
+-                    specs[entry.name] = {parent = entry.parent or "", frame = frame}
+-                end
+-            end
+-        end
+-    end
+-    for _, instance in mesh:GetDescendants() do
+-        if instance:IsA("Attachment") and specs[instance.Name] then
+-            if present[instance.Name] then
+-                table.insert(problems, "duplicate imported socket " .. instance.Name)
+-            else
+-                present[instance.Name] = instance
+-            end
+-        end
+-    end
+-    return specs, present, problems
+-end
+-
+--- The required parent is an already imported Bone or one reconstructed in
+--- this pass. Using its imported CFrame avoids inventing a Roblox world origin
+--- or deriving transforms from a resized/rotated external Model root.
+-function Recovery.Restore(mesh: MeshPart, authored: any): ({string}, {string})
+-    local specs, present, problems = collect(mesh, authored)
+-    if #problems > 0 then
+-        return {}, problems
+-    end
+-    local restored = {}
+-    local remaining = {}
+-    for name in specs do
+-        if not present[name] then
+-            remaining[name] = true
+-        end
+-    end
+-
+-    -- Any already imported Attachment is a valid spatial socket. Preserve it
+-    -- rather than creating a duplicate name in the published rig.
+-    -- Imported armature roots with positive weights (e.g. door hinge) provide
+-    -- an absolute Roblox reference. Child offsets are authored in Blender's
+-    -- shared bone-local coordinate basis, so global FBX axis changes cancel.
+-    for _ = 1, MAX_BONES do
+-        local advanced = false
+-        for name in remaining do
+-            local spec = specs[name]
+-            local parent = present[spec.parent]
+-            if parent and parent:IsA("Bone") and specs[spec.parent] then
+-                local localFrame = specs[spec.parent].frame:ToObjectSpace(spec.frame)
+-                if localFrame.Position.Magnitude > MAX_OFFSET then
+-                    table.insert(problems, name .. ": authored offset exceeds safety limit")
+-                else
+-                    local replacement = Instance.new("Bone")
+-                    replacement.Name = name
+-                    replacement.CFrame = localFrame
+-                    replacement:SetAttribute("Game1RecoveredFromFBXRestPose", true)
+-                    replacement.Parent = parent
+-                    present[name] = replacement
+-                    table.insert(restored, name)
+-                    advanced = true
+-                end
+-                remaining[name] = nil
+-            end
+-        end
+-        if not advanced then break end
+-    end
+-    -- Other roots/branches cannot be reconstructed safely without a surviving
+-    -- imported parent. Leave them missing and let the existing validator show
+-    -- a warning. In particular, do NOT use fake world coordinates for house.
+-    for name in remaining do
+-        table.insert(problems, name .. ": imported parent bone unavailable; cannot restore exactly")
+-    end
+-    table.sort(restored)
+-    table.sort(problems)
+-    return restored, problems
+-end
+-
+-return table.freeze(Recovery)
+diff --git a/system/studio-plugin/plugin.project.json b/system/studio-plugin/plugin.project.json
+--- a/system/studio-plugin/plugin.project.json
++++ b/system/studio-plugin/plugin.project.json
+@@ -70,9 +70,6 @@
+       "StudioRealEstateRigValidation": {
+         "$path": "modules/StudioRealEstateRigValidation.luau"
+       },
+-      "StudioRealEstateSocketRecovery": {
+-        "$path": "modules/StudioRealEstateSocketRecovery.luau"
+-      },
+       "StudioRealEstateCollisionPolicy": {
+         "$path": "modules/StudioRealEstateCollisionPolicy.luau"
+       },
+diff --git a/system/verify/check_model_publication_blender.py b/system/verify/check_model_publication_blender.py
+new file mode 100644
+--- /dev/null
++++ b/system/verify/check_model_publication_blender.py
+@@ -0,0 +1,26 @@
++"""Manual Blender regression on the registered house_level4_01 source copies; no upload."""
++import sys, json, hashlib
++from pathlib import Path
++root=Path(__file__).resolve().parents[2]
++sys.path.insert(0,str(root/'system/control-center'))
++from real_estate.fbx import inspect, inspect_selected, prepare_publication
++from character_analysis import prepare_character_publication_fbx
++from model_publication_service import staged_model
++row=next(r for r in json.loads((root/'assets/manifests/real-estate.json').read_text(encoding='utf-8'))['items'] if r['slug']=='house_level4_01')
++out=root/'artifacts/publication-check';out.mkdir(exist_ok=True)
++source=root/row['model_path']; door=root/row['meshSources']['door']['path']
++hashes={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in (source,door)}
++textures={k:str(root/v['path']) for k,v in row['textures'].items() if v.get('path')}
++expected=inspect(root,source)
++full=prepare_publication(root,source,out/'full',expected,textures)
++selected=inspect_selected(root,door,'door')
++part=prepare_publication(root,door,out/'part',selected,{'door':textures['door']},only_part='door')
++character=prepare_character_publication_fbx(root,door,out/'character-door.fbx')
++with staged_model(root,door) as staged:
++    generic=inspect_selected(root,staged,'door')
++    from real_estate.contracts import assert_rig_survived
++    assert_rig_survived(selected,generic,'door')
++for p,h in hashes.items(): assert hashlib.sha256(Path(p).read_bytes()).hexdigest()==h
++report={'full':full,'part':part,'character':character['preparation'],'generic':generic,'sourceHashesUnchanged':True}
++(out/'report.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
++print(json.dumps({'fullParts':list(full['parts']), 'door':part['parts']['door'], 'sourceHashesUnchanged':True}))
+diff --git a/system/verify/test_real_estate_import_bone_survival_m113.py b/system/verify/test_real_estate_import_bone_survival_m113.py
+--- a/system/verify/test_real_estate_import_bone_survival_m113.py
++++ b/system/verify/test_real_estate_import_bone_survival_m113.py
+@@ -55,10 +55,10 @@
+             plan_publication_weights(heads, verts, min_covered_vertices=3,
+                                      minimum_weight=.2, anchor_weight=.3)
+ 
+-    def test_blender_export_uses_only_estate_coverage_policy(self):
++    def test_blender_export_uses_shared_coverage_policy(self):
+         script = (ROOT / 'system/asset-manager/prepare_real_estate_publication_fbx.py').read_text()
+-        self.assertIn('min_covered_vertices=3', script)
+-        self.assertIn('minimum_weight=0.20, anchor_weight=0.30', script)
++        self.assertIn('from model_publication import prepare_rig, export_model', script)
++        self.assertNotIn('minimum_weight=', script)
+         self.assertIn('assert_rig_survived', (ROOT / 'system/control-center/real_estate/fbx.py').read_text())
+         studio = (ROOT / 'system/studio-plugin/modules/StudioRealEstateModel.luau').read_text()
+         self.assertIn('rigWarnings = rigWarnings', studio)
+diff --git a/system/verify/test_real_estate_socket_contract_m131.py b/system/verify/test_real_estate_socket_contract_m131.py
+--- a/system/verify/test_real_estate_socket_contract_m131.py
++++ b/system/verify/test_real_estate_socket_contract_m131.py
+@@ -13,7 +13,7 @@
+ from real_estate.contracts import assert_rig_survived, validate_analysis, warnings_for_analysis
+ from real_estate.rig_features import bone_role, feature_warnings, DOOR_HINGE
+ from real_estate_rig_discovery import find_rig
+-from real_estate_skin_policy import check_rigid_hinge
++from bone_weight_survival import plan_publication_weights
+ from real_estate.store import RealEstateStore
+ from test_real_estate_m107 import skeleton
+ 
+@@ -90,26 +90,22 @@
+         source['meshes'][1]['influencedBones'] = []
+         self.assertIn('door_hinge_unweighted', {w['code'] for w in feature_warnings(source)})
+ 
+-    def test_hinge_skin_preservation_does_not_change_any_vertex_weights(self):
+-        groups = [{DOOR_HINGE: 1.0} for _ in range(1968)]
+-        original = json.dumps(groups)
+-        report = check_rigid_hinge(groups, {DOOR_HINGE, *DOOR})
+-        self.assertEqual(json.dumps(groups), original)
+-        self.assertEqual(report['modifiedVertexCount'], 0)
+-        self.assertEqual(report['protectedVertexCount'], 1968)
+-        for weights in ({DOOR_HINGE: .8}, {DOOR_HINGE:.8,DOOR[0]:.2},
+-                        {DOOR[0]:1.0}):
+-            with self.assertRaisesRegex(ValueError, 'weight 1.0'):
+-                check_rigid_hinge([weights], {DOOR_HINGE, *DOOR})
++    def test_publication_adds_socket_coverage_to_temporary_skin(self):
++        groups = [{'position': (i, 0, 0), 'weights': {DOOR_HINGE: 1.0}} for i in range(16)]
++        report = plan_publication_weights({name: (0,0,0) for name in (DOOR_HINGE, *DOOR)}, groups)
++        self.assertEqual(report['survivingBoneCount'], 4)
++        for bone in (DOOR_HINGE, *DOOR):
++            self.assertTrue(any(v['weights'].get(bone, 0) >= .05 for v in groups))
+ 
+-    def test_staged_import_requires_weighted_hinge_but_not_unweighted_child_sockets(self):
++    def test_staged_import_requires_every_authored_bone_weighted(self):
+         expected = modern()
+         staged = {'meshes': [json.loads(json.dumps(expected['meshes'][1]))]}
++        staged['meshes'][0]['influencedBones'] = [DOOR_HINGE, *DOOR]
+         assert_rig_survived(expected, staged, 'door')
+-        staged['meshes'][0]['influencedBones'] = []
+-        with self.assertRaisesRegex(ValueError, 'lost weighted bone'):
+-            assert_rig_survived(expected, staged, 'door')
+-        staged['meshes'][0]['influencedBones'] = [DOOR_HINGE]
++        for bone in (DOOR_HINGE, *DOOR):
++            staged['meshes'][0]['influencedBones'] = [n for n in (DOOR_HINGE, *DOOR) if n != bone]
++            with self.assertRaisesRegex(ValueError, 'lost weighted bone'):
++                assert_rig_survived(expected, staged, 'door')
+         staged['meshes'][0]['bones'].pop()
+         with self.assertRaisesRegex(ValueError, 'changed bone names'):
+             assert_rig_survived(expected, staged, 'door')
+@@ -126,8 +122,8 @@
+         script = (ROOT / 'system/asset-manager/prepare_real_estate_publication_fbx.py').read_text()
+         studio = (ROOT / 'system/studio-plugin/modules/StudioRealEstateModel.luau').read_text()
+         js = (ROOT / 'system/control-center/static/real-estate.js').read_text()
+-        self.assertIn('check_rigid_hinge(', script)
+-        self.assertIn('if part == \'door\' and HINGE in names:', script)
++        self.assertIn('prepare_rig(rig, [mesh])', script)
++        self.assertNotIn('check_rigid_hinge', script)
+         self.assertIn('assembly.WorldPivot = hinge.TransformedWorldCFrame', studio)
+         self.assertIn('Game1DoorClosedLocalPivot', studio)
+         self.assertIn('DoorAssembly', studio)
+diff --git a/system/verify/test_real_estate_socket_recovery_m133.py b/system/verify/test_real_estate_socket_recovery_m133.py
+--- a/system/verify/test_real_estate_socket_recovery_m133.py
++++ b/system/verify/test_real_estate_socket_recovery_m133.py
+@@ -1,9 +1,4 @@
+-"""M133: true socket Bone restoration in Studio without deforming published meshes.
+-
+-Roblox physics/CFrame still requires a manual Studio test: these unit tests
+-assert that authoring transforms reach the Bridge and no mutation/publication
+-is introduced by the Studio-only recovery path.
+-"""
++"""Publication owns all bones; Studio never reconstructs them."""
+ import json
+ import sys
+ import tempfile
+@@ -22,7 +17,7 @@
+ 
+ 
+ class RestoredSocketsM133(unittest.TestCase):
+-    def test_authoritative_rest_matrices_transmitted_unmodified(self):
++    def test_sync_requests_imported_bones_without_reconstruction_metadata(self):
+         hinge = {'name': 'door_01_hinge_socket', 'parent': '', 'matrixLocal': IDENTITY}
+         child = {'name': 'door_01_handle_outside_socket',
+                  'parent': hinge['name'], 'matrixLocal': [1,0,0,3, 0,1,0,4, 0,0,1,5, 0,0,0,1]}
+@@ -36,46 +31,21 @@
+         store.get.return_value = row
+         store.root = ROOT
+         load = Mock(return_value={'realEstateStats': {'bonesValidated': True,
+-                        'rigsValidated': 2, 'texturesApplied': 2, 'recoveredSockets': ['door/door_01_handle_outside_socket']}})
++                        'rigsValidated': 2, 'texturesApplied': 2}})
+         RealEstateStudioSync(store, load).sync(row['slug'])
+         metadata = load.call_args.kwargs['metadata']
+-        self.assertEqual(metadata['authoredBones']['door'], [hinge, child])
+-        self.assertEqual(metadata['authoredBones']['house'], [])
++        self.assertNotIn('authoredBones', metadata)
++        self.assertEqual(metadata['expectedMeshes']['door'], [hinge['name'], child['name']])
+         self.assertEqual(load.call_args.args[0], '111')
+         self.assertEqual(load.call_args.kwargs['placement_mode'], 'real-estate-rig')
+ 
+-    def test_restorer_uses_imported_parents_and_authored_relative_transforms(self):
+-        script = (ROOT / 'system/studio-plugin/modules/StudioRealEstateSocketRecovery.luau').read_text()
+-        assembly = (ROOT / 'system/studio-plugin/modules/StudioRealEstateModel.luau').read_text()
+-        validation = (ROOT / 'system/studio-plugin/modules/StudioRealEstateRigValidation.luau').read_text()
+-        self.assertIn('specs[spec.parent].frame:ToObjectSpace(spec.frame)', script)
+-        self.assertIn('replacement.CFrame = localFrame', script)
+-        self.assertIn('replacement.Parent = parent', script)
+-        self.assertIn('Instance.new("Bone")', script)
+-        self.assertIn('instance:IsA("Attachment")', script)
+-        self.assertIn('parent:IsA("Bone")', script)
+-        self.assertIn('Game1RecoveredFromFBXRestPose', script)
+-        self.assertIn('imported parent bone unavailable; cannot restore exactly', script)
+-        self.assertNotIn('Transform =', script)
+-        self.assertNotIn('Instance.new("MeshPart")', script)
+-        self.assertIn('StudioRealEstateSocketRecovery.Restore(candidate, authored)', assembly)
+-        self.assertLess(assembly.index('StudioRealEstateSocketRecovery.Restore('),
+-                        assembly.index('StudioRealEstateRigValidation.Verify('))
+-        self.assertIn('Game1RecoveredRealEstateSockets', assembly)
+-        self.assertIn('function Validation.FindMesh(', validation)
+-        self.assertIn('StudioRealEstateRigValidation.FindMesh(rig, part)', assembly)
+-        self.assertIn('assembly.WorldPivot = hinge.TransformedWorldCFrame', assembly)
+-        self.assertNotIn('hinge.Transform =', assembly)
+-
+-    def test_plugin_and_frontend_consume_recovery_stats(self):
+-        tree = json.loads((ROOT / 'system/studio-plugin/plugin.project.json').read_text())
+-        self.assertEqual(tree['tree']['modules']['StudioRealEstateSocketRecovery']['$path'],
+-                         'modules/StudioRealEstateSocketRecovery.luau')
+-        self.assertIn("'StudioRealEstateSocketRecovery',",
+-                      (ROOT / 'system/studio-plugin/install.ps1').read_text())
+-        ui = (ROOT / 'system/control-center/static/real-estate.js').read_text()
+-        self.assertIn('const recovered=stats.recoveredSockets||[];', ui)
+-        self.assertIn('sockets recovered', ui)
++    def test_recovery_removed_from_sources_and_packaging(self):
++        self.assertFalse((ROOT / 'system/studio-plugin/modules/StudioRealEstateSocketRecovery.luau').exists())
++        for path in ('system/studio-plugin/modules/StudioRealEstateModel.luau',
++                     'system/studio-plugin/modules/StudioRealEstatePartSync.luau',
++                     'system/studio-plugin/plugin.project.json', 'system/studio-plugin/install.ps1'):
++            self.assertNotIn('StudioRealEstateSocketRecovery', (ROOT / path).read_text())
++        self.assertNotIn('recoveredSockets', (ROOT / 'system/control-center/static/real-estate.js').read_text())
+ 
+     def test_no_changes_to_image_or_model_publication_pipeline(self):
+         # Only Studio read-side recovery. No model/texture upload is part of
+@@ -84,7 +54,7 @@
+         self.assertNotIn('create_model_asset', script)
+         self.assertNotIn('create_image_asset', script)
+         self.assertNotIn('ensure_published', script)
+-        self.assertIn('authoredBones', script)
++        self.assertNotIn('authoredBones', script)
+ 
+ 
+ if __name__ == '__main__':
+diff --git a/system/verify/test_real_estate_studio_optional_sockets_m132.py b/system/verify/test_real_estate_studio_optional_sockets_m132.py
+--- a/system/verify/test_real_estate_studio_optional_sockets_m132.py
++++ b/system/verify/test_real_estate_studio_optional_sockets_m132.py
+@@ -30,16 +30,11 @@
+         self.assertNotIn('authored socket ', self.assembler)
+         self.assertIn('function Validation.FindMesh(', self.validator)
+ 
+-    def test_only_missing_hinge_blocks_sync(self):
+-        self.assertIn('required hinge Bone', self.validator)
+-        self.assertIn('if not hinge or not hinge:IsA("Bone") then', self.validator)
+-        self.assertIn('for _, name in missing do', self.validator)
+-        self.assertIn('if name ~= DOOR_HINGE then', self.validator)
+-        self.assertIn('table.insert(warnings, part .. ": " .. name', self.validator)
+-        self.assertNotIn('error(part .. ": authored socket "', self.validator)
++    def test_any_missing_authored_bone_blocks_sync(self):
++        self.assertIn('if #missing > 0 then', self.validator)
++        self.assertIn('published Model Asset lost authored Bones', self.validator)
+         self.assertIn('socket.Parent ~= hinge', self.validator)
+-        self.assertIn('hinge:IsDescendantOf(mesh)', self.validator)
+-        self.assertIn('instance:IsA("Attachment") and authored[instance.Name]', self.validator)
++        self.assertNotIn('instance:IsA("Attachment")', self.validator)
+ 
+     def test_no_synthetic_socket_or_bone_animation(self):
+         self.assertNotIn('Instance.new("Attachment")', self.validator)
+diff --git a/system/verify/test_shared_model_publication.py b/system/verify/test_shared_model_publication.py
+new file mode 100644
+--- /dev/null
++++ b/system/verify/test_shared_model_publication.py
+@@ -0,0 +1,55 @@
++"""Shared staging lifetime, failure isolation and source immutability."""
++import json
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++from types import SimpleNamespace
++from unittest.mock import patch
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / 'system/control-center'))
++from model_publication_service import staged_model
++
++
++class SharedPublicationStagingTests(unittest.TestCase):
++    def test_staged_file_exists_during_upload_and_is_cleaned_afterward(self):
++        with tempfile.TemporaryDirectory() as directory:
++            root = Path(directory)
++            source = root / 'source.fbx'
++            source.write_bytes(b'artist source')
++            def prepare(command, **kwargs):
++                original, target, report = map(Path, command[-3:])
++                self.assertEqual(original, source.resolve())
++                self.assertNotEqual(target, source)
++                self.assertEqual(kwargs['timeout'], 240)
++                target.write_bytes(b'prepared skin')
++                report.write_text(json.dumps({'schemaVersion':1,'restTransformsChanged':False}))
++                return SimpleNamespace(returncode=0)
++            with patch('model_publication_service.blender_executable',return_value=Path('blender')), patch('model_publication_service.subprocess.run',side_effect=prepare):
++                with staged_model(root,source) as result:
++                    self.assertEqual(result.read_bytes(),b'prepared skin')
++                self.assertFalse(result.exists())
++            self.assertEqual(source.read_bytes(),b'artist source')
++
++    def test_failed_preparation_never_yields_an_upload_file(self):
++        with tempfile.TemporaryDirectory() as directory:
++            root=Path(directory); source=root/'source.fbx'; source.write_bytes(b'source')
++            failure=SimpleNamespace(returncode=1,stderr='lost rest transform',stdout='')
++            with patch('model_publication_service.blender_executable',return_value=Path('blender')), patch('model_publication_service.subprocess.run',return_value=failure):
++                with self.assertRaisesRegex(ValueError,'lost rest transform'):
++                    with staged_model(root,source):
++                        self.fail('upload must not execute')
++            self.assertEqual(source.read_bytes(),b'source')
++
++    def test_all_blender_entrypoints_use_shared_mechanism(self):
++        for name in ('character','real_estate','model'):
++            source=(ROOT/f'system/asset-manager/prepare_{name}_publication_fbx.py').read_text(encoding='utf-8')
++            self.assertIn('from model_publication import',source)
++            self.assertNotIn('bpy.ops.export_scene.fbx',source)
++            self.assertNotIn('plan_publication_weights(',source)
++        for domain in ('location_asset','weapon'):
++            source=(ROOT/f'system/control-center/{domain}_store.py').read_text(encoding='utf-8')
++            self.assertIn('with staged_model(self.root, model) as publication:',source)
++
++
++if __name__ == '__main__': unittest.main()
+diff --git a/system/verify/verify.py b/system/verify/verify.py
+--- a/system/verify/verify.py
++++ b/system/verify/verify.py
+@@ -408,7 +408,7 @@
+     err("character FBX preparer must not rebake authored rotation/scale")
+ 
+ publication_preparer = ROOT / "system/asset-manager/prepare_character_publication_fbx.py"
+-publication_preparer_text = publication_preparer.read_text(encoding="utf-8") if publication_preparer.is_file() else ""
++publication_preparer_text = (publication_preparer.read_text(encoding="utf-8") + (ROOT / "system/asset-manager/model_publication.py").read_text(encoding="utf-8")) if publication_preparer.is_file() else ""
+ bone_planner = ROOT / "system/asset-manager/bone_weight_survival.py"
+ bone_planner_text = bone_planner.read_text(encoding="utf-8") if bone_planner.is_file() else ""
+ for required in [

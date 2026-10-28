@@ -187,7 +187,5 @@ def assert_rig_survived(expected: dict, actual: dict, part: str) -> None:
             for x,y in zip(before['matrixLocal'],after['matrixLocal'])
         ):
             raise ValueError(f'staged {part} changed rest pose for {name}')
-        # Unweighted sockets are valid. Never inject artificial skin weights
-        # into a rigid hinge door merely to satisfy a stage-only assertion.
-        if name in old.get('influencedBones', []) and name not in new.get('influencedBones', []):
+        if name not in new.get('influencedBones', []):
             raise ValueError(f'staged {part} lost weighted bone {name}')

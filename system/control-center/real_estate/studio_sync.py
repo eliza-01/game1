@@ -38,11 +38,6 @@ class RealEstateStudioSync:
                 part['name']: [bone['name'] for bone in part['bones']]
                 for part in row['skeleton']['meshes']
             },
-            # Authoritative rest transforms already saved at FBX registration.
-            # Only Studio child-Bone recovery consumes these; no reupload needed.
-            'authoredBones': {
-                part['name']: part['bones'] for part in row['skeleton']['meshes']
-            },
             'meshOptions': row.get('meshOptions') or {},
             'textures': [
                 texture_binding(name, data['assetId'], getattr(self.store, 'root', None), data.get('path') or '')

@@ -7,7 +7,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 
-from character_analysis import blender_executable
+from blender_runtime import blender_executable
 from .contracts import validate_analysis, present_parts
 
 

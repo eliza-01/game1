@@ -13,7 +13,7 @@ sys.path.insert(0, str(ROOT / 'system/asset-manager'))
 from real_estate.contracts import assert_rig_survived, validate_analysis, warnings_for_analysis
 from real_estate.rig_features import bone_role, feature_warnings, DOOR_HINGE
 from real_estate_rig_discovery import find_rig
-from real_estate_skin_policy import check_rigid_hinge
+from bone_weight_survival import plan_publication_weights
 from real_estate.store import RealEstateStore
 from test_real_estate_m107 import skeleton
 
@@ -90,26 +90,22 @@ class SocketContractM131(unittest.TestCase):
         source['meshes'][1]['influencedBones'] = []
         self.assertIn('door_hinge_unweighted', {w['code'] for w in feature_warnings(source)})
 
-    def test_hinge_skin_preservation_does_not_change_any_vertex_weights(self):
-        groups = [{DOOR_HINGE: 1.0} for _ in range(1968)]
-        original = json.dumps(groups)
-        report = check_rigid_hinge(groups, {DOOR_HINGE, *DOOR})
-        self.assertEqual(json.dumps(groups), original)
-        self.assertEqual(report['modifiedVertexCount'], 0)
-        self.assertEqual(report['protectedVertexCount'], 1968)
-        for weights in ({DOOR_HINGE: .8}, {DOOR_HINGE:.8,DOOR[0]:.2},
-                        {DOOR[0]:1.0}):
-            with self.assertRaisesRegex(ValueError, 'weight 1.0'):
-                check_rigid_hinge([weights], {DOOR_HINGE, *DOOR})
+    def test_publication_adds_socket_coverage_to_temporary_skin(self):
+        groups = [{'position': (i, 0, 0), 'weights': {DOOR_HINGE: 1.0}} for i in range(16)]
+        report = plan_publication_weights({name: (0,0,0) for name in (DOOR_HINGE, *DOOR)}, groups)
+        self.assertEqual(report['survivingBoneCount'], 4)
+        for bone in (DOOR_HINGE, *DOOR):
+            self.assertTrue(any(v['weights'].get(bone, 0) >= .05 for v in groups))
 
-    def test_staged_import_requires_weighted_hinge_but_not_unweighted_child_sockets(self):
+    def test_staged_import_requires_every_authored_bone_weighted(self):
         expected = modern()
         staged = {'meshes': [json.loads(json.dumps(expected['meshes'][1]))]}
+        staged['meshes'][0]['influencedBones'] = [DOOR_HINGE, *DOOR]
         assert_rig_survived(expected, staged, 'door')
-        staged['meshes'][0]['influencedBones'] = []
-        with self.assertRaisesRegex(ValueError, 'lost weighted bone'):
-            assert_rig_survived(expected, staged, 'door')
-        staged['meshes'][0]['influencedBones'] = [DOOR_HINGE]
+        for bone in (DOOR_HINGE, *DOOR):
+            staged['meshes'][0]['influencedBones'] = [n for n in (DOOR_HINGE, *DOOR) if n != bone]
+            with self.assertRaisesRegex(ValueError, 'lost weighted bone'):
+                assert_rig_survived(expected, staged, 'door')
         staged['meshes'][0]['bones'].pop()
         with self.assertRaisesRegex(ValueError, 'changed bone names'):
             assert_rig_survived(expected, staged, 'door')
@@ -126,8 +122,8 @@ class SocketContractM131(unittest.TestCase):
         script = (ROOT / 'system/asset-manager/prepare_real_estate_publication_fbx.py').read_text()
         studio = (ROOT / 'system/studio-plugin/modules/StudioRealEstateModel.luau').read_text()
         js = (ROOT / 'system/control-center/static/real-estate.js').read_text()
-        self.assertIn('check_rigid_hinge(', script)
-        self.assertIn('if part == \'door\' and HINGE in names:', script)
+        self.assertIn('prepare_rig(rig, [mesh])', script)
+        self.assertNotIn('check_rigid_hinge', script)
         self.assertIn('assembly.WorldPivot = hinge.TransformedWorldCFrame', studio)
         self.assertIn('Game1DoorClosedLocalPivot', studio)
         self.assertIn('DoorAssembly', studio)

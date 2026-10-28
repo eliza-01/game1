@@ -2,9 +2,9 @@
 -- Other rigs, their Asset IDs, and their placed transforms are never rebuilt.
 local HttpService = game:GetService("HttpService")
 local Validation = require(script.Parent.StudioRealEstateRigValidation)
-local Recovery = require(script.Parent.StudioRealEstateSocketRecovery)
 local Collision = require(script.Parent.StudioRealEstateCollisionPolicy)
 local Texture = require(script.Parent.StudioTextureAppearance)
+local PlacedTargets = require(script.Parent.StudioRealEstatePlacedTargets)
 
 local PartSync = {}
 
@@ -62,11 +62,6 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
     local old = existingPart(wrapper, part)
     if not old then
         error("Targeted rig " .. part .. " not found in template; run full Sync Studio first")
-    end
-    local candidate = Validation.FindMesh(imported, part)
-    local recovered = {}
-    if typeof(metadata.authoredBones) == "table" and metadata.authoredBones[part] then
-        recovered = select(1, Recovery.Restore(candidate, metadata.authoredBones[part]))
     end
     local mesh, check = Validation.Verify(imported, part, manifests[part])
     local imageId, usesAlpha = nil, nil
@@ -147,45 +142,63 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
     local placedFound = 0
     local warnings = {}
     local referenceHouse = houseMesh(wrapper)
-    if referenceHouse then
-        for _, root in workspace:GetDescendants() do
-            if root:IsA("Model") and root:GetAttribute("Game1RealEstateSlug") == slug
-                and root:GetAttribute("Game1RealEstateTemplate") ~= true then
-                placedFound += 1
-                local placed = houseMesh(root)
-                local placedOld = existingPart(root, part)
-                if placed and placedOld then
-                    local transform = placed.CFrame * referenceHouse.CFrame:Inverse()
-                    local cloned: Model? = nil
-                    local success, cause = pcall(function()
-                        local staged = replacement:Clone()
-                        cloned = staged
-                        -- A targeted door update must not unexpectedly close
-                        -- an already-open door in the authoring scene.
-                        local target = if part == "door" then placedOld:GetPivot()
-                            else transform * replacement:GetPivot()
-                        staged:PivotTo(target)
-                        staged.Name = placedOld.Name
-                        staged.Parent = root
-                    end)
-                    if success then
-                        placedOld:Destroy()
-                        placedCount += 1
-                    else
-                        if cloned then cloned:Destroy() end
-                        table.insert(warnings, root:GetFullName() .. ": " .. tostring(cause))
-                    end
-                else
-                    table.insert(warnings, root:GetFullName() .. ": part or house anchor not managed")
-                end
+    if not referenceHouse then
+        table.insert(warnings, "Template house anchor missing or ambiguous; placed rigs not updated")
+    end
+    for _, root in PlacedTargets.List(slug) do
+        placedFound += 1
+        local placed = houseMesh(root)
+        local placedOld = existingPart(root, part)
+        if not referenceHouse or not placed or not placedOld then
+            table.insert(warnings, root:GetFullName() .. ": target rig or house anchor missing")
+            continue
+        end
+        local transform = placed.CFrame * referenceHouse.CFrame:Inverse()
+        local cloned: Model? = nil
+        local success, cause = pcall(function()
+            local staged = replacement:Clone()
+            cloned = staged
+            -- Preserve the placed door's current pivot/open state. Do not
+            -- introduce new socket offsets or rewrite Blender-authored poses.
+            local target = if part == "door" then placedOld:GetPivot()
+                else transform * replacement:GetPivot()
+            staged:PivotTo(target)
+            local originalName = placedOld.Name
+            local backupName = originalName .. "_M152_Previous"
+            if root:FindFirstChild(backupName) then
+                error("Unresolved previous staged rig: " .. backupName)
             end
+            placedOld.Name = backupName
+            staged.Name = originalName
+            local attached, attachError = pcall(function() staged.Parent = root end)
+            if not attached then
+                placedOld.Name = originalName
+                error(attachError)
+            end
+        end)
+        if success then
+            placedOld:Destroy()
+            PlacedTargets.MarkPlaced(root)
+            local placedIds = decodeMap(root:GetAttribute("Game1RigAssetIds"))
+            placedIds[part] = tostring(assetId)
+            root:SetAttribute("Game1RigAssetIds", HttpService:JSONEncode(placedIds))
+            if part == "door" then
+                root:SetAttribute("Game1DoorModelAssetId", tostring(assetId))
+            elseif part == "house" then
+                root:SetAttribute("Game1HouseModelAssetId", tostring(assetId))
+                root:SetAttribute("Game1ModelAssetId", tostring(assetId))
+            end
+            placedCount += 1
+        else
+            if cloned then cloned:Destroy() end
+            table.insert(warnings, root:GetFullName() .. ": " .. tostring(cause))
         end
     end
     return wrapper, {bonesValidated = true, rigsValidated = 1,
         texturesApplied = if imageId then 1 else 0,
-        partialSync = true, part = part, workspaceModelsUpdated = placedCount,
+        partialSync = true, part = part, placedSyncVersion = 2, workspaceModelsUpdated = placedCount,
         workspaceModelsFound = placedFound,
-        boneCount = check.boneCount, recoveredSockets = recovered,
+        boneCount = check.boneCount,
         missingSockets = check.missingSockets, rigWarnings = warnings}
 end
 

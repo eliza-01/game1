@@ -17,6 +17,9 @@ function ServiceCatalog.Build(root: Instance)
             local EnvironmentAssetService = require(world:WaitForChild("EnvironmentAssetService"))
             EnvironmentAssetService.Start()
         end},
+        {name = "HouseSocketService", critical = false, start = function()
+            require(world:WaitForChild("HouseSocketService")).Start()
+        end},
         {name = "EntityHitboxService", critical = true, start = function()
             local EntityHitboxService = require(combat:WaitForChild("EntityHitboxService"))
             EntityHitboxService.Start()
@@ -60,6 +63,9 @@ function ServiceCatalog.Build(root: Instance)
         {name = "TestLoadoutService", critical = false, dependsOn = {"CharacterService", "AttackService"}, start = function()
             local TestLoadoutService = require(dev:WaitForChild("TestLoadoutService"))
             TestLoadoutService.Start()
+        end},
+        {name = "HouseSocketDebugService", critical = false, dependsOn = {"HouseSocketService"}, start = function()
+            require(dev:WaitForChild("HouseSocketDebugService")).Start()
         end},
         {name = "TrainingDummyService", critical = false, dependsOn = {"EntityHitboxService"}, start = function()
             require(dev:WaitForChild("TrainingDummyService")).Start()

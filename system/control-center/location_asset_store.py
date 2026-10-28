@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from model_publication_service import staged_model
+
 from pathlib import Path
 import hashlib
 import json
@@ -519,25 +521,26 @@ class LocationAssetStore:
 
         if str(row.get("model_published_sha256") or "") != str(row.get("model_sha256") or ""):
             current_asset_id = str(row.get("model_asset_id") or "").strip()
-            if current_asset_id:
-                operation = update_model_asset(
-                    model,
-                    asset_id=current_asset_id,
-                    display_name=row["name_en"],
-                    description=description,
-                    creator_type=creator_type,
-                    creator_id=creator_id,
-                    api_key=api_key,
-                )
-            else:
-                operation = create_model_asset(
-                    model,
-                    display_name=row["name_en"],
-                    description=description,
-                    creator_type=creator_type,
-                    creator_id=creator_id,
-                    api_key=api_key,
-                )
+            with staged_model(self.root, model) as publication:
+                if current_asset_id:
+                    operation = update_model_asset(
+                        publication,
+                        asset_id=current_asset_id,
+                        display_name=row["name_en"],
+                        description=description,
+                        creator_type=creator_type,
+                        creator_id=creator_id,
+                        api_key=api_key,
+                    )
+                else:
+                    operation = create_model_asset(
+                        publication,
+                        display_name=row["name_en"],
+                        description=description,
+                        creator_type=creator_type,
+                        creator_id=creator_id,
+                        api_key=api_key,
+                    )
             result = wait_for_operation(operation, api_key=api_key)
             now = time.time()
             with self.connect() as connection:

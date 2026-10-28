@@ -86,10 +86,10 @@ foreach($Marker in @(
     'StudioRealEstateModel',
     'StudioRealEstatePartSync',
     'StudioRealEstateRigValidation',
-    'StudioRealEstateSocketRecovery',
     'StudioRealEstateCollisionPolicy',
     'StudioRealEstatePlacedCollisionSync',
     'StudioRealEstatePlacedVisualSync',
+    'StudioRealEstatePlacedTargets',
     'StudioDecoSyncCommands',
     'StudioTextureAppearance',
     'StudioActorSpawnCommands'

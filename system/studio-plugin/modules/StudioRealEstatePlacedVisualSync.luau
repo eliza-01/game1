@@ -1,6 +1,7 @@
 -- Full Real Estate sync: refresh visual rigs on *all managed placed* houses.
 -- Preserve the house transform, existing door opening pivot, and any unmanaged
 -- player-owned objects. Collision rigs have an independent synchronizer.
+local Targets = require(script.Parent.StudioRealEstatePlacedTargets)
 local VisualSync = {}
 
 local function houseAnchor(root: Instance): MeshPart?
@@ -29,18 +30,15 @@ local function visuals(template: Model): {Model}
     return result
 end
 
-function VisualSync.Update(template: Model, slug: string): (number, number, {string})
+function VisualSync.Update(template: Model, slug: string, placedTargets: {Model}?): (number, number, {string})
+    local targets = placedTargets or Targets.List(slug)
     local sourceHouse = houseAnchor(template)
-    if not sourceHouse then return 0, 0, {"Full visual sync skipped: template house anchor missing or ambiguous"} end
+    if not sourceHouse then return 0, #targets, {"Full visual sync skipped: template house anchor missing or ambiguous"} end
     local sources = visuals(template)
     local changed = 0
     local found = 0
     local warnings = {}
-    for _, root in workspace:GetDescendants() do
-        if not root:IsA("Model") or root:GetAttribute("Game1RealEstateSlug") ~= slug
-            or root:GetAttribute("Game1RealEstateTemplate") == true then
-            continue
-        end
+    for _, root in targets do
         found += 1
         local placedHouse = houseAnchor(root)
         if not placedHouse then
@@ -97,6 +95,13 @@ function VisualSync.Update(template: Model, slug: string): (number, number, {str
             continue
         end
         for _, stage in committed do stage.old:Destroy() end
+        Targets.MarkPlaced(root)
+        -- Keep published IDs on the placed instance consistent with its
+        -- actual copied rigs; do not touch player-owned children or pivots.
+        root:SetAttribute("Game1RigAssetIds", template:GetAttribute("Game1RigAssetIds"))
+        root:SetAttribute("Game1HouseModelAssetId", template:GetAttribute("Game1HouseModelAssetId"))
+        root:SetAttribute("Game1DoorModelAssetId", template:GetAttribute("Game1DoorModelAssetId"))
+        root:SetAttribute("Game1ModelAssetId", template:GetAttribute("Game1ModelAssetId"))
         changed += 1
     end
     return changed, found, warnings

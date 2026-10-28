@@ -8,13 +8,14 @@ local CombatShared = Shared:WaitForChild("combat")
 local WeaponAttackVolume = require(CombatShared:WaitForChild("WeaponAttackVolume"))
 
 local StudioDebugDock = require(script.Parent:WaitForChild("StudioDebugDock"))
+local HouseSocketDebugController = require(script.Parent:WaitForChild("HouseSocketDebugController"))
 
 local TestLoadoutController = {}
 local started = false
 local player = Players.LocalPlayer
 
 local PANEL_WIDTH = 320
-local PANEL_EXPANDED_HEIGHT = 482
+local PANEL_EXPANDED_HEIGHT = 540
 local PANEL_COLLAPSED_SIZE = 44
 local CONTENT_WIDTH = PANEL_WIDTH - 32
 local DEBUG_PANEL_OPEN_ATTRIBUTE = "Game1DebugPanelOpen"
@@ -586,6 +587,8 @@ local function createGui()
     apply.Font = Enum.Font.GothamSemibold
     apply.TextSize = 10
     apply.Active = false
+
+    HouseSocketDebugController.AttachLauncher(body, 428)
 
     local collapsed = true
     local function setCollapsed(value: boolean)

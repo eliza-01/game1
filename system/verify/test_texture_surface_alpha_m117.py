@@ -157,9 +157,10 @@ class SurfaceAlphaM117Tests(unittest.TestCase):
             self.assertNotIn('.TextureID = "rbxassetid://"', contents, file)
         self.assertIn('StudioTextureAppearance', text('system/studio-plugin/plugin.project.json'))
         runtime = text('src/server/world/EnvironmentAssetVisuals.luau')
-        self.assertIn('surface.ColorMap = uri', runtime)
         self.assertIn('mesh.TextureID = uri', runtime)
-        self.assertIn('surface.AlphaMode = targetMode', runtime)
+        self.assertIn('FindFirstChildOfClass("SurfaceAppearance")', runtime)
+        self.assertNotIn('surface.ColorMap = uri', runtime)
+        self.assertNotIn('surface.AlphaMode = targetMode', runtime)
 
 
 if __name__ == '__main__':

@@ -1,0 +1,158 @@
+{
+  "vertices": 1968,
+  "maxRestGeometryDelta": 9.5367431640625e-07,
+  "qa": {
+    "ok": true,
+    "pass": false,
+    "errors": [
+      "door: 282 edges with inconsistent face winding",
+      "floating/detached part in door (1 verts at [-1.989, -7.265, 8.398])"
+    ],
+    "warnings": [
+      "door: ~40.82% UV overlap (ok only if mirrored/stacked on purpose; bakes break)",
+      "door: non-manifold edges=246 wire=0",
+      "door: duplicate verts=0 loose verts=2",
+      "hidden back-to-back faces: door (14 pairs) - delete to save tris",
+      "1 parts fully enclosed, not touching (eyes/internals?): ['door']",
+      "asset lowest point z=4.5178 (not resting on ground plane z=0)"
+    ],
+    "ground_z": 4.5178,
+    "zfighting": [],
+    "floating": [
+      {
+        "object": "door",
+        "island_verts": 1,
+        "center": [
+          -1.989,
+          -7.265,
+          8.398
+        ]
+      }
+    ],
+    "back_to_back": [
+      {
+        "where": "door",
+        "tri_pairs": 14
+      }
+    ],
+    "enclosed": [
+      {
+        "object": "door",
+        "island_verts": 1,
+        "center": [
+          -2.128,
+          -7.979,
+          8.405
+        ]
+      }
+    ],
+    "objects": {
+      "door": {
+        "verts": 1968,
+        "faces": 3954,
+        "tris": 3954,
+        "ngons": 0,
+        "boundary_edges": 306,
+        "nonmanifold_edges": 246,
+        "wire_edges": 0,
+        "loose_verts": 2,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 282,
+        "duplicate_verts": 0,
+        "islands": 10,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 1,
+        "unweighted_verts": 0,
+        "verts_over_4_influences": 0,
+        "uv_maps": 1,
+        "uv_oob_pct": 0.0,
+        "uv_zero_area_faces": 0,
+        "uv_overlap_pct": 40.82,
+        "uv_coverage_pct": 1.8
+      }
+    }
+  },
+  "sourceQA": {
+    "ok": true,
+    "pass": false,
+    "errors": [
+      "door: 282 edges with inconsistent face winding",
+      "floating/detached part in door (1 verts at [-1.989, -7.265, 8.398])"
+    ],
+    "warnings": [
+      "door: ~40.82% UV overlap (ok only if mirrored/stacked on purpose; bakes break)",
+      "door: non-manifold edges=246 wire=0",
+      "door: duplicate verts=0 loose verts=2",
+      "hidden back-to-back faces: door (14 pairs) - delete to save tris",
+      "1 parts fully enclosed, not touching (eyes/internals?): ['door']",
+      "asset lowest point z=4.5178 (not resting on ground plane z=0)"
+    ],
+    "ground_z": 4.5178,
+    "zfighting": [],
+    "floating": [
+      {
+        "object": "door",
+        "island_verts": 1,
+        "center": [
+          -1.989,
+          -7.265,
+          8.398
+        ]
+      }
+    ],
+    "back_to_back": [
+      {
+        "where": "door",
+        "tri_pairs": 14
+      }
+    ],
+    "enclosed": [
+      {
+        "object": "door",
+        "island_verts": 1,
+        "center": [
+          -2.128,
+          -7.979,
+          8.405
+        ]
+      }
+    ],
+    "objects": {
+      "door": {
+        "verts": 1968,
+        "faces": 3954,
+        "tris": 3954,
+        "ngons": 0,
+        "boundary_edges": 306,
+        "nonmanifold_edges": 246,
+        "wire_edges": 0,
+        "loose_verts": 2,
+        "degenerate_faces": 0,
+        "zero_length_edges": 0,
+        "inconsistent_normals_edges": 282,
+        "duplicate_verts": 0,
+        "islands": 10,
+        "inside_out_islands": 0,
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "materials": 1,
+        "unweighted_verts": 0,
+        "verts_over_4_influences": 0,
+        "uv_maps": 1,
+        "uv_oob_pct": 0.0,
+        "uv_zero_area_faces": 0,
+        "uv_overlap_pct": 40.82,
+        "uv_coverage_pct": 1.8
+      }
+    }
+  }
+}

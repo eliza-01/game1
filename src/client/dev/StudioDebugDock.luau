@@ -8,7 +8,7 @@ local BUTTON_GAP = 8
 local LEFT = 16
 local TOP = 8
 local WINDOW_TOP = TOP + BUTTON_SIZE + BUTTON_GAP
-local slots = { TL = 0, MV = 1, MO = 2, CS = 3 }
+local slots = { TL = 0, MV = 1, MO = 2, CS = 3, HS = 4 }
 
 function StudioDebugDock.ButtonPosition(id: string): UDim2
     local slot = assert(slots[id], "unknown debug panel: " .. id)

@@ -70,9 +70,6 @@
       "StudioRealEstateRigValidation": {
         "$path": "modules/StudioRealEstateRigValidation.luau"
       },
-      "StudioRealEstateSocketRecovery": {
-        "$path": "modules/StudioRealEstateSocketRecovery.luau"
-      },
       "StudioRealEstateCollisionPolicy": {
         "$path": "modules/StudioRealEstateCollisionPolicy.luau"
       },
@@ -96,6 +93,9 @@
       },
       "StudioTimelineTransport": {
         "$path": "modules/StudioTimelineTransport.luau"
+      },
+      "StudioRealEstatePlacedTargets": {
+        "$path": "modules/StudioRealEstatePlacedTargets.luau"
       },
       "StudioRealEstatePlacedVisualSync": {
         "$path": "modules/StudioRealEstatePlacedVisualSync.luau"

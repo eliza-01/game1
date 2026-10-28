@@ -55,10 +55,10 @@ class BoneImportCoverage(unittest.TestCase):
             plan_publication_weights(heads, verts, min_covered_vertices=3,
                                      minimum_weight=.2, anchor_weight=.3)
 
-    def test_blender_export_uses_only_estate_coverage_policy(self):
+    def test_blender_export_uses_shared_coverage_policy(self):
         script = (ROOT / 'system/asset-manager/prepare_real_estate_publication_fbx.py').read_text()
-        self.assertIn('min_covered_vertices=3', script)
-        self.assertIn('minimum_weight=0.20, anchor_weight=0.30', script)
+        self.assertIn('from model_publication import prepare_rig, export_model', script)
+        self.assertNotIn('minimum_weight=', script)
         self.assertIn('assert_rig_survived', (ROOT / 'system/control-center/real_estate/fbx.py').read_text())
         studio = (ROOT / 'system/studio-plugin/modules/StudioRealEstateModel.luau').read_text()
         self.assertIn('rigWarnings = rigWarnings', studio)

@@ -30,16 +30,11 @@ class StudioRealEstateOptionalSocketsM132(unittest.TestCase):
         self.assertNotIn('authored socket ', self.assembler)
         self.assertIn('function Validation.FindMesh(', self.validator)
 
-    def test_only_missing_hinge_blocks_sync(self):
-        self.assertIn('required hinge Bone', self.validator)
-        self.assertIn('if not hinge or not hinge:IsA("Bone") then', self.validator)
-        self.assertIn('for _, name in missing do', self.validator)
-        self.assertIn('if name ~= DOOR_HINGE then', self.validator)
-        self.assertIn('table.insert(warnings, part .. ": " .. name', self.validator)
-        self.assertNotIn('error(part .. ": authored socket "', self.validator)
+    def test_any_missing_authored_bone_blocks_sync(self):
+        self.assertIn('if #missing > 0 then', self.validator)
+        self.assertIn('published Model Asset lost authored Bones', self.validator)
         self.assertIn('socket.Parent ~= hinge', self.validator)
-        self.assertIn('hinge:IsDescendantOf(mesh)', self.validator)
-        self.assertIn('instance:IsA("Attachment") and authored[instance.Name]', self.validator)
+        self.assertNotIn('instance:IsA("Attachment")', self.validator)
 
     def test_no_synthetic_socket_or_bone_animation(self):
         self.assertNotIn('Instance.new("Attachment")', self.validator)

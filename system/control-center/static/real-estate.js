@@ -401,23 +401,26 @@ async function realEstateSync(slug, part=null){
     const result=await request('/api/real-estate/'+encodeURIComponent(slug)+'/sync',{
       method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({part:part||''})});
     const stats=result.studio?.realEstateStats||{};
+    if(stats.placedSyncVersion!==2){
+      throw new Error('Game1Bridge Studio plugin is outdated: placed-sync v2 is required. Install the current Studio plugin and restart Studio before syncing again.');
+    }
     const warnings=stats.rigWarnings||[];
     const missing=stats.missingSockets||[];
-    const recovered=stats.recoveredSockets||[];
     const found=Number(stats.workspaceModelsFound||0);
     const updated=Number(stats.workspaceModelsUpdated||0);
     const physics=Number(stats.workspaceCollisionRigsUpdated||0);
-    const incomplete=missing.length>0||warnings.length>0||updated<found;
-    const summary=`Studio template updated · placed houses ${updated}/${found}`+
+    const incomplete=found===0||missing.length>0||warnings.length>0||updated<found;
+    const summary=(found===0
+      ? `Studio template updated · NO matching placed houses found (0/0)`
+      : `Studio template updated · placed houses ${updated}/${found}`)+
       (physics?` · collision rigs ${physics}`:'')+
-      (recovered.length?` · sockets recovered ${recovered.length}`:'')+
       (missing.length?` · sockets missing ${missing.length}`:'')+
       (warnings.length?` · ${warnings.length} warning(s)`:'');
     toast(summary,incomplete);
     if(warnings.length||missing.length){
       const box=$('real-estate-rig-warnings');
       box.hidden=false;
-      box.innerHTML=`<strong>Studio Sync diagnostics</strong><ul>${[...warnings,...missing.map(name=>'Missing socket: '+name)].map(w=>`<li>${esc(w)}</li>`).join('')}</ul><small>Only managed Workspace models with Game1RealEstateSlug are updated. Unmanaged manually inserted copies require registration.</small>`;
+      box.innerHTML=`<strong>Studio Sync diagnostics</strong><ul>${[...warnings,...missing.map(name=>'Missing socket: '+name)].map(w=>`<li>${esc(w)}</li>`).join('')}</ul><small>Workspace models with the matching Game1RealEstateSlug are updated regardless of folder or a copied template flag. Missing instances need a managed slug.</small>`;
     }
     return result;
   }catch(error){toast(`Studio Sync: ${error.message}`,true);return null;}

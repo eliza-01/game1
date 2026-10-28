@@ -1,9 +1,4 @@
-"""M133: true socket Bone restoration in Studio without deforming published meshes.
-
-Roblox physics/CFrame still requires a manual Studio test: these unit tests
-assert that authoring transforms reach the Bridge and no mutation/publication
-is introduced by the Studio-only recovery path.
-"""
+"""Publication owns all bones; Studio never reconstructs them."""
 import json
 import sys
 import tempfile
@@ -22,7 +17,7 @@ IDENTITY = [1., 0., 0., 0.,
 
 
 class RestoredSocketsM133(unittest.TestCase):
-    def test_authoritative_rest_matrices_transmitted_unmodified(self):
+    def test_sync_requests_imported_bones_without_reconstruction_metadata(self):
         hinge = {'name': 'door_01_hinge_socket', 'parent': '', 'matrixLocal': IDENTITY}
         child = {'name': 'door_01_handle_outside_socket',
                  'parent': hinge['name'], 'matrixLocal': [1,0,0,3, 0,1,0,4, 0,0,1,5, 0,0,0,1]}
@@ -36,46 +31,21 @@ class RestoredSocketsM133(unittest.TestCase):
         store.get.return_value = row
         store.root = ROOT
         load = Mock(return_value={'realEstateStats': {'bonesValidated': True,
-                        'rigsValidated': 2, 'texturesApplied': 2, 'recoveredSockets': ['door/door_01_handle_outside_socket']}})
+                        'rigsValidated': 2, 'texturesApplied': 2}})
         RealEstateStudioSync(store, load).sync(row['slug'])
         metadata = load.call_args.kwargs['metadata']
-        self.assertEqual(metadata['authoredBones']['door'], [hinge, child])
-        self.assertEqual(metadata['authoredBones']['house'], [])
+        self.assertNotIn('authoredBones', metadata)
+        self.assertEqual(metadata['expectedMeshes']['door'], [hinge['name'], child['name']])
         self.assertEqual(load.call_args.args[0], '111')
         self.assertEqual(load.call_args.kwargs['placement_mode'], 'real-estate-rig')
 
-    def test_restorer_uses_imported_parents_and_authored_relative_transforms(self):
-        script = (ROOT / 'system/studio-plugin/modules/StudioRealEstateSocketRecovery.luau').read_text()
-        assembly = (ROOT / 'system/studio-plugin/modules/StudioRealEstateModel.luau').read_text()
-        validation = (ROOT / 'system/studio-plugin/modules/StudioRealEstateRigValidation.luau').read_text()
-        self.assertIn('specs[spec.parent].frame:ToObjectSpace(spec.frame)', script)
-        self.assertIn('replacement.CFrame = localFrame', script)
-        self.assertIn('replacement.Parent = parent', script)
-        self.assertIn('Instance.new("Bone")', script)
-        self.assertIn('instance:IsA("Attachment")', script)
-        self.assertIn('parent:IsA("Bone")', script)
-        self.assertIn('Game1RecoveredFromFBXRestPose', script)
-        self.assertIn('imported parent bone unavailable; cannot restore exactly', script)
-        self.assertNotIn('Transform =', script)
-        self.assertNotIn('Instance.new("MeshPart")', script)
-        self.assertIn('StudioRealEstateSocketRecovery.Restore(candidate, authored)', assembly)
-        self.assertLess(assembly.index('StudioRealEstateSocketRecovery.Restore('),
-                        assembly.index('StudioRealEstateRigValidation.Verify('))
-        self.assertIn('Game1RecoveredRealEstateSockets', assembly)
-        self.assertIn('function Validation.FindMesh(', validation)
-        self.assertIn('StudioRealEstateRigValidation.FindMesh(rig, part)', assembly)
-        self.assertIn('assembly.WorldPivot = hinge.TransformedWorldCFrame', assembly)
-        self.assertNotIn('hinge.Transform =', assembly)
-
-    def test_plugin_and_frontend_consume_recovery_stats(self):
-        tree = json.loads((ROOT / 'system/studio-plugin/plugin.project.json').read_text())
-        self.assertEqual(tree['tree']['modules']['StudioRealEstateSocketRecovery']['$path'],
-                         'modules/StudioRealEstateSocketRecovery.luau')
-        self.assertIn("'StudioRealEstateSocketRecovery',",
-                      (ROOT / 'system/studio-plugin/install.ps1').read_text())
-        ui = (ROOT / 'system/control-center/static/real-estate.js').read_text()
-        self.assertIn('const recovered=stats.recoveredSockets||[];', ui)
-        self.assertIn('sockets recovered', ui)
+    def test_recovery_removed_from_sources_and_packaging(self):
+        self.assertFalse((ROOT / 'system/studio-plugin/modules/StudioRealEstateSocketRecovery.luau').exists())
+        for path in ('system/studio-plugin/modules/StudioRealEstateModel.luau',
+                     'system/studio-plugin/modules/StudioRealEstatePartSync.luau',
+                     'system/studio-plugin/plugin.project.json', 'system/studio-plugin/install.ps1'):
+            self.assertNotIn('StudioRealEstateSocketRecovery', (ROOT / path).read_text())
+        self.assertNotIn('recoveredSockets', (ROOT / 'system/control-center/static/real-estate.js').read_text())
 
     def test_no_changes_to_image_or_model_publication_pipeline(self):
         # Only Studio read-side recovery. No model/texture upload is part of
@@ -84,7 +54,7 @@ class RestoredSocketsM133(unittest.TestCase):
         self.assertNotIn('create_model_asset', script)
         self.assertNotIn('create_image_asset', script)
         self.assertNotIn('ensure_published', script)
-        self.assertIn('authoredBones', script)
+        self.assertNotIn('authoredBones', script)
 
 
 if __name__ == '__main__':

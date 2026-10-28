@@ -408,7 +408,7 @@ if preparer.is_file() and "transform_apply" in preparer.read_text(encoding="utf-
     err("character FBX preparer must not rebake authored rotation/scale")
 
 publication_preparer = ROOT / "system/asset-manager/prepare_character_publication_fbx.py"
-publication_preparer_text = publication_preparer.read_text(encoding="utf-8") if publication_preparer.is_file() else ""
+publication_preparer_text = (publication_preparer.read_text(encoding="utf-8") + (ROOT / "system/asset-manager/model_publication.py").read_text(encoding="utf-8")) if publication_preparer.is_file() else ""
 bone_planner = ROOT / "system/asset-manager/bone_weight_survival.py"
 bone_planner_text = bone_planner.read_text(encoding="utf-8") if bone_planner.is_file() else ""
 for required in [
@@ -2750,9 +2750,13 @@ for required in ["DecoPlacedAssetSync.RefreshTextures", "Refresh Deco Asset Text
         err(f"m51 DecoManager registry refresh integration missing {required}")
 if '"DecoPlacedAssetSync"' not in plugin_project_text:
     err("m51 Studio plugin project is missing DecoPlacedAssetSync")
-for required in ["textureAssetId", "mesh.TextureID = uri", "surface.ColorMap = uri", "ApplyModel", "ApplyPart"]:
+# Runtime cannot read/write SurfaceAppearance.ColorMap (Plugin capability).
+# The Studio texture adapter alone owns SurfaceAppearance and alpha authoring.
+for required in ["textureAssetId", "mesh.TextureID = uri", 'FindFirstChildOfClass("SurfaceAppearance")', "ApplyModel", "ApplyPart"]:
     if required not in environment_visuals_text:
         err(f"m51 runtime environment texture hydration missing {required}")
+if "surface.ColorMap" in environment_visuals_text or "surface.AlphaMode" in environment_visuals_text:
+    err("m51 runtime environment binder must not access Plugin-only SurfaceAppearance properties")
 for required in ["EnvironmentAssetVisuals.ApplyModel", "EnvironmentAssetVisuals.ApplyPart"]:
     if required not in environment_asset_service_text:
         err(f"m51 EnvironmentAssetService visual hydration missing {required}")

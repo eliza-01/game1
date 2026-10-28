@@ -1,0 +1,271 @@
+{
+  "full": {
+    "schemaVersion": 2,
+    "parts": {
+      "house": {
+        "verticesOverFourBefore": 0,
+        "verticesOverFourAfter": 0,
+        "prunedVertices": 0,
+        "patchedBoneCount": 6,
+        "patchedBones": [
+          {
+            "bone": "chest_01_socket",
+            "mesh": "house",
+            "vertex": 195
+          },
+          {
+            "bone": "chimney_01_socket",
+            "mesh": "house",
+            "vertex": 3538
+          },
+          {
+            "bone": "elevator_01_socket",
+            "mesh": "house",
+            "vertex": 2834
+          },
+          {
+            "bone": "house_floor_01_spawn_01_socket",
+            "mesh": "house",
+            "vertex": 1302
+          },
+          {
+            "bone": "house_floor_02_spawn_01_socket",
+            "mesh": "house",
+            "vertex": 2834
+          },
+          {
+            "bone": "land_spawn_01_socket",
+            "mesh": "house",
+            "vertex": 2521
+          }
+        ],
+        "survivingBoneCount": 6,
+        "minimumInfluence": 0.05,
+        "minimumVerticesPerBone": 1
+      },
+      "col_mesh": {
+        "status": "no_bones",
+        "preservedBones": 0
+      },
+      "door": {
+        "verticesOverFourBefore": 0,
+        "verticesOverFourAfter": 0,
+        "prunedVertices": 0,
+        "patchedBoneCount": 3,
+        "patchedBones": [
+          {
+            "bone": "door_01_handle_inside_socket",
+            "mesh": "door",
+            "vertex": 260
+          },
+          {
+            "bone": "door_01_handle_outside_socket",
+            "mesh": "door",
+            "vertex": 1139
+          },
+          {
+            "bone": "door_01_padlock_01_socket",
+            "mesh": "door",
+            "vertex": 168
+          }
+        ],
+        "survivingBoneCount": 4,
+        "minimumInfluence": 0.05,
+        "minimumVerticesPerBone": 1
+      },
+      "restoration": {
+        "status": "no_bones",
+        "preservedBones": 0
+      },
+      "window_frames_glass": {
+        "status": "no_bones",
+        "preservedBones": 0
+      }
+    },
+    "textureMode": "embedded",
+    "rigAssets": {
+      "house": "house.fbx",
+      "col_mesh": "col_mesh.fbx",
+      "door": "door.fbx",
+      "restoration": "restoration.fbx",
+      "window_frames_glass": "window_frames_glass.fbx"
+    }
+  },
+  "part": {
+    "schemaVersion": 2,
+    "parts": {
+      "door": {
+        "verticesOverFourBefore": 0,
+        "verticesOverFourAfter": 0,
+        "prunedVertices": 0,
+        "patchedBoneCount": 3,
+        "patchedBones": [
+          {
+            "bone": "door_01_handle_inside_socket",
+            "mesh": "door",
+            "vertex": 260
+          },
+          {
+            "bone": "door_01_handle_outside_socket",
+            "mesh": "door",
+            "vertex": 1139
+          },
+          {
+            "bone": "door_01_padlock_01_socket",
+            "mesh": "door",
+            "vertex": 168
+          }
+        ],
+        "survivingBoneCount": 4,
+        "minimumInfluence": 0.05,
+        "minimumVerticesPerBone": 1
+      }
+    },
+    "textureMode": "embedded",
+    "rigAssets": {
+      "door": "door.fbx"
+    }
+  },
+  "character": {
+    "schemaVersion": 1,
+    "mode": "roblox-open-cloud-bone-survival",
+    "armature": "door_armature",
+    "boneCount": 4,
+    "meshNames": [
+      "door"
+    ],
+    "survivalWeight": 0.05,
+    "patchedBoneCount": 3,
+    "patchedBones": [
+      {
+        "bone": "door_01_handle_inside_socket",
+        "mesh": "door",
+        "vertex": 260
+      },
+      {
+        "bone": "door_01_handle_outside_socket",
+        "mesh": "door",
+        "vertex": 1139
+      },
+      {
+        "bone": "door_01_padlock_01_socket",
+        "mesh": "door",
+        "vertex": 168
+      }
+    ],
+    "survivingBoneCount": 4,
+    "prunedVertices": 0,
+    "verticesOverFourBefore": 0,
+    "verticesOverFourAfter": 0,
+    "restTransformsChanged": false,
+    "fbxScaleMode": "FBX_SCALE_UNITS"
+  },
+  "generic": {
+    "schemaVersion": 1,
+    "meshes": [
+      {
+        "name": "door",
+        "armature": "door_armature",
+        "vertices": 1968,
+        "bones": [
+          {
+            "name": "door_01_handle_inside_socket",
+            "parent": "door_01_hinge_socket",
+            "matrixLocal": [
+              1.0,
+              0.0,
+              2e-07,
+              -4.224946,
+              0.0,
+              1.0,
+              0.0,
+              0.5916122,
+              -2e-07,
+              0.0,
+              1.0,
+              0.20629,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          {
+            "name": "door_01_handle_outside_socket",
+            "parent": "door_01_hinge_socket",
+            "matrixLocal": [
+              1e-07,
+              0.0,
+              1.0,
+              -4.0266972,
+              0.0,
+              -1.0,
+              0.0,
+              -0.5904185,
+              1.0,
+              0.0,
+              -1e-07,
+              0.167103,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          {
+            "name": "door_01_hinge_socket",
+            "parent": "",
+            "matrixLocal": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              -1.0,
+              2e-07,
+              0.0,
+              1.0,
+              0.0,
+              2e-07,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          {
+            "name": "door_01_padlock_01_socket",
+            "parent": "door_01_hinge_socket",
+            "matrixLocal": [
+              0.9007933,
+              -0.4017779,
+              -0.1647604,
+              -4.865746,
+              0.4257222,
+              0.8918893,
+              0.1526233,
+              -0.4892775,
+              0.0856273,
+              -0.2076244,
+              0.9744537,
+              0.302325,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          }
+        ],
+        "influencedBones": [
+          "door_01_handle_inside_socket",
+          "door_01_handle_outside_socket",
+          "door_01_hinge_socket",
+          "door_01_padlock_01_socket"
+        ]
+      }
+    ],
+    "unassignedArmatures": []
+  },
+  "sourceHashesUnchanged": true
+}

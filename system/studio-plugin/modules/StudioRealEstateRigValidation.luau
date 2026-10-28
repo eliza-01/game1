@@ -1,7 +1,6 @@
 -- Validate an already-published Real Estate Model Asset as actually loaded by Roblox.
 -- Blender/FBX manifests are authoring expectations, not proof of what survived
--- publication. Optional spatial sockets may disappear without skin weights.
--- A rigid door hinge is required for a safe DoorAssembly pivot, however.
+-- publication. All authored bones are required, including unweighted source sockets.
 local Validation = {}
 
 local DOOR_HINGE = "door_01_hinge_socket"
@@ -48,17 +47,18 @@ function Validation.Verify(root: Model, part: string, expected: any): (MeshPart,
         end
     end
 
-    local imported: {[string]: Attachment} = {}
+    local imported: {[string]: Bone} = {}
     local boneNames = {}
     local boneCount = 0
     for _, instance in root:GetDescendants() do
-        -- Bone derives from Attachment. An imported spatial marker may be an
-        -- ordinary Attachment: that is sufficient for a position-only socket.
         if instance:IsA("Bone") then
             boneCount += 1
             table.insert(boneNames, instance.Name)
         end
-        if instance:IsA("Attachment") and authored[instance.Name] then
+        if instance:IsA("Bone") and authored[instance.Name] then
+            if not instance:IsDescendantOf(mesh) then
+                error(part .. ": bone outside expected mesh " .. instance.Name)
+            end
             if imported[instance.Name] then
                 error(part .. ": duplicate imported marker " .. instance.Name)
             end
@@ -68,12 +68,16 @@ function Validation.Verify(root: Model, part: string, expected: any): (MeshPart,
     table.sort(boneNames)
     local missing = {}
     for name in authored do
-        if name:sub(-7) == "_socket" and not imported[name] then
+        if not imported[name] then
             table.insert(missing, name)
         end
     end
     table.sort(missing)
 
+    if #missing > 0 then
+        error(part .. ": published Model Asset lost authored Bones: " .. table.concat(missing, ", ")
+            .. "; republish the model before Studio Sync")
+    end
     local warnings = {}
     -- Hinge is structural: without the imported Bone, PivotTo would use a
     -- fabricated origin. Never replace a working template in that situation.
@@ -97,19 +101,9 @@ function Validation.Verify(root: Model, part: string, expected: any): (MeshPart,
             end
         end
     elseif part == "door" then
-        table.insert(warnings, "door: legacy rig without hinge pivot; DoorAssembly not created")
+        table.insert(warnings, "door: no authored hinge pivot; DoorAssembly not created")
     end
 
-    -- Non-hinge sockets describe optional authoring features. Their absence
-    -- must be visible to the author, but must not block loading the geometry
-    -- or hinge. Missing sockets are NOT synthesized at guessed positions.
-    for _, name in missing do
-        if name ~= DOOR_HINGE then
-            table.insert(warnings, part .. ": " .. name
-                .. " is absent from published Model Asset; interaction at this socket is unavailable"
-                .. " (imported Bones: " .. table.concat(boneNames, ", ") .. ")")
-        end
-    end
     return mesh, {
         boneCount = boneCount,
         socketCount = socketCount,

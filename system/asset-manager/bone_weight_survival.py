@@ -33,9 +33,8 @@ def plan_publication_weights(
 ) -> dict:
     """Normalize skin weights and keep every bone above an explicit coverage policy.
 
-    Defaults preserve the legacy NPC/character publication policy. Estate rigs
-    can request redundant, stronger influence anchors because Roblox's importer
-    may cull interaction bones with only one tiny weighted vertex.
+    All model domains use these defaults. Coverage settings are algorithm inputs,
+    not asset-name exceptions; no domain adapter overrides them.
     """
     if not bone_heads or not vertices:
         raise ValueError("publication requires an armature and skinned vertices")

@@ -3882,7 +3882,9 @@ return table.freeze(PlotsVisibility)
           <string name="Name">StudioRealEstateCollisionPolicy</string>
           <string name="Source"><![CDATA[-- Real Estate physics layer. Pure mesh naming + one writer for physics flags.
 -- Collision geometry is an independent Roblox Model Asset with no Image ID.
+local CollectionService = game:GetService("CollectionService")
 local Policy = {}
+local COLLIDER_TAG = "Game1RealEstateCollider"
 
 function Policy.IsCollider(name: string): boolean
     local lower = string.lower(name)
@@ -3915,8 +3917,14 @@ function Policy.Apply(mesh: MeshPart, name: string, raw: any)
         -- holes and openings. For large estates, split into simple volumes.
         mesh.CollisionFidelity = Enum.CollisionFidelity.PreciseConvexDecomposition
         mesh:SetAttribute("Game1RealEstatePhysicsOnly", true)
+        mesh:SetAttribute("Game1RealEstateDestructible", settings.destructible == true)
+        CollectionService:AddTag(mesh, COLLIDER_TAG)
     else
         mesh:SetAttribute("Game1RealEstatePhysicsOnly", nil)
+        mesh:SetAttribute("Game1RealEstateDestructible", nil)
+        if CollectionService:HasTag(mesh, COLLIDER_TAG) then
+            CollectionService:RemoveTag(mesh, COLLIDER_TAG)
+        end
     end
 end
 
@@ -3935,6 +3943,7 @@ local StudioRealEstateRigValidation = require(script.Parent.StudioRealEstateRigV
 local StudioRealEstateSocketRecovery = require(script.Parent.StudioRealEstateSocketRecovery)
 local StudioRealEstateCollisionPolicy = require(script.Parent.StudioRealEstateCollisionPolicy)
 local StudioRealEstatePlacedCollisionSync = require(script.Parent.StudioRealEstatePlacedCollisionSync)
+local StudioRealEstatePlacedVisualSync = require(script.Parent.StudioRealEstatePlacedVisualSync)
 local StudioRealEstateModel = {}
 
 -- A hinge must survive import. Missing optional unweighted sockets are
@@ -3995,10 +4004,12 @@ local function setGlassAppearance(mesh: MeshPart, enabled: boolean)
     end
 end
 
-local function refreshPlaced(slug: string, imageAssets: {[string]: string}, imageAlpha: {[string]: any}, meshOptions: any): number
+local function refreshPlaced(slug: string, imageAssets: {[string]: string}, imageAlpha: {[string]: any}, meshOptions: any): (number,number)
     local changed = 0
+    local found = 0
     for _, instance in workspace:GetDescendants() do
         if instance:IsA("Model") and instance:GetAttribute("Game1RealEstateSlug") == slug then
+            found += 1
             local applied = false
             for _, child in instance:GetDescendants() do
                 if child:IsA("MeshPart") then
@@ -4020,7 +4031,7 @@ local function refreshPlaced(slug: string, imageAssets: {[string]: string}, imag
             end
         end
     end
-    return changed
+    return changed, found
 end
 
 function StudioRealEstateModel.Place(imported: Model, destination: Instance, slug: string,
@@ -4183,9 +4194,17 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
     for _, warning in collisionWarnings do
         table.insert(rigWarnings, warning)
     end
-    local placedUpdated = refreshPlaced(slug, imageAssets, imageAlpha, meshOptions)
+    local visualUpdated, visualFound, visualWarnings = StudioRealEstatePlacedVisualSync.Update(wrapper, slug)
+    for _, warning in visualWarnings do
+        table.insert(rigWarnings, warning)
+    end
+    -- Apply appearance independently; visual replacement may have been skipped
+    -- safely for an incomplete/unmanaged placed house.
+    local textureUpdated = select(1, refreshPlaced(slug, imageAssets, imageAlpha, meshOptions))
     return wrapper, {bonesValidated = true, rigsValidated = #parts,
-        texturesApplied = textureCount, workspaceModelsUpdated = placedUpdated,
+        texturesApplied = textureCount, workspaceModelsUpdated = visualUpdated,
+        workspaceModelsFound = visualFound,
+        workspaceTextureModelsUpdated = textureUpdated,
         workspaceCollisionRigsUpdated = collisionUpdated,
         boneCount = bones, socketCount = socketCount,
         socketContractComplete = #missingSockets == 0,
@@ -4346,12 +4365,14 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
     -- anchor to preserve each house's existing world transform; never rebuild
     -- unrelated meshes or player-owned furniture.
     local placedCount = 0
+    local placedFound = 0
     local warnings = {}
     local referenceHouse = houseMesh(wrapper)
     if referenceHouse then
         for _, root in workspace:GetDescendants() do
             if root:IsA("Model") and root:GetAttribute("Game1RealEstateSlug") == slug
                 and root:GetAttribute("Game1RealEstateTemplate") ~= true then
+                placedFound += 1
                 local placed = houseMesh(root)
                 local placedOld = existingPart(root, part)
                 if placed and placedOld then
@@ -4360,7 +4381,11 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
                     local success, cause = pcall(function()
                         local staged = replacement:Clone()
                         cloned = staged
-                        staged:PivotTo(transform * replacement:GetPivot())
+                        -- A targeted door update must not unexpectedly close
+                        -- an already-open door in the authoring scene.
+                        local target = if part == "door" then placedOld:GetPivot()
+                            else transform * replacement:GetPivot()
+                        staged:PivotTo(target)
                         staged.Name = placedOld.Name
                         staged.Parent = root
                     end)
@@ -4380,6 +4405,7 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
     return wrapper, {bonesValidated = true, rigsValidated = 1,
         texturesApplied = if imageId then 1 else 0,
         partialSync = true, part = part, workspaceModelsUpdated = placedCount,
+        workspaceModelsFound = placedFound,
         boneCount = check.boneCount, recoveredSockets = recovered,
         missingSockets = check.missingSockets, rigWarnings = warnings}
 end
@@ -4477,6 +4503,117 @@ return table.freeze(Sync)
         </Properties>
       </Item>
       <Item class="ModuleScript" referent="25">
+        <Properties>
+          <string name="Name">StudioRealEstatePlacedVisualSync</string>
+          <string name="Source"><![CDATA[-- Full Real Estate sync: refresh visual rigs on *all managed placed* houses.
+-- Preserve the house transform, existing door opening pivot, and any unmanaged
+-- player-owned objects. Collision rigs have an independent synchronizer.
+local VisualSync = {}
+
+local function houseAnchor(root: Instance): MeshPart?
+    local found: MeshPart? = nil
+    for _, child in root:GetDescendants() do
+        if child:IsA("MeshPart") and child.Name == "house" then
+            if found then return nil end
+            found = child
+        end
+    end
+    return found
+end
+
+local function visuals(template: Model): {Model}
+    local result = {}
+    for _, child in template:GetChildren() do
+        if child:IsA("Model") and child:GetAttribute("Game1RealEstatePhysicsRig") ~= true then
+            table.insert(result, child)
+        end
+    end
+    table.sort(result, function(a, b)
+        if a.Name == "HouseRig" then return true end
+        if b.Name == "HouseRig" then return false end
+        return a.Name < b.Name
+    end)
+    return result
+end
+
+function VisualSync.Update(template: Model, slug: string): (number, number, {string})
+    local sourceHouse = houseAnchor(template)
+    if not sourceHouse then return 0, 0, {"Full visual sync skipped: template house anchor missing or ambiguous"} end
+    local sources = visuals(template)
+    local changed = 0
+    local found = 0
+    local warnings = {}
+    for _, root in workspace:GetDescendants() do
+        if not root:IsA("Model") or root:GetAttribute("Game1RealEstateSlug") ~= slug
+            or root:GetAttribute("Game1RealEstateTemplate") == true then
+            continue
+        end
+        found += 1
+        local placedHouse = houseAnchor(root)
+        if not placedHouse then
+            table.insert(warnings, root:GetFullName() .. ": house anchor missing or ambiguous")
+            continue
+        end
+        local frame = placedHouse.CFrame * sourceHouse.CFrame:Inverse()
+        local stages = {}
+        local complete = true
+        for _, source in sources do
+            local old = root:FindFirstChild(source.Name)
+            if not old or not old:IsA("Model") then
+                complete = false
+                table.insert(warnings, root:GetFullName() .. ": unmanaged/missing " .. source.Name)
+                break
+            end
+            local staged: Model? = nil
+            local ok, problem = pcall(function()
+                local candidate = source:Clone()
+                staged = candidate
+                -- Keep an already-open door at its previous pivot; all other
+                -- visual meshes follow the authored relative house transform.
+                local target = if source.Name == "DoorAssembly"
+                    then (old :: Model):GetPivot() else frame * source:GetPivot()
+                candidate:PivotTo(target)
+            end)
+            if not ok or not staged then
+                complete = false
+                if staged then staged:Destroy() end
+                table.insert(warnings, root:GetFullName() .. ": " .. tostring(problem))
+                break
+            end
+            table.insert(stages, {old = old :: Model, staged = staged :: Model, name = source.Name})
+        end
+        if not complete then
+            for _, stage in stages do stage.staged:Destroy() end
+            continue
+        end
+        local committed = {}
+        local ok, problem = pcall(function()
+            for _, stage in stages do
+                stage.old.Name = stage.name .. "_M143_Previous"
+                stage.staged.Name = stage.name
+                stage.staged.Parent = root
+                table.insert(committed, stage)
+            end
+        end)
+        if not ok then
+            for _, stage in stages do
+                stage.staged:Destroy()
+                stage.old.Name = stage.name
+            end
+            table.insert(warnings, root:GetFullName() .. ": update rolled back: " .. tostring(problem))
+            continue
+        end
+        for _, stage in committed do stage.old:Destroy() end
+        changed += 1
+    end
+    return changed, found, warnings
+end
+
+return table.freeze(VisualSync)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="26">
         <Properties>
           <string name="Name">StudioRealEstateRigValidation</string>
           <string name="Source"><![CDATA[-- Validate an already-published Real Estate Model Asset as actually loaded by Roblox.
@@ -4603,7 +4740,7 @@ return table.freeze(Validation)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="26">
+      <Item class="ModuleScript" referent="27">
         <Properties>
           <string name="Name">StudioRealEstateSocketRecovery</string>
           <string name="Source"><![CDATA[-- Rebuild authored but unweighted socket Bones after Roblox Model Asset import.
@@ -4743,7 +4880,7 @@ return table.freeze(Recovery)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="27">
+      <Item class="ModuleScript" referent="28">
         <Properties>
           <string name="Name">StudioTextureAppearance</string>
           <string name="Source"><![CDATA[-- Shared Studio-side material binding for all authored MeshParts.
@@ -4805,7 +4942,7 @@ return table.freeze(StudioTextureAppearance)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="28">
+      <Item class="ModuleScript" referent="29">
         <Properties>
           <string name="Name">StudioTimelineEditorCommands</string>
           <string name="Source"><![CDATA[-- Timeline authoring session: validates requests, binds UI events and reports results.
@@ -5094,7 +5231,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="29">
+      <Item class="ModuleScript" referent="30">
         <Properties>
           <string name="Name">StudioTimelinePoseSampler</string>
           <string name="Source"><![CDATA[-- Offline pose extraction and interpolation for a preview rig. No UI or HTTP dependencies.
@@ -5273,7 +5410,7 @@ return table.freeze(StudioTimelinePoseSampler)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="30">
+      <Item class="ModuleScript" referent="31">
         <Properties>
           <string name="Name">StudioTimelinePreview</string>
           <string name="Source"><![CDATA[-- Owns the isolated ViewportFrame rig, camera interaction and animation-asset retrieval.
@@ -5489,7 +5626,7 @@ return table.freeze(StudioTimelinePreview)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="31">
+      <Item class="ModuleScript" referent="32">
         <Properties>
           <string name="Name">StudioTimelineTransport</string>
           <string name="Source"><![CDATA[-- HTTP boundary for the Timeline editor. No UI, animation or Studio model access.
@@ -5547,7 +5684,7 @@ return table.freeze(StudioTimelineTransport)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="32">
+      <Item class="ModuleScript" referent="33">
         <Properties>
           <string name="Name">StudioTimelineWidget</string>
           <string name="Source"><![CDATA[-- Timeline editor view. Builds the dock widget and exposes only its controls.

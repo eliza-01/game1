@@ -37,11 +37,15 @@ def mesh_options(parts, raw: dict | None) -> dict:
         entry = entry if isinstance(entry, dict) else {}
         glass = entry.get('glass')
         no_collide = entry.get('noCollide')
+        destructible = entry.get('destructible')
         result[part] = {
             'glass': (glass if type(glass) is bool else glass_default(part))
                      if requires_texture(part) else False,
             'noCollide': no_collide if type(no_collide) is bool else default_no_collide(part),
             'collisionMesh': is_collision_mesh(part),
+            # Same authoring policy as Location Assets: solid weapon bounce by default.
+            # Actual break/damage simulation is a separate future gameplay feature.
+            'destructible': destructible if type(destructible) is bool and is_collision_mesh(part) else False,
         }
     return result
 

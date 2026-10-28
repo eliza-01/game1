@@ -2,7 +2,7 @@
   'use strict';
   const $=id=>document.getElementById(id);
   const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  function toast(message,bad=false){const node=$('toast');if(!node)return;node.textContent=message;node.className='toast show'+(bad?' error':'');clearTimeout(toast.timer);toast.timer=setTimeout(()=>node.className='toast',5200)}
+  // Use the shared Asset Manager notification surface (dismiss / replace, never timed).
   const view=$('locations-view');
   if(!view)return;
 

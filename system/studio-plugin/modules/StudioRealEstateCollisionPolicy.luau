@@ -1,6 +1,8 @@
 -- Real Estate physics layer. Pure mesh naming + one writer for physics flags.
 -- Collision geometry is an independent Roblox Model Asset with no Image ID.
+local CollectionService = game:GetService("CollectionService")
 local Policy = {}
+local COLLIDER_TAG = "Game1RealEstateCollider"
 
 function Policy.IsCollider(name: string): boolean
     local lower = string.lower(name)
@@ -33,8 +35,14 @@ function Policy.Apply(mesh: MeshPart, name: string, raw: any)
         -- holes and openings. For large estates, split into simple volumes.
         mesh.CollisionFidelity = Enum.CollisionFidelity.PreciseConvexDecomposition
         mesh:SetAttribute("Game1RealEstatePhysicsOnly", true)
+        mesh:SetAttribute("Game1RealEstateDestructible", settings.destructible == true)
+        CollectionService:AddTag(mesh, COLLIDER_TAG)
     else
         mesh:SetAttribute("Game1RealEstatePhysicsOnly", nil)
+        mesh:SetAttribute("Game1RealEstateDestructible", nil)
+        if CollectionService:HasTag(mesh, COLLIDER_TAG) then
+            CollectionService:RemoveTag(mesh, COLLIDER_TAG)
+        end
     end
 end
 

@@ -96,6 +96,9 @@
       },
       "StudioTimelineTransport": {
         "$path": "modules/StudioTimelineTransport.luau"
+      },
+      "StudioRealEstatePlacedVisualSync": {
+        "$path": "modules/StudioRealEstatePlacedVisualSync.luau"
       }
     }
   }

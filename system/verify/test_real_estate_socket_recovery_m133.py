@@ -75,7 +75,7 @@ class RestoredSocketsM133(unittest.TestCase):
                       (ROOT / 'system/studio-plugin/install.ps1').read_text())
         ui = (ROOT / 'system/control-center/static/real-estate.js').read_text()
         self.assertIn('const recovered=stats.recoveredSockets||[];', ui)
-        self.assertIn('unweighted socket(s) recovered', ui)
+        self.assertIn('sockets recovered', ui)
 
     def test_no_changes_to_image_or_model_publication_pipeline(self):
         # Only Studio read-side recovery. No model/texture upload is part of

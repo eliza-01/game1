@@ -36,7 +36,23 @@ function initFilenameRulesDisclosure(){
   guide.addEventListener('toggle',()=>{try{localStorage.setItem(FILENAME_GUIDE_OPEN_KEY,guide.open?'1':'0')}catch{}});
 }
 
-function toast(message,error=false){const el=$('toast');el.textContent=message;el.className='toast show'+(error?' error':'');clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.className='toast',5200)}
+// One global notification surface. Every notice remains visible until the user
+// dismisses it or another notice replaces it; no timers, including for errors.
+// The third argument is retained for older call sites but no longer changes this policy.
+function toast(message,error=false,persistent=false){
+  const el=$('toast');
+  if(!el)return;
+  el.replaceChildren();
+  const content=document.createElement('span');
+  content.className='toast-message';content.textContent=String(message);
+  const close=document.createElement('button');
+  close.type='button';close.className='toast-close';close.textContent='×';
+  close.setAttribute('aria-label','Dismiss notification');
+  close.onclick=()=>{el.className='toast';};
+  el.append(content,close);
+  el.setAttribute('role',error?'alert':'status');
+  el.className='toast show'+(error?' error':'');
+}
 async function request(url,options){const response=await fetch(url,options);let data={};try{data=await response.json()}catch{}if(!response.ok)throw Error(data.error||`http ${response.status}`);return data}
 function selectedRow(){return state.data?.items?.find(x=>x.id===state.selected)||null}
 function identityId(){return `${$('race').value}_${$('gender').value}`}

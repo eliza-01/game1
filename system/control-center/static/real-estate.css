@@ -128,3 +128,38 @@
   margin:5px 0 2px; color:var(--muted); font-size:10px; max-width:100%; }
 #real-estate-view .real-estate-atlas-version-picker select { width:auto; max-width:100%; min-width:145px;
   font-size:11px; padding:4px 6px; }
+
+/* M144: collider's weapon-contact policy, independent from character physics. */
+.real-estate-contact-policy {display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);padding:3px 7px;border-radius:999px;font-size:10px;color:var(--muted);white-space:nowrap;}
+/* M143: one mesh, one workflow; actions are next to the asset they affect. */
+.real-estate-mesh-card-header {display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:7px;}
+.real-estate-manage {font-size:11px;padding:6px 9px;white-space:nowrap;}
+.real-estate-mesh-source-label {color:var(--muted);font-size:10px;}
+.real-estate-row-actions {flex-direction:column;align-items:flex-start;min-width:132px;}
+.real-estate-row-actions button {max-width:100%;}
+.real-estate-atlas-dots .deco-atlas-dot.is-active {border-color:var(--dot-color);box-shadow:0 0 0 1px color-mix(in srgb,var(--dot-color) 44%,transparent);}
+.real-estate-mesh-dialog {border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:16px;padding:0;width:min(560px,calc(100vw - 24px));max-height:min(88vh,820px);box-shadow:var(--shadow);}
+.real-estate-mesh-dialog::backdrop {background:#050b13bb;backdrop-filter:blur(3px);}
+.real-estate-mesh-dialog-head {display:flex;justify-content:space-between;align-items:start;gap:12px;padding:18px 20px;border-bottom:1px solid var(--line);}
+.real-estate-mesh-dialog-head h3 {margin:4px 0 0;font-size:18px;overflow-wrap:anywhere;}
+.real-estate-mesh-dialog-head button {padding:4px 9px;}
+.real-estate-mesh-dialog-body {padding:16px 20px 20px;display:grid;gap:12px;overflow:auto;max-height:calc(88vh - 85px);}
+.real-estate-mesh-tabs {display:flex;gap:6px;border-bottom:1px solid var(--line);padding-bottom:10px;}
+.real-estate-mesh-tabs button[aria-selected="true"] {border-color:var(--mint);color:var(--mint);}
+.real-estate-mesh-step {display:grid;gap:8px;border:1px solid var(--line);border-radius:10px;padding:12px;min-width:0;}
+.real-estate-mesh-step-head {display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;}
+.real-estate-mesh-step-head strong {font-size:13px;}
+.real-estate-mesh-step small, .real-estate-mesh-step p {font-size:11px;line-height:1.5;color:var(--muted);overflow-wrap:anywhere;}
+.real-estate-mesh-step .actions {gap:7px;}
+.real-estate-mesh-step .actions button {font-size:12px;}
+.real-estate-step-status {font-size:11px;min-width:0;overflow-wrap:anywhere;}
+.real-estate-step-status.ready {color:var(--mint);}
+.real-estate-step-status.pending {color:var(--orange);}
+.real-estate-step-status.issue {color:var(--danger);}
+.real-estate-mesh-dialog select {width:100%;min-width:0;}
+.real-estate-workflow-result {padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--panel2);font-size:11px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5;}
+.real-estate-workflow-result[hidden] {display:none;}
+.real-estate-workflow-result.issue {border-color:var(--danger);}
+.real-estate-mesh-dialog [aria-busy="true"] {opacity:.7;}
+
+.real-estate-texture-manage {font-size:10px;padding:3px 7px;margin:3px 0 0 6px;white-space:nowrap;}

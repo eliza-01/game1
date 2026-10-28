@@ -2150,9 +2150,11 @@ for required in [
 ]:
     if required not in location_js_text:
         err(f"m41 Locations UI missing {required}")
-for required in ['id="nav-locations"', 'id="locations-view"', 'location-assets.css?v=1', 'locations.js?v=1']:
+for required in ['id="nav-locations"', 'id="locations-view"', 'location-assets.css?v=1']:
     if required not in index_m35_text:
         err(f"m41 Asset Manager Locations section missing {required}")
+if not re.search(r'locations\.js\?v=\d+', index_m35_text):
+    err('m41 Asset Manager Locations section missing versioned locations.js')
 for required in [
     '"/api/locations"',
     'path == "/api/locations/draw"',

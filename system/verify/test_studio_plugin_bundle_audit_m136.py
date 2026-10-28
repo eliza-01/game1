@@ -1,5 +1,6 @@
 """M136: installed Studio Bridge audit detects missing modules, tools, stale bundles."""
 import importlib.util
+import shutil
 import tempfile
 import unittest
 import xml.etree.ElementTree as ET
@@ -47,7 +48,9 @@ class StudioBridgeAuditM136(unittest.TestCase):
             generated = folder / 'generated'
             generated.mkdir()
             installed = plugins / 'Game1Bridge.rbxmx'
-            bundle(installed, module_names, main)
+            generated_bundle = generated / 'Game1Bridge.rbxmx'
+            bundle(generated_bundle, module_names, main)
+            shutil.copyfile(generated_bundle, installed)
             parsed = audit_mod.inspect_bundle(installed)
             self.assertEqual(parsed['status'], 'ok')
             self.assertTrue(parsed['main'])
@@ -55,11 +58,26 @@ class StudioBridgeAuditM136(unittest.TestCase):
             self.assertEqual(len(parsed['modules']), len(module_names))
             self.assertTrue(parsed['studio_entrypoint'])
             # Run the actual audit against source and a simulated installed bundle.
-            report = audit_mod.audit(ROOT, installed, plugins)
+            report = audit_mod.audit(ROOT, installed, plugins,
+                                     generated_override=generated_bundle)
             self.assertEqual(report['status'], 'ok')
-            self.assertEqual(next(c for c in report['checks'] if c['name'] == 'Installed module inventory')['status'], 'OK')
+            checks = {c['name']: c for c in report['checks']}
+            self.assertEqual(checks['Installed module inventory']['status'], 'OK')
+            self.assertEqual(checks['Generated / installed SHA256']['status'], 'OK')
+
+            # Same module inventory, but changed bytes: checksum must fail.
+            bundle(installed, module_names, main + '\n-- modified install')
+            report = audit_mod.audit(ROOT, installed, plugins,
+                                     generated_override=generated_bundle)
+            checks = {c['name']: c for c in report['checks']}
+            self.assertEqual(report['status'], 'failed')
+            self.assertEqual(checks['Installed module inventory']['status'], 'OK')
+            self.assertEqual(checks['Generated / installed SHA256']['status'], 'FAIL')
+
+            # Missing module must fail independently of the checksum.
             bundle(installed, [n for n in module_names if n != 'StudioPlotsVisibility'], main)
-            report = audit_mod.audit(ROOT, installed, plugins)
+            report = audit_mod.audit(ROOT, installed, plugins,
+                                     generated_override=generated_bundle)
             self.assertEqual(report['status'], 'failed')
             self.assertIn('StudioPlotsVisibility', next(c for c in report['checks'] if c['name'] == 'Installed module inventory')['detail'])
 

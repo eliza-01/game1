@@ -1,10 +1,12 @@
 local Workspace = game:GetService("Workspace")
 
 local EnvironmentAssetService = require(script.Parent.Parent:WaitForChild("world"):WaitForChild("EnvironmentAssetService"))
+local RealEstateEnvironmentTargets = require(script.Parent:WaitForChild("RealEstateEnvironmentTargets"))
 
 local WeaponEnvironmentCollision = {}
 
 local filterRevision = -1
+local estateFilterRevision = -1
 local blockingCount = 0
 local rayParams = RaycastParams.new()
 local overlapQueryParams = OverlapParams.new()
@@ -16,7 +18,8 @@ overlapQueryParams.MaxParts = 32
 
 local function refreshFilters(): boolean
     local registeredModels, revision = EnvironmentAssetService.GetRegisteredSnapshot()
-    if revision == filterRevision then
+    local estateColliders, estateRevision = RealEstateEnvironmentTargets.GetBlockingSnapshot()
+    if revision == filterRevision and estateRevision == estateFilterRevision then
         return blockingCount > 0
     end
 
@@ -27,10 +30,14 @@ local function refreshFilters(): boolean
             table.insert(blockingModels, model)
         end
     end
+    for _, collider in estateColliders do
+        table.insert(blockingModels, collider)
+    end
     rayParams.FilterDescendantsInstances = blockingModels
     overlapQueryParams.FilterDescendantsInstances = blockingModels
     blockingCount = #blockingModels
     filterRevision = revision
+    estateFilterRevision = estateRevision
     return blockingCount > 0
 end
 
@@ -82,8 +89,14 @@ local function contactFromPart(part: BasePart, volume: any): (Vector3, Vector3)
     return contact, normal.Unit
 end
 
-local function resolveHit(part: BasePart, position: Vector3, normal: Vector3): any?
+local function resolveEnvironmentPart(part: BasePart): (Model?, any?)
     local model, definition = EnvironmentAssetService.ResolvePart(part)
+    if model then return model, definition end
+    return RealEstateEnvironmentTargets.ResolvePart(part)
+end
+
+local function resolveHit(part: BasePart, position: Vector3, normal: Vector3): any?
+    local model, definition = resolveEnvironmentPart(part)
     if not model or not definition or definition.destructible == true then
         return nil
     end
@@ -140,7 +153,7 @@ function WeaponEnvironmentCollision.Query(previousVolume: any?, currentVolume: a
         then currentVolume.weaponBonePosition
         else currentVolume.cframe.Position
     for _, part in ipairs(candidates) do
-        local model, definition = EnvironmentAssetService.ResolvePart(part)
+        local model, definition = resolveEnvironmentPart(part)
         if model and definition and definition.destructible ~= true then
             local position, normal = contactFromPart(part, currentVolume)
             local distance = (position - reference).Magnitude

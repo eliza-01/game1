@@ -144,12 +144,14 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
     -- anchor to preserve each house's existing world transform; never rebuild
     -- unrelated meshes or player-owned furniture.
     local placedCount = 0
+    local placedFound = 0
     local warnings = {}
     local referenceHouse = houseMesh(wrapper)
     if referenceHouse then
         for _, root in workspace:GetDescendants() do
             if root:IsA("Model") and root:GetAttribute("Game1RealEstateSlug") == slug
                 and root:GetAttribute("Game1RealEstateTemplate") ~= true then
+                placedFound += 1
                 local placed = houseMesh(root)
                 local placedOld = existingPart(root, part)
                 if placed and placedOld then
@@ -158,7 +160,11 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
                     local success, cause = pcall(function()
                         local staged = replacement:Clone()
                         cloned = staged
-                        staged:PivotTo(transform * replacement:GetPivot())
+                        -- A targeted door update must not unexpectedly close
+                        -- an already-open door in the authoring scene.
+                        local target = if part == "door" then placedOld:GetPivot()
+                            else transform * replacement:GetPivot()
+                        staged:PivotTo(target)
                         staged.Name = placedOld.Name
                         staged.Parent = root
                     end)
@@ -178,6 +184,7 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
     return wrapper, {bonesValidated = true, rigsValidated = 1,
         texturesApplied = if imageId then 1 else 0,
         partialSync = true, part = part, workspaceModelsUpdated = placedCount,
+        workspaceModelsFound = placedFound,
         boneCount = check.boneCount, recoveredSockets = recovered,
         missingSockets = check.missingSockets, rigWarnings = warnings}
 end

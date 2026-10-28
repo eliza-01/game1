@@ -6,6 +6,7 @@ local StudioRealEstateRigValidation = require(script.Parent.StudioRealEstateRigV
 local StudioRealEstateSocketRecovery = require(script.Parent.StudioRealEstateSocketRecovery)
 local StudioRealEstateCollisionPolicy = require(script.Parent.StudioRealEstateCollisionPolicy)
 local StudioRealEstatePlacedCollisionSync = require(script.Parent.StudioRealEstatePlacedCollisionSync)
+local StudioRealEstatePlacedVisualSync = require(script.Parent.StudioRealEstatePlacedVisualSync)
 local StudioRealEstateModel = {}
 
 -- A hinge must survive import. Missing optional unweighted sockets are
@@ -66,10 +67,12 @@ local function setGlassAppearance(mesh: MeshPart, enabled: boolean)
     end
 end
 
-local function refreshPlaced(slug: string, imageAssets: {[string]: string}, imageAlpha: {[string]: any}, meshOptions: any): number
+local function refreshPlaced(slug: string, imageAssets: {[string]: string}, imageAlpha: {[string]: any}, meshOptions: any): (number,number)
     local changed = 0
+    local found = 0
     for _, instance in workspace:GetDescendants() do
         if instance:IsA("Model") and instance:GetAttribute("Game1RealEstateSlug") == slug then
+            found += 1
             local applied = false
             for _, child in instance:GetDescendants() do
                 if child:IsA("MeshPart") then
@@ -91,7 +94,7 @@ local function refreshPlaced(slug: string, imageAssets: {[string]: string}, imag
             end
         end
     end
-    return changed
+    return changed, found
 end
 
 function StudioRealEstateModel.Place(imported: Model, destination: Instance, slug: string,
@@ -254,9 +257,17 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
     for _, warning in collisionWarnings do
         table.insert(rigWarnings, warning)
     end
-    local placedUpdated = refreshPlaced(slug, imageAssets, imageAlpha, meshOptions)
+    local visualUpdated, visualFound, visualWarnings = StudioRealEstatePlacedVisualSync.Update(wrapper, slug)
+    for _, warning in visualWarnings do
+        table.insert(rigWarnings, warning)
+    end
+    -- Apply appearance independently; visual replacement may have been skipped
+    -- safely for an incomplete/unmanaged placed house.
+    local textureUpdated = select(1, refreshPlaced(slug, imageAssets, imageAlpha, meshOptions))
     return wrapper, {bonesValidated = true, rigsValidated = #parts,
-        texturesApplied = textureCount, workspaceModelsUpdated = placedUpdated,
+        texturesApplied = textureCount, workspaceModelsUpdated = visualUpdated,
+        workspaceModelsFound = visualFound,
+        workspaceTextureModelsUpdated = textureUpdated,
         workspaceCollisionRigsUpdated = collisionUpdated,
         boneCount = bones, socketCount = socketCount,
         socketContractComplete = #missingSockets == 0,

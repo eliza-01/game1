@@ -89,6 +89,7 @@ foreach($Marker in @(
     'StudioRealEstateSocketRecovery',
     'StudioRealEstateCollisionPolicy',
     'StudioRealEstatePlacedCollisionSync',
+    'StudioRealEstatePlacedVisualSync',
     'StudioDecoSyncCommands',
     'StudioTextureAppearance',
     'StudioActorSpawnCommands'

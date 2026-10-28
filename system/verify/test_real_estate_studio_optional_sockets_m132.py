@@ -54,7 +54,7 @@ class StudioRealEstateOptionalSocketsM132(unittest.TestCase):
         self.assertIn('missingSockets = missingSockets, rigWarnings = rigWarnings', self.assembler)
         ui = (ROOT / 'system/control-center/static/real-estate.js').read_text(encoding='utf-8')
         self.assertIn('const missing=stats.missingSockets||[];', ui)
-        self.assertIn('socket(s) unavailable', ui)
+        self.assertIn('sockets missing', ui)
 
     def test_failed_sync_only_removes_new_empty_destination_folders(self):
         self.assertIn('local createdFolders: {Folder} = {}', self.loader)

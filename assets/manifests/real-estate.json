@@ -70,7 +70,8 @@
         "house": {
           "glass": false,
           "noCollide": true,
-          "collisionMesh": false
+          "collisionMesh": false,
+          "destructible": false
         }
       },
       "textures": {
@@ -287,12 +288,14 @@
         "house": {
           "glass": false,
           "noCollide": true,
-          "collisionMesh": false
+          "collisionMesh": false,
+          "destructible": false
         },
         "door": {
           "glass": false,
           "noCollide": true,
-          "collisionMesh": false
+          "collisionMesh": false,
+          "destructible": false
         }
       },
       "textures": {
@@ -350,9 +353,9 @@
       "model_asset_id": "104294623962583",
       "model_published_hash": "08fbbd5917f497e1f38d5b330f33ff69abdf215b5e87ecc5891fb74d7901ef35",
       "model_moderation": "Approved",
-      "revision": 3,
+      "revision": 6,
       "created_at": 1793090825.0620272,
-      "updated_at": 1793140446.1097958,
+      "updated_at": 1793145989.4526575,
       "skeleton": {
         "schemaVersion": 1,
         "meshes": [
@@ -499,7 +502,7 @@
           {
             "name": "col_mesh",
             "armature": "",
-            "vertices": 362,
+            "vertices": 586,
             "bones": [],
             "influencedBones": []
           },
@@ -626,10 +629,15 @@
         "restoration",
         "window_frames_glass"
       ],
-      "meshSources": {},
+      "meshSources": {
+        "col_mesh": {
+          "path": "assets/source/real-estate/house_level4_01/mesh-revisions/col_mesh/5dd1fa19b282f058784e1d370704d1e2daba767204ee91629e62b594f3e90045.fbx",
+          "sha256": "5dd1fa19b282f058784e1d370704d1e2daba767204ee91629e62b594f3e90045"
+        }
+      },
       "rigSourceHashes": {
         "house": "08fbbd5917f497e1f38d5b330f33ff69abdf215b5e87ecc5891fb74d7901ef35",
-        "col_mesh": "08fbbd5917f497e1f38d5b330f33ff69abdf215b5e87ecc5891fb74d7901ef35",
+        "col_mesh": "5dd1fa19b282f058784e1d370704d1e2daba767204ee91629e62b594f3e90045",
         "door": "08fbbd5917f497e1f38d5b330f33ff69abdf215b5e87ecc5891fb74d7901ef35",
         "restoration": "08fbbd5917f497e1f38d5b330f33ff69abdf215b5e87ecc5891fb74d7901ef35",
         "window_frames_glass": "08fbbd5917f497e1f38d5b330f33ff69abdf215b5e87ecc5891fb74d7901ef35"
@@ -638,27 +646,32 @@
         "house": {
           "glass": false,
           "noCollide": true,
-          "collisionMesh": false
+          "collisionMesh": false,
+          "destructible": false
         },
         "col_mesh": {
           "glass": false,
           "noCollide": false,
-          "collisionMesh": true
+          "collisionMesh": true,
+          "destructible": false
         },
         "door": {
           "glass": false,
-          "noCollide": true,
-          "collisionMesh": false
+          "noCollide": false,
+          "collisionMesh": false,
+          "destructible": false
         },
         "restoration": {
           "glass": false,
           "noCollide": true,
-          "collisionMesh": false
+          "collisionMesh": false,
+          "destructible": false
         },
         "window_frames_glass": {
           "glass": true,
           "noCollide": true,
-          "collisionMesh": false
+          "collisionMesh": false,
+          "destructible": false
         }
       },
       "textures": {
@@ -806,17 +819,17 @@
           "atlasCurrent": null
         },
         "restoration": {
-          "reuseReference": "location:test_window_01",
           "path": "assets/source/texture-atlases/restoration_01/2048x2048/revisions/2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683/restoration_01_2048x2048_atlas.png",
+          "filename": "restoration_01_2048x2048_atlas.png",
           "sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
+          "reuseReference": "",
           "assetId": "138456659862372",
           "publishedSha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
           "publicationFormat": "source",
-          "filename": "restoration_01_2048x2048_atlas.png",
-          "atlasVariantId": null,
+          "atlasVariantId": 4,
           "atlasKey": "restoration_01",
-          "atlasBindingRevision": 0,
-          "atlasSyncStatus": "",
+          "atlasBindingRevision": 1,
+          "atlasSyncStatus": "synced",
           "atlasLegacyWarning": false,
           "atlasVersion": "01",
           "atlasVariants": [
@@ -870,7 +883,7 @@
               "atlasKey": "restoration_01"
             }
           ],
-          "atlasCurrent": null
+          "atlasCurrent": true
         },
         "window_frames_glass": {
           "reuseReference": "location:test_window_01",
@@ -954,8 +967,8 @@
           "publishedSha256": "08fbbd5917f497e1f38d5b330f33ff69abdf215b5e87ecc5891fb74d7901ef35"
         },
         "col_mesh": {
-          "assetId": "78713055396120",
-          "publishedSha256": "08fbbd5917f497e1f38d5b330f33ff69abdf215b5e87ecc5891fb74d7901ef35"
+          "assetId": "138238811471587",
+          "publishedSha256": "5dd1fa19b282f058784e1d370704d1e2daba767204ee91629e62b594f3e90045"
         },
         "window_frames_glass": {
           "assetId": "87248977300962",
@@ -1153,22 +1166,26 @@
         "house": {
           "glass": false,
           "noCollide": true,
-          "collisionMesh": false
+          "collisionMesh": false,
+          "destructible": false
         },
         "door": {
           "glass": false,
           "noCollide": true,
-          "collisionMesh": false
+          "collisionMesh": false,
+          "destructible": false
         },
         "repair": {
           "glass": false,
           "noCollide": true,
-          "collisionMesh": false
+          "collisionMesh": false,
+          "destructible": false
         },
         "stone_fence_01_kit": {
           "glass": false,
           "noCollide": true,
-          "collisionMesh": false
+          "collisionMesh": false,
+          "destructible": false
         }
       },
       "textures": {
@@ -1775,6 +1792,18 @@
       "path": "assets/source/texture-atlases/house_level4_01/4096x4096/house_level4_01_4096x4096_atlas.png",
       "sha256": "a6a63fa8cb93d67995da16d3c211357f698535dc0118b55be357e23d3424c307",
       "assetId": "92116826074029"
+    },
+    {
+      "reference": "estate:house_level4_01:restoration",
+      "label": "house_level4_01 / restoration",
+      "slug": "house_level4_01",
+      "filename": "restoration_01_2048x2048_atlas.png",
+      "group": "estate",
+      "category": "",
+      "categoryLabel": "",
+      "path": "assets/source/texture-atlases/restoration_01/2048x2048/revisions/2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683/restoration_01_2048x2048_atlas.png",
+      "sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
+      "assetId": "138456659862372"
     },
     {
       "reference": "estate:house_level5_01:house",

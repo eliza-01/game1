@@ -126,6 +126,9 @@ class ScopedMeshTests(unittest.TestCase):
         ui=(ROOT/'system/control-center/static/real-estate.js').read_text()
         self.assertIn('/mesh-inspect',ui)
         self.assertIn('/mesh-source',ui)
-        self.assertIn('sync this mesh',ui)
+        workflow=(ROOT/'system/control-center/static/real-estate-mesh-workflow.js').read_text(encoding='utf-8')
+        self.assertIn('data-mw-sync', workflow)
+        self.assertIn('realEstateSync(row.slug,part)', workflow)
+        self.assertIn('workspaceModelsUpdated', workflow)
 
 if __name__=='__main__':unittest.main()

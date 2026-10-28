@@ -84,7 +84,7 @@ class HouseAuthoringContract(unittest.TestCase):
         self.assertIn('return mesh, {', validator)
         self.assertIn('StudioRealEstateRigValidation.Verify(rig, part, manifests[part])', studio)
         self.assertNotIn('error(part .. " rig lost bone',studio)
-        self.assertIn('Studio import warnings',js)
+        self.assertIn('Studio Sync diagnostics',js)
         self.assertIn('.real-estate-mesh-switches input[type="checkbox"]',css)
         self.assertIn('width:14px; height:14px;',css)
         self.assertIn('width:max-content; max-width:100%',css)

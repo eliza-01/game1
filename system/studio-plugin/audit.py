@@ -77,7 +77,14 @@ def inspect_bundle(path: Path) -> dict:
     return result
 
 
-def audit(root: Path, installed: Path | None, plugins_dir: Path | None) -> dict:
+def audit(root: Path, installed: Path | None, plugins_dir: Path | None,
+          *, generated_override: Path | None = None) -> dict:
+    """Audit sources and a plugin bundle.
+
+    For an installed-plugin audit the build is always ``root/generated``.
+    Tests may explicitly inject an isolated, temporary generated artifact,
+    so they never compare their fake installed plugin against the real build.
+    """
     plugin_dir = root / 'system' / 'studio-plugin'
     manifest_path = plugin_dir / 'plugin.project.json'
     report: dict = {'status': 'ok', 'checks': [], 'plugins': {}}
@@ -119,7 +126,7 @@ def audit(root: Path, installed: Path | None, plugins_dir: Path | None) -> dict:
     installed_path = installed
     if installed_path is None and plugins_dir is not None:
         installed_path = plugins_dir / 'Game1Bridge.rbxmx'
-    generated_path = root / 'generated' / 'Game1Bridge.rbxmx'
+    generated_path = generated_override if generated_override is not None else root / 'generated' / 'Game1Bridge.rbxmx'
     if installed_path is None:
         check('Installed plugin', False, 'LOCALAPPDATA is unavailable; use --installed', warning=True)
         return report

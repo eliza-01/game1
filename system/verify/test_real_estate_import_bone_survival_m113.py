@@ -152,9 +152,10 @@ class ForceSingleRigPublication(unittest.TestCase):
 
     def test_ui_exposes_explicit_republish_per_part(self):
         js = (ROOT / 'system/control-center/static/real-estate.js').read_text()
-        self.assertIn('data-re-rig="${esc(part)}"', js)
-        self.assertIn("realEstatePublish('model:'+part)", js)
-        self.assertIn('window.confirm(`Republish', js)
+        workflow = (ROOT / 'system/control-center/static/real-estate-mesh-workflow.js').read_text()
+        self.assertIn('data-mw-publish', workflow)
+        self.assertIn("realEstatePublish('model:'+part)", workflow)
+        self.assertIn('NEW Model Asset ID', workflow)
 
 
 if __name__ == '__main__':

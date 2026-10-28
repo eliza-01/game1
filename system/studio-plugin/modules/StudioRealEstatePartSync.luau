@@ -5,6 +5,7 @@ local Validation = require(script.Parent.StudioRealEstateRigValidation)
 local Collision = require(script.Parent.StudioRealEstateCollisionPolicy)
 local Texture = require(script.Parent.StudioTextureAppearance)
 local PlacedTargets = require(script.Parent.StudioRealEstatePlacedTargets)
+local HouseFrame = require(script.Parent.StudioRealEstateHouseFrame)
 
 local PartSync = {}
 
@@ -16,15 +17,6 @@ local function decodeMap(value: any): any
     if typeof(value) ~= "string" then return {} end
     local ok, decoded = pcall(function() return HttpService:JSONDecode(value) end)
     return if ok and typeof(decoded) == "table" then decoded else {}
-end
-
-local function houseMesh(root: Model): MeshPart?
-    for _, child in root:GetDescendants() do
-        if child:IsA("MeshPart") and child.Name == "house" then
-            return child
-        end
-    end
-    return nil
 end
 
 local function existingPart(root: Model, part: string): Model?
@@ -80,6 +72,15 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
         applyGlass(mesh, typeof(settings) == "table" and settings.glass == true)
     end
     Collision.Apply(mesh, part, settings)
+    -- A revised FBX can move the MeshPart geometry centre, but its authored
+    -- pivot is the house-space origin. Keep that origin fixed in ServerStorage.
+    if part == "house" then
+        local oldHouse = HouseFrame.Find(old)
+        if not oldHouse then
+            error("Targeted house sync: existing template house anchor is missing or ambiguous")
+        end
+        HouseFrame.Align(imported, mesh, oldHouse:GetPivot(), "template house")
+    end
     local replacement: Model = imported
     imported.Name = rigName(part)
     if Collision.IsCollider(part) then
@@ -96,7 +97,7 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
             assembly.WorldPivot = hinge.TransformedWorldCFrame
             assembly:SetAttribute("Game1DoorHingeSocket", "door_01_hinge_socket")
             assembly:SetAttribute("Game1DoorPivotMode", "rigid_model")
-            local anchor = houseMesh(wrapper)
+            local anchor = HouseFrame.Find(wrapper)
             if not anchor then error("house anchor missing; target rig not replaced") end
             local localPivot = anchor.CFrame:ToObjectSpace(assembly:GetPivot())
             assembly:SetAttribute("Game1DoorClosedLocalPivot", HttpService:JSONEncode({localPivot:GetComponents()}))
@@ -141,28 +142,37 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
     local placedCount = 0
     local placedFound = 0
     local warnings = {}
-    local referenceHouse = houseMesh(wrapper)
+    local referenceHouse = HouseFrame.Find(wrapper)
     if not referenceHouse then
         table.insert(warnings, "Template house anchor missing or ambiguous; placed rigs not updated")
     end
     for _, root in PlacedTargets.List(slug) do
         placedFound += 1
-        local placed = houseMesh(root)
+        local placed = HouseFrame.Find(root)
         local placedOld = existingPart(root, part)
         if not referenceHouse or not placed or not placedOld then
             table.insert(warnings, root:GetFullName() .. ": target rig or house anchor missing")
             continue
         end
-        local transform = placed.CFrame * referenceHouse.CFrame:Inverse()
+        local transform = HouseFrame.Relative(referenceHouse, placed)
         local cloned: Model? = nil
         local success, cause = pcall(function()
             local staged = replacement:Clone()
             cloned = staged
             -- Preserve the placed door's current pivot/open state. Do not
             -- introduce new socket offsets or rewrite Blender-authored poses.
-            local target = if part == "door" then placedOld:GetPivot()
-                else transform * replacement:GetPivot()
-            staged:PivotTo(target)
+            if part == "house" then
+                local stagedHouse = HouseFrame.Find(staged)
+                local oldHouse = HouseFrame.Find(placedOld)
+                if not stagedHouse or not oldHouse then
+                    error("placed house anchor missing or ambiguous")
+                end
+                HouseFrame.Align(staged, stagedHouse, oldHouse:GetPivot(), "placed house")
+            else
+                local target = if part == "door" then placedOld:GetPivot()
+                    else transform * replacement:GetPivot()
+                staged:PivotTo(target)
+            end
             local originalName = placedOld.Name
             local backupName = originalName .. "_M152_Previous"
             if root:FindFirstChild(backupName) then
@@ -198,6 +208,7 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
         texturesApplied = if imageId then 1 else 0,
         partialSync = true, part = part, placedSyncVersion = 2, workspaceModelsUpdated = placedCount,
         workspaceModelsFound = placedFound,
+        alignment = "authored-house-pivot",
         boneCount = check.boneCount,
         missingSockets = check.missingSockets, rigWarnings = warnings}
 end

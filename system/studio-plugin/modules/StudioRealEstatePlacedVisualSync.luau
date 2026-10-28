@@ -2,18 +2,8 @@
 -- Preserve the house transform, existing door opening pivot, and any unmanaged
 -- player-owned objects. Collision rigs have an independent synchronizer.
 local Targets = require(script.Parent.StudioRealEstatePlacedTargets)
+local HouseFrame = require(script.Parent.StudioRealEstateHouseFrame)
 local VisualSync = {}
-
-local function houseAnchor(root: Instance): MeshPart?
-    local found: MeshPart? = nil
-    for _, child in root:GetDescendants() do
-        if child:IsA("MeshPart") and child.Name == "house" then
-            if found then return nil end
-            found = child
-        end
-    end
-    return found
-end
 
 local function visuals(template: Model): {Model}
     local result = {}
@@ -32,7 +22,7 @@ end
 
 function VisualSync.Update(template: Model, slug: string, placedTargets: {Model}?): (number, number, {string})
     local targets = placedTargets or Targets.List(slug)
-    local sourceHouse = houseAnchor(template)
+    local sourceHouse = HouseFrame.Find(template)
     if not sourceHouse then return 0, #targets, {"Full visual sync skipped: template house anchor missing or ambiguous"} end
     local sources = visuals(template)
     local changed = 0
@@ -40,12 +30,12 @@ function VisualSync.Update(template: Model, slug: string, placedTargets: {Model}
     local warnings = {}
     for _, root in targets do
         found += 1
-        local placedHouse = houseAnchor(root)
+        local placedHouse = HouseFrame.Find(root)
         if not placedHouse then
             table.insert(warnings, root:GetFullName() .. ": house anchor missing or ambiguous")
             continue
         end
-        local frame = placedHouse.CFrame * sourceHouse.CFrame:Inverse()
+        local frame = HouseFrame.Relative(sourceHouse, placedHouse)
         local stages = {}
         local complete = true
         for _, source in sources do
@@ -64,6 +54,19 @@ function VisualSync.Update(template: Model, slug: string, placedTargets: {Model}
                 local target = if source.Name == "DoorAssembly"
                     then (old :: Model):GetPivot() else frame * source:GetPivot()
                 candidate:PivotTo(target)
+                if source.Name == "HouseRig" then
+                    local candidateHouse = HouseFrame.Find(candidate)
+                    if not candidateHouse then error("staged house anchor missing or ambiguous") end
+                    -- Exact author pivot check, even when the MeshPart's
+                    -- geometry centre differs from the published template.
+                    local actual = candidateHouse:GetPivot()
+                    local desired = placedHouse:GetPivot()
+                    if (actual.Position - desired.Position).Magnitude > 0.025
+                        or actual.LookVector:Dot(desired.LookVector) < 0.9999
+                        or actual.UpVector:Dot(desired.UpVector) < 0.9999 then
+                        error("placed visual house origin would shift")
+                    end
+                end
             end)
             if not ok or not staged then
                 complete = false

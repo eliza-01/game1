@@ -1,0 +1,60 @@
+[
+  {
+    "part": "house",
+    "vertices": 6133,
+    "triangles": 12023,
+    "bones": 7,
+    "maxRestGeometryDelta": 1.2839233415447483e-05,
+    "sourceUnchanged": true,
+    "skin": {
+      "unweightedVerticesBefore": 6133,
+      "unweightedVerticesAfter": 0,
+      "unweightedVertexPolicy": "nearest-authored-bone-head-v1",
+      "verticesOverFourBefore": 0,
+      "verticesOverFourAfter": 0,
+      "prunedVertices": 0,
+      "patchedBoneCount": 0,
+      "patchedBones": [],
+      "survivingBoneCount": 7,
+      "minimumInfluence": 0.05,
+      "minimumVerticesPerBone": 1
+    }
+  },
+  {
+    "part": "door",
+    "vertices": 1968,
+    "triangles": 3954,
+    "bones": 4,
+    "maxRestGeometryDelta": 1.3486991523486091e-06,
+    "sourceUnchanged": true,
+    "skin": {
+      "unweightedVerticesBefore": 0,
+      "unweightedVerticesAfter": 0,
+      "unweightedVertexPolicy": "nearest-authored-bone-head-v1",
+      "verticesOverFourBefore": 0,
+      "verticesOverFourAfter": 0,
+      "prunedVertices": 0,
+      "patchedBoneCount": 3,
+      "patchedBones": [
+        {
+          "bone": "door_01_handle_inside_socket",
+          "mesh": "door",
+          "vertex": 260
+        },
+        {
+          "bone": "door_01_handle_outside_socket",
+          "mesh": "door",
+          "vertex": 1139
+        },
+        {
+          "bone": "door_01_padlock_01_socket",
+          "mesh": "door",
+          "vertex": 168
+        }
+      ],
+      "survivingBoneCount": 4,
+      "minimumInfluence": 0.05,
+      "minimumVerticesPerBone": 1
+    }
+  }
+]

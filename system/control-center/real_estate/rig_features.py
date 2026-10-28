@@ -7,7 +7,9 @@ from __future__ import annotations
 
 HOUSE_SOCKETS = frozenset({
     'chimney_01_socket', 'elevator_01_socket',
+    'elevator_02_socket', 'elevator_03_socket',
     'house_floor_01_spawn_01_socket', 'house_floor_02_spawn_01_socket',
+    'house_floor_03_spawn_01_socket',
     'chest_01_socket', 'land_spawn_01_socket',
 })
 DOOR_HINGE = 'door_01_hinge_socket'

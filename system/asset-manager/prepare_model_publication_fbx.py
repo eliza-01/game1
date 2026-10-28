@@ -5,6 +5,7 @@ from pathlib import Path
 import bpy
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from model_publication import clean_scene, linked_meshes, prepare_rig, export_model, rest_snapshot
+from model_publication import assert_skin_complete
 
 
 def snapshot():
@@ -36,6 +37,7 @@ def main(source, output, report_path):
         if bones.keys() != after[name].keys():
             raise ValueError(f'publication changed bone set: {name}')
         rig = bpy.data.objects[name]
+        assert_skin_complete(rig, linked_meshes(rig))
         influenced = set()
         for mesh in linked_meshes(rig):
             groups = {g.index: g.name for g in mesh.vertex_groups if g.name in bones}

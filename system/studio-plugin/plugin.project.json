@@ -99,6 +99,9 @@
       },
       "StudioRealEstatePlacedVisualSync": {
         "$path": "modules/StudioRealEstatePlacedVisualSync.luau"
+      },
+      "StudioRealEstateHouseFrame": {
+        "$path": "modules/StudioRealEstateHouseFrame.luau"
       }
     }
   }

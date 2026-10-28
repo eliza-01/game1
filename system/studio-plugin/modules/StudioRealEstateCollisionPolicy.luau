@@ -38,6 +38,11 @@ function Policy.Apply(mesh: MeshPart, name: string, raw: any)
         mesh:SetAttribute("Game1RealEstateDestructible", settings.destructible == true)
         CollectionService:AddTag(mesh, COLLIDER_TAG)
     else
+        -- Houses are static buildings. New published MeshParts may default to
+        -- unanchored even though the replaced placed house was anchored.
+        if string.lower(name) == "house" then
+            mesh.Anchored = true
+        end
         mesh:SetAttribute("Game1RealEstatePhysicsOnly", nil)
         mesh:SetAttribute("Game1RealEstateDestructible", nil)
         if CollectionService:HasTag(mesh, COLLIDER_TAG) then

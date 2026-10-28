@@ -9,12 +9,15 @@ local Workspace = game:GetService("Workspace")
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local Contract = require(Shared:WaitForChild("world"):WaitForChild("HouseSocketContract"))
 local SpatialRoot = require(Shared:WaitForChild("character"):WaitForChild("CharacterSpatialRoot"))
+local SpawnOrientation = require(Shared:WaitForChild("world"):WaitForChild("HouseSpawnOrientation"))
 local Door = require(script.Parent:WaitForChild("HouseDoorService"))
+local Padlock = require(script.Parent:WaitForChild("HousePadlockService"))
+local Elevator = require(script.Parent:WaitForChild("HouseElevatorService"))
 local Effects = require(script.Parent:WaitForChild("HouseSocketEffects"))
 local Discovery = require(script.Parent:WaitForChild("HouseSocketDiscovery"))
 
 local Service = {}
-type Entry = {sockets: {[string]: Attachment}, connections: {RBXScriptConnection}, generated: {Instance}}
+type Entry = {sockets: {[string]: Attachment}, connections: {RBXScriptConnection}, generated: {Instance}, padlockPart: BasePart?}
 local registered: {[Model]: Entry} = {}
 local started = false
 local cooldown: {[Player]: number} = {}
@@ -35,6 +38,18 @@ local function getFrame(socket: Attachment): CFrame
     return socket.WorldCFrame
 end
 
+local function hoverRadiusFor(player: Player, name: string): number?
+    local definition = Contract.Get(name)
+    if not definition or not definition.hoverRadius then return nil end
+    if RunService:IsStudio() then
+        local override = player:GetAttribute(Contract.HoverRadiusAttribute(name))
+        if typeof(override) == "number" then
+            return math.clamp(override, Contract.MinHoverRadius, Contract.MaxHoverRadius)
+        end
+    end
+    return definition.hoverRadius
+end
+
 local function radiusFor(player: Player, name: string): number
     local definition = Contract.Get(name)
     if not definition then return 0 end
@@ -47,28 +62,88 @@ local function radiusFor(player: Player, name: string): number
     return definition.radius
 end
 
+-- A lock belongs to a house, not to either door handle. All prompt states
+-- are server-replicated; the client never decides whether a door is unlocked.
 local function updateDoorPrompts(entry: Entry, house: Model)
     local door = house:FindFirstChild("DoorAssembly")
-    local open = door and door:GetAttribute("Game1DoorOpen") == true
-    local text = if open then "Закрыть дверь" else "Открыть дверь"
+    local open = door ~= nil and door:GetAttribute("Game1DoorOpen") == true
+    local moving = Door.IsMoving(house)
+    local hasPadlock = entry.sockets["door_01_padlock_01_socket"] ~= nil
+    local locked = Padlock.IsAttached(house, hasPadlock)
+    local canAttach = door ~= nil and door:IsA("Model")
+        and Padlock.CanAttach(house, hasPadlock, open, moving)
+    local action = if open then "Закрыть дверь" else "Открыть дверь"
+    -- Both handles share the same two-action panel when the door is shut and
+    -- unlocked. F must never be enabled during opening/closing animation.
     for _, name in {"door_01_handle_inside_socket", "door_01_handle_outside_socket"} do
         local socket = entry.sockets[name]
-        local prompt = socket and socket:FindFirstChild("Game1HouseInteraction")
-        if prompt and prompt:IsA("ProximityPrompt") then prompt.ActionText = text end
+        local primary = socket and socket:FindFirstChild("Game1HouseInteraction")
+        if primary and primary:IsA("ProximityPrompt") then
+            primary.ActionText = action
+            primary.Enabled = not locked
+        end
+        local alternate = socket and socket:FindFirstChild("Game1HouseInteractionAlternate")
+        if alternate and alternate:IsA("ProximityPrompt") then
+            alternate.ActionText = "Навесить замок · ключ"
+            alternate.Enabled = canAttach
+        end
+    end
+    local socket = entry.sockets["door_01_padlock_01_socket"]
+    local prompt = socket and socket:FindFirstChild("Game1HouseInteraction")
+    if prompt and prompt:IsA("ProximityPrompt") then
+        prompt.ActionText = "Снять замок · ключ"
+        prompt.Enabled = locked -- Re-attach only through F at either handle.
+    end
+    local part = entry.padlockPart
+    if part then
+        part.Transparency = if locked then 0.4 else 1
     end
 end
 
-local function handleInteraction(house: Model, name: string, player: Player)
+local function handleInteraction(house: Model, name: string, player: Player, key: string)
     local entry = registered[house]
     local socket = entry and entry.sockets[name]
     local definition = Contract.Get(name)
     if not entry or not socket or not socket:IsDescendantOf(house) or not definition or not definition.interact then return end
+    if key ~= "E" and key ~= "F" then return end
+    if definition.role ~= "elevator" and definition.role ~= "door" and key ~= "E" then return end
+    -- Check that the requested key is actually offered for this socket.
+    -- Includes F only on offered elevator routes or unlocked door handles.
+    if definition.role == "elevator" then
+        local offered = false
+        for _, option in Elevator.Options(entry.sockets, name) do
+            if option.key == key then offered = true; break end
+        end
+        if not offered then return end
+    elseif definition.role == "door" then
+        local hasPadlock = entry.sockets["door_01_padlock_01_socket"] ~= nil
+        if Padlock.IsAttached(house, hasPadlock) then return end
+        if key == "F" then
+            local door = house:FindFirstChild("DoorAssembly")
+            if not door or not Padlock.CanAttach(house, hasPadlock,
+                door:GetAttribute("Game1DoorOpen") == true, Door.IsMoving(house)) then return end
+        end
+    elseif definition.role == "padlock" then
+        local door = house:FindFirstChild("DoorAssembly")
+        if not Padlock.IsAttached(house, true) and (not door
+            or door:GetAttribute("Game1DoorOpen") == true
+            or Door.IsMoving(house)) then return end
+    end
     local pos = rootPosition(player)
-    if not pos or (pos - getFrame(socket).Position).Magnitude > radiusFor(player, name) + 2 then return end
+    -- Any AIM-enabled socket uses the exact USE radius; legacy +2 remains
+    -- for door/padlock prompts, which do not have an AIM region.
+    local allowedDistance = radiusFor(player, name) + (if definition.hoverRadius then 0 else 2)
+    if not pos or (pos - getFrame(socket).Position).Magnitude > allowedDistance then return end
     local now = os.clock()
     if now - (cooldown[player] or 0) < 0.45 then return end
     cooldown[player] = now
-    if definition.role == "door" then
+    if definition.role == "door" and key == "F" then
+        local door = house:FindFirstChild("DoorAssembly")
+        local open = door ~= nil and door:GetAttribute("Game1DoorOpen") == true
+        local _ok, reason = Padlock.Toggle(house, player, true, open, Door.IsMoving(house))
+        if feedback then feedback:FireClient(player, reason) end
+        updateDoorPrompts(entry, house)
+    elseif definition.role == "door" then
         local ok, reason = Door.Toggle(house)
         if not ok then
             warn("[game1][house-socket] " .. reason)
@@ -82,12 +157,17 @@ local function handleInteraction(house: Model, name: string, player: Player)
             end
         end
         updateDoorPrompts(entry, house)
-    elseif definition.role == "chest" or definition.role == "padlock" or definition.role == "elevator" then
-        -- Stubs never grant loot, toggle locks or move a platform.
-        local message = if definition.role == "chest" then "Сундук пока недоступен"
-            elseif definition.role == "padlock" then "Замок пока недоступен"
-            else "Лифт пока недоступен"
+    elseif definition.role == "padlock" then
+        local door = house:FindFirstChild("DoorAssembly")
+        local doorOpen = door ~= nil and door:GetAttribute("Game1DoorOpen") == true
+        local _ok, reason = Padlock.Toggle(house, player, true, doorOpen, Door.IsMoving(house))
+        if feedback then feedback:FireClient(player, reason) end
+        updateDoorPrompts(entry, house)
+    elseif definition.role == "elevator" then
+        local _ok, message = Elevator.Move(player, entry.sockets, name, key)
         if feedback then feedback:FireClient(player, message) end
+    elseif definition.role == "chest" then
+        if feedback then feedback:FireClient(player, "Сундук пока недоступен") end
     end
 end
 
@@ -103,7 +183,7 @@ end
 
 local function register(house: Model)
     if registered[house] or not Discovery.IsHouse(house) then return end
-    local entry: Entry = {sockets = {}, connections = {}, generated = {}}
+    local entry: Entry = {sockets = {}, connections = {}, generated = {}, padlockPart = nil}
     registered[house] = entry
     local missing = {}
     local foundCount = 0
@@ -119,53 +199,81 @@ local function register(house: Model)
             end
         end
     end
+    -- Resolve every socket before creating interaction prompts: an elevator
+    -- must see its destination floors even if the source sorts first.
     for _, definition in Contract.Definitions do
         local found = socketByName[definition.name]
         local duplicate = duplicateNames[definition.name] == true
         if duplicate or not found then
-            table.insert(missing, definition.name .. (if duplicate then " (duplicate)" else " (missing)"))
+            if not definition.optional then
+                table.insert(missing, definition.name .. (if duplicate then " (duplicate)" else " (missing)"))
+            end
             continue
         end
-        local socket = found :: Attachment
-        entry.sockets[definition.name] = socket
+        entry.sockets[definition.name] = found :: Attachment
         foundCount += 1
+    end
+    Padlock.Ensure(house, entry.sockets["door_01_padlock_01_socket"] ~= nil)
+
+    local function createPrompt(socket: Attachment, definition: Contract.SocketDefinition, key: string, action: string)
+        local prompt = Instance.new("ProximityPrompt")
+        prompt.Name = if key == "F" then "Game1HouseInteractionAlternate" else "Game1HouseInteraction"
+        prompt:SetAttribute("Game1HouseSocketName", definition.name)
+        prompt:SetAttribute("Game1HouseSocketRadius", definition.radius)
+        prompt.ActionText = action
+        prompt.ObjectText = ""
+        prompt.KeyboardKeyCode = if key == "F" then Enum.KeyCode.F else Enum.KeyCode.E
+        prompt.HoldDuration = 0
+        prompt.MaxActivationDistance = Contract.MaxDebugRadius -- client + server policy restricts per socket
+        prompt.RequiresLineOfSight = true
+        if RunService:IsStudio() then prompt.RequiresLineOfSight = false end
+        prompt.Exclusivity = Enum.ProximityPromptExclusivity.OnePerButton
+        prompt.Style = Enum.ProximityPromptStyle.Custom
+        prompt.Parent = socket
+        table.insert(entry.generated, prompt)
+        table.insert(entry.connections, prompt.Triggered:Connect(function(player)
+            handleInteraction(house, definition.name, player, key)
+        end))
+    end
+
+    for _, definition in Contract.Definitions do
+        local socket = entry.sockets[definition.name]
+        if not socket then continue end
         if definition.interact then
-            local prompt = Instance.new("ProximityPrompt")
-            prompt.Name = "Game1HouseInteraction"
-            prompt:SetAttribute("Game1HouseSocketName", definition.name)
-            prompt:SetAttribute("Game1HouseSocketRadius", definition.radius)
-            prompt.ActionText = definition.action
-            prompt.ObjectText = ""
-            prompt.KeyboardKeyCode = Enum.KeyCode.F
-            prompt.HoldDuration = 0
-            prompt.MaxActivationDistance = Contract.MaxDebugRadius -- client + server policy restricts per socket
-            prompt.RequiresLineOfSight = true
-            -- Authoring preview: house collision meshes can hide an otherwise
-            -- reachable handle while its final line-of-sight policy is tuned.
-            if RunService:IsStudio() then prompt.RequiresLineOfSight = false end
-            prompt.Exclusivity = Enum.ProximityPromptExclusivity.OnePerButton
-            prompt.Style = Enum.ProximityPromptStyle.Custom
-            prompt.Parent = socket
-            table.insert(entry.generated, prompt)
-            table.insert(entry.connections, prompt.Triggered:Connect(function(player)
-                handleInteraction(house, definition.name, player)
-            end))
+            if definition.role == "elevator" then
+                for _, option in Elevator.Options(entry.sockets, definition.name) do
+                    createPrompt(socket, definition, option.key, option.action)
+                end
+            else
+                createPrompt(socket, definition, "E", definition.action)
+                if definition.role == "door" and entry.sockets["door_01_padlock_01_socket"] then
+                    createPrompt(socket, definition, "F", "Навесить замок · ключ")
+                end
+            end
         end
         if definition.placeholder then
             local part = Effects.CreatePlaceholder(house, socket, definition.placeholder)
-            if part then table.insert(entry.generated, part) end
+            if part then
+                table.insert(entry.generated, part)
+                if definition.role == "padlock" then entry.padlockPart = part end
+            end
         elseif definition.role == "chimney" then
             table.insert(entry.generated, Effects.StartSmoke(socket))
         end
     end
     local door = house:FindFirstChild("DoorAssembly")
     if door and door:IsA("Model") then
-        table.insert(entry.connections, door:GetAttributeChangedSignal("Game1DoorOpen"):Connect(function()
-            updateDoorPrompts(entry, house)
-        end))
+        for _, attribute in {"Game1DoorOpen", "Game1DoorMoving"} do
+            table.insert(entry.connections, door:GetAttributeChangedSignal(attribute):Connect(function()
+                updateDoorPrompts(entry, house)
+            end))
+        end
     end
     table.insert(entry.connections, house.AncestryChanged:Connect(function()
         if not house:IsDescendantOf(Workspace) then clear(house) end
+    end))
+    table.insert(entry.connections, house:GetAttributeChangedSignal("Game1PadlockAttached"):Connect(function()
+        updateDoorPrompts(entry, house)
     end))
     updateDoorPrompts(entry, house)
     if #missing > 0 then
@@ -212,10 +320,23 @@ function Service.GetDebugStatus(player: Player): {any}
     for _, definition in Contract.Definitions do
         local house, socket = Service.FindNearest(player, definition.name)
         table.insert(rows, {name = definition.name, role = definition.role,
-            radius = radiusFor(player, definition.name), found = socket ~= nil,
+            radius = radiusFor(player, definition.name),
+            hoverRadius = hoverRadiusFor(player, definition.name), found = socket ~= nil,
             house = if house then house.Name else "", action = definition.action})
     end
     return rows
+end
+
+function Service.GetDebugKey(player: Player): boolean
+    return Padlock.HasKey(player)
+end
+
+function Service.SetDebugKey(player: Player, owned: any): any
+    if not RunService:IsStudio() or typeof(owned) ~= "boolean" then
+        return {ok = false, error = "Studio only; key state must be boolean"}
+    end
+    Padlock.SetTestKey(player, owned)
+    return {ok = true, owned = Padlock.HasKey(player)}
 end
 
 function Service.SetDebugRadius(player: Player, name: any, value: any): any
@@ -227,6 +348,20 @@ function Service.SetDebugRadius(player: Player, name: any, value: any): any
     radius = math.clamp(radius, Contract.MinDebugRadius, Contract.MaxDebugRadius)
     player:SetAttribute(Contract.RadiusAttribute(name), radius)
     return {ok = true, name = name, radius = radius}
+end
+
+function Service.SetDebugHoverRadius(player: Player, name: any, value: any): any
+    local definition = if typeof(name) == "string" then Contract.Get(name) else nil
+    if not RunService:IsStudio() or not definition or not definition.hoverRadius then
+        return {ok = false, error = "Aim range is Studio-only and requires an AIM socket"}
+    end
+    local hoverRadius = tonumber(value)
+    if not hoverRadius or hoverRadius ~= hoverRadius or hoverRadius == math.huge or hoverRadius == -math.huge then
+        return {ok = false, error = "Aim radius must be finite"}
+    end
+    hoverRadius = math.clamp(hoverRadius, Contract.MinHoverRadius, Contract.MaxHoverRadius)
+    player:SetAttribute(Contract.HoverRadiusAttribute(name), hoverRadius)
+    return {ok = true, name = name, hoverRadius = hoverRadius}
 end
 
 function Service.TeleportDebug(player: Player, name: any): any
@@ -246,7 +381,18 @@ function Service.TeleportDebug(player: Player, name: any): any
     local character = player.Character
     local root = SpatialRoot.Get(player)
     if not character or not root then return {ok = false, error = "Character not ready"} end
-    character:PivotTo(getFrame(socket) + Vector3.new(0, 3, 0))
+    -- Bone -Y is Blender Tail -> Head (spawn forward), not character up.
+    -- Project the authored heading onto world XZ and keep the rig upright.
+    local targetFrame = SpawnOrientation.Upright(getFrame(socket), socket:IsA("Bone"), 3)
+    if not targetFrame then
+        return {ok = false, error = "Spawn socket has no horizontal forward direction: " .. name}
+    end
+    character:PivotTo(targetFrame)
+    local controller = character:FindFirstChildOfClass("ControllerManager")
+    if controller then
+        controller.MovingDirection = Vector3.zero
+        controller.FacingDirection = targetFrame.LookVector
+    end
     root.AssemblyLinearVelocity = Vector3.zero
     root.AssemblyAngularVelocity = Vector3.zero
     return {ok = true, house = house.Name, socket = name}
@@ -279,13 +425,14 @@ function Service.Start()
         interactionRemote.Parent = folder
     end
     if interactionRemote:IsA("RemoteEvent") then
-        interactionRemote.OnServerEvent:Connect(function(player, socket: any)
-            if typeof(socket) ~= "Instance" or not socket:IsA("Attachment") then return end
+        interactionRemote.OnServerEvent:Connect(function(player, socket: any, key: any)
+            if typeof(socket) ~= "Instance" or not socket:IsA("Attachment")
+                or (key ~= "E" and key ~= "F") then return end
             local house = Discovery.OwnerOf(socket)
             if not house then return end
             local entry = registered[house]
             if not entry or entry.sockets[socket.Name] ~= socket then return end
-            handleInteraction(house, socket.Name, player)
+            handleInteraction(house, socket.Name, player, key)
         end)
     end
     local function safeRegister(house: Model)
@@ -336,9 +483,17 @@ function Service.Start()
             if descendant:IsA("Attachment") and Contract.Get(descendant.Name) then
                 if entry.sockets[descendant.Name] ~= descendant then return true end
                 local definition = Contract.Get(descendant.Name)
-                if definition and definition.interact
-                    and not descendant:FindFirstChild("Game1HouseInteraction") then
-                    return true
+                if definition and definition.interact then
+                    local options = if definition.role == "elevator" then Elevator.Options(entry.sockets, descendant.Name) else {}
+                    local hasE = definition.role ~= "elevator"
+                    local hasF = definition.role == "door"
+                        and entry.sockets["door_01_padlock_01_socket"] ~= nil
+                    for _, option in options do
+                        if option.key == "E" then hasE = true end
+                        if option.key == "F" then hasF = true end
+                    end
+                    if hasE and not descendant:FindFirstChild("Game1HouseInteraction") then return true end
+                    if hasF and not descendant:FindFirstChild("Game1HouseInteractionAlternate") then return true end
                 end
             end
         end
@@ -363,8 +518,9 @@ function Service.Start()
             for name, socket in entry.sockets do
                 sockets += 1
                 local definition = Contract.Get(name)
-                if definition and definition.interact and socket:FindFirstChild("Game1HouseInteraction") then
-                    prompts += 1
+                if definition and definition.interact then
+                    if socket:FindFirstChild("Game1HouseInteraction") then prompts += 1 end
+                    if socket:FindFirstChild("Game1HouseInteractionAlternate") then prompts += 1 end
                 end
             end
         end

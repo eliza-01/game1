@@ -8,6 +8,7 @@ from pathlib import Path
 # Resolve adjacent helper modules explicitly, just as the publication entrypoint does.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from real_estate_rig_discovery import find_mesh, find_rig
+from model_publication import assert_skin_complete
 
 
 def analyze(source, only_part=None, extract=False):
@@ -32,6 +33,10 @@ def analyze(source, only_part=None, extract=False):
         if name == 'house' and (not rig or rig.name.casefold() != 'house_armature'):
             raise RuntimeError('Required house_armature is missing or not assigned to mesh house.')
         rig_name = rig.name if rig else ''
+        # The single-part, non-extract invocation inspects a staged publication.
+        # Registration/extraction still accepts unweighted authoring sources.
+        if only_part is not None and not extract and rig:
+            assert_skin_complete(rig, [mesh])
         bones = [{
             'name': b.name,
             'parent': b.parent.name if b.parent else '',

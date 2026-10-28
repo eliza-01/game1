@@ -12,6 +12,8 @@ local PromptController = require(script.Parent.Parent:WaitForChild("world"):Wait
 local Debug = {}
 local player = Players.LocalPlayer
 local previews: {[Attachment]: Part} = {}
+local aimPreviews: {[Attachment]: Part} = {}
+local previewHoverOverrides: {[string]: number} = {}
 local visualize = false
 local updateConnection: RBXScriptConnection? = nil
 local MAX_PREVIEWS = 100
@@ -52,6 +54,7 @@ end
 local function clearPreview()
     if updateConnection then updateConnection:Disconnect(); updateConnection = nil end
     for socket, part in previews do part:Destroy(); previews[socket] = nil end
+    for socket, part in aimPreviews do part:Destroy(); aimPreviews[socket] = nil end
 end
 
 local function isManaged(socket: Attachment): boolean
@@ -115,10 +118,36 @@ local function updatePreview()
             local r = if typeof(override) == "number" then override else spec.radius
             part.Size = Vector3.new(r * 2, r * 2, r * 2)
             part.CFrame = if socket:IsA("Bone") then socket.TransformedWorldCFrame else socket.WorldCFrame
+            if spec.hoverRadius then
+                local aim = aimPreviews[socket]
+                if not aim then
+                    aim = Instance.new("Part")
+                    aim.Name = "Game1SocketAimPreview"
+                    aim.Shape = Enum.PartType.Ball
+                    aim.Anchored = true
+                    aim.CanCollide = false
+                    aim.CanQuery = false
+                    aim.CanTouch = false
+                    aim.CastShadow = false
+                    aim.Material = Enum.Material.Neon
+                    aim.Color = Color3.fromRGB(255, 194, 99) -- amber = center-reticle ray aim volume
+                    aim.Transparency = 0.76
+                    aim.Parent = Workspace.CurrentCamera
+                    aimPreviews[socket] = aim
+                end
+                local overrideAim = previewHoverOverrides[spec.name]
+                    or player:GetAttribute(Contract.HoverRadiusAttribute(spec.name))
+                local aimRadius = if typeof(overrideAim) == "number" then overrideAim else spec.hoverRadius
+                aim.Size = Vector3.new(aimRadius * 2, aimRadius * 2, aimRadius * 2)
+                aim.CFrame = part.CFrame
+            end
         end
     end
     for socket, part in previews do
         if not active[socket] then part:Destroy(); previews[socket] = nil end
+    end
+    for socket, part in aimPreviews do
+        if not active[socket] then part:Destroy(); aimPreviews[socket] = nil end
     end
 end
 
@@ -129,7 +158,16 @@ local function mountPanel(gui: ScreenGui)
     panel.Name = "Game1HouseSocketDebug"
     local camera = Workspace.CurrentCamera
     local viewportHeight = if camera then camera.ViewportSize.Y else 550
-    panel.Size = UDim2.fromOffset(390, math.min(455, math.max(220, viewportHeight - 92)))
+    -- 15% shorter than M159, INCLUDING viewport-constrained windows.
+    local function panelHeight(height: number): number
+        return math.min(1547, math.max(220, (height - 30) * 0.85))
+    end
+    panel.Size = UDim2.fromOffset(390, panelHeight(viewportHeight))
+    if camera then
+        camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+            if panel.Parent then panel.Size = UDim2.fromOffset(390, panelHeight(camera.ViewportSize.Y)) end
+        end)
+    end
     panel.Position = StudioDebugDock.WindowPosition("HS", 390)
     panel.BackgroundColor3 = COLORS.bg
     panel.Visible = false
@@ -149,6 +187,15 @@ local function mountPanel(gui: ScreenGui)
     local refresh = control(panel, "REFRESH", 90, 26)
     refresh.Position = UDim2.fromOffset(156, 42)
     refresh.ZIndex = 81
+    local keyButton = control(panel, "KEY: OWN", 117, 26)
+    keyButton.Position = UDim2.fromOffset(259, 42)
+    keyButton.ZIndex = 81
+    local keyOwned = true
+    local function showKeyState(owned: boolean)
+        keyOwned = owned
+        keyButton.Text = if owned then "KEY: OWN" else "KEY: LOST"
+        keyButton.TextColor3 = if owned then COLORS.accent else Color3.fromRGB(255, 111, 111)
+    end
     local info = label(panel, "", 365, 20)
     info.Position = UDim2.fromOffset(12, 74)
     info.TextColor3 = COLORS.muted
@@ -185,13 +232,14 @@ local function mountPanel(gui: ScreenGui)
         end
         local result = invoke("GetTestHouseSockets")
         if not result.ok then info.Text = tostring(result.error); return end
+        showKeyState(result.keyOwned ~= false)
         local missing = 0
         for index, row in result.sockets do
             local spec = Contract.Get(row.name)
             if not spec then continue end
             if not row.found then missing += 1 end
             local entry = Instance.new("Frame")
-            entry.Size = UDim2.new(1, -6, 0, 51)
+            entry.Size = UDim2.new(1, -6, 0, if spec.hoverRadius then 79 else 51)
             entry.BackgroundColor3 = COLORS.panel
             entry.LayoutOrder = index
             entry.ZIndex = 82
@@ -221,6 +269,35 @@ local function mountPanel(gui: ScreenGui)
             end
             minus.Activated:Connect(function() set(-1) end)
             plus.Activated:Connect(function() set(1) end)
+            if spec.hoverRadius then
+                local useLabel = label(entry, "USE · reach", 145, 23)
+                useLabel.Position = UDim2.fromOffset(164, 26)
+                useLabel.TextColor3 = COLORS.accent
+                useLabel.ZIndex = 83
+                local aimMinus = control(entry, "−", 30, 23)
+                aimMinus.Position = UDim2.fromOffset(8, 52)
+                aimMinus.ZIndex = 83
+                local aimValue = label(entry, tostring(row.hoverRadius or spec.hoverRadius) .. " studs", 65, 23)
+                aimValue.Position = UDim2.fromOffset(46, 52)
+                aimValue.ZIndex = 83
+                local aimPlus = control(entry, "+", 30, 23)
+                aimPlus.Position = UDim2.fromOffset(119, 52)
+                aimPlus.ZIndex = 83
+                local aimLabel = label(entry, "AIM · hover", 145, 23)
+                aimLabel.Position = UDim2.fromOffset(164, 52)
+                aimLabel.TextColor3 = Color3.fromRGB(255, 194, 99)
+                aimLabel.ZIndex = 83
+                local function setAim(delta: number)
+                    local current = tonumber(aimValue.Text:match("[%d%.]+")) or spec.hoverRadius or 5
+                    local response = invoke("SetTestHouseSocketHoverRadius", row.name, current + delta)
+                    if not response.ok then info.Text = tostring(response.error); return end
+                    aimValue.Text = tostring(response.hoverRadius) .. " studs"
+                    previewHoverOverrides[row.name] = response.hoverRadius
+                    if visualize then updatePreview() end
+                end
+                aimMinus.Activated:Connect(function() setAim(-1) end)
+                aimPlus.Activated:Connect(function() setAim(1) end)
+            end
             if spec.role == "spawn" then
                 local tp = control(entry, "TP", 50, 23)
                 tp.Position = UDim2.fromOffset(295, 26)
@@ -269,6 +346,14 @@ local function mountPanel(gui: ScreenGui)
         end
     end)
     refresh.Activated:Connect(draw)
+    keyButton.Activated:Connect(function()
+        local result = invoke("SetTestHouseKeyOwned", not keyOwned)
+        if result.ok then
+            showKeyState(result.owned == true)
+        else
+            info.Text = tostring(result.error)
+        end
+    end)
     previewButton.Activated:Connect(function()
         visualize = not visualize
         previewButton.Text = if visualize then "RANGES: ON" else "RANGES: OFF"

@@ -4,18 +4,8 @@
 -- No repositioning / replacement of visual house, door, or edited props.
 local CollisionPolicy = require(script.Parent.StudioRealEstateCollisionPolicy)
 local Targets = require(script.Parent.StudioRealEstatePlacedTargets)
+local HouseFrame = require(script.Parent.StudioRealEstateHouseFrame)
 local Sync = {}
-
-local function findHouse(root: Instance): MeshPart?
-    local result: MeshPart? = nil
-    for _, instance in root:GetDescendants() do
-        if instance:IsA("MeshPart") and instance.Name == "house" then
-            if result then return nil end -- ambiguous, don't guess frame
-            result = instance
-        end
-    end
-    return result
-end
 
 local function authoredRigs(template: Model): {[string]: Model}
     local result = {}
@@ -33,7 +23,7 @@ end
 function Sync.Update(template: Model, slug: string, placedTargets: {Model}?): (number, {string})
     local physicsRigs = authoredRigs(template)
     if next(physicsRigs) == nil then return 0, {} end
-    local referenceHouse = findHouse(template)
+    local referenceHouse = HouseFrame.Find(template)
     if not referenceHouse then
         return 0, {"collision sync skipped: template house anchor missing or ambiguous"}
     end
@@ -41,13 +31,13 @@ function Sync.Update(template: Model, slug: string, placedTargets: {Model}?): (n
     local warnings = {}
     local targets = placedTargets or Targets.List(slug)
     for _, root in targets do
-        local placedHouse = findHouse(root)
+        local placedHouse = HouseFrame.Find(root)
         if not placedHouse then
             table.insert(warnings, "collision sync skipped for " .. root:GetFullName()
                 .. ": placed house anchor missing or ambiguous")
             continue
         end
-        local relative = placedHouse.CFrame * referenceHouse.CFrame:Inverse()
+        local relative = HouseFrame.Relative(referenceHouse, placedHouse)
         for part, source in physicsRigs do
             local old = root:FindFirstChild(source.Name)
             if old and (not old:IsA("Model") or old:GetAttribute("Game1RealEstatePhysicsRig") ~= true

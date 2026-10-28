@@ -7,6 +7,7 @@ local StudioRealEstateCollisionPolicy = require(script.Parent.StudioRealEstateCo
 local StudioRealEstatePlacedCollisionSync = require(script.Parent.StudioRealEstatePlacedCollisionSync)
 local StudioRealEstatePlacedVisualSync = require(script.Parent.StudioRealEstatePlacedVisualSync)
 local PlacedTargets = require(script.Parent.StudioRealEstatePlacedTargets)
+local HouseFrame = require(script.Parent.StudioRealEstateHouseFrame)
 local StudioRealEstateModel = {}
 
 -- Every authored bone must survive publication before a template is replaced.
@@ -207,6 +208,17 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
         end
         StudioRealEstateCollisionPolicy.Apply(meshes[part], part, settings)
     end
+    -- Align the new complete assembly to the previously registered house
+    -- origin before swapping templates. A changed house geometry centre must
+    -- not move the entire estate relative to existing placed copies.
+    if previous then
+        local previousHouse = HouseFrame.Find(previous)
+        if not previousHouse then
+            wrapper:Destroy()
+            error("Full house sync: existing template house anchor is missing or ambiguous")
+        end
+        HouseFrame.Align(wrapper, meshes.house, previousHouse:GetPivot(), "full template house")
+    end
     wrapper:SetAttribute("Game1RealEstateSocketContractComplete", #missingSockets == 0)
     wrapper:SetAttribute("Game1MissingRealEstateSockets", HttpService:JSONEncode(missingSockets))
     wrapper:SetAttribute("Game1RealEstateTemplate", true)
@@ -241,6 +253,7 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
     -- safely for an incomplete/unmanaged placed house.
     local textureUpdated = select(1, refreshPlaced(slug, imageAssets, imageAlpha, meshOptions, placedTargets))
     return wrapper, {bonesValidated = true, rigsValidated = #parts,
+        alignment = "authored-house-pivot",
         texturesApplied = textureCount, placedSyncVersion = 2, workspaceModelsUpdated = visualUpdated,
         workspaceModelsFound = visualFound,
         workspaceTextureModelsUpdated = textureUpdated,

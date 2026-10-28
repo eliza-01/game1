@@ -3920,6 +3920,11 @@ function Policy.Apply(mesh: MeshPart, name: string, raw: any)
         mesh:SetAttribute("Game1RealEstateDestructible", settings.destructible == true)
         CollectionService:AddTag(mesh, COLLIDER_TAG)
     else
+        -- Houses are static buildings. New published MeshParts may default to
+        -- unanchored even though the replaced placed house was anchored.
+        if string.lower(name) == "house" then
+            mesh.Anchored = true
+        end
         mesh:SetAttribute("Game1RealEstatePhysicsOnly", nil)
         mesh:SetAttribute("Game1RealEstateDestructible", nil)
         if CollectionService:HasTag(mesh, COLLIDER_TAG) then
@@ -3934,6 +3939,45 @@ return table.freeze(Policy)
       </Item>
       <Item class="ModuleScript" referent="22">
         <Properties>
+          <string name="Name">StudioRealEstateHouseFrame</string>
+          <string name="Source"><![CDATA[-- Author-space transform for all Real Estate Studio sync paths.
+-- The MeshPart CFrame tracks its geometry centre, which can shift after an
+-- FBX revision. The authored import pivot (CFrame * PivotOffset) is the
+-- stable registration frame. Never match replacements by CFrame alone.
+local HouseFrame = {}
+
+function HouseFrame.Find(root: Instance): MeshPart?
+    local match: MeshPart? = nil
+    for _, instance in root:GetDescendants() do
+        if instance:IsA("MeshPart") and instance.Name == "house" then
+            if match then return nil end
+            match = instance
+        end
+    end
+    return match
+end
+
+function HouseFrame.Relative(source: MeshPart, target: MeshPart): CFrame
+    return target:GetPivot() * source:GetPivot():Inverse()
+end
+
+function HouseFrame.Align(rig: Model, sourceAnchor: MeshPart, targetPivot: CFrame, context: string)
+    local offset = targetPivot * sourceAnchor:GetPivot():Inverse()
+    rig:PivotTo(offset * rig:GetPivot())
+    local result = sourceAnchor:GetPivot()
+    if (result.Position - targetPivot.Position).Magnitude > 0.025
+        or result.LookVector:Dot(targetPivot.LookVector) < 0.9999
+        or result.UpVector:Dot(targetPivot.UpVector) < 0.9999 then
+        error(context .. ": authored house pivot could not be aligned after Model:PivotTo")
+    end
+end
+
+return table.freeze(HouseFrame)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="23">
+        <Properties>
           <string name="Name">StudioRealEstateModel</string>
           <string name="Source"><![CDATA[-- Studio assembly for any number of independent Real Estate MeshPart rigs.
 -- This adapter validates the complete template before touching ServerStorage.
@@ -3944,6 +3988,7 @@ local StudioRealEstateCollisionPolicy = require(script.Parent.StudioRealEstateCo
 local StudioRealEstatePlacedCollisionSync = require(script.Parent.StudioRealEstatePlacedCollisionSync)
 local StudioRealEstatePlacedVisualSync = require(script.Parent.StudioRealEstatePlacedVisualSync)
 local PlacedTargets = require(script.Parent.StudioRealEstatePlacedTargets)
+local HouseFrame = require(script.Parent.StudioRealEstateHouseFrame)
 local StudioRealEstateModel = {}
 
 -- Every authored bone must survive publication before a template is replaced.
@@ -4144,6 +4189,17 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
         end
         StudioRealEstateCollisionPolicy.Apply(meshes[part], part, settings)
     end
+    -- Align the new complete assembly to the previously registered house
+    -- origin before swapping templates. A changed house geometry centre must
+    -- not move the entire estate relative to existing placed copies.
+    if previous then
+        local previousHouse = HouseFrame.Find(previous)
+        if not previousHouse then
+            wrapper:Destroy()
+            error("Full house sync: existing template house anchor is missing or ambiguous")
+        end
+        HouseFrame.Align(wrapper, meshes.house, previousHouse:GetPivot(), "full template house")
+    end
     wrapper:SetAttribute("Game1RealEstateSocketContractComplete", #missingSockets == 0)
     wrapper:SetAttribute("Game1MissingRealEstateSockets", HttpService:JSONEncode(missingSockets))
     wrapper:SetAttribute("Game1RealEstateTemplate", true)
@@ -4178,6 +4234,7 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
     -- safely for an incomplete/unmanaged placed house.
     local textureUpdated = select(1, refreshPlaced(slug, imageAssets, imageAlpha, meshOptions, placedTargets))
     return wrapper, {bonesValidated = true, rigsValidated = #parts,
+        alignment = "authored-house-pivot",
         texturesApplied = textureCount, placedSyncVersion = 2, workspaceModelsUpdated = visualUpdated,
         workspaceModelsFound = visualFound,
         workspaceTextureModelsUpdated = textureUpdated,
@@ -4191,7 +4248,7 @@ return table.freeze(StudioRealEstateModel)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="23">
+      <Item class="ModuleScript" referent="24">
         <Properties>
           <string name="Name">StudioRealEstatePartSync</string>
           <string name="Source"><![CDATA[-- Atomic, single-rig refresh of a managed Real Estate template.
@@ -4201,6 +4258,7 @@ local Validation = require(script.Parent.StudioRealEstateRigValidation)
 local Collision = require(script.Parent.StudioRealEstateCollisionPolicy)
 local Texture = require(script.Parent.StudioTextureAppearance)
 local PlacedTargets = require(script.Parent.StudioRealEstatePlacedTargets)
+local HouseFrame = require(script.Parent.StudioRealEstateHouseFrame)
 
 local PartSync = {}
 
@@ -4212,15 +4270,6 @@ local function decodeMap(value: any): any
     if typeof(value) ~= "string" then return {} end
     local ok, decoded = pcall(function() return HttpService:JSONDecode(value) end)
     return if ok and typeof(decoded) == "table" then decoded else {}
-end
-
-local function houseMesh(root: Model): MeshPart?
-    for _, child in root:GetDescendants() do
-        if child:IsA("MeshPart") and child.Name == "house" then
-            return child
-        end
-    end
-    return nil
 end
 
 local function existingPart(root: Model, part: string): Model?
@@ -4276,6 +4325,15 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
         applyGlass(mesh, typeof(settings) == "table" and settings.glass == true)
     end
     Collision.Apply(mesh, part, settings)
+    -- A revised FBX can move the MeshPart geometry centre, but its authored
+    -- pivot is the house-space origin. Keep that origin fixed in ServerStorage.
+    if part == "house" then
+        local oldHouse = HouseFrame.Find(old)
+        if not oldHouse then
+            error("Targeted house sync: existing template house anchor is missing or ambiguous")
+        end
+        HouseFrame.Align(imported, mesh, oldHouse:GetPivot(), "template house")
+    end
     local replacement: Model = imported
     imported.Name = rigName(part)
     if Collision.IsCollider(part) then
@@ -4292,7 +4350,7 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
             assembly.WorldPivot = hinge.TransformedWorldCFrame
             assembly:SetAttribute("Game1DoorHingeSocket", "door_01_hinge_socket")
             assembly:SetAttribute("Game1DoorPivotMode", "rigid_model")
-            local anchor = houseMesh(wrapper)
+            local anchor = HouseFrame.Find(wrapper)
             if not anchor then error("house anchor missing; target rig not replaced") end
             local localPivot = anchor.CFrame:ToObjectSpace(assembly:GetPivot())
             assembly:SetAttribute("Game1DoorClosedLocalPivot", HttpService:JSONEncode({localPivot:GetComponents()}))
@@ -4337,28 +4395,37 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
     local placedCount = 0
     local placedFound = 0
     local warnings = {}
-    local referenceHouse = houseMesh(wrapper)
+    local referenceHouse = HouseFrame.Find(wrapper)
     if not referenceHouse then
         table.insert(warnings, "Template house anchor missing or ambiguous; placed rigs not updated")
     end
     for _, root in PlacedTargets.List(slug) do
         placedFound += 1
-        local placed = houseMesh(root)
+        local placed = HouseFrame.Find(root)
         local placedOld = existingPart(root, part)
         if not referenceHouse or not placed or not placedOld then
             table.insert(warnings, root:GetFullName() .. ": target rig or house anchor missing")
             continue
         end
-        local transform = placed.CFrame * referenceHouse.CFrame:Inverse()
+        local transform = HouseFrame.Relative(referenceHouse, placed)
         local cloned: Model? = nil
         local success, cause = pcall(function()
             local staged = replacement:Clone()
             cloned = staged
             -- Preserve the placed door's current pivot/open state. Do not
             -- introduce new socket offsets or rewrite Blender-authored poses.
-            local target = if part == "door" then placedOld:GetPivot()
-                else transform * replacement:GetPivot()
-            staged:PivotTo(target)
+            if part == "house" then
+                local stagedHouse = HouseFrame.Find(staged)
+                local oldHouse = HouseFrame.Find(placedOld)
+                if not stagedHouse or not oldHouse then
+                    error("placed house anchor missing or ambiguous")
+                end
+                HouseFrame.Align(staged, stagedHouse, oldHouse:GetPivot(), "placed house")
+            else
+                local target = if part == "door" then placedOld:GetPivot()
+                    else transform * replacement:GetPivot()
+                staged:PivotTo(target)
+            end
             local originalName = placedOld.Name
             local backupName = originalName .. "_M152_Previous"
             if root:FindFirstChild(backupName) then
@@ -4394,6 +4461,7 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
         texturesApplied = if imageId then 1 else 0,
         partialSync = true, part = part, placedSyncVersion = 2, workspaceModelsUpdated = placedCount,
         workspaceModelsFound = placedFound,
+        alignment = "authored-house-pivot",
         boneCount = check.boneCount,
         missingSockets = check.missingSockets, rigWarnings = warnings}
 end
@@ -4402,7 +4470,7 @@ return table.freeze(PartSync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="24">
+      <Item class="ModuleScript" referent="25">
         <Properties>
           <string name="Name">StudioRealEstatePlacedCollisionSync</string>
           <string name="Source"><![CDATA[-- Repair *only* authoring-managed collision rigs of already placed Estates.
@@ -4411,18 +4479,8 @@ return table.freeze(PartSync)
 -- No repositioning / replacement of visual house, door, or edited props.
 local CollisionPolicy = require(script.Parent.StudioRealEstateCollisionPolicy)
 local Targets = require(script.Parent.StudioRealEstatePlacedTargets)
+local HouseFrame = require(script.Parent.StudioRealEstateHouseFrame)
 local Sync = {}
-
-local function findHouse(root: Instance): MeshPart?
-    local result: MeshPart? = nil
-    for _, instance in root:GetDescendants() do
-        if instance:IsA("MeshPart") and instance.Name == "house" then
-            if result then return nil end -- ambiguous, don't guess frame
-            result = instance
-        end
-    end
-    return result
-end
 
 local function authoredRigs(template: Model): {[string]: Model}
     local result = {}
@@ -4440,7 +4498,7 @@ end
 function Sync.Update(template: Model, slug: string, placedTargets: {Model}?): (number, {string})
     local physicsRigs = authoredRigs(template)
     if next(physicsRigs) == nil then return 0, {} end
-    local referenceHouse = findHouse(template)
+    local referenceHouse = HouseFrame.Find(template)
     if not referenceHouse then
         return 0, {"collision sync skipped: template house anchor missing or ambiguous"}
     end
@@ -4448,13 +4506,13 @@ function Sync.Update(template: Model, slug: string, placedTargets: {Model}?): (n
     local warnings = {}
     local targets = placedTargets or Targets.List(slug)
     for _, root in targets do
-        local placedHouse = findHouse(root)
+        local placedHouse = HouseFrame.Find(root)
         if not placedHouse then
             table.insert(warnings, "collision sync skipped for " .. root:GetFullName()
                 .. ": placed house anchor missing or ambiguous")
             continue
         end
-        local relative = placedHouse.CFrame * referenceHouse.CFrame:Inverse()
+        local relative = HouseFrame.Relative(referenceHouse, placedHouse)
         for part, source in physicsRigs do
             local old = root:FindFirstChild(source.Name)
             if old and (not old:IsA("Model") or old:GetAttribute("Game1RealEstatePhysicsRig") ~= true
@@ -4487,7 +4545,7 @@ return table.freeze(Sync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="25">
+      <Item class="ModuleScript" referent="26">
         <Properties>
           <string name="Name">StudioRealEstatePlacedTargets</string>
           <string name="Source"><![CDATA[-- One authoritative definition of a placed Real Estate instance.
@@ -4532,25 +4590,15 @@ return table.freeze(Targets)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="26">
+      <Item class="ModuleScript" referent="27">
         <Properties>
           <string name="Name">StudioRealEstatePlacedVisualSync</string>
           <string name="Source"><![CDATA[-- Full Real Estate sync: refresh visual rigs on *all managed placed* houses.
 -- Preserve the house transform, existing door opening pivot, and any unmanaged
 -- player-owned objects. Collision rigs have an independent synchronizer.
 local Targets = require(script.Parent.StudioRealEstatePlacedTargets)
+local HouseFrame = require(script.Parent.StudioRealEstateHouseFrame)
 local VisualSync = {}
-
-local function houseAnchor(root: Instance): MeshPart?
-    local found: MeshPart? = nil
-    for _, child in root:GetDescendants() do
-        if child:IsA("MeshPart") and child.Name == "house" then
-            if found then return nil end
-            found = child
-        end
-    end
-    return found
-end
 
 local function visuals(template: Model): {Model}
     local result = {}
@@ -4569,7 +4617,7 @@ end
 
 function VisualSync.Update(template: Model, slug: string, placedTargets: {Model}?): (number, number, {string})
     local targets = placedTargets or Targets.List(slug)
-    local sourceHouse = houseAnchor(template)
+    local sourceHouse = HouseFrame.Find(template)
     if not sourceHouse then return 0, #targets, {"Full visual sync skipped: template house anchor missing or ambiguous"} end
     local sources = visuals(template)
     local changed = 0
@@ -4577,12 +4625,12 @@ function VisualSync.Update(template: Model, slug: string, placedTargets: {Model}
     local warnings = {}
     for _, root in targets do
         found += 1
-        local placedHouse = houseAnchor(root)
+        local placedHouse = HouseFrame.Find(root)
         if not placedHouse then
             table.insert(warnings, root:GetFullName() .. ": house anchor missing or ambiguous")
             continue
         end
-        local frame = placedHouse.CFrame * sourceHouse.CFrame:Inverse()
+        local frame = HouseFrame.Relative(sourceHouse, placedHouse)
         local stages = {}
         local complete = true
         for _, source in sources do
@@ -4601,6 +4649,19 @@ function VisualSync.Update(template: Model, slug: string, placedTargets: {Model}
                 local target = if source.Name == "DoorAssembly"
                     then (old :: Model):GetPivot() else frame * source:GetPivot()
                 candidate:PivotTo(target)
+                if source.Name == "HouseRig" then
+                    local candidateHouse = HouseFrame.Find(candidate)
+                    if not candidateHouse then error("staged house anchor missing or ambiguous") end
+                    -- Exact author pivot check, even when the MeshPart's
+                    -- geometry centre differs from the published template.
+                    local actual = candidateHouse:GetPivot()
+                    local desired = placedHouse:GetPivot()
+                    if (actual.Position - desired.Position).Magnitude > 0.025
+                        or actual.LookVector:Dot(desired.LookVector) < 0.9999
+                        or actual.UpVector:Dot(desired.UpVector) < 0.9999 then
+                        error("placed visual house origin would shift")
+                    end
+                end
             end)
             if not ok or not staged then
                 complete = false
@@ -4648,7 +4709,7 @@ return table.freeze(VisualSync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="27">
+      <Item class="ModuleScript" referent="28">
         <Properties>
           <string name="Name">StudioRealEstateRigValidation</string>
           <string name="Source"><![CDATA[-- Validate an already-published Real Estate Model Asset as actually loaded by Roblox.
@@ -4769,7 +4830,7 @@ return table.freeze(Validation)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="28">
+      <Item class="ModuleScript" referent="29">
         <Properties>
           <string name="Name">StudioTextureAppearance</string>
           <string name="Source"><![CDATA[-- Shared Studio-side material binding for all authored MeshParts.
@@ -4831,7 +4892,7 @@ return table.freeze(StudioTextureAppearance)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="29">
+      <Item class="ModuleScript" referent="30">
         <Properties>
           <string name="Name">StudioTimelineEditorCommands</string>
           <string name="Source"><![CDATA[-- Timeline authoring session: validates requests, binds UI events and reports results.
@@ -5120,7 +5181,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="30">
+      <Item class="ModuleScript" referent="31">
         <Properties>
           <string name="Name">StudioTimelinePoseSampler</string>
           <string name="Source"><![CDATA[-- Offline pose extraction and interpolation for a preview rig. No UI or HTTP dependencies.
@@ -5299,7 +5360,7 @@ return table.freeze(StudioTimelinePoseSampler)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="31">
+      <Item class="ModuleScript" referent="32">
         <Properties>
           <string name="Name">StudioTimelinePreview</string>
           <string name="Source"><![CDATA[-- Owns the isolated ViewportFrame rig, camera interaction and animation-asset retrieval.
@@ -5515,7 +5576,7 @@ return table.freeze(StudioTimelinePreview)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="32">
+      <Item class="ModuleScript" referent="33">
         <Properties>
           <string name="Name">StudioTimelineTransport</string>
           <string name="Source"><![CDATA[-- HTTP boundary for the Timeline editor. No UI, animation or Studio model access.
@@ -5573,7 +5634,7 @@ return table.freeze(StudioTimelineTransport)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="33">
+      <Item class="ModuleScript" referent="34">
         <Properties>
           <string name="Name">StudioTimelineWidget</string>
           <string name="Source"><![CDATA[-- Timeline editor view. Builds the dock widget and exposes only its controls.

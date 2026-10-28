@@ -29,7 +29,9 @@ class WorkspaceHouseDiscoveryM148(unittest.TestCase):
             "land_spawn_01_socket",
         }
         self.assertEqual(len(authored), 10)
-        self.assertEqual(authored - {"door_01_hinge_socket"}, definitions)
+        self.assertEqual(authored - {"door_01_hinge_socket"}, definitions - {
+            "elevator_02_socket", "elevator_03_socket", "house_floor_03_spawn_01_socket"
+        })
 
     def test_studio_fallback_is_explicit_and_production_remains_managed(self):
         discovery = source(DISCOVERY)

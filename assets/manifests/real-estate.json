@@ -350,12 +350,12 @@
       "sale_price": 1,
       "model_path": "assets/source/real-estate/house_level4_01/model/house_level4_01.fbx",
       "model_sha256": "08fbbd5917f497e1f38d5b330f33ff69abdf215b5e87ecc5891fb74d7901ef35",
-      "model_asset_id": "104294623962583",
+      "model_asset_id": "138241846604222",
       "model_published_hash": "08fbbd5917f497e1f38d5b330f33ff69abdf215b5e87ecc5891fb74d7901ef35",
       "model_moderation": "Approved",
-      "revision": 9,
+      "revision": 14,
       "created_at": 1793090825.0620272,
-      "updated_at": 1793199967.3529139,
+      "updated_at": 1793213494.2534044,
       "skeleton": {
         "schemaVersion": 1,
         "meshes": [
@@ -368,18 +368,18 @@
                 "name": "chest_01_socket",
                 "parent": "",
                 "matrixLocal": [
-                  0.9063075,
-                  -0.422619,
+                  0.9063084,
+                  -0.422617,
                   -1e-07,
-                  -8.7616539,
-                  0.422619,
-                  0.9063075,
+                  -8.7616549,
+                  0.422617,
+                  0.9063084,
                   -1e-07,
                   13.6776428,
                   1e-07,
                   0.0,
                   1.0,
-                  4.4954605,
+                  4.495461,
                   0.0,
                   0.0,
                   0.0,
@@ -415,6 +415,28 @@
                   1.0,
                   0.0,
                   0.0,
+                  -1.4245626,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  16.6359444,
+                  0.0,
+                  1.0,
+                  0.0,
+                  9.3010626,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "elevator_02_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
                   -0.6758471,
                   0.0,
                   0.0,
@@ -441,7 +463,7 @@
                   0.0,
                   1.0,
                   0.0,
-                  2.9975719,
+                  2.9975722,
                   0.0,
                   0.0,
                   1.0,
@@ -459,7 +481,7 @@
                   1.0,
                   0.0,
                   0.0,
-                  -1.4064646,
+                  -1.4064647,
                   0.0,
                   1.0,
                   0.0,
@@ -497,7 +519,15 @@
                 ]
               }
             ],
-            "influencedBones": []
+            "influencedBones": [
+              "chest_01_socket",
+              "chimney_01_socket",
+              "elevator_01_socket",
+              "elevator_02_socket",
+              "house_floor_01_spawn_01_socket",
+              "house_floor_02_spawn_01_socket",
+              "land_spawn_01_socket"
+            ]
           },
           {
             "name": "col_mesh",
@@ -637,10 +667,14 @@
         "door": {
           "path": "assets/source/real-estate/house_level4_01/mesh-revisions/door/d7164b2adeb23eb9bc75064eb5294c8cd77435a0a0d950b1407ef4d987d44e2e.fbx",
           "sha256": "d7164b2adeb23eb9bc75064eb5294c8cd77435a0a0d950b1407ef4d987d44e2e"
+        },
+        "house": {
+          "path": "assets/source/real-estate/house_level4_01/mesh-revisions/house/1671aa43fe258e969a589e4fa63a77f0a3a3a21ea94530d4427881c62d8eb7eb.fbx",
+          "sha256": "1671aa43fe258e969a589e4fa63a77f0a3a3a21ea94530d4427881c62d8eb7eb"
         }
       },
       "rigSourceHashes": {
-        "house": "08fbbd5917f497e1f38d5b330f33ff69abdf215b5e87ecc5891fb74d7901ef35",
+        "house": "1671aa43fe258e969a589e4fa63a77f0a3a3a21ea94530d4427881c62d8eb7eb",
         "col_mesh": "5dd1fa19b282f058784e1d370704d1e2daba767204ee91629e62b594f3e90045",
         "door": "d7164b2adeb23eb9bc75064eb5294c8cd77435a0a0d950b1407ef4d987d44e2e",
         "restoration": "08fbbd5917f497e1f38d5b330f33ff69abdf215b5e87ecc5891fb74d7901ef35",
@@ -959,8 +993,8 @@
       },
       "rigAssets": {
         "house": {
-          "assetId": "104294623962583",
-          "publishedSha256": "08fbbd5917f497e1f38d5b330f33ff69abdf215b5e87ecc5891fb74d7901ef35"
+          "assetId": "138241846604222",
+          "publishedSha256": "1671aa43fe258e969a589e4fa63a77f0a3a3a21ea94530d4427881c62d8eb7eb"
         },
         "door": {
           "assetId": "82375846196238",

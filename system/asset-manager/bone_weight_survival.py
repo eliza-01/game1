@@ -15,10 +15,16 @@ ANCHOR_WEIGHT = 0.055  # survives FBX float rounding and normalization
 
 
 def _normalize(weights: dict[str, float]) -> dict[str, float]:
-    total = sum(weights.values())
-    if total <= 0:
+    if not weights:
         return {}
-    return {name: value / total for name, value in weights.items() if value > 0}
+    total = sum(weights.values())
+    if isfinite(total) and abs(total - 1.0) <= 1e-12:
+        return dict(weights)
+    # Scale first so finite but very large input weights cannot overflow the sum.
+    largest = max(weights.values())
+    scaled = {name: value / largest for name, value in weights.items()}
+    total = sum(scaled.values())
+    return {name: value / total for name, value in scaled.items() if value > 0}
 
 
 def _distance_sq(a, b):
@@ -42,8 +48,13 @@ def plan_publication_weights(
             or min_covered_vertices > len(vertices)):
         raise ValueError("invalid publication bone coverage policy")
     names = set(bone_heads)
+    ordered_names = sorted(names)
+    for position in [*bone_heads.values(), *(v['position'] for v in vertices)]:
+        if len(position) != 3 or not all(isfinite(float(v)) for v in position):
+            raise ValueError("publication requires finite 3D skin coordinates")
     over_limit_before = 0
     pruned_vertices = 0
+    unweighted_before = 0
     for vertex in vertices:
         raw = vertex['weights']
         active = {
@@ -55,6 +66,14 @@ def plan_publication_weights(
             over_limit_before += 1
             pruned_vertices += 1
         vertex['weights'] = _normalize(dict(ordered[:MAX_INFLUENCES]))
+        if not vertex['weights']:
+            # Fill only uncovered vertices. Use authored bone heads in the same
+            # world space as vertices; lexical ties make the policy reproducible.
+            # This is rest-pose coverage, not automatic animation-quality rigging.
+            nearest = min(ordered_names, key=lambda name: (
+                _distance_sq(vertex['position'], bone_heads[name]), name))
+            vertex['weights'] = {nearest: 1.0}
+            unweighted_before += 1
 
     def coverage():
         counts = {name: 0 for name in names}
@@ -125,7 +144,13 @@ def plan_publication_weights(
         raise ValueError("publication bones lack required vertex coverage: " + ", ".join(missing))
     if any(len(vertex['weights']) > MAX_INFLUENCES for vertex in vertices):
         raise AssertionError("publication exceeded four influences per vertex")
+    if any(not v['weights'] or abs(sum(v['weights'].values()) - 1.0) > 1e-6
+           for v in vertices):
+        raise AssertionError("publication left invalid vertex skin coverage")
     return {
+        'unweightedVerticesBefore': unweighted_before,
+        'unweightedVerticesAfter': 0,
+        'unweightedVertexPolicy': 'nearest-authored-bone-head-v1',
         'verticesOverFourBefore': over_limit_before,
         'verticesOverFourAfter': 0,
         'prunedVertices': pruned_vertices,

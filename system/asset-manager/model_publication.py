@@ -5,6 +5,7 @@ The policy matches character publication: all authored bones get >=5% coverage
 on at least one vertex; at most four influences. Rest transforms never change.
 """
 import bpy
+from math import isfinite
 from pathlib import Path
 from bone_weight_survival import MAX_INFLUENCES, SURVIVAL_WEIGHT, plan_publication_weights
 
@@ -146,13 +147,43 @@ def prepare_rig(armature, meshes):
     if not meshes:
         raise ValueError(f"Armature {armature.name} has no linked mesh")
     report = prepare_publication_weights(armature, meshes)
+    assert_skin_complete(armature, meshes)
     assert_rest_unchanged(armature, before)
     return report
+
+
+def assert_skin_complete(armature, meshes):
+    """Validate actual Blender vertex groups, also after a staged FBX reimport.
+
+    Meshes without an armature are static and must not call this validator.
+    No repairs happen here: an incomplete export is rejected before upload.
+    """
+    names = {bone.name for bone in armature.data.bones}
+    if not names:
+        return
+    influenced = set()
+    for mesh in meshes:
+        groups = {g.index: g.name for g in mesh.vertex_groups if g.name in names}
+        for vertex in mesh.data.vertices:
+            weights = [(groups[g.group], float(g.weight)) for g in vertex.groups
+                       if g.group in groups and g.weight != 0]
+            if (not weights or len(weights) > MAX_INFLUENCES
+                    or any(not isfinite(w) or w <= 0 for _, w in weights)
+                    or abs(sum(w for _, w in weights) - 1.0) > 0.0001):
+                raise ValueError(f'{mesh.name}: invalid publication skin at vertex {vertex.index}; '
+                                 'expected 1-4 positive normalized bone influences')
+            influenced.update(name for name, _ in weights)
+    missing = sorted(names - influenced)
+    if missing:
+        raise ValueError('publication lost bone influences: ' + ', '.join(missing))
 
 
 def export_model(output, objects, *, embed_textures=False):
     """One export contract for characters, estates and other model assets."""
     output = Path(output)
+    for rig in objects:
+        if rig.type == 'ARMATURE' and len(rig.data.bones):
+            assert_skin_complete(rig, [mesh for mesh in linked_meshes(rig) if mesh in objects])
     bpy.ops.object.select_all(action="DESELECT")
     for obj in objects:
         obj.select_set(True)

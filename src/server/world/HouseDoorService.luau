@@ -12,6 +12,7 @@ local function clearAnimation(door: Model)
     local entry = active[door]
     if not entry then return end
     active[door] = nil
+    door:SetAttribute("Game1DoorMoving", false)
     if entry.tween then entry.tween:Cancel() end
     if entry.connection then entry.connection:Disconnect() end
     if entry.value then entry.value:Destroy() end
@@ -48,6 +49,7 @@ function Doors.Toggle(house: Model): (boolean, string)
     end)
     local tween = TweenService:Create(value, TweenInfo.new(DURATION, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Value = target})
     active[door] = {tween = tween, value = value, connection = connection}
+    door:SetAttribute("Game1DoorMoving", true)
     door:SetAttribute("Game1DoorOpen", not open)
     tween.Completed:Connect(function()
         if active[door] and active[door].tween == tween then
@@ -56,6 +58,11 @@ function Doors.Toggle(house: Model): (boolean, string)
     end)
     tween:Play()
     return true, if open then "Закрыть дверь" else "Открыть дверь"
+end
+
+function Doors.IsMoving(house: Model): boolean
+    local door = house:FindFirstChild("DoorAssembly")
+    return door ~= nil and door:IsA("Model") and active[door] ~= nil
 end
 
 function Doors.Cleanup(house: Model)

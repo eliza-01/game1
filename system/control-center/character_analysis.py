@@ -107,6 +107,11 @@ def prepare_character_publication_fbx(project_root: Path, source: Path, output: 
         preparation = json.loads(report_path.read_text(encoding="utf-8"))
 
     analysis = analyze_character_fbx(project_root, output)
+    uncovered = [str(mesh.get('name') or 'mesh') for mesh in analysis.get('meshes', [])
+                 if int(mesh.get('unweightedVertices') or 0) > 0]
+    if uncovered:
+        raise CharacterAnalysisError('publication FBX contains unweighted vertices: '
+                                     + ', '.join(uncovered))
     over_limit = [
         str(mesh.get("name") or "mesh")
         for mesh in (analysis.get("meshes") or [])

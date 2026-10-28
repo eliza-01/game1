@@ -24,17 +24,17 @@ class HouseSocketInteractions(unittest.TestCase):
                 self.assertIn(name, (ROOT / 'system/studio-plugin/modules/StudioRealEstateModel.luau').read_text(encoding='utf8'))
             else:
                 self.assertIn(name, shared)
-        self.assertEqual(shared.count('interact = true'), 5)
-        self.assertEqual(shared.count('interact = false'), 4)
+        self.assertEqual(shared.count('interact = true'), 7)
+        self.assertEqual(shared.count('interact = false'), 5)
         self.assertIn('MinDebugRadius = 2',shared)
         self.assertIn('MaxDebugRadius = 30',shared)
 
     def test_proximity_is_authoritatively_validated(self):
         runtime = self.text('server/world/HouseSocketService.luau')
-        self.assertIn('prompt.KeyboardKeyCode = Enum.KeyCode.F', runtime)
+        self.assertIn('Enum.KeyCode.F else Enum.KeyCode.E', runtime)
         self.assertIn('prompt.Style = Enum.ProximityPromptStyle.Custom',runtime)
         self.assertIn('prompt.RequiresLineOfSight = true',runtime)
-        self.assertIn('radiusFor(player, name) + 2', runtime)
+        self.assertIn('radiusFor(player, name) + (if definition.hoverRadius then 0 else 2)', runtime)
         self.assertIn('rootPosition(player)', runtime)
         self.assertIn('cooldown[player]', runtime)
         self.assertIn('if not RunService:IsStudio()',runtime)
@@ -59,7 +59,7 @@ class HouseSocketInteractions(unittest.TestCase):
         hud=self.text('client/world/HouseSocketPromptController.luau')
         debug=self.text('client/dev/HouseSocketDebugController.luau')
         loadout=self.text('client/dev/TestLoadoutController.luau')
-        for required in ['Instance.new("BillboardGui")','"Game1HousePrompt"','"F"',
+        for required in ['Instance.new("BillboardGui")','"Game1HousePrompt"','prompt.KeyboardKeyCode.Name',
                          'PromptShown:Connect','PromptHidden:Connect','ActionText']:
             self.assertIn(required,hud)
         self.assertIn('GetTestHouseSockets',debug)

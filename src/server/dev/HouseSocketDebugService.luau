@@ -26,10 +26,17 @@ function Debug.Start()
     end
     remote(folder, "GetTestHouseSockets").OnServerInvoke = function(player)
         local metrics = Service.Reconcile()
-        return {ok = true, sockets = Service.GetDebugStatus(player), metrics = metrics}
+        return {ok = true, sockets = Service.GetDebugStatus(player), metrics = metrics,
+            keyOwned = Service.GetDebugKey(player)}
+    end
+    remote(folder, "SetTestHouseKeyOwned").OnServerInvoke = function(player, owned)
+        return Service.SetDebugKey(player, owned)
     end
     remote(folder, "SetTestHouseSocketRadius").OnServerInvoke = function(player, name, radius)
         return Service.SetDebugRadius(player, name, radius)
+    end
+    remote(folder, "SetTestHouseSocketHoverRadius").OnServerInvoke = function(player, name, radius)
+        return Service.SetDebugHoverRadius(player, name, radius)
     end
     remote(folder, "TeleportTestHouseSpawn").OnServerInvoke = function(player, name)
         return Service.TeleportDebug(player, name)

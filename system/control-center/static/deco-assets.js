@@ -74,8 +74,10 @@ function decoAssetSetForm(row) {
   decoAssetState.modelPath = '';
   decoAssetState.texturePath = '';
   decoAssetState.replacementPath = '';
-  decoAssetState.textureReferenceSlug = row?.atlasVariantId ? '' : (row?.texture_reference_slug || '');
-  decoAssetState.atlasVariantId = Number(row?.atlasVariantId || 0);
+  // Showing an inherited atlas dot must not silently detach a legacy follower
+  // when the author clicks Save without explicitly choosing a different atlas.
+  decoAssetState.textureReferenceSlug = row?.texture_shared ? (row.texture_reference_slug || '') : '';
+  decoAssetState.atlasVariantId = row?.texture_shared ? 0 : Number(row?.atlasVariantId || 0);
 
   if (row) {
     $('location-asset-name').value = row.name_en || '';
@@ -151,11 +153,15 @@ function decoAssetRenderTextureReferences() {
   const legacy = document.createElement('optgroup');
   legacy.label = 'Legacy texture reuse (compatibility only)';
   for (const row of decoAssetState.data?.items || []) {
-    if (row.slug === decoAssetState.selected || row.atlasVariantId || row.texture_owner_slug !== row.slug || !row.texture_path) continue;
+    if (row.slug === decoAssetState.selected || row.texture_shared || !row.texture_path) continue;
+    // Modern atlas owners are offered only when this asset already follows
+    // them; new reuse should select a published Atlas Registry variant.
+    if (row.atlasVariantId && row.slug !== decoAssetState.textureReferenceSlug) continue;
+    if (!row.atlasVariantId && row.texture_owner_slug !== row.slug) continue;
     if (query && !`${row.slug} ${decoAssetTextureFilename(row)}`.toLowerCase().includes(query)) continue;
     const option = document.createElement('option');
     option.value = `legacy:${row.slug}`;
-    option.textContent = `${decoAssetTextureFilename(row)} · ${row.texture_asset_id || 'unpublished'} (legacy)`;
+    option.textContent = `${decoAssetTextureFilename(row)} · ${row.texture_asset_id || 'unpublished'} (follow ${row.slug})`;
     legacy.appendChild(option);
   }
   if (legacy.children.length) select.appendChild(legacy);
@@ -220,7 +226,7 @@ async function decoAssetRetrySync(slug) {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({slug}),
     });
-    toast(`Studio synced · ${Number(result.studio?.matchedModels || 0)} matched · ${Number(result.studio?.parts || 0)} parts updated. Save Place in Studio.`);
+    toast(`Studio synced · ${Number(result.studio?.matchedModels ?? result.studio?.models ?? 0)} matched · ${Number(result.studio?.parts || 0)} parts updated. Save Place in Studio.`);
   } catch (error) {
     toast(`Atlas saved; Studio sync pending: ${error.message}. Use Retry.`, true);
   }
@@ -433,6 +439,7 @@ async function decoAssetSyncStudio() {
     toast('syncing DecoManager and placed asset textures in Studio…');
     const result = await request('/api/location-assets/studio-sync', { method: 'POST' });
     const studio = result.studio || {};
+    await decoAssetLoad();
     toast(`Studio synced · ${Number(studio.models || 0)} placed model(s), ${Number(studio.parts || 0)} MeshPart(s) updated · ${Number(studio.registryItems || 0)} registered`);
   } catch (error) {
     toast(error.message, true);

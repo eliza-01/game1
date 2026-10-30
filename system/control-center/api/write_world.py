@@ -34,11 +34,27 @@ def route(path, body, deps):
             payload = body()
             slug = str(payload.get('slug') or '').strip().lower()
             if slug:
-                revision = location_assets.atlases.active_revisions("location_asset", slug).get(slug)
+                # A legacy shared-texture consumer may inherit an Atlas Registry
+                # binding from its owner rather than hold an independent binding.
+                # Targeted acknowledgement cannot prove that other followers
+                # were refreshed, so refresh all and acknowledge all bindings
+                # in that compatibility case.
+                row = location_assets.get(slug)
+                if not row:
+                    raise ValueError('unknown location asset')
+                binding_owner = str(row.get('atlasBindingSourceSlug') or '')
+                if not binding_owner:
+                    raise ValueError('atlas binding not found')
+                revision = location_assets.atlases.active_revisions("location_asset", binding_owner).get(binding_owner)
                 if revision is None:
                     raise ValueError('atlas binding not found')
-                studio = deps["sync_location_assets_to_studio"](slug=slug, binding_revision=revision)
-                location_assets.atlases.mark_synced("location_asset", slug, revision)
+                if binding_owner != slug:
+                    revisions = location_assets.atlases.active_revisions("location_asset")
+                    studio = deps["sync_location_assets_to_studio"]()
+                    location_assets.atlases.mark_all_synced("location_asset", revisions)
+                else:
+                    studio = deps["sync_location_assets_to_studio"](slug=slug, binding_revision=revision)
+                    location_assets.atlases.mark_synced("location_asset", slug, revision)
                 location_assets.export()
             else:
                 revisions = (location_assets.atlases.active_revisions("location_asset")

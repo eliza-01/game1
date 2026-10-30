@@ -1280,21 +1280,70 @@
         },
         "stone_fence_01_kit": {
           "reuseReference": "location:stone_fence_01",
-          "path": "assets/source/location-assets/fence/stone_fence_01/textures/stone_fence_01.jpg",
+          "path": "assets/source/texture-atlases/structures_01/2048x2048/structures_01_2048x2048_atlas.jpg",
           "sha256": "2f41320116f4b423de010f4c906b5b16eabc981c055bb4fc478c84437a95bb88",
           "assetId": "119920676388867",
           "publishedSha256": "2f41320116f4b423de010f4c906b5b16eabc981c055bb4fc478c84437a95bb88",
           "publicationFormat": "source",
           "atlasVariantId": null,
-          "atlasKey": "",
+          "atlasKey": "structures_01",
           "atlasBindingRevision": 0,
           "atlasSyncStatus": "",
-          "atlasLegacyWarning": true,
-          "atlasVersion": "",
-          "atlasVariants": [],
-          "atlasVersionChoices": [],
+          "atlasLegacyWarning": false,
+          "atlasVersion": "01",
+          "atlasVariants": [
+            {
+              "id": 8,
+              "family_id": 5,
+              "width": 2048,
+              "height": 2048,
+              "filename": "structures_01_2048x2048_atlas.jpg",
+              "original_filename": "structures_01_2048x2048_atlas.jpg",
+              "source_path": "assets/source/texture-atlases/structures_01/2048x2048/structures_01_2048x2048_atlas.jpg",
+              "source_sha256": "2f41320116f4b423de010f4c906b5b16eabc981c055bb4fc478c84437a95bb88",
+              "uses_alpha": false,
+              "published_id": "119920676388867",
+              "published_sha256": "2f41320116f4b423de010f4c906b5b16eabc981c055bb4fc478c84437a95bb88",
+              "moderation_state": "",
+              "published_at": 1793282710.6406033,
+              "created_at": 1793282695.1566315,
+              "atlas_key": "structures_01",
+              "replacement_sha256": null,
+              "current": true,
+              "replacementPending": false,
+              "resolution": "2048x2048",
+              "baseKey": "structures",
+              "version": "01"
+            }
+          ],
+          "atlasVersionChoices": [
+            {
+              "id": 8,
+              "family_id": 5,
+              "width": 2048,
+              "height": 2048,
+              "filename": "structures_01_2048x2048_atlas.jpg",
+              "original_filename": "structures_01_2048x2048_atlas.jpg",
+              "source_path": "assets/source/texture-atlases/structures_01/2048x2048/structures_01_2048x2048_atlas.jpg",
+              "source_sha256": "2f41320116f4b423de010f4c906b5b16eabc981c055bb4fc478c84437a95bb88",
+              "uses_alpha": false,
+              "published_id": "119920676388867",
+              "published_sha256": "2f41320116f4b423de010f4c906b5b16eabc981c055bb4fc478c84437a95bb88",
+              "moderation_state": "",
+              "published_at": 1793282710.6406033,
+              "created_at": 1793282695.1566315,
+              "atlas_key": "structures_01",
+              "replacement_sha256": null,
+              "current": true,
+              "replacementPending": false,
+              "resolution": "2048x2048",
+              "baseKey": "structures",
+              "version": "01",
+              "atlasKey": "structures_01"
+            }
+          ],
           "atlasCurrent": null,
-          "filename": "stone_fence_01.jpg"
+          "filename": "structures_01_2048x2048_atlas.jpg"
         }
       },
       "rigAssets": {
@@ -1514,6 +1563,36 @@
           "version": "01"
         }
       ]
+    },
+    {
+      "atlasKey": "structures_01",
+      "baseKey": "structures",
+      "version": "01",
+      "variants": [
+        {
+          "id": 8,
+          "family_id": 5,
+          "width": 2048,
+          "height": 2048,
+          "filename": "structures_01_2048x2048_atlas.jpg",
+          "original_filename": "structures_01_2048x2048_atlas.jpg",
+          "source_path": "assets/source/texture-atlases/structures_01/2048x2048/structures_01_2048x2048_atlas.jpg",
+          "source_sha256": "2f41320116f4b423de010f4c906b5b16eabc981c055bb4fc478c84437a95bb88",
+          "uses_alpha": false,
+          "published_id": "119920676388867",
+          "published_sha256": "2f41320116f4b423de010f4c906b5b16eabc981c055bb4fc478c84437a95bb88",
+          "moderation_state": "",
+          "published_at": 1793282710.6406033,
+          "created_at": 1793282695.1566315,
+          "atlas_key": "structures_01",
+          "replacement_sha256": null,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "2048x2048",
+          "baseKey": "structures",
+          "version": "01"
+        }
+      ]
     }
   ],
   "textureReferences": [
@@ -1581,11 +1660,11 @@
       "reference": "location:stone_fence_01",
       "label": "Stone Fence 01",
       "slug": "stone_fence_01",
-      "filename": "stone_fence_01.jpg",
+      "filename": "structures_01_2048x2048_atlas.jpg",
       "group": "location",
       "category": "fence",
       "categoryLabel": "Fences",
-      "path": "assets/source/location-assets/fence/stone_fence_01/textures/stone_fence_01.jpg",
+      "path": "assets/source/texture-atlases/structures_01/2048x2048/structures_01_2048x2048_atlas.jpg",
       "sha256": "2f41320116f4b423de010f4c906b5b16eabc981c055bb4fc478c84437a95bb88",
       "assetId": "119920676388867"
     },
@@ -1593,11 +1672,11 @@
       "reference": "location:stone_fence_pillar_01",
       "label": "Stone Fence Pillar 01",
       "slug": "stone_fence_pillar_01",
-      "filename": "stone_fence_01.jpg",
+      "filename": "structures_01_2048x2048_atlas.jpg",
       "group": "location",
       "category": "fence",
       "categoryLabel": "Fences",
-      "path": "assets/source/location-assets/fence/stone_fence_01/textures/stone_fence_01.jpg",
+      "path": "assets/source/texture-atlases/structures_01/2048x2048/structures_01_2048x2048_atlas.jpg",
       "sha256": "2f41320116f4b423de010f4c906b5b16eabc981c055bb4fc478c84437a95bb88",
       "assetId": "119920676388867"
     },
@@ -1605,11 +1684,11 @@
       "reference": "location:wooden_fence_01",
       "label": "Wooden Fence 01",
       "slug": "wooden_fence_01",
-      "filename": "stone_fence_01.jpg",
+      "filename": "structures_01_2048x2048_atlas.jpg",
       "group": "location",
       "category": "fence",
       "categoryLabel": "Fences",
-      "path": "assets/source/location-assets/fence/stone_fence_01/textures/stone_fence_01.jpg",
+      "path": "assets/source/texture-atlases/structures_01/2048x2048/structures_01_2048x2048_atlas.jpg",
       "sha256": "2f41320116f4b423de010f4c906b5b16eabc981c055bb4fc478c84437a95bb88",
       "assetId": "119920676388867"
     },
@@ -1617,11 +1696,11 @@
       "reference": "location:wooden_fence_pillar_01",
       "label": "Wooden Fence Pillar 01",
       "slug": "wooden_fence_pillar_01",
-      "filename": "stone_fence_01.jpg",
+      "filename": "structures_01_2048x2048_atlas.jpg",
       "group": "location",
       "category": "fence",
       "categoryLabel": "Fences",
-      "path": "assets/source/location-assets/fence/stone_fence_01/textures/stone_fence_01.jpg",
+      "path": "assets/source/texture-atlases/structures_01/2048x2048/structures_01_2048x2048_atlas.jpg",
       "sha256": "2f41320116f4b423de010f4c906b5b16eabc981c055bb4fc478c84437a95bb88",
       "assetId": "119920676388867"
     },
@@ -1629,11 +1708,11 @@
       "reference": "location:stone_ladder_01",
       "label": "Stone Ladder 01",
       "slug": "stone_ladder_01",
-      "filename": "stone_fence_01.jpg",
+      "filename": "structures_01_2048x2048_atlas.jpg",
       "group": "location",
       "category": "ladder",
       "categoryLabel": "Ladders",
-      "path": "assets/source/location-assets/fence/stone_fence_01/textures/stone_fence_01.jpg",
+      "path": "assets/source/texture-atlases/structures_01/2048x2048/structures_01_2048x2048_atlas.jpg",
       "sha256": "2f41320116f4b423de010f4c906b5b16eabc981c055bb4fc478c84437a95bb88",
       "assetId": "119920676388867"
     },
@@ -2008,6 +2087,18 @@
       "path": "assets/source/texture-atlases/restoration_01/2048x2048/revisions/2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683/restoration_01_2048x2048_atlas.png",
       "sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
       "assetId": "138456659862372"
+    },
+    {
+      "reference": "atlas:8",
+      "label": "structures_01",
+      "slug": "",
+      "filename": "structures_01_2048x2048_atlas.jpg",
+      "group": "atlas",
+      "category": "",
+      "categoryLabel": "",
+      "path": "assets/source/texture-atlases/structures_01/2048x2048/structures_01_2048x2048_atlas.jpg",
+      "sha256": "2f41320116f4b423de010f4c906b5b16eabc981c055bb4fc478c84437a95bb88",
+      "assetId": "119920676388867"
     }
   ],
   "summary": {

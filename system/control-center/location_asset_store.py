@@ -241,10 +241,21 @@ class LocationAssetStore:
         result = dict(row)
         if atlas_catalog is None:
             atlas_catalog = self.atlases.catalog()
-        binding = self.atlases.binding("location_asset", str(result.get("slug") or ""))
-        owner = None if binding else self._resolve_texture_owner(result, rows_by_slug)
+        slug = str(result.get("slug") or "")
+        direct_binding = self.atlases.binding("location_asset", slug)
+        owner = None if direct_binding else self._resolve_texture_owner(result, rows_by_slug)
+        # Legacy texture reuse follows the owner's *effective* publication.
+        # Once an owner adopts Atlas Registry its raw location_assets columns
+        # are no longer authoritative (and may deliberately be NULL). Resolve
+        # the published image through the registry without rewriting a legacy
+        # relationship or allocating another Roblox Image Asset ID.
+        inherited_binding = (self.atlases.binding("location_asset", str(owner["slug"]))
+                             if owner and owner.get("slug") != slug else None)
+        binding = direct_binding or inherited_binding
         result["texture_owner_slug"] = str(owner.get("slug") or "") if owner else ""
-        result["texture_shared"] = bool(str(result.get("texture_reference_slug") or "")) and not binding
+        result["texture_shared"] = bool(str(result.get("texture_reference_slug") or "")) and not direct_binding
+        if binding:
+            result["atlasBindingSourceSlug"] = (slug if direct_binding else str(owner["slug"]))
         result["destructible"] = bool(result.get("destructible"))
         if owner is not None and owner.get("slug") != result.get("slug"):
             for field in (
@@ -264,7 +275,9 @@ class LocationAssetStore:
                 "texture_asset_id": binding["published_id"],
                 "texture_published_sha256": binding["published_sha256"],
                 "texture_moderation_state": binding["moderation_state"],
-                "texture_reference_slug": "",
+                # Keep legacy followers linked to the owner. An explicit
+                # variant selection is the only action that detaches them.
+                "texture_reference_slug": "" if direct_binding else result["texture_reference_slug"],
                 "atlasVariantId": binding["variant_id"],
                 "atlasFamily": binding["atlas_key"],
                 "atlasResolution": binding["resolution"],

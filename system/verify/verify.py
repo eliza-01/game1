@@ -2789,8 +2789,13 @@ if location_asset_manifest_path.is_file():
     for row in location_asset_manifest.get("items") or []:
         if not str(row.get("model_path") or "").startswith("assets/source/location-assets/"):
             err(f"m52 Location Asset model path is not canonical source-only: {row.get('slug')}")
-        if not str(row.get("texture_reference_slug") or "") and not str(row.get("texture_path") or "").startswith("assets/source/location-assets/"):
-            err(f"m52 owned Location Asset texture path is not canonical source-only: {row.get('slug')}")
+        if not str(row.get("texture_reference_slug") or ""):
+            # Atlas Registry owns canonical shared sources independently of the
+            # Location Asset model folder (m125+). Both live under assets/source.
+            expected_prefix = ("assets/source/texture-atlases/" if row.get("atlasVariantId")
+                               else "assets/source/location-assets/")
+            if not str(row.get("texture_path") or "").startswith(expected_prefix):
+                err(f"m52 owned Location Asset texture path is not canonical source-only: {row.get('slug')}")
         for legacy_field in ("model_source_path", "model_prepared_path", "texture_source_path", "texture_prepared_path"):
             if legacy_field in row:
                 err(f"m52 manifest still exports legacy field {legacy_field}: {row.get('slug')}")

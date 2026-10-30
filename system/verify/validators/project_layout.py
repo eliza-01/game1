@@ -9,6 +9,8 @@ import json
 from pathlib import Path
 from typing import Callable
 
+from validators.path_display import project_relative_path
+
 
 REQUIRED_RUNTIME_MODULES = (
     "src/server/character/CharacterService.luau",
@@ -112,7 +114,7 @@ def check_project_layout(root: Path, report_error: Callable[[str], None]) -> Non
                     "CombatV2",
                 ]:
                     if token in text:
-                        report_error(f"{path.relative_to(root)} contains forbidden token {token}")
+                        report_error(f"{project_relative_path(path, root)} contains forbidden token {token}")
 
     cfg = json.loads((root / "config/project.json").read_text(encoding="utf-8"))
     if cfg.get("name") != "game1" or cfg.get("slug") != "game1":

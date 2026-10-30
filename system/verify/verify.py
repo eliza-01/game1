@@ -4,6 +4,12 @@ import re
 import sys
 
 from validators.actor_runtime import check_actor_runtime_contracts
+from validators.animations import check_animation_scaling, check_character_animation, check_manual_animation_reimport
+from validators.characters import (
+    check_character_manifest, check_character_rig, check_character_publication,
+    check_character_identity, check_character_starting_stats,
+)
+from validators.weapons import check_weapon_registration, check_weapon_attack_movement
 from validators.combat_contact import check_combat_contact_contracts
 from validators.monsters import check_monster_contracts
 from validators.project_layout import check_project_identity, check_project_layout
@@ -20,54 +26,7 @@ def err(message: str) -> None:
 # M165: project identity is checked before archetype data for stable diagnostics.
 check_project_identity(ROOT, err)
 
-manifest = json.loads((ROOT / "assets/manifests/character-archetypes.json").read_text(encoding="utf-8"))
-if manifest.get("project") != "game1":
-    err("character manifest identity must be game1")
-if manifest.get("schemaVersion") != 5:
-    err("character manifest schema must be 5; run python .\\system\\control-center\\migrate.py")
-if manifest.get("racePool") != ["human"]:
-    err("character race pool must start with human only")
-if manifest.get("genderPool") != ["male", "female"]:
-    err("character gender pool must be male/female")
-
-archetypes = manifest.get("archetypes", [])
-if not isinstance(archetypes, list):
-    err("character archetypes must be a list")
-    archetypes = []
-
-ids = {str(row.get("id", "")) for row in archetypes if isinstance(row, dict)}
-active_id = manifest.get("activeArchetypeId")
-if active_id is not None and active_id not in ids:
-    err("active character archetype must exist in the manifest")
-
-identities = set()
-for row in archetypes:
-    if not isinstance(row, dict):
-        err("character archetype row must be an object")
-        continue
-    race = str(row.get("race") or "")
-    gender = str(row.get("gender") or "")
-    incomplete = str(row.get("status") or "") == "INCOMPLETE"
-    if not incomplete or race or gender:
-        if race != "human":
-            err(f"character archetype {row.get('id')} has an unregistered race: {race}")
-        if gender not in {"male", "female"}:
-            err(f"character archetype {row.get('id')} has invalid gender: {gender}")
-        identity = (race, gender)
-        if identity in identities:
-            err(f"duplicate character identity: {race}/{gender}")
-        identities.add(identity)
-    model = row.get("model")
-    skeleton = row.get("skeleton")
-    if not isinstance(model, dict):
-        err(f"character archetype {row.get('id')} must have one model object")
-    if not isinstance(skeleton, dict):
-        err(f"character archetype {row.get('id')} must have skeleton metadata")
-    elif row.get("status") != "INCOMPLETE":
-        if int(skeleton.get("boneCount") or 0) <= 0:
-            err(f"character archetype {row.get('id')} has no analyzed bones")
-        if not str(skeleton.get("signature") or ""):
-            err(f"character archetype {row.get('id')} has no skeleton signature")
+archetypes, active_id = check_character_manifest(ROOT, err)
 
 # M165: project layout, forbidden legacy references, and runtime inventory.
 check_project_layout(ROOT, err)
@@ -116,35 +75,7 @@ for required in [
 if "BillboardGui" not in dummy_text or "HP %d/%d" not in dummy_text:
     err("training dummy visible hp contract missing")
 
-character_service_text = (ROOT / "src/server/character/CharacterService.luau").read_text(encoding="utf-8")
-rig_text = (ROOT / "src/server/character/CharacterRigService.luau").read_text(encoding="utf-8")
-for required in [
-    'root.Name = "RootCollider"',
-    'navigationRoot.Name = "NavigationRoot"',
-    'controllerManager.Name = "ControllerManager"',
-    'sensorPart.Name = "GroundSensorPart"',
-    'sensor.Name = "GroundSensor"',
-    'cloned.Name = "ImportedRig"',
-    'weld.Name = "VisualRootWeld"',
-]:
-    if required not in rig_text:
-        err(f"canonical character rig contract missing: {required}")
-if 'object:IsA("MeshPart") and object:FindFirstChildWhichIsA("Bone"' in rig_text:
-    err("skinned MeshPart must not be selected as the character root anchor")
-if "Game1BootstrapCompatibilityRoot" not in rig_text:
-    err("bootstrap placeholder compatibility must stay isolated from registered characters")
-if "registered character template is missing ImportedRig/RootPart" not in rig_text:
-    err("registered characters must require the canonical Studio-authored RootPart")
-if "lowestVisibleGeometryY" not in rig_text or 'object ~= visualRootPart' not in rig_text:
-    err("registered character visual must ground-align from visible geometry, excluding RootPart")
-if 'VisualFootContactSource' not in rig_text or '"visible_geometry"' not in rig_text:
-    err("character visual ground-contact diagnostics are missing")
-if "row == nil" not in character_service_text:
-    err("runtime compatibility root must be allowed only for the bootstrap placeholder")
-if "findRegisteredTemplate" not in character_service_text or '"characters"' not in character_service_text:
-    err("registered character runtime must resolve managed ServerStorage templates")
-if "getAssetTemplate" not in character_service_text:
-    err("published registered character fallback is missing")
+character_service_text, rig_text = check_character_rig(ROOT, err)
 
 hitbox_text = (ROOT / "src/server/combat/EntityHitboxService.luau").read_text(encoding="utf-8")
 hitbox_geometry_text = (ROOT / "src/server/combat/HitboxMeshGeometryCache.luau").read_text(encoding="utf-8")
@@ -242,427 +173,26 @@ host_agent_text = (ROOT / "system/control-center/host_agent.py").read_text(encod
 if "sync_character_to_studio" not in host_agent_text or 'sync_suffix = "/sync"' not in host_agent_text:
     err("character publication must expose reference-style Studio sync")
 
-registry_path = ROOT / "src/shared/character/CharacterRegistry.luau"
-registry_text = registry_path.read_text(encoding="utf-8") if registry_path.is_file() else ""
-if "activeArchetypeId" not in registry_text:
-    err("generated character registry has no active archetype field")
-if archetypes and ("race =" not in registry_text or "gender =" not in registry_text):
-    err("generated character registry does not expose race/gender")
-
-schema_text = (ROOT / "system/control-center/schema.sql").read_text(encoding="utf-8")
-for required in ["project_settings", "character_publications", "race text", "gender text", "skeleton_signature", "model_replacement_pending", "publication_pipeline"]:
-    if required not in schema_text:
-        err(f"control center schema missing {required}")
-
-store_text = (ROOT / "system/control-center/character_store.py").read_text(encoding="utf-8")
-if 'RACES = ("human",)' not in store_text or 'GENDERS = ("male", "female")' not in store_text:
-    err("character identity pools are missing")
-if "analyze_character_fbx" not in store_text:
-    err("character armature analysis is not wired into registration")
-if "prepare_character_fbx" not in store_text:
-    err("character FBX preparation is not wired into registration")
-if "create_model_asset" not in store_text:
-    err("character model publication contract is missing")
-if "update_model_asset" in store_text:
-    err("character model publication must create a new asset id instead of updating an existing Roblox model asset")
-if "current_sha == published_sha" not in store_text:
-    err("unchanged character model publication must be a no-op")
-if 'CHARACTER_PUBLICATION_PIPELINE = "roblox-open-cloud-bone-survival-v2-scale-safe"' not in store_text:
-    err("character publication pipeline version is missing")
-if "published_pipeline == CHARACTER_PUBLICATION_PIPELINE" not in store_text:
-    err("old character publications must be republished when the bone-safe pipeline changes")
-if 'src/shared/character/CharacterRegistry.luau' not in store_text:
-    err("character registry generator must target the character shared domain")
-
-ui = (ROOT / "system/control-center/static/index.html").read_text(encoding="utf-8")
-css = ROOT / "system/control-center/static/asset-manager.css"
-js = ROOT / "system/control-center/static/character-assets.js"
-if not css.is_file() or not js.is_file():
-    err("character asset manager css/js files are missing")
-if 'id="race"' not in ui or 'id="gender"' not in ui or 'id="publish-character"' not in ui:
-    err("character asset manager race/gender/publication controls are missing")
-if 'id="character-model-source"' in ui:
-    err("character edit UI must not reassign/reuse another archetype's existing Roblox model asset id")
-character_js_text = js.read_text(encoding="utf-8") if js.is_file() else ""
-for required in ['id="animation-folder-path"', 'id="choose-animation-folder"', 'id="scan-animations"']:
-    if required not in ui:
-        err(f"character animation folder explorer missing {required}")
-for required in ["ANIMATION_FOLDER_KEY", "initAnimationFolderExplorer", "initialPath", "localStorage.setItem(ANIMATION_FOLDER_KEY"]:
-    if required not in character_js_text:
-        err(f"character animation folder persistence missing {required}")
-if "/replace-model" not in host_agent_text:
-    err("character edit UI needs an explicit replace-model endpoint")
-
-analyzer = ROOT / "system/asset-manager/analyze_character_fbx.py"
-if not analyzer.is_file() or "FBX contains no armature" not in analyzer.read_text(encoding="utf-8"):
-    err("deterministic character fbx armature analyzer is missing")
-analysis_text = (ROOT / "system/control-center/character_analysis.py").read_text(encoding="utf-8")
-if "shutil.copy2(source, output)" not in analysis_text or "preserve-source-bytes" not in analysis_text:
-    err("character prepared FBX must preserve authored source bytes")
-preparer = ROOT / "system/asset-manager/prepare_character_fbx.py"
-if preparer.is_file() and "transform_apply" in preparer.read_text(encoding="utf-8"):
-    err("character FBX preparer must not rebake authored rotation/scale")
-
-publication_preparer = ROOT / "system/asset-manager/prepare_character_publication_fbx.py"
-publication_preparer_text = (publication_preparer.read_text(encoding="utf-8") + (ROOT / "system/asset-manager/model_publication.py").read_text(encoding="utf-8")) if publication_preparer.is_file() else ""
-bone_planner = ROOT / "system/asset-manager/bone_weight_survival.py"
-bone_planner_text = bone_planner.read_text(encoding="utf-8") if bone_planner.is_file() else ""
-for required in [
-    "SURVIVAL_WEIGHT = 0.05",
-    "MAX_INFLUENCES = 4",
-]:
-    if required not in bone_planner_text:
-        err(f"shared publication bone-survival planner missing {required}")
-for required in [
-    "plan_publication_weights",
-    "ROBLOX_MAX_INFLUENCES = MAX_INFLUENCES",
-    "assert_rest_unchanged",
-    "use_armature_deform_only=False",
-    "global_scale=1.0",
-    'apply_scale_options="FBX_SCALE_UNITS"',
-    "restTransformsChanged",
-    "fbxScaleMode",
-]:
-    if required not in publication_preparer_text:
-        err(f"Roblox-safe character publication preparer missing {required}")
-if "transform_apply" in publication_preparer_text:
-    err("Roblox-safe publication preparation must never apply/move character bone transforms")
-for required in ["prepare_character_publication_fbx", "_assert_publication_skeleton_matches"]:
-    if required not in analysis_text + store_text:
-        err(f"character publication skeleton safety missing {required}")
-if "boneNames" not in plugin_text or 'validate_published_rig(result, row, kind="character")' not in host_agent_text or 'f"{label} stripped' not in host_agent_text:
-    err("Studio character sync must report exact bones stripped by Roblox publication")
-
-# m5.1 character animation contract
-animation_manifest_path = ROOT / "assets/manifests/character-animations.json"
-if not animation_manifest_path.is_file():
-    err(r"character animation manifest is missing; run python .\system\control-center\migrate.py")
-    animation_manifest = {}
-else:
-    animation_manifest = json.loads(animation_manifest_path.read_text(encoding="utf-8"))
-if animation_manifest.get("schemaVersion") != 2 or animation_manifest.get("project") != "game1":
-    err("character animation manifest must be game1 schema 2")
-if animation_manifest.get("weaponSets") != ["hands", "1hs", "2hs", "bow"]:
-    err("character animation weapon sets must be hands, 1hs, 2hs and bow")
-for binding in animation_manifest.get("bindings") or []:
-    if "playbackSpeedPercent" in binding or "playback_speed_percent" in binding:
-        err(f"character animation binding must not own playback speed: {binding.get('id')}")
-
-animation_store_path = ROOT / "system/control-center/animation_store.py"
-animation_core_dir = ROOT / "system/control-center/animation_core"
-animation_store_text = animation_store_path.read_text(encoding="utf-8") if animation_store_path.is_file() else ""
-if animation_core_dir.is_dir():
-    for core_file in sorted(animation_core_dir.glob("*.py")):
-        animation_store_text += "\n" + core_file.read_text(encoding="utf-8")
-for required in [
-    "class AnimationStore",
-    "def scan_folder",
-    "def classify_animation",
-    'WEAPON_SETS = ("hands", "1hs", "2hs", "bow")',
-    "def assign_file",
-    "normalize_manual_binding",
-    "_strip_character_prefix",
-    '"seated.enter"',
-    '"seated.loop"',
-    '"seated.exit"',
-    '"attack"',
-    '"variant"',
-]:
-    if required not in animation_store_text:
-        err(f"character animation store missing {required}")
-if 'queue = [row for row in rows if row["status"] == "LOCAL_ONLY"]' not in animation_store_text:
-    err("publish-missing must never create duplicate assets for changed published animations")
-if "reimport it manually in Roblox Studio" not in animation_store_text or "Check Roblox Assets Animations" not in animation_store_text:
-    err("changed animation assets must preserve their permanent id and use manual reimport confirmation")
-
-animation_registry_path = ROOT / "src/shared/character/CharacterAnimationRegistry.luau"
-animation_registry_text = animation_registry_path.read_text(encoding="utf-8") if animation_registry_path.is_file() else ""
-if "profiles = table.freeze" not in animation_registry_text:
-    err("generated character animation runtime registry is missing")
-
-resolver_path = ROOT / "src/client/character/animation/AnimationResolver.luau"
-controller_path = ROOT / "src/client/character/animation/CharacterAnimationController.luau"
-resolver_runtime = resolver_path.read_text(encoding="utf-8") if resolver_path.is_file() else ""
-controller_runtime = controller_path.read_text(encoding="utf-8") if controller_path.is_file() else ""
-for required in ["ResolveLocomotion", "ResolveAction", "AnimationWeaponSet", "skeletonSignature"]:
-    if required not in resolver_runtime:
-        err(f"animation resolver missing {required}")
-for required in ["MovementState", "PlayAction", "AnimationResolvedClip", "AnimationTrackCache", "AnimationPlaybackSpeedPercent", "AnimationSpeedScaling"]:
-    if required not in controller_runtime:
-        err(f"character animation controller missing {required}")
-client_init_text = (ROOT / "src/client/init.client.luau").read_text(encoding="utf-8")
-if "CharacterAnimationController.Start()" not in client_init_text:
-    err("character animation controller is not started by the client runtime")
-attack_controller_text = (ROOT / "src/client/combat/AttackController.luau").read_text(encoding="utf-8")
-if 'animationController.PlayAction("attack")' not in attack_controller_text:
-    err("combat attack input is not connected to the semantic attack animation slot")
-for required in ["BeginAimFacingCompensation", "TorsoYawLimit", "aimPoseController.BeginAttack", "finishPresentation(sequence)"]:
-    if required not in attack_controller_text:
-        err(f"robloxlineage attack/aim integration missing {required}")
-aim_pose_text = (ROOT / "src/client/combat/AimPoseController.luau").read_text(encoding="utf-8")
-for required in ["RunService.PreSimulation", "spine.001", "AimTorsoYawDegrees", "applyWorldAim", "desiredTransform", "ViewportPointToRay", "Game1AimReticle"]:
-    if required not in aim_pose_text:
-        err(f"procedural torso aim controller missing {required}")
-movement_runtime = (ROOT / "src/client/character/MovementController.luau").read_text(encoding="utf-8")
-for required in ["BeginAimFacingCompensation", "UpdateAimFacingCompensation", "applyAimFacingCompensation"]:
-    if required not in movement_runtime:
-        err(f"movement aim-facing compensation missing {required}")
-if "AimPoseController.Start()" not in client_init_text:
-    err("procedural torso aim controller is not started by the client runtime")
-
-# m21+ RobloxLineage upper-body attack presentation contract. Facing/aim are held
-# for the complete attack when stationary; the source clip is sampled on a proxy
-# and only the upper-body bridge subtree is composed over live lower-body locomotion.
-attack_composer_path = ROOT / "src/client/character/animation/AttackUpperBodyComposer.luau"
-attack_composer_text = attack_composer_path.read_text(encoding="utf-8") if attack_composer_path.is_file() else ""
-for required in [
-    "__Game1AttackUpperBodyProxy",
-    'FindFirstChild("spine.001", true)',
-    "buildUpperPairs",
-    "sourceArmature",
-    "mappedAttackWorld",
-    "baseBridgeTransform:Lerp",
-    "RunService.PreSimulation:Connect(step)",
-    "RunService.PreAnimation:Connect(holdSourceTerminalPose)",
-]:
-    if required not in attack_composer_text:
-        err(f"upper-body attack composition missing {required}")
-for required in [
-    "attackLowerBodyActive",
-    'return "combat_idle"',
-    "AttackUpperBodyComposer.Begin(character, descriptor, playbackSpeed)",
-    "AnimationAttackUpperBodyComposed",
-    "AnimationAttackLowerBodySlot",
-    "AttackUpperBodyComposer.BeginExitBlend()",
-]:
-    if required not in controller_runtime:
-        err(f"attack lower/upper-body composition contract missing {required}")
-for forbidden in [
-    "task.delay(facingDuration",
-    "AttackConfig.MovementLockSeconds",
-    "AttackConfig.AimPoseSeconds",
-]:
-    if forbidden in attack_controller_text:
-        err(f"attack presentation still releases aim/movement early: {forbidden}")
-if "aimPoseController.BeginAttack(target, attackDuration)" not in attack_controller_text:
-    err("attack aim pose must stay active for the complete attack duration")
-if "movementController.EndAimFacingCompensation()" not in attack_controller_text.split("local function finishPresentation", 1)[1].split("function AttackController.Start", 1)[0]:
-    err("root aim compensation must release only from full-attack presentation cleanup")
-if 'character:SetAttribute("AnimationProfileId", archetype)' not in character_service_text:
-    err("character runtime does not expose animation profile identity")
-if 'character:SetAttribute("CharacterSkeletonSignature"' not in character_service_text:
-    err("character runtime does not expose skeleton signature to animation resolver")
-if 'character:SetAttribute("AnimationWeaponSet", "hands")' not in character_service_text:
-    err("character runtime must default to the canonical hands animation context")
-
-for required in ["animation_profiles", "animation_clips", "animation_bindings", "animation_publications"]:
-    if required not in schema_text:
-        err(f"control center schema missing {required}")
-if 'id="nav-animations"' not in ui or 'id="scan-animations"' not in ui or 'id="publish-missing-animations"' not in ui:
-    err("asset manager character animation section is missing")
-js_text = js.read_text(encoding="utf-8") if js.is_file() else ""
-for required in ["filename_rule_catalog", "canonicalFilename", "variantPattern", "filename_prefix"]:
-    if required not in animation_store_text:
-        err(f"animation filename-rule catalog missing {required}")
-for required in ['id="animation-filename-rules"', 'id="animation-filename-guide"', "all registered states", "selected archetype id"]:
-    if required not in ui:
-        err(f"animation filename-rules UI missing {required}")
-if "renderFilenameRules" not in js_text:
-    err("animation filename-rules renderer missing")
-for required in ["FILENAME_GUIDE_OPEN_KEY", "localStorage.getItem", "localStorage.setItem", "initFilenameRulesDisclosure"]:
-    if required not in js_text:
-        err(f"animation filename-rules disclosure persistence missing {required}")
-for required in ["chooseAnimationFolder", "scanAnimations", "publishMissingAnimations", "animationFilter", "assignUnassignedAnimation", "manualSlotCatalog"]:
-    if required not in js_text:
-        err(f"asset manager animation ui missing {required}")
-for forbidden in ["setAnimationSpeed", "data-speed"]:
-    if forbidden in js_text:
-        err(f"asset manager character clip table must not expose per-clip speed control: {forbidden}")
-if "<th>speed %</th>" in ui:
-    err("asset manager animation clip tables must not expose authored speed percent")
-if 'create_animation_asset' not in (ROOT / "system/control-center/opencloud_assets.py").read_text(encoding="utf-8"):
-    err("open cloud animation publication helper is missing")
-
-# m5.2 archetype identity editing contract
-identity_service = ROOT / "system/control-center/character_core/identity.py"
-identity_text = identity_service.read_text(encoding="utf-8") if identity_service.is_file() else ""
-for required in [
-    "class CharacterIdentityService",
-    "def update",
-    "UPDATE character_publications SET character_id",
-    "UPDATE animation_profiles SET character_id",
-    "UPDATE animation_publications SET clip_id",
-    "UPDATE animation_clips",
-    "UPDATE animation_bindings",
-    "migratedAnimationClips",
-]:
-    if required not in identity_text:
-        err(f"archetype identity migration missing {required}")
-if 'identity_suffix = "/identity"' not in host_agent_text or "character_identity.update" not in host_agent_text:
-    err("host agent does not expose archetype identity editing")
-if 'id="save-archetype"' not in ui or 'id="character-id" autocomplete="off"' not in ui:
-    err("asset manager archetype edit controls are missing")
-for required in ["saveArchetype", "save archetype identity first", "/identity"]:
-    if required not in js_text:
-        err(f"asset manager archetype editing ui missing {required}")
-
-# m6.2 archetype registration safety + immutable character model replacement
-character_store_text = (ROOT / "system/control-center/character_store.py").read_text(encoding="utf-8")
-for required in ["existingId", "archetype {character_id} already exists", "def assign_model", "character_model_assignments"]:
-    if required not in character_store_text:
-        err(f"character registration/model reassignment contract missing {required}")
-if "character_model_assignments" not in schema_text:
-    err("control center schema missing character_model_assignments audit table")
-if 'replace_model_suffix = "/replace-model"' not in host_agent_text or "store.publish(character_id, credentials)" not in host_agent_text:
-    err("host agent does not expose sequential character model replacement")
-if '"forceReplacement": True' not in host_agent_text:
-    err("explicit character Replace must force a new immutable Roblox asset id")
-if "and not replacement_pending" not in character_store_text:
-    err("unchanged-content no-op must never swallow an explicit character replacement")
-if "replace model did not create a new Roblox asset id" not in host_agent_text:
-    err("replace-model endpoint must reject accidental reuse of the old Roblox asset id")
-if 'id="character-model-source"' in ui:
-    err("asset manager must not offer cross-archetype Roblox asset id reuse")
-for required in ["replace model · publish new asset", "/replace-model", "existingId:row?.id||''"]:
-    if required not in js_text:
-        err(f"asset manager archetype model replacement ui missing {required}")
-if 'source.get("model_asset_id")' in character_store_text:
-    err("character model reassignment must not copy another archetype's Roblox asset id")
+schema_text, ui, js, character_js_text = check_character_publication(
+    ROOT, err, host_agent_text=host_agent_text, plugin_text=plugin_text, archetypes=archetypes,
+)
 
 
-# m6 weapon registry / stats / attachment contract
-weapon_manifest_path = ROOT / "assets/manifests/weapons.json"
-if not weapon_manifest_path.is_file():
-    err(r"weapon manifest is missing; run python .\system\control-center\migrate.py")
-    weapon_manifest = {}
-else:
-    weapon_manifest = json.loads(weapon_manifest_path.read_text(encoding="utf-8"))
-if weapon_manifest.get("schemaVersion") != 2 or weapon_manifest.get("project") != "game1":
-    err("weapon manifest must be game1 schema 2")
-weapon_options = weapon_manifest.get("options") or {}
-if weapon_options.get("weaponTypes") != ["dagger", "sword", "bigsword", "bow"]:
-    err("weapon type pool must be dagger, sword, bigsword, bow")
-if weapon_options.get("rarities") != ["common", "uncommon", "rare", "mythical", "legendary", "immortal"]:
-    err("weapon rarity pool must be common through immortal")
+(
+    animation_store_text, animation_registry_text, controller_runtime,
+    client_init_text, attack_controller_text, movement_runtime, js_text,
+) = check_character_animation(
+    ROOT, err, schema_text=schema_text, ui=ui, js=js, character_service_text=character_service_text,
+)
 
-weapon_store_path = ROOT / "system/control-center/weapon_store.py"
-weapon_store_text = weapon_store_path.read_text(encoding="utf-8") if weapon_store_path.is_file() else ""
-for required in [
-    "class WeaponStore",
-    "def slugify_english",
-    'WEAPON_TYPES = ("dagger", "sword", "bigsword", "bow")',
-    'RARITIES = ("common", "uncommon", "rare", "mythical", "legendary", "immortal")',
-    'STAT_KEYS = ("Damage", "AttackSpeed")',
-    "weapon_stat_modifiers",
-    "weapon_textures",
-    "create_model_asset",
-    "create_image_asset",
-    "update_model_asset",
-    "update_image_asset",
-    'src/shared/weapon/WeaponRegistry.luau',
-]:
-    if required not in weapon_store_text:
-        err(f"weapon store missing {required}")
+check_character_identity(ROOT, err, schema_text=schema_text, ui=ui, host_agent_text=host_agent_text, js_text=js_text)
 
-for required in ["weapons", "weapon_textures", "weapon_stat_modifiers", "weapon_publications"]:
-    if required not in schema_text:
-        err(f"control center schema missing {required}")
-
-opencloud_text = (ROOT / "system/control-center/opencloud_assets.py").read_text(encoding="utf-8")
-for required in ["create_image_asset", "update_image_asset", '"assetType": "Image"']:
-    if required not in opencloud_text:
-        err(f"open cloud weapon texture publication missing {required}")
-
-weapon_registry_path = ROOT / "src/shared/weapon/WeaponRegistry.luau"
-weapon_registry_text = weapon_registry_path.read_text(encoding="utf-8") if weapon_registry_path.is_file() else ""
-for required in ["activeWeaponSlug", "weapons = table.freeze"]:
-    if required not in weapon_registry_text:
-        err(f"generated weapon registry missing {required}")
-
-weapon_equip_path = ROOT / "src/server/weapon/WeaponEquipService.luau"
-weapon_attach_path = ROOT / "src/client/weapon/WeaponAttachmentController.luau"
-weapon_equip_text = weapon_equip_path.read_text(encoding="utf-8") if weapon_equip_path.is_file() else ""
-weapon_attach_text = weapon_attach_path.read_text(encoding="utf-8") if weapon_attach_path.is_file() else ""
-for required in ["Weapon_R_Bone", "weapon_r", "Weapon_L_Bone", "weapon_l", "AnimationWeaponSet", "statModifiers", "EquipStartup", "GetAvailable", "ListAvailable", "WeaponLoadoutSource", "Game1WeaponGrip", "runtime-canonical-grip-v2", "ensureCanonicalRuntimeGrip", "grip.WorldCFrame:Inverse()"]:
-    if required not in weapon_equip_text:
-        err(f"weapon equip runtime missing {required}")
-for required in ["Game1WeaponAttachment", "parent.TransformedWorldCFrame * targetBone.CFrame", "weapon:PivotTo", "Game1WeaponGrip", "grip.WorldCFrame:Inverse()"]:
-    if required not in weapon_attach_text:
-        err(f"weapon attachment runtime missing {required}")
-if "WeaponEquipService.EquipStartup(character)" not in character_service_text:
-    err("character spawn does not apply the startup weapon")
-if "WeaponAttachmentController.Start()" not in client_init_text:
-    err("weapon attachment controller is not started by the client runtime")
-
-stats_config_text = (ROOT / "src/shared/character/CharacterStatsConfig.luau").read_text(encoding="utf-8")
-stats_service_text = (ROOT / "src/server/character/CharacterStatsService.luau").read_text(encoding="utf-8")
-movement_config_text = (ROOT / "src/shared/character/CharacterMovementConfig.luau").read_text(encoding="utf-8")
-for required in ["AttackSpeed = 100", "RunSpeed = 50"]:
-    if required not in stats_config_text:
-        err(f"character baseline stat missing {required}")
-for required in ["SetModifierSource", "modifierSources", 'Service.SetModifierSource(character, "weapon", modifiers)']:
-    if required not in stats_service_text:
-        err(f"composable stat modifier service missing {required}")
-for required in ["DefaultRunSpeed = 50", "WalkSpeedMultiplier = 0.5", "return runSpeed", "return runSpeed * CharacterMovementConfig.WalkSpeedMultiplier"]:
-    if required not in movement_config_text:
-        err(f"direct RunSpeed/walk-half movement contract missing {required}")
-if 'character:GetAttribute("RunSpeed")' not in rig_text or 'character:GetAttribute("MoveSpeed")' in rig_text:
-    err("character rig initial movement must use RunSpeed directly")
-if 'AnimationSpeedScaling.ResolveForAnimation(character, "attack", descriptor.animationId)' not in attack_text:
-    err("server attack timeline does not resolve stat-scaled AttackSpeed playback")
-if 'animationSpeedPercent = animationPlaybackPercent(slot, descriptor.animationId)' not in controller_runtime:
-    err("client attack presentation does not use shared stat-scaled playback")
-for required in ['animationController.PlayAction("attack")', "action.durationSeconds", "clipId = action.clipId"]:
-    if required not in attack_controller_text:
-        err(f"client full-animation attack lock missing {required}")
-
-if 'id="nav-weapons"' not in ui or 'id="register-weapon"' not in ui or 'id="weapon-stat-attack-speed"' not in ui:
-    err("asset manager weapon registration section is missing")
-if 'id="weapon-attack-radius"' not in ui:
-    err("weapon registration must expose attack radius in studs")
-if 'id="weapon-test-loadout"' in ui or 'id="save-weapon-test-loadout"' in ui:
-    err("studio test loadout must not live in the web asset manager")
-weapon_js_path = ROOT / "system/control-center/static/weapon-assets.js"
-weapon_js_text = weapon_js_path.read_text(encoding="utf-8") if weapon_js_path.is_file() else ""
-for required in ["weaponSlugify", "weaponRegister", "weaponPublish", "weaponSync", "weaponActivate", "attackRadiusStuds", "weapon-attack-radius"]:
-    if required not in weapon_js_text:
-        err(f"asset manager weapon ui missing {required}")
-for required in ["attack_radius_studs", "ATTACK_RADIUS_DEFAULT", "attackRadiusStuds"]:
-    if required not in weapon_store_text:
-        err(f"weapon attack-radius storage contract missing {required}")
-if "attack_radius_studs real not null default 7" not in schema_text.lower():
-    err("weapon schema is missing attack_radius_studs")
-if "weaponSaveTestLoadout" in weapon_js_text:
-    err("obsolete asset-manager test loadout javascript is still present")
-
-for required in ["WeaponStore", "sync_weapon_to_studio", 'placement_mode="weapon-pivot"', '"/api/weapons"']:
-    if required not in host_agent_text:
-        err(f"host agent weapon api missing {required}")
-if '"/api/weapons/test-loadout"' in host_agent_text or "def set_test_loadout" in weapon_store_text or "TEST_LOADOUT_KEY" in weapon_store_text:
-    err("obsolete web/control-center test loadout path is still active")
-if 'placementMode ~= "weapon-pivot"' not in plugin_text or "placeWeaponModel" not in plugin_text:
-    err("studio bridge weapon-pivot placement is missing")
-for required in ["Game1WeaponGrip", "ensureWeaponGrip", "canonicalGripWorld", "referencePart.CFrame:ToObjectSpace"]:
-    if required not in plugin_text:
-        err(f"studio bridge canonical weapon grip is missing {required}")
-for runtime_name, runtime_text in [("client weapon attachment", weapon_attach_text), ("server weapon equip", weapon_equip_text)]:
-    for required in ["WEAPON_EQUIP_ROTATION", "CFrame.Angles(math.rad(-90), 0, 0)", "grip.WorldCFrame:Inverse()"]:
-        if required not in runtime_text:
-            err(f"{runtime_name} stable global -90deg X weapon basis missing {required}")
-    if "CFrame.new(grip.WorldPosition)" in runtime_text and runtime_name == "client weapon attachment":
-        err("client weapon attachment must not rebuild a position-only grip frame every render step")
-if "ensureCanonicalRuntimeGrip" not in weapon_equip_text or "weaponReferencePart" not in weapon_equip_text:
-    err("server weapon equip must rebuild one canonical runtime grip for every weapon")
-if "legacy-pivot" in weapon_equip_text or "weapon:PivotTo(socketFrame)" in weapon_equip_text:
-    err("weapon equip must not keep a legacy Model-pivot alignment path")
-if "weapon:PivotTo(socketFrame)" in weapon_attach_text:
-    err("client weapon attachment must not keep a legacy Model-pivot alignment path")
-for required in ['character:SetAttribute("AttackRadius"', "attackRadiusStuds", "AttackConfig.MaxAimDistance"]:
-    if required not in weapon_equip_text:
-        err(f"weapon equip attack-radius runtime missing {required}")
-for required in ['character:GetAttribute("AttackRadius")', "attackRange", "WeaponAttackVolume.Build"]:
-    if required not in attack_text:
-        err(f"server-authoritative weapon attack radius missing {required}")
+stats_config_text, stats_service_text, movement_config_text = check_weapon_registration(
+    ROOT, err, schema_text=schema_text, ui=ui, host_agent_text=host_agent_text,
+    plugin_text=plugin_text, rig_text=rig_text, character_service_text=character_service_text,
+    attack_text=attack_text, controller_runtime=controller_runtime,
+    attack_controller_text=attack_controller_text, client_init_text=client_init_text,
+)
 
 # m6.2 Studio-native Test Loadout (ported from the reference architecture)
 test_loadout_server_path = ROOT / "src/server/dev/TestLoadoutService.luau"
@@ -763,74 +293,10 @@ if "MovementDebugController.Start()" not in client_init_text:
 
 
 # m12 shared animation-speed scaling: gameplay stat -> playback percentage
-animation_scaling_manifest_path = ROOT / "assets/manifests/animation-speed-scaling.json"
-animation_scaling_runtime_path = ROOT / "src/shared/animation/AnimationSpeedScaling.luau"
-animation_scaling_registry_path = ROOT / "src/shared/animation/AnimationSpeedScalingRegistry.luau"
-animation_scaling_store_path = ROOT / "system/control-center/animation_speed_scaling_store.py"
-animation_scaling_js_path = ROOT / "system/control-center/static/animation-speed.js"
-if not animation_scaling_manifest_path.is_file():
-    err("animation speed scaling manifest is missing")
-    animation_scaling_manifest = {}
-else:
-    animation_scaling_manifest = json.loads(animation_scaling_manifest_path.read_text(encoding="utf-8"))
-if animation_scaling_manifest.get("schemaVersion") != 1 or animation_scaling_manifest.get("project") != "game1":
-    err("animation speed scaling manifest must be game1 schema 1")
-expected_scaling = {
-    ("humanoid", "all", "run"): "RunSpeed",
-    ("humanoid", "all", "walk"): "RunSpeed",
-    ("humanoid", "all", "attack"): "AttackSpeed",
-    ("humanoid", "all", "combat_idle"): "AttackSpeed",
-    ("monster", "gremlin", "run"): "RunSpeed",
-}
-actual_scaling = {}
-for profile in animation_scaling_manifest.get("profiles") or []:
-    for rule in profile.get("rules") or []:
-        key = (str(profile.get("targetType") or ""), str(profile.get("targetId") or ""), str(rule.get("channel") or ""))
-        actual_scaling[key] = (str(rule.get("stat") or ""), float(rule.get("unitsPerPercent") or 0))
-for key, expected_stat in expected_scaling.items():
-    actual = actual_scaling.get(key)
-    if not actual or actual[0] != expected_stat or actual[1] <= 0:
-        err(f"animation speed scaling rule mismatch for {key}: expected positive adjustable {expected_stat} ratio, got {actual}")
-animation_scaling_runtime = animation_scaling_runtime_path.read_text(encoding="utf-8") if animation_scaling_runtime_path.is_file() else ""
-animation_scaling_registry = animation_scaling_registry_path.read_text(encoding="utf-8") if animation_scaling_registry_path.is_file() else ""
-animation_scaling_store = animation_scaling_store_path.read_text(encoding="utf-8") if animation_scaling_store_path.is_file() else ""
-animation_scaling_js = animation_scaling_js_path.read_text(encoding="utf-8") if animation_scaling_js_path.is_file() else ""
-monster_assets_js_early = (ROOT / "system/control-center/static/monster-assets.js").read_text(encoding="utf-8")
-monster_animation_registry_early = (ROOT / "src/shared/monster/MonsterAnimationRegistry.luau").read_text(encoding="utf-8")
-for required in ["ResolveForModel", "ResolveDetailsForModel", "TargetForModel", "unitsPerPercent", "Formula.DetailsPercent", "DebugUnitsPerPercentAttribute", "authoredUnitsPerPercent", "debugUnitsPerPercent"]:
-    if required not in animation_scaling_runtime:
-        err(f"animation speed scaling runtime missing {required}")
-for owner, required in {
-    "AnimationScalingFormula.luau": ["value / unitsPerPercent", "Formula.RulePercent", "Formula.DetailsPercent"],
-    "AnimationScalingPolicy.luau": ["Registry.custom", 'return "monster"', 'return "humanoid", "all"'],
-    "AnimationScalingDebugOverrides.luau": ["Workspace:GetAttribute", "Overrides.ModelUnits", "Overrides.ClipRule"],
-}.items():
-    owner_path = ROOT / "src/shared/animation" / owner
-    owner_source = owner_path.read_text(encoding="utf-8") if owner_path.is_file() else ""
-    for fragment in required:
-        if fragment not in owner_source:
-            err(f"animation scaling component {owner} missing {fragment}")
-if "DebugOverrideAttribute" in animation_scaling_runtime or "MovementDebugAnimationSpeedPercentOverride" in animation_scaling_runtime:
-    err("animation speed scaling must not support an absolute playback-percent debug override")
-for required in ['["humanoid"]', '["all"]', 'unitsPerPercent = 2.0', '["gremlin"]', 'unitsPerPercent = 0.6']:
-    if required not in animation_scaling_registry:
-        err(f"generated animation speed scaling registry missing {required}")
-for required in ["AnimationSpeedScalingStore", "unitsPerPercent", "AnimationSpeedScalingRegistry.luau"]:
-    if required not in animation_scaling_store:
-        err(f"animation speed scaling Asset Manager store missing {required}")
-for required in ["animation speed", "units per 1%", "/api/animation-speed-scaling"]:
-    if required not in (ui + animation_scaling_js + host_agent_text).lower():
-        err(f"animation speed scaling Asset Manager UI/API missing {required}")
-if "data-speed" in character_js_text or "data-speed" in monster_assets_js_early:
-    err("per-animation playback Speed % controls must be removed from Asset Manager clip tables")
-if "/api/animation-bindings/" in host_agent_text and 'endswith("/speed")' in host_agent_text:
-    err("character animation binding speed endpoint must be removed")
-if 'monster_binding_prefix) and path.endswith("/speed")' in host_agent_text:
-    err("monster animation binding speed endpoint must be removed")
-if "playbackSpeedPercent" in animation_registry_text or "playbackSpeedPercent" in monster_animation_registry_early:
-    err("runtime animation registries must not carry per-clip playback speed")
-if "(speedStat /" in attack_timeline_text or "DefaultAttackSpeed" in attack_timeline_text:
-    err("attack timeline must consume final stat-scaled playback percent without multiplying AttackSpeed twice")
+check_animation_scaling(
+    ROOT, err, ui=ui, host_agent_text=host_agent_text, character_js_text=character_js_text,
+    animation_registry_text=animation_registry_text, attack_timeline_text=attack_timeline_text,
+)
 
 
 monster_sources = check_monster_contracts(
@@ -977,141 +443,14 @@ for manifest_name in ["character-animations.json", "monster-animations.json"]:
         if clip_id and f'["{clip_id}"]' not in attack_timeline_data_text:
             err(f"registered attack clip has no authoritative timeline: {clip_id}")
 
-# m13+ starting stats.
-character_manifest = json.loads((ROOT / "assets/manifests/character-archetypes.json").read_text(encoding="utf-8"))
-character_options = character_manifest.get("archetypes") or []
-for row in character_options:
-    stats = row.get("stats") or {}
-    for key in ["Level", "MaxHP", "Damage", "Defense", "AttackSpeed", "RunSpeed", "CritChance"]:
-        if key not in stats:
-            err(f"character archetype starting stat missing {key}: {row.get('id')}")
-character_store_m13 = (ROOT / "system/control-center/character_store.py").read_text(encoding="utf-8")
-for required in ["character_stats", "set_stats", "defaultStats", '"stats": row.get("stats")']:
-    if required not in character_store_m13:
-        err(f"character starting-stat Asset Manager contract missing {required}")
-for required in ["row.stats", 'value("RunSpeed")', 'value("AttackSpeed")']:
-    if required not in (stats_service_text + character_service_text):
-        err(f"character runtime starting-stat contract missing {required}")
+check_character_starting_stats(ROOT, err, character_service_text=character_service_text, stats_service_text=stats_service_text)
 
-# m18 manual animation reimport verification lives in Asset Manager and mirrors
-# RobloxLineage: scan detects local SHA changes, Studio reimport remains manual,
-# then Open Cloud asset versions confirm a newer Approved version of the same id.
-fingerprint_path = ROOT / "system/control-center/animation_fingerprint.py"
-if fingerprint_path.exists():
-    err("Studio content fingerprint checker must be removed; reimport confirmation is Open Cloud version based")
-studio_plugin_text = (ROOT / "system/studio-plugin/Game1Bridge.server.luau").read_text(encoding="utf-8")
-# M101: Timeline source is packaged as independently testable Studio modules.
-studio_plugin_text += "\n" + "\n".join(
-    (ROOT / "system/studio-plugin/modules" / (name + ".luau")).read_text(encoding="utf-8")
-    for name in (
-        "StudioTimelineEditorCommands", "StudioTimelineWidget", "StudioTimelinePreview",
-        "StudioTimelinePoseSampler", "StudioTimelineTransport",
-    )
+studio_plugin_text = check_manual_animation_reimport(
+    ROOT, err, animation_store_text=animation_store_text,
+    character_js_text=character_js_text, host_agent_text=host_agent_text,
 )
-generated_plugin_text = (ROOT / "generated/Game1Bridge.rbxmx").read_text(encoding="utf-8") if (ROOT / "generated/Game1Bridge.rbxmx").is_file() else ""
-for forbidden in ["Game1CheckAnimations", "Check Animations", "Game1CheckRobloxAssetsAnimations", "KeyframeSequenceProvider", "fingerprintKeyframeSequence", "/api/studio/animation-check"]:
-    if forbidden in studio_plugin_text or forbidden in generated_plugin_text:
-        err(f"Studio animation-check plugin UI/code must be removed: {forbidden}")
-opencloud_text = (ROOT / "system/control-center/opencloud_assets.py").read_text(encoding="utf-8")
-reimport_check_text = (ROOT / "system/control-center/animation_reimport_check.py").read_text(encoding="utf-8")
-character_publication_text = (ROOT / "system/control-center/animation_core/publication.py").read_text(encoding="utf-8")
-monster_store_text_m18 = (ROOT / "system/control-center/monster_animation_store.py").read_text(encoding="utf-8")
-for required in ["ASSET_VERSIONS_URL_TEMPLATE", "def list_asset_versions", "assetVersions"]:
-    if required not in opencloud_text:
-        err(f"Open Cloud animation-version query missing {required}")
-for required in ["find_confirmed_manual_reimport", "createTime", "published", "Approved", "creationContext", "known_version_ids"]:
-    if required not in reimport_check_text:
-        err(f"manual animation reimport confirmation missing {required}")
-for required in ["content_updated_at", "asset_version_id", "manual_verified", "check_manual_reimports", "roblox/manual-version-confirmation"]:
-    if required not in character_publication_text + animation_store_text + monster_store_text_m18:
-        err(f"manual animation publication history missing {required}")
-for required in ["/api/animations/check-roblox-assets", "check_manual_reimports"]:
-    if required not in host_agent_text:
-        err(f"Asset Manager Roblox animation check API missing {required}")
-for required in ["Check Roblox Assets Animations", "/api/animations/check-roblox-assets", "checkRobloxAnimationAssets"]:
-    if required not in character_js_text + (ROOT / "system/control-center/static/index.html").read_text(encoding="utf-8"):
-        err(f"Asset Manager animation reimport UI missing {required}")
-if "state.data.activeArchetypeId" not in character_js_text or "autoSelected=true" not in character_js_text:
-    err("character Asset Manager must auto-select the active/first archetype so starting stats can be saved")
 
-# m22 weapon gameplay types + adjustable moving-attack locomotion + Test Loadout radius.
-weapon_manifest_path = ROOT / "assets/manifests/weapons.json"
-weapon_manifest_m22 = json.loads(weapon_manifest_path.read_text(encoding="utf-8")) if weapon_manifest_path.is_file() else {}
-weapon_types_m22 = ((weapon_manifest_m22.get("options") or {}).get("weaponTypes") or [])
-if weapon_types_m22 != ["dagger", "sword", "bigsword", "bow"]:
-    err(f"canonical weapon types are wrong: {weapon_types_m22}")
-attack_movement_rows = {str(row.get("weaponType") or ""): row for row in weapon_manifest_m22.get("attackMovement") or []}
-for weapon_type in ["dagger", "sword", "bigsword", "bow"]:
-    row = attack_movement_rows.get(weapon_type)
-    if not row:
-        err(f"weapon attack movement rule missing: {weapon_type}")
-        continue
-    if str(row.get("locomotionMode") or "") not in {"Run", "Walk"}:
-        err(f"weapon attack locomotion mode invalid: {weapon_type}")
-    multiplier = float(row.get("runSpeedMultiplier") or -1)
-    if multiplier < 0 or multiplier > 2:
-        err(f"weapon attack RunSpeed multiplier invalid: {weapon_type}")
-if attack_movement_rows.get("dagger", {}).get("runSpeedMultiplier") != 1.0:
-    err("dagger default moving attack must start at 100% RunSpeed")
-if attack_movement_rows.get("sword", {}).get("runSpeedMultiplier") != 1.0:
-    err("sword default moving attack must start at 100% RunSpeed")
-if attack_movement_rows.get("bigsword", {}).get("runSpeedMultiplier") != 0.75:
-    err("bigsword default moving attack must start at 75% RunSpeed")
-if attack_movement_rows.get("bow", {}).get("runSpeedMultiplier") != 0.75:
-    err("bow default moving attack must start at 75% RunSpeed")
-
-weapon_store_m22 = (ROOT / "system/control-center/weapon_store.py").read_text(encoding="utf-8")
-weapon_js_m22 = (ROOT / "system/control-center/static/weapon-assets.js").read_text(encoding="utf-8")
-weapon_host_m22 = host_agent_text
-for required in ["weapon_attack_movement", "update_attack_movement", "dagger", "sword", "bigsword", "bow"]:
-    if required not in weapon_store_m22:
-        err(f"Asset Manager weapon type/attack movement storage missing {required}")
-for required in ["weaponRenderAttackMovement", "movement · % RunSpeed", "data-mode", "data-percent"]:
-    if required not in weapon_js_m22:
-        err(f"Asset Manager weapon attack movement UI missing {required}")
-if "/api/weapons/attack-movement" not in weapon_host_m22:
-    err("Asset Manager weapon attack movement API missing")
-
-weapon_attack_movement_path = ROOT / "src/shared/weapon/WeaponAttackMovement.luau"
-weapon_attack_movement_text = weapon_attack_movement_path.read_text(encoding="utf-8") if weapon_attack_movement_path.is_file() else ""
-weapon_equip_m22 = (ROOT / "src/server/weapon/WeaponEquipService.luau").read_text(encoding="utf-8")
-movement_m22 = (ROOT / "src/client/character/MovementController.luau").read_text(encoding="utf-8")
-attack_controller_m22 = (ROOT / "src/client/combat/AttackController.luau").read_text(encoding="utf-8")
-animation_controller_m22 = (ROOT / "src/client/character/animation/CharacterAnimationController.luau").read_text(encoding="utf-8")
-movement_config_m22 = (ROOT / "src/shared/character/CharacterMovementConfig.luau").read_text(encoding="utf-8")
-animation_scaling_m22 = (ROOT / "src/shared/animation/AnimationSpeedScaling.luau").read_text(encoding="utf-8")
-for required in ["attackMovementByType", "runSpeedMultiplier", "locomotionMode", "animationSet"]:
-    if required not in weapon_attack_movement_text + (ROOT / "src/shared/weapon/WeaponRegistry.luau").read_text(encoding="utf-8"):
-        err(f"runtime weapon attack movement registry missing {required}")
-for required in ["AttackMovementLocomotionMode", "AttackMovementRunSpeedMultiplier", "WeaponAttackMovement.Resolve"]:
-    if required not in weapon_equip_m22:
-        err(f"weapon equip attack movement attributes missing {required}")
-for required in ["BeginAttackMovement", "EndAttackMovement", "RobloxSpeedAtRunMultiplier", "AttackMovementActive"]:
-    if required not in movement_m22:
-        err(f"moving attack runtime control missing {required}")
-if "movementController.LockMovement(attackDuration)" in attack_controller_m22:
-    err("attacks must not hard-lock player movement")
-for required in ["BeginAttackMovement", "movingAtAttackStart", "EndAttackMovement"]:
-    if required not in attack_controller_m22:
-        err(f"attack controller moving-attack contract missing {required}")
-for required in ["AttackMovementLocomotionMode", "combat_idle", "EquivalentRunSpeedForLocomotion", "ResolveForAnimation", "AnimationAttackLowerBodySlot"]:
-    if required not in animation_controller_m22:
-        err(f"live lower-body attack locomotion missing {required}")
-for required in ["RobloxSpeedAtRunMultiplier", "EquivalentRunSpeedForLocomotion"]:
-    if required not in movement_config_m22:
-        err(f"attack movement conversion missing {required}")
-if "ResolveForModelWithStatValue" not in animation_scaling_m22:
-    err("animation scaling cannot resolve attack locomotion cadence from actual movement speed")
-
-test_loadout_server_m22 = (ROOT / "src/server/dev/TestLoadoutService.luau").read_text(encoding="utf-8")
-test_loadout_client_m22 = (ROOT / "src/client/dev/TestLoadoutController.luau").read_text(encoding="utf-8")
-for required in ["SetTestAttackRadius", "Game1TestAttackRadiusOverride", "setTestAttackRadius"]:
-    if required not in test_loadout_server_m22:
-        err(f"Test Loadout attack radius runtime control missing {required}")
-for required in ["SetTestAttackRadius", "Test attack radius · studs", "radiusBox", "RESET"]:
-    if required not in test_loadout_client_m22:
-        err(f"Test Loadout attack radius UI missing {required}")
-
+check_weapon_attack_movement(ROOT, err, host_agent_text=host_agent_text)
 
 check_actor_runtime_contracts(
     ROOT, err, monster_attributes_text=monster_sources.attributes_text,

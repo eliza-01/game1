@@ -9,6 +9,8 @@ import json
 from pathlib import Path
 from typing import Callable
 
+from validators.path_display import project_relative_path
+
 
 def check_source_only_contract(
     root: Path,
@@ -115,7 +117,7 @@ def check_source_only_contract(
     ]:
         active_text = active_store.read_text(encoding="utf-8")
         if 'self.root / "assets/prepared' in active_text or 'self.root / "assets" / "prepared"' in active_text:
-            report_error(f"m53 active store can still create assets/prepared: {active_store.relative_to(root)}")
+            report_error(f"m53 active store can still create assets/prepared: {project_relative_path(active_store, root)}")
 
     if "<b>prepared</b>" in character_js_text or "source/prepared copies" in ui_html:
         report_error("m53 Asset Manager still exposes the removed Source/Prepared dual-storage UI")

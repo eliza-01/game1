@@ -1,45 +1,25 @@
 # game1
 
-Новый независимый Roblox-проект. Он использует инженерные принципы RobloxLineage, но **не его Place, базы данных или игровую предметную модель**.
+Независимый Roblox-проект (основа MMO) с custom characters, server-authoritative combat, Monster/NPC, Asset Manager, системой локаций/декора, Real Estate и Studio Bridge. **Не использует Place и базы RobloxLineage.**
 
-## Важно перед запуском
+## С чего начать
 
-Распакуй проект в отдельную sibling-директорию, например:
+1. **[Документация — полный индекс](docs/README Read First!.md)**: действующие документы, спецификации и исторические отчёты по доменам.
+2. **[Актуальное ТЗ](docs/spec/CURRENT_PROJECT_SPEC_RU.md)**: текущие механики, ограничения, дальнейшие требования и DoD.
+3. **[Действующая архитектура](docs/architecture/CURRENT_ARCHITECTURE_RU.md)** и **[остаток рефакторинга](docs/architecture/REFACTOR_ROADMAP_RU.md)**.
+4. **[Процесс и проверки](docs/workflows/DEVELOPMENT_AND_VALIDATION_RU.md)** и [AGENTS.md](AGENTS.md) — правила изменений.
 
-```text
-E:\RobloxProjects\RobloxLineage
-E:\RobloxProjects\game1
-```
+Исторический [Milestone 1 spec](docs/history/milestone-1/PROJECT_SPEC_MILESTONE_1_RU.md) описывает **первоначальный старт**, когда существовал только Characters; он больше не описывает текущий набор систем. Отчёты M85–M105 показывают выполненную часть декомпозиции, а не задачу повторно её выполнить.
 
-**Не распаковывай game1 поверх RobloxLineage и не запускай его из папки RobloxLineage.** `bootstrap.ps1` специально откажется работать из такого пути.
+## Локальная установка и запуск (Windows)
 
-`game1` никогда не использует `place/current.rbxl`. Канонический файл нового проекта:
-
-```text
-place\game1.rbxl
-```
-
-Первичная сборка создаёт минимальную сцену (Baseplate + SpawnLocation) и runtime. После этого Workspace редактируется и сохраняется в Studio: live Rojo синхронизирует код, но не владеет объектами сцены и не возвращает их позиции назад.
-
-## Первый запуск
-
-Из корня `game1`:
+Хранить проект отдельно, например `E:\RobloxProjects\game1`, **не** внутри/поверх `RobloxLineage`.
 
 ```powershell
 .\bootstrap.ps1
 ```
 
-После успешной сборки:
-
-1. Открой **`place\game1.rbxl`** в Roblox Studio.
-2. В Rojo plugin подключись к `127.0.0.1:34882`.
-3. В отдельном PowerShell из корня `game1` запусти:
-
-```powershell
-.\sync.ps1
-```
-
-## Основные команды
+Канонический Place: `place\game1.rbxl`. Открой его в Roblox Studio и подключи Rojo plugin к `127.0.0.1:34882`; при необходимости запусти `./sync.ps1` из корня.
 
 ```powershell
 rokit install
@@ -50,11 +30,23 @@ rokit install
 .\sync.ps1
 ```
 
-- Control Center: `http://127.0.0.1:43820`
-- Host agent: `127.0.0.1:43821`
-- Rojo: `127.0.0.1:34882`
-- Reserved Studio bridge: `127.0.0.1:43137`
+| Локальный сервис | Default address |
+| --- | --- |
+| Control Center | `http://127.0.0.1:43820` |
+| Host Agent | `127.0.0.1:43821` |
+| Rojo | `127.0.0.1:34882` |
+| Studio Bridge reserved | `127.0.0.1:43137` |
 
-Character DB стартует пустой. Roblox Model asset `99674249877653` используется только как временный bootstrap visual, пока в новом Asset Manager не зарегистрирован первый character archetype.
+Значения — базовые настройки проекта, реальные environment overrides проверять на машине пользователя. Сцена остаётся Studio-authored; live Rojo синхронизирует код, не должен перезаписывать позиции объектов Workspace.
 
-Gameplay baseline: Level 1, HP 100, Damage 10, Defense 0. Формула урона: `max(0, Damage - Defense)`.
+## Проверка изменений
+
+```powershell
+python system/verify/verify.py
+python -W error::ResourceWarning -m unittest discover -s system/verify -p 'test_*.py' -q
+python system/studio-plugin/validate_luau.py
+```
+
+Runtime behaviour Roblox Studio, публикация через Open Cloud и источники Blender проверяются **отдельно**. Успех Python-тестов не означает проверенный Play session.
+
+**Документальный срез:** 30 октября 2026, `game1_diag_2026-10-30_13-52-46.zip` (после M162); реальные Studio состояния за пределами этого дампа не удостоверены.

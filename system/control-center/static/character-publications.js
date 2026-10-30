@@ -17,7 +17,13 @@
     all.checked=!!available.length&&available.every(row=>selected.has(key(row)));
     all.indeterminate=!!selected.size&&!all.checked;
     el('publish-all').disabled=uiBusy||active()||!selected.size||!catalog?.publication?.configured;
-    el('publish-count').textContent=selected.size+' selected';
+    el('publish-count').textContent=selected.size+' выбрано';
+    const remaining=active()?job.items.filter(item=>!['succeeded','skipped','failed','interrupted'].includes(item.status)).length:0;
+    const queued=active()?remaining:selected.size;
+    const queueButton=el('publication-open');
+    queueButton.classList.toggle('cp-queue-alert',queued>0);
+    queueButton.textContent=queued?`Queue · ${queued}`:'Queue';
+    queueButton.setAttribute('aria-label',queued?`Очередь публикации: ${queued} компонентов`:'Очередь публикации');
     for(const checkbox of document.querySelectorAll('[data-cp-publish-select]')){
       const row=rows().find(r=>key(r)===checkbox.dataset.cpPublishSelect);
       checkbox.disabled=uiBusy||active()||!row||!eligible(row);checkbox.checked=selected.has(checkbox.dataset.cpPublishSelect);
@@ -26,7 +32,8 @@
       const row=rows().find(r=>key(r)===button.dataset.cpPublishButton);
       button.disabled=uiBusy||active()||!row||!eligible(row)||!catalog?.publication?.configured;
     }
-    el('publication-open').hidden=!job;
+    // The queue remains discoverable before the first upload and after completion.
+    if(el('publication-dialog').open&&!active()&&selected.size)renderSelectionPreview();
   }
   function selectionCell(row){
     const td=document.createElement('td');td.className='cp-publish-selection';
@@ -41,6 +48,20 @@
     b.type='button';b.dataset.cpPublishButton=key(row);
     b.disabled=uiBusy||active()||!eligible(row)||!catalog?.publication?.configured;
     b.onclick=()=>start([row]);return b;
+  }
+  function renderSelectionPreview(){
+    const host=el('publication-rows');host.replaceChildren();
+    const queued=rows().filter(row=>selected.has(key(row))&&eligible(row));
+    el('publication-progress').max=Math.max(1,queued.length);
+    el('publication-progress').value=0;
+    el('publication-summary').textContent=queued.length
+      ? `Выбрано для публикации: ${queued.length}. Нажмите «Publish selected» в таблице для запуска.`
+      : 'Очередь пуста. Выберите части в таблице.';
+    for(const row of queued){
+      const tr=document.createElement('tr');
+      tr.append(make('td',row.id),make('td','выбрано'),make('td','Ожидает запуска'),make('td',row.model_asset_id||'—'));
+      host.append(tr);
+    }
   }
   function renderJob(){
     const host=el('publication-rows');host.replaceChildren();if(!job)return;
@@ -61,6 +82,9 @@
       toastAnchor=document.createComment('publication-toast-home');notice.before(toastAnchor);dlg.append(notice);
     }
     if(!dlg.open)dlg.showModal();
+    if(!active()&&selected.size)renderSelectionPreview();
+    else if(job)renderJob();
+    else renderSelectionPreview();
   }
   function notify(){
     if(!job||active())return;

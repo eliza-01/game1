@@ -36,10 +36,12 @@ class CharacterModularUiTests(unittest.TestCase):
         markup = Markup()
         markup.feed(self.html)
         self.assertEqual(len(markup.ids), len(set(markup.ids)))
+        # M177 removes the redundant four-step navigation, not the section anchors.
+        self.assertNotIn('class="character-flow-nav"', self.html)
         for anchor in ('character-components-panel', 'cp-publication-step',
                        'character-assemblies-panel', 'ca-rows'):
-            self.assertIn(anchor, markup.anchors)
             self.assertIn(anchor, markup.ids)
+            self.assertNotIn(anchor, markup.anchors)
 
     def test_legacy_publication_is_separate_and_not_migrated_by_ui(self):
         self.assertIn('class="cp-legacy"', self.html)
@@ -66,7 +68,9 @@ class CharacterModularUiTests(unittest.TestCase):
         self.assertIn("plan.new_sets", self.components)
         self.assertIn("plan.conflicts", self.components)
         self.assertIn('Publish selected', self.html)
-        self.assertIn('Published revisions remain assigned during replacement', self.components)
+        self.assertIn('window.game1CharacterComponentSummary.render(catalog)', self.components)
+        summary = (STATIC / 'character-component-summary.js').read_text(encoding='utf8')
+        self.assertIn('Старые Model ID сохраняются до успешной замены.', summary)
         self.assertIn('No Roblox Model Asset was uploaded', self.components)
 
 

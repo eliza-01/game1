@@ -63,13 +63,7 @@
       else actions.append(window.game1CharacterPublications.button(row));
       tr.append(actions);host.append(tr);
     }
-    const rows=catalog.items||[];
-    el('sets').textContent=(catalog.sets||[]).length?'Registered clothing sets: '+catalog.sets.join(', '):'No clothing sets yet. A part named <set>_upper/lower/gloves/boots automatically registers its set.';
-    const rigs=rows.filter(row=>row.kind==='rig').length;
-    const published=rows.filter(row=>row.published_revision===row.revision&&row.model_asset_id).length;
-    const awaiting=rows.filter(row=>row.published_revision!==row.revision).length;
-    el('counts').textContent=`${rigs} rig(s) · ${rows.length-rigs} reusable part(s)`;
-    el('flow-summary').textContent=`${(catalog.sets||[]).length} set(s) · ${published}/${rows.length} current Model Assets · ${awaiting} component(s) awaiting publication. Published revisions remain assigned during replacement. Select only the changes you want to upload.`;
+    window.game1CharacterComponentSummary.render(catalog);
   }
   function preview(){
     const host=el('preview');host.replaceChildren();

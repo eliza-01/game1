@@ -7,7 +7,7 @@
 <title>game1 · asset manager</title>
 <link rel="stylesheet" href="asset-manager.css?v=11">
 <link rel="stylesheet" href="location-assets.css?v=1">
-<link rel="stylesheet" href="character-components.css?v=4">
+<link rel="stylesheet" href="character-components.css?v=5">
 <link rel="stylesheet" href="character-assemblies.css?v=4">
 <link rel="stylesheet" href="deco-assets.css?v=5">
 <link rel="stylesheet" href="real-estate.css?v=12">
@@ -74,22 +74,16 @@
 <section class="content">
 <div id="characters-view">
 <div class="panel hero">
-<div><span class="eyebrow">modular characters · v1 / parallel legacy compatibility</span><h2>characters</h2><p>Register reusable parts, publish only changed meshes, then assemble the default appearance. Existing whole-model characters remain intact until an explicit migration.</p></div>
+<div><span class="eyebrow">modular characters · v1 / parallel legacy compatibility</span><h2>characters</h2></div>
 <div class="metrics"><div><b id="metric-total">0</b><span>whole-model registered</span></div><div><b id="metric-published">0</b><span>whole-model published</span></div><div><b id="metric-active">0</b><span>whole-model startup</span></div></div>
 </div>
-<nav class="character-flow-nav" aria-label="Modular character workflow">
-<a href="#character-components-panel"><b>01</b><span>Inspect &amp; register parts</span></a>
-<a href="#cp-publication-step"><b>02</b><span>Publish Model IDs</span></a>
-<a href="#character-assemblies-panel"><b>03</b><span>Build a character</span></a>
-<a href="#ca-rows"><b>04</b><span>Set as Startup</span></a>
-</nav>
 <div class="panel" id="character-components-panel">
-<span class="eyebrow">01 · register a shared rig and reusable parts</span><h3>Rig &amp; parts</h3><small id="cp-counts" class="hint"></small>
-<p>Inspect the FBX first: registration creates each named part and any new clothing set, but does not publish. Parts from different sets can be mixed in a character recipe. The same rig is shared across compatible characters.</p>
-<div id="cp-flow-summary" class="character-flow-note" role="status" aria-live="polite">Reading component catalog…</div>
-<details><summary>Mesh naming standard</summary><p><code>&lt;set&gt;_upper</code> · <code>&lt;set&gt;_lower</code> · <code>&lt;set&gt;_gloves</code> · <code>&lt;set&gt;_boots</code><br><code>head_01_male</code> / <code>head_01_female</code><br><code>hair_01_male</code> / <code>hair_01_female</code> / <code>hair_01_common</code><br><code>eyes_01</code> · <code>eyebrows_01</code> · <code>eyes_01_spiral</code> (effect)<br>Main rig: <code>human_armature</code>. Hair may carry its own <code>hair_01_common_armature</code>.</p></details>
+<span class="eyebrow">01 · register a shared rig and reusable parts</span><h3>Rig &amp; parts</h3>
+<div id="cp-counts" class="cp-metrics" aria-label="Статистика компонентов"></div>
+<div id="cp-flow-summary" class="cp-guidance" role="status" aria-live="polite">Загрузка компонентов…</div>
+<details open><summary>Mesh naming standard</summary><p><code>&lt;set&gt;_upper</code> · <code>&lt;set&gt;_lower</code> · <code>&lt;set&gt;_gloves</code> · <code>&lt;set&gt;_boots</code><br><code>head_01_male</code> / <code>head_01_female</code><br><code>hair_01_male</code> / <code>hair_01_female</code> / <code>hair_01_common</code><br><code>eyes_01</code> · <code>eyebrows_01</code> · <code>eyes_01_spiral</code> (effect)<br>Main rig: <code>human_armature</code>. Hair may carry its own <code>hair_01_common_armature</code>.</p></details>
 <div class="cp-toolbar"><button id="cp-choose" class="primary" type="button">Choose FBX · inspect</button><button id="cp-register" type="button" disabled>Register detected rig &amp; parts</button><button id="cp-refresh" type="button">Refresh</button></div>
-<small id="cp-source" class="hint">No FBX selected.</small><div id="cp-status" role="status" aria-live="polite"></div><div id="cp-preview" class="character-inspection-preview" aria-live="polite"></div><p id="cp-sets" class="hint"></p><div class="cp-toolbar" id="cp-publication-step"><strong class="character-phase-label">02 · publish registered components</strong><span id="cp-publish-count">0 selected</span><button id="cp-publication-open" type="button" hidden>Show publication queue</button></div>
+<small id="cp-source" class="hint">No FBX selected.</small><div id="cp-status" role="status" aria-live="polite"></div><div id="cp-preview" class="character-inspection-preview" aria-live="polite"></div><p id="cp-sets" class="hint"></p><div class="cp-toolbar" id="cp-publication-step"><strong class="character-phase-label">02 · Публикация компонентов</strong><span id="cp-publish-count">0 выбрано</span><button id="cp-publication-open" class="cp-queue-button" type="button">Queue</button></div>
 <div class="table-wrap"><table id="cp-table"><thead><tr><th aria-label="health"></th><th><button class="cp-sort" type="button" data-cp-sort="id">name</button></th><th><button class="cp-sort" type="button" data-cp-sort="slot">part</button></th><th><button class="cp-sort" type="button" data-cp-sort="set_id">set</button></th><th>rig</th><th>status</th><th>Model Asset ID</th><th>shared atlas</th><th class="cp-publish-selection"><input id="cp-publish-select-all" type="checkbox" aria-label="Select all unpublished components"></th><th class="cp-publication-column"><span>publication</span><button id="cp-publish-all" type="button" disabled>Publish selected</button></th></tr></thead><tbody id="cp-rows"></tbody></table></div>
 <section class="cp-atlas-section" aria-label="Character shared atlases">
 <div class="cp-toolbar"><button id="cp-atlas-naming-guide" class="character-help" type="button" aria-label="Правила именования атласов персонажей" data-character-atlas-guide data-character-tip="АТЛАСЫ ПЕРСОНАЖЕЙ&#10;Формат: &lt;имя&gt;_&lt;ширина&gt;x&lt;высота&gt;_atlas.png (также JPG/JPEG).&#10;Только a–z, 0–9 и _. Размер в имени должен совпадать с изображением.&#10;Сет fullplate imperial → fullplate_imperial.&#10;Верх: fullplate_imperial_upper_2048x2048_atlas.png&#10;Низ: fullplate_imperial_lower_2048x2048_atlas.png&#10;Перчатки: fullplate_imperial_gloves_2048x2048_atlas.png&#10;Ботинки: fullplate_imperial_boots_2048x2048_atlas.png&#10;Общий сет: fullplate_imperial_2048x2048_atlas.png&#10;Голова: head_01_male_1024x1024_atlas.png / head_01_female_1024x1024_atlas.png&#10;Волосы: hair_01_male_1024x1024_atlas.png / hair_01_female_1024x1024_atlas.png / hair_01_common_1024x1024_atlas.png&#10;Глаза: eyes_01_512x512_atlas.png / eyes_01_spiral_512x512_atlas.png (эффект)&#10;Брови: eyebrows_01_512x512_atlas.png&#10;Один атлас можно назначить нескольким частям. Замена требует подтверждения и создаёт новый Image ID.">?</button><button id="cp-atlas-register" class="primary" type="button">Register Atlas</button><span class="hint">Character atlases only · separate Image Assets</span></div>
@@ -114,7 +108,7 @@
 <div id="ca-parts" class="ca-parts-grid"></div>
 <div id="ca-mix" class="character-flow-note ca-outfit-state" aria-live="polite"></div>
 <div id="ca-readiness" class="character-flow-note ca-readiness-state" aria-live="polite"></div>
-<details class="ca-stats"><summary>Starting stats</summary><div id="ca-stats" class="ca-grid"></div></details>
+<details class="ca-stats" open><summary>Starting stats</summary><div id="ca-stats" class="ca-grid"></div></details>
 <div class="actions ca-editor-actions"><button id="ca-save" type="button" disabled>Save recipe &amp; starting stats</button><button id="ca-reset" class="character-reset" type="button">Reset edits</button><button type="button" class="character-help" aria-label="О сохранении и Startup" data-character-tip="Save сохраняет рецепт и стартовые характеристики в проект. Studio получает реестр через Rojo. Для Startup нужны опубликованные части; изменения проверяются при новом Play.">?</button></div>
 <div id="ca-status" role="status" aria-live="polite"></div>
 </section>
@@ -596,8 +590,9 @@
 <script src="publication-descriptions.js?v=1"></script>
 <script src="character-assets.js?v=20"></script>
 <script src="character-workflow.js?v=2"></script>
-<script src="character-publications.js?v=1"></script>
-<script src="character-components.js?v=4"></script>
+<script src="character-publications.js?v=2"></script>
+<script src="character-component-summary.js?v=1"></script>
+<script src="character-components.js?v=5"></script>
 <script src="character-atlas-ui.js?v=1"></script>
 <script src="character-assemblies.js?v=4"></script>
 <script src="animation-speed.js?v=3"></script>

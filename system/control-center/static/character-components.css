@@ -24,10 +24,6 @@
 .cp-publication-failed,.cp-publication-interrupted{color:#ef8a86}
 .cp-publication-succeeded,.cp-publication-skipped{color:#73d4b1}
 /* M173: modular character workflow. No styling changes outside Characters. */
-.character-flow-nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:16px 0 20px}
-.character-flow-nav a{display:flex;align-items:center;gap:10px;padding:13px 15px;border:1px solid var(--line);border-radius:12px;background:var(--panel);text-decoration:none;color:var(--text);font-size:12px}
-.character-flow-nav a:hover,.character-flow-nav a:focus-visible{border-color:var(--mint);outline:none}
-.character-flow-nav b{display:grid;place-items:center;flex:none;width:27px;height:27px;border-radius:9px;background:#42d6b122;color:var(--mint)}
 .character-flow-note{padding:11px 13px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);color:var(--muted);font-size:12px;line-height:1.55;overflow-wrap:anywhere;margin:12px 0}
 .character-flow-note strong{color:var(--text)}
 .character-phase-label{color:var(--mint);font-size:12px;letter-spacing:.045em}
@@ -37,8 +33,6 @@
 .character-inspection-preview .character-preview-row:last-child{border-bottom:0}
 .character-preview-row span{color:var(--muted)}
 .character-preview-warning{color:var(--orange)}
-@media(max-width:850px){.character-flow-nav{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:520px){.character-flow-nav{grid-template-columns:1fr}}
 
 #character-rail .character-rail-group{display:block;padding:12px 8px 6px;color:var(--mint);font-size:10px;letter-spacing:.08em;text-transform:uppercase}
 #characters-view #character-components-panel,#characters-view #character-assemblies-panel{scroll-margin-top:100px}
@@ -69,3 +63,21 @@
 
 /* M175: readable, keyboard-accessible atlas name guide. */
 #character-tooltip.character-tooltip-atlas{white-space:pre-line;width:min(540px,calc(100vw - 24px));font-size:11px;line-height:1.43;max-height:calc(100vh - 24px);overflow:hidden}
+
+/* M177 · compact live publication health, always accessible queue. */
+#character-components-panel .cp-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:9px;margin:16px 0 10px}
+#character-components-panel .cp-metric{display:grid;gap:4px;padding:12px 14px;border:1px solid var(--line);border-radius:11px;background:var(--panel2);min-width:0}
+#character-components-panel .cp-metric strong{font-size:20px;line-height:1.2;color:var(--text);font-variant-numeric:tabular-nums}
+#character-components-panel .cp-metric span{font-size:11px;color:var(--muted)}
+#character-components-panel .cp-metric.cp-metric-good strong{color:#60d5a2}
+#character-components-panel .cp-metric.cp-metric-alert strong{color:#ffae61}
+#character-components-panel .cp-guidance{display:grid;gap:8px;margin:10px 0 16px}
+#character-components-panel .cp-advice,#character-components-panel .cp-summary-warning,#character-components-panel .cp-summary-ready{margin:0;padding:10px 13px;border-radius:9px;font-size:12px;line-height:1.5}
+#character-components-panel .cp-advice{background:#38b9cf10;border:1px solid #4cbdcb50;color:var(--text)}
+#character-components-panel .cp-summary-warning{background:#ff9f4312;border:1px solid #ffae6188;color:#ffd29d}
+#character-components-panel .cp-summary-ready{background:#42d6b10b;border:1px solid #42d6b166;color:#a9ebcd}
+#character-components-panel .cp-queue-button{border:1px solid #3cbfbd;background:transparent;color:#7de4de;border-radius:9px;font-weight:750;min-width:83px}
+#character-components-panel .cp-queue-button:hover,#character-components-panel .cp-queue-button:focus-visible{border-color:#8cf3e7;color:#c1fff7}
+#character-components-panel .cp-queue-button.cp-queue-alert{border-color:#ee6363;color:#ffe0e0;background:#a8343418;animation:cp-queue-pulse 1.35s ease-in-out infinite}
+@keyframes cp-queue-pulse{0%,100%{border-color:#ee6363;box-shadow:0 0 0 0 #ed55552b}50%{border-color:#ffaaaa;box-shadow:0 0 0 4px #ed555525}}
+@media(prefers-reduced-motion:reduce){#character-components-panel .cp-queue-button.cp-queue-alert{animation:none;border-width:2px}}

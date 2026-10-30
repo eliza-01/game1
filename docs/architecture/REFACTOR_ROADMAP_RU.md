@@ -32,11 +32,11 @@
 
 ### R2 — modular verify, сохранить единую CLI (P1)
 
-**Состояние:** `system/verify/verify.py` ~2986 строк. Есть domain tests, но централизованный self-check смешивает валидацию реестров, данных и структуры.
+**Состояние на M164:** `system/verify/verify.py` сокращён с 2986 до 2866 строк. Проверки M52/M53 (source-only Location Assets, манифесты, запрещённый `assets/prepared`, миграция и SQLite alias-пути) вынесены в `system/verify/validators/source_only.py`. Остальные домены остаются в фасаде; R2 **в работе**, не завершён.
 
 **Целевые компоненты:** фасад `verify.py` + независимые domain validators (character, npc/monster, world/estate, manifests/atlas, tools/bridge), явная схема ошибок без побочных эффектов.
 
-**Приёмка:** та же точка запуска и не менее строгий набор проверок; compare before/after на snapshot; нет automatic writes/migrations. Один этап = один домен, не всё сразу.
+**Приёмка:** та же точка запуска и не менее строгий набор проверок; compare before/after на snapshot; нет automatic writes/migrations. Один этап = один домен, не всё сразу. Для M164 проверены совпадение вывода `verify.py` до/после, отдельные тесты позитивных и ошибочных source-only сценариев и общий набор тестов. **Следующий шаг:** выделять следующий самостоятельный домен только с аналогичной регрессией, не переносить глобальное состояние целиком.
 
 ### R3 — boundaries Control Center / Asset Manager (P1/P2)
 

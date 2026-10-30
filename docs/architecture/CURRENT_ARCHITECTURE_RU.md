@@ -34,6 +34,7 @@ Studio Plugin/Host Agent — **authoring plane**, не клиентский иг
 | Real Estate | `system/control-center/real_estate/{store,contracts,studio_sync,jobs,...}.py`, StudioRealEstate* | Авторинг и mesh revisions отдельно от sync; `store.py` всё ещё крупный |
 | FBX | `system/asset-manager/model_publication.py`, `bone_weight_survival.py` | Общая подготовка скиннинга; независимо от ассетной категории, включая проверку покрытия вершин |
 | Atlas | Registry + consumers Location/Real Estate | Shared Image ID у варианта; legacy inheritance поддерживается для существующих записей |
+| Verification (M164) | `system/verify/verify.py` → `system/verify/validators/source_only.py` | Read-only проверки M52/M53 вынесены; фасад по-прежнему владеет запуском, форматированием и общей политикой ошибок. Остальная декомпозиция R2 впереди |
 | House runtime | `HouseSocketContract`, `HouseElevatorPolicy`, `HouseSocketService`, `HouseDoorService`, `HousePadlockService`, клиентский Prompt, Studio debug | USE/AIM, модельный pivot двери, server authorization; детальнее в [ТЗ](../spec/CURRENT_PROJECT_SPEC_RU.md) |
 
 ## Опасные устаревшие предположения
@@ -53,7 +54,7 @@ Studio Plugin/Host Agent — **authoring plane**, не клиентский иг
 - Клиентские debug UI: повторяющиеся элементы и управление inputs, но не выносить gameplay ownership из server.
 - NPC на monster-инфраструктуре: это существующая внутренняя совместимость, не контракт будущего `Actor` API.
 - `HouseSocketService` и большой debug controller: дополнительно распределять state, eligibility, effect и UI при росте функционала.
-- `verify.py`: оставлять одну команду запуска, переносить правила по доменам, не снижая покрытия.
+- `verify.py`: M164 выделил M52/M53 source-only validator; остальные правила ещё в монолите. Сохранять одну команду запуска, переносить следующие домены с тестами и без снижения покрытия.
 
 ## Статус первоначального рефакторинга
 

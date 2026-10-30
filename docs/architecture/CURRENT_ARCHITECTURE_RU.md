@@ -34,7 +34,7 @@ Studio Plugin/Host Agent — **authoring plane**, не клиентский иг
 | Real Estate | `system/control-center/real_estate/{store,contracts,studio_sync,jobs,...}.py`, StudioRealEstate* | Авторинг и mesh revisions отдельно от sync; `store.py` всё ещё крупный |
 | FBX | `system/asset-manager/model_publication.py`, `bone_weight_survival.py` | Общая подготовка скиннинга; независимо от ассетной категории, включая проверку покрытия вершин |
 | Atlas | Registry + consumers Location/Real Estate | Shared Image ID у варианта; legacy inheritance поддерживается для существующих записей |
-| Verification (M164–M170) | `system/verify/verify.py` → `system/verify/validators/` | Вынесены source-only, project layout, Monster registry/spawn, Actor runtime и Combat Contact/Headshot, Character, Animation, Weapon, Studio Debug, Death, Attack Timeline и Rojo/Animation Speed tooling, Location/Deco/Environment/Texture Sync (M169), Combat foundation/Hitbox/Studio Character Bridge/registered attack clips (M170). `verify.py` содержит только orchestration, сохранены CLI и порядок ошибок; финальная обработка M54/M55 ещё открыта |
+| Verification (M164–M171) | `system/verify/verify.py` → `system/verify/validators/` | Вынесены source-only, project layout, Monster registry/spawn, Actor runtime и Combat Contact/Headshot, Character, Animation, Weapon, Studio Debug, Death, Attack Timeline и Rojo/Animation Speed tooling, Location/Deco/Environment/Texture Sync (M169), Combat foundation/Hitbox/Studio Character Bridge/registered attack clips (M170). `verify.py` содержит только orchestration; M171 устранил пропуск ошибок M54/M55/M128 при расчёте exit code. R2 завершён |
 | House runtime | `HouseSocketContract`, `HouseElevatorPolicy`, `HouseSocketService`, `HouseDoorService`, `HousePadlockService`, клиентский Prompt, Studio debug | USE/AIM, модельный pivot двери, server authorization; детальнее в [ТЗ](../spec/CURRENT_PROJECT_SPEC_RU.md) |
 
 ## Опасные устаревшие предположения
@@ -48,13 +48,13 @@ Studio Plugin/Host Agent — **authoring plane**, не клиентский иг
 
 ## Зоны ответственности, ещё требующие декомпозиции
 
-Текущие размеры: `verify.py` **187 строк после M170** (2986 до M164), `MovementDebugController` ~1009, `TestLoadoutController` ~987, `monster_animation_store.py` 946, `real_estate/store.py` 822, `character_store.py` 806, `location_asset_store.py` 691 строк. **Размер лишь триггер аудита, не доказательство неправильных границ.** Для каждого этапа нужен анализ read/write ownership, API и тестов.
+Текущие размеры: `verify.py` **~187 строк после M171** (2986 до M164), `MovementDebugController` ~1009, `TestLoadoutController` ~987, `monster_animation_store.py` 946, `real_estate/store.py` 822, `character_store.py` 806, `location_asset_store.py` 691 строк. **Размер лишь триггер аудита, не доказательство неправильных границ.** Для каждого этапа нужен анализ read/write ownership, API и тестов.
 
 - Python stores: хранение + публикационный workflow + совместимость legacy/manifest могут смешиваться; выносить через service/repository с сохранением внешних методов.
 - Клиентские debug UI: повторяющиеся элементы и управление inputs, но не выносить gameplay ownership из server.
 - NPC на monster-инфраструктуре: это существующая внутренняя совместимость, не контракт будущего `Actor` API.
 - `HouseSocketService` и большой debug controller: дополнительно распределять state, eligibility, effect и UI при росте функционала.
-- `verify.py`: M164–M170 вынесли 23 валидатора (source-only, project layout, Monster, Actor runtime, Combat Contact/Headshot, Character, Animation, Weapon, Studio Debug, Death, Attack Timeline и authoring tooling, Location authoring, Location Assets, Deco Studio, shared texture variants, environment bounce, published texture sync, categories). Фасад уже стал тонким координатором; дальнейшего дробления ради количества строк не требуется. Сохранять CLI, ошибки и тесты. Известный дефект прежнего CLI: M54/M55 стоят после промежуточного `if errors`, поэтому их ошибки не переводят exit code в 1; исправлять отдельно после завершения behavior-preserving экстракции.
+- `verify.py`: M164–M170 вынесли 23 валидатора (source-only, project layout, Monster, Actor runtime, Combat Contact/Headshot, Character, Animation, Weapon, Studio Debug, Death, Attack Timeline и authoring tooling, Location authoring, Location Assets, Deco Studio, shared texture variants, environment bounce, published texture sync, categories). Фасад уже стал тонким координатором; дальнейшего дробления ради количества строк не требуется. В M171 устранён дефект прежнего CLI: M54/M55/M128 теперь учитываются единственной проверкой `if errors`; при ошибке код завершения `1`, при успехе `0`. Подтверждено независимыми end-to-end тестами. R2 закрыт; сохранять CLI и регрессионные тесты при будущих изменениях.
 
 ## Статус первоначального рефакторинга
 

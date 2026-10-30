@@ -9,7 +9,7 @@ from .location_assets import LocationAssetSources
 def check_location_asset_categories(root: Path, report_error: Callable[[str], None], *,
                                     sources: LocationAssetSources, character_js_text: str,
                                     studio_plugin_text: str, install_plugin_text: str) -> None:
-    """Check M54/M55/M128 after the historical first error-exit boundary."""
+    """Validate M54/M55/M128 editor contracts before the final CLI exit."""
     location_asset_store_text = sources.store_text
     index_m43_text = sources.index_text
     deco_assets_js_text = sources.assets_js
@@ -38,7 +38,8 @@ def check_location_asset_categories(root: Path, report_error: Callable[[str], No
         'id="location-asset-library-category"',
         'ladders</span>',
         'flowers</span>',
-        'game1 location asset · Oak Tree',
+        'id="location-asset-publication-description"',
+        'filled automatically from the selected asset',
     ]:
         if required not in index_m43_text:
             report_error(f"m54 Location Assets markup missing {required}")

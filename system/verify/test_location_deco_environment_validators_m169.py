@@ -96,9 +96,19 @@ class LocationDecoEnvironmentM169Tests(unittest.TestCase):
         check_location_asset_categories(ROOT, issues.append, sources=sources,
             character_js_text=read('system/control-center/static/character-assets.js'),
             studio_plugin_text=self.studio, install_plugin_text=read('system/studio-plugin/install.ps1'))
-        # Existing M168 behavior: post-exit M54 check emits an issue but the
-        # legacy CLI still exits 0. Fixing that exit boundary is separate work.
-        self.assertEqual(issues, ['m54 Location Assets markup missing game1 location asset · Oak Tree'])
+        # M171: all active domain checks should pass on the canonical project.
+        self.assertEqual(issues, [])
+
+    def test_categories_rejects_missing_publication_description_field_and_hint(self):
+        issues, sources = self.core()
+        self.assertEqual(issues, [])
+        altered = sources._replace(index_text=sources.index_text.replace(
+            'filled automatically from the selected asset', 'description hint deliberately removed',
+        ))
+        check_location_asset_categories(ROOT, issues.append, sources=altered,
+            character_js_text=read('system/control-center/static/character-assets.js'),
+            studio_plugin_text=self.studio, install_plugin_text=read('system/studio-plugin/install.ps1'))
+        self.assertIn('m54 Location Assets markup missing filled automatically from the selected asset', issues)
 
     def test_locations_rejects_missing_polygon_validation(self):
         with self.change_file('system/control-center/location_store.py',

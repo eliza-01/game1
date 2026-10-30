@@ -168,16 +168,17 @@ check_source_only_contract(
     ui_html=ui,
 )
 
+# M171: collect M54/M55/M128 diagnostics before the single CLI exit boundary.
+check_location_asset_categories(
+    ROOT, err, sources=location_assets, character_js_text=character_js_text,
+    studio_plugin_text=studio_plugin_text, install_plugin_text=install_plugin_text,
+)
+
 if errors:
     print("verify failed")
     for item in errors:
         print(" -", item)
     sys.exit(1)
-
-check_location_asset_categories(
-    ROOT, err, sources=location_assets, character_js_text=character_js_text,
-    studio_plugin_text=studio_plugin_text, install_plugin_text=install_plugin_text,
-)
 
 print("verify ok · game1 m55 Buildings + synchronized Location Asset category context passed")
 print("registered character archetypes:", len(archetypes))

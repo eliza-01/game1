@@ -32,11 +32,11 @@
 
 ### R2 — modular verify, сохранить единую CLI (P1)
 
-**Состояние на M164:** `system/verify/verify.py` сокращён с 2986 до 2866 строк. Проверки M52/M53 (source-only Location Assets, манифесты, запрещённый `assets/prepared`, миграция и SQLite alias-пути) вынесены в `system/verify/validators/source_only.py`. Остальные домены остаются в фасаде; R2 **в работе**, не завершён.
+**Состояние на M166:** `system/verify/verify.py` сокращён с **2986 до 2096 строк**. M164 вынес M52/M53 source-only, M165 — project identity/Rojo/runtime inventory; M166 добавил три валидатора: `monsters.py` (Monster registry, animation, spawn), `actor_runtime.py` (M23/M25/M26 Monster AI, pursuit, lifecycle/Options) и `combat_contact.py` (M27–M33 weapon contact, hitboxes и headshot ray). В фасаде сохранены вызовы в исходном порядке и минимальные read-only тексты, необходимые соседним контрактам. **R2 в работе.**
 
 **Целевые компоненты:** фасад `verify.py` + независимые domain validators (character, npc/monster, world/estate, manifests/atlas, tools/bridge), явная схема ошибок без побочных эффектов.
 
-**Приёмка:** та же точка запуска и не менее строгий набор проверок; compare before/after на snapshot; нет automatic writes/migrations. Один этап = один домен, не всё сразу. Для M164 проверены совпадение вывода `verify.py` до/после, отдельные тесты позитивных и ошибочных source-only сценариев и общий набор тестов. **Следующий шаг:** выделять следующий самостоятельный домен только с аналогичной регрессией, не переносить глобальное состояние целиком.
+**Приёмка:** та же точка запуска и не менее строгий набор проверок; compare before/after на snapshot; нет automatic writes/migrations. Выносить независимые доменные группы в один патч допустимо только при строгой проверке каждого и неизменной очередности сообщений. Для M164 проверены совпадение вывода `verify.py` до/после, отдельные тесты source-only и общий набор; для M165 — тот же вывод, сценарии неправильных namespace/ports/legacy paths/runtime inventory; для M166 — тот же вывод, 9 дополнительных тестов Monster/Actor/Combat, включая негативные проверки и контроль отсутствия записей. **Следующий шаг:** продолжить вынос Weapon/Character/Animation и Location/Atlas/Bridge с явными входами и без глобального mutable state. Финальная цель — тонкий `verify.py` примерно 100–200 строк, но границы определять по ответственности, не по длине.
 
 ### R3 — boundaries Control Center / Asset Manager (P1/P2)
 

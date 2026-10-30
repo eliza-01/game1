@@ -17,6 +17,8 @@ create table if not exists characters (
     skeleton_signature text not null default '',
     skeleton_structure_signature text not null default '',
     skeleton_json text not null default '{}',
+    visual_mode text not null default 'model',
+    assembly_json text not null default '{}',
     published_sha256 text not null default '',
     publication_pipeline text not null default '',
     model_replacement_pending integer not null default 0,

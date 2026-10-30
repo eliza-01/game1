@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "project": "game1",
+  "combat": {
+    "stateDurationSeconds": 6.0
+  },
+  "characterAnimations": {
+    "deathPlaybackPercent": 50.0,
+    "revivePlaybackPercent": 50.0
+  }
+}

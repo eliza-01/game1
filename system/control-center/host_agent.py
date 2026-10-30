@@ -26,6 +26,9 @@ def load_local_env(path: Path):
 load_local_env(ROOT / ".env.local")
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from character_store import CharacterStore
+from character_core.components import CharacterComponents
+from character_core.assemblies import CharacterAssemblies
+from character_core.publication_queue import CharacterPublicationQueue
 from animation_store import AnimationStore
 from weapon_store import WeaponStore
 from monster_store import MonsterStore
@@ -47,7 +50,7 @@ from services.studio_deco_bridge import run_deco_refresh_bridge
 from services.studio_asset_sync import StudioAssetSyncService
 from services.animation_export import write_animation_export
 from services.native_pickers import (
-    choose_animation_folder, choose_character_fbx, choose_location_asset_fbx,
+    choose_animation_folder, choose_character_fbx, choose_character_atlas, choose_location_asset_fbx,
     choose_location_asset_texture, choose_monster_fbx, choose_monster_textures,
     choose_weapon_fbx, choose_weapon_textures, choose_real_estate_fbx, choose_real_estate_texture,
 )
@@ -62,6 +65,10 @@ control_agent_build = "game1-m50-environment-weapon-bounce-001"
 port = int(os.environ.get("CONTROL_AGENT_PORT", "43821"))
 token = os.environ.get("CONTROL_TOKEN", "Game1LocalControlV1")
 store = CharacterStore(ROOT)
+character_components = CharacterComponents(ROOT)
+character_assemblies = CharacterAssemblies(ROOT, store, character_components)
+store.export()
+character_publications = CharacterPublicationQueue(ROOT, character_components, on_published=store.export)
 animations = AnimationStore(ROOT)
 weapons = WeaponStore(ROOT)
 monsters = MonsterStore(ROOT)
@@ -134,7 +141,7 @@ def publication_credentials(description: str = ""):
 
 # Application composition root for read-only HTTP adapters. Built once, not per request.
 READ_SOURCES = MappingProxyType({
-    "characters": store, "animations": animations,
+    "characters": store, "animations": animations, "character_components": character_components, "character_assemblies": character_assemblies, "character_publications": character_publications,
     "weapons": weapons, "monsters": monsters, "monster_animations": monster_animations,
     "npcs": npcs, "npc_animations": npc_animations, "npc_equipment": npc_equipment,
     "location_assets": location_assets, "real_estate": real_estate,
@@ -152,8 +159,11 @@ WRITE_SOURCES = MappingProxyType({
     "animation_speed_scaling": animation_speed_scaling,
     "animations": animations,
     "character_identity": character_identity,
+    "character_components": character_components,
+    "character_assemblies": character_assemblies, "character_publications": character_publications,
     "choose_animation_folder": choose_animation_folder,
     "choose_character_fbx": choose_character_fbx,
+    "choose_character_atlas": choose_character_atlas,
     "choose_location_asset_fbx": choose_location_asset_fbx,
     "choose_location_asset_texture": choose_location_asset_texture,
     "choose_real_estate_fbx": choose_real_estate_fbx,

@@ -7,6 +7,8 @@
 <title>game1 · asset manager</title>
 <link rel="stylesheet" href="asset-manager.css?v=11">
 <link rel="stylesheet" href="location-assets.css?v=1">
+<link rel="stylesheet" href="character-components.css?v=4">
+<link rel="stylesheet" href="character-assemblies.css?v=3">
 <link rel="stylesheet" href="deco-assets.css?v=5">
 <link rel="stylesheet" href="real-estate.css?v=12">
 </head>
@@ -34,7 +36,7 @@
 <div id="character-rail">
 <hr class="rail-separator">
 <div class="section-title"><div><span>character registry</span><h3>characters</h3></div><span id="rail-count">0</span></div>
-<div class="tree-actions"><button id="new-character" class="primary" type="button">new</button><button id="refresh" type="button">refresh</button></div>
+<div class="tree-actions"><button id="new-character" class="primary" type="button">New assembly</button><button id="refresh" type="button">refresh</button></div>
 <div id="character-tree" class="tree"></div>
 </div>
 <div id="animation-rail" hidden>
@@ -72,18 +74,54 @@
 <section class="content">
 <div id="characters-view">
 <div class="panel hero">
-<div><span class="eyebrow">character assets · clean game1 schema</span><h2>characters</h2><p>race and gender are gameplay identity. each registered archetype owns one canonical fbx with a skinned armature. character model assets are immutable here: replacing the FBX always publishes a new Roblox asset id and switches the archetype only after that upload succeeds.</p></div>
-<div class="metrics"><div><b id="metric-total">0</b><span>registered</span></div><div><b id="metric-published">0</b><span>published</span></div><div><b id="metric-active">0</b><span>active</span></div></div>
+<div><span class="eyebrow">modular characters · v1 / parallel legacy compatibility</span><h2>characters</h2><p>Register reusable parts, publish only changed meshes, then assemble the default appearance. Existing whole-model characters remain intact until an explicit migration.</p></div>
+<div class="metrics"><div><b id="metric-total">0</b><span>whole-model registered</span></div><div><b id="metric-published">0</b><span>whole-model published</span></div><div><b id="metric-active">0</b><span>whole-model startup</span></div></div>
 </div>
+<nav class="character-flow-nav" aria-label="Modular character workflow">
+<a href="#character-components-panel"><b>01</b><span>Inspect &amp; register parts</span></a>
+<a href="#cp-publication-step"><b>02</b><span>Publish Model IDs</span></a>
+<a href="#character-assemblies-panel"><b>03</b><span>Build a character</span></a>
+<a href="#ca-rows"><b>04</b><span>Set as Startup</span></a>
+</nav>
+<div class="panel" id="character-components-panel">
+<span class="eyebrow">01 · register a shared rig and reusable parts</span><h3>Rig &amp; parts</h3><small id="cp-counts" class="hint"></small>
+<p>Inspect the FBX first: registration creates each named part and any new clothing set, but does not publish. Parts from different sets can be mixed in a character recipe. The same rig is shared across compatible characters.</p>
+<div id="cp-flow-summary" class="character-flow-note" role="status" aria-live="polite">Reading component catalog…</div>
+<details><summary>Mesh naming standard</summary><p><code>&lt;set&gt;_upper</code> · <code>&lt;set&gt;_lower</code> · <code>&lt;set&gt;_gloves</code> · <code>&lt;set&gt;_boots</code><br><code>head_01_male</code> / <code>head_01_female</code><br><code>hair_01_male</code> / <code>hair_01_female</code> / <code>hair_01_common</code><br><code>eyes_01</code> · <code>eyebrows_01</code> · <code>eyes_01_spiral</code> (effect)<br>Main rig: <code>human_armature</code>. Hair may carry its own <code>hair_01_common_armature</code>.</p></details>
+<div class="cp-toolbar"><button id="cp-choose" class="primary" type="button">Choose FBX · inspect</button><button id="cp-register" type="button" disabled>Register detected rig &amp; parts</button><button id="cp-refresh" type="button">Refresh</button></div>
+<small id="cp-source" class="hint">No FBX selected.</small><div id="cp-status" role="status" aria-live="polite"></div><div id="cp-preview" class="character-inspection-preview" aria-live="polite"></div><p id="cp-sets" class="hint"></p><div class="cp-toolbar" id="cp-publication-step"><strong class="character-phase-label">02 · publish registered components</strong><span id="cp-publish-count">0 selected</span><button id="cp-publication-open" type="button" hidden>Show publication queue</button></div>
+<div class="table-wrap"><table id="cp-table"><thead><tr><th aria-label="health"></th><th><button class="cp-sort" type="button" data-cp-sort="id">name</button></th><th><button class="cp-sort" type="button" data-cp-sort="slot">part</button></th><th><button class="cp-sort" type="button" data-cp-sort="set_id">set</button></th><th>rig</th><th>status</th><th>Model Asset ID</th><th>shared atlas</th><th class="cp-publish-selection"><input id="cp-publish-select-all" type="checkbox" aria-label="Select all unpublished components"></th><th class="cp-publication-column"><span>publication</span><button id="cp-publish-all" type="button" disabled>Publish selected</button></th></tr></thead><tbody id="cp-rows"></tbody></table></div>
+<section class="cp-atlas-section" aria-label="Character shared atlases">
+<div class="cp-toolbar"><button id="cp-atlas-naming-guide" class="character-help" type="button" aria-label="Character atlas naming guide and examples" data-character-atlas-guide data-character-tip="CHARACTER ATLAS · NAMING GUIDE&#10;Format: &lt;atlas_key&gt;_&lt;W&gt;x&lt;H&gt;_atlas.png (JPG/JPEG also valid)&#10;ASCII lowercase + digits + underscores. No spaces or hyphens.&#10;Set «fullplate imperial» → fullplate_imperial (multiword sets supported).&#10;&#10;Upper: fullplate_imperial_upper_2048x2048_atlas.png&#10;Lower: fullplate_imperial_lower_2048x2048_atlas.png&#10;Gloves: fullplate_imperial_gloves_2048x2048_atlas.png&#10;Boots: fullplate_imperial_boots_2048x2048_atlas.png&#10;Shared outfit: fullplate_imperial_2048x2048_atlas.png&#10;Head: head_01_male_1024x1024_atlas.png / head_01_female_1024x1024_atlas.png&#10;Hair: hair_01_male_1024x1024_atlas.png / hair_01_female_1024x1024_atlas.png&#10;Common hair: hair_01_common_1024x1024_atlas.png&#10;Eyes: eyes_01_512x512_atlas.png&#10;Eyebrows: eyebrows_01_512x512_atlas.png&#10;Effect: eyes_01_spiral_512x512_atlas.png&#10;&#10;Examples only: any published Character atlas may be shared by multiple parts.&#10;The W × H in the filename must match the actual image size.&#10;Register Atlas previews first; replacing pixels needs confirmation and publishes a new Image Asset ID.">?</button><button id="cp-atlas-register" class="primary" type="button">Register Atlas</button><span class="hint">Character atlases only · separate Image Assets</span></div>
+<div class="table-wrap"><table id="cp-atlas-table"><thead><tr><th>atlas</th><th>resolution</th><th>Image Asset ID</th><th>publication</th></tr></thead><tbody id="cp-atlas-rows"></tbody></table></div>
+</section>
+<dialog id="cp-atlas-dialog" aria-labelledby="cp-atlas-title"><h3 id="cp-atlas-title">Character atlas · review</h3><p id="cp-atlas-report" aria-live="polite"></p><div class="cp-atlas-compare"><figure><div class="cp-atlas-image"><img id="cp-atlas-old-preview" alt="Currently registered atlas preview"></div><figcaption>Existing atlas</figcaption></figure><figure><div class="cp-atlas-image"><img id="cp-atlas-new-preview" alt="Selected atlas preview"></div><figcaption>Selected file</figcaption></figure></div><div id="cp-atlas-info" class="character-flow-note"></div><div id="cp-atlas-validation" role="alert"></div><div id="cp-atlas-expected" class="hint"></div><label id="cp-atlas-approval-label" hidden><input type="checkbox" id="cp-atlas-approval"> Confirm replacement and publication under a new Image Asset ID</label><div id="cp-atlas-stages" class="cp-atlas-stages" aria-live="polite"></div><div class="actions"><button id="cp-atlas-show-folder" type="button" hidden>Show in folder</button><button id="cp-atlas-reselect" type="button">Choose another file</button><button id="cp-atlas-confirm" class="primary" type="button" disabled>Publish atlas</button><button id="cp-atlas-close" type="button">Close</button></div></dialog>
+<small class="hint">Atlas binding changes the appearance reference, not the mesh Model Asset ID. Same Atlas Registry as Location Assets: &lt;atlas_key&gt;_&lt;width&gt;x&lt;height&gt;_atlas.png. One published Image Asset ID is reused by every bound part. Solid-color eyes and eyebrows do not require an atlas.</small>
+</div>
+
+<div class="panel" id="character-assemblies-panel">
+<span class="eyebrow">03 · assemble a playable character</span><h3>Character assemblies</h3>
+<button type="button" class="character-help" aria-label="About Character assemblies" data-character-tip="Save a character recipe from reusable parts. A starter set fills upper, lower, gloves and boots; override each slot with another set. Head determines gender; hair can match it or be common. Eyes and eyebrows are shared. Saving a recipe never publishes a model or switches Startup.">?</button>
+<div id="ca-editor-summary" class="character-flow-note" role="status" aria-live="polite">Choose or create a character recipe.</div>
+<div class="ca-grid"><label>Character ID<input id="ca-id" autocomplete="off"></label><label>Display name<input id="ca-name"></label><label>Rig<select id="ca-rig"></select></label><label>Starter set<select id="ca-set"></select></label></div>
+<div id="ca-parts" class="ca-grid"></div>
+<div id="ca-mix" class="character-flow-note" aria-live="polite"></div>
+<div id="ca-readiness" class="character-flow-note" aria-live="polite"></div>
+<details><summary>Starting stats</summary><div id="ca-stats" class="ca-grid"></div></details>
+<div class="actions"><button id="ca-save" type="button" disabled>Save recipe &amp; starting stats</button><button id="ca-reset" class="character-reset" type="button">Reset edits</button><button id="ca-new" type="button">New character</button><button id="ca-refresh" type="button">Refresh</button><button type="button" class="character-help" aria-label="About assembly and startup" data-character-tip="Saving a recipe changes only SQLite and generated CharacterRegistry.luau; it never publishes FBX or automatically switches startup. All eight slots and the rig must have published dependencies before Set as Startup is allowed. A new Play session is needed to test startup. Legacy whole-model records remain unchanged.">?</button></div><div id="ca-status" role="status" aria-live="polite"></div>
+<div class="table-wrap"><table><thead><tr><th>character</th><th>rig</th><th>head</th><th>outfit</th><th>readiness / missing</th><th>actions</th></tr></thead><tbody id="ca-rows"></tbody></table></div>
+</div>
+<details class="cp-legacy"><summary>Legacy whole-model characters · compatibility only (no automatic migration)</summary>
+<div class="cp-toolbar"><button id="new-legacy-character" type="button">New whole-model character (legacy)</button><span class="hint">Use only for old full-FBX archetypes. Modular sets and parts are registered above.</span></div>
 <div class="panel runtime-card"><div id="runtime-state" class="runtime-state bootstrap"><strong>bootstrap</strong><span>loading runtime source…</span></div><div id="publication-state" class="publication-missing">open cloud: checking…</div></div>
 <div class="character-workflow">
 <div class="panel character-card">
-<span class="eyebrow">01 · character archetype</span><h3>register model</h3>
-<p>choose identity, then select an fbx. registration validates the armature in blender and writes one canonical source-only FBX plus skeleton metadata. when editing a published archetype, choosing another FBX exposes one replacement action: prepare it, publish a new Roblox asset, then apply the new id.</p>
+<span class="eyebrow">01 · identity &amp; base stats</span><h3>character setup</h3>
 <div class="character-grid"><label>race<select id="race"></select></label><label>gender<select id="gender"></select></label></div>
 <label>archetype id<input id="character-id" autocomplete="off" pattern="[a-z0-9][a-z0-9_-]{0,63}"></label>
-<small class="hint">editing identity migrates canonical model/animation paths and keeps the currently assigned Roblox asset id. model replacement is a separate action below.</small>
+
 <label>display name<input id="display-name" autocomplete="off"></label>
+<div class="actions"><button id="save-archetype" type="button" disabled>Save Identity</button><button type="button" class="character-help" aria-label="About Save Identity" data-character-tip="Save Identity updates the archetype ID, race, gender and display name. Changing the ID migrates canonical character and animation paths; the published Model Asset ID is preserved. Review migration carefully. No FBX publication is performed.">?</button></div>
 <hr class="card-separator">
 <span class="eyebrow">starting parameters</span><h3 class="subheading">character stats</h3>
 <small class="hint">base values assigned when this archetype spawns. runtime equipment/modifiers are applied on top.</small>
@@ -96,15 +134,16 @@
 <label>run speed<input id="character-stat-run-speed" type="number" min="0" step="1" value="50"></label>
 <label>critical chance %<input id="character-stat-crit-chance" type="number" min="0" max="100" step="0.1" value="0"></label>
 </div>
-<div class="actions"><button id="save-character-stats" type="button" disabled>save starting stats</button></div>
-<div class="picker"><button id="choose-model" type="button">choose fbx</button><small id="picked-model">fbx not selected</small></div>
+<div class="actions"><button id="clear-form" class="character-reset" type="button">Reset</button><button id="save-character-stats" type="button" disabled>Save Starting Stats</button><button type="button" class="character-help" aria-label="About Starting Stats" data-character-tip="Saves base attributes into SQLite, character-archetypes.json and generated CharacterRegistry.luau. Rojo propagates the generated module to Studio. A new Play session is required for newly spawned characters to use changed stats. No model publication or Studio asset sync is needed.">?</button></div>
 <div id="model-status" class="status-box"><strong>not registered</strong><span>select a character row or choose an fbx.</span></div>
-<div class="actions"><button id="save-archetype" type="button" disabled>save archetype</button><button id="register-character" class="primary" type="button">register character</button><button id="clear-form" type="button">clear form</button></div>
 <hr class="card-separator">
-<span class="eyebrow">02 · publication</span><h3 class="subheading">roblox model asset</h3><p>first publish creates a model asset id. existing character model assets are never updated in place. publication builds a temporary bone-safe FBX without moving rest bones, then uploads it as a brand-new asset; the previous id remains assigned until the new upload succeeds.</p>
-<label>description<input id="publication-description" value="Game1 Character Model"></label>
-<div class="actions"><button id="publish-character" class="primary" type="button" disabled>publish model</button><button id="sync-character" type="button" disabled>sync studio</button><button id="activate-character" type="button" disabled>activate</button></div>
-<small id="publication-hint" class="hint">select a registered character.</small>
+<span class="eyebrow">02 · model workflow</span><h3 class="subheading">Reg + Publish</h3>
+<label>Roblox description<input id="publication-description" value="Game1 Character Model"></label>
+<div class="actions"><button id="register-character" class="primary" type="button">Reg + Publish</button><button type="button" class="character-help" aria-label="About Reg and Publish" data-character-tip="One guided operation: validate FBX and identity → register canonical source and skeleton → create a new Roblox Model Asset ID when needed → validate and sync the published model into Studio. Published assets are immutable: a replacement always creates a new ID. External Roblox and Studio services are not one database transaction; the report shows any partial success and retry options.">?</button></div>
+<small id="picked-model" class="hint">FBX chosen during Reg + Publish.</small>
+<div id="publication-hint" class="hint">Select a character or start a new one.</div>
+<hr class="card-separator">
+<span class="eyebrow">03 · startup archetype</span><div class="actions"><button id="activate-character" type="button" disabled>Set as Startup</button><button type="button" class="character-help" aria-label="About Startup" data-character-tip="Selects the archetype used by the runtime as the default starting player model. Requires a published Model Asset ID. It does not publish an asset or change character stats.">?</button></div>
 </div>
 <div class="panel character-card">
 <div class="section-title"><div><span>versioned registry</span><h3>registered characters</h3></div><button id="validate-view" type="button">refresh</button></div>
@@ -112,8 +151,26 @@
 <div id="selected-details" class="details"><span class="muted">select a character.</span></div>
 </div>
 </div>
+</details>
 </div>
 
+<dialog id="cp-publication-dialog" aria-labelledby="cp-publication-title">
+<div class="section-title"><h3 id="cp-publication-title">Publication queue</h3><button id="cp-publication-close" type="button">Close</button></div>
+<p id="cp-publication-summary" role="status" aria-live="polite"></p><progress id="cp-publication-progress" max="1" value="0"></progress>
+<div class="table-wrap"><table><thead><tr><th>component</th><th>status</th><th>current step / result</th><th>Model Asset ID</th></tr></thead><tbody id="cp-publication-rows"></tbody></table></div>
+<p class="hint">Components publish one at a time. Closing this window keeps the queue running. Failed entries do not stop the remaining items.</p>
+</dialog>
+<dialog id="cp-conflict" aria-labelledby="cp-conflict-title">
+<h3 id="cp-conflict-title">Published parts already exist</h3>
+<p>These mesh names are already registered and published. For unchanged parts, cancel and export an FBX without those meshes. To replace them, explicitly check each part below.</p>
+<p>Registration stages a replacement; the current published ID remains assigned until the replacement upload succeeds.</p>
+<div id="cp-conflicts"></div><div class="actions"><button id="cp-cancel" type="button">Cancel · prepare another FBX</button><button id="cp-confirm" type="button" disabled>Confirm selected replacements</button></div>
+</dialog>
+<dialog id="character-report-dialog" class="character-report-dialog" aria-labelledby="character-report-title">
+<div class="character-report-head"><div><span class="eyebrow">character pipeline</span><h3 id="character-report-title">Operation report</h3></div><button id="character-report-close" type="button" aria-label="Close report">✕</button></div>
+<div class="character-report-body"><div id="character-report-summary"></div><div id="character-report-stages" aria-live="polite"></div><div id="character-report-recovery"></div></div>
+</dialog>
+<div id="character-tooltip" role="tooltip" hidden></div>
 <div id="animations-view" hidden>
 <div class="panel hero">
 <div><span class="eyebrow">character animation library · semantic bindings</span><h2>animations</h2><p>one studio-exported rbxm/rbxmx clip becomes one permanent roblox animation asset. files are scanned by name, registered against a character animation profile, and resolved at runtime through semantic slots instead of filenames.</p></div>
@@ -529,7 +586,12 @@
 </main>
 <div id="toast" class="toast"></div>
 <script src="publication-descriptions.js?v=1"></script>
-<script src="character-assets.js?v=18"></script>
+<script src="character-assets.js?v=19"></script>
+<script src="character-workflow.js?v=2"></script>
+<script src="character-publications.js?v=1"></script>
+<script src="character-components.js?v=4"></script>
+<script src="character-atlas-ui.js?v=1"></script>
+<script src="character-assemblies.js?v=3"></script>
 <script src="animation-speed.js?v=3"></script>
 <script src="timelines.js?v=2"></script>
 <script src="locations.js?v=2"></script>

@@ -11,6 +11,7 @@ local CharacterRegistry = require(CharacterShared:WaitForChild("CharacterRegistr
 local BootstrapConfig = require(CharacterShared:WaitForChild("BootstrapConfig"))
 
 local CharacterRigService = require(script.Parent:WaitForChild("CharacterRigService"))
+local CharacterAssemblyBuilder = require(script.Parent:WaitForChild("CharacterAssemblyBuilder"))
 local CharacterStatsService = require(script.Parent:WaitForChild("CharacterStatsService"))
 local CombatRoot = script.Parent.Parent:WaitForChild("combat")
 local EntityHitboxService = require(CombatRoot:WaitForChild("EntityHitboxService"))
@@ -43,6 +44,9 @@ local function registeredAssetId(row: any?): number?
     if not row then
         return nil
     end
+    if row.visualMode == "assembly" then
+        return if row.assembly and row.assembly.ready then tonumber(row.assembly.rig.asset_id) else nil
+    end
     if type(row.model) == "table" then
         return tonumber(row.model.assetId)
     end
@@ -64,6 +68,10 @@ local function selectedCharacter(requestedOverride: string?): (any?, number?, st
             requestedId,
             tostring(row.race or ""),
             tostring(row.gender or "")
+    end
+    if requestedId ~= "" then
+        warn("[game1] selected character is unavailable; refusing bootstrap substitution", requestedId)
+        return row, nil, requestedId, requestedId, requestedId, nil, nil
     end
     return nil,
         tonumber(BootstrapConfig.CharacterModelAssetId),
@@ -150,7 +158,23 @@ local function findRegisteredTemplate(row: any): Model?
     return nil
 end
 
-local function templateFor(row: any?, assetId: number): Model?
+local function templateFor(row: any?, assetId: number): (Model?, string?)
+    if row and row.visualMode == "assembly" then
+        local cacheKey = "assembly-" .. tostring(row.assembly.fingerprint)
+        local cached = cache:FindFirstChild(cacheKey)
+        if cached and cached:IsA("Model") then return cached end
+        local ok, result = pcall(CharacterAssemblyBuilder.Build, row.assembly, function(componentAssetId: number)
+            return getAssetTemplate(componentAssetId, "component-" .. tostring(componentAssetId))
+        end)
+        if not ok then
+            warn("[game1] character assembly failed", row.id, result)
+            return nil, tostring(result)
+        end
+        local template = result :: Model
+        template.Name = cacheKey
+        template.Parent = cache
+        return template
+    end
     if row then
         local stored = findRegisteredTemplate(row)
         if stored then
@@ -205,23 +229,19 @@ createCharacter = function(player: Player, requestedArchetypeId: string?, revive
 
     local row, assetId, archetype, label, requestedArchetype, race, gender = selectedCharacter(requestedArchetypeId)
     if not assetId then
+        player:SetAttribute("CharacterLoadError", "Selected character is unavailable: " .. tostring(requestedArchetype or ""))
         spawning[player] = nil
         return nil
     end
 
-    local template = templateFor(row, assetId)
-    if not template and row then
-        assetId = tonumber(BootstrapConfig.CharacterModelAssetId)
-        archetype = "bootstrap"
-        label = BootstrapConfig.CharacterLabel
-        race = nil
-        gender = nil
-        template = assetId and templateFor(nil, assetId) or nil
-    end
+    local template, loadError = templateFor(row, assetId)
     if not template then
+        player:SetAttribute("CharacterLoadError", loadError or ("Cannot load character: " .. archetype))
+        warn("[game1] character spawn cancelled; previous character preserved", archetype)
         spawning[player] = nil
         return nil
     end
+    player:SetAttribute("CharacterLoadError", nil)
 
     destroyPreviousCharacter(player)
 

@@ -3,11 +3,22 @@
 Dependencies are supplied by the composition root; unhandled paths return None.
 """
 from urllib.parse import unquote
+from . import character_components
+from services.character_registration_flow import run as run_character_registration_flow
 
 
 def route(path, body, deps):
     if not path.startswith(('/api/characters', '/api/weapons', '/api/npcs', '/api/monsters', '/api/npc-equipment',)):
         return None
+
+    response = character_components.write(path, body, deps)
+    if response is not None:
+        return response
+    if path == '/api/characters/assemblies':
+        try:
+            return 200, deps['character_assemblies'].save(body())
+        except ValueError as error:
+            return 400, {'error': str(error)}
 
     def out(status, payload):
         return status, payload
@@ -22,6 +33,15 @@ def route(path, body, deps):
     sync_monster_to_studio = deps["sync_monster_to_studio"]
     sync_weapon_to_studio = deps["sync_weapon_to_studio"]
     weapons = deps["weapons"]
+
+    if path == "/api/characters/workflow":
+        # One request owns the ordered checkpoints; partial outcomes are returned
+        # as a structured report instead of hiding successful remote uploads.
+        return out(200, run_character_registration_flow(
+            body(), store=store,
+            publication_credentials=publication_credentials,
+            sync_character_to_studio=sync_character_to_studio,
+        ))
 
     if path == "/api/characters":
         try:

@@ -113,6 +113,9 @@ class CharacterIdentityService:
         if not old:
             raise ValueError(f"unknown character archetype: {old_id}")
 
+        if old.get('visual_mode') == 'assembly':
+            raise ValueError('edit character recipes in the assembly editor')
+
         options = self.characters.options()
         race = str(payload.get("race", old.get("race") or "") or "").strip().lower()
         gender = str(payload.get("gender", old.get("gender") or "") or "").strip().lower()

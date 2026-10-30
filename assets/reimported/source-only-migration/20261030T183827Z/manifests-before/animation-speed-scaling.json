@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 1,
+  "project": "game1",
+  "profiles": [
+    {
+      "targetType": "humanoid",
+      "targetId": "all",
+      "displayName": "All Characters & NPCs",
+      "rules": [
+        {
+          "channel": "run",
+          "label": "Run Speed",
+          "stat": "RunSpeed",
+          "unitsPerPercent": 1.8
+        },
+        {
+          "channel": "walk",
+          "label": "Walk Speed",
+          "stat": "RunSpeed",
+          "unitsPerPercent": 2.0
+        },
+        {
+          "channel": "combat_idle",
+          "label": "Idle Combat Speed",
+          "stat": "AttackSpeed",
+          "unitsPerPercent": 4.0
+        },
+        {
+          "channel": "attack",
+          "label": "Attack Speed",
+          "stat": "AttackSpeed",
+          "unitsPerPercent": 2.0
+        }
+      ]
+    },
+    {
+      "targetType": "monster",
+      "targetId": "gremlin",
+      "displayName": "Gremlin",
+      "rules": [
+        {
+          "channel": "run",
+          "label": "Run Speed",
+          "stat": "RunSpeed",
+          "unitsPerPercent": 0.6
+        }
+      ]
+    }
+  ],
+  "legacyProfiles": [
+    {
+      "targetType": "character",
+      "targetId": "human_female",
+      "displayName": "Human Female",
+      "rules": [
+        {
+          "channel": "run",
+          "label": "Run Speed",
+          "stat": "RunSpeed",
+          "unitsPerPercent": 1.9
+        },
+        {
+          "channel": "walk",
+          "label": "Walk Speed",
+          "stat": "RunSpeed",
+          "unitsPerPercent": 2.0
+        },
+        {
+          "channel": "combat_idle",
+          "label": "Idle Combat Speed",
+          "stat": "AttackSpeed",
+          "unitsPerPercent": 4.0
+        },
+        {
+          "channel": "attack",
+          "label": "Attack Speed",
+          "stat": "AttackSpeed",
+          "unitsPerPercent": 2.0
+        }
+      ]
+    }
+  ],
+  "customScaling": [
+    {
+      "assetId": "116868377220889",
+      "stat": "RunSpeed",
+      "unitsPerPercent": 5.0
+    },
+    {
+      "assetId": "122295588324584",
+      "stat": "RunSpeed",
+      "unitsPerPercent": 2.4
+    },
+    {
+      "assetId": "132123582014306",
+      "stat": "RunSpeed",
+      "unitsPerPercent": 1.4
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "migration": "game1-source-only-assets-v1",
+  "completedAtUtc": "2026-10-30T18:38:27.733761Z",
+  "movedPreparedOnlyFiles": 11,
+  "removedIdentityDuplicates": 0,
+  "preparedWins": 0,
+  "sourceWins": 0,
+  "conflicts": [],
+  "rewrittenManifestFiles": 1,
+  "backupPath": "assets/reimported/source-only-migration/20261030T183827Z"
+}

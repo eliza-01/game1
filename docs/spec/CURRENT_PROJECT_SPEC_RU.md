@@ -42,6 +42,8 @@
 - Для NPC и Monster разные lifecycle/policy допустимы, но общие actor-примитивы не копируются. Переименование внешних полей — отдельная versioned migration.
 - Facial animation / смена спрайтов глаз обсуждались как **предложение**, не являются реализованным текущим subsystem и требуют отдельного визуального/технического ТЗ.
 
+**Characters · M172 (UI-first):** единый `Reg + Publish` с последовательным отчетом по регистрации, Roblox publication и Studio, отдельно `Save Identity` (миграция ID/paths), `Save Starting Stats` (SQLite + JSON/Luau export, без Model Sync), `Reset` выбранной формы и `Set as Startup`. При частичной ошибке Studio нельзя считать Roblox upload отменённым. Подробности и критерии проверки — [Characters Pipeline M172](../workflows/CHARACTERS_PIPELINE_M172_RU.md).
+
 ## 5. Asset Manager и публикация
 
 - Источник (`assets/source`) отделён от подготовленной FBX-копии (`assets/prepared`) и опубликованного Model/Image/Animation ID. Изменения публикации не изменяют исходник автоматически.

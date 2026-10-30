@@ -44,6 +44,22 @@ if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
     )
 
 
+def choose_character_atlas() -> str:
+    return _powershell_picker(
+        r'''
+Add-Type -AssemblyName System.Windows.Forms
+$dialog = New-Object System.Windows.Forms.OpenFileDialog
+$dialog.Title = 'game1 · choose Character atlas PNG/JPG'
+$dialog.Filter = 'Character atlas (*.png;*.jpg;*.jpeg)|*.png;*.jpg;*.jpeg'
+$dialog.Multiselect = $false
+if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    Write-Output $dialog.FileName
+}
+'''
+    )
+
+
 
 def choose_weapon_fbx() -> str:
     return _powershell_picker(

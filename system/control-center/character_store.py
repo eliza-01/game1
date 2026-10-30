@@ -73,6 +73,7 @@ def _assert_publication_skeleton_matches(row: dict, analysis: dict):
 
 class CharacterStore:
     def __init__(self, root: Path):
+        self.assemblies = None
         self.root = root
         self.runtime = root / ".control-center"
         self.runtime.mkdir(parents=True, exist_ok=True)
@@ -180,6 +181,8 @@ class CharacterStore:
             return None
         result = dict(row)
         result["stats"] = self._stats(connection, str(result["id"]))
+        if result.get('visual_mode') == 'assembly' and self.assemblies:
+            return self.assemblies.decorate(result)
         return result
 
     def list(self):
@@ -213,6 +216,8 @@ class CharacterStore:
         row = self.get(character_id)
         if not row:
             raise ValueError(f"unknown character archetype: {character_id}")
+        if row.get('visual_mode') == 'assembly':
+            raise ValueError('edit starting stats in the assembly editor')
         stats = self._validate_stats(payload, row)
         with self.connect() as connection:
             for key, value in stats.items():
@@ -235,7 +240,10 @@ class CharacterStore:
         row = self.get(character_id)
         if not row:
             raise ValueError(f"unknown character archetype: {character_id}")
-        if not str(row.get("model_asset_id") or "").strip():
+        if row.get('visual_mode') == 'assembly':
+            if not row.get('assembly_resolved', {}).get('ready'):
+                raise ValueError('publish all selected assembly dependencies before activating it')
+        elif not str(row.get("model_asset_id") or "").strip():
             raise ValueError("publish the character model before activating it")
         with self.connect() as connection:
             connection.execute(
@@ -279,6 +287,8 @@ class CharacterStore:
 
     @staticmethod
     def _status(row: dict) -> str:
+        if row.get('visual_mode') == 'assembly':
+            return row.get('status') or 'ASSEMBLY_DRAFT'
         source = str(row.get("source_path") or "")
         asset_id = str(row.get("model_asset_id") or "")
         sha = str(row.get("sha256") or "")
@@ -298,6 +308,9 @@ class CharacterStore:
         return "CHANGED"
 
     def register(self, data):
+        candidate = self.get(str(data.get('existingId') or data.get('id') or ''))
+        if candidate and candidate.get('visual_mode') == 'assembly':
+            raise ValueError('use the assembly editor for this character')
         expected_existing_id = str(data.get("existingId") or "").strip().lower()
         seed_old = self.get(expected_existing_id) if expected_existing_id else None
         character_id, display_name, race, gender = self._identity(data, seed_old)
@@ -448,6 +461,8 @@ class CharacterStore:
             raise ValueError(f"unknown target archetype: {target_id}")
         if not source:
             raise ValueError(f"unknown source archetype: {source_id}")
+        if target.get('visual_mode') == 'assembly' or source.get('visual_mode') == 'assembly':
+            raise ValueError('assembly characters reference parts, not a whole-model reassignment')
         if target_id == source_id:
             return target
 
@@ -581,6 +596,8 @@ class CharacterStore:
         row = self.get(character_id)
         if not row:
             raise ValueError(f"unknown character archetype: {character_id}")
+        if row.get('visual_mode') == 'assembly':
+            raise ValueError('publish the referenced rig and parts separately')
         prepared = self.root / str(row.get("prepared_path") or row.get("source_path") or "")
         if not prepared.is_file():
             raise ValueError("canonical character FBX is missing; re-register the model")
@@ -682,6 +699,11 @@ class CharacterStore:
         row = self.get(active_id)
         if not row:
             return {"mode": "bootstrap", "activeArchetypeId": None, "reason": "active archetype is missing"}
+        if row.get('visual_mode') == 'assembly':
+            ready = bool(row.get('assembly_resolved', {}).get('ready'))
+            return dict(mode='assembled' if ready else 'bootstrap', activeArchetypeId=active_id,
+                        displayName=row['display_name'], race=row['race'], gender=row['gender'],
+                        reason='' if ready else 'assembly dependencies are not published')
         asset_id = str(row.get("model_asset_id") or "").strip()
         if not asset_id:
             return {
@@ -722,6 +744,8 @@ class CharacterStore:
                     "gender": row.get("gender") or "",
                     "status": self._status(row),
                     "revision": row["revision"],
+                    "visualMode": row.get('visual_mode') or 'model',
+                    "assembly": row.get('assembly_resolved'),
                     "stats": row.get("stats") or dict(DEFAULT_STATS),
                     "model": {
                         "sourcePath": row["source_path"],
@@ -783,6 +807,7 @@ class CharacterStore:
                 f'\t\t\trace = {lua(row["race"])},',
                 f'\t\t\tgender = {lua(row["gender"])},',
                 f'\t\t\tstatus = {lua(row["status"])},',
+                f'\t\t\tvisualMode = {lua(row["visualMode"])},',
                 f'\t\t\trevision = {row["revision"]},',
                 "\t\t\tstats = table.freeze({",
                 *[f'\t\t\t\t{key} = {lua(value)},' for key, value in row["stats"].items()],
@@ -800,6 +825,9 @@ class CharacterStore:
                 "\t\t\t}),",
                 "\t\t}),",
             ]
+            if row.get('assembly'):
+                from character_core.assemblies import lua_table
+                lines.insert(len(lines)-1, '\t\t\tassembly = '+lua_table(row['assembly'])+',')
         lines += ["\t},", "})", ""]
         (self.root / "src/shared/character").mkdir(parents=True, exist_ok=True)
         (self.root / "src/shared/character/CharacterRegistry.luau").write_text("\n".join(lines), encoding="utf-8")

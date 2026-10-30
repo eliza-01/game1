@@ -229,7 +229,7 @@ class WriteRoutingM88(unittest.TestCase):
                           and any(isinstance(t, ast.Name) and t.id == "WRITE_SOURCES" for t in node.targets))
         provided = {key.value for key in definition.value.args[0].keys}
         requested = set()
-        for module in ("write_files", "write_actors", "write_world", "write_animations", "delete_entities", "real_estate"):
+        for module in ("write_files", "write_actors", "write_world", "write_animations", "delete_entities", "real_estate", "character_components"):
             source = ast.parse((ROOT / f"system/control-center/api/{module}.py").read_text(encoding="utf-8"))
             for node in ast.walk(source):
                 if (isinstance(node, ast.Subscript) and isinstance(node.value, ast.Name)

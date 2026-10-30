@@ -1,0 +1,21 @@
+#character-assemblies-panel{padding:22px;margin:18px 0;border:1px solid #26363d;border-radius:16px;background:var(--panel,#131c24)}
+.ca-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin:16px 0}
+.ca-grid label{display:grid;gap:6px}
+#ca-status{padding:12px 0;min-height:2em;overflow-wrap:anywhere}
+#ca-status.error{color:#ef8a86}
+#ca-rows button{margin:3px}
+/* M173: distinguish a saved recipe from a pending draft and explain outfit mixing. */
+#character-assemblies-panel .character-flow-note p{margin:7px 0 0}
+#character-assemblies-panel .character-ready{border-color:#42d6b177}
+#character-assemblies-panel .character-needs-publish{border-color:#ff9f4366}
+#ca-rows td{vertical-align:top;overflow-wrap:anywhere;font-size:12px}
+#ca-rows .character-selected-assembly{background:#42d6b111}
+#ca-save.character-dirty{border-color:var(--mint);background:var(--mint);color:#06271f;font-weight:800}
+#character-assemblies-panel label{min-width:0}
+#character-assemblies-panel select{max-width:100%;min-width:0}
+/* M174 · slot-specific illustrative 32px icons; these are NOT model renders. */
+.ca-part-control{display:flex;align-items:center;gap:9px;min-width:0}
+.ca-part-control select{flex:1;min-width:0}
+.ca-part-icon{width:32px;height:32px;min-width:32px;display:grid;place-items:center;border:1px solid #45606a;background:#29404755;color:#8bddc9;border-radius:9px;font-size:22px;line-height:1}
+#ca-editor-summary{scroll-margin-top:120px}
+#ca-rows .character-selected-assembly{outline:1px solid #42d6b177;outline-offset:-1px}

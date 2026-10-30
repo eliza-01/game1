@@ -47,9 +47,16 @@ def check_character_manifest(
             if gender not in {"male", "female"}:
                 err(f"character archetype {row.get('id')} has invalid gender: {gender}")
             identity = (race, gender)
-            if identity in identities:
-                err(f"duplicate character identity: {race}/{gender}")
-            identities.add(identity)
+            if row.get('visualMode', 'model') != 'assembly':
+                if identity in identities:
+                    err(f"duplicate character identity: {race}/{gender}")
+                identities.add(identity)
+        if row.get('visualMode') == 'assembly':
+            assembly = row.get('assembly')
+            if not isinstance(assembly, dict) or assembly.get('schema_version') != 1:
+                err(f"character {row.get('id')} needs an assembly v1 recipe")
+            elif set(assembly.get('parts') or {}) != {'upper','lower','gloves','boots','head','eyes','eyebrows','hair'}:
+                err(f"character {row.get('id')} must select eight default parts")
         model = row.get("model")
         skeleton = row.get("skeleton")
         if not isinstance(model, dict):
@@ -141,7 +148,7 @@ def check_character_publication(
     js = ROOT / "system/control-center/static/character-assets.js"
     if not css.is_file() or not js.is_file():
         err("character asset manager css/js files are missing")
-    if 'id="race"' not in ui or 'id="gender"' not in ui or 'id="publish-character"' not in ui:
+    if 'id="race"' not in ui or 'id="gender"' not in ui or 'id="register-character"' not in ui:
         err("character asset manager race/gender/publication controls are missing")
     if 'id="character-model-source"' in ui:
         err("character edit UI must not reassign/reuse another archetype's existing Roblox model asset id")
@@ -219,7 +226,7 @@ def check_character_identity(
         err("host agent does not expose archetype identity editing")
     if 'id="save-archetype"' not in ui or 'id="character-id" autocomplete="off"' not in ui:
         err("asset manager archetype edit controls are missing")
-    for required in ["saveArchetype", "save archetype identity first", "/identity"]:
+    for required in ["saveArchetype", "save identity changes for", "/identity"]:
         if required not in js_text:
             err(f"asset manager archetype editing ui missing {required}")
 
@@ -240,9 +247,10 @@ def check_character_identity(
         err("replace-model endpoint must reject accidental reuse of the old Roblox asset id")
     if 'id="character-model-source"' in ui:
         err("asset manager must not offer cross-archetype Roblox asset id reuse")
-    for required in ["replace model · publish new asset", "/replace-model", "existingId:row?.id||''"]:
-        if required not in js_text:
-            err(f"asset manager archetype model replacement ui missing {required}")
+    pipeline_text = (ROOT / "system/control-center/static/character-workflow.js").read_text(encoding="utf-8")
+    for required in ["Reg + Publish", "/api/characters/workflow", "existingId:row?.id||''", "Retry Studio Sync"]:
+        if required not in (ui + pipeline_text):
+            err(f"asset manager guided character publication missing {required}")
     if 'source.get("model_asset_id")' in character_store_text:
         err("character model reassignment must not copy another archetype's Roblox asset id")
 

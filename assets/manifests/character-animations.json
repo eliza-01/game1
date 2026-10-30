@@ -11,6 +11,10 @@
     {
       "characterId": "human_female",
       "skeletonSignature": "6b825a0cd2cdeaf700fca3c853fb52d41e9f170020b012d7d1188d4f9352210c"
+    },
+    {
+      "characterId": "human_male",
+      "skeletonSignature": "81519687bd1413ddf34287374fa5ef61f46c52d3976c5be95aa06e5204f56496"
     }
   ],
   "clips": [

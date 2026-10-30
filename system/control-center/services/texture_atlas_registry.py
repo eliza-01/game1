@@ -12,6 +12,7 @@ import shutil
 import threading
 import time
 import unicodedata
+import uuid
 
 from PIL import Image, UnidentifiedImageError
 
@@ -92,6 +93,15 @@ class AtlasRegistry:
         self.root = root.resolve()
         self.db = self.root / '.control-center/game1.db'
         with self.connect() as db:
+            # M174 is an additive schema change. Keep a one-time online backup
+            # of the existing DB before the first creation of the scope table.
+            existing_scope = db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='texture_atlas_scopes'").fetchone()
+            if not existing_scope and self.db.is_file():
+                backup_dir = self.db.parent / 'backups'
+                backup_dir.mkdir(parents=True, exist_ok=True)
+                backup_file = backup_dir / ('before_character_atlas_scope_' + uuid.uuid4().hex + '.db')
+                with connect_sqlite(backup_file) as target:
+                    db.backup(target)
             db.executescript('''
                 CREATE TABLE IF NOT EXISTS texture_atlas_families (
                     id INTEGER PRIMARY KEY, atlas_key TEXT NOT NULL UNIQUE,
@@ -127,6 +137,9 @@ class AtlasRegistry:
                     UNIQUE(consumer_type,consumer_id,source_sha256,image_asset_id));
                 CREATE INDEX IF NOT EXISTS ix_legacy_atlas_sha
                     ON texture_atlas_legacy_publications(source_sha256);
+                CREATE TABLE IF NOT EXISTS texture_atlas_scopes (
+                    variant_id INTEGER PRIMARY KEY REFERENCES texture_atlas_variants(id),
+                    scope TEXT NOT NULL CHECK(scope IN ('character')));
                 CREATE TABLE IF NOT EXISTS texture_atlas_bindings (
                     consumer_type TEXT NOT NULL,
                     consumer_id TEXT NOT NULL,
@@ -174,8 +187,16 @@ class AtlasRegistry:
         row['baseKey'], row['version'] = atlas_version(row['atlas_key'])
         return row
 
-    def catalog(self, search: str = '') -> list[dict]:
+    def character_variant_ids(self) -> set[int]:
+        """Explicit Character ownership plus existing Character bindings (legacy)."""
+        with self.connect() as db:
+            rows = db.execute("""SELECT variant_id FROM texture_atlas_scopes WHERE scope='character'
+                UNION SELECT variant_id FROM texture_atlas_bindings WHERE consumer_type='character_part'""")
+            return {int(row[0]) for row in rows}
+
+    def catalog(self, search: str = '', *, domain: str | None = None) -> list[dict]:
         search = str(search or '').strip().lower()
+        allowed = self.character_variant_ids() if domain == 'character' else None
         with self.connect() as db:
             rows = db.execute('''SELECT v.*, f.atlas_key, r.source_sha256 AS replacement_sha256
                 FROM texture_atlas_variants v
@@ -185,6 +206,8 @@ class AtlasRegistry:
         result: dict[str, dict] = {}
         for row in rows:
             item = self._variant(dict(row))
+            if allowed is not None and item['id'] not in allowed:
+                continue
             if search and search not in item['atlas_key'] and search not in item['filename'].lower():
                 continue
             group = result.setdefault(item['atlas_key'], {
@@ -216,7 +239,9 @@ class AtlasRegistry:
                 WHERE variant_id=? ORDER BY consumer_type,consumer_id''', (int(variant_id),)).fetchall()
         return [dict(row) for row in rows]
 
-    def register_file(self, source_path: str) -> dict:
+    def register_file(self, source_path: str, *, domain: str = 'location') -> dict:
+        if domain not in ('location', 'character'):
+            raise ValueError('unsupported atlas registration domain')
         path = Path(str(source_path)).expanduser().resolve()
         if not path.is_file() or path.suffix.lower() not in ('.png', '.jpg', '.jpeg'):
             raise ValueError('select a PNG/JPG atlas file')
@@ -236,6 +261,14 @@ class AtlasRegistry:
                                       (family_id, parsed['width'], parsed['height'])).fetchone()
                 if existing:
                     variant_id = existing['id']
+                    claimed = db.execute('SELECT scope FROM texture_atlas_scopes WHERE variant_id=?',
+                                         (variant_id,)).fetchone()
+                    character_bound = db.execute("""SELECT 1 FROM texture_atlas_bindings
+                        WHERE variant_id=? AND consumer_type='character_part' LIMIT 1""", (variant_id,)).fetchone()
+                    if domain == 'character' and not (claimed and claimed['scope'] == 'character') and not character_bound:
+                        raise ValueError('this atlas name/resolution belongs to another section; choose a unique Character atlas name')
+                    if domain != 'character' and claimed and claimed['scope'] == 'character':
+                        raise ValueError('this atlas belongs to Characters; choose another atlas name')
                     unresolved = db.execute('SELECT 1 FROM texture_atlas_pending_uploads WHERE variant_id=?',
                                             (variant_id,)).fetchone()
                     if existing['source_sha256'] == sha:
@@ -277,6 +310,9 @@ class AtlasRegistry:
                     (family_id,parsed['width'],parsed['height'],parsed['filename'],path.name,
                      rel,sha,int(alpha),now))
                 variant_id = cursor.lastrowid
+                if domain == 'character':
+                    db.execute('INSERT INTO texture_atlas_scopes(variant_id,scope) VALUES(?,?)',
+                               (variant_id, 'character'))
             return self.get_variant(variant_id)
 
     def bind(self, consumer_type: str, consumer_id: str, variant_id: int, *, expected_revision: int | None = None,

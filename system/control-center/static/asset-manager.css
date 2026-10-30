@@ -86,3 +86,26 @@
 .toast.show {pointer-events:auto;display:flex;align-items:flex-start;gap:13px;z-index:60;}
 .toast-message {flex:1;min-width:0;white-space:pre-wrap;overflow-wrap:anywhere;}
 .toast-close {padding:0 5px;border:0;background:transparent;font-size:20px;line-height:1;flex:none;}
+
+/* M172: Characters guided workflow, scoped to this view. */
+#characters-view .character-reset{border-color:var(--orange);color:var(--orange);background:transparent}
+#characters-view button.character-dirty{border-color:var(--mint);background:var(--mint);color:#06271f;font-weight:800;opacity:1}
+#characters-view .character-help{width:30px;height:34px;padding:0;border-radius:50%;border-color:var(--muted);color:var(--muted);font-weight:800}
+#characters-view .character-help:hover,#characters-view .character-help:focus-visible{color:var(--mint);border-color:var(--mint)}
+#character-tooltip{position:fixed;z-index:99;width:min(350px,calc(100vw - 24px));padding:12px 14px;border:1px solid var(--mint);border-radius:11px;background:var(--panel);color:var(--text);box-shadow:var(--shadow);pointer-events:none;font-size:12px;line-height:1.5}
+#character-tooltip[hidden]{display:none}
+.character-report-dialog{width:min(620px,calc(100vw - 24px));max-height:85vh;overflow:auto;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:16px;padding:0;box-shadow:var(--shadow)}
+.character-report-dialog::backdrop{background:#060c12b9}
+.character-report-head{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.character-report-head h3{font-size:20px;margin-top:4px}
+.character-report-head button{padding:5px 9px}
+.character-report-body{padding:18px 22px;display:grid;gap:12px;line-height:1.5;overflow-wrap:anywhere}
+#character-report-stages{display:grid;gap:7px}
+.character-report-step{padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel2)}
+.character-report-step strong,.character-report-step span{display:block}
+.character-report-step strong{font-size:12px;text-transform:capitalize}
+.character-report-step span{color:var(--muted);font-size:12px;margin-top:3px}
+.character-report-step.ok{border-color:#42d6b155}.character-report-step.ok strong{color:var(--mint)}
+.character-report-step.error{border-color:#ff657766}.character-report-step.error strong{color:var(--danger)}
+.character-report-step.pending strong{color:var(--orange)}
+#character-report-recovery button{margin-top:9px;border-color:var(--mint)}

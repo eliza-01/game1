@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "jobs": [
+    {
+      "schema_version": 1,
+      "id": "dd9da8ec-1277-481f-8f46-0eed7cc290d8",
+      "status": "completed",
+      "started_at": 1793392048.952679,
+      "finished_at": 1793392144.5604298,
+      "items": [
+        {
+          "kind": "rig",
+          "id": "human",
+          "revision": 1,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "72991204751635"
+        },
+        {
+          "kind": "part",
+          "id": "eyes_01",
+          "revision": 1,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "89729530332422"
+        },
+        {
+          "kind": "part",
+          "id": "eyes_01_spiral",
+          "revision": 1,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "116007128921217"
+        },
+        {
+          "kind": "part",
+          "id": "hair_01_common",
+          "revision": 1,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "103448998519786"
+        },
+        {
+          "kind": "part",
+          "id": "hair_02_common",
+          "revision": 1,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "130975136673384"
+        },
+        {
+          "kind": "part",
+          "id": "head_01_male",
+          "revision": 1,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "96269914472557"
+        },
+        {
+          "kind": "part",
+          "id": "newborn_boots",
+          "revision": 1,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "131320421035892"
+        },
+        {
+          "kind": "part",
+          "id": "newborn_gloves",
+          "revision": 1,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "115795849731571"
+        },
+        {
+          "kind": "part",
+          "id": "newborn_lower",
+          "revision": 1,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "112020397345330"
+        },
+        {
+          "kind": "part",
+          "id": "newborn_upper",
+          "revision": 1,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "73567696582696"
+        }
+      ]
+    }
+  ]
+}

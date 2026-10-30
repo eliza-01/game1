@@ -107,5 +107,12 @@ return table.freeze({
 				}),
 			}),
 		}),
+		["human_male"] = table.freeze({
+			skeletonSignature = "81519687bd1413ddf34287374fa5ef61f46c52d3976c5be95aa06e5204f56496",
+			base = table.freeze({
+			}),
+			weapons = table.freeze({
+			}),
+		}),
 	}),
 })

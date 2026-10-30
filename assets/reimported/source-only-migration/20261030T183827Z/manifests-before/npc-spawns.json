@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "project": "game1",
+  "records": {
+    "spawn-6de4624d878b4e7b9e7a4d77406b071b": {
+      "spawnId": "spawn-6de4624d878b4e7b9e7a4d77406b071b",
+      "monsterSlug": "warsmith",
+      "mapKey": "main",
+      "placeId": 0,
+      "position": {
+        "x": 454.716,
+        "y": -54.0,
+        "z": -228.246
+      },
+      "yawDegrees": 50.050000000000004,
+      "respawnSeconds": 10.0,
+      "spawnRadius": 0.0,
+      "maxAlive": 1,
+      "enabled": true,
+      "createdAtUtc": "2026-10-13T00:41:53.298802Z",
+      "updatedAtUtc": "2026-10-20T19:59:13.272186Z",
+      "studioSync": {
+        "status": "synced",
+        "recordFingerprint": "14cdcfaf5fe1bd969288c1132eea7015ca58259e7293fa71b754c14590a1967b",
+        "placeId": 0,
+        "markerPath": "Workspace.Game1Authoring.NpcSpawns.Warsmith_6de4624d",
+        "syncedAtUtc": "2026-10-20T19:59:14.307851Z"
+      }
+    },
+    "spawn-17106a938a634015b0f320e7bd64328e": {
+      "spawnId": "spawn-17106a938a634015b0f320e7bd64328e",
+      "monsterSlug": "guard_01",
+      "mapKey": "main",
+      "placeId": 0,
+      "position": {
+        "x": 429.41,
+        "y": -54.0,
+        "z": -304.086
+      },
+      "yawDegrees": 311.25,
+      "respawnSeconds": 10.0,
+      "spawnRadius": 1.0,
+      "maxAlive": 1,
+      "enabled": true,
+      "createdAtUtc": "2026-10-20T19:56:17.512727Z",
+      "updatedAtUtc": "2026-10-20T19:56:17.512727Z",
+      "studioSync": {
+        "status": "synced",
+        "recordFingerprint": "3934532b0a3a714a6a2d1ccb8f46ceb0cffadf1a2502447ac940ab03123f9d72",
+        "placeId": 0,
+        "markerPath": "Workspace.Game1Authoring.NpcSpawns.Guard_01_17106a93",
+        "syncedAtUtc": "2026-10-20T19:56:18.536004Z"
+      }
+    },
+    "spawn-b126db75e53949cea848dc7bf8b9300c": {
+      "spawnId": "spawn-b126db75e53949cea848dc7bf8b9300c",
+      "monsterSlug": "guard_01",
+      "mapKey": "main",
+      "placeId": 0,
+      "position": {
+        "x": 266.093,
+        "y": -142.376,
+        "z": -171.079
+      },
+      "yawDegrees": 325.55,
+      "respawnSeconds": 10.0,
+      "spawnRadius": 1.0,
+      "maxAlive": 1,
+      "enabled": true,
+      "createdAtUtc": "2026-10-20T19:57:07.740699Z",
+      "updatedAtUtc": "2026-10-20T19:57:07.740699Z",
+      "studioSync": {
+        "status": "synced",
+        "recordFingerprint": "ec38ceddaa764f765dc3c06ad313a7c52d2c66aff7b5756efade4f912fa6e3e9",
+        "placeId": 0,
+        "markerPath": "Workspace.Game1Authoring.NpcSpawns.Guard_01_b126db75",
+        "syncedAtUtc": "2026-10-20T19:57:08.793207Z"
+      }
+    }
+  }
+}

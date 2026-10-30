@@ -99,6 +99,10 @@ def route(path, body, deps):
                                  'syncedConsumers': 0, 'pendingConsumers': 0})
             credentials = publication_credentials('game1 atlas republish')
             result = location_assets.atlases.ensure_published(variant_id, credentials, 'game1 atlas republish')
+            if 'character_components' in deps:
+                deps['character_components'].export()
+            if 'character_assemblies' in deps:
+                deps['character_assemblies'].characters.export()
             # Both domains consume the same publication; export both registries
             # before asking Studio to refresh templates and placed instances.
             location_assets.export()
@@ -139,6 +143,10 @@ def route(path, body, deps):
             variant_id = int(path[len('/api/texture-atlases/variants/'):-len('/publish')].strip('/'))
             credentials = publication_credentials('game1 atlas')
             result = location_assets.atlases.ensure_published(variant_id, credentials, 'game1 atlas')
+            if 'character_components' in deps:
+                deps['character_components'].export()
+            if 'character_assemblies' in deps:
+                deps['character_assemblies'].characters.export()
             location_assets.export()
             return out(200, result)
         except Exception as error:

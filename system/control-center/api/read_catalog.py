@@ -3,6 +3,7 @@
 Do not mutate stores or depend on BaseHTTPRequestHandler/Studio transport.
 """
 from urllib.parse import parse_qs, unquote
+from . import character_components
 
 
 def _query(parsed, name: str) -> str:
@@ -11,6 +12,11 @@ def _query(parsed, name: str) -> str:
 
 def route(parsed, sources, publication_config):
     path = parsed.path
+    if path == '/api/characters/assemblies':
+        return 200, sources['character_assemblies'].snapshot()
+    response = character_components.read(path, sources)
+    if response is not None:
+        return response
     catalog = {
         "/api/characters": ("characters", None),
         "/api/animations": ("animations", "character"),

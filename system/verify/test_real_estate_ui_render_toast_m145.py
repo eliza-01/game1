@@ -88,7 +88,7 @@ assert.equal(toastNode.className,'toast');
         locations = (STATIC / 'locations.js').read_text(encoding='utf-8')
         html = (STATIC / 'index.html').read_text(encoding='utf-8')
         self.assertNotIn('function toast(', locations)
-        self.assertIn('character-assets.js?v=19', html)
+        self.assertIn('character-assets.js?v=20', html)
         self.assertIn('real-estate.js?v=19', html)
         self.assertIn('locations.js?v=2', html)
 

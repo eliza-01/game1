@@ -55,7 +55,7 @@ class CharacterModularUiTests(unittest.TestCase):
             self.assertIn(f'id="{element}"', self.html)
         for token in ('row.gender===\'common\'','row.gender===gender',
                       "const clothing = slots.slice(0,4)",
-                      "window.confirm('Discard unsaved", 'expected_revision:editRevision',
+                      "window.confirm('Отменить несохранённые", 'expected_revision:editRevision',
                       "resolved.missing", 'original=JSON.stringify(form())'):
             self.assertIn(token, self.assemblies)
         self.assertIn("role==='part'", self.assemblies)

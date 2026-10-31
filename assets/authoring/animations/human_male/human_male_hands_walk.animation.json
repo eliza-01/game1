@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "clip_name": "hands_walk",
+  "source_action": "walk_hand",
+  "fps": 30.0,
+  "frame_start": 0,
+  "frame_end": 50,
+  "looped": true,
+  "mode": "skeletal",
+  "events": [],
+  "animation_file": "human_male_hands_walk.rbxmx",
+  "animation_sha256": "d618432d28fc696e208ff1b3ba42fb88d8f616015a59a3e06212f340f60ee1ae",
+  "rig": {
+    "id": "human",
+    "revision": 2,
+    "asset_id": "99890351983275"
+  }
+}

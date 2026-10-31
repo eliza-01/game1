@@ -1,8 +1,19 @@
 from __future__ import annotations
 
 import json
+import re
 
 from .common import PROJECT, SCHEMA_VERSION, WEAPON_SETS
+from .documents import get_document
+
+def lua_data(value):
+    if value is None:return 'nil'
+    if value is True:return 'true'
+    if value is False:return 'false'
+    if isinstance(value,(int,float)):return repr(value)
+    if isinstance(value,str):return re.sub(r'\\u([0-9a-fA-F]{4})',r'\\u{\1}',json.dumps(value,ensure_ascii=False))
+    if isinstance(value,list):return '{'+','.join(lua_data(x) for x in value)+'}'
+    return '{'+','.join('['+lua_data(k)+']='+lua_data(v) for k,v in value.items())+'}'
 
 
 class AnimationRegistryMixin:
@@ -66,12 +77,13 @@ class AnimationRegistryMixin:
         manifest.parent.mkdir(parents=True, exist_ok=True)
         manifest.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
-        clips_by_id = {str(row["id"]): row for row in clips if str(row.get("asset_id") or "").isdigit()}
+        clips_by_id = {str(row["id"]): row for row in clips if str(row.get("asset_id") or "").isdigit() or str(row.get('source_path') or '').endswith('.animation.json')}
         profile_map: dict[str, dict] = {}
         for profile in profiles:
             profile_map[str(profile["character_id"])] = {
                 "skeletonSignature": str(profile.get("skeleton_signature") or ""),
                 "base": {},
+                "emotions": {},
                 "weapons": {},
             }
         for binding in bindings:
@@ -79,7 +91,7 @@ class AnimationRegistryMixin:
             if clip is None:
                 continue
             character_id = str(binding["character_id"])
-            profile = profile_map.setdefault(character_id, {"skeletonSignature": "", "base": {}, "weapons": {}})
+            profile = profile_map.setdefault(character_id, {"skeletonSignature": "", "base": {}, "emotions": {}, "weapons": {}})
             descriptor = {
                 "clipId": str(clip["id"]),
                 "assetId": str(clip["asset_id"]),
@@ -89,8 +101,14 @@ class AnimationRegistryMixin:
                 "looped": bool(binding["looped"]),
                 "priority": str(binding["priority"]),
             }
+            procedural=str(clip.get('source_path') or '').endswith('.animation.json')
+            if procedural:descriptor.update(assetId='',animationId='')
+            with self.connect() as documents:
+                descriptor['document']=get_document(documents,clip['id'],'procedural' if procedural else (clip.get('published_sha256') or clip['sha256']))
             if str(binding["scope"]) == "base":
                 profile["base"].setdefault(str(binding["slot"]), []).append(descriptor)
+            elif str(binding['scope']) == 'emotions':
+                profile['emotions'].setdefault(str(binding['slot']), []).append(descriptor)
             else:
                 weapon = profile["weapons"].setdefault(str(binding["weapon_set"]), {})
                 weapon.setdefault(str(binding["slot"]), []).append(descriptor)
@@ -98,6 +116,8 @@ class AnimationRegistryMixin:
         for profile in profile_map.values():
             for rows in profile["base"].values():
                 rows.sort(key=lambda row: row["variant"])
+            for rows in profile['emotions'].values():
+                rows.sort(key=lambda row: row['variant'])
             for weapon in profile["weapons"].values():
                 for rows in weapon.values():
                     rows.sort(key=lambda row: row["variant"])
@@ -115,6 +135,7 @@ class AnimationRegistryMixin:
                 indent + f"\tweight = {int(row['weight'])},",
                 indent + f"\tlooped = {'true' if row['looped'] else 'false'},",
                 indent + f"\tpriority = {lua_string(row['priority'])},",
+                indent + '\tdocument = '+lua_data(row.get('document'))+',',
                 indent + "}),",
             ]
 
@@ -136,6 +157,11 @@ class AnimationRegistryMixin:
                 lines.append(f"\t\t\t\t[{lua_string(slot)}] = table.freeze({{")
                 for row in profile["base"][slot]:
                     lines.extend(emit_descriptor(row, "\t\t\t\t\t"))
+                lines.append("\t\t\t\t}),")
+            lines += ["\t\t\t}),", "\t\t\temotions = table.freeze({"]
+            for slot in sorted(profile['emotions']):
+                lines.append(f"\t\t\t\t[{lua_string(slot)}] = table.freeze({{")
+                for row in profile['emotions'][slot]:lines.extend(emit_descriptor(row, "\t\t\t\t\t"))
                 lines.append("\t\t\t\t}),")
             lines += ["\t\t\t}),", "\t\t\tweapons = table.freeze({"]
             for weapon_set in sorted(profile["weapons"]):

@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "clip_name": "base_death",
+  "source_action": "death",
+  "fps": 30.0,
+  "frame_start": 0,
+  "frame_end": 50,
+  "looped": false,
+  "mode": "skeletal",
+  "events": [],
+  "animation_file": "human_male_base_death.rbxmx",
+  "animation_sha256": "98b3cdedc0f32d59cc1e17795aadefefa3ec916c5a25db3145c31209b16c3582",
+  "rig": {
+    "id": "human",
+    "revision": 2,
+    "asset_id": "99890351983275"
+  }
+}

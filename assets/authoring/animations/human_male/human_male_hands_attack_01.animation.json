@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "clip_name": "hands_attack_01",
+  "source_action": "atk01_hand",
+  "fps": 30.0,
+  "frame_start": 0,
+  "frame_end": 45,
+  "looped": false,
+  "mode": "skeletal",
+  "events": [],
+  "animation_file": "human_male_hands_attack_01.rbxmx",
+  "animation_sha256": "87b70500986a639f52c6c76ebf0b18c9ea8cf0525b4b0b0cf19710ae29c90513",
+  "rig": {
+    "id": "human",
+    "revision": 2,
+    "asset_id": "99890351983275"
+  }
+}

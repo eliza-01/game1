@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "clip_name": "2hs_attack_01",
+  "source_action": "atk01_2_hs",
+  "fps": 30.0,
+  "frame_start": 0,
+  "frame_end": 45,
+  "looped": false,
+  "mode": "skeletal",
+  "events": [],
+  "animation_file": "human_male_2hs_attack_01.rbxmx",
+  "animation_sha256": "418090f34ffa0e9681d8b64b984f926695f372423ed9b35ac4e27a5cdf5bf114",
+  "rig": {
+    "id": "human",
+    "revision": 2,
+    "asset_id": "99890351983275"
+  }
+}

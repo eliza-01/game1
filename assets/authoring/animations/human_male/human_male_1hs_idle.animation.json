@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "clip_name": "1hs_idle",
+  "source_action": "wait_1_hs",
+  "fps": 30.0,
+  "frame_start": 0,
+  "frame_end": 50,
+  "looped": true,
+  "mode": "skeletal",
+  "events": [],
+  "animation_file": "human_male_1hs_idle.rbxmx",
+  "animation_sha256": "0a59b2b3a86c0799a2827c6bedd703be60fbea656446accfa7ab8a60da1dc8a1",
+  "rig": {
+    "id": "human",
+    "revision": 2,
+    "asset_id": "99890351983275"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "clip_name": "hands_run",
+  "source_action": "run_hand",
+  "fps": 30.0,
+  "frame_start": 0,
+  "frame_end": 50,
+  "looped": true,
+  "mode": "skeletal",
+  "events": [],
+  "animation_file": "human_male_hands_run.rbxmx",
+  "animation_sha256": "60a47f8dc713dc8eee888a05a69a7bdc93881f3c25a0ac4eabb32bdb2aabcc83",
+  "rig": {
+    "id": "human",
+    "revision": 2,
+    "asset_id": "99890351983275"
+  }
+}

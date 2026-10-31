@@ -3,6 +3,7 @@ from __future__ import annotations
 from .common import ANIMATION_EXTENSIONS, _now
 from opencloud_assets import create_animation_asset, wait_for_operation
 from animation_reimport_check import find_confirmed_manual_reimport
+from services.animation_native import animation_upload_file
 
 
 class AnimationPublicationMixin:
@@ -12,6 +13,8 @@ class AnimationPublicationMixin:
         if not raw:
             raise ValueError(f"unknown animation clip: {clip_id}")
         row = dict(raw)
+        if str(row.get('source_path') or '').endswith('.animation.json'):
+            raise ValueError('procedural emotion is project data; it does not require a Roblox Animation upload')
         path = (self.root / str(row.get("prepared_path") or row.get("source_path") or "")).resolve()
         if not path.is_file() or path.suffix.lower() not in ANIMATION_EXTENSIONS:
             raise ValueError("registered animation file is missing")
@@ -33,7 +36,8 @@ class AnimationPublicationMixin:
                 "animation content changed after publication. game1 preserves the permanent asset id; "
                 "reimport it manually in Roblox Studio, then use Check Roblox Assets Animations in Asset Manager"
             )
-        operation = create_animation_asset(path, **common)
+        with animation_upload_file(path) as upload:
+            operation = create_animation_asset(upload, **common)
         result = wait_for_operation(operation, api_key=str(credentials["apiKey"]))
         now = _now()
         with self.connect() as connection:

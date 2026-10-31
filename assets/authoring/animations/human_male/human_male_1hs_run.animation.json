@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "clip_name": "1hs_run",
+  "source_action": "run_1_hs",
+  "fps": 30.0,
+  "frame_start": 0,
+  "frame_end": 50,
+  "looped": true,
+  "mode": "skeletal",
+  "events": [],
+  "animation_file": "human_male_1hs_run.rbxmx",
+  "animation_sha256": "e3f634bb9e9e09917efbb16489a96dfe7a7f1a9a5ac431e413600a0e91f35a6f",
+  "rig": {
+    "id": "human",
+    "revision": 2,
+    "asset_id": "99890351983275"
+  }
+}

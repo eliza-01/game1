@@ -38,6 +38,14 @@ BOW_EXTRA_SLOTS = [
     {"group": "stance", "slot": "aim", "label": "aim", "looped": True, "priority": "Movement", "variants": False},
 ]
 
+EMOTION_SLOT_CATALOG = [
+    {"group":"emotions","slot":name,"label":name.replace('_',' '),
+     "looped":name in {'idle','combat_idle','happy','happy_sharp_caret','happy_thick_caret','sad','closed'},
+     "priority":"Action2","variants":False,"execution":"skeletal" if name in {"idle","combat_idle","sad","look_around","raised_eyebrow"} else "procedural"}
+    for name in ('idle','combat_idle','happy','happy_sharp_caret','happy_thick_caret','sad',
+                 'blink','closed','indignant_surprise','dizzy_spiral','look_around','nausea_wave','raised_eyebrow')
+]
+SLOT_BY_EMOTION = {row['slot']:row for row in EMOTION_SLOT_CATALOG}
 SLOT_BY_BASE = {row["slot"]: row for row in BASE_SLOT_CATALOG}
 SLOT_BY_WEAPON = {row["slot"]: row for row in WEAPON_SLOT_CATALOG}
 SLOT_BY_BOW = {**SLOT_BY_WEAPON, **{row["slot"]: row for row in BOW_EXTRA_SLOTS}}
@@ -77,6 +85,12 @@ def filename_rule_catalog(character_id: str = "") -> list[dict]:
             "canonicalFilename": filename_prefix + _canonical_file_stem("base", "", slot, 0) + ".rbxm",
         })
 
+    for definition in EMOTION_SLOT_CATALOG:
+        slot=definition['slot']
+        rows.append(dict(scope='emotions',context='emotions',group='emotions',state=slot,
+            label=definition['label'],variants=False,variantPattern='',
+            canonicalFilename=filename_prefix+_canonical_file_stem('emotions','',slot,0)+('.animation.json' if definition['execution']=='procedural' else '.rbxmx')))
+
     for weapon_set in WEAPON_SETS:
         for definition in _catalog_for_weapon(weapon_set).values():
             slot = definition["slot"]
@@ -108,6 +122,8 @@ def _canonical_file_stem(scope: str, weapon_set: str, slot: str, variant: int) -
     slot_token = slot.replace(".", "_")
     if scope == "base":
         return f"base_{slot_token}"
+    if scope == 'emotions':
+        return f'emotions_{slot_token}'
     suffix = f"_{variant:02d}" if variant > 0 else ""
     return f"{weapon_set}_{slot_token}{suffix}"
 
@@ -125,7 +141,8 @@ def _binding_id(character_id: str, scope: str, weapon_set: str, slot: str, varia
 
 
 def _normalize_stem(path: Path) -> str:
-    return _safe_token(path.stem)
+    stem=path.name[:-len('.animation.json')] if path.name.endswith('.animation.json') else path.stem
+    return _safe_token(stem)
 
 
 def _parse_variant(value: str) -> tuple[str, int]:
@@ -164,8 +181,11 @@ def normalize_manual_binding(scope: str, weapon_set: str, slot: str, variant: in
         definition = SLOT_BY_BASE[slot]
         return {"scope": "base", "weaponSet": "", "slot": slot, "variant": 0, **definition}
 
+    if scope == 'emotions':
+        if slot not in SLOT_BY_EMOTION:raise ValueError('unknown emotion slot: '+slot)
+        return {'scope':'emotions','weaponSet':'','slot':slot,'variant':0,**SLOT_BY_EMOTION[slot]}
     if scope != "weapon":
-        raise ValueError("animation scope must be base or weapon")
+        raise ValueError("animation scope must be base, weapon or emotions")
     if weapon_set not in WEAPON_SETS:
         raise ValueError(f"unknown weapon animation set: {weapon_set}")
     catalog = _catalog_for_weapon(weapon_set)
@@ -183,6 +203,10 @@ def classify_animation(path: Path, character_id: str | None = None) -> dict | No
     """Map a Studio-exported clip filename to the canonical game1 semantic coordinate."""
     stem = _strip_character_prefix(_normalize_stem(path), character_id)
     if not stem:
+        return None
+    if stem.startswith('emotions_'):
+        slot=stem[len('emotions_'):]
+        if slot in SLOT_BY_EMOTION:return normalize_manual_binding('emotions','',slot)
         return None
 
     base_aliases = {

@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "clip_name": "base_seated_exit",
+  "source_action": "chair_stand",
+  "fps": 30.0,
+  "frame_start": 0,
+  "frame_end": 45,
+  "looped": false,
+  "mode": "skeletal",
+  "events": [],
+  "animation_file": "human_male_base_seated_exit.rbxmx",
+  "animation_sha256": "01cae1b24854171c6831cb21f1090e387c3dcad0122b79d0be532851ef2b223d",
+  "rig": {
+    "id": "human",
+    "revision": 2,
+    "asset_id": "99890351983275"
+  }
+}

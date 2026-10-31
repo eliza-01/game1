@@ -20,7 +20,7 @@ class AnimationReviewM178(unittest.TestCase):
         self.warnings_context.__enter__()
         warnings.filterwarnings("ignore", message="unclosed database", category=ResourceWarning)
         self.tmp=tempfile.TemporaryDirectory(prefix="game1-m178-")
-        self.root=Path(self.tmp.name)
+        self.root=Path(self.tmp.name).resolve()
         self.inbox=self.root/'inbox'
         self.inbox.mkdir()
         characters=CharacterStore(self.root)
@@ -31,8 +31,8 @@ class AnimationReviewM178(unittest.TestCase):
         self.store=AnimationStore(self.root)
 
     def tearDown(self):
-        self.tmp.cleanup()
         gc.collect()
+        self.tmp.cleanup()
         self.warnings_context.__exit__(None, None, None)
 
     def clip(self, name='human_male_idle.rbxm', data=b'original'):

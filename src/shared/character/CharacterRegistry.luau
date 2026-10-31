@@ -40,7 +40,7 @@ return table.freeze({
 			gender = "male",
 			status = "ASSEMBLY_READY",
 			visualMode = "assembly",
-			revision = 3,
+			revision = 4,
 			stats = table.freeze({
 				Level = 1,
 				MaxHP = 100,

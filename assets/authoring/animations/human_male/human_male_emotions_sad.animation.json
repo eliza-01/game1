@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "clip_name": "emotions_sad",
+  "source_action": "face_sad",
+  "fps": 30.0,
+  "frame_start": 1,
+  "frame_end": 90,
+  "looped": true,
+  "mode": "skeletal",
+  "events": [
+    {
+      "id": "event_0001",
+      "frame": 1,
+      "time": 0.0,
+      "name": "face_state",
+      "parameters": {
+        "name": "sad"
+      }
+    }
+  ],
+  "animation_file": "human_male_emotions_sad.rbxmx",
+  "animation_sha256": "fe3cfe3283ef5dca01ecbbfce6d0b86143b82218f34c35ec9e0b68fbbb655a0c",
+  "rig": {
+    "id": "human",
+    "revision": 2,
+    "asset_id": "99890351983275"
+  }
+}

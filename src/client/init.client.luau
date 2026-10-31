@@ -35,6 +35,7 @@ print(("[game1][client] %s v%s · runtime %s")
 
 MovementController.Start()
 CharacterAnimationController.Start()
+require(AnimationRoot:WaitForChild("FaceAnimationController")).Start()
 WeaponAttachmentController.Start()
 NpcWeaponVisibilityController.Start()
 AimPoseController.Start()

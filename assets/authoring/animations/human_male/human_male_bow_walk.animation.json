@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "clip_name": "bow_walk",
+  "source_action": "walk_bow",
+  "fps": 30.0,
+  "frame_start": 0,
+  "frame_end": 50,
+  "looped": true,
+  "mode": "skeletal",
+  "events": [],
+  "animation_file": "human_male_bow_walk.rbxmx",
+  "animation_sha256": "e637b215f599de9d9cbd8915f05bbc98b57e23f8c555994f8c4a74f7d4bd308d",
+  "rig": {
+    "id": "human",
+    "revision": 2,
+    "asset_id": "99890351983275"
+  }
+}

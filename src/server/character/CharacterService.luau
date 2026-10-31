@@ -254,6 +254,10 @@ createCharacter = function(player: Player, requestedArchetypeId: string?, revive
     character:SetAttribute("CharacterGender", gender or "")
     character:SetAttribute("CharacterSkeletonSignature", if row and row.skeleton then tostring(row.skeleton.signature or "") else "")
     character:SetAttribute("AnimationProfileId", archetype)
+    if row and row.assembly and row.assembly.rig then
+        character:SetAttribute("CharacterRigAssetId", tostring(row.assembly.rig.asset_id))
+        character:SetAttribute("CharacterRigRevision", row.assembly.rig.revision)
+    end
     character:SetAttribute("AnimationWeaponSet", "hands")
     character:SetAttribute("RequestedCharacterArchetype", requestedArchetype or "")
     character:SetAttribute("UsingBootstrapVisual", archetype == "bootstrap")
@@ -287,6 +291,7 @@ createCharacter = function(player: Player, requestedArchetypeId: string?, revive
     character.Parent = Workspace
     CharacterRigService.Finish(rig)
     player.Character = character
+    require(script.Parent:WaitForChild("FaceEmotionService")).Bind(character)
     WeaponEquipService.EquipStartup(character)
 
     local hitboxes = EntityHitboxService.Attach(character, rig.visual)

@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "clip_name": "emotions_look_around",
+  "source_action": "face_wait_special_look_around",
+  "fps": 30.0,
+  "frame_start": 1,
+  "frame_end": 240,
+  "looped": false,
+  "mode": "skeletal",
+  "events": [
+    {
+      "id": "event_0001",
+      "frame": 1,
+      "time": 0.0,
+      "name": "face_state",
+      "parameters": {
+        "name": "look_around"
+      }
+    },
+    {
+      "id": "event_0002",
+      "frame": 240,
+      "time": 7.966666666666667,
+      "name": "face_reset",
+      "parameters": {}
+    }
+  ],
+  "animation_file": "human_male_emotions_look_around.rbxmx",
+  "animation_sha256": "9905dca031e5046729a9881eb19e813721b90b6af47596fd950ebd37431ecf57",
+  "rig": {
+    "id": "human",
+    "revision": 2,
+    "asset_id": "99890351983275"
+  }
+}

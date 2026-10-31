@@ -3618,7 +3618,7 @@
       "race": "human",
       "gender": "male",
       "status": "ASSEMBLY_READY",
-      "revision": 3,
+      "revision": 4,
       "visualMode": "assembly",
       "assembly": {
         "schema_version": 1,

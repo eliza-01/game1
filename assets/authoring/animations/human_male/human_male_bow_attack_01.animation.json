@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "clip_name": "bow_attack_01",
+  "source_action": "atk01_bow",
+  "fps": 30.0,
+  "frame_start": 0,
+  "frame_end": 45,
+  "looped": false,
+  "mode": "skeletal",
+  "events": [],
+  "animation_file": "human_male_bow_attack_01.rbxmx",
+  "animation_sha256": "68c7989d119fbd69a063c54deb2e3e3b0cf05343deb43245ab950b7f4c443a9e",
+  "rig": {
+    "id": "human",
+    "revision": 2,
+    "asset_id": "99890351983275"
+  }
+}

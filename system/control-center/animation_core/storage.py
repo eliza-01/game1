@@ -6,9 +6,11 @@ import shutil
 import sqlite3
 
 from animation_retirement import retire_unbound_clip, retire_legacy_orphans
+from sqlite_connection import connect as open_database
+from .documents import ensure_schema, is_animation_source, read_document, document_path, document_digest, save_document, get_document
 
 from .common import (
-    ANIMATION_EXTENSIONS, BASE_SLOT_CATALOG, BOW_EXTRA_SLOTS, MAX_SCAN_FILES, NAMING_EXAMPLES, PROJECT, filename_rule_catalog,
+    ANIMATION_EXTENSIONS, BASE_SLOT_CATALOG, BOW_EXTRA_SLOTS, EMOTION_SLOT_CATALOG, MAX_SCAN_FILES, NAMING_EXAMPLES, PROJECT, filename_rule_catalog,
     SCHEMA_VERSION, WEAPON_SETS, WEAPON_SLOT_CATALOG, _binding_id, _canonical_file_stem,
     _catalog_for_weapon, _clip_id, _now, classify_animation, normalize_manual_binding,
 )
@@ -16,7 +18,7 @@ from .common import (
 
 class AnimationStorageMixin:
     def connect(self):
-        connection = sqlite3.connect(self.db)
+        connection = open_database(self.db)
         connection.row_factory = sqlite3.Row
         return connection
 
@@ -116,6 +118,7 @@ class AnimationStorageMixin:
                     retire_unbound_clip(connection, "character", clip_id)
             # Old removes may have left publication rows without a clip.
             retire_legacy_orphans(connection, "character")
+        ensure_schema(self)
         self._normalize_source_only_files()
 
     def _normalize_source_only_files(self) -> None:
@@ -244,16 +247,26 @@ class AnimationStorageMixin:
         stem = _canonical_file_stem(scope, weapon_set, slot, variant)
         if scope == "base":
             relative = Path("characters") / race / gender / character_id / "animations" / "base" / f"{stem}{suffix}"
+        elif scope == 'emotions':
+            relative = Path('characters') / race / gender / character_id / 'animations' / 'emotions' / f'{stem}{suffix}'
         else:
             relative = Path("characters") / race / gender / character_id / "animations" / "weapons" / weapon_set / f"{stem}{suffix}"
         canonical = self.root / "assets/source" / relative
         return canonical, canonical
 
     def _register_source(self, connection, character: dict, source: Path, binding: dict, now: float) -> tuple[str, dict]:
+        procedural=source.name.endswith('.animation.json')
+        document=read_document(source,None if procedural else self._sha256(source))
+        if procedural and (not document or document['mode']!='procedural'):
+            raise ValueError('standalone animation document must be procedural')
+        doc_sha=document_digest(source) if document else ''
         character_id = str(character.get("id") or "")
         clip_id = _clip_id(character_id, binding["scope"], binding["weaponSet"], binding["slot"], int(binding["variant"]))
         binding_id = _binding_id(character_id, binding["scope"], binding["weaponSet"], binding["slot"], int(binding["variant"]))
-        source_path, prepared_path = self._canonical_paths(character, binding, source.suffix.lower())
+        clip_name = _canonical_file_stem(binding["scope"], binding["weaponSet"], binding["slot"], int(binding["variant"]))
+        if document and document.get('clip_name')!=clip_name:raise ValueError('animation document clip_name does not match semantic binding')
+        suffix='.animation.json' if procedural else source.suffix.lower()
+        source_path, prepared_path = self._canonical_paths(character, binding, suffix)
         source_path.parent.mkdir(parents=True, exist_ok=True)
         source_sha = self._sha256(source)
         old = connection.execute("SELECT * FROM animation_clips WHERE id=?", (clip_id,)).fetchone()
@@ -267,7 +280,6 @@ class AnimationStorageMixin:
 
         relative_source = source_path.relative_to(self.root).as_posix()
         relative_prepared = prepared_path.relative_to(self.root).as_posix()
-        clip_name = _canonical_file_stem(binding["scope"], binding["weaponSet"], binding["slot"], int(binding["variant"]))
         if old_dict is None:
             connection.execute(
                 """INSERT INTO animation_clips(
@@ -306,7 +318,12 @@ class AnimationStorageMixin:
                 clip_id, 100, 1 if binding["looped"] else 0, binding["priority"], now, now,
             ),
         )
-        return outcome, {"filename": source.name, "clipId": clip_id, **binding}
+        if document:
+            destination=document_path(source_path)
+            if document_path(source).resolve()!=destination.resolve():shutil.copy2(document_path(source),destination)
+            save_document(connection,clip_id,document,doc_sha,now)
+        return outcome, {"filename": source.name, "clipId": clip_id, "documentOnly":procedural,
+                         "metadataOnly":bool(same_source and old_dict and old_dict.get('asset_id')), **binding}
 
     def assign_file(self, character_id: str, source_path: str, scope: str, weapon_set: str, slot: str, variant: int = 0) -> dict:
         character = self._character(character_id)
@@ -416,6 +433,7 @@ class AnimationStorageMixin:
         source = str(row.get("prepared_path") or "")
         if not source:
             return "MISSING"
+        if source.endswith('.animation.json'):return 'DOCUMENT_READY'
         asset = str(row.get("asset_id") or "")
         if not asset:
             return "LOCAL_ONLY"
@@ -438,6 +456,9 @@ class AnimationStorageMixin:
         result = []
         for raw in rows:
             row = dict(raw)
+            row['document_only']=str(row.get('source_path') or '').endswith('.animation.json')
+            with self.connect() as documents:
+                row['document']=get_document(documents,row['clip_id'],'procedural' if row['document_only'] else row['sha256'])
             row["status"] = self._status(row)
             row["looped"] = bool(row.get("looped"))
             row["animationId"] = f"rbxassetid://{row['asset_id']}" if str(row.get("asset_id") or "").isdigit() else ""
@@ -466,6 +487,7 @@ class AnimationStorageMixin:
             "filenameRules": filename_rule_catalog(selected),
             "slotCatalog": {
                 "base": BASE_SLOT_CATALOG,
+                "emotions": EMOTION_SLOT_CATALOG,
                 "weapon": {weapon_set: list(_catalog_for_weapon(weapon_set).values()) for weapon_set in WEAPON_SETS},
             },
             "items": items,

@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "clip_name": "emotions_idle",
+  "source_action": "face_idle",
+  "fps": 30.0,
+  "frame_start": 1,
+  "frame_end": 480,
+  "looped": true,
+  "mode": "skeletal",
+  "events": [
+    {
+      "id": "event_0001",
+      "frame": 1,
+      "time": 0.0,
+      "name": "face_state",
+      "parameters": {
+        "name": "idle"
+      }
+    },
+    {
+      "id": "event_0002",
+      "frame": 79,
+      "time": 2.6,
+      "name": "blink",
+      "parameters": {
+        "duration": 0.3333333333333333
+      }
+    },
+    {
+      "id": "event_0003",
+      "frame": 194,
+      "time": 6.433333333333334,
+      "name": "blink",
+      "parameters": {
+        "duration": 0.3333333333333333
+      }
+    },
+    {
+      "id": "event_0004",
+      "frame": 325,
+      "time": 10.8,
+      "name": "blink",
+      "parameters": {
+        "duration": 0.3333333333333333
+      }
+    },
+    {
+      "id": "event_0005",
+      "frame": 441,
+      "time": 14.666666666666666,
+      "name": "blink",
+      "parameters": {
+        "duration": 0.3333333333333333
+      }
+    }
+  ],
+  "animation_file": "human_male_emotions_idle.rbxmx",
+  "animation_sha256": "33a8e7dd0fbabe8c36d884dc89101fe888b73372f508c0aecfd0cd4311a9ae87",
+  "rig": {
+    "id": "human",
+    "revision": 2,
+    "asset_id": "99890351983275"
+  }
+}

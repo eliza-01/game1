@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "clip_name": "1hs_walk",
+  "source_action": "walk_1_hs",
+  "fps": 30.0,
+  "frame_start": 0,
+  "frame_end": 49,
+  "looped": true,
+  "mode": "skeletal",
+  "events": [],
+  "animation_file": "human_male_1hs_walk.rbxmx",
+  "animation_sha256": "9fac833691d7e1a71d7875f38ca9f26a1ea7150b90b158af1e6274bc43a836d9",
+  "rig": {
+    "id": "human",
+    "revision": 2,
+    "asset_id": "99890351983275"
+  }
+}

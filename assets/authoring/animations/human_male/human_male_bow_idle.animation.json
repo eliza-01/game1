@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "clip_name": "bow_idle",
+  "source_action": "wait_bow",
+  "fps": 30.0,
+  "frame_start": 0,
+  "frame_end": 50,
+  "looped": true,
+  "mode": "skeletal",
+  "events": [],
+  "animation_file": "human_male_bow_idle.rbxmx",
+  "animation_sha256": "91b184d4ed99542ced0fbf800468cf2bfe82e1af14f67d4791d44731943cc793",
+  "rig": {
+    "id": "human",
+    "revision": 2,
+    "asset_id": "99890351983275"
+  }
+}

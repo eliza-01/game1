@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "clip_name": "emotions_nausea_wave",
+  "source_action": "face_wait_special_nausea_wave",
+  "fps": 30.0,
+  "frame_start": 1,
+  "frame_end": 160,
+  "looped": false,
+  "mode": "procedural",
+  "events": [
+    {
+      "id": "event_0001",
+      "frame": 1,
+      "time": 0.0,
+      "name": "face_state",
+      "parameters": {
+        "name": "nausea_wave"
+      }
+    },
+    {
+      "id": "event_0002",
+      "frame": 160,
+      "time": 5.3,
+      "name": "face_reset",
+      "parameters": {}
+    }
+  ]
+}

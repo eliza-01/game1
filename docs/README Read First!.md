@@ -7,6 +7,7 @@
 
 | Документ | Зачем читать | Статус |
 | --- | --- | --- |
+| [Анимации: лицо, emotions и события](animation/README.md) | Четыре контроллера лица, Blender-маркеры, документы клипов и этап внедрения | **CURRENT / IMPLEMENTING** |
 | [Актуальное ТЗ](spec/CURRENT_PROJECT_SPEC_RU.md) | Текущие возможности, socket/atlas/FBX/actor контракты, scope и Definition of Done | **CURRENT** |
 | [Архитектурная карта](architecture/CURRENT_ARCHITECTURE_RU.md) | Модули, владение данными, уже выполненная декомпозиция и устаревшие предположения | **CURRENT** |
 | [Рефакторинг: остаток работ](architecture/REFACTOR_ROADMAP_RU.md) | Completed/Partial/Pending, очередность, критерии и non-goals | **CURRENT PLAN** |

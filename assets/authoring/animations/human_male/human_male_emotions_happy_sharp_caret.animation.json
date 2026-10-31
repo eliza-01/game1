@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "clip_name": "emotions_happy_sharp_caret",
+  "source_action": "face_happy_sharp_caret",
+  "fps": 30.0,
+  "frame_start": 1,
+  "frame_end": 90,
+  "looped": true,
+  "mode": "procedural",
+  "events": [
+    {
+      "id": "event_0001",
+      "frame": 1,
+      "time": 0.0,
+      "name": "face_state",
+      "parameters": {
+        "name": "happy_sharp_caret"
+      }
+    }
+  ]
+}

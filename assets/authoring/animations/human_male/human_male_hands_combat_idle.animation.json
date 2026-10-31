@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "clip_name": "hands_combat_idle",
+  "source_action": "atk_wait_hand",
+  "fps": 30.0,
+  "frame_start": 0,
+  "frame_end": 50,
+  "looped": true,
+  "mode": "skeletal",
+  "events": [],
+  "animation_file": "human_male_hands_combat_idle.rbxmx",
+  "animation_sha256": "14c8095c7f62d1555b9a8942b728a484ee9df2088b871cff51cc04dd605e8858",
+  "rig": {
+    "id": "human",
+    "revision": 2,
+    "asset_id": "99890351983275"
+  }
+}

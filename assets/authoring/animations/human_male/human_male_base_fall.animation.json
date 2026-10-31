@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "clip_name": "base_fall",
+  "source_action": "falling",
+  "fps": 30.0,
+  "frame_start": 0,
+  "frame_end": 60,
+  "looped": true,
+  "mode": "skeletal",
+  "events": [],
+  "animation_file": "human_male_base_fall.rbxmx",
+  "animation_sha256": "953a61df6cf2821dd35e2e168091e73f01a19ac18e2562c244c3de174f059181",
+  "rig": {
+    "id": "human",
+    "revision": 2,
+    "asset_id": "99890351983275"
+  }
+}

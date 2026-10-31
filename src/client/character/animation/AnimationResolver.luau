@@ -52,18 +52,27 @@ function AnimationResolver.Resolve(character: Model, scope: string, weaponSet: s
 	if scope == "weapon" then
 		local weapon = profile.weapons and profile.weapons[tostring(weaponSet or "")]
 		rows = weapon and weapon[slot]
+	elseif scope == "emotions" then
+		rows = profile.emotions and profile.emotions[slot]
 	else
 		rows = profile.base and profile.base[slot]
 	end
 	return weightedChoice(rows)
 end
 
-function AnimationResolver.ListForCharacter(character: Model)
+function AnimationResolver.ListForCharacter(character: Model, includeProcedural: boolean?)
 	local profile = profileFor(character)
 	if not profile then
 		return {}
 	end
 	local rows = {}
+	for _, slotRows in pairs(profile.emotions or {}) do
+		for _, row in ipairs(slotRows) do
+			if includeProcedural or tostring(row.animationId or "") ~= "" then
+				table.insert(rows, row)
+			end
+		end
+	end
 	for _, slotRows in pairs(profile.base or {}) do
 		for _, row in ipairs(slotRows) do
 			table.insert(rows, row)

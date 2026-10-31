@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "clip_name": "base_seated_loop",
+  "source_action": "chair_sit",
+  "fps": 30.0,
+  "frame_start": 0,
+  "frame_end": 45,
+  "looped": true,
+  "mode": "skeletal",
+  "events": [],
+  "animation_file": "human_male_base_seated_loop.rbxmx",
+  "animation_sha256": "122f605a6c72dcb6a35833fc8b44c8034d653b9f7d5d1cf2a05f125386c45eed",
+  "rig": {
+    "id": "human",
+    "revision": 2,
+    "asset_id": "99890351983275"
+  }
+}

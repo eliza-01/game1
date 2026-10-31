@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "clip_name": "bow_combat_idle",
+  "source_action": "atk_wait_bow",
+  "fps": 30.0,
+  "frame_start": 0,
+  "frame_end": 49,
+  "looped": true,
+  "mode": "skeletal",
+  "events": [],
+  "animation_file": "human_male_bow_combat_idle.rbxmx",
+  "animation_sha256": "3802c89fe91b983fde19520e7426c6aba9a8f9f3047a31b367018ac1afd839af",
+  "rig": {
+    "id": "human",
+    "revision": 2,
+    "asset_id": "99890351983275"
+  }
+}

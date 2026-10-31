@@ -109,6 +109,25 @@
           "asset_id": "73567696582696"
         }
       ]
+    },
+    {
+      "schema_version": 1,
+      "id": "4183d908-779d-4e12-a144-9b2ffd9d62c3",
+      "status": "completed",
+      "started_at": 1793408201.2668474,
+      "finished_at": 1793408207.3505836,
+      "items": [
+        {
+          "kind": "rig",
+          "id": "human",
+          "revision": 2,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "99890351983275"
+        }
+      ]
     }
   ]
 }

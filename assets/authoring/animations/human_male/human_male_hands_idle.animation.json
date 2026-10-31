@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "clip_name": "hands_idle",
+  "source_action": "wait_hand",
+  "fps": 30.0,
+  "frame_start": 0,
+  "frame_end": 50,
+  "looped": true,
+  "mode": "skeletal",
+  "events": [],
+  "animation_file": "human_male_hands_idle.rbxmx",
+  "animation_sha256": "b56b924b0812a539ef3ebc7910a0fe5785c4ff99de86ef7bb4ae325888b04689",
+  "rig": {
+    "id": "human",
+    "revision": 2,
+    "asset_id": "99890351983275"
+  }
+}

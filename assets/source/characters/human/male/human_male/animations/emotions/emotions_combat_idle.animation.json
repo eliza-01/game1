@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "clip_name": "emotions_combat_idle",
+  "source_action": "face_idle_combat",
+  "fps": 30.0,
+  "frame_start": 1,
+  "frame_end": 90,
+  "looped": true,
+  "mode": "skeletal",
+  "events": [
+    {
+      "id": "event_0001",
+      "frame": 1,
+      "time": 0.0,
+      "name": "face_state",
+      "parameters": {
+        "name": "combat_idle"
+      }
+    }
+  ],
+  "animation_file": "human_male_emotions_combat_idle.rbxmx",
+  "animation_sha256": "380a79ab2d8568e7603ad0eb63043c7c03bddddbea636e639e1d381ac109aeae",
+  "rig": {
+    "id": "human",
+    "revision": 2,
+    "asset_id": "99890351983275"
+  }
+}

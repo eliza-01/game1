@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "clip_name": "bow_run",
+  "source_action": "run_bow",
+  "fps": 30.0,
+  "frame_start": 0,
+  "frame_end": 50,
+  "looped": true,
+  "mode": "skeletal",
+  "events": [],
+  "animation_file": "human_male_bow_run.rbxmx",
+  "animation_sha256": "5a0a58dc3d156918f1936fa6c1258d02bd0d37b7e56d2902b3100adae29125b6",
+  "rig": {
+    "id": "human",
+    "revision": 2,
+    "asset_id": "99890351983275"
+  }
+}

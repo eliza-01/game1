@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "clip_name": "1hs_combat_idle",
+  "source_action": "atk_wait_1_hs",
+  "fps": 30.0,
+  "frame_start": 0,
+  "frame_end": 49,
+  "looped": true,
+  "mode": "skeletal",
+  "events": [],
+  "animation_file": "human_male_1hs_combat_idle.rbxmx",
+  "animation_sha256": "1b5253fcf84dd54e8e52941b5f41509eb19057b3edbd3d95d0db0a94c5558a60",
+  "rig": {
+    "id": "human",
+    "revision": 2,
+    "asset_id": "99890351983275"
+  }
+}

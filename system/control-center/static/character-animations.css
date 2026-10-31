@@ -1,0 +1,35 @@
+/* Animations M178: scoped profile, row navigation, staged publication dialogs. */
+#animations-view .animation-profile-panel{margin-top:14px;scroll-margin-top:16px}
+#animations-view .animation-workflow{display:block;margin-top:14px}
+#animations-view .animation-profile-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+#animations-view .animation-show-missing{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text);cursor:pointer}
+#animations-view .animation-show-missing input{width:auto;accent-color:var(--mint)}
+#animations-view [data-animation-sort]{cursor:pointer;user-select:none;white-space:nowrap}
+#animations-view [data-animation-sort]:focus-visible,#animations-view .animation-rule-link:focus-visible{outline:2px solid var(--mint);outline-offset:-2px}
+#animations-view .animation-sort-active{color:var(--mint)}
+#animations-view .animation-empty-row{background:color-mix(in srgb,var(--orange) 7%,transparent)}
+#animations-view .animation-empty-row .tag{color:var(--orange);border:1px solid var(--orange);background:transparent}
+#animations-view .animation-jump-focus{outline:2px solid var(--mint);outline-offset:-2px}
+#animations-view .animation-rule-link{width:100%;border:0;border-top:1px solid var(--line);border-radius:0;text-align:left;background:transparent;color:var(--text);cursor:pointer}
+#animations-view .animation-rule-link:hover{background:color-mix(in srgb,var(--mint) 12%,transparent)}
+#animations-view .animation-scan-help{color:var(--text);font-size:12px;line-height:1.5}
+.animation-operation-dialog{width:min(800px,calc(100vw - 24px));max-height:85vh;overflow:auto;border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--text);padding:0;box-shadow:var(--shadow)}
+.animation-operation-dialog::backdrop{background:rgba(0,0,0,.7)}
+.animation-operation-head,.animation-operation-actions{padding:15px 18px;display:flex;justify-content:space-between;gap:12px;align-items:center;border-bottom:1px solid var(--line)}
+.animation-operation-actions{border:0;border-top:1px solid var(--line);justify-content:flex-end;flex-wrap:wrap}
+.animation-operation-head small{color:var(--mint)}
+.animation-operation-head h3{margin:4px 0 0}
+.animation-operation-body{padding:16px 18px;display:grid;gap:12px}
+.animation-operation-body p{margin:0;line-height:1.5}
+.animation-info{padding:10px 12px;border-radius:9px;background:color-mix(in srgb,var(--mint) 9%,transparent);border:1px solid color-mix(in srgb,var(--mint) 30%,transparent)}
+.animation-scan-list{display:grid;gap:6px;max-height:40vh;overflow:auto}
+.animation-scan-item{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--panel2);font-size:12px}
+.animation-scan-item input{width:auto;flex:none;accent-color:var(--mint)}
+.animation-scan-item>span:nth-child(2){flex:1;min-width:0}
+.animation-scan-item strong,.animation-scan-item small{display:block;overflow-wrap:anywhere}
+.animation-scan-item small{color:var(--muted);margin-top:3px}
+.animation-review-status{color:var(--muted);font-weight:700;font-size:11px}
+.animation-review-status.new{color:var(--mint)}
+.animation-invalid{border-color:color-mix(in srgb,var(--orange) 35%,var(--line));color:var(--orange)}
+.animation-review-result{color:var(--text);font-weight:650;line-height:1.5;overflow-wrap:anywhere}
+@media(max-width:600px){.animation-operation-actions{justify-content:stretch}.animation-operation-actions button{flex:1}}

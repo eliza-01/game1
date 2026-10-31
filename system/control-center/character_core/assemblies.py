@@ -6,6 +6,7 @@ import time
 import uuid
 from character_core.part_names import TOKEN
 from sqlite_connection import connect
+from character_core.rig_revisions import published_rig
 
 BODY=('upper','lower','gloves','boots')
 SLOTS=(*BODY,'head','eyes','eyebrows','hair')
@@ -37,7 +38,7 @@ class CharacterAssemblies:
         characters.assemblies=self
 
     def resolve(self,recipe):
-        missing=[];rig=self.components.get('rig',recipe['rig_id'])
+        missing=[];rig=published_rig(self.components,recipe['rig_id'],recipe.get('rig_revision'))
         if not rig:return dict(schema_version=1,ready=False,missing=['rig '+recipe['rig_id']])
         bones=json.loads(rig['metadata_json'])['bones']
         if not str(rig['model_asset_id']).isdigit():missing.append('rig '+rig['id'])
@@ -54,6 +55,9 @@ class CharacterAssemblies:
             atlas=self.components.atlases.binding('character_part',key)
             if atlas and not str(atlas.get('published_id') or '').isdigit():missing.append(slot+': atlas unpublished')
             roots=[b['name'] for b in meta.get('skeleton',[]) if not b['parent']]
+            if not meta.get('attachment'):
+                unknown=set(meta.get('used_bones',[]))-{b['name'] for b in bones}
+                if unknown:missing.append(slot+': rig lacks bones '+', '.join(sorted(unknown)))
             result['parts'][slot]=dict(id=key,asset_id=row['model_asset_id'],revision=row['published_revision'],
                 used_bones=meta.get('used_bones',[]),attachment=meta.get('attachment',''),
                 socket_bone=roots[0] if meta.get('attachment') and len(roots)==1 else '',
@@ -97,6 +101,14 @@ class CharacterAssemblies:
             if not part or part['rig_id']!=profile or part['slot']!=slot or part['role']!='part':raise ValueError(slot+': incompatible part')
             if part['gender'] not in {'common',gender}:raise ValueError(slot+': incompatible with selected head gender')
         recipe=dict(schema_version=1,rig_id=profile,set_id=set_id,parts=parts)
+        previous_recipe=old.get('assembly',{}) if old else {}
+        pin=payload.get('rig_revision',previous_recipe.get('rig_revision') if previous_recipe.get('rig_id')==profile else None)
+        if pin is not None:
+            selected=published_rig(self.components,profile,pin)
+            if not selected:raise ValueError('published rig revision is unavailable')
+            recipe['rig_revision']=pin;rig=selected
+        else:
+            rig=published_rig(self.components,profile) or rig
         stats=self.characters._validate_stats(payload,old)
         if not all(math.isfinite(v) for v in stats.values()):raise ValueError('starting stats must be finite')
         bones=json.loads(rig['metadata_json'])['bones']

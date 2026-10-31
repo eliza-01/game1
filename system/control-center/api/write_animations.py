@@ -84,6 +84,34 @@ def route(path, body, deps):
         except Exception as error:
             return out(400, {"error": str(error)})
 
+    if path == "/api/animations/preview":
+        try:
+            payload = body()
+            return out(200, animations.preview_folder(str(payload.get("characterId") or ""), str(payload.get("rootPath") or "")))
+        except Exception as error:
+            return out(400, {"error": str(error)})
+
+    if path == "/api/animations/register-selected":
+        try:
+            payload = body()
+            return out(200, animations.register_selected(str(payload.get("characterId") or ""), str(payload.get("rootPath") or ""), payload.get("items")))
+        except Exception as error:
+            return out(400, {"error": str(error)})
+
+    if path.startswith("/api/animations/") and path.endswith("/stage-replacement"):
+        clip_id = unquote(path[len("/api/animations/"):-len("/stage-replacement")].strip("/"))
+        try:
+            return out(200, animations.stage_manual_replacement(clip_id, str(body().get("sourcePath") or "")))
+        except Exception as error:
+            return out(400, {"error": str(error)})
+
+    if path.startswith("/api/animations/") and path.endswith("/check-replacement"):
+        clip_id = unquote(path[len("/api/animations/"):-len("/check-replacement")].strip("/"))
+        try:
+            return out(200, animations.check_manual_reimports(publication_credentials(), clip_id))
+        except Exception as error:
+            return out(400, {"error": str(error)})
+
     if path == "/api/animations/scan":
         try:
             payload = body()

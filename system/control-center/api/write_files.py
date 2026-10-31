@@ -55,6 +55,13 @@ def route(path, body, deps):
         except (OSError, RuntimeError, ValueError) as error:
             return out(400, {"error": str(error)})
 
+    if path == "/api/files/choose-character-animation-file":
+        try:
+            payload = body()
+            return out(200, {"path": deps["choose_character_animation_file"](str(payload.get("initialPath") or ""))})
+        except Exception as error:
+            return out(400, {"error": str(error)})
+
     if path == "/api/files/choose-animation-folder":
         try:
             payload = body()

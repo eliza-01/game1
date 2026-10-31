@@ -118,4 +118,53 @@ class AssemblyTests(unittest.TestCase):
         self.assertEqual(len(list((self.root/'.control-center/backups').glob('before_character_assemblies_*.db'))),1)
 
 
+    def stage_new_rig(self):
+        from character_core.rig_revisions import stage_rig_revision
+        rig=self.components.get('rig','human')
+        bones=json.loads(rig['metadata_json'])['bones']
+        bones.append(dict(name='face_eye_l',parent='root',matrix=bones[0]['matrix'][:]))
+        artifact=self.root/'rig_revision.fbx';artifact.write_bytes(b'new rig fixture')
+        return stage_rig_revision(self.components,'human',artifact,expected_revision=1,
+            analyzer=lambda *a:dict(armature='human_armature',bones=bones,parts=[dict(name='rig_carrier')]))
+
+    def test_rig_republication_pins_existing_character_and_preserves_live_asset(self):
+        self.assemblies.save(self.payload());self.publish_dependencies()
+        result=self.stage_new_rig()
+        self.assertEqual(result['pinned_characters'],['human_male'])
+        self.assertTrue(Path(result['backup']).is_file())
+        row=self.characters.get('human_male')
+        self.assertEqual(row['revision'],2)
+        self.assertEqual(row['assembly']['rig_revision'],1)
+        with connect(self.characters.db) as db:
+            db.execute("UPDATE character_component_records SET model_asset_id='456',published_revision=revision WHERE kind='rig'")
+        resolved=self.characters.get('human_male')['assembly_resolved']
+        self.assertEqual(resolved['rig']['asset_id'],'123')
+        self.assertEqual(resolved['rig']['bone_names'],['root'])
+        self.assertTrue(resolved['ready'])
+
+    def test_staged_rig_uses_published_metadata_before_upload(self):
+        self.assemblies.save(self.payload());self.publish_dependencies();self.stage_new_rig()
+        recipe=self.payload();self.assemblies.save({**recipe,'id':'second_recipe'})
+        resolved=self.characters.get('second_recipe')['assembly_resolved']
+        self.assertEqual(resolved['rig']['bone_names'],['root'])
+        self.assertEqual(resolved['rig']['revision'],1)
+
+    def test_edit_preserves_pin_and_switch_requires_explicit_available_revision(self):
+        self.assemblies.save(self.payload());self.publish_dependencies();self.stage_new_rig()
+        payload=self.payload();payload['expected_revision']=2
+        self.assemblies.save(payload)
+        self.assertEqual(self.characters.get('human_male')['assembly']['rig_revision'],1)
+        payload['expected_revision']=3;payload['rig_revision']=99
+        with self.assertRaisesRegex(ValueError,'unavailable'):self.assemblies.save(payload)
+        recipe=self.characters.get('human_male')['assembly'];recipe['rig_revision']=99
+        self.assertFalse(self.assemblies.resolve(recipe)['ready'])
+
+    def test_unknown_part_bone_blocks_readiness(self):
+        self.assemblies.save(self.payload());self.publish_dependencies()
+        row=self.components.get('part','eyes_01');meta=json.loads(row['metadata_json']);meta['used_bones']=['removed_eye']
+        with connect(self.characters.db) as db:db.execute("UPDATE character_component_records SET metadata_json=? WHERE kind='part' AND id='eyes_01'",(json.dumps(meta),))
+        resolved=self.characters.get('human_male')['assembly_resolved']
+        self.assertFalse(resolved['ready']);self.assertIn('rig lacks bones',str(resolved['missing']))
+
+
 if __name__=='__main__':unittest.main()

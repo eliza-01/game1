@@ -50,7 +50,7 @@ from services.studio_deco_bridge import run_deco_refresh_bridge
 from services.studio_asset_sync import StudioAssetSyncService
 from services.animation_export import write_animation_export
 from services.native_pickers import (
-    choose_animation_folder, choose_character_fbx, choose_character_atlas, choose_location_asset_fbx,
+    choose_animation_folder, choose_character_animation_file, choose_character_fbx, choose_character_atlas, choose_location_asset_fbx,
     choose_location_asset_texture, choose_monster_fbx, choose_monster_textures,
     choose_weapon_fbx, choose_weapon_textures, choose_real_estate_fbx, choose_real_estate_texture,
 )
@@ -162,6 +162,7 @@ WRITE_SOURCES = MappingProxyType({
     "character_components": character_components,
     "character_assemblies": character_assemblies, "character_publications": character_publications,
     "choose_animation_folder": choose_animation_folder,
+    "choose_character_animation_file": choose_character_animation_file,
     "choose_character_fbx": choose_character_fbx,
     "choose_character_atlas": choose_character_atlas,
     "choose_location_asset_fbx": choose_location_asset_fbx,

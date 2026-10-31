@@ -66,13 +66,15 @@ class AnimationPublicationMixin:
                 break
         return {"requested": len(queue), "published": published, "failed": failed, "snapshot": self.snapshot(character_id)}
 
-    def check_manual_reimports(self, credentials: dict) -> dict:
+    def check_manual_reimports(self, credentials: dict, clip_id: str | None = None) -> dict:
         with self.connect() as connection:
             changed = [dict(row) for row in connection.execute(
                 """SELECT * FROM animation_clips
                    WHERE asset_id IS NOT NULL AND asset_id<>'' AND published_sha256<>sha256
                    ORDER BY character_id,name,id"""
             )]
+        if clip_id is not None:
+            changed = [row for row in changed if row["id"] == clip_id]
 
         confirmed = pending = failed = 0
         details = []

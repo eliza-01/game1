@@ -37,6 +37,9 @@ def check_character_animation(
     for required in [
         "class AnimationStore",
         "def scan_folder",
+        "def preview_folder",
+        "def register_selected",
+        "def stage_manual_replacement",
         "def classify_animation",
         'WEAPON_SETS = ("hands", "1hs", "2hs", "bow")',
         "def assign_file",
@@ -138,13 +141,13 @@ def check_character_animation(
     for required in ["animation_profiles", "animation_clips", "animation_bindings", "animation_publications"]:
         if required not in schema_text:
             err(f"control center schema missing {required}")
-    if 'id="nav-animations"' not in ui or 'id="scan-animations"' not in ui or 'id="publish-missing-animations"' not in ui:
+    if 'id="nav-animations"' not in ui or 'id="scan-animations"' not in ui or 'id="animation-scan-dialog"' not in ui:
         err("asset manager character animation section is missing")
     js_text = js.read_text(encoding="utf-8") if js.is_file() else ""
     for required in ["filename_rule_catalog", "canonicalFilename", "variantPattern", "filename_prefix"]:
         if required not in animation_store_text:
             err(f"animation filename-rule catalog missing {required}")
-    for required in ['id="animation-filename-rules"', 'id="animation-filename-guide"', "all registered states", "selected archetype id"]:
+    for required in ['id="animation-filename-rules"', 'id="animation-filename-guide"', "all registered states", 'id="animation-show-missing"']:
         if required not in ui:
             err(f"animation filename-rules UI missing {required}")
     if "renderFilenameRules" not in js_text:
@@ -152,9 +155,14 @@ def check_character_animation(
     for required in ["FILENAME_GUIDE_OPEN_KEY", "localStorage.getItem", "localStorage.setItem", "initFilenameRulesDisclosure"]:
         if required not in js_text:
             err(f"animation filename-rules disclosure persistence missing {required}")
-    for required in ["chooseAnimationFolder", "scanAnimations", "publishMissingAnimations", "animationFilter", "assignUnassignedAnimation", "manualSlotCatalog"]:
+    for required in ["chooseAnimationFolder", "scanAnimations", "animationFilter"]:
         if required not in js_text:
             err(f"asset manager animation ui missing {required}")
+    animation_ui = ROOT / "system/control-center/static/character-animation-ui.js"
+    animation_ui_text = animation_ui.read_text(encoding="utf-8") if animation_ui.is_file() else ""
+    for required in ["renderRules", "renderRows", "registerSelected", "stageReplacement", "checkReplacement", "localStorage.setItem"]:
+        if required not in animation_ui_text:
+            err(f"character animation reviewed workflow missing {required}")
     for forbidden in ["setAnimationSpeed", "data-speed"]:
         if forbidden in js_text:
             err(f"asset manager character clip table must not expose per-clip speed control: {forbidden}")

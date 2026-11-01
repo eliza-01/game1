@@ -1,6 +1,7 @@
 """Sync published Real Estate templates using the existing Game1Bridge model-load command."""
 from pathlib import Path
 from .contracts import present_parts
+from .rig_publication_policy import publish_bones_for_mesh
 from .collision_policy import requires_texture
 from services.texture_alpha import texture_binding
 
@@ -35,8 +36,15 @@ class RealEstateStudioSync:
             'minLevel': row['min_level'],
             'salePrice': row['sale_price'],
             'expectedMeshes': {
-                part['name']: [bone['name'] for bone in part['bones']]
+                part['name']: [bone['name'] for bone in publish_bones_for_mesh(part)]
                 for part in row['skeleton']['meshes']
+            },
+            # These offsets belong to the authored FBX revision. They are
+            # omitted for legacy/standalone mesh revisions lacking a house frame.
+            'authoredPlacements': {
+                mesh['name']: mesh['authoredPlacement']
+                for mesh in row['skeleton']['meshes']
+                if isinstance(mesh.get('authoredPlacement'), dict)
             },
             'meshOptions': row.get('meshOptions') or {},
             'textures': [

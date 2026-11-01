@@ -6,6 +6,7 @@ local Collision = require(script.Parent.StudioRealEstateCollisionPolicy)
 local Texture = require(script.Parent.StudioTextureAppearance)
 local PlacedTargets = require(script.Parent.StudioRealEstatePlacedTargets)
 local HouseFrame = require(script.Parent.StudioRealEstateHouseFrame)
+local PartPlacement = require(script.Parent.StudioRealEstatePartPlacement)
 
 local PartSync = {}
 
@@ -74,6 +75,16 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
     Collision.Apply(mesh, part, settings)
     -- A revised FBX can move the MeshPart geometry centre, but its authored
     -- pivot is the house-space origin. Keep that origin fixed in ServerStorage.
+    local authoredPlacementRestored = false
+    if part ~= "house" then
+        local anchor = HouseFrame.Find(wrapper)
+        if not anchor then
+            error("Targeted Real Estate Sync: existing house anchor missing or ambiguous")
+        end
+        local placements = typeof(metadata.authoredPlacements) == "table" and metadata.authoredPlacements or {}
+        authoredPlacementRestored = PartPlacement.Align(imported, mesh, anchor,
+            placements[part], placements.house, part)
+    end
     if part == "house" then
         local oldHouse = HouseFrame.Find(old)
         if not oldHouse then
@@ -210,6 +221,7 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
         workspaceModelsFound = placedFound,
         alignment = "authored-house-pivot",
         boneCount = check.boneCount,
+        authoredPlacementsRestored = if authoredPlacementRestored then 1 else 0,
         missingSockets = check.missingSockets, rigWarnings = warnings}
 end
 

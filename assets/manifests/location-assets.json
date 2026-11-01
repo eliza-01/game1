@@ -176,6 +176,36 @@
       ]
     },
     {
+      "atlasKey": "house_level5_01",
+      "baseKey": "house_level5",
+      "version": "01",
+      "variants": [
+        {
+          "id": 10,
+          "family_id": 7,
+          "width": 4096,
+          "height": 4096,
+          "filename": "house_level5_01_4096x4096_atlas.png",
+          "original_filename": "house_level5_01_4096x4096_atlas.png",
+          "source_path": "assets/source/texture-atlases/house_level5_01/4096x4096/house_level5_01_4096x4096_atlas.png",
+          "source_sha256": "7ff84ce5562c7571f4a94df379ea2881364d2f4b193beee7bf135da7a22c4d1e",
+          "uses_alpha": false,
+          "published_id": "137011316577762",
+          "published_sha256": "7ff84ce5562c7571f4a94df379ea2881364d2f4b193beee7bf135da7a22c4d1e",
+          "moderation_state": "",
+          "published_at": 1793558576.4940903,
+          "created_at": 1793558392.4787183,
+          "atlas_key": "house_level5_01",
+          "replacement_sha256": null,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "4096x4096",
+          "baseKey": "house_level5",
+          "version": "01"
+        }
+      ]
+    },
+    {
       "atlasKey": "lantern_01",
       "baseKey": "lantern",
       "version": "01",
@@ -202,6 +232,36 @@
           "resolution": "64x128",
           "baseKey": "lantern",
           "version": "01"
+        }
+      ]
+    },
+    {
+      "atlasKey": "newborn_upper",
+      "baseKey": "newborn_upper",
+      "version": "",
+      "variants": [
+        {
+          "id": 9,
+          "family_id": 6,
+          "width": 512,
+          "height": 512,
+          "filename": "newborn_upper_512x512_atlas.png",
+          "original_filename": "newborn_upper_512x512_atlas.png",
+          "source_path": "assets/source/texture-atlases/newborn_upper/512x512/newborn_upper_512x512_atlas.png",
+          "source_sha256": "d9d62491f090821f5e24a7a79671cfe0b5a506cf44a5c884aedda9649d4e9875",
+          "uses_alpha": true,
+          "published_id": "130840873415092",
+          "published_sha256": "d9d62491f090821f5e24a7a79671cfe0b5a506cf44a5c884aedda9649d4e9875",
+          "moderation_state": "Reviewing",
+          "published_at": 1793458414.8865848,
+          "created_at": 1793458411.1526465,
+          "atlas_key": "newborn_upper",
+          "replacement_sha256": null,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "512x512",
+          "baseKey": "newborn_upper",
+          "version": ""
         }
       ]
     },

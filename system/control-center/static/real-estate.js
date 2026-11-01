@@ -69,6 +69,21 @@ function realEstateForm(row){
   realEstateRenderTextures(row);
   realEstateRender();
 }
+// Inspect reports the *authored* shared FBX armature for each mesh, while
+// M182 publishes unweighted accessories of house_armature as static MeshParts.
+// This projection is presentation-only; Python owns the publication contract.
+function realEstateSharedStatic(part){
+  return part?.name!=='house' && String(part?.armature||'').toLowerCase()==='house_armature'
+    && !realEstatePublishedBones(part).length;
+}
+function realEstatePublishedBones(part){
+  if(Array.isArray(part?.publicationBones))return part.publicationBones;
+  // Older cached responses predate server-side ownership projection.
+  const bones=Array.isArray(part?.bones)?part.bones:[];
+  const legacyStatic=part?.name!=='house' && String(part?.armature||'').toLowerCase()==='house_armature'
+    && !(part?.influencedBones||[]).length;
+  return legacyStatic?[]:bones;
+}
 // Render roles from authored bone names, never guess rig ownership from a name.
 function realEstateBoneRole(part, name){
   if(part==='door' && name==='door_01_hinge_socket')return 'hinge';
@@ -76,27 +91,32 @@ function realEstateBoneRole(part, name){
   return 'bone';
 }
 function realEstateRigMode(part){
-  const names=new Set((part.bones||[]).map(b=>b.name));
+  const names=new Set(realEstatePublishedBones(part).map(b=>b.name));
+  if(realEstateSharedStatic(part))return 'Статичный MeshPart · общий исходный скелет, без копии костей';
   if(part.name==='door')return names.has('door_01_hinge_socket')
-    ? 'Hinge · rigid assembly pivot' : 'Legacy · no hinge pivot';
-  if(part.name==='house')return `${[...names].filter(n=>n.endsWith('_socket')).length} authored sockets`;
-  return part.armature?'Independent rig':'Static mesh';
+    ? 'Шарнир двери · отдельный Model Asset' : 'Дверь без hinge pivot';
+  if(part.name==='house')return `${[...names].filter(n=>n.endsWith('_socket')).length} авторских сокетов · сохраняются в Model Asset дома`;
+  return names.size?'Собственные / взвешенные кости · отдельный Model Asset':'Статичный MeshPart · без костей';
 }
 function realEstateRenderRigs(analysis, warnings=[]){
   const meshes=analysis?.meshes||[];
   const summary=$('real-estate-rig');
   summary.textContent=meshes.length
-    ? meshes.map(part=>`${realEstateMeshLabel(part.name)}: ${part.bones?.length||0} bones`).join(' · ')+' · view rig roles'
+    ? meshes.map(part=>`${realEstateMeshLabel(part.name)}: ${realEstatePublishedBones(part).length} костей при публикации`).join(' · ')+' · подробнее'
     : 'choose an FBX to view mesh / bone details';
   $('real-estate-bone-list').innerHTML=meshes.map(part=>{
-    const bones=part.bones||[];
+    const bones=realEstatePublishedBones(part);
     const mode=realEstateRigMode(part);
-    return `<section class="real-estate-bone-group"><strong>${esc(realEstateMeshLabel(part.name))} · ${esc(part.armature||'no linked armature')}</strong>
+    const source=part.bones||[];
+    const shared=realEstateSharedStatic(part);
+    return `<section class="real-estate-bone-group"><strong>${esc(realEstateMeshLabel(part.name))} · ${esc(part.armature||'без Armature')}</strong>
       <small class="real-estate-rig-mode">${esc(mode)}</small>
       ${bones.length?`<ul>${bones.map(b=>{
         const role=realEstateBoneRole(part.name,b.name);
         return `<li><code>${esc(b.name)}</code><span class="real-estate-bone-role">${role}</span>${b.parent?` <span class="muted">← ${esc(b.parent)}</span>`:''}</li>`;
-      }).join('')}</ul>`:'<small class="muted">No authored bones · unrigged mesh</small>'}</section>`;
+      }).join('')}</ul>`:shared
+        ? `<small class="muted">В исходном FBX: ${source.length} общих костей ${esc(part.armature)}. В Model Asset этой статичной части они не экспортируются.</small>`
+        : '<small class="muted">Нет костей для публикации</small>'}</section>`;
   }).join('');
   const warningBox=$('real-estate-rig-warnings');
   warningBox.hidden=!warnings.length;
@@ -507,7 +527,7 @@ function realEstateAtlasDots(texture, part){
   });
   return `<div class="deco-atlas-dots real-estate-atlas-dots" aria-label="Registered atlas resolutions">${dots.slice(0,5).join('')}${dots.length>5?`<details class="deco-atlas-more"><summary>+${dots.length-5}</summary><div>${dots.slice(5).join('')}</div></details>`:''}</div>`;
 }
-async function realEstateChooseAtlas(row,part,variantId){
+async function realEstateChooseAtlas(row,part,variantId,mode='variant'){
   const texture=row.textures?.[part];
   if(!texture||realEstateState.atlasBusy||Number(texture.atlasVariantId)===Number(variantId))return;
   realEstateState.atlasBusy=true;
@@ -515,7 +535,7 @@ async function realEstateChooseAtlas(row,part,variantId){
   try{
     const result=await request(`/api/real-estate/${encodeURIComponent(row.slug)}/atlas-binding`,{
       method:'PUT',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({part,variantId,expectedRevision:texture.reuseReference?0:Number(texture.atlasBindingRevision||0)})
+      body:JSON.stringify({part,variantId,mode,expectedRevision:texture.reuseReference?0:Number(texture.atlasBindingRevision||0)})
     });
     await realEstateLoad();
     if(result.studioSyncStatus==='pending_studio_sync'){

@@ -102,6 +102,9 @@
       },
       "StudioRealEstateHouseFrame": {
         "$path": "modules/StudioRealEstateHouseFrame.luau"
+      },
+      "StudioRealEstatePartPlacement": {
+        "$path": "modules/StudioRealEstatePartPlacement.luau"
       }
     }
   }

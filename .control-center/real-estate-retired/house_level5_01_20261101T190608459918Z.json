@@ -1,0 +1,81 @@
+{
+  "house": {
+    "slug": "house_level5_01",
+    "house_type": "house",
+    "house_level": 5,
+    "variant": "01",
+    "purchase_price": 50,
+    "min_level": 1,
+    "sale_price": 25,
+    "model_path": "assets/source/real-estate/house_level5_01/model/house_level5_01.fbx",
+    "model_sha256": "1d049c3d2a48b082ae98761b3fddbfc38ab1a8249347767fd493b60b5e900658",
+    "skeleton_json": "{\"schemaVersion\": 1, \"meshes\": [{\"name\": \"house\", \"armature\": \"house_armature\", \"vertices\": 6267, \"bones\": [{\"name\": \"chest_01_socket\", \"parent\": \"\", \"matrixLocal\": [-0.5536835, 0.8327274, 2e-07, 4.2553668, -0.8327274, -0.5536833, 3e-07, -9.3414764, 4e-07, 0.0, 1.0, 18.0743008, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"chimney_01_socket\", \"parent\": \"\", \"matrixLocal\": [1.0, 0.0, 1e-07, -13.4645491, -1e-07, 0.0, 1.0, 3.8363698, 0.0, -1.0, 0.0, 41.9577713, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"elevator_01_socket\", \"parent\": \"\", \"matrixLocal\": [-0.9415405, -0.3369006, 2e-07, -8.739563, 0.3369006, -0.9415402, -1e-07, -11.4913378, 2e-07, 0.0, 1.0, 15.9934559, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"elevator_02_socket\", \"parent\": \"\", \"matrixLocal\": [-1.0, 0.0, 2e-07, -7.481102, 2e-07, 0.0, 1.0, -7.4839854, 0.0, 1.0, 0.0, 17.9429512, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"house_floor_01_spawn_01_socket\", \"parent\": \"\", \"matrixLocal\": [0.981446, 0.1917388, 0.0, 0.5050471, -0.1917388, 0.981446, 0.0, -0.1838893, 0.0, 0.0, 1.0, 6.0051465, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"house_floor_02_spawn_01_socket\", \"parent\": \"\", \"matrixLocal\": [0.3712803, -0.8751509, -0.310261, -3.4289386, 0.6715434, 0.4838502, -0.5611761, -2.6329286, 0.6412336, 0.0, 0.7673458, 18.2462997, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"land_spawn_01_socket\", \"parent\": \"\", \"matrixLocal\": [-0.0, 0.0, -1.0, 2.428946, 0.0, 0.9999999, 0.0, 23.8303089, 1.0, 0.0, -0.0, 0.534623, 0.0, 0.0, 0.0, 1.0]}], \"influencedBones\": []}, {\"name\": \"col_mesh\", \"armature\": \"house_armature\", \"vertices\": 4725, \"bones\": [{\"name\": \"chest_01_socket\", \"parent\": \"\", \"matrixLocal\": [-0.5536835, 0.8327274, 2e-07, 4.2553668, -0.8327274, -0.5536833, 3e-07, -9.3414764, 4e-07, 0.0, 1.0, 18.0743008, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"chimney_01_socket\", \"parent\": \"\", \"matrixLocal\": [1.0, 0.0, 1e-07, -13.4645491, -1e-07, 0.0, 1.0, 3.8363698, 0.0, -1.0, 0.0, 41.9577713, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"elevator_01_socket\", \"parent\": \"\", \"matrixLocal\": [-0.9415405, -0.3369006, 2e-07, -8.739563, 0.3369006, -0.9415402, -1e-07, -11.4913378, 2e-07, 0.0, 1.0, 15.9934559, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"elevator_02_socket\", \"parent\": \"\", \"matrixLocal\": [-1.0, 0.0, 2e-07, -7.481102, 2e-07, 0.0, 1.0, -7.4839854, 0.0, 1.0, 0.0, 17.9429512, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"house_floor_01_spawn_01_socket\", \"parent\": \"\", \"matrixLocal\": [0.981446, 0.1917388, 0.0, 0.5050471, -0.1917388, 0.981446, 0.0, -0.1838893, 0.0, 0.0, 1.0, 6.0051465, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"house_floor_02_spawn_01_socket\", \"parent\": \"\", \"matrixLocal\": [0.3712803, -0.8751509, -0.310261, -3.4289386, 0.6715434, 0.4838502, -0.5611761, -2.6329286, 0.6412336, 0.0, 0.7673458, 18.2462997, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"land_spawn_01_socket\", \"parent\": \"\", \"matrixLocal\": [-0.0, 0.0, -1.0, 2.428946, 0.0, 0.9999999, 0.0, 23.8303089, 1.0, 0.0, -0.0, 0.534623, 0.0, 0.0, 0.0, 1.0]}], \"influencedBones\": []}, {\"name\": \"door\", \"armature\": \"door_armature\", \"vertices\": 2076, \"bones\": [{\"name\": \"door_01_handle_inside_socket\", \"parent\": \"door_01_hinge_socket\", \"matrixLocal\": [-1.0, 0.0, -7e-07, 4.4487662, -0.0, -1.0, -0.0, 7.0467577, -7e-07, 0.0, 1.0, 9.7134752, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"door_01_handle_outside_socket\", \"parent\": \"door_01_hinge_socket\", \"matrixLocal\": [-1e-06, 2e-07, -1.0, 4.3691859, 0.0, 1.0, 2e-07, 7.9904222, 1.0, 0.0, -1e-06, 9.6214809, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"door_01_hinge_socket\", \"parent\": \"\", \"matrixLocal\": [-1.0, 0.0, 2e-07, -0.4047228, 2e-07, 0.0, 1.0, 7.5226984, 0.0, 1.0, 0.0, 9.4761391, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"door_01_padlock_01_socket\", \"parent\": \"door_01_hinge_socket\", \"matrixLocal\": [-0.987075, 0.1600198, 0.0087519, 5.2550144, -0.1338413, -0.7930952, -0.5942109, 7.8211675, -0.0881445, -0.587702, 0.8042617, 9.9485092, 0.0, 0.0, 0.0, 1.0]}], \"influencedBones\": [\"door_01_hinge_socket\"]}, {\"name\": \"restoration\", \"armature\": \"house_armature\", \"vertices\": 8443, \"bones\": [{\"name\": \"chest_01_socket\", \"parent\": \"\", \"matrixLocal\": [-0.5536835, 0.8327274, 2e-07, 4.2553668, -0.8327274, -0.5536833, 3e-07, -9.3414764, 4e-07, 0.0, 1.0, 18.0743008, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"chimney_01_socket\", \"parent\": \"\", \"matrixLocal\": [1.0, 0.0, 1e-07, -13.4645491, -1e-07, 0.0, 1.0, 3.8363698, 0.0, -1.0, 0.0, 41.9577713, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"elevator_01_socket\", \"parent\": \"\", \"matrixLocal\": [-0.9415405, -0.3369006, 2e-07, -8.739563, 0.3369006, -0.9415402, -1e-07, -11.4913378, 2e-07, 0.0, 1.0, 15.9934559, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"elevator_02_socket\", \"parent\": \"\", \"matrixLocal\": [-1.0, 0.0, 2e-07, -7.481102, 2e-07, 0.0, 1.0, -7.4839854, 0.0, 1.0, 0.0, 17.9429512, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"house_floor_01_spawn_01_socket\", \"parent\": \"\", \"matrixLocal\": [0.981446, 0.1917388, 0.0, 0.5050471, -0.1917388, 0.981446, 0.0, -0.1838893, 0.0, 0.0, 1.0, 6.0051465, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"house_floor_02_spawn_01_socket\", \"parent\": \"\", \"matrixLocal\": [0.3712803, -0.8751509, -0.310261, -3.4289386, 0.6715434, 0.4838502, -0.5611761, -2.6329286, 0.6412336, 0.0, 0.7673458, 18.2462997, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"land_spawn_01_socket\", \"parent\": \"\", \"matrixLocal\": [-0.0, 0.0, -1.0, 2.428946, 0.0, 0.9999999, 0.0, 23.8303089, 1.0, 0.0, -0.0, 0.534623, 0.0, 0.0, 0.0, 1.0]}], \"influencedBones\": []}, {\"name\": \"structures_01\", \"armature\": \"house_armature\", \"vertices\": 8875, \"bones\": [{\"name\": \"chest_01_socket\", \"parent\": \"\", \"matrixLocal\": [-0.5536835, 0.8327274, 2e-07, 4.2553668, -0.8327274, -0.5536833, 3e-07, -9.3414764, 4e-07, 0.0, 1.0, 18.0743008, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"chimney_01_socket\", \"parent\": \"\", \"matrixLocal\": [1.0, 0.0, 1e-07, -13.4645491, -1e-07, 0.0, 1.0, 3.8363698, 0.0, -1.0, 0.0, 41.9577713, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"elevator_01_socket\", \"parent\": \"\", \"matrixLocal\": [-0.9415405, -0.3369006, 2e-07, -8.739563, 0.3369006, -0.9415402, -1e-07, -11.4913378, 2e-07, 0.0, 1.0, 15.9934559, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"elevator_02_socket\", \"parent\": \"\", \"matrixLocal\": [-1.0, 0.0, 2e-07, -7.481102, 2e-07, 0.0, 1.0, -7.4839854, 0.0, 1.0, 0.0, 17.9429512, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"house_floor_01_spawn_01_socket\", \"parent\": \"\", \"matrixLocal\": [0.981446, 0.1917388, 0.0, 0.5050471, -0.1917388, 0.981446, 0.0, -0.1838893, 0.0, 0.0, 1.0, 6.0051465, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"house_floor_02_spawn_01_socket\", \"parent\": \"\", \"matrixLocal\": [0.3712803, -0.8751509, -0.310261, -3.4289386, 0.6715434, 0.4838502, -0.5611761, -2.6329286, 0.6412336, 0.0, 0.7673458, 18.2462997, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"land_spawn_01_socket\", \"parent\": \"\", \"matrixLocal\": [-0.0, 0.0, -1.0, 2.428946, 0.0, 0.9999999, 0.0, 23.8303089, 1.0, 0.0, -0.0, 0.534623, 0.0, 0.0, 0.0, 1.0]}], \"influencedBones\": []}, {\"name\": \"window_frames_glass\", \"armature\": \"house_armature\", \"vertices\": 24, \"bones\": [{\"name\": \"chest_01_socket\", \"parent\": \"\", \"matrixLocal\": [-0.5536835, 0.8327274, 2e-07, 4.2553668, -0.8327274, -0.5536833, 3e-07, -9.3414764, 4e-07, 0.0, 1.0, 18.0743008, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"chimney_01_socket\", \"parent\": \"\", \"matrixLocal\": [1.0, 0.0, 1e-07, -13.4645491, -1e-07, 0.0, 1.0, 3.8363698, 0.0, -1.0, 0.0, 41.9577713, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"elevator_01_socket\", \"parent\": \"\", \"matrixLocal\": [-0.9415405, -0.3369006, 2e-07, -8.739563, 0.3369006, -0.9415402, -1e-07, -11.4913378, 2e-07, 0.0, 1.0, 15.9934559, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"elevator_02_socket\", \"parent\": \"\", \"matrixLocal\": [-1.0, 0.0, 2e-07, -7.481102, 2e-07, 0.0, 1.0, -7.4839854, 0.0, 1.0, 0.0, 17.9429512, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"house_floor_01_spawn_01_socket\", \"parent\": \"\", \"matrixLocal\": [0.981446, 0.1917388, 0.0, 0.5050471, -0.1917388, 0.981446, 0.0, -0.1838893, 0.0, 0.0, 1.0, 6.0051465, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"house_floor_02_spawn_01_socket\", \"parent\": \"\", \"matrixLocal\": [0.3712803, -0.8751509, -0.310261, -3.4289386, 0.6715434, 0.4838502, -0.5611761, -2.6329286, 0.6412336, 0.0, 0.7673458, 18.2462997, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"land_spawn_01_socket\", \"parent\": \"\", \"matrixLocal\": [-0.0, 0.0, -1.0, 2.428946, 0.0, 0.9999999, 0.0, 23.8303089, 1.0, 0.0, -0.0, 0.534623, 0.0, 0.0, 0.0, 1.0]}], \"influencedBones\": []}], \"unassignedArmatures\": []}",
+    "textures_json": "{\"house\": {\"path\": \"assets/source/texture-atlases/house_level5_01/4096x4096/house_level5_01_4096x4096_atlas.png\", \"filename\": \"house_level5_01_4096x4096_atlas.png\", \"sha256\": \"7ff84ce5562c7571f4a94df379ea2881364d2f4b193beee7bf135da7a22c4d1e\", \"reuseReference\": \"\", \"assetId\": \"\", \"publishedSha256\": \"\", \"publicationFormat\": \"\"}, \"col_mesh\": {\"path\": \"\", \"filename\": \"\", \"sha256\": \"\", \"reuseReference\": \"\", \"assetId\": \"\", \"publishedSha256\": \"\", \"publicationFormat\": \"\"}, \"door\": {\"reuseReference\": \"estate:house_level4_01:restoration\", \"path\": \"\", \"sha256\": \"\", \"assetId\": \"\", \"publishedSha256\": \"\", \"publicationFormat\": \"\", \"filename\": \"\"}, \"restoration\": {\"reuseReference\": \"estate:house_level4_01:restoration\", \"path\": \"\", \"sha256\": \"\", \"assetId\": \"\", \"publishedSha256\": \"\", \"publicationFormat\": \"\", \"filename\": \"\"}, \"structures_01\": {\"reuseReference\": \"location:stone_fence_01\", \"path\": \"\", \"sha256\": \"\", \"assetId\": \"\", \"publishedSha256\": \"\", \"publicationFormat\": \"\", \"filename\": \"\"}, \"window_frames_glass\": {\"reuseReference\": \"estate:house_level4_01:restoration\", \"path\": \"\", \"sha256\": \"\", \"assetId\": \"\", \"publishedSha256\": \"\", \"publicationFormat\": \"\", \"filename\": \"\"}}",
+    "model_asset_id": "110184338806186",
+    "model_published_hash": "1d049c3d2a48b082ae98761b3fddbfc38ab1a8249347767fd493b60b5e900658",
+    "model_moderation": "Approved",
+    "revision": 1,
+    "created_at": 1793558394.4184635,
+    "updated_at": 1793558575.8539774,
+    "model_rigs_json": "{\"house\": {\"assetId\": \"110184338806186\", \"publishedSha256\": \"1d049c3d2a48b082ae98761b3fddbfc38ab1a8249347767fd493b60b5e900658\"}, \"col_mesh\": {\"assetId\": \"117944554808662\", \"publishedSha256\": \"1d049c3d2a48b082ae98761b3fddbfc38ab1a8249347767fd493b60b5e900658\"}, \"door\": {\"assetId\": \"102714919114664\", \"publishedSha256\": \"1d049c3d2a48b082ae98761b3fddbfc38ab1a8249347767fd493b60b5e900658\"}, \"restoration\": {\"assetId\": \"70387349185854\", \"publishedSha256\": \"1d049c3d2a48b082ae98761b3fddbfc38ab1a8249347767fd493b60b5e900658\"}, \"structures_01\": {\"assetId\": \"95953463487136\", \"publishedSha256\": \"1d049c3d2a48b082ae98761b3fddbfc38ab1a8249347767fd493b60b5e900658\"}, \"window_frames_glass\": {\"assetId\": \"98511726724344\", \"publishedSha256\": \"1d049c3d2a48b082ae98761b3fddbfc38ab1a8249347767fd493b60b5e900658\"}}",
+    "mesh_options_json": "{\"house\": {\"glass\": false, \"noCollide\": true, \"collisionMesh\": false, \"destructible\": false}, \"col_mesh\": {\"glass\": false, \"noCollide\": false, \"collisionMesh\": true, \"destructible\": false}, \"door\": {\"glass\": false, \"noCollide\": false, \"collisionMesh\": false, \"destructible\": false}, \"restoration\": {\"glass\": false, \"noCollide\": true, \"collisionMesh\": false, \"destructible\": false}, \"structures_01\": {\"glass\": false, \"noCollide\": true, \"collisionMesh\": false, \"destructible\": false}, \"window_frames_glass\": {\"glass\": true, \"noCollide\": false, \"collisionMesh\": false, \"destructible\": false}}",
+    "mesh_sources_json": "{}"
+  },
+  "publications": [
+    {
+      "id": 44,
+      "house_slug": "house_level5_01",
+      "part": "model:house",
+      "asset_id": "110184338806186",
+      "sha256": "1d049c3d2a48b082ae98761b3fddbfc38ab1a8249347767fd493b60b5e900658",
+      "operation": "operations/a31d69be-2179-4ce7-8650-15f01c25b279",
+      "published_at": 1793558507.4811118
+    },
+    {
+      "id": 45,
+      "house_slug": "house_level5_01",
+      "part": "model:col_mesh",
+      "asset_id": "117944554808662",
+      "sha256": "1d049c3d2a48b082ae98761b3fddbfc38ab1a8249347767fd493b60b5e900658",
+      "operation": "operations/9f59a021-ad71-4cc1-87e1-59fc50256adb",
+      "published_at": 1793558522.9935386
+    },
+    {
+      "id": 46,
+      "house_slug": "house_level5_01",
+      "part": "model:door",
+      "asset_id": "102714919114664",
+      "sha256": "1d049c3d2a48b082ae98761b3fddbfc38ab1a8249347767fd493b60b5e900658",
+      "operation": "operations/e1d9059f-8627-4935-a1e2-b5f552bd470d",
+      "published_at": 1793558539.727442
+    },
+    {
+      "id": 47,
+      "house_slug": "house_level5_01",
+      "part": "model:restoration",
+      "asset_id": "70387349185854",
+      "sha256": "1d049c3d2a48b082ae98761b3fddbfc38ab1a8249347767fd493b60b5e900658",
+      "operation": "operations/b77dd19a-f52b-466c-a9d3-79dd78d24386",
+      "published_at": 1793558556.0522096
+    },
+    {
+      "id": 48,
+      "house_slug": "house_level5_01",
+      "part": "model:structures_01",
+      "asset_id": "95953463487136",
+      "sha256": "1d049c3d2a48b082ae98761b3fddbfc38ab1a8249347767fd493b60b5e900658",
+      "operation": "operations/92bc8425-42f0-4dfc-9513-7a269f901873",
+      "published_at": 1793558564.49149
+    },
+    {
+      "id": 49,
+      "house_slug": "house_level5_01",
+      "part": "model:window_frames_glass",
+      "asset_id": "98511726724344",
+      "sha256": "1d049c3d2a48b082ae98761b3fddbfc38ab1a8249347767fd493b60b5e900658",
+      "operation": "operations/9232c73a-2cbd-496c-b327-2fd12758efff",
+      "published_at": 1793558575.8539774
+    }
+  ],
+  "sourceFilesPreserved": true
+}

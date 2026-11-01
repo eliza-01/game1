@@ -8,13 +8,16 @@ from pathlib import Path
 # Resolve adjacent helper modules explicitly, just as the publication entrypoint does.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from real_estate_rig_discovery import find_mesh, find_rig
+from real_estate_import_rigs import restore_authored_rigs
 from model_publication import assert_skin_complete
+from real_estate_part_placement import inspect_placements
 
 
 def analyze(source, only_part=None, extract=False):
     bpy.ops.object.select_all(action='SELECT')
     bpy.ops.object.delete(use_global=False)
     bpy.ops.import_scene.fbx(filepath=str(source), use_anim=False)
+    restore_authored_rigs(bpy, source)
     meshes = []
     present = [obj.name for obj in bpy.context.scene.objects if obj.type == 'MESH']
     expected = [only_part] if only_part is not None else sorted(
@@ -27,6 +30,8 @@ def analyze(source, only_part=None, extract=False):
         raise RuntimeError(f"Expected only staged mesh {only_part}; found: {', '.join(present)}.")
     if len({name.casefold() for name in present}) != len(present):
         raise RuntimeError("FBX contains mesh names that differ only by case.")
+    placements = inspect_placements(find_mesh(bpy, 'house'),
+                                    [find_mesh(bpy, name) for name in expected]) if 'house' in present else {}
     for name in expected:
         mesh = find_mesh(bpy, name)
         rig = find_rig(bpy, mesh, name)
@@ -45,8 +50,11 @@ def analyze(source, only_part=None, extract=False):
         group_names = {group.index: group.name for group in mesh.vertex_groups}
         influences = sorted({group_names.get(group.group) for v in mesh.data.vertices for group in v.groups
                              if group.weight > 0 and group_names.get(group.group) in {b['name'] for b in bones}})
-        meshes.append({'name': name, 'armature': rig_name, 'vertices': len(mesh.data.vertices),
-                       'bones': bones, 'influencedBones': influences})
+        record = {'name': name, 'armature': rig_name, 'vertices': len(mesh.data.vertices),
+                  'bones': bones, 'influencedBones': influences}
+        if name in placements:
+            record['authoredPlacement'] = placements[name]
+        meshes.append(record)
     # Additional authored armatures are not mandatory Real Estate meshes.
     # Report unlinked ones rather than failing inspection or silently hiding them.
     registered = {entry['armature'] for entry in meshes if entry['armature']}

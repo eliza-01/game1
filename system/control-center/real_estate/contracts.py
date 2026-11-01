@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 
 from .rig_features import feature_warnings
+from .rig_publication_policy import publish_bones_for_mesh
 
 HOUSE_NAME = re.compile(r"^(?P<kind>[a-z][a-z0-9_]*)_level(?P<level>[1-9][0-9]*)_(?P<variant>[0-9]+)$")
 SLUG = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
@@ -82,7 +83,7 @@ def warnings_for_analysis(value: dict) -> list[dict]:
     if door is None:
         warn('door', 'missing_door', 'Optional mesh door is missing. Houses without doors are supported.')
     elif not door.get('armature'):
-        warn('door', 'missing_door_armature', 'door is present without a linked door_armature (optional).')
+        warn('door', 'missing_door_armature', 'door is present without a linked armature; bind it to house_armature.')
     # New standard: sockets describe attachment/interaction sites; a missing
     # socket is not itself proof that an optional feature is authored. In a
     # hinge-enabled door, however, hierarchy and rigid skinning must agree.
@@ -92,14 +93,9 @@ def warnings_for_analysis(value: dict) -> list[dict]:
         warn('', 'unassigned_armature',
              f"Armature {name} is not linked to a mesh and will not be published.")
 
-    owners = {}
-    for part in value.get('meshes', []):
-        if isinstance(part, dict) and part.get('armature'):
-            owners.setdefault(part['armature'], []).append(part.get('name'))
-    for rig, parts in owners.items():
-        if len(parts) > 1:
-            warn(', '.join(parts), 'shared_armature',
-                 f"Meshes {', '.join(parts)} share armature {rig}. Each will receive an independent copy of its bones on publication.")
+    # Several static meshes may intentionally share the house armature. The
+    # publication pipeline isolates each Model Asset and preserves its sockets,
+    # so this is supported authoring, not a warning requiring confirmation.
     return warnings
 
 
@@ -135,8 +131,9 @@ def validate_analysis(value: dict) -> dict:
             raise ValueError(f"{name}: bone names must be non-empty and unique")
         if int(item.get("vertices") or 0) < 3:
             raise ValueError(f"{name}: mesh has fewer than three vertices; check the FBX export")
-    # Multiple meshes may reference one Blender armature. Each gets its own
-    # exported Model Asset (and independent copy of the bones) in Studio.
+    # Multiple meshes may reference one Blender armature. Every mesh has an
+    # independent Model Asset; unweighted non-house meshes sharing
+    # house_armature do not inherit the house owner's socket bones.
     return value
 
 
@@ -172,9 +169,9 @@ def assert_rig_survived(expected: dict, actual: dict, part: str) -> None:
     new = actual['meshes'][0]
     if new['name'] != part:
         raise ValueError(f'staged {part} FBX contains the wrong mesh')
-    if old['bones'] and new.get('armature') != old.get('armature'):
+    if publish_bones_for_mesh(old) and new.get('armature') != old.get('armature'):
         raise ValueError(f'staged {part} FBX changed its bone armature')
-    a = {bone['name']:bone for bone in old['bones']}
+    a = {bone['name']:bone for bone in publish_bones_for_mesh(old)}
     b = {bone['name']:bone for bone in new['bones']}
     if a.keys() != b.keys():
         raise ValueError(f'staged {part} changed bone names')

@@ -57,7 +57,7 @@ def write(path, body, deps):
             payload = body()
             part = str(payload.get('part') or '').strip()
             updated = store.select_atlas(slug, part, int(payload['variantId']),
-                int(payload.get('expectedRevision', 0)))
+                int(payload.get('expectedRevision', 0)), mode=str(payload.get('mode') or 'variant'))
             try:
                 studio = deps['sync_real_estate_to_studio'](slug)
                 return 200, {'item': updated, 'studio': studio['studio'], 'studioSyncStatus': 'synced'}

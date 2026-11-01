@@ -167,7 +167,7 @@ function realEstateMeshWorkflowRender(){
     if(picker)picker.onchange=()=>{realEstateMeshWorkflow.chosenAtlasId=Number(String(picker.value).split(':')[1]||0);realEstateMeshWorkflowRender();};
     bind('use-atlas',()=>realEstateMeshWorkflowRun('Applying existing atlas',async()=>{
       if(!realEstateMeshWorkflow.chosenAtlasId)throw Error('Choose a published atlas');
-      const changed=await realEstateChooseAtlas(row,part,realEstateMeshWorkflow.chosenAtlasId);
+      const changed=await realEstateChooseAtlas(row,part,realEstateMeshWorkflow.chosenAtlasId,'existing');
       if(changed){realEstateMeshWorkflow.sourcePending=false;
         realEstateMeshWorkflowMessage(changed.studioSyncStatus==='pending_studio_sync'
           ? 'Atlas binding saved · Studio Sync pending. Retry after Studio connects.'

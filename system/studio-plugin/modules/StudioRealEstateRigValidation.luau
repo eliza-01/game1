@@ -66,6 +66,14 @@ function Validation.Verify(root: Model, part: string, expected: any): (MeshPart,
         end
     end
     table.sort(boneNames)
+    -- Empty manifest means a deliberately static published mesh. Older
+    -- publications may still contain copies of house socket bones; require
+    -- a clean republish instead of silently accepting their unstable rig.
+    if #expected == 0 and boneCount > 0 then
+        error(part .. ": static mesh Model Asset contains redundant Bones ("
+            .. table.concat(boneNames, ", ")
+            .. "); republish this mesh Model Asset before Studio Sync")
+    end
     local missing = {}
     for name in authored do
         if not imported[name] then

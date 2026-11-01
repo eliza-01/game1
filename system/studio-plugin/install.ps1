@@ -86,6 +86,7 @@ foreach($Marker in @(
     'StudioRealEstateModel',
     'StudioRealEstatePartSync',
     'StudioRealEstateHouseFrame',
+    'StudioRealEstatePartPlacement',
     'StudioRealEstateRigValidation',
     'StudioRealEstateCollisionPolicy',
     'StudioRealEstatePlacedCollisionSync',

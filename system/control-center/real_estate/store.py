@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from opencloud_assets import create_model_asset, create_image_asset, wait_for_operation
 from sqlite_connection import connect
 from .contracts import identity, parse_name, prices, present_parts, validate_analysis, warnings_for_analysis
+from .rig_publication_policy import publication_analysis
 from .textures import available_textures, resolve_texture
 from .fbx import inspect, prepare_publication
 from .mesh_revisions import inspect_revision, save_immutable
@@ -219,7 +220,10 @@ class RealEstateStore:
         result['atlasCurrent'] = binding['current'] if binding else None
         return result
 
-    def select_atlas(self, slug: str, part: str, variant_id: int, expected_revision: int | None) -> dict:
+    def select_atlas(self, slug: str, part: str, variant_id: int, expected_revision: int | None,
+                     *, mode: str = 'variant') -> dict:
+        if mode not in ('variant', 'existing'):
+            raise ValueError('unknown atlas selection mode')
         row = self.get(slug)
         if not row or part not in row['meshParts']:
             raise ValueError('unknown Real Estate mesh')
@@ -231,7 +235,9 @@ class RealEstateStore:
         if not selected or not selected['current']:
             raise ValueError('select a published atlas variant')
         current_key = row['textures'][part].get('atlasKey')
-        if current_key and not same_atlas_series(current_key, selected['atlas_key']):
+        # Resolution/version controls stay inside the current series. The
+        # explicit existing-atlas picker may rebind to any published series.
+        if mode == 'variant' and current_key and not same_atlas_series(current_key, selected['atlas_key']):
             raise ValueError('select an atlas resolution or version from the same mesh series')
         self.atlases.bind('real_estate', f'{slug}:{part}', variant_id,
             expected_revision=expected_revision)
@@ -253,7 +259,7 @@ class RealEstateStore:
         atlas_catalog = {group['atlasKey']: group for group in self.atlases.catalog()}
         result = []
         for row in rows:
-            row['skeleton'] = json.loads(row.pop('skeleton_json'))
+            row['skeleton'] = publication_analysis(json.loads(row.pop('skeleton_json')))
             row['rigWarnings'] = warnings_for_analysis(row['skeleton'])
             active = present_parts(row['skeleton'])
             row['meshParts'] = list(active)
@@ -329,7 +335,7 @@ class RealEstateStore:
         source = Path(str(source_path or '')).expanduser().resolve()
         defaults = parse_name(source.stem + '.fbx')
         analysis = inspect(self.root, source)
-        return {**defaults, 'sourcePath': str(source), 'analysis': analysis,
+        return {**defaults, 'sourcePath': str(source), 'analysis': publication_analysis(analysis),
                 'warnings': warnings_for_analysis(analysis),
                 'textures': available_textures(source.parent)}
 

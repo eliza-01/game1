@@ -8,6 +8,7 @@ local StudioRealEstatePlacedCollisionSync = require(script.Parent.StudioRealEsta
 local StudioRealEstatePlacedVisualSync = require(script.Parent.StudioRealEstatePlacedVisualSync)
 local PlacedTargets = require(script.Parent.StudioRealEstatePlacedTargets)
 local HouseFrame = require(script.Parent.StudioRealEstateHouseFrame)
+local PartPlacement = require(script.Parent.StudioRealEstatePartPlacement)
 local StudioRealEstateModel = {}
 
 -- Every authored bone must survive publication before a template is replaced.
@@ -106,6 +107,7 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
     if typeof(rigIds) ~= "table" or tonumber(rigIds.house) ~= assetId then
         error("Studio Sync requires published Model Asset IDs for every Real Estate mesh")
     end
+    local authoredPlacements = typeof(metadata.authoredPlacements) == "table" and metadata.authoredPlacements or {}
     local meshOptions = typeof(metadata.meshOptions) == 'table' and metadata.meshOptions or {}
     local imageAssets = {}
     local imageAlpha = {}
@@ -139,6 +141,7 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
     local rigWarnings = {}
     local missingSockets = {}
     local socketCount = 0
+    local placementsRestored = 0
     local textureCount = 0
     local activePart = "house"
     local ok, problem = pcall(function()
@@ -149,6 +152,14 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
             table.insert(staged, {part = part, rig = rig})
             local mesh, inspection = StudioRealEstateRigValidation.Verify(rig, part, manifests[part])
             meshes[part] = mesh
+            if part ~= "house" then
+                if PartPlacement.Align(rig, mesh, meshes.house,
+                    authoredPlacements[part], authoredPlacements.house, part) then
+                    placementsRestored += 1
+                elseif authoredPlacements.house ~= nil then
+                    table.insert(rigWarnings, part .. ": no authored placement for this mesh revision")
+                end
+            end
             bones += inspection.boneCount
             socketCount += inspection.socketCount
             for _, name in inspection.missingSockets do
@@ -259,6 +270,7 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
         workspaceTextureModelsUpdated = textureUpdated,
         workspaceCollisionRigsUpdated = collisionUpdated,
         boneCount = bones, socketCount = socketCount,
+        authoredPlacementsRestored = placementsRestored,
         socketContractComplete = #missingSockets == 0,
         missingSockets = missingSockets, rigWarnings = rigWarnings}
 end

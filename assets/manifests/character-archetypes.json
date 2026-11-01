@@ -3871,8 +3871,8 @@
         "parts": {
           "upper": {
             "id": "newborn_upper",
-            "asset_id": "73567696582696",
-            "revision": 1,
+            "asset_id": "87526597507999",
+            "revision": 2,
             "used_bones": [
               "clavicle_l",
               "clavicle_r",
@@ -3889,7 +3889,7 @@
             ],
             "attachment": "",
             "socket_bone": "",
-            "atlas_image_id": ""
+            "atlas_image_id": "130840873415092"
           },
           "lower": {
             "id": "newborn_lower",
@@ -4358,7 +4358,7 @@
         },
         "ready": true,
         "missing": [],
-        "fingerprint": "6420bddd9d211b9c94446c09"
+        "fingerprint": "0de92f1a65e2678315e5dd96"
       },
       "stats": {
         "Level": 1,

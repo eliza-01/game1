@@ -1,0 +1,81 @@
+{
+  "house": {
+    "slug": "house_level2_01",
+    "house_type": "house",
+    "house_level": 2,
+    "variant": "01",
+    "purchase_price": 1,
+    "min_level": 1,
+    "sale_price": 1,
+    "model_path": "assets/source/real-estate/house_level2_01/model/house_level2_01.fbx",
+    "model_sha256": "3887982ea007cfc57939da8b8bc12f19519cc1b71e338a1abbe5fc0b255a1610",
+    "skeleton_json": "{\"schemaVersion\": 1, \"meshes\": [{\"name\": \"house\", \"armature\": \"house_armature\", \"vertices\": 5944, \"bones\": [{\"name\": \"chimney_bone\", \"parent\": \"\", \"matrixLocal\": [1.0, 0.0, 2e-07, 64.1126862, 2e-07, 0.0, -1.0, 35.8664856, 0.0, 1.0, 0.0, 184.2377625, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"item_01_bone\", \"parent\": \"\", \"matrixLocal\": [1.0, 0.0, 0.0, -43.9291611, 0.0, 0.0, -1.0, -46.5865059, 0.0, 1.0, 0.0, 15.4885721, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"item_02_bone\", \"parent\": \"\", \"matrixLocal\": [1.0, 0.0, 2e-07, -89.8789368, 2e-07, 0.0, -1.0, 33.6192131, 0.0, 1.0, 0.0, 37.5335159, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"item_03_bone\", \"parent\": \"\", \"matrixLocal\": [1.0, 0.0, 0.0, -76.9106903, 0.0, 0.0, -1.0, -47.2023735, 0.0, 1.0, 0.0, 25.5473862, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"window_01_bone\", \"parent\": \"\", \"matrixLocal\": [1.0, 0.0, 0.0, -47.8788605, 0.0, 0.0, -1.0, -26.9819794, 0.0, 1.0, 0.0, 54.7597847, 0.0, 0.0, 0.0, 1.0]}], \"influencedBones\": []}, {\"name\": \"door\", \"armature\": \"door_armature\", \"vertices\": 232, \"bones\": [{\"name\": \"door_bone\", \"parent\": \"\", \"matrixLocal\": [1.0, 0.0, 0.0, -1.9e-06, 0.0, 0.0, -1.0, 0.0, 0.0, 1.0, 0.0, -1.9e-06, 0.0, 0.0, 0.0, 1.0]}], \"influencedBones\": []}]}",
+    "textures_json": "{\"house\": {\"path\": \"assets/source/real-estate/house_level2_01/textures/house.webp\", \"sha256\": \"3d6afd16fbed440a061b42d905ffafa57582bf1df755c849b7be1fde7dc8eec6\", \"assetId\": \"99301388099631\", \"publishedSha256\": \"3d6afd16fbed440a061b42d905ffafa57582bf1df755c849b7be1fde7dc8eec6\", \"publicationFormat\": \"png\"}, \"door\": {\"path\": \"assets/source/real-estate/house_level2_01/textures/door.png\", \"sha256\": \"5d9feb07eaca9a27d4f46b6891aff4a0abe8befc2cb0d58729e4c0b70004c9c9\", \"assetId\": \"86927818099561\", \"publishedSha256\": \"5d9feb07eaca9a27d4f46b6891aff4a0abe8befc2cb0d58729e4c0b70004c9c9\", \"publicationFormat\": \"source\"}}",
+    "model_asset_id": "126480085682449",
+    "model_published_hash": "3887982ea007cfc57939da8b8bc12f19519cc1b71e338a1abbe5fc0b255a1610",
+    "model_moderation": "Approved",
+    "revision": 6,
+    "created_at": 1792210226.0261047,
+    "updated_at": 1792227826.390311,
+    "model_rigs_json": "{}",
+    "mesh_options_json": "{}",
+    "mesh_sources_json": "{}"
+  },
+  "publications": [
+    {
+      "id": 1,
+      "house_slug": "house_level2_01",
+      "part": "model",
+      "asset_id": "102462794449872",
+      "sha256": "9978dab30a24af02a5d89e1f5fa1e09a9b4f63ffc89b6b0513a6e70fc6f0911e",
+      "operation": "operations/65d88eda-7422-4560-a463-f89cbed2f98b",
+      "published_at": 1792210267.7977076
+    },
+    {
+      "id": 2,
+      "house_slug": "house_level2_01",
+      "part": "model",
+      "asset_id": "102462794449872",
+      "sha256": "9978dab30a24af02a5d89e1f5fa1e09a9b4f63ffc89b6b0513a6e70fc6f0911e",
+      "operation": "operations/49facbbb-f7f2-4b35-943a-de00327d67f0",
+      "published_at": 1792219499.0758493
+    },
+    {
+      "id": 3,
+      "house_slug": "house_level2_01",
+      "part": "house",
+      "asset_id": "99301388099631",
+      "sha256": "3d6afd16fbed440a061b42d905ffafa57582bf1df755c849b7be1fde7dc8eec6",
+      "operation": "operations/8b659786-7a6c-4fe3-96c6-ad4f3e475251",
+      "published_at": 1792219505.0826163
+    },
+    {
+      "id": 4,
+      "house_slug": "house_level2_01",
+      "part": "door",
+      "asset_id": "86927818099561",
+      "sha256": "5d9feb07eaca9a27d4f46b6891aff4a0abe8befc2cb0d58729e4c0b70004c9c9",
+      "operation": "operations/0e442878-2054-44d9-af27-0ec0c9255519",
+      "published_at": 1792219510.913365
+    },
+    {
+      "id": 5,
+      "house_slug": "house_level2_01",
+      "part": "model",
+      "asset_id": "92968788660696",
+      "sha256": "f0386b31710f19183fd3e6b520f4e484935b351589a6ff419b85baa2c36cdafb",
+      "operation": "operations/e100bf00-54b1-4604-b98f-2070e8d3c006",
+      "published_at": 1792226943.2721462
+    },
+    {
+      "id": 6,
+      "house_slug": "house_level2_01",
+      "part": "model",
+      "asset_id": "126480085682449",
+      "sha256": "3887982ea007cfc57939da8b8bc12f19519cc1b71e338a1abbe5fc0b255a1610",
+      "operation": "operations/03fbbea4-f5d5-441a-9d52-c23061b1e2a4",
+      "published_at": 1792227826.390311
+    }
+  ],
+  "sourceFilesPreserved": true
+}

@@ -1,0 +1,45 @@
+{
+  "house": {
+    "slug": "house_level1_01",
+    "house_type": "house",
+    "house_level": 1,
+    "variant": "01",
+    "purchase_price": 1,
+    "min_level": 1,
+    "sale_price": 1,
+    "model_path": "assets/source/real-estate/house_level1_01/model/house_level1_01.fbx",
+    "model_sha256": "43245d3b532c85dd2122a8499c58f6c8a1da4c355d10802ad5cb46830dd279a5",
+    "skeleton_json": "{\"schemaVersion\": 1, \"meshes\": [{\"name\": \"house\", \"armature\": \"house_armature\", \"vertices\": 1097, \"bones\": [{\"name\": \"sit_bone_01\", \"parent\": \"\", \"matrixLocal\": [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, -5e-07, 0.0, 1.0, 0.0, -0.5, 0.0, 0.0, 0.0, 1.0]}], \"influencedBones\": []}]}",
+    "textures_json": "{\"house\": {\"path\": \"assets/source/real-estate/house_level1_01/textures/house.webp\", \"sha256\": \"db637b108fc593c41c4d61601b4246ea56f32333b8560a05cfd26d31442fef90\", \"reuseReference\": \"\", \"assetId\": \"102868434686869\", \"publishedSha256\": \"db637b108fc593c41c4d61601b4246ea56f32333b8560a05cfd26d31442fef90\", \"publicationFormat\": \"png\"}}",
+    "model_asset_id": "136874509194507",
+    "model_published_hash": "43245d3b532c85dd2122a8499c58f6c8a1da4c355d10802ad5cb46830dd279a5",
+    "model_moderation": "Approved",
+    "revision": 1,
+    "created_at": 1792373196.1647449,
+    "updated_at": 1792373232.730398,
+    "model_rigs_json": "{\"house\": {\"assetId\": \"136874509194507\", \"publishedSha256\": \"43245d3b532c85dd2122a8499c58f6c8a1da4c355d10802ad5cb46830dd279a5\"}}",
+    "mesh_options_json": "{}",
+    "mesh_sources_json": "{}"
+  },
+  "publications": [
+    {
+      "id": 12,
+      "house_slug": "house_level1_01",
+      "part": "model:house",
+      "asset_id": "136874509194507",
+      "sha256": "43245d3b532c85dd2122a8499c58f6c8a1da4c355d10802ad5cb46830dd279a5",
+      "operation": "operations/831b09b4-0323-4349-aa90-c0e712607ea6",
+      "published_at": 1792373225.9637845
+    },
+    {
+      "id": 13,
+      "house_slug": "house_level1_01",
+      "part": "house",
+      "asset_id": "102868434686869",
+      "sha256": "db637b108fc593c41c4d61601b4246ea56f32333b8560a05cfd26d31442fef90",
+      "operation": "operations/cc4ee102-dc5d-4da8-a8ba-19e72d6573a0",
+      "published_at": 1792373232.730398
+    }
+  ],
+  "sourceFilesPreserved": true
+}

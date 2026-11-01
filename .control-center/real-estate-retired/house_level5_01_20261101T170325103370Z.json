@@ -1,0 +1,126 @@
+{
+  "house": {
+    "slug": "house_level5_01",
+    "house_type": "house",
+    "house_level": 5,
+    "variant": "01",
+    "purchase_price": 1,
+    "min_level": 1,
+    "sale_price": 1,
+    "model_path": "assets/source/real-estate/house_level5_01/model/house_level5_01.fbx",
+    "model_sha256": "46128429087153328602b202c8742e3c3523d8de3ab7f2ccdd59dfa7fe1b2f82",
+    "skeleton_json": "{\"schemaVersion\": 1, \"meshes\": [{\"name\": \"house\", \"armature\": \"house_armature\", \"vertices\": 11115, \"bones\": [{\"name\": \"chimney_bone\", \"parent\": \"\", \"matrixLocal\": [1.0, 0.0, 0.0, -13.8282785, 0.0, 0.0, -1.0, 3.5811627, 0.0, 1.0, 0.0, 41.5055847, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"elevator_bone\", \"parent\": \"\", \"matrixLocal\": [1.0, 0.0, 2e-07, -7.481102, 2e-07, 0.0, -1.0, -7.4839854, 0.0, 1.0, 0.0, 17.2694283, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"floor1_spawn\", \"parent\": \"\", \"matrixLocal\": [1.0, 0.0, 0.0, -1.2143809, 0.0, 0.0, -1.0, -3.0976295, 0.0, 1.0, 0.0, 6.3109736, 0.0, 0.0, 0.0, 1.0]}, {\"name\": \"floor2_spawn\", \"parent\": \"\", \"matrixLocal\": [1.0, 0.0, 0.0, -6.9595084, 0.0, 0.0, -1.0, 5.3698416, 0.0, 1.0, 0.0, 18.246315, 0.0, 0.0, 0.0, 1.0]}], \"influencedBones\": []}, {\"name\": \"door\", \"armature\": \"door_armature\", \"vertices\": 479, \"bones\": [{\"name\": \"door_bone\", \"parent\": \"\", \"matrixLocal\": [1.0, 0.0, 0.0, 4.365665, 0.0, 0.0, -1.0, 8.0041466, 0.0, 1.0, 0.0, 9.4761391, 0.0, 0.0, 0.0, 1.0]}], \"influencedBones\": [\"door_bone\"]}, {\"name\": \"repair\", \"armature\": \"\", \"vertices\": 9495, \"bones\": [], \"influencedBones\": []}, {\"name\": \"stone_fence_01_kit\", \"armature\": \"\", \"vertices\": 14362, \"bones\": [], \"influencedBones\": []}]}",
+    "textures_json": "{\"house\": {\"path\": \"assets/source/real-estate/house_level5_01/textures/house.png\", \"sha256\": \"7ff84ce5562c7571f4a94df379ea2881364d2f4b193beee7bf135da7a22c4d1e\", \"reuseReference\": \"\", \"assetId\": \"137011316577762\", \"publishedSha256\": \"7ff84ce5562c7571f4a94df379ea2881364d2f4b193beee7bf135da7a22c4d1e\", \"publicationFormat\": \"source\"}, \"door\": {\"path\": \"assets/source/real-estate/house_level5_01/textures/door.png\", \"sha256\": \"bb0b9bacd9336b86be8cc0affcc54cec67e98ec3a7ee10df74ed4b9a3d20c6eb\", \"reuseReference\": \"\", \"assetId\": \"98387048887358\", \"publishedSha256\": \"bb0b9bacd9336b86be8cc0affcc54cec67e98ec3a7ee10df74ed4b9a3d20c6eb\", \"publicationFormat\": \"source\"}, \"repair\": {\"path\": \"assets/source/real-estate/house_level5_01/textures/repair.png\", \"sha256\": \"bb0b9bacd9336b86be8cc0affcc54cec67e98ec3a7ee10df74ed4b9a3d20c6eb\", \"reuseReference\": \"\", \"assetId\": \"122977374372900\", \"publishedSha256\": \"bb0b9bacd9336b86be8cc0affcc54cec67e98ec3a7ee10df74ed4b9a3d20c6eb\", \"publicationFormat\": \"source\"}, \"stone_fence_01_kit\": {\"reuseReference\": \"location:stone_fence_01\", \"path\": \"\", \"sha256\": \"\", \"assetId\": \"\", \"publishedSha256\": \"\", \"publicationFormat\": \"\"}}",
+    "model_asset_id": "97310733558805",
+    "model_published_hash": "46128429087153328602b202c8742e3c3523d8de3ab7f2ccdd59dfa7fe1b2f82",
+    "model_moderation": "Approved",
+    "revision": 5,
+    "created_at": 1792326272.1038847,
+    "updated_at": 1792375388.0347662,
+    "model_rigs_json": "{\"house\": {\"assetId\": \"97310733558805\", \"publishedSha256\": \"46128429087153328602b202c8742e3c3523d8de3ab7f2ccdd59dfa7fe1b2f82\"}, \"door\": {\"assetId\": \"71416945560950\", \"publishedSha256\": \"46128429087153328602b202c8742e3c3523d8de3ab7f2ccdd59dfa7fe1b2f82\"}, \"repair\": {\"assetId\": \"128617718019866\", \"publishedSha256\": \"46128429087153328602b202c8742e3c3523d8de3ab7f2ccdd59dfa7fe1b2f82\"}, \"stone_fence_01_kit\": {\"assetId\": \"76571004839323\", \"publishedSha256\": \"46128429087153328602b202c8742e3c3523d8de3ab7f2ccdd59dfa7fe1b2f82\"}}",
+    "mesh_options_json": "{}",
+    "mesh_sources_json": "{}"
+  },
+  "publications": [
+    {
+      "id": 7,
+      "house_slug": "house_level5_01",
+      "part": "model:house",
+      "asset_id": "92168418720758",
+      "sha256": "8a434f66f78e1fd9eb2ec43793b872baa0ab2c59b5e7f5d976323a2b3d3f8edd",
+      "operation": "operations/a810c439-0c65-45f9-a964-e62f3c46f6e6",
+      "published_at": 1792368401.0767899
+    },
+    {
+      "id": 8,
+      "house_slug": "house_level5_01",
+      "part": "model:door",
+      "asset_id": "95281304120511",
+      "sha256": "8a434f66f78e1fd9eb2ec43793b872baa0ab2c59b5e7f5d976323a2b3d3f8edd",
+      "operation": "operations/686300a2-e943-4157-b578-4515345b7123",
+      "published_at": 1792368409.4903533
+    },
+    {
+      "id": 9,
+      "house_slug": "house_level5_01",
+      "part": "house",
+      "asset_id": "70541400400712",
+      "sha256": "bb0b9bacd9336b86be8cc0affcc54cec67e98ec3a7ee10df74ed4b9a3d20c6eb",
+      "operation": "operations/6293480c-d1b4-41bc-8861-44500f66e4d5",
+      "published_at": 1792368415.4913871
+    },
+    {
+      "id": 10,
+      "house_slug": "house_level5_01",
+      "part": "house",
+      "asset_id": "137011316577762",
+      "sha256": "7ff84ce5562c7571f4a94df379ea2881364d2f4b193beee7bf135da7a22c4d1e",
+      "operation": "operations/e9d644cc-02f1-4985-a71e-5a76b426d612",
+      "published_at": 1792368604.1415296
+    },
+    {
+      "id": 11,
+      "house_slug": "house_level5_01",
+      "part": "door",
+      "asset_id": "98387048887358",
+      "sha256": "bb0b9bacd9336b86be8cc0affcc54cec67e98ec3a7ee10df74ed4b9a3d20c6eb",
+      "operation": "operations/f0c46b33-0a16-4dd9-b7bf-235621c180d1",
+      "published_at": 1792368610.217071
+    },
+    {
+      "id": 14,
+      "house_slug": "house_level5_01",
+      "part": "model:house",
+      "asset_id": "131651486036032",
+      "sha256": "46128429087153328602b202c8742e3c3523d8de3ab7f2ccdd59dfa7fe1b2f82",
+      "operation": "operations/542932b8-765a-4a4d-9d21-44988a941c25",
+      "published_at": 1792373541.0948632
+    },
+    {
+      "id": 15,
+      "house_slug": "house_level5_01",
+      "part": "model:door",
+      "asset_id": "71416945560950",
+      "sha256": "46128429087153328602b202c8742e3c3523d8de3ab7f2ccdd59dfa7fe1b2f82",
+      "operation": "operations/23537027-5870-4c8f-81fe-8647364d0741",
+      "published_at": 1792373547.2789829
+    },
+    {
+      "id": 16,
+      "house_slug": "house_level5_01",
+      "part": "model:repair",
+      "asset_id": "128617718019866",
+      "sha256": "46128429087153328602b202c8742e3c3523d8de3ab7f2ccdd59dfa7fe1b2f82",
+      "operation": "operations/150bde68-76ab-45d8-a202-9fa04d0814d4",
+      "published_at": 1792373562.200618
+    },
+    {
+      "id": 17,
+      "house_slug": "house_level5_01",
+      "part": "model:stone_fence_01_kit",
+      "asset_id": "76571004839323",
+      "sha256": "46128429087153328602b202c8742e3c3523d8de3ab7f2ccdd59dfa7fe1b2f82",
+      "operation": "operations/7a25c6fd-4e2b-4629-9ece-af991db683a0",
+      "published_at": 1792373574.8803878
+    },
+    {
+      "id": 18,
+      "house_slug": "house_level5_01",
+      "part": "repair",
+      "asset_id": "122977374372900",
+      "sha256": "bb0b9bacd9336b86be8cc0affcc54cec67e98ec3a7ee10df74ed4b9a3d20c6eb",
+      "operation": "operations/6f87a738-754b-4646-b572-9f0e09464237",
+      "published_at": 1792373580.9116242
+    },
+    {
+      "id": 19,
+      "house_slug": "house_level5_01",
+      "part": "model:house",
+      "asset_id": "97310733558805",
+      "sha256": "46128429087153328602b202c8742e3c3523d8de3ab7f2ccdd59dfa7fe1b2f82",
+      "operation": "operations/e36eec17-dd88-48b1-b210-afd270be187f",
+      "published_at": 1792375388.0347662
+    }
+  ],
+  "sourceFilesPreserved": true
+}

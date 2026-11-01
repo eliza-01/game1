@@ -1,10 +1,9 @@
 --!strict
 -- Builds an unparented template. Asset loading/cache and gameplay physics stay
 -- with CharacterService/CharacterRigService. No animation or inventory writes.
-local AssetService = game:GetService("AssetService")
+local CharacterAtlasBinder = require(script.Parent:WaitForChild("CharacterAtlasBinder"))
 local Builder = {}
 local slots = { "upper", "lower", "gloves", "boots", "head", "eyes", "eyebrows", "hair" }
-local appearances: { [string]: SurfaceAppearance } = {}
 
 local function meshFromAsset(asset: Model, expectedName: string): MeshPart
     local meshes = {}
@@ -33,22 +32,6 @@ local function configure(mesh: BasePart)
     mesh.CanTouch = false
     mesh.CanQuery = false
     mesh.Massless = true
-end
-
-local function applyAtlas(mesh: MeshPart, imageId: string)
-    if imageId == "" then return end
-    local uri = "rbxassetid://" .. imageId
-    local appearance = appearances[imageId]
-    if not appearance then
-        -- ColorMap is PluginSecurity; use the runtime factory, never its setter.
-        appearance = AssetService:CreateSurfaceAppearanceAsync({ ColorMap = Content.fromUri(uri) })
-        appearances[imageId] = appearance
-    end
-    for _, child in mesh:GetChildren() do
-        if child:IsA("SurfaceAppearance") then child:Destroy() end
-    end
-    mesh.TextureID = uri
-    appearance:Clone().Parent = mesh
 end
 
 function Builder.Build(recipe: any, loadAsset: (number) -> Model?): Model
@@ -133,7 +116,7 @@ function Builder.Build(recipe: any, loadAsset: (number) -> Model?): Model
                 weld.C1 = CFrame.identity
                 weld.Parent = mesh
             end
-            applyAtlas(mesh, part.atlas_image_id or "")
+            CharacterAtlasBinder.Apply(mesh, part.atlas_image_id)
         end
         imported.PrimaryPart = root
         wrapper.PrimaryPart = root

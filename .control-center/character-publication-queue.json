@@ -128,6 +128,25 @@
           "asset_id": "99890351983275"
         }
       ]
+    },
+    {
+      "schema_version": 1,
+      "id": "4b453e75-0c65-4f4e-b2fc-d736f3578c40",
+      "status": "completed",
+      "started_at": 1793466347.7979684,
+      "finished_at": 1793466360.742878,
+      "items": [
+        {
+          "kind": "part",
+          "id": "newborn_upper",
+          "revision": 2,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "87526597507999"
+        }
+      ]
     }
   ]
 }

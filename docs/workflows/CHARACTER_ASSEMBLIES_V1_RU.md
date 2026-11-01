@@ -87,9 +87,20 @@ CharacterService различает `model` и `assembly`. Цельная мод
   used_bones может содержать исчезнувшие после квантования весов влияния: они не
   обязаны иметь Bone в отдельной части. Полный набор костей канонического carrier
   обязателен; неизвестные кости и несовместимые bind-положения отклоняются.
-- Atlas ColorMap нельзя задавать обычным runtime setter: используется
-  AssetService.CreateSurfaceAppearanceAsync, затем clone готового appearance.
-  Документация: https://create.roblox.com/docs/reference/engine/classes/SurfaceAppearance
+- Опубликованный Character Atlas (Image Asset ID) применяется при сборке
+  через `CharacterAtlasBinder` к `MeshPart.TextureID`. Старый `SurfaceAppearance`
+  удаляется только для части с назначенным atlas override, поскольку иначе
+  его `ColorMap` перекрывает `TextureID`. Части без override сохраняют исходные
+  материалы/`SurfaceAppearance` из опубликованной модели.
+- `AssetService:CreateSurfaceAppearanceAsync` требует `EditableImage Content`,
+  поэтому передавать ему `Content.fromUri(rbxassetid://...)` нельзя. Применение
+  уже опубликованного обычного изображения не требует EditableImage, дополнительных
+  разрешений Mesh / Image API или повторной публикации Image/Model Asset.
+- Если для конкретной части необходимы PBR-карты или alpha cutout
+  `SurfaceAppearance.AlphaMode=Transparency`, их следует оформлять отдельным
+  authoring-процессом Studio/Model Asset; runtime-замена `TextureID` не сохраняет
+  PBR-слои старого `SurfaceAppearance` и не гарантирует идентичный alpha cutout.
+  Документация: https://create.roblox.com/docs/reference/engine/classes/MeshPart
   и https://create.roblox.com/docs/reference/engine/classes/AssetService.
 
 Этот этап не меняет клипы, animation scope и правила управления состояниями лица.

@@ -1,7 +1,9 @@
 import bpy,json
 from pathlib import Path
 from mathutils import Matrix,Vector
-rig=bpy.data.objects['human_armature'];action=bpy.data.actions['face_idle'];scene=bpy.context.scene
+rig=bpy.data.objects['human_armature'];scene=bpy.context.scene
+action=next((a for a in bpy.data.actions if a.get('game1_export_stem')=='emotions_idle' or a.name in {'human_male_emotions_idle','face_idle'}),None)
+if action is None:raise RuntimeError('Missing emotions_idle Action')
 root=Path(__file__).resolve().parents[3]
 out=root/'assets/authoring/animations/human_male';out.mkdir(parents=True,exist_ok=True)
 bind=json.loads((root/'system/blender-extensions/game1_animation_exporter/engine_bind.json').read_text())

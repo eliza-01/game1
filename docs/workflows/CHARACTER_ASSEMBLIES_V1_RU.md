@@ -75,8 +75,14 @@ CharacterService различает `model` и `assembly`. Цельная мод
 - Семь основных skinned MeshParts выравниваются по bind-положениям общих костей,
   проверяются и подключаются Weld к carrier внутри одного ImportedRig Model.
   Дубли Bone в этих частях удаляются; их skin data остаётся в mesh asset.
-- Волосы сохраняют собственные Bone и соединяются RigidConstraint через
-  `hair_bone_socket` с канонической `hair_mount`.
+- Причёска с собственными костями (старый режим `attachment_mode=socket`)
+  сохраняет эти Bone и соединяется RigidConstraint через исходный root socket
+  с канонической `hair_mount`.
+- Цельная причёска без skinning (`attachment_mode=pivot`) экспортируется как
+  один MeshPart; её авторский **MeshPart pivot**, с учётом `PivotOffset`,
+  совмещается через `PivotTo` с `hair_mount`. Затем создаётся тот же
+  RigidConstraint. `CFrame` самого MeshPart не используется вместо pivot.
+  Другие слоты по-прежнему требуют корректный bind и не получают fallback.
 - Создаются RootPart и один AnimationController/Animator; далее используется
   существующий CharacterRigService, без изменения gameplay collision/controller.
 - При ошибке сборки незавершённая модель уничтожается, текущий персонаж сохраняется.

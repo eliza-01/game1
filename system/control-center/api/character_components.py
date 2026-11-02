@@ -39,7 +39,8 @@ def write(path,body,deps):
         if path==ROOT+'/inspect':return 200,store.inspect(payload.get('sourcePath') or '')
         if path==ROOT+'/register':
             result=store.register(payload.get('token'),payload.get('replacements',[]),
-                replace_rig=payload.get('replaceRig',False),rig_only=payload.get('rigOnly',False))
+                replace_rig=payload.get('replaceRig',False),rig_only=payload.get('rigOnly',False),
+                allow_partial=payload.get('allowPartial',False),new_parts=payload.get('newParts'))
             if 'character_assemblies' in deps:deps['character_assemblies'].characters.export()
             return 200,result
         if path==ROOT+'/atlas':

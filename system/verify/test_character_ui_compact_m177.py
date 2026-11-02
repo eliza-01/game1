@@ -47,7 +47,7 @@ class CharacterCompactUiM177(unittest.TestCase):
         self.assertNotIn('innerHTML', self.summary)
         self.assertIn('window.game1CharacterComponentSummary.render(catalog)', self.components)
         self.assertLess(self.html.index('character-component-summary.js?v=1'),
-                        self.html.index('character-components.js?v=7'))
+                        self.html.index('character-components.js?v=11'))
 
     def test_naming_and_starting_stats_open_by_default(self):
         self.assertRegex(self.html, r'<details open><summary>Mesh naming standard</summary>')

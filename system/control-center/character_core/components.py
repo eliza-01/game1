@@ -15,7 +15,7 @@ import uuid
 from sqlite_connection import connect
 from services.texture_atlas_registry import AtlasRegistry
 from character_core.part_names import parse_part, rig_id, skeleton_matches, TOKEN
-from character_core.component_fbx import inspect_fbx
+from character_core.component_fbx import inspect_fbx, inspect_rig_fbx
 from character_core.rig_revisions import pin_unversioned_assemblies
 
 _LOCK=threading.RLock()
@@ -33,9 +33,9 @@ class ComponentConflict(ValueError):
 
 
 class CharacterComponents:
-    def __init__(self,root,*,analyzer=inspect_fbx):
+    def __init__(self,root,*,analyzer=inspect_fbx,rig_analyzer=inspect_rig_fbx):
         self.root=Path(root).resolve();self.db=self.root/'.control-center/game1.db'
-        self.db.parent.mkdir(parents=True,exist_ok=True);self.analyze=analyzer
+        self.db.parent.mkdir(parents=True,exist_ok=True);self.analyze=analyzer;self.analyze_rig=rig_analyzer
         # Online backup before the first additive migration; safe with WAL.
         with connect(self.db) as db:
             exists=db.execute("SELECT 1 FROM sqlite_master WHERE name='character_component_schema'").fetchone()
@@ -106,18 +106,21 @@ class CharacterComponents:
         directory.mkdir(parents=True);frozen=directory/'source.fbx'
         shutil.copy2(Path(source).resolve(),frozen)
         try:
-            info=self.analyze(self.root,frozen)
+            # A broken/unrecognized part must not hide a changed primary rig.
+            # Retry only the armature inspection; never silently accept those parts.
+            part_error = ''
+            try:
+                info=self.analyze(self.root,frozen)
+            except ValueError as exc:
+                part_error=str(exc)
+                try:
+                    info=self.analyze_rig(self.root,frozen)
+                except Exception:
+                    raise exc  # Preserve the original detailed FBX failure.
             key=rig_id(info['armature'])
-            if not info['parts']:raise ValueError('FBX has no parts')
-            for bones in [info['bones'],*(p['skeleton'] for p in info['parts'])]:
-                for bone in bones:
-                    if not TOKEN.fullmatch(bone['name']) or len(bone['matrix'])!=16 or not all(math.isfinite(v) for v in bone['matrix']):
-                        raise ValueError('bone names must be lower_case_snake_case with finite bind matrices')
-            parts=[]
-            for part in info['parts']:
-                meta=parse_part(part['name'])
-                parts.append({**part,**meta,'rig_id':key})
-            if len({p['id'] for p in parts})!=len(parts):raise ValueError('duplicate mesh names')
+            for bone in info['bones']:
+                if not TOKEN.fullmatch(bone['name']) or len(bone['matrix'])!=16 or not all(math.isfinite(v) for v in bone['matrix']):
+                    raise ValueError('bone names must be lower_case_snake_case with finite bind matrices')
             old=self.get('rig',key)
             rig_changed = False
             rig_difference = ''
@@ -129,11 +132,47 @@ class CharacterComponents:
                     rig_difference = str(exc).split('; register a new')[0]
                 if rig_changed and old['published_revision'] not in (0, old['revision']):
                     raise ComponentConflict('publish the pending rig revision before replacing it again')
+            # Inspect valid components independently. An unrelated rejected mesh
+            # must not make a correctly authored rigid hairstyle disappear.
+            part_errors=list(info.get('part_errors') or []) if not part_error else []
+            parts=[]
+            seen=set()
+            if not part_error:
+                for part in info['parts']:
+                    try:
+                        for bone in part['skeleton']:
+                            if not TOKEN.fullmatch(bone['name']) or len(bone['matrix'])!=16 or not all(math.isfinite(v) for v in bone['matrix']):
+                                raise ValueError('bone names must be lower_case_snake_case with finite bind matrices')
+                        meta=parse_part(part['name'])
+                        if meta['id'] in seen:
+                            raise ValueError('duplicate mesh names: '+meta['id'])
+                        if part.get('attachment_mode') == 'pivot':
+                            if (meta['slot'] != 'hair' or part.get('attachment') != 'hair_mount'
+                                    or part.get('armature') or part.get('skeleton') or part.get('used_bones')):
+                                raise ValueError(part['name']+': invalid rigid hair pivot attachment')
+                            if not any(b['name']=='hair_mount' for b in info['bones']):
+                                raise ValueError('rigid hair requires hair_mount in primary rig')
+                        parts.append({**part,**meta,'rig_id':key})
+                        seen.add(meta['id'])
+                    except ValueError as exc:
+                        part_errors.append(dict(name=part.get('name',''),message=str(exc)))
+            if part_error:
+                part_errors.insert(0,dict(name='',message=part_error))
+            part_error='; '.join(error['message'] for error in part_errors)
+            # With no valid components, only a changed, registered rig may be
+            # inspected. Preserve the strict error for all other cases.
+            if not parts and part_error and (not old or not rig_changed):
+                raise ValueError(part_error)
+            if not parts and not part_error:
+                raise ValueError('FBX has no parts')
+            rig_only_required=bool(part_error and not parts)
+            partial_required=bool(part_error and parts)
             rows=[]
             for p in parts:
                 old_part=self.get('part',p['id'])
                 if old_part and old_part['rig_id']!=key:raise ValueError(p['id']+': belongs to another rig')
                 rows.append(dict(id=p['id'],slot=p['slot'],set_id=p['set_id'],role=p['role'],
+                    attachment_mode=p.get('attachment_mode',''),
                     vertices=p['vertices'],triangles=p['triangles'],
                     existing_revision=old_part['revision'] if old_part else 0,
                     published_asset_id=old_part['model_asset_id'] if old_part else '',
@@ -142,13 +181,18 @@ class CharacterComponents:
                 rig_id=key,bones=info['bones'],armature=info['armature'],parts=parts,rows=rows,
                 rig_revision=old['revision'] if old else 0,
                 rig_published_asset_id=old['model_asset_id'] if old else '',
-                rig_changed=rig_changed,rig_difference=rig_difference)
+                rig_changed=rig_changed,rig_difference=rig_difference,
+                rig_only_required=rig_only_required,partial_required=partial_required,
+                part_error=part_error,part_errors=part_errors)
             with connect(self.db) as db:
                 db.execute('INSERT INTO character_component_imports(id,plan_json,created_at) VALUES(?,?,?)',
                            (ident,json.dumps(plan),time.time()))
             return dict(schema_version=1,token=ident,rig_id=key,bone_count=len(info['bones']),parts=rows,
                 new_sets=sorted({p['set_id'] for p in parts if p['set_id']} - set(self.snapshot()['sets'])),
                 conflicts=[p for p in rows if p['published_asset_id']],
+                registered=[p for p in rows if p['existing_revision']],
+                rig_only_required=rig_only_required,partial_required=partial_required,
+                part_error=part_error,part_errors=part_errors,
                 rig=dict(id=key,existing_revision=old['revision'] if old else 0,
                          published_asset_id=old['model_asset_id'] if old else '',
                          changed=rig_changed,warning=rig_difference))
@@ -156,7 +200,7 @@ class CharacterComponents:
             shutil.rmtree(directory)
             raise
 
-    def register(self,token,replacements,*,replace_rig=False,rig_only=False):
+    def register(self,token,replacements,*,replace_rig=False,rig_only=False,allow_partial=False,new_parts=None):
         with _LOCK:
             with connect(self.db) as db:
                 saved=db.execute('SELECT * FROM character_component_imports WHERE id=?',(token,)).fetchone()
@@ -166,9 +210,27 @@ class CharacterComponents:
             if not frozen.is_file() or sha(frozen)!=plan['sha256']:raise ComponentConflict('inspection source changed; choose FBX again')
             if type(rig_only) is not bool or (rig_only and not plan.get('rig_changed')):
                 raise ComponentConflict('rig-only replacement requires an inspected rig change')
-            required=set() if rig_only else {p['id'] for p in plan['rows'] if p['published_asset_id']}
-            if not isinstance(replacements,list) or len(replacements)!=len(set(replacements)) or set(replacements)!=required:
-                raise ComponentConflict('explicit approval required for every published part in this FBX')
+            if plan.get('rig_only_required') and not rig_only:
+                raise ComponentConflict('rig-only registration is required: FBX components failed validation')
+            if type(allow_partial) is not bool or (plan.get('partial_required') and not rig_only and not allow_partial):
+                raise ComponentConflict('explicit approval is required to register only the valid FBX parts')
+            # An FBX is a container of candidate parts, NOT a batch replacement.
+            # New components are selected independently from registered components.
+            # For older clients, omitted newParts still means all new components.
+            existing={p['id'] for p in plan['rows'] if p['existing_revision']}
+            new={p['id'] for p in plan['rows'] if not p['existing_revision']}
+            if (not isinstance(replacements,list) or any(not isinstance(v,str) for v in replacements)
+                    or len(replacements)!=len(set(replacements)) or not set(replacements)<=existing):
+                raise ComponentConflict('replacement approval contains unknown or duplicate registered parts')
+            if new_parts is None:
+                new_parts=sorted(new) if not rig_only else []
+            if (not isinstance(new_parts,list) or any(not isinstance(v,str) for v in new_parts)
+                    or len(new_parts)!=len(set(new_parts)) or not set(new_parts)<=new):
+                raise ComponentConflict('new component selection contains unknown or duplicate parts')
+            if rig_only and (replacements or new_parts):
+                raise ComponentConflict('rig-only registration cannot modify mesh components')
+            approved_replacements=set(replacements)
+            approved_new=set(new_parts)
             if type(replace_rig) is not bool or replace_rig != bool(plan.get('rig_changed')):
                 raise ComponentConflict('explicit Replace Rig approval is required when bind pose, parent or bone set changes')
             def validate(db):
@@ -184,25 +246,37 @@ class CharacterComponents:
                         if (row['model_asset_id'] if row else '')!=inspected['published_asset_id']:
                             raise ComponentConflict('part was published after inspection; inspect FBX again')
             with connect(self.db) as db:validate(db)
+            if not (approved_replacements or approved_new or (replace_rig and plan.get('rig_changed'))):
+                raise ComponentConflict('nothing selected; choose new components or approve replacements')
             folder=self.root/'assets/source/character_components/imports'/token
             # game1 is source-only: startup migrates/removes assets/prepared.
             # Extracted component FBX files are canonical publication inputs.
             prepared=self.root/'assets/source/character_components'/token
             folder.mkdir(parents=True,exist_ok=True);shutil.copy2(frozen,folder/'source.fbx')
-            info=self.analyze(self.root,folder/'source.fbx',prepared)
+            # When part validation failed, export the rig carrier only. Other
+            # components cannot be extracted/registered by this inspected plan.
+            if plan.get('rig_only_required'):
+                info=self.analyze_rig(self.root,folder/'source.fbx',prepared)
+            else:
+                info=self.analyze(self.root,folder/'source.fbx',prepared)
             skeleton_matches(plan['bones'],info['bones'])
-            if {p['name']:p['content_sha256'] for p in info['parts']}!={p['name']:p['content_sha256'] for p in plan['parts']}:
-                raise ComponentConflict('FBX changed during extraction')
+            if not rig_only:
+                expected={p['name']:p['content_sha256'] for p in plan['parts']}
+                actual={p['name']:p['content_sha256'] for p in info['parts'] if p['name'] in expected}
+                if (actual!=expected or len(actual)!=len(expected)
+                        or info.get('part_errors',[])!=plan.get('part_errors',[])[:len(info.get('part_errors',[]))]):
+                    raise ComponentConflict('FBX changed during extraction')
             entries=[('rig',plan['rig_id'],dict(bones=plan['bones'],armature=plan['armature']),None)]
             if not rig_only:
-                entries.extend(('part',p['id'],p,p) for p in plan['parts'])
+                selected_parts=approved_replacements | approved_new
+                entries.extend(('part',p['id'],p,p) for p in plan['parts'] if p['id'] in selected_parts)
             with connect(self.db) as db:
                 db.execute('BEGIN IMMEDIATE');validate(db)
                 for kind,key,meta,part in entries:
                     old=db.execute('SELECT * FROM character_component_records WHERE kind=? AND id=?',(kind,key)).fetchone()
                     if old and kind=='rig' and not plan.get('rig_changed'):continue # compatible rig is reused
                     content=part['content_sha256'] if part else hashlib.sha256(json.dumps(plan['bones'],sort_keys=True).encode()).hexdigest()
-                    if old and old['content_sha256']==content and key not in required:continue
+                    if old and old['content_sha256']==content and key not in approved_replacements:continue
                     artifact=prepared/((key if part else 'rig')+'.fbx')
                     if not artifact.is_file() or artifact.stat().st_size==0:raise ValueError('missing extracted FBX: '+key)
                     if old:

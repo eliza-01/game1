@@ -206,6 +206,44 @@
           "asset_id": "132634948928308"
         }
       ]
+    },
+    {
+      "schema_version": 1,
+      "id": "6e1e0242-781f-44d9-9018-fa47e49b2084",
+      "status": "completed",
+      "started_at": 1793642603.3901603,
+      "finished_at": 1793642616.5120604,
+      "items": [
+        {
+          "kind": "rig",
+          "id": "human",
+          "revision": 4,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "109451221701257"
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "24b45e61-9cd2-4676-8f7b-a6068a3a0610",
+      "status": "completed",
+      "started_at": 1793644479.5220554,
+      "finished_at": 1793644490.8401525,
+      "items": [
+        {
+          "kind": "part",
+          "id": "hair_03_common",
+          "revision": 1,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "89684073021930"
+        }
+      ]
     }
   ]
 }

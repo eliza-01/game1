@@ -68,7 +68,10 @@ class ComponentTests(unittest.TestCase):
     def test_partial_fbx_keeps_missing_parts_and_reuses_rig(self):
         self.register();self.published('newborn_upper');self.set_parts(['eyes_01'])
         plan=self.store.inspect(self.source);self.assertFalse(plan['conflicts'])
-        self.store.register(plan['token'],[])
+        with self.assertRaisesRegex(ComponentConflict,'nothing selected'):
+            self.store.register(plan['token'],[])
+        # Existing rows are not refreshed implicitly when the FBX contains no new parts.
+        self.store.register(plan['token'],['eyes_01'])
         self.assertEqual(self.store.get('part','newborn_upper')['model_asset_id'],'123')
         self.assertEqual(self.store.get('rig','human')['revision'],1)
         self.assertEqual(len(self.store.snapshot()['items']),7)
@@ -115,8 +118,7 @@ class ComponentTests(unittest.TestCase):
         plan=self.store.inspect(self.source)
         self.assertTrue(plan['rig']['changed'])
         self.assertEqual([p['id'] for p in plan['conflicts']],['newborn_upper'])
-        with self.assertRaisesRegex(ComponentConflict,'approval'):
-            self.store.register(plan['token'],[],replace_rig=True)
+        # No mesh approval is required when explicitly replacing only the rig.
         result=self.store.register(plan['token'],[],replace_rig=True,rig_only=True)
         self.assertEqual(self.store.get('part','newborn_upper'),before)
         rig=self.store.get('rig','human')

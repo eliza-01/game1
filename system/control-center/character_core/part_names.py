@@ -48,3 +48,12 @@ def skeleton_matches(expected, actual, tolerance=1e-5):
         a, b = bone['matrix'], other['matrix']
         if bone['parent'] != other['parent'] or len(a) != 16 or len(b) != 16 or any(abs(x-y)>tolerance for x,y in zip(a,b)):
             raise ValueError(f'bind pose/parent changed for {name}; register a new rig profile')
+
+
+def rigid_pivot_mount_for_part(name):
+    """Only a rigless hair part may be mounted by its authored mesh pivot."""
+    try:
+        part = parse_part(name)
+    except ValueError:
+        return ''
+    return 'hair_mount' if part['slot'] == 'hair' else ''

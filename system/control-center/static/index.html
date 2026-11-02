@@ -82,7 +82,7 @@
 <span class="eyebrow">01 · register a shared rig and reusable parts</span><h3>Rig &amp; parts</h3>
 <div id="cp-counts" class="cp-metrics" aria-label="Статистика компонентов"></div>
 <div id="cp-flow-summary" class="cp-guidance" role="status" aria-live="polite">Загрузка компонентов…</div>
-<details open><summary>Mesh naming standard</summary><p><code>&lt;set&gt;_upper</code> · <code>&lt;set&gt;_lower</code> · <code>&lt;set&gt;_gloves</code> · <code>&lt;set&gt;_boots</code><br><code>head_01_male</code> / <code>head_01_female</code><br><code>hair_01_male</code> / <code>hair_01_female</code> / <code>hair_01_common</code><br><code>eyes_01</code> · <code>eyebrows_01</code> · <code>eyes_01_spiral</code> (effect)<br>Main rig: <code>human_armature</code>. Hair may carry its own <code>hair_01_common_armature</code>.</p></details>
+<details open><summary>Mesh naming standard</summary><p><code>&lt;set&gt;_upper</code> · <code>&lt;set&gt;_lower</code> · <code>&lt;set&gt;_gloves</code> · <code>&lt;set&gt;_boots</code><br><code>head_01_male</code> / <code>head_01_female</code><br><code>hair_01_male</code> / <code>hair_01_female</code> / <code>hair_01_common</code><br><code>eyes_01</code> · <code>eyebrows_01</code> · <code>eyes_01_spiral</code> (effect)<br>Main rig: <code>human_armature</code>. Hair may carry its own <code>hair_01_common_armature</code>, or use its Object Pivot (without Armature) on <code>hair_mount</code>.</p></details>
 <div class="cp-toolbar"><button id="cp-choose" class="primary" type="button">Choose FBX · inspect</button><button id="cp-register" type="button" disabled>Register detected rig &amp; parts</button><button id="cp-refresh" type="button">Refresh</button></div>
 <small id="cp-source" class="hint">No FBX selected.</small><div id="cp-status" role="status" aria-live="polite"></div><div id="cp-preview" class="character-inspection-preview" aria-live="polite"></div><p id="cp-sets" class="hint"></p><div class="cp-toolbar" id="cp-publication-step"><strong class="character-phase-label">02 · Публикация компонентов</strong><span id="cp-publish-count">0 выбрано</span><button id="cp-publication-open" class="cp-queue-button" type="button">Queue</button></div>
 <div class="table-wrap"><table id="cp-table"><thead><tr><th aria-label="health"></th><th><button class="cp-sort" type="button" data-cp-sort="id">name</button></th><th><button class="cp-sort" type="button" data-cp-sort="slot">part</button></th><th><button class="cp-sort" type="button" data-cp-sort="set_id">set</button></th><th>rig</th><th>status</th><th>Model Asset ID</th><th>shared atlas</th><th class="cp-publish-selection"><input id="cp-publish-select-all" type="checkbox" aria-label="Select all unpublished components"></th><th class="cp-publication-column"><span>publication</span><button id="cp-publish-all" type="button" disabled>Publish selected</button></th></tr></thead><tbody id="cp-rows"></tbody></table></div>
@@ -164,10 +164,10 @@
 <p class="hint">Components publish one at a time. Closing this window keeps the queue running. Failed entries do not stop the remaining items.</p>
 </dialog>
 <dialog id="cp-conflict" aria-labelledby="cp-conflict-title">
-<h3 id="cp-conflict-title">Confirm component replacement</h3>
+<h3 id="cp-conflict-title">Review FBX component registration</h3>
 <p>An existing rig may have a changed bone set, parent or bind pose. Explicitly approve Replace Rig and each published mesh listed below. Old character assemblies remain pinned to the previous published rig revision.</p>
 <p>Registration stages a replacement; the current published ID remains assigned until the replacement upload succeeds.</p>
-<div id="cp-conflicts"></div><div class="actions"><button id="cp-cancel" type="button">Cancel · prepare another FBX</button><button id="cp-confirm" type="button" disabled>Confirm selected replacements</button></div>
+<div id="cp-conflicts"></div><div class="actions"><button id="cp-cancel" type="button">Cancel</button><button id="cp-confirm" type="button" disabled>Register selected changes</button></div>
 </dialog>
 <dialog id="character-report-dialog" class="character-report-dialog" aria-labelledby="character-report-title">
 <div class="character-report-head"><div><span class="eyebrow">character pipeline</span><h3 id="character-report-title">Operation report</h3></div><button id="character-report-close" type="button" aria-label="Close report">✕</button></div>
@@ -600,7 +600,7 @@
 <script src="character-workflow.js?v=2"></script>
 <script src="character-publications.js?v=2"></script>
 <script src="character-component-summary.js?v=1"></script>
-<script src="character-components.js?v=7"></script>
+<script src="character-components.js?v=11"></script>
 <script src="character-atlas-ui.js?v=1"></script>
 <script src="character-assemblies.js?v=4"></script>
 <script src="animation-speed.js?v=3"></script>

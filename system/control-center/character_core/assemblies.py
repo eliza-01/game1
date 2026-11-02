@@ -54,12 +54,22 @@ class CharacterAssemblies:
                 missing.append(slot+': published bind metadata missing');continue
             atlas=self.components.atlases.binding('character_part',key)
             if atlas and not str(atlas.get('published_id') or '').isdigit():missing.append(slot+': atlas unpublished')
+            mount_mode=meta.get('attachment_mode', 'socket' if meta.get('attachment') else '')
+            if mount_mode == 'pivot':
+                if (slot!='hair' or meta.get('attachment')!='hair_mount'
+                        or meta.get('armature') or meta.get('skeleton') or meta.get('used_bones')):
+                    missing.append(slot+': invalid rigid hair pivot attachment')
+                if 'hair_mount' not in {b['name'] for b in bones}:
+                    missing.append(slot+': rig lacks hair_mount')
+            elif mount_mode not in {'','socket'}:
+                missing.append(slot+': unknown attachment mode')
             roots=[b['name'] for b in meta.get('skeleton',[]) if not b['parent']]
             if not meta.get('attachment'):
                 unknown=set(meta.get('used_bones',[]))-{b['name'] for b in bones}
                 if unknown:missing.append(slot+': rig lacks bones '+', '.join(sorted(unknown)))
             result['parts'][slot]=dict(id=key,asset_id=row['model_asset_id'],revision=row['published_revision'],
                 used_bones=meta.get('used_bones',[]),attachment=meta.get('attachment',''),
+                attachment_mode=mount_mode,
                 socket_bone=roots[0] if meta.get('attachment') and len(roots)==1 else '',
                 atlas_image_id=str(atlas['published_id'] or '') if atlas else '')
         result['ready']=not missing;result['missing']=missing

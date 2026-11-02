@@ -187,6 +187,44 @@ class AssemblyTests(unittest.TestCase):
         recipe=self.characters.get('human_male')['assembly'];recipe['rig_revision']=99
         self.assertFalse(self.assemblies.resolve(recipe)['ready'])
 
+    def test_rigid_hair_pivot_and_legacy_socket_reproduce_distinct_recipes(self):
+        self.assemblies.save(self.payload())
+        self.publish_dependencies()
+        recipe=self.characters.get('human_male')['assembly']
+        with connect(self.characters.db) as db:
+            rig=self.components.get('rig','human')
+            rig_meta=json.loads(rig['metadata_json'])
+            rig_meta['bones'].append(dict(name='hair_mount',parent='root',
+                                         matrix=rig_meta['bones'][0]['matrix'][:]))
+            db.execute("UPDATE character_component_records SET metadata_json=? WHERE kind='rig' AND id='human'",
+                       (json.dumps(rig_meta),))
+            hair=self.components.get('part','hair_01_common')
+            hair_meta=json.loads(hair['metadata_json'])
+            hair_meta.update(armature='',skeleton=[],used_bones=[],attachment='hair_mount',attachment_mode='pivot')
+            db.execute("UPDATE character_component_records SET metadata_json=? WHERE kind='part' AND id='hair_01_common'",
+                       (json.dumps(hair_meta),))
+        pivot=self.assemblies.resolve(recipe)
+        self.assertTrue(pivot['ready'],pivot['missing'])
+        self.assertEqual(pivot['parts']['hair']['attachment_mode'],'pivot')
+        self.assertEqual(pivot['parts']['hair']['socket_bone'],'')
+        with connect(self.characters.db) as db:
+            hair_meta.update(armature='hair_01_common_armature',
+                skeleton=[dict(name='hair_bone_socket',parent='',matrix=hair_meta.get('skeleton',[]))],
+                used_bones=['hair_bone_socket'],attachment_mode='socket')
+            db.execute("UPDATE character_component_records SET metadata_json=? WHERE kind='part' AND id='hair_01_common'",
+                       (json.dumps(hair_meta),))
+        socket=self.assemblies.resolve(recipe)
+        self.assertTrue(socket['ready'],socket['missing'])
+        self.assertEqual(socket['parts']['hair']['attachment_mode'],'socket')
+        self.assertEqual(socket['parts']['hair']['socket_bone'],'hair_bone_socket')
+        with connect(self.characters.db) as db:
+            hair_meta['attachment_mode']='pivot'
+            db.execute("UPDATE character_component_records SET metadata_json=? WHERE kind='part' AND id='hair_01_common'",
+                       (json.dumps(hair_meta),))
+        invalid=self.assemblies.resolve(recipe)
+        self.assertFalse(invalid['ready'])
+        self.assertIn('invalid rigid hair pivot',str(invalid['missing']))
+
     def test_unknown_part_bone_blocks_readiness(self):
         self.assemblies.save(self.payload());self.publish_dependencies()
         row=self.components.get('part','eyes_01');meta=json.loads(row['metadata_json']);meta['used_bones']=['removed_eye']

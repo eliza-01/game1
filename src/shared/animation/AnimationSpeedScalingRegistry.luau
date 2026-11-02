@@ -45,6 +45,10 @@ return table.freeze({
 			stat = "RunSpeed",
 			unitsPerPercent = 1.4,
 		}),
+		["92273150940176"] = table.freeze({
+			stat = "RunSpeed",
+			unitsPerPercent = 0.8,
+		}),
 	}),
 	catalog = table.freeze({
 		["122840035798169"] = table.freeze({
@@ -82,6 +86,26 @@ return table.freeze({
 		["83724299950111"] = table.freeze({
 			label = "character / human_female / base_revive",
 			channel = "revive",
+		}),
+		["131417903911496"] = table.freeze({
+			label = "character / human_male / hands_attack_01",
+			channel = "attack",
+		}),
+		["81420323965197"] = table.freeze({
+			label = "character / human_male / hands_combat_idle",
+			channel = "combat_idle",
+		}),
+		["110559292454231"] = table.freeze({
+			label = "character / human_male / hands_idle",
+			channel = "idle",
+		}),
+		["92273150940176"] = table.freeze({
+			label = "character / human_male / hands_run",
+			channel = "run",
+		}),
+		["88979624612642"] = table.freeze({
+			label = "character / human_male / hands_walk",
+			channel = "walk",
 		}),
 		["101898400862842"] = table.freeze({
 			label = "monster / gremlin / attack_01",

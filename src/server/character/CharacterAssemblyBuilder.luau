@@ -77,8 +77,18 @@ function Builder.Build(recipe: any, loadAsset: (number) -> Model?): Model
             local incoming = bonesIn(mesh)
             if part.attachment ~= "" then
                 local target = assert(canonical[part.attachment], "missing attachment " .. part.attachment)
-                local socket = assert(incoming[part.socket_bone], "missing accessory socket")
-                mesh.CFrame = target.WorldCFrame * socket.WorldCFrame:Inverse() * mesh.CFrame
+                if part.attachment_mode == "pivot" then
+                    assert(slot == "hair" and part.attachment == "hair_mount", "invalid rigid hair mount")
+                    assert(#part.used_bones == 0 and next(incoming) == nil, "rigid hair must not contain skin bones")
+                    -- A rigid hairstyle is authored around its MeshPart pivot.
+                    -- PivotTo respects PivotOffset, including pivot orientation;
+                    -- positioning by mesh.CFrame would move the wrong origin.
+                    mesh:PivotTo(target.WorldCFrame)
+                else
+                    -- Backward compatible: older hair rigs use a socket Bone.
+                    local socket = assert(incoming[part.socket_bone], "missing accessory socket")
+                    mesh.CFrame = target.WorldCFrame * socket.WorldCFrame:Inverse() * mesh.CFrame
+                end
                 local anchor = Instance.new("Attachment")
                 anchor.Name = "CharacterMount"
                 anchor.CFrame = mesh.CFrame:ToObjectSpace(target.WorldCFrame)

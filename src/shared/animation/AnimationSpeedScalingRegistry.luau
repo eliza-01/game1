@@ -45,6 +45,10 @@ return table.freeze({
 			stat = "RunSpeed",
 			unitsPerPercent = 1.4,
 		}),
+		["85145236963317"] = table.freeze({
+			stat = "RunSpeed",
+			unitsPerPercent = 0.8,
+		}),
 		["92273150940176"] = table.freeze({
 			stat = "RunSpeed",
 			unitsPerPercent = 0.8,
@@ -86,6 +90,34 @@ return table.freeze({
 		["83724299950111"] = table.freeze({
 			label = "character / human_female / base_revive",
 			channel = "revive",
+		}),
+		["83055454480514"] = table.freeze({
+			label = "character / human_male / 1hs_attack_01",
+			channel = "attack",
+		}),
+		["104219318952480"] = table.freeze({
+			label = "character / human_male / 1hs_attack_02",
+			channel = "attack",
+		}),
+		["121285730411608"] = table.freeze({
+			label = "character / human_male / 1hs_attack_03",
+			channel = "attack",
+		}),
+		["85239390595044"] = table.freeze({
+			label = "character / human_male / 1hs_combat_idle",
+			channel = "combat_idle",
+		}),
+		["81010793636677"] = table.freeze({
+			label = "character / human_male / 1hs_idle",
+			channel = "idle",
+		}),
+		["85145236963317"] = table.freeze({
+			label = "character / human_male / 1hs_run",
+			channel = "run",
+		}),
+		["84605403834959"] = table.freeze({
+			label = "character / human_male / 1hs_walk",
+			channel = "walk",
 		}),
 		["131417903911496"] = table.freeze({
 			label = "character / human_male / hands_attack_01",

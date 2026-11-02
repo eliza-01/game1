@@ -1,5 +1,6 @@
 """Read-only world, authoring settings, runtime config and host status routes."""
 from urllib.parse import parse_qs
+from services.shared_asset_retirement import SharedAssetRetirement
 
 
 def route(parsed, sources, info):
@@ -10,6 +11,16 @@ def route(parsed, sources, info):
     if path == "/api/texture-atlases":
         search = str((parse_qs(parsed.query).get('search') or [''])[0])
         return 200, {'families': sources['location_assets'].atlases.catalog(search)}
+
+    if path == '/api/asset-retirement/impact':
+        query = parse_qs(parsed.query)
+        try:
+            return 200, SharedAssetRetirement(
+                sources['real_estate'], sources['location_assets'],
+                sources.get('real_estate_publications')
+            ).plan(str((query.get('kind') or [''])[0]), str((query.get('slug') or [''])[0]))
+        except (ValueError, OSError) as error:
+            return 400, {'error': str(error)}
 
     if path == "/api/location-assets":
         snapshot = sources["location_assets"].snapshot()

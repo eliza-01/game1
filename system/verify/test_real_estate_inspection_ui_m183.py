@@ -31,7 +31,7 @@ class RealEstateInspectionM183(unittest.TestCase):
         self.assertEqual(real_estate.count('id="real-estate-atlas-rows"'), 1)
         self.assertEqual(real_estate.count('id="real-estate-library-rows"'), 1)
         self.assertLess(real_estate.index('id="real-estate-library-rows"'), real_estate.index('id="real-estate-atlas-rows"'))
-        self.assertIn('real-estate.js?v=20', html)
+        self.assertIn('real-estate.js?v=21', html)
 
     @unittest.skipUnless(shutil.which('node'), 'Node.js is required for browser JS test')
     def test_renderer_shows_published_bones_not_shared_source_duplicates(self):

@@ -3,6 +3,7 @@
 No direct HTTP transport dependency. Deletion ordering remains unchanged.
 """
 from urllib.parse import unquote
+from services.shared_asset_retirement import SharedAssetRetirement
 
 
 def route(path, body, deps):
@@ -18,7 +19,10 @@ def route(path, body, deps):
             job = deps['real_estate_publications'].get(slug)
             if job and job['status'] in ('queued', 'running'):
                 raise ValueError('house publication is running; wait until it completes')
-            return out(200, deps['real_estate'].delete(slug))
+            if 'location_assets' not in deps:
+                return out(200, deps['real_estate'].delete(slug))
+            return out(200, SharedAssetRetirement(deps['real_estate'], deps['location_assets'],
+                deps.get('real_estate_publications')).execute('estate', slug))
         except (ValueError, OSError, KeyError) as error:
             return out(400, {'error': str(error)})
 
@@ -89,8 +93,8 @@ def route(path, body, deps):
     if path.startswith(location_asset_prefix):
         slug = unquote(path[len(location_asset_prefix):])
         try:
-            location_assets.delete(slug)
-            return out(200, {"ok": True})
+            return out(200, SharedAssetRetirement(deps['real_estate'], location_assets,
+                deps.get('real_estate_publications')).execute('location', slug))
         except Exception as error:
             return out(400, {"error": str(error)})
 

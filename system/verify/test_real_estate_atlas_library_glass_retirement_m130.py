@@ -108,7 +108,7 @@ class RealEstateM130(TestCase):
         self.assertEqual(archived['publications'][0]['asset_id'],'9001')
         self.assertEqual(self.store.publications(house['slug']),[])
 
-    def test_delete_blocks_dependent_house(self):
+    def test_delete_retains_dependent_house_texture_reference(self):
         house=self.register()
         other=self.register('02')
         with self.store.connect() as db:
@@ -116,9 +116,10 @@ class RealEstateM130(TestCase):
             textures=json.loads(raw)
             textures['house']['reuseReference']=f"estate:{house['slug']}:house"
             db.execute('UPDATE real_estate SET textures_json=? WHERE slug=?', (json.dumps(textures),other['slug']))
-        with self.assertRaisesRegex(ValueError,'reused by'):
-            self.store.delete(house['slug'])
-        self.assertIsNotNone(self.store.get(house['slug']))
+        self.store.delete(house['slug'])
+        self.assertIsNone(self.store.get(house['slug']))
+        self.assertIsNotNone(self.store.get(other['slug']))
+        self.assertIsNotNone(self.store.retained_textures.get(f"estate:{house['slug']}:house"))
 
     def test_delete_http_checks_running_job(self):
         self.register()

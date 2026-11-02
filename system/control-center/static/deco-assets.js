@@ -450,18 +450,14 @@ async function decoAssetSyncStudio() {
 
 async function decoAssetDelete() {
   const row = decoAssetSelected();
-  if (!row || !confirm(`delete ${row.name_en} from the game1 location asset registry? placed Studio instances are not removed.`)) {
-    return;
-  }
-  try {
-    await request(`/api/location-assets/${encodeURIComponent(row.slug)}`, { method: 'DELETE' });
-    decoAssetState.selected = null;
+  if (!row) return;
+  await window.game1AssetRetirement.open({kind:'location',slug:row.slug,onDone:async(result)=>{
+    decoAssetState.selected=null;
     await decoAssetLoad();
+    if(typeof realEstateLoad==='function')await realEstateLoad();
     decoAssetSetForm(null);
-    toast('location asset registry row deleted');
-  } catch (error) {
-    toast(error.message, true);
-  }
+    toast(`Retired ${result.deleted.length} registration(s); shared assets preserved`);
+  }});
 }
 
 decoAssetRestorePreferences();

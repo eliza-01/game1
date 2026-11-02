@@ -8,10 +8,12 @@ import json
 import re
 import shutil
 import time
+from datetime import datetime, timezone
 
 from sqlite_connection import connect as connect_sqlite
 from services.texture_alpha import texture_uses_alpha
 from services.texture_atlas_registry import AtlasRegistry, parse_filename
+from services.retained_textures import RetainedTextures
 
 from opencloud_assets import (
     create_image_asset,
@@ -75,6 +77,7 @@ class LocationAssetStore:
         self.db = self.runtime / "game1.db"
         self._init()
         self.atlases = AtlasRegistry(self.root)
+        self.retained_textures = RetainedTextures(self.root)
         self._index_legacy_texture_publications()
         self.export()
 
@@ -233,7 +236,8 @@ class LocationAssetStore:
             reference = str(current.get("texture_reference_slug") or "").strip().lower()
             if not reference:
                 return current
-            current = (rows_by_slug or {}).get(reference) or self._raw_get(reference)
+            current = ((rows_by_slug or {}).get(reference) or self._raw_get(reference)
+                       or self.retained_textures.get('location:' + reference))
             if current is None:
                 return None
 
@@ -353,6 +357,8 @@ class LocationAssetStore:
         slug = incoming_slug or (str(old.get("slug") or "") if old else "") or slugify_english(name_en)
         if not SLUG_RE.fullmatch(slug):
             raise ValueError("location asset slug must be lowercase snake_case")
+        if old is None and self.retained_textures.get('location:' + slug):
+            raise ValueError('slug is reserved by a retained shared texture; rebind dependents before reuse')
         if old is None:
             old = self._raw_get(slug)
         category = str(payload.get("category") or (old.get("category") if old else "") or "").strip().lower()
@@ -383,7 +389,8 @@ class LocationAssetStore:
         if texture_reference:
             if texture_reference == slug:
                 raise ValueError("a location asset cannot reuse its own texture")
-            reference_row = self._raw_get(texture_reference)
+            reference_row = (self._raw_get(texture_reference)
+                             or self.retained_textures.get('location:' + texture_reference))
             if reference_row is None:
                 raise ValueError(f"unknown shared texture asset: {texture_reference}")
             reference_owner = self._resolve_texture_owner(reference_row)
@@ -607,10 +614,16 @@ class LocationAssetStore:
         self.export()
         return self.get(slug)
 
-    def delete(self, slug: str):
+    def delete(self, slug: str, *, retain_shared: bool | None = None):
+        """Retire the model registration, never the underlying published image.
+
+        Legacy owner references are frozen as immutable texture-only records.
+        The shared atlas variant and uploaded Image Asset ID are not deleted.
+        """
         normalized = str(slug or "").strip().lower()
-        if not self.get(normalized):
-            return
+        row = self.get(normalized)
+        if not row:
+            return {'ok': True}
         with self.connect() as connection:
             dependents = connection.execute(
                 """SELECT la.slug FROM location_assets la
@@ -618,13 +631,34 @@ class LocationAssetStore:
                    WHERE la.texture_reference_slug=? AND b.consumer_id IS NULL ORDER BY la.slug""",
                 (normalized,),
             ).fetchall()
-            if dependents:
-                names = ", ".join(str(row[0]) for row in dependents[:8])
-                raise ValueError("texture is reused by location assets: " + names)
-            connection.execute("DELETE FROM texture_atlas_bindings WHERE consumer_type='location_asset' AND consumer_id=?", (normalized,))
+        keep = bool(dependents) if retain_shared is None else bool(retain_shared)
+        if keep:
+            self.retained_textures.retain('location:' + normalized, {
+                'slug': normalized, 'texture_reference_slug': '',
+                **{k: row.get(k) for k in (
+                    'texture_path', 'texture_filename', 'texture_sha256',
+                    'texture_asset_id', 'texture_published_sha256', 'texture_moderation_state')},
+            })
+        with self.connect() as connection:
+            raw = dict(connection.execute('SELECT * FROM location_assets WHERE slug=?', (normalized,)).fetchone())
+            history = [dict(item) for item in connection.execute(
+                'SELECT * FROM location_asset_publications WHERE asset_slug=? ORDER BY id',
+                (normalized,))]
+        archive = self.root / '.control-center' / 'location-assets-retired'
+        archive.mkdir(parents=True, exist_ok=True)
+        target = archive / (normalized + '_' + datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ') + '.json')
+        with target.open('x', encoding='utf-8') as file:
+            json.dump({'asset': raw, 'publications': history, 'sourceFilesPreserved': True},
+                      file, ensure_ascii=False, indent=2)
+        with self.connect() as connection:
+            if not keep:
+                connection.execute("DELETE FROM texture_atlas_bindings WHERE consumer_type='location_asset' AND consumer_id=?", (normalized,))
             connection.execute("DELETE FROM location_asset_publications WHERE asset_slug=?", (normalized,))
             connection.execute("DELETE FROM location_assets WHERE slug=?", (normalized,))
         self.export()
+        return {'ok': True, 'sharedTextureRetained': keep,
+                'archived': target.relative_to(self.root).as_posix(),
+                'sourceFilesPreserved': True}
 
     def publications(self, slug: str) -> list[dict]:
         with self.connect() as connection:

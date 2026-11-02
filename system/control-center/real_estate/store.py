@@ -23,6 +23,7 @@ from .mesh_revisions import inspect_revision, save_immutable
 from .publication_textures import prepare_texture, published_format
 from .collision_policy import is_collision_mesh, requires_texture, default_no_collide
 from services.texture_atlas_registry import AtlasRegistry, parse_filename, atlas_version, same_atlas_series
+from services.retained_textures import RetainedTextures
 
 
 def glass_default(part: str) -> bool:
@@ -69,6 +70,7 @@ class RealEstateStore:
         self.db = self.root / '.control-center' / 'game1_real_estate.db'
         self.db.parent.mkdir(parents=True, exist_ok=True)
         self.atlases = (getattr(location_assets, "atlases", None) or AtlasRegistry(self.root))
+        self.retained_textures = RetainedTextures(self.root)
         with self.connect() as db:
             db.execute('''CREATE TABLE IF NOT EXISTS real_estate (
                 slug TEXT PRIMARY KEY, house_type TEXT NOT NULL, house_level INTEGER NOT NULL,
@@ -148,7 +150,17 @@ class RealEstateStore:
         for row in raw_rows:
             active = present_parts(json.loads(row['skeleton_json']))
             for part, data in json.loads(row['textures_json']).items():
-                if part not in active or data.get('reuseReference') or not data.get('assetId') or not data.get('path'):
+                if part not in active or data.get('reuseReference'):
+                    continue
+                binding = self.atlases.binding('real_estate', f"{row['slug']}:{part}")
+                if binding and binding['current'] and binding.get('published_id'):
+                    choices.append({'reference': f"estate:{row['slug']}:{part}",
+                        'label': f"{row['slug']} / {part}", 'slug': row['slug'],
+                        'filename': binding['filename'], 'group': 'estate',
+                        'category': '', 'categoryLabel': '', 'path': binding['source_path'],
+                        'sha256': binding['source_sha256'], 'assetId': str(binding['published_id'])})
+                    continue
+                if not data.get('assetId') or not data.get('path'):
                     continue
                 if data.get('publishedSha256') != data.get('sha256'):
                     continue
@@ -161,6 +173,26 @@ class RealEstateStore:
                     'group': 'estate', 'category': '', 'categoryLabel': '',
                     'path': data['path'], 'sha256': data['sha256'],
                     'assetId': str(data['assetId'])})
+        # Retired model registrations can still own legacy published textures.
+        # Their independent texture-only records preserve old reuseReference IDs.
+        known = {choice['reference'] for choice in choices}
+        for reference, saved in self.retained_textures.all():
+            if reference in known or not (saved.get('path') or saved.get('texture_path')) or not (saved.get('assetId') or saved.get('texture_asset_id')):
+                continue
+            if reference.startswith('location:'):
+                choices.append({'reference': reference, 'label': saved.get('slug') or reference,
+                    'slug': saved.get('slug') or '', 'filename': saved.get('texture_filename') or '',
+                    'group': 'location', 'category': '', 'categoryLabel': '',
+                    'path': saved.get('texture_path') or '', 'sha256': saved.get('texture_sha256') or '',
+                    'assetId': str(saved.get('texture_asset_id') or '')})
+            else:
+                saved = dict(saved)
+                _, owner_slug, owner_part = reference.split(':', 2)
+                binding = self.atlases.binding('real_estate', f'{owner_slug}:{owner_part}')
+                if binding and binding['current'] and binding.get('published_id'):
+                    saved.update(path=binding['source_path'], filename=binding['filename'],
+                                 sha256=binding['source_sha256'], assetId=str(binding['published_id']))
+                choices.append({'reference': reference, **saved})
         # Published shared variants belong to the central atlas catalog,
         # independently of any Estate or Location Asset that selected them.
         for family in self.atlases.catalog():
@@ -349,6 +381,8 @@ class RealEstateStore:
         existing = self.get(existing_slug or slug)
         if self.get(slug) and not existing_slug:
             raise ValueError('house already registered; select it to edit')
+        if not existing and self.retained_textures.all(f'estate:{slug}:'):
+            raise ValueError('house slug is reserved by retained shared textures; rebind dependents before reuse')
         raw_source = str(payload.get('sourcePath') or '').strip()
         if not raw_source and not existing:
             raise ValueError('choose a Real Estate FBX')
@@ -549,7 +583,7 @@ class RealEstateStore:
             return bool(db.execute("""SELECT 1 FROM real_estate_publications
                 WHERE house_slug=? AND asset_id='' AND operation!='' LIMIT 1""", (slug,)).fetchone())
 
-    def delete(self, slug: str) -> dict:
+    def delete(self, slug: str, *, retain_parts: set[str] | None = None) -> dict:
         """Retire the authoring registration, not uploaded Roblox assets or shared atlases.
 
         An on-disk JSON audit copy is created before database changes. Source
@@ -558,12 +592,17 @@ class RealEstateStore:
         row = self.get(slug)
         if not row:
             raise ValueError('unknown registered house')
-        for candidate in self._raw_rows():
-            if candidate['slug'] == slug:
-                continue
-            for part, texture in json.loads(candidate['textures_json']).items():
-                if str(texture.get('reuseReference') or '').startswith(f'estate:{slug}:'):
-                    raise ValueError(f"{slug} is reused by {candidate['slug']} / {part}; change the dependent texture first")
+        if retain_parts is None:
+            # Standalone store callers retain legacy references too; the central
+            # retirement service additionally discovers cross-store dependents.
+            retain_parts = set()
+            for candidate in self._raw_rows():
+                if candidate['slug'] == slug:
+                    continue
+                for texture in json.loads(candidate['textures_json']).values():
+                    ref = str(texture.get('reuseReference') or '')
+                    if ref.startswith(f'estate:{slug}:'):
+                        retain_parts.add(ref.split(':', 2)[2])
         with self.connect() as db:
             unfinished = db.execute(
                 "SELECT COUNT(*) FROM real_estate_publications WHERE house_slug=? AND asset_id='' AND operation!=''",
@@ -573,6 +612,16 @@ class RealEstateStore:
             raw = dict(db.execute('SELECT * FROM real_estate WHERE slug=?', (slug,)).fetchone())
             publications = [dict(r) for r in db.execute(
                 'SELECT * FROM real_estate_publications WHERE house_slug=? ORDER BY id', (slug,))]
+        for part in retain_parts:
+            image = row.get('textures', {}).get(part, {})
+            if not image.get('path'):
+                raise ValueError(f'{slug} / {part}: shared texture has no source to preserve')
+            self.retained_textures.retain(f'estate:{slug}:{part}', {
+                'path': image['path'], 'filename': image.get('filename') or Path(image['path']).name,
+                'sha256': image.get('sha256') or '', 'assetId': str(image['assetId']),
+                'group': 'estate', 'slug': slug, 'label': f'{slug} / {part}',
+                'category': '', 'categoryLabel': '',
+            })
         archive = self.root / '.control-center' / 'real-estate-retired'
         archive.mkdir(parents=True, exist_ok=True)
         target = archive / (slug + '_' + datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ') + '.json')
@@ -587,7 +636,8 @@ class RealEstateStore:
                 raise ValueError('house changed during retirement; archive preserved')
         for part in json.loads(raw['skeleton_json']).get('meshes', []):
             if isinstance(part, dict) and isinstance(part.get('name'), str):
-                self.atlases.unbind('real_estate', f"{slug}:{part['name']}")
+                if part['name'] not in retain_parts:
+                    self.atlases.unbind('real_estate', f"{slug}:{part['name']}")
         self.export()
         return {'ok': True, 'archived': target.relative_to(self.root).as_posix(),
                 'sourceFilesPreserved': True, 'studioTemplatesUnchanged': True}

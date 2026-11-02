@@ -547,14 +547,12 @@ async function realEstateChooseAtlas(row,part,variantId,mode='variant'){
 }
 async function realEstateDelete(row){
   if(realEstatePublicationBusy(row.slug)){toast('Wait for the publication to finish before deleting',true);return;}
-  const message=`Remove ${row.slug} from the Real Estate registry?\n\nLocal FBX/texture files and published Roblox IDs will NOT be deleted. The database row and publication history are archived. Managed templates already in Studio will NOT be removed automatically. Houses reusing this house's texture will block deletion.`;
-  if(!window.confirm(message))return;
-  try{
-    const result=await request('/api/real-estate/'+encodeURIComponent(row.slug),{method:'DELETE'});
+  await window.game1AssetRetirement.open({kind:'estate',slug:row.slug,onDone:async(result)=>{
     if(realEstateState.selected===row.slug){realEstateState.selected=null;realEstateRemember();}
     await realEstateLoad();
-    toast(`House retired · archive ${result.archived} · Studio templates unchanged`);
-  }catch(error){toast(`Cannot delete ${row.slug}: ${error.message}`,true);}
+    if(typeof decoAssetLoad==='function')await decoAssetLoad();
+    toast(`Retired ${result.deleted.length} registration(s) · Studio templates unchanged`);
+  }});
 }
 async function realEstateRepublishAtlas(variant){
   if(realEstateState.atlasBusy)return;

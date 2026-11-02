@@ -47,7 +47,7 @@ def check_location_asset_variants(root: Path, report_error: Callable[[str], None
         'texture_owner_slug',
         'texture_shared',
         'shared texture owner',
-        'texture is reused by location assets',
+        'retained_textures.retain',
     ]:
         if required not in location_asset_store_text:
             report_error(f"m46 shared Location Asset texture support missing {required}")

@@ -382,6 +382,29 @@
           "resolution": "512x512",
           "baseKey": "newborn_upper",
           "version": ""
+        },
+        {
+          "id": 15,
+          "family_id": 6,
+          "width": 256,
+          "height": 256,
+          "filename": "newborn_upper_256x256_atlas.png",
+          "original_filename": "newborn_upper_256x256_atlas.png",
+          "source_path": "assets/source/texture-atlases/newborn_upper/256x256/newborn_upper_256x256_atlas.png",
+          "source_sha256": "8b8b9fec3dd805a196dbc48f42d5db0fec54d7d44e131761ad4358e394d92741",
+          "uses_alpha": true,
+          "published_id": "114627765941728",
+          "published_sha256": "8b8b9fec3dd805a196dbc48f42d5db0fec54d7d44e131761ad4358e394d92741",
+          "moderation_state": "Reviewing",
+          "published_at": 1793630622.4854963,
+          "created_at": 1793630618.817804,
+          "atlas_key": "newborn_upper",
+          "replacement_sha256": null,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "256x256",
+          "baseKey": "newborn_upper",
+          "version": ""
         }
       ]
     },

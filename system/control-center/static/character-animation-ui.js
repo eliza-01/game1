@@ -34,20 +34,35 @@
   }
   function jump(context,slot){const s=api.state();s.animationFilter=(context==='base'||context==='emotions')?context:'weapon:'+context;showMissing=true;$('animation-show-missing').checked=true;try{localStorage.setItem(missingKey,'1')}catch{}api.render();const row=[...$('animation-rows').querySelectorAll('tr')].find(r=>r.dataset.context===context&&r.dataset.slot===slot);if(row){row.classList.add('animation-jump-focus');row.scrollIntoView({behavior:'smooth',block:'center'});row.querySelector('[data-open]')?.click()}else $('animation-profile-panel').scrollIntoView({behavior:'smooth',block:'start'});}
   const open=id=>{const d=$(id);if(!d.open)d.showModal()};
+  function syncScanPublishButton(){
+    const selected=scan&&scan.characterId===api.state().animationCharacter&&
+      [...$('animation-scan-review').querySelectorAll('[data-review-index]:checked')]
+        .some(input=>scan.items?.[Number(input.dataset.reviewIndex)]?.selectable);
+    $('animation-register-selected').disabled=busy||!selected;
+  }
   function renderScan(){const host=$('animation-scan-review');if(!scan)return;const items=scan.items||[];
     const count=x=>items.filter(r=>r.status===x).length;
     host.innerHTML=`<p><strong>${safe(scan.characterId)}</strong> · ${scan.filesScanned} файлов · ${count('NEW')} новых · ${count('UNCHANGED')} без изменений · ${count('REPLACE_REQUIRED')} требуют Replace · ${(scan.unassigned||[]).length} с неверными именами</p><p class="animation-info">Сканирование ничего не зарегистрировало и не опубликовало. Выбери новые файлы. Опубликованные анимации заменяются только через их строку.</p><div class="animation-scan-list">${items.map((row,index)=>`<label class="animation-scan-item"><input type="checkbox" data-review-index="${index}" ${row.selectable?'checked':'disabled'}><span><strong>${safe(row.filename)}</strong><small>${safe(context(row))} / ${safe(row.slot)} ${row.variant?'· '+row.variant:''}</small></span><span class="animation-review-status ${row.status==='NEW'?'new':''}">${safe(row.status)}</span></label>`).join('')}${(scan.unassigned||[]).map(row=>`<div class="animation-scan-item animation-invalid"><span><strong>${safe(row.filename)}</strong><small>${safe(row.reason)}</small></span><span>Неверное имя</span></div>`).join('')}</div><div class="animation-review-result" id="animation-review-result" aria-live="polite"></div>`;
-    $('animation-register-selected').disabled=!items.some(r=>r.selectable)||busy;
+    syncScanPublishButton();
   }
-  async function scanFolder(){if(busy)return;const s=api.state();const path=$('animation-folder-path').value.trim();if(!path||!s.animationCharacter){api.toast('Выбери персонажа и папку',true);return;}busy=true;$('scan-animations').disabled=true;
-    try{scan=await api.request('/api/animations/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({characterId:s.animationCharacter,rootPath:path})});renderScan();open('animation-scan-dialog');$('animation-scan-status').innerHTML=`<strong>Проверено ${scan.filesScanned} файлов</strong><span>Открой отчёт сканирования и выбери новые анимации.</span>`}catch(e){api.toast(e.message,true)}finally{busy=false;api.render()}
+  async function scanFolder(){if(busy)return;const s=api.state();const characterId=s.animationCharacter;const path=$('animation-folder-path').value.trim();if(!path||!characterId){api.toast('Выбери персонажа и папку',true);return;}busy=true;scan=null;syncScanPublishButton();$('scan-animations').disabled=true;
+    try{
+      const preview=await api.request('/api/animations/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({characterId,rootPath:path})});
+      if(api.state().animationCharacter!==characterId){api.toast('Персонаж изменился во время сканирования. Повтори Scan folder.',true);return;}
+      scan=preview;renderScan();open('animation-scan-dialog');$('animation-scan-status').innerHTML=`<strong>Проверено ${scan.filesScanned} файлов</strong><span>Открой отчёт сканирования и выбери новые анимации.</span>`;
+    }catch(e){api.toast(e.message,true)}finally{busy=false;syncScanPublishButton();api.render()}
   }
-  async function registerSelected(){if(!scan||busy)return;const items=[...$('animation-scan-review').querySelectorAll('[data-review-index]:checked')].map(input=>scan.items[Number(input.dataset.reviewIndex)]);
-    if(!items.length)return;busy=true;$('animation-register-selected').disabled=true;let registered=0,published=0,documents=0;const report=$('animation-review-result');report.innerHTML='';
-    try{const result=await api.request('/api/animations/register-selected',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({characterId:scan.characterId,rootPath:scan.rootPath,items:items.map(r=>({path:r.path,sha256:r.sha256,documentSha256:r.documentSha256||''}))})});registered=result.count;report.textContent=`Зарегистрировано: ${registered}. Публикация…`;
+  async function registerSelected(){
+    if(!scan||busy)return;
+    if(scan.characterId!==api.state().animationCharacter){api.toast('Выбран другой персонаж. Повтори Scan folder.',true);syncScanPublishButton();return;}
+    const items=[...$('animation-scan-review').querySelectorAll('[data-review-index]:checked')]
+      .map(input=>scan.items?.[Number(input.dataset.reviewIndex)]).filter(row=>row?.selectable);
+    if(!items.length){syncScanPublishButton();return;}
+    busy=true;syncScanPublishButton();let registered=0,published=0,documents=0,committed=false;const report=$('animation-review-result');report.innerHTML='';
+    try{const result=await api.request('/api/animations/register-selected',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({characterId:scan.characterId,rootPath:scan.rootPath,items:items.map(r=>({path:r.path,sha256:r.sha256,documentSha256:r.documentSha256||''}))})});registered=result.count;committed=true;report.textContent=`Зарегистрировано: ${registered}. Публикация…`;
       for(const row of result.registered){try{if(row.documentOnly||row.metadataOnly){documents++;report.textContent=`Документы применены: ${documents} · опубликовано: ${published}`;continue;}await api.request('/api/animations/'+encodeURIComponent(row.clipId)+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:'Game1 Character Animation '+scan.characterId})});published++;report.textContent=`Зарегистрировано ${registered} · опубликовано ${published}/${registered}`}catch(e){report.textContent=`Зарегистрировано ${registered} · опубликовано ${published}. Остановлено: ${e.message}. Неопубликованные остаются в профиле — повтори Publish из их строки.`;break;}}
       await api.load();if(published+documents===registered)report.textContent=`Done! Зарегистрировано ${registered} · опубликовано ${published} · документов применено ${documents}.`;
-    }catch(e){report.textContent='Не выполнено: '+e.message;api.toast(e.message,true)}finally{busy=false;$('animation-register-selected').disabled=true;api.render()}
+    }catch(e){report.textContent='Не выполнено: '+e.message;api.toast(e.message,true)}finally{busy=false;if(committed)scan=null;syncScanPublishButton();api.render()}
   }
   function renderReplacement(){const row=replacing;const el=$('animation-replace-review');if(!row)return;
     el.innerHTML=`<p><b>${safe(row.name)}</b> · ${safe(context(row))} / ${safe(row.slot)}</p><p>Постоянный Roblox Asset ID: <strong>${safe(row.asset_id)}</strong>. Он не меняется.</p><p class="animation-info">1. Выбери .rbxm/.rbxmx. 2. Вручную импортируй эту анимацию в Roblox Studio как новую версию того же Asset ID. 3. Нажми «Проверить Roblox» после одобрения.</p><p>Файл: <b>${safe(replacementPath||'не выбран')}</b></p><div id="animation-replace-result" class="animation-review-result" aria-live="polite">${row.status==='CHANGED'?'Ожидается ручной реимпорт в Studio.':'Исходная версия опубликована.'}</div>`;
@@ -59,7 +74,7 @@
   async function checkReplacement(){if(!replacing||busy)return;busy=true;try{const result=await api.request('/api/animations/'+encodeURIComponent(replacing.clip_id)+'/check-replacement',{method:'POST'});await api.load();replacing=(api.state().animations?.items||[]).find(r=>r.clip_id===replacing.clip_id)||replacing;renderReplacement();$('animation-replace-result').textContent=result.confirmed?'Done! Roblox подтвердил новую Approved-версию; Asset ID сохранён.':result.pending?'Ожидание: новой одобренной версии Roblox пока нет.':'Проверка: '+(result.details?.[0]?.message||'нет ожидающей замены.')}catch(e){api.toast(e.message,true)}finally{busy=false;$('animation-replace-confirm').disabled=!replacementPath;$('animation-replace-check').disabled=replacing?.status!=='CHANGED'}}
   function init(callbacks){api=callbacks;$('animation-show-missing').checked=showMissing;$('animation-show-missing').addEventListener('change',e=>{showMissing=e.target.checked;try{localStorage.setItem(missingKey,showMissing?'1':'0')}catch{}api.render()});
     document.querySelectorAll('[data-animation-sort]').forEach(th=>{const action=()=>{const key=th.dataset.animationSort;sortDir=sortKey===key?-sortDir:1;sortKey=key;api.render()};th.addEventListener('click',action);th.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();action()}})});
-    document.querySelectorAll('[data-animation-close]').forEach(b=>b.addEventListener('click',()=>b.closest('dialog').close()));$('animation-register-selected').onclick=registerSelected;$('animation-replace-choose').onclick=chooseReplacement;$('animation-replace-confirm').onclick=stageReplacement;$('animation-replace-check').onclick=checkReplacement;
+    document.querySelectorAll('[data-animation-close]').forEach(b=>b.addEventListener('click',()=>b.closest('dialog').close()));$('animation-register-selected').onclick=registerSelected;$('animation-scan-review').addEventListener('change',syncScanPublishButton);$('animation-replace-choose').onclick=chooseReplacement;$('animation-replace-confirm').onclick=stageReplacement;$('animation-replace-check').onclick=checkReplacement;
   }
   window.game1AnimationUI={init,renderRows,renderRules,scanFolder};
 })();

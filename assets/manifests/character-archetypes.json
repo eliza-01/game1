@@ -3893,8 +3893,8 @@
           },
           "lower": {
             "id": "newborn_lower",
-            "asset_id": "112020397345330",
-            "revision": 1,
+            "asset_id": "132634948928308",
+            "revision": 2,
             "used_bones": [
               "pelvis",
               "shin_l",
@@ -3905,12 +3905,12 @@
             ],
             "attachment": "",
             "socket_bone": "",
-            "atlas_image_id": ""
+            "atlas_image_id": "81341252015506"
           },
           "gloves": {
             "id": "newborn_gloves",
-            "asset_id": "115795849731571",
-            "revision": 1,
+            "asset_id": "102485394229630",
+            "revision": 2,
             "used_bones": [
               "forearm_l",
               "forearm_r",
@@ -3963,8 +3963,8 @@
           },
           "boots": {
             "id": "newborn_boots",
-            "asset_id": "131320421035892",
-            "revision": 1,
+            "asset_id": "122121878001526",
+            "revision": 2,
             "used_bones": [
               "foot_l",
               "foot_r",
@@ -3979,15 +3979,15 @@
           },
           "head": {
             "id": "head_01_male",
-            "asset_id": "96269914472557",
-            "revision": 1,
+            "asset_id": "116643022358388",
+            "revision": 2,
             "used_bones": [
               "head",
               "neck"
             ],
             "attachment": "",
             "socket_bone": "",
-            "atlas_image_id": ""
+            "atlas_image_id": "76925163781035"
           },
           "eyes": {
             "id": "eyes_01",
@@ -4358,7 +4358,7 @@
         },
         "ready": true,
         "missing": [],
-        "fingerprint": "0de92f1a65e2678315e5dd96"
+        "fingerprint": "360dc809197531af666c549e"
       },
       "stats": {
         "Level": 1,

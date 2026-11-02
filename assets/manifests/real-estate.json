@@ -3063,7 +3063,7 @@
           "atlasVariantId": 8,
           "atlasKey": "structures_01",
           "atlasBindingRevision": 1,
-          "atlasSyncStatus": "pending_studio_sync",
+          "atlasSyncStatus": "synced",
           "atlasLegacyWarning": false,
           "atlasVersion": "01",
           "atlasVariants": [

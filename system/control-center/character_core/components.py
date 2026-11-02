@@ -16,6 +16,7 @@ from sqlite_connection import connect
 from services.texture_atlas_registry import AtlasRegistry
 from character_core.part_names import parse_part, rig_id, skeleton_matches, TOKEN
 from character_core.component_fbx import inspect_fbx
+from character_core.rig_revisions import pin_unversioned_assemblies
 
 _LOCK=threading.RLock()
 
@@ -118,7 +119,16 @@ class CharacterComponents:
                 parts.append({**part,**meta,'rig_id':key})
             if len({p['id'] for p in parts})!=len(parts):raise ValueError('duplicate mesh names')
             old=self.get('rig',key)
-            if old:skeleton_matches(json.loads(old['metadata_json'])['bones'],info['bones'])
+            rig_changed = False
+            rig_difference = ''
+            if old:
+                try:
+                    skeleton_matches(json.loads(old['metadata_json'])['bones'], info['bones'])
+                except ValueError as exc:
+                    rig_changed = True
+                    rig_difference = str(exc).split('; register a new')[0]
+                if rig_changed and old['published_revision'] not in (0, old['revision']):
+                    raise ComponentConflict('publish the pending rig revision before replacing it again')
             rows=[]
             for p in parts:
                 old_part=self.get('part',p['id'])
@@ -130,18 +140,23 @@ class CharacterComponents:
                     content_unchanged=bool(old_part and old_part['content_sha256']==p['content_sha256'])))
             plan=dict(schema_version=1,token=ident,source=str(frozen.relative_to(self.root)),sha256=sha(frozen),
                 rig_id=key,bones=info['bones'],armature=info['armature'],parts=parts,rows=rows,
-                rig_revision=old['revision'] if old else 0)
+                rig_revision=old['revision'] if old else 0,
+                rig_published_asset_id=old['model_asset_id'] if old else '',
+                rig_changed=rig_changed,rig_difference=rig_difference)
             with connect(self.db) as db:
                 db.execute('INSERT INTO character_component_imports(id,plan_json,created_at) VALUES(?,?,?)',
                            (ident,json.dumps(plan),time.time()))
             return dict(schema_version=1,token=ident,rig_id=key,bone_count=len(info['bones']),parts=rows,
                 new_sets=sorted({p['set_id'] for p in parts if p['set_id']} - set(self.snapshot()['sets'])),
-                conflicts=[p for p in rows if p['published_asset_id']])
+                conflicts=[p for p in rows if p['published_asset_id']],
+                rig=dict(id=key,existing_revision=old['revision'] if old else 0,
+                         published_asset_id=old['model_asset_id'] if old else '',
+                         changed=rig_changed,warning=rig_difference))
         except Exception:
             shutil.rmtree(directory)
             raise
 
-    def register(self,token,replacements):
+    def register(self,token,replacements,*,replace_rig=False,rig_only=False):
         with _LOCK:
             with connect(self.db) as db:
                 saved=db.execute('SELECT * FROM character_component_imports WHERE id=?',(token,)).fetchone()
@@ -149,15 +164,21 @@ class CharacterComponents:
             if saved['committed']:return self.snapshot()
             plan=json.loads(saved['plan_json']);frozen=self.root/plan['source']
             if not frozen.is_file() or sha(frozen)!=plan['sha256']:raise ComponentConflict('inspection source changed; choose FBX again')
-            required={p['id'] for p in plan['rows'] if p['published_asset_id']}
-            if not isinstance(replacements,list) or set(replacements)!=required:
+            if type(rig_only) is not bool or (rig_only and not plan.get('rig_changed')):
+                raise ComponentConflict('rig-only replacement requires an inspected rig change')
+            required=set() if rig_only else {p['id'] for p in plan['rows'] if p['published_asset_id']}
+            if not isinstance(replacements,list) or len(replacements)!=len(set(replacements)) or set(replacements)!=required:
                 raise ComponentConflict('explicit approval required for every published part in this FBX')
+            if type(replace_rig) is not bool or replace_rig != bool(plan.get('rig_changed')):
+                raise ComponentConflict('explicit Replace Rig approval is required when bind pose, parent or bone set changes')
             def validate(db):
                 for kind,key,revision in [('rig',plan['rig_id'],plan['rig_revision']),
-                    *(('part',p['id'],p['existing_revision']) for p in plan['rows'])]:
+                    *(('part',p['id'],p['existing_revision']) for p in ([] if rig_only else plan['rows']))]:
                     row=db.execute('SELECT revision,pending_operation,model_asset_id FROM character_component_records WHERE kind=? AND id=?',(kind,key)).fetchone()
                     if (row['revision'] if row else 0)!=revision or (row and row['pending_operation']):
                         raise ComponentConflict('catalog changed or publication pending; inspect FBX again')
+                    if kind=='rig' and (row['model_asset_id'] if row else '')!=plan.get('rig_published_asset_id',''):
+                        raise ComponentConflict('rig was published after inspection; inspect FBX again')
                     if kind=='part':
                         inspected=next(p for p in plan['rows'] if p['id']==key)
                         if (row['model_asset_id'] if row else '')!=inspected['published_asset_id']:
@@ -173,18 +194,24 @@ class CharacterComponents:
             if {p['name']:p['content_sha256'] for p in info['parts']}!={p['name']:p['content_sha256'] for p in plan['parts']}:
                 raise ComponentConflict('FBX changed during extraction')
             entries=[('rig',plan['rig_id'],dict(bones=plan['bones'],armature=plan['armature']),None)]
-            entries.extend(('part',p['id'],p,p) for p in plan['parts'])
+            if not rig_only:
+                entries.extend(('part',p['id'],p,p) for p in plan['parts'])
             with connect(self.db) as db:
                 db.execute('BEGIN IMMEDIATE');validate(db)
                 for kind,key,meta,part in entries:
                     old=db.execute('SELECT * FROM character_component_records WHERE kind=? AND id=?',(kind,key)).fetchone()
-                    if old and kind=='rig':continue # compatible rig is reused, not republished
+                    if old and kind=='rig' and not plan.get('rig_changed'):continue # compatible rig is reused
                     content=part['content_sha256'] if part else hashlib.sha256(json.dumps(plan['bones'],sort_keys=True).encode()).hexdigest()
                     if old and old['content_sha256']==content and key not in required:continue
                     artifact=prepared/((key if part else 'rig')+'.fbx')
                     if not artifact.is_file() or artifact.stat().st_size==0:raise ValueError('missing extracted FBX: '+key)
-                    if old:db.execute('INSERT INTO character_component_history(kind,component_id,revision,record_json,changed_at) VALUES(?,?,?,?,?)',
-                        (kind,key,old['revision'],json.dumps(dict(old)),time.time()))
+                    if old:
+                        db.execute('INSERT INTO character_component_history(kind,component_id,revision,record_json,changed_at) VALUES(?,?,?,?,?)',
+                            (kind,key,old['revision'],json.dumps(dict(old)),time.time()))
+                        if kind=='rig' and plan.get('rig_changed') and old['published_revision']:
+                            # Pin existing live recipes before changing the profile. They keep
+                            # resolving the previous published rig even after republishing.
+                            pin_unversioned_assemblies(db,key,old['published_revision'])
                     revision=old['revision']+1 if old else 1
                     db.execute('''INSERT INTO character_component_records
                         (kind,id,rig_id,slot,set_id,gender,role,revision,content_sha256,source_path,prepared_path,prepared_sha256,metadata_json,created_at)

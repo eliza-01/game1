@@ -79,9 +79,70 @@ class ComponentTests(unittest.TestCase):
         self.store.register(a['token'],['newborn_upper'])
         with self.assertRaises(ComponentConflict):self.store.register(b['token'],['newborn_upper'])
 
-    def test_incompatible_rig_rejected_before_any_registration(self):
-        self.register();self.info['bones'][0]['matrix']=list(IDENTITY);self.info['bones'][0]['matrix'][3]=2
-        with self.assertRaisesRegex(ValueError,'bind pose'):self.store.inspect(self.source)
+    def test_changed_bind_pose_requires_explicit_rig_approval_and_stages_new_revision(self):
+        self.register();self.published('human')
+        self.info['bones'][0]['matrix']=list(IDENTITY);self.info['bones'][0]['matrix'][3]=2
+        plan=self.store.inspect(self.source)
+        self.assertTrue(plan['rig']['changed'])
+        self.assertIn('bind pose',plan['rig']['warning'])
+        with self.assertRaisesRegex(ComponentConflict,'Replace Rig'):
+            self.store.register(plan['token'],[])
+        self.assertEqual(self.store.get('rig','human')['revision'],1)
+        self.store.register(plan['token'],[],replace_rig=True)
+        updated=self.store.get('rig','human')
+        self.assertEqual(updated['revision'],2)
+        self.assertEqual(updated['published_revision'],1)
+        self.assertEqual(updated['model_asset_id'],'123')
+        self.assertEqual(self.store.publication_metadata(updated)['bones'][0]['matrix'],IDENTITY)
+        self.assertEqual(self.store.get('part','eyes_01')['revision'],1)
+        self.assertEqual(self.store.snapshot()['items'][0]['status'],'replacement_pending')
+        # Repeated confirmation is idempotent.
+        self.store.register(plan['token'],[],replace_rig=True)
+        self.assertEqual(self.store.get('rig','human')['revision'],2)
+        from unittest.mock import patch
+        from types import SimpleNamespace
+        published=SimpleNamespace(asset_id='new123',operation_path='operations/rig',moderation_state='Approved')
+        with patch('opencloud_assets.create_model_asset',return_value='operations/rig') as uploader,\
+             patch('opencloud_assets.wait_for_operation',return_value=published):
+            self.store.publish('rig','human',dict(apiKey='test',creatorType='user',creatorId='1'))
+        uploader.assert_called_once()
+        self.assertEqual(self.store.get('rig','human')['model_asset_id'],'new123')
+
+    def test_rig_only_replaces_skeleton_without_touching_published_parts(self):
+        self.register();self.published('human');self.published('newborn_upper')
+        before=self.store.get('part','newborn_upper')
+        self.info['bones'][0]['matrix']=list(IDENTITY);self.info['bones'][0]['matrix'][7]=3
+        plan=self.store.inspect(self.source)
+        self.assertTrue(plan['rig']['changed'])
+        self.assertEqual([p['id'] for p in plan['conflicts']],['newborn_upper'])
+        with self.assertRaisesRegex(ComponentConflict,'approval'):
+            self.store.register(plan['token'],[],replace_rig=True)
+        result=self.store.register(plan['token'],[],replace_rig=True,rig_only=True)
+        self.assertEqual(self.store.get('part','newborn_upper'),before)
+        rig=self.store.get('rig','human')
+        self.assertEqual(rig['revision'],2)
+        self.assertEqual(rig['published_revision'],1)
+        with connect(self.store.db) as db:
+            self.assertEqual(db.execute("SELECT count(*) FROM character_component_history WHERE kind='part'").fetchone()[0],0)
+            self.assertEqual(db.execute("SELECT count(*) FROM character_component_history WHERE kind='rig'").fetchone()[0],1)
+        self.assertIsNotNone(result)
+
+    def test_rig_parent_change_and_bone_set_reported_in_preview(self):
+        self.register()
+        self.info['bones'].append(dict(name='back_mount',parent='root',matrix=IDENTITY[:]))
+        plan=self.store.inspect(self.source)
+        self.assertTrue(plan['rig']['changed'])
+        self.assertIn('bone set',plan['rig']['warning'])
+        self.store.register(plan['token'],[],replace_rig=True)
+        self.assertEqual(self.store.get('rig','human')['revision'],2)
+
+    def test_rig_inspection_detects_publication_race(self):
+        self.register()
+        self.info['bones'][0]['matrix']=list(IDENTITY);self.info['bones'][0]['matrix'][3]=2
+        plan=self.store.inspect(self.source)
+        self.published('human')
+        with self.assertRaisesRegex(ComponentConflict,'published after inspection'):
+            self.store.register(plan['token'],[],replace_rig=True)
         self.assertEqual(self.store.get('rig','human')['revision'],1)
 
     def test_publication_after_inspection_requires_new_approval(self):

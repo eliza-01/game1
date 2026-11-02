@@ -1,6 +1,6 @@
 # game1 — действующая карта архитектуры
 
-**Аудит по коду:** 30 октября 2026, `game1_diag_2026-10-30_13-52-46.zip`, после M162.
+**Аудит по коду:** 2 ноября 2026, `game1_diag_2026-11-02_02-52-50.zip` (M188), с декомпозицией Python stores M189.
 **Источник инженерных ограничений:** [`AGENTS.md`](../../AGENTS.md).
 **Историческое обоснование:** [аудит 14 октября](../ARCHITECTURE_AUDIT_2026-10-14_RU.md). Его старые размеры файлов и список «следующих этапов» не актуальны.
 
@@ -34,6 +34,8 @@ Studio Plugin/Host Agent — **authoring plane**, не клиентский иг
 | Real Estate | `system/control-center/real_estate/{store,contracts,studio_sync,jobs,...}.py`, StudioRealEstate* | Авторинг и mesh revisions отдельно от sync; `store.py` всё ещё крупный |
 | FBX | `system/asset-manager/model_publication.py`, `bone_weight_survival.py` | Общая подготовка скиннинга; независимо от ассетной категории, включая проверку покрытия вершин |
 | Atlas | Registry + consumers Location/Real Estate | Shared Image ID у варианта; legacy inheritance поддерживается для существующих записей |
+| Characters (M189, R3) | `character_store.py` + `character_core/{archetype_contract,model_workflow,registry_export}.py` | Основной фасад удерживает SQL access, stats/active identity; регистрация/публикация FBX и runtime export отделены; текущие API и ID не менялись |
+| Monster/NPC Animations (M189, R3) | `monster_animation_store.py` + `monster_animation_core/{schema,bindings,publication}.py` | Схема/миграции, mutation привязок, публикация отделены от scan/read/export; Character Animations (`animation_core/`) не затронут |
 | Verification (M164–M171) | `system/verify/verify.py` → `system/verify/validators/` | Вынесены source-only, project layout, Monster registry/spawn, Actor runtime и Combat Contact/Headshot, Character, Animation, Weapon, Studio Debug, Death, Attack Timeline и Rojo/Animation Speed tooling, Location/Deco/Environment/Texture Sync (M169), Combat foundation/Hitbox/Studio Character Bridge/registered attack clips (M170). `verify.py` содержит только orchestration; M171 устранил пропуск ошибок M54/M55/M128 при расчёте exit code. R2 завершён |
 | House runtime | `HouseSocketContract`, `HouseElevatorPolicy`, `HouseSocketService`, `HouseDoorService`, `HousePadlockService`, клиентский Prompt, Studio debug | USE/AIM, модельный pivot двери, server authorization; детальнее в [ТЗ](../spec/CURRENT_PROJECT_SPEC_RU.md) |
 
@@ -48,7 +50,7 @@ Studio Plugin/Host Agent — **authoring plane**, не клиентский иг
 
 ## Зоны ответственности, ещё требующие декомпозиции
 
-Текущие размеры: `verify.py` **~187 строк после M171** (2986 до M164), `MovementDebugController` ~1009, `TestLoadoutController` ~987, `monster_animation_store.py` 946, `real_estate/store.py` 822, `character_store.py` 806, `location_asset_store.py` 691 строк. **Размер лишь триггер аудита, не доказательство неправильных границ.** Для каждого этапа нужен анализ read/write ownership, API и тестов.
+Текущие размеры: `verify.py` **~187 строк после M171** (2986 до M164), `MovementDebugController` ~1009, `TestLoadoutController` ~987, `monster_animation_store.py` 469 после M189 (946 ранее), `real_estate/store.py` 822, `character_store.py` 250 после M189 (834 ранее), `location_asset_store.py` 691 строк. **Размер лишь триггер аудита, не доказательство неправильных границ.** Для каждого этапа нужен анализ read/write ownership, API и тестов.
 
 - Python stores: хранение + публикационный workflow + совместимость legacy/manifest могут смешиваться; выносить через service/repository с сохранением внешних методов.
 - Клиентские debug UI: повторяющиеся элементы и управление inputs, но не выносить gameplay ownership из server.

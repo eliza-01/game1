@@ -27,9 +27,10 @@ SOURCE_ONLY_MIGRATION_MARKERS = (
 )
 MIGRATION_CALL = 'migrate_source_only_assets(ROOT, ROOT / ".control-center" / "game1.db")'
 STORE_NAMES = (
-    'character_store.py', 'character_core/identity.py',
+    'character_store.py', 'character_core/identity.py', 'character_core/model_workflow.py',
     'animation_core/storage.py', 'weapon_store.py',
     'monster_store.py', 'monster_animation_store.py',
+    'monster_animation_core/schema.py', 'monster_animation_core/bindings.py',
 )
 
 

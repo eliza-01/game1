@@ -91,7 +91,12 @@ def check_monster_contracts(
         report_error("monster animation UI must not expose obsolete semantic monster profile jargon")
 
     monster_animation_store_path = root / "system/control-center/monster_animation_store.py"
-    monster_animation_store_text = monster_animation_store_path.read_text(encoding="utf-8") if monster_animation_store_path.is_file() else ""
+    monster_animation_store_text = "\n".join(path.read_text(encoding="utf-8") for path in (
+        monster_animation_store_path,
+        root / "system/control-center/monster_animation_core/schema.py",
+        root / "system/control-center/monster_animation_core/bindings.py",
+        root / "system/control-center/monster_animation_core/publication.py",
+    ) if path.is_file())
     for required in [
         "class MonsterAnimationStore", "def scan_folder", "def assign_file", "def publish_missing",
         '"slot": "idle"', '"slot": "idle_special"', '"state": "idle"', '"role": "special"', '"slot": "combat_idle"', '"variants": True', "canonicalFilename",

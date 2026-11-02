@@ -273,7 +273,10 @@ def check_manual_animation_reimport(
     opencloud_text = (ROOT / "system/control-center/opencloud_assets.py").read_text(encoding="utf-8")
     reimport_check_text = (ROOT / "system/control-center/animation_reimport_check.py").read_text(encoding="utf-8")
     character_publication_text = (ROOT / "system/control-center/animation_core/publication.py").read_text(encoding="utf-8")
-    monster_store_text_m18 = (ROOT / "system/control-center/monster_animation_store.py").read_text(encoding="utf-8")
+    monster_store_text_m18 = "\n".join(path.read_text(encoding="utf-8") for path in (
+        ROOT / "system/control-center/monster_animation_store.py",
+        ROOT / "system/control-center/monster_animation_core/publication.py",
+    ))
     for required in ["ASSET_VERSIONS_URL_TEMPLATE", "def list_asset_versions", "assetVersions"]:
         if required not in opencloud_text:
             err(f"Open Cloud animation-version query missing {required}")

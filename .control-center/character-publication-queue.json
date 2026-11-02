@@ -147,6 +147,65 @@
           "asset_id": "87526597507999"
         }
       ]
+    },
+    {
+      "schema_version": 1,
+      "id": "5bd7a4dc-9e79-4ba3-a235-a866648167ab",
+      "status": "completed",
+      "started_at": 1793629317.8803155,
+      "finished_at": 1793629387.8402386,
+      "items": [
+        {
+          "kind": "rig",
+          "id": "human",
+          "revision": 3,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "99717003227206"
+        },
+        {
+          "kind": "part",
+          "id": "head_01_male",
+          "revision": 2,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "116643022358388"
+        },
+        {
+          "kind": "part",
+          "id": "newborn_boots",
+          "revision": 2,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "122121878001526"
+        },
+        {
+          "kind": "part",
+          "id": "newborn_gloves",
+          "revision": 2,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "102485394229630"
+        },
+        {
+          "kind": "part",
+          "id": "newborn_lower",
+          "revision": 2,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "132634948928308"
+        }
+      ]
     }
   ]
 }

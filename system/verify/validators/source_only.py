@@ -109,11 +109,14 @@ def check_source_only_contract(
 
     for active_store in [
         root / "system/control-center/character_store.py",
+        root / "system/control-center/character_core/model_workflow.py",
         root / "system/control-center/character_core/identity.py",
         root / "system/control-center/animation_core/storage.py",
         root / "system/control-center/weapon_store.py",
         root / "system/control-center/monster_store.py",
         root / "system/control-center/monster_animation_store.py",
+        root / "system/control-center/monster_animation_core/schema.py",
+        root / "system/control-center/monster_animation_core/bindings.py",
     ]:
         active_text = active_store.read_text(encoding="utf-8")
         if 'self.root / "assets/prepared' in active_text or 'self.root / "assets" / "prepared"' in active_text:

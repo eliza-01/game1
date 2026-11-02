@@ -123,7 +123,11 @@ def check_character_publication(
         if required not in schema_text:
             err(f"control center schema missing {required}")
 
-    store_text = (ROOT / "system/control-center/character_store.py").read_text(encoding="utf-8")
+    # R3: validate the public facade together with its ownership modules.
+    store_text = "\n".join((ROOT / "system/control-center" / name).read_text(encoding="utf-8") for name in (
+        "character_store.py", "character_core/archetype_contract.py",
+        "character_core/model_workflow.py", "character_core/registry_export.py",
+    ))
     if 'RACES = ("human",)' not in store_text or 'GENDERS = ("male", "female")' not in store_text:
         err("character identity pools are missing")
     if "analyze_character_fbx" not in store_text:
@@ -231,7 +235,9 @@ def check_character_identity(
             err(f"asset manager archetype editing ui missing {required}")
 
     # m6.2 archetype registration safety + immutable character model replacement
-    character_store_text = (ROOT / "system/control-center/character_store.py").read_text(encoding="utf-8")
+    character_store_text = "\n".join((ROOT / "system/control-center" / name).read_text(encoding="utf-8") for name in (
+        "character_store.py", "character_core/model_workflow.py",
+    ))
     for required in ["existingId", "archetype {character_id} already exists", "def assign_model", "character_model_assignments"]:
         if required not in character_store_text:
             err(f"character registration/model reassignment contract missing {required}")
@@ -268,7 +274,9 @@ def check_character_starting_stats(
         for key in ["Level", "MaxHP", "Damage", "Defense", "AttackSpeed", "RunSpeed", "CritChance"]:
             if key not in stats:
                 err(f"character archetype starting stat missing {key}: {row.get('id')}")
-    character_store_m13 = (ROOT / "system/control-center/character_store.py").read_text(encoding="utf-8")
+    character_store_m13 = "\n".join((ROOT / "system/control-center" / name).read_text(encoding="utf-8") for name in (
+        "character_store.py", "character_core/archetype_contract.py", "character_core/registry_export.py",
+    ))
     for required in ["character_stats", "set_stats", "defaultStats", '"stats": row.get("stats")']:
         if required not in character_store_m13:
             err(f"character starting-stat Asset Manager contract missing {required}")

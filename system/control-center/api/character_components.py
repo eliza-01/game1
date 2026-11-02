@@ -37,7 +37,11 @@ def write(path,body,deps):
             credentials=deps['publication_credentials']('game1 character components')
             return 202,deps['character_publications'].start(payload.get('items'),payload.get('request_id'),credentials)
         if path==ROOT+'/inspect':return 200,store.inspect(payload.get('sourcePath') or '')
-        if path==ROOT+'/register':return 200,store.register(payload.get('token'),payload.get('replacements',[]))
+        if path==ROOT+'/register':
+            result=store.register(payload.get('token'),payload.get('replacements',[]),
+                replace_rig=payload.get('replaceRig',False),rig_only=payload.get('rigOnly',False))
+            if 'character_assemblies' in deps:deps['character_assemblies'].characters.export()
+            return 200,result
         if path==ROOT+'/atlas':
             revision=payload.get('expectedRevision')
             if revision is None:raise ValueError('expectedRevision is required')

@@ -31,6 +31,35 @@ def published_rig(components, key, revision=None):
     return record
 
 
+def pin_unversioned_assemblies(db, key, published_revision):
+    # Keep currently assembled characters on their published rig revision.
+
+    # Called inside the caller's IMMEDIATE registration transaction. Fresh projects
+    # without the Characters assembly tables do not need any migration or pinning.
+    columns = {r[1] for r in db.execute('PRAGMA table_info(characters)')}
+    if not {'id', 'revision', 'updated_at', 'visual_mode', 'assembly_json'} <= columns:
+        return []
+    db.execute('''CREATE TABLE IF NOT EXISTS character_assembly_history(
+        id INTEGER PRIMARY KEY,character_id TEXT NOT NULL,revision INTEGER NOT NULL,
+        recipe_json TEXT NOT NULL,stats_json TEXT NOT NULL,changed_at REAL NOT NULL)''')
+    pinned = []
+    for character in db.execute("SELECT * FROM characters WHERE visual_mode='assembly'").fetchall():
+        recipe = json.loads(character['assembly_json'])
+        if recipe.get('rig_id') != key or 'rig_revision' in recipe:
+            continue
+        stats = {}
+        if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='character_stats'").fetchone():
+            stats = {r['stat_key']: r['value'] for r in db.execute(
+                'SELECT * FROM character_stats WHERE character_id=?', (character['id'],))}
+        db.execute('''INSERT INTO character_assembly_history(character_id,revision,recipe_json,stats_json,changed_at)
+            VALUES(?,?,?,?,?)''', (character['id'],character['revision'],character['assembly_json'],json.dumps(stats),time.time()))
+        recipe['rig_revision'] = published_revision
+        db.execute('UPDATE characters SET assembly_json=?,revision=revision+1,updated_at=? WHERE id=?',
+                   (json.dumps(recipe),time.time(),character['id']))
+        pinned.append(character['id'])
+    return pinned
+
+
 def stage_rig_revision(components, key, source, *, expected_revision, analyzer=inspect_fbx):
     """Freeze a rig-only FBX; pin existing recipes before replacing its record.
 
@@ -72,18 +101,8 @@ def stage_rig_revision(components, key, source, *, expected_revision, analyzer=i
             raise ValueError('rig changed during inspection; retry')
         db.execute('''INSERT INTO character_component_history(kind,component_id,revision,record_json,changed_at)
             VALUES('rig',?,?,?,?)''', (key, old['revision'], json.dumps(old), time.time()))
-        for character in db.execute("SELECT * FROM characters WHERE visual_mode='assembly'").fetchall():
-            recipe = json.loads(character['assembly_json'])
-            if recipe.get('rig_id') != key or 'rig_revision' in recipe or not old['published_revision']:
-                continue
-            # Preserve its rendered result and skeleton metadata, but invalidate
-            # stale editors so they cannot overwrite the new compatibility pin.
-            stats = {r['stat_key']: r['value'] for r in db.execute('SELECT * FROM character_stats WHERE character_id=?', (character['id'],))}
-            db.execute('''INSERT INTO character_assembly_history(character_id,revision,recipe_json,stats_json,changed_at)
-                VALUES(?,?,?,?,?)''', (character['id'], character['revision'], character['assembly_json'], json.dumps(stats), time.time()))
-            recipe['rig_revision'] = old['published_revision']
-            db.execute('UPDATE characters SET assembly_json=?,revision=revision+1,updated_at=? WHERE id=?', (json.dumps(recipe), time.time(), character['id']))
-            pinned.append(character['id'])
+        if old['published_revision']:
+            pinned = pin_unversioned_assemblies(db,key,old['published_revision'])
         db.execute('''UPDATE character_component_records SET revision=revision+1,content_sha256=?,
             source_path=?,prepared_path=?,prepared_sha256=?,metadata_json=? WHERE kind='rig' AND id=?''',
             (digest, relative, relative, hashlib.sha256(artifact.read_bytes()).hexdigest(),

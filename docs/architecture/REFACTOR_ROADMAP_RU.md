@@ -1,6 +1,6 @@
 # game1 — незавершённый рефакторинг и план следующих этапов
 
-**Обновлено:** 30.10.2026 · **База:** диагностический дамп `13-52-46` (M162).
+**Обновлено:** 02.11.2026 · **База:** диагностический дамп `02-52-50` (M188) и Python-декомпозиция M189.
 **Характер документа:** план технического долга, не распоряжение на немедленное переписывание. Изменения выполняются только отдельными проверяемыми патчами.
 
 ## 1. Что завершено / что осталось
@@ -42,11 +42,13 @@
 
 ### R3 — boundaries Control Center / Asset Manager (P1/P2; Next)
 
-**Состояние:** `monster_animation_store.py` 946; `character_store.py` 806; `real_estate/store.py` 822; `location_asset_store.py` 691; `weapon_store.py` 647. `host_agent.py` уже вынесен, повторно не расщеплять без цели.
+**Состояние после M189:** `monster_animation_store.py` 469 (было 946), `character_store.py` 250 (было 834); `real_estate/store.py` ~822, `location_asset_store.py` ~691, `weapon_store.py` ~647. `host_agent.py` уже вынесен, повторно не расщеплять без цели. **R3 частично выполнен, не завершён.**
 
 **Цель:** сохранение identity, SQL/migrations, dependency resolution, authoring validation, publication orchestration и export registry живут в явных модулях с контрактами. Общий `Atlas Registry` — единственный ID публикации варианта; consumers и legacy `texture_reference_slug` читают через адаптер без копии ID.
 
 **Первым** логично провести чтение/разрешение shared atlas и статус Studio Sync (M162), затем отделять write paths и publication jobs. **Приёмка:** на копии реальной DB те же slugs/IDs, `PUBLISHED/UPDATE_AVAILABLE`, отсутствие дублирующего upload; old API contracts сохраняются; no schema rewrite without migration+rollback.
+
+**M189 (02.11, Characters → Animations, behavior-preserving):** из двух хранилищ извлечены use-case-слои и SQL ownership без смены схем и публикационного алгоритма. Фасады CharacterStore/MonsterAnimationStore и маршруты неизменны; обновлены source-only и доменные валидаторы, добавлены поведенческие тесты, сравнение SHA-256 четырёх выходов до/после. См. [отчёт M189](../workflows/CHARACTER_ANIMATION_STORES_R3_M189_RU.md). Следующий конкретный долг в этом же порядке: `animation_core/storage.py` (Character Animations), затем read/scan/registry Monster/NPC; staging/compensation по M172 — отдельно, поскольку это уже изменение поведения.
 
 ### R4 — общие UI-примитивы и controllers (P2)
 

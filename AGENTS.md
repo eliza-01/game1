@@ -25,9 +25,9 @@
 6. Verify `git apply --check` against the actual supplied project version. Deliver changes as a patch from the game1 project root with one single PowerShell block; restart **only** services affected. Do not restart Rojo or open new consoles by default.
 7. In every handoff describe boundaries changed, migrations, observed tests, untested runtime scenarios and any regressions/risks. Never claim full Studio validation from static tests.
 
-## Current documentation and remaining decomposition (updated 2026-10-30)
+## Current documentation and remaining decomposition (updated 2026-11-02)
 
-The M83 audit is **historical**. M85–M105 implemented the bootstrap, Host Agent, Monster AI/Spawner, Hitbox/Combat and Studio Bridge extraction steps. Do **not** repeat their original "not yet implemented" work. The live documents are:
+M189 separates Character and Monster/NPC Animation Python store responsibilities without changing public contracts; see `docs/workflows/CHARACTER_ANIMATION_STORES_R3_M189_RU.md`. R3 is not finished. The M83 audit is **historical**. M85–M105 implemented the bootstrap, Host Agent, Monster AI/Spawner, Hitbox/Combat and Studio Bridge extraction steps. Do **not** repeat their original "not yet implemented" work. The live documents are:
 
 - [`docs/README.md`](docs/README Read First!.md) — documentation index, current vs historical.
 - [`docs/spec/CURRENT_PROJECT_SPEC_RU.md`](docs/spec/CURRENT_PROJECT_SPEC_RU.md) — current product/technical contracts.

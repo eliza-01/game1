@@ -164,8 +164,8 @@
 <p class="hint">Components publish one at a time. Closing this window keeps the queue running. Failed entries do not stop the remaining items.</p>
 </dialog>
 <dialog id="cp-conflict" aria-labelledby="cp-conflict-title">
-<h3 id="cp-conflict-title">Published parts already exist</h3>
-<p>These mesh names are already registered and published. For unchanged parts, cancel and export an FBX without those meshes. To replace them, explicitly check each part below.</p>
+<h3 id="cp-conflict-title">Confirm component replacement</h3>
+<p>An existing rig may have a changed bone set, parent or bind pose. Explicitly approve Replace Rig and each published mesh listed below. Old character assemblies remain pinned to the previous published rig revision.</p>
 <p>Registration stages a replacement; the current published ID remains assigned until the replacement upload succeeds.</p>
 <div id="cp-conflicts"></div><div class="actions"><button id="cp-cancel" type="button">Cancel · prepare another FBX</button><button id="cp-confirm" type="button" disabled>Confirm selected replacements</button></div>
 </dialog>
@@ -600,7 +600,7 @@
 <script src="character-workflow.js?v=2"></script>
 <script src="character-publications.js?v=2"></script>
 <script src="character-component-summary.js?v=1"></script>
-<script src="character-components.js?v=5"></script>
+<script src="character-components.js?v=7"></script>
 <script src="character-atlas-ui.js?v=1"></script>
 <script src="character-assemblies.js?v=4"></script>
 <script src="animation-speed.js?v=3"></script>

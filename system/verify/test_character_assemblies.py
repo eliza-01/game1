@@ -31,6 +31,7 @@ class AssemblyTests(unittest.TestCase):
                'hair_01_common','hair_01_male','hair_01_female']
         info=dict(armature='human_armature',bones=bones,parts=[dict(name=n,vertices=3,triangles=1,
             content_sha256=n,armature='human_armature',skeleton=bones,used_bones=['root']) for n in names])
+        self.fixture_info=info
         def analyzer(root,source,output=None):
             if output:
                 output.mkdir(parents=True,exist_ok=True)
@@ -126,6 +127,33 @@ class AssemblyTests(unittest.TestCase):
         artifact=self.root/'rig_revision.fbx';artifact.write_bytes(b'new rig fixture')
         return stage_rig_revision(self.components,'human',artifact,expected_revision=1,
             analyzer=lambda *a:dict(armature='human_armature',bones=bones,parts=[dict(name='rig_carrier')]))
+
+    def test_full_fbx_rig_replacement_pins_existing_assemblies_before_publication(self):
+        self.assemblies.save(self.payload());self.publish_dependencies()
+        before=self.characters.get('human_male')['assembly_resolved']
+        self.assertTrue(before['ready'])
+        self.fixture_info['bones'][0]['matrix'][3]=1.25
+        source=self.root/'human.fbx'
+        inspected=self.components.inspect(source)
+        self.assertTrue(inspected['rig']['changed'])
+        self.assertEqual(len(inspected['conflicts']),len(self.fixture_info['parts']))
+        with self.assertRaisesRegex(ValueError,'Replace Rig'):
+            self.components.register(inspected['token'],[p['id'] for p in inspected['conflicts']])
+        self.components.register(inspected['token'],[p['id'] for p in inspected['conflicts']],replace_rig=True)
+        self.assertEqual(self.characters.get('human_male')['assembly']['rig_revision'],1)
+        self.assertEqual(self.characters.get('human_male')['assembly_resolved']['rig']['asset_id'],'123')
+        self.assertEqual(self.components.get('rig','human')['model_asset_id'],'123')
+        self.assertEqual(self.components.get('rig','human')['revision'],2)
+        with connect(self.characters.db) as db:
+            count=db.execute("SELECT count(*) FROM character_component_history WHERE kind='rig' AND component_id='human'").fetchone()[0]
+            self.assertEqual(count,1)
+            pins=db.execute("SELECT count(*) FROM character_assembly_history WHERE character_id='human_male'").fetchone()[0]
+            self.assertEqual(pins,1)
+            db.execute("UPDATE character_component_records SET model_asset_id='456',published_revision=revision WHERE kind='rig' AND id='human'")
+        resolved=self.characters.get('human_male')['assembly_resolved']
+        self.assertTrue(resolved['ready'])
+        self.assertEqual(resolved['rig']['asset_id'],'123')
+        self.assertEqual(resolved['rig']['bone_names'],['root'])
 
     def test_rig_republication_pins_existing_character_and_preserves_live_asset(self):
         self.assemblies.save(self.payload());self.publish_dependencies()

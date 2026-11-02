@@ -2,6 +2,7 @@
 (() => {
   const base='/api/characters/components';
   const el=id=>document.getElementById('cp-'+id);
+  const atlasPresentation=window.game1CharacterAtlasPresentation;
   let catalog=null,plan=null,busy=false,approvalResolve=null,sort={column:'id',ascending:true};
   const post=(url,data={})=>request(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
   const text=(tag,value)=>{const node=document.createElement(tag);node.textContent=String(value??'');return node;};
@@ -17,17 +18,22 @@
     const publishing=!!window.game1CharacterPublications?.isRunning();
     el('choose').disabled=value||publishing;
     el('refresh').disabled=value;
-    el('register').disabled=value||publishing||!plan;
     window.game1CharacterPublications?.setBusy(value);
     syncAtlasControls();
   }
-  function atlasOptions(select,selected='') {
+  function atlasOptions(select,partId,selected='') {
     select.append(new Option('Without atlas / solid material',''));
-    for(const group of catalog?.atlas_families||[])for(const v of group.variants||[]) {
-      const option=new Option(`${group.atlasKey} · ${v.width}×${v.height}${v.current?'':' · unpublished'}`,v.id);
+    for(const v of atlasPresentation.optionsForPart(partId,catalog?.atlas_families)){
+      const option=new Option(`${v.preferred?'★ ':''}${v.atlasKey} · ${v.width}×${v.height}${v.current?'':' · unpublished'}`,v.id);
       option.disabled=!v.current;select.append(option);
     }
     select.value=selected;
+    setAtlasSelectionRank(select);
+  }
+  function setAtlasSelectionRank(select){
+    const rank=atlasPresentation.variantRank(catalog?.atlas_families,select.value);
+    if(rank===null)delete select.dataset.cpAtlasRank;
+    else select.dataset.cpAtlasRank=String(rank);
   }
   async function run(action){if(busy||window.game1CharacterPublications?.isRunning()){toast('Wait for the current publication queue to finish.',true);return;}lock(true);try{await action();}catch(error){status(error.message,true);}finally{lock(false);}}
   async function refresh(){catalog=await request(base);render();window.dispatchEvent(new Event('character-components-changed'));}
@@ -40,7 +46,10 @@
       button.textContent=label+(active?(sort.ascending?' ↑':' ↓'):'');
       button.parentElement.setAttribute('aria-sort',active?(sort.ascending?'ascending':'descending'):'none');
     }
+    const isPublished=row=>!!row.model_asset_id&&row.published_revision===row.revision;
     const rowsSorted=[...(catalog.items||[])].sort((a,b)=>{
+      // Unpublished/new revisions always take priority, independent of column sort.
+      if(isPublished(a)!==isPublished(b))return isPublished(a)?1:-1;
       const value=row=>String(sort.column==='slot'?(row.kind==='rig'?'rig':row.slot):row[sort.column]||'').toLocaleLowerCase();
       return (sort.ascending?1:-1)*(value(a).localeCompare(value(b))||a.id.localeCompare(b.id));
     });
@@ -60,11 +69,12 @@
       if(row.kind==='part'){
         const select=document.createElement('select');select.setAttribute('aria-label','Atlas for '+row.id);
         select.dataset.cpAtlasSelect=row.id;
-        atlasOptions(select,row.atlas?.variant_id||'');
+        atlasOptions(select,row.id,row.atlas?.variant_id||'');
         // Unbinding is deliberately not inferred from an empty dropdown.
         select.querySelector('option').disabled=!!row.atlas;
         select.disabled=busy||window.game1CharacterPublications.isRunning();
         select.onchange=()=>run(async()=>{
+          setAtlasSelectionRank(select);
           if(!select.value)return;
           await post(base+'/atlas',{id:row.id,variantId:Number(select.value),expectedRevision:row.atlas?.revision||0});
           await refresh();status('Atlas selected. Shared Image Asset ID reused; no mesh upload.');
@@ -182,15 +192,16 @@
     plan=null;el('preview').replaceChildren();el('source').textContent=picked.path;status('Reading FBX mesh names and rig…');
     plan=await post(base+'/inspect',{sourcePath:picked.path});preview();
     status('Inspection complete. Review the parts and any new sets before registering. Nothing has been changed or uploaded.');
-    if(plan.parts.length||plan.rig?.changed||plan.partial_required)plan.approvals=await approve();
-    if(plan.approvals===null)status('Registration cancelled. No components were modified.');
-  });
-  el('register').onclick=()=>run(async()=>{
-    const approval=plan.approvals??await approve();if(approval===null){status('Cancelled. No components were modified.');return;}
+    // One explicit Register action in the review modal. No second button outside.
+    if(!(plan.parts.length||plan.rig?.changed||plan.partial_required))return;
+    const approval=await approve();
+    if(approval===null){status('Registration cancelled. No components were modified.');return;}
     status('Registering approved rig revision and extracting component FBX files…');
-    await post(base+'/register',{token:plan.token,replacements:approval.replacements,newParts:approval.newParts,replaceRig:approval.replaceRig,rigOnly:approval.rigOnly,allowPartial:approval.allowPartial||false});plan=null;el('preview').replaceChildren();
+    await post(base+'/register',{token:plan.token,replacements:approval.replacements,newParts:approval.newParts,replaceRig:approval.replaceRig,rigOnly:approval.rigOnly,allowPartial:approval.allowPartial||false});
+    plan=null;el('preview').replaceChildren();
     await refresh();status('Registration complete. Previous published IDs are preserved until publication succeeds. No Roblox Model Asset was uploaded during registration. Select the changed rig and parts in step 02 to publish NEW Model Asset IDs.');
   });
+
   el('refresh').onclick=()=>run(async()=>{await refresh();status('Catalog refreshed.');});
   for(const button of document.querySelectorAll('[data-cp-sort]')){
     button.onclick=()=>{

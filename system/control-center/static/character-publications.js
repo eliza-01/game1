@@ -55,7 +55,7 @@
     el('publication-progress').max=Math.max(1,queued.length);
     el('publication-progress').value=0;
     el('publication-summary').textContent=queued.length
-      ? `Выбрано для публикации: ${queued.length}. Нажмите «Publish selected» в таблице для запуска.`
+      ? `Выбрано для публикации: ${queued.length}. Нажмите «Publish selected» под таблицей для запуска.`
       : 'Очередь пуста. Выберите части в таблице.';
     for(const row of queued){
       const tr=document.createElement('tr');

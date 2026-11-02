@@ -2,6 +2,7 @@
 (() => {
   const base='/api/characters/components/atlases';
   const el=id=>document.getElementById('cp-atlas-'+id);
+  const atlasPresentation=window.game1CharacterAtlasPresentation;
   const post=(url,data={})=>request(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
   let catalog=null,inspection=null,busy=false;
   const text=(tag,value)=>{const node=document.createElement(tag);node.textContent=String(value??'');return node;};
@@ -15,13 +16,23 @@
   }
   function renderTable(){
     const host=el('rows');host.replaceChildren();
-    const groups=catalog?.atlas_families||[];
-    for(const group of groups)for(const v of group.variants||[]){
-      const tr=document.createElement('tr');
-      const state=v.replacementPending?'Replacement staged':v.current?'✓ published':v.published_id?'Outdated':'Not published';
-      tr.append(text('td',group.atlasKey),text('td',`${v.width}×${v.height}`),text('td',v.published_id||'—'));
-      const cell=text('td',state);cell.className=v.current&&!v.replacementPending?'cp-health-ok':'cp-health-warning';
-      tr.append(cell);host.append(tr);
+    const groups=atlasPresentation.orderedFamilies(catalog?.atlas_families);
+    for(const group of groups){
+      // One visual section per atlas family; retain the same four-column table.
+      const heading=document.createElement('tr');heading.className='cp-atlas-family-row';
+      const title=text('th',`${group.atlasKey} · ${group.variants.length} resolution(s)`);
+      title.colSpan=4;title.scope='rowgroup';heading.append(title);host.append(heading);
+      for(const v of group.variants){
+        const tr=document.createElement('tr');
+        const state=v.replacementPending?'Replacement staged':v.current?'✓ published':v.published_id?'Outdated':'Not published';
+        const resolution=document.createElement('td');
+        const dot=document.createElement('span');dot.className=`cp-atlas-rank-dot cp-atlas-rank-${v.rank}`;
+        dot.title=`Resolution priority ${v.rank+1} within ${group.atlasKey}`;
+        dot.setAttribute('aria-label',dot.title);resolution.append(dot,text('span',`${v.width}×${v.height}`));
+        tr.append(text('td',group.atlasKey),resolution,text('td',v.published_id||'—'));
+        const cell=text('td',state);cell.className=v.current&&!v.replacementPending?'cp-health-ok':'cp-health-warning';
+        tr.append(cell);host.append(tr);
+      }
     }
     if(!host.children.length){const tr=document.createElement('tr');const empty=text('td','No Character atlases yet. Register an atlas to begin.');empty.colSpan=4;tr.append(empty);host.append(tr);}
   }

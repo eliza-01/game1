@@ -92,6 +92,7 @@ const window = {
     button(){return new Element('button');},setBusy(){},isRunning(){return false;}},
   game1CharacterComponentSummary:{render(){}},addEventListener(){},dispatchEvent(){},
 };
+window.game1CharacterAtlasPresentation=require(process.argv[3]);
 const context=vm.createContext({document,window,request,Event:class Event {},
   Option: function Option(_label,value){const opt=new Element('option');opt.value=value;return opt;},
   toast(message){throw Error('Unexpected toast ' + message);}});
@@ -118,7 +119,6 @@ const settle=async()=>{for(let i=0;i<6;i++)await new Promise(resolve=>setImmedia
   assert(!el('confirm').disabled);
   el('confirm').onclick();
   await settle();
-  el('register').onclick();
   await settle();
   assert(registeredPayload,'Register posted request');
   assert.equal(registeredPayload.token,'token');

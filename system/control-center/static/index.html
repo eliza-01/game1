@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="asset-manager.css?v=12">
 <link rel="stylesheet" href="character-animations.css?v=1">
 <link rel="stylesheet" href="location-assets.css?v=1">
-<link rel="stylesheet" href="character-components.css?v=5">
+<link rel="stylesheet" href="character-components.css?v=6">
 <link rel="stylesheet" href="character-assemblies.css?v=4">
 <link rel="stylesheet" href="deco-assets.css?v=5">
 <link rel="stylesheet" href="real-estate.css?v=12">
@@ -83,9 +83,10 @@
 <div id="cp-counts" class="cp-metrics" aria-label="Статистика компонентов"></div>
 <div id="cp-flow-summary" class="cp-guidance" role="status" aria-live="polite">Загрузка компонентов…</div>
 <details open><summary>Mesh naming standard</summary><p><code>&lt;set&gt;_upper</code> · <code>&lt;set&gt;_lower</code> · <code>&lt;set&gt;_gloves</code> · <code>&lt;set&gt;_boots</code><br><code>head_01_male</code> / <code>head_01_female</code><br><code>hair_01_male</code> / <code>hair_01_female</code> / <code>hair_01_common</code><br><code>eyes_01</code> · <code>eyebrows_01</code> · <code>eyes_01_spiral</code> (effect)<br>Main rig: <code>human_armature</code>. Hair may carry its own <code>hair_01_common_armature</code>, or use its Object Pivot (without Armature) on <code>hair_mount</code>.</p></details>
-<div class="cp-toolbar"><button id="cp-choose" class="primary" type="button">Choose FBX · inspect</button><button id="cp-register" type="button" disabled>Register detected rig &amp; parts</button><button id="cp-refresh" type="button">Refresh</button></div>
+<div class="cp-toolbar"><button id="cp-choose" class="primary" type="button">Choose FBX · inspect</button><button id="cp-refresh" type="button">Refresh</button></div>
 <small id="cp-source" class="hint">No FBX selected.</small><div id="cp-status" role="status" aria-live="polite"></div><div id="cp-preview" class="character-inspection-preview" aria-live="polite"></div><p id="cp-sets" class="hint"></p><div class="cp-toolbar" id="cp-publication-step"><strong class="character-phase-label">02 · Публикация компонентов</strong><span id="cp-publish-count">0 выбрано</span><button id="cp-publication-open" class="cp-queue-button" type="button">Queue</button></div>
-<div class="table-wrap"><table id="cp-table"><thead><tr><th aria-label="health"></th><th><button class="cp-sort" type="button" data-cp-sort="id">name</button></th><th><button class="cp-sort" type="button" data-cp-sort="slot">part</button></th><th><button class="cp-sort" type="button" data-cp-sort="set_id">set</button></th><th>rig</th><th>status</th><th>Model Asset ID</th><th>shared atlas</th><th class="cp-publish-selection"><input id="cp-publish-select-all" type="checkbox" aria-label="Select all unpublished components"></th><th class="cp-publication-column"><span>publication</span><button id="cp-publish-all" type="button" disabled>Publish selected</button></th></tr></thead><tbody id="cp-rows"></tbody></table></div>
+<div class="table-wrap"><table id="cp-table"><thead><tr><th aria-label="health"></th><th><button class="cp-sort" type="button" data-cp-sort="id">name</button></th><th><button class="cp-sort" type="button" data-cp-sort="slot">part</button></th><th><button class="cp-sort" type="button" data-cp-sort="set_id">set</button></th><th>rig</th><th>status</th><th>Model Asset ID</th><th>shared atlas</th><th class="cp-publish-selection"><input id="cp-publish-select-all" type="checkbox" aria-label="Select all unpublished components"></th><th class="cp-publication-column"><span>publication</span></th></tr></thead><tbody id="cp-rows"></tbody></table></div>
+<div class="cp-publish-bulk"><button id="cp-publish-all" type="button" disabled>Publish selected</button></div>
 <section class="cp-atlas-section" aria-label="Character shared atlases">
 <div class="cp-toolbar"><button id="cp-atlas-naming-guide" class="character-help" type="button" aria-label="Правила именования атласов персонажей" data-character-atlas-guide data-character-tip="АТЛАСЫ ПЕРСОНАЖЕЙ&#10;Формат: &lt;имя&gt;_&lt;ширина&gt;x&lt;высота&gt;_atlas.png (также JPG/JPEG).&#10;Только a–z, 0–9 и _. Размер в имени должен совпадать с изображением.&#10;Сет fullplate imperial → fullplate_imperial.&#10;Верх: fullplate_imperial_upper_2048x2048_atlas.png&#10;Низ: fullplate_imperial_lower_2048x2048_atlas.png&#10;Перчатки: fullplate_imperial_gloves_2048x2048_atlas.png&#10;Ботинки: fullplate_imperial_boots_2048x2048_atlas.png&#10;Общий сет: fullplate_imperial_2048x2048_atlas.png&#10;Голова: head_01_male_1024x1024_atlas.png / head_01_female_1024x1024_atlas.png&#10;Волосы: hair_01_male_1024x1024_atlas.png / hair_01_female_1024x1024_atlas.png / hair_01_common_1024x1024_atlas.png&#10;Глаза: eyes_01_512x512_atlas.png / eyes_01_spiral_512x512_atlas.png (эффект)&#10;Брови: eyebrows_01_512x512_atlas.png&#10;Один атлас можно назначить нескольким частям. Замена требует подтверждения и создаёт новый Image ID.">?</button><button id="cp-atlas-register" class="primary" type="button">Register Atlas</button><span class="hint">Character atlases only · separate Image Assets</span></div>
 <div class="table-wrap"><table id="cp-atlas-table"><thead><tr><th>atlas</th><th>resolution</th><th>Image Asset ID</th><th>publication</th></tr></thead><tbody id="cp-atlas-rows"></tbody></table></div>
@@ -165,7 +166,7 @@
 </dialog>
 <dialog id="cp-conflict" aria-labelledby="cp-conflict-title">
 <h3 id="cp-conflict-title">Review FBX component registration</h3>
-<p>An existing rig may have a changed bone set, parent or bind pose. Explicitly approve Replace Rig and each published mesh listed below. Old character assemblies remain pinned to the previous published rig revision.</p>
+<p>Inspect does not register anything. New parts are selected by default; existing parts are kept unless you select individual replacements. If the rig has changed, Replace Rig needs separate approval. Old character assemblies remain pinned to their published rig revision.</p>
 <p>Registration stages a replacement; the current published ID remains assigned until the replacement upload succeeds.</p>
 <div id="cp-conflicts"></div><div class="actions"><button id="cp-cancel" type="button">Cancel</button><button id="cp-confirm" type="button" disabled>Register selected changes</button></div>
 </dialog>
@@ -600,8 +601,9 @@
 <script src="character-workflow.js?v=2"></script>
 <script src="character-publications.js?v=2"></script>
 <script src="character-component-summary.js?v=1"></script>
-<script src="character-components.js?v=11"></script>
-<script src="character-atlas-ui.js?v=1"></script>
+<script src="character-atlas-presentation.js?v=1"></script>
+<script src="character-components.js?v=12"></script>
+<script src="character-atlas-ui.js?v=2"></script>
 <script src="character-assemblies.js?v=4"></script>
 <script src="animation-speed.js?v=3"></script>
 <script src="timelines.js?v=2"></script>

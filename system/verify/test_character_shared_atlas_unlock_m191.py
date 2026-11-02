@@ -14,7 +14,7 @@ class CharacterSharedAtlasUnlockM191(TestCase):
         runner = ROOT / 'system/verify/character_atlas_unlock_m191.js'
         script = STATIC / 'character-components.js'
         result = subprocess.run(
-            [shutil.which('node'), str(runner), str(script)],
+            [shutil.which('node'), str(runner), str(script), str(STATIC / 'character-atlas-presentation.js')],
             text=True, capture_output=True, timeout=20,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -22,7 +22,7 @@ class CharacterSharedAtlasUnlockM191(TestCase):
 
     def test_browser_cache_buster_and_script_syntax(self):
         html = (STATIC / 'index.html').read_text(encoding='utf-8')
-        self.assertIn('character-components.js?v=11', html)
+        self.assertIn('character-components.js?v=12', html)
         result = subprocess.run(
             [shutil.which('node'), '--check', str(STATIC / 'character-components.js')],
             capture_output=True, text=True, timeout=10,

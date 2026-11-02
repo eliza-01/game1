@@ -95,6 +95,7 @@ const request = (url, options) => {
   }
   throw new Error(`unexpected API request: ${url}`);
 };
+window.game1CharacterAtlasPresentation=require(process.argv[3]);
 const context = vm.createContext({
   window, document, request,
   Option: function Option(label, value) { const node = new Element('option'); node.textContent = label; node.value = String(value); return node; },

@@ -33932,9 +33932,9 @@
       },
       "status": "published",
       "atlas": {
-        "revision": 1,
+        "revision": 3,
         "synced_revision": 0,
-        "changed_at": 1793458533.9217136,
+        "changed_at": 1793649920.9261272,
         "variant_id": 9,
         "family_id": 6,
         "width": 512,

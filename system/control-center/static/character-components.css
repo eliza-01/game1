@@ -81,3 +81,25 @@
 #character-components-panel .cp-queue-button.cp-queue-alert{border-color:#ee6363;color:#ffe0e0;background:#a8343418;animation:cp-queue-pulse 1.35s ease-in-out infinite}
 @keyframes cp-queue-pulse{0%,100%{border-color:#ee6363;box-shadow:0 0 0 0 #ed55552b}50%{border-color:#ffaaaa;box-shadow:0 0 0 4px #ed555525}}
 @media(prefers-reduced-motion:reduce){#character-components-panel .cp-queue-button.cp-queue-alert{animation:none;border-width:2px}}
+
+/* M198: publication action belongs below the table, after all selected rows. */
+.cp-publish-bulk{display:flex;justify-content:flex-end;margin:10px 0 4px}
+.cp-publish-bulk button{min-width:165px}
+/* Priorities are relative to a single atlas family, as in Location Assets. */
+.cp-atlas-rank-0{--cp-rank-color:#d9ac43}
+.cp-atlas-rank-1{--cp-rank-color:#a47bdf}
+.cp-atlas-rank-2{--cp-rank-color:#4f95ee}
+.cp-atlas-rank-3{--cp-rank-color:#54b991}
+.cp-atlas-rank-4{--cp-rank-color:#939ba8}
+#cp-atlas-table .cp-atlas-family-row th{text-align:left;padding:13px 10px 7px;
+  background:color-mix(in srgb,var(--panel2) 70%,transparent);border-top:2px solid var(--line);
+  color:var(--text);font-weight:750;font-size:12px}
+#cp-atlas-table .cp-atlas-family-row:first-child th{border-top:0}
+#cp-atlas-table td .cp-atlas-rank-dot{display:inline-block;width:9px;height:9px;
+  margin-right:9px;border-radius:50%;background:var(--cp-rank-color);vertical-align:middle;
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--cp-rank-color) 45%,transparent)}
+#cp-table select[data-cp-atlas-rank="0"]{border-color:#d9ac43;box-shadow:0 0 0 1px #d9ac4347}
+#cp-table select[data-cp-atlas-rank="1"]{border-color:#a47bdf;box-shadow:0 0 0 1px #a47bdf47}
+#cp-table select[data-cp-atlas-rank="2"]{border-color:#4f95ee;box-shadow:0 0 0 1px #4f95ee47}
+#cp-table select[data-cp-atlas-rank="3"]{border-color:#54b991;box-shadow:0 0 0 1px #54b99147}
+#cp-table select[data-cp-atlas-rank="4"]{border-color:#939ba8;box-shadow:0 0 0 1px #939ba847}

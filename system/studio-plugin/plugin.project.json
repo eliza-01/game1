@@ -105,6 +105,18 @@
       },
       "StudioRealEstatePartPlacement": {
         "$path": "modules/StudioRealEstatePartPlacement.luau"
+      },
+      "StudioCharacterTestStand": {
+        "$path": "modules/StudioCharacterTestStand.luau"
+      },
+      "StudioCharacterStandBuilder": {
+        "$path": "modules/StudioCharacterStandBuilder.luau"
+      },
+      "StudioCharacterStandPlacement": {
+        "$path": "modules/StudioCharacterStandPlacement.luau"
+      },
+      "StudioCharacterStandWidget": {
+        "$path": "modules/StudioCharacterStandWidget.luau"
       }
     }
   }

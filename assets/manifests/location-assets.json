@@ -146,6 +146,36 @@
       ]
     },
     {
+      "atlasKey": "head_01_male",
+      "baseKey": "head_01_male",
+      "version": "",
+      "variants": [
+        {
+          "id": 11,
+          "family_id": 8,
+          "width": 512,
+          "height": 512,
+          "filename": "head_01_male_512x512_atlas.png",
+          "original_filename": "head_01_male_512x512_atlas.png",
+          "source_path": "assets/source/texture-atlases/head_01_male/512x512/head_01_male_512x512_atlas.png",
+          "source_sha256": "1e7997a1597dacb6fc421e8485df8fa7ad7d5ae3862454de07f13a7205248e58",
+          "uses_alpha": true,
+          "published_id": "76925163781035",
+          "published_sha256": "1e7997a1597dacb6fc421e8485df8fa7ad7d5ae3862454de07f13a7205248e58",
+          "moderation_state": "Reviewing",
+          "published_at": 1793629486.0227144,
+          "created_at": 1793629482.414679,
+          "atlas_key": "head_01_male",
+          "replacement_sha256": null,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "512x512",
+          "baseKey": "head_01_male",
+          "version": ""
+        }
+      ]
+    },
+    {
       "atlasKey": "house_level4_01",
       "baseKey": "house_level4",
       "version": "01",
@@ -232,6 +262,96 @@
           "resolution": "64x128",
           "baseKey": "lantern",
           "version": "01"
+        }
+      ]
+    },
+    {
+      "atlasKey": "newborn_boots",
+      "baseKey": "newborn_boots",
+      "version": "",
+      "variants": [
+        {
+          "id": 12,
+          "family_id": 9,
+          "width": 512,
+          "height": 512,
+          "filename": "newborn_boots_512x512_atlas.png",
+          "original_filename": "newborn_boots_512x512_atlas.png",
+          "source_path": "assets/source/texture-atlases/newborn_boots/512x512/newborn_boots_512x512_atlas.png",
+          "source_sha256": "455e581a5c58f693c7f48d6a179cea4632ad461a58bcb5c88de46a8bf9bd1855",
+          "uses_alpha": true,
+          "published_id": "132696983496934",
+          "published_sha256": "455e581a5c58f693c7f48d6a179cea4632ad461a58bcb5c88de46a8bf9bd1855",
+          "moderation_state": "Reviewing",
+          "published_at": 1793629503.4751477,
+          "created_at": 1793629499.803513,
+          "atlas_key": "newborn_boots",
+          "replacement_sha256": null,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "512x512",
+          "baseKey": "newborn_boots",
+          "version": ""
+        }
+      ]
+    },
+    {
+      "atlasKey": "newborn_gloves",
+      "baseKey": "newborn_gloves",
+      "version": "",
+      "variants": [
+        {
+          "id": 13,
+          "family_id": 10,
+          "width": 256,
+          "height": 256,
+          "filename": "newborn_gloves_256x256_atlas.png",
+          "original_filename": "newborn_gloves_256x256_atlas.png",
+          "source_path": "assets/source/texture-atlases/newborn_gloves/256x256/newborn_gloves_256x256_atlas.png",
+          "source_sha256": "06b1f91463692288afefef95b4f3903ef5aa7c5a275d5b27fed04ac25fa4b7ee",
+          "uses_alpha": true,
+          "published_id": "135524533752769",
+          "published_sha256": "06b1f91463692288afefef95b4f3903ef5aa7c5a275d5b27fed04ac25fa4b7ee",
+          "moderation_state": "Reviewing",
+          "published_at": 1793629522.410063,
+          "created_at": 1793629518.7281086,
+          "atlas_key": "newborn_gloves",
+          "replacement_sha256": null,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "256x256",
+          "baseKey": "newborn_gloves",
+          "version": ""
+        }
+      ]
+    },
+    {
+      "atlasKey": "newborn_lower",
+      "baseKey": "newborn_lower",
+      "version": "",
+      "variants": [
+        {
+          "id": 14,
+          "family_id": 11,
+          "width": 1024,
+          "height": 512,
+          "filename": "newborn_lower_1024x512_atlas.png",
+          "original_filename": "newborn_lower_1024x512_atlas.png",
+          "source_path": "assets/source/texture-atlases/newborn_lower/1024x512/newborn_lower_1024x512_atlas.png",
+          "source_sha256": "65fc333c2cd1819867a769f187cd6d4f3fee757b7be5a4571047dc18e44a66c3",
+          "uses_alpha": true,
+          "published_id": "81341252015506",
+          "published_sha256": "65fc333c2cd1819867a769f187cd6d4f3fee757b7be5a4571047dc18e44a66c3",
+          "moderation_state": "Reviewing",
+          "published_at": 1793629539.199955,
+          "created_at": 1793629535.3873286,
+          "atlas_key": "newborn_lower",
+          "replacement_sha256": null,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "1024x512",
+          "baseKey": "newborn_lower",
+          "version": ""
         }
       ]
     },

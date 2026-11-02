@@ -28552,7 +28552,31 @@
         "rig_id": "human"
       },
       "status": "published",
-      "atlas": null
+      "atlas": {
+        "revision": 1,
+        "synced_revision": 0,
+        "changed_at": 1793630548.8238707,
+        "variant_id": 12,
+        "family_id": 9,
+        "width": 512,
+        "height": 512,
+        "filename": "newborn_boots_512x512_atlas.png",
+        "original_filename": "newborn_boots_512x512_atlas.png",
+        "source_path": "assets/source/texture-atlases/newborn_boots/512x512/newborn_boots_512x512_atlas.png",
+        "source_sha256": "455e581a5c58f693c7f48d6a179cea4632ad461a58bcb5c88de46a8bf9bd1855",
+        "uses_alpha": true,
+        "published_id": "132696983496934",
+        "published_sha256": "455e581a5c58f693c7f48d6a179cea4632ad461a58bcb5c88de46a8bf9bd1855",
+        "moderation_state": "Reviewing",
+        "published_at": 1793629503.4751477,
+        "atlas_key": "newborn_boots",
+        "current": true,
+        "replacementPending": false,
+        "resolution": "512x512",
+        "baseKey": "newborn_boots",
+        "version": "",
+        "syncStatus": "pending_studio_sync"
+      }
     },
     {
       "kind": "part",
@@ -30331,7 +30355,31 @@
         "rig_id": "human"
       },
       "status": "published",
-      "atlas": null
+      "atlas": {
+        "revision": 1,
+        "synced_revision": 0,
+        "changed_at": 1793630555.112602,
+        "variant_id": 13,
+        "family_id": 10,
+        "width": 256,
+        "height": 256,
+        "filename": "newborn_gloves_256x256_atlas.png",
+        "original_filename": "newborn_gloves_256x256_atlas.png",
+        "source_path": "assets/source/texture-atlases/newborn_gloves/256x256/newborn_gloves_256x256_atlas.png",
+        "source_sha256": "06b1f91463692288afefef95b4f3903ef5aa7c5a275d5b27fed04ac25fa4b7ee",
+        "uses_alpha": true,
+        "published_id": "135524533752769",
+        "published_sha256": "06b1f91463692288afefef95b4f3903ef5aa7c5a275d5b27fed04ac25fa4b7ee",
+        "moderation_state": "Reviewing",
+        "published_at": 1793629522.410063,
+        "atlas_key": "newborn_gloves",
+        "current": true,
+        "replacementPending": false,
+        "resolution": "256x256",
+        "baseKey": "newborn_gloves",
+        "version": "",
+        "syncStatus": "pending_studio_sync"
+      }
     },
     {
       "kind": "part",

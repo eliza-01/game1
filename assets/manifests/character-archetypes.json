@@ -3959,7 +3959,7 @@
             ],
             "attachment": "",
             "socket_bone": "",
-            "atlas_image_id": ""
+            "atlas_image_id": "135524533752769"
           },
           "boots": {
             "id": "newborn_boots",
@@ -3975,7 +3975,7 @@
             ],
             "attachment": "",
             "socket_bone": "",
-            "atlas_image_id": ""
+            "atlas_image_id": "132696983496934"
           },
           "head": {
             "id": "head_01_male",
@@ -4358,7 +4358,7 @@
         },
         "ready": true,
         "missing": [],
-        "fingerprint": "360dc809197531af666c549e"
+        "fingerprint": "509c14996aa38e003369dc73"
       },
       "stats": {
         "Level": 1,

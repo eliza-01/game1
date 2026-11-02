@@ -17,6 +17,7 @@ local StudioActorSpawnCommands = require(script.Parent.modules.StudioActorSpawnC
 local StudioTimelineEditorCommands = require(script.Parent.modules.StudioTimelineEditorCommands)
 local DecoManager = require(script.Parent.modules.DecoManager)
 local StudioDecoSyncCommands = require(script.Parent.modules.StudioDecoSyncCommands)
+local StudioCharacterTestStand = require(script.Parent.modules.StudioCharacterTestStand)
 
 local toolbar = plugin:CreateToolbar("game1")
 local markerVisibility = StudioMarkerVisibility.new(plugin, toolbar, Workspace)
@@ -35,6 +36,16 @@ local AGENT_URL = AGENT_BASE_URL .. "/api/agent/info"
 local AGENT_TOKEN = "Game1LocalControlV1"
 local BRIDGE_URL = "http://127.0.0.1:43137"
 local BRIDGE_TOKEN = "Game1StudioBridgeV1"
+
+local characterStand = StudioCharacterTestStand.new({
+    plugin = plugin,
+    toolbar = toolbar,
+    AssetService = AssetService,
+    Workspace = Workspace,
+    Selection = Selection,
+    RunService = RunService,
+    ChangeHistoryService = ChangeHistoryService,
+})
 
 local locationCommands = LocationCommands({
     HttpService = HttpService,
@@ -164,4 +175,4 @@ task.spawn(function()
     end
 end)
 
-print("[game1 plugin] loaded · model bridge v24 · DecoManager identity-only placement + environment bounce authoring + locations + viewport timeline pose sampler")
+print("[game1 plugin] loaded · model bridge v24 · Character Test Stand + DecoManager identity-only placement + environment bounce authoring + locations + viewport timeline pose sampler")

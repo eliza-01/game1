@@ -60,6 +60,11 @@ foreach($ModuleName in $PackagedNames){
 # The installer must reject old builds that lack the Monster/NPC Spawn command handler.
 foreach($Marker in @(
     'model bridge v24',
+    'Game1CharacterStand',
+    'StudioCharacterTestStand',
+    'StudioCharacterStandBuilder',
+    'StudioCharacterStandPlacement',
+    'StudioCharacterStandWidget',
     'local function checkAgent()',
     'local function handleMonsterSpawn(',
     'data.command == "monster-spawn"',
@@ -121,5 +126,5 @@ Remove-Item $Temp -Force -ErrorAction SilentlyContinue
 Write-Host ("Game1Bridge installed with DecoManager + authoring-marker visibility + Locations + Attack Timeline: {0}" -f $Installed)
 Write-Host ("SHA256: {0}" -f $InstalledHash)
 Write-Host 'DecoManager places published Location Assets; Locations draw from Asset Manager / Locations; Attack Timeline opens from Asset Manager / Timelines.'
-Write-Host ("Studio modules: {0}; toolbar: Markers, Plots, DecoManager" -f $Declared.Count)
+Write-Host ("Studio modules: {0}; toolbar: Markers, Plots, DecoManager, Character Stand" -f $Declared.Count)
 Write-Host 'Fully close every Roblox Studio window, then reopen Studio once.'

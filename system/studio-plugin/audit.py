@@ -19,6 +19,7 @@ EXPECTED_UI = {
     "Plots": ('StudioPlotsVisibility', 'StudioPlotsVisibility.new({', '"Game1Plots"'),
     "Markers": ('StudioMarkerVisibility', 'StudioMarkerVisibility.new(', '"Game1AuthoringMarkers"'),
     "DecoManager": ('DecoManager', 'DecoManager.new({', '"Game1DecoManager_v1"'),
+    "Character Stand": ('StudioCharacterTestStand', 'StudioCharacterTestStand.new({', '"Game1CharacterStand"'),
 }
 EXPECTED_COMMANDS = {
     "Real Estate model sync": 'StudioModelLoadCommands',

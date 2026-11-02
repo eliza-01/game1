@@ -26,6 +26,7 @@ local StudioActorSpawnCommands = require(script.Parent.modules.StudioActorSpawnC
 local StudioTimelineEditorCommands = require(script.Parent.modules.StudioTimelineEditorCommands)
 local DecoManager = require(script.Parent.modules.DecoManager)
 local StudioDecoSyncCommands = require(script.Parent.modules.StudioDecoSyncCommands)
+local StudioCharacterTestStand = require(script.Parent.modules.StudioCharacterTestStand)
 
 local toolbar = plugin:CreateToolbar("game1")
 local markerVisibility = StudioMarkerVisibility.new(plugin, toolbar, Workspace)
@@ -44,6 +45,16 @@ local AGENT_URL = AGENT_BASE_URL .. "/api/agent/info"
 local AGENT_TOKEN = "Game1LocalControlV1"
 local BRIDGE_URL = "http://127.0.0.1:43137"
 local BRIDGE_TOKEN = "Game1StudioBridgeV1"
+
+local characterStand = StudioCharacterTestStand.new({
+    plugin = plugin,
+    toolbar = toolbar,
+    AssetService = AssetService,
+    Workspace = Workspace,
+    Selection = Selection,
+    RunService = RunService,
+    ChangeHistoryService = ChangeHistoryService,
+})
 
 local locationCommands = LocationCommands({
     HttpService = HttpService,
@@ -173,7 +184,7 @@ task.spawn(function()
     end
 end)
 
-print("[game1 plugin] loaded · model bridge v24 · DecoManager identity-only placement + environment bounce authoring + locations + viewport timeline pose sampler")
+print("[game1 plugin] loaded · model bridge v24 · Character Test Stand + DecoManager identity-only placement + environment bounce authoring + locations + viewport timeline pose sampler")
 ]]></string>
       </Properties>
     </Item>
@@ -2457,6 +2468,488 @@ end
       </Item>
       <Item class="ModuleScript" referent="13">
         <Properties>
+          <string name="Name">StudioCharacterStandBuilder</string>
+          <string name="Source"><![CDATA[-- Studio authoring adapter for the SAME published assembly recipe and Builder
+-- used by CharacterService. No second bind/atlas/mesh pipeline is implemented here.
+local Builder = {}
+
+local function registryRoot()
+    local shared = game:GetService("ReplicatedStorage"):FindFirstChild("Game1Shared")
+    assert(shared, "Game1Shared is absent. Run Rojo sync before assembling a character stand.")
+    local character = shared:FindFirstChild("character")
+    assert(character, "Game1Shared.character is absent")
+    return character
+end
+
+function Builder.Profiles(): {any}
+    local character = registryRoot()
+    local registry = require(character:WaitForChild("CharacterRegistry"))
+    local result = {}
+    for _, row in ipairs(registry.archetypes or {}) do
+        if row.visualMode == "assembly" and row.assembly and row.assembly.ready == true then
+            table.insert(result, {id = row.id, label = tostring(row.displayName or row.id), mode = "assembly", row = row})
+        elseif row.visualMode == "model" and row.model and tonumber(row.model.assetId) then
+            table.insert(result, {id = row.id, label = tostring(row.displayName or row.id), mode = "model", row = row})
+        end
+    end
+    table.sort(result, function(a, b) return a.id < b.id end)
+    return result
+end
+
+local function getBuilder()
+    local server = nil
+    for _, candidate in game:GetService("ServerScriptService"):GetChildren() do
+        if candidate.Name == "Game1Server" and candidate:IsA("Script") then
+            assert(server == nil, "multiple active Game1Server scripts")
+            server = candidate
+        end
+    end
+    assert(server, "active Game1Server Script is absent. Run Rojo sync before assembling a character stand.")
+    local character = server:FindFirstChild("character")
+    assert(character, "Game1Server.character is absent")
+    local module = character:FindFirstChild("CharacterAssemblyBuilder")
+    assert(module and module:IsA("ModuleScript"), "CharacterAssemblyBuilder is absent")
+    return require(module)
+end
+
+local function loadPublished(assetService: any, id: number): Model
+    assert(id > 0 and id == math.floor(id), "invalid published Model Asset ID")
+    local loaded = assetService:LoadAssetAsync(id)
+    assert(loaded and loaded:IsA("Model"), "published asset is not a Model: " .. id)
+    return loaded
+end
+
+local function prepareLegacy(assetService: any, row: any): Model
+    local assetId = assert(tonumber(row.model.assetId), "legacy character lacks Model Asset ID")
+    local loaded = loadPublished(assetService, assetId)
+    local imported: Instance = loaded
+    if #loaded:GetChildren() == 1 then
+        imported = loaded:GetChildren()[1]
+        imported.Parent = nil
+        loaded:Destroy()
+    end
+    local rig: Model
+    if imported:IsA("Model") then
+        rig = imported
+    else
+        rig = Instance.new("Model")
+        rig.Name = "ImportedRig"
+        imported.Parent = rig
+    end
+    local wrapper = Instance.new("Model")
+    wrapper.Name = "assembled_character"
+    rig.Name = "ImportedRig"
+    rig.Parent = wrapper
+    local template = require(script.Parent.CharacterTemplate)
+    template.EnsureCanonicalRoot(wrapper, rig)
+    local host = rig:FindFirstChildWhichIsA("AnimationController", true)
+    if host then host.Parent = wrapper else
+        host = Instance.new("AnimationController")
+        host.Parent = wrapper
+    end
+    if not host:FindFirstChildOfClass("Animator") then
+        Instance.new("Animator").Parent = host
+    end
+    return wrapper
+end
+
+function Builder.Build(assetService: any, profile: any): Model
+    local row = profile.row
+    local wrapper: Model
+    if profile.mode == "assembly" then
+        local cached = {}
+        local loadedAssets = {}
+        local ok, result = xpcall(function()
+            local assemblyBuilder = getBuilder()
+            return assemblyBuilder.Build(row.assembly, function(id: number): Model
+                if not cached[id] then
+                    local loaded = loadPublished(assetService, id)
+                    cached[id] = loaded
+                    table.insert(loadedAssets, loaded)
+                end
+                return cached[id]
+            end)
+        end, debug.traceback)
+        for _, item in ipairs(loadedAssets) do item:Destroy() end
+        if not ok then error(result, 2) end
+        wrapper = result
+    else
+        wrapper = prepareLegacy(assetService, row)
+    end
+    wrapper:SetAttribute("Game1CharacterTestStand", true)
+    wrapper:SetAttribute("Game1AnimationProfileId", tostring(profile.id))
+    wrapper:SetAttribute("Game1CharacterArchetype", tostring(profile.id))
+    wrapper:SetAttribute("Game1SkeletonSignature", tostring(row.skeleton and row.skeleton.signature or ""))
+    wrapper:SetAttribute("Game1TestStandVersion", 1)
+    return wrapper
+end
+
+return table.freeze(Builder)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="14">
+        <Properties>
+          <string name="Name">StudioCharacterStandPlacement</string>
+          <string name="Source"><![CDATA[-- Edit-mode surface placement. Does not change the imported rig's orientation,
+-- bones, bind matrices, or asset identities. One click creates one stand clone.
+local Placement = {}
+
+local FOLDER_NAME = "Game1CharacterTestStands"
+
+local function standFolder(workspace: Workspace): Folder
+    local existing = workspace:FindFirstChild(FOLDER_NAME)
+    if existing then
+        assert(existing:IsA("Folder"), FOLDER_NAME .. " must be a Folder")
+        return existing
+    end
+    local folder = Instance.new("Folder")
+    folder.Name = FOLDER_NAME
+    folder.Parent = workspace
+    return folder
+end
+
+local function nextName(folder: Folder, profileId: string): string
+    local stem = tostring(profileId):gsub("[^%w_%-]", "_")
+    for number = 1, 9999 do
+        local name = string.format("%s_%02d", stem, number)
+        if not folder:FindFirstChild(name) then return name end
+    end
+    error("character test stand name limit reached")
+end
+
+function Placement.Place(draft: Model, surfacePoint: Vector3, workspace: Workspace): Model
+    local folder = standFolder(workspace)
+    local clone = draft:Clone()
+    clone.Name = nextName(folder, tostring(draft:GetAttribute("Game1AnimationProfileId") or "character"))
+    local ok, result = pcall(function()
+        -- Freeze the test mannequin; animation changes bones, not world physics.
+        -- Explicitly disable touching to keep combat and other services isolated.
+        for _, object in clone:GetDescendants() do
+            if object:IsA("BasePart") then
+                object.Anchored = true
+                object.CanCollide = false
+                object.CanTouch = false
+                object.CanQuery = false
+            end
+        end
+        local bounds, size = clone:GetBoundingBox()
+        local lowest = bounds.Position.Y - size.Y / 2
+        local current = clone:GetPivot()
+        local delta = Vector3.new(
+            surfacePoint.X - current.Position.X,
+            surfacePoint.Y - lowest,
+            surfacePoint.Z - current.Position.Z
+        )
+        clone:PivotTo(CFrame.new(delta) * current)
+
+        local box, dimensions = clone:GetBoundingBox()
+        local anchor = Instance.new("Part")
+        anchor.Name = "TestStandInteractionAnchor"
+        anchor.Size = Vector3.new(0.2, 0.2, 0.2)
+        anchor.CFrame = CFrame.new(box.Position.X, box.Position.Y, box.Position.Z)
+        anchor.Anchored = true
+        anchor.CanCollide = false
+        anchor.CanTouch = false
+        anchor.CanQuery = false
+        anchor.Transparency = 1
+        anchor.Parent = clone
+
+        local prompt = Instance.new("ProximityPrompt")
+        prompt.Name = "Game1NextAnimation"
+        prompt:SetAttribute("Game1CharacterTestStandPrompt", true)
+        prompt.KeyboardKeyCode = Enum.KeyCode.E
+        prompt.HoldDuration = 0
+        prompt.MaxActivationDistance = math.max(8, math.min(14, dimensions.Y * 0.35))
+        prompt.RequiresLineOfSight = false
+        prompt.ActionText = "Следующая анимация"
+        prompt.ObjectText = tostring(clone:GetAttribute("Game1AnimationProfileId") or clone.Name)
+        prompt.Parent = anchor
+        clone.Parent = folder
+        return clone
+    end)
+    if not ok then clone:Destroy(); error(result, 2) end
+    return result
+end
+
+return table.freeze(Placement)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="15">
+        <Properties>
+          <string name="Name">StudioCharacterStandWidget</string>
+          <string name="Source"><![CDATA[-- Dock widget contains presentation only. No asset imports or Workspace writes.
+local Widget = {}
+
+function Widget.new(plugin: Plugin): any
+    local info = DockWidgetPluginGuiInfo.new(Enum.InitialDockState.Right, false, false, 340, 290, 300, 260)
+    local dock = plugin:CreateDockWidgetPluginGui("Game1CharacterTestStand_v1", info)
+    dock.Title = "game1 · Character Test Stand"
+
+    local root = Instance.new("Frame")
+    root.Name = "Root"
+    root.BackgroundColor3 = Color3.fromRGB(28, 32, 39)
+    root.Size = UDim2.fromScale(1, 1)
+    root.BorderSizePixel = 0
+    root.Parent = dock
+
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0, 9)
+    layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Parent = root
+
+    local padding = Instance.new("UIPadding")
+    padding.PaddingTop = UDim.new(0, 14)
+    padding.PaddingLeft = UDim.new(0, 12)
+    padding.PaddingRight = UDim.new(0, 12)
+    padding.Parent = root
+
+    local function label(name: string, text: string, height: number): TextLabel
+        local item = Instance.new("TextLabel")
+        item.Name = name
+        item.LayoutOrder = #root:GetChildren()
+        item.Size = UDim2.new(1, 0, 0, height)
+        item.BackgroundTransparency = 1
+        item.Font = Enum.Font.SourceSans
+        item.TextSize = 14
+        item.TextColor3 = Color3.fromRGB(222, 228, 235)
+        item.TextWrapped = true
+        item.TextXAlignment = Enum.TextXAlignment.Left
+        item.Text = text
+        item.Parent = root
+        return item
+    end
+
+    local function button(name: string, text: string): TextButton
+        local item = Instance.new("TextButton")
+        item.Name = name
+        item.LayoutOrder = #root:GetChildren()
+        item.Size = UDim2.new(1, 0, 0, 37)
+        item.BackgroundColor3 = Color3.fromRGB(44, 75, 93)
+        item.BorderSizePixel = 0
+        item.Font = Enum.Font.SourceSansSemibold
+        item.TextSize = 15
+        item.TextColor3 = Color3.fromRGB(245, 248, 252)
+        item.Text = text
+        item.Parent = root
+        return item
+    end
+
+    label("Description", "Профиль из опубликованного CharacterRegistry", 25)
+    local profile = button("Profile", "Выбрать профиль")
+    local build = button("Assemble", "1 · Собрать персонажа")
+    local place = button("Place", "2 · Поставить на поверхность")
+    local status = label("Status", "Выбери профиль и собери тестовую модель.", 67)
+    return {dock = dock, profile = profile, build = build, place = place, status = status}
+end
+
+return table.freeze(Widget)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="16">
+        <Properties>
+          <string name="Name">StudioCharacterTestStand</string>
+          <string name="Source"><![CDATA[-- Game1Bridge composition root for the Studio-only character assembly stand.
+-- Build -> Place are explicit user actions; this module owns the draft lifetime.
+local StudioCharacterStandBuilder = require(script.Parent.StudioCharacterStandBuilder)
+local StudioCharacterStandPlacement = require(script.Parent.StudioCharacterStandPlacement)
+local StudioCharacterStandWidget = require(script.Parent.StudioCharacterStandWidget)
+
+local TestStand = {}
+TestStand.__index = TestStand
+
+function TestStand.new(services: any): any
+    local self = setmetatable({
+        plugin = services.plugin,
+        workspace = services.Workspace,
+        runService = services.RunService,
+        assetService = services.AssetService,
+        selection = services.Selection,
+        history = services.ChangeHistoryService,
+        mouse = services.plugin:GetMouse(),
+        profiles = {},
+        selectedIndex = 1,
+        draft = nil,
+        busy = false,
+        placing = false,
+        destroyed = false,
+        connections = {},
+    }, TestStand)
+    self.ui = StudioCharacterStandWidget.new(services.plugin)
+    self.button = services.toolbar:CreateButton("Game1CharacterStand", "Assemble & place test characters", "", "Character Stand")
+    self.button.ClickableWhenViewportHidden = true
+
+    table.insert(self.connections, self.button.Click:Connect(function()
+        self.ui.dock.Enabled = not self.ui.dock.Enabled
+        if self.ui.dock.Enabled then self:RefreshProfiles() end
+    end))
+    table.insert(self.connections, self.ui.profile.MouseButton1Click:Connect(function()
+        if self.busy or self.placing then return end
+        self.selectedIndex = self.selectedIndex % math.max(1, #self.profiles) + 1
+        self:SelectProfile()
+    end))
+    table.insert(self.connections, self.ui.build.MouseButton1Click:Connect(function()
+        self:Assemble()
+    end))
+    table.insert(self.connections, self.ui.place.MouseButton1Click:Connect(function()
+        self:BeginPlacement()
+    end))
+    table.insert(self.connections, self.mouse.Button1Down:Connect(function()
+        self:PlaceAtMouse()
+    end))
+    table.insert(self.connections, services.plugin.Deactivation:Connect(function()
+        if self.placing then self:CancelPlacement("Размещение отменено.") end
+    end))
+    table.insert(self.connections, services.plugin.Unloading:Connect(function()
+        self:Destroy()
+    end))
+    table.insert(self.connections, self.ui.dock:GetPropertyChangedSignal("Enabled"):Connect(function()
+        if not self.ui.dock.Enabled and self.placing then self:CancelPlacement("Размещение отменено.") end
+    end))
+    return self
+end
+
+function TestStand:SetStatus(text: string)
+    if not self.destroyed then self.ui.status.Text = text end
+end
+
+function TestStand:SelectProfile()
+    local profile = self.profiles[self.selectedIndex]
+    self.ui.profile.Text = if profile then profile.label .. "  ▾" else "Нет опубликованных профилей"
+    if self.draft then
+        self.draft:Destroy()
+        self.draft = nil
+    end
+    if profile then self:SetStatus("Выбран: " .. profile.id .. ". Нажми «Собрать персонажа».") end
+end
+
+function TestStand:RefreshProfiles()
+    if self.busy or self.placing then return end
+    local old = self.profiles[self.selectedIndex]
+    local oldId = old and old.id
+    local ok, profiles = pcall(StudioCharacterStandBuilder.Profiles)
+    if not ok then
+        self:SetStatus("CharacterRegistry: " .. tostring(profiles))
+        return
+    end
+    self.profiles = profiles
+    self.selectedIndex = 1
+    if oldId then
+        for index, profile in ipairs(profiles) do
+            if profile.id == oldId then self.selectedIndex = index; break end
+        end
+    end
+    local selected = self.profiles[self.selectedIndex]
+    self.ui.profile.Text = if selected then selected.label .. "  ▾" else "Нет опубликованных профилей"
+    if self.draft and selected and tostring(self.draft:GetAttribute("Game1AnimationProfileId")) == selected.id then
+        self:SetStatus("Собран: " .. selected.id .. ". Нажми «Поставить на поверхность».")
+    else
+        self:SelectProfile()
+    end
+end
+
+function TestStand:Assemble()
+    if self.destroyed or self.busy or self.placing or self.runService:IsRunning() then
+        self:SetStatus("Сборка доступна только в режиме Edit.")
+        return
+    end
+    local profile = self.profiles[self.selectedIndex]
+    if not profile then self:SetStatus("Сначала выбери опубликованный профиль."); return end
+    self.busy = true
+    self.ui.build.Active = false
+    self:SetStatus("Загружаю опубликованные Model Assets: " .. profile.id .. "…")
+    task.spawn(function()
+        local ok, result = xpcall(function()
+            return StudioCharacterStandBuilder.Build(self.assetService, profile)
+        end, debug.traceback)
+        self.busy = false
+        self.ui.build.Active = true
+        if self.destroyed then
+            if ok then result:Destroy() end
+            return
+        end
+        if not ok then
+            self:SetStatus("Сборка не удалась: " .. tostring(result))
+            warn("[game1][character-stand] assembly failed", result)
+            return
+        end
+        if self.draft then self.draft:Destroy() end
+        self.draft = result
+        self:SetStatus("Собран: " .. profile.id .. ". Нажми «Поставить», затем кликни по поверхности.")
+    end)
+end
+
+function TestStand:BeginPlacement()
+    if self.destroyed or self.busy or self.runService:IsRunning() or not self.draft then
+        self:SetStatus("Сначала собери персонажа в режиме Edit.")
+        return
+    end
+    self.placing = true
+    self:SetStatus("Кликни по поверхности в Workspace. Esc отменяет. Можно ставить несколько копий.")
+    self.plugin:Activate(true)
+end
+
+function TestStand:CancelPlacement(text: string)
+    self.placing = false
+    if not self.destroyed then self:SetStatus(text) end
+end
+
+function TestStand:PlaceAtMouse()
+    if not self.placing or self.busy or self.destroyed or self.runService:IsRunning() then return end
+    local ray = self.mouse.UnitRay
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    local stands = self.workspace:FindFirstChild("Game1CharacterTestStands")
+    params.FilterDescendantsInstances = if stands then {stands} else {}
+    local hit = self.workspace:Raycast(ray.Origin, ray.Direction * 2048, params)
+    if not hit then
+        self:SetStatus("Нет поверхности под курсором. Выбери Part или Terrain.")
+        return
+    end
+    if hit.Normal.Y < 0.6 then
+        self:SetStatus("Нужна горизонтальная поверхность (пол или Terrain).")
+        return
+    end
+    local recordingOk, recording = pcall(function()
+        return self.history:TryBeginRecording("Place Character Test Stand")
+    end)
+    if not recordingOk or not recording then
+        self:SetStatus("Undo недоступен: завершить другое редактирование и повторить.")
+        return
+    end
+    local ok, model = pcall(StudioCharacterStandPlacement.Place, self.draft, hit.Position, self.workspace)
+    local finished, finishError = pcall(function()
+        self.history:FinishRecording(recording, if ok then Enum.FinishRecordingOperation.Commit else Enum.FinishRecordingOperation.Cancel)
+    end)
+    if not finished then warn("[game1][character-stand] undo recording failed", finishError) end
+    if not ok then
+        self:SetStatus("Размещение не удалось: " .. tostring(model))
+        warn("[game1][character-stand] placement failed", model)
+        return
+    end
+    self.placing = false
+    self.plugin:Deactivate()
+    self.selection:Set({model})
+    self:SetStatus(model.Name .. " размещён. В Studio Play подойди к модели и нажми E.")
+end
+
+function TestStand:Destroy()
+    if self.destroyed then return end
+    self.destroyed = true
+    self.placing = false
+    if self.draft then self.draft:Destroy(); self.draft = nil end
+    for _, connection in ipairs(self.connections) do connection:Disconnect() end
+end
+
+return table.freeze(TestStand)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="17">
+        <Properties>
           <string name="Name">StudioDebugPreferenceBridge</string>
           <string name="Source"><![CDATA[-- Studio-only persistence bridge for Test Loadout preferences.
 -- Owns plugin settings, replicated attributes and their connections.
@@ -2575,7 +3068,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="14">
+      <Item class="ModuleScript" referent="18">
         <Properties>
           <string name="Name">StudioDecoSyncCommands</string>
           <string name="Source"><![CDATA[-- Transport-only adapter for DecoManager's existing registry/material refresh.
@@ -2635,7 +3128,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="15">
+      <Item class="ModuleScript" referent="19">
         <Properties>
           <string name="Name">StudioMarkerVisibility</string>
           <string name="Source"><![CDATA[-- Studio-only presentation toggle. No movement of markers, no metadata edits.
@@ -2779,7 +3272,7 @@ return table.freeze(Visibility)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="16">
+      <Item class="ModuleScript" referent="20">
         <Properties>
           <string name="Name">StudioModelLoadCommands</string>
           <string name="Source"><![CDATA[-- Studio model-sync command: validates and imports Character, Monster/NPC and Weapon models.
@@ -3346,7 +3839,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="17">
+      <Item class="ModuleScript" referent="21">
         <Properties>
           <string name="Name">StudioPlotsCatalog</string>
           <string name="Source"><![CDATA[-- Read-only discovery contract for authored Workspace.Plots/01..50.
@@ -3408,7 +3901,7 @@ return table.freeze(Catalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="18">
+      <Item class="ModuleScript" referent="22">
         <Properties>
           <string name="Name">StudioPlotsPartPolicy</string>
           <string name="Source"><![CDATA[-- Reversible, Studio-only properties for Plots visibility and playtest preview.
@@ -3493,7 +3986,7 @@ return table.freeze(Policy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="19">
+      <Item class="ModuleScript" referent="23">
         <Properties>
           <string name="Name">StudioPlotsSelectionFilter</string>
           <string name="Source"><![CDATA[-- Studio viewport hit-test filter for hidden Plots authoring geometry.
@@ -3583,7 +4076,7 @@ return table.freeze(Filter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="20">
+      <Item class="ModuleScript" referent="24">
         <Properties>
           <string name="Name">StudioPlotsVisibility</string>
           <string name="Source"><![CDATA[-- Studio-only Plots preview: hidden -> volumes -> volumes + numbers -> hidden.
@@ -3877,7 +4370,7 @@ return table.freeze(PlotsVisibility)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="21">
+      <Item class="ModuleScript" referent="25">
         <Properties>
           <string name="Name">StudioRealEstateCollisionPolicy</string>
           <string name="Source"><![CDATA[-- Real Estate physics layer. Pure mesh naming + one writer for physics flags.
@@ -3937,7 +4430,7 @@ return table.freeze(Policy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="22">
+      <Item class="ModuleScript" referent="26">
         <Properties>
           <string name="Name">StudioRealEstateHouseFrame</string>
           <string name="Source"><![CDATA[-- Author-space transform for all Real Estate Studio sync paths.
@@ -3976,7 +4469,7 @@ return table.freeze(HouseFrame)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="23">
+      <Item class="ModuleScript" referent="27">
         <Properties>
           <string name="Name">StudioRealEstateModel</string>
           <string name="Source"><![CDATA[-- Studio assembly for any number of independent Real Estate MeshPart rigs.
@@ -4260,7 +4753,7 @@ return table.freeze(StudioRealEstateModel)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="24">
+      <Item class="ModuleScript" referent="28">
         <Properties>
           <string name="Name">StudioRealEstatePartPlacement</string>
           <string name="Source"><![CDATA[-- Restore source-FBX mesh centres after independent Model Asset import.
@@ -4384,7 +4877,7 @@ return table.freeze(Placement)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="25">
+      <Item class="ModuleScript" referent="29">
         <Properties>
           <string name="Name">StudioRealEstatePartSync</string>
           <string name="Source"><![CDATA[-- Atomic, single-rig refresh of a managed Real Estate template.
@@ -4618,7 +5111,7 @@ return table.freeze(PartSync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="26">
+      <Item class="ModuleScript" referent="30">
         <Properties>
           <string name="Name">StudioRealEstatePlacedCollisionSync</string>
           <string name="Source"><![CDATA[-- Repair *only* authoring-managed collision rigs of already placed Estates.
@@ -4693,7 +5186,7 @@ return table.freeze(Sync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="27">
+      <Item class="ModuleScript" referent="31">
         <Properties>
           <string name="Name">StudioRealEstatePlacedTargets</string>
           <string name="Source"><![CDATA[-- One authoritative definition of a placed Real Estate instance.
@@ -4738,7 +5231,7 @@ return table.freeze(Targets)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="28">
+      <Item class="ModuleScript" referent="32">
         <Properties>
           <string name="Name">StudioRealEstatePlacedVisualSync</string>
           <string name="Source"><![CDATA[-- Full Real Estate sync: refresh visual rigs on *all managed placed* houses.
@@ -4857,7 +5350,7 @@ return table.freeze(VisualSync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="29">
+      <Item class="ModuleScript" referent="33">
         <Properties>
           <string name="Name">StudioRealEstateRigValidation</string>
           <string name="Source"><![CDATA[-- Validate an already-published Real Estate Model Asset as actually loaded by Roblox.
@@ -4986,7 +5479,7 @@ return table.freeze(Validation)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="30">
+      <Item class="ModuleScript" referent="34">
         <Properties>
           <string name="Name">StudioTextureAppearance</string>
           <string name="Source"><![CDATA[-- Shared Studio-side material binding for all authored MeshParts.
@@ -5048,7 +5541,7 @@ return table.freeze(StudioTextureAppearance)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="31">
+      <Item class="ModuleScript" referent="35">
         <Properties>
           <string name="Name">StudioTimelineEditorCommands</string>
           <string name="Source"><![CDATA[-- Timeline authoring session: validates requests, binds UI events and reports results.
@@ -5337,7 +5830,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="32">
+      <Item class="ModuleScript" referent="36">
         <Properties>
           <string name="Name">StudioTimelinePoseSampler</string>
           <string name="Source"><![CDATA[-- Offline pose extraction and interpolation for a preview rig. No UI or HTTP dependencies.
@@ -5516,7 +6009,7 @@ return table.freeze(StudioTimelinePoseSampler)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="33">
+      <Item class="ModuleScript" referent="37">
         <Properties>
           <string name="Name">StudioTimelinePreview</string>
           <string name="Source"><![CDATA[-- Owns the isolated ViewportFrame rig, camera interaction and animation-asset retrieval.
@@ -5732,7 +6225,7 @@ return table.freeze(StudioTimelinePreview)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="34">
+      <Item class="ModuleScript" referent="38">
         <Properties>
           <string name="Name">StudioTimelineTransport</string>
           <string name="Source"><![CDATA[-- HTTP boundary for the Timeline editor. No UI, animation or Studio model access.
@@ -5790,7 +6283,7 @@ return table.freeze(StudioTimelineTransport)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="35">
+      <Item class="ModuleScript" referent="39">
         <Properties>
           <string name="Name">StudioTimelineWidget</string>
           <string name="Source"><![CDATA[-- Timeline editor view. Builds the dock widget and exposes only its controls.

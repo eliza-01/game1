@@ -195,7 +195,7 @@ local function normalizeTemplate(template: Model): (Model, Model)
         if object:IsA("Humanoid") then
             object:Destroy()
         elseif object:IsA("BasePart") then
-            object.Anchored = false
+            object.Anchored = object:GetAttribute("Game1HairAttachment") == true
             object.CanCollide = false
             object.CanTouch = false
             object.CanQuery = false

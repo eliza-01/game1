@@ -13,8 +13,8 @@ local CharacterStatsService = require(script.Parent.Parent:WaitForChild("charact
 local WeaponEquipService = {}
 local EQUIPPED_NAME = "EquippedWeapon"
 
-local RIGHT_SOCKET_NAMES = { "Weapon_R_Bone", "weapon_r", "Weapon_R", "WeaponR" }
-local LEFT_SOCKET_NAMES = { "Weapon_L_Bone", "weapon_l", "Weapon_L", "WeaponL" }
+local RIGHT_SOCKET_NAMES = { "weapon_grip_r", "Weapon_R_Bone", "weapon_r", "Weapon_R", "WeaponR" }
+local LEFT_SOCKET_NAMES = { "weapon_grip_l", "Weapon_L_Bone", "weapon_l", "Weapon_L", "WeaponL" }
 local WEAPON_GRIP_NAME = "Game1WeaponGrip"
 local WEAPON_EQUIP_ROTATION = CFrame.Angles(math.rad(-90), 0, 0)
 

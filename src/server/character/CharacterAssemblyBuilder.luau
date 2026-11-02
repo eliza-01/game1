@@ -4,6 +4,7 @@
 local CharacterAtlasBinder = require(script.Parent:WaitForChild("CharacterAtlasBinder"))
 local Builder = {}
 local slots = { "upper", "lower", "gloves", "boots", "head", "eyes", "eyebrows", "hair" }
+local HAIR_GRIP_NAME = "CharacterMount"
 
 local function meshFromAsset(asset: Model, expectedName: string): MeshPart
     local meshes = {}
@@ -32,6 +33,31 @@ local function configure(mesh: BasePart)
     mesh.CanTouch = false
     mesh.CanQuery = false
     mesh.Massless = true
+end
+
+local function targetSocketCFrame(targetBone: Bone): CFrame
+    local parent = targetBone.Parent
+    if parent and parent:IsA("Bone") then
+        return parent.TransformedWorldCFrame * targetBone.CFrame
+    end
+    return targetBone.WorldCFrame
+end
+
+local function createCanonicalHairGrip(mesh: MeshPart): Attachment
+    -- Match the weapon attachment contract: preserve the authored grip point,
+    -- while the grip basis stays in world XYZ instead of inheriting PivotOffset.
+    local gripPoint = mesh:GetPivot().Position
+    local grip = Instance.new("Attachment")
+    grip.Name = HAIR_GRIP_NAME
+    grip.CFrame = mesh.CFrame:ToObjectSpace(CFrame.new(gripPoint))
+    grip:SetAttribute("Game1HairGrip", true)
+    grip.Parent = mesh
+    return grip
+end
+
+local function alignHairToSocket(mesh: MeshPart, grip: Attachment, socketFrame: CFrame)
+    local delta = socketFrame * grip.WorldCFrame:Inverse()
+    mesh:PivotTo(delta * mesh:GetPivot())
 end
 
 function Builder.Build(recipe: any, loadAsset: (number) -> Model?): Model
@@ -77,27 +103,34 @@ function Builder.Build(recipe: any, loadAsset: (number) -> Model?): Model
             local incoming = bonesIn(mesh)
             if part.attachment ~= "" then
                 local target = assert(canonical[part.attachment], "missing attachment " .. part.attachment)
+                local anchor: Attachment
+                local runtimeHairGrip = false
                 if part.attachment_mode == "pivot" then
                     assert(slot == "hair" and part.attachment == "hair_mount", "invalid rigid hair mount")
                     assert(#part.used_bones == 0 and next(incoming) == nil, "rigid hair must not contain skin bones")
-                    -- A rigid hairstyle is authored around its MeshPart pivot.
-                    -- PivotTo respects PivotOffset, including pivot orientation;
-                    -- positioning by mesh.CFrame would move the wrong origin.
-                    mesh:PivotTo(target.WorldCFrame)
+                    anchor = createCanonicalHairGrip(mesh)
+                    alignHairToSocket(mesh, anchor, targetSocketCFrame(target))
+                    mesh.Anchored = true
+                    mesh:SetAttribute("Game1HairAttachment", true)
+                    mesh:SetAttribute("HairTargetBoneName", target.Name)
+                    mesh:SetAttribute("HairAttachmentMode", "runtime-canonical-grip-v1")
+                    runtimeHairGrip = true
                 else
                     -- Backward compatible: older hair rigs use a socket Bone.
                     local socket = assert(incoming[part.socket_bone], "missing accessory socket")
                     mesh.CFrame = target.WorldCFrame * socket.WorldCFrame:Inverse() * mesh.CFrame
+                    anchor = Instance.new("Attachment")
+                    anchor.Name = HAIR_GRIP_NAME
+                    anchor.CFrame = mesh.CFrame:ToObjectSpace(target.WorldCFrame)
+                    anchor.Parent = mesh
                 end
-                local anchor = Instance.new("Attachment")
-                anchor.Name = "CharacterMount"
-                anchor.CFrame = mesh.CFrame:ToObjectSpace(target.WorldCFrame)
-                anchor.Parent = mesh
-                local joint = Instance.new("RigidConstraint")
-                joint.Name = "CharacterMountJoint"
-                joint.Attachment0 = target
-                joint.Attachment1 = anchor
-                joint.Parent = mesh
+                if not runtimeHairGrip then
+                    local joint = Instance.new("RigidConstraint")
+                    joint.Name = "CharacterMountJoint"
+                    joint.Attachment0 = target
+                    joint.Attachment1 = anchor
+                    joint.Parent = mesh
+                end
             else
                 -- Import quantization can remove negligible influences and their
                 -- Bone instances. Validate the imported skeleton, not the source

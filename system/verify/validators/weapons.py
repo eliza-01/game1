@@ -66,7 +66,7 @@ def check_weapon_registration(
     weapon_attach_path = ROOT / "src/client/weapon/WeaponAttachmentController.luau"
     weapon_equip_text = weapon_equip_path.read_text(encoding="utf-8") if weapon_equip_path.is_file() else ""
     weapon_attach_text = weapon_attach_path.read_text(encoding="utf-8") if weapon_attach_path.is_file() else ""
-    for required in ["Weapon_R_Bone", "weapon_r", "Weapon_L_Bone", "weapon_l", "AnimationWeaponSet", "statModifiers", "EquipStartup", "GetAvailable", "ListAvailable", "WeaponLoadoutSource", "Game1WeaponGrip", "runtime-canonical-grip-v2", "ensureCanonicalRuntimeGrip", "grip.WorldCFrame:Inverse()"]:
+    for required in ["weapon_grip_r", "weapon_grip_l", "Weapon_R_Bone", "weapon_r", "Weapon_L_Bone", "weapon_l", "AnimationWeaponSet", "statModifiers", "EquipStartup", "GetAvailable", "ListAvailable", "WeaponLoadoutSource", "Game1WeaponGrip", "runtime-canonical-grip-v2", "ensureCanonicalRuntimeGrip", "grip.WorldCFrame:Inverse()"]:
         if required not in weapon_equip_text:
             err(f"weapon equip runtime missing {required}")
     for required in ["Game1WeaponAttachment", "parent.TransformedWorldCFrame * targetBone.CFrame", "weapon:PivotTo", "Game1WeaponGrip", "grip.WorldCFrame:Inverse()"]:

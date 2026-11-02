@@ -152,11 +152,20 @@ class HairImportTests(unittest.TestCase):
 
     def test_runtime_keeps_socket_mode_and_aligns_rigid_pivot(self):
         source = (ROOT.parent / 'src/server/character/CharacterAssemblyBuilder.luau').read_text()
-        self.assertIn('mesh:PivotTo(target.WorldCFrame)', source)
+        rig_service = (ROOT.parent / 'src/server/character/CharacterRigService.luau').read_text()
+        controller = (ROOT.parent / 'src/client/character/HairAttachmentController.luau').read_text()
+        self.assertIn('grip.CFrame = mesh.CFrame:ToObjectSpace(CFrame.new(gripPoint))', source)
+        self.assertIn('local delta = socketFrame * grip.WorldCFrame:Inverse()', source)
+        self.assertIn('alignHairToSocket(mesh, anchor, targetSocketCFrame(target))', source)
+        self.assertIn('mesh:SetAttribute("Game1HairAttachment", true)', source)
+        self.assertIn('mesh.Anchored = true', source)
         self.assertIn('mesh.CFrame:ToObjectSpace(target.WorldCFrame)', source)
         self.assertIn('local socket = assert(incoming[part.socket_bone]', source)
         self.assertIn('joint.Attachment0 = target', source)
         self.assertIn('joint.Attachment1 = anchor', source)
+        self.assertIn('RunService.RenderStepped:Connect(update)', controller)
+        self.assertIn('local delta = socketFrame * state.grip.WorldCFrame:Inverse()', controller)
+        self.assertIn('object.Anchored = object:GetAttribute("Game1HairAttachment") == true', rig_service)
 
 
 if __name__ == '__main__':

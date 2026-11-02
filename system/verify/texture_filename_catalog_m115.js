@@ -20,6 +20,7 @@ function evaluate(script) {
     document:{createElement(tag){return {tag,innerHTML:'',value:'',textContent:'',className:'',children:[],appendChild(item){this.children.push(item);},querySelector(selector){return selector === "[data-retry]" ? null : {onclick:null};},querySelectorAll(){return []}};}},
     request(){},toast(){},game1SyncPublicationDescription(){},
   });
+  vm.runInContext(fs.readFileSync(path.join(root,'atlas-identity.js'),'utf8'),context);
   vm.runInContext(fs.readFileSync(path.join(root,script),'utf8'),context,{filename:script});
   return {context, get};
 }
@@ -32,14 +33,14 @@ function evaluate(script) {
      slug:'house_level5_01',filename:'Villa_Atlas.webp',assetId:'55556'}]};
     realEstateState.reuseFilters.house={query:'atlas 4',category:''};`,context);
   let html = vm.runInContext('realEstateReuseOptions("house")',context);
-  assert.match(html, /Granite Wall · Custom Atlas 4.PNG · 12345/);
+  assert.match(html, /Custom Atlas 4 · 12345/);
   assert.doesNotMatch(html, /Villa_Atlas/);
   vm.runInContext('realEstateState.reuseFilters.house.query="granite_wall"',context);
   html = vm.runInContext('realEstateReuseOptions("house")',context);
-  assert.match(html,/Granite Wall · Custom Atlas 4.PNG · 12345/);
-  vm.runInContext('realEstateState.reuseFilters.house.query="villa_atlas"',context);
+  assert.doesNotMatch(html,/Custom Atlas 4/); // model slug is not atlas identity
+  vm.runInContext('realEstateState.reuseFilters.house.query="villa"',context);
   html = vm.runInContext('realEstateReuseOptions("house")',context);
-  assert.match(html,/house_level5_01 \/ house · Villa_Atlas.webp · 55556/);
+  assert.match(html,/Villa · 55556/);
   assert.doesNotMatch(html, /Granite Wall/);
   vm.runInContext(`realEstateState.data.items=[{slug:'house_level5_01', house_level:5,variant:'01',
     status:'PUBLISHED', meshParts:['house','door'], textures:{
@@ -54,7 +55,7 @@ function evaluate(script) {
   assert.match(library,/model<\/span><code>66<\/code>/);
   assert.match(library,/image<\/span><code>99<\/code>/);
   html = vm.runInContext('realEstateReuseOptions("door")',context);
-  assert.match(html,/this Estate \/ house · house.png · 88/);
+  assert.match(html,/house · 88/);
 }
 {
   const {context,get}=evaluate('deco-assets.js');
@@ -68,10 +69,10 @@ function evaluate(script) {
   vm.runInContext('decoAssetRenderTextureReferences()',context);
   const options=get('location-asset-texture-reference').children;
   assert.equal(options.length,1);
-  assert.equal(options[0].label, 'Legacy texture reuse (compatibility only)');
+  assert.equal(options[0].label, 'Existing atlases · compatible references');
   assert.equal(options[0].children[0].value,'legacy:granite_wall');
-  assert.match(options[0].children[0].textContent,/Atlas \(Original\)\.png · 12345/);
+  assert.match(options[0].children[0].textContent,/Atlas \(Original\) · 12345/);
   vm.runInContext('decoAssetRender()',context);
-  assert.match(get('location-asset-rows').children[0].innerHTML, /Granite Wall<\/b><small>granite_wall<\/small><small class="deco-texture-filename">Atlas \(Original\)\.png/);
+  assert.match(get('location-asset-rows').children[0].innerHTML, /Granite Wall<\/b><small>granite_wall<\/small><small class="deco-texture-filename">Atlas \(Original\)/);
 }
 console.log('M115 browser-side labels, search and house asset grouping: passed');

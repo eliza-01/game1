@@ -90,7 +90,9 @@ class TextureFilenameCatalogTests(unittest.TestCase):
         self.assertEqual(len(refs), 1)
         entry = refs[0]
         self.assertEqual(entry['reference'], 'location:granite')
-        self.assertEqual(entry['label'], 'Granite Wall')
+        self.assertEqual(entry['label'], 'Granite Atlas (final)')
+        self.assertEqual(entry['atlasName'], 'Granite Atlas (final)')
+        self.assertEqual(entry['atlasVersion'], '')
         self.assertEqual(entry['slug'], 'granite')
         self.assertEqual(entry['filename'], self.texture.name)
         self.assertEqual(entry['assetId'], '99012')

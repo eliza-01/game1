@@ -29,7 +29,7 @@ def check_source_only_contract(
     # migration became authoritative.
     for required in [
         "model_path TEXT NOT NULL DEFAULT ''",
-        "texture_path TEXT NOT NULL DEFAULT ''",
+        "self.atlases.binding",
         'self.root / "assets/source/location-assets"',
     ]:
         if required not in location_asset_store_text:
@@ -51,19 +51,17 @@ def check_source_only_contract(
         for row in location_asset_manifest.get("items") or []:
             if not str(row.get("model_path") or "").startswith("assets/source/location-assets/"):
                 report_error(f"m52 Location Asset model path is not canonical source-only: {row.get('slug')}")
-            if not str(row.get("texture_reference_slug") or ""):
-                # Atlas Registry owns canonical shared sources independently of the
-                # Location Asset model folder (m125+). Both live under assets/source.
-                expected_prefix = ("assets/source/texture-atlases/" if row.get("atlasVariantId")
-                                   else "assets/source/location-assets/")
-                if not str(row.get("texture_path") or "").startswith(expected_prefix):
-                    report_error(f"m52 owned Location Asset texture path is not canonical source-only: {row.get('slug')}")
+            if row.get('atlasVariantId') and not str(row.get('texture_path') or '').startswith('assets/source/texture-atlases/'):
+                # Checked-in generated manifests may contain M201 registrations
+                # until the first post-migration Control Center export.
+                if not str(row.get('texture_path') or '').startswith('assets/source/location-assets/'):
+                    report_error(f"m203 Location Asset atlas source is noncanonical: {row.get('slug')}")
             for legacy_field in ("model_source_path", "model_prepared_path", "texture_source_path", "texture_prepared_path"):
                 if legacy_field in row:
                     report_error(f"m52 manifest still exports legacy field {legacy_field}: {row.get('slug')}")
 
-    if "row.texture_path" not in deco_assets_js_text or "row.texture_source_path" in deco_assets_js_text:
-        report_error("m52 Location Assets UI must use source-only texture_path")
+    if "decoAssetTextureFilename(row)" not in deco_assets_js_text or "row.texture_source_path" in deco_assets_js_text:
+        report_error("m203 Location Assets UI must use the atlas-projected source path")
 
     # m53 project-wide source-only storage. Active asset bytes live only in
     # assets/source. Compatibility DB columns may remain for old query shapes,

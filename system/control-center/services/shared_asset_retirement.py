@@ -1,13 +1,13 @@
 """Cross-store deletion impact and explicitly authorized retirement orchestration.
 
-A shared image is an independent publication identity, NOT owned by the model
-that first selected it. Preserve mode retains legacy references without deleting
-any dependent model. Cascade mode retires all dependent registrations first.
+Images belong exclusively to Atlas Registry. Model deletion only removes its
+binding; shared consumers are informational and are never cascade targets.
 """
 from __future__ import annotations
 
 import hashlib
 import json
+
 
 
 def _node(kind, slug):
@@ -21,37 +21,29 @@ class SharedAssetRetirement:
         self.jobs = publication_jobs
 
     def _graph(self):
+        """Graph contains only model registrations; atlas use is not ownership."""
         nodes = {}
-        edges = {}
         for row in self.location_assets.list():
             key = _node('location', row['slug'])
-            nodes[key] = {'kind': 'location', 'slug': row['slug'], 'label': row.get('name_en') or row['slug'],
-                          'revision': int(row.get('revision') or 0),
-                          'textureId': str(row.get('texture_asset_id') or ''),
-                          'textureReference': str(row.get('texture_reference_slug') or ''),
-                          'atlasBindingRevision': int(row.get('bindingRevision') or 0)}
-            ref = str(row.get('texture_reference_slug') or '')
-            # A direct AtlasRegistry binding supersedes historical owner reuse.
-            if ref and not self.location_assets.atlases.binding('location_asset', row['slug']):
-                edges.setdefault(_node('location', ref), []).append((key, 'texture', ''))
+            nodes[key] = {'kind': 'location', 'slug': row['slug'],
+                'label': row.get('name_en') or row['slug'],
+                'revision': int(row.get('revision') or 0),
+                'textureId': str(row.get('texture_asset_id') or ''),
+                'textureFilename': str(row.get('texture_filename') or ''),
+                'atlasKey': str(row.get('atlasFamily') or ''),
+                'atlasVariantId': int(row.get('atlasVariantId') or 0),
+                'atlasBindingRevision': int(row.get('bindingRevision') or 0)}
         for row in self.real_estate.list():
             key = _node('estate', row['slug'])
-            nodes[key] = {'kind': 'estate', 'slug': row['slug'], 'label': row['slug'],
-                          'revision': int(row.get('revision') or 0),
-                          'textures': {part: {'reuseReference': str(tex.get('reuseReference') or ''),
-                                              'assetId': str(tex.get('assetId') or ''),
-                                              'atlasBindingRevision': int(tex.get('atlasBindingRevision') or 0)}
-                                       for part, tex in row.get('textures', {}).items()}}
-            for part, texture in row.get('textures', {}).items():
-                ref = str(texture.get('reuseReference') or '')
-                if ref.startswith('location:'):
-                    owner = ref
-                elif ref.startswith('estate:'):
-                    owner = _node('estate', ref.split(':', 2)[1])
-                else:
-                    continue
-                edges.setdefault(owner, []).append((key, part, ref.split(':', 2)[2] if ref.startswith('estate:') else ''))
-        return nodes, edges
+            nodes[key] = {'kind': 'estate', 'slug': row['slug'],
+                'label': row['slug'], 'revision': int(row.get('revision') or 0),
+                'textures': {part: {'assetId': str(tex.get('assetId') or ''),
+                    'filename': str(tex.get('filename') or ''),
+                    'atlasKey': str(tex.get('atlasKey') or ''),
+                    'atlasVariantId': int(tex.get('atlasVariantId') or 0),
+                    'atlasBindingRevision': int(tex.get('atlasBindingRevision') or 0)}
+                    for part,tex in row.get('textures',{}).items()}}
+        return nodes, {}
 
     def plan(self, kind: str, slug: str) -> dict:
         if kind not in ('location', 'estate'):
@@ -78,8 +70,44 @@ class SharedAssetRetirement:
             ordered.append(node)
 
         walk(root)
-        # Root is last. All dependents are retired before the owners they refer to.
-        payload = {'root': root, 'nodes': [nodes[n] for n in ordered], 'relations': relations}
+        # Central Atlas Registry separates shared-use visibility from legacy
+        # owner/dependent deletion edges. A consumer of the same published
+        # image must NEVER become a cascade-delete target merely for sharing it.
+        owned = nodes[root]
+        images = ([{'assetId': owned['textureId'], 'filename': owned['textureFilename'],
+                    'atlasKey': owned['atlasKey'],
+                    'atlasVariantId': owned['atlasVariantId']}] if kind == 'location' else
+                  list(owned['textures'].values()))
+        shared_uses = []
+        seen_ids = set()
+        for image in images:
+            image_id = str(image.get('assetId') or '')
+            variant_id = int(image.get('atlasVariantId') or 0)
+            identity = ('variant', variant_id) if variant_id else ('image', image_id)
+            if identity in seen_ids or (not variant_id and not image_id):
+                continue
+            seen_ids.add(identity)
+            uses = []
+            for key, other in nodes.items():
+                if key == root:
+                    continue
+                if other['kind'] == 'location':
+                    if ((variant_id and int(other.get('atlasVariantId') or 0) == variant_id)
+                            or (not variant_id and str(other.get('textureId') or '') == image_id)):
+                        uses.append({'dependent': key, 'part': 'texture'})
+                else:
+                    for part, texture in other['textures'].items():
+                        if ((variant_id and int(texture.get('atlasVariantId') or 0) == variant_id)
+                                or (not variant_id and str(texture.get('assetId') or '') == image_id)):
+                            uses.append({'dependent': key, 'part': part})
+            if uses:
+                shared_uses.append({'assetId': image_id, 'variantId': variant_id,
+                    'filename': image.get('filename') or '',
+                    'atlasKey': image.get('atlasKey') or '', 'uses': uses})
+        # Root is last. All legacy dependents are retired before their owners;
+        # independently bound atlas consumers are informational only.
+        payload = {'root': root, 'nodes': [nodes[n] for n in ordered],
+                   'relations': relations, 'sharedAtlasUses': shared_uses}
         token = hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
         return {**payload, 'dependentCount': len(ordered)-1, 'token': token,
                 'defaultMode': 'preserve', 'sourceFilesPreserved': True}
@@ -105,23 +133,18 @@ class SharedAssetRetirement:
             raise ValueError('dependencies changed; review the deletion dialog again')
         entries = plan['nodes'] if mode == 'all' else [plan['nodes'][-1]]
         self._check_ready(entries)
+        # Shared atlas use is informational, not a deletion edge. There are
+        # no owner registrations and nothing to detach before deleting models.
         deleted = []
         for entry in entries:
             key = _node(entry['kind'], entry['slug'])
-            # Retain only references still needed by surviving consumers.
-            if mode == 'preserve':
-                referenced = [r for r in plan['relations'] if r['owner'] == key]
-            else:
-                referenced = []
             if entry['kind'] == 'estate':
-                parts = {r['ownerPart'] for r in referenced}
-                result = self.real_estate.delete(entry['slug'], retain_parts=parts)
+                result = self.real_estate.delete(entry['slug'])
             else:
-                result = self.location_assets.delete(entry['slug'],
-                                                     retain_shared=bool(referenced))
+                result = self.location_assets.delete(entry['slug'])
             deleted.append({'kind': entry['kind'], 'slug': entry['slug'],
                             'archive': (result or {}).get('archived', '')})
         return {'ok': True, 'mode': mode, 'deleted': deleted,
                 'dependentCount': plan['dependentCount'],
-                'sharedImagesPreserved': mode == 'preserve',
+                'sharedImagesPreserved': True,
                 'sourceFilesPreserved': True}

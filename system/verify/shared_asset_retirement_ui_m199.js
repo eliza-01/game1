@@ -18,7 +18,7 @@ const calls=[];let done=0;
 const plan={root:'estate:house_level4_01',dependentCount:3,token:'safe-token',
  nodes:[{kind:'estate',slug:'house_level5_01'}, {kind:'estate',slug:'house_level6_01'},
   {kind:'estate',slug:'house_level7_01'},
-  {kind:'estate',slug:'house_level4_01',textures:{house:{assetId:'130840873415092'},roof:{assetId:'456'}}}],
+  {kind:'estate',slug:'house_level4_01',textures:{house:{assetId:'130840873415092',filename:'house_01_512x512_atlas.png'},roof:{assetId:'456',filename:'roof_01_256x256_atlas.png'}}}],
  relations:[
   {owner:'estate:house_level4_01',ownerPart:'house',dependent:'estate:house_level5_01',part:'door'},
   {owner:'estate:house_level4_01',ownerPart:'house',dependent:'estate:house_level5_01',part:'windows'},
@@ -31,7 +31,10 @@ async function request(path,args){
  calls.push(JSON.parse(args.body));
  return {deleted:[{slug:args.body.slug}]};
 }
-const window={};vm.runInNewContext(fs.readFileSync(process.argv[2],'utf8'),{document,window,request});
+const window={};
+const context=vm.createContext({document,window,request});
+vm.runInContext(fs.readFileSync(process.argv[3],'utf8'),context);
+vm.runInContext(fs.readFileSync(process.argv[2],'utf8'),context);
 (async()=>{
  await window.game1AssetRetirement.open({kind:'estate',slug:'house_level4_01',onDone:async()=>{done++}});
  assert.equal(radio[0].checked,true);
@@ -41,15 +44,15 @@ const window={};vm.runInNewContext(fs.readFileSync(process.argv[2],'utf8'),{docu
  const depChildren=selector('[data-retirement-dependencies]').children;
  const groups=depChildren.filter(child=>child.className==='shared-asset-retirement-source');
  assert.equal(groups.length,2,'two different reused source textures must be separated');
- const house=groups.find(child=>child.children[0].textContent==='Shared atlas · house_level4_01 / house');
- const roof=groups.find(child=>child.children[0].textContent==='Shared atlas · house_level4_01 / roof');
+ const house=groups.find(child=>child.children[0].textContent==='Shared atlas · house_01');
+ const roof=groups.find(child=>child.children[0].textContent==='Shared atlas · roof_01');
  assert.ok(house);assert.ok(roof);
- assert.equal(house.children[1].textContent,'Image Asset ID: 130840873415092');
+ assert.equal(house.children[1].textContent,'house · variant 01 · 512×512 · Image Asset ID: 130840873415092');
  assert.equal(house.children[2].textContent,'Used by 3 part(s) in 2 registration(s):');
  assert.deepEqual(house.children[3].children.map(li=>li.textContent),[
   'estate:house_level5_01 / door','estate:house_level5_01 / windows',
   'estate:house_level6_01 / door']);
- assert.equal(roof.children[1].textContent,'Image Asset ID: 456');
+ assert.equal(roof.children[1].textContent,'roof · variant 01 · 256×256 · Image Asset ID: 456');
  assert.equal(roof.children[3].children.length,1);
  await selector('[data-retirement-submit]').onclick();
  assert.equal(calls[0].mode,'preserve');assert.equal(calls[0].token,'safe-token');
@@ -74,13 +77,13 @@ const window={};vm.runInNewContext(fs.readFileSync(process.argv[2],'utf8'),{docu
  // Location dependency must resolve the source as a texture, not a model part.
  nextPlan={root:'location:tree_01',dependentCount:1,token:'location-token',
   nodes:[{kind:'estate',slug:'house_level4_01'},
-    {kind:'location',slug:'tree_01',textureId:'987654321'}],
+    {kind:'location',slug:'tree_01',textureId:'987654321',textureFilename:'structures_01_1024x512_atlas.png'}],
   relations:[{owner:'location:tree_01',ownerPart:'',dependent:'estate:house_level4_01',part:'door'}]};
  await window.game1AssetRetirement.open({kind:'location',slug:'tree_01',onDone:async()=>{done++}});
  const locationGroups=selector('[data-retirement-dependencies]').children.filter(child=>child.className==='shared-asset-retirement-source');
  assert.equal(locationGroups.length,1);
- assert.equal(locationGroups[0].children[0].textContent,'Shared atlas · tree_01 / texture');
- assert.equal(locationGroups[0].children[1].textContent,'Image Asset ID: 987654321');
+ assert.equal(locationGroups[0].children[0].textContent,'Shared atlas · structures_01');
+ assert.equal(locationGroups[0].children[1].textContent,'structures · variant 01 · 1024×512 · Image Asset ID: 987654321');
  assert.equal(selector('[data-retirement-submit]').textContent,'Delete location asset · keep shared assets');
  console.log('m200 modal dynamic actions, grouped reused atlases, estate/location, safe default: OK');
 })().catch(e=>{console.error(e);process.exitCode=1});

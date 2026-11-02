@@ -20,7 +20,9 @@
     for(const group of groups){
       // One visual section per atlas family; retain the same four-column table.
       const heading=document.createElement('tr');heading.className='cp-atlas-family-row';
-      const title=text('th',`${group.atlasKey} · ${group.variants.length} resolution(s)`);
+      const identity=window.game1AtlasIdentity.describe({atlasKey:group.atlasKey});
+      const title=text('th',`${identity.key} · ${group.variants.length} resolution(s)`+
+        (identity.variant?` · ${identity.name} / variant ${identity.variant}`:''));
       title.colSpan=4;title.scope='rowgroup';heading.append(title);host.append(heading);
       for(const v of group.variants){
         const tr=document.createElement('tr');

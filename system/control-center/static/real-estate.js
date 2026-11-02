@@ -28,7 +28,11 @@ function realEstateStatus(){const row=realEstateSelected();return row?.status||'
 function realEstateMeshLabel(part){return part==='repair'?'restoration (legacy: repair)':part;}
 // Shared naming contract: COL_Floor / house_col / wall_COL_01 are physics-only.
 function realEstateIsCollider(part){return /(?:^|_)col(?:_|$)/i.test(part);}
-function realEstateMeshDefaults(part){return {glass:part.toLowerCase().includes('glass')&&!realEstateIsCollider(part),noCollide:!realEstateIsCollider(part),destructible:false};}
+function realEstateMeshDefaults(part){
+  const name=String(part||'').toLowerCase();
+  const noCollide=!realEstateIsCollider(part)&&name!=='door'&&name!=='window_frames_glass';
+  return {glass:name.includes('glass')&&!realEstateIsCollider(part),noCollide,destructible:false};
+}
 function realEstateRemember(){try{localStorage.setItem(REAL_ESTATE_SELECTED,realEstateState.selected||'');}catch{}}
 function realEstateForm(row){
   realEstateState.selected=row?.slug||null;
@@ -128,34 +132,16 @@ function realEstateOptions(){
   const item=realEstateState.inspect;
   return item ? item.textures||[] : [];
 }
-// Catalog entries retain owner identity. Location categories come from the
-// existing Location Asset registry; the selected item remains visible while
-// the user filters, so filtering can never silently replace a saved reference.
-function realEstateLocationCategories(){
-  const entries=(realEstateState.data?.textureReferences||[]).filter(e=>e.group==='location'||e.reference.startsWith('location:'));
-  const categories=new Map(entries.map(e=>[e.category||'other',e.categoryLabel||e.category||'Other']));
-  return [...categories.entries()].sort((a,b)=>a[1].localeCompare(b[1]));
-}
-// Display identity and file metadata are deliberately separate from the
-// stable reuse reference: changing how options look cannot change ownership.
+// Display names derive from the actual atlas, never from its first model owner.
+// Atlas selection is independent from model registration slugs.
 function realEstateReuseLabel(entry){
-  return [entry.label, entry.filename||String(entry.path||'').split(/[\\/]/).pop()||'unknown file', entry.assetId].join(' · ');
+  return window.game1AtlasIdentity.label({filename:entry.filename||entry.path,
+    atlasKey:entry.group==='atlas'?entry.label:''},{assetId:entry.assetId});
 }
-function realEstateLocalHouseAtlasLabel(){
-  const owner=realEstateSelected()?.textures?.house||{};
-  const current=realEstateState.textures.house||'';
-  const source=(realEstateState.data?.textureReferences||[]).find(e=>e.reference===realEstateState.textureRefs.house);
-  const filename=(source?.filename || (current && current!==owner.path?current.split(/[\\/]/).pop():'') ||
-    owner.filename || current.split(/[\\/]/).pop() || String(owner.path||'').split(/[\\/]/).pop() || 'no texture selected');
-  return ['this Estate / house', filename, source?.assetId||owner.assetId||'not published'].join(' · ');
-}
-// The Atlas Registry catalog is authoritative for published atlas variants.
-// textureReferences is a convenience projection that may omit modern atlases
-// in an older Host Agent response; never make the reuse picker depend on it.
 function realEstatePublishedAtlasChoices(){
   const choices=new Map();
   for(const entry of realEstateState.data?.textureReferences||[]){
-    if((entry.group==='atlas'||String(entry.reference||'').startsWith('atlas:')) && entry.assetId){
+    if((entry.group==='atlas'||String(entry.reference||'').startsWith('atlas:'))&&entry.assetId){
       choices.set(entry.reference,entry);
     }
   }
@@ -170,39 +156,56 @@ function realEstatePublishedAtlasChoices(){
       });
     }
   }
-  return [...choices.values()].sort((a,b)=>
-    String(a.label||'').localeCompare(String(b.label||'')) ||
-    String(a.filename||'').localeCompare(String(b.filename||'')));
+  return [...choices.values()];
 }
 function realEstateReuseOptions(part){
-  const all=realEstateState.data?.textureReferences||[];
   const active=realEstateState.textureRefs[part]||'';
-  const filter=realEstateState.reuseFilters[part]||{category:'',query:''};
-  const query=(filter.query||'').trim().toLocaleLowerCase();
-  const matching=e=>e.reference===active||(!query||
-    [e.label,e.slug,e.filename,e.path,e.reference,e.categoryLabel,e.assetId].some(v=>String(v||'').toLocaleLowerCase().includes(query)));
-  const location=all.filter(e=>(e.group==='location'||e.reference.startsWith('location:'))&&
-    (e.reference===active||!filter.category||e.category===filter.category)&&matching(e));
-  const estates=all.filter(e=>(e.group==='estate'||e.reference.startsWith('estate:'))&&matching(e));
-  // AtlasRegistry is the canonical owner of new Location/Real Estate atlases.
-  // Do not infer ownership from an Estate row: a shared atlas may have no
-  // legacy per-mesh image publication at all (e.g. house_level4_01).
-  const atlases=realEstatePublishedAtlasChoices().filter(matching);
-  const option=e=>`<option value="${esc(e.reference)}">${esc(realEstateReuseLabel(e))}</option>`;
-  const result=['<option value="">choose reuse source…</option>'];
-  if(part!=='house')result.push(`<optgroup label="This Estate"><option value="mesh:house">${esc(realEstateLocalHouseAtlasLabel())}</option></optgroup>`);
-  // Show modern shared atlases before the long legacy owner lists.
-  if(atlases.length)result.push(`<optgroup label="Shared Atlas Registry · published">${atlases.map(option).join('')}</optgroup>`);
-  const categories=new Map();
-  for(const e of location){
-    const key=e.category||'other';
-    if(!categories.has(key))categories.set(key,{label:e.categoryLabel||key,entries:[]});
-    categories.get(key).entries.push(e);
+  const query=String(realEstateState.reuseFilters[part]?.query||'').trim().toLocaleLowerCase();
+  const all=[...realEstatePublishedAtlasChoices()];
+  if(part!=='house'){
+    const owner=realEstateSelected()?.textures?.house||{};
+    const path=realEstateState.textures.house||owner.path||'';
+    if(path||owner.filename)all.push({reference:'same:house',group:'local',
+      filename:owner.filename||String(path).split(/[\\/]/).pop(),assetId:owner.assetId||'',
+      atlasKey:owner.atlasKey||''});
   }
-  for(const category of [...categories.values()].sort((a,b)=>a.label.localeCompare(b.label))){
-    result.push(`<optgroup label="Location Assets · ${esc(category.label)}">${category.entries.map(option).join('')}</optgroup>`);
+  const choiceByRef=new Map(all.filter(e=>e?.reference).map(e=>[e.reference,e]));
+  const candidates=[...choiceByRef.values()].filter(e=>{
+    const identity=window.game1AtlasIdentity.describe({filename:e.filename||e.path,
+      atlasKey:e.group==='atlas'?e.label:(e.atlasKey||'')});
+    return e.reference===active||!query||[identity.key,identity.name,identity.variant,
+      identity.resolution,identity.filename,e.assetId].some(v=>String(v||'').toLocaleLowerCase().includes(query));
+  });
+  // One published resolution is one atlas identity regardless of its consumers.
+  candidates.sort((a,b)=>{
+    const ai=window.game1AtlasIdentity.describe({filename:a.filename||a.path,atlasKey:a.group==='atlas'?a.label:a.atlasKey});
+    const bi=window.game1AtlasIdentity.describe({filename:b.filename||b.path,atlasKey:b.group==='atlas'?b.label:b.atlasKey});
+    return ai.key.localeCompare(bi.key)||
+      ((a.assetId&&a.assetId===b.assetId)?Number(b.reference===active)-Number(a.reference===active):0)||
+      (window.game1AtlasIdentity.pixelArea(bi.resolution)-window.game1AtlasIdentity.pixelArea(ai.resolution))||
+      String(a.reference).localeCompare(String(b.reference));
+  });
+  const visible=[];
+  const ids=new Set();
+  for(const e of candidates){
+    const id=String(e.assetId||'');
+    if(id&&ids.has(id)&&e.reference!==active)continue;
+    if(id)ids.add(id);
+    visible.push(e);
   }
-  if(estates.length)result.push(`<optgroup label="Real Estate · registered">${estates.map(option).join('')}</optgroup>`);
+  const result=['<option value="">choose reuse atlas…</option>'];
+  let previous='';
+  for(const e of visible){
+    const identity=window.game1AtlasIdentity.describe({filename:e.filename||e.path,
+      atlasKey:e.group==='atlas'?e.label:(e.atlasKey||'')});
+    if(identity.key!==previous){
+      if(previous)result.push('</optgroup>');
+      result.push(`<optgroup label="${esc(identity.key)}">`);
+      previous=identity.key;
+    }
+    result.push(`<option value="${esc(e.reference)}">${esc(realEstateReuseLabel(e))}</option>`);
+  }
+  if(previous)result.push('</optgroup>');
   return result.join('');
 }
 function realEstateUpdateReuseOptions(part){
@@ -223,7 +226,6 @@ function realEstateRenderTextures(){
     }
   }
   const options=realEstateOptions();
-  const categories=realEstateLocationCategories();
   host.innerHTML=(parts.length&&!parts.some(realEstateIsCollider)
     ? '<small class="real-estate-physics-caution">No COL_ collision mesh in this FBX. If all visual meshes have No Collide enabled, characters will fall through the house until a collision model is published.</small>' : '')+parts.map(part=>{
     let selected=realEstateState.textures[part]||'';
@@ -238,10 +240,8 @@ function realEstateRenderTextures(){
       choices.push(`<option value="${esc(selected)}">${esc(selected.split(/[\\/]/).pop())} · selected</option>`);
     }
     for(const item of options)choices.push(`<option value="${esc(item.path)}">${esc(item.name)}</option>`);
-    const filters=realEstateState.reuseFilters[part]||{category:'',query:''};
+    const filters=realEstateState.reuseFilters[part]||{query:''};
     realEstateState.reuseFilters[part]=filters;
-    const categoryChoices=['<option value="">all Location categories</option>',
-      ...categories.map(([id,label])=>`<option value="${esc(id)}">${esc(label)}</option>`)];
     const collider=realEstateIsCollider(part);
     const flags=realEstateState.meshOptions[part];
     if(collider){
@@ -268,11 +268,10 @@ function realEstateRenderTextures(){
       </div>
       <div id="real-estate-shared-${esc(part)}" class="real-estate-texture-shared" ${reuse?'':'hidden'}>
         <div class="real-estate-reuse-filters">
-          <input type="search" id="real-estate-reuse-search-${esc(part)}" aria-label="Search ${esc(part)} reuse" placeholder="search asset, filename, slug or ID…" value="${esc(filters.query)}">
-          <select id="real-estate-reuse-category-${esc(part)}" aria-label="${esc(part)} Location category">${categoryChoices.join('')}</select>
+          <input type="search" id="real-estate-reuse-search-${esc(part)}" aria-label="Search ${esc(part)} reuse" placeholder="search atlas name, variant, resolution or ID…" value="${esc(filters.query)}">
         </div>
         <select aria-label="${esc(part)} reused texture" id="real-estate-reference-${esc(part)}"></select>
-        <small class="hint">Published Location/Real Estate Image Asset · Shared Atlas Registry (existing Roblox ID, no upload). For changed pixels, use Republish instead.</small>
+        <small class="hint">Atlases are identified by filename and Image Asset ID, independent of the first model that used them (no upload). For changed pixels, use Republish instead.</small>
       </div></div>`;
   }).join('');
   for(const part of parts){
@@ -299,11 +298,8 @@ function realEstateRenderTextures(){
     $(`real-estate-browse-${part}`).onclick=()=>realEstateBrowseTexture(part);
     const shared=$(`real-estate-reference-${part}`);
     const filters=realEstateState.reuseFilters[part];
-    const category=$(`real-estate-reuse-category-${part}`);
-    category.value=filters.category;
     const search=$(`real-estate-reuse-search-${part}`);
     search.oninput=()=>{filters.query=search.value;realEstateUpdateReuseOptions(part);};
-    category.onchange=()=>{filters.category=category.value;realEstateUpdateReuseOptions(part);};
     realEstateUpdateReuseOptions(part);
     shared.onchange=()=>{realEstateState.textureRefs[part]=shared.value;};
     $(`real-estate-reuse-${part}`).onchange=(event)=>{
@@ -371,7 +367,7 @@ async function realEstateChooseFbx(){
         const part=mesh.name;
         if(part==='house'||realEstateIsCollider(part))continue;
         const hasOwnTexture=(inspection.textures||[]).some(t=>t.name.toLowerCase().startsWith(part.toLowerCase()+'.')||t.name.toLowerCase().startsWith(part.toLowerCase()+'_'));
-        if(!hasOwnTexture){realEstateState.textureRefs[part]='mesh:house';realEstateState.reuseEnabled[part]=true;}
+        if(!hasOwnTexture){realEstateState.textureRefs[part]='same:house';realEstateState.reuseEnabled[part]=true;}
       }
     }
     realEstateRenderTextures();
@@ -633,10 +629,10 @@ function realEstateRenderAtlasLibrary(rows){
   tbody.innerHTML=variants.map(v=>{
     const consumers=rows.flatMap(r=>Object.entries(r.textures||{}).filter(([,t])=>Number(t.atlasVariantId)===Number(v.id)).map(([part])=>r.slug+' / '+part));
     const hint=consumers.length?consumers.join(', '):'No current Real Estate consumers';
-    return `<tr><td><strong>${esc(v.atlasKey)}</strong><br><small>${esc(v.filename||'')}</small></td><td>${esc(v.resolution||'')}</td><td><code>${esc(v.published_id||'not published')}</code></td><td><small title="${esc(hint)}">${esc(hint)}</small></td><td><button type="button" data-re-atlas-republish="${Number(v.id)}" ${!v.current||realEstateState.atlasBusy||!realEstateState.data?.publication?.configured?'disabled':''}>Republish · new ID</button></td></tr>`;
+    return `<tr><td><strong>${esc(window.game1AtlasIdentity.describe({atlasKey:v.atlasKey,filename:v.filename}).key)}</strong><br><small>${esc(window.game1AtlasIdentity.describe({atlasKey:v.atlasKey,filename:v.filename}).name)} · variant ${esc(window.game1AtlasIdentity.describe({atlasKey:v.atlasKey,filename:v.filename}).variant||'—')}</small></td><td>${esc(v.resolution||'')}</td><td><code>${esc(v.published_id||'not published')}</code></td><td><small title="${esc(hint)}">${esc(hint)}</small></td><td><button type="button" data-re-atlas-republish="${Number(v.id)}" ${!v.current||realEstateState.atlasBusy||!realEstateState.data?.publication?.configured?'disabled':''}>Republish · new ID</button></td></tr>`;
   }).join('')+legacy.map(item=>{
     const owner=item.owners[0];
-    return `<tr class="real-estate-atlas-legacy"><td><strong>⚠️ legacy</strong><br><small>${esc(item.filename)}</small></td><td>unknown</td><td><code>${esc(item.id)}</code></td><td><small>${esc(item.users.join(', '))}</small></td><td>${owner?`<button type="button" data-re-legacy-slug="${esc(owner.slug)}" data-re-legacy-part="${esc(owner.part)}" ${realEstateState.atlasBusy||!realEstateState.data?.publication?.configured?'disabled':''}>Replace / republish · new ID</button>`:'<small>Owner not available</small>'}</td></tr>`;
+    return `<tr class="real-estate-atlas-legacy"><td><strong>${esc(window.game1AtlasIdentity.describe({filename:item.filename}).key)}</strong><br><small>${esc(item.filename)}</small></td><td>unknown</td><td><code>${esc(item.id)}</code></td><td><small>${esc(item.users.join(', '))}</small></td><td>${owner?`<button type="button" data-re-legacy-slug="${esc(owner.slug)}" data-re-legacy-part="${esc(owner.part)}" ${realEstateState.atlasBusy||!realEstateState.data?.publication?.configured?'disabled':''}>Replace / republish · new ID</button>`:'<small>Owner not available</small>'}</td></tr>`;
   }).join('')||'<tr><td colspan="5" class="muted">No registered atlases match the filter.</td></tr>';
   $('real-estate-atlas-count').textContent=String(variants.length+legacy.length);
   for(const btn of tbody.querySelectorAll('[data-re-atlas-republish]')){

@@ -13,10 +13,8 @@ from datetime import datetime, timezone
 from sqlite_connection import connect as connect_sqlite
 from services.texture_alpha import texture_uses_alpha
 from services.texture_atlas_registry import AtlasRegistry, parse_filename
-from services.retained_textures import RetainedTextures
 
 from opencloud_assets import (
-    create_image_asset,
     create_model_asset,
     update_model_asset,
     wait_for_operation,
@@ -77,9 +75,12 @@ class LocationAssetStore:
         self.db = self.runtime / "game1.db"
         self._init()
         self.atlases = AtlasRegistry(self.root)
-        self.retained_textures = RetainedTextures(self.root)
         self._index_legacy_texture_publications()
-        self.export()
+        with self.connect() as db:
+            columns = {r[1] for r in db.execute('PRAGMA table_info(location_assets)')}
+            unfinished = bool('texture_path' in columns)  # upgrade before projections
+        if not unfinished:
+            self.export()
 
     def connect(self):
         # Shared closing connection commits/rolls back AND releases the file handle.
@@ -98,13 +99,6 @@ class LocationAssetStore:
                     model_asset_id TEXT,
                     model_published_sha256 TEXT NOT NULL DEFAULT '',
                     model_moderation_state TEXT NOT NULL DEFAULT '',
-                    texture_path TEXT NOT NULL DEFAULT '',
-                    texture_filename TEXT NOT NULL DEFAULT '',
-                    texture_sha256 TEXT NOT NULL DEFAULT '',
-                    texture_asset_id TEXT,
-                    texture_published_sha256 TEXT NOT NULL DEFAULT '',
-                    texture_moderation_state TEXT NOT NULL DEFAULT '',
-                    texture_reference_slug TEXT NOT NULL DEFAULT '',
                     destructible INTEGER NOT NULL DEFAULT 0,
                     revision INTEGER NOT NULL DEFAULT 1,
                     created_at REAL NOT NULL,
@@ -113,16 +107,10 @@ class LocationAssetStore:
                 )"""
             )
             columns = {row[1] for row in connection.execute("PRAGMA table_info(location_assets)").fetchall()}
-            # Metadata only: preserve the name the author selected before the
-            # texture is copied to its stable slug-based canonical path.
-            if "texture_filename" not in columns:
-                connection.execute("ALTER TABLE location_assets ADD COLUMN texture_filename TEXT NOT NULL DEFAULT ''")
-                columns.add("texture_filename")
             required = {
-                "slug", "name_en", "category", "model_path", "model_sha256", "model_asset_id",
-                "model_published_sha256", "model_moderation_state", "texture_path", "texture_filename", "texture_sha256",
-                "texture_asset_id", "texture_published_sha256", "texture_moderation_state",
-                "texture_reference_slug", "destructible", "revision", "created_at", "updated_at", "published_at",
+                'slug','name_en','category','model_path','model_sha256',
+                'model_asset_id','model_published_sha256','model_moderation_state',
+                'destructible','revision','created_at','updated_at','published_at',
             }
             if not required.issubset(columns):
                 missing = ", ".join(sorted(required - columns))
@@ -140,42 +128,22 @@ class LocationAssetStore:
                     published_at REAL NOT NULL
                 )"""
             )
-            # Before m51 Location Assets updated changed images in-place. Roblox image
-            # consumers can keep serving the old image for that Asset ID, so a replacement
-            # texture must have a fresh publication identity. Detect those rows from
-            # publication history and make them pending for one clean republish.
-            legacy_texture_updates = connection.execute(
-                """SELECT la.slug
-                   FROM location_assets AS la
-                   JOIN location_asset_publications AS publication
-                     ON publication.asset_slug=la.slug
-                    AND publication.kind='texture'
-                    AND publication.asset_id=la.texture_asset_id
-                   WHERE COALESCE(la.texture_reference_slug,'')=''
-                     AND COALESCE(la.texture_asset_id,'')<>''
-                   GROUP BY la.slug,la.texture_asset_id
-                   HAVING COUNT(DISTINCT publication.sha256)>1"""
-            ).fetchall()
-            if legacy_texture_updates:
-                now = time.time()
-                connection.executemany(
-                    """UPDATE location_assets
-                       SET texture_asset_id=NULL,texture_published_sha256='',texture_moderation_state='',updated_at=?
-                       WHERE slug=?""",
-                    [(now, str(row["slug"])) for row in legacy_texture_updates],
-                )
+            # Owner-era texture columns remain readable only until the M203
+            # atlas migration drops them; never mutate old Image Asset IDs.
 
     def _index_legacy_texture_publications(self) -> None:
         # Import history into the shared registry without renaming files or
         # changing any published Roblox identity. Conflicts remain pending.
         with self.connect() as connection:
-            rows = connection.execute('''SELECT slug,texture_sha256,texture_asset_id
-                FROM location_assets WHERE texture_reference_slug=''
-                AND texture_sha256=texture_published_sha256
-                AND texture_asset_id IS NOT NULL''').fetchall()
+            columns = {r[1] for r in connection.execute('PRAGMA table_info(location_assets)')}
+            if not {'texture_sha256','texture_asset_id','texture_published_sha256'} <= columns:
+                return
+            rows = connection.execute("""SELECT slug,texture_sha256,texture_asset_id
+                FROM location_assets WHERE texture_sha256=texture_published_sha256
+                AND texture_asset_id IS NOT NULL""").fetchall()
         self.atlases.import_legacy_publications('location_asset', [
-            {'id': row['slug'], 'sha256': row['texture_sha256'], 'imageId': row['texture_asset_id']}
-            for row in rows])
+            {'id':r['slug'],'sha256':r['texture_sha256'],'imageId':r['texture_asset_id']}
+            for r in rows])
 
     @staticmethod
     def _sha256(path: Path) -> str:
@@ -201,21 +169,13 @@ class LocationAssetStore:
         )
 
     def _status(self, row: dict) -> str:
-        if not row.get("model_path") or not row.get("texture_path"):
-            return "INCOMPLETE"
-        model_current = bool(
-            str(row.get("model_asset_id") or "")
-            and str(row.get("model_published_sha256") or "") == str(row.get("model_sha256") or "")
-        )
-        texture_current = self._texture_current(row)
-        if model_current and texture_current:
-            return "PUBLISHED"
-        has_own_publication = bool(str(row.get("model_asset_id") or "")) or bool(
-            not str(row.get("texture_reference_slug") or "") and not row.get("atlasVariantId") and str(row.get("texture_asset_id") or "")
-        )
-        if has_own_publication:
-            return "UPDATE_AVAILABLE"
-        return "LOCAL_ONLY"
+        model_current = bool(row.get('model_asset_id') and
+            row.get('model_published_sha256') == row.get('model_sha256'))
+        if not row.get('model_path') or not row.get('atlasVariantId'):
+            return 'INCOMPLETE'
+        if model_current and self._texture_current(row):
+            return 'PUBLISHED'
+        return 'UPDATE_AVAILABLE' if row.get('model_asset_id') else 'LOCAL_ONLY'
 
     def _raw_get(self, slug: str) -> dict | None:
         normalized = str(slug or "").strip().lower()
@@ -225,93 +185,35 @@ class LocationAssetStore:
             row = connection.execute("SELECT * FROM location_assets WHERE slug=?", (normalized,)).fetchone()
         return dict(row) if row else None
 
-    def _resolve_texture_owner(self, row: dict, rows_by_slug: dict[str, dict] | None = None) -> dict | None:
-        current = dict(row)
-        seen: set[str] = set()
-        while True:
-            slug = str(current.get("slug") or "").strip().lower()
-            if slug in seen:
-                return None
-            seen.add(slug)
-            reference = str(current.get("texture_reference_slug") or "").strip().lower()
-            if not reference:
-                return current
-            current = ((rows_by_slug or {}).get(reference) or self._raw_get(reference)
-                       or self.retained_textures.get('location:' + reference))
-            if current is None:
-                return None
-
-    def _decorate(self, row, rows_by_slug: dict[str, dict] | None = None, atlas_catalog: list[dict] | None = None) -> dict:
+    def _decorate(self, row, rows_by_slug=None, atlas_catalog=None) -> dict:
+        """Only a direct binding determines the effective image publication."""
         result = dict(row)
-        if atlas_catalog is None:
-            atlas_catalog = self.atlases.catalog()
-        slug = str(result.get("slug") or "")
-        direct_binding = self.atlases.binding("location_asset", slug)
-        owner = None if direct_binding else self._resolve_texture_owner(result, rows_by_slug)
-        # Legacy texture reuse follows the owner's *effective* publication.
-        # Once an owner adopts Atlas Registry its raw location_assets columns
-        # are no longer authoritative (and may deliberately be NULL). Resolve
-        # the published image through the registry without rewriting a legacy
-        # relationship or allocating another Roblox Image Asset ID.
-        inherited_binding = (self.atlases.binding("location_asset", str(owner["slug"]))
-                             if owner and owner.get("slug") != slug else None)
-        binding = direct_binding or inherited_binding
-        result["texture_owner_slug"] = str(owner.get("slug") or "") if owner else ""
-        result["texture_shared"] = bool(str(result.get("texture_reference_slug") or "")) and not direct_binding
+        atlas_catalog = self.atlases.catalog() if atlas_catalog is None else atlas_catalog
+        binding = self.atlases.binding('location_asset', str(result.get('slug') or ''))
+        result['destructible'] = bool(result.get('destructible'))
+        for field, default in (('texture_path',''),('texture_filename',''),('texture_sha256',''),
+                               ('texture_asset_id',None),('texture_published_sha256',''),
+                               ('texture_moderation_state',''),('texture_reference_slug','')):
+            result.setdefault(field,default)
         if binding:
-            result["atlasBindingSourceSlug"] = (slug if direct_binding else str(owner["slug"]))
-        result["destructible"] = bool(result.get("destructible"))
-        if owner is not None and owner.get("slug") != result.get("slug"):
-            for field in (
-                "texture_path",
-                "texture_filename",
-                "texture_sha256",
-                "texture_asset_id",
-                "texture_published_sha256",
-                "texture_moderation_state",
-            ):
-                result[field] = owner.get(field)
-        if binding:
-            result.update({
-                "texture_path": binding["source_path"],
-                "texture_filename": binding["original_filename"],
-                "texture_sha256": binding["source_sha256"],
-                "texture_asset_id": binding["published_id"],
-                "texture_published_sha256": binding["published_sha256"],
-                "texture_moderation_state": binding["moderation_state"],
-                # Keep legacy followers linked to the owner. An explicit
-                # variant selection is the only action that detaches them.
-                "texture_reference_slug": "" if direct_binding else result["texture_reference_slug"],
-                "atlasVariantId": binding["variant_id"],
-                "atlasFamily": binding["atlas_key"],
-                "atlasResolution": binding["resolution"],
-                "bindingRevision": binding["revision"],
-                "studioSyncStatus": binding["syncStatus"],
-                "atlasVariants": next((g["variants"] for g in atlas_catalog
-                                       if g["atlasKey"] == binding["atlas_key"]), []),
-            })
-        # Shared consumers must inherit the owner's filename, including for
-        # legacy owners with no saved original basename.
-        result["texture_filename"] = (
-            str(result.get("texture_filename") or "")
-            or Path(str(result.get("texture_path") or "")).name
-        )
-        result["textureUsesAlpha"] = (
-            texture_uses_alpha(self.root, str(result.get("texture_path") or ""))
-            if self._texture_current(result) else None
-        )
-        filename = result["texture_filename"]
-        if not binding and filename:
-            # A legacy filename can *suggest* a family, never a published
-            # variant identity. The author must explicitly choose a dot.
-            stem = Path(filename).stem.casefold()
-            atlas_key = stem[:-6] if stem.endswith("_atlas") else stem
-            result["atlasVariants"] = next(
-                (family["variants"] for family in atlas_catalog
-                 if family["atlasKey"] == atlas_key), [])
-        result["atlasLegacyWarning"] = bool(filename and not parse_filename(filename))
-        result["status"] = self._status(result)
-        result["category_label"] = CATEGORY_LABELS.get(result.get("category"), str(result.get("category") or ""))
+            result.update(texture_path=binding['source_path'],
+                texture_filename=binding['original_filename'],
+                texture_sha256=binding['source_sha256'],
+                texture_asset_id=binding['published_id'],
+                texture_published_sha256=binding['published_sha256'],
+                texture_moderation_state=binding['moderation_state'],
+                atlasVariantId=binding['variant_id'],
+                atlasFamily=binding['atlas_key'],
+                atlasResolution=binding['resolution'],
+                bindingRevision=binding['revision'],
+                studioSyncStatus=binding['syncStatus'],
+                atlasVariants=next((g['variants'] for g in atlas_catalog
+                                    if g['atlasKey']==binding['atlas_key']), []))
+        result['textureUsesAlpha'] = (texture_uses_alpha(self.root, str(result.get('texture_path') or ''))
+                                       if binding and binding['current'] else None)
+        result['atlasLegacyWarning'] = bool(binding and not parse_filename(result['texture_filename']))
+        result['status'] = self._status(result)
+        result['category_label'] = CATEGORY_LABELS.get(result.get('category'), str(result.get('category') or ''))
         return result
 
     def list(self) -> list[dict]:
@@ -328,25 +230,14 @@ class LocationAssetStore:
         return self._decorate(row) if row else None
 
     def _archive_existing(self, path: Path, slug: str, revision: int):
+        """Archive replaced MODEL FBX; never retire Atlas Registry files."""
         if not path.is_file():
             return
         relative = path.resolve().relative_to(self.root)
-        tail = relative.parts[-2:]
-        destination = self.root / "assets/reimported/location-assets" / slug / f"r{revision:04d}" / Path(*tail)
+        destination = self.root / 'assets/reimported/location-assets' / slug / f'r{revision:04d}' / Path(*relative.parts[-2:])
         destination.parent.mkdir(parents=True, exist_ok=True)
         if not destination.exists():
             shutil.copy2(path, destination)
-
-    def _retire_replaced_file(self, relative_path: str, slug: str, revision: int, replacements: set[Path]):
-        if not relative_path:
-            return
-        path = (self.root / relative_path).resolve()
-        # Sources managed by the shared registry must never be retired by an
-        # individual model; other models may still reference the same file.
-        if "texture-atlases" in path.parts or path in replacements or not path.is_file():
-            return
-        self._archive_existing(path, slug, revision)
-        path.unlink()
 
     def register(self, payload: dict) -> dict:
         incoming_slug = str(payload.get("slug") or "").strip().lower()
@@ -357,8 +248,6 @@ class LocationAssetStore:
         slug = incoming_slug or (str(old.get("slug") or "") if old else "") or slugify_english(name_en)
         if not SLUG_RE.fullmatch(slug):
             raise ValueError("location asset slug must be lowercase snake_case")
-        if old is None and self.retained_textures.get('location:' + slug):
-            raise ValueError('slug is reserved by a retained shared texture; rebind dependents before reuse')
         if old is None:
             old = self._raw_get(slug)
         category = str(payload.get("category") or (old.get("category") if old else "") or "").strip().lower()
@@ -367,65 +256,32 @@ class LocationAssetStore:
             raise ValueError("location asset category must be one of: " + ", ".join(CATEGORIES))
 
         selected_model = str(payload.get("modelSourcePath") or "").strip()
-        selected_texture = str(payload.get("textureSourcePath") or "").strip()
-        atlas_variant_id = int(payload.get("atlasVariantId") or 0)
+        selected_texture = str(payload.get('textureSourcePath') or '').strip()
+        atlas_variant_id = int(payload.get('atlasVariantId') or 0)
+        if payload.get('textureReferenceSlug'):
+            raise ValueError('select an independent Atlas Registry variant, not a model owner')
         if selected_texture and atlas_variant_id:
-            raise ValueError("choose either atlas file or registered variant, not both")
-        if atlas_variant_id and not self.atlases.get_variant(atlas_variant_id):
-            raise ValueError("unknown atlas variant")
-        # New canonical atlas sources are managed outside individual model folders.
-        if selected_texture and parse_filename(Path(selected_texture).name):
-            atlas_variant_id = self.atlases.register_file(selected_texture)["id"]
-            selected_texture = ""
-        texture_reference = str(payload.get("textureReferenceSlug") or "").strip().lower()
-        old_reference = (str(old.get("texture_reference_slug") or "").strip().lower()
-                         if old and not self.atlases.binding("location_asset", slug) else "")
+            raise ValueError('choose either an atlas file or registered variant')
+        if selected_texture:
+            atlas_variant_id = self.atlases.adopt_file(selected_texture)['id']
+        if not atlas_variant_id and old:
+            binding = self.atlases.binding('location_asset', slug)
+            atlas_variant_id = int(binding['variant_id']) if binding else 0
+        if not atlas_variant_id or not self.atlases.get_variant(atlas_variant_id):
+            raise ValueError('select an independent atlas variant or PNG/JPG source')
         if old is None and not selected_model:
-            raise ValueError("choose a location asset FBX before registration")
-        if (selected_texture or atlas_variant_id) and texture_reference:
-            raise ValueError("choose either a texture file or a reused registered texture, not both")
-
-        reference_owner = None
-        if texture_reference:
-            if texture_reference == slug:
-                raise ValueError("a location asset cannot reuse its own texture")
-            reference_row = (self._raw_get(texture_reference)
-                             or self.retained_textures.get('location:' + texture_reference))
-            if reference_row is None:
-                raise ValueError(f"unknown shared texture asset: {texture_reference}")
-            reference_owner = self._resolve_texture_owner(reference_row)
-            if reference_owner is None or not str(reference_owner.get("texture_path") or ""):
-                raise ValueError("selected shared texture has no canonical texture source")
-            texture_reference = str(reference_owner.get("slug") or texture_reference)
-
-        if old is None and not selected_texture and not texture_reference and not atlas_variant_id:
-            raise ValueError("choose a location asset PNG/JPG or reuse a registered texture before registration")
-        if old is not None and old_reference and not texture_reference and not selected_texture and not atlas_variant_id:
-            raise ValueError("choose a replacement PNG/JPG or another shared texture before clearing the current shared texture")
+            raise ValueError('choose a location asset FBX before registration')
 
         now = time.time()
         revision = int(old.get("revision") or 0) + 1 if old else 1
-        values = {
-            "model_path": str(old.get("model_path") or "") if old else "",
-            "model_sha256": str(old.get("model_sha256") or "") if old else "",
-            "texture_path": str(old.get("texture_path") or "") if old else "",
-            "texture_sha256": str(old.get("texture_sha256") or "") if old else "",
-        }
-        texture_filename = str(old.get("texture_filename") or "") if old else ""
-        texture_asset_id = old.get("texture_asset_id") if old else None
-        texture_published_sha256 = str(old.get("texture_published_sha256") or "") if old else ""
-        texture_moderation_state = str(old.get("texture_moderation_state") or "") if old else ""
-        stored_reference = old_reference
-
-        if atlas_variant_id:
-            variant = self.atlases.get_variant(atlas_variant_id)
-            values["texture_path"] = variant["source_path"]
-            values["texture_sha256"] = variant["source_sha256"]
-            texture_filename = variant["original_filename"]
-            texture_asset_id = variant["published_id"]
-            texture_published_sha256 = variant["published_sha256"]
-            texture_moderation_state = variant["moderation_state"]
-            stored_reference = ""
+        # Model rows do not store authoritative atlas paths/IDs.
+        values = {'model_path': str(old.get('model_path') or '') if old else '',
+                  'model_sha256': str(old.get('model_sha256') or '') if old else ''}
+        texture_filename = ''
+        texture_asset_id = None
+        texture_published_sha256 = ''
+        texture_moderation_state = ''
+        stored_reference = ''
 
         if selected_model:
             selected = Path(selected_model).expanduser().resolve()
@@ -439,72 +295,19 @@ class LocationAssetStore:
             values["model_path"] = canonical_target.relative_to(self.root).as_posix()
             values["model_sha256"] = self._sha256(canonical_target)
 
-        if selected_texture:
-            selected = Path(selected_texture).expanduser().resolve()
-            source_suffix = selected.suffix.lower()
-            if not selected.is_file() or source_suffix not in TEXTURE_SUFFIXES:
-                raise ValueError("location asset texture must be a PNG or JPG file")
-            canonical_suffix = ".jpg" if source_suffix == ".jpeg" else source_suffix
-            canonical_target = self.root / "assets/source/location-assets" / category / slug / "textures" / f"{slug}{canonical_suffix}"
-            if old:
-                replacements = {canonical_target.resolve()}
-                old_revision = int(old.get("revision") or 1)
-                self._retire_replaced_file(str(old.get("texture_path") or ""), slug, old_revision, replacements)
-            canonical_target.parent.mkdir(parents=True, exist_ok=True)
-            if old:
-                self._archive_existing(canonical_target, slug, int(old.get("revision") or 1))
-            shutil.copy2(selected, canonical_target)
-            values["texture_path"] = canonical_target.relative_to(self.root).as_posix()
-            values["texture_sha256"] = self._sha256(canonical_target)
-            texture_filename = selected.name
-            old_texture_sha256 = str(old.get("texture_sha256") or "") if old else ""
-            texture_replaced = old is None or bool(old_reference) or values["texture_sha256"] != old_texture_sha256
-            if texture_replaced:
-                # A changed Location Asset texture is a new Roblox Image asset, never
-                # an in-place update of the previous image id. This keeps Studio/DecoManager
-                # deterministic and lets shared-texture consumers follow the new owner id.
-                texture_asset_id = None
-                texture_published_sha256 = ""
-                texture_moderation_state = ""
-            stored_reference = ""
-        elif texture_reference:
-            if old and not old_reference:
-                old_revision = int(old.get("revision") or 1)
-                self._retire_replaced_file(str(old.get("texture_path") or ""), slug, old_revision, set())
-            values["texture_path"] = ""
-            values["texture_sha256"] = ""
-            texture_filename = ""  # Owner supplies the displayed filename.
-            texture_asset_id = None
-            texture_published_sha256 = ""
-            texture_moderation_state = ""
-            stored_reference = texture_reference
-
         with self.connect() as connection:
-            connection.execute(
-                """INSERT OR REPLACE INTO location_assets(
-                    slug,name_en,category,
-                    model_path,model_sha256,model_asset_id,model_published_sha256,model_moderation_state,
-                    texture_path,texture_filename,texture_sha256,texture_asset_id,texture_published_sha256,texture_moderation_state,texture_reference_slug,destructible,
-                    revision,created_at,updated_at,published_at
-                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (
-                    slug, name_en, category,
-                    values["model_path"], values["model_sha256"],
-                    old.get("model_asset_id") if old else None,
-                    str(old.get("model_published_sha256") or "") if old else "",
-                    str(old.get("model_moderation_state") or "") if old else "",
-                    values["texture_path"], texture_filename, values["texture_sha256"],
-                    texture_asset_id, texture_published_sha256, texture_moderation_state, stored_reference, 1 if destructible else 0,
-                    revision,
-                    old.get("created_at") if old else now,
-                    now,
-                    old.get("published_at") if old else None,
-                ),
-            )
-        if atlas_variant_id:
-            self.atlases.bind("location_asset", slug, atlas_variant_id, allow_unpublished=True)
-        elif selected_texture or texture_reference:
-            self.atlases.unbind("location_asset", slug)
+            connection.execute("""INSERT OR REPLACE INTO location_assets (
+                slug,name_en,category,model_path,model_sha256,model_asset_id,
+                model_published_sha256,model_moderation_state,destructible,
+                revision,created_at,updated_at,published_at
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (slug,name_en,category,values['model_path'],values['model_sha256'],
+             old.get('model_asset_id') if old else None,
+             str(old.get('model_published_sha256') or '') if old else '',
+             str(old.get('model_moderation_state') or '') if old else '',
+             1 if destructible else 0,revision,old.get('created_at') if old else now,
+             now,old.get('published_at') if old else None))
+        self.atlases.bind('location_asset', slug, atlas_variant_id, allow_unpublished=True)
         self.export()
         return self.get(slug)
 
@@ -525,11 +328,9 @@ class LocationAssetStore:
             raise ValueError("canonical Location Asset FBX is missing")
         if not texture.is_file():
             raise ValueError("canonical Location Asset texture is missing")
-        atlas_binding = self.atlases.binding("location_asset", slug)
-        texture_reference = str(row.get("texture_reference_slug") or "").strip().lower()
-        if texture_reference and not self._texture_current(row):
-            raise ValueError(f"shared texture owner {texture_reference} must publish its texture first")
-
+        atlas_binding = self.atlases.binding('location_asset', slug)
+        if atlas_binding is None:
+            raise ValueError('independent atlas binding missing')
         api_key = str(credentials.get("apiKey") or "")
         creator_type = str(credentials.get("creatorType") or "")
         creator_id = str(credentials.get("creatorId") or "")
@@ -578,67 +379,22 @@ class LocationAssetStore:
                      row["model_sha256"], result.moderation_state or "", now),
                 )
 
-        row = self.get(slug)
-        if atlas_binding and not atlas_binding["current"]:
-            self.atlases.ensure_published(atlas_binding["variant_id"], credentials, description)
-        elif not atlas_binding and not texture_reference and str(row.get("texture_published_sha256") or "") != str(row.get("texture_sha256") or ""):
-            display_name = f"{row['name_en']} texture"
-            # Dirty owned textures always publish as a new Roblox Image asset. Image
-            # replacement is identity-changing for Location Assets by design.
-            operation = create_image_asset(
-                texture,
-                display_name=display_name,
-                description=description,
-                creator_type=creator_type,
-                creator_id=creator_id,
-                api_key=api_key,
-            )
-            result = wait_for_operation(operation, api_key=api_key)
-            now = time.time()
-            with self.connect() as connection:
-                connection.execute(
-                    """UPDATE location_assets
-                       SET texture_asset_id=?,texture_published_sha256=?,texture_moderation_state=?,updated_at=?,published_at=?
-                       WHERE slug=?""",
-                    (result.asset_id, row["texture_sha256"], result.moderation_state or "", now, now, slug),
-                )
-                connection.execute(
-                    """INSERT INTO location_asset_publications(
-                        asset_slug,kind,revision,asset_id,operation_path,sha256,moderation_state,published_at
-                    ) VALUES(?,?,?,?,?,?,?,?)""",
-                    (slug, "texture", int(row["revision"]), result.asset_id, result.operation_path,
-                     row["texture_sha256"], result.moderation_state or "", now),
-                )
+        if not atlas_binding['current']:
+            self.atlases.ensure_published(atlas_binding['variant_id'], credentials, description)
 
-        self._index_legacy_texture_publications()
         self.export()
         return self.get(slug)
 
     def delete(self, slug: str, *, retain_shared: bool | None = None):
         """Retire the model registration, never the underlying published image.
 
-        Legacy owner references are frozen as immutable texture-only records.
-        The shared atlas variant and uploaded Image Asset ID are not deleted.
+        Atlas Registry entries and published Image Asset IDs survive.
         """
         normalized = str(slug or "").strip().lower()
         row = self.get(normalized)
         if not row:
             return {'ok': True}
-        with self.connect() as connection:
-            dependents = connection.execute(
-                """SELECT la.slug FROM location_assets la
-                   LEFT JOIN texture_atlas_bindings b ON b.consumer_type='location_asset' AND b.consumer_id=la.slug
-                   WHERE la.texture_reference_slug=? AND b.consumer_id IS NULL ORDER BY la.slug""",
-                (normalized,),
-            ).fetchall()
-        keep = bool(dependents) if retain_shared is None else bool(retain_shared)
-        if keep:
-            self.retained_textures.retain('location:' + normalized, {
-                'slug': normalized, 'texture_reference_slug': '',
-                **{k: row.get(k) for k in (
-                    'texture_path', 'texture_filename', 'texture_sha256',
-                    'texture_asset_id', 'texture_published_sha256', 'texture_moderation_state')},
-            })
+        # Atlas variants have no model owner. Only this consumer is removed.
         with self.connect() as connection:
             raw = dict(connection.execute('SELECT * FROM location_assets WHERE slug=?', (normalized,)).fetchone())
             history = [dict(item) for item in connection.execute(
@@ -651,12 +407,11 @@ class LocationAssetStore:
             json.dump({'asset': raw, 'publications': history, 'sourceFilesPreserved': True},
                       file, ensure_ascii=False, indent=2)
         with self.connect() as connection:
-            if not keep:
-                connection.execute("DELETE FROM texture_atlas_bindings WHERE consumer_type='location_asset' AND consumer_id=?", (normalized,))
             connection.execute("DELETE FROM location_asset_publications WHERE asset_slug=?", (normalized,))
             connection.execute("DELETE FROM location_assets WHERE slug=?", (normalized,))
+        self.atlases.unbind('location_asset', normalized)
         self.export()
-        return {'ok': True, 'sharedTextureRetained': keep,
+        return {'ok': True, 'sharedTextureRetained': True,
                 'archived': target.relative_to(self.root).as_posix(),
                 'sourceFilesPreserved': True}
 
@@ -716,8 +471,6 @@ class LocationAssetStore:
                     str(row['textureUsesAlpha']).lower()) + ","),
                 f"\t\t\tatlasVariantId = {int(row.get('atlasVariantId') or 0)},",
                 f"\t\t\tbindingRevision = {int(row.get('bindingRevision') or 0)},",
-                f"\t\t\ttextureOwnerSlug = {self._lua_string(row.get('texture_owner_slug') or '')},",
-                f"\t\t\ttextureShared = {str(bool(row.get('texture_shared'))).lower()},",
                 f"\t\t\tdestructible = {str(bool(row.get('destructible'))).lower()},",
                 "\t\t}),",
             ])

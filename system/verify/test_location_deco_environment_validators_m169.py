@@ -140,9 +140,9 @@ class LocationDecoEnvironmentM169Tests(unittest.TestCase):
 
     def test_location_assets_rejects_missing_published_status(self):
         with self.change_file('system/control-center/location_asset_store.py',
-                              lambda s: s.replace('return "PUBLISHED"', 'return "BAD_STATUS"')):
+                              lambda s: s.replace("return 'PUBLISHED'", "return 'BAD_STATUS'")):
             issues, _ = self.core()
-        self.assertIn('m43 LocationAssetStore missing return "PUBLISHED"', issues)
+        self.assertIn("m43 LocationAssetStore missing return 'PUBLISHED'", issues)
 
     def test_deco_studio_save_rejects_missing_native_helper(self):
         issues, sources = self.core()
@@ -156,8 +156,8 @@ class LocationDecoEnvironmentM169Tests(unittest.TestCase):
     def test_variants_reject_removed_shared_texture_owner(self):
         issues, sources = self.core()
         self.assertEqual(issues, [])
-        altered = sources._replace(store_text=sources.store_text.replace('_resolve_texture_owner', 'removed_owner'))
-        self.assertIn('m46 shared Location Asset texture support missing def _resolve_texture_owner',
+        altered = sources._replace(store_text=sources.store_text.replace('self.atlases.binding', 'removed_binding'))
+        self.assertIn('m203 independent Location Asset atlas support missing self.atlases.binding',
                       self.variants(altered))
 
     def test_variants_reject_missing_authored_pivot(self):
@@ -180,10 +180,10 @@ class LocationDecoEnvironmentM169Tests(unittest.TestCase):
 
     def test_texture_sync_rejects_legacy_in_place_image_updates(self):
         issues, sources = self.core()
-        altered = sources._replace(store_text=sources.store_text + '\nupdate_image_asset')
+        altered = sources._replace(store_text=sources.store_text + '\nupdate_image_asset(')
         check_location_texture_sync(ROOT, issues.append, sources=altered,
             environment_asset_service_text=read('src/server/world/EnvironmentAssetService.luau'))
-        self.assertIn('m51 Location Assets still contain legacy in-place Image Asset updates', issues)
+        self.assertIn('m203 Location Assets still own image publication: update_image_asset(', issues)
 
     def test_categories_reject_missing_library_category_synchronization(self):
         issues, sources = self.core()

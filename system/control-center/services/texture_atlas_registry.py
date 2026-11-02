@@ -10,6 +10,7 @@ import hashlib
 import re
 import shutil
 import threading
+import tempfile
 import time
 import unicodedata
 import uuid
@@ -238,6 +239,53 @@ class AtlasRegistry:
             rows = db.execute('''SELECT consumer_type,consumer_id,revision FROM texture_atlas_bindings
                 WHERE variant_id=? ORDER BY consumer_type,consumer_id''', (int(variant_id),)).fetchall()
         return [dict(row) for row in rows]
+
+    def adopt_file(self, source_path: str, *, domain: str = 'location') -> dict:
+        """Bring a new image into Atlas Registry, never a model-owned PNG.
+
+        Model registration cannot implicitly replace an existing atlas. A
+        different image requires an explicit Registry republish operation.
+        """
+        path = Path(str(source_path)).expanduser().resolve()
+        if not path.is_file() or path.suffix.lower() not in ('.png', '.jpg', '.jpeg', '.webp'):
+            raise ValueError('select a PNG/JPG/WebP atlas file')
+        with Image.open(path) as image:
+            width, height = image.size
+            image.verify()
+        parsed = parse_filename(path.name)
+        if parsed:
+            key = parsed['atlasKey']
+            filename = path.name
+        else:
+            stem = path.stem
+            if stem.casefold().endswith('_atlas'):
+                stem = stem[:-6]
+            stem = unicodedata.normalize('NFKC', stem).casefold()
+            stem = re.sub(r'[^\w .-]+', '-', stem).strip(' .-_')[:96] or 'atlas'
+            if stem.split('.')[0] in _WINDOWS_RESERVED:
+                stem = ('atlas_' + stem)[:96]
+            key = stem
+            extension = '.png' if path.suffix.lower() == '.webp' else path.suffix.lower()
+            filename = f'{stem}_{width}x{height}_atlas{extension}'
+        with tempfile.TemporaryDirectory(prefix='game1-atlas-register-') as temporary:
+            staged = Path(temporary) / filename
+            if path.suffix.lower() == '.webp':
+                with Image.open(path) as image:
+                    image.convert('RGBA').save(staged, 'PNG')
+            else:
+                shutil.copy2(path, staged)
+            sha = digest(staged)
+            with self.connect() as db:
+                existing = db.execute('''SELECT v.id,v.source_sha256 FROM texture_atlas_variants v
+                    JOIN texture_atlas_families f ON f.id=v.family_id
+                    WHERE f.atlas_key=? AND v.width=? AND v.height=?''',
+                    (key, width, height)).fetchone()
+            if existing:
+                if existing['source_sha256'] != sha:
+                    raise ValueError(f'{key} {width}x{height}: another image exists; '
+                                     'replace/republish explicitly in Atlas Registry')
+                return self.get_variant(existing['id'])
+            return self.register_file(str(staged), domain=domain)
 
     def register_file(self, source_path: str, *, domain: str = 'location') -> dict:
         if domain not in ('location', 'character'):

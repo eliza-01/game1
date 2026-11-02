@@ -55,7 +55,7 @@ class CharacterAtlasPresentationM198(unittest.TestCase):
     def test_presentation_scripts_loaded_before_consumers(self):
         start = self.html.index('character-atlas-presentation.js?v=1')
         self.assertLess(start, self.html.index('character-components.js?v=12'))
-        self.assertLess(start, self.html.index('character-atlas-ui.js?v=2'))
+        self.assertLess(start, self.html.index('character-atlas-ui.js?v=3'))
 
     @unittest.skipUnless(shutil.which('node'), 'Node required for browser integration simulation')
     def test_ranked_options_render_and_unpublished_first(self):
@@ -63,7 +63,8 @@ class CharacterAtlasPresentationM198(unittest.TestCase):
             str(ROOT / 'system/verify/character_atlas_presentation_m198.js'),
             str(STATIC / 'character-atlas-presentation.js'),
             str(STATIC / 'character-components.js'),
-            str(STATIC / 'character-atlas-ui.js')],
+            str(STATIC / 'character-atlas-ui.js'),
+            str(STATIC / 'atlas-identity.js')],
             text=True, capture_output=True, timeout=25)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn('unpublished-first passed', result.stdout)

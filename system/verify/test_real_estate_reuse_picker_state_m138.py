@@ -19,6 +19,7 @@ const elements=Object.create(null);
 const $=id=>elements[id]??(elements[id]={value:'',innerHTML:'',hidden:true,textContent:'',addEventListener(){}});
 const esc=v=>String(v??'');
 const ctx=vm.createContext({$,esc,window:{},localStorage:{setItem(){},getItem(){return null;}},request(){},toast(){}});
+vm.runInContext(fs.readFileSync(process.argv[2],'utf8'),ctx);
 vm.runInContext(fs.readFileSync(process.argv[1],'utf8'),ctx);
 vm.runInContext(`realEstateState.data={
   textureReferences:[{group:'estate',reference:'estate:other:house',label:'other',filename:'house.png',assetId:'333'}],
@@ -26,7 +27,7 @@ vm.runInContext(`realEstateState.data={
     {id:5,current:true,filename:'house_level4_01_4096x4096_atlas.png',source_path:'assets/source/texture-atlases/house_level4_01/4096x4096/house_level4_01_4096x4096_atlas.png',published_id:'92116826074029'},
     {id:6,current:false,filename:'house_level4_01_2048x2048_atlas.png',published_id:''}]}],items:[]};`,ctx);
 let html=vm.runInContext('realEstateReuseOptions("door")',ctx);
-assert.match(html,/<option value="atlas:5">house_level4_01 · house_level4_01_4096x4096_atlas.png · 92116826074029<\/option>/);
+assert.match(html,/<option value="atlas:5">house_level4_01 · 4096×4096 · 92116826074029<\/option>/);
 assert.doesNotMatch(html,/atlas:6/);
 vm.runInContext('realEstateState.reuseFilters.door={category:"all",query:"92116826074029"}',ctx);
 html=vm.runInContext('realEstateReuseOptions("door")',ctx);
@@ -46,7 +47,8 @@ assert.equal(vm.runInContext('realEstateState.textures.door',ctx),'assets/source
 const selected=vm.runInContext('realEstateReuseOptions("house")',ctx);
 assert.match(selected,/<option value="atlas:5">/);
 '''
-        result=subprocess.run([shutil.which('node'),'-e',code,str(js)],capture_output=True,text=True,timeout=20)
+        result=subprocess.run([shutil.which('node'),'-e',code,str(js),
+                                 str(ROOT/'system/control-center/static/atlas-identity.js')],capture_output=True,text=True,timeout=20)
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)
 
     def test_index_script_version_bumped(self):

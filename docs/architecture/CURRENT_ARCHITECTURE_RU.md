@@ -65,3 +65,8 @@ M85–M105 **реализовали** значительную декомпоз�
 ## Порядок обновления этой карты
 
 При изменении сервиса, store, контрактов Remote или schema обновлять: (1) текущую карту/ТЗ, (2) область проверки и ограничения, (3) исторический milestone-отчёт при крупном изменении. Не переписывать задним числом старые выводы. Наличие README или unit test не равно авторскому подтверждению Studio runtime.
+
+
+### M203 · Атласы и потребители
+
+Real Estate и Location Assets не владеют Image Asset и не публикуют его сами. Варианты и исходники принадлежат Atlas Registry; в `texture_atlas_bindings` — только ссылки `consumer_type/consumer_id → variant_id`. M203 удаляет исторические owner-ссылки/retained-slug механизм миграцией двух баз. Проекции `textureAssetId` в runtime реестрах не являются ownership. Weapon/Monster/NPC texture slots пока отдельный старый контур — не приписывать его к этому контракту без миграции. Подробнее: `docs/workflows/ATLAS_INDEPENDENCE_M203_RU.md`.

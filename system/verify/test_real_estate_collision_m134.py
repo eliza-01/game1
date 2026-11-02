@@ -45,20 +45,30 @@ class RealEstateColliderM134(TestCase):
             self.assertTrue(is_collision_mesh(name),name)
             self.assertFalse(requires_texture(name))
             self.assertFalse(default_no_collide(name))
-        for name in ('house','restoration','door','column','cologne','window_frames_glass'):
+        for name in ('house','restoration','column','cologne'):
             self.assertFalse(is_collision_mesh(name),name)
             self.assertTrue(requires_texture(name))
             self.assertTrue(default_no_collide(name))
+        for name in ('door','window_frames_glass','DOOR','WINDOW_FRAMES_GLASS'):
+            self.assertFalse(is_collision_mesh(name),name)
+            self.assertTrue(requires_texture(name))
+            self.assertFalse(default_no_collide(name))
 
     def test_options_default_and_explicit_overrides(self):
-        opts=mesh_options(['house','window_frames_glass','house_col'], {})
+        opts=mesh_options(['house','door','window_frames_glass','house_col'], {})
         self.assertTrue(opts['house']['noCollide'])
+        self.assertFalse(opts['door']['noCollide'])
+        self.assertFalse(opts['window_frames_glass']['noCollide'])
         self.assertTrue(opts['window_frames_glass']['glass'])
         self.assertFalse(opts['house_col']['glass'])
         self.assertFalse(opts['house_col']['noCollide'])
         self.assertTrue(opts['house_col']['collisionMesh'])
-        modified=mesh_options(['house','house_col'], {'house':{'noCollide':False},'house_col':{'noCollide':True}})
+        modified=mesh_options(['house','door','window_frames_glass','house_col'], {
+            'house':{'noCollide':False}, 'door':{'noCollide':True},
+            'window_frames_glass':{'noCollide':True}, 'house_col':{'noCollide':True}})
         self.assertFalse(modified['house']['noCollide'])
+        self.assertTrue(modified['door']['noCollide'])
+        self.assertTrue(modified['window_frames_glass']['noCollide'])
         self.assertTrue(modified['house_col']['noCollide'])
 
     def test_registration_without_col_texture_survives_restart(self):

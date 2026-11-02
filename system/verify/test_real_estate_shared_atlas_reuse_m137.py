@@ -49,6 +49,7 @@ const elements = Object.create(null);
 const $ = id => elements[id] ?? (elements[id] = {innerHTML:'',value:'',hidden:true,addEventListener(){}});
 const esc = value => String(value ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');
 const ctx = vm.createContext({$, esc, window:{},localStorage:{getItem(){return null;},setItem(){}},request(){},toast(){}});
+vm.runInContext(fs.readFileSync(process.argv[2], 'utf8'), ctx);
 vm.runInContext(fs.readFileSync(process.argv[1], 'utf8'), ctx);
 vm.runInContext(`realEstateState.data={textureReferences:[
   {group:'atlas',reference:'atlas:5',label:'house_level4_01',filename:'house_level4_01_4096x4096_atlas.png',
@@ -60,12 +61,12 @@ vm.runInContext(`realEstateState.data={textureReferences:[
  realEstateState.textureRefs.door='atlas:5';
  realEstateState.reuseFilters.door={category:'',query:''};`,ctx);
 let html = vm.runInContext('realEstateReuseOptions("door")', ctx);
-assert.match(html, /Shared Atlas Registry · published/);
-assert.match(html, /<option value="atlas:5">house_level4_01 · house_level4_01_4096x4096_atlas.png · 92116826074029<\/option>/);
+assert.match(html, /<optgroup label="house_level4_01">/);
+assert.match(html, /<option value="atlas:5">house_level4_01 · 4096×4096 · 92116826074029<\/option>/);
 assert.match(html, /<option value="atlas:4">restoration_01/);
-assert.match(html, /Real Estate · registered/);
-assert.match(html, /Location Assets · Fences/);
-assert.match(html, /<option value="mesh:house">/);
+assert.match(html, /<optgroup label="house">/);
+assert.match(html, /<optgroup label="stone">/);
+assert.doesNotMatch(html, /<option value="mesh:house">/); // no local house atlas provided
 vm.runInContext('realEstateState.reuseFilters.door.query="92116826074029"',ctx);
 html = vm.runInContext('realEstateReuseOptions("door")',ctx);
 assert.match(html, /<option value="atlas:5">/);
@@ -84,7 +85,8 @@ assert.match(html, /<option value="atlas:5">/);
 // The selected value is unchanged by changing how the dropdown is displayed.
 assert.equal(vm.runInContext('realEstateState.textureRefs.door',ctx),'atlas:5');
 '''
-        result = subprocess.run([shutil.which('node'), '-e', code, str(js)],
+        result = subprocess.run([shutil.which('node'), '-e', code, str(js),
+                                 str(ROOT / 'system/control-center/static/atlas-identity.js')],
                                 capture_output=True, text=True, timeout=15)
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
 

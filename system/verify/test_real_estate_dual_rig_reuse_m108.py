@@ -201,7 +201,7 @@ class DualRigReuseTests(unittest.TestCase):
         self.assertIn('real-estate-reference-',js)
         self.assertIn('textureReferences:',js)
         self.assertIn('flex-direction:column',css)
-        self.assertIn('Published Location/Real Estate Image Asset',js)
+        self.assertIn('Atlases are identified by filename and Image Asset ID',js)
         self.assertIn('real-estate.js?v=',(ROOT/'system/control-center/static/index.html').read_text('utf-8'))
 
 if __name__=='__main__':

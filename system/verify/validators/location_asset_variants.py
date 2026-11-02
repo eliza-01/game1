@@ -20,12 +20,12 @@ def check_location_asset_variants(root: Path, report_error: Callable[[str], None
     # m44 Location Assets: PNG/JPG source textures with clean extension-aware preparation.
     for required in [
         'TEXTURE_SUFFIXES = (".png", ".jpg", ".jpeg")',
-        'canonical_suffix = ".jpg" if source_suffix == ".jpeg" else source_suffix',
-        "_retire_replaced_file",
-        "PNG or JPG",
+        'self.atlases.adopt_file',
+        'self.atlases.bind',
+        'self.atlases.ensure_published',
     ]:
         if required not in location_asset_store_text:
-            report_error(f"m44 LocationAssetStore image format support missing {required}")
+            report_error(f"m203 independent Location Asset texture support missing {required}")
     for required in [
         "def choose_location_asset_texture()",
         "*.png;*.jpg;*.jpeg",
@@ -37,35 +37,35 @@ def check_location_asset_variants(root: Path, report_error: Callable[[str], None
     if "PNG/JPG" not in deco_assets_js_text or "PNG/JPG" not in index_m43_text:
         report_error("m44 Location Assets UI does not advertise PNG/JPG texture support")
 
-    # m46 Location Assets: Decorations category + shared registered texture references.
+    # M203 replaces model-as-texture-owner with independent atlas variants.
     for required in [
         'SCHEMA_VERSION = 4',
         '"decoration": "Decorations"',
-        'texture_reference_slug TEXT NOT NULL DEFAULT',
-        'def _resolve_texture_owner',
-        'textureReferenceSlug',
-        'texture_owner_slug',
-        'texture_shared',
-        'shared texture owner',
-        'retained_textures.retain',
+        "atlasVariantId",
+        "texture_atlas_bindings" if False else "self.atlases.binding",
     ]:
         if required not in location_asset_store_text:
-            report_error(f"m46 shared Location Asset texture support missing {required}")
+            report_error(f"m203 independent Location Asset atlas support missing {required}")
+    for forbidden in ("def _resolve_texture_owner", "retained_textures.retain",
+                      "texture_reference_slug TEXT NOT NULL DEFAULT"):
+        if forbidden in location_asset_store_text:
+            report_error(f"m203 owner-based atlas implementation remains: {forbidden}")
     for required in [
         'id="location-asset-texture-reference"',
         'decorations</span>',
         'atlas variant',
     ]:
         if required not in index_m43_text:
-            report_error(f"m46 Location Assets UI missing {required}")
+            report_error(f"m203 Location Assets independent atlas UI missing {required}")
     for required in [
-        'textureReferenceSlug',
         'decoAssetRenderTextureReferences',
         'location-asset-texture-reference',
-        'reuse a registered texture',
+        'atlasVariantId',
     ]:
         if required not in deco_assets_js_text:
-            report_error(f"m46 Location Assets shared-texture UI behavior missing {required}")
+            report_error(f"m203 Location Assets atlas picker missing {required}")
+    if 'textureReferenceSlug:' in deco_assets_js_text:
+        report_error('m203 Location Assets UI must not submit model-owner references')
     for required in [
         'decoration = "Decorations"',
         'ladder = "Ladders"',

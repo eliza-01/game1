@@ -27,6 +27,7 @@ from validators.combat_contact import check_combat_contact_contracts
 from validators.monsters import check_monster_contracts
 from validators.project_layout import check_project_identity, check_project_layout
 from validators.source_only import check_source_only_contract
+from validators.atlas_independence import check_atlas_independence
 
 ROOT = Path(__file__).resolve().parents[2]
 errors = []
@@ -152,6 +153,8 @@ environment_asset_service_text, install_plugin_text = check_environment_bounce(
     ROOT, err, sources=location_assets, host_agent_text=host_agent_text,
     studio_plugin_text=studio_plugin_text,
 )
+
+check_atlas_independence(ROOT, err)
 
 check_location_texture_sync(
     ROOT, err, sources=location_assets,

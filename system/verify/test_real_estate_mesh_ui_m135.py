@@ -34,6 +34,7 @@ const assert = require('node:assert/strict');
 const nodes = Object.create(null);
 function $(id){return nodes[id]??(nodes[id]={hidden:true,innerHTML:'',textContent:'',value:'',addEventListener:()=>{}});}
 const ctx = vm.createContext({$,esc:s=>String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;'),window:{},request:async()=>{},toast:()=>{},console});
+vm.runInContext(fs.readFileSync(process.argv[2],'utf8'),ctx);
 vm.runInContext(fs.readFileSync(process.argv[1],'utf8'),ctx);
 vm.runInContext(`realEstateState.inspect={analysis:{meshes:[{name:'house'},{name:'col_mesh'},{name:'door'},{name:'restoration'},{name:'window_frames_glass'}]},textures:[{name:'house_level4_01_4096x4096_atlas.png',path:'C:/textures/house_level4_01_4096x4096_atlas.png'}]};realEstateState.data={textureReferences:[]};realEstateRenderTextures()`,ctx);
 const html=$('real-estate-mesh-textures').innerHTML;
@@ -44,16 +45,26 @@ assert.match(html,/Collision · no texture/);
 assert.doesNotMatch(html,/id="real-estate-texture-col_mesh"/);
 assert.match(html,/id="real-estate-nocollide-col_mesh" >/);
 assert.match(html,/id="real-estate-nocollide-house" checked/);
+assert.match(html,/id="real-estate-nocollide-door" >/);
+assert.match(html,/id="real-estate-nocollide-window_frames_glass" >/);
 assert.match(html,/id="real-estate-glass-window_frames_glass" checked/);
 $('real-estate-nocollide-house').onchange({target:{checked:false}});
 $('real-estate-reuse-door').onchange({target:{checked:true}});
-const state=vm.runInContext('({house:realEstateState.meshOptions.house,doorReuse:realEstateState.reuseEnabled.door})',ctx);
+const state=vm.runInContext('({house:realEstateState.meshOptions.house,door:realEstateState.meshOptions.door,glass:realEstateState.meshOptions.window_frames_glass,doorReuse:realEstateState.reuseEnabled.door})',ctx);
 assert.equal(state.house.noCollide,false);
+assert.equal(state.door.noCollide,false);
+assert.equal(state.glass.noCollide,false);
 assert.equal(state.doorReuse,true);
 assert.equal($('real-estate-owned-door').hidden,true);
 assert.equal($('real-estate-shared-door').hidden,false);
+vm.runInContext('realEstateRender=()=>{}',ctx);
+vm.runInContext(`realEstateForm({slug:'example',meshParts:['door','window_frames_glass'],meshOptions:{door:{noCollide:true},window_frames_glass:{noCollide:true}}});`,ctx);
+const saved=vm.runInContext('({door:realEstateState.meshOptions.door,glass:realEstateState.meshOptions.window_frames_glass})',ctx);
+assert.equal(saved.door.noCollide,true);
+assert.equal(saved.glass.noCollide,true);
 '''
-        done = subprocess.run(['node', '-e', code, str(JS)], capture_output=True, text=True, timeout=15)
+        done = subprocess.run(['node', '-e', code, str(JS),
+                                str(ROOT / 'system/control-center/static/atlas-identity.js')], capture_output=True, text=True, timeout=15)
         self.assertEqual(done.returncode, 0, done.stderr)
 
 

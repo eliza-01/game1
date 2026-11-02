@@ -9,6 +9,7 @@ from weapon_store import WeaponStore
 from monster_store import MonsterStore
 from monster_animation_store import MonsterAnimationStore
 from location_asset_store import LocationAssetStore
+from real_estate.store import RealEstateStore
 from source_only_assets import migrate_source_only_assets
 
 source_only_report = migrate_source_only_assets(ROOT, ROOT / ".control-center" / "game1.db")
@@ -18,6 +19,7 @@ weapons = WeaponStore(ROOT)
 monsters = MonsterStore(ROOT)
 monster_animations = MonsterAnimationStore(ROOT)
 location_assets = LocationAssetStore(ROOT)
+real_estate = RealEstateStore(ROOT, location_assets=location_assets)
 character_snapshot = characters.snapshot()
 animation_snapshot = animations.snapshot(character_snapshot.get("activeArchetypeId"))
 weapon_snapshot = weapons.snapshot()

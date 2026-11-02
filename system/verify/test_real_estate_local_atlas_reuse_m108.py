@@ -162,30 +162,31 @@ const context={window:{},localStorage:{getItem:()=>null,setItem:()=>{}},
   esc:s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),
   request:()=>{},toast:()=>{},console};
 vm.createContext(context);
+vm.runInContext(fs.readFileSync(process.argv[2],'utf8'),context);
 vm.runInContext(fs.readFileSync(process.argv[1],'utf8'),context);
 const output=vm.runInContext(`(() => {
  realEstateState.data={textureReferences:[
-  {group:'location',reference:'location:granite-wall',category:'rock',categoryLabel:'Rocks',label:'Granite Wall',assetId:'88001'},
-  {group:'location',reference:'location:oak-fence',category:'fence',categoryLabel:'Fences',label:'Oak Fence',assetId:'88002'},
-  {group:'estate',reference:'estate:other:house',label:'other / house',assetId:'88003'}
+  {group:'location',reference:'location:granite-wall',category:'rock',categoryLabel:'Rocks',label:'Granite Wall',filename:'granite_01_512x512_atlas.png',assetId:'88001'},
+  {group:'location',reference:'location:oak-fence',category:'fence',categoryLabel:'Fences',label:'Oak Fence',filename:'oak_01_512x512_atlas.png',assetId:'88002'},
+  {group:'estate',reference:'estate:other:house',label:'other / house',filename:'other_01_512x512_atlas.png',assetId:'88003'}
  ]};
  realEstateState.textureRefs.door='location:oak-fence';
  realEstateState.reuseFilters.door={category:'rock',query:'granite'};
  const filtered=realEstateReuseOptions('door');
- const categories=realEstateLocationCategories();
  realEstateState.reuseFilters.door={category:'',query:'oak'};
  const searched=realEstateReuseOptions('door');
- return {filtered,searched,categories};
+ return {filtered,searched};
 })()`,context);
-if(!output.filtered.includes('This Estate')||!output.filtered.includes('mesh:house'))process.exit(11);
-if(!output.filtered.includes('Granite Wall')||!output.filtered.includes('Oak Fence'))process.exit(12);
-if(!output.filtered.includes('Location Assets · Rocks'))process.exit(13);
+if(output.filtered.includes('This Estate')||output.filtered.includes('mesh:house'))process.exit(11);
+if(!output.filtered.includes('granite_01')||!output.filtered.includes('oak_01'))process.exit(12);
+if(output.filtered.includes('Location Assets · Rocks'))process.exit(13);
 if(output.filtered.includes('other / house'))process.exit(14);
-if(!output.searched.includes('Oak Fence')||output.searched.includes('Granite Wall'))process.exit(15);
-if(output.categories.length!==2)process.exit(16);
+if(!output.searched.includes('oak_01')||output.searched.includes('granite_01'))process.exit(15);
+
 '''
         output=subprocess.run([shutil.which('node'),'-e',script,
-                                str(ROOT/'system/control-center/static/real-estate.js')],
+                                str(ROOT/'system/control-center/static/real-estate.js'),
+                                str(ROOT/'system/control-center/static/atlas-identity.js')],
                                text=True,capture_output=True)
         self.assertEqual(output.returncode,0,output.stderr+output.stdout)
 

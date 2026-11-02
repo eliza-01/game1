@@ -15,7 +15,7 @@
       <div data-retirement-dependencies class="shared-asset-retirement-dependencies"></div>
       <div class="shared-asset-retirement-modes">
         <label><input type="radio" name="shared-retirement-mode" value="preserve" checked> <b>Keep used assets (recommended)</b><small>Delete only this registration. Shared textures, Image Asset IDs and dependent models remain available.</small></label>
-        <label><input type="radio" name="shared-retirement-mode" value="all"> <b>Delete all dependent registrations</b><small>Also retire the listed models that reuse its textures. Roblox cloud assets and local source files are still preserved.</small></label>
+        <label><input type="radio" name="shared-retirement-mode" value="all"> <b>Delete linked registrations</b><small>Only for structural dependencies; shared atlas consumers are never deletion targets.</small></label>
       </div>
       <label data-retirement-confirm-label hidden>Type the registration slug to confirm deleting all dependents:
         <input type="text" data-retirement-confirm autocomplete="off" spellcheck="false"></label>
@@ -47,41 +47,59 @@
     target.textContent=`${kind==='estate'?'Real Estate':'Location Asset'} · ${slug}`;
     const count=plan.dependentCount||0;
     const summary=document.createElement('p');
-    summary.textContent=count?`${count} dependent registration(s) use shared textures:`:'No other model registrations depend on this asset.';
+    const shareCount=(plan.sharedAtlasUses||[]).reduce((n,item)=>n+(item.uses||[]).length,0);
+    summary.textContent=count?`${count} legacy dependent registration(s) use shared textures:`:
+      shareCount?`Shared Image Assets are also used by ${shareCount} other part(s). Those registrations will be preserved.`:
+      'No other model registrations depend on this asset.';
     deps.appendChild(summary);
-    if(count){
-      // Group by the original shared texture, not by the consuming model.
-      // One source may be reused by several distinct MeshParts (or models).
-      const groups=new Map();
+    if(count||shareCount){
+      // Group by Image Asset identity, NOT by the first model that published it.
+      // A single image may be referenced by multiple legacy owners/part names.
+      const sources=new Map();
+      const owners=new Map((plan.nodes||[]).map(node=>[`${node.kind}:${node.slug}`,node]));
       for(const relation of plan.relations||[]){
         const sourcePart=relation.ownerPart||'texture';
-        const key=JSON.stringify([relation.owner,sourcePart]);
-        if(!groups.has(key))groups.set(key,{owner:relation.owner,sourcePart,uses:[]});
-        const group=groups.get(key);
+        const owner=owners.get(relation.owner);
+        const texture=relation.owner.startsWith('estate:')?owner?.textures?.[sourcePart]:null;
+        const assetId=String(texture?.assetId||owner?.textureId||'');
+        const filename=texture?.filename||owner?.textureFilename||'';
+        const atlasKey=texture?.atlasKey||owner?.atlasKey||'';
+        const identity=window.game1AtlasIdentity.describe({filename,atlasKey});
+        const key=assetId?`image:${assetId}`:`reference:${relation.owner}:${sourcePart}`;
+        if(!sources.has(key))sources.set(key,{assetId,identity,uses:[]});
+        const group=sources.get(key);
         if(!group.uses.some(use=>use.dependent===relation.dependent&&use.part===relation.part)){
           group.uses.push({dependent:relation.dependent,part:relation.part});
         }
       }
-      const sources=[...groups.values()].sort((a,b)=>
-        a.owner.localeCompare(b.owner)||a.sourcePart.localeCompare(b.sourcePart));
-      const owners=new Map((plan.nodes||[]).map(node=>[`${node.kind}:${node.slug}`,node]));
-      for(const source of sources){
-        const owner=owners.get(source.owner);
+      // Independently bound Atlas Registry consumers are NOT cascade targets.
+      // Show them in the same image-based grouping as legacy references.
+      for(const shared of plan.sharedAtlasUses||[]){
+        const assetId=String(shared.assetId||'');
+        const key=assetId?`image:${assetId}`:`variant:${shared.variantId}`;
+        if(!sources.has(key))sources.set(key,{assetId,
+          identity:window.game1AtlasIdentity.describe({filename:shared.filename,atlasKey:shared.atlasKey}),uses:[]});
+        const group=sources.get(key);
+        for(const use of shared.uses||[]){
+          if(!group.uses.some(item=>item.dependent===use.dependent&&item.part===use.part))
+            group.uses.push({dependent:use.dependent,part:use.part});
+        }
+      }
+      for(const source of [...sources.values()].sort((a,b)=>
+        a.identity.key.localeCompare(b.identity.key)||a.assetId.localeCompare(b.assetId))){
         const section=document.createElement('section');
         section.className='shared-asset-retirement-source';
         const heading=document.createElement('h4');
-        const ownerSlug=source.owner.split(':').slice(1).join(':');
-        heading.textContent=`Shared atlas · ${ownerSlug} / ${source.sourcePart}`;
+        heading.textContent=`Shared atlas · ${source.identity.key}`;
         section.appendChild(heading);
-        const assetId=source.owner.startsWith('estate:')
-          ? owner?.textures?.[source.sourcePart]?.assetId
-          : owner?.textureId;
-        if(assetId){
-          const meta=document.createElement('p');
-          meta.className='shared-asset-retirement-source-id';
-          meta.textContent=`Image Asset ID: ${assetId}`;
-          section.appendChild(meta);
-        }
+        const description=document.createElement('p');
+        description.className='shared-asset-retirement-source-id';
+        description.textContent=[
+          source.identity.variant?`${source.identity.name} · variant ${source.identity.variant}`:source.identity.name,
+          source.identity.resolution,
+          source.assetId?`Image Asset ID: ${source.assetId}`:'Image Asset ID unavailable'
+        ].filter(Boolean).join(' · ');
+        section.appendChild(description);
         const consumerModels=new Set(source.uses.map(use=>use.dependent)).size;
         const summary=document.createElement('p');
         summary.className='shared-asset-retirement-source-summary';
@@ -98,12 +116,13 @@
         deps.appendChild(section);
       }
     }
+    modes[1].disabled=count===0;
     const update=()=>{
       const all=modes[1].checked;
       confirmLabel.hidden=!all||count===0;
       submit.textContent=all&&count>0
         ?`Delete all (${plan.nodes.length} registrations)`
-        :`${kind==='estate'?'Delete house':'Delete location asset'}${count>0?' · keep shared assets':''}`;
+        :`${kind==='estate'?'Delete house':'Delete location asset'}${count>0||shareCount>0?' · keep shared assets':''}`;
       submit.disabled=all&&count>0&&confirm.value!==slug;
     };
     modes.forEach(r=>r.onchange=update);

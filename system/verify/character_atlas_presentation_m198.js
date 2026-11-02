@@ -68,6 +68,7 @@ const context=vm.createContext({document,window:{
   request(url){if(url==='/api/characters/components')return Promise.resolve(catalog);throw Error('Unexpected request '+url);},
   toast(){throw Error('Unexpected toast');}});
 function load(file){vm.runInContext(fs.readFileSync(file,'utf8'),context,{filename:file});}
+load(process.argv[5]);
 load(process.argv[3]);
 load(process.argv[4]);
 (async()=>{

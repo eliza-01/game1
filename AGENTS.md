@@ -36,3 +36,7 @@ M189 separates Character and Monster/NPC Animation Python store responsibilities
 - [`docs/workflows/DEVELOPMENT_AND_VALIDATION_RU.md`](docs/workflows/DEVELOPMENT_AND_VALIDATION_RU.md) — test and handoff procedure.
 
 Historical reports in `docs/history/` are snapshots, not normative contracts. Maintain the historical M83 audit at its existing path because a regression test pins that file. These rules remain binding; a newer document cannot silently waive them.
+
+## M203 · Real Estate / Location Atlas independence
+
+Model slug cannot own or reserve atlas identity. New authoring calls `AtlasRegistry.adopt_file/bind/ensure_published`; old owner references and retained texture snapshots migrate into independent variants on startup; see `docs/workflows/ATLAS_INDEPENDENCE_M203_RU.md`. This does not migrate unrelated Weapon/Monster/NPC texture slot stores; they remain a separate architectural debt and must not be represented as compliant.

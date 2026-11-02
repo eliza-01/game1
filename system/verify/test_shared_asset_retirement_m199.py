@@ -103,9 +103,11 @@ class SharedAssetRetirementM199(TestCase):
         fresh = LocationAssetStore(self.root)
         follower = fresh.get('second_wall')
         self.assertEqual(follower['texture_asset_id'], '123456789')
-        self.assertEqual(follower['texture_owner_slug'], 'owner_wall')
+        self.assertEqual(follower['texture_owner_slug'], '')
+        self.assertEqual(follower['texture_reference_slug'], '')
+        self.assertEqual(fresh.atlases.binding('location_asset','second_wall')['published_id'], '123456789')
         self.assertTrue((self.root / follower['texture_path']).is_file())
-        self.assertEqual(fresh.atlases.binding('location_asset','owner_wall')['published_id'],'123456789')
+        self.assertIsNone(fresh.atlases.binding('location_asset','owner_wall'))
 
     def test_house_owner_removed_but_dependent_door_keeps_same_image_id(self):
         owner = self.register_house('01')
@@ -122,7 +124,8 @@ class SharedAssetRetirementM199(TestCase):
         fresh = RealEstateStore(self.root, location_assets=LocationAssetStore(self.root))
         after = fresh.get(follower['slug'])['textures']['door']
         self.assertEqual(after['assetId'],'99001234')
-        self.assertEqual(after['reuseReference'],f'estate:{owner["slug"]}:house')
+        self.assertEqual(after['reuseReference'], '')
+        self.assertEqual(fresh.atlases.binding('real_estate',f'{follower["slug"]}:door')['published_id'], '99001234')
         self.assertTrue((self.root / after['path']).is_file())
 
     def test_non_atlas_legacy_house_texture_preserved_after_retirement(self):
@@ -136,15 +139,28 @@ class SharedAssetRetirementM199(TestCase):
         self.assertEqual(texture['assetId'], '88112233')
         self.assertTrue((self.root / texture['path']).is_file())
         self.assertEqual(texture['filename'], 'legacy_house_texture.png')
+        self.assertIn('assets/source/texture-atlases/', texture['path'])
+        # Register a DIFFERENT house under the deleted slug: its new atlas
+        # can overwrite the old owner-local path but not the retained pixels.
+        from hashlib import sha256
+        original_path=self.root/texture['path']
+        original_digest=sha256(original_path.read_bytes()).hexdigest()
+        Image.new('RGB', (32,32), (100,110,120)).save(self.legacy_image)
+        self.register_house('01',legacy=True)
+        after=self.estate.get(follower['slug'])['textures']['door']
+        self.assertEqual(after['assetId'],'88112233')
+        self.assertEqual(after['path'],texture['path'])
+        self.assertEqual(sha256(original_path.read_bytes()).hexdigest(),original_digest)
 
-    def test_retired_owner_slug_is_reserved_to_avoid_rebinding_old_consumers(self):
+    def test_retired_owner_slug_can_be_reused_after_independent_atlas_migration(self):
         owner = self.register_location('old_owner')
         self.publish_location_atlas(owner)
         self.register_location('follower', 'old_owner')
         self.service.execute('location', 'old_owner')
-        with self.assertRaisesRegex(ValueError, 'reserved'):
-            self.register_location('old_owner')
+        new = self.register_location('old_owner')
+        self.assertEqual(new['slug'], 'old_owner')
         self.assertEqual(self.loc.get('follower')['texture_asset_id'], '123456789')
+        self.assertEqual(self.loc.get('follower')['texture_reference_slug'], '')
 
     def test_location_owner_referenced_by_house_survives_retirement(self):
         loc = self.register_location('old_lamp')
@@ -157,7 +173,8 @@ class SharedAssetRetirementM199(TestCase):
         estate = RealEstateStore(self.root, location_assets=LocationAssetStore(self.root))
         texture = estate.get(house['slug'])['textures']['house']
         self.assertEqual(texture['assetId'],'66778899')
-        self.assertEqual(texture['reuseReference'],'location:old_lamp')
+        self.assertEqual(texture['reuseReference'],'')
+        self.assertEqual(estate.atlases.binding('real_estate',f'{house["slug"]}:house')['published_id'],'66778899')
 
     def test_delete_all_removes_transitive_dependents_only_after_confirmation(self):
         owner=self.register_location('owner_a')

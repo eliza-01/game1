@@ -15,31 +15,27 @@ def check_location_texture_sync(root: Path, report_error: Callable[[str], None],
     deco_assets_js_text = sources.assets_js
     deco_manager_text = sources.manager_text
     plugin_project_text = sources.plugin_project_text
-    # m51 Location Assets: changed owned textures get a fresh Roblox Image Asset ID.
-    deco_placed_sync_path = root / "system/studio-plugin/modules/DecoPlacedAssetSync.luau"
-    environment_visuals_path = root / "src/server/world/EnvironmentAssetVisuals.luau"
-    for path in [deco_placed_sync_path, environment_visuals_path]:
-        if not path.is_file():
-            report_error(f"m51 texture synchronization module missing: {path.relative_to(root)}")
-    deco_placed_sync_text = deco_placed_sync_path.read_text(encoding="utf-8") if deco_placed_sync_path.is_file() else ""
-    environment_visuals_text = environment_visuals_path.read_text(encoding="utf-8") if environment_visuals_path.is_file() else ""
+    # M203: texture replacement/publication belongs to AtlasRegistry, not
+    # LocationAssetStore. Studio refresh still consumes published image IDs.
     for required in [
-        "legacy_texture_updates",
-        "COUNT(DISTINCT publication.sha256)>1",
-        "texture_replaced =",
-        "replacement is identity-changing for Location Assets by design",
-        "operation = create_image_asset(",
+        'self.atlases.ensure_published',
+        "self.atlases.binding('location_asset'",
+        "'atlasVariantId'",
     ]:
         if required not in location_asset_store_text:
-            report_error(f"m51 Location Asset replacement publication missing {required}")
-    if "update_image_asset" in location_asset_store_text:
-        report_error("m51 Location Assets still contain legacy in-place Image Asset updates")
-    for required in [
-        "central atlas reuse never does",
-        "texture ${published.texture_asset_id || '—'}",
-    ]:
-        if required not in (index_m43_text + deco_assets_js_text):
-            report_error(f"m51 Location Assets UI publication identity missing {required}")
+            report_error(f"m203 Location Assets atlas publication delegation missing {required}")
+    for forbidden in ('create_image_asset(', 'update_image_asset(', 'retained_textures.retain'):
+        if forbidden in location_asset_store_text:
+            report_error(f"m203 Location Assets still own image publication: {forbidden}")
+    deco_placed_sync_path = root / "system/studio-plugin/modules/DecoPlacedAssetSync.luau"
+    environment_visuals_path = root / "src/server/world/EnvironmentAssetVisuals.luau"
+    for path in (deco_placed_sync_path, environment_visuals_path):
+        if not path.is_file():
+            report_error(f"m51 texture synchronization module missing: {path.relative_to(root)}")
+    deco_placed_sync_text = deco_placed_sync_path.read_text(encoding='utf-8') if deco_placed_sync_path.is_file() else ''
+    environment_visuals_text = environment_visuals_path.read_text(encoding='utf-8') if environment_visuals_path.is_file() else ''
+    if "texture ${published.texture_asset_id || '—'}" not in deco_assets_js_text + index_m43_text:
+        report_error('m51 published texture feedback missing')
     for required in ["Game1DecoAssetSlug", "StudioTextureAppearance.Apply(part, uri, row.textureUsesAlpha)", "RefreshTextures"]:
         if required not in deco_placed_sync_text:
             report_error(f"m51 DecoManager placed-texture sync missing {required}")

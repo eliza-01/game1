@@ -250,7 +250,7 @@
 <div class="details">asset slug: <strong id="real-estate-slug">house_level1_01</strong></div>
 <div class="character-grid"><label>purchase price<input id="real-estate-purchase" type="number" min="1" value="1" step="1"></label><label>minimum purchase level<input id="real-estate-min-level" type="number" min="1" value="1" step="1"></label><label>sale price<input id="real-estate-sale" type="number" min="1" value="1" step="1"></label></div>
 <hr class="card-separator"><span class="eyebrow">02 · mesh textures</span><h3>per-mesh textures</h3>
-<p class="hint">Choose an atlas for each visual mesh, or enable <strong>Reuse atlas</strong>. <code>COL_</code> / <code>_col</code> meshes are physics-only: they have no texture and default to collision enabled. All other meshes default to <strong>No Collide</strong>.</p>
+<p class="hint">Choose an atlas for each visual mesh, or enable <strong>Reuse atlas</strong>. <code>COL_</code> / <code>_col</code> meshes are physics-only: they have no texture and default to collision enabled. <code>door</code> and <code>window_frames_glass</code> also default to collisions enabled (<strong>No Collide</strong> unchecked). Other visual meshes default to <strong>No Collide</strong>.</p>
 <div id="real-estate-mesh-textures" class="real-estate-texture-list"></div>
 <div id="real-estate-rig-warnings" class="real-estate-rig-warnings" hidden></div>
 <details id="real-estate-rig-details" class="real-estate-bone-details"><summary id="real-estate-rig">choose an FBX to inspect its mesh bones</summary><div id="real-estate-bone-list" class="real-estate-bone-list"></div></details>
@@ -604,19 +604,20 @@
 <script src="character-component-summary.js?v=1"></script>
 <script src="character-atlas-presentation.js?v=1"></script>
 <script src="character-components.js?v=12"></script>
-<script src="character-atlas-ui.js?v=2"></script>
+<script src="atlas-identity.js?v=1"></script>
+<script src="character-atlas-ui.js?v=3"></script>
 <script src="character-assemblies.js?v=4"></script>
 <script src="animation-speed.js?v=3"></script>
 <script src="timelines.js?v=2"></script>
 <script src="locations.js?v=2"></script>
-<script src="shared-asset-retirement.js?v=2"></script>
-<script src="deco-assets.js?v=7"></script>
+<script src="shared-asset-retirement.js?v=4"></script>
+<script src="deco-assets.js?v=8"></script>
 <script src="options.js?v=1"></script>
 <script src="weapon-assets.js?v=3"></script>
 <script src="monster-assets.js?v=6"></script>
 <script src="npc-assets.js?v=5"></script>
 <script src="npc-spawns.js?v=4"></script>
-<script src="real-estate.js?v=21&rig=186&atlas=188"></script>
+<script src="real-estate.js?v=23&rig=186&atlas=202"></script>
 <script src="real-estate-mesh-workflow.js?v=2&atlas=188"></script>
 <script src="monster-spawns.js?v=1"></script>
 </body>

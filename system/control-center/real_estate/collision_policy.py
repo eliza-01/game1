@@ -21,4 +21,8 @@ def requires_texture(name: str) -> bool:
 
 
 def default_no_collide(name: str) -> bool:
-    return not is_collision_mesh(name)
+    # Door and window glass are interactive/solid by default, like colliders.
+    # This only supplies missing authoring flags; explicit saved values win.
+    return not is_collision_mesh(name) and str(name).casefold() not in (
+        'door', 'window_frames_glass',
+    )

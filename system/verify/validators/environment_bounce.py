@@ -47,7 +47,7 @@ def check_environment_bounce(root: Path, report_error: Callable[[str], None], *,
 
     for required in [
         "destructible INTEGER NOT NULL DEFAULT 0",
-        'result["destructible"] = bool(result.get("destructible"))',
+        "result['destructible'] = bool(result.get('destructible'))",
         'f"\\t\\t\\tdestructible = {str(bool(row.get(\'destructible\'))).lower()},"',
     ]:
         if required not in location_asset_store_text:

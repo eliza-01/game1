@@ -171,9 +171,9 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
         if root and root:IsA("BasePart") then
             local direction = Vector3.new(target.X - root.Position.X, 0, target.Z - root.Position.Z)
             if direction.Magnitude > 0.001 then
-                local playbackSpeed = math.max(0.01, tonumber(action.playbackSpeed) or 1)
-                local timelineScale = 1 / playbackSpeed
-                local facingTurnDuration = math.min(attackDuration, AttackConfig.FacingTurnSeconds * timelineScale)
+                -- Facing is a gameplay interval, not a function of the FBX clip's
+                -- individual playback multiplier.
+                local facingTurnDuration = math.min(attackDuration, AttackConfig.FacingTurnSeconds)
 
                 if movementController and not movingAtAttackStart then
                     if movementController.BeginAimFacingCompensation then

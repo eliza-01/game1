@@ -3618,7 +3618,7 @@
       "race": "human",
       "gender": "male",
       "status": "ASSEMBLY_READY",
-      "revision": 5,
+      "revision": 6,
       "visualMode": "assembly",
       "assembly": {
         "schema_version": 1,
@@ -4062,7 +4062,7 @@
         "MaxHP": 100,
         "Damage": 10,
         "Defense": 0,
-        "AttackSpeed": 100,
+        "AttackSpeed": 200,
         "RunSpeed": 150,
         "CritChance": 0
       },

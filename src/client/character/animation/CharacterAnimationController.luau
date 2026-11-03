@@ -483,17 +483,21 @@ function CharacterAnimationController.PlayAction(slot: string)
 	end
 
 	local clipId = tostring(descriptor.clipId or "")
-	local animationSpeedPercent = animationPlaybackPercent(slot, descriptor.animationId)
+	-- Non-attack channels retain animation scaling. Character attacks instead
+	-- derive the actual track playback from the fixed gameplay cadence.
+	local animationSpeedPercent = if slot == "attack" then 100
+		else animationPlaybackPercent(slot, descriptor.animationId)
 	local playbackSpeed = animationSpeedPercent / 100
 	local timeline = nil
 	local runtimeDuration = 0
 	if slot == "attack" then
-		timeline = AttackTimelineConfig.ResolveRuntime(clipId, animationSpeedPercent)
+		timeline = AttackTimelineConfig.ResolveCharacterRuntime(clipId, character:GetAttribute("AttackSpeed"))
 		if not timeline then
 			warn(("[game1][animation] attack clip has no timeline: %s"):format(clipId))
 			return nil
 		end
 		playbackSpeed = timeline.playbackSpeed
+		animationSpeedPercent = timeline.animationSpeedPercent
 		runtimeDuration = timeline.duration
 	end
 
@@ -502,7 +506,12 @@ function CharacterAnimationController.PlayAction(slot: string)
 	local actionToken = currentActionToken
 	currentActionSlot = slot
 	currentActionLockedUntil = if slot == "attack" then now + runtimeDuration else 0
-	publishPlaybackPercent(slot)
+	if slot == "attack" then
+		-- Show the clip's *actual* fit-to-cadence playback in Studio debug UI.
+		character:SetAttribute("AnimationPlaybackSpeedPercent", animationSpeedPercent)
+	else
+		publishPlaybackPercent(slot)
+	end
 
 	local track = fallbackTrack
 	local composed = false

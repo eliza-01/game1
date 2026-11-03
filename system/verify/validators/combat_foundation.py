@@ -46,10 +46,10 @@ def check_combat_foundation(ROOT: Path, err: Callable[[str], None]):
         if forbidden in attack_timeline_text:
             err(f"obsolete attack timeline runtime field remains: {forbidden}")
     for required in [
-        "AttackTimelineConfig.ResolveRuntime",
+        "AttackTimelineConfig.ResolveCharacterRuntime",
         "CharacterAttackWindow.Resolve",
         "allowedAttackDescriptor",
-        "AnimationSpeedScaling.ResolveForAnimation",
+        'character:GetAttribute("AttackSpeed")',
         "AttackSessionStore.IsCoolingDown",
         'character:SetAttribute("AttackEndsAt"',
     ]:

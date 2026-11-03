@@ -4,13 +4,11 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local CharacterShared = Shared:WaitForChild("character")
 local CombatShared = Shared:WaitForChild("combat")
-local AnimationShared = Shared:WaitForChild("animation")
 local Config = require(CombatShared:WaitForChild("AttackConfig"))
 local AttackTimelineConfig = require(CombatShared:WaitForChild("AttackTimelineConfig"))
 local CharacterAttackWindow = require(CombatShared:WaitForChild("CharacterAttackWindow"))
 local WeaponAttackVolume = require(CombatShared:WaitForChild("WeaponAttackVolume"))
 local WeaponBounceConfig = require(CombatShared:WaitForChild("WeaponBounceConfig"))
-local AnimationSpeedScaling = require(AnimationShared:WaitForChild("AnimationSpeedScaling"))
 local CharacterAnimationRegistry = require(CharacterShared:WaitForChild("CharacterAnimationRegistry"))
 local AttackAimGeometry = require(CombatShared:WaitForChild("AttackAimGeometry"))
 local WeaponEnvironmentCollision = require(script.Parent:WaitForChild("WeaponEnvironmentCollision"))
@@ -317,8 +315,9 @@ local function attack(player: Player, payload: any)
         return
     end
 
-    local animationSpeedPercent = AnimationSpeedScaling.ResolveForAnimation(character, "attack", descriptor.animationId)
-    local timing = AttackTimelineConfig.ResolveRuntime(clipId, animationSpeedPercent)
+    -- Server cadence is authoritative and does not depend on the submitted clip
+    -- length or a per-clip animation scaling override.
+    local timing = AttackTimelineConfig.ResolveCharacterRuntime(clipId, character:GetAttribute("AttackSpeed"))
     if not timing then
         if Config.DebugLogs then
             print(("[game1][attack] reject player=%s reason=missing_timeline clip=%s"):format(player.Name, clipId))

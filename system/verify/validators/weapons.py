@@ -91,10 +91,15 @@ def check_weapon_registration(
             err(f"direct RunSpeed/walk-half movement contract missing {required}")
     if 'character:GetAttribute("RunSpeed")' not in rig_text or 'character:GetAttribute("MoveSpeed")' in rig_text:
         err("character rig initial movement must use RunSpeed directly")
-    if 'AnimationSpeedScaling.ResolveForAnimation(character, "attack", descriptor.animationId)' not in attack_text:
-        err("server attack timeline does not resolve stat-scaled AttackSpeed playback")
-    if 'animationSpeedPercent = animationPlaybackPercent(slot, descriptor.animationId)' not in controller_runtime:
-        err("client attack presentation does not use shared stat-scaled playback")
+    cadence_path = ROOT / "src/shared/combat/CharacterAttackCadence.luau"
+    cadence_text = cadence_path.read_text(encoding="utf-8") if cadence_path.is_file() else ""
+    timeline_text = (ROOT / "src/shared/combat/AttackTimelineConfig.luau").read_text(encoding="utf-8")
+    if 'AttackTimelineConfig.ResolveCharacterRuntime(clipId, character:GetAttribute("AttackSpeed"))' not in attack_text:
+        err("server character attack duration must use authoritative AttackSpeed cadence")
+    if 'AttackTimelineConfig.ResolveCharacterRuntime(clipId, character:GetAttribute("AttackSpeed"))' not in controller_runtime:
+        err("client character attack playback must match the server cadence")
+    if 'function CharacterAttackCadence.DurationForStat' not in cadence_text or 'sourceDuration / playbackDuration' not in timeline_text:
+        err("character attack cadence must fit authored clips to the stat-defined duration")
     for required in ['animationController.PlayAction("attack")', "action.durationSeconds", "clipId = action.clipId"]:
         if required not in attack_controller_text:
             err(f"client full-animation attack lock missing {required}")

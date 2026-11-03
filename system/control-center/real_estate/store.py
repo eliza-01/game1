@@ -21,7 +21,9 @@ from .textures import available_textures, resolve_texture
 from .fbx import inspect, prepare_publication
 from .mesh_revisions import inspect_revision, save_immutable
 from .publication_textures import prepare_texture, published_format
-from .collision_policy import is_collision_mesh, requires_texture, default_no_collide
+from .collision_policy import (
+    is_collision_mesh, requires_texture, default_no_collide, normalize_collision_fidelity,
+)
 from services.texture_atlas_registry import AtlasRegistry, parse_filename, atlas_version, same_atlas_series
 from services.atlas_identity import display_identity
 
@@ -44,6 +46,8 @@ def mesh_options(parts, raw: dict | None) -> dict:
             'glass': (glass if type(glass) is bool else glass_default(part))
                      if requires_texture(part) else False,
             'noCollide': no_collide if type(no_collide) is bool else default_no_collide(part),
+            'collisionFidelity': normalize_collision_fidelity(part, entry.get('collisionFidelity')),
+            'doubleSided': entry['doubleSided'] if type(entry.get('doubleSided')) is bool else True,
             'collisionMesh': is_collision_mesh(part),
             # Same authoring policy as Location Assets: solid weapon bounce by default.
             # Actual break/damage simulation is a separate future gameplay feature.

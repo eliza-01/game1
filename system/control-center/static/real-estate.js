@@ -28,10 +28,28 @@ function realEstateStatus(){const row=realEstateSelected();return row?.status||'
 function realEstateMeshLabel(part){return part==='repair'?'restoration (legacy: repair)':part;}
 // Shared naming contract: COL_Floor / house_col / wall_COL_01 are physics-only.
 function realEstateIsCollider(part){return /(?:^|_)col(?:_|$)/i.test(part);}
+function realEstatePreciseDefault(part){
+  const name=String(part||'').toLowerCase();
+  return realEstateIsCollider(part)||name==='door'||name.startsWith('door_')||name.includes('glass');
+}
 function realEstateMeshDefaults(part){
   const name=String(part||'').toLowerCase();
-  const noCollide=!realEstateIsCollider(part)&&name!=='door'&&name!=='window_frames_glass';
-  return {glass:name.includes('glass')&&!realEstateIsCollider(part),noCollide,destructible:false};
+  const precise=realEstatePreciseDefault(part);
+  return {glass:name.includes('glass')&&!realEstateIsCollider(part),noCollide:!precise,
+    collisionFidelity:precise?'PreciseConvexDecomposition':'Box',doubleSided:true,destructible:false};
+}
+function realEstatePhysicsStatus(flags){
+  const solid=flags.noCollide!==true;
+  return `CanCollide: ${solid} · CanTouch: false · CanQuery: ${solid}`;
+}
+function realEstatePhysicsControls(part,flags){
+  const choices=[['Box','Box'],['Hull','Hull'],['Default','Default'],
+    ['PreciseConvexDecomposition','Precise (convex decomposition)']];
+  return `<div class="real-estate-physics-controls">
+    <label>Collision Fidelity <select id="real-estate-fidelity-${esc(part)}" aria-label="Collision Fidelity for ${esc(part)}">${choices.map(([v,t])=>`<option value="${v}" ${flags.collisionFidelity===v?'selected':''}>${t}</option>`).join('')}</select></label>
+    <label class="real-estate-physics-toggle"><input type="checkbox" id="real-estate-doublesided-${esc(part)}" ${flags.doubleSided?'checked':''}> DoubleSided</label>
+    <small class="real-estate-physics-state" id="real-estate-physics-state-${esc(part)}">${realEstatePhysicsStatus(flags)}</small>
+  </div>`;
 }
 function realEstateRemember(){try{localStorage.setItem(REAL_ESTATE_SELECTED,realEstateState.selected||'');}catch{}}
 function realEstateForm(row){
@@ -44,6 +62,8 @@ function realEstateForm(row){
   realEstateState.meshOptions=Object.fromEntries(meshNames.map(part=>[part,{
     glass:row?.meshOptions?.[part]?.glass ?? realEstateMeshDefaults(part).glass,
     noCollide:row?.meshOptions?.[part]?.noCollide ?? realEstateMeshDefaults(part).noCollide,
+    collisionFidelity:row?.meshOptions?.[part]?.collisionFidelity ?? realEstateMeshDefaults(part).collisionFidelity,
+    doubleSided:row?.meshOptions?.[part]?.doubleSided ?? realEstateMeshDefaults(part).doubleSided,
     destructible:realEstateIsCollider(part) && (row?.meshOptions?.[part]?.destructible === true)
   }]));
   // A central AtlasRegistry binding is reuse even when the legacy Estate
@@ -221,9 +241,10 @@ function realEstateRenderTextures(){
   const host=$('real-estate-mesh-textures');
   const parts=realEstateParts();
   for(const part of parts){
-    if(!realEstateState.meshOptions[part]||typeof realEstateState.meshOptions[part]!=='object'){
-      realEstateState.meshOptions[part]=realEstateMeshDefaults(part);
-    }
+    const defaults=realEstateMeshDefaults(part);
+    const existing=realEstateState.meshOptions[part];
+    realEstateState.meshOptions[part]=existing&&typeof existing==='object'
+      ? {...defaults,...existing} : defaults;
   }
   const options=realEstateOptions();
   host.innerHTML=(parts.length&&!parts.some(realEstateIsCollider)
@@ -252,6 +273,7 @@ function realEstateRenderTextures(){
           <label class="real-estate-physics-toggle" title="When enabled weapon attacks pass through this collider. Actual destruction is not implemented yet."><input type="checkbox" id="real-estate-destructible-${esc(part)}" ${flags.destructible?'checked':''}> Destructible</label>
           <span class="real-estate-contact-policy" id="real-estate-contact-${esc(part)}" aria-live="polite">${flags.destructible?'Destructible · no bounce':'Solid · bounce'}</span>
         </div>
+        ${realEstatePhysicsControls(part,flags)}
         <small class="real-estate-collider-note">Invisible · physical for characters · weapon bounce when not destructible. Destruction gameplay is not implemented yet.</small></div>`;
     }
     return `<div class="real-estate-texture-row" data-texture-part="${esc(part)}">
@@ -261,6 +283,7 @@ function realEstateRenderTextures(){
         <label class="real-estate-physics-toggle" title="Disable physics collisions, touch events, and spatial queries for this mesh"><input type="checkbox" id="real-estate-nocollide-${esc(part)}" ${flags.noCollide?'checked':''}> No Collide</label>
         <label class="real-estate-reuse-toggle" title="Bind this mesh to an existing published Atlas Registry variant. Reuse never uploads another Roblox Image Asset."><input type="checkbox" id="real-estate-reuse-${esc(part)}" ${reuse?'checked':''}> Reuse atlas</label>
       </div>
+      ${realEstatePhysicsControls(part,flags)}
       <div id="real-estate-owned-${esc(part)}" class="real-estate-texture-owned" ${reuse?'hidden':''}>
         <select aria-label="${esc(part)} texture" id="real-estate-texture-${esc(part)}">${choices.join('')}</select>
         <button type="button" id="real-estate-browse-${esc(part)}">browse…</button>
@@ -277,6 +300,13 @@ function realEstateRenderTextures(){
   for(const part of parts){
     $(`real-estate-nocollide-${part}`).onchange=event=>{
       realEstateState.meshOptions[part].noCollide=event.target.checked;
+      $(`real-estate-physics-state-${part}`).textContent=realEstatePhysicsStatus(realEstateState.meshOptions[part]);
+    };
+    $(`real-estate-fidelity-${part}`).onchange=event=>{
+      realEstateState.meshOptions[part].collisionFidelity=event.target.value;
+    };
+    $(`real-estate-doublesided-${part}`).onchange=event=>{
+      realEstateState.meshOptions[part].doubleSided=event.target.checked;
     };
     if(realEstateIsCollider(part)){
       $(`real-estate-destructible-${part}`).onchange=event=>{
@@ -394,6 +424,8 @@ function realEstatePayload(){
     meshOptions:Object.fromEntries(parts.map(part=>[part,{
       glass:Boolean(realEstateState.meshOptions[part]?.glass),
       noCollide:Boolean(realEstateState.meshOptions[part]?.noCollide),
+      collisionFidelity:realEstateState.meshOptions[part]?.collisionFidelity ?? realEstateMeshDefaults(part).collisionFidelity,
+      doubleSided:realEstateState.meshOptions[part]?.doubleSided ?? realEstateMeshDefaults(part).doubleSided,
       destructible:realEstateIsCollider(part) && realEstateState.meshOptions[part]?.destructible === true
     }])),
     acceptWarnings:realEstateState.acceptWarnings};

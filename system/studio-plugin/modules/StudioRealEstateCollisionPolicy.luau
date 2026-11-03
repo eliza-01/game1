@@ -1,8 +1,15 @@
--- Real Estate physics layer. Pure mesh naming + one writer for physics flags.
--- Collision geometry is an independent Roblox Model Asset with no Image ID.
+-- Real Estate physics layer. Only this module writes MeshPart physics.
+-- All authored visual parts are DoubleSided by default; COL_* remains physics-only.
 local CollectionService = game:GetService("CollectionService")
 local Policy = {}
 local COLLIDER_TAG = "Game1RealEstateCollider"
+
+local FIDELITY = {
+    Box = Enum.CollisionFidelity.Box,
+    Hull = Enum.CollisionFidelity.Hull,
+    Default = Enum.CollisionFidelity.Default,
+    PreciseConvexDecomposition = Enum.CollisionFidelity.PreciseConvexDecomposition,
+}
 
 function Policy.IsCollider(name: string): boolean
     local lower = string.lower(name)
@@ -10,36 +17,40 @@ function Policy.IsCollider(name: string): boolean
         or lower:sub(-4) == "_col"
 end
 
+local function preciseByDefault(name: string): boolean
+    local lower = string.lower(name)
+    return Policy.IsCollider(name) or lower == "door" or lower:sub(1, 5) == "door_"
+        or lower:find("glass", 1, true) ~= nil
+end
+
 function Policy.Apply(mesh: MeshPart, name: string, raw: any)
     local collider = Policy.IsCollider(name)
-    local settings = typeof(raw) == "table" and raw or {}
-    local noCollide = not collider
-    if typeof(settings.noCollide) == "boolean" then
-        noCollide = settings.noCollide
+    local settings = if typeof(raw) == "table" then raw else {}
+    local preciseDefault = preciseByDefault(name)
+    local noCollide = if typeof(settings.noCollide) == "boolean" then settings.noCollide
+        else not preciseDefault
+    local fidelity = settings.collisionFidelity
+    if typeof(fidelity) ~= "string" or FIDELITY[fidelity] == nil then
+        fidelity = if preciseDefault then "PreciseConvexDecomposition" else "Box"
     end
-    -- Raycasts (including GroundSensor) must see the collision surface.
-    -- Set ordering matters: CanQuery=false requires CanCollide=false.
-    if noCollide then
-        mesh.CanCollide = false
-        mesh.CanQuery = false
-    else
-        mesh.CanQuery = true
-        mesh.CanCollide = true
-    end
-    mesh.CanTouch = false -- physics is not a Touched-based interaction trigger
+
+    -- Roblox requires CanQuery=true for collidable parts. Touch remains off
+    -- (collision physics does not require a Touched event listener).
+    mesh.CanCollide = not noCollide
+    mesh.CanQuery = not noCollide
+    mesh.CanTouch = false
+    mesh.CollisionFidelity = FIDELITY[fidelity]
+    mesh.DoubleSided = if typeof(settings.doubleSided) == "boolean" then settings.doubleSided else true
+
     if collider then
         mesh.Transparency = 1
         mesh.CastShadow = false
         mesh.Anchored = true
-        -- One concave mesh is allowed but not exact; do not use Hull/Box for
-        -- holes and openings. For large estates, split into simple volumes.
-        mesh.CollisionFidelity = Enum.CollisionFidelity.PreciseConvexDecomposition
         mesh:SetAttribute("Game1RealEstatePhysicsOnly", true)
         mesh:SetAttribute("Game1RealEstateDestructible", settings.destructible == true)
         CollectionService:AddTag(mesh, COLLIDER_TAG)
     else
-        -- Houses are static buildings. New published MeshParts may default to
-        -- unanchored even though the replaced placed house was anchored.
+        -- Houses are static buildings. Published MeshParts may be unanchored.
         if string.lower(name) == "house" then
             mesh.Anchored = true
         end

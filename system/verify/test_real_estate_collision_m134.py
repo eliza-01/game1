@@ -144,7 +144,7 @@ class RealEstateColliderM134(TestCase):
         manifest=(ROOT/'system/studio-plugin/plugin.project.json').read_text('utf8')
         installer=(ROOT/'system/studio-plugin/install.ps1').read_text('utf8')
         self.assertIn('StudioRealEstateCollisionPolicy.Apply',plugin)
-        self.assertIn('CanQuery = true',policy)
+        self.assertIn('mesh.CanQuery = not noCollide',policy)
         self.assertIn('mesh.Transparency = 1',policy)
         self.assertIn('CollisionFidelity.PreciseConvexDecomposition',policy)
         self.assertIn('if is_collision_mesh(part):',prepare)

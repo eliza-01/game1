@@ -122,7 +122,7 @@ def check_attack_timelines(root: Path, report_error: Callable[[str], None], *,
         'id="nav-timelines"',
         'id="timelines-view"',
         'id="timeline-open-studio"',
-        'timelines.js?v=2',
+        'timelines.js?v=3',
     ]:
         if required not in index_m35_text:
             report_error(f"m35 Asset Manager timeline UI missing {required}")

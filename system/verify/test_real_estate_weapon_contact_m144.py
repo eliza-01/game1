@@ -62,8 +62,8 @@ class RealEstateWeaponContactM144(unittest.TestCase):
         self.assertIn('"Game1RealEstateDestructible"', studio)
         self.assertIn('settings.destructible == true', studio)
         self.assertIn('CollectionService:AddTag(mesh, COLLIDER_TAG)', studio)
-        self.assertIn('mesh.CanCollide = true', studio)
-        self.assertIn('mesh.CanQuery = true', studio)
+        self.assertIn('mesh.CanCollide = not noCollide', studio)
+        self.assertIn('mesh.CanQuery = not noCollide', studio)
         self.assertIn('mesh.Transparency = 1', studio)
         self.assertIn('Game1RealEstatePhysicsOnly', studio)
 

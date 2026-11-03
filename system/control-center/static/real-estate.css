@@ -163,3 +163,10 @@
 .real-estate-mesh-dialog [aria-busy="true"] {opacity:.7;}
 
 .real-estate-texture-manage {font-size:10px;padding:3px 7px;margin:3px 0 0 6px;white-space:nowrap;}
+
+
+/* M205: one readable per-part physics status and authoring controls. */
+.real-estate-physics-controls { display:flex; flex-wrap:wrap; gap:7px 12px; align-items:center; margin:7px 0 5px; }
+.real-estate-physics-controls > label { display:inline-flex; align-items:center; gap:6px; font-size:11px; }
+.real-estate-physics-controls select { max-width:240px; font-size:11px; }
+.real-estate-physics-state { flex-basis:100%; color:var(--muted); font-size:11px; }

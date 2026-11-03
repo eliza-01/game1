@@ -21,6 +21,34 @@ local BY_CLIP = {
             HitEnd = table.freeze({ normalizedTime = 0.5 }),
         }),
     }),
+    ["human_male__weapon__1hs__attack__01"] = table.freeze({
+        duration = 1.5,
+        events = table.freeze({
+            HitStart = table.freeze({ normalizedTime = 0.4 }),
+            HitEnd = table.freeze({ normalizedTime = 0.5 }),
+        }),
+    }),
+    ["human_male__weapon__1hs__attack__02"] = table.freeze({
+        duration = 1.5,
+        events = table.freeze({
+            HitStart = table.freeze({ normalizedTime = 0.4 }),
+            HitEnd = table.freeze({ normalizedTime = 0.5 }),
+        }),
+    }),
+    ["human_male__weapon__1hs__attack__03"] = table.freeze({
+        duration = 1.466666667,
+        events = table.freeze({
+            HitStart = table.freeze({ normalizedTime = 0.4 }),
+            HitEnd = table.freeze({ normalizedTime = 0.5 }),
+        }),
+    }),
+    ["human_male__weapon__hands__attack__01"] = table.freeze({
+        duration = 1.5,
+        events = table.freeze({
+            HitStart = table.freeze({ normalizedTime = 0.4 }),
+            HitEnd = table.freeze({ normalizedTime = 0.5 }),
+        }),
+    }),
     ["monster__gremlin__attack__01"] = table.freeze({
         duration = 1.799999952,
         events = table.freeze({

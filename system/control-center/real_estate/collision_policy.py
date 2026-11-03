@@ -23,6 +23,25 @@ def requires_texture(name: str) -> bool:
 def default_no_collide(name: str) -> bool:
     # Door and window glass are interactive/solid by default, like colliders.
     # This only supplies missing authoring flags; explicit saved values win.
-    return not is_collision_mesh(name) and str(name).casefold() not in (
-        'door', 'window_frames_glass',
-    )
+    return not precise_collision_default(name)
+
+
+# One authoring default for the UI, API and Studio physics policy.
+COLLISION_FIDELITIES = ('Box', 'Hull', 'Default', 'PreciseConvexDecomposition')
+
+
+def precise_collision_default(name: str) -> bool:
+    lower = str(name).casefold()
+    return is_collision_mesh(lower) or lower == 'door' or lower.startswith('door_') or 'glass' in lower
+
+
+def default_collision_fidelity(name: str) -> str:
+    return 'PreciseConvexDecomposition' if precise_collision_default(name) else 'Box'
+
+
+def normalize_collision_fidelity(name: str, value: object) -> str:
+    if value is None:
+        return default_collision_fidelity(name)
+    if not isinstance(value, str) or value not in COLLISION_FIDELITIES:
+        raise ValueError(f'{name}: invalid CollisionFidelity; choose {", ".join(COLLISION_FIDELITIES)}')
+    return value

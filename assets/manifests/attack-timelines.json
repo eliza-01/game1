@@ -39,6 +39,58 @@
       }
     },
     {
+      "clipId": "human_male__weapon__1hs__attack__01",
+      "duration": 1.5,
+      "events": {
+        "HitStart": {
+          "normalizedTime": 0.4
+        },
+        "HitEnd": {
+          "normalizedTime": 0.5
+        }
+      },
+      "reviewRequired": true
+    },
+    {
+      "clipId": "human_male__weapon__1hs__attack__02",
+      "duration": 1.5,
+      "events": {
+        "HitStart": {
+          "normalizedTime": 0.4
+        },
+        "HitEnd": {
+          "normalizedTime": 0.5
+        }
+      },
+      "reviewRequired": true
+    },
+    {
+      "clipId": "human_male__weapon__1hs__attack__03",
+      "duration": 1.466666667,
+      "events": {
+        "HitStart": {
+          "normalizedTime": 0.4
+        },
+        "HitEnd": {
+          "normalizedTime": 0.5
+        }
+      },
+      "reviewRequired": true
+    },
+    {
+      "clipId": "human_male__weapon__hands__attack__01",
+      "duration": 1.5,
+      "events": {
+        "HitStart": {
+          "normalizedTime": 0.4
+        },
+        "HitEnd": {
+          "normalizedTime": 0.5
+        }
+      },
+      "reviewRequired": true
+    },
+    {
       "clipId": "monster__gremlin__attack__01",
       "duration": 1.799999952,
       "events": {

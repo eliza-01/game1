@@ -157,7 +157,8 @@ class TimelineStore:
                     "variant": int(clip.get("variant") or 0),
                     "duration": float(timeline.get("duration") or 0),
                     "events": dict(timeline.get("events") or {}),
-                    "configured": bool(timeline),
+                    "configured": bool(timeline) and not bool(timeline.get("reviewRequired")),
+                    "needsReview": bool(timeline.get("reviewRequired")),
                 })
         for monster in self.monsters.list():
             slug = str(monster.get("slug") or "")
@@ -178,7 +179,8 @@ class TimelineStore:
                     "variant": int(clip.get("variant") or 0),
                     "duration": float(timeline.get("duration") or 0),
                     "events": dict(timeline.get("events") or {}),
-                    "configured": bool(timeline),
+                    "configured": bool(timeline) and not bool(timeline.get("reviewRequired")),
+                    "needsReview": bool(timeline.get("reviewRequired")),
                 })
         rows.sort(key=lambda row: (row["subjectType"], row["subjectName"].casefold(), row["clipName"].casefold()))
         return rows

@@ -820,7 +820,7 @@
       "slot": "attack",
       "variant": 1,
       "clipId": "human_male__weapon__1hs__attack__01",
-      "weight": 100,
+      "weight": 1,
       "looped": false,
       "priority": "Action"
     },
@@ -832,7 +832,7 @@
       "slot": "attack",
       "variant": 2,
       "clipId": "human_male__weapon__1hs__attack__02",
-      "weight": 100,
+      "weight": 1,
       "looped": false,
       "priority": "Action"
     },

@@ -6,6 +6,7 @@ local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local CombatShared = Shared:WaitForChild("combat")
 local AttackConfig = require(CombatShared:WaitForChild("AttackConfig"))
 local AimPoseController = require(script.Parent.Parent.Parent:WaitForChild("combat"):WaitForChild("AimPoseController"))
+local CharacterUpperBodyRig = require(script.Parent:WaitForChild("CharacterUpperBodyRig"))
 
 local AttackUpperBodyComposer = {}
 
@@ -25,39 +26,6 @@ local blendStartedAt = 0
 local exitBlendStartedAt = 0
 local exitBlendRequested = false
 local upperPairs = {}
-
-local function spineOrder(name: string): number?
-	local lower = string.lower(name)
-	if lower == "spine" then
-		return 0
-	end
-	local suffix = string.match(lower, "^spine%.(%d+)$")
-	if suffix then
-		return tonumber(suffix)
-	end
-	return nil
-end
-
-local function findUpperBodyBridge(root: Instance): Bone?
-	local preferred = root:FindFirstChild("spine.001", true)
-	if preferred and preferred:IsA("Bone") then
-		return preferred
-	end
-
-	local candidates = {}
-	for _, object in root:GetDescendants() do
-		if object:IsA("Bone") then
-			local order = spineOrder(object.Name)
-			if order ~= nil and order >= 1 then
-				table.insert(candidates, { bone = object, order = order })
-			end
-		end
-	end
-	table.sort(candidates, function(left, right)
-		return left.order < right.order
-	end)
-	return if candidates[1] then candidates[1].bone else nil
-end
 
 local function findNamedBone(root: Instance, name: string): Bone?
 	local object = root:FindFirstChild(name, true)
@@ -209,6 +177,10 @@ function AttackUpperBodyComposer.IsActive(): boolean
 	return active
 end
 
+function AttackUpperBodyComposer.GetBridgeName(): string?
+	return if active and targetBridge then targetBridge.Name else nil
+end
+
 function AttackUpperBodyComposer.GetExitBlendSeconds(): number
 	return math.max(0, tonumber(AttackConfig.UpperBodyAttackExitBlendSeconds) or 0.12)
 end
@@ -237,14 +209,14 @@ function AttackUpperBodyComposer.BeginExitBlend()
 	exitBlendStartedAt = os.clock()
 end
 
-function AttackUpperBodyComposer.Begin(character: Model, descriptor: any, playbackSpeed: number): (AnimationTrack?, string?)
+function AttackUpperBodyComposer.Begin(character: Model, descriptor: any, playbackSpeed: number, stillValid: (() -> boolean)?): (AnimationTrack?, string?)
 	local visual = character:FindFirstChild("Visual")
 	if not visual or not visual:IsA("Model") then
 		return nil, "visible character rig is missing"
 	end
-	local bridge = findUpperBodyBridge(visual)
+	local bridge, bridgeError = CharacterUpperBodyRig.ResolveBridge(visual)
 	if not bridge then
-		return nil, "upper-body bridge bone is missing"
+		return nil, bridgeError or "upper-body bridge bone is missing"
 	end
 	local host = nearestBasePart(bridge)
 	if not host then
@@ -301,6 +273,14 @@ function AttackUpperBodyComposer.Begin(character: Model, descriptor: any, playba
 	end
 	track:Stop(0)
 	track.TimePosition = 0
+	-- LoadAnimation can yield for the first attack. A respawn/death during
+	-- loading must not steal a newer character's active composition.
+	if stillValid and not stillValid() then
+		track:Destroy()
+		animation:Destroy()
+		proxy:Destroy()
+		return nil, "attack preparation cancelled during animation load"
+	end
 
 	destroyProxy()
 	active = true

@@ -34,6 +34,7 @@ REQUIRED_RUNTIME_MODULES = (
     "src/client/character/animation/AnimationResolver.luau",
     "src/client/character/animation/AnimationTrackCache.luau",
     "src/client/character/animation/AttackUpperBodyComposer.luau",
+    "src/client/character/animation/CharacterUpperBodyRig.luau",
     "src/client/character/animation/CharacterAnimationController.luau",
     "src/client/combat/AttackController.luau",
     "src/client/combat/AimPoseController.luau",

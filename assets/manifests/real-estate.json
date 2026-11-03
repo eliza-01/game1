@@ -5680,7 +5680,7 @@
           "atlasVariantId": 4,
           "atlasKey": "restoration_01",
           "atlasBindingRevision": 1,
-          "atlasSyncStatus": "pending_studio_sync",
+          "atlasSyncStatus": "synced",
           "atlasLegacyWarning": false,
           "atlasVersion": "01",
           "atlasVariants": [
@@ -5747,7 +5747,7 @@
           "atlasVariantId": 4,
           "atlasKey": "restoration_01",
           "atlasBindingRevision": 1,
-          "atlasSyncStatus": "pending_studio_sync",
+          "atlasSyncStatus": "synced",
           "atlasLegacyWarning": false,
           "atlasVersion": "01",
           "atlasVariants": [
@@ -5881,7 +5881,7 @@
           "atlasVariantId": 4,
           "atlasKey": "restoration_01",
           "atlasBindingRevision": 1,
-          "atlasSyncStatus": "pending_studio_sync",
+          "atlasSyncStatus": "synced",
           "atlasLegacyWarning": false,
           "atlasVersion": "01",
           "atlasVariants": [

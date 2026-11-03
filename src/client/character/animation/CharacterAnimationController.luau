@@ -33,6 +33,7 @@ local currentActionComposed = false
 local currentActionTimeline = nil
 local currentActionClipId = ""
 local currentActionToken = 0
+local attackComposePending = false
 local attackLowerBodyActive = false
 local connections = {}
 local lifeTransition = false
@@ -66,6 +67,7 @@ local function clearCharacter()
 	currentActionTimeline = nil
 	currentActionClipId = ""
 	currentActionToken += 1
+	attackComposePending = false
 	attackLowerBodyActive = false
 	AttackUpperBodyComposer.End()
 	lifeTransition = false
@@ -156,6 +158,12 @@ end
 local refreshLoop
 
 local function stopCurrentAction(fadeTime: number?)
+	if character and currentActionSlot == "attack" then
+		character:SetAttribute("AnimationAttackUpperBodyComposed", false)
+		character:SetAttribute("AnimationAttackLowerBodySlot", nil)
+		character:SetAttribute("AnimationAttackBridgeBone", nil)
+		character:SetAttribute("AnimationActionEndsAt", nil)
+	end
 	if currentActionComposed then
 		AttackUpperBodyComposer.End()
 	elseif currentAction and currentAction.IsPlaying then
@@ -188,6 +196,7 @@ local function finishAttackPresentation(boundCharacter: Model, boundTrack: Anima
 	boundCharacter:SetAttribute("AnimationActionEndsAt", nil)
 	boundCharacter:SetAttribute("AnimationAttackUpperBodyComposed", false)
 	boundCharacter:SetAttribute("AnimationAttackLowerBodySlot", nil)
+	boundCharacter:SetAttribute("AnimationAttackBridgeBone", nil)
 	refreshLoop()
 end
 
@@ -233,7 +242,9 @@ refreshLoop = function()
 
 	local clipId = tostring(descriptor.clipId or "")
 	local playbackScale = animationPlaybackScale(slot, descriptor.animationId)
-	publishPlaybackPercent(slot)
+	if not attackLowerBodyActive then
+		publishPlaybackPercent(slot)
+	end
 
 	if currentLoop and currentLoopClipId == clipId then
 		applyBackwardPlayback(currentLoop, slot)
@@ -462,7 +473,7 @@ local function bindCharacter(newCharacter: Model)
 end
 
 function CharacterAnimationController.PlayAction(slot: string)
-	if not character or not cache or lifeTransition then
+	if not character or not cache or lifeTransition or attackComposePending then
 		return nil
 	end
 
@@ -477,8 +488,10 @@ function CharacterAnimationController.PlayAction(slot: string)
 	if not descriptor then
 		return nil
 	end
-	local fallbackTrack = cache:Get(descriptor)
-	if not fallbackTrack then
+	-- An attack is never played on the visible full-body Animator: its leg
+	-- keys would override the live run/walk track. The proxy owns its source.
+	local fallbackTrack = if slot == "attack" then nil else cache:Get(descriptor)
+	if slot ~= "attack" and not fallbackTrack then
 		return nil
 	end
 
@@ -502,33 +515,62 @@ function CharacterAnimationController.PlayAction(slot: string)
 	end
 
 	stopCurrentAction(0.06)
-	currentActionToken += 1
-	local actionToken = currentActionToken
-	currentActionSlot = slot
-	currentActionLockedUntil = if slot == "attack" then now + runtimeDuration else 0
-	if slot == "attack" then
-		-- Show the clip's *actual* fit-to-cadence playback in Studio debug UI.
-		character:SetAttribute("AnimationPlaybackSpeedPercent", animationSpeedPercent)
-	else
-		publishPlaybackPercent(slot)
-	end
-
+	local pendingToken = currentActionToken
+	local boundCharacter = character
+	local boundCache = cache
 	local track = fallbackTrack
 	local composed = false
 	if slot == "attack" then
-		-- The original RobloxLineage attack contract keeps the legs on live combat
-		-- locomotion and samples only the upper-body subtree from the attack clip.
-		-- This avoids attack-authored leg/root keys fighting planted movement/facing.
+		-- A source track may need to load before it can be sampled. Guard both
+		-- repeated input and lifecycle transitions while Begin yields.
+		attackComposePending = true
 		attackLowerBodyActive = true
 		refreshLoop()
-		local composedTrack, composeError = AttackUpperBodyComposer.Begin(character, descriptor, playbackSpeed)
-		if composedTrack then
-			track = composedTrack
-			composed = true
-		else
-			warn(("[game1][animation] upper-body attack composition unavailable; using full-body fallback: %s")
-				:format(tostring(composeError)))
+		local composedTrack, composeError = AttackUpperBodyComposer.Begin(boundCharacter, descriptor, playbackSpeed, function()
+			return character == boundCharacter and cache == boundCache
+				and currentActionToken == pendingToken and not lifeTransition
+		end)
+		if currentActionToken == pendingToken then
+			attackComposePending = false
 		end
+		if character ~= boundCharacter or cache ~= boundCache
+			or currentActionToken ~= pendingToken or lifeTransition
+		then
+			if composedTrack then AttackUpperBodyComposer.End() end
+			return nil
+		end
+		if not composedTrack then
+			-- Never replace live locomotion with a full-body attack animation.
+			-- If composition is unavailable, the attack is not issued to the server.
+			attackLowerBodyActive = false
+			currentAction = nil
+			currentActionSlot = ""
+			currentActionLockedUntil = 0
+			character:SetAttribute("AnimationAttackUpperBodyComposed", false)
+			character:SetAttribute("AnimationAttackLowerBodySlot", nil)
+			character:SetAttribute("AnimationAttackBridgeBone", nil)
+			character:SetAttribute("AnimationAttackCompositionError", tostring(composeError))
+			refreshLoop()
+			warn(("[game1][animation] attack %s cancelled; upper-body composition unavailable: %s")
+				:format(clipId, tostring(composeError)))
+			return nil
+		end
+		track = composedTrack
+		composed = true
+		character:SetAttribute("AnimationAttackCompositionError", nil)
+	end
+
+	-- Start the gameplay interval only after the source animation is ready;
+	-- waiting for a first-time LoadAnimation must not consume the attack window.
+	local actionStartedAt = os.clock()
+	currentActionToken += 1
+	local actionToken = currentActionToken
+	currentActionSlot = slot
+	currentActionLockedUntil = if slot == "attack" then actionStartedAt + runtimeDuration else 0
+	if slot == "attack" then
+		character:SetAttribute("AnimationPlaybackSpeedPercent", animationSpeedPercent)
+	else
+		publishPlaybackPercent(slot)
 	end
 
 	currentAction = track
@@ -546,6 +588,7 @@ function CharacterAnimationController.PlayAction(slot: string)
 		character:SetAttribute("AnimationActionEndsAt", currentActionLockedUntil)
 		character:SetAttribute("AnimationAttackBounced", false)
 		character:SetAttribute("AnimationAttackUpperBodyComposed", composed)
+		character:SetAttribute("AnimationAttackBridgeBone", AttackUpperBodyComposer.GetBridgeName())
 		character:SetAttribute("AnimationAttackLowerBodySlot", movementSlot())
 		local boundCharacter = character
 		local boundTrack = track

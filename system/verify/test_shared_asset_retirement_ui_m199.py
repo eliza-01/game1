@@ -11,7 +11,7 @@ class SharedAssetRetirementUiM199(unittest.TestCase):
         html=(ROOT/'system/control-center/static/index.html').read_text(encoding='utf-8')
         self.assertIn('shared-asset-retirement.css?v=2', html)
         self.assertLess(html.index('shared-asset-retirement.js?v=4'),html.index('deco-assets.js?v=8'))
-        self.assertLess(html.index('shared-asset-retirement.js?v=4'),html.index('real-estate.js?v=23'))
+        self.assertLess(html.index('shared-asset-retirement.js?v=4'),html.index('real-estate.js?v=24'))
         for name,kind in [('deco-assets.js','location'),('real-estate.js','estate')]:
             code=(ROOT/'system/control-center/static'/name).read_text(encoding='utf-8')
             self.assertIn("game1AssetRetirement.open({kind:'"+kind+"'",code)

@@ -178,7 +178,10 @@ function Controller.Start()
     RunService.PreAnimation:Connect(function()
         for _,session in sessions do session.presenter:BeforeAnimation() end
     end)
-    RunService.PreSimulation:Connect(function(delta)
+    -- AttackUpperBodyComposer writes the final head/upper-body pose in PreSimulation.
+    -- Face display meshes are world-space anchored copies: render their CFrames
+    -- after that pose, otherwise eyes can trail the head during an attack.
+    RunService.PostSimulation:Connect(function(delta)
         for _,session in sessions do Controller.StepSession(session,delta) end
     end)
 end

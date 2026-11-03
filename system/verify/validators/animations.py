@@ -83,7 +83,7 @@ def check_character_animation(
         if required not in attack_controller_text:
             err(f"robloxlineage attack/aim integration missing {required}")
     aim_pose_text = (ROOT / "src/client/combat/AimPoseController.luau").read_text(encoding="utf-8")
-    for required in ["RunService.PreSimulation", "spine.001", "AimTorsoYawDegrees", "applyWorldAim", "desiredTransform", "ViewportPointToRay", "Game1AimReticle"]:
+    for required in ["RunService.PreSimulation", "CharacterUpperBodyRig.ResolveBridge", "AimTorsoYawDegrees", "applyWorldAim", "desiredTransform", "ViewportPointToRay", "Game1AimReticle"]:
         if required not in aim_pose_text:
             err(f"procedural torso aim controller missing {required}")
     movement_runtime = (ROOT / "src/client/character/MovementController.luau").read_text(encoding="utf-8")
@@ -98,9 +98,14 @@ def check_character_animation(
     # and only the upper-body bridge subtree is composed over live lower-body locomotion.
     attack_composer_path = ROOT / "src/client/character/animation/AttackUpperBodyComposer.luau"
     attack_composer_text = attack_composer_path.read_text(encoding="utf-8") if attack_composer_path.is_file() else ""
+    bridge_path = ROOT / "src/client/character/animation/CharacterUpperBodyRig.luau"
+    bridge_text = bridge_path.read_text(encoding="utf-8") if bridge_path.is_file() else ""
+    for required in ["ResolveBridge", "^spine[._]%d+$", "hasLowerBodyDescendants", "multiple upper-body spine branches"]:
+        if required not in bridge_text:
+            err(f"character upper-body skeleton contract missing {required}")
     for required in [
         "__Game1AttackUpperBodyProxy",
-        'FindFirstChild("spine.001", true)',
+        "CharacterUpperBodyRig.ResolveBridge",
         "buildUpperPairs",
         "sourceArmature",
         "mappedAttackWorld",
@@ -113,10 +118,12 @@ def check_character_animation(
     for required in [
         "attackLowerBodyActive",
         'return "combat_idle"',
-        "AttackUpperBodyComposer.Begin(character, descriptor, playbackSpeed)",
+        "AttackUpperBodyComposer.Begin(boundCharacter, descriptor, playbackSpeed, function()",
         "AnimationAttackUpperBodyComposed",
         "AnimationAttackLowerBodySlot",
         "AttackUpperBodyComposer.BeginExitBlend()",
+        "attackComposePending",
+        "cancelled; upper-body composition unavailable",
     ]:
         if required not in controller_runtime:
             err(f"attack lower/upper-body composition contract missing {required}")

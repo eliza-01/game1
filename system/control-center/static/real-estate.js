@@ -105,6 +105,9 @@ function realEstateForm(row){
   $('real-estate-min-level').value=row?.min_level??1;
   $('real-estate-sale').value=row?.sale_price??1;
   $('real-estate-description').value=`Game1 Real Estate ${row?.slug||'house'}`;
+  const registrationError=$('real-estate-register-error');
+  registrationError.textContent='';
+  registrationError.hidden=true;
   realEstateRenderRigs(row?.skeleton||null, row?.rigWarnings||[]);
   realEstateRenderTextures(row);
   realEstateRender();
@@ -454,6 +457,8 @@ function realEstatePayload(){
     acceptWarnings:realEstateState.acceptWarnings};
 }
 async function realEstateRegister(){
+  const errorBox=$('real-estate-register-error');
+  errorBox.hidden=true;errorBox.textContent='';
   try{
     $('real-estate-register').disabled=true;
     const row=await request('/api/real-estate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(realEstatePayload())});
@@ -462,7 +467,14 @@ async function realEstateRegister(){
     if(row.studioSyncStatus==='pending_studio_sync')toast(`Mesh settings saved · Studio Sync pending: ${row.studioError||'Studio unavailable'}`,true);
     else toast(`Real Estate registered · ${row.slug}${row.studioSyncStatus==='synced'?' · Studio updated':''}`);
     return true;
-  }catch(error){toast(error.message,true);return false;}finally{$('real-estate-register').disabled=false;}
+  }catch(error){
+    // API returns the server-side validation reason (not just HTTP 400).
+    // Keep it beside Register / Save; a toast alone is easy to miss.
+    errorBox.textContent=`Register / Save: ${error.message}`;
+    errorBox.hidden=false;
+    toast(error.message,true);
+    return false;
+  }finally{$('real-estate-register').disabled=false;}
 }
 async function realEstateSync(slug, part=null){
   const row=realEstateRows().find(item=>item.slug===slug);
@@ -764,7 +776,7 @@ function realEstateRender(){
   const job=realEstateState.publicationJob;
   $('real-estate-publish-status').textContent=busy
     ? `Publishing ${job.scope} · ${job.step} (continues in Host Agent if this tab closes)`
-    : job?.slug===row?.slug&&job.status==='failed'
+    : row && job && job.slug===row.slug && job.status==='failed'
       ? `Last publication failed · ${job.step}: ${job.error}`
       : row?`${row.status} · ${(row.meshParts||[]).map(p=>p.slice(0,1).toUpperCase()+p.slice(1)+'Rig').join(' + ')} ${row.publicationCurrent?.model?'ready':'changed'} · ${row.meshParts?.map(part=>realEstateIsCollider(part)?`${part} physics only`:`${part} image ${row.publicationCurrent?.[part]?'ready':'changed'}`).join(' · ')} · Sync Studio requires all present assets ready`:'register a house first';
   realEstateIdentity();

@@ -77,8 +77,9 @@ class CharacterAttackCadenceM206(unittest.TestCase):
         self.assertIn(call, CLIENT)
         self.assertNotIn('AnimationSpeedScaling.ResolveForAnimation(character, "attack", descriptor.animationId)', SERVER)
         self.assertIn('AttackSessionStore.Begin(player, character, serial, clientAttackId, now + attackDuration, damageWindow)', SERVER)
-        self.assertIn('currentActionLockedUntil = if slot == "attack" then now + runtimeDuration else 0', CLIENT)
-        self.assertIn('AttackUpperBodyComposer.Begin(character, descriptor, playbackSpeed)', CLIENT)
+        self.assertIn('local actionStartedAt = os.clock()', CLIENT)
+        self.assertIn('currentActionLockedUntil = if slot == "attack" then actionStartedAt + runtimeDuration else 0', CLIENT)
+        self.assertIn('AttackUpperBodyComposer.Begin(boundCharacter, descriptor, playbackSpeed, function()', CLIENT)
         self.assertIn('action.durationSeconds', ATTACK_INPUT)
         self.assertIn('math.min(attackDuration, AttackConfig.FacingTurnSeconds)', ATTACK_INPUT)
 

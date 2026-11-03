@@ -6,6 +6,8 @@ local Workspace = game:GetService("Workspace")
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local CombatShared = Shared:WaitForChild("combat")
 local AttackConfig = require(CombatShared:WaitForChild("AttackConfig"))
+local CharacterUpperBodyRig = require(script.Parent.Parent:WaitForChild("character")
+    :WaitForChild("animation"):WaitForChild("CharacterUpperBodyRig"))
 
 local AimPoseController = {}
 
@@ -20,12 +22,6 @@ local activeUntil = 0
 local renderedYaw = 0
 local poseDrivenExternally = false
 local skipOwnStepOnce = false
-
-local PREFERRED_SPINE_NAMES = {
-    "spine.001",
-    "spine.002",
-    "spine.003",
-}
 
 local RETICLE_GUI_NAME = "Game1AimReticle"
 
@@ -82,44 +78,12 @@ local function signedYaw(fromDirection: Vector3, toDirection: Vector3): number
     return math.atan2(from:Cross(to).Y, math.clamp(from:Dot(to), -1, 1))
 end
 
-local function spineOrder(name: string): number?
-    local lower = string.lower(name)
-    if lower == "spine" then
-        return 0
-    end
-    local suffix = string.match(lower, "^spine%.(%d+)$")
-    if suffix then
-        return tonumber(suffix)
-    end
-    return nil
-end
-
-local function findAimBone(model: Model): Bone?
+local function findAimBone(model: Model): (Bone?, string?)
     local visual = model:FindFirstChild("Visual")
-    if not visual then
-        return nil
+    if not visual or not visual:IsA("Model") then
+        return nil, "Visual model is missing"
     end
-
-    for _, name in ipairs(PREFERRED_SPINE_NAMES) do
-        local found = visual:FindFirstChild(name, true)
-        if found and found:IsA("Bone") then
-            return found
-        end
-    end
-
-    local candidates = {}
-    for _, descendant in visual:GetDescendants() do
-        if descendant:IsA("Bone") then
-            local order = spineOrder(descendant.Name)
-            if order ~= nil and order >= 1 then
-                table.insert(candidates, { bone = descendant, order = order })
-            end
-        end
-    end
-    table.sort(candidates, function(left, right)
-        return left.order < right.order
-    end)
-    return if candidates[1] then candidates[1].bone else nil
+    return CharacterUpperBodyRig.ResolveBridge(visual)
 end
 
 local function parentWorldCFrame(bone: Bone): CFrame?
@@ -157,9 +121,10 @@ local function bindCharacter(newCharacter: Model)
         return
     end
     root = newRoot
-    aimBone = findAimBone(newCharacter)
+    local resolvedBone, resolveError = findAimBone(newCharacter)
+    aimBone = resolvedBone
     if not aimBone then
-        warn("[game1][aim] no compatible upper-body aim pivot; root facing still works")
+        warn("[game1][aim] no compatible upper-body aim pivot; root facing still works: " .. tostring(resolveError))
     else
         print(("[game1][aim] world-space aim pivot ready: %s"):format(aimBone.Name))
     end

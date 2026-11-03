@@ -365,6 +365,12 @@ class RealEstateStore:
                 atlas_selections[part] = atlas_selections['house']
         for part in active:
             if requires_texture(part) and part not in atlas_selections:
+                # Historical registered houses can contain a visual mesh with
+                # no atlas binding. Editing prices/physics must not fail solely
+                # because of that pre-existing incomplete authoring state.
+                # Still require a real atlas for new houses and newly added parts.
+                if existing and part in existing['meshParts']:
+                    continue
                 raise ValueError(f'{part}: choose an atlas source or registered variant')
         model_hash = _sha(source)
         if existing and existing.get('meshSources') and raw_source and model_hash != existing['model_sha256']:

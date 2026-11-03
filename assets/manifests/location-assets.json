@@ -236,6 +236,36 @@
       ]
     },
     {
+      "atlasKey": "house_level3_01",
+      "baseKey": "house_level3",
+      "version": "01",
+      "variants": [
+        {
+          "id": 23,
+          "family_id": 19,
+          "width": 4096,
+          "height": 4096,
+          "filename": "house_level3_01_4096x4096_atlas.png",
+          "original_filename": "house_level3_01_4096x4096_atlas.png",
+          "source_path": "assets/source/texture-atlases/house_level3_01/4096x4096/house_level3_01_4096x4096_atlas.png",
+          "source_sha256": "4ecf81345f68fbe2930ec3435a5c4d424edff6ea0a4e2ceff3d47546c0a5f933",
+          "uses_alpha": false,
+          "published_id": "92387358259832",
+          "published_sha256": "4ecf81345f68fbe2930ec3435a5c4d424edff6ea0a4e2ceff3d47546c0a5f933",
+          "moderation_state": "Reviewing",
+          "published_at": 1793709400.013442,
+          "created_at": 1793709249.6142604,
+          "atlas_key": "house_level3_01",
+          "replacement_sha256": null,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "4096x4096",
+          "baseKey": "house_level3",
+          "version": "01"
+        }
+      ]
+    },
+    {
       "atlasKey": "house_level4_01",
       "baseKey": "house_level4",
       "version": "01",

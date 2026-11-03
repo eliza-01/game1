@@ -4404,7 +4404,9 @@ function Policy.Apply(mesh: MeshPart, name: string, raw: any)
     local preciseDefault = preciseByDefault(name)
     local noCollide = if typeof(settings.noCollide) == "boolean" then settings.noCollide
         else not preciseDefault
-    local fidelity = settings.collisionFidelity
+    -- The physical shape must be Precise for EVERY collidable part, regardless
+    -- of its name or an old saved Default/Box/Hull value.
+    local fidelity = if not noCollide then "PreciseConvexDecomposition" else settings.collisionFidelity
     if typeof(fidelity) ~= "string" or FIDELITY[fidelity] == nil then
         fidelity = if preciseDefault then "PreciseConvexDecomposition" else "Box"
     end

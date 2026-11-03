@@ -39,9 +39,14 @@ def default_collision_fidelity(name: str) -> str:
     return 'PreciseConvexDecomposition' if precise_collision_default(name) else 'Box'
 
 
-def normalize_collision_fidelity(name: str, value: object) -> str:
-    if value is None:
-        return default_collision_fidelity(name)
-    if not isinstance(value, str) or value not in COLLISION_FIDELITIES:
+def normalize_collision_fidelity(name: str, value: object, *, no_collide: bool | None = None) -> str:
+    """One authoritative rule: every collidable MeshPart uses Precise.
+
+    Validate supplied values even when an older record contains Default/Hull/Box;
+    after validation, collision state determines the effective fidelity.
+    """
+    if value is not None and (not isinstance(value, str) or value not in COLLISION_FIDELITIES):
         raise ValueError(f'{name}: invalid CollisionFidelity; choose {", ".join(COLLISION_FIDELITIES)}')
-    return value
+    if no_collide is False:
+        return 'PreciseConvexDecomposition'
+    return value if value is not None else default_collision_fidelity(name)

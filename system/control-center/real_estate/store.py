@@ -42,11 +42,14 @@ def mesh_options(parts, raw: dict | None) -> dict:
         glass = entry.get('glass')
         no_collide = entry.get('noCollide')
         destructible = entry.get('destructible')
+        effective_no_collide = no_collide if type(no_collide) is bool else default_no_collide(part)
         result[part] = {
             'glass': (glass if type(glass) is bool else glass_default(part))
                      if requires_texture(part) else False,
-            'noCollide': no_collide if type(no_collide) is bool else default_no_collide(part),
-            'collisionFidelity': normalize_collision_fidelity(part, entry.get('collisionFidelity')),
+            'noCollide': effective_no_collide,
+            'collisionFidelity': normalize_collision_fidelity(
+                part, entry.get('collisionFidelity'), no_collide=effective_no_collide,
+            ),
             'doubleSided': entry['doubleSided'] if type(entry.get('doubleSided')) is bool else True,
             'collisionMesh': is_collision_mesh(part),
             # Same authoring policy as Location Assets: solid weapon bounce by default.

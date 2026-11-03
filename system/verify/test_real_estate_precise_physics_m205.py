@@ -44,6 +44,15 @@ class RealEstatePhysicsM205(unittest.TestCase):
         self.assertEqual(custom['house']['collisionFidelity'], 'PreciseConvexDecomposition')
         self.assertTrue(custom['col_mesh']['noCollide'])
         self.assertEqual(custom['col_mesh']['collisionFidelity'], 'Box')
+        # M207: an old explicit Default/Box/Hull can never persist on a
+        # collidable part, including a visual mesh manually made physical.
+        legacy = mesh_options(['door', 'house', 'wall_COL_01'], {
+            'door': {'noCollide': False, 'collisionFidelity': 'Default'},
+            'house': {'noCollide': False, 'collisionFidelity': 'Box'},
+            'wall_COL_01': {'noCollide': False, 'collisionFidelity': 'Hull'},
+        })
+        self.assertTrue(all(v['collisionFidelity'] == 'PreciseConvexDecomposition'
+                            for v in legacy.values()))
         with self.assertRaisesRegex(ValueError, 'invalid CollisionFidelity'):
             mesh_options(['door'], {'door': {'collisionFidelity': 'Magic'}})
 
@@ -81,6 +90,9 @@ for(const part of ['house','door','window_frames_glass','wall_COL_01']){
   assert.match(html,new RegExp('id="real-estate-doublesided-'+part+'"'));
   assert.match(html,new RegExp('id="real-estate-physics-state-'+part+'"'));
 }
+// Collision-enabled parts show a locked Precise selector, even with old saved choices.
+assert.match(html,/id="real-estate-fidelity-door"[^>]*disabled/);
+assert.match(html,/id="real-estate-fidelity-wall_COL_01"[^>]*disabled/);
 const opts=vm.runInContext('realEstateState.meshOptions',ctx);
 for(const part of ['door','window_frames_glass','wall_COL_01']){
   assert.equal(opts[part].noCollide,false);
@@ -89,9 +101,9 @@ for(const part of ['door','window_frames_glass','wall_COL_01']){
 }
 assert.equal(opts.house.noCollide,true);
 assert.equal(opts.house.collisionFidelity,'Box');
+$('real-estate-nocollide-door').onchange({target:{checked:true}});
 $('real-estate-fidelity-door').onchange({target:{value:'Hull'}});
 $('real-estate-doublesided-door').onchange({target:{checked:false}});
-$('real-estate-nocollide-door').onchange({target:{checked:true}});
 assert.equal(opts.door.collisionFidelity,'Hull');
 assert.equal(opts.door.doubleSided,false);
 assert.equal(opts.door.noCollide,true);

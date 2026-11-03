@@ -38,6 +38,19 @@ function realEstateMeshDefaults(part){
   return {glass:name.includes('glass')&&!realEstateIsCollider(part),noCollide:!precise,
     collisionFidelity:precise?'PreciseConvexDecomposition':'Box',doubleSided:true,destructible:false};
 }
+function realEstateEffectiveFidelity(part,flags){
+  // Collision fidelity is a derived physical constraint, not an independent
+  // choice while CanCollide is enabled. This also normalizes older saved rows.
+  if(flags.noCollide!==true)return 'PreciseConvexDecomposition';
+  const allowed=['Box','Hull','Default','PreciseConvexDecomposition'];
+  return allowed.includes(flags.collisionFidelity)
+    ? flags.collisionFidelity : realEstateMeshDefaults(part).collisionFidelity;
+}
+function realEstateNormalizePhysics(part,raw){
+  const flags={...realEstateMeshDefaults(part),...(raw||{})};
+  flags.collisionFidelity=realEstateEffectiveFidelity(part,flags);
+  return flags;
+}
 function realEstatePhysicsStatus(flags){
   const solid=flags.noCollide!==true;
   return `CanCollide: ${solid} · CanTouch: false · CanQuery: ${solid}`;
@@ -46,7 +59,7 @@ function realEstatePhysicsControls(part,flags){
   const choices=[['Box','Box'],['Hull','Hull'],['Default','Default'],
     ['PreciseConvexDecomposition','Precise (convex decomposition)']];
   return `<div class="real-estate-physics-controls">
-    <label>Collision Fidelity <select id="real-estate-fidelity-${esc(part)}" aria-label="Collision Fidelity for ${esc(part)}">${choices.map(([v,t])=>`<option value="${v}" ${flags.collisionFidelity===v?'selected':''}>${t}</option>`).join('')}</select></label>
+    <label>Collision Fidelity <select id="real-estate-fidelity-${esc(part)}" aria-label="Collision Fidelity for ${esc(part)}" ${flags.noCollide!==true?'disabled title="Precise is required when collision is enabled"':''}>${choices.map(([v,t])=>`<option value="${v}" ${flags.collisionFidelity===v?'selected':''}>${t}</option>`).join('')}</select></label>
     <label class="real-estate-physics-toggle"><input type="checkbox" id="real-estate-doublesided-${esc(part)}" ${flags.doubleSided?'checked':''}> DoubleSided</label>
     <small class="real-estate-physics-state" id="real-estate-physics-state-${esc(part)}">${realEstatePhysicsStatus(flags)}</small>
   </div>`;
@@ -66,6 +79,9 @@ function realEstateForm(row){
     doubleSided:row?.meshOptions?.[part]?.doubleSided ?? realEstateMeshDefaults(part).doubleSided,
     destructible:realEstateIsCollider(part) && (row?.meshOptions?.[part]?.destructible === true)
   }]));
+  for(const part of meshNames){
+    realEstateState.meshOptions[part]=realEstateNormalizePhysics(part,realEstateState.meshOptions[part]);
+  }
   // A central AtlasRegistry binding is reuse even when the legacy Estate
   // texture row has reuseReference="". The binding, not the local source path,
   // determines the active published Image Asset ID.
@@ -241,10 +257,7 @@ function realEstateRenderTextures(){
   const host=$('real-estate-mesh-textures');
   const parts=realEstateParts();
   for(const part of parts){
-    const defaults=realEstateMeshDefaults(part);
-    const existing=realEstateState.meshOptions[part];
-    realEstateState.meshOptions[part]=existing&&typeof existing==='object'
-      ? {...defaults,...existing} : defaults;
+    realEstateState.meshOptions[part]=realEstateNormalizePhysics(part,realEstateState.meshOptions[part]);
   }
   const options=realEstateOptions();
   host.innerHTML=(parts.length&&!parts.some(realEstateIsCollider)
@@ -299,11 +312,18 @@ function realEstateRenderTextures(){
   }).join('');
   for(const part of parts){
     $(`real-estate-nocollide-${part}`).onchange=event=>{
-      realEstateState.meshOptions[part].noCollide=event.target.checked;
-      $(`real-estate-physics-state-${part}`).textContent=realEstatePhysicsStatus(realEstateState.meshOptions[part]);
+      const flags=realEstateState.meshOptions[part];
+      flags.noCollide=event.target.checked;
+      flags.collisionFidelity=realEstateEffectiveFidelity(part,flags);
+      const select=$(`real-estate-fidelity-${part}`);
+      select.value=flags.collisionFidelity;
+      select.disabled=!flags.noCollide;
+      $(`real-estate-physics-state-${part}`).textContent=realEstatePhysicsStatus(flags);
     };
     $(`real-estate-fidelity-${part}`).onchange=event=>{
-      realEstateState.meshOptions[part].collisionFidelity=event.target.value;
+      const flags=realEstateState.meshOptions[part];
+      flags.collisionFidelity=flags.noCollide===true?event.target.value:'PreciseConvexDecomposition';
+      event.target.value=flags.collisionFidelity;
     };
     $(`real-estate-doublesided-${part}`).onchange=event=>{
       realEstateState.meshOptions[part].doubleSided=event.target.checked;
@@ -421,13 +441,16 @@ function realEstatePayload(){
     minLevel:$('real-estate-min-level').value,salePrice:$('real-estate-sale').value,
     textures:Object.fromEntries(parts.filter(part=>!realEstateIsCollider(part)).map(part=>[part,realEstateState.textureRefs[part]?'':(realEstateState.textures[part]||'')])),
     textureReferences:Object.fromEntries(parts.filter(part=>!realEstateIsCollider(part)).map(part=>[part,realEstateState.textureRefs[part]||''])),
-    meshOptions:Object.fromEntries(parts.map(part=>[part,{
-      glass:Boolean(realEstateState.meshOptions[part]?.glass),
-      noCollide:Boolean(realEstateState.meshOptions[part]?.noCollide),
-      collisionFidelity:realEstateState.meshOptions[part]?.collisionFidelity ?? realEstateMeshDefaults(part).collisionFidelity,
-      doubleSided:realEstateState.meshOptions[part]?.doubleSided ?? realEstateMeshDefaults(part).doubleSided,
-      destructible:realEstateIsCollider(part) && realEstateState.meshOptions[part]?.destructible === true
-    }])),
+    meshOptions:Object.fromEntries(parts.map(part=>{
+      const flags=realEstateNormalizePhysics(part,realEstateState.meshOptions[part]);
+      return [part,{
+        glass:Boolean(flags.glass),
+        noCollide:flags.noCollide===true,
+        collisionFidelity:flags.collisionFidelity,
+        doubleSided:flags.doubleSided,
+        destructible:realEstateIsCollider(part) && flags.destructible === true
+      }];
+    })),
     acceptWarnings:realEstateState.acceptWarnings};
 }
 async function realEstateRegister(){

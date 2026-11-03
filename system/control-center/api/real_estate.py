@@ -3,6 +3,8 @@ from urllib.parse import unquote
 
 
 def read(parsed, sources):
+    if parsed.path == '/api/real-estate/placements':
+        return 200, sources['real_estate_placements'].snapshot()
     if parsed.path == '/api/real-estate':
         try:
             snapshot = sources['real_estate'].snapshot()
@@ -24,6 +26,17 @@ def write(path, body, deps):
         return None
     store = deps['real_estate']
     try:
+        if path == '/api/real-estate/placements/bind':
+            payload = body()
+            slug = str(payload.get('houseSlug') or '').strip()
+            plot = payload.get('plotIndex')
+            if type(plot) is not int or not 1 <= plot <= 50:
+                raise ValueError('plot must be between 1 and 50')
+            if store.get(slug) is None:
+                raise ValueError('choose a registered house')
+            # Studio owns the measured transform; browser data never supplies a CFrame.
+            capture = deps['capture_house_placement'](slug, plot)
+            return 200, {'item': deps['real_estate_placements'].bind(slug, plot, capture)}
         if path.startswith('/api/real-estate/') and path.endswith('/mesh-inspect'):
             slug = unquote(path[len('/api/real-estate/'):-len('/mesh-inspect')].strip('/'))
             payload = body()

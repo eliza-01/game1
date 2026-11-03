@@ -43,6 +43,12 @@ function Policy.Apply(mesh: MeshPart, name: string, raw: any)
     mesh.CanTouch = false
     mesh.CollisionFidelity = FIDELITY[fidelity]
     mesh.DoubleSided = if typeof(settings.doubleSided) == "boolean" then settings.doubleSided else true
+    -- Capture the *authoring policy* on the MeshPart itself. Studio copies can
+    -- be revalidated without a Host Agent request or a full model reimport.
+    -- This metadata is not a second registry: it is the applied snapshot.
+    mesh:SetAttribute("Game1RealEstateNoCollide", noCollide)
+    mesh:SetAttribute("Game1RealEstateCollisionFidelity", fidelity)
+    mesh:SetAttribute("Game1RealEstateDoubleSided", mesh.DoubleSided)
 
     if collider then
         mesh.Transparency = 1
@@ -62,6 +68,40 @@ function Policy.Apply(mesh: MeshPart, name: string, raw: any)
             CollectionService:RemoveTag(mesh, COLLIDER_TAG)
         end
     end
+end
+
+-- Studio copy/paste does not pass through Model.Place/PartSync. Reassert the
+-- imported physical shape after a managed house enters Workspace, preserving
+-- the explicit mesh settings recorded by Apply. Older templates (before this
+-- snapshot existed) fall back to their copied collision toggles.
+function Policy.RestoreCopiedMesh(mesh: MeshPart): boolean
+    local noCollide = mesh:GetAttribute("Game1RealEstateNoCollide")
+    if typeof(noCollide) ~= "boolean" then
+        noCollide = not mesh.CanCollide
+    end
+    local fidelity = mesh:GetAttribute("Game1RealEstateCollisionFidelity")
+    if typeof(fidelity) ~= "string" or FIDELITY[fidelity] == nil then
+        fidelity = mesh.CollisionFidelity.Name
+    end
+    local doubleSided = mesh:GetAttribute("Game1RealEstateDoubleSided")
+    if typeof(doubleSided) ~= "boolean" then
+        doubleSided = mesh.DoubleSided
+    end
+    local expected = if noCollide then (FIDELITY[fidelity] or FIDELITY.Box)
+        else FIDELITY.PreciseConvexDecomposition
+    local needsRestore = mesh.CollisionFidelity ~= expected
+        or mesh.CanCollide ~= not noCollide
+        or mesh.CanQuery ~= not noCollide
+        or mesh.CanTouch ~= false
+        or mesh.DoubleSided ~= doubleSided
+    if not needsRestore then return false end
+    Policy.Apply(mesh, mesh.Name, {
+        noCollide = noCollide,
+        collisionFidelity = fidelity,
+        doubleSided = doubleSided,
+        destructible = mesh:GetAttribute("Game1RealEstateDestructible") == true,
+    })
+    return true
 end
 
 return table.freeze(Policy)

@@ -1,7 +1,8 @@
 """Real Estate registry, canonical source preservation and Open Cloud publishing.
 
 An Estate owns authored Model Assets; all textures belong to Atlas Registry.
-This authoring store does not implement property ownership or runtime placement.
+This authoring store does not implement player ownership or runtime placement;
+plot bindings belong to real_estate.placement.
 """
 from __future__ import annotations
 
@@ -505,6 +506,8 @@ class RealEstateStore:
             if isinstance(part, dict) and isinstance(part.get('name'), str):
                 self.atlases.unbind('real_estate', f"{slug}:{part['name']}")
         self.export()
+        if getattr(self, 'placement_store', None) is not None:
+            self.placement_store.export()  # Trigger retired this house's plot bindings.
         return {'ok': True, 'archived': target.relative_to(self.root).as_posix(),
                 'sourceFilesPreserved': True, 'studioTemplatesUnchanged': True}
 

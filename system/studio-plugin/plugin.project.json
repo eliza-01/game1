@@ -40,6 +40,9 @@
       "StudioMarkerVisibility": {
         "$path": "modules/StudioMarkerVisibility.luau"
       },
+      "StudioHousePlacementCapture": {
+        "$path": "modules/StudioHousePlacementCapture.luau"
+      },
       "StudioPlotsCatalog": {
         "$path": "modules/StudioPlotsCatalog.luau"
       },
@@ -72,6 +75,9 @@
       },
       "StudioRealEstateCollisionPolicy": {
         "$path": "modules/StudioRealEstateCollisionPolicy.luau"
+      },
+      "StudioRealEstatePlacedPhysicsGuard": {
+        "$path": "modules/StudioRealEstatePlacedPhysicsGuard.luau"
       },
       "StudioRealEstatePlacedCollisionSync": {
         "$path": "modules/StudioRealEstatePlacedCollisionSync.luau"

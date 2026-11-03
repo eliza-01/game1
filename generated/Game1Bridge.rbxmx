@@ -27,6 +27,8 @@ local StudioTimelineEditorCommands = require(script.Parent.modules.StudioTimelin
 local DecoManager = require(script.Parent.modules.DecoManager)
 local StudioDecoSyncCommands = require(script.Parent.modules.StudioDecoSyncCommands)
 local StudioCharacterTestStand = require(script.Parent.modules.StudioCharacterTestStand)
+local StudioHousePlacementCapture = require(script.Parent.modules.StudioHousePlacementCapture)
+local StudioRealEstatePlacedPhysicsGuard = require(script.Parent.modules.StudioRealEstatePlacedPhysicsGuard)
 
 local toolbar = plugin:CreateToolbar("game1")
 local markerVisibility = StudioMarkerVisibility.new(plugin, toolbar, Workspace)
@@ -45,6 +47,10 @@ local AGENT_URL = AGENT_BASE_URL .. "/api/agent/info"
 local AGENT_TOKEN = "Game1LocalControlV1"
 local BRIDGE_URL = "http://127.0.0.1:43137"
 local BRIDGE_TOKEN = "Game1StudioBridgeV1"
+
+-- Only Studio authoring copies are corrected; gameplay actors are untouched.
+local stopEstateCopyGuard = StudioRealEstatePlacedPhysicsGuard.Start(Workspace, RunService)
+plugin.Unloading:Connect(stopEstateCopyGuard)
 
 local characterStand = StudioCharacterTestStand.new({
     plugin = plugin,
@@ -148,6 +154,15 @@ local handleDecoRefresh = StudioDecoSyncCommands({
     bridgeToken = BRIDGE_TOKEN,
 })
 
+local handleHousePlacementCapture = StudioHousePlacementCapture({
+    HttpService = HttpService,
+    Selection = Selection,
+    Workspace = Workspace,
+    RunService = RunService,
+    bridgeUrl = BRIDGE_URL,
+    bridgeToken = BRIDGE_TOKEN,
+})
+
 local function pollBridge()
     if RunService:IsRunning() then
         return
@@ -174,6 +189,8 @@ local function pollBridge()
         locationCommands.handle(data)
     elseif data.command == "deco-refresh" then
         handleDecoRefresh(data)
+    elseif data.command == "house-placement-capture" then
+        handleHousePlacementCapture(data)
     end
 end
 
@@ -3130,6 +3147,103 @@ end
       </Item>
       <Item class="ModuleScript" referent="19">
         <Properties>
+          <string name="Name">StudioHousePlacementCapture</string>
+          <string name="Source"><![CDATA[-- Read-only Studio authoring adapter. Selection and plot markers stay untouched.
+-- No runtime ownership, no house assembly, no Workspace mutation.
+local PlotsCatalog = require(script.Parent.StudioPlotsCatalog)
+
+return function(context)
+    local HttpService = context.HttpService
+    local Selection = context.Selection
+    local Workspace = context.Workspace
+    local RunService = context.RunService
+    local BRIDGE_URL = context.bridgeUrl
+    local BRIDGE_TOKEN = context.bridgeToken
+
+    local function components(cframe: CFrame): {number}
+        return { cframe:GetComponents() }
+    end
+
+    local function capture(command)
+        if RunService:IsRunning() then
+            error("Stop Studio Play/Run before binding a house placement")
+        end
+        local houseSlug = tostring(command.houseSlug or "")
+        local plotIndex = tonumber(command.plotIndex)
+        if not plotIndex or plotIndex % 1 ~= 0 or plotIndex < 1 or plotIndex > 50 then
+            error("Plot must be between 1 and 50")
+        end
+        if houseSlug == "" then
+            error("Choose a registered house in Real Estate")
+        end
+        local chosen = Selection:Get()
+        if #chosen ~= 1 or not chosen[1]:IsA("Model") then
+            error("Select exactly one Model named " .. houseSlug .. " in Studio Explorer")
+        end
+        local model = chosen[1] :: Model
+        if model.Name ~= houseSlug or not model:IsDescendantOf(Workspace) then
+            error("Selected Model must be Workspace model named exactly " .. houseSlug)
+        end
+        if not model:FindFirstChildWhichIsA("BasePart", true) then
+            error("Selected house Model has no BasePart geometry")
+        end
+        local entries = PlotsCatalog.Collect(Workspace)
+        local volume = nil
+        for _, entry in ipairs(entries) do
+            if entry.index == plotIndex then
+                volume = entry.volume
+                break
+            end
+        end
+        if not volume then
+            error(string.format("Workspace.Plots/%02d/plot_%02d_volume not found", plotIndex, plotIndex))
+        end
+        local world = model:GetPivot()
+        local plotFrame = volume.CFrame
+        return {
+            houseSlug = houseSlug,
+            plotIndex = plotIndex,
+            plotVolume = volume.Name,
+            worldCFrame = components(world),
+            plotCFrame = components(plotFrame),
+            localCFrame = components(plotFrame:ToObjectSpace(world)),
+            scale = model:GetScale(),
+        }
+    end
+
+    return function(command)
+        local response = {
+            command = "house-placement-capture", schemaVersion = 1,
+            project = "game1", operationId = command.operationId,
+            houseSlug = command.houseSlug, plotIndex = command.plotIndex,
+        }
+        local ok, result = pcall(capture, command)
+        if ok then
+            for field, value in pairs(result) do
+                response[field] = value
+            end
+        else
+            response.error = tostring(result)
+        end
+        local posted, answer = pcall(HttpService.RequestAsync, HttpService, {
+            Url = BRIDGE_URL .. "/house-placement-result",
+            Method = "POST",
+            Headers = {
+                ["X-Game1-Token"] = BRIDGE_TOKEN,
+                ["Content-Type"] = "application/json",
+            },
+            Body = HttpService:JSONEncode(response),
+        })
+        if not posted or not answer.Success then
+            warn("[game1][house placement] bridge failed: " .. tostring(posted and answer.StatusCode or answer))
+        end
+    end
+end
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="20">
+        <Properties>
           <string name="Name">StudioMarkerVisibility</string>
           <string name="Source"><![CDATA[-- Studio-only presentation toggle. No movement of markers, no metadata edits.
 -- Visibility is re-applied from authored marker defaults after Studio restart.
@@ -3272,7 +3386,7 @@ return table.freeze(Visibility)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="20">
+      <Item class="ModuleScript" referent="21">
         <Properties>
           <string name="Name">StudioModelLoadCommands</string>
           <string name="Source"><![CDATA[-- Studio model-sync command: validates and imports Character, Monster/NPC and Weapon models.
@@ -3839,7 +3953,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="21">
+      <Item class="ModuleScript" referent="22">
         <Properties>
           <string name="Name">StudioPlotsCatalog</string>
           <string name="Source"><![CDATA[-- Read-only discovery contract for authored Workspace.Plots/01..50.
@@ -3901,7 +4015,7 @@ return table.freeze(Catalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="22">
+      <Item class="ModuleScript" referent="23">
         <Properties>
           <string name="Name">StudioPlotsPartPolicy</string>
           <string name="Source"><![CDATA[-- Reversible, Studio-only properties for Plots visibility and playtest preview.
@@ -3986,7 +4100,7 @@ return table.freeze(Policy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="23">
+      <Item class="ModuleScript" referent="24">
         <Properties>
           <string name="Name">StudioPlotsSelectionFilter</string>
           <string name="Source"><![CDATA[-- Studio viewport hit-test filter for hidden Plots authoring geometry.
@@ -4076,7 +4190,7 @@ return table.freeze(Filter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="24">
+      <Item class="ModuleScript" referent="25">
         <Properties>
           <string name="Name">StudioPlotsVisibility</string>
           <string name="Source"><![CDATA[-- Studio-only Plots preview: hidden -> volumes -> volumes + numbers -> hidden.
@@ -4370,7 +4484,7 @@ return table.freeze(PlotsVisibility)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="25">
+      <Item class="ModuleScript" referent="26">
         <Properties>
           <string name="Name">StudioRealEstateCollisionPolicy</string>
           <string name="Source"><![CDATA[-- Real Estate physics layer. Only this module writes MeshPart physics.
@@ -4418,6 +4532,12 @@ function Policy.Apply(mesh: MeshPart, name: string, raw: any)
     mesh.CanTouch = false
     mesh.CollisionFidelity = FIDELITY[fidelity]
     mesh.DoubleSided = if typeof(settings.doubleSided) == "boolean" then settings.doubleSided else true
+    -- Capture the *authoring policy* on the MeshPart itself. Studio copies can
+    -- be revalidated without a Host Agent request or a full model reimport.
+    -- This metadata is not a second registry: it is the applied snapshot.
+    mesh:SetAttribute("Game1RealEstateNoCollide", noCollide)
+    mesh:SetAttribute("Game1RealEstateCollisionFidelity", fidelity)
+    mesh:SetAttribute("Game1RealEstateDoubleSided", mesh.DoubleSided)
 
     if collider then
         mesh.Transparency = 1
@@ -4439,11 +4559,45 @@ function Policy.Apply(mesh: MeshPart, name: string, raw: any)
     end
 end
 
+-- Studio copy/paste does not pass through Model.Place/PartSync. Reassert the
+-- imported physical shape after a managed house enters Workspace, preserving
+-- the explicit mesh settings recorded by Apply. Older templates (before this
+-- snapshot existed) fall back to their copied collision toggles.
+function Policy.RestoreCopiedMesh(mesh: MeshPart): boolean
+    local noCollide = mesh:GetAttribute("Game1RealEstateNoCollide")
+    if typeof(noCollide) ~= "boolean" then
+        noCollide = not mesh.CanCollide
+    end
+    local fidelity = mesh:GetAttribute("Game1RealEstateCollisionFidelity")
+    if typeof(fidelity) ~= "string" or FIDELITY[fidelity] == nil then
+        fidelity = mesh.CollisionFidelity.Name
+    end
+    local doubleSided = mesh:GetAttribute("Game1RealEstateDoubleSided")
+    if typeof(doubleSided) ~= "boolean" then
+        doubleSided = mesh.DoubleSided
+    end
+    local expected = if noCollide then (FIDELITY[fidelity] or FIDELITY.Box)
+        else FIDELITY.PreciseConvexDecomposition
+    local needsRestore = mesh.CollisionFidelity ~= expected
+        or mesh.CanCollide ~= not noCollide
+        or mesh.CanQuery ~= not noCollide
+        or mesh.CanTouch ~= false
+        or mesh.DoubleSided ~= doubleSided
+    if not needsRestore then return false end
+    Policy.Apply(mesh, mesh.Name, {
+        noCollide = noCollide,
+        collisionFidelity = fidelity,
+        doubleSided = doubleSided,
+        destructible = mesh:GetAttribute("Game1RealEstateDestructible") == true,
+    })
+    return true
+end
+
 return table.freeze(Policy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="26">
+      <Item class="ModuleScript" referent="27">
         <Properties>
           <string name="Name">StudioRealEstateHouseFrame</string>
           <string name="Source"><![CDATA[-- Author-space transform for all Real Estate Studio sync paths.
@@ -4482,7 +4636,7 @@ return table.freeze(HouseFrame)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="27">
+      <Item class="ModuleScript" referent="28">
         <Properties>
           <string name="Name">StudioRealEstateModel</string>
           <string name="Source"><![CDATA[-- Studio assembly for any number of independent Real Estate MeshPart rigs.
@@ -4766,7 +4920,7 @@ return table.freeze(StudioRealEstateModel)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="28">
+      <Item class="ModuleScript" referent="29">
         <Properties>
           <string name="Name">StudioRealEstatePartPlacement</string>
           <string name="Source"><![CDATA[-- Restore source-FBX mesh centres after independent Model Asset import.
@@ -4890,7 +5044,7 @@ return table.freeze(Placement)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="29">
+      <Item class="ModuleScript" referent="30">
         <Properties>
           <string name="Name">StudioRealEstatePartSync</string>
           <string name="Source"><![CDATA[-- Atomic, single-rig refresh of a managed Real Estate template.
@@ -5124,7 +5278,7 @@ return table.freeze(PartSync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="30">
+      <Item class="ModuleScript" referent="31">
         <Properties>
           <string name="Name">StudioRealEstatePlacedCollisionSync</string>
           <string name="Source"><![CDATA[-- Repair *only* authoring-managed collision rigs of already placed Estates.
@@ -5199,7 +5353,79 @@ return table.freeze(Sync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="31">
+      <Item class="ModuleScript" referent="32">
+        <Properties>
+          <string name="Name">StudioRealEstatePlacedPhysicsGuard</string>
+          <string name="Source"><![CDATA[-- Studio Edit Mode: normalize a managed Estate pasted or dragged from
+-- ServerStorage into Workspace. The normal Sync path already normalizes its
+-- staged MeshParts; manual copy/paste does not call that path.
+-- One event-driven pass per newly inserted managed root; no Workspace polling.
+local CollisionPolicy = require(script.Parent.StudioRealEstateCollisionPolicy)
+local PlacedTargets = require(script.Parent.StudioRealEstatePlacedTargets)
+local Guard = {}
+
+function Guard.Start(Workspace: any, RunService: any): () -> ()
+    local pending = setmetatable({}, {__mode = "k"})
+    local enabled = true
+
+    local function onAdded(instance: Instance)
+        if not enabled or RunService:IsRunning() or not instance:IsA("Model") then
+            return
+        end
+        local slug = instance:GetAttribute("Game1RealEstateSlug")
+        if typeof(slug) ~= "string" or slug == "" or pending[instance] then
+            return
+        end
+        -- A nested managed model is not another house. The attribute belongs
+        -- to the top-level template/placed root, not its individual rigs.
+        local ancestor = instance.Parent
+        while ancestor and ancestor ~= Workspace do
+            if ancestor:IsA("Model") and ancestor:GetAttribute("Game1RealEstateSlug") == slug then
+                return
+            end
+            ancestor = ancestor.Parent
+        end
+        pending[instance] = true
+        task.delay(0.1, function()
+            pending[instance] = nil
+            if not enabled or RunService:IsRunning() or not instance:IsDescendantOf(Workspace) then
+                return
+            end
+            local restored = 0
+            for _, descendant in instance:GetDescendants() do
+                if descendant:IsA("MeshPart") then
+                    if CollisionPolicy.RestoreCopiedMesh(descendant) then
+                        restored += 1
+                    end
+                end
+            end
+            -- Cloned ServerStorage templates must not masquerade as templates
+            -- once they are placed in Workspace.
+            PlacedTargets.MarkPlaced(instance)
+            if restored > 0 then
+                print(("[game1 plugin] repaired %d copied Estate MeshPart physics settings: %s")
+                    :format(restored, instance:GetFullName()))
+            end
+        end)
+    end
+
+    local connection = Workspace.DescendantAdded:Connect(onAdded)
+    -- Also repair copies that were placed before the plugin was installed or
+    -- reloaded. This scan runs once on plugin startup, not on every frame.
+    for _, instance in Workspace:GetDescendants() do
+        onAdded(instance)
+    end
+    return function()
+        enabled = false
+        connection:Disconnect()
+    end
+end
+
+return table.freeze(Guard)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="33">
         <Properties>
           <string name="Name">StudioRealEstatePlacedTargets</string>
           <string name="Source"><![CDATA[-- One authoritative definition of a placed Real Estate instance.
@@ -5244,7 +5470,7 @@ return table.freeze(Targets)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="32">
+      <Item class="ModuleScript" referent="34">
         <Properties>
           <string name="Name">StudioRealEstatePlacedVisualSync</string>
           <string name="Source"><![CDATA[-- Full Real Estate sync: refresh visual rigs on *all managed placed* houses.
@@ -5363,7 +5589,7 @@ return table.freeze(VisualSync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="33">
+      <Item class="ModuleScript" referent="35">
         <Properties>
           <string name="Name">StudioRealEstateRigValidation</string>
           <string name="Source"><![CDATA[-- Validate an already-published Real Estate Model Asset as actually loaded by Roblox.
@@ -5492,7 +5718,7 @@ return table.freeze(Validation)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="34">
+      <Item class="ModuleScript" referent="36">
         <Properties>
           <string name="Name">StudioTextureAppearance</string>
           <string name="Source"><![CDATA[-- Shared Studio-side material binding for all authored MeshParts.
@@ -5554,7 +5780,7 @@ return table.freeze(StudioTextureAppearance)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="35">
+      <Item class="ModuleScript" referent="37">
         <Properties>
           <string name="Name">StudioTimelineEditorCommands</string>
           <string name="Source"><![CDATA[-- Timeline authoring session: validates requests, binds UI events and reports results.
@@ -5843,7 +6069,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="36">
+      <Item class="ModuleScript" referent="38">
         <Properties>
           <string name="Name">StudioTimelinePoseSampler</string>
           <string name="Source"><![CDATA[-- Offline pose extraction and interpolation for a preview rig. No UI or HTTP dependencies.
@@ -6022,7 +6248,7 @@ return table.freeze(StudioTimelinePoseSampler)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="37">
+      <Item class="ModuleScript" referent="39">
         <Properties>
           <string name="Name">StudioTimelinePreview</string>
           <string name="Source"><![CDATA[-- Owns the isolated ViewportFrame rig, camera interaction and animation-asset retrieval.
@@ -6238,7 +6464,7 @@ return table.freeze(StudioTimelinePreview)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="38">
+      <Item class="ModuleScript" referent="40">
         <Properties>
           <string name="Name">StudioTimelineTransport</string>
           <string name="Source"><![CDATA[-- HTTP boundary for the Timeline editor. No UI, animation or Studio model access.
@@ -6296,7 +6522,7 @@ return table.freeze(StudioTimelineTransport)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="39">
+      <Item class="ModuleScript" referent="41">
         <Properties>
           <string name="Name">StudioTimelineWidget</string>
           <string name="Source"><![CDATA[-- Timeline editor view. Builds the dock widget and exposes only its controls.

@@ -170,3 +170,10 @@
 .real-estate-physics-controls > label { display:inline-flex; align-items:center; gap:6px; font-size:11px; }
 .real-estate-physics-controls select { max-width:240px; font-size:11px; }
 .real-estate-physics-state { flex-basis:100%; color:var(--muted); font-size:11px; }
+
+/* M208: plot/house placement authoring stays separate from publication. */
+.real-estate-placement { margin-top:20px; }
+.real-estate-placement-controls { display:flex;flex-wrap:wrap;align-items:end;gap:12px;margin:12px 0; }
+.real-estate-placement-controls label { display:grid;gap:5px;min-width:190px;flex:1; }
+.real-estate-placement-controls button { white-space:nowrap; }
+.real-estate-placement .table-wrap { margin-top:12px; }

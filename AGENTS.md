@@ -40,3 +40,7 @@ Historical reports in `docs/history/` are snapshots, not normative contracts. Ma
 ## M203 · Real Estate / Location Atlas independence
 
 Model slug cannot own or reserve atlas identity. New authoring calls `AtlasRegistry.adopt_file/bind/ensure_published`; old owner references and retained texture snapshots migrate into independent variants on startup; see `docs/workflows/ATLAS_INDEPENDENCE_M203_RU.md`. This does not migrate unrelated Weapon/Monster/NPC texture slot stores; they remain a separate architectural debt and must not be represented as compliant.
+
+## M208 · plot × house placement authoring
+
+`real_estate/placement.py` owns persisted `(plotIndex, houseSlug)` CFrame/scale bindings; Studio reads the selected Model and existing Plots catalog through `StudioHousePlacementCapture.luau`. This is not the gameplay purchase/spawn service. See `docs/workflows/REAL_ESTATE_PLOT_HOUSE_PLACEMENT_M208_RU.md`.

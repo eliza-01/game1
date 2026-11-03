@@ -768,6 +768,7 @@ function realEstateRender(){
       ? `Last publication failed · ${job.step}: ${job.error}`
       : row?`${row.status} · ${(row.meshParts||[]).map(p=>p.slice(0,1).toUpperCase()+p.slice(1)+'Rig').join(' + ')} ${row.publicationCurrent?.model?'ready':'changed'} · ${row.meshParts?.map(part=>realEstateIsCollider(part)?`${part} physics only`:`${part} image ${row.publicationCurrent?.[part]?'ready':'changed'}`).join(' · ')} · Sync Studio requires all present assets ready`:'register a house first';
   realEstateIdentity();
+  if(typeof game1RealEstatePlacementRender==='function')game1RealEstatePlacementRender();
   if(typeof realEstateMeshWorkflowRender==='function')realEstateMeshWorkflowRender();
 }
 async function realEstateLoad(){
@@ -778,6 +779,7 @@ async function realEstateLoad(){
     if(!realEstateState.selected){try{realEstateState.selected=localStorage.getItem(REAL_ESTATE_SELECTED)||null;}catch{}}
     if(realEstateState.selected && !realEstateSelected())realEstateState.selected=null;
     realEstateForm(realEstateSelected());
+    if(typeof game1RealEstatePlacementLoad==='function')await game1RealEstatePlacementLoad();
     if(realEstateState.selected)await realEstateWatchPublication(realEstateState.selected,false);
   }catch(error){toast(error.message,true);}
 }

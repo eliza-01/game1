@@ -121,6 +121,30 @@ return table.freeze({
 		["human_male"] = table.freeze({
 			skeletonSignature = "81519687bd1413ddf34287374fa5ef61f46c52d3976c5be95aa06e5204f56496",
 			base = table.freeze({
+				["death"] = table.freeze({
+					table.freeze({
+						clipId = "human_male__base__death__00",
+						assetId = "138556723203566",
+						animationId = "rbxassetid://138556723203566",
+						variant = 0,
+						weight = 100,
+						looped = false,
+						priority = "Action",
+						document = nil,
+					}),
+				}),
+				["revive"] = table.freeze({
+					table.freeze({
+						clipId = "human_male__base__revive__00",
+						assetId = "81850127715492",
+						animationId = "rbxassetid://81850127715492",
+						variant = 0,
+						weight = 100,
+						looped = false,
+						priority = "Action",
+						document = nil,
+					}),
+				}),
 			}),
 			emotions = table.freeze({
 				["blink"] = table.freeze({

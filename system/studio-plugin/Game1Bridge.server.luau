@@ -18,6 +18,8 @@ local StudioTimelineEditorCommands = require(script.Parent.modules.StudioTimelin
 local DecoManager = require(script.Parent.modules.DecoManager)
 local StudioDecoSyncCommands = require(script.Parent.modules.StudioDecoSyncCommands)
 local StudioCharacterTestStand = require(script.Parent.modules.StudioCharacterTestStand)
+local StudioHousePlacementCapture = require(script.Parent.modules.StudioHousePlacementCapture)
+local StudioRealEstatePlacedPhysicsGuard = require(script.Parent.modules.StudioRealEstatePlacedPhysicsGuard)
 
 local toolbar = plugin:CreateToolbar("game1")
 local markerVisibility = StudioMarkerVisibility.new(plugin, toolbar, Workspace)
@@ -36,6 +38,10 @@ local AGENT_URL = AGENT_BASE_URL .. "/api/agent/info"
 local AGENT_TOKEN = "Game1LocalControlV1"
 local BRIDGE_URL = "http://127.0.0.1:43137"
 local BRIDGE_TOKEN = "Game1StudioBridgeV1"
+
+-- Only Studio authoring copies are corrected; gameplay actors are untouched.
+local stopEstateCopyGuard = StudioRealEstatePlacedPhysicsGuard.Start(Workspace, RunService)
+plugin.Unloading:Connect(stopEstateCopyGuard)
 
 local characterStand = StudioCharacterTestStand.new({
     plugin = plugin,
@@ -139,6 +145,15 @@ local handleDecoRefresh = StudioDecoSyncCommands({
     bridgeToken = BRIDGE_TOKEN,
 })
 
+local handleHousePlacementCapture = StudioHousePlacementCapture({
+    HttpService = HttpService,
+    Selection = Selection,
+    Workspace = Workspace,
+    RunService = RunService,
+    bridgeUrl = BRIDGE_URL,
+    bridgeToken = BRIDGE_TOKEN,
+})
+
 local function pollBridge()
     if RunService:IsRunning() then
         return
@@ -165,6 +180,8 @@ local function pollBridge()
         locationCommands.handle(data)
     elseif data.command == "deco-refresh" then
         handleDecoRefresh(data)
+    elseif data.command == "house-placement-capture" then
+        handleHousePlacementCapture(data)
     end
 end
 

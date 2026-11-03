@@ -41,6 +41,8 @@ from timeline_store import TimelineStore
 from location_store import LocationStore
 from location_asset_store import LocationAssetStore
 from real_estate.store import RealEstateStore
+from real_estate.placement import RealEstatePlacementStore
+from services.studio_house_placement_bridge import capture_house_placement
 from real_estate.studio_sync import RealEstateStudioSync
 from deco_layout_store import DecoLayoutStore
 from studio_save import request_active_studio_save
@@ -87,6 +89,8 @@ timelines = TimelineStore(ROOT, store, animations, monsters, monster_animations)
 locations = LocationStore(ROOT, run_location_authoring_bridge)
 location_assets = LocationAssetStore(ROOT)
 real_estate = RealEstateStore(ROOT, location_assets=location_assets)
+real_estate_placements = RealEstatePlacementStore(ROOT, real_estate)
+real_estate.placement_store = real_estate_placements
 real_estate_publications = RealEstatePublicationJobs(real_estate)
 deco_layouts = DecoLayoutStore(ROOT)
 character_identity = CharacterIdentityService(ROOT, store, animations)
@@ -145,6 +149,7 @@ READ_SOURCES = MappingProxyType({
     "weapons": weapons, "monsters": monsters, "monster_animations": monster_animations,
     "npcs": npcs, "npc_animations": npc_animations, "npc_equipment": npc_equipment,
     "location_assets": location_assets, "real_estate": real_estate,
+    "real_estate_placements": real_estate_placements,
     "real_estate_publications": real_estate_publications, "npc_spawns": npc_spawns,
     "monster_spawns": monster_spawns, "animation_speed_scaling": animation_speed_scaling,
     "options": options_store, "timelines": timelines, "locations": locations,
@@ -170,6 +175,8 @@ WRITE_SOURCES = MappingProxyType({
     "choose_real_estate_fbx": choose_real_estate_fbx,
     "choose_real_estate_texture": choose_real_estate_texture,
     "real_estate": real_estate,
+    "real_estate_placements": real_estate_placements,
+    "capture_house_placement": capture_house_placement,
     "real_estate_publications": real_estate_publications,
     "sync_real_estate_to_studio": real_estate_studio_sync.sync,
     "choose_monster_fbx": choose_monster_fbx,

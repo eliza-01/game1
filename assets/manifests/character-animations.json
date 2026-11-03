@@ -243,6 +243,34 @@
       "status": "PUBLISHED"
     },
     {
+      "id": "human_male__base__death__00",
+      "characterId": "human_male",
+      "name": "base_death",
+      "sourcePath": "assets/source/characters/human/male/human_male/animations/base/base_death.rbxm",
+      "preparedPath": "assets/source/characters/human/male/human_male/animations/base/base_death.rbxm",
+      "sha256": "c3d7f62d9f37e28da989af672254eee7457fefea61e8ece3418d4ed2aba8f67f",
+      "sourceSha256": "c3d7f62d9f37e28da989af672254eee7457fefea61e8ece3418d4ed2aba8f67f",
+      "assetId": "138556723203566",
+      "publishedSha256": "c3d7f62d9f37e28da989af672254eee7457fefea61e8ece3418d4ed2aba8f67f",
+      "moderationState": "Approved",
+      "revision": 1,
+      "status": "PUBLISHED"
+    },
+    {
+      "id": "human_male__base__revive__00",
+      "characterId": "human_male",
+      "name": "base_revive",
+      "sourcePath": "assets/source/characters/human/male/human_male/animations/base/base_revive.rbxm",
+      "preparedPath": "assets/source/characters/human/male/human_male/animations/base/base_revive.rbxm",
+      "sha256": "f1a4a4d38f55454a5975ccd32527de5696ee7894bf48cbb863b3f52ae9b624ca",
+      "sourceSha256": "f1a4a4d38f55454a5975ccd32527de5696ee7894bf48cbb863b3f52ae9b624ca",
+      "assetId": "81850127715492",
+      "publishedSha256": "f1a4a4d38f55454a5975ccd32527de5696ee7894bf48cbb863b3f52ae9b624ca",
+      "moderationState": "Approved",
+      "revision": 1,
+      "status": "PUBLISHED"
+    },
+    {
       "id": "human_male__emotions__blink__00",
       "characterId": "human_male",
       "name": "emotions_blink",
@@ -603,6 +631,30 @@
       "weight": 100,
       "looped": true,
       "priority": "Movement"
+    },
+    {
+      "id": "binding__human_male__base__death__00",
+      "characterId": "human_male",
+      "scope": "base",
+      "weaponSet": "",
+      "slot": "death",
+      "variant": 0,
+      "clipId": "human_male__base__death__00",
+      "weight": 100,
+      "looped": false,
+      "priority": "Action"
+    },
+    {
+      "id": "binding__human_male__base__revive__00",
+      "characterId": "human_male",
+      "scope": "base",
+      "weaponSet": "",
+      "slot": "revive",
+      "variant": 0,
+      "clipId": "human_male__base__revive__00",
+      "weight": 100,
+      "looped": false,
+      "priority": "Action"
     },
     {
       "id": "binding__human_male__emotions__blink__00",

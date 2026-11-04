@@ -64,6 +64,41 @@ def route(path, body, deps):
         except Exception as error:
             return out(400, {'error': str(error)})
 
+    if path.startswith('/api/texture-atlases/variants/') and path.endswith('/retire'):
+        try:
+            raw = path[len('/api/texture-atlases/variants/'):-len('/retire')].strip('/')
+            if not raw.isdigit():
+                raise ValueError('invalid atlas variant ID')
+            payload = body()
+            if not isinstance(payload, dict) or type(payload.get('autoClosest', False)) is not bool:
+                raise ValueError('invalid atlas retirement request')
+            replacement = payload.get('replacementVariantId')
+            if replacement is not None and (type(replacement) is not int or replacement < 1):
+                raise ValueError('invalid replacement variant ID')
+            result = location_assets.atlases.retire_variant(
+                int(raw), token=str(payload.get('token') or ''),
+                replacement_variant_id=replacement,
+                auto_closest=payload.get('autoClosest', False))
+            # The SQLite retirement has COMMITTED. An export error must not
+            # return a misleading HTTP 400 that encourages repeating deletion.
+            # Keep an explicit warning so the operator can reconcile manifests.
+            exports = [('location_assets', location_assets.export),
+                       ('real_estate', deps['real_estate'].export)]
+            if 'character_components' in deps:
+                exports.append(('character_components', deps['character_components'].export))
+            if 'character_assemblies' in deps:
+                exports.append(('characters', deps['character_assemblies'].characters.export))
+            warnings = []
+            for name, exporter in exports:
+                try:
+                    exporter()
+                except (ValueError, OSError, RuntimeError) as error:
+                    warnings.append(f'{name}: {error}')
+            result['exportWarnings'] = warnings
+            return out(200, result)
+        except (ValueError, OSError, RuntimeError) as error:
+            return out(400, {'error': str(error)})
+
     if path == "/api/texture-atlases/variants":
         try:
             return out(200, location_assets.atlases.register_file(str(body().get('sourcePath') or '')))

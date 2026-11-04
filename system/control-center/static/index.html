@@ -6,14 +6,16 @@
 <link rel="icon" href="data:,">
 <title>game1 · asset manager</title>
 <link rel="stylesheet" href="shared-asset-retirement.css?v=2">
-<link rel="stylesheet" href="asset-manager.css?v=12">
-<link rel="stylesheet" href="database-history.css?v=1">
+<link rel="stylesheet" href="asset-manager.css?v=13">
+<link rel="stylesheet" href="database-history.css?v=3">
+<link rel="stylesheet" href="atlas-library.css?v=2">
+<link rel="stylesheet" href="asset-section-order.css?v=1">
 <link rel="stylesheet" href="character-animations.css?v=1">
 <link rel="stylesheet" href="location-assets.css?v=1">
 <link rel="stylesheet" href="character-components.css?v=6">
 <link rel="stylesheet" href="character-assemblies.css?v=4">
 <link rel="stylesheet" href="deco-assets.css?v=6">
-<link rel="stylesheet" href="real-estate.css?v=12&physics=205">
+<link rel="stylesheet" href="real-estate.css?v=13&physics=205">
 </head>
 <body>
 <header>
@@ -34,6 +36,7 @@
 <button id="nav-location-assets" class="asset-section" type="button"><b>location assets</b><small>trees · bushes · rocks · lights · fences · decorations · ladders · flowers · buildings · props</small></button>
 <button id="nav-database" class="asset-section" type="button"><b>database</b><small>asset audit · ID history</small></button>
 <div id="database-nav" class="database-subnav" hidden><button id="nav-asset-audit" type="button" class="database-subnav-item">Asset History</button></div>
+<button id="nav-atlas" class="asset-section" type="button"><b>atlas</b><small>variants · consumers · retirement</small></button>
 <button id="nav-real-estate" class="asset-section" type="button"><b>real estate</b><small>houses · any mesh rigs · textures</small></button>
 <button id="nav-timelines" class="asset-section" type="button"><b>timelines</b><small>attack animation events</small></button>
 <button id="nav-options" class="asset-section" type="button"><b>options</b><small>common runtime settings</small></button>
@@ -276,12 +279,15 @@
 <p class="hint">Choose a registered house and a numbered plot. In Studio Edit mode select exactly one Model in Workspace whose name matches the house slug, position/rotate/scale it, then click <strong>Bind selected Model</strong>. Saved bindings are independent for every house and plot.</p>
 <div class="real-estate-placement-controls">
   <label>House<select id="re-placement-house"><option value="">Choose registered house</option></select></label>
-  <label>Plot<select id="re-placement-plot"></select></label>
+  <div class="re-plot-picker"><span>Plot</span><div class="re-plot-picker-row"><button id="re-placement-prev" type="button" aria-label="Previous plot">◀</button><select id="re-placement-plot" aria-label="Plot"></select><button id="re-placement-next" type="button" aria-label="Next plot">▶</button></div></div>
   <button id="re-placement-bind" class="primary" type="button" disabled>Bind selected Model</button>
   <button id="re-placement-refresh" type="button">Refresh</button>
 </div>
 <div id="re-placement-status" class="status-box">Select a house and a plot, then choose its Model in Studio.</div>
-<div class="table-wrap"><table aria-label="House placement bindings"><thead><tr><th>Plot</th><th>House</th><th>Position (world)</th><th>Scale</th><th>Rev.</th></tr></thead><tbody id="re-placement-rows"><tr><td colspan="5" class="muted">No placement bindings yet.</td></tr></tbody></table></div>
+<div class="table-wrap"><table aria-label="House placement bindings"><thead><tr><th><button id="re-placement-toggle-all" class="re-anchor-toggle" type="button" title="Anchor all bindings" aria-label="Toggle anchoring for all bindings">⚓</button></th><th>Actions</th><th>Plot</th><th>House</th><th>Position (world)</th><th>Scale</th><th>Rev.</th></tr></thead><tbody id="re-placement-rows"><tr><td colspan="7" class="muted">No placement bindings yet.</td></tr></tbody></table></div>
+<div class="re-placement-anchor-actions actions"><button id="re-placement-anchor-all" type="button">⚓ Anchor all</button><button id="re-placement-free-all" type="button">≋ Free all</button></div>
+<div class="re-placement-bulk-actions actions"><button id="re-placement-place-all" class="primary" type="button" title="Place the selected house on every bound plot">Place all</button><button id="re-placement-clear-all" type="button" title="Clear all managed authored house previews in Workspace.Plots">Clear all</button></div>
+<small class="hint">Place all uses the selected house and its saved plot bindings. Clear all removes every system-managed house preview from Workspace.Plots/01–50 (including outdated previews), not manually placed models. Both operations use one Studio Undo recording.</small>
 <small class="hint">Bindings store full world and plot-relative CFrames plus Model scale. They do not purchase houses, spawn them at runtime, or change original templates.</small>
 </div>
 </div></div></div>
@@ -418,6 +424,32 @@
 <p class="muted database-history-note">Общие атласы отображаются по variant ID: их нельзя приписывать одной модели. Для Location Assets замена атласа в Studio Sync привязана к конкретному slug. Если прежний ID неизвестен, показывается «—». Повторная публикация с тем же ID сохраняется как ревизия содержимого.</p>
 </div>
 </div>
+
+<div id="atlas-view" hidden>
+  <div class="panel hero"><div><span class="eyebrow">one shared registry · every domain</span><h2>Atlas</h2>
+    <p>All registered texture atlases. Select an atlas to see its consumers, Image ID and safe retirement options. Deleting here archives the atlas in the registry without silently changing Roblox Studio or deleting source files.</p></div></div>
+  <div class="panel atlas-library-panel">
+    <div class="section-title"><div><span>Central Atlas Registry</span><h3>Available atlases <small id="atlas-library-count">0</small></h3></div><button id="atlas-library-refresh" type="button">Refresh</button></div>
+    <label class="atlas-library-search">Search atlas key or filename<input id="atlas-library-search" type="search" placeholder="atlas name / resolution"></label>
+    <div id="atlas-library-status" role="status" aria-live="polite" class="muted"></div>
+    <div id="atlas-library-list" class="atlas-library-list"></div>
+  </div>
+</div>
+<dialog id="atlas-library-dialog" class="atlas-library-dialog" aria-labelledby="atlas-library-dialog-title">
+  <div class="atlas-library-dialog-heading"><h3 id="atlas-library-dialog-title">Atlas</h3><button id="atlas-library-close" type="button" aria-label="Close">Close</button></div>
+  <div id="atlas-library-dialog-summary"></div>
+  <h4>Used by</h4><ul id="atlas-library-consumers" class="atlas-library-consumers"></ul>
+  <section class="atlas-library-retire"><h4>Delete atlas from active registry</h4>
+    <p class="hint">Delete removes the variant from the active registry (archives its record). Existing consumers must first be rebound to a published atlas. Roblox Image IDs, publication history and original files are preserved. All changed consumers require their own Studio Sync.</p>
+    <label>Replacement atlas<select id="atlas-library-replacement"><option value="">Select replacement</option></select></label>
+    <label class="atlas-library-check"><input id="atlas-library-auto" type="checkbox"> Use closest quality from the same atlas family, if available</label>
+    <div id="atlas-library-recommendation" class="hint"></div>
+    <button id="atlas-library-sync-closest" type="button" disabled title="Planned feature; not implemented">Sync with closest atlas · soon</button>
+    <label class="atlas-library-check"><input id="atlas-library-confirm" type="checkbox"> I have reviewed the consumers and understand Studio will not synchronize automatically</label>
+    <div class="actions"><button id="atlas-library-retire" type="button" disabled>Delete atlas</button></div>
+  </section>
+  <div id="atlas-library-dialog-status" role="status" aria-live="polite"></div>
+</dialog>
 
 <div id="monsters-view" hidden>
 <div class="panel hero">
@@ -630,7 +662,8 @@
 </main>
 <div id="toast" class="toast"></div>
 <script src="publication-descriptions.js?v=1"></script>
-<script src="character-assets.js?v=22"></script>
+<script src="character-assets.js?v=23"></script>
+<script src="asset-section-order.js?v=1"></script>
 <script src="character-animation-ui.js?v=2"></script>
 <script src="character-workflow.js?v=2"></script>
 <script src="character-publications.js?v=2"></script>
@@ -650,6 +683,7 @@
 <script src="deco-assets.js?v=12"></script>
 <script src="location-asset-workflow.js?v=2"></script>
 <script src="asset-audit.js?v=2"></script>
+<script src="atlas-library.js?v=2"></script>
 <script src="options.js?v=1"></script>
 <script src="weapon-assets.js?v=3"></script>
 <script src="monster-assets.js?v=6"></script>
@@ -657,7 +691,7 @@
 <script src="npc-spawns.js?v=4"></script>
 <script src="real-estate.js?v=25&rig=186&atlas=202&physics=207&fix=212"></script>
 <script src="real-estate-mesh-workflow.js?v=2&atlas=188"></script>
-<script src="real-estate-placement.js?v=1"></script>
+<script src="real-estate-placement.js?v=2"></script>
 <script src="monster-spawns.js?v=1"></script>
 </body>
 </html>

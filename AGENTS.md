@@ -112,3 +112,32 @@ full audit and conservative preflight before any Place mutations. M216 remains
 the historical safety floor concerning root identity, placement scope and audit,
 not a ban on the now-shared managed CHILD rig replacement. See
 `docs/workflows/SHARED_PLACED_RIG_SYNC_M222_RU.md`.
+
+## M223 · Central Atlas retirement / authored plot previews
+
+`AtlasRegistry.retire_variant` is the sole writer of atlas retirement and binding
+migrations; never physically delete retained images, published IDs or publication
+history, never auto-select a different atlas key and never trigger implicit Studio
+Sync after a retirement. All consumers must be rebound in a single transaction
+and their revisions incremented. SQLite is authoritative when MySQL audit is offline.
+
+Real Estate Plot Place/Clear operates ONLY on separately marked authored
+previews in `Workspace.Plots/NN/Houses`. The saved Placement binding is the
+sole source of coordinates, and plugin changes must participate in Studio Undo.
+No gameplay purchases, no mutation of unmanaged Workspace models or templates.
+Read `docs/workflows/ASSET_MANAGER_ATLAS_PLOT_PREVIEW_M223_RU.md` before changes.
+
+## M224 · Placement anchoring and Atlas Library UI
+
+`RealEstatePlacementStore` owns the persistent per-binding anchored flag, with an additive
+SQLite migration and unchanged CFrame capture schema. Studio mutates only marked
+authored previews (`Game1PlotHousePreview`), never arbitrary Workspace contents.
+Anchor/Free must use the authenticated scoped placement bridge and Studio Undo.
+Re-Place may replace managed previews on the same plot but never unmanaged objects.
+Atlas Delete means active-registry retirement with source/ID/history preserved,
+not deletion of files or published Roblox assets. See
+`docs/workflows/ASSET_MANAGER_M224_PLACEMENT_ATLAS_HOTFIX_RU.md`.
+
+## M227 · Bulk authored house previews
+
+`Place all` uses one selected house slug and ONLY saved Real Estate bindings from the server; it must never accept browser-supplied positions. `Clear all` is intentionally global across managed authored previews and never touches unmanaged Place objects. Single Place/Clear and bulk Place/Clear must share Studio preflight, staged clone/anchor verification, managed-only replacement and one Undo recording per command. Do not implement bulk by running individual commands 50 times. See `docs/workflows/REAL_ESTATE_BULK_PLOT_PREVIEW_M227_RU.md`.

@@ -7,6 +7,9 @@
 
 | Документ | Зачем читать | Статус |
 | --- | --- | --- |
+| [M227 — Real Estate Place all / Clear all](workflows/REAL_ESTATE_BULK_PLOT_PREVIEW_M227_RU.md) | Пакетная постановка выбранного дома по сохранённым Bind и удаление всех управляемых preview; одна Studio Undo-операция | **CURRENT · STUDIO SMOKE REQUIRED** |
+| [M226 — Studio plugin installer recovery](workflows/STUDIO_PLUGIN_INSTALLER_LOCK_RECOVERY_M226_RU.md) | Ошибка file-lock при копировании Game1Bridge: проверка SHA-256, безопасный retry и восстановление после частичной установки M225 | **CURRENT** |
+| [M223 — Asset Manager: Atlas и Plot Place/Clear](workflows/ASSET_MANAGER_ATLAS_PLOT_PREVIEW_M223_RU.md) | Sidebar order, централизованный Atlas Registry с retirement/историей, авторский Place/Clear домов по сохранённым Bind | **CURRENT · STUDIO SMOKE REQUIRED** |
 | [M222 — Shared managed rig replacement](workflows/SHARED_PLACED_RIG_SYNC_M222_RU.md) | Единый транзакционный механизм child-rig swap для Real Estate и Location Assets, полная публикация skinned FBX, аудит, откат | **CURRENT · STUDIO SMOKE REQUIRED** |
 | [M221 — In-place FBX geometry Sync](workflows/LOCATION_ASSETS_INPLACE_GEOMETRY_SYNC_M221_RU.md) | Guarded MeshPart:ApplyMesh, per-slug geometry update, Studio v4, rollback/history | **SUPERSEDED BY M222** |
 | [M220 — Location Assets resource workflow](workflows/LOCATION_ASSETS_RESOURCE_WORKFLOW_M220_RU.md) | Раздельные Register/Edit, FBX Model ID и независимый Atlas Registry, общие UI-компоненты Real Estate, M221 updates geometry contract | **CURRENT UI / PUBLICATION** |
@@ -47,3 +50,5 @@
 Начать с текущего ТЗ и исходных contracts. Если отчёт M133 рекомендует `StudioRealEstateSocketRecovery`, он **устарел**: восстановление костей удалено M153. Если M146 рекомендует единую кнопку F для всех действий, для современной двери/замка применяются M159, а для лифта/сундука M161. См. раздел «Опасные устаревшие предположения» в [архитектурной карте](architecture/CURRENT_ARCHITECTURE_RU.md).
 
 Чтобы добавить новый milestone: сохранить **отчёт** в соответствующем `history/<domain>`, а **действующий контракт** обновить в `spec/` и/или `architecture/`, затем обновить [каталог](history/README.md). Не дублировать конкурирующие «актуальные ТЗ» под разными датами.
+
+- [M224 · Placement Anchor/Free, Atlas grouping, sidebar/database hotfix](workflows/ASSET_MANAGER_M224_PLACEMENT_ATLAS_HOTFIX_RU.md) — актуальные правила авторских превью и удаления атласов.

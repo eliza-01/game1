@@ -12,10 +12,11 @@ import os
 from pathlib import Path
 import tempfile
 import time
+import uuid
 
 from sqlite_connection import connect
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 1  # unchanged CFrame capture protocol; anchored is additive metadata
 PLOT_COUNT = 50
 
 
@@ -89,9 +90,21 @@ class RealEstatePlacementStore:
                 local_cframe_json TEXT NOT NULL,
                 model_scale REAL NOT NULL CHECK(model_scale > 0),
                 revision INTEGER NOT NULL DEFAULT 1,
+                anchored INTEGER NOT NULL DEFAULT 1 CHECK(anchored IN (0,1)),
                 updated_at REAL NOT NULL,
                 PRIMARY KEY(plot_index, house_slug)
             )''')
+            # Additive migration for pre-M224 placement databases. Existing houses start anchored.
+            cols = {row[1] for row in db.execute("PRAGMA table_info(real_estate_placements)")}
+            if "anchored" not in cols:
+                # Use SQLite's online backup API before this one-time migration;
+                # raw copying an open WAL database would not be reliable.
+                backups = self.db.parent / 'backups'
+                backups.mkdir(parents=True, exist_ok=True)
+                backup_path = backups / f'before_placement_anchor_m224_{uuid.uuid4().hex}.db'
+                with connect(backup_path) as backup:
+                    db.backup(backup)
+                db.execute("ALTER TABLE real_estate_placements ADD COLUMN anchored INTEGER NOT NULL DEFAULT 1 CHECK(anchored IN (0,1))")
             # Deleting a house must retire only its placement bindings.
             db.execute('''CREATE TRIGGER IF NOT EXISTS real_estate_placements_house_delete
                 AFTER DELETE ON real_estate BEGIN
@@ -116,7 +129,18 @@ class RealEstatePlacementStore:
                 'plotCFrame': json.loads(row['plot_cframe_json']),
                 'localCFrame': json.loads(row['local_cframe_json']),
                 'scale': row['model_scale'], 'revision': row['revision'],
+                'anchored': bool(row['anchored']),
                 'updatedAt': row['updated_at']}
+
+    def get(self, house_slug: str, plot_index: int) -> dict | None:
+        if type(plot_index) is not int or not 1 <= plot_index <= PLOT_COUNT:
+            raise ValueError('plot must be an integer between 1 and 50')
+        with connect(self.db) as db:
+            row = db.execute('''SELECT p.* FROM real_estate_placements p
+                JOIN real_estate h ON h.slug=p.house_slug
+                WHERE p.house_slug=? AND p.plot_index=?''',
+                (house_slug, plot_index)).fetchone()
+        return self._present(dict(row)) if row else None
 
     def bind(self, house_slug: str, plot_index: int, capture: dict) -> dict:
         if not isinstance(house_slug, str) or not house_slug or self.houses.get(house_slug) is None:
@@ -145,6 +169,39 @@ class RealEstatePlacementStore:
                                   'WHERE plot_index=? AND house_slug=?', (plot_index, house_slug)).fetchone())
         self.export()
         return self._present(row)
+
+    def set_anchored(self, targets: list[dict], anchored: bool) -> int:
+        """Persist authoring flags after Studio confirms the requested mutation.
+
+        Only exact, existing plot×house bindings are writable. The geometric
+        binding revision remains unchanged because its transform did not change.
+        """
+        if type(anchored) is not bool or not isinstance(targets, list):
+            raise ValueError('invalid anchor state or targets')
+        seen = set()
+        for pair in targets:
+            if not isinstance(pair, dict):
+                raise ValueError('invalid placement target')
+            slug, plot = pair.get('houseSlug'), pair.get('plotIndex')
+            if not isinstance(slug, str) or not slug or type(plot) is not int or not 1 <= plot <= PLOT_COUNT:
+                raise ValueError('invalid placement target')
+            if (slug, plot) in seen:
+                raise ValueError('duplicate placement target')
+            seen.add((slug, plot))
+        changed = 0
+        with connect(self.db) as db:
+            # Guard against stale UI/snapshot and removed rows.
+            for slug, plot in seen:
+                if not db.execute('SELECT 1 FROM real_estate_placements WHERE house_slug=? AND plot_index=?',
+                                  (slug, plot)).fetchone():
+                    raise ValueError('placement bindings changed; refresh and retry')
+            for slug, plot in sorted(seen):
+                changed += db.execute('UPDATE real_estate_placements SET anchored=? '
+                    'WHERE house_slug=? AND plot_index=? AND anchored<>?',
+                    (int(anchored), slug, plot, int(anchored))).rowcount
+        if changed:
+            self.export()
+        return changed
 
     def export(self) -> None:
         """Atomic, deterministic authoring manifest for a future purchase service."""

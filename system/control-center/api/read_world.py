@@ -10,7 +10,16 @@ def route(parsed, sources, info):
 
     if path == "/api/texture-atlases":
         search = str((parse_qs(parsed.query).get('search') or [''])[0])
-        return 200, {'families': sources['location_assets'].atlases.catalog(search)}
+        return 200, {'families': sources['location_assets'].atlases.catalog_with_consumers(search)}
+
+    if path.startswith('/api/texture-atlases/variants/') and path.endswith('/retirement'):
+        try:
+            raw = path[len('/api/texture-atlases/variants/'):-len('/retirement')].strip('/')
+            if not raw.isdigit():
+                raise ValueError('invalid atlas variant ID')
+            return 200, sources['location_assets'].atlases.retirement_plan(int(raw))
+        except (ValueError, OSError) as error:
+            return 400, {'error': str(error)}
 
     if path == '/api/asset-replacements':
         try:

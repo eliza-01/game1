@@ -36,6 +36,7 @@ if($LASTEXITCODE -ne 0){throw 'Studio Luau preflight failed; installed plugin wa
 Push-Location $PSScriptRoot
 try {
     rojo build plugin.project.json -o $Temp
+    if($LASTEXITCODE -ne 0){throw 'Rojo Studio plugin build failed; installed plugin was not replaced'}
 } finally {
     Pop-Location
 }
@@ -80,6 +81,7 @@ foreach($Marker in @(
     'Game1DecoAssets',
     'Game1AuthoringMarkers',
     'StudioMarkerVisibility',
+    'StudioHousePlacementPreview',
     'StudioPlotsCatalog',
     'StudioPlotsVisibility',
     'StudioPlotsPartPolicy',
@@ -118,11 +120,51 @@ foreach($RemovedMarker in @('Game1ControlCenter','Game1CheckAnimations','Check R
     }
 }
 
-Copy-Item $Temp $Generated -Force
-Copy-Item $Temp $Installed -Force
+# Publishing a validated Rojo bundle is separate from building it. Windows may
+# temporarily lock an existing .rbxmx as a memory-mapped file. Never delete a
+# locked plugin or treat a partial copy as a successful installation.
+function Install-VerifiedBundle {
+    param(
+        [Parameter(Mandatory=$true)][string]$Source,
+        [Parameter(Mandatory=$true)][string]$Destination,
+        [Parameter(Mandatory=$true)][string]$ExpectedHash
+    )
+    $MaxAttempts=5
+    for($Attempt=1; $Attempt -le $MaxAttempts; $Attempt++){
+        try {
+            # Do not overwrite an identical bundle: this also avoids needless
+            # writes to a file opened by Studio, a watcher or antivirus.
+            if(Test-Path -LiteralPath $Destination -PathType Leaf){
+                $ExistingHash=(Get-FileHash -LiteralPath $Destination -Algorithm SHA256 -ErrorAction Stop).Hash
+                if($ExistingHash -eq $ExpectedHash){
+                    Write-Host ("Studio bridge already current: {0}" -f $Destination)
+                    return
+                }
+            }
+            Copy-Item -LiteralPath $Source -Destination $Destination -Force -ErrorAction Stop
+            $ActualHash=(Get-FileHash -LiteralPath $Destination -Algorithm SHA256 -ErrorAction Stop).Hash
+            if($ActualHash -ne $ExpectedHash){
+                throw "Copied Studio bridge hash mismatch: $Destination"
+            }
+            return
+        } catch {
+            $Failure=$_
+            if($Attempt -eq $MaxAttempts){
+                throw ("Studio bridge install failed: {0}. File may be locked by Roblox Studio, a build/watch process or another application. Close those processes and run ONLY system/studio-plugin/install.ps1 again; do NOT reapply the Git patch. Last error: {1}" -f $Destination, $Failure)
+            }
+            Start-Sleep -Milliseconds (200 * $Attempt)
+        }
+    }
+}
+
+$BuiltHash=(Get-FileHash -LiteralPath $Temp -Algorithm SHA256 -ErrorAction Stop).Hash
+Install-VerifiedBundle -Source $Temp -Destination $Generated -ExpectedHash $BuiltHash
+Install-VerifiedBundle -Source $Temp -Destination $Installed -ExpectedHash $BuiltHash
 $GeneratedHash=(Get-FileHash $Generated -Algorithm SHA256).Hash
 $InstalledHash=(Get-FileHash $Installed -Algorithm SHA256).Hash
-if($GeneratedHash -ne $InstalledHash){throw 'Installed Studio bridge hash does not match generated bridge hash'}
+if($GeneratedHash -ne $InstalledHash -or $GeneratedHash -ne $BuiltHash){
+    throw 'Installed Studio bridge hash does not match the verified Rojo build'
+}
 Remove-Item $Temp -Force -ErrorAction SilentlyContinue
 
 Write-Host ("Game1Bridge installed with DecoManager + authoring-marker visibility + Locations + Attack Timeline: {0}" -f $Installed)

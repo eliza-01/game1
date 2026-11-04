@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from pathlib import Path
 import hashlib
+import json
+import math
 import re
 import shutil
 import threading
@@ -150,6 +152,29 @@ class AtlasRegistry:
                     synced_revision INTEGER NOT NULL DEFAULT 0,
                     PRIMARY KEY(consumer_type,consumer_id));
             ''')
+            # Preserve publication history and immutable IDs when an atlas is retired.
+            columns = {row[1] for row in db.execute('PRAGMA table_info(texture_atlas_variants)')}
+            if 'retired_at' not in columns:
+                backup_dir = self.db.parent / 'backups'
+                backup_dir.mkdir(parents=True, exist_ok=True)
+                with connect_sqlite(backup_dir / ('before_atlas_retirement_m223_' + uuid.uuid4().hex + '.db')) as target:
+                    db.backup(target)
+                db.execute('ALTER TABLE texture_atlas_variants ADD COLUMN retired_at REAL')
+            db.execute('''CREATE TABLE IF NOT EXISTS texture_atlas_retirements (
+                id INTEGER PRIMARY KEY,
+                variant_id INTEGER NOT NULL,
+                replacement_variant_id INTEGER,
+                consumer_snapshot_json TEXT NOT NULL,
+                retired_at REAL NOT NULL)''')
+            db.execute('''CREATE TABLE IF NOT EXISTS texture_atlas_binding_migrations (
+                id INTEGER PRIMARY KEY,
+                retirement_id INTEGER NOT NULL REFERENCES texture_atlas_retirements(id),
+                consumer_type TEXT NOT NULL,
+                consumer_id TEXT NOT NULL,
+                old_image_id TEXT NOT NULL,
+                new_image_id TEXT NOT NULL,
+                revision INTEGER NOT NULL,
+                changed_at REAL NOT NULL)''')
 
     def connect(self):
         return connect_sqlite(self.db)
@@ -181,7 +206,8 @@ class AtlasRegistry:
 
     @staticmethod
     def _variant(row: dict) -> dict:
-        row['current'] = bool(row.get('published_id') and row['published_sha256'] == row['source_sha256'])
+        row['retired'] = row.get('retired_at') is not None
+        row['current'] = bool(not row['retired'] and row.get('published_id') and row['published_sha256'] == row['source_sha256'])
         row['replacementPending'] = bool(row.get('replacement_sha256') and row['replacement_sha256'] != row['source_sha256'])
         row['uses_alpha'] = bool(row.get('uses_alpha'))
         row['resolution'] = f"{row['width']}x{row['height']}"
@@ -203,6 +229,7 @@ class AtlasRegistry:
                 FROM texture_atlas_variants v
                 JOIN texture_atlas_families f ON f.id=v.family_id
                 LEFT JOIN texture_atlas_replacements r ON r.variant_id=v.id
+                WHERE v.retired_at IS NULL
                 ORDER BY f.atlas_key, v.width*v.height DESC, v.width DESC, v.height DESC, v.id''').fetchall()
         result: dict[str, dict] = {}
         for row in rows:
@@ -216,6 +243,26 @@ class AtlasRegistry:
                 'version': item['version'], 'variants': []})
             group['variants'].append(item)
         return list(result.values())
+
+    def catalog_with_consumers(self, search: str = '') -> list[dict]:
+        """Library view: one variant row, all consumer identities attached once.
+
+        Consumer lookup is batched, avoiding a separate query for each atlas.
+        The core catalog contract stays unchanged for existing workflows.
+        """
+        families = self.catalog(search)
+        variants = {v['id']: v for f in families for v in f['variants']}
+        with self.connect() as db:
+            rows = db.execute('''SELECT variant_id,consumer_type,consumer_id
+                FROM texture_atlas_bindings ORDER BY consumer_type,consumer_id''').fetchall()
+        for variant in variants.values():
+            variant['consumers'] = []
+        for row in rows:
+            variant = variants.get(row['variant_id'])
+            if variant is not None:
+                variant['consumers'].append({'consumer_type': row['consumer_type'],
+                                             'consumer_id': row['consumer_id']})
+        return families
 
     def binding(self, consumer_type: str, consumer_id: str) -> dict | None:
         with self.connect() as db:
@@ -239,6 +286,102 @@ class AtlasRegistry:
             rows = db.execute('''SELECT consumer_type,consumer_id,revision FROM texture_atlas_bindings
                 WHERE variant_id=? ORDER BY consumer_type,consumer_id''', (int(variant_id),)).fetchall()
         return [dict(row) for row in rows]
+
+    def retirement_plan(self, variant_id: int) -> dict:
+        # Impact preview: retain publication/audit records.
+        variant = self.get_variant(variant_id)
+        if not variant or variant['retired']:
+            raise ValueError('unknown active atlas variant')
+        consumers = self.consumers(variant_id)
+        with self.connect() as db:
+            pending = db.execute('SELECT 1 FROM texture_atlas_pending_uploads WHERE variant_id=?', (variant_id,)).fetchone()
+            staged = db.execute('SELECT 1 FROM texture_atlas_replacements WHERE variant_id=?', (variant_id,)).fetchone()
+        if pending or staged or variant['replacementPending']:
+            raise ValueError('resolve pending atlas upload or source replacement before retirement')
+        candidates = [candidate for family in self.catalog() for candidate in family['variants']
+                      if candidate['id'] != variant_id and candidate['current']]
+        candidates.sort(key=lambda item: (0 if item['atlas_key'] == variant['atlas_key']
+                                          else 1 if item['baseKey'] == variant['baseKey'] else 2,
+                                          abs(item['width']*item['height']-variant['width']*variant['height']),
+                                          item['atlas_key'], item['id']))
+        # Automatic quality selection is safe ONLY within the same atlas key.
+        # A similarly sized image of a different object is not a valid substitute.
+        similar = [item for item in candidates if item['atlas_key'] == variant['atlas_key']]
+        similar.sort(key=lambda v: (abs(math.log2((v['width'] * v['height']) /
+                                  (variant['width'] * variant['height']))),
+                                  abs(v['width']-variant['width']) + abs(v['height']-variant['height']), v['id']))
+        suggested = similar[0]['id'] if similar else None
+        identity = {'variantId': variant_id, 'publishedId': variant['published_id'],
+                    'sourceSha256': variant['source_sha256'],
+                    'consumers': [{'type': x['consumer_type'], 'id': x['consumer_id'],
+                                   'revision': x['revision']} for x in consumers],
+                    'candidates': [(v['id'], v['published_id'], v['source_sha256']) for v in candidates]}
+        token = hashlib.sha256(json.dumps(identity, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+        return {'variant': variant, 'consumers': consumers, 'candidates': candidates,
+                'suggestedReplacementId': suggested, 'token': token}
+
+    def retire_variant(self, variant_id: int, *, token: str,
+                       replacement_variant_id: int | None = None,
+                       auto_closest: bool = False) -> dict:
+        # Retire transactionally with stale-preview protection.
+        # No original image bytes or historical publications are deleted.
+        plan = self.retirement_plan(variant_id)
+        if not token or token != plan['token']:
+            raise ValueError('atlas uses changed; refresh the deletion warning')
+        if auto_closest and replacement_variant_id is not None:
+            raise ValueError('choose either automatic or manual replacement')
+        target = plan['suggestedReplacementId'] if auto_closest else replacement_variant_id
+        if target is not None and (type(target) is not int or target == variant_id or
+                not any(item['id'] == target for item in plan['candidates'])):
+            raise ValueError('replacement must be a different, current published atlas')
+        if auto_closest and target is None:
+            raise ValueError('no published atlas in the same family at another resolution')
+        if plan['consumers'] and target is None:
+            raise ValueError('this atlas is in use; choose a replacement first')
+        now = time.time()
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            current = db.execute('''SELECT published_id,source_sha256,retired_at
+                FROM texture_atlas_variants WHERE id=?''', (variant_id,)).fetchone()
+            actual = [dict(row) for row in db.execute('''SELECT consumer_type,consumer_id,revision
+                FROM texture_atlas_bindings WHERE variant_id=? ORDER BY consumer_type,consumer_id''', (variant_id,))]
+            # Publication/source replacement can start while the confirmation
+            # modal is open. Recheck both under the same write lock.
+            in_flight = db.execute('''SELECT 1 FROM texture_atlas_pending_uploads WHERE variant_id=?''',
+                                   (variant_id,)).fetchone()
+            staged_source = db.execute('''SELECT 1 FROM texture_atlas_replacements WHERE variant_id=?''',
+                                       (variant_id,)).fetchone()
+            if (not current or current['retired_at'] is not None or
+                current['published_id'] != plan['variant']['published_id'] or
+                current['source_sha256'] != plan['variant']['source_sha256'] or
+                actual != plan['consumers'] or in_flight or staged_source):
+                raise ValueError('atlas changed while reviewing; refresh and try again')
+            if target is not None:
+                replacement = db.execute('''SELECT published_id,source_sha256,published_sha256,retired_at
+                    FROM texture_atlas_variants WHERE id=?''', (target,)).fetchone()
+                selected = next(item for item in plan['candidates'] if item['id'] == target)
+                if (not replacement or replacement['retired_at'] is not None or not replacement['published_id']
+                        or replacement['source_sha256'] != replacement['published_sha256']
+                        or str(replacement['published_id']) != str(selected['published_id'])
+                        or replacement['source_sha256'] != selected['source_sha256']):
+                    raise ValueError('replacement atlas changed; refresh and confirm again')
+                db.execute('''UPDATE texture_atlas_bindings SET variant_id=?,revision=revision+1,
+                    changed_at=? WHERE variant_id=?''', (target, now, variant_id))
+            db.execute('UPDATE texture_atlas_variants SET retired_at=? WHERE id=?', (now, variant_id))
+            cursor = db.execute('''INSERT INTO texture_atlas_retirements
+                (variant_id,replacement_variant_id,consumer_snapshot_json,retired_at)
+                VALUES(?,?,?,?)''', (variant_id, target, json.dumps(actual, sort_keys=True), now))
+            if target is not None:
+                for consumer in actual:
+                    db.execute('''INSERT INTO texture_atlas_binding_migrations
+                        (retirement_id,consumer_type,consumer_id,old_image_id,new_image_id,revision,changed_at)
+                        VALUES(?,?,?,?,?,?,?)''', (
+                        cursor.lastrowid, consumer['consumer_type'], consumer['consumer_id'],
+                        str(current['published_id'] or ''), str(replacement['published_id']),
+                        consumer['revision'] + 1, now))
+        return {'retiredVariantId': variant_id, 'replacementVariantId': target,
+                'consumersRebound': len(actual), 'studioSyncRequired': bool(actual),
+                'sourceFilesPreserved': True}
 
     def adopt_file(self, source_path: str, *, domain: str = 'location') -> dict:
         """Bring a new image into Atlas Registry, never a model-owned PNG.
@@ -299,11 +442,13 @@ class AtlasRegistry:
                 shutil.copy2(path, staged)
             sha = digest(staged)
             with self.connect() as db:
-                existing = db.execute('''SELECT v.id,v.source_sha256 FROM texture_atlas_variants v
+                existing = db.execute('''SELECT v.id,v.source_sha256,v.retired_at FROM texture_atlas_variants v
                     JOIN texture_atlas_families f ON f.id=v.family_id
                     WHERE f.atlas_key=? AND v.width=? AND v.height=?''',
                     (key, width, height)).fetchone()
             if existing:
+                if existing['retired_at'] is not None:
+                    raise ValueError('this atlas resolution was retired; use a new atlas key')
                 if existing['source_sha256'] != sha:
                     raise ValueError(f'{key} {width}x{height}: another image exists; '
                                      'replace/republish explicitly in Atlas Registry')
@@ -328,9 +473,11 @@ class AtlasRegistry:
                            (parsed['atlasKey'], now))
                 family_id = db.execute('SELECT id FROM texture_atlas_families WHERE atlas_key=?',
                                        (parsed['atlasKey'],)).fetchone()[0]
-                existing = db.execute('SELECT id,source_sha256 FROM texture_atlas_variants WHERE family_id=? AND width=? AND height=?',
+                existing = db.execute('SELECT id,source_sha256,retired_at FROM texture_atlas_variants WHERE family_id=? AND width=? AND height=?',
                                       (family_id, parsed['width'], parsed['height'])).fetchone()
                 if existing:
+                    if existing['retired_at'] is not None:
+                        raise ValueError('this atlas resolution was retired; use a new atlas key')
                     variant_id = existing['id']
                     claimed = db.execute('SELECT scope FROM texture_atlas_scopes WHERE variant_id=?',
                                          (variant_id,)).fetchone()
@@ -396,6 +543,8 @@ class AtlasRegistry:
                                  (int(variant_id),)).fetchone()
             if not variant:
                 raise ValueError('unknown atlas variant')
+            if db.execute('SELECT retired_at FROM texture_atlas_variants WHERE id=?', (int(variant_id),)).fetchone()[0] is not None:
+                raise ValueError('retired atlas cannot be selected')
             if not allow_unpublished and (not variant['published_id'] or variant['published_sha256'] != variant['source_sha256']):
                 raise ValueError('atlas variant must be published before selecting it')
             old = db.execute('SELECT variant_id,revision FROM texture_atlas_bindings WHERE consumer_type=? AND consumer_id=?', (consumer_type,consumer_id)).fetchone()
@@ -444,6 +593,8 @@ class AtlasRegistry:
             variant = self.get_variant(variant_id)
             if not variant:
                 raise ValueError('unknown atlas variant')
+            if variant['retired']:
+                raise ValueError('retired atlas cannot be published')
             with self.connect() as db:
                 replacement = db.execute('SELECT * FROM texture_atlas_replacements WHERE variant_id=?',
                                          (variant_id,)).fetchone()

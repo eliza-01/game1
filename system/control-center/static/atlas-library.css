@@ -1,0 +1,31 @@
+.atlas-library-panel{min-width:0;margin-top:14px;padding:22px 24px}
+.atlas-library-search{display:grid;gap:7px;max-width:460px;margin:14px 0}
+.atlas-library-search input{width:100%;min-width:0}
+.atlas-library-list{display:grid;gap:8px;margin-top:16px}
+.atlas-library-item{display:grid;grid-template-columns:minmax(180px,1fr) minmax(130px,auto) auto;gap:15px;align-items:center;width:100%;min-width:0;text-align:left;padding:13px 14px}
+.atlas-library-item span{min-width:0;overflow-wrap:anywhere}
+.atlas-library-item strong{display:block;font-size:13px;color:var(--text)}
+.atlas-library-item small{display:block;margin-top:4px;color:var(--muted);font-size:11px;overflow-wrap:anywhere}
+.atlas-library-id{font-family:Consolas,monospace;font-size:12px;color:var(--mint)}
+.atlas-library-dialog{width:min(760px,calc(100vw - 40px));max-height:86vh;overflow:auto;border:1px solid var(--line);border-radius:14px;padding:22px;background:var(--panel);color:var(--text)}
+.atlas-library-dialog::backdrop{background:#0009}
+.atlas-library-dialog-heading{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.atlas-library-dialog-heading h3{margin:0;overflow-wrap:anywhere}
+#atlas-library-dialog-summary{margin-top:12px;color:var(--muted);font-size:12px;overflow-wrap:anywhere}
+.atlas-library-consumers{list-style:none;margin:10px 0 16px;padding:0;display:grid;gap:6px}
+.atlas-library-consumers li{border:1px solid var(--line);border-radius:8px;padding:9px;overflow-wrap:anywhere}
+.atlas-library-consumers small{color:var(--muted)}
+.atlas-library-retire{border-top:1px solid var(--line);padding-top:13px;display:grid;gap:12px}
+.atlas-library-retire h4{margin:0}
+.atlas-library-retire label:not(.atlas-library-check){display:grid;gap:7px;min-width:0}
+.atlas-library-retire select{width:100%;min-width:0}
+.atlas-library-check{display:flex;gap:8px;align-items:center;font-size:12px}
+.atlas-library-check input{flex:0 0 auto}
+#atlas-library-dialog-status{margin-top:12px;color:var(--orange);font-size:12px}
+@media(max-width:700px){.atlas-library-item{grid-template-columns:minmax(0,1fr);gap:7px}}
+
+.atlas-library-models{color:var(--muted);font-size:11px;line-height:1.5;margin-top:7px;opacity:.85}
+#atlas-library-sync-closest{justify-self:start;opacity:.55;cursor:not-allowed}
+
+/* Match the Database panel spacing without affecting Atlas dialog geometry. */
+@media(max-width:700px){.atlas-library-panel{padding:15px 12px}}

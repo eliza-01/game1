@@ -42,7 +42,7 @@ class StudioLuauPreflightM139(unittest.TestCase):
         self.assertLess(installer.index("'validate_luau.py'"),
                         installer.index('rojo build plugin.project.json'))
         self.assertLess(installer.index('Studio Luau preflight failed'),
-                        installer.index('Copy-Item $Temp $Installed -Force'))
+                        installer.index('Install-VerifiedBundle -Source $Temp -Destination $Installed'))
 
 
 if __name__ == '__main__':

@@ -177,3 +177,17 @@
 .real-estate-placement-controls label { display:grid;gap:5px;min-width:190px;flex:1; }
 .real-estate-placement-controls button { white-space:nowrap; }
 .real-estate-placement .table-wrap { margin-top:12px; }
+
+/* M223 authoring-only house plot operations. */
+.re-plot-picker{display:flex;flex-direction:column;gap:5px;min-width:0;font-size:12px}
+.re-plot-picker-row{display:flex;align-items:center;gap:5px;min-width:0}
+#real-estate-view .re-plot-picker-row select{flex:1 1 auto;min-width:95px;max-width:175px}
+.re-plot-picker-row button{flex:0 0 auto;padding:8px 9px}
+.re-placement-row-actions{display:flex;gap:5px;flex-wrap:wrap;min-width:125px}
+.re-placement-row-actions button{font-size:11px;padding:6px 9px}
+
+.re-placement-anchor-actions{margin:12px 0 2px;justify-content:flex-end}
+.re-placement-bulk-actions{margin:10px 0 12px;justify-content:flex-end}
+.re-anchor-toggle{min-width:37px;padding:6px 9px;font-size:19px;line-height:1.1;border-radius:9px}
+.re-anchor-toggle.is-anchored{color:var(--mint)}
+.re-anchor-toggle.is-free{color:var(--orange);font-size:23px}

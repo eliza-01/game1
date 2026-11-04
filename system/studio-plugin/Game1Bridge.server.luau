@@ -19,6 +19,7 @@ local DecoManager = require(script.Parent.modules.DecoManager)
 local StudioDecoSyncCommands = require(script.Parent.modules.StudioDecoSyncCommands)
 local StudioCharacterTestStand = require(script.Parent.modules.StudioCharacterTestStand)
 local StudioHousePlacementCapture = require(script.Parent.modules.StudioHousePlacementCapture)
+local StudioHousePlacementPreview = require(script.Parent.modules.StudioHousePlacementPreview)
 local StudioRealEstatePlacedPhysicsGuard = require(script.Parent.modules.StudioRealEstatePlacedPhysicsGuard)
 
 local toolbar = plugin:CreateToolbar("game1")
@@ -153,7 +154,9 @@ local handleHousePlacementCapture = StudioHousePlacementCapture({
     bridgeUrl = BRIDGE_URL,
     bridgeToken = BRIDGE_TOKEN,
 })
-
+local handleHousePlacementPreview = StudioHousePlacementPreview({HttpService=HttpService,
+    Workspace=Workspace, ServerStorage=ServerStorage, RunService=RunService,
+    ChangeHistoryService=ChangeHistoryService, bridgeUrl=BRIDGE_URL, bridgeToken=BRIDGE_TOKEN})
 local function pollBridge()
     if RunService:IsRunning() then
         return
@@ -182,6 +185,7 @@ local function pollBridge()
         handleDecoRefresh(data)
     elseif data.command == "house-placement-capture" then
         handleHousePlacementCapture(data)
+    elseif data.command == "house-placement-preview-v2" then handleHousePlacementPreview(data)
     end
 end
 

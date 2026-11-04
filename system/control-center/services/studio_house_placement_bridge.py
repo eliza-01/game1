@@ -13,11 +13,34 @@ import uuid
 from studio_bridge import PORT, PROJECT, TOKEN, StudioBridgeError
 
 
-def capture_house_placement(house_slug: str, plot_index: int, *, timeout_seconds: float = 30.0) -> dict:
+def _request_house_placement(house_slug: str, plot_index: int, *, action: str,
+                             placement: dict | None = None, anchored: bool | None = None,
+                             targets: list[dict] | None = None, timeout_seconds: float = 30.0) -> dict:
+    if action not in ('capture', 'place', 'clear', 'anchors', 'place_all', 'clear_all'):
+        raise ValueError('unknown house placement action')
     operation_id = uuid.uuid4().hex
-    command = {'command': 'house-placement-capture', 'schemaVersion': 1,
+    command = {'command': 'house-placement-capture' if action == 'capture' else 'house-placement-preview-v2',
+               'schemaVersion': 1 if action == 'capture' else 2,
                'project': PROJECT, 'operationId': operation_id,
                'houseSlug': house_slug, 'plotIndex': plot_index}
+    if action != 'capture':
+        command['action'] = action
+        if placement is not None:
+            command['placement'] = placement
+        if action in ('anchors', 'place_all', 'clear_all'):
+            if not isinstance(targets, list) or len(targets) > 250:
+                raise ValueError('invalid batch targets')
+            command['targets'] = targets
+        if action == 'anchors':
+            if type(anchored) is not bool:
+                raise ValueError('invalid anchor command')
+            command['anchored'] = anchored
+    identity = {key: command[key] for key in ('command', 'schemaVersion', 'project', 'operationId',
+                                                'houseSlug', 'plotIndex')}
+    if action != 'capture':
+        identity['action'] = action
+    if action == 'anchors':
+        identity['anchored'] = anchored
     state = {'claimed': False, 'result': None}
 
     class Handler(BaseHTTPRequestHandler):
@@ -56,7 +79,7 @@ def capture_house_placement(house_slug: str, plot_index: int, *, timeout_seconds
                     raise ValueError('invalid payload size')
                 result = json.loads(self.rfile.read(length).decode('utf-8'))
                 if (not state['claimed'] or state['result'] is not None or not isinstance(result, dict)
-                        or any(result.get(key) != val for key, val in command.items())):
+                        or any(result.get(key) != val for key, val in identity.items())):
                     raise ValueError('unexpected or stale Studio capture')
                 state['result'] = result
                 return self.respond(200, {'ok': True})
@@ -77,13 +100,96 @@ def capture_house_placement(house_slug: str, plot_index: int, *, timeout_seconds
                 claimed_at = time.monotonic()
             if not state['claimed'] and time.monotonic() - started >= 8:
                 break
-            if claimed_at is not None and time.monotonic() - claimed_at >= 12:
+            if claimed_at is not None and time.monotonic() - claimed_at >= (70 if action in ('anchors', 'place_all', 'clear_all') else 12):
                 break
     finally:
         server.server_close()
     if state['result'] is None:
-        raise StudioBridgeError('Studio did not return a placement: select the named Model '
-                                'in Workspace, leave Play mode, and ensure Game1Bridge is installed')
+        raise StudioBridgeError('Studio did not complete house placement ' + action +
+                                ': check Edit mode, installed Game1Bridge, and the Studio Output')
     if state['result'].get('error'):
         raise StudioBridgeError(str(state['result']['error']))
     return state['result']
+
+
+def capture_house_placement(house_slug: str, plot_index: int, *, timeout_seconds: float = 30.0) -> dict:
+    return _request_house_placement(house_slug, plot_index, action='capture', timeout_seconds=timeout_seconds)
+
+
+def preview_house_placement(house_slug: str, plot_index: int, action: str,
+                            placement: dict | None = None, *, timeout_seconds: float = 30.0) -> dict:
+    if action == 'place' and not isinstance(placement, dict):
+        raise ValueError('a saved house-to-plot binding is required before Place')
+    if action == 'place' and type(placement.get('anchored')) is not bool:
+        raise ValueError('saved binding must have an explicit anchored boolean')
+    result = _request_house_placement(house_slug, plot_index, action=action,
+                                      placement=placement, timeout_seconds=timeout_seconds)
+    # A stale plugin must never return an apparently successful Place while
+    # silently leaving every part anchored. This is a verified *postcondition*,
+    # not just an echoed input field.
+    if action == 'place' and (result.get('status') != 'placed'
+        or type(result.get('anchored')) is not bool
+        or result['anchored'] is not placement['anchored']
+        or type(result.get('anchoredPartsVerified')) is not int
+        or result['anchoredPartsVerified'] < 1):
+        raise StudioBridgeError('Studio did not verify house Anchored state; '
+                                'install the latest Game1Bridge plugin and retry on a Place copy')
+    return result
+
+
+def anchor_house_placements(targets: list[dict], anchored: bool, *, timeout_seconds: float = 90.0) -> dict:
+    """Single Studio Undo operation for a scoped set of authored previews."""
+    if type(anchored) is not bool or not isinstance(targets, list) or len(targets) > 250:
+        raise ValueError('invalid anchor request')
+    # A dedicated action rides the existing authenticated placement bridge.
+    return _request_house_placement('*', 0, action='anchors', targets=targets,
+                                    anchored=anchored, timeout_seconds=timeout_seconds)
+
+
+def bulk_house_placements(house_slug: str | None, action: str,
+                          bindings: list[dict] | None = None, *, timeout_seconds: float = 90.0) -> dict:
+    """One authenticated Studio command / one Undo recording for the whole batch.
+
+    The HTTP caller cannot supply transforms. All placement data is read from
+    the saved Placement Store before this function is called.
+    """
+    if action == 'place_all':
+        if (type(house_slug) is not str or not house_slug or
+                any(c not in 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-' for c in house_slug)):
+            raise ValueError('invalid registered house slug')
+        if not isinstance(bindings, list) or not 1 <= len(bindings) <= 50:
+            raise ValueError('Place all requires 1–50 saved bindings')
+        targets = []
+        seen = set()
+        for binding in bindings:
+            if not isinstance(binding, dict) or binding.get('houseSlug') != house_slug:
+                raise ValueError('inconsistent house binding')
+            plot = binding.get('plotIndex')
+            if type(plot) is not int or not 1 <= plot <= 50 or plot in seen:
+                raise ValueError('duplicate or invalid plot binding')
+            if type(binding.get('anchored')) is not bool:
+                raise ValueError('binding anchored must be a boolean')
+            if not isinstance(binding.get('localCFrame'), list) or len(binding['localCFrame']) != 12:
+                raise ValueError('binding is missing relative CFrame')
+            seen.add(plot)
+            targets.append(binding)
+        targets.sort(key=lambda binding: binding['plotIndex'])
+        slug = house_slug
+    elif action == 'clear_all':
+        if bindings is not None:
+            raise ValueError('Clear all does not accept browser-supplied targets')
+        targets = []
+        slug = '*'
+    else:
+        raise ValueError('invalid house placement batch action')
+    result = _request_house_placement(slug, 0, action=action, targets=targets,
+                                      timeout_seconds=timeout_seconds)
+    expected = 'placed_all' if action == 'place_all' else 'cleared_all'
+    if (result.get('status') != expected or type(result.get('changed')) is not int
+            or result['changed'] < 0 or (action == 'place_all' and
+            (result['changed'] != len(targets) or
+             type(result.get('anchoredPartsVerified')) is not int or
+             result['anchoredPartsVerified'] < len(targets)))):
+        raise StudioBridgeError('Studio did not verify the full house placement batch; '
+                                'reinstall Game1Bridge and inspect the test Place')
+    return result

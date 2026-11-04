@@ -155,6 +155,42 @@ class SqliteAssetAuditImporter:
             })
         return events
 
+    def _atlas_binding_migration_events(self) -> list[dict]:
+        """Reflect retired-atlas rebinds in Database / Asset History (M217)."""
+        path = self.root / '.control-center' / 'game1.db'
+        if not path.is_file():
+            return []
+        with closing(sqlite3.connect(path)) as connection:
+            connection.row_factory = sqlite3.Row
+            if 'texture_atlas_binding_migrations' not in self._tables(connection):
+                return []
+            rows = [dict(row) for row in connection.execute(
+                'SELECT * FROM texture_atlas_binding_migrations ORDER BY id')]
+        events = []
+        for row in rows:
+            consumer_type = row['consumer_type']
+            consumer = row['consumer_id']
+            if consumer_type in ('real_estate', 'character_part') and ':' in consumer:
+                asset_key, slot = consumer.rsplit(':', 1)
+            else:
+                asset_key, slot = consumer, ''
+            domain = 'character_component' if consumer_type == 'character_part' else consumer_type
+            source_system = 'sqlite:game1.db:texture_atlas_binding_migrations'
+            source_record = str(row['id'])
+            events.append({
+                'operationId': self._operation_id(source_system, source_record),
+                'atUtc': self._at_utc(row['changed_at']),
+                'eventKind': 'atlas_rebind', 'assetDomain': domain,
+                'assetKey': asset_key, 'assetSlot': slot,
+                'assetType': 'image', 'sourceSystem': source_system,
+                'sourceRecord': source_record,
+                'sourceSha256': '', 'operationPath': '',
+                'assetId': row['new_image_id'], 'previousAssetId': row['old_image_id'],
+                'bindingRevision': row['revision'],
+                'metadata': {'retirementId': row['retirement_id']},
+            })
+        return events
+
     def sync_all(self) -> dict:
         with self._lock:
             try:
@@ -171,6 +207,16 @@ class SqliteAssetAuditImporter:
                     scanned += len(events)
                     sources.append({'database': spec.database, 'table': spec.table,
                                     'events': len(events)})
+                atlas_rebinds = self._atlas_binding_migration_events()
+                if hasattr(self.repository, 'append_publications'):
+                    self.repository.append_publications(atlas_rebinds)
+                else:
+                    for event in atlas_rebinds:
+                        self.repository.append_publication(event)
+                scanned += len(atlas_rebinds)
+                sources.append({'database': 'game1.db',
+                                'table': 'texture_atlas_binding_migrations',
+                                'events': len(atlas_rebinds)})
                 return {'scanned': scanned, 'sources': sources}
             except (ValueError, RuntimeError):
                 raise

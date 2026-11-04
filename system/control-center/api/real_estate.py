@@ -37,6 +37,66 @@ def write(path, body, deps):
             # Studio owns the measured transform; browser data never supplies a CFrame.
             capture = deps['capture_house_placement'](slug, plot)
             return 200, {'item': deps['real_estate_placements'].bind(slug, plot, capture)}
+        if path == '/api/real-estate/placements/preview':
+            payload = body()
+            slug = str(payload.get('houseSlug') or '').strip()
+            plot = payload.get('plotIndex')
+            action = payload.get('action')
+            if type(plot) is not int or not 1 <= plot <= 50 or action not in ('place', 'clear'):
+                raise ValueError('choose a plot and a Place/Clear action')
+            if not store.get(slug):
+                raise ValueError('unknown registered house')
+            binding = deps['real_estate_placements'].get(slug, plot)
+            if action == 'place' and binding is None:
+                raise ValueError('Bind this house and plot before Place')
+            studio = deps['preview_house_placement'](slug, plot, action, binding)
+            return 200, {'studio': studio}
+        if path == '/api/real-estate/placements/bulk':
+            payload = body()
+            if not isinstance(payload, dict):
+                raise ValueError('invalid bulk placement request')
+            action = payload.get('action')
+            if action == 'place_all':
+                slug = payload.get('houseSlug')
+                if type(slug) is not str or not store.get(slug):
+                    raise ValueError('select a registered house for Place all')
+                # The browser selects only the house. Transforms and anchoring
+                # always come from saved authoring bindings, never from HTTP.
+                bindings = [item for item in deps['real_estate_placements'].snapshot()['items']
+                            if item['houseSlug'] == slug]
+                if not bindings:
+                    raise ValueError('no saved Placement bindings for this house')
+                studio = deps['bulk_house_placements'](slug, action, bindings)
+            elif action == 'clear_all':
+                # Clears managed authored previews only, including orphaned
+                # previews whose binding was deleted after placement.
+                studio = deps['bulk_house_placements'](None, action)
+            else:
+                raise ValueError('unknown Place all / Clear all action')
+            return 200, {'studio': studio}
+        if path == '/api/real-estate/placements/anchors':
+            payload = body()
+            if not isinstance(payload, dict) or type(payload.get('anchored')) is not bool:
+                raise ValueError('anchored must be a boolean')
+            scope = payload.get('scope')
+            placements = deps['real_estate_placements']
+            if scope == 'all':
+                targets = [{'houseSlug': x['houseSlug'], 'plotIndex': x['plotIndex']}
+                           for x in placements.snapshot()['items']]
+            elif scope == 'one':
+                slug, plot = payload.get('houseSlug'), payload.get('plotIndex')
+                if type(slug) is not str or type(plot) is not int or not placements.get(slug, plot):
+                    raise ValueError('choose an existing house-to-plot binding')
+                targets = [{'houseSlug': slug, 'plotIndex': plot}]
+            else:
+                raise ValueError('choose one or all placement bindings')
+            # Studio first, database second: a bridge failure does not silently
+            # claim a state that was never applied in Studio.
+            if not targets:
+                return 200, {'changed': 0, 'studio': {'status': 'no_bindings'}}
+            studio = deps['anchor_house_placements'](targets, payload['anchored'])
+            changed = placements.set_anchored(targets, payload['anchored'])
+            return 200, {'changed': changed, 'studio': studio}
         if path.startswith('/api/real-estate/') and path.endswith('/mesh-inspect'):
             slug = unquote(path[len('/api/real-estate/'):-len('/mesh-inspect')].strip('/'))
             payload = body()

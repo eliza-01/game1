@@ -28,6 +28,7 @@ local DecoManager = require(script.Parent.modules.DecoManager)
 local StudioDecoSyncCommands = require(script.Parent.modules.StudioDecoSyncCommands)
 local StudioCharacterTestStand = require(script.Parent.modules.StudioCharacterTestStand)
 local StudioHousePlacementCapture = require(script.Parent.modules.StudioHousePlacementCapture)
+local StudioHousePlacementPreview = require(script.Parent.modules.StudioHousePlacementPreview)
 local StudioRealEstatePlacedPhysicsGuard = require(script.Parent.modules.StudioRealEstatePlacedPhysicsGuard)
 
 local toolbar = plugin:CreateToolbar("game1")
@@ -162,7 +163,9 @@ local handleHousePlacementCapture = StudioHousePlacementCapture({
     bridgeUrl = BRIDGE_URL,
     bridgeToken = BRIDGE_TOKEN,
 })
-
+local handleHousePlacementPreview = StudioHousePlacementPreview({HttpService=HttpService,
+    Workspace=Workspace, ServerStorage=ServerStorage, RunService=RunService,
+    ChangeHistoryService=ChangeHistoryService, bridgeUrl=BRIDGE_URL, bridgeToken=BRIDGE_TOKEN})
 local function pollBridge()
     if RunService:IsRunning() then
         return
@@ -191,6 +194,7 @@ local function pollBridge()
         handleDecoRefresh(data)
     elseif data.command == "house-placement-capture" then
         handleHousePlacementCapture(data)
+    elseif data.command == "house-placement-preview-v2" then handleHousePlacementPreview(data)
     end
 end
 
@@ -3546,6 +3550,432 @@ end
       </Item>
       <Item class="ModuleScript" referent="21">
         <Properties>
+          <string name="Name">StudioHousePlacementPreview</string>
+          <string name="Source"><![CDATA[-- Explicitly authored house preview in Workspace.Plots/NN/Houses.
+-- The placed copy is distinct from ServerStorage templates and player-owned houses.
+-- Refuses to modify any object it did not create and mark itself.
+local PlotsCatalog = require(script.Parent.StudioPlotsCatalog)
+
+return function(context)
+    local HttpService = context.HttpService
+    local Workspace = context.Workspace
+    local ServerStorage = context.ServerStorage
+    local RunService = context.RunService
+    local ChangeHistoryService = context.ChangeHistoryService
+
+    local function findPlot(index: number): (Folder, BasePart)
+        local entries = PlotsCatalog.Collect(Workspace)
+        for _, entry in ipairs(entries) do
+            if entry.index == index then
+                local folder = entry.volume.Parent
+                if folder and folder:IsA("Folder") then
+                    return folder, entry.volume
+                end
+            end
+        end
+        error(string.format("Workspace.Plots/%02d/plot_%02d_volume not found", index, index))
+    end
+
+    local function validateIdentity(command)
+        if RunService:IsRunning() then
+            error("House Place/Clear works only in Studio Edit Mode")
+        end
+        local slug = tostring(command.houseSlug or "")
+        local index = command.plotIndex
+        if slug == "" or slug:find("[^%w_%-]") then
+            error("Invalid registered house slug")
+        end
+        if typeof(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > 50 then
+            error("Plot must be between 1 and 50")
+        end
+        return slug, index
+    end
+
+    -- One anchoring policy for staged previews and already placed previews.
+    -- Checking *after* parenting matters: no successful Place may report Free
+    -- while a descendant BasePart is actually anchored in Workspace.
+    local function setAndVerifyAnchored(model: Model, anchored: boolean): number
+        local count = 0
+        for _, part in ipairs(model:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.Anchored = anchored
+                count += 1
+            end
+        end
+        if count == 0 then error("House preview has no BaseParts to anchor/free") end
+        for _, part in ipairs(model:GetDescendants()) do
+            if part:IsA("BasePart") and part.Anchored ~= anchored then
+                error("House preview anchoring verification failed: " .. part:GetFullName())
+            end
+        end
+        return count
+    end
+
+    -- Apply anchor state only to marked authored previews whose plot×house
+    -- identities came from the server's saved binding snapshot.
+    local function runAnchors(command)
+        if RunService:IsRunning() then
+            error("House Anchor/Free works only in Studio Edit Mode")
+        end
+        if typeof(command.anchored) ~= "boolean" or typeof(command.targets) ~= "table"
+            or #command.targets > 250 then
+            error("Invalid anchor command")
+        end
+        local wanted = {}
+        local count = 0
+        for _, item in ipairs(command.targets) do
+            local slug = item.houseSlug
+            local index = item.plotIndex
+            if typeof(slug) ~= "string" or slug == "" or slug:find("[^%w_%-]")
+                or typeof(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > 50 then
+                error("Invalid house/plot anchor target")
+            end
+            local key = tostring(index) .. ":" .. slug
+            if wanted[key] then error("Duplicate house/plot anchor target") end
+            wanted[key] = true
+            count += 1
+        end
+        if count ~= #command.targets then error("Invalid anchor target collection") end
+        local models = {}
+        local parts = {}
+        local plots = PlotsCatalog.Collect(Workspace)
+        for _, entry in ipairs(plots) do
+            local plotFolder = entry.volume.Parent
+            local houses = plotFolder and plotFolder:FindFirstChild("Houses")
+            if houses and houses:IsA("Folder") then
+                for _, model in ipairs(houses:GetChildren()) do
+                    if model:IsA("Model") and model:GetAttribute("Game1PlotHousePreview") == true
+                        and model:GetAttribute("Game1PlotIndex") == entry.index then
+                        local slug = model:GetAttribute("Game1RealEstateSlug")
+                        if typeof(slug) == "string" and wanted[tostring(entry.index) .. ":" .. slug] then
+                            table.insert(models, model)
+                            for _, descendant in ipairs(model:GetDescendants()) do
+                                if descendant:IsA("BasePart") then table.insert(parts, descendant) end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        -- All validation is complete before any Workspace mutation.
+        local recording = ChangeHistoryService:TryBeginRecording("Set authored house anchoring")
+        if not recording then error("Studio undo recording unavailable; no changes made") end
+        local previousParts, previousModels = {}, {}
+        local ok, problem = pcall(function()
+            for _, part in ipairs(parts) do
+                previousParts[part] = part.Anchored
+                part.Anchored = command.anchored
+            end
+            for _, part in ipairs(parts) do
+                if part.Anchored ~= command.anchored then
+                    error("Anchor/Free verification failed: " .. part:GetFullName())
+                end
+            end
+            for _, model in ipairs(models) do
+                previousModels[model] = model:GetAttribute("Game1PlotHouseAnchored")
+                model:SetAttribute("Game1PlotHouseAnchored", command.anchored)
+            end
+        end)
+        if not ok then
+            for part, old in pairs(previousParts) do pcall(function() part.Anchored = old end) end
+            for model, old in pairs(previousModels) do
+                pcall(function() model:SetAttribute("Game1PlotHouseAnchored", old) end)
+            end
+            ChangeHistoryService:FinishRecording(recording, Enum.FinishRecordingOperation.Cancel)
+            error("Anchor/Free failed (rolled back): " .. tostring(problem))
+        end
+        ChangeHistoryService:FinishRecording(recording, Enum.FinishRecordingOperation.Commit)
+        return {status = "anchored", changed = #models, partsChanged = #parts,
+                anchored = command.anchored}
+    end
+
+    -- Both single-row and bulk Place/Clear use these same preparation and
+    -- commit functions. No placed objects are destroyed before all requested
+    -- plots, templates and staged clones pass preflight.
+    local function isManagedPreview(model, index)
+        return model:IsA("Model")
+            and model:GetAttribute("Game1PlotHousePreview") == true
+            and model:GetAttribute("Game1PlotIndex") == index
+            and typeof(model:GetAttribute("Game1RealEstateSlug")) == "string"
+            and model:GetAttribute("Game1RealEstateSlug") == model.Name
+    end
+
+    local function checkedHousesFolder(plotFolder)
+        local folder = plotFolder:FindFirstChild("Houses")
+        if folder and not folder:IsA("Folder") then
+            error("Plot Houses exists but is not a Folder")
+        end
+        return folder
+    end
+
+    local function managedChildren(folder, index)
+        local existing = {}
+        if folder then
+            for _, child in ipairs(folder:GetChildren()) do
+                if isManagedPreview(child, index) then
+                    table.insert(existing, child)
+                end
+            end
+        end
+        return existing
+    end
+
+    local function rejectUnmanagedNameConflict(folder, index, slug)
+        if not folder then return end
+        for _, child in ipairs(folder:GetChildren()) do
+            if child.Name == slug and (not child:IsA("Model")
+                or child:GetAttribute("Game1PlotHousePreview") ~= true
+                or not isManagedPreview(child, index)) then
+                error("Refusing to replace an unmanaged house in this plot")
+            end
+        end
+    end
+
+    local function stagePlace(binding, slug, index, plotFolder, volume)
+        local folder = checkedHousesFolder(plotFolder)
+        rejectUnmanagedNameConflict(folder, index, slug)
+        if typeof(binding) ~= "table" or binding.houseSlug ~= slug or binding.plotIndex ~= index
+            or typeof(binding.localCFrame) ~= "table" or #binding.localCFrame ~= 12
+            or typeof(binding.scale) ~= "number" or binding.scale <= 0
+            or typeof(binding.revision) ~= "number"
+            or typeof(binding.anchored) ~= "boolean" then
+            error("Missing or invalid saved Placement binding (anchored must be boolean)")
+        end
+        local components = {}
+        for i = 1, 12 do
+            local component = binding.localCFrame[i]
+            if typeof(component) ~= "number" or component ~= component or math.abs(component) > 1e7 then
+                error("Invalid placement CFrame component")
+            end
+            components[i] = component
+        end
+        local templateRoot = ServerStorage:FindFirstChild("real_estate")
+        local houseFolder = templateRoot and templateRoot:FindFirstChild(slug)
+        local modelFolder = houseFolder and houseFolder:FindFirstChild("model")
+        local template = modelFolder and modelFolder:FindFirstChild(slug)
+        if not template or not template:IsA("Model") or template:GetAttribute("Game1RealEstateTemplate") ~= true then
+            error("Sync entire house to ServerStorage/real_estate/" .. slug .. "/model first")
+        end
+        local clone = template:Clone()
+        clone.Name = slug
+        local prepared, problem = pcall(function()
+            clone:ScaleTo(binding.scale)
+            clone:PivotTo(volume.CFrame * CFrame.new(table.unpack(components)))
+            clone:SetAttribute("Game1RealEstateTemplate", nil)
+            clone:SetAttribute("Game1PlotHousePreview", true)
+            clone:SetAttribute("Game1PlotIndex", index)
+            clone:SetAttribute("Game1RealEstateSlug", slug)
+            clone:SetAttribute("Game1PlacementRevision", binding.revision)
+            setAndVerifyAnchored(clone, binding.anchored)
+            clone:SetAttribute("Game1PlotHouseAnchored", binding.anchored)
+        end)
+        if not prepared then
+            clone:Destroy()
+            error("Preparing house preview failed: " .. tostring(problem))
+        end
+        local previousPreviews = managedChildren(folder, index)
+        return {kind = "place", plotFolder = plotFolder, folder = folder,
+            previous = previousPreviews, clone = clone, binding = binding}
+    end
+
+    local function cleanupStaged(plans)
+        for _, plan in ipairs(plans) do
+            if plan.clone and plan.clone.Parent == nil then
+                plan.clone:Destroy()
+            end
+        end
+    end
+
+    local function executePlans(plans, action)
+        if #plans == 0 then
+            return {status = action == "clear_all" and "cleared_all" or "already_clear",
+                changed = 0}
+        end
+        local recording = ChangeHistoryService:TryBeginRecording(
+            action == "place_all" and "Place all authored house previews"
+            or action == "clear_all" and "Clear all authored house previews"
+            or action == "place" and "Place authored house preview"
+            or "Clear authored house preview")
+        if not recording then
+            cleanupStaged(plans)
+            error("Studio undo recording unavailable; no changes made")
+        end
+        local createdFolders = {}
+        local totalVerifiedParts = 0
+        local placed, placeError = pcall(function()
+            for _, plan in ipairs(plans) do
+                if plan.kind == "place" then
+                    local folder = plan.folder
+                    if not folder then
+                        folder = Instance.new("Folder")
+                        folder.Name = "Houses"
+                        folder.Parent = plan.plotFolder
+                        table.insert(createdFolders, folder)
+                        plan.folder = folder
+                    end
+                    local clone = plan.clone
+                    local binding = plan.binding
+                    clone.Parent = folder
+                    local verifiedParts = setAndVerifyAnchored(clone, binding.anchored)
+                    totalVerifiedParts += verifiedParts
+                    clone:SetAttribute("Game1PlotHouseAnchored", binding.anchored)
+                end
+            end
+        end)
+        if not placed then
+            for _, plan in ipairs(plans) do
+                if plan.clone then plan.clone:Destroy() end
+            end
+            for _, folder in ipairs(createdFolders) do folder:Destroy() end
+            ChangeHistoryService:FinishRecording(recording, Enum.FinishRecordingOperation.Cancel)
+            error("House placement failed (no existing previews removed): " .. tostring(placeError))
+        end
+        local removed = 0
+        for _, plan in ipairs(plans) do
+            for _, previous in ipairs(plan.previous) do
+                previous:Destroy()
+                removed += 1
+            end
+        end
+        ChangeHistoryService:FinishRecording(recording, Enum.FinishRecordingOperation.Commit)
+        local placedCount = 0
+        for _, plan in ipairs(plans) do
+            if plan.kind == "place" then placedCount += 1 end
+        end
+        if action == "place_all" then
+            return {status = "placed_all", changed = placedCount,
+                replaced = removed, anchoredPartsVerified = totalVerifiedParts}
+        elseif action == "clear_all" then
+            return {status = "cleared_all", changed = removed}
+        elseif action == "place" then
+            local plan = plans[1]
+            local verifiedParts = totalVerifiedParts
+            return {status = "placed", changed = placedCount,
+                revision = plan.binding.revision,
+                anchored = plan.binding.anchored, anchoredPartsVerified = verifiedParts,
+                destination = plan.clone:GetFullName()}
+        end
+        return {status = "cleared", changed = removed}
+    end
+
+    local function runBatch(command)
+        if RunService:IsRunning() then
+            error("House Place all / Clear all works only in Studio Edit Mode")
+        end
+        if command.plotIndex ~= 0 or typeof(command.targets) ~= "table" then
+            error("Invalid house placement batch command")
+        end
+        if command.action == "clear_all" then
+            if command.houseSlug ~= "*" or #command.targets ~= 0 then
+                error("Invalid Clear all scope")
+            end
+            local plots = PlotsCatalog.Collect(Workspace)
+            if #plots ~= 50 then
+                error("Clear all requires all 50 authored plot volumes; Workspace unchanged")
+            end
+            local plans = {}
+            for _, entry in ipairs(plots) do
+                local folder = checkedHousesFolder(entry.volume.Parent)
+                local previous = managedChildren(folder, entry.index)
+                if #previous > 0 then
+                    table.insert(plans, {kind = "clear", previous = previous})
+                end
+            end
+            return executePlans(plans, "clear_all")
+        end
+        if command.action ~= "place_all" then error("Unknown bulk house placement action") end
+        local slug = command.houseSlug
+        if typeof(slug) ~= "string" or slug == "" or slug:find("[^%w_%-]")
+            or #command.targets < 1 or #command.targets > 50 then
+            error("Invalid Place all house or target list")
+        end
+        local plotsByIndex = {}
+        for _, entry in ipairs(PlotsCatalog.Collect(Workspace)) do
+            plotsByIndex[entry.index] = entry
+        end
+        local seen, plans = {}, {}
+        local ok, problem = pcall(function()
+            for _, binding in ipairs(command.targets) do
+                if typeof(binding) ~= "table" or binding.houseSlug ~= slug then
+                    error("Place all target house mismatch")
+                end
+                local index = binding.plotIndex
+                if typeof(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > 50
+                    or seen[index] then
+                    error("Place all duplicate/invalid plot")
+                end
+                seen[index] = true
+                local entry = plotsByIndex[index]
+                if not entry or not entry.volume.Parent or not entry.volume.Parent:IsA("Folder") then
+                    error(string.format("Workspace.Plots/%02d/plot_%02d_volume not found", index, index))
+                end
+                table.insert(plans, stagePlace(binding, slug, index, entry.volume.Parent, entry.volume))
+            end
+        end)
+        if not ok then
+            cleanupStaged(plans)
+            error("Place all preflight failed (Workspace unchanged): " .. tostring(problem))
+        end
+        return executePlans(plans, "place_all")
+    end
+
+    local function run(command)
+        if command.action == "anchors" then return runAnchors(command) end
+        if command.action == "place_all" or command.action == "clear_all" then
+            return runBatch(command)
+        end
+        local slug, index = validateIdentity(command)
+        local plotFolder, volume = findPlot(index)
+        local folder = checkedHousesFolder(plotFolder)
+        rejectUnmanagedNameConflict(folder, index, slug)
+        if command.action == "clear" then
+            local previous = {}
+            for _, child in ipairs(managedChildren(folder, index)) do
+                if child.Name == slug then table.insert(previous, child) end
+            end
+            if #previous == 0 then return {status = "already_clear", changed = 0} end
+            return executePlans({{kind = "clear", previous = previous}}, "clear")
+        end
+        if command.action ~= "place" then error("Unknown house placement action") end
+        return executePlans({stagePlace(command.placement, slug, index, plotFolder, volume)}, "place")
+    end
+
+    return function(command)
+        local response = {
+            command = "house-placement-preview-v2", schemaVersion = 2,
+            project = "game1", operationId = command.operationId,
+            houseSlug = command.houseSlug, plotIndex = command.plotIndex,
+            action = command.action,
+            anchored = command.anchored,
+        }
+        local ok, result = pcall(function()
+            if command.command ~= "house-placement-preview-v2" or command.schemaVersion ~= 2 then
+                error("Incompatible house-placement-preview protocol; reinstall Game1Bridge")
+            end
+            return run(command)
+        end)
+        if ok then
+            for key, value in result do response[key] = value end
+        else
+            response.error = tostring(result)
+        end
+        local posted, reply = pcall(HttpService.RequestAsync, HttpService, {
+            Url = context.bridgeUrl .. "/house-placement-result", Method = "POST",
+            Headers = { ["X-Game1-Token"] = context.bridgeToken,
+                        ["Content-Type"] = "application/json" },
+            Body = HttpService:JSONEncode(response),
+        })
+        if not posted or not reply.Success then
+            warn("[game1][house placement preview] bridge response failed: "
+                .. tostring(posted and reply.StatusCode or reply))
+        end
+    end
+end
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="22">
+        <Properties>
           <string name="Name">StudioManagedRigSwap</string>
           <string name="Source"><![CDATA[-- Shared Studio mechanism for replacing AUTHORING-MANAGED child rigs while
 -- retaining the placed root Model and its identity. Used by Real Estate and
@@ -3711,7 +4141,7 @@ return table.freeze(RigSwap)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="22">
+      <Item class="ModuleScript" referent="23">
         <Properties>
           <string name="Name">StudioMarkerVisibility</string>
           <string name="Source"><![CDATA[-- Studio-only presentation toggle. No movement of markers, no metadata edits.
@@ -3855,7 +4285,7 @@ return table.freeze(Visibility)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="23">
+      <Item class="ModuleScript" referent="24">
         <Properties>
           <string name="Name">StudioModelLoadCommands</string>
           <string name="Source"><![CDATA[-- Studio model-sync command: validates and imports Character, Monster/NPC and Weapon models.
@@ -4422,7 +4852,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="24">
+      <Item class="ModuleScript" referent="25">
         <Properties>
           <string name="Name">StudioPlotsCatalog</string>
           <string name="Source"><![CDATA[-- Read-only discovery contract for authored Workspace.Plots/01..50.
@@ -4484,7 +4914,7 @@ return table.freeze(Catalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="25">
+      <Item class="ModuleScript" referent="26">
         <Properties>
           <string name="Name">StudioPlotsPartPolicy</string>
           <string name="Source"><![CDATA[-- Reversible, Studio-only properties for Plots visibility and playtest preview.
@@ -4569,7 +4999,7 @@ return table.freeze(Policy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="26">
+      <Item class="ModuleScript" referent="27">
         <Properties>
           <string name="Name">StudioPlotsSelectionFilter</string>
           <string name="Source"><![CDATA[-- Studio viewport hit-test filter for hidden Plots authoring geometry.
@@ -4659,7 +5089,7 @@ return table.freeze(Filter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="27">
+      <Item class="ModuleScript" referent="28">
         <Properties>
           <string name="Name">StudioPlotsVisibility</string>
           <string name="Source"><![CDATA[-- Studio-only Plots preview: hidden -> volumes -> volumes + numbers -> hidden.
@@ -4953,7 +5383,7 @@ return table.freeze(PlotsVisibility)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="28">
+      <Item class="ModuleScript" referent="29">
         <Properties>
           <string name="Name">StudioRealEstateCollisionPolicy</string>
           <string name="Source"><![CDATA[-- Real Estate physics layer. Only this module writes MeshPart physics.
@@ -5066,7 +5496,7 @@ return table.freeze(Policy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="29">
+      <Item class="ModuleScript" referent="30">
         <Properties>
           <string name="Name">StudioRealEstateHouseFrame</string>
           <string name="Source"><![CDATA[-- Author-space transform for all Real Estate Studio sync paths.
@@ -5099,7 +5529,7 @@ return table.freeze(HouseFrame)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="30">
+      <Item class="ModuleScript" referent="31">
         <Properties>
           <string name="Name">StudioRealEstateModel</string>
           <string name="Source"><![CDATA[-- Studio assembly for any number of independent Real Estate MeshPart rigs.
@@ -5383,7 +5813,7 @@ return table.freeze(StudioRealEstateModel)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="31">
+      <Item class="ModuleScript" referent="32">
         <Properties>
           <string name="Name">StudioRealEstatePartPlacement</string>
           <string name="Source"><![CDATA[-- Restore source-FBX mesh centres after independent Model Asset import.
@@ -5507,7 +5937,7 @@ return table.freeze(Placement)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="32">
+      <Item class="ModuleScript" referent="33">
         <Properties>
           <string name="Name">StudioRealEstatePartSync</string>
           <string name="Source"><![CDATA[-- Atomic, single-rig refresh of a managed Real Estate template.
@@ -5741,7 +6171,7 @@ return table.freeze(PartSync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="33">
+      <Item class="ModuleScript" referent="34">
         <Properties>
           <string name="Name">StudioRealEstatePlacedCollisionSync</string>
           <string name="Source"><![CDATA[-- Repair *only* authoring-managed collision rigs of already placed Estates.
@@ -5816,7 +6246,7 @@ return table.freeze(Sync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="34">
+      <Item class="ModuleScript" referent="35">
         <Properties>
           <string name="Name">StudioRealEstatePlacedPhysicsGuard</string>
           <string name="Source"><![CDATA[-- Studio Edit Mode: normalize a managed Estate pasted or dragged from
@@ -5888,7 +6318,7 @@ return table.freeze(Guard)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="35">
+      <Item class="ModuleScript" referent="36">
         <Properties>
           <string name="Name">StudioRealEstatePlacedTargets</string>
           <string name="Source"><![CDATA[-- One authoritative definition of a placed Real Estate instance.
@@ -5933,7 +6363,7 @@ return table.freeze(Targets)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="36">
+      <Item class="ModuleScript" referent="37">
         <Properties>
           <string name="Name">StudioRealEstatePlacedVisualSync</string>
           <string name="Source"><![CDATA[-- Full Real Estate sync: refresh visual rigs on *all managed placed* houses.
@@ -6052,7 +6482,7 @@ return table.freeze(VisualSync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="37">
+      <Item class="ModuleScript" referent="38">
         <Properties>
           <string name="Name">StudioRealEstateRigValidation</string>
           <string name="Source"><![CDATA[-- Validate an already-published Real Estate Model Asset as actually loaded by Roblox.
@@ -6181,7 +6611,7 @@ return table.freeze(Validation)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="38">
+      <Item class="ModuleScript" referent="39">
         <Properties>
           <string name="Name">StudioTextureAppearance</string>
           <string name="Source"><![CDATA[-- Shared Studio-side material binding for all authored MeshParts.
@@ -6268,7 +6698,7 @@ return table.freeze(StudioTextureAppearance)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="39">
+      <Item class="ModuleScript" referent="40">
         <Properties>
           <string name="Name">StudioTimelineEditorCommands</string>
           <string name="Source"><![CDATA[-- Timeline authoring session: validates requests, binds UI events and reports results.
@@ -6557,7 +6987,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="40">
+      <Item class="ModuleScript" referent="41">
         <Properties>
           <string name="Name">StudioTimelinePoseSampler</string>
           <string name="Source"><![CDATA[-- Offline pose extraction and interpolation for a preview rig. No UI or HTTP dependencies.
@@ -6736,7 +7166,7 @@ return table.freeze(StudioTimelinePoseSampler)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="41">
+      <Item class="ModuleScript" referent="42">
         <Properties>
           <string name="Name">StudioTimelinePreview</string>
           <string name="Source"><![CDATA[-- Owns the isolated ViewportFrame rig, camera interaction and animation-asset retrieval.
@@ -6952,7 +7382,7 @@ return table.freeze(StudioTimelinePreview)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="42">
+      <Item class="ModuleScript" referent="43">
         <Properties>
           <string name="Name">StudioTimelineTransport</string>
           <string name="Source"><![CDATA[-- HTTP boundary for the Timeline editor. No UI, animation or Studio model access.
@@ -7010,7 +7440,7 @@ return table.freeze(StudioTimelineTransport)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="43">
+      <Item class="ModuleScript" referent="44">
         <Properties>
           <string name="Name">StudioTimelineWidget</string>
           <string name="Source"><![CDATA[-- Timeline editor view. Builds the dock widget and exposes only its controls.

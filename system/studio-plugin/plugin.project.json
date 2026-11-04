@@ -49,6 +49,9 @@
       "StudioHousePlacementCapture": {
         "$path": "modules/StudioHousePlacementCapture.luau"
       },
+      "StudioHousePlacementPreview": {
+        "$path": "modules/StudioHousePlacementPreview.luau"
+      },
       "StudioPlotsCatalog": {
         "$path": "modules/StudioPlotsCatalog.luau"
       },

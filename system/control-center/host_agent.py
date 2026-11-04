@@ -42,7 +42,7 @@ from location_store import LocationStore
 from location_asset_store import LocationAssetStore
 from real_estate.store import RealEstateStore
 from real_estate.placement import RealEstatePlacementStore
-from services.studio_house_placement_bridge import capture_house_placement
+from services.studio_house_placement_bridge import capture_house_placement, preview_house_placement, anchor_house_placements, bulk_house_placements
 from real_estate.studio_sync import RealEstateStudioSync
 from deco_layout_store import DecoLayoutStore
 from studio_save import request_active_studio_save
@@ -191,6 +191,9 @@ WRITE_SOURCES = MappingProxyType({
     "real_estate": real_estate,
     "real_estate_placements": real_estate_placements,
     "capture_house_placement": capture_house_placement,
+    "preview_house_placement": preview_house_placement,
+    "bulk_house_placements": bulk_house_placements,
+    "anchor_house_placements": anchor_house_placements,
     "real_estate_publications": real_estate_publications,
     "sync_real_estate_to_studio": real_estate_studio_sync.sync,
     "choose_monster_fbx": choose_monster_fbx,

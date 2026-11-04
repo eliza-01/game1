@@ -1,0 +1,10 @@
+.asset-sections .asset-section-row {display:grid;grid-template-columns:20px minmax(0,1fr);align-items:center;gap:4px;min-width:0;}
+.asset-section-row > .asset-section {min-width:0;width:100%;}
+.asset-section-row > .database-subnav {grid-column:2;min-width:0;padding:0 0 6px 6px;}
+.asset-section-grip {display:flex;align-items:center;justify-content:center;min-width:20px;width:20px;height:38px;padding:0;background:transparent;border:0;border-radius:6px;color:var(--muted);cursor:grab;touch-action:none;}
+.asset-section-grip:hover,.asset-section-grip:focus-visible {background:var(--panel2);color:var(--mint);outline:1px solid var(--line);}
+.asset-section-grip:active {cursor:grabbing;}
+.asset-six-dots {display:grid;grid-template-columns:repeat(2,3px);grid-template-rows:repeat(3,3px);gap:3px;}
+.asset-six-dots i {display:block;width:3px;height:3px;background:currentColor;border-radius:50%;}
+.asset-section-row.dragging {opacity:.4;}
+.asset-section-row.drag-target {outline:1px dashed var(--mint);outline-offset:1px;border-radius:7px;}

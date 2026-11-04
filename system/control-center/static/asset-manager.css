@@ -109,3 +109,7 @@
 .character-report-step.error{border-color:#ff657766}.character-report-step.error strong{color:var(--danger)}
 .character-report-step.pending strong{color:var(--orange)}
 #character-report-recovery button{margin-top:9px;border-color:var(--mint)}
+
+/* Sidebar owns scrolling while hovered or focused; conceal scrollbar chrome. */
+@media(min-width:1051px){.rail{max-height:calc(100dvh - 112px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none}.rail::-webkit-scrollbar{display:none}}
+main > .content{padding-top:14px}

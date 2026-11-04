@@ -35,7 +35,7 @@ class LocationAssetSyncHistory:
             raise ValueError('invalid Studio ID change history size')
         validated = []
         for item in changes:
-            if not isinstance(item, dict) or item.get('kind') not in ('atlas', 'model_reference'):
+            if not isinstance(item, dict) or item.get('kind') not in ('atlas', 'model_reference', 'model'):
                 raise ValueError('invalid Studio ID change history type')
             old = str(item.get('oldId', ''))
             new = str(item.get('newId', ''))

@@ -17,9 +17,9 @@ from studio_bridge import PORT, PROJECT, TOKEN, StudioBridgeError
 def run_deco_refresh_bridge(*, timeout_seconds: float = 75.0,
                             slug: str, binding_revision: int,
                             model_asset_id: str, atlas_asset_id: str) -> dict:
-    """M216: only schema 3 commands can reach the Studio plugin.
+    """M222: schema 5 requires shared managed-rig replacement in Studio.
 
-    Older M215 plugins explicitly reject schema 3 rather than rebuilding models.
+    Older M221 plugins reject schema 5 and cannot execute legacy ApplyMesh.
     """
     if not re.fullmatch(r'[a-z0-9][a-z0-9_]{0,63}', str(slug)):
         raise ValueError('Location Asset Studio Sync requires one valid slug')
@@ -32,7 +32,7 @@ def run_deco_refresh_bridge(*, timeout_seconds: float = 75.0,
     command = {
         'project': PROJECT,
         'command': 'deco-refresh',
-        'schemaVersion': 3,
+        'schemaVersion': 5,
         'operationId': operation_id,
         'targetSlug': slug,
         'bindingRevision': binding_revision,
@@ -121,12 +121,13 @@ def run_deco_refresh_bridge(*, timeout_seconds: float = 75.0,
     values = {'operationId': operation_id, 'targetSlug': slug,
               'bindingRevision': binding_revision}
     for field in ('models', 'parts', 'matchedModels', 'modelReferences',
-                  'pendingGeometry', 'registryItems', 'replacedModels'):
+                  'pendingGeometry', 'geometryUpdated', 'meshPartsUpdated', 'registryItems', 'replacedModels'):
         value = result.get(field)
         if type(value) is not int or value < 0:
             raise StudioBridgeError(f'invalid Studio deco-refresh result field: {field}')
         values[field] = value
-    if values['replacedModels'] != 0 or values['models'] > values['matchedModels']:
+    if (values['replacedModels'] != 0 or values['models'] > values['matchedModels']
+            or values['geometryUpdated'] > values['models']):
         raise StudioBridgeError('unsafe Location Asset Studio model replacement result')
     changes = result.get('changes')
     if not isinstance(changes, list) or len(changes) > 32:

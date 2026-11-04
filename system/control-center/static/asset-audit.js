@@ -3,7 +3,7 @@ const assetAuditState = {events: [], nextCursor: null, loading: false, error: ''
 
 function assetAuditResource(event, change) {
   if (change.kind === 'atlas') return 'Atlas';
-  if (change.kind === 'model_reference') return 'Model';
+  if (change.kind === 'model_reference' || change.kind === 'model') return 'Model';
   if (event.assetType === 'image') return 'Atlas';
   if (event.assetType === 'model') return 'Model';
   if (event.assetType === 'animation') return 'Animation';

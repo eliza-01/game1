@@ -60,18 +60,21 @@ function evaluate(script) {
 {
   const {context,get}=evaluate('deco-assets.js');
   vm.runInContext(`decoAssetState.data={items:[
-      {slug:'granite_wall',name_en:'Granite Wall',category:'rock',texture_path:'assets/granite_wall.png',texture_filename:'Atlas (Original).png',
-       texture_owner_slug:'granite_wall',texture_asset_id:'12345', status:'PUBLISHED'},
-      {slug:'prop',name_en:'Prop',category:'rock',texture_owner_slug:'granite_wall',texture_shared:true,
-       texture_filename:'Atlas (Original).png',texture_asset_id:'12345',status:'PUBLISHED'}],
-      options:{categories:[{id:'rock',label:'Rocks'}]},summary:{registered:2,published:2,changed:0},publication:{configured:false}};
+      {slug:'granite_wall',name_en:'Granite Wall',category:'rock',texture_path:'assets/granite_wall.png',
+       texture_filename:'Atlas (Original).png',texture_asset_id:'12345', atlasFamily:'granite',status:'PUBLISHED'},
+      {slug:'prop',name_en:'Prop',category:'rock',texture_filename:'Atlas (Original).png',
+       texture_asset_id:'12345',atlasFamily:'granite',status:'PUBLISHED'}],
+      atlases:[{atlasKey:'granite',variants:[{id:9,filename:'granite_128x128_atlas.png',
+        resolution:'128x128',width:128,height:128,published_id:'12345',current:true}]}],
+      options:{categories:[{id:'rock',label:'Rocks'}]},summary:{registered:2,published:2,changed:0},
+      publication:{configured:true}};
     decoAssetState.libraryCategory='all';`,context);
   vm.runInContext('decoAssetRenderTextureReferences()',context);
   const options=get('location-asset-texture-reference').children;
-  assert.equal(options.length,1);
-  assert.equal(options[0].label, 'Existing atlases · compatible references');
-  assert.equal(options[0].children[0].value,'legacy:granite_wall');
-  assert.match(options[0].children[0].textContent,/Atlas \(Original\) · 12345/);
+  assert.equal(options.length,1); // One independent shared family, not model-owned legacy slots.
+  assert.equal(options[0].label,'granite');
+  assert.equal(options[0].children[0].value,'variant:9');
+  assert.match(options[0].children[0].textContent,/12345/);
   vm.runInContext('decoAssetRender()',context);
   assert.match(get('location-asset-rows').children[0].innerHTML, /Granite Wall<\/b><small>granite_wall<\/small><small class="deco-texture-filename">Atlas \(Original\)/);
 }

@@ -7,13 +7,8 @@ const realEstateMeshWorkflow = {slug:'',part:'',tab:'model',busy:false,chosenAtl
 function realEstateMeshWorkflowEnsure(){
   let dialog=document.getElementById('real-estate-mesh-dialog');
   if(dialog)return dialog;
-  dialog=document.createElement('dialog');
-  dialog.id='real-estate-mesh-dialog';
-  dialog.className='real-estate-mesh-dialog';
-  dialog.setAttribute('aria-label','Manage Real Estate mesh');
-  dialog.addEventListener('close',()=>{realEstateMeshWorkflow.slug='';realEstateMeshWorkflow.part='';});
-  document.body.appendChild(dialog);
-  return dialog;
+  return window.game1AssetWorkflowDialog.ensure('real-estate-mesh-dialog', 'Manage Real Estate mesh',
+    ()=>{realEstateMeshWorkflow.slug='';realEstateMeshWorkflow.part='';});
 }
 function realEstateMeshWorkflowCurrent(){
   const row=realEstateRows().find(item=>item.slug===realEstateMeshWorkflow.slug);
@@ -88,10 +83,10 @@ function realEstateMeshWorkflowRender(){
       <div><small class="eyebrow">${esc(row.slug)} · mesh</small><h3>${esc(part)}${collider?' · collision':''}</h3></div>
       <button type="button" data-mw-close aria-label="Close mesh workflow">✕</button>
     </div><div class="real-estate-mesh-dialog-body" aria-busy="${busy}">
-      <nav class="real-estate-mesh-tabs" aria-label="Mesh operations">
-        <button type="button" data-mw-tab="model" aria-selected="${modelTab}">Model · FBX</button>
-        ${collider?'':`<button type="button" data-mw-tab="texture" aria-selected="${!modelTab}">Texture · atlas</button>`}
-      </nav>
+      ${window.game1AssetWorkflowDialog.tabs([
+        {id:'model',label:'Model · FBX'},
+        ...(!collider?[{id:'texture',label:'Texture · atlas'}]:[])
+      ], realEstateMeshWorkflow.tab)}
       ${modelTab?`<section class="real-estate-mesh-step">
         <div class="real-estate-mesh-step-head"><strong>1 · Source FBX</strong><span class="real-estate-step-status ready">${esc(sourceText)}</span></div>
         <p>Replace only ${esc(part)}. A standalone FBX or the matching mesh from a full-house FBX is accepted. Other models and images stay unchanged.</p>

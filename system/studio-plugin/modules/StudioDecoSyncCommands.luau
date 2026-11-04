@@ -1,7 +1,7 @@
 -- M216: reject legacy global commands (including M215) before they can mutate.
 return function(config: any)
     return function(command: any)
-        if command.project ~= "game1" or command.schemaVersion ~= 3
+        if command.project ~= "game1" or command.schemaVersion ~= 5
             or type(command.operationId) ~= "string" or command.operationId == ""
             or type(command.targetSlug) ~= "string" or command.targetSlug == ""
             or type(command.bindingRevision) ~= "number" or command.bindingRevision < 1
@@ -18,13 +18,13 @@ return function(config: any)
                 command.targetSlug, true, command.modelAssetId, command.atlasAssetId)
         end)
         local payload = {
-            project = "game1", command = "deco-refresh", schemaVersion = 3,
+            project = "game1", command = "deco-refresh", schemaVersion = 5,
             operationId = command.operationId, targetSlug = command.targetSlug,
             bindingRevision = command.bindingRevision,
         }
         if ok and report ~= nil then
             for _, field in ipairs({ "models", "parts", "replacedModels", "matchedModels",
-                "modelReferences", "pendingGeometry", "registryItems", "changes", "instances" }) do
+                "modelReferences", "pendingGeometry", "geometryUpdated", "meshPartsUpdated", "registryItems", "changes", "instances" }) do
                 payload[field] = report[field]
             end
         else

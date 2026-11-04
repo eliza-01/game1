@@ -11,9 +11,10 @@ class PivotSyncM156(unittest.TestCase):
     def test_shared_author_pivot_resolver_is_registered(self):
         helper=(MODULES/'StudioRealEstateHouseFrame.luau').read_text('utf-8')
         self.assertIn('target:GetPivot() * source:GetPivot():Inverse()',helper)
-        self.assertIn('targetPivot * sourceAnchor:GetPivot():Inverse()',helper)
-        self.assertIn('rig:PivotTo(offset * rig:GetPivot())',helper)
-        self.assertIn('authored house pivot could not be aligned',helper)
+        self.assertIn('RigSwap.AlignToAnchor(rig, sourceAnchor, targetPivot, context)', helper)
+        shared=(MODULES/'StudioManagedRigSwap.luau').read_text('utf-8')
+        self.assertIn('targetPivot * sourceAnchor:GetPivot():Inverse() * rig:GetPivot()', shared)
+        self.assertIn('authored anchor shifted after alignment', shared)
         self.assertNotIn('source.CFrame',helper)
         self.assertNotIn('target.CFrame',helper)
         project=json.loads((PLUG/'plugin.project.json').read_text())

@@ -283,7 +283,10 @@ def route(path, body, deps):
         try:
             payload = body()
             credentials = publication_credentials(str(payload.get("description") or "game1 location asset"))
-            return out(200, location_assets.publish(slug, credentials))
+            scope = str(payload.get('scope') or 'changed')
+            force_model = payload.get('forceModel') is True
+            return out(200, location_assets.publish(
+                slug, credentials, scope=scope, force_model=force_model))
         except Exception as error:
             return out(400, {"error": str(error)})
     return None

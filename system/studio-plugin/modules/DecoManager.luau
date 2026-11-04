@@ -332,24 +332,27 @@ function DecoManager:refreshRegistry(targetSlug: string?, applyIds: boolean?, ex
     -- Catalog browsing never alters any placed Model. Explicit Studio Sync
     -- requires exactly one slug and two publication IDs verified by the plugin.
     local syncResult = { models = 0, parts = 0, matchedModels = 0,
-        modelReferences = 0, pendingGeometry = 0, replacedModels = 0,
+        modelReferences = 0, pendingGeometry = 0, geometryUpdated = 0,
+        meshPartsUpdated = 0, replacedModels = 0,
         changes = {}, instances = {} }
     if applyIds == true then
         if not targetSlug or not expectedModelId or not expectedAtlasId then
-            error("scoped ID-only Studio Sync requires an explicit asset and publication IDs")
+            error("scoped Model + Atlas Studio Sync requires an explicit slug and published IDs")
         end
         -- A waypoint BEFORE the update makes Undo possible even for an error.
-        self.ChangeHistoryService:SetWaypoint("Before Location Asset ID Sync: " .. targetSlug)
+        self.ChangeHistoryService:SetWaypoint("Before Location Asset Model + Atlas Sync: " .. targetSlug)
         syncResult = DecoPlacedAssetSync.RefreshIds(
-            self.Workspace, result, targetSlug, self.HttpService, expectedModelId, expectedAtlasId)
-        self.ChangeHistoryService:SetWaypoint("Location Asset ID Sync: " .. targetSlug)
+            self.Workspace, result, targetSlug, self.HttpService, expectedModelId, expectedAtlasId, self.loader)
+        self.ChangeHistoryService:SetWaypoint("Location Asset Model + Atlas Sync: " .. targetSlug)
     end
     self:_setCategory(self.category)
-    self:_setStatus(("Registry refreshed · %d placed item(s), %d image IDs changed, %d model references · %d stale FBX geometries"):format(
-        syncResult.matchedModels, syncResult.parts, syncResult.modelReferences, syncResult.pendingGeometry))
+    self:_setStatus(("Registry refreshed · %d placed, %d atlas IDs, %d updated meshes, %d model references, %d stale FBX"):format(
+        syncResult.matchedModels, syncResult.parts, syncResult.meshPartsUpdated,
+        syncResult.modelReferences, syncResult.pendingGeometry))
     return { models = syncResult.models, parts = syncResult.parts,
         replacedModels = 0, matchedModels = syncResult.matchedModels,
         modelReferences = syncResult.modelReferences, pendingGeometry = syncResult.pendingGeometry,
+        geometryUpdated = syncResult.geometryUpdated, meshPartsUpdated = syncResult.meshPartsUpdated,
         changes = syncResult.changes, instances = syncResult.instances,
         registryItems = #result.items }
 end

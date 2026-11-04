@@ -144,7 +144,7 @@ return table.freeze({
 			textureAssetId = "78602158656399",
 			textureUsesAlpha = true,
 			atlasVariantId = 27,
-			bindingRevision = 3,
+			bindingRevision = 9,
 			destructible = false,
 		}),
 		["ground_torch_01"] = table.freeze({

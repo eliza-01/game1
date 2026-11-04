@@ -12,7 +12,7 @@
 <link rel="stylesheet" href="location-assets.css?v=1">
 <link rel="stylesheet" href="character-components.css?v=6">
 <link rel="stylesheet" href="character-assemblies.css?v=4">
-<link rel="stylesheet" href="deco-assets.css?v=5">
+<link rel="stylesheet" href="deco-assets.css?v=6">
 <link rel="stylesheet" href="real-estate.css?v=12&physics=205">
 </head>
 <body>
@@ -375,30 +375,27 @@
 <div><span class="eyebrow">environment library · published decor</span><h2>location assets</h2><p>register a static decoration with one FBX and a texture atlas. New atlas names follow &lt;atlas_key&gt;_&lt;width&gt;x&lt;height&gt;_atlas.png; reused variants share exactly one published Image Asset ID. publish the required assets, then place published variants through Studio DecoManager. placed instances belong to the place; registry publication and placement backups stay separate.</p><div class="deco-category-strip"><span>trees</span><span>bushes</span><span>rocks</span><span>lights</span><span>fences</span><span>decorations</span><span>ladders</span><span>flowers</span><span>buildings</span><span>props</span></div></div>
 <div class="metrics"><div><b id="location-asset-metric-total">0</b><span>registered</span></div><div><b id="location-asset-metric-published">0</b><span>published</span></div><div><b id="location-asset-metric-changed">0</b><span>changed</span></div></div>
 </div>
-<div class="panel runtime-card"><div class="runtime-state registered"><strong>DecoManager registry</strong><span>Sync Studio refreshes DecoManager, updated published models and atlases of managed placed decorations. It preserves each placement position, rotation, scale and ID; no additional placements or ServerStorage imports.</span></div><div id="location-asset-publication-state" class="publication-missing">open cloud: checking…</div></div>
-<div class="deco-asset-workflow">
-<div class="panel character-card">
-<div class="section-title"><div><span>01 · identity</span><h3>register location asset</h3></div><button id="new-location-asset-main" type="button">new asset</button></div>
+<div class="panel runtime-card"><div class="runtime-state registered"><strong>DecoManager registry</strong><span>Sync Studio is scoped to the Location Asset row. It updates published ID references and atlas URIs of managed placements. Existing geometry, positions, rotations and scales are untouched.</span></div><div id="location-asset-publication-state" class="publication-missing">open cloud: checking…</div></div>
+<div class="deco-asset-workflow deco-asset-workflow-m220">
+<div class="panel character-card" id="location-asset-editor-panel">
+<div class="section-title"><div><span>01 · new registration</span><h3>Register Location Asset</h3></div><button id="new-location-asset-main" type="button">New asset</button></div>
+<p class="hint">Only for new assets. To edit an existing FBX, atlas or published ID, use <b>Edit</b> in its library row. Registration and resource management are separate workflows.</p>
 <label>asset name<input id="location-asset-name" autocomplete="off" placeholder="for example Oak Tree"></label>
-<label>slug<input id="location-asset-slug" readonly><small class="hint">stable lowercase id generated from the asset name.</small></label>
+<label>slug<input id="location-asset-slug" readonly><small class="hint">Stable lowercase id generated from the name.</small></label>
 <label>category<select id="location-asset-category"></select></label>
-<div class="deco-gameplay-policy"><label class="deco-policy-toggle"><input id="location-asset-destructible" type="checkbox"><span><b>Destructible</b><small>On: weapon attacks pass through for the future destruction pipeline. Off: the asset is a solid weapon blocker and causes bounce.</small></span></label></div>
+<div class="deco-gameplay-policy"><label class="deco-policy-toggle"><input id="location-asset-destructible" type="checkbox"><span><b>Destructible</b><small>On: weapon attacks pass through. Off: solid weapon blocker and causes bounce.</small></span></label></div>
 <hr class="card-separator">
-<span class="eyebrow">02 · source assets</span>
-<div class="deco-source-pickers"><div class="picker"><button id="choose-location-asset-model" type="button">choose fbx</button><small id="picked-location-asset-model">fbx not selected</small></div><div class="picker"><button id="choose-location-asset-texture" type="button">choose PNG/JPG</button><small id="picked-location-asset-texture">PNG/JPG not selected</small></div></div>
-<div class="deco-texture-source"><label>search atlas family<input id="location-asset-atlas-search" type="search" placeholder="search atlas name or resolution"></label><label>atlas variant<select id="location-asset-texture-reference"><option value="">new PNG/JPG atlas</option></select><small class="hint">Variants belong to atlas families, not models. Reuse never uploads a new Roblox Image ID. Legacy reuse registered texture by model owner remains available for compatibility. Ordinary central atlas reuse never does. Republish: choose a changed file with the SAME atlas name and resolution to obtain a NEW Roblox Image Asset ID. All models bound to that atlas variant switch together after successful publication. Identical pixels never upload twice.</small></label><div class="actions"><button id="register-location-atlas-variant" type="button">register chosen PNG as variant</button><button id="publish-location-atlas-variant" type="button">publish selected atlas</button></div></div>
-<div id="location-asset-model-status" class="status-box"><strong>not registered</strong><span>choose FBX + PNG/JPG, then register the asset.</span></div>
-<div class="actions"><button id="register-location-asset" class="primary" type="button">register asset</button><button id="clear-location-asset-form" type="button">clear form</button><button id="delete-location-asset" class="danger" type="button" disabled>delete</button></div>
-<hr class="card-separator">
-<span class="eyebrow">03 · publication</span><h3 class="subheading">Roblox model + image</h3>
-<label>description<input id="location-asset-publication-description" value="Game1 Location Asset"><small class="hint">filled automatically from the selected asset, for example <code>Game1 Location Asset Oak Tree</code>.</small></label>
-<div class="actions"><button id="publish-location-asset" class="primary" type="button" disabled>publish all changed</button><button id="sync-location-assets" type="button" disabled>sync selected asset IDs</button></div><small class="hint">Updates only the selected Location Asset: atlas IDs and the published model reference. Existing meshes, transforms and geometry are NEVER replaced. Stale FBX geometry requires a separate, manual update.</small><details><summary>Studio ID replacement history</summary><pre id="location-asset-studio-history" style="white-space:pre-wrap;max-height:220px;overflow:auto">Select a Location Asset to view history.</pre></details>
-<small id="location-asset-publication-hint" class="hint">select a registered location asset.</small>
+<span class="eyebrow">02 · sources</span>
+<div class="deco-source-pickers"><div class="picker"><button id="choose-location-asset-model" type="button">Choose FBX</button><small id="picked-location-asset-model">FBX not selected</small></div><div class="picker"><button id="choose-location-asset-texture" type="button">Choose PNG/JPG</button><small id="picked-location-asset-texture">Image not selected</small></div></div>
+<div class="deco-texture-source"><label>Search registered atlases<input id="location-asset-atlas-search" type="search" placeholder="name or resolution"></label><label>Reuse an atlas variant<select id="location-asset-texture-reference"><option value="">New local atlas</option></select><small class="hint">Shared variants are independent of any model. Registering with an existing atlas never republishes it.</small></label></div>
+<div class="actions"><button id="register-location-asset" class="primary" type="button">Register new asset</button><button id="clear-location-asset-form" type="button">Clear form</button></div>
+<small class="hint">After registration, Edit opens the same resource workflow as Manage Atlas / Model in Real Estate.</small>
+</div>
 </div>
 <div class="panel character-card">
 <div class="section-title"><div><span>published library</span><h3>registered assets</h3></div><div class="deco-library-controls"><label>category filter<select id="location-asset-library-category"><option value="all">all categories</option></select></label><button id="refresh-location-assets-table" type="button">refresh</button></div></div>
 <div class="deco-assets-note"><strong>Studio placement</strong><span>Open <b>DecoManager</b> in Roblox Studio, choose a category, browse variants with arrows, then Place. <b>Save Assets Data</b> snapshots all placed instances and saves the place.</span></div>
-<div class="table-wrap weapon-table-wrap"><table><thead><tr><th>asset</th><th>category</th><th>weapon contact</th><th>Roblox assets</th><th>status</th><th></th></tr></thead><tbody id="location-asset-rows"></tbody></table></div>
+<div class="table-wrap weapon-table-wrap"><table><thead><tr><th>asset</th><th>category</th><th>weapon contact</th><th>Roblox assets</th><th>status</th><th></th></tr></thead><tbody id="location-asset-rows"></tbody></table></div><details class="deco-sync-history"><summary>Studio ID replacement history · selected in Edit</summary><pre id="location-asset-studio-history">Open Edit to load an asset's Studio history.</pre></details>
 </div>
 </div>
 </div>
@@ -647,7 +644,11 @@
 <script src="timelines.js?v=3"></script>
 <script src="locations.js?v=2"></script>
 <script src="shared-asset-retirement.js?v=4"></script>
-<script src="deco-assets.js?v=9"></script>
+<script src="studio-sync.js?v=2"></script>
+<script src="asset-atlas-actions.js?v=1"></script>
+<script src="asset-workflow-dialog.js?v=1"></script>
+<script src="deco-assets.js?v=12"></script>
+<script src="location-asset-workflow.js?v=2"></script>
 <script src="asset-audit.js?v=2"></script>
 <script src="options.js?v=1"></script>
 <script src="weapon-assets.js?v=3"></script>

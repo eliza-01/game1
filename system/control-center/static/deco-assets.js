@@ -1,132 +1,73 @@
+/* Location Assets: registration/library adapter.
+ * Existing-resource editing lives in location-asset-workflow.js; the shared
+ * Atlas Registry and Studio Sync own their respective domain operations.
+ */
 const decoAssetState = {
-  data: null,
-  selected: null,
-  modelPath: '',
-  texturePath: '',
-  atlasVariantId: 0,
-  replacementPath: '',
-  atlasBusy: false,
-  libraryCategory: 'all',
+  data: null, modelPath: '', texturePath: '', atlasVariantId: 0,
+  libraryCategory: 'all', syncingSlug: null, atlasBusy: false,
 };
-
 const DECO_LIBRARY_CATEGORY_KEY = 'game1.locationAssets.libraryCategory';
-const DECO_SELECTED_ASSET_KEY = 'game1.locationAssets.selectedAsset';
+const DECO_ATLAS_COLORS = ['#d9ac43', '#a47bdf', '#4f95ee', '#54b991', '#939ba8'];
 
 function decoAssetRemember(key, value) {
-  try {
-    if (value) localStorage.setItem(key, value);
-    else localStorage.removeItem(key);
-  } catch {}
+  try { if (value) localStorage.setItem(key, value); else localStorage.removeItem(key); } catch {}
 }
-
 function decoAssetRestorePreferences() {
-  try {
-    decoAssetState.libraryCategory = localStorage.getItem(DECO_LIBRARY_CATEGORY_KEY) || 'all';
-    decoAssetState.selected = localStorage.getItem(DECO_SELECTED_ASSET_KEY) || null;
-  } catch {}
+  try { decoAssetState.libraryCategory = localStorage.getItem(DECO_LIBRARY_CATEGORY_KEY) || 'all'; } catch {}
 }
-
-function decoAssetSelected() {
-  return decoAssetState.data?.items?.find((row) => row.slug === decoAssetState.selected) || null;
-}
-
 function decoAssetSlugify(value) {
-  return String(value || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .replace(/_+/g, '_')
-    .slice(0, 64);
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '').replace(/_+/g, '_').slice(0, 64);
 }
-
+function decoAssetRow(slug) {
+  return decoAssetState.data?.items?.find(item => item.slug === slug) || null;
+}
 function decoAssetCategoryLabel(category) {
-  const item = decoAssetState.data?.options?.categories?.find((row) => row.id === category);
+  const item = decoAssetState.data?.options?.categories?.find(row => row.id === category);
   return item?.label || category || '';
 }
-
-// The API projects the independent atlas source filename. Fall back to
-// its canonical path for records registered before filename metadata existed.
 function decoAssetTextureFilename(row) {
   return row?.texture_filename || String(row?.texture_path || '').split(/[\\/]/).pop() || '';
 }
-
 function decoAssetStatusTag(status) {
   return `<span class="tag ${String(status || '').toLowerCase()}">${esc(status || '')}</span>`;
 }
-
 function decoAssetSyncSlug() {
-  game1SyncPublicationDescription("location-asset-publication-description", "Location Asset", $("location-asset-name").value);
-  if (!decoAssetState.selected) {
-    $('location-asset-slug').value = decoAssetSlugify($('location-asset-name').value);
-  }
+  $('location-asset-slug').value = decoAssetSlugify($('location-asset-name').value);
 }
-
-function decoAssetBeginNew() {
-  decoAssetSetForm(null);
-  const input = $('location-asset-name');
-  if (input) input.focus();
-}
-
-function decoAssetSetForm(row) {
-  decoAssetState.selected = row?.slug || null;
-  decoAssetRemember(DECO_SELECTED_ASSET_KEY, decoAssetState.selected || '');
-  if (typeof decoAssetShowSyncHistory === 'function') decoAssetShowSyncHistory(decoAssetState.selected);
+function decoAssetSetForm() {
+  // The registration editor is always new-only, never a recycled Edit modal.
   decoAssetState.modelPath = '';
   decoAssetState.texturePath = '';
-  decoAssetState.replacementPath = '';
-  decoAssetState.atlasVariantId = Number(row?.atlasVariantId || 0);
-
-  if (row) {
-    $('location-asset-name').value = row.name_en || '';
-    $('location-asset-slug').value = row.slug || '';
-    $('location-asset-category').value = row.category || 'tree';
-    decoAssetState.libraryCategory = row.category || 'tree';
-    decoAssetRemember(DECO_LIBRARY_CATEGORY_KEY, decoAssetState.libraryCategory);
-    $('location-asset-destructible').checked = row.destructible === true || Number(row.destructible || 0) === 1;
-    $('picked-location-asset-model').textContent = 'keep current fbx or choose a replacement';
-    $('picked-location-asset-texture').textContent = decoAssetTextureFilename(row) || 'no atlas · choose a registered variant or source PNG/JPG';
-  } else {
-    $('location-asset-name').value = '';
-    $('location-asset-slug').value = '';
-    const validCategories = new Set((decoAssetState.data?.options?.categories || []).map((item) => item.id));
-    const category = validCategories.has(decoAssetState.libraryCategory)
-      ? decoAssetState.libraryCategory
-      : (decoAssetState.data?.options?.categories?.[0]?.id || 'tree');
-    $('location-asset-category').value = category;
-    $('location-asset-destructible').checked = false;
-    $('picked-location-asset-model').textContent = 'fbx not selected';
-    $('picked-location-asset-texture').textContent = 'PNG/JPG not selected';
-  }
-
-  game1SyncPublicationDescription("location-asset-publication-description", "Location Asset", row?.name_en || "");
-  decoAssetRender();
+  decoAssetState.atlasVariantId = 0;
+  $('location-asset-name').value = '';
+  $('location-asset-slug').value = '';
+  const categories = decoAssetState.data?.options?.categories || [];
+  $('location-asset-category').value = categories.some(c => c.id === decoAssetState.libraryCategory)
+    ? decoAssetState.libraryCategory : (categories[0]?.id || 'tree');
+  $('location-asset-destructible').checked = false;
+  $('picked-location-asset-model').textContent = 'Choose the FBX for this new asset';
+  $('picked-location-asset-texture').textContent = 'Choose PNG/JPG or reuse a registered atlas';
+  $('location-asset-atlas-search').value = '';
+  decoAssetRenderTextureReferences();
 }
-
-// An atlas family/size is one variant, regardless of which models reuse it.
-// A changed file with the same canonical filename selects that variant for
-// Republish instead of pretending to be a new model-owned texture.
+function decoAssetBeginNew() {
+  decoAssetSetForm();
+  $('location-asset-name').focus();
+}
 function decoAssetMatchingVariant(path) {
   const filename = String(path || '').split(/[\\/]/).pop();
   const match = filename.match(/^(.+)_([1-9][0-9]*)x([1-9][0-9]*)_atlas\.(png|jpe?g)$/i);
   if (!match) return null;
   const family = (decoAssetState.data?.atlases || []).find(
-    (item) => item.atlasKey.toLowerCase() === match[1].toLowerCase());
-  return family?.variants?.find(
-    (variant) => Number(variant.width) === Number(match[2])
-      && Number(variant.height) === Number(match[3])) || null;
+    group => group.atlasKey.toLowerCase() === match[1].toLowerCase());
+  return family?.variants?.find(variant => Number(variant.width) === Number(match[2])
+    && Number(variant.height) === Number(match[3])) || null;
 }
-
-function decoAssetAtlasRepublishMode() {
-  const variant = (decoAssetState.data?.atlases || []).flatMap((group) => group.variants || [])
-    .find((item) => Number(item.id) === decoAssetState.atlasVariantId);
-  return Boolean(decoAssetState.replacementPath || variant?.replacementPending);
-}
-
-// Every option is an Atlas Registry variant, never a model-owned texture.
 function decoAssetRenderTextureReferences() {
   const select = $('location-asset-texture-reference');
   const query = $('location-asset-atlas-search').value.trim().toLowerCase();
-  select.innerHTML = '<option value="">choose / register an atlas…</option>';
+  select.innerHTML = '<option value="">New local PNG/JPG atlas</option>';
   for (const family of decoAssetState.data?.atlases || []) {
     const group = document.createElement('optgroup');
     group.label = window.game1AtlasIdentity.describe({atlasKey:family.atlasKey}).key;
@@ -135,301 +76,228 @@ function decoAssetRenderTextureReferences() {
           && Number(variant.id) !== decoAssetState.atlasVariantId) continue;
       const option = document.createElement('option');
       option.value = `variant:${variant.id}`;
-      option.textContent = window.game1AtlasIdentity.label({filename:variant.filename,atlasKey:family.atlasKey,
-        resolution:variant.resolution},{assetId:variant.current ? variant.published_id : 'publish required'});
+      option.textContent = window.game1AtlasIdentity.label({
+        filename:variant.filename, atlasKey:family.atlasKey, resolution:variant.resolution,
+      }, {assetId:variant.current ? variant.published_id : 'publish required'});
       group.appendChild(option);
     }
     if (group.children.length) select.appendChild(group);
   }
   select.value = decoAssetState.atlasVariantId ? `variant:${decoAssetState.atlasVariantId}` : '';
-  const republish = decoAssetAtlasRepublishMode();
-  const publishButton = $('publish-location-atlas-variant');
-  publishButton.textContent = republish ? 'Republish atlas · new Roblox ID' : 'Publish selected atlas';
-  publishButton.disabled = decoAssetState.atlasBusy || !decoAssetState.atlasVariantId || !decoAssetState.data?.publication?.configured;
-  $('register-location-atlas-variant').disabled = decoAssetState.atlasBusy || !decoAssetState.texturePath;
 }
-
-const DECO_ATLAS_COLORS = ['#d9ac43', '#a47bdf', '#4f95ee', '#54b991', '#939ba8'];
-
 function decoAtlasWarning(row) {
   return row.atlasLegacyWarning
-    ? `<span class="deco-atlas-warning" title="Legacy filename. Expected &lt;atlas_key&gt;_&lt;width&gt;x&lt;height&gt;_atlas.png" aria-label="Legacy atlas filename">⚠️</span>`
+    ? '<span class="deco-atlas-warning" title="Legacy filename; expected &lt;atlas_key&gt;_&lt;width&gt;x&lt;height&gt;_atlas.png">⚠️</span>'
     : '';
 }
-
 function decoAtlasDots(row) {
-  // Gold is always leftmost: rank by actual pixel count, not insertion order.
-  const variants = [...(row.atlasVariants || [])].sort((a, b) =>
-    (Number(b.width) * Number(b.height) - Number(a.width) * Number(a.height)) ||
-    (Number(b.width) - Number(a.width)) ||
-    (Number(b.height) - Number(a.height)) ||
-    (Number(a.id) - Number(b.id))
-  );
+  const variants = [...(row.atlasVariants || [])].sort((a,b) =>
+    (Number(b.width)*Number(b.height) - Number(a.width)*Number(a.height)) ||
+    (Number(b.width)-Number(a.width)) || (Number(b.height)-Number(a.height)) ||
+    (Number(a.id)-Number(b.id)));
   if (!variants.length) return '';
-  const render = (variant, index) => {
+  const render = (variant,index) => {
     const current = Number(row.atlasVariantId) === Number(variant.id);
     const valid = Boolean(variant.current);
-    const tip = `${variant.filename} · ${variant.resolution}${valid ? '' : ' · publish first'}`;
-    return `<button type="button" class="deco-atlas-dot ${current ? 'is-active' : ''}" style="--dot-color:${DECO_ATLAS_COLORS[Math.min(index,4)]}" data-atlas-variant="${Number(variant.id)}" title="${esc(tip)}" aria-label="${esc(tip)}" aria-pressed="${current}" ${(!valid || decoAssetState.atlasBusy) ? 'disabled' : ''}><span></span></button>`;
+    const tip = `${variant.filename} · ${variant.resolution}${valid?'':' · publish first'}`;
+    return `<button type="button" class="deco-atlas-dot ${current?'is-active':''}" style="--dot-color:${DECO_ATLAS_COLORS[Math.min(index,4)]}" data-atlas-variant="${Number(variant.id)}" title="${esc(tip)}" aria-label="${esc(tip)}" aria-pressed="${current}" ${(!valid || decoAssetState.atlasBusy) ? 'disabled' : ''}><span></span></button>`;
   };
   return `<div class="deco-atlas-dots" aria-label="Registered atlas resolutions">${variants.slice(0,5).map(render).join('')}${variants.length>5 ? `<details class="deco-atlas-more"><summary>+${variants.length-5}</summary><div>${variants.slice(5).map((v,i)=>render(v,i+5)).join('')}</div></details>` : ''}</div>`;
 }
-
 async function decoAssetChooseAtlasVariant(row, id) {
-  if (decoAssetState.atlasBusy || Number(row.atlasVariantId) === Number(id)) return;
+  if (decoAssetState.atlasBusy || Number(row.atlasVariantId) === Number(id)) return null;
   decoAssetState.atlasBusy = true;
   decoAssetRender();
   try {
-    await request(`/api/location-assets/${encodeURIComponent(row.slug)}/atlas-binding`, {
-      method: 'PUT', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({variantId: id, expectedRevision: Number(row.bindingRevision || 0)}),
+    const result = await request(`/api/location-assets/${encodeURIComponent(row.slug)}/atlas-binding`, {
+      method: 'PUT', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({variantId:id, expectedRevision:Number(row.bindingRevision || 0)}),
     });
     await decoAssetLoad();
-    await decoAssetRetrySync(row.slug);
+    toast(`Atlas binding saved for ${row.slug} · Sync Studio explicitly when ready.`);
+    return result;
   } catch (error) {
     toast(`Atlas change: ${error.message}`, true);
     await decoAssetLoad();
+    return null;
   } finally {
     decoAssetState.atlasBusy = false;
     decoAssetRender();
   }
 }
-
-async function decoAssetRetrySync(slug) {
-  try {
-    const result = await request('/api/location-assets/studio-sync', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({slug}),
-    });
-    toast(`Studio synced ${slug} · ${Number(result.studio?.matchedModels ?? 0)} matched · ${Number(result.studio?.parts || 0)} atlas IDs updated · no models rebuilt. Save Place in Studio.`);
-    await decoAssetShowSyncHistory(slug);
-  } catch (error) {
-    toast(`Atlas saved; Studio sync pending: ${error.message}. Use Retry.`, true);
-  }
-  await decoAssetLoad();
-}
-
-function decoAssetUseCategory(category, { updateEditor = true } = {}) {
-  const categories = decoAssetState.data?.options?.categories || [];
-  if (!categories.some((row) => row.id === category)) return;
+function decoAssetUseCategory(category, {updateEditor = true} = {}) {
+  if (!(decoAssetState.data?.options?.categories || []).some(c => c.id === category)) return;
   decoAssetState.libraryCategory = category;
   decoAssetRemember(DECO_LIBRARY_CATEGORY_KEY, category);
   if (updateEditor) $('location-asset-category').value = category;
 }
-
 function decoAssetRenderLibraryFilter() {
-  const select = $('location-asset-library-category');
-  if (!select) return;
-  const categories = decoAssetState.data?.options?.categories || [];
-  const valid = new Set(['all', ...categories.map((row) => row.id)]);
-  if (!valid.has(decoAssetState.libraryCategory)) decoAssetState.libraryCategory = 'all';
-  select.innerHTML = '<option value="all">all categories</option>';
-  for (const category of categories) {
+  const filter = $('location-asset-library-category');
+  filter.innerHTML = '<option value="all">all categories</option>';
+  for (const category of decoAssetState.data?.options?.categories || []) {
     const option = document.createElement('option');
     option.value = category.id;
     option.textContent = category.label;
-    select.appendChild(option);
+    filter.appendChild(option);
   }
-  select.value = decoAssetState.libraryCategory;
+  if (!['all', ...(decoAssetState.data?.options?.categories || []).map(c => c.id)].includes(decoAssetState.libraryCategory)) {
+    decoAssetState.libraryCategory = 'all';
+  }
+  filter.value = decoAssetState.libraryCategory;
 }
-
 function decoAssetRender() {
   if (!decoAssetState.data) return;
-
-  const selected = decoAssetSelected();
   const summary = decoAssetState.data.summary || {};
   $('location-asset-metric-total').textContent = String(summary.registered || 0);
   $('location-asset-metric-published').textContent = String(summary.published || 0);
   $('location-asset-metric-changed').textContent = String(summary.changed || 0);
-
   const categories = $('location-asset-category');
   if (!categories.options.length) {
     for (const category of decoAssetState.data.options?.categories || []) {
       const option = document.createElement('option');
-      option.value = category.id;
-      option.textContent = category.label;
-      categories.appendChild(option);
+      option.value = category.id; option.textContent = category.label; categories.appendChild(option);
     }
+    categories.value = categories[0]?.value || 'tree';
   }
-
   decoAssetRenderTextureReferences();
   decoAssetRenderLibraryFilter();
-  $('register-location-asset').textContent = selected ? 'save asset changes' : 'register asset';
-
   const publication = decoAssetState.data.publication || {};
   const publicationState = $('location-asset-publication-state');
   publicationState.className = publication.configured ? 'publication-ok' : 'publication-missing';
   publicationState.textContent = publication.configured ? 'open cloud: ready' : 'open cloud: not configured';
-
-  const status = $('location-asset-model-status');
-  if (selected) {
-    const textureInfo = `atlas ${esc(window.game1AtlasIdentity.label({filename:decoAssetTextureFilename(selected),atlasKey:selected.atlasFamily||''}, {assetId:selected.texture_asset_id||'not published'}))}`;
-    status.innerHTML = `<strong>${esc(selected.name_en)} ${decoAtlasWarning(selected)} · ${decoAssetStatusTag(selected.status)}</strong><span>${esc(decoAssetCategoryLabel(selected.category))} · model ${esc(selected.model_asset_id || 'not published')} · ${textureInfo}</span>`;
-  } else {
-    status.innerHTML = '<strong>not registered</strong><span>choose FBX + PNG/JPG, then register the location asset.</span>';
-  }
-
-  $('publish-location-asset').disabled = !selected || !publication.configured;
-  $('sync-location-assets').disabled = !selected || selected.status !== 'PUBLISHED';
-  $('delete-location-asset').disabled = !selected;
-  $('location-asset-publication-hint').textContent = selected
-    ? (selected.status === 'PUBLISHED'
-      ? 'Published and available to DecoManager.'
-      : 'Publish changed model/texture so DecoManager can load it.')
-    : 'select a registered location asset.';
-
   const rows = $('location-asset-rows');
   rows.innerHTML = '';
-  const libraryRows = (decoAssetState.data.items || []).filter((row) =>
-    decoAssetState.libraryCategory === 'all' || row.category === decoAssetState.libraryCategory
-  );
-  for (const row of libraryRows) {
+  const visible = (decoAssetState.data.items || []).filter(row =>
+    decoAssetState.libraryCategory === 'all' || row.category === decoAssetState.libraryCategory);
+  for (const row of visible) {
     const tr = document.createElement('tr');
-    const contactPolicy = (row.destructible === true || Number(row.destructible || 0) === 1) ? '<span class="tag">destructible</span>' : '<span class="tag published">solid · bounce</span>';
-    tr.innerHTML = `<td><b>${esc(row.name_en)}</b><small>${esc(row.slug)}</small><small class="deco-texture-filename">${esc(window.game1AtlasIdentity.describe({filename:decoAssetTextureFilename(row),atlasKey:row.atlasFamily||''}).key)} ${decoAtlasWarning(row)}</small>${decoAtlasDots(row)}${row.studioSyncStatus === 'pending_studio_sync' ? '<button class="deco-atlas-retry" data-retry type="button">Sync pending · retry</button>' : ''}</td><td>${esc(decoAssetCategoryLabel(row.category))}</td><td>${contactPolicy}</td><td><small>model ${esc(row.model_asset_id || '—')}</small><small>image ${esc(row.texture_asset_id || '—')}</small></td><td>${decoAssetStatusTag(row.status)}</td><td><button data-select type="button">edit</button></td>`;
-    tr.querySelector('[data-select]').onclick = () => decoAssetSetForm(row);
-    tr.querySelectorAll('[data-atlas-variant]').forEach((button) => {
+    const contactPolicy = row.destructible
+      ? '<span class="tag">destructible</span>' : '<span class="tag published">solid · bounce</span>';
+    tr.innerHTML = `<td><b>${esc(row.name_en)}</b><small>${esc(row.slug)}</small>` +
+      `<small class="deco-texture-filename">${esc(window.game1AtlasIdentity.describe({filename:decoAssetTextureFilename(row),atlasKey:row.atlasFamily||''}).key)} ${decoAtlasWarning(row)}</small>` +
+      `${decoAtlasDots(row)}${row.studioSyncStatus === 'pending_studio_sync' ? '<small class="deco-sync-pending">Studio Sync pending</small>' : ''}</td>` +
+      `<td>${esc(decoAssetCategoryLabel(row.category))}</td><td>${contactPolicy}</td>` +
+      `<td><small>Model ID ${esc(row.model_asset_id || '—')}</small><small>Image ID ${esc(row.texture_asset_id || '—')}</small></td>` +
+      `<td>${decoAssetStatusTag(row.status)}</td><td><div class="deco-asset-row-actions">` +
+      `<button data-select type="button" ${decoAssetState.syncingSlug?'disabled':''}>Edit</button>` +
+      `<button data-deco-sync type="button" ${row.status !== 'PUBLISHED' || decoAssetState.syncingSlug || decoAssetState.atlasBusy ? 'disabled' : ''} title="Sync published Model geometry and Atlas IDs in-place for every managed instance of this slug. Test on a backup Place first.">Sync Studio</button>` +
+      `</div></td>`;
+    tr.querySelector('[data-select]').onclick = () => decoAssetEditOpen(row.slug);
+    tr.querySelector('[data-deco-sync]').onclick = () => decoAssetSyncStudio(row.slug);
+    tr.querySelectorAll('[data-atlas-variant]').forEach(button => {
       button.onclick = () => decoAssetChooseAtlasVariant(row, Number(button.dataset.atlasVariant));
     });
-    const retry = tr.querySelector('[data-retry]');
-    if (retry) retry.onclick = () => decoAssetRetrySync(row.slug);
     rows.appendChild(tr);
   }
-  if (!libraryRows.length) {
+  if (!visible.length) {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td colspan="6"><span class="muted">no registered assets in ${esc(decoAssetState.libraryCategory === 'all' ? 'the library' : decoAssetCategoryLabel(decoAssetState.libraryCategory))}.</span></td>`;
+    tr.innerHTML = '<td colspan="6"><span class="muted">No registered assets match this category.</span></td>';
     rows.appendChild(tr);
   }
 }
-
 async function decoAssetLoad() {
   try {
     decoAssetState.data = await request('/api/location-assets');
-    if (decoAssetState.selected && !decoAssetSelected()) {
-      decoAssetState.selected = null;
-      decoAssetRemember(DECO_SELECTED_ASSET_KEY, '');
-    }
-    const selected = decoAssetSelected();
-    if (selected) {
-      decoAssetSetForm(selected);
-    } else {
-      decoAssetRender();
-      const categories = new Set((decoAssetState.data?.options?.categories || []).map((row) => row.id));
-      if (categories.has(decoAssetState.libraryCategory)) {
-        $('location-asset-category').value = decoAssetState.libraryCategory;
-      }
-    }
-  } catch (error) {
-    toast(error.message, true);
-  }
+    decoAssetRender();
+  } catch (error) { toast(`Location Assets: ${error.message}`, true); }
 }
-
 async function decoAssetChooseModel() {
   try {
-    const result = await request('/api/files/choose-location-asset-model', { method: 'POST' });
-    if (!result.path) return;
-    decoAssetState.modelPath = result.path;
-    $('picked-location-asset-model').textContent = result.path;
-  } catch (error) {
-    toast(error.message, true);
-  }
+    const chosen = await request('/api/files/choose-location-asset-model', {method:'POST'});
+    if (!chosen.path) return;
+    decoAssetState.modelPath = chosen.path;
+    $('picked-location-asset-model').textContent = chosen.path;
+  } catch (error) { toast(error.message, true); }
 }
-
 async function decoAssetChooseTexture() {
   try {
-    const result = await request('/api/files/choose-location-asset-texture', { method: 'POST' });
-    if (!result.path) return;
-    const matched = decoAssetMatchingVariant(result.path);
-    decoAssetState.texturePath = matched ? '' : result.path;
-    decoAssetState.replacementPath = matched ? result.path : '';
-      decoAssetState.atlasVariantId = matched ? Number(matched.id) : 0;
-    $('picked-location-asset-texture').textContent = matched
-      ? `Republish candidate · ${result.path} · current Roblox ID ${matched.published_id || 'not published'}`
-      : result.path;
+    const chosen = await window.game1AtlasWorkflow.chooseImage('/api/files/choose-location-asset-texture');
+    if (!chosen.path) return;
+    const match = decoAssetMatchingVariant(chosen.path);
+    decoAssetState.atlasVariantId = match ? Number(match.id) : 0;
+    decoAssetState.texturePath = match ? '' : chosen.path;
+    $('picked-location-asset-texture').textContent = match
+      ? `Existing atlas ${match.filename} selected · changed bytes require Edit → Republish after registration`
+      : chosen.path;
     decoAssetRenderTextureReferences();
-  } catch (error) {
-    toast(error.message, true);
-  }
+  } catch (error) { toast(error.message, true); }
 }
-
 async function decoAssetRegister() {
   try {
-    const selected = decoAssetSelected();
     const payload = {
-      nameEn: $('location-asset-name').value.trim(),
-      slug: $('location-asset-slug').value.trim(),
-      category: $('location-asset-category').value,
-      modelSourcePath: decoAssetState.modelPath,
-      textureSourcePath: decoAssetState.texturePath,
-      atlasVariantId: decoAssetState.atlasVariantId,
-      destructible: $('location-asset-destructible').checked,
+      nameEn: $('location-asset-name').value.trim(), slug:$('location-asset-slug').value.trim(),
+      category:$('location-asset-category').value, destructible: $('location-asset-destructible').checked,
+      modelSourcePath:decoAssetState.modelPath, textureSourcePath:decoAssetState.texturePath,
+      atlasVariantId:decoAssetState.atlasVariantId, createOnly:true,
     };
-    if (!selected && !payload.modelSourcePath) {
-      throw Error('choose FBX');
-    }
-    if (!selected && !payload.textureSourcePath && !payload.atlasVariantId) {
-      throw Error('choose PNG/JPG or a registered atlas variant');
-    }
-
+    if (!payload.modelSourcePath) throw Error('Choose FBX first');
+    if (!payload.textureSourcePath && !payload.atlasVariantId) throw Error('Choose PNG/JPG or an existing atlas');
     const row = await request('/api/location-assets', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload),
     });
-    decoAssetState.selected = row.slug;
     await decoAssetLoad();
-    toast(`registered ${row.name_en}`);
-  } catch (error) {
-    toast(error.message, true);
-  }
+    decoAssetSetForm();
+    toast(`Registered ${row.slug} · use Edit to publish its Model and Atlas independently`);
+    decoAssetEditOpen(row.slug);
+  } catch (error) { toast(`Register: ${error.message}`, true); }
 }
-
-async function decoAssetPublish() {
-  const row = decoAssetSelected();
-  if (!row) return;
+async function decoAssetSaveEdits(slug, payload, expectedRevision) {
+  const row = decoAssetRow(slug);
+  if (!row) throw Error('Location Asset no longer exists; refresh the library');
+  const saved = await request('/api/location-assets', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      slug, nameEn:payload.nameEn ?? row.name_en, category:payload.category ?? row.category,
+      destructible:payload.destructible ?? Boolean(row.destructible),
+      modelSourcePath:payload.modelSourcePath || '', textureSourcePath:payload.textureSourcePath || '',
+      atlasVariantId:payload.textureSourcePath ? 0 : (payload.atlasVariantId ?? row.atlasVariantId),
+      expectedRevision, editOnly:true,
+    }),
+  });
+  await decoAssetLoad();
+  return saved;
+}
+async function decoAssetPublish(slug, scope='changed', forceModel=false) {
+  const row = decoAssetRow(slug);
+  if (!row) throw Error('Location Asset not found');
+  const published = await request(`/api/location-assets/${encodeURIComponent(slug)}/publish`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({description:game1PublicationDescription('Location Asset',row.name_en),scope,forceModel}),
+  });
+  await decoAssetLoad();
+  return published;
+}
+// M221: one slug, ALL its managed placements; guarded in-place meshes and atlas IDs.
+// Never rebuild, re-parent or move placed Models.
+async function decoAssetSyncStudio(slug) {
+  const row = decoAssetRow(slug);
+  if (!row || row.status !== 'PUBLISHED') return toast('Publish Model and Atlas before Studio Sync.', true);
+  if (decoAssetState.syncingSlug) return toast('Another Location Asset Sync is running.', true);
+  if (typeof window.confirm === 'function' && !window.confirm(
+    `Sync ${slug} in Roblox Studio? This will update published MeshPart geometry and Atlas IDs in ALL placed instances of this slug. ` +
+    'ApplyMesh also updates collision geometry. Save a backup copy of your Place first. Continue?'
+  )) return null;
+  decoAssetState.syncingSlug = slug;
+  decoAssetRender();
   try {
-    toast('publishing location asset…');
-    const published = await request(`/api/location-assets/${encodeURIComponent(row.slug)}/publish`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ description: $('location-asset-publication-description').value }),
-    });
+    const result = await window.game1StudioSync.run('location', slug);
+    const studio = result.studio;
     await decoAssetLoad();
-    toast(`location asset published · model ${published.model_asset_id || '—'} · texture ${published.texture_asset_id || '—'}`);
+    toast(window.game1StudioSync.locationSummary(slug, studio), Number(studio.matchedModels || 0) === 0);
+    await decoAssetShowSyncHistory(slug);
+    return result;
   } catch (error) {
-    toast(error.message, true);
-  }
+    toast(`Studio Sync ${slug}: ${error.message}`, true);
+    return null;
+  } finally { decoAssetState.syncingSlug = null; decoAssetRender(); }
 }
-
-// M216: a Studio Sync is ALWAYS scoped to the selected Location Asset.
-// Never rebuild models or apply FBX to existing placed instances.
-async function decoAssetSyncStudio() {
-  const row = decoAssetSelected();
-  if (!row || row.status !== 'PUBLISHED') return toast('Select a published Location Asset first.', true);
-  const button = $('sync-location-assets');
-  if (button.disabled) return;
-  button.disabled = true;
-  try {
-    toast(`syncing published IDs for ${row.slug} only…`);
-    const result = await request('/api/location-assets/studio-sync', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({slug: row.slug}),
-    });
-    const studio = result.studio || {};
-    await decoAssetLoad();
-    toast(`Studio sync ${row.slug} · ${Number(studio.matchedModels || 0)} matched · ${Number(studio.parts || 0)} texture IDs changed · ${Number(studio.modelReferences || 0)} model ID references · ${Number(studio.pendingGeometry || 0)} FBX geometries unchanged (manual replacement required). Models never rebuilt.`);
-    await decoAssetShowSyncHistory(row.slug);
-  } catch (error) {
-    toast(error.message, true);
-  } finally {
-    decoAssetRender();
-  }
+function decoAssetEditOpen(slug) {
+  return window.game1LocationAssetWorkflow.open(slug);
 }
-
 async function decoAssetShowSyncHistory(slug) {
   const box = $('location-asset-studio-history');
   if (!box) return;
-  if (!slug) { box.textContent = 'Select a Location Asset to view ID changes.'; return; }
+  if (!slug) { box.textContent = 'Open Edit on a Location Asset to view its history.'; return; }
   try {
     const events = [];
     let before = null;
@@ -441,28 +309,19 @@ async function decoAssetShowSyncHistory(slug) {
     } while (before !== null);
     box.textContent = events.length ? events.map(event => {
       const changes = (event.changes || []).map(change =>
-        `${change.kind === 'model_reference' ? 'Model reference' : 'Atlas'}: ${change.oldId || 'unknown'} → ${change.newId} (${change.count})`).join('; ');
-      const instances = (event.instances || []).map(instance => {
-        const instanceChanges = (instance.changes || []).map(change =>
-          `${change.kind}: ${change.oldId || 'unknown'} → ${change.newId} (${change.count})`).join(', ');
-        return `  ${instance.instanceId} · ${instance.studioPath} · ${instanceChanges}`;
-      }).join('\n');
-      return `${event.atUtc} · ${changes || 'no ID changes'} · pending FBX: ${event.pendingGeometry}${instances ? `\n${instances}` : ''}`;
-    }).join('\n') : 'No Studio ID changes recorded for this asset yet.';
-  } catch (error) {
-    box.textContent = `History unavailable: ${error.message}`;
-  }
+        `${change.kind === 'model_reference' ? 'Model reference' : change.kind === 'model' ? 'Model geometry' : 'Atlas'}: ${change.oldId || 'unknown'} → ${change.newId} (${change.count})`).join('; ');
+      return `${event.atUtc} · ${changes || 'No ID changes'} · pending FBX ${event.pendingGeometry}`;
+    }).join('\n') : `No Studio ID changes recorded for ${slug}.`;
+  } catch (error) { box.textContent = `History unavailable: ${error.message}`; }
 }
-
-async function decoAssetDelete() {
-  const row = decoAssetSelected();
+async function decoAssetDelete(slug) {
+  const row = decoAssetRow(slug);
   if (!row) return;
-  await window.game1AssetRetirement.open({kind:'location',slug:row.slug,onDone:async(result)=>{
-    decoAssetState.selected=null;
+  await window.game1AssetRetirement.open({kind:'location',slug,onDone:async result => {
     await decoAssetLoad();
-    if(typeof realEstateLoad==='function')await realEstateLoad();
-    decoAssetSetForm(null);
-    toast(`Retired ${result.deleted.length} registration(s); shared assets preserved`);
+    if (typeof realEstateLoad === 'function') await realEstateLoad();
+    window.game1LocationAssetWorkflow.close();
+    toast(`Retired ${result.deleted.length} registration(s); shared atlas assets preserved`);
   }});
 }
 
@@ -475,67 +334,18 @@ $('choose-location-asset-model').onclick = decoAssetChooseModel;
 $('choose-location-asset-texture').onclick = decoAssetChooseTexture;
 $('location-asset-atlas-search').oninput = decoAssetRenderTextureReferences;
 $('location-asset-texture-reference').onchange = () => {
-  const selection = $('location-asset-texture-reference').value;
-  decoAssetState.atlasVariantId = selection.startsWith('variant:') ? Number(selection.slice(8)) : 0;
-  decoAssetState.replacementPath = '';
-  if (selection) {
+  const choice = $('location-asset-texture-reference').value;
+  decoAssetState.atlasVariantId = choice.startsWith('variant:') ? Number(choice.slice(8)) : 0;
+  if (decoAssetState.atlasVariantId) {
     decoAssetState.texturePath = '';
-    $('picked-location-asset-texture').textContent = `using ${$('location-asset-texture-reference').selectedOptions[0].textContent}`;
+    $('picked-location-asset-texture').textContent = 'Reusing an Atlas Registry variant; no new upload';
   }
   decoAssetRenderTextureReferences();
-};
-$('register-location-atlas-variant').onclick = async () => {
-  if (!decoAssetState.texturePath) return toast('Choose PNG/JPG first', true);
-  try {
-    const variant = await request('/api/texture-atlases/variants', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({sourcePath:decoAssetState.texturePath}),
-    });
-    decoAssetState.texturePath = '';
-    decoAssetState.replacementPath = '';
-    decoAssetState.atlasVariantId = variant.id;
-      await decoAssetLoad();
-    toast(`Atlas variant registered · ${variant.atlas_key} ${variant.resolution}`);
-  } catch (error) { toast(error.message, true); }
-};
-$('publish-location-atlas-variant').onclick = async () => {
-  if (!decoAssetState.atlasVariantId || decoAssetState.atlasBusy) return;
-  const id = decoAssetState.atlasVariantId;
-  const path = decoAssetState.replacementPath;
-  const republish = decoAssetAtlasRepublishMode();
-  if (republish && !confirm('Republish this atlas? Roblox will assign a NEW Image Asset ID. All models using this resolution will switch to the new ID.')) return;
-  decoAssetState.atlasBusy = true;
-  decoAssetRenderTextureReferences();
-  try {
-    const result = await request(`/api/texture-atlases/variants/${id}/${republish ? 'republish' : 'publish'}`, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify(republish ? {sourcePath:path} : {}),
-    });
-    decoAssetState.replacementPath = '';
-    await decoAssetLoad();
-    if (republish) {
-      if (result.unchanged) toast('Atlas bytes unchanged · existing Image Asset ID kept (no upload)');
-      else {
-        const message = `Atlas republished · NEW Roblox Image ID ${result.variant.published_id} · ${result.pendingConsumers || 0} consumer(s) pending explicit Studio Sync; no placed asset was touched`;
-        toast(result.studioErrors?.length ? `${message} · ${result.studioErrors.join('; ')}` : message, Boolean(result.studioErrors?.length));
-      }
-    } else toast(`Atlas published · Roblox Image ID ${result.published_id}`);
-  } catch (error) {
-    toast(`Atlas publication: ${error.message}`, true);
-    await decoAssetLoad();
-  } finally {
-    decoAssetState.atlasBusy = false;
-    decoAssetRenderTextureReferences();
-  }
 };
 $('location-asset-library-category').onchange = () => {
   const category = $('location-asset-library-category').value || 'all';
-  if (category === 'all') {
-    decoAssetState.libraryCategory = 'all';
-    decoAssetRemember(DECO_LIBRARY_CATEGORY_KEY, 'all');
-  } else {
-    decoAssetUseCategory(category);
-  }
+  if(category === 'all') { decoAssetState.libraryCategory = 'all'; decoAssetRemember(DECO_LIBRARY_CATEGORY_KEY, 'all'); }
+  else decoAssetUseCategory(category);
   decoAssetRender();
 };
 $('location-asset-category').onchange = () => {
@@ -544,6 +354,3 @@ $('location-asset-category').onchange = () => {
 };
 $('register-location-asset').onclick = decoAssetRegister;
 $('clear-location-asset-form').onclick = decoAssetBeginNew;
-$('publish-location-asset').onclick = decoAssetPublish;
-$('sync-location-assets').onclick = decoAssetSyncStudio;
-$('delete-location-asset').onclick = decoAssetDelete;

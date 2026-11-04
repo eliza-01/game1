@@ -34,7 +34,7 @@ vm.createContext(globals);
 vm.runInContext(ui,globals);
 const data = [
   {atUtc:'2026-11-04T00:00:00Z', assetDomain:'location_asset', assetKey:'campfire_01', assetType:'studio_reference', eventKind:'studio_sync',
-    changes:[{kind:'atlas',oldId:'111',newId:'222',count:2},{kind:'model_reference',oldId:'333',newId:'444',count:2}]},
+    changes:[{kind:'atlas',oldId:'111',newId:'222',count:2},{kind:'model_reference',oldId:'333',newId:'444',count:2},{kind:'model',oldId:'201',newId:'301',count:2}]},
   {atUtc:'2026-11-04T01:00:00Z', assetDomain:'texture_atlas', assetKey:'9',assetType:'image', eventKind:'publication',
     changes:[{kind:'asset_publication',oldId:'111',newId:'222',count:1}]},
   {atUtc:'2026-11-04T01:00:00Z',assetDomain:'real_estate',assetKey:'house_01', assetSlot:'door', assetType:'model',eventKind:'publication',
@@ -49,6 +49,7 @@ async function main() {
   assert.match(el('asset-audit-rows').innerHTML,/campfire_01/);
   assert.match(el('asset-audit-rows').innerHTML,/Atlas/);
   assert.match(el('asset-audit-rows').innerHTML,/Model/);
+  assert.match(el('asset-audit-rows').innerHTML, /data-copy="301"/);
   assert.match(el('asset-audit-rows').innerHTML,/Shared atlas · variant 9/);
   assert.doesNotMatch(el('asset-audit-rows').innerHTML,/<script>alert/);
   assert.match(el('asset-audit-rows').innerHTML, /data-copy="campfire_01"/);
@@ -58,7 +59,7 @@ async function main() {
   assert.match(el('asset-audit-rows').innerHTML, /same ID · content revision/);
   assert.equal(el('asset-audit-more').hidden, false);
   assert.match(el('asset-audit-rows').innerHTML, /title="Previous ID not recorded"/);
-  assert.equal((el('asset-audit-rows').innerHTML.match(/class="database-history-row"/g)||[]).length,5);
+  assert.equal((el('asset-audit-rows').innerHTML.match(/class="database-history-row"/g)||[]).length,6);
   // Both ID and slug copy ONLY the clicked value; no automatic clipboard writes.
   assert.equal(copied.length,0);
   const click = (value, inList = true) => el('asset-audit-rows').on_click({target:{closest: () => ({dataset:{copy:value},inList})}});

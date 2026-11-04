@@ -142,3 +142,18 @@
 .deco-atlas-more > div { display:flex; gap:5px; flex-wrap:wrap; padding:5px; }
 .deco-atlas-warning { cursor:help; font-size:12px; }
 .deco-atlas-retry { font-size:11px; margin-top:5px; }
+
+/* M220: independent resource workflow shared visually with Real Estate. */
+.deco-asset-workflow-m220 {display:block;max-width:760px;}
+.deco-asset-row-actions {display:flex;gap:7px;flex-wrap:wrap;align-items:center;min-width:145px;}
+.deco-asset-row-actions button {white-space:nowrap;}
+.deco-sync-pending {color:var(--orange);font-weight:600;}
+#location-asset-edit-dialog {width:min(730px,calc(100vw - 24px));max-height:90vh;}
+#location-asset-edit-dialog .real-estate-mesh-dialog-body {max-height:calc(90vh - 90px);}
+#location-asset-edit-dialog .deco-manage-fields {display:grid;gap:12px;}
+#location-asset-edit-dialog .deco-manage-fields label {display:grid;gap:6px;margin:0;}
+#location-asset-edit-dialog .deco-manage-value {display:block;overflow-wrap:anywhere;word-break:break-word;}
+#location-asset-edit-dialog .deco-policy-toggle {display:flex;align-items:center;gap:8px;}
+#location-asset-edit-dialog input[type=search] {width:100%;}
+#location-asset-edit-dialog .real-estate-mesh-step .actions {flex-wrap:wrap;}
+.deco-sync-history pre {white-space:pre-wrap;overflow:auto;max-height:230px;}

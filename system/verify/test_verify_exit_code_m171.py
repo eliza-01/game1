@@ -30,11 +30,11 @@ original = location_asset_categories.check_location_asset_categories
 
 def check_with_altered_inputs(root, report_error, *, sources, **kwargs):
     if scenario in ("m54", "combined"):
-        sources = sources._replace(index_text=sources.index_text.replace(
-            "filled automatically from the selected asset", "removed description hint"))
+        sources = sources._replace(assets_js=sources.assets_js.replace(
+            "game1PublicationDescription('Location Asset',row.name_en)", "removed_description_name_policy"))
     if scenario == "m54_field":
-        sources = sources._replace(index_text=sources.index_text.replace(
-            'id="location-asset-publication-description"', 'id="missing-publication-description"'))
+        sources = sources._replace(assets_js=sources.assets_js.replace(
+            'description:game1PublicationDescription(', 'removed_description_payload('))
     if scenario == "m128":
         sources = sources._replace(store_text=sources.store_text.replace(
             '"prop": "Props"', '"prop": "INVALID"'))
@@ -74,7 +74,7 @@ class VerifyExitCodeM171Tests(unittest.TestCase):
         result = self.run_verify("m54")
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertTrue(result.stdout.startswith("verify failed\n"), result.stdout)
-        self.assertIn("m54 Location Assets markup missing filled automatically from the selected asset", result.stdout)
+        self.assertIn("m54 Location Assets publication name policy missing", result.stdout)
         self.assertNotIn("verify ok", result.stdout)
 
     def test_m55_missing_editor_library_category_sync_is_failure(self):
@@ -86,7 +86,7 @@ class VerifyExitCodeM171Tests(unittest.TestCase):
     def test_m54_missing_description_field_is_failure(self):
         result = self.run_verify("m54_field")
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn('m54 Location Assets markup missing id="location-asset-publication-description"', result.stdout)
+        self.assertIn('m54 Location Assets publication payload missing description', result.stdout)
         self.assertNotIn("verify ok", result.stdout)
 
     def test_m128_missing_props_store_category_is_failure(self):
@@ -99,7 +99,7 @@ class VerifyExitCodeM171Tests(unittest.TestCase):
         result = self.run_verify("combined")
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         early = result.stdout.index("test earlier project identity issue")
-        m54 = result.stdout.index("m54 Location Assets markup missing")
+        m54 = result.stdout.index("m54 Location Assets publication name policy missing")
         m55 = result.stdout.index("m55 library category must synchronize editor category")
         self.assertLess(early, m54)
         self.assertLess(m54, m55)

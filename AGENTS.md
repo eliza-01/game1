@@ -66,3 +66,49 @@ Studio Bridge commands. See docs/workflows/LOCATION_ASSETS_SAFE_ID_SYNC_M216_RU.
 ## M218 · Read-only Database / Asset History
 
 The Asset Manager Database → Asset History view consumes the existing M217 audit through `GET /api/asset-replacements`; it never mutates Studio, asset IDs or authoring DBs. Display independent shared atlas publications as variant identities, not as belonging to an arbitrary model. Studio model_reference changes are metadata, not geometry replacements. See `docs/workflows/ASSET_HISTORY_DATABASE_M218_RU.md`.
+
+## M219 · Location Assets row-scoped Studio Sync UX
+
+Each Location Asset library row owns `Edit` (shared modal shell, original authoring form) and `Sync Studio` (explicit slug argument). Switching atlas variants must not silently invoke Studio Sync. `studio-sync.js` is the shared client dispatcher for Location Assets and Real Estate; backend and Studio operations remain domain-specific and must keep M216 non-destructive rules. See `docs/workflows/LOCATION_ASSETS_ROW_SYNC_EDITOR_M219_RU.md`.
+
+## M220 · Location Assets resource workflow (supersedes M219 editor)
+
+Location Asset registration is create-only, `Edit` is a dedicated resource workflow
+with separate `Identity`, `Model · FBX`, and `Texture · atlas` operations.
+Real Estate and Location Assets share editor tab/step presentation and common
+Atlas Registry transport, not duplicated authoring pipelines. Publishing FBX
+creates a NEW Roblox Model Asset ID and preserves the previous publication
+in the append-only audit. Shared atlas republish never silently Syncs its
+consumers. Studio Sync remains strictly scoped and non-destructive under M216;
+updating reference metadata DOES NOT update an existing MeshPart's geometry.
+See `docs/workflows/LOCATION_ASSETS_RESOURCE_WORKFLOW_M220_RU.md`.
+
+## M221 · Explicit in-place FBX sync supersedes ONLY M216 ApplyMesh ban
+
+Under an explicitly slug-scoped schemaVersion 4 Studio Sync, a guarded, shared
+`StudioMeshInPlaceSync` may call `ApplyMesh` **on existing MeshParts** after full
+matching/local-frame preflight and creation of rollback snapshots. Never clone,
+replace, re-parent, delete, PivotTo or ScaleTo a placed Model. Preserve each
+MeshPart's CFrame and Size, model identity, links and place structure. A changed
+FBX has unavoidable collision-geometry implications; skinned/wrapped or
+incompatible parts MUST fail closed. Audit actual `model` changes, not just
+reference IDs; no mutation outside the requested slug. Old M216/M220 plugin
+commands are incompatible with schema 4. Studio verification on a backup Place
+remains mandatory. See docs/workflows/LOCATION_ASSETS_INPLACE_GEOMETRY_SYNC_M221_RU.md.
+
+## M222 · One Studio rig replacement mechanism for Estate and Location Assets
+
+`StudioManagedRigSwap` is the single staged managed-child-rig replacement
+transaction for BOTH Real Estate placed-visual sync and Location Assets FBX
+sync. Domain adapters select roots, published rig contents, authored anchors and
+metadata; the common module stages, commits and rolls back child-rig changes.
+Never destroy/replace or move a placed *root* Model. Real Estate continues to
+anchor at its `house` MeshPart; Location uses a unique published MeshPart
+authoring pivot. Preserve skinned Bones/Wrap hierarchy by copying the whole rig
+from the published Model, rather than `ApplyMesh` into an existing skinned part.
+M221's `StudioMeshInPlaceSync` is REMOVED; its manual skinned-mesh rejection
+and `ApplyMesh` path are superseded. Sync stays explicit and slug-scoped, with
+full audit and conservative preflight before any Place mutations. M216 remains
+the historical safety floor concerning root identity, placement scope and audit,
+not a ban on the now-shared managed CHILD rig replacement. See
+`docs/workflows/SHARED_PLACED_RIG_SYNC_M222_RU.md`.

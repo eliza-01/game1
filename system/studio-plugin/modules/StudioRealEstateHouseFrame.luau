@@ -2,6 +2,7 @@
 -- The MeshPart CFrame tracks its geometry centre, which can shift after an
 -- FBX revision. The authored import pivot (CFrame * PivotOffset) is the
 -- stable registration frame. Never match replacements by CFrame alone.
+local RigSwap = require(script.Parent.StudioManagedRigSwap)
 local HouseFrame = {}
 
 function HouseFrame.Find(root: Instance): MeshPart?
@@ -20,14 +21,7 @@ function HouseFrame.Relative(source: MeshPart, target: MeshPart): CFrame
 end
 
 function HouseFrame.Align(rig: Model, sourceAnchor: MeshPart, targetPivot: CFrame, context: string)
-    local offset = targetPivot * sourceAnchor:GetPivot():Inverse()
-    rig:PivotTo(offset * rig:GetPivot())
-    local result = sourceAnchor:GetPivot()
-    if (result.Position - targetPivot.Position).Magnitude > 0.025
-        or result.LookVector:Dot(targetPivot.LookVector) < 0.9999
-        or result.UpVector:Dot(targetPivot.UpVector) < 0.9999 then
-        error(context .. ": authored house pivot could not be aligned after Model:PivotTo")
-    end
+    RigSwap.AlignToAnchor(rig, sourceAnchor, targetPivot, context)
 end
 
 return table.freeze(HouseFrame)

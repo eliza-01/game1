@@ -97,6 +97,7 @@ foreach($Marker in @(
     'StudioRealEstatePlacedPhysicsGuard',
     'StudioRealEstatePlacedCollisionSync',
     'StudioRealEstatePlacedVisualSync',
+    'StudioManagedRigSwap',
     'StudioRealEstatePlacedTargets',
     'StudioDecoSyncCommands',
     'StudioTextureAppearance',

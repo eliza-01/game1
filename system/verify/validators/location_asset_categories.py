@@ -25,11 +25,11 @@ def check_location_asset_categories(root: Path, report_error: Callable[[str], No
             report_error(f"m54 Asset Manager remembered section missing {required}")
     for required in [
         "DECO_LIBRARY_CATEGORY_KEY = 'game1.locationAssets.libraryCategory'",
-        "DECO_SELECTED_ASSET_KEY = 'game1.locationAssets.selectedAsset'",
+        'function decoAssetSaveEdits(',
         "function decoAssetBeginNew()",
         "new-location-asset-main",
         "location-asset-library-category",
-        "save asset changes",
+        'location-asset-workflow.js?v=',
     ]:
         if required not in deco_assets_js_text and required not in index_m43_text:
             report_error(f"m54 Location Assets UX missing {required}")
@@ -38,15 +38,22 @@ def check_location_asset_categories(root: Path, report_error: Callable[[str], No
         'id="location-asset-library-category"',
         'ladders</span>',
         'flowers</span>',
-        'id="location-asset-publication-description"',
-        'filled automatically from the selected asset',
+        'id="location-asset-editor-panel"',
+        'Register new asset',
     ]:
         if required not in index_m43_text:
             report_error(f"m54 Location Assets markup missing {required}")
+    # M220: the publication description belongs to the selected existing row,
+    # not to an input in a create-only form. Both validations are independently
+    # testable and must fail closed when removed.
+    if "game1PublicationDescription('Location Asset',row.name_en)" not in deco_assets_js_text:
+        report_error('m54 Location Assets publication name policy missing')
+    if 'description:game1PublicationDescription(' not in deco_assets_js_text:
+        report_error('m54 Location Assets publication payload missing description')
     for required in [
         '"ladder": "Ladders"',
         '"flower": "Flowers"',
-        'description = f"{description} · {asset_name}"',
+        "description = f'{description} · {asset_name}'",
     ]:
         if required not in location_asset_store_text:
             report_error(f"m54 LocationAssetStore missing {required}")

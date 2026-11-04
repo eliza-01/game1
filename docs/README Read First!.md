@@ -7,9 +7,13 @@
 
 | Документ | Зачем читать | Статус |
 | --- | --- | --- |
+| [M222 — Shared managed rig replacement](workflows/SHARED_PLACED_RIG_SYNC_M222_RU.md) | Единый транзакционный механизм child-rig swap для Real Estate и Location Assets, полная публикация skinned FBX, аудит, откат | **CURRENT · STUDIO SMOKE REQUIRED** |
+| [M221 — In-place FBX geometry Sync](workflows/LOCATION_ASSETS_INPLACE_GEOMETRY_SYNC_M221_RU.md) | Guarded MeshPart:ApplyMesh, per-slug geometry update, Studio v4, rollback/history | **SUPERSEDED BY M222** |
+| [M220 — Location Assets resource workflow](workflows/LOCATION_ASSETS_RESOURCE_WORKFLOW_M220_RU.md) | Раздельные Register/Edit, FBX Model ID и независимый Atlas Registry, общие UI-компоненты Real Estate, M221 updates geometry contract | **CURRENT UI / PUBLICATION** |
+| [M219 — Location Assets per-row Sync + Edit dialog](workflows/LOCATION_ASSETS_ROW_SYNC_EDITOR_M219_RU.md) | Историческая ступень: адресная кнопка Sync; устаревшее перенесение формы в Edit отменено M220 | **SUPERSEDED BY M220** |
 | [M218 — Database → Asset History](workflows/ASSET_HISTORY_DATABASE_M218_RU.md) | Read-only UI, копирование slug/ID, фильтры и страницы существующего MySQL аудита | **CURRENT** |
 | [M217 — полный аудит замен всех ассетов](workflows/ASSET_REPLACEMENT_AUDIT_M217_RU.md) | MySQL 8.4, объединённая история публикаций/замен всех asset-доменов, backup/recovery | **CURRENT / SAFETY CRITICAL** |
-| [M216 — Location Assets: аварийный откат M215 и безопасный ID Sync](workflows/LOCATION_ASSETS_SAFE_ID_SYNC_M216_RU.md) | Строгое ограничение Studio Sync одним slug, запрет перепостроения моделей и журнал заменённых ID | **CURRENT / SAFETY CRITICAL** |
+| [M216 — Location Assets: аварийный откат M215 и безопасный ID Sync](workflows/LOCATION_ASSETS_SAFE_ID_SYNC_M216_RU.md) | Строгое ограничение Studio Sync одним slug, запрет перепостроения моделей и журнал заменённых ID | **HISTORICAL SAFETY FLOOR; M221 EXTENDS** |
 | [M189 — R3 Characters/Animations stores](workflows/CHARACTER_ANIMATION_STORES_R3_M189_RU.md) | Границы Python-хранилищ, контроль идентичности генерации, дальнейший долг | **CURRENT R3 STEP** |
 | [Анимации: лицо, emotions и события](animation/README.md) | Четыре контроллера лица, Blender-маркеры, документы клипов и этап внедрения | **CURRENT / IMPLEMENTING** |
 | [Актуальное ТЗ](spec/CURRENT_PROJECT_SPEC_RU.md) | Текущие возможности, socket/atlas/FBX/actor контракты, scope и Definition of Done | **CURRENT** |

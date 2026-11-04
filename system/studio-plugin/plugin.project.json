@@ -28,6 +28,9 @@
       "DecoPlacedAssetSync": {
         "$path": "modules/DecoPlacedAssetSync.luau"
       },
+      "StudioManagedRigSwap": {
+        "$path": "modules/StudioManagedRigSwap.luau"
+      },
       "DecoManager": {
         "$path": "modules/DecoManager.luau"
       },

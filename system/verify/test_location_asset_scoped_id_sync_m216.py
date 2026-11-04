@@ -69,7 +69,8 @@ class SafetyM216(TestCase):
         self.history = LocationAssetSyncHistory(Path(self.tmp.name), database=MemoryAudit())
         self.report = {'operationId': 'a' * 32, 'models': 1, 'parts': 2,
                        'matchedModels': 2, 'modelReferences': 1,
-                       'pendingGeometry': 2, 'replacedModels': 0, 'registryItems': 26,
+                       'pendingGeometry': 2, 'geometryUpdated': 0, 'meshPartsUpdated': 0,
+                       'replacedModels': 0, 'registryItems': 26,
                        'changes': [
                            {'kind': 'model_reference', 'oldId': '10', 'newId': '12345', 'count': 1},
                            {'kind': 'atlas', 'oldId': '33', 'newId': '98765', 'count': 2},
@@ -154,16 +155,18 @@ class SafetyM216(TestCase):
         sync = self.source('system/studio-plugin/modules/DecoPlacedAssetSync.luau')
         manager = self.source('system/studio-plugin/modules/DecoManager.luau')
         command = self.source('system/studio-plugin/modules/StudioDecoSyncCommands.luau')
-        self.assertIn('schemaVersion ~= 3', command)
+        self.assertIn('schemaVersion ~= 5', command)
         self.assertIn('command.targetSlug', command)
         self.assertIn('DecoPlacedAssetSync.RefreshIds(', manager)
         self.assertNotIn('DecoPlacedAssetSync.RefreshModels(', manager)
         for forbidden in ('previous:Destroy()', 'replacement:Destroy()',
-                          'LoadAssetAsync(', ':PivotTo(', ':ScaleTo(', ':ApplyMesh(',
-                          '.MeshId =', '.CFrame =', '.Size ='):
+                          'LoadAssetAsync(', '.MeshId =', '.CFrame =', '.Size ='):
             self.assertNotIn(forbidden, sync)
-        self.assertNotRegex(sync, r'\.Parent\s*=(?!=)')
-        self.assertIn('StudioTextureAppearance.Apply(mesh, uri, nil, true)', sync)
+        self.assertIn('RigSwap.Prepare(', sync)
+        self.assertIn('RigSwap.Commit(', sync)
+        self.assertIn('RigSwap.Rollback(', sync)
+        self.assertNotIn('model:Destroy()', sync)
+        self.assertIn('StudioTextureAppearance.Apply(change.part, uri, nil, true)', sync)
         appearance = self.source('system/studio-plugin/modules/StudioTextureAppearance.luau')
         self.assertIn('if idsOnly == true then', appearance)
         self.assertIn('mesh.TextureID = uri', appearance)
@@ -177,17 +180,18 @@ class SafetyM216(TestCase):
 
     def test_sync_finds_legacy_places_by_stable_identity_without_reparenting(self):
         sync = self.source('system/studio-plugin/modules/DecoPlacedAssetSync.luau')
-        discovery = sync.split('local function placedModels(', 1)[1].split(
-            'local function priorHistory(', 1)[0]
+        discovery = sync.split('local function targets(', 1)[1].split(
+            'local function meshParts(', 1)[0]
         self.assertIn('workspace:GetDescendants()', discovery)
-        self.assertIn('descendant:GetAttribute(SLUG_ATTRIBUTE) == slug', discovery)
-        self.assertIn('descendant:GetAttribute("Game1DecoInstanceId")', discovery)
+        self.assertIn('descendant:GetAttribute(SLUG) == slug', discovery)
+        self.assertIn('descendant:GetAttribute(INSTANCE)', discovery)
         self.assertNotRegex(discovery, r'\.Parent\s*=(?!=)')
 
     def test_ui_scopes_sync_and_shows_history(self):
         js = self.source('system/control-center/static/deco-assets.js')
         html = self.source('system/control-center/static/index.html')
-        self.assertIn('body: JSON.stringify({slug: row.slug})', js)
+        self.assertIn("window.game1StudioSync.run('location', slug)", js)
+        self.assertIn("tr.querySelector('[data-deco-sync]').onclick = () => decoAssetSyncStudio(row.slug)", js)
         self.assertIn('decoAssetShowSyncHistory', js)
         self.assertIn('location-asset-studio-history', html)
         self.assertNotIn("request('/api/location-assets/studio-sync', { method: 'POST' })", js)
@@ -202,7 +206,7 @@ class SafetyM216(TestCase):
                              headers=headers, method=method), timeout=3) as response:
             return json.load(response)
 
-    def test_bridge_schema_3_roundtrip_and_old_command_rejection(self):
+    def test_bridge_schema_4_roundtrip_and_old_command_rejection(self):
         with socket.socket() as sock:
             sock.bind(('127.0.0.1', 0))
             port = sock.getsockname()[1]
@@ -224,7 +228,7 @@ class SafetyM216(TestCase):
                     break
                 except (URLError, OSError):
                     time.sleep(.01)
-            self.assertEqual(command['schemaVersion'], 3)
+            self.assertEqual(command['schemaVersion'], 5)
             self.assertEqual(command['targetSlug'], 'oak_tree')
             with self.assertRaises(HTTPError):
                 self._request(port, '/deco-refresh-result', 'POST', {

@@ -492,8 +492,7 @@ async function realEstateSync(slug, part=null){
   if(!row)return null;
   try{
     toast(`Syncing ${slug}${part?' / '+part:''} · template and managed placed houses…`,false,true);
-    const result=await request('/api/real-estate/'+encodeURIComponent(slug)+'/sync',{
-      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({part:part||''})});
+    const result=await window.game1StudioSync.run('real-estate',slug,{part});
     const stats=result.studio?.realEstateStats||{};
     if(stats.placedSyncVersion!==2){
       throw new Error('Game1Bridge Studio plugin is outdated: placed-sync v2 is required. Install the current Studio plugin and restart Studio before syncing again.');
@@ -637,8 +636,7 @@ async function realEstateRepublishAtlas(variant){
     if(!window.confirm(`Republish ${name} from ${file.path}?\n\nRoblox will assign a NEW Image Asset ID. All consumers of this atlas variant (including Location Assets) will switch to the new ID after successful publication.`))return;
     realEstateState.atlasBusy=true;
     realEstateRender();
-    const result=await request('/api/texture-atlases/variants/'+Number(variant.id)+'/republish',{
-      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sourcePath:file.path})});
+    const result=await window.game1AtlasWorkflow.republish(variant.id,file.path);
     await realEstateLoad();
     const errors=result.studioErrors||[];
     toast(result.unchanged?`Atlas bytes unchanged · no upload: ${name}`:

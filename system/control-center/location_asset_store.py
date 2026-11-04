@@ -16,7 +16,6 @@ from services.texture_atlas_registry import AtlasRegistry, parse_filename
 
 from opencloud_assets import (
     create_model_asset,
-    update_model_asset,
     wait_for_operation,
 )
 
@@ -250,6 +249,17 @@ class LocationAssetStore:
             raise ValueError("location asset slug must be lowercase snake_case")
         if old is None:
             old = self._raw_get(slug)
+        # Registration and editing have separate authoring contracts. A stale
+        # editor must never accidentally create a new asset or overwrite an
+        # unrelated slug that somebody registered in another tab.
+        if payload.get('createOnly') and old is not None:
+            raise ValueError('asset already registered; open Edit instead')
+        if payload.get('editOnly') and old is None:
+            raise ValueError('asset no longer registered; refresh the library')
+        expected = payload.get('expectedRevision')
+        if expected is not None and (old is None or type(expected) is not int or
+                                     int(old['revision']) != expected):
+            raise ValueError('Location Asset changed since Edit opened; refresh before saving')
         category = str(payload.get("category") or (old.get("category") if old else "") or "").strip().lower()
         destructible = parse_bool(payload.get("destructible"), bool(old.get("destructible")) if old else False)
         if category not in CATEGORIES:
@@ -318,68 +328,63 @@ class LocationAssetStore:
         self.export()
         return self.get(slug)
 
-    def publish(self, slug: str, credentials: dict) -> dict:
+    def publish(self, slug: str, credentials: dict, *, scope: str = 'changed',
+                force_model: bool = False) -> dict:
+        '''Publish selected resources independently with immutable Model IDs.
+
+        Publishing a changed FBX creates a new Model Asset ID (as in Real
+        Estate), never updates the old published version in place. The old ID
+        remains active until Roblox confirms success. Atlas publication is
+        delegated to the shared Atlas Registry and never changes the FBX.
+        '''
+        if scope not in ('changed', 'model', 'atlas'):
+            raise ValueError('publication scope must be changed, model, or atlas')
+        if force_model and scope != 'model':
+            raise ValueError('force model publication requires model scope')
         row = self.get(slug)
         if not row:
-            raise ValueError(f"unknown location asset: {slug}")
-        model = self.root / str(row.get("model_path") or "")
-        texture = self.root / str(row.get("texture_path") or "")
-        if not model.is_file():
-            raise ValueError("canonical Location Asset FBX is missing")
-        if not texture.is_file():
-            raise ValueError("canonical Location Asset texture is missing")
+            raise ValueError(f'unknown location asset: {slug}')
+        model = self.root / str(row.get('model_path') or '')
         atlas_binding = self.atlases.binding('location_asset', slug)
-        if atlas_binding is None:
-            raise ValueError('independent atlas binding missing')
-        api_key = str(credentials.get("apiKey") or "")
-        creator_type = str(credentials.get("creatorType") or "")
-        creator_id = str(credentials.get("creatorId") or "")
-        base_description = str(credentials.get("description") or "game1 location asset").strip()
-        description = base_description or "game1 location asset"
-        asset_name = str(row.get("name_en") or "").strip()
+        if scope in ('changed', 'model') and not model.is_file():
+            raise ValueError('canonical Location Asset FBX is missing')
+        if scope in ('changed', 'atlas'):
+            if atlas_binding is None:
+                raise ValueError('independent atlas binding missing')
+            texture = self.root / str(row.get('texture_path') or '')
+            if not texture.is_file():
+                raise ValueError('canonical Location Asset texture is missing')
+        api_key = str(credentials.get('apiKey') or '')
+        creator_type = str(credentials.get('creatorType') or '')
+        creator_id = str(credentials.get('creatorId') or '')
+        description = str(credentials.get('description') or 'game1 location asset').strip() or 'game1 location asset'
+        asset_name = str(row.get('name_en') or '').strip()
         if asset_name and asset_name.casefold() not in description.casefold():
-            description = f"{description} · {asset_name}"
+            description = f'{description} · {asset_name}'
 
-        if str(row.get("model_published_sha256") or "") != str(row.get("model_sha256") or ""):
-            current_asset_id = str(row.get("model_asset_id") or "").strip()
+        needs_model = (str(row.get('model_published_sha256') or '') !=
+                       str(row.get('model_sha256') or ''))
+        if scope in ('changed', 'model') and (needs_model or force_model):
+            # NEVER update_model_asset: versioned publication and the M217 audit
+            # must retain an immutable chain of previous -> new Model IDs.
             with staged_model(self.root, model) as publication:
-                if current_asset_id:
-                    operation = update_model_asset(
-                        publication,
-                        asset_id=current_asset_id,
-                        display_name=row["name_en"],
-                        description=description,
-                        creator_type=creator_type,
-                        creator_id=creator_id,
-                        api_key=api_key,
-                    )
-                else:
-                    operation = create_model_asset(
-                        publication,
-                        display_name=row["name_en"],
-                        description=description,
-                        creator_type=creator_type,
-                        creator_id=creator_id,
-                        api_key=api_key,
-                    )
+                operation = create_model_asset(
+                    publication, display_name=row['name_en'], description=description,
+                    creator_type=creator_type, creator_id=creator_id, api_key=api_key)
             result = wait_for_operation(operation, api_key=api_key)
             now = time.time()
             with self.connect() as connection:
-                connection.execute(
-                    """UPDATE location_assets
-                       SET model_asset_id=?,model_published_sha256=?,model_moderation_state=?,updated_at=?,published_at=?
-                       WHERE slug=?""",
-                    (result.asset_id, row["model_sha256"], result.moderation_state or "", now, now, slug),
-                )
-                connection.execute(
-                    """INSERT INTO location_asset_publications(
-                        asset_slug,kind,revision,asset_id,operation_path,sha256,moderation_state,published_at
-                    ) VALUES(?,?,?,?,?,?,?,?)""",
-                    (slug, "model", int(row["revision"]), result.asset_id, result.operation_path,
-                     row["model_sha256"], result.moderation_state or "", now),
-                )
+                connection.execute('''UPDATE location_assets
+                    SET model_asset_id=?,model_published_sha256=?,model_moderation_state=?,
+                        updated_at=?,published_at=? WHERE slug=?''',
+                    (result.asset_id, row['model_sha256'], result.moderation_state or '', now, now, slug))
+                connection.execute('''INSERT INTO location_asset_publications(
+                    asset_slug,kind,revision,asset_id,operation_path,sha256,moderation_state,published_at
+                ) VALUES(?,?,?,?,?,?,?,?)''',
+                    (slug, 'model', int(row['revision']), result.asset_id, result.operation_path,
+                     row['model_sha256'], result.moderation_state or '', now))
 
-        if not atlas_binding['current']:
+        if scope in ('changed', 'atlas') and atlas_binding is not None and not atlas_binding['current']:
             self.atlases.ensure_published(atlas_binding['variant_id'], credentials, description)
 
         self.export()

@@ -102,13 +102,13 @@ class LocationDecoEnvironmentM169Tests(unittest.TestCase):
     def test_categories_rejects_missing_publication_description_field_and_hint(self):
         issues, sources = self.core()
         self.assertEqual(issues, [])
-        altered = sources._replace(index_text=sources.index_text.replace(
-            'filled automatically from the selected asset', 'description hint deliberately removed',
+        altered = sources._replace(assets_js=sources.assets_js.replace(
+            "game1PublicationDescription('Location Asset',row.name_en)", 'description hint deliberately removed',
         ))
         check_location_asset_categories(ROOT, issues.append, sources=altered,
             character_js_text=read('system/control-center/static/character-assets.js'),
             studio_plugin_text=self.studio, install_plugin_text=read('system/studio-plugin/install.ps1'))
-        self.assertIn('m54 Location Assets markup missing filled automatically from the selected asset', issues)
+        self.assertIn('m54 Location Assets publication name policy missing', issues)
 
     def test_locations_rejects_missing_polygon_validation(self):
         with self.change_file('system/control-center/location_store.py',

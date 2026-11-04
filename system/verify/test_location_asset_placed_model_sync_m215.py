@@ -17,17 +17,18 @@ class M215Retirement(TestCase):
         self.assertIn('DecoPlacedAssetSync.RefreshIds(', manager)
         self.assertNotIn('function DecoPlacedAssetSync.RefreshModels(', sync)
         self.assertNotIn('DecoPlacedAssetSync.RefreshModels(', manager)
-        for unsafe in ('previous:Destroy()', ':Clone()', ':PivotTo(', ':ScaleTo(', ':ApplyMesh(',
-                       'newModel.Parent =', 'loader:loadPublished(', 'templates[item.slug]'):
+        for unsafe in ('previous:Destroy()', 'newModel.Parent =', 'templates[item.slug]', 'model:Destroy()'):
             self.assertNotIn(unsafe, sync)
 
-    def test_fbx_revision_not_marked_applied_without_geometry_update(self):
+    def test_fbx_revision_stamped_only_after_geometry_update(self):
         sync = (ROOT / 'system/studio-plugin/modules/DecoPlacedAssetSync.luau').read_text(encoding='utf-8')
         refresh = sync.split('function DecoPlacedAssetSync.RefreshIds(', 1)[1]
         self.assertIn('Game1DecoRegistryModelAssetId', sync)
         self.assertIn('Game1DecoPublishedModelSha256', sync)
         self.assertIn('pendingGeometry', sync)
-        self.assertNotIn('SetAttribute("Game1DecoPublishedModelSha256"', refresh)
+        self.assertIn('RigSwap.Commit(item.swap)', refresh)
+        self.assertLess(refresh.index('RigSwap.Commit(item.swap)'),
+                        refresh.index('model:SetAttribute("Game1DecoPublishedModelSha256", publishedSha)'))
 
     def test_fresh_placement_is_stamped_before_it_enters_workspace(self):
         sync = (ROOT / 'system/studio-plugin/modules/DecoPlacedAssetSync.luau').read_text(encoding='utf-8')
@@ -37,6 +38,6 @@ class M215Retirement(TestCase):
         self.assertIn('model.Parent ~= nil', stamp)
         self.assertIn('SetAttribute("Game1DecoPublishedModelAssetId"', stamp)
         self.assertIn('SetAttribute("Game1DecoPublishedModelSha256"', stamp)
-        self.assertIn('SetAttribute(REGISTRY_MODEL_ID_ATTRIBUTE', stamp)
+        self.assertIn('SetAttribute(REFERENCE', stamp)
         self.assertLess(placement.index('DecoPlacedAssetSync.StampPublishedModel(placed, row)'),
                         placement.index('placed.Parent ='))

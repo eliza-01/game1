@@ -28,11 +28,13 @@ class LocationAssetsSyncM118(TestCase):
         command = self.source('system/studio-plugin/modules/StudioDecoSyncCommands.luau')
         sync = self.source('system/studio-plugin/modules/DecoPlacedAssetSync.luau')
         manager = self.source('system/studio-plugin/modules/DecoManager.luau')
-        self.assertIn('id="sync-location-assets"', html)
-        self.assertIn('body: JSON.stringify({slug: row.slug})', js)
-        self.assertIn('schemaVersion ~= 3', command)
+        self.assertIn('data-deco-sync type="button"', js)
+        self.assertIn("decoAssetSyncStudio(row.slug)", js)
+        self.assertIn("window.game1StudioSync.run('location', slug)", js)
+        self.assertNotIn('id="sync-location-assets"', html)
+        self.assertIn('schemaVersion ~= 5', command)
         self.assertIn('command.targetSlug', command)
         self.assertIn('DecoPlacedAssetSync.RefreshIds(', manager)
-        self.assertIn('StudioTextureAppearance.Apply(mesh, uri, nil, true)', sync)
-        for forbidden in ('LoadAssetAsync', 'previous:Destroy()', 'newModel.Parent =', ':ApplyMesh('):
+        self.assertIn('StudioTextureAppearance.Apply(change.part, uri, nil, true)', sync)
+        for forbidden in ('LoadAssetAsync', 'previous:Destroy()', 'newModel.Parent ='):
             self.assertNotIn(forbidden, sync)

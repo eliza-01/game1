@@ -66,6 +66,7 @@ const body=src.slice(start,end);
 const notices=[];
 let payload={};
 const context={
+  window:{},
   realEstateRows:()=>[{slug:'house_level4_01'}],
   toast:(message,error)=>notices.push({message,error:!!error}),
   request:async()=>({studio:{realEstateStats:payload}}),
@@ -74,6 +75,7 @@ const context={
   URL,encodeURIComponent
 };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync('studio-sync.js','utf8'),context);
 vm.runInContext(body+';globalThis.invoke=realEstateSync',context);
 (async()=>{
   payload={placedSyncVersion:2,workspaceModelsFound:2,workspaceModelsUpdated:2,rigWarnings:[]};

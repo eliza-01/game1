@@ -52,6 +52,7 @@ function makeDialog() {
 const row={slug:'house_level4_01',meshParts:['house','door','col_mesh'],
   rigAssets:{},rigSourceHashes:{},textures:{},publicationCurrent:{}};
 const ctx=vm.createContext({
+  window:{},
   document:{
     getElementById(id){return nodes.get(id)||null},
     createElement(tag){assert.equal(tag,'dialog');lastDialog=makeDialog();return lastDialog},
@@ -63,6 +64,7 @@ const ctx=vm.createContext({
   realEstateState:{data:{publication:{configured:true}},atlasBusy:false,publicationJob:null},
   esc:value=>String(value??'')
 });
+vm.runInContext(fs.readFileSync('asset-workflow-dialog.js','utf8'),ctx);
 vm.runInContext(source,ctx);
 const check=(js)=>vm.runInContext(js,ctx);
 // Before M151 this opening threw at picker.onchange: picker is null on model tab.

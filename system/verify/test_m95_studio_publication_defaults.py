@@ -27,9 +27,10 @@ class M95Contracts(unittest.TestCase):
         html = read("system/control-center/static/index.html")
         self.assertIn('`${base} ${label}`', js)
         self.assertIn('publication-descriptions.js?v=1', html)
-        for page in ('deco-assets', 'monster-assets', 'npc-assets', 'weapon-assets', 'character-assets'):
+        for page in ('monster-assets', 'npc-assets', 'weapon-assets', 'character-assets'):
             self.assertIn('game1SyncPublicationDescription(', read('system/control-center/static/'+page+'.js'))
-        self.assertIn('Game1 Location Asset Oak Tree', html)
+        # M220 renders the description from a scoped row, not from the create-only form.
+        self.assertIn("game1PublicationDescription('Location Asset',row.name_en)", read('system/control-center/static/deco-assets.js'))
 
     def test_05b_animation_publication_sync_stays_inside_function(self):
         for kind in ("monster", "npc"):

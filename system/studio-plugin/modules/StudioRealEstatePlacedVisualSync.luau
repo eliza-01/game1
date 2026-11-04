@@ -3,6 +3,7 @@
 -- player-owned objects. Collision rigs have an independent synchronizer.
 local Targets = require(script.Parent.StudioRealEstatePlacedTargets)
 local HouseFrame = require(script.Parent.StudioRealEstateHouseFrame)
+local RigSwap = require(script.Parent.StudioManagedRigSwap)
 local VisualSync = {}
 
 local function visuals(template: Model): {Model}
@@ -80,24 +81,23 @@ function VisualSync.Update(template: Model, slug: string, placedTargets: {Model}
             for _, stage in stages do stage.staged:Destroy() end
             continue
         end
-        local committed = {}
+        local oldRigs, newRigs = {}, {}
+        for _, stage in ipairs(stages) do
+            table.insert(oldRigs, stage.old)
+            table.insert(newRigs, stage.staged)
+        end
+        local transaction = nil
         local ok, problem = pcall(function()
-            for _, stage in stages do
-                stage.old.Name = stage.name .. "_M143_Previous"
-                stage.staged.Name = stage.name
-                stage.staged.Parent = root
-                table.insert(committed, stage)
-            end
+            transaction = RigSwap.Prepare(root, oldRigs, newRigs)
+            RigSwap.Commit(transaction)
         end)
         if not ok then
-            for _, stage in stages do
-                stage.staged:Destroy()
-                stage.old.Name = stage.name
-            end
+            if transaction then RigSwap.Rollback(transaction) end
+            for _, stage in ipairs(stages) do stage.staged:Destroy() end
             table.insert(warnings, root:GetFullName() .. ": update rolled back: " .. tostring(problem))
             continue
         end
-        for _, stage in committed do stage.old:Destroy() end
+        RigSwap.Finalize(transaction)
         Targets.MarkPlaced(root)
         -- Keep published IDs on the placed instance consistent with its
         -- actual copied rigs; do not touch player-owned children or pivots.

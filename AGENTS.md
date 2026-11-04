@@ -62,3 +62,7 @@ update MeshPart.TextureID and existing SurfaceAppearance.ColorMap. Always
 record changes to per-placement and Host Agent ID histories; all publications
 of shared atlases require per-consumer explicit Sync. Reject legacy global
 Studio Bridge commands. See docs/workflows/LOCATION_ASSETS_SAFE_ID_SYNC_M216_RU.md.
+
+## M218 · Read-only Database / Asset History
+
+The Asset Manager Database → Asset History view consumes the existing M217 audit through `GET /api/asset-replacements`; it never mutates Studio, asset IDs or authoring DBs. Display independent shared atlas publications as variant identities, not as belonging to an arbitrary model. Studio model_reference changes are metadata, not geometry replacements. See `docs/workflows/ASSET_HISTORY_DATABASE_M218_RU.md`.

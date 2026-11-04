@@ -48,7 +48,7 @@ operation path, время UTC и источник записи. FBX, изобр
 реализованы.
 
 Чтение: `GET /api/asset-replacements` с фильтрами `domain`, `key`, `limit`,
-`before`. Control Center раздел `asset history` показывает страницы журнала.
+`before`. Control Center отображает журнал в `Database → Asset History` (M218); подробности представления и пределы сопоставления общих атласов приведены в `ASSET_HISTORY_DATABASE_M218_RU.md`.
 
 ## Отказы, backup и rollback
 

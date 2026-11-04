@@ -7,6 +7,7 @@
 
 | Документ | Зачем читать | Статус |
 | --- | --- | --- |
+| [M218 — Database → Asset History](workflows/ASSET_HISTORY_DATABASE_M218_RU.md) | Read-only UI, копирование slug/ID, фильтры и страницы существующего MySQL аудита | **CURRENT** |
 | [M217 — полный аудит замен всех ассетов](workflows/ASSET_REPLACEMENT_AUDIT_M217_RU.md) | MySQL 8.4, объединённая история публикаций/замен всех asset-доменов, backup/recovery | **CURRENT / SAFETY CRITICAL** |
 | [M216 — Location Assets: аварийный откат M215 и безопасный ID Sync](workflows/LOCATION_ASSETS_SAFE_ID_SYNC_M216_RU.md) | Строгое ограничение Studio Sync одним slug, запрет перепостроения моделей и журнал заменённых ID | **CURRENT / SAFETY CRITICAL** |
 | [M189 — R3 Characters/Animations stores](workflows/CHARACTER_ANIMATION_STORES_R3_M189_RU.md) | Границы Python-хранилищ, контроль идентичности генерации, дальнейший долг | **CURRENT R3 STEP** |

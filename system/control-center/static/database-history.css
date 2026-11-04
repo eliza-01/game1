@@ -1,0 +1,20 @@
+/* M218: Database / Asset History only. Never style other Asset Manager views. */
+.database-subnav{padding:2px 10px 10px 24px}
+.database-subnav[hidden]{display:none}
+.database-subnav-item{display:block;width:100%;text-align:left;border-left:2px solid var(--line);border-radius:0 8px 8px 0;padding:9px 12px;background:transparent;font-size:12px}
+.database-subnav-item.active{border-left-color:var(--mint);color:var(--mint);background:var(--panel2)}
+.database-history-filters{display:grid;grid-template-columns:minmax(170px,1fr) minmax(220px,1.4fr) minmax(150px,.7fr);gap:12px;margin:18px 0}
+.database-history-filters label{min-width:0}
+.database-history-filters input,.database-history-filters select{width:100%}
+.database-history-status{margin:12px 0;font-size:12px}
+.database-history-list{list-style:none;margin:8px 0 16px;padding:0;display:grid;gap:7px}
+.database-history-row{padding:12px 14px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;min-width:0}
+.database-history-main{display:flex;align-items:center;gap:9px;flex-wrap:wrap;min-width:0;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px}
+.database-history-copy{display:inline-block;min-width:0;max-width:100%;padding:4px 7px;font:inherit;font-weight:700;overflow-wrap:anywhere;white-space:normal;text-align:left;color:var(--mint);border:1px solid color-mix(in srgb,var(--mint) 25%,var(--line));border-radius:6px;cursor:copy}
+.database-history-copy:hover,.database-history-copy:focus-visible{border-color:var(--mint);text-decoration:underline}
+.database-history-kind{font-weight:800;color:var(--text)}
+.database-history-colon,.database-history-arrow,.database-history-unknown,.database-history-meta{color:var(--muted)}
+.database-history-meta{display:block;margin-top:8px;font-size:10px;line-height:1.5;overflow-wrap:anywhere}
+.database-history-shared{font-weight:700;overflow-wrap:anywhere}
+.database-history-note{font-size:11px;line-height:1.5;margin-top:13px}
+@media(max-width:730px){.database-history-filters{grid-template-columns:1fr}.database-history-main{gap:6px}}

@@ -7,6 +7,7 @@
 <title>game1 · asset manager</title>
 <link rel="stylesheet" href="shared-asset-retirement.css?v=2">
 <link rel="stylesheet" href="asset-manager.css?v=12">
+<link rel="stylesheet" href="database-history.css?v=1">
 <link rel="stylesheet" href="character-animations.css?v=1">
 <link rel="stylesheet" href="location-assets.css?v=1">
 <link rel="stylesheet" href="character-components.css?v=6">
@@ -31,7 +32,8 @@
 <button id="nav-monsters" class="asset-section" type="button"><b>monsters</b><small>rigs · stats · animations</small></button>
 <button id="nav-locations" class="asset-section" type="button"><b>locations</b><small>polygon registry · studio authoring</small></button>
 <button id="nav-location-assets" class="asset-section" type="button"><b>location assets</b><small>trees · bushes · rocks · lights · fences · decorations · ladders · flowers · buildings · props</small></button>
-<button id="nav-asset-audit" class="asset-section" type="button"><b>asset history</b><small>all publications · replacements · Studio ID sync</small></button>
+<button id="nav-database" class="asset-section" type="button"><b>database</b><small>asset audit · ID history</small></button>
+<div id="database-nav" class="database-subnav" hidden><button id="nav-asset-audit" type="button" class="database-subnav-item">Asset History</button></div>
 <button id="nav-real-estate" class="asset-section" type="button"><b>real estate</b><small>houses · any mesh rigs · textures</small></button>
 <button id="nav-timelines" class="asset-section" type="button"><b>timelines</b><small>attack animation events</small></button>
 <button id="nav-options" class="asset-section" type="button"><b>options</b><small>common runtime settings</small></button>
@@ -401,15 +403,22 @@
 </div>
 </div>
 
-<div id="asset-audit-view" hidden>
+<div id="database-view" hidden>
 <div class="panel hero">
-<div><span class="eyebrow">immutable MySQL audit</span><h2>asset replacement history</h2><p>Complete retained publication and replacement history across characters, components, animations, weapons, monsters, NPCs, atlases, location assets and real estate. Studio instance details are recorded for Location Asset ID sync operations.</p></div>
+<div><span class="eyebrow">game1 · read-only audit database</span><h2>Database</h2><p>История публикаций и замен Roblox Asset ID из MySQL. Просмотр не изменяет зарегистрированные ассеты, атласы и Roblox Studio.</p></div>
 </div>
-<div class="panel character-card">
-<div class="section-title"><div><span>filters</span><h3>all asset events</h3></div><button id="asset-audit-refresh" type="button">refresh</button></div>
-<div class="character-grid"><label>domain<select id="asset-audit-domain"><option value="">all domains</option><option>character</option><option>character_component</option><option>character_animation</option><option>weapon</option><option>monster</option><option>monster_animation</option><option>npc</option><option>npc_animation</option><option>texture_atlas</option><option>texture_atlas_legacy</option><option>location_asset</option><option>real_estate</option></select></label><label>asset key<input id="asset-audit-key" type="search" placeholder="exact key or slug"></label></div>
-<div class="table-wrap weapon-table-wrap"><table><thead><tr><th>UTC time</th><th>domain / key</th><th>resource</th><th>replacement</th><th>source</th></tr></thead><tbody id="asset-audit-rows"><tr><td colspan="5" class="muted">Open this section to load audit history.</td></tr></tbody></table></div>
+<div class="panel database-history-panel">
+<div class="section-title"><div><span>01 · Database</span><h3>Asset History</h3></div><button id="asset-audit-refresh" type="button">refresh</button></div>
+<p class="muted">Нажми на имя модели, чтобы скопировать slug, или на любой Roblox ID, чтобы скопировать число. История Studio Sync показывает ID-ссылку на модель, а не фактическую замену геометрии.</p>
+<div class="database-history-filters">
+<label>domain<select id="asset-audit-domain"><option value="">all domains</option><option>character</option><option>character_component</option><option>character_animation</option><option>weapon</option><option>monster</option><option>monster_animation</option><option>npc</option><option>npc_animation</option><option>texture_atlas</option><option>texture_atlas_legacy</option><option>location_asset</option><option>real_estate</option></select></label>
+<label>slug / key<input id="asset-audit-key" type="search" placeholder="exact slug or atlas key"></label>
+<label>resource<select id="asset-audit-type"><option value="">all types</option><option value="Model">Model</option><option value="Atlas">Atlas</option><option value="Animation">Animation</option></select></label>
+</div>
+<div id="asset-audit-status" role="status" aria-live="polite" class="database-history-status muted">Открой Database, чтобы загрузить историю.</div>
+<ul id="asset-audit-rows" class="database-history-list" aria-label="Asset replacement ID history"></ul>
 <div class="actions"><button id="asset-audit-more" type="button" hidden>load older events</button><span id="asset-audit-count" class="muted"></span></div>
+<p class="muted database-history-note">Общие атласы отображаются по variant ID: их нельзя приписывать одной модели. Для Location Assets замена атласа в Studio Sync привязана к конкретному slug. Если прежний ID неизвестен, показывается «—». Повторная публикация с тем же ID сохраняется как ревизия содержимого.</p>
 </div>
 </div>
 
@@ -639,7 +648,7 @@
 <script src="locations.js?v=2"></script>
 <script src="shared-asset-retirement.js?v=4"></script>
 <script src="deco-assets.js?v=9"></script>
-<script src="asset-audit.js?v=1"></script>
+<script src="asset-audit.js?v=2"></script>
 <script src="options.js?v=1"></script>
 <script src="weapon-assets.js?v=3"></script>
 <script src="monster-assets.js?v=6"></script>

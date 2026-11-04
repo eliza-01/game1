@@ -70,3 +70,23 @@ M85–M105 **реализовали** значительную декомпоз�
 ### M203 · Атласы и потребители
 
 Real Estate и Location Assets не владеют Image Asset и не публикуют его сами. Варианты и исходники принадлежат Atlas Registry; в `texture_atlas_bindings` — только ссылки `consumer_type/consumer_id → variant_id`. M203 удаляет исторические owner-ссылки/retained-slug механизм миграцией двух баз. Проекции `textureAssetId` в runtime реестрах не являются ownership. Weapon/Monster/NPC texture slots пока отдельный старый контур — не приписывать его к этому контракту без миграции. Подробнее: `docs/workflows/ATLAS_INDEPENDENCE_M203_RU.md`.
+
+### M216: безопасность синхронизации Location Assets
+
+`DecoPlacedAssetSync.RefreshIds` — исключительно редакторская замена двух Image ID
+свойств на существующих MeshPart для **одного** `Game1DecoAssetSlug`, плюс
+метаданные Model Asset reference. Обновление самой FBX-геометрии/физики не входит
+в Sync Studio. `StudioDecoSyncCommands` принимает только schemaVersion=3, Host
+Agent валидирует target slug и сохраняет append-only журнал изменений ID через
+`LocationAssetSyncHistory`; общий Atlas Republish не запускает Studio Sync.
+См. `docs/workflows/LOCATION_ASSETS_SAFE_ID_SYNC_M216_RU.md`.
+
+### M217: постоянный аудит замен всех ассетов
+
+`MySqlAssetReplacementAudit` — единственный writer нормализованных audit-таблиц
+MySQL 8.4. `SqliteAssetAuditImporter` проецирует store-owned publication tables
+в общий журнал без изменения SQLite. `LocationAssetSyncHistory` отдельно
+координирует Studio WAL и per-instance результат (`instanceId`, path, old/new
+IDs). Ошибка MySQL блокирует audit-sensitive publish/delete/Sync, но не запуск
+остальных Host Agent сервисов. См.
+`docs/workflows/ASSET_REPLACEMENT_AUDIT_M217_RU.md`.

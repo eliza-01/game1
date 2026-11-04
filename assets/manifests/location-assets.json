@@ -172,6 +172,29 @@
           "resolution": "1024x2048",
           "baseKey": "campfire",
           "version": "01"
+        },
+        {
+          "id": 27,
+          "family_id": 12,
+          "width": 256,
+          "height": 512,
+          "filename": "campfire_01_256x512_atlas.png",
+          "original_filename": "campfire_01_256x512_atlas.png",
+          "source_path": "assets/source/texture-atlases/campfire_01/256x512/campfire_01_256x512_atlas.png",
+          "source_sha256": "f7b8f7c74484cae4599166c01b77d14d20222aee85e04e2fc94e128205cc0553",
+          "uses_alpha": true,
+          "published_id": "78602158656399",
+          "published_sha256": "f7b8f7c74484cae4599166c01b77d14d20222aee85e04e2fc94e128205cc0553",
+          "moderation_state": "Reviewing",
+          "published_at": 1793732908.6642716,
+          "created_at": 1793732886.9227848,
+          "atlas_key": "campfire_01",
+          "replacement_sha256": null,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "256x512",
+          "baseKey": "campfire",
+          "version": "01"
         }
       ]
     },
@@ -206,6 +229,36 @@
       ]
     },
     {
+      "atlasKey": "dion_partisan_s_dn_par_campfire01_atlas_material",
+      "baseKey": "dion_partisan_s_dn_par_campfire01_atlas_material",
+      "version": "",
+      "variants": [
+        {
+          "id": 26,
+          "family_id": 22,
+          "width": 1024,
+          "height": 512,
+          "filename": "dion_partisan_s_Dn_Par_Campfire01_Atlas_Material_1024x512_atlas.png",
+          "original_filename": "dion_partisan_s_Dn_Par_Campfire01_Atlas_Material_1024x512_atlas.png",
+          "source_path": "assets/source/texture-atlases/dion_partisan_s_dn_par_campfire01_atlas_material/1024x512/dion_partisan_s_Dn_Par_Campfire01_Atlas_Material_1024x512_atlas.png",
+          "source_sha256": "d31ef671473a84093e01dd636751f08af5d35f2d8a3b60df38978647b6694853",
+          "uses_alpha": true,
+          "published_id": null,
+          "published_sha256": "",
+          "moderation_state": "",
+          "published_at": null,
+          "created_at": 1793731103.456645,
+          "atlas_key": "dion_partisan_s_dn_par_campfire01_atlas_material",
+          "replacement_sha256": null,
+          "current": false,
+          "replacementPending": false,
+          "resolution": "1024x512",
+          "baseKey": "dion_partisan_s_dn_par_campfire01_atlas_material",
+          "version": ""
+        }
+      ]
+    },
+    {
       "atlasKey": "head_01_male",
       "baseKey": "head_01_male",
       "version": "",
@@ -232,6 +285,66 @@
           "resolution": "512x512",
           "baseKey": "head_01_male",
           "version": ""
+        }
+      ]
+    },
+    {
+      "atlasKey": "house_level1_01",
+      "baseKey": "house_level1",
+      "version": "01",
+      "variants": [
+        {
+          "id": 25,
+          "family_id": 21,
+          "width": 2048,
+          "height": 2048,
+          "filename": "house_level1_01_2048x2048_atlas.png",
+          "original_filename": "house_level1_01_2048x2048_atlas.png",
+          "source_path": "assets/source/texture-atlases/house_level1_01/2048x2048/house_level1_01_2048x2048_atlas.png",
+          "source_sha256": "cb1f0779b9bfb41b71bce1c9ea3c13c3d9053dfc9b89f74b0337ae9f1da65be0",
+          "uses_alpha": false,
+          "published_id": "128033899815070",
+          "published_sha256": "cb1f0779b9bfb41b71bce1c9ea3c13c3d9053dfc9b89f74b0337ae9f1da65be0",
+          "moderation_state": "Approved",
+          "published_at": 1793729061.9591753,
+          "created_at": 1793728992.469019,
+          "atlas_key": "house_level1_01",
+          "replacement_sha256": null,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "2048x2048",
+          "baseKey": "house_level1",
+          "version": "01"
+        }
+      ]
+    },
+    {
+      "atlasKey": "house_level2_01",
+      "baseKey": "house_level2",
+      "version": "01",
+      "variants": [
+        {
+          "id": 24,
+          "family_id": 20,
+          "width": 2048,
+          "height": 2048,
+          "filename": "house_level2_01_2048x2048_atlas.png",
+          "original_filename": "house_level2_01_2048x2048_atlas.png",
+          "source_path": "assets/source/texture-atlases/house_level2_01/2048x2048/house_level2_01_2048x2048_atlas.png",
+          "source_sha256": "141abec1990c088940b8650a7a59413c4ab5ff45eddc568f7da87b1134a1d012",
+          "uses_alpha": false,
+          "published_id": "132689780322999",
+          "published_sha256": "141abec1990c088940b8650a7a59413c4ab5ff45eddc568f7da87b1134a1d012",
+          "moderation_state": "Approved",
+          "published_at": 1793727023.7680624,
+          "created_at": 1793726925.3291721,
+          "atlas_key": "house_level2_01",
+          "replacement_sha256": null,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "2048x2048",
+          "baseKey": "house_level2",
+          "version": "01"
         }
       ]
     },
@@ -735,7 +848,7 @@
       "atlasFamily": "smithy",
       "atlasResolution": "2048x2048",
       "bindingRevision": 1,
-      "studioSyncStatus": "pending_studio_sync",
+      "studioSyncStatus": "synced",
       "atlasVariants": [
         {
           "id": 19,
@@ -791,7 +904,7 @@
       "atlasFamily": "smithy",
       "atlasResolution": "2048x2048",
       "bindingRevision": 1,
-      "studioSyncStatus": "pending_studio_sync",
+      "studioSyncStatus": "synced",
       "atlasVariants": [
         {
           "id": 19,
@@ -847,7 +960,7 @@
       "atlasFamily": "christmas_tree",
       "atlasResolution": "2048x2048",
       "bindingRevision": 1,
-      "studioSyncStatus": "pending_studio_sync",
+      "studioSyncStatus": "synced",
       "atlasVariants": [
         {
           "id": 17,
@@ -903,7 +1016,7 @@
       "atlasFamily": "main_statue",
       "atlasResolution": "2048x2048",
       "bindingRevision": 1,
-      "studioSyncStatus": "pending_studio_sync",
+      "studioSyncStatus": "synced",
       "atlasVariants": [
         {
           "id": 18,
@@ -959,7 +1072,7 @@
       "atlasFamily": "wooden_post_kit__import_39bee931b",
       "atlasResolution": "1280x1280",
       "bindingRevision": 1,
-      "studioSyncStatus": "pending_studio_sync",
+      "studioSyncStatus": "synced",
       "atlasVariants": [
         {
           "id": 22,
@@ -1071,7 +1184,7 @@
       "atlasFamily": "structures_01",
       "atlasResolution": "2048x2048",
       "bindingRevision": 1,
-      "studioSyncStatus": "pending_studio_sync",
+      "studioSyncStatus": "synced",
       "atlasVariants": [
         {
           "id": 8,
@@ -1127,7 +1240,7 @@
       "atlasFamily": "structures_01",
       "atlasResolution": "2048x2048",
       "bindingRevision": 1,
-      "studioSyncStatus": "pending_studio_sync",
+      "studioSyncStatus": "synced",
       "atlasVariants": [
         {
           "id": 8,
@@ -1183,7 +1296,7 @@
       "atlasFamily": "structures_01",
       "atlasResolution": "2048x2048",
       "bindingRevision": 1,
-      "studioSyncStatus": "pending_studio_sync",
+      "studioSyncStatus": "synced",
       "atlasVariants": [
         {
           "id": 8,
@@ -1239,7 +1352,7 @@
       "atlasFamily": "structures_01",
       "atlasResolution": "2048x2048",
       "bindingRevision": 1,
-      "studioSyncStatus": "pending_studio_sync",
+      "studioSyncStatus": "synced",
       "atlasVariants": [
         {
           "id": 8,
@@ -1295,7 +1408,7 @@
       "atlasFamily": "wooden_post_kit",
       "atlasResolution": "1280x1280",
       "bindingRevision": 1,
-      "studioSyncStatus": "pending_studio_sync",
+      "studioSyncStatus": "synced",
       "atlasVariants": [
         {
           "id": 21,
@@ -1331,27 +1444,27 @@
       "name_en": "Campfirte 01",
       "category": "light",
       "model_path": "assets/source/location-assets/light/campfirte_01/model/campfirte_01.fbx",
-      "model_sha256": "244c7131a9d4b740c74ad1b940ba661391f6941522131a7a1296945293c13ef3",
+      "model_sha256": "e74d752f7dffc7515e143d04ce62b6183e771f4932109b01622dcdff339fa711",
       "model_asset_id": "119790979739015",
-      "model_published_sha256": "244c7131a9d4b740c74ad1b940ba661391f6941522131a7a1296945293c13ef3",
+      "model_published_sha256": "e74d752f7dffc7515e143d04ce62b6183e771f4932109b01622dcdff339fa711",
       "model_moderation_state": "Approved",
       "destructible": false,
-      "revision": 3,
+      "revision": 7,
       "created_at": 1792517965.2518861,
-      "updated_at": 1792520909.0187018,
-      "published_at": 1792520909.0187018,
-      "texture_path": "assets/source/texture-atlases/campfire_01/1024x2048/migrated/75581e14ef29d79ec770681d4052b0aed172fd6595c02ebdb03727f794a546ef/campfire_01_atlas.png",
-      "texture_filename": "campfire_01_atlas.png",
-      "texture_sha256": "75581e14ef29d79ec770681d4052b0aed172fd6595c02ebdb03727f794a546ef",
-      "texture_asset_id": "73384502057808",
-      "texture_published_sha256": "75581e14ef29d79ec770681d4052b0aed172fd6595c02ebdb03727f794a546ef",
-      "texture_moderation_state": "Approved",
+      "updated_at": 1793732904.9424636,
+      "published_at": 1793732904.9424636,
+      "texture_path": "assets/source/texture-atlases/campfire_01/256x512/campfire_01_256x512_atlas.png",
+      "texture_filename": "campfire_01_256x512_atlas.png",
+      "texture_sha256": "f7b8f7c74484cae4599166c01b77d14d20222aee85e04e2fc94e128205cc0553",
+      "texture_asset_id": "78602158656399",
+      "texture_published_sha256": "f7b8f7c74484cae4599166c01b77d14d20222aee85e04e2fc94e128205cc0553",
+      "texture_moderation_state": "Reviewing",
       "texture_reference_slug": "",
-      "atlasVariantId": 16,
+      "atlasVariantId": 27,
       "atlasFamily": "campfire_01",
-      "atlasResolution": "1024x2048",
-      "bindingRevision": 1,
-      "studioSyncStatus": "pending_studio_sync",
+      "atlasResolution": "256x512",
+      "bindingRevision": 3,
+      "studioSyncStatus": "synced",
       "atlasVariants": [
         {
           "id": 16,
@@ -1375,10 +1488,33 @@
           "resolution": "1024x2048",
           "baseKey": "campfire",
           "version": "01"
+        },
+        {
+          "id": 27,
+          "family_id": 12,
+          "width": 256,
+          "height": 512,
+          "filename": "campfire_01_256x512_atlas.png",
+          "original_filename": "campfire_01_256x512_atlas.png",
+          "source_path": "assets/source/texture-atlases/campfire_01/256x512/campfire_01_256x512_atlas.png",
+          "source_sha256": "f7b8f7c74484cae4599166c01b77d14d20222aee85e04e2fc94e128205cc0553",
+          "uses_alpha": true,
+          "published_id": "78602158656399",
+          "published_sha256": "f7b8f7c74484cae4599166c01b77d14d20222aee85e04e2fc94e128205cc0553",
+          "moderation_state": "Reviewing",
+          "published_at": 1793732908.6642716,
+          "created_at": 1793732886.9227848,
+          "atlas_key": "campfire_01",
+          "replacement_sha256": null,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "256x512",
+          "baseKey": "campfire",
+          "version": "01"
         }
       ],
       "textureUsesAlpha": true,
-      "atlasLegacyWarning": true,
+      "atlasLegacyWarning": false,
       "status": "PUBLISHED",
       "category_label": "Lights"
     },
@@ -1407,7 +1543,7 @@
       "atlasFamily": "wall_torch_01",
       "atlasResolution": "2048x2048",
       "bindingRevision": 1,
-      "studioSyncStatus": "pending_studio_sync",
+      "studioSyncStatus": "synced",
       "atlasVariants": [
         {
           "id": 20,
@@ -1463,7 +1599,7 @@
       "atlasFamily": "wall_torch_01",
       "atlasResolution": "2048x2048",
       "bindingRevision": 1,
-      "studioSyncStatus": "pending_studio_sync",
+      "studioSyncStatus": "synced",
       "atlasVariants": [
         {
           "id": 20,
@@ -1519,7 +1655,7 @@
       "atlasFamily": "wall_torch_01",
       "atlasResolution": "2048x2048",
       "bindingRevision": 1,
-      "studioSyncStatus": "pending_studio_sync",
+      "studioSyncStatus": "synced",
       "atlasVariants": [
         {
           "id": 20,
@@ -1631,7 +1767,7 @@
       "atlasFamily": "wooden_post_kit",
       "atlasResolution": "1280x1280",
       "bindingRevision": 1,
-      "studioSyncStatus": "pending_studio_sync",
+      "studioSyncStatus": "synced",
       "atlasVariants": [
         {
           "id": 21,
@@ -1687,7 +1823,7 @@
       "atlasFamily": "wall_torch_01",
       "atlasResolution": "2048x2048",
       "bindingRevision": 1,
-      "studioSyncStatus": "pending_studio_sync",
+      "studioSyncStatus": "synced",
       "atlasVariants": [
         {
           "id": 20,
@@ -1743,7 +1879,7 @@
       "atlasFamily": "wall_torch_01",
       "atlasResolution": "2048x2048",
       "bindingRevision": 1,
-      "studioSyncStatus": "pending_studio_sync",
+      "studioSyncStatus": "synced",
       "atlasVariants": [
         {
           "id": 20,
@@ -1799,7 +1935,7 @@
       "atlasFamily": "wall_torch_01",
       "atlasResolution": "2048x2048",
       "bindingRevision": 1,
-      "studioSyncStatus": "pending_studio_sync",
+      "studioSyncStatus": "synced",
       "atlasVariants": [
         {
           "id": 20,
@@ -1911,7 +2047,7 @@
       "atlasFamily": "main_statue",
       "atlasResolution": "2048x2048",
       "bindingRevision": 1,
-      "studioSyncStatus": "pending_studio_sync",
+      "studioSyncStatus": "synced",
       "atlasVariants": [
         {
           "id": 18,
@@ -2092,7 +2228,7 @@
       "atlasFamily": "christmas_tree",
       "atlasResolution": "2048x2048",
       "bindingRevision": 1,
-      "studioSyncStatus": "pending_studio_sync",
+      "studioSyncStatus": "synced",
       "atlasVariants": [
         {
           "id": 17,
@@ -2148,7 +2284,7 @@
       "atlasFamily": "christmas_tree",
       "atlasResolution": "2048x2048",
       "bindingRevision": 1,
-      "studioSyncStatus": "pending_studio_sync",
+      "studioSyncStatus": "synced",
       "atlasVariants": [
         {
           "id": 17,
@@ -2204,7 +2340,7 @@
       "atlasFamily": "christmas_tree",
       "atlasResolution": "2048x2048",
       "bindingRevision": 1,
-      "studioSyncStatus": "pending_studio_sync",
+      "studioSyncStatus": "synced",
       "atlasVariants": [
         {
           "id": 17,

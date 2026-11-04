@@ -1,5 +1,30 @@
 name: game1-control
 services:
+  asset-audit-db:
+    image: mysql:8.4
+    container_name: game1-asset-audit-db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: game1_asset_audit
+      MYSQL_USER: game1_audit
+      # Local loopback-only development credential. Override both Compose and
+      # Host Agent with GAME1_ASSET_AUDIT_PASSWORD outside local development.
+      MYSQL_PASSWORD: ${GAME1_ASSET_AUDIT_PASSWORD:-Game1LocalAuditOnly}
+      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+    ports:
+      - "127.0.0.1:43823:3306"
+    volumes:
+      - game1-asset-audit-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$${MYSQL_USER} -p$${MYSQL_PASSWORD} --silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
+    networks: [game1-control-net]
   control-center:
     build: .
     container_name: game1-control-center
@@ -15,3 +40,6 @@ services:
 networks:
   game1-control-net:
     name: game1-control-net
+volumes:
+  game1-asset-audit-data:
+    name: game1-asset-audit-data

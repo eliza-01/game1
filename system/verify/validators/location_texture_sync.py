@@ -36,10 +36,10 @@ def check_location_texture_sync(root: Path, report_error: Callable[[str], None],
     environment_visuals_text = environment_visuals_path.read_text(encoding='utf-8') if environment_visuals_path.is_file() else ''
     if "texture ${published.texture_asset_id || '—'}" not in deco_assets_js_text + index_m43_text:
         report_error('m51 published texture feedback missing')
-    for required in ["Game1DecoAssetSlug", "StudioTextureAppearance.Apply(part, uri, row.textureUsesAlpha)", "RefreshTextures"]:
+    for required in ["Game1DecoAssetSlug", "StudioTextureAppearance.Apply(mesh, uri, nil, true)", "RefreshIds"]:
         if required not in deco_placed_sync_text:
             report_error(f"m51 DecoManager placed-texture sync missing {required}")
-    for required in ["DecoPlacedAssetSync.RefreshTextures", "Refresh Deco Asset Textures"]:
+    for required in ["DecoPlacedAssetSync.RefreshIds", "Before Location Asset ID Sync", "Location Asset ID Sync"]:
         if required not in deco_manager_text:
             report_error(f"m51 DecoManager registry refresh integration missing {required}")
     if '"DecoPlacedAssetSync"' not in plugin_project_text:

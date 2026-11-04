@@ -436,6 +436,28 @@ return DecoAssetLoader
       </Item>
       <Item class="ModuleScript" referent="5">
         <Properties>
+          <string name="Name">DecoAssetPreparation</string>
+          <string name="Source"><![CDATA[-- Applied only to initial decoration placement. Studio Sync never changes
+-- physical-part policy or replaces already placed geometry.
+local DecoAssetPreparation = {}
+
+function DecoAssetPreparation.PreparePlaced(model: Model)
+    for _, descendant in ipairs(model:GetDescendants()) do
+        if descendant:IsA("BasePart") then
+            -- The placement ghost is anchored; placed decorations are not.
+            -- Collision and query properties remain authored by the model.
+            descendant.Anchored = false
+            descendant.CanTouch = false
+        end
+    end
+end
+
+return table.freeze(DecoAssetPreparation)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="6">
+        <Properties>
           <string name="Name">DecoManager</string>
           <string name="Source"><![CDATA[local DecoAssetLoader = require(script.Parent.DecoAssetLoader)
 local DecoPlacement = require(script.Parent.DecoPlacement)
@@ -756,7 +778,7 @@ function DecoManager:_setCategory(category: string)
     self:_showCurrent()
 end
 
-function DecoManager:refreshRegistry(targetSlug: string?)
+function DecoManager:refreshRegistry(targetSlug: string?, applyIds: boolean?, expectedModelId: string?, expectedAtlasId: string?)
     self:_setStatus("Refreshing Location Assets registry…")
     local ok, result = pcall(function()
         return self.loader:fetchRegistry()
@@ -768,20 +790,29 @@ function DecoManager:refreshRegistry(targetSlug: string?)
         return nil, tostring(result)
     end
     self.registry = result
-    local syncResult = DecoPlacedAssetSync.RefreshTextures(self.Workspace, result, targetSlug, self.ServerStorage)
-    if syncResult.parts > 0 then
-        self.ChangeHistoryService:SetWaypoint("Refresh Deco Asset Textures")
+    -- Catalog browsing never alters any placed Model. Explicit Studio Sync
+    -- requires exactly one slug and two publication IDs verified by the plugin.
+    local syncResult = { models = 0, parts = 0, matchedModels = 0,
+        modelReferences = 0, pendingGeometry = 0, replacedModels = 0,
+        changes = {}, instances = {} }
+    if applyIds == true then
+        if not targetSlug or not expectedModelId or not expectedAtlasId then
+            error("scoped ID-only Studio Sync requires an explicit asset and publication IDs")
+        end
+        -- A waypoint BEFORE the update makes Undo possible even for an error.
+        self.ChangeHistoryService:SetWaypoint("Before Location Asset ID Sync: " .. targetSlug)
+        syncResult = DecoPlacedAssetSync.RefreshIds(
+            self.Workspace, result, targetSlug, self.HttpService, expectedModelId, expectedAtlasId)
+        self.ChangeHistoryService:SetWaypoint("Location Asset ID Sync: " .. targetSlug)
     end
     self:_setCategory(self.category)
-    if syncResult.parts > 0 then
-        self:_setStatus(("Registry refreshed · updated texture on %d placed asset(s) / %d MeshPart(s)"):format(
-            syncResult.models,
-            syncResult.parts
-        ))
-    else
-        self:_setStatus("Registry refreshed · placed textures are already current")
-    end
-    return { models = syncResult.models, parts = syncResult.parts, matchedModels = syncResult.matchedModels, registryItems = #result.items }
+    self:_setStatus(("Registry refreshed · %d placed item(s), %d image IDs changed, %d model references · %d stale FBX geometries"):format(
+        syncResult.matchedModels, syncResult.parts, syncResult.modelReferences, syncResult.pendingGeometry))
+    return { models = syncResult.models, parts = syncResult.parts,
+        replacedModels = 0, matchedModels = syncResult.matchedModels,
+        modelReferences = syncResult.modelReferences, pendingGeometry = syncResult.pendingGeometry,
+        changes = syncResult.changes, instances = syncResult.instances,
+        registryItems = #result.items }
 end
 
 function DecoManager:_placeCurrent()
@@ -918,10 +949,10 @@ function DecoManager:_wire()
         self:_saveAssetsData()
     end)
     self.plugin.Deactivation:Connect(function()
-        self.placement:cancel()
+        self.placement:cancel(false)
     end)
     self.plugin.Unloading:Connect(function()
-        self.placement:cancel()
+        self.placement:cancel(false)
         self:_clearPreview()
     end)
     self:_setCategory("tree")
@@ -931,74 +962,317 @@ return DecoManager
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="6">
+      <Item class="ModuleScript" referent="7">
         <Properties>
           <string name="Name">DecoPlacedAssetSync</string>
-          <string name="Source"><![CDATA[local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
+          <string name="Source"><![CDATA[-- M216: scoped, ID-only Location Asset Studio synchronization.
+-- CRITICAL: Never replace, re-parent, ScaleTo, PivotTo, ApplyMesh or Destroy a
+-- placed Model / MeshPart. A published Model asset is NOT a writable MeshId.
+local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
+
 local DecoPlacedAssetSync = {}
+local SLUG_ATTRIBUTE = "Game1DecoAssetSlug"
+local HISTORY_ATTRIBUTE = "Game1DecoSyncHistory"
+local REGISTRY_MODEL_ID_ATTRIBUTE = "Game1DecoRegistryModelAssetId"
 
-local ROOT_NAME = "Game1DecoAssets"
-local ASSET_SLUG_ATTRIBUTE = "Game1DecoAssetSlug"
+local function assetId(value: any): string
+    local parsed = tonumber(value)
+    if not parsed or parsed <= 0 or parsed ~= math.floor(parsed) then
+        error("invalid published Location Asset ID")
+    end
+    return tostring(math.floor(parsed))
+end
 
-local function rowsBySlug(registry: any): { [string]: any }
-    local result = {}
+local function findRow(registry: any, slug: string): any
     if type(registry) ~= "table" or type(registry.items) ~= "table" then
-        return result
+        error("invalid Location Assets registry")
     end
     for _, row in ipairs(registry.items) do
-        local slug = tostring(row.slug or "")
-        if slug ~= "" then
-            result[slug] = row
+        if tostring(row.slug or "") == slug then
+            if tostring(row.status or "") ~= "PUBLISHED" then
+                error("Location Asset is not fully published: " .. slug)
+            end
+            return row
+        end
+    end
+    error("Location Asset is missing from the registry: " .. slug)
+end
+
+local function placedModels(workspace: Workspace, slug: string): { Model }
+    local result: { Model } = {}
+    local authoring = workspace:FindFirstChild("Game1Authoring")
+    local camera = workspace.CurrentCamera
+    -- Older authored places keep decorations below Workspace.Places, while new
+    -- placements live below Workspace.Game1DecoAssets. Identity attributes are
+    -- the stable boundary; never move either layout merely to make Sync find it.
+    for _, descendant in ipairs(workspace:GetDescendants()) do
+        if descendant:IsA("Model")
+            and descendant:GetAttribute(SLUG_ATTRIBUTE) == slug
+            and tostring(descendant:GetAttribute("Game1DecoInstanceId") or "") ~= ""
+            and (authoring == nil or not descendant:IsDescendantOf(authoring))
+            and (camera == nil or not descendant:IsDescendantOf(camera)) then
+            local ancestor = descendant.Parent
+            local nested = false
+            while ancestor ~= nil and ancestor ~= workspace do
+                if ancestor:IsA("Model") and ancestor:GetAttribute(SLUG_ATTRIBUTE) ~= nil then
+                    nested = true
+                    break
+                end
+                ancestor = ancestor.Parent
+            end
+            if not nested then
+                table.insert(result, descendant)
+            end
         end
     end
     return result
 end
 
--- Only game1-owned instances are eligible. Scope is by immutable asset slug,
--- never by proximity, name or model shape. Does not load/place/clone anything.
-function DecoPlacedAssetSync.RefreshTextures(workspace: Workspace, registry: any, targetSlug: string?, serverStorage: Instance?): any
-    local registryRows = rowsBySlug(registry)
-    local changedModels, changedParts, matchedModels = 0, 0, 0
-    local function updateTree(root: Instance)
-        for _, descendant in ipairs(root:GetDescendants()) do
-            if descendant:IsA("Model") then
-                local slug = tostring(descendant:GetAttribute(ASSET_SLUG_ATTRIBUTE) or "")
-                if slug ~= "" and (targetSlug == nil or targetSlug == "" or slug == targetSlug) then
-                    local row = registryRows[slug]
-                    local numericId = row and tonumber(row.texture_asset_id) or nil
-                    if row and tostring(row.status or "") == "PUBLISHED" and numericId and numericId > 0 then
-                        matchedModels += 1
-                        local uri = "rbxassetid://" .. tostring(math.floor(numericId))
-                        local modelChanged = false
-                        for _, part in ipairs(descendant:GetDescendants()) do
-                            if part:IsA("MeshPart") and StudioTextureAppearance.Apply(part, uri, row.textureUsesAlpha) then
-                                changedParts += 1
-                                modelChanged = true
-                            end
-                        end
-                        if modelChanged then
-                            changedModels += 1
-                        end
-                    end
+-- Stamp publication identity only on a fresh, unparented placement clone. This
+-- is deliberately separate from RefreshIds: ID Sync must never claim that an
+-- existing placed model received newly published FBX geometry.
+function DecoPlacedAssetSync.StampPublishedModel(model: Model, row: any)
+    if not model:IsA("Model") or model.Parent ~= nil then
+        error("published identity can only be stamped on a fresh placement clone")
+    end
+    local modelId = assetId(row.model_asset_id)
+    local publishedSha = tostring(row.model_published_sha256 or "")
+    if publishedSha == "" then
+        error("published Location Asset model SHA is required")
+    end
+    model:SetAttribute("Game1DecoPublishedModelAssetId", modelId)
+    model:SetAttribute("Game1DecoPublishedModelSha256", publishedSha)
+    model:SetAttribute(REGISTRY_MODEL_ID_ATTRIBUTE, modelId)
+end
+
+local function priorHistory(model: Model, http: any): { any }
+    local raw = model:GetAttribute(HISTORY_ATTRIBUTE)
+    if raw == nil then
+        return {}
+    end
+    if type(raw) ~= "string" then
+        error("invalid Studio ID history attribute on " .. model:GetFullName())
+    end
+    local ok, decoded = pcall(http.JSONDecode, http, raw)
+    if not ok or type(decoded) ~= "table" then
+        error("corrupt Studio ID history on " .. model:GetFullName())
+    end
+    return decoded
+end
+
+local function idFromUri(uri: string): string
+    return uri:match("(%d+)$") or ""
+end
+
+-- This intentionally DOES NOT apply the newly published FBX to old placements.
+-- MeshPart.MeshId is not writable. ApplyMesh also replaces collision geometry,
+-- so it cannot be used for the promised "replace IDs only" operation.
+function DecoPlacedAssetSync.RefreshIds(
+    workspace: Workspace, registry: any, targetSlug: string, http: any,
+    expectedModelId: string, expectedAtlasId: string
+): any
+    if type(targetSlug) ~= "string" or targetSlug == "" then
+        error("a target Location Asset slug is required; global sync is forbidden")
+    end
+    local row = findRow(registry, targetSlug)
+    local modelId = assetId(row.model_asset_id)
+    local atlasId = assetId(row.texture_asset_id)
+    if modelId ~= expectedModelId or atlasId ~= expectedAtlasId then
+        error("Location Asset publication changed during Studio Sync; retry")
+    end
+    local models = placedModels(workspace, targetSlug)
+    local uri = "rbxassetid://" .. atlasId
+    local pending = {}
+    local uniqueChanges = {}
+    for _, model in ipairs(models) do
+        local currentReference = tostring(model:GetAttribute(REGISTRY_MODEL_ID_ATTRIBUTE)
+            or model:GetAttribute("Game1DecoPublishedModelAssetId") or "")
+        local modelChange = currentReference ~= modelId
+        local meshChanges = {}
+        for _, descendant in ipairs(model:GetDescendants()) do
+            if descendant:IsA("MeshPart") then
+                local surface = descendant:FindFirstChildOfClass("SurfaceAppearance")
+                if descendant.TextureID ~= uri or (surface ~= nil and surface.ColorMap ~= uri) then
+                    table.insert(meshChanges, { part = descendant, oldId = idFromUri(descendant.TextureID) })
                 end
             end
         end
+        if modelChange or #meshChanges > 0 then
+            local history = priorHistory(model, http) -- validate before touching any instance
+            table.insert(pending, { model = model, oldModelId = currentReference,
+                modelChange = modelChange, meshes = meshChanges, history = history })
+            if modelChange then
+                uniqueChanges["model_reference:" .. currentReference .. ":" .. modelId] = true
+            end
+            for _, entry in ipairs(meshChanges) do
+                uniqueChanges["atlas:" .. entry.oldId .. ":" .. atlasId] = true
+            end
+        end
     end
-    updateTree(workspace)
-    if serverStorage ~= nil then
-        updateTree(serverStorage)
+    local differentPairs = 0
+    for _ in pairs(uniqueChanges) do
+        differentPairs += 1
     end
-    return { models = changedModels, parts = changedParts, matchedModels = matchedModels }
+    if differentPairs > 32 then
+        error("too many different published IDs in one Sync; refused before changes")
+    end
+
+    local summary = {}
+    local function record(kind: string, oldId: string, newId: string)
+        local key = kind .. ":" .. oldId .. ":" .. newId
+        if not summary[key] then
+            summary[key] = { kind = kind, oldId = oldId, newId = newId, count = 0 }
+        end
+        summary[key].count += 1
+    end
+    -- Pre-serialize audit entries BEFORE changing any placed object. Store a
+    -- compact per-instance summary, not one duplicate record per MeshPart.
+    for _, item in ipairs(pending) do
+        local group = {}
+        local function include(kind: string, oldId: string, newId: string)
+            local key = kind .. ":" .. oldId .. ":" .. newId
+            if not group[key] then
+                group[key] = { kind = kind, oldId = oldId, newId = newId, count = 0 }
+            end
+            group[key].count += 1
+        end
+        if item.modelChange then
+            include("model_reference", item.oldModelId, modelId)
+        end
+        for _, entry in ipairs(item.meshes) do
+            include("atlas", entry.oldId, atlasId)
+        end
+        local changes = {}
+        for _, event in pairs(group) do
+            table.insert(changes, event)
+        end
+        table.insert(item.history, { atUtc = os.time(), slug = targetSlug,
+            instanceId = tostring(item.model:GetAttribute("Game1DecoInstanceId") or ""), changes = changes })
+        while #item.history > 32 do
+            table.remove(item.history, 1)
+        end
+        item.encodedHistory = http:JSONEncode(item.history)
+        if #item.encodedHistory > 30000 then
+            error("Location Asset Studio history too large; refused before changes")
+        end
+    end
+
+    local modifiedModels, changedParts, modelReferences = 0, 0, 0
+    local undo = {}
+    local committed, commitError = pcall(function()
+        for _, item in ipairs(pending) do
+            local model: Model = item.model
+            item.committedChanges = {}
+            local function committedChange(kind: string, oldId: string, newId: string)
+                local key = kind .. ":" .. oldId .. ":" .. newId
+                if not item.committedChanges[key] then
+                    item.committedChanges[key] = {
+                        kind = kind, oldId = oldId, newId = newId, count = 0,
+                    }
+                end
+                item.committedChanges[key].count += 1
+            end
+            -- Do not commit if the place has been edited while preflight ran.
+            if model.Parent == nil or model:GetAttribute(SLUG_ATTRIBUTE) ~= targetSlug then
+                error("placed Location Asset changed during Sync; aborting")
+            end
+            -- The model ID is only a registry REFERENCE. In particular leave
+            -- Game1DecoPublishedModelSha256 unchanged: the FBX stays as placed.
+            if item.modelChange then
+                table.insert(undo, {kind = "model_reference", model = model,
+                    previous = model:GetAttribute(REGISTRY_MODEL_ID_ATTRIBUTE)})
+                model:SetAttribute(REGISTRY_MODEL_ID_ATTRIBUTE, modelId)
+                modelReferences += 1
+                record("model_reference", item.oldModelId, modelId)
+                committedChange("model_reference", item.oldModelId, modelId)
+            end
+            for _, entry in ipairs(item.meshes) do
+                local mesh: MeshPart = entry.part
+                local surface = mesh:FindFirstChildOfClass("SurfaceAppearance")
+                table.insert(undo, {kind = "atlas", mesh = mesh, surface = surface,
+                    texture = mesh.TextureID, colorMap = if surface then surface.ColorMap else nil})
+                -- Central texture adapter in STRICT ID-only mode. No AlphaMode,
+                -- SurfaceAppearance creation, pivot, scale or collision changes.
+                if StudioTextureAppearance.Apply(mesh, uri, nil, true) then
+                    changedParts += 1
+                    record("atlas", entry.oldId, atlasId)
+                    committedChange("atlas", entry.oldId, atlasId)
+                end
+            end
+            table.insert(undo, {kind = "history", model = model,
+                previous = model:GetAttribute(HISTORY_ATTRIBUTE)})
+            model:SetAttribute(HISTORY_ATTRIBUTE, item.encodedHistory)
+            modifiedModels += 1
+        end
+    end)
+    if not committed then
+        -- Best-effort transaction rollback. Never Destroy / Clone a Model.
+        for index = #undo, 1, -1 do
+            local entry = undo[index]
+            pcall(function()
+                if entry.kind == "atlas" then
+                    entry.mesh.TextureID = entry.texture
+                    if entry.surface ~= nil and entry.colorMap ~= nil then
+                        entry.surface.ColorMap = entry.colorMap
+                    end
+                elseif entry.kind == "model_reference" then
+                    entry.model:SetAttribute(REGISTRY_MODEL_ID_ATTRIBUTE, entry.previous)
+                elseif entry.kind == "history" then
+                    entry.model:SetAttribute(HISTORY_ATTRIBUTE, entry.previous)
+                end
+            end)
+        end
+        error("scoped Location Asset ID sync failed; ID rollback attempted: " .. tostring(commitError), 2)
+    end
+    local changes = {}
+    for _, event in pairs(summary) do
+        table.insert(changes, event)
+    end
+    table.sort(changes, function(a, b)
+        return a.kind .. a.oldId .. a.newId < b.kind .. b.oldId .. b.newId
+    end)
+    -- The central audit database needs the exact placed instance affected by
+    -- each replacement. The bounded model attribute above remains only a
+    -- convenient recent cache inside Studio; this response is the durable log.
+    local instances = {}
+    for _, item in ipairs(pending) do
+        local instanceChanges = {}
+        for _, event in pairs(item.committedChanges) do
+            table.insert(instanceChanges, event)
+        end
+        table.sort(instanceChanges, function(a, b)
+            return a.kind .. a.oldId .. a.newId < b.kind .. b.oldId .. b.newId
+        end)
+        if #instanceChanges > 0 then
+            table.insert(instances, {
+                instanceId = tostring(item.model:GetAttribute("Game1DecoInstanceId") or ""),
+                studioPath = item.model:GetFullName(),
+                changes = instanceChanges,
+            })
+        end
+    end
+    local pendingGeometry = 0
+    for _, model in ipairs(models) do
+        if tostring(model:GetAttribute("Game1DecoPublishedModelSha256") or "")
+            ~= tostring(row.model_published_sha256 or "") then
+            pendingGeometry += 1
+        end
+    end
+    return { models = modifiedModels, parts = changedParts, matchedModels = #models,
+        modelReferences = modelReferences, pendingGeometry = pendingGeometry,
+        replacedModels = 0, changes = changes, instances = instances }
 end
 
 return DecoPlacedAssetSync
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="7">
+      <Item class="ModuleScript" referent="8">
         <Properties>
           <string name="Name">DecoPlacement</string>
           <string name="Source"><![CDATA[local DecoTransform = require(script.Parent.DecoTransform)
+local DecoAssetPreparation = require(script.Parent.DecoAssetPreparation)
+local DecoPlacedAssetSync = require(script.Parent.DecoPlacedAssetSync)
 
 local DecoPlacement = {}
 DecoPlacement.__index = DecoPlacement
@@ -1030,17 +1304,6 @@ local function prepareGhost(model: Model)
     end
 end
 
-local function preparePlaced(model: Model)
-    for _, descendant in ipairs(model:GetDescendants()) do
-        if descendant:IsA("BasePart") then
-            -- Placement ghosts are anchored, authored decorations are not. Keep the
-            -- placed asset editable with the normal Studio transform tools.
-            descendant.Anchored = false
-            descendant.CanTouch = false
-        end
-    end
-end
-
 function DecoPlacement.new(config: any)
     local self = setmetatable({
         plugin = config.plugin,
@@ -1057,6 +1320,7 @@ function DecoPlacement.new(config: any)
         clickConnection = nil,
         statusCallback = nil,
         committing = false,
+        ownsPluginMouse = false,
     }, DecoPlacement)
     return self
 end
@@ -1155,12 +1419,17 @@ function DecoPlacement:_detachSession(): Model?
     return ghost
 end
 
-function DecoPlacement:cancel()
+function DecoPlacement:cancel(releasePluginMouse: boolean?)
     local ghost = self:_detachSession()
     if ghost ~= nil then
         ghost:Destroy()
     end
     self.committing = false
+    local shouldDeactivate = self.ownsPluginMouse and releasePluginMouse ~= false
+    self.ownsPluginMouse = false
+    if shouldDeactivate then
+        self.plugin:Deactivate()
+    end
 end
 
 function DecoPlacement:_commit()
@@ -1176,7 +1445,8 @@ function DecoPlacement:_commit()
     local pivot = ghost:GetPivot()
 
     local placed = sourceTemplate:Clone()
-    preparePlaced(placed)
+    DecoAssetPreparation.PreparePlaced(placed)
+    DecoPlacedAssetSync.StampPublishedModel(placed, row)
     local instanceId = self.HttpService:GenerateGUID(false)
     placed.Name = tostring(row.slug or "deco") .. "__" .. string.sub(instanceId, 1, 8)
     -- Studio placement stores identity, not gameplay policy. Runtime resolves the
@@ -1192,6 +1462,7 @@ function DecoPlacement:_commit()
     if staleGhost ~= nil then
         staleGhost:Destroy()
     end
+    self.ownsPluginMouse = false
     self.plugin:Deactivate()
     self.ChangeHistoryService:SetWaypoint("Place Deco Asset")
 
@@ -1208,6 +1479,7 @@ function DecoPlacement:start(template: Model, row: any, statusCallback: (string)
     -- Plugin.Deactivation while tool ownership changes; there is nothing fresh to
     -- destroy until Activate has completed.
     self.plugin:Activate(true)
+    self.ownsPluginMouse = true
 
     self.sourceTemplate = template
     self.row = row
@@ -1270,7 +1542,7 @@ return DecoPlacement
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="8">
+      <Item class="ModuleScript" referent="9">
         <Properties>
           <string name="Name">DecoTransform</string>
           <string name="Source"><![CDATA[local DecoTransform = {}
@@ -1353,7 +1625,7 @@ return DecoTransform
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="9">
+      <Item class="ModuleScript" referent="10">
         <Properties>
           <string name="Name">LocationCommands</string>
           <string name="Source"><![CDATA[-- Polygon Location authoring commands for game1 Asset Manager.
@@ -1804,7 +2076,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="10">
+      <Item class="ModuleScript" referent="11">
         <Properties>
           <string name="Name">NpcSpawnPlacement</string>
           <string name="Source"><![CDATA[-- NPC-only Studio placement gesture. Monster placement remains unchanged.
@@ -1965,7 +2237,7 @@ return table.freeze(NpcSpawnPlacement)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="11">
+      <Item class="ModuleScript" referent="12">
         <Properties>
           <string name="Name">NpcSpawnPreview</string>
           <string name="Source"><![CDATA[-- Studio-only representation of the published NPC while authoring a spawn point.
@@ -2071,7 +2343,7 @@ return table.freeze(NpcSpawnPreview)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="12">
+      <Item class="ModuleScript" referent="13">
         <Properties>
           <string name="Name">StudioActorSpawnCommands</string>
           <string name="Source"><![CDATA[-- Monster/NPC authored spawn commands and lightweight Studio marker placement.
@@ -2483,7 +2755,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="13">
+      <Item class="ModuleScript" referent="14">
         <Properties>
           <string name="Name">StudioCharacterStandBuilder</string>
           <string name="Source"><![CDATA[-- Studio authoring adapter for the SAME published assembly recipe and Builder
@@ -2605,7 +2877,7 @@ return table.freeze(Builder)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="14">
+      <Item class="ModuleScript" referent="15">
         <Properties>
           <string name="Name">StudioCharacterStandPlacement</string>
           <string name="Source"><![CDATA[-- Edit-mode surface placement. Does not change the imported rig's orientation,
@@ -2693,7 +2965,7 @@ return table.freeze(Placement)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="15">
+      <Item class="ModuleScript" referent="16">
         <Properties>
           <string name="Name">StudioCharacterStandWidget</string>
           <string name="Source"><![CDATA[-- Dock widget contains presentation only. No asset imports or Workspace writes.
@@ -2766,7 +3038,7 @@ return table.freeze(Widget)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="16">
+      <Item class="ModuleScript" referent="17">
         <Properties>
           <string name="Name">StudioCharacterTestStand</string>
           <string name="Source"><![CDATA[-- Game1Bridge composition root for the Studio-only character assembly stand.
@@ -2792,6 +3064,7 @@ function TestStand.new(services: any): any
         draft = nil,
         busy = false,
         placing = false,
+        ownsPluginMouse = false,
         destroyed = false,
         connections = {},
     }, TestStand)
@@ -2818,7 +3091,7 @@ function TestStand.new(services: any): any
         self:PlaceAtMouse()
     end))
     table.insert(self.connections, services.plugin.Deactivation:Connect(function()
-        if self.placing then self:CancelPlacement("Размещение отменено.") end
+        if self.placing then self:CancelPlacement("Размещение отменено.", false) end
     end))
     table.insert(self.connections, services.plugin.Unloading:Connect(function()
         self:Destroy()
@@ -2907,10 +3180,16 @@ function TestStand:BeginPlacement()
     self.placing = true
     self:SetStatus("Кликни по поверхности в Workspace. Esc отменяет. Можно ставить несколько копий.")
     self.plugin:Activate(true)
+    self.ownsPluginMouse = true
 end
 
-function TestStand:CancelPlacement(text: string)
+function TestStand:CancelPlacement(text: string, releasePluginMouse: boolean?)
+    local shouldDeactivate = self.ownsPluginMouse and releasePluginMouse ~= false
     self.placing = false
+    self.ownsPluginMouse = false
+    if shouldDeactivate then
+        self.plugin:Deactivate()
+    end
     if not self.destroyed then self:SetStatus(text) end
 end
 
@@ -2948,6 +3227,7 @@ function TestStand:PlaceAtMouse()
         return
     end
     self.placing = false
+    self.ownsPluginMouse = false
     self.plugin:Deactivate()
     self.selection:Set({model})
     self:SetStatus(model.Name .. " размещён. В Studio Play подойди к модели и нажми E.")
@@ -2965,7 +3245,7 @@ return table.freeze(TestStand)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="17">
+      <Item class="ModuleScript" referent="18">
         <Properties>
           <string name="Name">StudioDebugPreferenceBridge</string>
           <string name="Source"><![CDATA[-- Studio-only persistence bridge for Test Loadout preferences.
@@ -3085,67 +3365,56 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="18">
+      <Item class="ModuleScript" referent="19">
         <Properties>
           <string name="Name">StudioDecoSyncCommands</string>
-          <string name="Source"><![CDATA[-- Transport-only adapter for DecoManager's existing registry/material refresh.
--- Never imports models into ServerStorage or modifies published asset identities.
+          <string name="Source"><![CDATA[-- M216: reject legacy global commands (including M215) before they can mutate.
 return function(config: any)
     return function(command: any)
-        if command.project ~= "game1" or (command.schemaVersion ~= 1 and command.schemaVersion ~= 2)
-            or type(command.operationId) ~= "string" or command.operationId == "" then
-            warn("[game1] invalid deco-refresh command")
-            return
-        end
-        local scoped = command.schemaVersion == 2
-        if scoped and (type(command.targetSlug) ~= "string" or command.targetSlug == ""
-            or type(command.bindingRevision) ~= "number" or command.bindingRevision < 1) then
-            warn("[game1] invalid scoped deco-refresh")
+        if command.project ~= "game1" or command.schemaVersion ~= 3
+            or type(command.operationId) ~= "string" or command.operationId == ""
+            or type(command.targetSlug) ~= "string" or command.targetSlug == ""
+            or type(command.bindingRevision) ~= "number" or command.bindingRevision < 1
+            or type(command.modelAssetId) ~= "string" or command.modelAssetId == ""
+            or type(command.atlasAssetId) ~= "string" or command.atlasAssetId == "" then
+            warn("[game1] rejected unsafe/unscoped Location Asset sync command")
             return
         end
         local ok, report, refreshError = pcall(function()
             if config.RunService:IsRunning() then
                 error("Studio Edit mode required")
             end
-            if scoped then
-                return config.decoManager:refreshRegistry(command.targetSlug)
-            end
-            return config.decoManager:refreshRegistry()
+            return config.decoManager:refreshRegistry(
+                command.targetSlug, true, command.modelAssetId, command.atlasAssetId)
         end)
         local payload = {
-            project = "game1",
-            command = "deco-refresh",
-            schemaVersion = command.schemaVersion,
-            operationId = command.operationId,
-            targetSlug = if scoped then command.targetSlug else nil,
-            bindingRevision = if scoped then command.bindingRevision else nil,
+            project = "game1", command = "deco-refresh", schemaVersion = 3,
+            operationId = command.operationId, targetSlug = command.targetSlug,
+            bindingRevision = command.bindingRevision,
         }
         if ok and report ~= nil then
-            payload.matchedModels = report.matchedModels
-            payload.models = report.models
-            payload.parts = report.parts
-            payload.registryItems = report.registryItems
+            for _, field in ipairs({ "models", "parts", "replacedModels", "matchedModels",
+                "modelReferences", "pendingGeometry", "registryItems", "changes", "instances" }) do
+                payload[field] = report[field]
+            end
         else
             payload.error = tostring(if ok then refreshError else report)
         end
         local posted, response = pcall(config.HttpService.RequestAsync, config.HttpService, {
-            Url = config.bridgeUrl .. "/deco-refresh-result",
-            Method = "POST",
-            Headers = {
-                ["X-Game1-Token"] = config.bridgeToken,
-                ["Content-Type"] = "application/json",
-            },
+            Url = config.bridgeUrl .. "/deco-refresh-result", Method = "POST",
+            Headers = { ["X-Game1-Token"] = config.bridgeToken,
+                ["Content-Type"] = "application/json" },
             Body = config.HttpService:JSONEncode(payload),
         })
         if not posted or not response.Success then
-            warn("[game1] deco-refresh result could not be reported: " .. tostring(if posted then response.Body else response))
+            warn("[game1] Location Asset sync result could not be reported: " .. tostring(if posted then response.Body else response))
         end
     end
 end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="19">
+      <Item class="ModuleScript" referent="20">
         <Properties>
           <string name="Name">StudioHousePlacementCapture</string>
           <string name="Source"><![CDATA[-- Read-only Studio authoring adapter. Selection and plot markers stay untouched.
@@ -3242,7 +3511,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="20">
+      <Item class="ModuleScript" referent="21">
         <Properties>
           <string name="Name">StudioMarkerVisibility</string>
           <string name="Source"><![CDATA[-- Studio-only presentation toggle. No movement of markers, no metadata edits.
@@ -3386,7 +3655,7 @@ return table.freeze(Visibility)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="21">
+      <Item class="ModuleScript" referent="22">
         <Properties>
           <string name="Name">StudioModelLoadCommands</string>
           <string name="Source"><![CDATA[-- Studio model-sync command: validates and imports Character, Monster/NPC and Weapon models.
@@ -3953,7 +4222,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="22">
+      <Item class="ModuleScript" referent="23">
         <Properties>
           <string name="Name">StudioPlotsCatalog</string>
           <string name="Source"><![CDATA[-- Read-only discovery contract for authored Workspace.Plots/01..50.
@@ -4015,7 +4284,7 @@ return table.freeze(Catalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="23">
+      <Item class="ModuleScript" referent="24">
         <Properties>
           <string name="Name">StudioPlotsPartPolicy</string>
           <string name="Source"><![CDATA[-- Reversible, Studio-only properties for Plots visibility and playtest preview.
@@ -4100,7 +4369,7 @@ return table.freeze(Policy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="24">
+      <Item class="ModuleScript" referent="25">
         <Properties>
           <string name="Name">StudioPlotsSelectionFilter</string>
           <string name="Source"><![CDATA[-- Studio viewport hit-test filter for hidden Plots authoring geometry.
@@ -4190,7 +4459,7 @@ return table.freeze(Filter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="25">
+      <Item class="ModuleScript" referent="26">
         <Properties>
           <string name="Name">StudioPlotsVisibility</string>
           <string name="Source"><![CDATA[-- Studio-only Plots preview: hidden -> volumes -> volumes + numbers -> hidden.
@@ -4484,7 +4753,7 @@ return table.freeze(PlotsVisibility)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="26">
+      <Item class="ModuleScript" referent="27">
         <Properties>
           <string name="Name">StudioRealEstateCollisionPolicy</string>
           <string name="Source"><![CDATA[-- Real Estate physics layer. Only this module writes MeshPart physics.
@@ -4597,7 +4866,7 @@ return table.freeze(Policy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="27">
+      <Item class="ModuleScript" referent="28">
         <Properties>
           <string name="Name">StudioRealEstateHouseFrame</string>
           <string name="Source"><![CDATA[-- Author-space transform for all Real Estate Studio sync paths.
@@ -4636,7 +4905,7 @@ return table.freeze(HouseFrame)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="28">
+      <Item class="ModuleScript" referent="29">
         <Properties>
           <string name="Name">StudioRealEstateModel</string>
           <string name="Source"><![CDATA[-- Studio assembly for any number of independent Real Estate MeshPart rigs.
@@ -4920,7 +5189,7 @@ return table.freeze(StudioRealEstateModel)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="29">
+      <Item class="ModuleScript" referent="30">
         <Properties>
           <string name="Name">StudioRealEstatePartPlacement</string>
           <string name="Source"><![CDATA[-- Restore source-FBX mesh centres after independent Model Asset import.
@@ -5044,7 +5313,7 @@ return table.freeze(Placement)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="30">
+      <Item class="ModuleScript" referent="31">
         <Properties>
           <string name="Name">StudioRealEstatePartSync</string>
           <string name="Source"><![CDATA[-- Atomic, single-rig refresh of a managed Real Estate template.
@@ -5278,7 +5547,7 @@ return table.freeze(PartSync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="31">
+      <Item class="ModuleScript" referent="32">
         <Properties>
           <string name="Name">StudioRealEstatePlacedCollisionSync</string>
           <string name="Source"><![CDATA[-- Repair *only* authoring-managed collision rigs of already placed Estates.
@@ -5353,7 +5622,7 @@ return table.freeze(Sync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="32">
+      <Item class="ModuleScript" referent="33">
         <Properties>
           <string name="Name">StudioRealEstatePlacedPhysicsGuard</string>
           <string name="Source"><![CDATA[-- Studio Edit Mode: normalize a managed Estate pasted or dragged from
@@ -5425,7 +5694,7 @@ return table.freeze(Guard)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="33">
+      <Item class="ModuleScript" referent="34">
         <Properties>
           <string name="Name">StudioRealEstatePlacedTargets</string>
           <string name="Source"><![CDATA[-- One authoritative definition of a placed Real Estate instance.
@@ -5470,7 +5739,7 @@ return table.freeze(Targets)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="34">
+      <Item class="ModuleScript" referent="35">
         <Properties>
           <string name="Name">StudioRealEstatePlacedVisualSync</string>
           <string name="Source"><![CDATA[-- Full Real Estate sync: refresh visual rigs on *all managed placed* houses.
@@ -5589,7 +5858,7 @@ return table.freeze(VisualSync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="35">
+      <Item class="ModuleScript" referent="36">
         <Properties>
           <string name="Name">StudioRealEstateRigValidation</string>
           <string name="Source"><![CDATA[-- Validate an already-published Real Estate Model Asset as actually loaded by Roblox.
@@ -5718,7 +5987,7 @@ return table.freeze(Validation)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="36">
+      <Item class="ModuleScript" referent="37">
         <Properties>
           <string name="Name">StudioTextureAppearance</string>
           <string name="Source"><![CDATA[-- Shared Studio-side material binding for all authored MeshParts.
@@ -5726,11 +5995,36 @@ return table.freeze(Validation)
 -- rigs in the previous project required this compatibility invariant.
 local StudioTextureAppearance = {}
 
-function StudioTextureAppearance.Apply(mesh: MeshPart, uri: string, usesAlpha: any): boolean
+function StudioTextureAppearance.Apply(mesh: MeshPart, uri: string, usesAlpha: any, idsOnly: boolean?): boolean
     if uri == "" then
         return false
     end
     local surface = mesh:FindFirstChildOfClass("SurfaceAppearance")
+    if idsOnly == true then
+        -- M216 placed Location Asset sync. Only existing Asset ID fields are
+        -- mutable; do not create SurfaceAppearance or rewrite AlphaMode/physics.
+        if mesh.TextureID == uri and (surface == nil or surface.ColorMap == uri) then
+            return false
+        end
+        local previousTexture = mesh.TextureID
+        local previousMap = if surface then surface.ColorMap else nil
+        local applied, reason = pcall(function()
+            mesh.TextureID = uri
+            if surface ~= nil then
+                surface.ColorMap = uri
+            end
+        end)
+        if not applied then
+            pcall(function()
+                mesh.TextureID = previousTexture
+                if surface ~= nil and previousMap ~= nil then
+                    surface.ColorMap = previousMap
+                end
+            end)
+            error("ID-only appearance binding failed for " .. mesh:GetFullName() .. ": " .. tostring(reason), 2)
+        end
+        return true
+    end
     local desiredMode = if usesAlpha == true then Enum.AlphaMode.Transparency else Enum.AlphaMode.Overlay
     local modeKnown = typeof(usesAlpha) == "boolean"
     local alreadyCurrent = mesh.TextureID == uri
@@ -5780,7 +6074,7 @@ return table.freeze(StudioTextureAppearance)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="37">
+      <Item class="ModuleScript" referent="38">
         <Properties>
           <string name="Name">StudioTimelineEditorCommands</string>
           <string name="Source"><![CDATA[-- Timeline authoring session: validates requests, binds UI events and reports results.
@@ -6069,7 +6363,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="38">
+      <Item class="ModuleScript" referent="39">
         <Properties>
           <string name="Name">StudioTimelinePoseSampler</string>
           <string name="Source"><![CDATA[-- Offline pose extraction and interpolation for a preview rig. No UI or HTTP dependencies.
@@ -6248,7 +6542,7 @@ return table.freeze(StudioTimelinePoseSampler)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="39">
+      <Item class="ModuleScript" referent="40">
         <Properties>
           <string name="Name">StudioTimelinePreview</string>
           <string name="Source"><![CDATA[-- Owns the isolated ViewportFrame rig, camera interaction and animation-asset retrieval.
@@ -6464,7 +6758,7 @@ return table.freeze(StudioTimelinePreview)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="40">
+      <Item class="ModuleScript" referent="41">
         <Properties>
           <string name="Name">StudioTimelineTransport</string>
           <string name="Source"><![CDATA[-- HTTP boundary for the Timeline editor. No UI, animation or Studio model access.
@@ -6522,7 +6816,7 @@ return table.freeze(StudioTimelineTransport)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="41">
+      <Item class="ModuleScript" referent="42">
         <Properties>
           <string name="Name">StudioTimelineWidget</string>
           <string name="Source"><![CDATA[-- Timeline editor view. Builds the dock widget and exposes only its controls.

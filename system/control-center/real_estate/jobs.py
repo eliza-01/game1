@@ -11,9 +11,10 @@ from uuid import uuid4
 
 
 class RealEstatePublicationJobs:
-    def __init__(self, store, *, max_concurrent: int = 2):
+    def __init__(self, store, *, max_concurrent: int = 2, on_succeeded=None):
         self.store = store
         self.max_concurrent = max_concurrent
+        self.on_succeeded = on_succeeded
         self._lock = Lock()
         self._latest: dict[str, dict] = {}
 
@@ -58,6 +59,8 @@ class RealEstatePublicationJobs:
             job['step'] = 'Preparing publication'
         try:
             self.store.publish(slug, credentials, scope=job['scope'], on_progress=progress)
+            if self.on_succeeded is not None:
+                self.on_succeeded()
         except Exception as exc:
             # The worker must not die silently, which formerly closed the HTTP
             # socket without a JSON error and hid the step that failed.

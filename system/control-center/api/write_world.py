@@ -32,40 +32,37 @@ def route(path, body, deps):
     if path == "/api/location-assets/studio-sync":
         try:
             payload = body()
+            if not isinstance(payload, dict):
+                raise ValueError('sync requires a selected Location Asset')
             slug = str(payload.get('slug') or '').strip().lower()
-            if slug:
-                # A legacy shared-texture consumer may inherit an Atlas Registry
-                # binding from its owner rather than hold an independent binding.
-                # Targeted acknowledgement cannot prove that other followers
-                # were refreshed, so refresh all and acknowledge all bindings
-                # in that compatibility case.
-                row = location_assets.get(slug)
-                if not row:
-                    raise ValueError('unknown location asset')
-                binding_owner = str(row.get('atlasBindingSourceSlug') or '')
-                if not binding_owner:
-                    raise ValueError('atlas binding not found')
-                revision = location_assets.atlases.active_revisions("location_asset", binding_owner).get(binding_owner)
-                if revision is None:
-                    raise ValueError('atlas binding not found')
-                if binding_owner != slug:
-                    revisions = location_assets.atlases.active_revisions("location_asset")
-                    studio = deps["sync_location_assets_to_studio"]()
-                    location_assets.atlases.mark_all_synced("location_asset", revisions)
-                else:
-                    studio = deps["sync_location_assets_to_studio"](slug=slug, binding_revision=revision)
-                    location_assets.atlases.mark_synced("location_asset", slug, revision)
-                location_assets.export()
-            else:
-                revisions = (location_assets.atlases.active_revisions("location_asset")
-                             if hasattr(location_assets, 'atlases') else {})
-                studio = deps["sync_location_assets_to_studio"]()
-                if revisions:
-                    location_assets.atlases.mark_all_synced("location_asset", revisions)
-                    location_assets.export()
-            return out(200, {"studio": studio})
+            if not slug:
+                raise ValueError('global Location Assets Sync is disabled; select one asset')
+            row = location_assets.get(slug)
+            if not row:
+                raise ValueError('unknown location asset')
+            if row.get('status') != 'PUBLISHED':
+                raise ValueError('publish this Location Asset before Studio Sync')
+            # The M203 independent binding is a direct slug->variant relation.
+            # Legacy inherited bindings cannot be acknowledged by a scoped Sync.
+            if row.get('atlasBindingSourceSlug') not in (None, '', slug):
+                raise ValueError('independent atlas binding required for scoped Studio Sync')
+            if not location_assets.atlases.binding('location_asset', slug):
+                raise ValueError('direct atlas binding not found')
+            revision = row.get('bindingRevision')
+            if type(revision) is not int or revision < 1:
+                raise ValueError('invalid Location Asset atlas binding revision')
+            studio = deps['sync_location_assets_to_studio'](
+                slug=slug, binding_revision=revision,
+                model_asset_id=str(row.get('model_asset_id') or ''),
+                atlas_asset_id=str(row.get('texture_asset_id') or ''))
+            # Record changes BEFORE acknowledging a successful atlas binding.
+            deps['location_asset_sync_history'].append(
+                slug=slug, binding_revision=revision, studio=studio)
+            location_assets.atlases.mark_synced('location_asset', slug, revision)
+            location_assets.export()
+            return out(200, {'studio': studio})
         except Exception as error:
-            return out(400, {"error": str(error)})
+            return out(400, {'error': str(error)})
 
     if path == "/api/texture-atlases/variants":
         try:
@@ -107,34 +104,14 @@ def route(path, body, deps):
             # before asking Studio to refresh templates and placed instances.
             location_assets.export()
             deps['real_estate'].export()
+            # M216: publishing a SHARED atlas must not silently edit ANY Place.
+            # All consumers become pending and must be explicitly synced by slug
+            # (Real Estate keeps its own separately targeted Sync operation).
             consumers = location_assets.atlases.consumers(variant_id)
-            synced = 0
-            errors = []
-            location_consumers = [item for item in consumers if item['consumer_type'] == 'location_asset']
-            if location_consumers:
-                try:
-                    deps['sync_location_assets_to_studio']()
-                    for item in location_consumers:
-                        if location_assets.atlases.mark_synced('location_asset', item['consumer_id'], item['revision']):
-                            synced += 1
-                except Exception as exc:
-                    errors.append('Location Assets Studio Sync: ' + str(exc))
-            houses = sorted({item['consumer_id'].rsplit(':', 1)[0] for item in consumers
-                             if item['consumer_type'] == 'real_estate'})
-            for slug in houses:
-                try:
-                    deps['sync_real_estate_to_studio'](slug)
-                    synced += sum(1 for item in consumers if item['consumer_type'] == 'real_estate'
-                                  and item['consumer_id'].rsplit(':', 1)[0] == slug
-                                  and location_assets.atlases.binding('real_estate', item['consumer_id'])['syncStatus'] == 'synced')
-                except Exception as exc:
-                    errors.append('Real Estate ' + slug + ' Studio Sync: ' + str(exc))
-            if synced:
-                location_assets.export()
-                deps['real_estate'].export()
-            return out(200, {'variant': result, 'syncedConsumers': synced,
-                             'pendingConsumers': max(0,len(consumers)-synced),
-                             'studioErrors': errors})
+            return out(200, {'variant': result, 'syncedConsumers': 0,
+                             'pendingConsumers': len(consumers), 'studioErrors': [],
+                             'requiresExplicitStudioSync': True})
+
         except Exception as error:
             return out(400, {'error': str(error)})
 

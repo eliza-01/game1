@@ -70,6 +70,7 @@ function decoAssetBeginNew() {
 function decoAssetSetForm(row) {
   decoAssetState.selected = row?.slug || null;
   decoAssetRemember(DECO_SELECTED_ASSET_KEY, decoAssetState.selected || '');
+  if (typeof decoAssetShowSyncHistory === 'function') decoAssetShowSyncHistory(decoAssetState.selected);
   decoAssetState.modelPath = '';
   decoAssetState.texturePath = '';
   decoAssetState.replacementPath = '';
@@ -200,7 +201,8 @@ async function decoAssetRetrySync(slug) {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({slug}),
     });
-    toast(`Studio synced · ${Number(result.studio?.matchedModels ?? result.studio?.models ?? 0)} matched · ${Number(result.studio?.parts || 0)} parts updated. Save Place in Studio.`);
+    toast(`Studio synced ${slug} · ${Number(result.studio?.matchedModels ?? 0)} matched · ${Number(result.studio?.parts || 0)} atlas IDs updated · no models rebuilt. Save Place in Studio.`);
+    await decoAssetShowSyncHistory(slug);
   } catch (error) {
     toast(`Atlas saved; Studio sync pending: ${error.message}. Use Retry.`, true);
   }
@@ -268,7 +270,7 @@ function decoAssetRender() {
   }
 
   $('publish-location-asset').disabled = !selected || !publication.configured;
-  $('sync-location-assets').disabled = !(decoAssetState.data.items || []).some(row => row.status === 'PUBLISHED');
+  $('sync-location-assets').disabled = !selected || selected.status !== 'PUBLISHED';
   $('delete-location-asset').disabled = !selected;
   $('location-asset-publication-hint').textContent = selected
     ? (selected.status === 'PUBLISHED'
@@ -399,22 +401,56 @@ async function decoAssetPublish() {
   }
 }
 
-// DecoManager is the owner of Studio placement. Sync refreshes its registry
-// and rebinds the material on placed instances; it never imports duplicates.
+// M216: a Studio Sync is ALWAYS scoped to the selected Location Asset.
+// Never rebuild models or apply FBX to existing placed instances.
 async function decoAssetSyncStudio() {
+  const row = decoAssetSelected();
+  if (!row || row.status !== 'PUBLISHED') return toast('Select a published Location Asset first.', true);
   const button = $('sync-location-assets');
   if (button.disabled) return;
   button.disabled = true;
   try {
-    toast('syncing DecoManager and placed asset textures in Studio…');
-    const result = await request('/api/location-assets/studio-sync', { method: 'POST' });
+    toast(`syncing published IDs for ${row.slug} only…`);
+    const result = await request('/api/location-assets/studio-sync', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({slug: row.slug}),
+    });
     const studio = result.studio || {};
     await decoAssetLoad();
-    toast(`Studio synced · ${Number(studio.models || 0)} placed model(s), ${Number(studio.parts || 0)} MeshPart(s) updated · ${Number(studio.registryItems || 0)} registered`);
+    toast(`Studio sync ${row.slug} · ${Number(studio.matchedModels || 0)} matched · ${Number(studio.parts || 0)} texture IDs changed · ${Number(studio.modelReferences || 0)} model ID references · ${Number(studio.pendingGeometry || 0)} FBX geometries unchanged (manual replacement required). Models never rebuilt.`);
+    await decoAssetShowSyncHistory(row.slug);
   } catch (error) {
     toast(error.message, true);
   } finally {
     decoAssetRender();
+  }
+}
+
+async function decoAssetShowSyncHistory(slug) {
+  const box = $('location-asset-studio-history');
+  if (!box) return;
+  if (!slug) { box.textContent = 'Select a Location Asset to view ID changes.'; return; }
+  try {
+    const events = [];
+    let before = null;
+    do {
+      const cursor = before === null ? '' : `&before=${encodeURIComponent(before)}`;
+      const response = await request(`/api/location-assets/studio-history?slug=${encodeURIComponent(slug)}&limit=500${cursor}`);
+      events.push(...(response.events || []));
+      before = response.nextCursor ?? null;
+    } while (before !== null);
+    box.textContent = events.length ? events.map(event => {
+      const changes = (event.changes || []).map(change =>
+        `${change.kind === 'model_reference' ? 'Model reference' : 'Atlas'}: ${change.oldId || 'unknown'} → ${change.newId} (${change.count})`).join('; ');
+      const instances = (event.instances || []).map(instance => {
+        const instanceChanges = (instance.changes || []).map(change =>
+          `${change.kind}: ${change.oldId || 'unknown'} → ${change.newId} (${change.count})`).join(', ');
+        return `  ${instance.instanceId} · ${instance.studioPath} · ${instanceChanges}`;
+      }).join('\n');
+      return `${event.atUtc} · ${changes || 'no ID changes'} · pending FBX: ${event.pendingGeometry}${instances ? `\n${instances}` : ''}`;
+    }).join('\n') : 'No Studio ID changes recorded for this asset yet.';
+  } catch (error) {
+    box.textContent = `History unavailable: ${error.message}`;
   }
 }
 
@@ -480,7 +516,7 @@ $('publish-location-atlas-variant').onclick = async () => {
     if (republish) {
       if (result.unchanged) toast('Atlas bytes unchanged · existing Image Asset ID kept (no upload)');
       else {
-        const message = `Atlas republished · NEW Roblox Image ID ${result.variant.published_id} · ${result.syncedConsumers || 0} Studio sync(s) · ${result.pendingConsumers || 0} pending`;
+        const message = `Atlas republished · NEW Roblox Image ID ${result.variant.published_id} · ${result.pendingConsumers || 0} consumer(s) pending explicit Studio Sync; no placed asset was touched`;
         toast(result.studioErrors?.length ? `${message} · ${result.studioErrors.join('; ')}` : message, Boolean(result.studioErrors?.length));
       }
     } else toast(`Atlas published · Roblox Image ID ${result.published_id}`);

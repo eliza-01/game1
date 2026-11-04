@@ -141,10 +141,10 @@ return table.freeze({
 			category = "light",
 			status = "PUBLISHED",
 			modelAssetId = "119790979739015",
-			textureAssetId = "73384502057808",
+			textureAssetId = "78602158656399",
 			textureUsesAlpha = true,
-			atlasVariantId = 16,
-			bindingRevision = 1,
+			atlasVariantId = 27,
+			bindingRevision = 3,
 			destructible = false,
 		}),
 		["ground_torch_01"] = table.freeze({

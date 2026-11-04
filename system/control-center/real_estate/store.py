@@ -338,9 +338,26 @@ class RealEstateStore:
         incoming_options = payload.get('meshOptions')
         merged_options = mesh_options(active, {**previous_options, **incoming_options}
             if isinstance(incoming_options, dict) else previous_options)
+        # A stale client may submit the displayed Registry source_path instead
+        # of the binding ID. The source is not a new image; preserve the binding
+        # without rereading the file or attempting Atlas Registry adoption.
+        def unchanged_bound_source(part: str) -> bool:
+            if not existing or chosen_refs[part] or not selections.get(part):
+                return False
+            current = existing['textures'].get(part) or {}
+            if not current.get('atlasVariantId') or not current.get('path'):
+                return False
+            incoming = Path(str(selections[part])).expanduser()
+            saved = Path(str(current['path'])).expanduser()
+            incoming = incoming if incoming.is_absolute() else self.root / incoming
+            saved = saved if saved.is_absolute() else self.root / saved
+            return incoming.resolve() == saved.resolve()
+
+        unchanged_sources = {part for part in active if unchanged_bound_source(part)}
         texture_sources = {
             part: (resolve_texture(self.root, selections.get(part), part=part)
-                   if requires_texture(part) and not chosen_refs[part] and selections.get(part) else None)
+                   if requires_texture(part) and not chosen_refs[part] and selections.get(part)
+                   and part not in unchanged_sources else None)
             for part in active
         }
         canonical = self.root / 'assets' / 'source' / 'real-estate' / slug
@@ -355,7 +372,10 @@ class RealEstateStore:
             if ref.startswith('atlas:'):
                 atlas_selections[part] = self.atlases.get_variant(int(ref[6:]))
             elif texture_sources.get(part) is not None:
-                atlas_selections[part] = self.atlases.adopt_file(str(texture_sources[part]))
+                try:
+                    atlas_selections[part] = self.atlases.adopt_file(str(texture_sources[part]))
+                except ValueError as exc:
+                    raise ValueError(f'{part}: {exc}') from exc
             elif existing and existing['textures'].get(part, {}).get('atlasVariantId') and not ref:
                 atlas_selections[part] = self.atlases.get_variant(existing['textures'][part]['atlasVariantId'])
         for part in active:

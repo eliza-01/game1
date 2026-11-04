@@ -206,7 +206,8 @@ class ScopedAtlasBridgeM125(TestCase):
         def worker():
             try:
                 outcome['value'] = bridge.run_deco_refresh_bridge(
-                    slug='wooden_post_01', binding_revision=3, timeout_seconds=5)
+                    slug='wooden_post_01', binding_revision=3,
+                    model_asset_id='1005', atlas_asset_id='3006', timeout_seconds=5)
             except Exception as error:
                 outcome['error'] = error
         with mock.patch.object(bridge, 'PORT', port):
@@ -228,7 +229,7 @@ class ScopedAtlasBridgeM125(TestCase):
                 except (URLError, OSError):
                     time.sleep(.02)
             self.assertIsNotNone(command)
-            self.assertEqual(command['schemaVersion'],2)
+            self.assertEqual(command['schemaVersion'],3)
             self.assertEqual(command['targetSlug'],'wooden_post_01')
             self.assertEqual(command['bindingRevision'],3)
             with self.assertRaises(HTTPError) as mismatch:
@@ -236,7 +237,8 @@ class ScopedAtlasBridgeM125(TestCase):
                      'models':1,'parts':2,'registryItems':5})
             self.assertEqual(mismatch.exception.code,400)
             call('/deco-refresh-result', {**command, 'matchedModels':4,
-                  'models':1,'parts':2,'registryItems':5})
+                  'models':1,'parts':2,'registryItems':5, 'replacedModels': 0,
+                  'modelReferences':1, 'pendingGeometry': 1, 'changes': []})
             thread.join(6)
             self.assertFalse(thread.is_alive())
             self.assertNotIn('error',outcome)

@@ -1,3 +1,5 @@
 # Host Agent only (system/control-center/host_agent.py).
 # Decode WebP as a temporary PNG for Real Estate publication.
 Pillow>=12,<13
+# MySQL 8.4 asset replacement audit (pure Python DB-API driver).
+PyMySQL>=1.1,<2

@@ -12,6 +12,21 @@ def route(parsed, sources, info):
         search = str((parse_qs(parsed.query).get('search') or [''])[0])
         return 200, {'families': sources['location_assets'].atlases.catalog(search)}
 
+    if path == '/api/asset-replacements':
+        try:
+            query = parse_qs(parsed.query)
+            domain = str((query.get('domain') or [''])[0])
+            key = str((query.get('key') or [''])[0])
+            event_kind = str((query.get('eventKind') or [''])[0])
+            limit = int((query.get('limit') or ['200'])[0])
+            raw_before = str((query.get('before') or [''])[0])
+            page = sources['asset_replacement_audit'].page(
+                domain=domain, key=key, event_kind=event_kind, limit=limit,
+                before=int(raw_before) if raw_before else None)
+            return 200, {'domain': domain, 'key': key, **page}
+        except (ValueError, OSError, RuntimeError) as error:
+            return 400, {'error': str(error)}
+
     if path == '/api/asset-retirement/impact':
         query = parse_qs(parsed.query)
         try:
@@ -20,6 +35,18 @@ def route(parsed, sources, info):
                 sources.get('real_estate_publications')
             ).plan(str((query.get('kind') or [''])[0]), str((query.get('slug') or [''])[0]))
         except (ValueError, OSError) as error:
+            return 400, {'error': str(error)}
+
+    if path == "/api/location-assets/studio-history":
+        try:
+            query = parse_qs(parsed.query)
+            slug = str((query.get('slug') or [''])[0])
+            limit = int((query.get('limit') or ['200'])[0])
+            raw_before = str((query.get('before') or [''])[0])
+            page = sources['location_asset_sync_history'].page(
+                slug, limit=limit, before=int(raw_before) if raw_before else None)
+            return 200, {'slug': slug, **page}
+        except (ValueError, OSError, RuntimeError) as error:
             return 400, {'error': str(error)}
 
     if path == "/api/location-assets":

@@ -2,6 +2,8 @@
 .control-center/*.pid
 .control-center/*.db
 .control-center/*.db-*
+.control-center/location-asset-studio-sync-history.jsonl
+.control-center/backups/
 .env.local
 place/snapshots/*.rbxl
 __pycache__/

@@ -229,12 +229,17 @@ class WriteRoutingM88(unittest.TestCase):
                           and any(isinstance(t, ast.Name) and t.id == "WRITE_SOURCES" for t in node.targets))
         provided = {key.value for key in definition.value.args[0].keys}
         requested = set()
-        for module in ("write_files", "write_actors", "write_world", "write_animations", "delete_entities", "real_estate", "character_components"):
+        for module in ("write_dispatch", "write_files", "write_actors", "write_world", "write_animations", "delete_entities", "real_estate", "character_components"):
             source = ast.parse((ROOT / f"system/control-center/api/{module}.py").read_text(encoding="utf-8"))
             for node in ast.walk(source):
                 if (isinstance(node, ast.Subscript) and isinstance(node.value, ast.Name)
                     and node.value.id == "deps" and isinstance(node.slice, ast.Constant)):
                     requested.add(node.slice.value)
+                if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                    and isinstance(node.func.value, ast.Name) and node.func.value.id == "deps"
+                    and node.func.attr == "get" and node.args
+                    and isinstance(node.args[0], ast.Constant)):
+                    requested.add(node.args[0].value)
         self.assertEqual(requested, provided)
 
     def test_local_picker_stays_isolated_from_store_mutations(self):

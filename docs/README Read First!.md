@@ -7,6 +7,8 @@
 
 | Документ | Зачем читать | Статус |
 | --- | --- | --- |
+| [M217 — полный аудит замен всех ассетов](workflows/ASSET_REPLACEMENT_AUDIT_M217_RU.md) | MySQL 8.4, объединённая история публикаций/замен всех asset-доменов, backup/recovery | **CURRENT / SAFETY CRITICAL** |
+| [M216 — Location Assets: аварийный откат M215 и безопасный ID Sync](workflows/LOCATION_ASSETS_SAFE_ID_SYNC_M216_RU.md) | Строгое ограничение Studio Sync одним slug, запрет перепостроения моделей и журнал заменённых ID | **CURRENT / SAFETY CRITICAL** |
 | [M189 — R3 Characters/Animations stores](workflows/CHARACTER_ANIMATION_STORES_R3_M189_RU.md) | Границы Python-хранилищ, контроль идентичности генерации, дальнейший долг | **CURRENT R3 STEP** |
 | [Анимации: лицо, emotions и события](animation/README.md) | Четыре контроллера лица, Blender-маркеры, документы клипов и этап внедрения | **CURRENT / IMPLEMENTING** |
 | [Актуальное ТЗ](spec/CURRENT_PROJECT_SPEC_RU.md) | Текущие возможности, socket/atlas/FBX/actor контракты, scope и Definition of Done | **CURRENT** |

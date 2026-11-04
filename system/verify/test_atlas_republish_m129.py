@@ -125,7 +125,9 @@ class AtlasRepublishM129(TestCase):
         self.assertEqual(payload['variant']['published_id'],'222')
         self.assertEqual(payload['syncedConsumers'],0)
         self.assertEqual(payload['pendingConsumers'],1)
-        self.assertIn('Studio offline',payload['studioErrors'][0])
+        self.assertEqual(payload['studioErrors'],[])
+        self.assertTrue(payload['requiresExplicitStudioSync'])
+        deps['sync_location_assets_to_studio'].assert_not_called()
         self.assertEqual(self.loc.get('wooden_post_01')['texture_asset_id'],'222')
         self.assertEqual(self.atlases.binding('location_asset','wooden_post_01')['syncStatus'],'pending_studio_sync')
         self.assertTrue(deps['real_estate'].export.called)
@@ -146,7 +148,7 @@ class AtlasRepublishM129(TestCase):
         upload.assert_not_called()
         deps['sync_location_assets_to_studio'].assert_not_called()
 
-    def test_republish_route_syncs_all_consumers_using_exact_variant(self):
+    def test_republish_route_marks_consumers_pending_without_touching_studio(self):
         self.publish_as(111)
         self.loc.register({'slug':'wooden_post_02','nameEn':'Post 02','category':'decoration',
                            'modelSourcePath':str(self.fbx),'atlasVariantId':self.vid})
@@ -169,13 +171,13 @@ class AtlasRepublishM129(TestCase):
             status, payload = route(f'/api/texture-atlases/variants/{self.vid}/republish',
                                     lambda:{'sourcePath':str(self.image)},deps)
         self.assertEqual(status,200,payload)
-        self.assertEqual(payload['syncedConsumers'],3)
-        self.assertEqual(payload['pendingConsumers'],0)
+        self.assertEqual(payload['syncedConsumers'],0)
+        self.assertEqual(payload['pendingConsumers'],3)
         self.assertEqual(payload['studioErrors'],[])
-        deps['sync_location_assets_to_studio'].assert_called_once_with()
-        deps['sync_real_estate_to_studio'].assert_called_once_with('house_level2_01')
+        deps['sync_location_assets_to_studio'].assert_not_called()
+        deps['sync_real_estate_to_studio'].assert_not_called()
         for item in self.atlases.consumers(self.vid):
-            self.assertEqual(self.atlases.binding(item['consumer_type'],item['consumer_id'])['syncStatus'],'synced')
+            self.assertEqual(self.atlases.binding(item['consumer_type'],item['consumer_id'])['syncStatus'],'pending_studio_sync')
 
     def test_wrong_republish_filename_rejected_before_staging(self):
         self.publish_as(111)

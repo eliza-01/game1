@@ -9,23 +9,36 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import time
 import uuid
+import re
 
 from studio_bridge import PORT, PROJECT, TOKEN, StudioBridgeError
 
 
 def run_deco_refresh_bridge(*, timeout_seconds: float = 75.0,
-                            slug: str = '', binding_revision: int | None = None) -> dict:
+                            slug: str, binding_revision: int,
+                            model_asset_id: str, atlas_asset_id: str) -> dict:
+    """M216: only schema 3 commands can reach the Studio plugin.
+
+    Older M215 plugins explicitly reject schema 3 rather than rebuilding models.
+    """
+    if not re.fullmatch(r'[a-z0-9][a-z0-9_]{0,63}', str(slug)):
+        raise ValueError('Location Asset Studio Sync requires one valid slug')
+    if type(binding_revision) is not int or binding_revision < 1:
+        raise ValueError('invalid Location Asset binding revision')
+    for identifier in (model_asset_id, atlas_asset_id):
+        if not re.fullmatch(r'[1-9][0-9]{0,19}', str(identifier)):
+            raise ValueError('a published Model and Atlas Asset ID are required')
     operation_id = uuid.uuid4().hex
     command = {
-        "project": PROJECT,
-        "command": "deco-refresh",
-        "schemaVersion": 1,
-        "operationId": operation_id,
+        'project': PROJECT,
+        'command': 'deco-refresh',
+        'schemaVersion': 3,
+        'operationId': operation_id,
+        'targetSlug': slug,
+        'bindingRevision': binding_revision,
+        'modelAssetId': model_asset_id,
+        'atlasAssetId': atlas_asset_id,
     }
-    if slug:
-        if not isinstance(binding_revision, int) or binding_revision < 1:
-            raise ValueError('targeted deco refresh needs binding revision')
-        command.update(schemaVersion=2, targetSlug=slug, bindingRevision=binding_revision)
     state = {"claimed": False, "result": None}
 
     class Handler(BaseHTTPRequestHandler):
@@ -60,7 +73,9 @@ def run_deco_refresh_bridge(*, timeout_seconds: float = 75.0,
                 return self.send_json(404, {"error": "not found"})
             try:
                 length = int(self.headers.get("Content-Length", "0"))
-                if length < 1 or length > 8192:
+                # Per-instance audit records are intentionally returned to the
+                # Host Agent. Keep the request bounded without truncating them.
+                if length < 1 or length > 2 * 1024 * 1024:
                     raise ValueError("invalid result payload length")
                 incoming = json.loads(self.rfile.read(length).decode("utf-8"))
                 if (not isinstance(incoming, dict)
@@ -68,8 +83,8 @@ def run_deco_refresh_bridge(*, timeout_seconds: float = 75.0,
                         or incoming.get("command") != "deco-refresh"
                         or incoming.get("schemaVersion") != command["schemaVersion"]
                         or incoming.get("operationId") != operation_id
-                        or (slug and (incoming.get("targetSlug") != slug
-                                      or incoming.get("bindingRevision") != binding_revision))):
+                        or incoming.get("targetSlug") != slug
+                        or incoming.get("bindingRevision") != binding_revision):
                     raise ValueError("invalid deco-refresh result identity")
                 if not state["claimed"]:
                     raise ValueError("command has not been claimed")
@@ -103,13 +118,44 @@ def run_deco_refresh_bridge(*, timeout_seconds: float = 75.0,
     result = state["result"]
     if result.get("error"):
         raise StudioBridgeError(f"DecoManager refresh failed: {result['error']}")
-    values = {}
-    for field in ("models", "parts", "registryItems"):
+    values = {'operationId': operation_id, 'targetSlug': slug,
+              'bindingRevision': binding_revision}
+    for field in ('models', 'parts', 'matchedModels', 'modelReferences',
+                  'pendingGeometry', 'registryItems', 'replacedModels'):
         value = result.get(field)
         if type(value) is not int or value < 0:
-            raise StudioBridgeError(f"invalid Studio deco-refresh result field: {field}")
+            raise StudioBridgeError(f'invalid Studio deco-refresh result field: {field}')
         values[field] = value
-    if slug:
-        values.update(targetSlug=slug, bindingRevision=binding_revision,
-                      matchedModels=int(result.get('matchedModels', 0)))
+    if values['replacedModels'] != 0 or values['models'] > values['matchedModels']:
+        raise StudioBridgeError('unsafe Location Asset Studio model replacement result')
+    changes = result.get('changes')
+    if not isinstance(changes, list) or len(changes) > 32:
+        raise StudioBridgeError('invalid Studio Location Asset ID change log')
+    values['changes'] = changes
+    instances = result.get('instances')
+    if not isinstance(instances, list) or len(instances) > 10000:
+        raise StudioBridgeError('invalid Studio Location Asset instance audit log')
+    validated_instances = []
+    seen_instances = set()
+    for item in instances:
+        if not isinstance(item, dict):
+            raise StudioBridgeError('invalid Studio Location Asset instance audit entry')
+        instance_id = str(item.get('instanceId') or '')
+        studio_path = str(item.get('studioPath') or '')
+        item_changes = item.get('changes')
+        if (not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', instance_id)
+                or not studio_path or len(studio_path) > 1024
+                or instance_id in seen_instances
+                or not isinstance(item_changes, list) or not item_changes
+                or len(item_changes) > 32):
+            raise StudioBridgeError('invalid Studio Location Asset instance audit entry')
+        seen_instances.add(instance_id)
+        validated_instances.append({
+            'instanceId': instance_id,
+            'studioPath': studio_path,
+            'changes': item_changes,
+        })
+    if len(validated_instances) != values['models']:
+        raise StudioBridgeError('Studio Location Asset instance audit count mismatch')
+    values['instances'] = validated_instances
     return values

@@ -88,8 +88,9 @@ function realEstateForm(row){
   const referenceForPart=part=>{
     const texture=row?.textures?.[part]||{};
     if(texture.reuseReference)return texture.reuseReference;
-    return texture.atlasVariantId && texture.atlasCurrent
-      ? `atlas:${texture.atlasVariantId}` : '';
+    // Atlas identity survives pending publication and replacement. Never turn
+    // an existing binding into a local PNG upload merely because it is not current.
+    return texture.atlasVariantId ? `atlas:${texture.atlasVariantId}` : '';
   };
   realEstateState.textureRefs=Object.fromEntries(
     meshNames.map(part=>[part,referenceForPart(part)]));
@@ -201,6 +202,16 @@ function realEstateReuseOptions(part){
   const active=realEstateState.textureRefs[part]||'';
   const query=String(realEstateState.reuseFilters[part]?.query||'').trim().toLocaleLowerCase();
   const all=[...realEstatePublishedAtlasChoices()];
+  // The published-only picker must still show the currently bound variant,
+  // including unpublished or pending-republication atlases. This is not a
+  // way to bind arbitrary unpublished variants to other houses.
+  const current=realEstateSelected()?.textures?.[part];
+  if(active.startsWith('atlas:') && String(current?.atlasVariantId||'')===active.slice(6)
+      && !all.some(entry=>entry.reference===active)){
+    all.push({reference:active,group:'atlas',label:current.atlasKey||'',
+      filename:current.filename||current.path||'',path:current.path||'',
+      assetId:current.assetId||'',existingUnpublished:true});
+  }
   if(part!=='house'){
     const owner=realEstateSelected()?.textures?.house||{};
     const path=realEstateState.textures.house||owner.path||'';
@@ -242,7 +253,7 @@ function realEstateReuseOptions(part){
       result.push(`<optgroup label="${esc(identity.key)}">`);
       previous=identity.key;
     }
-    result.push(`<option value="${esc(e.reference)}">${esc(realEstateReuseLabel(e))}</option>`);
+    result.push(`<option value="${esc(e.reference)}">${esc(realEstateReuseLabel(e))}${e.existingUnpublished?' · bound, awaiting publication':''}</option>`);
   }
   if(previous)result.push('</optgroup>');
   return result.join('');

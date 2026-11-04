@@ -317,7 +317,7 @@ function DecoManager:_setCategory(category: string)
     self:_showCurrent()
 end
 
-function DecoManager:refreshRegistry(targetSlug: string?)
+function DecoManager:refreshRegistry(targetSlug: string?, applyIds: boolean?, expectedModelId: string?, expectedAtlasId: string?)
     self:_setStatus("Refreshing Location Assets registry…")
     local ok, result = pcall(function()
         return self.loader:fetchRegistry()
@@ -329,20 +329,29 @@ function DecoManager:refreshRegistry(targetSlug: string?)
         return nil, tostring(result)
     end
     self.registry = result
-    local syncResult = DecoPlacedAssetSync.RefreshTextures(self.Workspace, result, targetSlug, self.ServerStorage)
-    if syncResult.parts > 0 then
-        self.ChangeHistoryService:SetWaypoint("Refresh Deco Asset Textures")
+    -- Catalog browsing never alters any placed Model. Explicit Studio Sync
+    -- requires exactly one slug and two publication IDs verified by the plugin.
+    local syncResult = { models = 0, parts = 0, matchedModels = 0,
+        modelReferences = 0, pendingGeometry = 0, replacedModels = 0,
+        changes = {}, instances = {} }
+    if applyIds == true then
+        if not targetSlug or not expectedModelId or not expectedAtlasId then
+            error("scoped ID-only Studio Sync requires an explicit asset and publication IDs")
+        end
+        -- A waypoint BEFORE the update makes Undo possible even for an error.
+        self.ChangeHistoryService:SetWaypoint("Before Location Asset ID Sync: " .. targetSlug)
+        syncResult = DecoPlacedAssetSync.RefreshIds(
+            self.Workspace, result, targetSlug, self.HttpService, expectedModelId, expectedAtlasId)
+        self.ChangeHistoryService:SetWaypoint("Location Asset ID Sync: " .. targetSlug)
     end
     self:_setCategory(self.category)
-    if syncResult.parts > 0 then
-        self:_setStatus(("Registry refreshed · updated texture on %d placed asset(s) / %d MeshPart(s)"):format(
-            syncResult.models,
-            syncResult.parts
-        ))
-    else
-        self:_setStatus("Registry refreshed · placed textures are already current")
-    end
-    return { models = syncResult.models, parts = syncResult.parts, matchedModels = syncResult.matchedModels, registryItems = #result.items }
+    self:_setStatus(("Registry refreshed · %d placed item(s), %d image IDs changed, %d model references · %d stale FBX geometries"):format(
+        syncResult.matchedModels, syncResult.parts, syncResult.modelReferences, syncResult.pendingGeometry))
+    return { models = syncResult.models, parts = syncResult.parts,
+        replacedModels = 0, matchedModels = syncResult.matchedModels,
+        modelReferences = syncResult.modelReferences, pendingGeometry = syncResult.pendingGeometry,
+        changes = syncResult.changes, instances = syncResult.instances,
+        registryItems = #result.items }
 end
 
 function DecoManager:_placeCurrent()
@@ -479,10 +488,10 @@ function DecoManager:_wire()
         self:_saveAssetsData()
     end)
     self.plugin.Deactivation:Connect(function()
-        self.placement:cancel()
+        self.placement:cancel(false)
     end)
     self.plugin.Unloading:Connect(function()
-        self.placement:cancel()
+        self.placement:cancel(false)
         self:_clearPreview()
     end)
     self:_setCategory("tree")

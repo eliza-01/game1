@@ -31,6 +31,7 @@
 <button id="nav-monsters" class="asset-section" type="button"><b>monsters</b><small>rigs · stats · animations</small></button>
 <button id="nav-locations" class="asset-section" type="button"><b>locations</b><small>polygon registry · studio authoring</small></button>
 <button id="nav-location-assets" class="asset-section" type="button"><b>location assets</b><small>trees · bushes · rocks · lights · fences · decorations · ladders · flowers · buildings · props</small></button>
+<button id="nav-asset-audit" class="asset-section" type="button"><b>asset history</b><small>all publications · replacements · Studio ID sync</small></button>
 <button id="nav-real-estate" class="asset-section" type="button"><b>real estate</b><small>houses · any mesh rigs · textures</small></button>
 <button id="nav-timelines" class="asset-section" type="button"><b>timelines</b><small>attack animation events</small></button>
 <button id="nav-options" class="asset-section" type="button"><b>options</b><small>common runtime settings</small></button>
@@ -372,7 +373,7 @@
 <div><span class="eyebrow">environment library · published decor</span><h2>location assets</h2><p>register a static decoration with one FBX and a texture atlas. New atlas names follow &lt;atlas_key&gt;_&lt;width&gt;x&lt;height&gt;_atlas.png; reused variants share exactly one published Image Asset ID. publish the required assets, then place published variants through Studio DecoManager. placed instances belong to the place; registry publication and placement backups stay separate.</p><div class="deco-category-strip"><span>trees</span><span>bushes</span><span>rocks</span><span>lights</span><span>fences</span><span>decorations</span><span>ladders</span><span>flowers</span><span>buildings</span><span>props</span></div></div>
 <div class="metrics"><div><b id="location-asset-metric-total">0</b><span>registered</span></div><div><b id="location-asset-metric-published">0</b><span>published</span></div><div><b id="location-asset-metric-changed">0</b><span>changed</span></div></div>
 </div>
-<div class="panel runtime-card"><div class="runtime-state registered"><strong>DecoManager registry</strong><span>Sync Studio refreshes DecoManager and the textures/SurfaceAppearance of already placed decorations. New assets are placed through DecoManager; no ServerStorage import.</span></div><div id="location-asset-publication-state" class="publication-missing">open cloud: checking…</div></div>
+<div class="panel runtime-card"><div class="runtime-state registered"><strong>DecoManager registry</strong><span>Sync Studio refreshes DecoManager, updated published models and atlases of managed placed decorations. It preserves each placement position, rotation, scale and ID; no additional placements or ServerStorage imports.</span></div><div id="location-asset-publication-state" class="publication-missing">open cloud: checking…</div></div>
 <div class="deco-asset-workflow">
 <div class="panel character-card">
 <div class="section-title"><div><span>01 · identity</span><h3>register location asset</h3></div><button id="new-location-asset-main" type="button">new asset</button></div>
@@ -389,7 +390,7 @@
 <hr class="card-separator">
 <span class="eyebrow">03 · publication</span><h3 class="subheading">Roblox model + image</h3>
 <label>description<input id="location-asset-publication-description" value="Game1 Location Asset"><small class="hint">filled automatically from the selected asset, for example <code>Game1 Location Asset Oak Tree</code>.</small></label>
-<div class="actions"><button id="publish-location-asset" class="primary" type="button" disabled>publish all changed</button><button id="sync-location-assets" type="button" disabled>sync studio</button></div>
+<div class="actions"><button id="publish-location-asset" class="primary" type="button" disabled>publish all changed</button><button id="sync-location-assets" type="button" disabled>sync selected asset IDs</button></div><small class="hint">Updates only the selected Location Asset: atlas IDs and the published model reference. Existing meshes, transforms and geometry are NEVER replaced. Stale FBX geometry requires a separate, manual update.</small><details><summary>Studio ID replacement history</summary><pre id="location-asset-studio-history" style="white-space:pre-wrap;max-height:220px;overflow:auto">Select a Location Asset to view history.</pre></details>
 <small id="location-asset-publication-hint" class="hint">select a registered location asset.</small>
 </div>
 <div class="panel character-card">
@@ -397,6 +398,18 @@
 <div class="deco-assets-note"><strong>Studio placement</strong><span>Open <b>DecoManager</b> in Roblox Studio, choose a category, browse variants with arrows, then Place. <b>Save Assets Data</b> snapshots all placed instances and saves the place.</span></div>
 <div class="table-wrap weapon-table-wrap"><table><thead><tr><th>asset</th><th>category</th><th>weapon contact</th><th>Roblox assets</th><th>status</th><th></th></tr></thead><tbody id="location-asset-rows"></tbody></table></div>
 </div>
+</div>
+</div>
+
+<div id="asset-audit-view" hidden>
+<div class="panel hero">
+<div><span class="eyebrow">immutable MySQL audit</span><h2>asset replacement history</h2><p>Complete retained publication and replacement history across characters, components, animations, weapons, monsters, NPCs, atlases, location assets and real estate. Studio instance details are recorded for Location Asset ID sync operations.</p></div>
+</div>
+<div class="panel character-card">
+<div class="section-title"><div><span>filters</span><h3>all asset events</h3></div><button id="asset-audit-refresh" type="button">refresh</button></div>
+<div class="character-grid"><label>domain<select id="asset-audit-domain"><option value="">all domains</option><option>character</option><option>character_component</option><option>character_animation</option><option>weapon</option><option>monster</option><option>monster_animation</option><option>npc</option><option>npc_animation</option><option>texture_atlas</option><option>texture_atlas_legacy</option><option>location_asset</option><option>real_estate</option></select></label><label>asset key<input id="asset-audit-key" type="search" placeholder="exact key or slug"></label></div>
+<div class="table-wrap weapon-table-wrap"><table><thead><tr><th>UTC time</th><th>domain / key</th><th>resource</th><th>replacement</th><th>source</th></tr></thead><tbody id="asset-audit-rows"><tr><td colspan="5" class="muted">Open this section to load audit history.</td></tr></tbody></table></div>
+<div class="actions"><button id="asset-audit-more" type="button" hidden>load older events</button><span id="asset-audit-count" class="muted"></span></div>
 </div>
 </div>
 
@@ -611,7 +624,7 @@
 </main>
 <div id="toast" class="toast"></div>
 <script src="publication-descriptions.js?v=1"></script>
-<script src="character-assets.js?v=21"></script>
+<script src="character-assets.js?v=22"></script>
 <script src="character-animation-ui.js?v=2"></script>
 <script src="character-workflow.js?v=2"></script>
 <script src="character-publications.js?v=2"></script>
@@ -625,13 +638,14 @@
 <script src="timelines.js?v=3"></script>
 <script src="locations.js?v=2"></script>
 <script src="shared-asset-retirement.js?v=4"></script>
-<script src="deco-assets.js?v=8"></script>
+<script src="deco-assets.js?v=9"></script>
+<script src="asset-audit.js?v=1"></script>
 <script src="options.js?v=1"></script>
 <script src="weapon-assets.js?v=3"></script>
 <script src="monster-assets.js?v=6"></script>
 <script src="npc-assets.js?v=5"></script>
 <script src="npc-spawns.js?v=4"></script>
-<script src="real-estate.js?v=24&rig=186&atlas=202&physics=207&fix=211"></script>
+<script src="real-estate.js?v=25&rig=186&atlas=202&physics=207&fix=212"></script>
 <script src="real-estate-mesh-workflow.js?v=2&atlas=188"></script>
 <script src="real-estate-placement.js?v=1"></script>
 <script src="monster-spawns.js?v=1"></script>

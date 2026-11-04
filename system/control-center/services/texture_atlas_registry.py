@@ -249,13 +249,31 @@ class AtlasRegistry:
         path = Path(str(source_path)).expanduser().resolve()
         if not path.is_file() or path.suffix.lower() not in ('.png', '.jpg', '.jpeg', '.webp'):
             raise ValueError('select a PNG/JPG/WebP atlas file')
-        with Image.open(path) as image:
-            width, height = image.size
-            image.verify()
+        # The native image format, not the filename extension, determines how
+        # the source must be staged. Blender/export tools can leave WebP bytes
+        # inside a .png file; copying those bytes into a .png registry source
+        # later makes register_file reject an otherwise decodable texture.
+        try:
+            with Image.open(path) as image:
+                native_format = image.format
+                width, height = image.size
+                if native_format not in {'PNG', 'JPEG', 'WEBP'}:
+                    raise ValueError('texture must be a real PNG or JPEG file, or a WebP image '
+                                     f'(detected {native_format or "unknown"} in {path.name})')
+                if width > 16384 or height > 16384:
+                    raise ValueError('atlas dimensions must not exceed 16384 pixels')
+                image.verify()
+        except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as exc:
+            raise ValueError(f'cannot read atlas image {path.name}: {exc}') from exc
+        # Never save PNG bytes under a JPEG suffix or vice versa. WebP is
+        # decoded losslessly to PNG; existing PNG/JPEG bytes are left intact.
+        canonical_extension = '.png' if native_format in ('PNG', 'WEBP') else '.jpg'
         parsed = parse_filename(path.name)
         if parsed:
             key = parsed['atlasKey']
             filename = path.name
+            if path.suffix.lower() not in ({'.png'} if canonical_extension == '.png' else {'.jpg', '.jpeg'}):
+                filename = path.with_suffix(canonical_extension).name
         else:
             stem = path.stem
             if stem.casefold().endswith('_atlas'):
@@ -265,13 +283,18 @@ class AtlasRegistry:
             if stem.split('.')[0] in _WINDOWS_RESERVED:
                 stem = ('atlas_' + stem)[:96]
             key = stem
-            extension = '.png' if path.suffix.lower() == '.webp' else path.suffix.lower()
-            filename = f'{stem}_{width}x{height}_atlas{extension}'
+            filename = f'{stem}_{width}x{height}_atlas{canonical_extension}'
         with tempfile.TemporaryDirectory(prefix='game1-atlas-register-') as temporary:
             staged = Path(temporary) / filename
-            if path.suffix.lower() == '.webp':
-                with Image.open(path) as image:
-                    image.convert('RGBA').save(staged, 'PNG')
+            if native_format == 'WEBP':
+                try:
+                    with Image.open(path) as image:
+                        image.load()
+                        mode = ('RGBA' if 'A' in image.getbands() or 'transparency' in image.info
+                                else 'RGB')
+                        image.convert(mode).save(staged, 'PNG')
+                except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as exc:
+                    raise ValueError(f'cannot convert WebP atlas {path.name} to PNG: {exc}') from exc
             else:
                 shutil.copy2(path, staged)
             sha = digest(staged)

@@ -1,4 +1,6 @@
 local DecoTransform = require(script.Parent.DecoTransform)
+local DecoAssetPreparation = require(script.Parent.DecoAssetPreparation)
+local DecoPlacedAssetSync = require(script.Parent.DecoPlacedAssetSync)
 
 local DecoPlacement = {}
 DecoPlacement.__index = DecoPlacement
@@ -30,17 +32,6 @@ local function prepareGhost(model: Model)
     end
 end
 
-local function preparePlaced(model: Model)
-    for _, descendant in ipairs(model:GetDescendants()) do
-        if descendant:IsA("BasePart") then
-            -- Placement ghosts are anchored, authored decorations are not. Keep the
-            -- placed asset editable with the normal Studio transform tools.
-            descendant.Anchored = false
-            descendant.CanTouch = false
-        end
-    end
-end
-
 function DecoPlacement.new(config: any)
     local self = setmetatable({
         plugin = config.plugin,
@@ -57,6 +48,7 @@ function DecoPlacement.new(config: any)
         clickConnection = nil,
         statusCallback = nil,
         committing = false,
+        ownsPluginMouse = false,
     }, DecoPlacement)
     return self
 end
@@ -155,12 +147,17 @@ function DecoPlacement:_detachSession(): Model?
     return ghost
 end
 
-function DecoPlacement:cancel()
+function DecoPlacement:cancel(releasePluginMouse: boolean?)
     local ghost = self:_detachSession()
     if ghost ~= nil then
         ghost:Destroy()
     end
     self.committing = false
+    local shouldDeactivate = self.ownsPluginMouse and releasePluginMouse ~= false
+    self.ownsPluginMouse = false
+    if shouldDeactivate then
+        self.plugin:Deactivate()
+    end
 end
 
 function DecoPlacement:_commit()
@@ -176,7 +173,8 @@ function DecoPlacement:_commit()
     local pivot = ghost:GetPivot()
 
     local placed = sourceTemplate:Clone()
-    preparePlaced(placed)
+    DecoAssetPreparation.PreparePlaced(placed)
+    DecoPlacedAssetSync.StampPublishedModel(placed, row)
     local instanceId = self.HttpService:GenerateGUID(false)
     placed.Name = tostring(row.slug or "deco") .. "__" .. string.sub(instanceId, 1, 8)
     -- Studio placement stores identity, not gameplay policy. Runtime resolves the
@@ -192,6 +190,7 @@ function DecoPlacement:_commit()
     if staleGhost ~= nil then
         staleGhost:Destroy()
     end
+    self.ownsPluginMouse = false
     self.plugin:Deactivate()
     self.ChangeHistoryService:SetWaypoint("Place Deco Asset")
 
@@ -208,6 +207,7 @@ function DecoPlacement:start(template: Model, row: any, statusCallback: (string)
     -- Plugin.Deactivation while tool ownership changes; there is nothing fresh to
     -- destroy until Activate has completed.
     self.plugin:Activate(true)
+    self.ownsPluginMouse = true
 
     self.sourceTemplate = template
     self.row = row

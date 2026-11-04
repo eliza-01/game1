@@ -49,6 +49,9 @@ from studio_save import request_active_studio_save
 from character_core.identity import CharacterIdentityService
 from studio_bridge import run_model_load_bridge, run_monster_spawn_bridge, run_timeline_editor_bridge, run_location_authoring_bridge
 from services.studio_deco_bridge import run_deco_refresh_bridge
+from services.location_asset_sync_history import LocationAssetSyncHistory
+from services.mysql_asset_replacement_audit import MySqlAssetReplacementAudit, MySqlAuditConfig
+from services.sqlite_asset_audit_importer import SqliteAssetAuditImporter
 from services.studio_asset_sync import StudioAssetSyncService
 from services.animation_export import write_animation_export
 from services.native_pickers import (
@@ -66,11 +69,19 @@ migrate_source_only_assets(ROOT, ROOT / ".control-center" / "game1.db")
 control_agent_build = "game1-m50-environment-weapon-bounce-001"
 port = int(os.environ.get("CONTROL_AGENT_PORT", "43821"))
 token = os.environ.get("CONTROL_TOKEN", "Game1LocalControlV1")
+asset_audit_repository = MySqlAssetReplacementAudit(MySqlAuditConfig.from_environment())
+asset_replacement_audit = SqliteAssetAuditImporter(ROOT, asset_audit_repository)
 store = CharacterStore(ROOT)
 character_components = CharacterComponents(ROOT)
 character_assemblies = CharacterAssemblies(ROOT, store, character_components)
 store.export()
-character_publications = CharacterPublicationQueue(ROOT, character_components, on_published=store.export)
+def export_character_publication():
+    store.export()
+    asset_replacement_audit.sync_all()
+
+
+character_publications = CharacterPublicationQueue(
+    ROOT, character_components, on_published=export_character_publication)
 animations = AnimationStore(ROOT)
 weapons = WeaponStore(ROOT)
 monsters = MonsterStore(ROOT)
@@ -88,10 +99,12 @@ options_store = OptionsStore(ROOT)
 timelines = TimelineStore(ROOT, store, animations, monsters, monster_animations)
 locations = LocationStore(ROOT, run_location_authoring_bridge)
 location_assets = LocationAssetStore(ROOT)
+location_asset_sync_history = LocationAssetSyncHistory(ROOT, database=asset_audit_repository)
 real_estate = RealEstateStore(ROOT, location_assets=location_assets)
 real_estate_placements = RealEstatePlacementStore(ROOT, real_estate)
 real_estate.placement_store = real_estate_placements
-real_estate_publications = RealEstatePublicationJobs(real_estate)
+real_estate_publications = RealEstatePublicationJobs(
+    real_estate, on_succeeded=asset_replacement_audit.sync_all)
 deco_layouts = DecoLayoutStore(ROOT)
 character_identity = CharacterIdentityService(ROOT, store, animations)
 real_estate_studio_sync = RealEstateStudioSync(real_estate, run_model_load_bridge)
@@ -148,7 +161,8 @@ READ_SOURCES = MappingProxyType({
     "characters": store, "animations": animations, "character_components": character_components, "character_assemblies": character_assemblies, "character_publications": character_publications,
     "weapons": weapons, "monsters": monsters, "monster_animations": monster_animations,
     "npcs": npcs, "npc_animations": npc_animations, "npc_equipment": npc_equipment,
-    "location_assets": location_assets, "real_estate": real_estate,
+    "location_assets": location_assets, "location_asset_sync_history": location_asset_sync_history,
+    "asset_replacement_audit": asset_replacement_audit, "real_estate": real_estate,
     "real_estate_placements": real_estate_placements,
     "real_estate_publications": real_estate_publications, "npc_spawns": npc_spawns,
     "monster_spawns": monster_spawns, "animation_speed_scaling": animation_speed_scaling,
@@ -185,6 +199,8 @@ WRITE_SOURCES = MappingProxyType({
     "choose_weapon_textures": choose_weapon_textures,
     "deco_layouts": deco_layouts,
     "location_assets": location_assets,
+    "location_asset_sync_history": location_asset_sync_history,
+    "asset_replacement_audit": asset_replacement_audit,
     "sync_location_assets_to_studio": run_deco_refresh_bridge,
     "locations": locations,
     "monster_animations": monster_animations,

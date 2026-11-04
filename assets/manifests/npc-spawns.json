@@ -58,23 +58,22 @@
       "mapKey": "main",
       "placeId": 0,
       "position": {
-        "x": 266.093,
-        "y": -142.376,
-        "z": -171.079
+        "x": 270.423,
+        "y": -142.103,
+        "z": -172.457
       },
-      "yawDegrees": 325.55,
+      "yawDegrees": 316.45,
       "respawnSeconds": 10.0,
-      "spawnRadius": 1.0,
-      "maxAlive": 1,
       "enabled": true,
       "createdAtUtc": "2026-10-20T19:57:07.740699Z",
-      "updatedAtUtc": "2026-10-20T19:57:07.740699Z",
+      "updatedAtUtc": "2026-11-03T19:48:32.421326Z",
+      "placedAtUtc": "2026-11-03T19:48:22.862182Z",
       "studioSync": {
         "status": "synced",
-        "recordFingerprint": "ec38ceddaa764f765dc3c06ad313a7c52d2c66aff7b5756efade4f912fa6e3e9",
+        "recordFingerprint": "27a32717ba29f15f34e76fa03886e9159f795eccacb93eee18b2249bbe7e901a",
         "placeId": 0,
         "markerPath": "Workspace.Game1Authoring.NpcSpawns.Guard_01_b126db75",
-        "syncedAtUtc": "2026-10-20T19:57:08.793207Z"
+        "syncedAtUtc": "2026-11-03T19:48:33.460647Z"
       }
     }
   }

@@ -21,6 +21,7 @@ function TestStand.new(services: any): any
         draft = nil,
         busy = false,
         placing = false,
+        ownsPluginMouse = false,
         destroyed = false,
         connections = {},
     }, TestStand)
@@ -47,7 +48,7 @@ function TestStand.new(services: any): any
         self:PlaceAtMouse()
     end))
     table.insert(self.connections, services.plugin.Deactivation:Connect(function()
-        if self.placing then self:CancelPlacement("Размещение отменено.") end
+        if self.placing then self:CancelPlacement("Размещение отменено.", false) end
     end))
     table.insert(self.connections, services.plugin.Unloading:Connect(function()
         self:Destroy()
@@ -136,10 +137,16 @@ function TestStand:BeginPlacement()
     self.placing = true
     self:SetStatus("Кликни по поверхности в Workspace. Esc отменяет. Можно ставить несколько копий.")
     self.plugin:Activate(true)
+    self.ownsPluginMouse = true
 end
 
-function TestStand:CancelPlacement(text: string)
+function TestStand:CancelPlacement(text: string, releasePluginMouse: boolean?)
+    local shouldDeactivate = self.ownsPluginMouse and releasePluginMouse ~= false
     self.placing = false
+    self.ownsPluginMouse = false
+    if shouldDeactivate then
+        self.plugin:Deactivate()
+    end
     if not self.destroyed then self:SetStatus(text) end
 end
 
@@ -177,6 +184,7 @@ function TestStand:PlaceAtMouse()
         return
     end
     self.placing = false
+    self.ownsPluginMouse = false
     self.plugin:Deactivate()
     self.selection:Set({model})
     self:SetStatus(model.Name .. " размещён. В Studio Play подойди к модели и нажми E.")

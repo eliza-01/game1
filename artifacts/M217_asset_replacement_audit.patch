@@ -1,0 +1,2261 @@
+diff --git a/.gitignore b/.gitignore
+index b0ec575..95a54b1 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -2,6 +2,8 @@
+ .control-center/*.pid
+ .control-center/*.db
+ .control-center/*.db-*
++.control-center/location-asset-studio-sync-history.jsonl
++.control-center/backups/
+ .env.local
+ place/snapshots/*.rbxl
+ __pycache__/
+diff --git a/docs/README Read First!.md b/docs/README Read First!.md
+index c3d78cb..c906748 100644
+--- a/docs/README Read First!.md	
++++ b/docs/README Read First!.md	
+@@ -7,6 +7,8 @@
+ 
+ | Документ | Зачем читать | Статус |
+ | --- | --- | --- |
++| [M217 — полный аудит замен всех ассетов](workflows/ASSET_REPLACEMENT_AUDIT_M217_RU.md) | MySQL 8.4, объединённая история публикаций/замен всех asset-доменов, backup/recovery | **CURRENT / SAFETY CRITICAL** |
++| [M216 — Location Assets: аварийный откат M215 и безопасный ID Sync](workflows/LOCATION_ASSETS_SAFE_ID_SYNC_M216_RU.md) | Строгое ограничение Studio Sync одним slug, запрет перепостроения моделей и журнал заменённых ID | **CURRENT / SAFETY CRITICAL** |
+ | [M189 — R3 Characters/Animations stores](workflows/CHARACTER_ANIMATION_STORES_R3_M189_RU.md) | Границы Python-хранилищ, контроль идентичности генерации, дальнейший долг | **CURRENT R3 STEP** |
+ | [Анимации: лицо, emotions и события](animation/README.md) | Четыре контроллера лица, Blender-маркеры, документы клипов и этап внедрения | **CURRENT / IMPLEMENTING** |
+ | [Актуальное ТЗ](spec/CURRENT_PROJECT_SPEC_RU.md) | Текущие возможности, socket/atlas/FBX/actor контракты, scope и Definition of Done | **CURRENT** |
+diff --git a/docs/architecture/CURRENT_ARCHITECTURE_RU.md b/docs/architecture/CURRENT_ARCHITECTURE_RU.md
+index bf240f8..cda1352 100644
+--- a/docs/architecture/CURRENT_ARCHITECTURE_RU.md
++++ b/docs/architecture/CURRENT_ARCHITECTURE_RU.md
+@@ -70,3 +70,23 @@ M85–M105 **реализовали** значительную декомпоз
+ ### M203 · Атласы и потребители
+ 
+ Real Estate и Location Assets не владеют Image Asset и не публикуют его сами. Варианты и исходники принадлежат Atlas Registry; в `texture_atlas_bindings` — только ссылки `consumer_type/consumer_id → variant_id`. M203 удаляет исторические owner-ссылки/retained-slug механизм миграцией двух баз. Проекции `textureAssetId` в runtime реестрах не являются ownership. Weapon/Monster/NPC texture slots пока отдельный старый контур — не приписывать его к этому контракту без миграции. Подробнее: `docs/workflows/ATLAS_INDEPENDENCE_M203_RU.md`.
++
++### M216: безопасность синхронизации Location Assets
++
++`DecoPlacedAssetSync.RefreshIds` — исключительно редакторская замена двух Image ID
++свойств на существующих MeshPart для **одного** `Game1DecoAssetSlug`, плюс
++метаданные Model Asset reference. Обновление самой FBX-геометрии/физики не входит
++в Sync Studio. `StudioDecoSyncCommands` принимает только schemaVersion=3, Host
++Agent валидирует target slug и сохраняет append-only журнал изменений ID через
++`LocationAssetSyncHistory`; общий Atlas Republish не запускает Studio Sync.
++См. `docs/workflows/LOCATION_ASSETS_SAFE_ID_SYNC_M216_RU.md`.
++
++### M217: постоянный аудит замен всех ассетов
++
++`MySqlAssetReplacementAudit` — единственный writer нормализованных audit-таблиц
++MySQL 8.4. `SqliteAssetAuditImporter` проецирует store-owned publication tables
++в общий журнал без изменения SQLite. `LocationAssetSyncHistory` отдельно
++координирует Studio WAL и per-instance результат (`instanceId`, path, old/new
++IDs). Ошибка MySQL блокирует audit-sensitive publish/delete/Sync, но не запуск
++остальных Host Agent сервисов. См.
++`docs/workflows/ASSET_REPLACEMENT_AUDIT_M217_RU.md`.
+diff --git a/generated/Game1Bridge.rbxmx b/generated/Game1Bridge.rbxmx
+index cfaab68..5908959 100644
+--- a/generated/Game1Bridge.rbxmx
++++ b/generated/Game1Bridge.rbxmx
+@@ -435,6 +435,28 @@ return DecoAssetLoader
+         </Properties>
+       </Item>
+       <Item class="ModuleScript" referent="5">
++        <Properties>
++          <string name="Name">DecoAssetPreparation</string>
++          <string name="Source"><![CDATA[-- Applied only to initial decoration placement. Studio Sync never changes
++-- physical-part policy or replaces already placed geometry.
++local DecoAssetPreparation = {}
++
++function DecoAssetPreparation.PreparePlaced(model: Model)
++    for _, descendant in ipairs(model:GetDescendants()) do
++        if descendant:IsA("BasePart") then
++            -- The placement ghost is anchored; placed decorations are not.
++            -- Collision and query properties remain authored by the model.
++            descendant.Anchored = false
++            descendant.CanTouch = false
++        end
++    end
++end
++
++return table.freeze(DecoAssetPreparation)
++]]></string>
++        </Properties>
++      </Item>
++      <Item class="ModuleScript" referent="6">
+         <Properties>
+           <string name="Name">DecoManager</string>
+           <string name="Source"><![CDATA[local DecoAssetLoader = require(script.Parent.DecoAssetLoader)
+@@ -756,7 +778,7 @@ function DecoManager:_setCategory(category: string)
+     self:_showCurrent()
+ end
+ 
+-function DecoManager:refreshRegistry(targetSlug: string?)
++function DecoManager:refreshRegistry(targetSlug: string?, applyIds: boolean?, expectedModelId: string?, expectedAtlasId: string?)
+     self:_setStatus("Refreshing Location Assets registry…")
+     local ok, result = pcall(function()
+         return self.loader:fetchRegistry()
+@@ -768,20 +790,29 @@ function DecoManager:refreshRegistry(targetSlug: string?)
+         return nil, tostring(result)
+     end
+     self.registry = result
+-    local syncResult = DecoPlacedAssetSync.RefreshTextures(self.Workspace, result, targetSlug, self.ServerStorage)
+-    if syncResult.parts > 0 then
+-        self.ChangeHistoryService:SetWaypoint("Refresh Deco Asset Textures")
++    -- Catalog browsing never alters any placed Model. Explicit Studio Sync
++    -- requires exactly one slug and two publication IDs verified by the plugin.
++    local syncResult = { models = 0, parts = 0, matchedModels = 0,
++        modelReferences = 0, pendingGeometry = 0, replacedModels = 0,
++        changes = {}, instances = {} }
++    if applyIds == true then
++        if not targetSlug or not expectedModelId or not expectedAtlasId then
++            error("scoped ID-only Studio Sync requires an explicit asset and publication IDs")
++        end
++        -- A waypoint BEFORE the update makes Undo possible even for an error.
++        self.ChangeHistoryService:SetWaypoint("Before Location Asset ID Sync: " .. targetSlug)
++        syncResult = DecoPlacedAssetSync.RefreshIds(
++            self.Workspace, result, targetSlug, self.HttpService, expectedModelId, expectedAtlasId)
++        self.ChangeHistoryService:SetWaypoint("Location Asset ID Sync: " .. targetSlug)
+     end
+     self:_setCategory(self.category)
+-    if syncResult.parts > 0 then
+-        self:_setStatus(("Registry refreshed · updated texture on %d placed asset(s) / %d MeshPart(s)"):format(
+-            syncResult.models,
+-            syncResult.parts
+-        ))
+-    else
+-        self:_setStatus("Registry refreshed · placed textures are already current")
+-    end
+-    return { models = syncResult.models, parts = syncResult.parts, matchedModels = syncResult.matchedModels, registryItems = #result.items }
++    self:_setStatus(("Registry refreshed · %d placed item(s), %d image IDs changed, %d model references · %d stale FBX geometries"):format(
++        syncResult.matchedModels, syncResult.parts, syncResult.modelReferences, syncResult.pendingGeometry))
++    return { models = syncResult.models, parts = syncResult.parts,
++        replacedModels = 0, matchedModels = syncResult.matchedModels,
++        modelReferences = syncResult.modelReferences, pendingGeometry = syncResult.pendingGeometry,
++        changes = syncResult.changes, instances = syncResult.instances,
++        registryItems = #result.items }
+ end
+ 
+ function DecoManager:_placeCurrent()
+@@ -918,10 +949,10 @@ function DecoManager:_wire()
+         self:_saveAssetsData()
+     end)
+     self.plugin.Deactivation:Connect(function()
+-        self.placement:cancel()
++        self.placement:cancel(false)
+     end)
+     self.plugin.Unloading:Connect(function()
+-        self.placement:cancel()
++        self.placement:cancel(false)
+         self:_clearPreview()
+     end)
+     self:_setCategory("tree")
+@@ -931,74 +962,317 @@ return DecoManager
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="6">
++      <Item class="ModuleScript" referent="7">
+         <Properties>
+           <string name="Name">DecoPlacedAssetSync</string>
+-          <string name="Source"><![CDATA[local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
++          <string name="Source"><![CDATA[-- M216: scoped, ID-only Location Asset Studio synchronization.
++-- CRITICAL: Never replace, re-parent, ScaleTo, PivotTo, ApplyMesh or Destroy a
++-- placed Model / MeshPart. A published Model asset is NOT a writable MeshId.
++local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
++
+ local DecoPlacedAssetSync = {}
++local SLUG_ATTRIBUTE = "Game1DecoAssetSlug"
++local HISTORY_ATTRIBUTE = "Game1DecoSyncHistory"
++local REGISTRY_MODEL_ID_ATTRIBUTE = "Game1DecoRegistryModelAssetId"
+ 
+-local ROOT_NAME = "Game1DecoAssets"
+-local ASSET_SLUG_ATTRIBUTE = "Game1DecoAssetSlug"
++local function assetId(value: any): string
++    local parsed = tonumber(value)
++    if not parsed or parsed <= 0 or parsed ~= math.floor(parsed) then
++        error("invalid published Location Asset ID")
++    end
++    return tostring(math.floor(parsed))
++end
+ 
+-local function rowsBySlug(registry: any): { [string]: any }
+-    local result = {}
++local function findRow(registry: any, slug: string): any
+     if type(registry) ~= "table" or type(registry.items) ~= "table" then
+-        return result
++        error("invalid Location Assets registry")
+     end
+     for _, row in ipairs(registry.items) do
+-        local slug = tostring(row.slug or "")
+-        if slug ~= "" then
+-            result[slug] = row
++        if tostring(row.slug or "") == slug then
++            if tostring(row.status or "") ~= "PUBLISHED" then
++                error("Location Asset is not fully published: " .. slug)
++            end
++            return row
++        end
++    end
++    error("Location Asset is missing from the registry: " .. slug)
++end
++
++local function placedModels(workspace: Workspace, slug: string): { Model }
++    local result: { Model } = {}
++    local authoring = workspace:FindFirstChild("Game1Authoring")
++    local camera = workspace.CurrentCamera
++    -- Older authored places keep decorations below Workspace.Places, while new
++    -- placements live below Workspace.Game1DecoAssets. Identity attributes are
++    -- the stable boundary; never move either layout merely to make Sync find it.
++    for _, descendant in ipairs(workspace:GetDescendants()) do
++        if descendant:IsA("Model")
++            and descendant:GetAttribute(SLUG_ATTRIBUTE) == slug
++            and tostring(descendant:GetAttribute("Game1DecoInstanceId") or "") ~= ""
++            and (authoring == nil or not descendant:IsDescendantOf(authoring))
++            and (camera == nil or not descendant:IsDescendantOf(camera)) then
++            local ancestor = descendant.Parent
++            local nested = false
++            while ancestor ~= nil and ancestor ~= workspace do
++                if ancestor:IsA("Model") and ancestor:GetAttribute(SLUG_ATTRIBUTE) ~= nil then
++                    nested = true
++                    break
++                end
++                ancestor = ancestor.Parent
++            end
++            if not nested then
++                table.insert(result, descendant)
++            end
+         end
+     end
+     return result
+ end
+ 
+--- Only game1-owned instances are eligible. Scope is by immutable asset slug,
+--- never by proximity, name or model shape. Does not load/place/clone anything.
+-function DecoPlacedAssetSync.RefreshTextures(workspace: Workspace, registry: any, targetSlug: string?, serverStorage: Instance?): any
+-    local registryRows = rowsBySlug(registry)
+-    local changedModels, changedParts, matchedModels = 0, 0, 0
+-    local function updateTree(root: Instance)
+-        for _, descendant in ipairs(root:GetDescendants()) do
+-            if descendant:IsA("Model") then
+-                local slug = tostring(descendant:GetAttribute(ASSET_SLUG_ATTRIBUTE) or "")
+-                if slug ~= "" and (targetSlug == nil or targetSlug == "" or slug == targetSlug) then
+-                    local row = registryRows[slug]
+-                    local numericId = row and tonumber(row.texture_asset_id) or nil
+-                    if row and tostring(row.status or "") == "PUBLISHED" and numericId and numericId > 0 then
+-                        matchedModels += 1
+-                        local uri = "rbxassetid://" .. tostring(math.floor(numericId))
+-                        local modelChanged = false
+-                        for _, part in ipairs(descendant:GetDescendants()) do
+-                            if part:IsA("MeshPart") and StudioTextureAppearance.Apply(part, uri, row.textureUsesAlpha) then
+-                                changedParts += 1
+-                                modelChanged = true
+-                            end
+-                        end
+-                        if modelChanged then
+-                            changedModels += 1
+-                        end
+-                    end
++-- Stamp publication identity only on a fresh, unparented placement clone. This
++-- is deliberately separate from RefreshIds: ID Sync must never claim that an
++-- existing placed model received newly published FBX geometry.
++function DecoPlacedAssetSync.StampPublishedModel(model: Model, row: any)
++    if not model:IsA("Model") or model.Parent ~= nil then
++        error("published identity can only be stamped on a fresh placement clone")
++    end
++    local modelId = assetId(row.model_asset_id)
++    local publishedSha = tostring(row.model_published_sha256 or "")
++    if publishedSha == "" then
++        error("published Location Asset model SHA is required")
++    end
++    model:SetAttribute("Game1DecoPublishedModelAssetId", modelId)
++    model:SetAttribute("Game1DecoPublishedModelSha256", publishedSha)
++    model:SetAttribute(REGISTRY_MODEL_ID_ATTRIBUTE, modelId)
++end
++
++local function priorHistory(model: Model, http: any): { any }
++    local raw = model:GetAttribute(HISTORY_ATTRIBUTE)
++    if raw == nil then
++        return {}
++    end
++    if type(raw) ~= "string" then
++        error("invalid Studio ID history attribute on " .. model:GetFullName())
++    end
++    local ok, decoded = pcall(http.JSONDecode, http, raw)
++    if not ok or type(decoded) ~= "table" then
++        error("corrupt Studio ID history on " .. model:GetFullName())
++    end
++    return decoded
++end
++
++local function idFromUri(uri: string): string
++    return uri:match("(%d+)$") or ""
++end
++
++-- This intentionally DOES NOT apply the newly published FBX to old placements.
++-- MeshPart.MeshId is not writable. ApplyMesh also replaces collision geometry,
++-- so it cannot be used for the promised "replace IDs only" operation.
++function DecoPlacedAssetSync.RefreshIds(
++    workspace: Workspace, registry: any, targetSlug: string, http: any,
++    expectedModelId: string, expectedAtlasId: string
++): any
++    if type(targetSlug) ~= "string" or targetSlug == "" then
++        error("a target Location Asset slug is required; global sync is forbidden")
++    end
++    local row = findRow(registry, targetSlug)
++    local modelId = assetId(row.model_asset_id)
++    local atlasId = assetId(row.texture_asset_id)
++    if modelId ~= expectedModelId or atlasId ~= expectedAtlasId then
++        error("Location Asset publication changed during Studio Sync; retry")
++    end
++    local models = placedModels(workspace, targetSlug)
++    local uri = "rbxassetid://" .. atlasId
++    local pending = {}
++    local uniqueChanges = {}
++    for _, model in ipairs(models) do
++        local currentReference = tostring(model:GetAttribute(REGISTRY_MODEL_ID_ATTRIBUTE)
++            or model:GetAttribute("Game1DecoPublishedModelAssetId") or "")
++        local modelChange = currentReference ~= modelId
++        local meshChanges = {}
++        for _, descendant in ipairs(model:GetDescendants()) do
++            if descendant:IsA("MeshPart") then
++                local surface = descendant:FindFirstChildOfClass("SurfaceAppearance")
++                if descendant.TextureID ~= uri or (surface ~= nil and surface.ColorMap ~= uri) then
++                    table.insert(meshChanges, { part = descendant, oldId = idFromUri(descendant.TextureID) })
+                 end
+             end
+         end
++        if modelChange or #meshChanges > 0 then
++            local history = priorHistory(model, http) -- validate before touching any instance
++            table.insert(pending, { model = model, oldModelId = currentReference,
++                modelChange = modelChange, meshes = meshChanges, history = history })
++            if modelChange then
++                uniqueChanges["model_reference:" .. currentReference .. ":" .. modelId] = true
++            end
++            for _, entry in ipairs(meshChanges) do
++                uniqueChanges["atlas:" .. entry.oldId .. ":" .. atlasId] = true
++            end
++        end
++    end
++    local differentPairs = 0
++    for _ in pairs(uniqueChanges) do
++        differentPairs += 1
++    end
++    if differentPairs > 32 then
++        error("too many different published IDs in one Sync; refused before changes")
++    end
++
++    local summary = {}
++    local function record(kind: string, oldId: string, newId: string)
++        local key = kind .. ":" .. oldId .. ":" .. newId
++        if not summary[key] then
++            summary[key] = { kind = kind, oldId = oldId, newId = newId, count = 0 }
++        end
++        summary[key].count += 1
+     end
+-    updateTree(workspace)
+-    if serverStorage ~= nil then
+-        updateTree(serverStorage)
++    -- Pre-serialize audit entries BEFORE changing any placed object. Store a
++    -- compact per-instance summary, not one duplicate record per MeshPart.
++    for _, item in ipairs(pending) do
++        local group = {}
++        local function include(kind: string, oldId: string, newId: string)
++            local key = kind .. ":" .. oldId .. ":" .. newId
++            if not group[key] then
++                group[key] = { kind = kind, oldId = oldId, newId = newId, count = 0 }
++            end
++            group[key].count += 1
++        end
++        if item.modelChange then
++            include("model_reference", item.oldModelId, modelId)
++        end
++        for _, entry in ipairs(item.meshes) do
++            include("atlas", entry.oldId, atlasId)
++        end
++        local changes = {}
++        for _, event in pairs(group) do
++            table.insert(changes, event)
++        end
++        table.insert(item.history, { atUtc = os.time(), slug = targetSlug,
++            instanceId = tostring(item.model:GetAttribute("Game1DecoInstanceId") or ""), changes = changes })
++        while #item.history > 32 do
++            table.remove(item.history, 1)
++        end
++        item.encodedHistory = http:JSONEncode(item.history)
++        if #item.encodedHistory > 30000 then
++            error("Location Asset Studio history too large; refused before changes")
++        end
+     end
+-    return { models = changedModels, parts = changedParts, matchedModels = matchedModels }
++
++    local modifiedModels, changedParts, modelReferences = 0, 0, 0
++    local undo = {}
++    local committed, commitError = pcall(function()
++        for _, item in ipairs(pending) do
++            local model: Model = item.model
++            item.committedChanges = {}
++            local function committedChange(kind: string, oldId: string, newId: string)
++                local key = kind .. ":" .. oldId .. ":" .. newId
++                if not item.committedChanges[key] then
++                    item.committedChanges[key] = {
++                        kind = kind, oldId = oldId, newId = newId, count = 0,
++                    }
++                end
++                item.committedChanges[key].count += 1
++            end
++            -- Do not commit if the place has been edited while preflight ran.
++            if model.Parent == nil or model:GetAttribute(SLUG_ATTRIBUTE) ~= targetSlug then
++                error("placed Location Asset changed during Sync; aborting")
++            end
++            -- The model ID is only a registry REFERENCE. In particular leave
++            -- Game1DecoPublishedModelSha256 unchanged: the FBX stays as placed.
++            if item.modelChange then
++                table.insert(undo, {kind = "model_reference", model = model,
++                    previous = model:GetAttribute(REGISTRY_MODEL_ID_ATTRIBUTE)})
++                model:SetAttribute(REGISTRY_MODEL_ID_ATTRIBUTE, modelId)
++                modelReferences += 1
++                record("model_reference", item.oldModelId, modelId)
++                committedChange("model_reference", item.oldModelId, modelId)
++            end
++            for _, entry in ipairs(item.meshes) do
++                local mesh: MeshPart = entry.part
++                local surface = mesh:FindFirstChildOfClass("SurfaceAppearance")
++                table.insert(undo, {kind = "atlas", mesh = mesh, surface = surface,
++                    texture = mesh.TextureID, colorMap = if surface then surface.ColorMap else nil})
++                -- Central texture adapter in STRICT ID-only mode. No AlphaMode,
++                -- SurfaceAppearance creation, pivot, scale or collision changes.
++                if StudioTextureAppearance.Apply(mesh, uri, nil, true) then
++                    changedParts += 1
++                    record("atlas", entry.oldId, atlasId)
++                    committedChange("atlas", entry.oldId, atlasId)
++                end
++            end
++            table.insert(undo, {kind = "history", model = model,
++                previous = model:GetAttribute(HISTORY_ATTRIBUTE)})
++            model:SetAttribute(HISTORY_ATTRIBUTE, item.encodedHistory)
++            modifiedModels += 1
++        end
++    end)
++    if not committed then
++        -- Best-effort transaction rollback. Never Destroy / Clone a Model.
++        for index = #undo, 1, -1 do
++            local entry = undo[index]
++            pcall(function()
++                if entry.kind == "atlas" then
++                    entry.mesh.TextureID = entry.texture
++                    if entry.surface ~= nil and entry.colorMap ~= nil then
++                        entry.surface.ColorMap = entry.colorMap
++                    end
++                elseif entry.kind == "model_reference" then
++                    entry.model:SetAttribute(REGISTRY_MODEL_ID_ATTRIBUTE, entry.previous)
++                elseif entry.kind == "history" then
++                    entry.model:SetAttribute(HISTORY_ATTRIBUTE, entry.previous)
++                end
++            end)
++        end
++        error("scoped Location Asset ID sync failed; ID rollback attempted: " .. tostring(commitError), 2)
++    end
++    local changes = {}
++    for _, event in pairs(summary) do
++        table.insert(changes, event)
++    end
++    table.sort(changes, function(a, b)
++        return a.kind .. a.oldId .. a.newId < b.kind .. b.oldId .. b.newId
++    end)
++    -- The central audit database needs the exact placed instance affected by
++    -- each replacement. The bounded model attribute above remains only a
++    -- convenient recent cache inside Studio; this response is the durable log.
++    local instances = {}
++    for _, item in ipairs(pending) do
++        local instanceChanges = {}
++        for _, event in pairs(item.committedChanges) do
++            table.insert(instanceChanges, event)
++        end
++        table.sort(instanceChanges, function(a, b)
++            return a.kind .. a.oldId .. a.newId < b.kind .. b.oldId .. b.newId
++        end)
++        if #instanceChanges > 0 then
++            table.insert(instances, {
++                instanceId = tostring(item.model:GetAttribute("Game1DecoInstanceId") or ""),
++                studioPath = item.model:GetFullName(),
++                changes = instanceChanges,
++            })
++        end
++    end
++    local pendingGeometry = 0
++    for _, model in ipairs(models) do
++        if tostring(model:GetAttribute("Game1DecoPublishedModelSha256") or "")
++            ~= tostring(row.model_published_sha256 or "") then
++            pendingGeometry += 1
++        end
++    end
++    return { models = modifiedModels, parts = changedParts, matchedModels = #models,
++        modelReferences = modelReferences, pendingGeometry = pendingGeometry,
++        replacedModels = 0, changes = changes, instances = instances }
+ end
+ 
+ return DecoPlacedAssetSync
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="7">
++      <Item class="ModuleScript" referent="8">
+         <Properties>
+           <string name="Name">DecoPlacement</string>
+           <string name="Source"><![CDATA[local DecoTransform = require(script.Parent.DecoTransform)
++local DecoAssetPreparation = require(script.Parent.DecoAssetPreparation)
++local DecoPlacedAssetSync = require(script.Parent.DecoPlacedAssetSync)
+ 
+ local DecoPlacement = {}
+ DecoPlacement.__index = DecoPlacement
+@@ -1030,17 +1304,6 @@ local function prepareGhost(model: Model)
+     end
+ end
+ 
+-local function preparePlaced(model: Model)
+-    for _, descendant in ipairs(model:GetDescendants()) do
+-        if descendant:IsA("BasePart") then
+-            -- Placement ghosts are anchored, authored decorations are not. Keep the
+-            -- placed asset editable with the normal Studio transform tools.
+-            descendant.Anchored = false
+-            descendant.CanTouch = false
+-        end
+-    end
+-end
+-
+ function DecoPlacement.new(config: any)
+     local self = setmetatable({
+         plugin = config.plugin,
+@@ -1057,6 +1320,7 @@ function DecoPlacement.new(config: any)
+         clickConnection = nil,
+         statusCallback = nil,
+         committing = false,
++        ownsPluginMouse = false,
+     }, DecoPlacement)
+     return self
+ end
+@@ -1155,12 +1419,17 @@ function DecoPlacement:_detachSession(): Model?
+     return ghost
+ end
+ 
+-function DecoPlacement:cancel()
++function DecoPlacement:cancel(releasePluginMouse: boolean?)
+     local ghost = self:_detachSession()
+     if ghost ~= nil then
+         ghost:Destroy()
+     end
+     self.committing = false
++    local shouldDeactivate = self.ownsPluginMouse and releasePluginMouse ~= false
++    self.ownsPluginMouse = false
++    if shouldDeactivate then
++        self.plugin:Deactivate()
++    end
+ end
+ 
+ function DecoPlacement:_commit()
+@@ -1176,7 +1445,8 @@ function DecoPlacement:_commit()
+     local pivot = ghost:GetPivot()
+ 
+     local placed = sourceTemplate:Clone()
+-    preparePlaced(placed)
++    DecoAssetPreparation.PreparePlaced(placed)
++    DecoPlacedAssetSync.StampPublishedModel(placed, row)
+     local instanceId = self.HttpService:GenerateGUID(false)
+     placed.Name = tostring(row.slug or "deco") .. "__" .. string.sub(instanceId, 1, 8)
+     -- Studio placement stores identity, not gameplay policy. Runtime resolves the
+@@ -1192,6 +1462,7 @@ function DecoPlacement:_commit()
+     if staleGhost ~= nil then
+         staleGhost:Destroy()
+     end
++    self.ownsPluginMouse = false
+     self.plugin:Deactivate()
+     self.ChangeHistoryService:SetWaypoint("Place Deco Asset")
+ 
+@@ -1208,6 +1479,7 @@ function DecoPlacement:start(template: Model, row: any, statusCallback: (string)
+     -- Plugin.Deactivation while tool ownership changes; there is nothing fresh to
+     -- destroy until Activate has completed.
+     self.plugin:Activate(true)
++    self.ownsPluginMouse = true
+ 
+     self.sourceTemplate = template
+     self.row = row
+@@ -1270,7 +1542,7 @@ return DecoPlacement
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="8">
++      <Item class="ModuleScript" referent="9">
+         <Properties>
+           <string name="Name">DecoTransform</string>
+           <string name="Source"><![CDATA[local DecoTransform = {}
+@@ -1353,7 +1625,7 @@ return DecoTransform
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="9">
++      <Item class="ModuleScript" referent="10">
+         <Properties>
+           <string name="Name">LocationCommands</string>
+           <string name="Source"><![CDATA[-- Polygon Location authoring commands for game1 Asset Manager.
+@@ -1804,7 +2076,7 @@ end
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="10">
++      <Item class="ModuleScript" referent="11">
+         <Properties>
+           <string name="Name">NpcSpawnPlacement</string>
+           <string name="Source"><![CDATA[-- NPC-only Studio placement gesture. Monster placement remains unchanged.
+@@ -1965,7 +2237,7 @@ return table.freeze(NpcSpawnPlacement)
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="11">
++      <Item class="ModuleScript" referent="12">
+         <Properties>
+           <string name="Name">NpcSpawnPreview</string>
+           <string name="Source"><![CDATA[-- Studio-only representation of the published NPC while authoring a spawn point.
+@@ -2071,7 +2343,7 @@ return table.freeze(NpcSpawnPreview)
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="12">
++      <Item class="ModuleScript" referent="13">
+         <Properties>
+           <string name="Name">StudioActorSpawnCommands</string>
+           <string name="Source"><![CDATA[-- Monster/NPC authored spawn commands and lightweight Studio marker placement.
+@@ -2483,7 +2755,7 @@ end
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="13">
++      <Item class="ModuleScript" referent="14">
+         <Properties>
+           <string name="Name">StudioCharacterStandBuilder</string>
+           <string name="Source"><![CDATA[-- Studio authoring adapter for the SAME published assembly recipe and Builder
+@@ -2605,7 +2877,7 @@ return table.freeze(Builder)
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="14">
++      <Item class="ModuleScript" referent="15">
+         <Properties>
+           <string name="Name">StudioCharacterStandPlacement</string>
+           <string name="Source"><![CDATA[-- Edit-mode surface placement. Does not change the imported rig's orientation,
+@@ -2693,7 +2965,7 @@ return table.freeze(Placement)
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="15">
++      <Item class="ModuleScript" referent="16">
+         <Properties>
+           <string name="Name">StudioCharacterStandWidget</string>
+           <string name="Source"><![CDATA[-- Dock widget contains presentation only. No asset imports or Workspace writes.
+@@ -2766,7 +3038,7 @@ return table.freeze(Widget)
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="16">
++      <Item class="ModuleScript" referent="17">
+         <Properties>
+           <string name="Name">StudioCharacterTestStand</string>
+           <string name="Source"><![CDATA[-- Game1Bridge composition root for the Studio-only character assembly stand.
+@@ -2792,6 +3064,7 @@ function TestStand.new(services: any): any
+         draft = nil,
+         busy = false,
+         placing = false,
++        ownsPluginMouse = false,
+         destroyed = false,
+         connections = {},
+     }, TestStand)
+@@ -2818,7 +3091,7 @@ function TestStand.new(services: any): any
+         self:PlaceAtMouse()
+     end))
+     table.insert(self.connections, services.plugin.Deactivation:Connect(function()
+-        if self.placing then self:CancelPlacement("Размещение отменено.") end
++        if self.placing then self:CancelPlacement("Размещение отменено.", false) end
+     end))
+     table.insert(self.connections, services.plugin.Unloading:Connect(function()
+         self:Destroy()
+@@ -2907,10 +3180,16 @@ function TestStand:BeginPlacement()
+     self.placing = true
+     self:SetStatus("Кликни по поверхности в Workspace. Esc отменяет. Можно ставить несколько копий.")
+     self.plugin:Activate(true)
++    self.ownsPluginMouse = true
+ end
+ 
+-function TestStand:CancelPlacement(text: string)
++function TestStand:CancelPlacement(text: string, releasePluginMouse: boolean?)
++    local shouldDeactivate = self.ownsPluginMouse and releasePluginMouse ~= false
+     self.placing = false
++    self.ownsPluginMouse = false
++    if shouldDeactivate then
++        self.plugin:Deactivate()
++    end
+     if not self.destroyed then self:SetStatus(text) end
+ end
+ 
+@@ -2948,6 +3227,7 @@ function TestStand:PlaceAtMouse()
+         return
+     end
+     self.placing = false
++    self.ownsPluginMouse = false
+     self.plugin:Deactivate()
+     self.selection:Set({model})
+     self:SetStatus(model.Name .. " размещён. В Studio Play подойди к модели и нажми E.")
+@@ -2965,7 +3245,7 @@ return table.freeze(TestStand)
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="17">
++      <Item class="ModuleScript" referent="18">
+         <Properties>
+           <string name="Name">StudioDebugPreferenceBridge</string>
+           <string name="Source"><![CDATA[-- Studio-only persistence bridge for Test Loadout preferences.
+@@ -3085,67 +3365,56 @@ end
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="18">
++      <Item class="ModuleScript" referent="19">
+         <Properties>
+           <string name="Name">StudioDecoSyncCommands</string>
+-          <string name="Source"><![CDATA[-- Transport-only adapter for DecoManager's existing registry/material refresh.
+--- Never imports models into ServerStorage or modifies published asset identities.
++          <string name="Source"><![CDATA[-- M216: reject legacy global commands (including M215) before they can mutate.
+ return function(config: any)
+     return function(command: any)
+-        if command.project ~= "game1" or (command.schemaVersion ~= 1 and command.schemaVersion ~= 2)
+-            or type(command.operationId) ~= "string" or command.operationId == "" then
+-            warn("[game1] invalid deco-refresh command")
+-            return
+-        end
+-        local scoped = command.schemaVersion == 2
+-        if scoped and (type(command.targetSlug) ~= "string" or command.targetSlug == ""
+-            or type(command.bindingRevision) ~= "number" or command.bindingRevision < 1) then
+-            warn("[game1] invalid scoped deco-refresh")
++        if command.project ~= "game1" or command.schemaVersion ~= 3
++            or type(command.operationId) ~= "string" or command.operationId == ""
++            or type(command.targetSlug) ~= "string" or command.targetSlug == ""
++            or type(command.bindingRevision) ~= "number" or command.bindingRevision < 1
++            or type(command.modelAssetId) ~= "string" or command.modelAssetId == ""
++            or type(command.atlasAssetId) ~= "string" or command.atlasAssetId == "" then
++            warn("[game1] rejected unsafe/unscoped Location Asset sync command")
+             return
+         end
+         local ok, report, refreshError = pcall(function()
+             if config.RunService:IsRunning() then
+                 error("Studio Edit mode required")
+             end
+-            if scoped then
+-                return config.decoManager:refreshRegistry(command.targetSlug)
+-            end
+-            return config.decoManager:refreshRegistry()
++            return config.decoManager:refreshRegistry(
++                command.targetSlug, true, command.modelAssetId, command.atlasAssetId)
+         end)
+         local payload = {
+-            project = "game1",
+-            command = "deco-refresh",
+-            schemaVersion = command.schemaVersion,
+-            operationId = command.operationId,
+-            targetSlug = if scoped then command.targetSlug else nil,
+-            bindingRevision = if scoped then command.bindingRevision else nil,
++            project = "game1", command = "deco-refresh", schemaVersion = 3,
++            operationId = command.operationId, targetSlug = command.targetSlug,
++            bindingRevision = command.bindingRevision,
+         }
+         if ok and report ~= nil then
+-            payload.matchedModels = report.matchedModels
+-            payload.models = report.models
+-            payload.parts = report.parts
+-            payload.registryItems = report.registryItems
++            for _, field in ipairs({ "models", "parts", "replacedModels", "matchedModels",
++                "modelReferences", "pendingGeometry", "registryItems", "changes", "instances" }) do
++                payload[field] = report[field]
++            end
+         else
+             payload.error = tostring(if ok then refreshError else report)
+         end
+         local posted, response = pcall(config.HttpService.RequestAsync, config.HttpService, {
+-            Url = config.bridgeUrl .. "/deco-refresh-result",
+-            Method = "POST",
+-            Headers = {
+-                ["X-Game1-Token"] = config.bridgeToken,
+-                ["Content-Type"] = "application/json",
+-            },
++            Url = config.bridgeUrl .. "/deco-refresh-result", Method = "POST",
++            Headers = { ["X-Game1-Token"] = config.bridgeToken,
++                ["Content-Type"] = "application/json" },
+             Body = config.HttpService:JSONEncode(payload),
+         })
+         if not posted or not response.Success then
+-            warn("[game1] deco-refresh result could not be reported: " .. tostring(if posted then response.Body else response))
++            warn("[game1] Location Asset sync result could not be reported: " .. tostring(if posted then response.Body else response))
+         end
+     end
+ end
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="19">
++      <Item class="ModuleScript" referent="20">
+         <Properties>
+           <string name="Name">StudioHousePlacementCapture</string>
+           <string name="Source"><![CDATA[-- Read-only Studio authoring adapter. Selection and plot markers stay untouched.
+@@ -3242,7 +3511,7 @@ end
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="20">
++      <Item class="ModuleScript" referent="21">
+         <Properties>
+           <string name="Name">StudioMarkerVisibility</string>
+           <string name="Source"><![CDATA[-- Studio-only presentation toggle. No movement of markers, no metadata edits.
+@@ -3386,7 +3655,7 @@ return table.freeze(Visibility)
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="21">
++      <Item class="ModuleScript" referent="22">
+         <Properties>
+           <string name="Name">StudioModelLoadCommands</string>
+           <string name="Source"><![CDATA[-- Studio model-sync command: validates and imports Character, Monster/NPC and Weapon models.
+@@ -3953,7 +4222,7 @@ end
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="22">
++      <Item class="ModuleScript" referent="23">
+         <Properties>
+           <string name="Name">StudioPlotsCatalog</string>
+           <string name="Source"><![CDATA[-- Read-only discovery contract for authored Workspace.Plots/01..50.
+@@ -4015,7 +4284,7 @@ return table.freeze(Catalog)
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="23">
++      <Item class="ModuleScript" referent="24">
+         <Properties>
+           <string name="Name">StudioPlotsPartPolicy</string>
+           <string name="Source"><![CDATA[-- Reversible, Studio-only properties for Plots visibility and playtest preview.
+@@ -4100,7 +4369,7 @@ return table.freeze(Policy)
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="24">
++      <Item class="ModuleScript" referent="25">
+         <Properties>
+           <string name="Name">StudioPlotsSelectionFilter</string>
+           <string name="Source"><![CDATA[-- Studio viewport hit-test filter for hidden Plots authoring geometry.
+@@ -4190,7 +4459,7 @@ return table.freeze(Filter)
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="25">
++      <Item class="ModuleScript" referent="26">
+         <Properties>
+           <string name="Name">StudioPlotsVisibility</string>
+           <string name="Source"><![CDATA[-- Studio-only Plots preview: hidden -> volumes -> volumes + numbers -> hidden.
+@@ -4484,7 +4753,7 @@ return table.freeze(PlotsVisibility)
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="26">
++      <Item class="ModuleScript" referent="27">
+         <Properties>
+           <string name="Name">StudioRealEstateCollisionPolicy</string>
+           <string name="Source"><![CDATA[-- Real Estate physics layer. Only this module writes MeshPart physics.
+@@ -4597,7 +4866,7 @@ return table.freeze(Policy)
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="27">
++      <Item class="ModuleScript" referent="28">
+         <Properties>
+           <string name="Name">StudioRealEstateHouseFrame</string>
+           <string name="Source"><![CDATA[-- Author-space transform for all Real Estate Studio sync paths.
+@@ -4636,7 +4905,7 @@ return table.freeze(HouseFrame)
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="28">
++      <Item class="ModuleScript" referent="29">
+         <Properties>
+           <string name="Name">StudioRealEstateModel</string>
+           <string name="Source"><![CDATA[-- Studio assembly for any number of independent Real Estate MeshPart rigs.
+@@ -4920,7 +5189,7 @@ return table.freeze(StudioRealEstateModel)
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="29">
++      <Item class="ModuleScript" referent="30">
+         <Properties>
+           <string name="Name">StudioRealEstatePartPlacement</string>
+           <string name="Source"><![CDATA[-- Restore source-FBX mesh centres after independent Model Asset import.
+@@ -5044,7 +5313,7 @@ return table.freeze(Placement)
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="30">
++      <Item class="ModuleScript" referent="31">
+         <Properties>
+           <string name="Name">StudioRealEstatePartSync</string>
+           <string name="Source"><![CDATA[-- Atomic, single-rig refresh of a managed Real Estate template.
+@@ -5278,7 +5547,7 @@ return table.freeze(PartSync)
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="31">
++      <Item class="ModuleScript" referent="32">
+         <Properties>
+           <string name="Name">StudioRealEstatePlacedCollisionSync</string>
+           <string name="Source"><![CDATA[-- Repair *only* authoring-managed collision rigs of already placed Estates.
+@@ -5353,7 +5622,7 @@ return table.freeze(Sync)
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="32">
++      <Item class="ModuleScript" referent="33">
+         <Properties>
+           <string name="Name">StudioRealEstatePlacedPhysicsGuard</string>
+           <string name="Source"><![CDATA[-- Studio Edit Mode: normalize a managed Estate pasted or dragged from
+@@ -5425,7 +5694,7 @@ return table.freeze(Guard)
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="33">
++      <Item class="ModuleScript" referent="34">
+         <Properties>
+           <string name="Name">StudioRealEstatePlacedTargets</string>
+           <string name="Source"><![CDATA[-- One authoritative definition of a placed Real Estate instance.
+@@ -5470,7 +5739,7 @@ return table.freeze(Targets)
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="34">
++      <Item class="ModuleScript" referent="35">
+         <Properties>
+           <string name="Name">StudioRealEstatePlacedVisualSync</string>
+           <string name="Source"><![CDATA[-- Full Real Estate sync: refresh visual rigs on *all managed placed* houses.
+@@ -5589,7 +5858,7 @@ return table.freeze(VisualSync)
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="35">
++      <Item class="ModuleScript" referent="36">
+         <Properties>
+           <string name="Name">StudioRealEstateRigValidation</string>
+           <string name="Source"><![CDATA[-- Validate an already-published Real Estate Model Asset as actually loaded by Roblox.
+@@ -5718,7 +5987,7 @@ return table.freeze(Validation)
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="36">
++      <Item class="ModuleScript" referent="37">
+         <Properties>
+           <string name="Name">StudioTextureAppearance</string>
+           <string name="Source"><![CDATA[-- Shared Studio-side material binding for all authored MeshParts.
+@@ -5726,11 +5995,36 @@ return table.freeze(Validation)
+ -- rigs in the previous project required this compatibility invariant.
+ local StudioTextureAppearance = {}
+ 
+-function StudioTextureAppearance.Apply(mesh: MeshPart, uri: string, usesAlpha: any): boolean
++function StudioTextureAppearance.Apply(mesh: MeshPart, uri: string, usesAlpha: any, idsOnly: boolean?): boolean
+     if uri == "" then
+         return false
+     end
+     local surface = mesh:FindFirstChildOfClass("SurfaceAppearance")
++    if idsOnly == true then
++        -- M216 placed Location Asset sync. Only existing Asset ID fields are
++        -- mutable; do not create SurfaceAppearance or rewrite AlphaMode/physics.
++        if mesh.TextureID == uri and (surface == nil or surface.ColorMap == uri) then
++            return false
++        end
++        local previousTexture = mesh.TextureID
++        local previousMap = if surface then surface.ColorMap else nil
++        local applied, reason = pcall(function()
++            mesh.TextureID = uri
++            if surface ~= nil then
++                surface.ColorMap = uri
++            end
++        end)
++        if not applied then
++            pcall(function()
++                mesh.TextureID = previousTexture
++                if surface ~= nil and previousMap ~= nil then
++                    surface.ColorMap = previousMap
++                end
++            end)
++            error("ID-only appearance binding failed for " .. mesh:GetFullName() .. ": " .. tostring(reason), 2)
++        end
++        return true
++    end
+     local desiredMode = if usesAlpha == true then Enum.AlphaMode.Transparency else Enum.AlphaMode.Overlay
+     local modeKnown = typeof(usesAlpha) == "boolean"
+     local alreadyCurrent = mesh.TextureID == uri
+@@ -5780,7 +6074,7 @@ return table.freeze(StudioTextureAppearance)
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="37">
++      <Item class="ModuleScript" referent="38">
+         <Properties>
+           <string name="Name">StudioTimelineEditorCommands</string>
+           <string name="Source"><![CDATA[-- Timeline authoring session: validates requests, binds UI events and reports results.
+@@ -6069,7 +6363,7 @@ end
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="38">
++      <Item class="ModuleScript" referent="39">
+         <Properties>
+           <string name="Name">StudioTimelinePoseSampler</string>
+           <string name="Source"><![CDATA[-- Offline pose extraction and interpolation for a preview rig. No UI or HTTP dependencies.
+@@ -6248,7 +6542,7 @@ return table.freeze(StudioTimelinePoseSampler)
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="39">
++      <Item class="ModuleScript" referent="40">
+         <Properties>
+           <string name="Name">StudioTimelinePreview</string>
+           <string name="Source"><![CDATA[-- Owns the isolated ViewportFrame rig, camera interaction and animation-asset retrieval.
+@@ -6464,7 +6758,7 @@ return table.freeze(StudioTimelinePreview)
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="40">
++      <Item class="ModuleScript" referent="41">
+         <Properties>
+           <string name="Name">StudioTimelineTransport</string>
+           <string name="Source"><![CDATA[-- HTTP boundary for the Timeline editor. No UI, animation or Studio model access.
+@@ -6522,7 +6816,7 @@ return table.freeze(StudioTimelineTransport)
+ ]]></string>
+         </Properties>
+       </Item>
+-      <Item class="ModuleScript" referent="41">
++      <Item class="ModuleScript" referent="42">
+         <Properties>
+           <string name="Name">StudioTimelineWidget</string>
+           <string name="Source"><![CDATA[-- Timeline editor view. Builds the dock widget and exposes only its controls.
+diff --git a/system/control-center/api/read_world.py b/system/control-center/api/read_world.py
+index 5bad37a..115b5a0 100644
+--- a/system/control-center/api/read_world.py
++++ b/system/control-center/api/read_world.py
+@@ -12,6 +12,21 @@ def route(parsed, sources, info):
+         search = str((parse_qs(parsed.query).get('search') or [''])[0])
+         return 200, {'families': sources['location_assets'].atlases.catalog(search)}
+ 
++    if path == '/api/asset-replacements':
++        try:
++            query = parse_qs(parsed.query)
++            domain = str((query.get('domain') or [''])[0])
++            key = str((query.get('key') or [''])[0])
++            event_kind = str((query.get('eventKind') or [''])[0])
++            limit = int((query.get('limit') or ['200'])[0])
++            raw_before = str((query.get('before') or [''])[0])
++            page = sources['asset_replacement_audit'].page(
++                domain=domain, key=key, event_kind=event_kind, limit=limit,
++                before=int(raw_before) if raw_before else None)
++            return 200, {'domain': domain, 'key': key, **page}
++        except (ValueError, OSError, RuntimeError) as error:
++            return 400, {'error': str(error)}
++
+     if path == '/api/asset-retirement/impact':
+         query = parse_qs(parsed.query)
+         try:
+@@ -22,6 +37,18 @@ def route(parsed, sources, info):
+         except (ValueError, OSError) as error:
+             return 400, {'error': str(error)}
+ 
++    if path == "/api/location-assets/studio-history":
++        try:
++            query = parse_qs(parsed.query)
++            slug = str((query.get('slug') or [''])[0])
++            limit = int((query.get('limit') or ['200'])[0])
++            raw_before = str((query.get('before') or [''])[0])
++            page = sources['location_asset_sync_history'].page(
++                slug, limit=limit, before=int(raw_before) if raw_before else None)
++            return 200, {'slug': slug, **page}
++        except (ValueError, OSError, RuntimeError) as error:
++            return 400, {'error': str(error)}
++
+     if path == "/api/location-assets":
+         snapshot = sources["location_assets"].snapshot()
+         snapshot["publication"] = sources["publication_config"]()
+diff --git a/system/control-center/api/write_dispatch.py b/system/control-center/api/write_dispatch.py
+index cff6ddb..0d90149 100644
+--- a/system/control-center/api/write_dispatch.py
++++ b/system/control-center/api/write_dispatch.py
+@@ -3,27 +3,56 @@ from . import write_files, write_actors, write_world, write_animations, delete_e
+ from services.shared_asset_retirement import SharedAssetRetirement
+ 
+ 
++def _requires_asset_audit(path):
++    return (path == '/api/asset-retirement/execute'
++            or path == '/api/characters/workflow'
++            or path.endswith(('/publish', '/publish-missing', '/republish',
++                               '/replace-model', '/model')))
++
++
+ def dispatch_post(path, body, deps):
++    audit = deps.get('asset_replacement_audit')
++    requires_audit = audit is not None and _requires_asset_audit(path)
++    if requires_audit:
++        try:
++            audit.sync_all()
++        except Exception as error:
++            return 503, {'error': f'asset audit unavailable; mutation refused: {error}'}
+     if path == '/api/asset-retirement/execute':
+         try:
+             data = body()
+             coordinator = SharedAssetRetirement(
+                 deps['real_estate'], deps['location_assets'],
+                 deps.get('real_estate_publications'))
+-            return 200, coordinator.execute(
++            response = 200, coordinator.execute(
+                 str(data.get('kind') or ''), str(data.get('slug') or ''),
+                 mode=str(data.get('mode') or 'preserve'),
+                 token=str(data.get('token') or ''))
++            audit.sync_all()
++            return response
+         except (ValueError, OSError, KeyError) as error:
+             return 400, {'error': str(error)}
+     for handler in (real_estate.write, write_files.route, write_actors.route, write_world.route, write_animations.route):
+         response = handler(path, body, deps)
+         if response is not None:
++            if requires_audit and response[0] < 300:
++                try:
++                    audit.sync_all()
++                except Exception as error:
++                    return 503, {'error': f'asset mutation completed but audit import failed: {error}'}
+             return response
+     return 404, {"error": "not found"}
+ 
+ 
+ def dispatch_delete(path, body, deps):
++    audit = deps.get('asset_replacement_audit')
++    if audit is not None:
++        try:
++            # Publication rows are store-owned and some deletion flows remove
++            # them. Import first so history remains immutable after retirement.
++            audit.sync_all()
++        except Exception as error:
++            return 503, {'error': f'asset audit unavailable; deletion refused: {error}'}
+     response = delete_entities.route(path, body, deps)
+     if response is not None:
+         return response
+diff --git a/system/control-center/api/write_world.py b/system/control-center/api/write_world.py
+index 120676d..f488ca3 100644
+--- a/system/control-center/api/write_world.py
++++ b/system/control-center/api/write_world.py
+@@ -32,40 +32,37 @@ def route(path, body, deps):
+     if path == "/api/location-assets/studio-sync":
+         try:
+             payload = body()
++            if not isinstance(payload, dict):
++                raise ValueError('sync requires a selected Location Asset')
+             slug = str(payload.get('slug') or '').strip().lower()
+-            if slug:
+-                # A legacy shared-texture consumer may inherit an Atlas Registry
+-                # binding from its owner rather than hold an independent binding.
+-                # Targeted acknowledgement cannot prove that other followers
+-                # were refreshed, so refresh all and acknowledge all bindings
+-                # in that compatibility case.
+-                row = location_assets.get(slug)
+-                if not row:
+-                    raise ValueError('unknown location asset')
+-                binding_owner = str(row.get('atlasBindingSourceSlug') or '')
+-                if not binding_owner:
+-                    raise ValueError('atlas binding not found')
+-                revision = location_assets.atlases.active_revisions("location_asset", binding_owner).get(binding_owner)
+-                if revision is None:
+-                    raise ValueError('atlas binding not found')
+-                if binding_owner != slug:
+-                    revisions = location_assets.atlases.active_revisions("location_asset")
+-                    studio = deps["sync_location_assets_to_studio"]()
+-                    location_assets.atlases.mark_all_synced("location_asset", revisions)
+-                else:
+-                    studio = deps["sync_location_assets_to_studio"](slug=slug, binding_revision=revision)
+-                    location_assets.atlases.mark_synced("location_asset", slug, revision)
+-                location_assets.export()
+-            else:
+-                revisions = (location_assets.atlases.active_revisions("location_asset")
+-                             if hasattr(location_assets, 'atlases') else {})
+-                studio = deps["sync_location_assets_to_studio"]()
+-                if revisions:
+-                    location_assets.atlases.mark_all_synced("location_asset", revisions)
+-                    location_assets.export()
+-            return out(200, {"studio": studio})
++            if not slug:
++                raise ValueError('global Location Assets Sync is disabled; select one asset')
++            row = location_assets.get(slug)
++            if not row:
++                raise ValueError('unknown location asset')
++            if row.get('status') != 'PUBLISHED':
++                raise ValueError('publish this Location Asset before Studio Sync')
++            # The M203 independent binding is a direct slug->variant relation.
++            # Legacy inherited bindings cannot be acknowledged by a scoped Sync.
++            if row.get('atlasBindingSourceSlug') not in (None, '', slug):
++                raise ValueError('independent atlas binding required for scoped Studio Sync')
++            if not location_assets.atlases.binding('location_asset', slug):
++                raise ValueError('direct atlas binding not found')
++            revision = row.get('bindingRevision')
++            if type(revision) is not int or revision < 1:
++                raise ValueError('invalid Location Asset atlas binding revision')
++            studio = deps['sync_location_assets_to_studio'](
++                slug=slug, binding_revision=revision,
++                model_asset_id=str(row.get('model_asset_id') or ''),
++                atlas_asset_id=str(row.get('texture_asset_id') or ''))
++            # Record changes BEFORE acknowledging a successful atlas binding.
++            deps['location_asset_sync_history'].append(
++                slug=slug, binding_revision=revision, studio=studio)
++            location_assets.atlases.mark_synced('location_asset', slug, revision)
++            location_assets.export()
++            return out(200, {'studio': studio})
+         except Exception as error:
+-            return out(400, {"error": str(error)})
++            return out(400, {'error': str(error)})
+ 
+     if path == "/api/texture-atlases/variants":
+         try:
+@@ -107,34 +104,14 @@ def route(path, body, deps):
+             # before asking Studio to refresh templates and placed instances.
+             location_assets.export()
+             deps['real_estate'].export()
++            # M216: publishing a SHARED atlas must not silently edit ANY Place.
++            # All consumers become pending and must be explicitly synced by slug
++            # (Real Estate keeps its own separately targeted Sync operation).
+             consumers = location_assets.atlases.consumers(variant_id)
+-            synced = 0
+-            errors = []
+-            location_consumers = [item for item in consumers if item['consumer_type'] == 'location_asset']
+-            if location_consumers:
+-                try:
+-                    deps['sync_location_assets_to_studio']()
+-                    for item in location_consumers:
+-                        if location_assets.atlases.mark_synced('location_asset', item['consumer_id'], item['revision']):
+-                            synced += 1
+-                except Exception as exc:
+-                    errors.append('Location Assets Studio Sync: ' + str(exc))
+-            houses = sorted({item['consumer_id'].rsplit(':', 1)[0] for item in consumers
+-                             if item['consumer_type'] == 'real_estate'})
+-            for slug in houses:
+-                try:
+-                    deps['sync_real_estate_to_studio'](slug)
+-                    synced += sum(1 for item in consumers if item['consumer_type'] == 'real_estate'
+-                                  and item['consumer_id'].rsplit(':', 1)[0] == slug
+-                                  and location_assets.atlases.binding('real_estate', item['consumer_id'])['syncStatus'] == 'synced')
+-                except Exception as exc:
+-                    errors.append('Real Estate ' + slug + ' Studio Sync: ' + str(exc))
+-            if synced:
+-                location_assets.export()
+-                deps['real_estate'].export()
+-            return out(200, {'variant': result, 'syncedConsumers': synced,
+-                             'pendingConsumers': max(0,len(consumers)-synced),
+-                             'studioErrors': errors})
++            return out(200, {'variant': result, 'syncedConsumers': 0,
++                             'pendingConsumers': len(consumers), 'studioErrors': [],
++                             'requiresExplicitStudioSync': True})
++
+         except Exception as error:
+             return out(400, {'error': str(error)})
+ 
+diff --git a/system/control-center/compose.yaml b/system/control-center/compose.yaml
+index 02851f9..dbf33f4 100644
+--- a/system/control-center/compose.yaml
++++ b/system/control-center/compose.yaml
+@@ -1,5 +1,30 @@
+ name: game1-control
+ services:
++  asset-audit-db:
++    image: mysql:8.4
++    container_name: game1-asset-audit-db
++    restart: unless-stopped
++    environment:
++      MYSQL_DATABASE: game1_asset_audit
++      MYSQL_USER: game1_audit
++      # Local loopback-only development credential. Override both Compose and
++      # Host Agent with GAME1_ASSET_AUDIT_PASSWORD outside local development.
++      MYSQL_PASSWORD: ${GAME1_ASSET_AUDIT_PASSWORD:-Game1LocalAuditOnly}
++      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
++    command:
++      - --character-set-server=utf8mb4
++      - --collation-server=utf8mb4_0900_ai_ci
++    ports:
++      - "127.0.0.1:43823:3306"
++    volumes:
++      - game1-asset-audit-data:/var/lib/mysql
++    healthcheck:
++      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$${MYSQL_USER} -p$${MYSQL_PASSWORD} --silent"]
++      interval: 5s
++      timeout: 3s
++      retries: 20
++      start_period: 20s
++    networks: [game1-control-net]
+   control-center:
+     build: .
+     container_name: game1-control-center
+@@ -15,3 +40,6 @@ services:
+ networks:
+   game1-control-net:
+     name: game1-control-net
++volumes:
++  game1-asset-audit-data:
++    name: game1-asset-audit-data
+diff --git a/system/control-center/host_agent.py b/system/control-center/host_agent.py
+index 4233013..12be42c 100644
+--- a/system/control-center/host_agent.py
++++ b/system/control-center/host_agent.py
+@@ -49,6 +49,9 @@ from studio_save import request_active_studio_save
+ from character_core.identity import CharacterIdentityService
+ from studio_bridge import run_model_load_bridge, run_monster_spawn_bridge, run_timeline_editor_bridge, run_location_authoring_bridge
+ from services.studio_deco_bridge import run_deco_refresh_bridge
++from services.location_asset_sync_history import LocationAssetSyncHistory
++from services.mysql_asset_replacement_audit import MySqlAssetReplacementAudit, MySqlAuditConfig
++from services.sqlite_asset_audit_importer import SqliteAssetAuditImporter
+ from services.studio_asset_sync import StudioAssetSyncService
+ from services.animation_export import write_animation_export
+ from services.native_pickers import (
+@@ -66,11 +69,19 @@ migrate_source_only_assets(ROOT, ROOT / ".control-center" / "game1.db")
+ control_agent_build = "game1-m50-environment-weapon-bounce-001"
+ port = int(os.environ.get("CONTROL_AGENT_PORT", "43821"))
+ token = os.environ.get("CONTROL_TOKEN", "Game1LocalControlV1")
++asset_audit_repository = MySqlAssetReplacementAudit(MySqlAuditConfig.from_environment())
++asset_replacement_audit = SqliteAssetAuditImporter(ROOT, asset_audit_repository)
+ store = CharacterStore(ROOT)
+ character_components = CharacterComponents(ROOT)
+ character_assemblies = CharacterAssemblies(ROOT, store, character_components)
+ store.export()
+-character_publications = CharacterPublicationQueue(ROOT, character_components, on_published=store.export)
++def export_character_publication():
++    store.export()
++    asset_replacement_audit.sync_all()
++
++
++character_publications = CharacterPublicationQueue(
++    ROOT, character_components, on_published=export_character_publication)
+ animations = AnimationStore(ROOT)
+ weapons = WeaponStore(ROOT)
+ monsters = MonsterStore(ROOT)
+@@ -88,10 +99,12 @@ options_store = OptionsStore(ROOT)
+ timelines = TimelineStore(ROOT, store, animations, monsters, monster_animations)
+ locations = LocationStore(ROOT, run_location_authoring_bridge)
+ location_assets = LocationAssetStore(ROOT)
++location_asset_sync_history = LocationAssetSyncHistory(ROOT, database=asset_audit_repository)
+ real_estate = RealEstateStore(ROOT, location_assets=location_assets)
+ real_estate_placements = RealEstatePlacementStore(ROOT, real_estate)
+ real_estate.placement_store = real_estate_placements
+-real_estate_publications = RealEstatePublicationJobs(real_estate)
++real_estate_publications = RealEstatePublicationJobs(
++    real_estate, on_succeeded=asset_replacement_audit.sync_all)
+ deco_layouts = DecoLayoutStore(ROOT)
+ character_identity = CharacterIdentityService(ROOT, store, animations)
+ real_estate_studio_sync = RealEstateStudioSync(real_estate, run_model_load_bridge)
+@@ -148,7 +161,8 @@ READ_SOURCES = MappingProxyType({
+     "characters": store, "animations": animations, "character_components": character_components, "character_assemblies": character_assemblies, "character_publications": character_publications,
+     "weapons": weapons, "monsters": monsters, "monster_animations": monster_animations,
+     "npcs": npcs, "npc_animations": npc_animations, "npc_equipment": npc_equipment,
+-    "location_assets": location_assets, "real_estate": real_estate,
++    "location_assets": location_assets, "location_asset_sync_history": location_asset_sync_history,
++    "asset_replacement_audit": asset_replacement_audit, "real_estate": real_estate,
+     "real_estate_placements": real_estate_placements,
+     "real_estate_publications": real_estate_publications, "npc_spawns": npc_spawns,
+     "monster_spawns": monster_spawns, "animation_speed_scaling": animation_speed_scaling,
+@@ -185,6 +199,8 @@ WRITE_SOURCES = MappingProxyType({
+     "choose_weapon_textures": choose_weapon_textures,
+     "deco_layouts": deco_layouts,
+     "location_assets": location_assets,
++    "location_asset_sync_history": location_asset_sync_history,
++    "asset_replacement_audit": asset_replacement_audit,
+     "sync_location_assets_to_studio": run_deco_refresh_bridge,
+     "locations": locations,
+     "monster_animations": monster_animations,
+diff --git a/system/control-center/real_estate/jobs.py b/system/control-center/real_estate/jobs.py
+index 313491b..577ee1d 100644
+--- a/system/control-center/real_estate/jobs.py
++++ b/system/control-center/real_estate/jobs.py
+@@ -11,9 +11,10 @@ from uuid import uuid4
+ 
+ 
+ class RealEstatePublicationJobs:
+-    def __init__(self, store, *, max_concurrent: int = 2):
++    def __init__(self, store, *, max_concurrent: int = 2, on_succeeded=None):
+         self.store = store
+         self.max_concurrent = max_concurrent
++        self.on_succeeded = on_succeeded
+         self._lock = Lock()
+         self._latest: dict[str, dict] = {}
+ 
+@@ -58,6 +59,8 @@ class RealEstatePublicationJobs:
+             job['step'] = 'Preparing publication'
+         try:
+             self.store.publish(slug, credentials, scope=job['scope'], on_progress=progress)
++            if self.on_succeeded is not None:
++                self.on_succeeded()
+         except Exception as exc:
+             # The worker must not die silently, which formerly closed the HTTP
+             # socket without a JSON error and hid the step that failed.
+diff --git a/system/control-center/requirements-host.txt b/system/control-center/requirements-host.txt
+index 13da10d..8a8438f 100644
+--- a/system/control-center/requirements-host.txt
++++ b/system/control-center/requirements-host.txt
+@@ -1,3 +1,5 @@
+ # Host Agent only (system/control-center/host_agent.py).
+ # Decode WebP as a temporary PNG for Real Estate publication.
+ Pillow>=12,<13
++# MySQL 8.4 asset replacement audit (pure Python DB-API driver).
++PyMySQL>=1.1,<2
+diff --git a/system/control-center/services/studio_deco_bridge.py b/system/control-center/services/studio_deco_bridge.py
+index 51063b6..88b8bac 100644
+--- a/system/control-center/services/studio_deco_bridge.py
++++ b/system/control-center/services/studio_deco_bridge.py
+@@ -9,23 +9,36 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+ import json
+ import time
+ import uuid
++import re
+ 
+ from studio_bridge import PORT, PROJECT, TOKEN, StudioBridgeError
+ 
+ 
+ def run_deco_refresh_bridge(*, timeout_seconds: float = 75.0,
+-                            slug: str = '', binding_revision: int | None = None) -> dict:
++                            slug: str, binding_revision: int,
++                            model_asset_id: str, atlas_asset_id: str) -> dict:
++    """M216: only schema 3 commands can reach the Studio plugin.
++
++    Older M215 plugins explicitly reject schema 3 rather than rebuilding models.
++    """
++    if not re.fullmatch(r'[a-z0-9][a-z0-9_]{0,63}', str(slug)):
++        raise ValueError('Location Asset Studio Sync requires one valid slug')
++    if type(binding_revision) is not int or binding_revision < 1:
++        raise ValueError('invalid Location Asset binding revision')
++    for identifier in (model_asset_id, atlas_asset_id):
++        if not re.fullmatch(r'[1-9][0-9]{0,19}', str(identifier)):
++            raise ValueError('a published Model and Atlas Asset ID are required')
+     operation_id = uuid.uuid4().hex
+     command = {
+-        "project": PROJECT,
+-        "command": "deco-refresh",
+-        "schemaVersion": 1,
+-        "operationId": operation_id,
++        'project': PROJECT,
++        'command': 'deco-refresh',
++        'schemaVersion': 3,
++        'operationId': operation_id,
++        'targetSlug': slug,
++        'bindingRevision': binding_revision,
++        'modelAssetId': model_asset_id,
++        'atlasAssetId': atlas_asset_id,
+     }
+-    if slug:
+-        if not isinstance(binding_revision, int) or binding_revision < 1:
+-            raise ValueError('targeted deco refresh needs binding revision')
+-        command.update(schemaVersion=2, targetSlug=slug, bindingRevision=binding_revision)
+     state = {"claimed": False, "result": None}
+ 
+     class Handler(BaseHTTPRequestHandler):
+@@ -60,7 +73,9 @@ def run_deco_refresh_bridge(*, timeout_seconds: float = 75.0,
+                 return self.send_json(404, {"error": "not found"})
+             try:
+                 length = int(self.headers.get("Content-Length", "0"))
+-                if length < 1 or length > 8192:
++                # Per-instance audit records are intentionally returned to the
++                # Host Agent. Keep the request bounded without truncating them.
++                if length < 1 or length > 2 * 1024 * 1024:
+                     raise ValueError("invalid result payload length")
+                 incoming = json.loads(self.rfile.read(length).decode("utf-8"))
+                 if (not isinstance(incoming, dict)
+@@ -68,8 +83,8 @@ def run_deco_refresh_bridge(*, timeout_seconds: float = 75.0,
+                         or incoming.get("command") != "deco-refresh"
+                         or incoming.get("schemaVersion") != command["schemaVersion"]
+                         or incoming.get("operationId") != operation_id
+-                        or (slug and (incoming.get("targetSlug") != slug
+-                                      or incoming.get("bindingRevision") != binding_revision))):
++                        or incoming.get("targetSlug") != slug
++                        or incoming.get("bindingRevision") != binding_revision):
+                     raise ValueError("invalid deco-refresh result identity")
+                 if not state["claimed"]:
+                     raise ValueError("command has not been claimed")
+@@ -103,13 +118,44 @@ def run_deco_refresh_bridge(*, timeout_seconds: float = 75.0,
+     result = state["result"]
+     if result.get("error"):
+         raise StudioBridgeError(f"DecoManager refresh failed: {result['error']}")
+-    values = {}
+-    for field in ("models", "parts", "registryItems"):
++    values = {'operationId': operation_id, 'targetSlug': slug,
++              'bindingRevision': binding_revision}
++    for field in ('models', 'parts', 'matchedModels', 'modelReferences',
++                  'pendingGeometry', 'registryItems', 'replacedModels'):
+         value = result.get(field)
+         if type(value) is not int or value < 0:
+-            raise StudioBridgeError(f"invalid Studio deco-refresh result field: {field}")
++            raise StudioBridgeError(f'invalid Studio deco-refresh result field: {field}')
+         values[field] = value
+-    if slug:
+-        values.update(targetSlug=slug, bindingRevision=binding_revision,
+-                      matchedModels=int(result.get('matchedModels', 0)))
++    if values['replacedModels'] != 0 or values['models'] > values['matchedModels']:
++        raise StudioBridgeError('unsafe Location Asset Studio model replacement result')
++    changes = result.get('changes')
++    if not isinstance(changes, list) or len(changes) > 32:
++        raise StudioBridgeError('invalid Studio Location Asset ID change log')
++    values['changes'] = changes
++    instances = result.get('instances')
++    if not isinstance(instances, list) or len(instances) > 10000:
++        raise StudioBridgeError('invalid Studio Location Asset instance audit log')
++    validated_instances = []
++    seen_instances = set()
++    for item in instances:
++        if not isinstance(item, dict):
++            raise StudioBridgeError('invalid Studio Location Asset instance audit entry')
++        instance_id = str(item.get('instanceId') or '')
++        studio_path = str(item.get('studioPath') or '')
++        item_changes = item.get('changes')
++        if (not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', instance_id)
++                or not studio_path or len(studio_path) > 1024
++                or instance_id in seen_instances
++                or not isinstance(item_changes, list) or not item_changes
++                or len(item_changes) > 32):
++            raise StudioBridgeError('invalid Studio Location Asset instance audit entry')
++        seen_instances.add(instance_id)
++        validated_instances.append({
++            'instanceId': instance_id,
++            'studioPath': studio_path,
++            'changes': item_changes,
++        })
++    if len(validated_instances) != values['models']:
++        raise StudioBridgeError('Studio Location Asset instance audit count mismatch')
++    values['instances'] = validated_instances
+     return values
+diff --git a/system/control-center/static/character-assets.js b/system/control-center/static/character-assets.js
+index 0f97917..41eeb76 100644
+--- a/system/control-center/static/character-assets.js
++++ b/system/control-center/static/character-assets.js
+@@ -7,7 +7,7 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;',
+ const FILENAME_GUIDE_OPEN_KEY='game1.animation.filenameRules.open';
+ const ANIMATION_FOLDER_KEY='game1.animation.folder';
+ const ASSET_MANAGER_VIEW_KEY='game1.assetManager.activeSection';
+-const ASSET_MANAGER_VIEWS=new Set(['characters','animations','animation-speed','weapons','monsters','npcs','locations','location-assets','real-estate','timelines','options']);
++const ASSET_MANAGER_VIEWS=new Set(['characters','animations','animation-speed','weapons','monsters','npcs','locations','location-assets','asset-audit','real-estate','timelines','options']);
+ 
+ function normalizeAnimationFolderPath(value){
+   let path=String(value??'').trim();
+@@ -63,10 +63,10 @@ function setView(view){
+   if(!ASSET_MANAGER_VIEWS.has(view))view='characters';
+   state.view=view;
+   try{localStorage.setItem(ASSET_MANAGER_VIEW_KEY,view)}catch{}
+-  $('characters-view').hidden=view!=='characters';$('animations-view').hidden=view!=='animations';$('animation-speed-view').hidden=view!=='animation-speed';$('weapons-view').hidden=view!=='weapons';$('monsters-view').hidden=view!=='monsters';$('npcs-view').hidden=view!=='npcs';$('locations-view').hidden=view!=='locations';$('location-assets-view').hidden=view!=='location-assets';$('real-estate-view').hidden=view!=='real-estate';$('timelines-view').hidden=view!=='timelines';$('options-view').hidden=view!=='options';
++  $('characters-view').hidden=view!=='characters';$('animations-view').hidden=view!=='animations';$('animation-speed-view').hidden=view!=='animation-speed';$('weapons-view').hidden=view!=='weapons';$('monsters-view').hidden=view!=='monsters';$('npcs-view').hidden=view!=='npcs';$('locations-view').hidden=view!=='locations';$('location-assets-view').hidden=view!=='location-assets';$('asset-audit-view').hidden=view!=='asset-audit';$('real-estate-view').hidden=view!=='real-estate';$('timelines-view').hidden=view!=='timelines';$('options-view').hidden=view!=='options';
+   $('character-rail').hidden=view!=='characters';$('animation-rail').hidden=view!=='animations';$('weapon-rail').hidden=view!=='weapons';$('monster-rail').hidden=view!=='monsters';$('npc-rail').hidden=view!=='npcs';$('real-estate-rail').hidden=view!=='real-estate';
+-  $('nav-characters').classList.toggle('active',view==='characters');$('nav-animations').classList.toggle('active',view==='animations');$('nav-animation-speed').classList.toggle('active',view==='animation-speed');$('nav-weapons').classList.toggle('active',view==='weapons');$('nav-monsters').classList.toggle('active',view==='monsters');$('nav-npcs').classList.toggle('active',view==='npcs');$('nav-locations').classList.toggle('active',view==='locations');$('nav-location-assets').classList.toggle('active',view==='location-assets');$('nav-real-estate').classList.toggle('active',view==='real-estate');$('nav-timelines').classList.toggle('active',view==='timelines');$('nav-options').classList.toggle('active',view==='options');
+-  if(view==='animations')loadAnimations();if(view==='animation-speed'&&window.game1AnimationSpeedLoad)window.game1AnimationSpeedLoad();if(view==='weapons'&&window.game1WeaponsLoad)window.game1WeaponsLoad();if(view==='monsters'&&window.game1MonstersLoad)window.game1MonstersLoad();if(view==='npcs'&&window.game1NpcsLoad)window.game1NpcsLoad();if(view==='locations'&&window.game1LocationsLoad)window.game1LocationsLoad();if(view==='location-assets'&&window.game1LocationAssetsLoad)window.game1LocationAssetsLoad();if(view==='real-estate'&&window.game1RealEstateLoad)window.game1RealEstateLoad();if(view==='timelines'&&window.game1TimelinesLoad)window.game1TimelinesLoad();if(view==='options'&&window.game1OptionsLoad)window.game1OptionsLoad();
++  $('nav-characters').classList.toggle('active',view==='characters');$('nav-animations').classList.toggle('active',view==='animations');$('nav-animation-speed').classList.toggle('active',view==='animation-speed');$('nav-weapons').classList.toggle('active',view==='weapons');$('nav-monsters').classList.toggle('active',view==='monsters');$('nav-npcs').classList.toggle('active',view==='npcs');$('nav-locations').classList.toggle('active',view==='locations');$('nav-location-assets').classList.toggle('active',view==='location-assets');$('nav-asset-audit').classList.toggle('active',view==='asset-audit');$('nav-real-estate').classList.toggle('active',view==='real-estate');$('nav-timelines').classList.toggle('active',view==='timelines');$('nav-options').classList.toggle('active',view==='options');
++  if(view==='animations')loadAnimations();if(view==='animation-speed'&&window.game1AnimationSpeedLoad)window.game1AnimationSpeedLoad();if(view==='weapons'&&window.game1WeaponsLoad)window.game1WeaponsLoad();if(view==='monsters'&&window.game1MonstersLoad)window.game1MonstersLoad();if(view==='npcs'&&window.game1NpcsLoad)window.game1NpcsLoad();if(view==='locations'&&window.game1LocationsLoad)window.game1LocationsLoad();if(view==='location-assets'&&window.game1LocationAssetsLoad)window.game1LocationAssetsLoad();if(view==='asset-audit'&&window.game1AssetAuditLoad)window.game1AssetAuditLoad();if(view==='real-estate'&&window.game1RealEstateLoad)window.game1RealEstateLoad();if(view==='timelines'&&window.game1TimelinesLoad)window.game1TimelinesLoad();if(view==='options'&&window.game1OptionsLoad)window.game1OptionsLoad();
+ }
+ 
+ function characterStatsPayload(){return {Level:Number($('character-stat-level').value||1),MaxHP:Number($('character-stat-hp').value||0),Damage:Number($('character-stat-damage').value||0),Defense:Number($('character-stat-defense').value||0),AttackSpeed:Number($('character-stat-attack-speed').value||0),RunSpeed:Number($('character-stat-run-speed').value||0),CritChance:Number($('character-stat-crit-chance').value||0)}}
+@@ -156,7 +156,7 @@ async function removeAnimationBinding(bindingId){if(!confirm('Remove this charac
+ function restoreAssetManagerView(){let saved='characters';try{saved=localStorage.getItem(ASSET_MANAGER_VIEW_KEY)||'characters'}catch{}setView(ASSET_MANAGER_VIEWS.has(saved)?saved:'characters')}
+ window.addEventListener('load',restoreAssetManagerView);
+ 
+-$('display-name').oninput=()=>{if(!state.selected)state.autoDisplayName=false;window.game1CharacterWorkflow?.updateButtons(selectedRow())};$('character-id').oninput=()=>window.game1CharacterWorkflow?.updateButtons(selectedRow());$('nav-characters').onclick=()=>setView('characters');$('nav-animations').onclick=()=>setView('animations');$('nav-animation-speed').onclick=()=>setView('animation-speed');$('nav-weapons').onclick=()=>setView('weapons');$('nav-monsters').onclick=()=>setView('monsters');$('nav-npcs').onclick=()=>setView('npcs');$('nav-locations').onclick=()=>setView('locations');$('nav-location-assets').onclick=()=>setView('location-assets');$('nav-real-estate').onclick=()=>setView('real-estate');$('nav-timelines').onclick=()=>setView('timelines');$('nav-options').onclick=()=>setView('options');$('race').onchange=()=>{syncIdentity();window.game1CharacterWorkflow?.updateButtons(selectedRow())};$('gender').onchange=()=>{syncIdentity();window.game1CharacterWorkflow?.updateButtons(selectedRow())};$('save-archetype').onclick=saveArchetype;$('save-character-stats').onclick=saveCharacterStats;$('register-character').onclick=registerCharacter;$('activate-character').onclick=()=>activate();$('new-legacy-character').onclick=()=>openLegacyCharacter(null);$('clear-form').onclick=()=>window.game1CharacterWorkflow?.reset();$('refresh').onclick=loadCharacters;$('validate-view').onclick=loadCharacters;$('theme').onclick=()=>document.body.classList.toggle('light');
++$('display-name').oninput=()=>{if(!state.selected)state.autoDisplayName=false;window.game1CharacterWorkflow?.updateButtons(selectedRow())};$('character-id').oninput=()=>window.game1CharacterWorkflow?.updateButtons(selectedRow());$('nav-characters').onclick=()=>setView('characters');$('nav-animations').onclick=()=>setView('animations');$('nav-animation-speed').onclick=()=>setView('animation-speed');$('nav-weapons').onclick=()=>setView('weapons');$('nav-monsters').onclick=()=>setView('monsters');$('nav-npcs').onclick=()=>setView('npcs');$('nav-locations').onclick=()=>setView('locations');$('nav-location-assets').onclick=()=>setView('location-assets');$('nav-asset-audit').onclick=()=>setView('asset-audit');$('nav-real-estate').onclick=()=>setView('real-estate');$('nav-timelines').onclick=()=>setView('timelines');$('nav-options').onclick=()=>setView('options');$('race').onchange=()=>{syncIdentity();window.game1CharacterWorkflow?.updateButtons(selectedRow())};$('gender').onchange=()=>{syncIdentity();window.game1CharacterWorkflow?.updateButtons(selectedRow())};$('save-archetype').onclick=saveArchetype;$('save-character-stats').onclick=saveCharacterStats;$('register-character').onclick=registerCharacter;$('activate-character').onclick=()=>activate();$('new-legacy-character').onclick=()=>openLegacyCharacter(null);$('clear-form').onclick=()=>window.game1CharacterWorkflow?.reset();$('refresh').onclick=loadCharacters;$('validate-view').onclick=loadCharacters;$('theme').onclick=()=>document.body.classList.toggle('light');
+ $('animation-character').onchange=()=>{state.animationCharacter=$('animation-character').value;state.animationSelected=null;state.lastScan=null;loadAnimations()};$('choose-animation-folder').onclick=chooseAnimationFolder;$('scan-animations').onclick=scanAnimations;
+ initAnimationFolderExplorer();
+ initFilenameRulesDisclosure();
+diff --git a/system/control-center/static/deco-assets.js b/system/control-center/static/deco-assets.js
+index 603e6a9..94e9217 100644
+--- a/system/control-center/static/deco-assets.js
++++ b/system/control-center/static/deco-assets.js
+@@ -70,6 +70,7 @@ function decoAssetBeginNew() {
+ function decoAssetSetForm(row) {
+   decoAssetState.selected = row?.slug || null;
+   decoAssetRemember(DECO_SELECTED_ASSET_KEY, decoAssetState.selected || '');
++  if (typeof decoAssetShowSyncHistory === 'function') decoAssetShowSyncHistory(decoAssetState.selected);
+   decoAssetState.modelPath = '';
+   decoAssetState.texturePath = '';
+   decoAssetState.replacementPath = '';
+@@ -200,7 +201,8 @@ async function decoAssetRetrySync(slug) {
+       method: 'POST', headers: {'Content-Type': 'application/json'},
+       body: JSON.stringify({slug}),
+     });
+-    toast(`Studio synced · ${Number(result.studio?.matchedModels ?? result.studio?.models ?? 0)} matched · ${Number(result.studio?.parts || 0)} parts updated. Save Place in Studio.`);
++    toast(`Studio synced ${slug} · ${Number(result.studio?.matchedModels ?? 0)} matched · ${Number(result.studio?.parts || 0)} atlas IDs updated · no models rebuilt. Save Place in Studio.`);
++    await decoAssetShowSyncHistory(slug);
+   } catch (error) {
+     toast(`Atlas saved; Studio sync pending: ${error.message}. Use Retry.`, true);
+   }
+@@ -268,7 +270,7 @@ function decoAssetRender() {
+   }
+ 
+   $('publish-location-asset').disabled = !selected || !publication.configured;
+-  $('sync-location-assets').disabled = !(decoAssetState.data.items || []).some(row => row.status === 'PUBLISHED');
++  $('sync-location-assets').disabled = !selected || selected.status !== 'PUBLISHED';
+   $('delete-location-asset').disabled = !selected;
+   $('location-asset-publication-hint').textContent = selected
+     ? (selected.status === 'PUBLISHED'
+@@ -399,18 +401,24 @@ async function decoAssetPublish() {
+   }
+ }
+ 
+-// DecoManager is the owner of Studio placement. Sync refreshes its registry
+-// and rebinds the material on placed instances; it never imports duplicates.
++// M216: a Studio Sync is ALWAYS scoped to the selected Location Asset.
++// Never rebuild models or apply FBX to existing placed instances.
+ async function decoAssetSyncStudio() {
++  const row = decoAssetSelected();
++  if (!row || row.status !== 'PUBLISHED') return toast('Select a published Location Asset first.', true);
+   const button = $('sync-location-assets');
+   if (button.disabled) return;
+   button.disabled = true;
+   try {
+-    toast('syncing DecoManager and placed asset textures in Studio…');
+-    const result = await request('/api/location-assets/studio-sync', { method: 'POST' });
++    toast(`syncing published IDs for ${row.slug} only…`);
++    const result = await request('/api/location-assets/studio-sync', {
++      method: 'POST', headers: {'Content-Type':'application/json'},
++      body: JSON.stringify({slug: row.slug}),
++    });
+     const studio = result.studio || {};
+     await decoAssetLoad();
+-    toast(`Studio synced · ${Number(studio.models || 0)} placed model(s), ${Number(studio.parts || 0)} MeshPart(s) updated · ${Number(studio.registryItems || 0)} registered`);
++    toast(`Studio sync ${row.slug} · ${Number(studio.matchedModels || 0)} matched · ${Number(studio.parts || 0)} texture IDs changed · ${Number(studio.modelReferences || 0)} model ID references · ${Number(studio.pendingGeometry || 0)} FBX geometries unchanged (manual replacement required). Models never rebuilt.`);
++    await decoAssetShowSyncHistory(row.slug);
+   } catch (error) {
+     toast(error.message, true);
+   } finally {
+@@ -418,6 +426,34 @@ async function decoAssetSyncStudio() {
+   }
+ }
+ 
++async function decoAssetShowSyncHistory(slug) {
++  const box = $('location-asset-studio-history');
++  if (!box) return;
++  if (!slug) { box.textContent = 'Select a Location Asset to view ID changes.'; return; }
++  try {
++    const events = [];
++    let before = null;
++    do {
++      const cursor = before === null ? '' : `&before=${encodeURIComponent(before)}`;
++      const response = await request(`/api/location-assets/studio-history?slug=${encodeURIComponent(slug)}&limit=500${cursor}`);
++      events.push(...(response.events || []));
++      before = response.nextCursor ?? null;
++    } while (before !== null);
++    box.textContent = events.length ? events.map(event => {
++      const changes = (event.changes || []).map(change =>
++        `${change.kind === 'model_reference' ? 'Model reference' : 'Atlas'}: ${change.oldId || 'unknown'} → ${change.newId} (${change.count})`).join('; ');
++      const instances = (event.instances || []).map(instance => {
++        const instanceChanges = (instance.changes || []).map(change =>
++          `${change.kind}: ${change.oldId || 'unknown'} → ${change.newId} (${change.count})`).join(', ');
++        return `  ${instance.instanceId} · ${instance.studioPath} · ${instanceChanges}`;
++      }).join('\n');
++      return `${event.atUtc} · ${changes || 'no ID changes'} · pending FBX: ${event.pendingGeometry}${instances ? `\n${instances}` : ''}`;
++    }).join('\n') : 'No Studio ID changes recorded for this asset yet.';
++  } catch (error) {
++    box.textContent = `History unavailable: ${error.message}`;
++  }
++}
++
+ async function decoAssetDelete() {
+   const row = decoAssetSelected();
+   if (!row) return;
+@@ -480,7 +516,7 @@ $('publish-location-atlas-variant').onclick = async () => {
+     if (republish) {
+       if (result.unchanged) toast('Atlas bytes unchanged · existing Image Asset ID kept (no upload)');
+       else {
+-        const message = `Atlas republished · NEW Roblox Image ID ${result.variant.published_id} · ${result.syncedConsumers || 0} Studio sync(s) · ${result.pendingConsumers || 0} pending`;
++        const message = `Atlas republished · NEW Roblox Image ID ${result.variant.published_id} · ${result.pendingConsumers || 0} consumer(s) pending explicit Studio Sync; no placed asset was touched`;
+         toast(result.studioErrors?.length ? `${message} · ${result.studioErrors.join('; ')}` : message, Boolean(result.studioErrors?.length));
+       }
+     } else toast(`Atlas published · Roblox Image ID ${result.published_id}`);
+diff --git a/system/control-center/static/index.html b/system/control-center/static/index.html
+index a0b0d81..e8077a0 100644
+--- a/system/control-center/static/index.html
++++ b/system/control-center/static/index.html
+@@ -31,6 +31,7 @@
+ <button id="nav-monsters" class="asset-section" type="button"><b>monsters</b><small>rigs · stats · animations</small></button>
+ <button id="nav-locations" class="asset-section" type="button"><b>locations</b><small>polygon registry · studio authoring</small></button>
+ <button id="nav-location-assets" class="asset-section" type="button"><b>location assets</b><small>trees · bushes · rocks · lights · fences · decorations · ladders · flowers · buildings · props</small></button>
++<button id="nav-asset-audit" class="asset-section" type="button"><b>asset history</b><small>all publications · replacements · Studio ID sync</small></button>
+ <button id="nav-real-estate" class="asset-section" type="button"><b>real estate</b><small>houses · any mesh rigs · textures</small></button>
+ <button id="nav-timelines" class="asset-section" type="button"><b>timelines</b><small>attack animation events</small></button>
+ <button id="nav-options" class="asset-section" type="button"><b>options</b><small>common runtime settings</small></button>
+@@ -372,7 +373,7 @@
+ <div><span class="eyebrow">environment library · published decor</span><h2>location assets</h2><p>register a static decoration with one FBX and a texture atlas. New atlas names follow &lt;atlas_key&gt;_&lt;width&gt;x&lt;height&gt;_atlas.png; reused variants share exactly one published Image Asset ID. publish the required assets, then place published variants through Studio DecoManager. placed instances belong to the place; registry publication and placement backups stay separate.</p><div class="deco-category-strip"><span>trees</span><span>bushes</span><span>rocks</span><span>lights</span><span>fences</span><span>decorations</span><span>ladders</span><span>flowers</span><span>buildings</span><span>props</span></div></div>
+ <div class="metrics"><div><b id="location-asset-metric-total">0</b><span>registered</span></div><div><b id="location-asset-metric-published">0</b><span>published</span></div><div><b id="location-asset-metric-changed">0</b><span>changed</span></div></div>
+ </div>
+-<div class="panel runtime-card"><div class="runtime-state registered"><strong>DecoManager registry</strong><span>Sync Studio refreshes DecoManager and the textures/SurfaceAppearance of already placed decorations. New assets are placed through DecoManager; no ServerStorage import.</span></div><div id="location-asset-publication-state" class="publication-missing">open cloud: checking…</div></div>
++<div class="panel runtime-card"><div class="runtime-state registered"><strong>DecoManager registry</strong><span>Sync Studio refreshes DecoManager, updated published models and atlases of managed placed decorations. It preserves each placement position, rotation, scale and ID; no additional placements or ServerStorage imports.</span></div><div id="location-asset-publication-state" class="publication-missing">open cloud: checking…</div></div>
+ <div class="deco-asset-workflow">
+ <div class="panel character-card">
+ <div class="section-title"><div><span>01 · identity</span><h3>register location asset</h3></div><button id="new-location-asset-main" type="button">new asset</button></div>
+@@ -389,7 +390,7 @@
+ <hr class="card-separator">
+ <span class="eyebrow">03 · publication</span><h3 class="subheading">Roblox model + image</h3>
+ <label>description<input id="location-asset-publication-description" value="Game1 Location Asset"><small class="hint">filled automatically from the selected asset, for example <code>Game1 Location Asset Oak Tree</code>.</small></label>
+-<div class="actions"><button id="publish-location-asset" class="primary" type="button" disabled>publish all changed</button><button id="sync-location-assets" type="button" disabled>sync studio</button></div>
++<div class="actions"><button id="publish-location-asset" class="primary" type="button" disabled>publish all changed</button><button id="sync-location-assets" type="button" disabled>sync selected asset IDs</button></div><small class="hint">Updates only the selected Location Asset: atlas IDs and the published model reference. Existing meshes, transforms and geometry are NEVER replaced. Stale FBX geometry requires a separate, manual update.</small><details><summary>Studio ID replacement history</summary><pre id="location-asset-studio-history" style="white-space:pre-wrap;max-height:220px;overflow:auto">Select a Location Asset to view history.</pre></details>
+ <small id="location-asset-publication-hint" class="hint">select a registered location asset.</small>
+ </div>
+ <div class="panel character-card">
+@@ -400,6 +401,18 @@
+ </div>
+ </div>
+ 
++<div id="asset-audit-view" hidden>
++<div class="panel hero">
++<div><span class="eyebrow">immutable MySQL audit</span><h2>asset replacement history</h2><p>Complete retained publication and replacement history across characters, components, animations, weapons, monsters, NPCs, atlases, location assets and real estate. Studio instance details are recorded for Location Asset ID sync operations.</p></div>
++</div>
++<div class="panel character-card">
++<div class="section-title"><div><span>filters</span><h3>all asset events</h3></div><button id="asset-audit-refresh" type="button">refresh</button></div>
++<div class="character-grid"><label>domain<select id="asset-audit-domain"><option value="">all domains</option><option>character</option><option>character_component</option><option>character_animation</option><option>weapon</option><option>monster</option><option>monster_animation</option><option>npc</option><option>npc_animation</option><option>texture_atlas</option><option>texture_atlas_legacy</option><option>location_asset</option><option>real_estate</option></select></label><label>asset key<input id="asset-audit-key" type="search" placeholder="exact key or slug"></label></div>
++<div class="table-wrap weapon-table-wrap"><table><thead><tr><th>UTC time</th><th>domain / key</th><th>resource</th><th>replacement</th><th>source</th></tr></thead><tbody id="asset-audit-rows"><tr><td colspan="5" class="muted">Open this section to load audit history.</td></tr></tbody></table></div>
++<div class="actions"><button id="asset-audit-more" type="button" hidden>load older events</button><span id="asset-audit-count" class="muted"></span></div>
++</div>
++</div>
++
+ <div id="monsters-view" hidden>
+ <div class="panel hero">
+ <div><span class="eyebrow">monster assets · canonical game1 registry</span><h2>monsters</h2><p>one monster owns one rigged fbx, zero or more textures, absolute combat stats and its animations. monster animations have no weapon-class split: idle, idle special variants, combat idle, walk, run, attack variants and death are bound directly to the monster.</p></div>
+@@ -611,7 +624,7 @@
+ </main>
+ <div id="toast" class="toast"></div>
+ <script src="publication-descriptions.js?v=1"></script>
+-<script src="character-assets.js?v=21"></script>
++<script src="character-assets.js?v=22"></script>
+ <script src="character-animation-ui.js?v=2"></script>
+ <script src="character-workflow.js?v=2"></script>
+ <script src="character-publications.js?v=2"></script>
+@@ -625,13 +638,14 @@
+ <script src="timelines.js?v=3"></script>
+ <script src="locations.js?v=2"></script>
+ <script src="shared-asset-retirement.js?v=4"></script>
+-<script src="deco-assets.js?v=8"></script>
++<script src="deco-assets.js?v=9"></script>
++<script src="asset-audit.js?v=1"></script>
+ <script src="options.js?v=1"></script>
+ <script src="weapon-assets.js?v=3"></script>
+ <script src="monster-assets.js?v=6"></script>
+ <script src="npc-assets.js?v=5"></script>
+ <script src="npc-spawns.js?v=4"></script>
+-<script src="real-estate.js?v=24&rig=186&atlas=202&physics=207&fix=211"></script>
++<script src="real-estate.js?v=25&rig=186&atlas=202&physics=207&fix=212"></script>
+ <script src="real-estate-mesh-workflow.js?v=2&atlas=188"></script>
+ <script src="real-estate-placement.js?v=1"></script>
+ <script src="monster-spawns.js?v=1"></script>
+diff --git a/system/studio-plugin/modules/DecoManager.luau b/system/studio-plugin/modules/DecoManager.luau
+index 885907d..6283650 100644
+--- a/system/studio-plugin/modules/DecoManager.luau
++++ b/system/studio-plugin/modules/DecoManager.luau
+@@ -317,7 +317,7 @@ function DecoManager:_setCategory(category: string)
+     self:_showCurrent()
+ end
+ 
+-function DecoManager:refreshRegistry(targetSlug: string?)
++function DecoManager:refreshRegistry(targetSlug: string?, applyIds: boolean?, expectedModelId: string?, expectedAtlasId: string?)
+     self:_setStatus("Refreshing Location Assets registry…")
+     local ok, result = pcall(function()
+         return self.loader:fetchRegistry()
+@@ -329,20 +329,29 @@ function DecoManager:refreshRegistry(targetSlug: string?)
+         return nil, tostring(result)
+     end
+     self.registry = result
+-    local syncResult = DecoPlacedAssetSync.RefreshTextures(self.Workspace, result, targetSlug, self.ServerStorage)
+-    if syncResult.parts > 0 then
+-        self.ChangeHistoryService:SetWaypoint("Refresh Deco Asset Textures")
++    -- Catalog browsing never alters any placed Model. Explicit Studio Sync
++    -- requires exactly one slug and two publication IDs verified by the plugin.
++    local syncResult = { models = 0, parts = 0, matchedModels = 0,
++        modelReferences = 0, pendingGeometry = 0, replacedModels = 0,
++        changes = {}, instances = {} }
++    if applyIds == true then
++        if not targetSlug or not expectedModelId or not expectedAtlasId then
++            error("scoped ID-only Studio Sync requires an explicit asset and publication IDs")
++        end
++        -- A waypoint BEFORE the update makes Undo possible even for an error.
++        self.ChangeHistoryService:SetWaypoint("Before Location Asset ID Sync: " .. targetSlug)
++        syncResult = DecoPlacedAssetSync.RefreshIds(
++            self.Workspace, result, targetSlug, self.HttpService, expectedModelId, expectedAtlasId)
++        self.ChangeHistoryService:SetWaypoint("Location Asset ID Sync: " .. targetSlug)
+     end
+     self:_setCategory(self.category)
+-    if syncResult.parts > 0 then
+-        self:_setStatus(("Registry refreshed · updated texture on %d placed asset(s) / %d MeshPart(s)"):format(
+-            syncResult.models,
+-            syncResult.parts
+-        ))
+-    else
+-        self:_setStatus("Registry refreshed · placed textures are already current")
+-    end
+-    return { models = syncResult.models, parts = syncResult.parts, matchedModels = syncResult.matchedModels, registryItems = #result.items }
++    self:_setStatus(("Registry refreshed · %d placed item(s), %d image IDs changed, %d model references · %d stale FBX geometries"):format(
++        syncResult.matchedModels, syncResult.parts, syncResult.modelReferences, syncResult.pendingGeometry))
++    return { models = syncResult.models, parts = syncResult.parts,
++        replacedModels = 0, matchedModels = syncResult.matchedModels,
++        modelReferences = syncResult.modelReferences, pendingGeometry = syncResult.pendingGeometry,
++        changes = syncResult.changes, instances = syncResult.instances,
++        registryItems = #result.items }
+ end
+ 
+ function DecoManager:_placeCurrent()
+@@ -479,10 +488,10 @@ function DecoManager:_wire()
+         self:_saveAssetsData()
+     end)
+     self.plugin.Deactivation:Connect(function()
+-        self.placement:cancel()
++        self.placement:cancel(false)
+     end)
+     self.plugin.Unloading:Connect(function()
+-        self.placement:cancel()
++        self.placement:cancel(false)
+         self:_clearPreview()
+     end)
+     self:_setCategory("tree")
+diff --git a/system/studio-plugin/modules/DecoPlacedAssetSync.luau b/system/studio-plugin/modules/DecoPlacedAssetSync.luau
+index 999231b..07b1f29 100644
+--- a/system/studio-plugin/modules/DecoPlacedAssetSync.luau
++++ b/system/studio-plugin/modules/DecoPlacedAssetSync.luau
+@@ -1,58 +1,299 @@
++-- M216: scoped, ID-only Location Asset Studio synchronization.
++-- CRITICAL: Never replace, re-parent, ScaleTo, PivotTo, ApplyMesh or Destroy a
++-- placed Model / MeshPart. A published Model asset is NOT a writable MeshId.
+ local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
++
+ local DecoPlacedAssetSync = {}
++local SLUG_ATTRIBUTE = "Game1DecoAssetSlug"
++local HISTORY_ATTRIBUTE = "Game1DecoSyncHistory"
++local REGISTRY_MODEL_ID_ATTRIBUTE = "Game1DecoRegistryModelAssetId"
+ 
+-local ROOT_NAME = "Game1DecoAssets"
+-local ASSET_SLUG_ATTRIBUTE = "Game1DecoAssetSlug"
++local function assetId(value: any): string
++    local parsed = tonumber(value)
++    if not parsed or parsed <= 0 or parsed ~= math.floor(parsed) then
++        error("invalid published Location Asset ID")
++    end
++    return tostring(math.floor(parsed))
++end
+ 
+-local function rowsBySlug(registry: any): { [string]: any }
+-    local result = {}
++local function findRow(registry: any, slug: string): any
+     if type(registry) ~= "table" or type(registry.items) ~= "table" then
+-        return result
++        error("invalid Location Assets registry")
+     end
+     for _, row in ipairs(registry.items) do
+-        local slug = tostring(row.slug or "")
+-        if slug ~= "" then
+-            result[slug] = row
++        if tostring(row.slug or "") == slug then
++            if tostring(row.status or "") ~= "PUBLISHED" then
++                error("Location Asset is not fully published: " .. slug)
++            end
++            return row
++        end
++    end
++    error("Location Asset is missing from the registry: " .. slug)
++end
++
++local function placedModels(workspace: Workspace, slug: string): { Model }
++    local result: { Model } = {}
++    local authoring = workspace:FindFirstChild("Game1Authoring")
++    local camera = workspace.CurrentCamera
++    -- Older authored places keep decorations below Workspace.Places, while new
++    -- placements live below Workspace.Game1DecoAssets. Identity attributes are
++    -- the stable boundary; never move either layout merely to make Sync find it.
++    for _, descendant in ipairs(workspace:GetDescendants()) do
++        if descendant:IsA("Model")
++            and descendant:GetAttribute(SLUG_ATTRIBUTE) == slug
++            and tostring(descendant:GetAttribute("Game1DecoInstanceId") or "") ~= ""
++            and (authoring == nil or not descendant:IsDescendantOf(authoring))
++            and (camera == nil or not descendant:IsDescendantOf(camera)) then
++            local ancestor = descendant.Parent
++            local nested = false
++            while ancestor ~= nil and ancestor ~= workspace do
++                if ancestor:IsA("Model") and ancestor:GetAttribute(SLUG_ATTRIBUTE) ~= nil then
++                    nested = true
++                    break
++                end
++                ancestor = ancestor.Parent
++            end
++            if not nested then
++                table.insert(result, descendant)
++            end
+         end
+     end
+     return result
+ end
+ 
+--- Only game1-owned instances are eligible. Scope is by immutable asset slug,
+--- never by proximity, name or model shape. Does not load/place/clone anything.
+-function DecoPlacedAssetSync.RefreshTextures(workspace: Workspace, registry: any, targetSlug: string?, serverStorage: Instance?): any
+-    local registryRows = rowsBySlug(registry)
+-    local changedModels, changedParts, matchedModels = 0, 0, 0
+-    local function updateTree(root: Instance)
+-        for _, descendant in ipairs(root:GetDescendants()) do
+-            if descendant:IsA("Model") then
+-                local slug = tostring(descendant:GetAttribute(ASSET_SLUG_ATTRIBUTE) or "")
+-                if slug ~= "" and (targetSlug == nil or targetSlug == "" or slug == targetSlug) then
+-                    local row = registryRows[slug]
+-                    local numericId = row and tonumber(row.texture_asset_id) or nil
+-                    if row and tostring(row.status or "") == "PUBLISHED" and numericId and numericId > 0 then
+-                        matchedModels += 1
+-                        local uri = "rbxassetid://" .. tostring(math.floor(numericId))
+-                        local modelChanged = false
+-                        for _, part in ipairs(descendant:GetDescendants()) do
+-                            if part:IsA("MeshPart") and StudioTextureAppearance.Apply(part, uri, row.textureUsesAlpha) then
+-                                changedParts += 1
+-                                modelChanged = true
+-                            end
+-                        end
+-                        if modelChanged then
+-                            changedModels += 1
+-                        end
+-                    end
++-- Stamp publication identity only on a fresh, unparented placement clone. This
++-- is deliberately separate from RefreshIds: ID Sync must never claim that an
++-- existing placed model received newly published FBX geometry.
++function DecoPlacedAssetSync.StampPublishedModel(model: Model, row: any)
++    if not model:IsA("Model") or model.Parent ~= nil then
++        error("published identity can only be stamped on a fresh placement clone")
++    end
++    local modelId = assetId(row.model_asset_id)
++    local publishedSha = tostring(row.model_published_sha256 or "")
++    if publishedSha == "" then
++        error("published Location Asset model SHA is required")
++    end
++    model:SetAttribute("Game1DecoPublishedModelAssetId", modelId)
++    model:SetAttribute("Game1DecoPublishedModelSha256", publishedSha)
++    model:SetAttribute(REGISTRY_MODEL_ID_ATTRIBUTE, modelId)
++end
++
++local function priorHistory(model: Model, http: any): { any }
++    local raw = model:GetAttribute(HISTORY_ATTRIBUTE)
++    if raw == nil then
++        return {}
++    end
++    if type(raw) ~= "string" then
++        error("invalid Studio ID history attribute on " .. model:GetFullName())
++    end
++    local ok, decoded = pcall(http.JSONDecode, http, raw)
++    if not ok or type(decoded) ~= "table" then
++        error("corrupt Studio ID history on " .. model:GetFullName())
++    end
++    return decoded
++end
++
++local function idFromUri(uri: string): string
++    return uri:match("(%d+)$") or ""
++end
++
++-- This intentionally DOES NOT apply the newly published FBX to old placements.
++-- MeshPart.MeshId is not writable. ApplyMesh also replaces collision geometry,
++-- so it cannot be used for the promised "replace IDs only" operation.
++function DecoPlacedAssetSync.RefreshIds(
++    workspace: Workspace, registry: any, targetSlug: string, http: any,
++    expectedModelId: string, expectedAtlasId: string
++): any
++    if type(targetSlug) ~= "string" or targetSlug == "" then
++        error("a target Location Asset slug is required; global sync is forbidden")
++    end
++    local row = findRow(registry, targetSlug)
++    local modelId = assetId(row.model_asset_id)
++    local atlasId = assetId(row.texture_asset_id)
++    if modelId ~= expectedModelId or atlasId ~= expectedAtlasId then
++        error("Location Asset publication changed during Studio Sync; retry")
++    end
++    local models = placedModels(workspace, targetSlug)
++    local uri = "rbxassetid://" .. atlasId
++    local pending = {}
++    local uniqueChanges = {}
++    for _, model in ipairs(models) do
++        local currentReference = tostring(model:GetAttribute(REGISTRY_MODEL_ID_ATTRIBUTE)
++            or model:GetAttribute("Game1DecoPublishedModelAssetId") or "")
++        local modelChange = currentReference ~= modelId
++        local meshChanges = {}
++        for _, descendant in ipairs(model:GetDescendants()) do
++            if descendant:IsA("MeshPart") then
++                local surface = descendant:FindFirstChildOfClass("SurfaceAppearance")
++                if descendant.TextureID ~= uri or (surface ~= nil and surface.ColorMap ~= uri) then
++                    table.insert(meshChanges, { part = descendant, oldId = idFromUri(descendant.TextureID) })
++                end
++            end
++        end
++        if modelChange or #meshChanges > 0 then
++            local history = priorHistory(model, http) -- validate before touching any instance
++            table.insert(pending, { model = model, oldModelId = currentReference,
++                modelChange = modelChange, meshes = meshChanges, history = history })
++            if modelChange then
++                uniqueChanges["model_reference:" .. currentReference .. ":" .. modelId] = true
++            end
++            for _, entry in ipairs(meshChanges) do
++                uniqueChanges["atlas:" .. entry.oldId .. ":" .. atlasId] = true
++            end
++        end
++    end
++    local differentPairs = 0
++    for _ in pairs(uniqueChanges) do
++        differentPairs += 1
++    end
++    if differentPairs > 32 then
++        error("too many different published IDs in one Sync; refused before changes")
++    end
++
++    local summary = {}
++    local function record(kind: string, oldId: string, newId: string)
++        local key = kind .. ":" .. oldId .. ":" .. newId
++        if not summary[key] then
++            summary[key] = { kind = kind, oldId = oldId, newId = newId, count = 0 }
++        end
++        summary[key].count += 1
++    end
++    -- Pre-serialize audit entries BEFORE changing any placed object. Store a
++    -- compact per-instance summary, not one duplicate record per MeshPart.
++    for _, item in ipairs(pending) do
++        local group = {}
++        local function include(kind: string, oldId: string, newId: string)
++            local key = kind .. ":" .. oldId .. ":" .. newId
++            if not group[key] then
++                group[key] = { kind = kind, oldId = oldId, newId = newId, count = 0 }
++            end
++            group[key].count += 1
++        end
++        if item.modelChange then
++            include("model_reference", item.oldModelId, modelId)
++        end
++        for _, entry in ipairs(item.meshes) do
++            include("atlas", entry.oldId, atlasId)
++        end
++        local changes = {}
++        for _, event in pairs(group) do
++            table.insert(changes, event)
++        end
++        table.insert(item.history, { atUtc = os.time(), slug = targetSlug,
++            instanceId = tostring(item.model:GetAttribute("Game1DecoInstanceId") or ""), changes = changes })
++        while #item.history > 32 do
++            table.remove(item.history, 1)
++        end
++        item.encodedHistory = http:JSONEncode(item.history)
++        if #item.encodedHistory > 30000 then
++            error("Location Asset Studio history too large; refused before changes")
++        end
++    end
++
++    local modifiedModels, changedParts, modelReferences = 0, 0, 0
++    local undo = {}
++    local committed, commitError = pcall(function()
++        for _, item in ipairs(pending) do
++            local model: Model = item.model
++            item.committedChanges = {}
++            local function committedChange(kind: string, oldId: string, newId: string)
++                local key = kind .. ":" .. oldId .. ":" .. newId
++                if not item.committedChanges[key] then
++                    item.committedChanges[key] = {
++                        kind = kind, oldId = oldId, newId = newId, count = 0,
++                    }
+                 end
++                item.committedChanges[key].count += 1
++            end
++            -- Do not commit if the place has been edited while preflight ran.
++            if model.Parent == nil or model:GetAttribute(SLUG_ATTRIBUTE) ~= targetSlug then
++                error("placed Location Asset changed during Sync; aborting")
++            end
++            -- The model ID is only a registry REFERENCE. In particular leave
++            -- Game1DecoPublishedModelSha256 unchanged: the FBX stays as placed.
++            if item.modelChange then
++                table.insert(undo, {kind = "model_reference", model = model,
++                    previous = model:GetAttribute(REGISTRY_MODEL_ID_ATTRIBUTE)})
++                model:SetAttribute(REGISTRY_MODEL_ID_ATTRIBUTE, modelId)
++                modelReferences += 1
++                record("model_reference", item.oldModelId, modelId)
++                committedChange("model_reference", item.oldModelId, modelId)
+             end
++            for _, entry in ipairs(item.meshes) do
++                local mesh: MeshPart = entry.part
++                local surface = mesh:FindFirstChildOfClass("SurfaceAppearance")
++                table.insert(undo, {kind = "atlas", mesh = mesh, surface = surface,
++                    texture = mesh.TextureID, colorMap = if surface then surface.ColorMap else nil})
++                -- Central texture adapter in STRICT ID-only mode. No AlphaMode,
++                -- SurfaceAppearance creation, pivot, scale or collision changes.
++                if StudioTextureAppearance.Apply(mesh, uri, nil, true) then
++                    changedParts += 1
++                    record("atlas", entry.oldId, atlasId)
++                    committedChange("atlas", entry.oldId, atlasId)
++                end
++            end
++            table.insert(undo, {kind = "history", model = model,
++                previous = model:GetAttribute(HISTORY_ATTRIBUTE)})
++            model:SetAttribute(HISTORY_ATTRIBUTE, item.encodedHistory)
++            modifiedModels += 1
++        end
++    end)
++    if not committed then
++        -- Best-effort transaction rollback. Never Destroy / Clone a Model.
++        for index = #undo, 1, -1 do
++            local entry = undo[index]
++            pcall(function()
++                if entry.kind == "atlas" then
++                    entry.mesh.TextureID = entry.texture
++                    if entry.surface ~= nil and entry.colorMap ~= nil then
++                        entry.surface.ColorMap = entry.colorMap
++                    end
++                elseif entry.kind == "model_reference" then
++                    entry.model:SetAttribute(REGISTRY_MODEL_ID_ATTRIBUTE, entry.previous)
++                elseif entry.kind == "history" then
++                    entry.model:SetAttribute(HISTORY_ATTRIBUTE, entry.previous)
++                end
++            end)
+         end
++        error("scoped Location Asset ID sync failed; ID rollback attempted: " .. tostring(commitError), 2)
+     end
+-    updateTree(workspace)
+-    if serverStorage ~= nil then
+-        updateTree(serverStorage)
++    local changes = {}
++    for _, event in pairs(summary) do
++        table.insert(changes, event)
++    end
++    table.sort(changes, function(a, b)
++        return a.kind .. a.oldId .. a.newId < b.kind .. b.oldId .. b.newId
++    end)
++    -- The central audit database needs the exact placed instance affected by
++    -- each replacement. The bounded model attribute above remains only a
++    -- convenient recent cache inside Studio; this response is the durable log.
++    local instances = {}
++    for _, item in ipairs(pending) do
++        local instanceChanges = {}
++        for _, event in pairs(item.committedChanges) do
++            table.insert(instanceChanges, event)
++        end
++        table.sort(instanceChanges, function(a, b)
++            return a.kind .. a.oldId .. a.newId < b.kind .. b.oldId .. b.newId
++        end)
++        if #instanceChanges > 0 then
++            table.insert(instances, {
++                instanceId = tostring(item.model:GetAttribute("Game1DecoInstanceId") or ""),
++                studioPath = item.model:GetFullName(),
++                changes = instanceChanges,
++            })
++        end
++    end
++    local pendingGeometry = 0
++    for _, model in ipairs(models) do
++        if tostring(model:GetAttribute("Game1DecoPublishedModelSha256") or "")
++            ~= tostring(row.model_published_sha256 or "") then
++            pendingGeometry += 1
++        end
+     end
+-    return { models = changedModels, parts = changedParts, matchedModels = matchedModels }
++    return { models = modifiedModels, parts = changedParts, matchedModels = #models,
++        modelReferences = modelReferences, pendingGeometry = pendingGeometry,
++        replacedModels = 0, changes = changes, instances = instances }
+ end
+ 
+ return DecoPlacedAssetSync
+diff --git a/system/studio-plugin/modules/StudioDecoSyncCommands.luau b/system/studio-plugin/modules/StudioDecoSyncCommands.luau
+index 010e4cf..ecc92d8 100644
+--- a/system/studio-plugin/modules/StudioDecoSyncCommands.luau
++++ b/system/studio-plugin/modules/StudioDecoSyncCommands.luau
+@@ -1,54 +1,43 @@
+--- Transport-only adapter for DecoManager's existing registry/material refresh.
+--- Never imports models into ServerStorage or modifies published asset identities.
++-- M216: reject legacy global commands (including M215) before they can mutate.
+ return function(config: any)
+     return function(command: any)
+-        if command.project ~= "game1" or (command.schemaVersion ~= 1 and command.schemaVersion ~= 2)
+-            or type(command.operationId) ~= "string" or command.operationId == "" then
+-            warn("[game1] invalid deco-refresh command")
+-            return
+-        end
+-        local scoped = command.schemaVersion == 2
+-        if scoped and (type(command.targetSlug) ~= "string" or command.targetSlug == ""
+-            or type(command.bindingRevision) ~= "number" or command.bindingRevision < 1) then
+-            warn("[game1] invalid scoped deco-refresh")
++        if command.project ~= "game1" or command.schemaVersion ~= 3
++            or type(command.operationId) ~= "string" or command.operationId == ""
++            or type(command.targetSlug) ~= "string" or command.targetSlug == ""
++            or type(command.bindingRevision) ~= "number" or command.bindingRevision < 1
++            or type(command.modelAssetId) ~= "string" or command.modelAssetId == ""
++            or type(command.atlasAssetId) ~= "string" or command.atlasAssetId == "" then
++            warn("[game1] rejected unsafe/unscoped Location Asset sync command")
+             return
+         end
+         local ok, report, refreshError = pcall(function()
+             if config.RunService:IsRunning() then
+                 error("Studio Edit mode required")
+             end
+-            if scoped then
+-                return config.decoManager:refreshRegistry(command.targetSlug)
+-            end
+-            return config.decoManager:refreshRegistry()
++            return config.decoManager:refreshRegistry(
++                command.targetSlug, true, command.modelAssetId, command.atlasAssetId)
+         end)
+         local payload = {
+-            project = "game1",
+-            command = "deco-refresh",
+-            schemaVersion = command.schemaVersion,
+-            operationId = command.operationId,
+-            targetSlug = if scoped then command.targetSlug else nil,
+-            bindingRevision = if scoped then command.bindingRevision else nil,
++            project = "game1", command = "deco-refresh", schemaVersion = 3,
++            operationId = command.operationId, targetSlug = command.targetSlug,
++            bindingRevision = command.bindingRevision,
+         }
+         if ok and report ~= nil then
+-            payload.matchedModels = report.matchedModels
+-            payload.models = report.models
+-            payload.parts = report.parts
+-            payload.registryItems = report.registryItems
++            for _, field in ipairs({ "models", "parts", "replacedModels", "matchedModels",
++                "modelReferences", "pendingGeometry", "registryItems", "changes", "instances" }) do
++                payload[field] = report[field]
++            end
+         else
+             payload.error = tostring(if ok then refreshError else report)
+         end
+         local posted, response = pcall(config.HttpService.RequestAsync, config.HttpService, {
+-            Url = config.bridgeUrl .. "/deco-refresh-result",
+-            Method = "POST",
+-            Headers = {
+-                ["X-Game1-Token"] = config.bridgeToken,
+-                ["Content-Type"] = "application/json",
+-            },
++            Url = config.bridgeUrl .. "/deco-refresh-result", Method = "POST",
++            Headers = { ["X-Game1-Token"] = config.bridgeToken,
++                ["Content-Type"] = "application/json" },
+             Body = config.HttpService:JSONEncode(payload),
+         })
+         if not posted or not response.Success then
+-            warn("[game1] deco-refresh result could not be reported: " .. tostring(if posted then response.Body else response))
++            warn("[game1] Location Asset sync result could not be reported: " .. tostring(if posted then response.Body else response))
+         end
+     end
+ end
+diff --git a/system/verify/test_http_write_contracts_m88.py b/system/verify/test_http_write_contracts_m88.py
+index b4e4c09..2c6c536 100644
+--- a/system/verify/test_http_write_contracts_m88.py
++++ b/system/verify/test_http_write_contracts_m88.py
+@@ -229,12 +229,17 @@ class WriteRoutingM88(unittest.TestCase):
+                           and any(isinstance(t, ast.Name) and t.id == "WRITE_SOURCES" for t in node.targets))
+         provided = {key.value for key in definition.value.args[0].keys}
+         requested = set()
+-        for module in ("write_files", "write_actors", "write_world", "write_animations", "delete_entities", "real_estate", "character_components"):
++        for module in ("write_dispatch", "write_files", "write_actors", "write_world", "write_animations", "delete_entities", "real_estate", "character_components"):
+             source = ast.parse((ROOT / f"system/control-center/api/{module}.py").read_text(encoding="utf-8"))
+             for node in ast.walk(source):
+                 if (isinstance(node, ast.Subscript) and isinstance(node.value, ast.Name)
+                     and node.value.id == "deps" and isinstance(node.slice, ast.Constant)):
+                     requested.add(node.slice.value)
++                if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
++                    and isinstance(node.func.value, ast.Name) and node.func.value.id == "deps"
++                    and node.func.attr == "get" and node.args
++                    and isinstance(node.args[0], ast.Constant)):
++                    requested.add(node.args[0].value)
+         self.assertEqual(requested, provided)
+ 
+     def test_local_picker_stays_isolated_from_store_mutations(self):

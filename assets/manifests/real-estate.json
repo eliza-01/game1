@@ -2,6 +2,1967 @@
   "schemaVersion": 2,
   "items": [
     {
+      "slug": "house_level1_01",
+      "house_type": "house",
+      "house_level": 1,
+      "variant": "01",
+      "purchase_price": 1,
+      "min_level": 1,
+      "sale_price": 1,
+      "model_path": "assets/source/real-estate/house_level1_01/model/house_level1_01.fbx",
+      "model_sha256": "fcf4160bfee251200c44a4dc85ef77beba8142acec90b1c5dfdd7bee7417be1a",
+      "model_asset_id": "127590517468421",
+      "model_published_hash": "fcf4160bfee251200c44a4dc85ef77beba8142acec90b1c5dfdd7bee7417be1a",
+      "model_moderation": "Approved",
+      "revision": 1,
+      "created_at": 1793728992.756869,
+      "updated_at": 1793729048.0967388,
+      "skeleton": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "house",
+            "armature": "house_armature",
+            "vertices": 1094,
+            "bones": [
+              {
+                "name": "chest_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  0.991291,
+                  -0.1316891,
+                  0.0,
+                  -12.7205677,
+                  0.1316891,
+                  0.9912912,
+                  0.0,
+                  2.3668451,
+                  0.0,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "house_floor_01_spawn_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  -1.0,
+                  0.0,
+                  -2e-07,
+                  -0.4238807,
+                  0.0,
+                  -1.0,
+                  -0.0,
+                  -4.2594533,
+                  -2e-07,
+                  -0.0,
+                  1.0,
+                  0.463781,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "land_spawn_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  0.8348502,
+                  -0.5504766,
+                  -1.2e-06,
+                  -5.7508926,
+                  -0.5504761,
+                  -0.8348503,
+                  9e-07,
+                  -11.2155857,
+                  -1.5e-06,
+                  -1e-07,
+                  -1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "seat_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0263775,
+                  0.0,
+                  1.0,
+                  0.0,
+                  1.7024108,
+                  0.0,
+                  0.0,
+                  1.0,
+                  2.0709307,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [],
+            "authoredPlacement": {
+              "version": 2,
+              "centerInHouse": [
+                -0.0,
+                0.0,
+                0.0
+              ],
+              "size": [
+                18.236702,
+                13.210838,
+                16.500192
+              ]
+            },
+            "publicationBones": [
+              {
+                "name": "chest_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  0.991291,
+                  -0.1316891,
+                  0.0,
+                  -12.7205677,
+                  0.1316891,
+                  0.9912912,
+                  0.0,
+                  2.3668451,
+                  0.0,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "house_floor_01_spawn_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  -1.0,
+                  0.0,
+                  -2e-07,
+                  -0.4238807,
+                  0.0,
+                  -1.0,
+                  -0.0,
+                  -4.2594533,
+                  -2e-07,
+                  -0.0,
+                  1.0,
+                  0.463781,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "land_spawn_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  0.8348502,
+                  -0.5504766,
+                  -1.2e-06,
+                  -5.7508926,
+                  -0.5504761,
+                  -0.8348503,
+                  9e-07,
+                  -11.2155857,
+                  -1.5e-06,
+                  -1e-07,
+                  -1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "seat_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0263775,
+                  0.0,
+                  1.0,
+                  0.0,
+                  1.7024108,
+                  0.0,
+                  0.0,
+                  1.0,
+                  2.0709307,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ]
+          },
+          {
+            "name": "col_mesh",
+            "armature": "house_armature",
+            "vertices": 205,
+            "bones": [
+              {
+                "name": "chest_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  0.991291,
+                  -0.1316891,
+                  0.0,
+                  -12.7205677,
+                  0.1316891,
+                  0.9912912,
+                  0.0,
+                  2.3668451,
+                  0.0,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "house_floor_01_spawn_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  -1.0,
+                  0.0,
+                  -2e-07,
+                  -0.4238807,
+                  0.0,
+                  -1.0,
+                  -0.0,
+                  -4.2594533,
+                  -2e-07,
+                  -0.0,
+                  1.0,
+                  0.463781,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "land_spawn_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  0.8348502,
+                  -0.5504766,
+                  -1.2e-06,
+                  -5.7508926,
+                  -0.5504761,
+                  -0.8348503,
+                  9e-07,
+                  -11.2155857,
+                  -1.5e-06,
+                  -1e-07,
+                  -1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "seat_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0263775,
+                  0.0,
+                  1.0,
+                  0.0,
+                  1.7024108,
+                  0.0,
+                  0.0,
+                  1.0,
+                  2.0709307,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [],
+            "authoredPlacement": {
+              "version": 2,
+              "centerInHouse": [
+                -0.015395,
+                0.01908,
+                -0.042095
+              ],
+              "size": [
+                18.209368,
+                13.719437,
+                16.035542
+              ]
+            },
+            "publicationBones": []
+          }
+        ],
+        "unassignedArmatures": []
+      },
+      "rigWarnings": [
+        {
+          "part": "door",
+          "code": "missing_door",
+          "message": "Optional mesh door is missing. Houses without doors are supported."
+        }
+      ],
+      "meshParts": [
+        "house",
+        "col_mesh"
+      ],
+      "meshSources": {},
+      "rigSourceHashes": {
+        "house": "fcf4160bfee251200c44a4dc85ef77beba8142acec90b1c5dfdd7bee7417be1a",
+        "col_mesh": "fcf4160bfee251200c44a4dc85ef77beba8142acec90b1c5dfdd7bee7417be1a"
+      },
+      "meshOptions": {
+        "house": {
+          "glass": false,
+          "noCollide": true,
+          "collisionFidelity": "Box",
+          "doubleSided": true,
+          "collisionMesh": false,
+          "destructible": false
+        },
+        "col_mesh": {
+          "glass": false,
+          "noCollide": false,
+          "collisionFidelity": "PreciseConvexDecomposition",
+          "doubleSided": true,
+          "collisionMesh": true,
+          "destructible": false
+        }
+      },
+      "textures": {
+        "house": {
+          "path": "assets/source/texture-atlases/house_level1_01/2048x2048/house_level1_01_2048x2048_atlas.png",
+          "filename": "house_level1_01_2048x2048_atlas.png",
+          "sha256": "cb1f0779b9bfb41b71bce1c9ea3c13c3d9053dfc9b89f74b0337ae9f1da65be0",
+          "reuseReference": "",
+          "assetId": "128033899815070",
+          "publishedSha256": "cb1f0779b9bfb41b71bce1c9ea3c13c3d9053dfc9b89f74b0337ae9f1da65be0",
+          "publicationFormat": "source",
+          "atlasVariantId": 25,
+          "atlasKey": "house_level1_01",
+          "atlasBindingRevision": 1,
+          "atlasSyncStatus": "synced",
+          "atlasLegacyWarning": false,
+          "atlasVersion": "01",
+          "atlasVariants": [
+            {
+              "id": 25,
+              "family_id": 21,
+              "width": 2048,
+              "height": 2048,
+              "filename": "house_level1_01_2048x2048_atlas.png",
+              "original_filename": "house_level1_01_2048x2048_atlas.png",
+              "source_path": "assets/source/texture-atlases/house_level1_01/2048x2048/house_level1_01_2048x2048_atlas.png",
+              "source_sha256": "cb1f0779b9bfb41b71bce1c9ea3c13c3d9053dfc9b89f74b0337ae9f1da65be0",
+              "uses_alpha": false,
+              "published_id": "128033899815070",
+              "published_sha256": "cb1f0779b9bfb41b71bce1c9ea3c13c3d9053dfc9b89f74b0337ae9f1da65be0",
+              "moderation_state": "Approved",
+              "published_at": 1793729061.9591753,
+              "created_at": 1793728992.469019,
+              "atlas_key": "house_level1_01",
+              "replacement_sha256": null,
+              "current": true,
+              "replacementPending": false,
+              "resolution": "2048x2048",
+              "baseKey": "house_level1",
+              "version": "01"
+            }
+          ],
+          "atlasVersionChoices": [
+            {
+              "id": 25,
+              "family_id": 21,
+              "width": 2048,
+              "height": 2048,
+              "filename": "house_level1_01_2048x2048_atlas.png",
+              "original_filename": "house_level1_01_2048x2048_atlas.png",
+              "source_path": "assets/source/texture-atlases/house_level1_01/2048x2048/house_level1_01_2048x2048_atlas.png",
+              "source_sha256": "cb1f0779b9bfb41b71bce1c9ea3c13c3d9053dfc9b89f74b0337ae9f1da65be0",
+              "uses_alpha": false,
+              "published_id": "128033899815070",
+              "published_sha256": "cb1f0779b9bfb41b71bce1c9ea3c13c3d9053dfc9b89f74b0337ae9f1da65be0",
+              "moderation_state": "Approved",
+              "published_at": 1793729061.9591753,
+              "created_at": 1793728992.469019,
+              "atlas_key": "house_level1_01",
+              "replacement_sha256": null,
+              "current": true,
+              "replacementPending": false,
+              "resolution": "2048x2048",
+              "baseKey": "house_level1",
+              "version": "01",
+              "atlasKey": "house_level1_01"
+            }
+          ],
+          "atlasCurrent": true
+        },
+        "col_mesh": {
+          "path": "",
+          "filename": "",
+          "sha256": "",
+          "reuseReference": "",
+          "assetId": "",
+          "publishedSha256": "",
+          "publicationFormat": ""
+        }
+      },
+      "rigAssets": {
+        "house": {
+          "assetId": "127590517468421",
+          "publishedSha256": "fcf4160bfee251200c44a4dc85ef77beba8142acec90b1c5dfdd7bee7417be1a"
+        },
+        "col_mesh": {
+          "assetId": "119467643514463",
+          "publishedSha256": "fcf4160bfee251200c44a4dc85ef77beba8142acec90b1c5dfdd7bee7417be1a"
+        }
+      },
+      "publicationCurrent": {
+        "model": true,
+        "house": true,
+        "col_mesh": true
+      },
+      "status": "PUBLISHED"
+    },
+    {
+      "slug": "house_level2_01",
+      "house_type": "house",
+      "house_level": 2,
+      "variant": "01",
+      "purchase_price": 1,
+      "min_level": 1,
+      "sale_price": 1,
+      "model_path": "assets/source/real-estate/house_level2_01/model/house_level2_01.fbx",
+      "model_sha256": "9654bee5d9eaef1674cd061b4cde15891d3072dc44a490d0584a7c9396727f57",
+      "model_asset_id": "101423627410358",
+      "model_published_hash": "9654bee5d9eaef1674cd061b4cde15891d3072dc44a490d0584a7c9396727f57",
+      "model_moderation": "Approved",
+      "revision": 1,
+      "created_at": 1793726925.4643605,
+      "updated_at": 1793727012.6145997,
+      "skeleton": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "house",
+            "armature": "house_armature",
+            "vertices": 2836,
+            "bones": [
+              {
+                "name": "chest_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  -3.7423711,
+                  0.0,
+                  1.0,
+                  0.0,
+                  5.9323506,
+                  0.0,
+                  0.0,
+                  1.0,
+                  1.0067215,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "chimney_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  3e-07,
+                  0.0,
+                  -1.0,
+                  9.2545338,
+                  1.0,
+                  0.0,
+                  3e-07,
+                  1.0833509,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  21.4599361,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "door_01_handle_inside_socket",
+                "parent": "door_01_hinge_socket",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  2.8424664,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -5.4606776,
+                  0.0,
+                  0.0,
+                  1.0,
+                  5.3094788,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "door_01_handle_outside_socket",
+                "parent": "door_01_hinge_socket",
+                "matrixLocal": [
+                  1e-07,
+                  0.0,
+                  1.0,
+                  2.8460007,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  -6.7941732,
+                  1.0,
+                  0.0,
+                  -1e-07,
+                  5.2743802,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "door_01_hinge_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  5.8132286,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  -6.474669,
+                  0.0,
+                  1.0,
+                  0.0,
+                  5.1978025,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "door_01_padlock_01_socket",
+                "parent": "door_01_hinge_socket",
+                "matrixLocal": [
+                  0.7347713,
+                  -0.6610385,
+                  -0.1521161,
+                  2.0990615,
+                  0.6782889,
+                  0.7179945,
+                  0.156231,
+                  -6.5675516,
+                  0.0059437,
+                  -0.2179727,
+                  0.9759367,
+                  5.7345729,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "house_floor_01_spawn_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  -1.0,
+                  0.0,
+                  -5e-07,
+                  1.6761811,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  0.1603304,
+                  -5e-07,
+                  0.0,
+                  1.0,
+                  0.9805771,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "land_spawn_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  2e-07,
+                  1.0937672,
+                  -0.0,
+                  -0.999945,
+                  0.0104866,
+                  -15.9363947,
+                  2e-07,
+                  -0.0104866,
+                  -0.9999449,
+                  0.0249348,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "seat_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  -2.6263003,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -8.2934322,
+                  0.0,
+                  0.0,
+                  1.0,
+                  2.7706389,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "seat_02_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  -6.3816314,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -8.6470337,
+                  0.0,
+                  0.0,
+                  1.0,
+                  3.8796201,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [],
+            "authoredPlacement": {
+              "version": 2,
+              "centerInHouse": [
+                -0.0,
+                0.0,
+                0.0
+              ],
+              "size": [
+                22.187448,
+                21.984902,
+                25.383196
+              ]
+            },
+            "publicationBones": [
+              {
+                "name": "chest_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  -3.7423711,
+                  0.0,
+                  1.0,
+                  0.0,
+                  5.9323506,
+                  0.0,
+                  0.0,
+                  1.0,
+                  1.0067215,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "chimney_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  3e-07,
+                  0.0,
+                  -1.0,
+                  9.2545338,
+                  1.0,
+                  0.0,
+                  3e-07,
+                  1.0833509,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  21.4599361,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "house_floor_01_spawn_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  -1.0,
+                  0.0,
+                  -5e-07,
+                  1.6761811,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  0.1603304,
+                  -5e-07,
+                  0.0,
+                  1.0,
+                  0.9805771,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "land_spawn_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  2e-07,
+                  1.0937672,
+                  -0.0,
+                  -0.999945,
+                  0.0104866,
+                  -15.9363947,
+                  2e-07,
+                  -0.0104866,
+                  -0.9999449,
+                  0.0249348,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "seat_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  -2.6263003,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -8.2934322,
+                  0.0,
+                  0.0,
+                  1.0,
+                  2.7706389,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "seat_02_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  -6.3816314,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -8.6470337,
+                  0.0,
+                  0.0,
+                  1.0,
+                  3.8796201,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ]
+          },
+          {
+            "name": "col_mesh",
+            "armature": "house_armature",
+            "vertices": 415,
+            "bones": [
+              {
+                "name": "chest_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  -3.7423711,
+                  0.0,
+                  1.0,
+                  0.0,
+                  5.9323506,
+                  0.0,
+                  0.0,
+                  1.0,
+                  1.0067215,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "chimney_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  3e-07,
+                  0.0,
+                  -1.0,
+                  9.2545338,
+                  1.0,
+                  0.0,
+                  3e-07,
+                  1.0833509,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  21.4599361,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "door_01_handle_inside_socket",
+                "parent": "door_01_hinge_socket",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  2.8424664,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -5.4606776,
+                  0.0,
+                  0.0,
+                  1.0,
+                  5.3094788,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "door_01_handle_outside_socket",
+                "parent": "door_01_hinge_socket",
+                "matrixLocal": [
+                  1e-07,
+                  0.0,
+                  1.0,
+                  2.8460007,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  -6.7941732,
+                  1.0,
+                  0.0,
+                  -1e-07,
+                  5.2743802,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "door_01_hinge_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  5.8132286,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  -6.474669,
+                  0.0,
+                  1.0,
+                  0.0,
+                  5.1978025,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "door_01_padlock_01_socket",
+                "parent": "door_01_hinge_socket",
+                "matrixLocal": [
+                  0.7347713,
+                  -0.6610385,
+                  -0.1521161,
+                  2.0990615,
+                  0.6782889,
+                  0.7179945,
+                  0.156231,
+                  -6.5675516,
+                  0.0059437,
+                  -0.2179727,
+                  0.9759367,
+                  5.7345729,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "house_floor_01_spawn_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  -1.0,
+                  0.0,
+                  -5e-07,
+                  1.6761811,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  0.1603304,
+                  -5e-07,
+                  0.0,
+                  1.0,
+                  0.9805771,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "land_spawn_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  2e-07,
+                  1.0937672,
+                  -0.0,
+                  -0.999945,
+                  0.0104866,
+                  -15.9363947,
+                  2e-07,
+                  -0.0104866,
+                  -0.9999449,
+                  0.0249348,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "seat_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  -2.6263003,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -8.2934322,
+                  0.0,
+                  0.0,
+                  1.0,
+                  2.7706389,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "seat_02_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  -6.3816314,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -8.6470337,
+                  0.0,
+                  0.0,
+                  1.0,
+                  3.8796201,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [],
+            "authoredPlacement": {
+              "version": 2,
+              "centerInHouse": [
+                -0.012167,
+                0.052201,
+                -0.440207
+              ],
+              "size": [
+                22.063848,
+                21.888721,
+                25.412699
+              ]
+            },
+            "publicationBones": []
+          },
+          {
+            "name": "door",
+            "armature": "house_armature",
+            "vertices": 500,
+            "bones": [
+              {
+                "name": "chest_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  -3.7423711,
+                  0.0,
+                  1.0,
+                  0.0,
+                  5.9323506,
+                  0.0,
+                  0.0,
+                  1.0,
+                  1.0067215,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "chimney_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  3e-07,
+                  0.0,
+                  -1.0,
+                  9.2545338,
+                  1.0,
+                  0.0,
+                  3e-07,
+                  1.0833509,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  21.4599361,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "door_01_handle_inside_socket",
+                "parent": "door_01_hinge_socket",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  2.8424664,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -5.4606776,
+                  0.0,
+                  0.0,
+                  1.0,
+                  5.3094788,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "door_01_handle_outside_socket",
+                "parent": "door_01_hinge_socket",
+                "matrixLocal": [
+                  1e-07,
+                  0.0,
+                  1.0,
+                  2.8460007,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  -6.7941732,
+                  1.0,
+                  0.0,
+                  -1e-07,
+                  5.2743802,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "door_01_hinge_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  5.8132286,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  -6.474669,
+                  0.0,
+                  1.0,
+                  0.0,
+                  5.1978025,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "door_01_padlock_01_socket",
+                "parent": "door_01_hinge_socket",
+                "matrixLocal": [
+                  0.7347713,
+                  -0.6610385,
+                  -0.1521161,
+                  2.0990615,
+                  0.6782889,
+                  0.7179945,
+                  0.156231,
+                  -6.5675516,
+                  0.0059437,
+                  -0.2179727,
+                  0.9759367,
+                  5.7345729,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "house_floor_01_spawn_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  -1.0,
+                  0.0,
+                  -5e-07,
+                  1.6761811,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  0.1603304,
+                  -5e-07,
+                  0.0,
+                  1.0,
+                  0.9805771,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "land_spawn_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  2e-07,
+                  1.0937672,
+                  -0.0,
+                  -0.999945,
+                  0.0104866,
+                  -15.9363947,
+                  2e-07,
+                  -0.0104866,
+                  -0.9999449,
+                  0.0249348,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "seat_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  -2.6263003,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -8.2934322,
+                  0.0,
+                  0.0,
+                  1.0,
+                  2.7706389,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "seat_02_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  -6.3816314,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -8.6470337,
+                  0.0,
+                  0.0,
+                  1.0,
+                  3.8796201,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [
+              "door_01_hinge_socket"
+            ],
+            "authoredPlacement": {
+              "version": 2,
+              "centerInHouse": [
+                -2.813532,
+                -5.670199,
+                -8.148521
+              ],
+              "size": [
+                3.839763,
+                7.086927,
+                1.748137
+              ]
+            },
+            "publicationBones": [
+              {
+                "name": "door_01_handle_inside_socket",
+                "parent": "door_01_hinge_socket",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  2.8424664,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -5.4606776,
+                  0.0,
+                  0.0,
+                  1.0,
+                  5.3094788,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "door_01_handle_outside_socket",
+                "parent": "door_01_hinge_socket",
+                "matrixLocal": [
+                  1e-07,
+                  0.0,
+                  1.0,
+                  2.8460007,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  -6.7941732,
+                  1.0,
+                  0.0,
+                  -1e-07,
+                  5.2743802,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "door_01_hinge_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  5.8132286,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  -6.474669,
+                  0.0,
+                  1.0,
+                  0.0,
+                  5.1978025,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "door_01_padlock_01_socket",
+                "parent": "door_01_hinge_socket",
+                "matrixLocal": [
+                  0.7347713,
+                  -0.6610385,
+                  -0.1521161,
+                  2.0990615,
+                  0.6782889,
+                  0.7179945,
+                  0.156231,
+                  -6.5675516,
+                  0.0059437,
+                  -0.2179727,
+                  0.9759367,
+                  5.7345729,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ]
+          },
+          {
+            "name": "window_frames_glass",
+            "armature": "house_armature",
+            "vertices": 8,
+            "bones": [
+              {
+                "name": "chest_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  -3.7423711,
+                  0.0,
+                  1.0,
+                  0.0,
+                  5.9323506,
+                  0.0,
+                  0.0,
+                  1.0,
+                  1.0067215,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "chimney_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  3e-07,
+                  0.0,
+                  -1.0,
+                  9.2545338,
+                  1.0,
+                  0.0,
+                  3e-07,
+                  1.0833509,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  21.4599361,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "door_01_handle_inside_socket",
+                "parent": "door_01_hinge_socket",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  2.8424664,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -5.4606776,
+                  0.0,
+                  0.0,
+                  1.0,
+                  5.3094788,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "door_01_handle_outside_socket",
+                "parent": "door_01_hinge_socket",
+                "matrixLocal": [
+                  1e-07,
+                  0.0,
+                  1.0,
+                  2.8460007,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  -6.7941732,
+                  1.0,
+                  0.0,
+                  -1e-07,
+                  5.2743802,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "door_01_hinge_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  5.8132286,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  -6.474669,
+                  0.0,
+                  1.0,
+                  0.0,
+                  5.1978025,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "door_01_padlock_01_socket",
+                "parent": "door_01_hinge_socket",
+                "matrixLocal": [
+                  0.7347713,
+                  -0.6610385,
+                  -0.1521161,
+                  2.0990615,
+                  0.6782889,
+                  0.7179945,
+                  0.156231,
+                  -6.5675516,
+                  0.0059437,
+                  -0.2179727,
+                  0.9759367,
+                  5.7345729,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "house_floor_01_spawn_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  -1.0,
+                  0.0,
+                  -5e-07,
+                  1.6761811,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  0.1603304,
+                  -5e-07,
+                  0.0,
+                  1.0,
+                  0.9805771,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "land_spawn_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  2e-07,
+                  1.0937672,
+                  -0.0,
+                  -0.999945,
+                  0.0104866,
+                  -15.9363947,
+                  2e-07,
+                  -0.0104866,
+                  -0.9999449,
+                  0.0249348,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "seat_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  -2.6263003,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -8.2934322,
+                  0.0,
+                  0.0,
+                  1.0,
+                  2.7706389,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "seat_02_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  -6.3816314,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -8.6470337,
+                  0.0,
+                  0.0,
+                  1.0,
+                  3.8796201,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [],
+            "authoredPlacement": {
+              "version": 2,
+              "centerInHouse": [
+                6.05901,
+                -3.798254,
+                -3.812703
+              ],
+              "size": [
+                6.405948,
+                3.604869,
+                8.570784
+              ]
+            },
+            "publicationBones": []
+          }
+        ],
+        "unassignedArmatures": []
+      },
+      "rigWarnings": [],
+      "meshParts": [
+        "house",
+        "col_mesh",
+        "door",
+        "window_frames_glass"
+      ],
+      "meshSources": {},
+      "rigSourceHashes": {
+        "house": "9654bee5d9eaef1674cd061b4cde15891d3072dc44a490d0584a7c9396727f57",
+        "col_mesh": "9654bee5d9eaef1674cd061b4cde15891d3072dc44a490d0584a7c9396727f57",
+        "door": "9654bee5d9eaef1674cd061b4cde15891d3072dc44a490d0584a7c9396727f57",
+        "window_frames_glass": "9654bee5d9eaef1674cd061b4cde15891d3072dc44a490d0584a7c9396727f57"
+      },
+      "meshOptions": {
+        "house": {
+          "glass": false,
+          "noCollide": true,
+          "collisionFidelity": "Box",
+          "doubleSided": true,
+          "collisionMesh": false,
+          "destructible": false
+        },
+        "col_mesh": {
+          "glass": false,
+          "noCollide": false,
+          "collisionFidelity": "PreciseConvexDecomposition",
+          "doubleSided": true,
+          "collisionMesh": true,
+          "destructible": false
+        },
+        "door": {
+          "glass": false,
+          "noCollide": false,
+          "collisionFidelity": "PreciseConvexDecomposition",
+          "doubleSided": true,
+          "collisionMesh": false,
+          "destructible": false
+        },
+        "window_frames_glass": {
+          "glass": true,
+          "noCollide": false,
+          "collisionFidelity": "PreciseConvexDecomposition",
+          "doubleSided": true,
+          "collisionMesh": false,
+          "destructible": false
+        }
+      },
+      "textures": {
+        "house": {
+          "path": "assets/source/texture-atlases/house_level2_01/2048x2048/house_level2_01_2048x2048_atlas.png",
+          "filename": "house_level2_01_2048x2048_atlas.png",
+          "sha256": "141abec1990c088940b8650a7a59413c4ab5ff45eddc568f7da87b1134a1d012",
+          "reuseReference": "",
+          "assetId": "132689780322999",
+          "publishedSha256": "141abec1990c088940b8650a7a59413c4ab5ff45eddc568f7da87b1134a1d012",
+          "publicationFormat": "source",
+          "atlasVariantId": 24,
+          "atlasKey": "house_level2_01",
+          "atlasBindingRevision": 1,
+          "atlasSyncStatus": "synced",
+          "atlasLegacyWarning": false,
+          "atlasVersion": "01",
+          "atlasVariants": [
+            {
+              "id": 24,
+              "family_id": 20,
+              "width": 2048,
+              "height": 2048,
+              "filename": "house_level2_01_2048x2048_atlas.png",
+              "original_filename": "house_level2_01_2048x2048_atlas.png",
+              "source_path": "assets/source/texture-atlases/house_level2_01/2048x2048/house_level2_01_2048x2048_atlas.png",
+              "source_sha256": "141abec1990c088940b8650a7a59413c4ab5ff45eddc568f7da87b1134a1d012",
+              "uses_alpha": false,
+              "published_id": "132689780322999",
+              "published_sha256": "141abec1990c088940b8650a7a59413c4ab5ff45eddc568f7da87b1134a1d012",
+              "moderation_state": "Approved",
+              "published_at": 1793727023.7680624,
+              "created_at": 1793726925.3291721,
+              "atlas_key": "house_level2_01",
+              "replacement_sha256": null,
+              "current": true,
+              "replacementPending": false,
+              "resolution": "2048x2048",
+              "baseKey": "house_level2",
+              "version": "01"
+            }
+          ],
+          "atlasVersionChoices": [
+            {
+              "id": 24,
+              "family_id": 20,
+              "width": 2048,
+              "height": 2048,
+              "filename": "house_level2_01_2048x2048_atlas.png",
+              "original_filename": "house_level2_01_2048x2048_atlas.png",
+              "source_path": "assets/source/texture-atlases/house_level2_01/2048x2048/house_level2_01_2048x2048_atlas.png",
+              "source_sha256": "141abec1990c088940b8650a7a59413c4ab5ff45eddc568f7da87b1134a1d012",
+              "uses_alpha": false,
+              "published_id": "132689780322999",
+              "published_sha256": "141abec1990c088940b8650a7a59413c4ab5ff45eddc568f7da87b1134a1d012",
+              "moderation_state": "Approved",
+              "published_at": 1793727023.7680624,
+              "created_at": 1793726925.3291721,
+              "atlas_key": "house_level2_01",
+              "replacement_sha256": null,
+              "current": true,
+              "replacementPending": false,
+              "resolution": "2048x2048",
+              "baseKey": "house_level2",
+              "version": "01",
+              "atlasKey": "house_level2_01"
+            }
+          ],
+          "atlasCurrent": true
+        },
+        "col_mesh": {
+          "path": "",
+          "filename": "",
+          "sha256": "",
+          "reuseReference": "",
+          "assetId": "",
+          "publishedSha256": "",
+          "publicationFormat": ""
+        },
+        "door": {
+          "path": "assets/source/texture-atlases/restoration_01/2048x2048/revisions/2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683/restoration_01_2048x2048_atlas.png",
+          "filename": "restoration_01_2048x2048_atlas.png",
+          "sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
+          "reuseReference": "",
+          "assetId": "138456659862372",
+          "publishedSha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
+          "publicationFormat": "source",
+          "atlasVariantId": 4,
+          "atlasKey": "restoration_01",
+          "atlasBindingRevision": 1,
+          "atlasSyncStatus": "synced",
+          "atlasLegacyWarning": false,
+          "atlasVersion": "01",
+          "atlasVariants": [
+            {
+              "id": 4,
+              "family_id": 3,
+              "width": 2048,
+              "height": 2048,
+              "filename": "restoration_01_2048x2048_atlas.png",
+              "original_filename": "restoration_01_2048x2048_atlas.png",
+              "source_path": "assets/source/texture-atlases/restoration_01/2048x2048/revisions/2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683/restoration_01_2048x2048_atlas.png",
+              "source_sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
+              "uses_alpha": true,
+              "published_id": "138456659862372",
+              "published_sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
+              "moderation_state": "Reviewing",
+              "published_at": 1792938075.6938567,
+              "created_at": 1792931156.6928835,
+              "atlas_key": "restoration_01",
+              "replacement_sha256": null,
+              "current": true,
+              "replacementPending": false,
+              "resolution": "2048x2048",
+              "baseKey": "restoration",
+              "version": "01"
+            }
+          ],
+          "atlasVersionChoices": [
+            {
+              "id": 4,
+              "family_id": 3,
+              "width": 2048,
+              "height": 2048,
+              "filename": "restoration_01_2048x2048_atlas.png",
+              "original_filename": "restoration_01_2048x2048_atlas.png",
+              "source_path": "assets/source/texture-atlases/restoration_01/2048x2048/revisions/2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683/restoration_01_2048x2048_atlas.png",
+              "source_sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
+              "uses_alpha": true,
+              "published_id": "138456659862372",
+              "published_sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
+              "moderation_state": "Reviewing",
+              "published_at": 1792938075.6938567,
+              "created_at": 1792931156.6928835,
+              "atlas_key": "restoration_01",
+              "replacement_sha256": null,
+              "current": true,
+              "replacementPending": false,
+              "resolution": "2048x2048",
+              "baseKey": "restoration",
+              "version": "01",
+              "atlasKey": "restoration_01"
+            }
+          ],
+          "atlasCurrent": true
+        },
+        "window_frames_glass": {
+          "path": "assets/source/texture-atlases/restoration_01/2048x2048/revisions/2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683/restoration_01_2048x2048_atlas.png",
+          "filename": "restoration_01_2048x2048_atlas.png",
+          "sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
+          "reuseReference": "",
+          "assetId": "138456659862372",
+          "publishedSha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
+          "publicationFormat": "source",
+          "atlasVariantId": 4,
+          "atlasKey": "restoration_01",
+          "atlasBindingRevision": 1,
+          "atlasSyncStatus": "synced",
+          "atlasLegacyWarning": false,
+          "atlasVersion": "01",
+          "atlasVariants": [
+            {
+              "id": 4,
+              "family_id": 3,
+              "width": 2048,
+              "height": 2048,
+              "filename": "restoration_01_2048x2048_atlas.png",
+              "original_filename": "restoration_01_2048x2048_atlas.png",
+              "source_path": "assets/source/texture-atlases/restoration_01/2048x2048/revisions/2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683/restoration_01_2048x2048_atlas.png",
+              "source_sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
+              "uses_alpha": true,
+              "published_id": "138456659862372",
+              "published_sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
+              "moderation_state": "Reviewing",
+              "published_at": 1792938075.6938567,
+              "created_at": 1792931156.6928835,
+              "atlas_key": "restoration_01",
+              "replacement_sha256": null,
+              "current": true,
+              "replacementPending": false,
+              "resolution": "2048x2048",
+              "baseKey": "restoration",
+              "version": "01"
+            }
+          ],
+          "atlasVersionChoices": [
+            {
+              "id": 4,
+              "family_id": 3,
+              "width": 2048,
+              "height": 2048,
+              "filename": "restoration_01_2048x2048_atlas.png",
+              "original_filename": "restoration_01_2048x2048_atlas.png",
+              "source_path": "assets/source/texture-atlases/restoration_01/2048x2048/revisions/2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683/restoration_01_2048x2048_atlas.png",
+              "source_sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
+              "uses_alpha": true,
+              "published_id": "138456659862372",
+              "published_sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
+              "moderation_state": "Reviewing",
+              "published_at": 1792938075.6938567,
+              "created_at": 1792931156.6928835,
+              "atlas_key": "restoration_01",
+              "replacement_sha256": null,
+              "current": true,
+              "replacementPending": false,
+              "resolution": "2048x2048",
+              "baseKey": "restoration",
+              "version": "01",
+              "atlasKey": "restoration_01"
+            }
+          ],
+          "atlasCurrent": true
+        }
+      },
+      "rigAssets": {
+        "house": {
+          "assetId": "101423627410358",
+          "publishedSha256": "9654bee5d9eaef1674cd061b4cde15891d3072dc44a490d0584a7c9396727f57"
+        },
+        "col_mesh": {
+          "assetId": "135797805158855",
+          "publishedSha256": "9654bee5d9eaef1674cd061b4cde15891d3072dc44a490d0584a7c9396727f57"
+        },
+        "door": {
+          "assetId": "112134968260876",
+          "publishedSha256": "9654bee5d9eaef1674cd061b4cde15891d3072dc44a490d0584a7c9396727f57"
+        },
+        "window_frames_glass": {
+          "assetId": "72128658287640",
+          "publishedSha256": "9654bee5d9eaef1674cd061b4cde15891d3072dc44a490d0584a7c9396727f57"
+        }
+      },
+      "publicationCurrent": {
+        "model": true,
+        "house": true,
+        "col_mesh": true,
+        "door": true,
+        "window_frames_glass": true
+      },
+      "status": "PUBLISHED"
+    },
+    {
       "slug": "house_level3_01",
       "house_type": "house",
       "house_level": 3,
@@ -6103,6 +8064,29 @@
           "resolution": "1024x2048",
           "baseKey": "campfire",
           "version": "01"
+        },
+        {
+          "id": 27,
+          "family_id": 12,
+          "width": 256,
+          "height": 512,
+          "filename": "campfire_01_256x512_atlas.png",
+          "original_filename": "campfire_01_256x512_atlas.png",
+          "source_path": "assets/source/texture-atlases/campfire_01/256x512/campfire_01_256x512_atlas.png",
+          "source_sha256": "f7b8f7c74484cae4599166c01b77d14d20222aee85e04e2fc94e128205cc0553",
+          "uses_alpha": true,
+          "published_id": "78602158656399",
+          "published_sha256": "f7b8f7c74484cae4599166c01b77d14d20222aee85e04e2fc94e128205cc0553",
+          "moderation_state": "Reviewing",
+          "published_at": 1793732908.6642716,
+          "created_at": 1793732886.9227848,
+          "atlas_key": "campfire_01",
+          "replacement_sha256": null,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "256x512",
+          "baseKey": "campfire",
+          "version": "01"
         }
       ]
     },
@@ -6137,6 +8121,36 @@
       ]
     },
     {
+      "atlasKey": "dion_partisan_s_dn_par_campfire01_atlas_material",
+      "baseKey": "dion_partisan_s_dn_par_campfire01_atlas_material",
+      "version": "",
+      "variants": [
+        {
+          "id": 26,
+          "family_id": 22,
+          "width": 1024,
+          "height": 512,
+          "filename": "dion_partisan_s_Dn_Par_Campfire01_Atlas_Material_1024x512_atlas.png",
+          "original_filename": "dion_partisan_s_Dn_Par_Campfire01_Atlas_Material_1024x512_atlas.png",
+          "source_path": "assets/source/texture-atlases/dion_partisan_s_dn_par_campfire01_atlas_material/1024x512/dion_partisan_s_Dn_Par_Campfire01_Atlas_Material_1024x512_atlas.png",
+          "source_sha256": "d31ef671473a84093e01dd636751f08af5d35f2d8a3b60df38978647b6694853",
+          "uses_alpha": true,
+          "published_id": null,
+          "published_sha256": "",
+          "moderation_state": "",
+          "published_at": null,
+          "created_at": 1793731103.456645,
+          "atlas_key": "dion_partisan_s_dn_par_campfire01_atlas_material",
+          "replacement_sha256": null,
+          "current": false,
+          "replacementPending": false,
+          "resolution": "1024x512",
+          "baseKey": "dion_partisan_s_dn_par_campfire01_atlas_material",
+          "version": ""
+        }
+      ]
+    },
+    {
       "atlasKey": "head_01_male",
       "baseKey": "head_01_male",
       "version": "",
@@ -6163,6 +8177,66 @@
           "resolution": "512x512",
           "baseKey": "head_01_male",
           "version": ""
+        }
+      ]
+    },
+    {
+      "atlasKey": "house_level1_01",
+      "baseKey": "house_level1",
+      "version": "01",
+      "variants": [
+        {
+          "id": 25,
+          "family_id": 21,
+          "width": 2048,
+          "height": 2048,
+          "filename": "house_level1_01_2048x2048_atlas.png",
+          "original_filename": "house_level1_01_2048x2048_atlas.png",
+          "source_path": "assets/source/texture-atlases/house_level1_01/2048x2048/house_level1_01_2048x2048_atlas.png",
+          "source_sha256": "cb1f0779b9bfb41b71bce1c9ea3c13c3d9053dfc9b89f74b0337ae9f1da65be0",
+          "uses_alpha": false,
+          "published_id": "128033899815070",
+          "published_sha256": "cb1f0779b9bfb41b71bce1c9ea3c13c3d9053dfc9b89f74b0337ae9f1da65be0",
+          "moderation_state": "Approved",
+          "published_at": 1793729061.9591753,
+          "created_at": 1793728992.469019,
+          "atlas_key": "house_level1_01",
+          "replacement_sha256": null,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "2048x2048",
+          "baseKey": "house_level1",
+          "version": "01"
+        }
+      ]
+    },
+    {
+      "atlasKey": "house_level2_01",
+      "baseKey": "house_level2",
+      "version": "01",
+      "variants": [
+        {
+          "id": 24,
+          "family_id": 20,
+          "width": 2048,
+          "height": 2048,
+          "filename": "house_level2_01_2048x2048_atlas.png",
+          "original_filename": "house_level2_01_2048x2048_atlas.png",
+          "source_path": "assets/source/texture-atlases/house_level2_01/2048x2048/house_level2_01_2048x2048_atlas.png",
+          "source_sha256": "141abec1990c088940b8650a7a59413c4ab5ff45eddc568f7da87b1134a1d012",
+          "uses_alpha": false,
+          "published_id": "132689780322999",
+          "published_sha256": "141abec1990c088940b8650a7a59413c4ab5ff45eddc568f7da87b1134a1d012",
+          "moderation_state": "Approved",
+          "published_at": 1793727023.7680624,
+          "created_at": 1793726925.3291721,
+          "atlas_key": "house_level2_01",
+          "replacement_sha256": null,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "2048x2048",
+          "baseKey": "house_level2",
+          "version": "01"
         }
       ]
     },
@@ -6722,6 +8796,22 @@
       "atlasResolution": ""
     },
     {
+      "reference": "atlas:27",
+      "label": "campfire_01",
+      "slug": "",
+      "filename": "campfire_01_256x512_atlas.png",
+      "group": "atlas",
+      "category": "",
+      "categoryLabel": "",
+      "path": "assets/source/texture-atlases/campfire_01/256x512/campfire_01_256x512_atlas.png",
+      "sha256": "f7b8f7c74484cae4599166c01b77d14d20222aee85e04e2fc94e128205cc0553",
+      "assetId": "78602158656399",
+      "atlasKey": "campfire_01",
+      "atlasName": "campfire",
+      "atlasVersion": "01",
+      "atlasResolution": "256×512"
+    },
+    {
       "reference": "atlas:17",
       "label": "christmas_tree",
       "slug": "",
@@ -6738,6 +8828,22 @@
       "atlasResolution": ""
     },
     {
+      "reference": "atlas:26",
+      "label": "dion_partisan_s_dn_par_campfire01_atlas_material",
+      "slug": "",
+      "filename": "dion_partisan_s_Dn_Par_Campfire01_Atlas_Material_1024x512_atlas.png",
+      "group": "atlas",
+      "category": "",
+      "categoryLabel": "",
+      "path": "assets/source/texture-atlases/dion_partisan_s_dn_par_campfire01_atlas_material/1024x512/dion_partisan_s_Dn_Par_Campfire01_Atlas_Material_1024x512_atlas.png",
+      "sha256": "d31ef671473a84093e01dd636751f08af5d35f2d8a3b60df38978647b6694853",
+      "assetId": "",
+      "atlasKey": "dion_partisan_s_dn_par_campfire01_atlas_material",
+      "atlasName": "dion_partisan_s_dn_par_campfire01_atlas_material",
+      "atlasVersion": "",
+      "atlasResolution": "1024×512"
+    },
+    {
       "reference": "atlas:11",
       "label": "head_01_male",
       "slug": "",
@@ -6752,6 +8858,38 @@
       "atlasName": "head_01_male",
       "atlasVersion": "",
       "atlasResolution": "512×512"
+    },
+    {
+      "reference": "atlas:25",
+      "label": "house_level1_01",
+      "slug": "",
+      "filename": "house_level1_01_2048x2048_atlas.png",
+      "group": "atlas",
+      "category": "",
+      "categoryLabel": "",
+      "path": "assets/source/texture-atlases/house_level1_01/2048x2048/house_level1_01_2048x2048_atlas.png",
+      "sha256": "cb1f0779b9bfb41b71bce1c9ea3c13c3d9053dfc9b89f74b0337ae9f1da65be0",
+      "assetId": "128033899815070",
+      "atlasKey": "house_level1_01",
+      "atlasName": "house_level1",
+      "atlasVersion": "01",
+      "atlasResolution": "2048×2048"
+    },
+    {
+      "reference": "atlas:24",
+      "label": "house_level2_01",
+      "slug": "",
+      "filename": "house_level2_01_2048x2048_atlas.png",
+      "group": "atlas",
+      "category": "",
+      "categoryLabel": "",
+      "path": "assets/source/texture-atlases/house_level2_01/2048x2048/house_level2_01_2048x2048_atlas.png",
+      "sha256": "141abec1990c088940b8650a7a59413c4ab5ff45eddc568f7da87b1134a1d012",
+      "assetId": "132689780322999",
+      "atlasKey": "house_level2_01",
+      "atlasName": "house_level2",
+      "atlasVersion": "01",
+      "atlasResolution": "2048×2048"
     },
     {
       "reference": "atlas:23",
@@ -7011,8 +9149,8 @@
     }
   ],
   "summary": {
-    "registered": 3,
-    "published": 3,
+    "registered": 5,
+    "published": 5,
     "changed": 0
   }
 }

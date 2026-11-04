@@ -139,11 +139,12 @@ def check_location_asset_variants(root: Path, report_error: Callable[[str], None
         report_error("m48 Studio plugin version marker is stale")
 
 
-    # m49 DecoManager: placed decoration instances stay unanchored for manual Studio editing.
-    if 'descendant.Anchored = false' not in deco_placement_text:
-        report_error("m49 DecoPlacement must leave placed decoration BaseParts unanchored")
-    prepare_placed_match = re.search(r'local function preparePlaced\(model: Model\)(.*?)\nend', deco_placement_text, re.S)
-    if prepare_placed_match is None:
-        report_error("m49 DecoPlacement preparePlaced helper is missing")
-    elif 'Anchored = true' in prepare_placed_match.group(1):
-        report_error("m49 DecoPlacement still anchors placed decoration BaseParts")
+    # M215: placement and model refresh share the physical-part policy.
+    preparation = root / 'system/studio-plugin/modules/DecoAssetPreparation.luau'
+    preparation_text = preparation.read_text(encoding='utf-8') if preparation.is_file() else ''
+    if 'DecoAssetPreparation.PreparePlaced(placed)' not in deco_placement_text:
+        report_error('m215 DecoPlacement does not apply the shared placed-part policy')
+    if 'descendant.Anchored = false' not in preparation_text:
+        report_error('m49/M215 placed decoration BaseParts must be unanchored')
+    if 'descendant.CanTouch = false' not in preparation_text:
+        report_error('m215 placed decoration BaseParts must remain touch-disabled')

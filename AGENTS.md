@@ -44,3 +44,21 @@ Model slug cannot own or reserve atlas identity. New authoring calls `AtlasRegis
 ## M208 · plot × house placement authoring
 
 `real_estate/placement.py` owns persisted `(plotIndex, houseSlug)` CFrame/scale bindings; Studio reads the selected Model and existing Plots catalog through `StudioHousePlacementCapture.luau`. This is not the gameplay purchase/spawn service. See `docs/workflows/REAL_ESTATE_PLOT_HOUSE_PLACEMENT_M208_RU.md`.
+
+## M213 · native atlas formats
+
+`AtlasRegistry.adopt_file` validates Pillow's actual source format; WebP even with
+`.png` suffix is staged as a real PNG, and PNG/JPEG suffixes in storage match
+actual bytes. Unsupported or unreadable images still fail closed. See
+`docs/workflows/REAL_ESTATE_ATLAS_NATIVE_FORMAT_M213_RU.md`.
+
+## M216 · Critical Location Assets Studio Sync safety contract
+
+A Studio Sync MUST target exactly one explicitly selected Location Asset slug.
+Never replace/destroy/re-parent a placed Model or MeshPart. No PivotTo, ScaleTo,
+ApplyMesh or changes to CFrame/Size/physics/bones. The published Model Asset ID
+is reference metadata, NOT the writable MeshPart.MeshId. Atlas Sync may only
+update MeshPart.TextureID and existing SurfaceAppearance.ColorMap. Always
+record changes to per-placement and Host Agent ID histories; all publications
+of shared atlases require per-consumer explicit Sync. Reject legacy global
+Studio Bridge commands. See docs/workflows/LOCATION_ASSETS_SAFE_ID_SYNC_M216_RU.md.

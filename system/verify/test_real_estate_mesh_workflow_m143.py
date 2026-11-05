@@ -17,23 +17,25 @@ class MeshWorkflowM143(unittest.TestCase):
         self.assertIn('data-re-manage=', table)
         self.assertIn('realEstateMeshWorkflowOpen(', table)
         self.assertIn('real-estate-mesh-workflow.js', html)
-        for control in ('data-mw-replace','data-mw-publish','data-mw-sync',
-                        'data-mw-local','data-mw-save-image','data-mw-publish-image',
-                        'data-mw-use-atlas','data-mw-republish-atlas'):
+        for control in ('data-mw-replace','data-mw-publish','data-mw-sync'):
             self.assertIn(control,js)
         self.assertIn("realEstatePublish('model:'+part)",js)
-        self.assertIn("realEstatePublish('image:'+part)",js)
-        self.assertIn('Sync model · template + placed',js)
+        self.assertIn('window.game1ConsumerAtlasEditor.render',js)
+        self.assertIn('window.game1ConsumerAtlasEditor.wire',js)
+        self.assertIn('Sync Model + Atlas · Studio',js)
+        self.assertNotIn('data-mw-save-image',js)
         self.assertNotIn('data-re-mesh-source=',table)
         self.assertNotIn('data-re-rig=',table)
-        self.assertNotIn('republish ${esc(part)} rig',table)
 
-    def test_picker_is_explicit_save_not_hidden_publish(self):
+    def test_picker_is_shared_and_publication_never_hidden(self):
         js=(STATIC/'real-estate-mesh-workflow.js').read_text('utf-8')
         table=(STATIC/'real-estate.js').read_text('utf-8')
-        self.assertIn('realEstateBrowseTexture(part)',js)
-        self.assertIn('realEstateRegister()',js)
-        self.assertIn('realEstateChooseAtlas(',js)
+        shared=(STATIC/'asset-atlas-editor.js').read_text('utf-8')
+        self.assertIn('onRefresh:realEstateLoad',js)
+        self.assertIn('consumerType:',shared)
+        self.assertIn('publish-reviewed',shared)
+        self.assertIn('preview-source',shared)
+        self.assertIn('Confirm replacement',shared)
         self.assertNotIn('async function realEstateReplaceTexture(row,part)',table)
         self.assertIn('data-re-texture=',table)
         self.assertIn("realEstateMeshWorkflowOpen(row.slug,button.dataset.reTexture,'texture')",table)

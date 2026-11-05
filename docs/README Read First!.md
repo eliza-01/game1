@@ -55,3 +55,11 @@
 Чтобы добавить новый milestone: сохранить **отчёт** в соответствующем `history/<domain>`, а **действующий контракт** обновить в `spec/` и/или `architecture/`, затем обновить [каталог](history/README.md). Не дублировать конкурирующие «актуальные ТЗ» под разными датами.
 
 - [M224 · Placement Anchor/Free, Atlas grouping, sidebar/database hotfix](workflows/ASSET_MANAGER_M224_PLACEMENT_ATLAS_HOTFIX_RU.md) — актуальные правила авторских превью и удаления атласов.
+
+- [M231 · Location Assets FBX COLLISION / Glass / Skeleton](workflows/LOCATION_ASSETS_FBX_COLLISION_SKELETON_M231_RU.md) — общий анализ FBX и Studio-физика.
+
+- M232: `docs/workflows/LOCATION_ASSETS_FBX_AUTHORING_M232_RU.md` — общий FBX inspection, видимый редактор mesh/collision/bones и исправление Precise для COL.
+
+- [M233 · Location Assets Model-only publication isolation](workflows/LOCATION_ASSETS_MODEL_ONLY_PUBLICATION_M233_RU.md) — модельный FBX без встроенных атласов; отдельный API и запрет неявного Image upload.
+
+- [M234 · Shared Atlas Editor / Apply Changes / Studio Sync](workflows/SHARED_ATLAS_EDITOR_APPLY_M234_RU.md) — CURRENT: единый редактор атласов для Real Estate и Location Assets, сохранение привязанных вариантов, предпросмотр совместного republish, только явный Studio Sync.

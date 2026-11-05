@@ -2,58 +2,23 @@
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 import subprocess
 import tempfile
 
 from blender_runtime import blender_executable
 from .contracts import validate_analysis, present_parts
+from services.fbx_blender_report import _blender_failure  # legacy import, shared implementation
 
 
-def _blender_failure(diagnostic: str, exit_code: int) -> str:
-    """Show an actionable Blender error instead of hiding it behind a generic label."""
-    match = re.findall(
-        r"^([A-Za-z_][A-Za-z_0-9.]*Error|Exception):\s*(.+)$",
-        diagnostic, flags=re.MULTILINE,
-    )
-    if match:
-        kind, message = match[-1]
-        if kind in {"ModuleNotFoundError", "ImportError"}:
-            return ("Real Estate Blender helper could not be loaded (" + message.strip()
-                    + "). Check that the latest project files are installed.")
-        return message.strip()
-    # A native crash or abrupt termination has no Python traceback.
-    lines = [line.strip() for line in diagnostic.splitlines() if line.strip()
-             and not line.lstrip().startswith(("File ", "^", "Traceback ", "Blender quit"))]
-    last = lines[-1] if lines else "No diagnostic output from Blender"
-    return f"Blender could not analyze the FBX (exit code {exit_code}). {last}"
 
 
 def _run(project_root: Path, script: str, arguments: tuple[Path | str, ...], *, report_path: Path) -> dict:
-    """Run Blender with its CLI arguments and an explicit JSON report destination.
-
-    Rig inspection ends with the part name (house/door), not the report filename.
-    Never infer the report path from the last CLI argument.
-    """
-    args = [str(blender_executable()), '--background', '--factory-startup',
-            '--python-exit-code', '1',
-            '--python', str(project_root / 'system/asset-manager' / script),
-            '--', *(str(argument) for argument in arguments)]
-    run = subprocess.run(args, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=240)
-    if run.returncode:
-        diagnostic = (run.stderr or '') + '\n' + (run.stdout or '')
-        raise ValueError('Real Estate FBX: ' + _blender_failure(diagnostic, run.returncode)[:500])
-    if not report_path.is_file():
-        diagnostic = (run.stderr or '') + '\n' + (run.stdout or '')
-        raise ValueError('Real Estate FBX: ' + _blender_failure(diagnostic, run.returncode)[:500]
-                         if diagnostic.strip() else
-                         f'Real Estate FBX: Blender {script} finished without a JSON report. '
-                         'Verify Blender installation and the FBX file.')
-    try:
-        return json.loads(report_path.read_text(encoding='utf-8'))
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        raise ValueError('Real Estate FBX: Blender produced an invalid analysis report') from exc
+    """Real Estate adapter for the shared Blender report executor."""
+    from services.fbx_blender_report import run_report
+    return run_report(project_root, script, arguments, report_path=report_path,
+                      label='Real Estate FBX', runner=subprocess.run,
+                      executable=blender_executable)
 
 
 def inspect(root: Path, source: Path) -> dict:
@@ -61,10 +26,9 @@ def inspect(root: Path, source: Path) -> dict:
     if source.suffix.lower() != '.fbx' or not source.is_file():
         raise ValueError('choose a valid Real Estate FBX')
     with tempfile.TemporaryDirectory(prefix='game1-real-estate-inspect-') as temp:
-        report_path = Path(temp) / 'analysis.json'
-        analysis = _run(root, 'analyze_real_estate_fbx.py', (source, report_path),
-                        report_path=report_path)
-    return validate_analysis(analysis)
+        report = Path(temp) / 'analysis.json'
+        return validate_analysis(_run(root, 'analyze_real_estate_fbx.py',
+                             (source, report), report_path=report))
 
 
 def inspect_selected(root: Path, source: Path, part: str) -> dict:

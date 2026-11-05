@@ -33,36 +33,17 @@ function realEstatePreciseDefault(part){
   return realEstateIsCollider(part)||name==='door'||name.startsWith('door_')||name.includes('glass');
 }
 function realEstateMeshDefaults(part){
-  const name=String(part||'').toLowerCase();
-  const precise=realEstatePreciseDefault(part);
-  return {glass:name.includes('glass')&&!realEstateIsCollider(part),noCollide:!precise,
-    collisionFidelity:precise?'PreciseConvexDecomposition':'Box',doubleSided:true,destructible:false};
+  return {...window.game1MeshAuthoring.defaults(part),destructible:false};
 }
 function realEstateEffectiveFidelity(part,flags){
-  // Collision fidelity is a derived physical constraint, not an independent
-  // choice while CanCollide is enabled. This also normalizes older saved rows.
-  if(flags.noCollide!==true)return 'PreciseConvexDecomposition';
-  const allowed=['Box','Hull','Default','PreciseConvexDecomposition'];
-  return allowed.includes(flags.collisionFidelity)
-    ? flags.collisionFidelity : realEstateMeshDefaults(part).collisionFidelity;
+  return window.game1MeshAuthoring.effectiveFidelity(flags);
 }
 function realEstateNormalizePhysics(part,raw){
-  const flags={...realEstateMeshDefaults(part),...(raw||{})};
-  flags.collisionFidelity=realEstateEffectiveFidelity(part,flags);
-  return flags;
+  return {...window.game1MeshAuthoring.normalize(part,raw),destructible:Boolean(raw?.destructible)};
 }
-function realEstatePhysicsStatus(flags){
-  const solid=flags.noCollide!==true;
-  return `CanCollide: ${solid} · CanTouch: false · CanQuery: ${solid}`;
-}
+function realEstatePhysicsStatus(flags){return window.game1MeshAuthoring.status(flags);}
 function realEstatePhysicsControls(part,flags){
-  const choices=[['Box','Box'],['Hull','Hull'],['Default','Default'],
-    ['PreciseConvexDecomposition','Precise (convex decomposition)']];
-  return `<div class="real-estate-physics-controls">
-    <label>Collision Fidelity <select id="real-estate-fidelity-${esc(part)}" aria-label="Collision Fidelity for ${esc(part)}" ${flags.noCollide!==true?'disabled title="Precise is required when collision is enabled"':''}>${choices.map(([v,t])=>`<option value="${v}" ${flags.collisionFidelity===v?'selected':''}>${t}</option>`).join('')}</select></label>
-    <label class="real-estate-physics-toggle"><input type="checkbox" id="real-estate-doublesided-${esc(part)}" ${flags.doubleSided?'checked':''}> DoubleSided</label>
-    <small class="real-estate-physics-state" id="real-estate-physics-state-${esc(part)}">${realEstatePhysicsStatus(flags)}</small>
-  </div>`;
+  return window.game1MeshAuthoring.controls(part,flags,'real-estate');
 }
 function realEstateRemember(){try{localStorage.setItem(REAL_ESTATE_SELECTED,realEstateState.selected||'');}catch{}}
 function realEstateForm(row){
@@ -155,10 +136,7 @@ function realEstateRenderRigs(analysis, warnings=[]){
     const shared=realEstateSharedStatic(part);
     return `<section class="real-estate-bone-group"><strong>${esc(realEstateMeshLabel(part.name))} · ${esc(part.armature||'без Armature')}</strong>
       <small class="real-estate-rig-mode">${esc(mode)}</small>
-      ${bones.length?`<ul>${bones.map(b=>{
-        const role=realEstateBoneRole(part.name,b.name);
-        return `<li><code>${esc(b.name)}</code><span class="real-estate-bone-role">${role}</span>${b.parent?` <span class="muted">← ${esc(b.parent)}</span>`:''}</li>`;
-      }).join('')}</ul>`:shared
+      ${bones.length?window.game1MeshAuthoring.boneList(bones,[],name=>realEstateBoneRole(part.name,name)):shared
         ? `<small class="muted">В исходном FBX: ${source.length} общих костей ${esc(part.armature)}. В Model Asset этой статичной части они не экспортируются.</small>`
         : '<small class="muted">Нет костей для публикации</small>'}</section>`;
   }).join('');
@@ -487,7 +465,7 @@ async function realEstateRegister(){
     return false;
   }finally{$('real-estate-register').disabled=false;}
 }
-async function realEstateSync(slug, part=null){
+async function realEstateSync(slug, part=null, {throwOnError=false}={}){
   const row=realEstateRows().find(item=>item.slug===slug);
   if(!row)return null;
   try{
@@ -516,7 +494,7 @@ async function realEstateSync(slug, part=null){
       box.innerHTML=`<strong>Studio Sync diagnostics</strong><ul>${[...warnings,...missing.map(name=>'Missing socket: '+name)].map(w=>`<li>${esc(w)}</li>`).join('')}</ul><small>Workspace models with the matching Game1RealEstateSlug are updated regardless of folder or a copied template flag. Missing instances need a managed slug.</small>`;
     }
     return result;
-  }catch(error){toast(`Studio Sync: ${error.message}`,true);return null;}
+  }catch(error){if(throwOnError)throw error;toast(`Studio Sync: ${error.message}`,true);return null;}
 }
 async function realEstatePublish(scope='all'){
   const row=realEstateSelected(); if(!row)return;

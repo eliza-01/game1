@@ -62,8 +62,10 @@ class RealEstateWeaponContactM144(unittest.TestCase):
         self.assertIn('"Game1RealEstateDestructible"', studio)
         self.assertIn('settings.destructible == true', studio)
         self.assertIn('CollectionService:AddTag(mesh, COLLIDER_TAG)', studio)
-        self.assertIn('mesh.CanCollide = not noCollide', studio)
-        self.assertIn('mesh.CanQuery = not noCollide', studio)
+        self.assertIn('Core.Apply(mesh, not noCollide, fidelity,', studio)
+        core = (ROOT/'src/shared/world/MeshPhysicsCore.luau').read_text(encoding='utf-8')
+        self.assertIn('mesh.CanCollide = true', core)
+        self.assertIn('mesh.CanQuery = true', core)
         self.assertIn('mesh.Transparency = 1', studio)
         self.assertIn('Game1RealEstatePhysicsOnly', studio)
 

@@ -32,7 +32,7 @@ def run_deco_refresh_bridge(*, timeout_seconds: float = 75.0,
     command = {
         'project': PROJECT,
         'command': 'deco-refresh',
-        'schemaVersion': 5,
+        'schemaVersion': 6,
         'operationId': operation_id,
         'targetSlug': slug,
         'bindingRevision': binding_revision,

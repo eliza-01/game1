@@ -78,9 +78,9 @@ class M221InPlaceGeometry(TestCase):
     def test_old_studio_plugin_cannot_acknew_schema(self):
         cmd = self.source('system/studio-plugin/modules/StudioDecoSyncCommands.luau')
         bridge = self.source('system/control-center/services/studio_deco_bridge.py')
-        self.assertIn('schemaVersion ~= 5', cmd)
-        self.assertIn('schemaVersion = 5', cmd)
-        self.assertIn("'schemaVersion': 5", bridge)
+        self.assertIn('schemaVersion ~= 6', cmd)
+        self.assertIn('schemaVersion = 6', cmd)
+        self.assertIn("'schemaVersion': 6", bridge)
         self.assertIn('"geometryUpdated"', cmd)
         self.assertIn('"meshPartsUpdated"', cmd)
         self.assertIn("'geometryUpdated', 'meshPartsUpdated'", bridge)

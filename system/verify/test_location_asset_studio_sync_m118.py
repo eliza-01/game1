@@ -32,7 +32,7 @@ class LocationAssetsSyncM118(TestCase):
         self.assertIn("decoAssetSyncStudio(row.slug)", js)
         self.assertIn("window.game1StudioSync.run('location', slug)", js)
         self.assertNotIn('id="sync-location-assets"', html)
-        self.assertIn('schemaVersion ~= 5', command)
+        self.assertIn('schemaVersion ~= 6', command)
         self.assertIn('command.targetSlug', command)
         self.assertIn('DecoPlacedAssetSync.RefreshIds(', manager)
         self.assertIn('StudioTextureAppearance.Apply(change.part, uri, nil, true)', sync)

@@ -155,7 +155,7 @@ class SafetyM216(TestCase):
         sync = self.source('system/studio-plugin/modules/DecoPlacedAssetSync.luau')
         manager = self.source('system/studio-plugin/modules/DecoManager.luau')
         command = self.source('system/studio-plugin/modules/StudioDecoSyncCommands.luau')
-        self.assertIn('schemaVersion ~= 5', command)
+        self.assertIn('schemaVersion ~= 6', command)
         self.assertIn('command.targetSlug', command)
         self.assertIn('DecoPlacedAssetSync.RefreshIds(', manager)
         self.assertNotIn('DecoPlacedAssetSync.RefreshModels(', manager)
@@ -228,7 +228,7 @@ class SafetyM216(TestCase):
                     break
                 except (URLError, OSError):
                     time.sleep(.01)
-            self.assertEqual(command['schemaVersion'], 5)
+            self.assertEqual(command['schemaVersion'], 6)
             self.assertEqual(command['targetSlug'], 'oak_tree')
             with self.assertRaises(HTTPError):
                 self._request(port, '/deco-refresh-result', 'POST', {

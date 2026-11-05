@@ -14,6 +14,7 @@ return table.freeze({
 			atlasVariantId = 19,
 			bindingRevision = 1,
 			destructible = false,
+			meshOptions = table.freeze({}),
 		}),
 		["smithy"] = table.freeze({
 			slug = "smithy",
@@ -26,6 +27,7 @@ return table.freeze({
 			atlasVariantId = 19,
 			bindingRevision = 1,
 			destructible = false,
+			meshOptions = table.freeze({}),
 		}),
 		["bush_01"] = table.freeze({
 			slug = "bush_01",
@@ -38,6 +40,7 @@ return table.freeze({
 			atlasVariantId = 17,
 			bindingRevision = 1,
 			destructible = false,
+			meshOptions = table.freeze({}),
 		}),
 		["pillar_with_lantern"] = table.freeze({
 			slug = "pillar_with_lantern",
@@ -50,6 +53,7 @@ return table.freeze({
 			atlasVariantId = 18,
 			bindingRevision = 1,
 			destructible = false,
+			meshOptions = table.freeze({}),
 		}),
 		["wooden_post_01"] = table.freeze({
 			slug = "wooden_post_01",
@@ -62,6 +66,7 @@ return table.freeze({
 			atlasVariantId = 22,
 			bindingRevision = 1,
 			destructible = false,
+			meshOptions = table.freeze({}),
 		}),
 		["stone_fence_01"] = table.freeze({
 			slug = "stone_fence_01",
@@ -74,6 +79,7 @@ return table.freeze({
 			atlasVariantId = 8,
 			bindingRevision = 1,
 			destructible = false,
+			meshOptions = table.freeze({}),
 		}),
 		["stone_fence_pillar_01"] = table.freeze({
 			slug = "stone_fence_pillar_01",
@@ -86,6 +92,7 @@ return table.freeze({
 			atlasVariantId = 8,
 			bindingRevision = 1,
 			destructible = false,
+			meshOptions = table.freeze({}),
 		}),
 		["wooden_fence_01"] = table.freeze({
 			slug = "wooden_fence_01",
@@ -98,6 +105,7 @@ return table.freeze({
 			atlasVariantId = 8,
 			bindingRevision = 1,
 			destructible = false,
+			meshOptions = table.freeze({}),
 		}),
 		["wooden_fence_pillar_01"] = table.freeze({
 			slug = "wooden_fence_pillar_01",
@@ -110,6 +118,7 @@ return table.freeze({
 			atlasVariantId = 8,
 			bindingRevision = 1,
 			destructible = false,
+			meshOptions = table.freeze({}),
 		}),
 		["stone_ladder_01"] = table.freeze({
 			slug = "stone_ladder_01",
@@ -122,6 +131,7 @@ return table.freeze({
 			atlasVariantId = 8,
 			bindingRevision = 1,
 			destructible = false,
+			meshOptions = table.freeze({}),
 		}),
 		["wooden_bridge_bar_01"] = table.freeze({
 			slug = "wooden_bridge_bar_01",
@@ -134,6 +144,7 @@ return table.freeze({
 			atlasVariantId = 21,
 			bindingRevision = 1,
 			destructible = false,
+			meshOptions = table.freeze({}),
 		}),
 		["campfirte_01"] = table.freeze({
 			slug = "campfirte_01",
@@ -146,6 +157,7 @@ return table.freeze({
 			atlasVariantId = 27,
 			bindingRevision = 9,
 			destructible = false,
+			meshOptions = table.freeze({}),
 		}),
 		["ground_torch_01"] = table.freeze({
 			slug = "ground_torch_01",
@@ -158,6 +170,7 @@ return table.freeze({
 			atlasVariantId = 20,
 			bindingRevision = 1,
 			destructible = false,
+			meshOptions = table.freeze({}),
 		}),
 		["ground_torch_02"] = table.freeze({
 			slug = "ground_torch_02",
@@ -170,6 +183,7 @@ return table.freeze({
 			atlasVariantId = 20,
 			bindingRevision = 1,
 			destructible = false,
+			meshOptions = table.freeze({}),
 		}),
 		["ground_torch_03"] = table.freeze({
 			slug = "ground_torch_03",
@@ -182,6 +196,7 @@ return table.freeze({
 			atlasVariantId = 20,
 			bindingRevision = 1,
 			destructible = false,
+			meshOptions = table.freeze({}),
 		}),
 		["lantern_01"] = table.freeze({
 			slug = "lantern_01",
@@ -194,6 +209,7 @@ return table.freeze({
 			atlasVariantId = 3,
 			bindingRevision = 1,
 			destructible = false,
+			meshOptions = table.freeze({}),
 		}),
 		["lantern_02"] = table.freeze({
 			slug = "lantern_02",
@@ -206,6 +222,7 @@ return table.freeze({
 			atlasVariantId = 21,
 			bindingRevision = 1,
 			destructible = false,
+			meshOptions = table.freeze({}),
 		}),
 		["wall_torch_01"] = table.freeze({
 			slug = "wall_torch_01",
@@ -218,6 +235,7 @@ return table.freeze({
 			atlasVariantId = 20,
 			bindingRevision = 1,
 			destructible = false,
+			meshOptions = table.freeze({}),
 		}),
 		["wall_torch_02"] = table.freeze({
 			slug = "wall_torch_02",
@@ -230,6 +248,7 @@ return table.freeze({
 			atlasVariantId = 20,
 			bindingRevision = 1,
 			destructible = false,
+			meshOptions = table.freeze({}),
 		}),
 		["wall_torch_03"] = table.freeze({
 			slug = "wall_torch_03",
@@ -242,6 +261,7 @@ return table.freeze({
 			atlasVariantId = 20,
 			bindingRevision = 1,
 			destructible = false,
+			meshOptions = table.freeze({}),
 		}),
 		["test_window_01"] = table.freeze({
 			slug = "test_window_01",
@@ -254,6 +274,7 @@ return table.freeze({
 			atlasVariantId = 4,
 			bindingRevision = 2,
 			destructible = false,
+			meshOptions = table.freeze({}),
 		}),
 		["main_statue"] = table.freeze({
 			slug = "main_statue",
@@ -266,6 +287,7 @@ return table.freeze({
 			atlasVariantId = 18,
 			bindingRevision = 1,
 			destructible = false,
+			meshOptions = table.freeze({}),
 		}),
 		["big_tree_01"] = table.freeze({
 			slug = "big_tree_01",
@@ -276,8 +298,9 @@ return table.freeze({
 			textureAssetId = "96502503617864",
 			textureUsesAlpha = true,
 			atlasVariantId = 6,
-			bindingRevision = 6,
+			bindingRevision = 8,
 			destructible = true,
+			meshOptions = table.freeze({}),
 		}),
 		["birch_01"] = table.freeze({
 			slug = "birch_01",
@@ -290,6 +313,7 @@ return table.freeze({
 			atlasVariantId = 17,
 			bindingRevision = 1,
 			destructible = true,
+			meshOptions = table.freeze({}),
 		}),
 		["birch_02"] = table.freeze({
 			slug = "birch_02",
@@ -302,18 +326,33 @@ return table.freeze({
 			atlasVariantId = 17,
 			bindingRevision = 1,
 			destructible = true,
+			meshOptions = table.freeze({}),
+		}),
+		["blossom_tree_01"] = table.freeze({
+			slug = "blossom_tree_01",
+			name = "Blossom Tree 01",
+			category = "tree",
+			status = "PUBLISHED",
+			modelAssetId = "86078672052247",
+			textureAssetId = "114432887987699",
+			textureUsesAlpha = true,
+			atlasVariantId = 28,
+			bindingRevision = 1,
+			destructible = true,
+			meshOptions = table.freeze({["blossom_tree_01"]=table.freeze({["collisionFidelity"]="Box",["collisionMesh"]=false,["doubleSided"]=false,["glass"]=false,["noCollide"]=true}),["col_mesh"]=table.freeze({["collisionFidelity"]="PreciseConvexDecomposition",["collisionMesh"]=true,["doubleSided"]=false,["glass"]=false,["noCollide"]=false})}),
 		}),
 		["christmas_tree"] = table.freeze({
 			slug = "christmas_tree",
 			name = "Christmas Tree",
 			category = "tree",
 			status = "PUBLISHED",
-			modelAssetId = "135618055671248",
-			textureAssetId = "130407188742566",
-			textureUsesAlpha = false,
-			atlasVariantId = 17,
-			bindingRevision = 1,
+			modelAssetId = "136703637428538",
+			textureAssetId = "116267630909794",
+			textureUsesAlpha = true,
+			atlasVariantId = 29,
+			bindingRevision = 2,
 			destructible = false,
+			meshOptions = table.freeze({["christmas_tree_01"]=table.freeze({["collisionFidelity"]="Box",["collisionMesh"]=false,["doubleSided"]=false,["glass"]=false,["noCollide"]=true}),["col_mesh"]=table.freeze({["collisionFidelity"]="PreciseConvexDecomposition",["collisionMesh"]=true,["doubleSided"]=false,["glass"]=false,["noCollide"]=false})}),
 		}),
 	}),
 })

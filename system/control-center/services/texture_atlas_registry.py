@@ -68,6 +68,31 @@ def parse_filename(name: str) -> dict | None:
             'extension': m['ext'].lower(), 'filename': str(name)}
 
 
+def canonical_atlas_filename(path: Path, native_format: str, width: int, height: int) -> str:
+    """One atlas filename contract for legacy registration and reviewed publication."""
+    extension = '.png' if native_format in ('PNG', 'WEBP') else '.jpg'
+    parsed = parse_filename(path.name)
+    if parsed:
+        accepted = {'.png'} if extension == '.png' else {'.jpg', '.jpeg'}
+        return path.name if path.suffix.lower() in accepted else path.with_suffix(extension).name
+    stem = path.stem
+    if stem.casefold().endswith('_atlas'):
+        stem = stem[:-6]
+    stem = unicodedata.normalize('NFKC', stem).casefold()
+    stem = re.sub(r'[^\w .-]+', '-', stem).strip(' .-_')[:96] or 'atlas'
+    if stem.split('.')[0] in _WINDOWS_RESERVED:
+        stem = ('atlas_' + stem)[:96]
+    return f'{stem}_{width}x{height}_atlas{extension}'
+
+
+def convert_webp_atlas_to_png(source: Path, destination: Path) -> None:
+    """Shared lossless pixel decode; never copy WEBP bytes into a .png file."""
+    with Image.open(source) as image:
+        image.load()
+        mode = 'RGBA' if 'A' in image.getbands() or 'transparency' in image.info else 'RGB'
+        image.convert(mode).save(destination, 'PNG')
+
+
 def image_metadata(path: Path, parsed: dict) -> bool:
     try:
         with Image.open(path) as img:
@@ -175,6 +200,21 @@ class AtlasRegistry:
                 new_image_id TEXT NOT NULL,
                 revision INTEGER NOT NULL,
                 changed_at REAL NOT NULL)''')
+
+        # M234: a consumer may offer several published atlases, but exactly
+        # one remains the active Studio/runtime binding. Preserve existing IDs.
+        with self.connect() as db:
+            present = db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='texture_atlas_consumer_options'").fetchone()
+            if not present and self.db.is_file():
+                backup_dir = self.db.parent / 'backups'
+                backup_dir.mkdir(parents=True, exist_ok=True)
+                with connect_sqlite(backup_dir / ('before_atlas_options_m234_' + uuid.uuid4().hex + '.db')) as backup:
+                    db.backup(backup)
+            db.execute("""CREATE TABLE IF NOT EXISTS texture_atlas_consumer_options (
+                consumer_type TEXT NOT NULL, consumer_id TEXT NOT NULL,
+                variant_id INTEGER NOT NULL REFERENCES texture_atlas_variants(id),
+                added_at REAL NOT NULL,
+                PRIMARY KEY (consumer_type,consumer_id,variant_id))""")
 
     def connect(self):
         return connect_sqlite(self.db)
@@ -410,32 +450,13 @@ class AtlasRegistry:
             raise ValueError(f'cannot read atlas image {path.name}: {exc}') from exc
         # Never save PNG bytes under a JPEG suffix or vice versa. WebP is
         # decoded losslessly to PNG; existing PNG/JPEG bytes are left intact.
-        canonical_extension = '.png' if native_format in ('PNG', 'WEBP') else '.jpg'
-        parsed = parse_filename(path.name)
-        if parsed:
-            key = parsed['atlasKey']
-            filename = path.name
-            if path.suffix.lower() not in ({'.png'} if canonical_extension == '.png' else {'.jpg', '.jpeg'}):
-                filename = path.with_suffix(canonical_extension).name
-        else:
-            stem = path.stem
-            if stem.casefold().endswith('_atlas'):
-                stem = stem[:-6]
-            stem = unicodedata.normalize('NFKC', stem).casefold()
-            stem = re.sub(r'[^\w .-]+', '-', stem).strip(' .-_')[:96] or 'atlas'
-            if stem.split('.')[0] in _WINDOWS_RESERVED:
-                stem = ('atlas_' + stem)[:96]
-            key = stem
-            filename = f'{stem}_{width}x{height}_atlas{canonical_extension}'
+        filename = canonical_atlas_filename(path, native_format, width, height)
+        key = parse_filename(filename)['atlasKey']
         with tempfile.TemporaryDirectory(prefix='game1-atlas-register-') as temporary:
             staged = Path(temporary) / filename
             if native_format == 'WEBP':
                 try:
-                    with Image.open(path) as image:
-                        image.load()
-                        mode = ('RGBA' if 'A' in image.getbands() or 'transparency' in image.info
-                                else 'RGB')
-                        image.convert(mode).save(staged, 'PNG')
+                    convert_webp_atlas_to_png(path, staged)
                 except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as exc:
                     raise ValueError(f'cannot convert WebP atlas {path.name} to PNG: {exc}') from exc
             else:
@@ -533,6 +554,32 @@ class AtlasRegistry:
                                (variant_id, 'character'))
             return self.get_variant(variant_id)
 
+    def attached_variants(self, consumer_type: str, consumer_id: str) -> list[dict]:
+        """Shared picker collection; current family variants stay visible for legacy consumers."""
+        active = self.binding(consumer_type, consumer_id)
+        with self.connect() as db:
+            rows = db.execute("""SELECT v.id FROM texture_atlas_variants v
+                LEFT JOIN texture_atlas_consumer_options o ON o.variant_id=v.id
+                    AND o.consumer_type=? AND o.consumer_id=?
+                WHERE v.retired_at IS NULL AND (o.variant_id IS NOT NULL
+                    OR v.family_id=(SELECT family_id FROM texture_atlas_variants WHERE id=?))
+                ORDER BY v.width*v.height DESC,v.id""",
+                (consumer_type, consumer_id, int(active['variant_id']) if active else -1)).fetchall()
+        return [variant for r in rows if (variant:=self.get_variant(r['id'])) is not None]
+
+    def attach(self, consumer_type: str, consumer_id: str, variant_id: int) -> list[dict]:
+        """Offer a published atlas without changing the effective Image ID or Studio."""
+        variant = self.get_variant(variant_id)
+        if not variant or not variant['current']:
+            raise ValueError('choose a published atlas variant')
+        if not consumer_type or not consumer_id:
+            raise ValueError('atlas consumer required')
+        with self.connect() as db:
+            db.execute("""INSERT OR IGNORE INTO texture_atlas_consumer_options
+                (consumer_type,consumer_id,variant_id,added_at) VALUES(?,?,?,?)""",
+                (consumer_type,consumer_id,int(variant_id),time.time()))
+        return self.attached_variants(consumer_type,consumer_id)
+
     def bind(self, consumer_type: str, consumer_id: str, variant_id: int, *, expected_revision: int | None = None,
              allow_unpublished: bool = False) -> dict:
         with self.connect() as db:
@@ -551,6 +598,9 @@ class AtlasRegistry:
             revision = int(old['revision']) if old else 0
             if expected_revision is not None and int(expected_revision) != revision:
                 raise ValueError('stale atlas binding revision; refresh the asset list')
+            db.execute("""INSERT OR IGNORE INTO texture_atlas_consumer_options
+                (consumer_type,consumer_id,variant_id,added_at) VALUES(?,?,?,?)""",
+                (consumer_type,consumer_id,int(variant_id),time.time()))
             if old and old['variant_id'] == int(variant_id):
                 return self.binding(consumer_type,consumer_id)
             db.execute('''INSERT INTO texture_atlas_bindings(consumer_type,consumer_id,variant_id,revision,changed_at)
@@ -562,6 +612,8 @@ class AtlasRegistry:
     def unbind(self, consumer_type: str, consumer_id: str) -> None:
         with self.connect() as db:
             db.execute('DELETE FROM texture_atlas_bindings WHERE consumer_type=? AND consumer_id=?',
+                       (consumer_type, consumer_id))
+            db.execute('DELETE FROM texture_atlas_consumer_options WHERE consumer_type=? AND consumer_id=?',
                        (consumer_type, consumer_id))
 
     def active_revisions(self, consumer_type: str, consumer_id: str | None = None) -> dict[str, int]:

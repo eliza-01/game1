@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "slug": "blossom_tree_01",
+  "sourceSha256": "b9f4af8a7a2857168613a1866694afeb0df3eb368028876d154f5a897f7eab4b",
+  "analysis": {
+    "schemaVersion": 1,
+    "meshes": [
+      {
+        "name": "blossom_tree_01",
+        "armature": "",
+        "vertices": 1340,
+        "bones": [],
+        "influencedBones": [],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": false,
+          "canQuery": false,
+          "canTouch": false,
+          "doubleSided": true,
+          "collisionFidelity": "Box",
+          "physicsOnly": false
+        }
+      },
+      {
+        "name": "col_mesh",
+        "armature": "",
+        "vertices": 344,
+        "bones": [],
+        "influencedBones": [],
+        "role": "collider",
+        "physics": {
+          "role": "collider",
+          "canCollide": true,
+          "canQuery": true,
+          "canTouch": false,
+          "doubleSided": true,
+          "collisionFidelity": "PreciseConvexDecomposition",
+          "physicsOnly": true
+        }
+      }
+    ],
+    "hasCollider": true,
+    "armatures": [],
+    "unassignedArmatures": []
+  }
+}

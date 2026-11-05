@@ -1,26 +1,25 @@
--- Real Estate physics layer. Only this module writes MeshPart physics.
+-- Real Estate physics profile; shared MeshPhysicsCore writes MeshPart physics.
 -- All authored visual parts are DoubleSided by default; COL_* remains physics-only.
 local CollectionService = game:GetService("CollectionService")
+local Core = require(script.Parent.StudioMeshPhysicsCore)
 local Policy = {}
 local COLLIDER_TAG = "Game1RealEstateCollider"
 
 local FIDELITY = {
-    Box = Enum.CollisionFidelity.Box,
-    Hull = Enum.CollisionFidelity.Hull,
-    Default = Enum.CollisionFidelity.Default,
-    PreciseConvexDecomposition = Enum.CollisionFidelity.PreciseConvexDecomposition,
+    Box = Core.Fidelity("Box"),
+    Hull = Core.Fidelity("Hull"),
+    Default = Core.Fidelity("Default"),
+    PreciseConvexDecomposition = Core.Fidelity("PreciseConvexDecomposition"),
 }
 
 function Policy.IsCollider(name: string): boolean
-    local lower = string.lower(name)
-    return lower:sub(1, 4) == "col_" or lower:find("_col_", 1, true) ~= nil
-        or lower:sub(-4) == "_col"
+    return Core.IsCollider(name)
 end
 
 local function preciseByDefault(name: string): boolean
     local lower = string.lower(name)
     return Policy.IsCollider(name) or lower == "door" or lower:sub(1, 5) == "door_"
-        or lower:find("glass", 1, true) ~= nil
+        or Core.IsGlass(name)
 end
 
 function Policy.Apply(mesh: MeshPart, name: string, raw: any)
@@ -38,11 +37,8 @@ function Policy.Apply(mesh: MeshPart, name: string, raw: any)
 
     -- Roblox requires CanQuery=true for collidable parts. Touch remains off
     -- (collision physics does not require a Touched event listener).
-    mesh.CanCollide = not noCollide
-    mesh.CanQuery = not noCollide
-    mesh.CanTouch = false
-    mesh.CollisionFidelity = FIDELITY[fidelity]
-    mesh.DoubleSided = if typeof(settings.doubleSided) == "boolean" then settings.doubleSided else true
+    Core.Apply(mesh, not noCollide, fidelity,
+        if typeof(settings.doubleSided) == "boolean" then settings.doubleSided else true)
     -- Capture the *authoring policy* on the MeshPart itself. Studio copies can
     -- be revalidated without a Host Agent request or a full model reimport.
     -- This metadata is not a second registry: it is the applied snapshot.

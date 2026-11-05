@@ -8,6 +8,7 @@ This intentionally narrow style guard is NOT a full Luau syntax parser.
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 import sys
 
@@ -26,6 +27,19 @@ def ambiguous_leading_parentheses(source: str) -> list[int]:
 def check_plugin(plugin_dir: Path) -> list[str]:
     errors: list[str] = []
     files = sorted(plugin_dir.rglob('*.luau'))
+    # A Rojo alias may point to a deliberately shared Luau module outside
+    # system/studio-plugin. Validate those sources too before installation.
+    manifest = plugin_dir / 'plugin.project.json'
+    if manifest.is_file():
+        try:
+            spec = json.loads(manifest.read_text(encoding='utf-8'))
+            for module in spec['tree']['modules'].values():
+                if isinstance(module, dict) and '$path' in module:
+                    resolved = (plugin_dir / module['$path']).resolve()
+                    if resolved.suffix == '.luau' and resolved.is_file() and resolved not in files:
+                        files.append(resolved)
+        except (OSError, KeyError, ValueError, TypeError) as exc:
+            return [f'Invalid Studio plugin Rojo manifest: {exc}']
     if not files:
         return [f'No Luau files found in {plugin_dir}']
     for path in files:

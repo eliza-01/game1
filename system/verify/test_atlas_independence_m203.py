@@ -253,7 +253,8 @@ class AtlasIndependenceM203(TestCase):
         self.published(first['atlasVariantId'],'5588990011')
         second=self.light('published_two',first['atlasVariantId'])
         @contextmanager
-        def staged(_root, source):
+        def staged(_root, source, *, texture_mode="embedded"):
+            self.assertEqual(texture_mode, "geometry_only")
             yield source
         credentials={'creatorType':'user','creatorId':'1','apiKey':'test-key'}
         with mock.patch('location_asset_store.staged_model',side_effect=staged), \

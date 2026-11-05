@@ -58,13 +58,14 @@ class RealEstatePhysicsM205(unittest.TestCase):
 
     def test_studio_policy_applies_identical_authoring_options_everywhere(self):
         source = (ROOT / 'system/studio-plugin/modules/StudioRealEstateCollisionPolicy.luau').read_text('utf8')
-        for expected in (
-            'mesh.CanCollide = not noCollide', 'mesh.CanQuery = not noCollide',
-            'mesh.CanTouch = false', 'mesh.CollisionFidelity = FIDELITY[fidelity]',
-            'mesh.DoubleSided = if typeof(settings.doubleSided)',
-            'CollectionService:AddTag(mesh, COLLIDER_TAG)',
-        ):
-            self.assertIn(expected, source)
+        core = (ROOT / 'src/shared/world/MeshPhysicsCore.luau').read_text('utf8')
+        self.assertIn('Core.Apply(mesh, not noCollide, fidelity,', source)
+        self.assertIn('CollectionService:AddTag(mesh, COLLIDER_TAG)', source)
+        for expected in ('mesh.CanCollide = true', 'mesh.CanCollide = false',
+                         'mesh.CanQuery = true', 'mesh.CanQuery = false',
+                         'mesh.CanTouch = false', 'mesh.CollisionFidelity = Core.Fidelity(if canCollide then "PreciseConvexDecomposition" else fidelity)',
+                         'mesh.DoubleSided = doubleSided'):
+            self.assertIn(expected, core)
         for name in ('StudioRealEstateModel', 'StudioRealEstatePartSync'):
             self.assertIn('CollisionPolicy' if name.endswith('Model') else 'Collision.Apply',
                 (ROOT / f'system/studio-plugin/modules/{name}.luau').read_text('utf8'))
@@ -80,6 +81,7 @@ function $(id){return nodes[id]??(nodes[id]={hidden:true,innerHTML:'',textConten
 const ctx=vm.createContext({$,esc:s=>String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;'),
   window:{},request:async()=>{},toast:()=>{},console});
 vm.runInContext(fs.readFileSync(process.argv[2],'utf8'),ctx);
+vm.runInContext(fs.readFileSync(process.argv[3],'utf8'),ctx);
 vm.runInContext(fs.readFileSync(process.argv[1],'utf8'),ctx);
 vm.runInContext(`realEstateState.inspect={analysis:{meshes:[{name:'house'},{name:'door'},
   {name:'window_frames_glass'},{name:'wall_COL_01'}]},textures:[]};
@@ -117,7 +119,7 @@ assert.equal(saved.noCollide,true);
 assert.equal(saved.collisionFidelity,'Hull');
 assert.equal(saved.doubleSided,false);
 '''
-        completed = subprocess.run(['node', '-e', code, str(js), str(atlas)], capture_output=True,
+        completed = subprocess.run(['node', '-e', code, str(js), str(atlas),str(ROOT / 'system/control-center/static/mesh-authoring.js')], capture_output=True,
                                    text=True, timeout=15)
         self.assertEqual(completed.returncode, 0, completed.stderr)
 

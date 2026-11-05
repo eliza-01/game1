@@ -37,7 +37,8 @@ class M220LocationResourceWorkflow(TestCase):
 
     def model_publish(self, asset_ids):
         @contextmanager
-        def staged(root,model):
+        def staged(root,model, *, texture_mode="embedded"):
+            self.assertEqual(texture_mode, "geometry_only")
             self.assertEqual(Path(model).suffix,'.fbx')
             yield model
         ids=iter(asset_ids)

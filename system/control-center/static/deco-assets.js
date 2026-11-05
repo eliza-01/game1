@@ -4,6 +4,7 @@
  */
 const decoAssetState = {
   data: null, modelPath: '', texturePath: '', atlasVariantId: 0,
+  inspection: null, meshOptions: {},
   libraryCategory: 'all', syncingSlug: null, atlasBusy: false,
 };
 const DECO_LIBRARY_CATEGORY_KEY = 'game1.locationAssets.libraryCategory';
@@ -38,6 +39,8 @@ function decoAssetSyncSlug() {
 function decoAssetSetForm() {
   // The registration editor is always new-only, never a recycled Edit modal.
   decoAssetState.modelPath = '';
+  decoAssetState.inspection = null;
+  decoAssetState.meshOptions = {};
   decoAssetState.texturePath = '';
   decoAssetState.atlasVariantId = 0;
   $('location-asset-name').value = '';
@@ -47,6 +50,7 @@ function decoAssetSetForm() {
     ? decoAssetState.libraryCategory : (categories[0]?.id || 'tree');
   $('location-asset-destructible').checked = false;
   $('picked-location-asset-model').textContent = 'Choose the FBX for this new asset';
+  decoAssetRenderInspection();
   $('picked-location-asset-texture').textContent = 'Choose PNG/JPG or reuse a registered atlas';
   $('location-asset-atlas-search').value = '';
   decoAssetRenderTextureReferences();
@@ -201,12 +205,33 @@ async function decoAssetLoad() {
     decoAssetRender();
   } catch (error) { toast(`Location Assets: ${error.message}`, true); }
 }
+function decoAssetRenderInspection() {
+  const host=$('location-asset-fbx-preview');
+  if(!host)return;
+  host.innerHTML=window.game1MeshAuthoring.inspectionView(
+    decoAssetState.inspection,decoAssetState.meshOptions);
+  window.game1MeshAuthoring.wire(host,decoAssetState.meshOptions,null,
+    Boolean(decoAssetState.inspection?.hasCollider));
+}
+async function decoAssetInspectSource(path){
+  return request('/api/location-assets/inspect', {method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({sourcePath:path})});
+}
 async function decoAssetChooseModel() {
   try {
     const chosen = await request('/api/files/choose-location-asset-model', {method:'POST'});
     if (!chosen.path) return;
+    // Same immediate inspect-before-registration workflow as Real Estate.
+    const inspected = await decoAssetInspectSource(chosen.path);
     decoAssetState.modelPath = chosen.path;
-    $('picked-location-asset-model').textContent = chosen.path;
+    decoAssetState.inspection = inspected.analysis;
+    decoAssetState.meshOptions = window.game1MeshAuthoring.seeded(inspected.analysis);
+    $('picked-location-asset-model').textContent = inspected.sourcePath;
+    if(!$('location-asset-name').value.trim()){
+      $('location-asset-name').value=inspected.name.replace(/_/g,' ');
+      decoAssetSyncSlug();
+    }
+    decoAssetRenderInspection();
   } catch (error) { toast(error.message, true); }
 }
 async function decoAssetChooseTexture() {
@@ -228,9 +253,10 @@ async function decoAssetRegister() {
       nameEn: $('location-asset-name').value.trim(), slug:$('location-asset-slug').value.trim(),
       category:$('location-asset-category').value, destructible: $('location-asset-destructible').checked,
       modelSourcePath:decoAssetState.modelPath, textureSourcePath:decoAssetState.texturePath,
-      atlasVariantId:decoAssetState.atlasVariantId, createOnly:true,
+      atlasVariantId:decoAssetState.atlasVariantId, createOnly:true, inspectFbx:true,
+      meshOptions:decoAssetState.meshOptions,
     };
-    if (!payload.modelSourcePath) throw Error('Choose FBX first');
+    if (!payload.modelSourcePath || !decoAssetState.inspection) throw Error('Choose and analyze the FBX first');
     if (!payload.textureSourcePath && !payload.atlasVariantId) throw Error('Choose PNG/JPG or an existing atlas');
     const row = await request('/api/location-assets', {
       method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload),
@@ -251,31 +277,44 @@ async function decoAssetSaveEdits(slug, payload, expectedRevision) {
       destructible:payload.destructible ?? Boolean(row.destructible),
       modelSourcePath:payload.modelSourcePath || '', textureSourcePath:payload.textureSourcePath || '',
       atlasVariantId:payload.textureSourcePath ? 0 : (payload.atlasVariantId ?? row.atlasVariantId),
-      expectedRevision, editOnly:true,
+      expectedRevision, editOnly:true, inspectFbx:Boolean(payload.modelSourcePath),
+      ...(payload.meshOptions ? {meshOptions:payload.meshOptions} : {}),
     }),
   });
   await decoAssetLoad();
   return saved;
 }
-async function decoAssetPublish(slug, scope='changed', forceModel=false) {
+async function decoAssetPublish(slug, scope, forceModel=false) {
+  if (scope !== 'model') throw Error('Location Model publication requires explicit model scope; publish Atlas via Atlas Registry');
   const row = decoAssetRow(slug);
   if (!row) throw Error('Location Asset not found');
-  const published = await request(`/api/location-assets/${encodeURIComponent(slug)}/publish`, {
+  const imageIdBefore = String(row.texture_asset_id || '');
+  const published = await request(`/api/location-assets/${encodeURIComponent(slug)}/publish-model`, {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({description:game1PublicationDescription('Location Asset',row.name_en),scope,forceModel}),
+    body:JSON.stringify({description:game1PublicationDescription('Location Asset',row.name_en),forceModel}),
   });
+  if (published.resourceKind !== 'Model' || published.atlasUnchanged !== true ||
+      String(published.texture_asset_id || '') !== imageIdBefore) {
+    throw Error('Model publication did not confirm unchanged Atlas ID; inspect publication history before retrying');
+  }
   await decoAssetLoad();
   return published;
 }
 // M221: one slug, ALL its managed placements; guarded in-place meshes and atlas IDs.
 // Never rebuild, re-parent or move placed Models.
-async function decoAssetSyncStudio(slug) {
+async function decoAssetSyncStudio(slug, {throwOnError = false} = {}) {
   const row = decoAssetRow(slug);
-  if (!row || row.status !== 'PUBLISHED') return toast('Publish Model and Atlas before Studio Sync.', true);
-  if (decoAssetState.syncingSlug) return toast('Another Location Asset Sync is running.', true);
+  if (!row || row.status !== 'PUBLISHED') {
+    if (throwOnError) throw Error('Publish Model and Atlas before Studio Sync.');
+    return toast('Publish Model and Atlas before Studio Sync.', true);
+  }
+  if (decoAssetState.syncingSlug) {
+    if (throwOnError) throw Error('Another Location Asset Sync is running.');
+    return toast('Another Location Asset Sync is running.', true);
+  }
   if (typeof window.confirm === 'function' && !window.confirm(
     `Sync ${slug} in Roblox Studio? This will update published MeshPart geometry and Atlas IDs in ALL placed instances of this slug. ` +
-    'ApplyMesh also updates collision geometry. Save a backup copy of your Place first. Continue?'
+    'The shared managed-rig sync updates geometry and authoring physics. Save a backup Place first. Continue?'
   )) return null;
   decoAssetState.syncingSlug = slug;
   decoAssetRender();
@@ -287,6 +326,7 @@ async function decoAssetSyncStudio(slug) {
     await decoAssetShowSyncHistory(slug);
     return result;
   } catch (error) {
+    if (throwOnError) throw error; // Inline editor must show the actual Studio failure.
     toast(`Studio Sync ${slug}: ${error.message}`, true);
     return null;
   } finally { decoAssetState.syncingSlug = null; decoAssetRender(); }

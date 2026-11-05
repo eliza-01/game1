@@ -36,8 +36,9 @@ def check_location_texture_sync(root: Path, report_error: Callable[[str], None],
     environment_visuals_text = environment_visuals_path.read_text(encoding='utf-8') if environment_visuals_path.is_file() else ''
     workflow_file = root / 'system/control-center/static/location-asset-workflow.js'
     workflow = workflow_file.read_text(encoding='utf-8') if workflow_file.is_file() else ''
-    if not ('Image ID' in workflow and 'decoAssetPublish' in workflow and
-            'texture_asset_id' in deco_assets_js_text):
+    shared_atlas = (root/'system/control-center/static/asset-atlas-editor.js').read_text(encoding='utf-8')
+    if not ('game1ConsumerAtlasEditor' in workflow and 'Image ID' in shared_atlas and
+            'decoAssetPublish' in workflow and 'texture_asset_id' in deco_assets_js_text):
         report_error('m51 published texture feedback missing')
     for required in ["Game1DecoAssetSlug", "StudioTextureAppearance.Apply(change.part, uri, nil, true)", "RefreshIds"]:
         if required not in deco_placed_sync_text:

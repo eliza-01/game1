@@ -35,6 +35,7 @@ const nodes = Object.create(null);
 function $(id){return nodes[id]??(nodes[id]={hidden:true,innerHTML:'',textContent:'',value:'',addEventListener:()=>{}});}
 const ctx = vm.createContext({$,esc:s=>String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;'),window:{},request:async()=>{},toast:()=>{},console});
 vm.runInContext(fs.readFileSync(process.argv[2],'utf8'),ctx);
+vm.runInContext(fs.readFileSync(process.argv[3],'utf8'),ctx);
 vm.runInContext(fs.readFileSync(process.argv[1],'utf8'),ctx);
 vm.runInContext(`realEstateState.inspect={analysis:{meshes:[{name:'house'},{name:'col_mesh'},{name:'door'},{name:'restoration'},{name:'window_frames_glass'}]},textures:[{name:'house_level4_01_4096x4096_atlas.png',path:'C:/textures/house_level4_01_4096x4096_atlas.png'}]};realEstateState.data={textureReferences:[]};realEstateRenderTextures()`,ctx);
 const html=$('real-estate-mesh-textures').innerHTML;
@@ -64,7 +65,8 @@ assert.equal(saved.door.noCollide,true);
 assert.equal(saved.glass.noCollide,true);
 '''
         done = subprocess.run(['node', '-e', code, str(JS),
-                                str(ROOT / 'system/control-center/static/atlas-identity.js')], capture_output=True, text=True, timeout=15)
+                                str(ROOT / 'system/control-center/static/atlas-identity.js'),
+                                str(ROOT / 'system/control-center/static/mesh-authoring.js')], capture_output=True, text=True, timeout=15)
         self.assertEqual(done.returncode, 0, done.stderr)
 
 

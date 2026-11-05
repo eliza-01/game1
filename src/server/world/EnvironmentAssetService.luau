@@ -4,6 +4,7 @@ local Workspace = game:GetService("Workspace")
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local WorldShared = Shared:WaitForChild("world")
 local LocationAssetRegistry = require(WorldShared:WaitForChild("LocationAssetRegistry"))
+local MeshPhysics = require(WorldShared:WaitForChild("MeshPhysicsCore"))
 local EnvironmentAssetVisuals = require(script.Parent:WaitForChild("EnvironmentAssetVisuals"))
 
 local EnvironmentAssetService = {}
@@ -43,16 +44,18 @@ local function rebuildRegisteredModels()
     registryRevision += 1
 end
 
-local function applyStaticRuntimePhysics(model: Model)
+local function applyStaticRuntimePhysics(model: Model, definition: any)
     -- Authoring stays editable: DecoManager saves unanchored instances in Studio.
     -- Runtime owns world physics and turns registered location assets into stable
     -- scenery without copying gameplay policy into Instance attributes.
     for _, descendant in ipairs(model:GetDescendants()) do
         if descendant:IsA("BasePart") then
             descendant.Anchored = true
-            descendant.CanQuery = true
         end
     end
+    -- The same Location policy as DecoManager: COL_* remains queryable and
+    -- physical, visual/glass meshes remain nonqueryable when a COL exists.
+    MeshPhysics.ApplyLocationModel(model, nil, definition.meshOptions)
 end
 
 local function unregisterModel(model: Model, deferRebuild: boolean?)
@@ -102,7 +105,7 @@ local function registerModel(model: Model, deferRebuild: boolean?)
         end)
     end
     EnvironmentAssetVisuals.ApplyModel(model, definition)
-    applyStaticRuntimePhysics(model)
+    applyStaticRuntimePhysics(model, definition)
     if deferRebuild ~= true then
         rebuildRegisteredModels()
     end
@@ -171,7 +174,7 @@ function EnvironmentAssetService.Start()
                 if cursor:IsA("Model") and definitionsByModel[cursor] then
                     EnvironmentAssetVisuals.ApplyPart(descendant, definitionsByModel[cursor])
                     descendant.Anchored = true
-                    descendant.CanQuery = true
+                    MeshPhysics.ApplyLocationModel(cursor, nil, definitionsByModel[cursor].meshOptions)
                     break
                 end
                 cursor = cursor.Parent

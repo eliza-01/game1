@@ -178,8 +178,10 @@ def assert_skin_complete(armature, meshes):
         raise ValueError('publication lost bone influences: ' + ', '.join(missing))
 
 
-def export_model(output, objects, *, embed_textures=False):
+def export_model(output, objects, *, embed_textures=False, no_textures=False):
     """One export contract for characters, estates and other model assets."""
+    if no_textures and embed_textures:
+        raise ValueError("geometry-only publication cannot embed textures")
     output = Path(output)
     for rig in objects:
         if rig.type == 'ARMATURE' and len(rig.data.bones):
@@ -195,7 +197,8 @@ def export_model(output, objects, *, embed_textures=False):
         axis_forward="-Z", axis_up="Y", global_scale=1.0,
         apply_unit_scale=True, apply_scale_options="FBX_SCALE_UNITS",
         use_space_transform=True, bake_space_transform=False,
-        path_mode="COPY" if embed_textures else "AUTO", embed_textures=embed_textures,
+        path_mode="STRIP" if no_textures else ("COPY" if embed_textures else "AUTO"),
+        embed_textures=embed_textures,
     )
     if result != {'FINISHED'} or not output.is_file() or output.stat().st_size <= 0:
         raise RuntimeError("publication FBX was not written")

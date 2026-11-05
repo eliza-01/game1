@@ -4,7 +4,8 @@ from services.shared_asset_retirement import SharedAssetRetirement
 
 
 def _requires_asset_audit(path):
-    return (path == '/api/asset-retirement/execute'
+    return (path == '/api/texture-atlases/publish-reviewed'
+            or path == '/api/asset-retirement/execute'
             or path == '/api/characters/workflow'
             or path.endswith(('/publish', '/publish-missing', '/republish',
                                '/replace-model', '/model')))
@@ -39,6 +40,11 @@ def dispatch_post(path, body, deps):
                 try:
                     audit.sync_all()
                 except Exception as error:
+                    if path == '/api/texture-atlases/publish-reviewed':
+                        result = dict(response[1])
+                        result.setdefault('exportWarnings', []).append(
+                            f'Asset History import failed after publication: {error}')
+                        return response[0], result
                     return 503, {'error': f'asset mutation completed but audit import failed: {error}'}
             return response
     return 404, {"error": "not found"}

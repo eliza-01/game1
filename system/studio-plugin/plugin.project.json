@@ -31,6 +31,9 @@
       "StudioManagedRigSwap": {
         "$path": "modules/StudioManagedRigSwap.luau"
       },
+      "StudioAuthoringMeshAnchor": {
+        "$path": "modules/StudioAuthoringMeshAnchor.luau"
+      },
       "DecoManager": {
         "$path": "modules/DecoManager.luau"
       },
@@ -132,6 +135,9 @@
       },
       "StudioCharacterStandWidget": {
         "$path": "modules/StudioCharacterStandWidget.luau"
+      },
+      "StudioMeshPhysicsCore": {
+        "$path": "../../src/shared/world/MeshPhysicsCore.luau"
       }
     }
   }

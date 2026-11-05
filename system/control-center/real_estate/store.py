@@ -193,10 +193,12 @@ class RealEstateStore:
                 publishedSha256=binding['published_sha256'] or '',
                 publicationFormat=published_format(Path(binding['source_path'])),
                 atlasVariantId=binding['variant_id'], atlasKey=binding['atlas_key'],
-                atlasBindingRevision=binding['revision'], atlasSyncStatus=binding['syncStatus'])
+                atlasBindingRevision=binding['revision'], atlasSyncStatus=binding['syncStatus'],
+                atlasOptions=self.atlases.attached_variants('real_estate', f'{slug}:{part}'))
         else:
             result.update(atlasVariantId=None, atlasKey='', atlasBindingRevision=0,
                 atlasSyncStatus='')
+        result.setdefault('atlasOptions', self.atlases.attached_variants('real_estate', f'{slug}:{part}'))
         result = self._atlas_presentation(result, catalog)
         result['atlasCurrent'] = binding['current'] if binding else None
         return result

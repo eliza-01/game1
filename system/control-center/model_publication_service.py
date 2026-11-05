@@ -8,7 +8,10 @@ from blender_runtime import blender_executable
 
 
 @contextmanager
-def staged_model(project_root: Path, source: Path):
+def staged_model(project_root: Path, source: Path, *, texture_mode: str = "embedded"):
+    """Stage a Model. Location uses geometry_only; existing Weapon keeps embedded."""
+    if texture_mode not in ("embedded", "geometry_only"):
+        raise ValueError("unsupported model publication texture mode")
     source = source.resolve()
     if not source.is_file() or source.suffix.lower() != '.fbx':
         raise ValueError('model publication requires an FBX file')
@@ -16,10 +19,13 @@ def staged_model(project_root: Path, source: Path):
         output = Path(directory) / source.name
         report = Path(directory) / 'report.json'
         script = project_root / 'system/asset-manager/prepare_model_publication_fbx.py'
+        command = [str(blender_executable()), '--background', '--factory-startup',
+                   '--python-exit-code', '1', '--python', str(script), '--',
+                   str(source), str(output), str(report)]
+        if texture_mode != 'embedded':
+            command.append(texture_mode)
         completed = subprocess.run(
-            [str(blender_executable()), '--background', '--factory-startup',
-             '--python-exit-code', '1', '--python', str(script), '--',
-             str(source), str(output), str(report)],
+            command,
             capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=240,
         )
         if completed.returncode or not output.is_file() or not report.is_file():
@@ -28,4 +34,9 @@ def staged_model(project_root: Path, source: Path):
         result = json.loads(report.read_text(encoding='utf-8'))
         if result.get('schemaVersion') != 1 or result.get('restTransformsChanged') is not False:
             raise ValueError('Invalid model publication preparation report')
+        if texture_mode == 'geometry_only' and (
+            result.get('textureMode') != 'geometry_only' or
+            result.get('materialSlots') != 0
+        ):
+            raise ValueError('Geometry-only publication did not prove texture-free FBX; upload aborted')
         yield output

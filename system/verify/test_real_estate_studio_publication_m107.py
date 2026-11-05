@@ -115,8 +115,8 @@ class RealEstatePublicationTests(unittest.TestCase):
         for attr in ('data-re-fbx','data-re-manage','data-re-sync'):
             self.assertIn(attr,js)
         workflow=(static/'real-estate-mesh-workflow.js').read_text('utf-8')
-        self.assertIn('data-mw-use-atlas',workflow)
-        self.assertIn('data-mw-publish-image',workflow)
+        self.assertIn('window.game1ConsumerAtlasEditor.render',workflow)
+        self.assertIn('Sync Model + Atlas · Studio',workflow)
         self.assertIn('realEstateState.textures={};realEstateState.textureRefs={};realEstateState.reuseEnabled={};',js)
         self.assertIn('if(!realEstateState.selected){',js)
 

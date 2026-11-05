@@ -157,3 +157,46 @@
 #location-asset-edit-dialog input[type=search] {width:100%;}
 #location-asset-edit-dialog .real-estate-mesh-step .actions {flex-wrap:wrap;}
 .deco-sync-history pre {white-space:pre-wrap;overflow:auto;max-height:230px;}
+
+/* Shared inspection report and authoring controls (M231+M232). */
+/* M232: shared FBX inspection/physics UI in new registration and Edit. */
+#location-asset-fbx-preview {margin:14px 0 4px;}
+.deco-fbx-report {display:grid;gap:11px;margin:12px 0 14px;padding:14px;border:1px solid var(--line);border-radius:10px;min-width:0;}
+.deco-fbx-report-header {display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;}
+.deco-fbx-report-header small {color:var(--muted);}
+.deco-fbx-mesh {display:grid;gap:10px;padding:12px;border:1px solid var(--line);border-radius:9px;background:var(--panel2);min-width:0;}
+.deco-fbx-mesh-title {display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;}
+.deco-fbx-report>small,.deco-fbx-mesh>small {display:block;color:var(--muted);}
+.deco-fbx-mesh details {margin-top:6px;font-size:12px;overflow-wrap:anywhere;}
+.deco-fbx-mesh-title small {color:var(--muted);}
+.deco-fbx-skeleton summary {cursor:pointer;color:var(--mint);}
+.deco-fbx-skeleton ul {margin:8px 0 0 4px;max-height:160px;overflow:auto;padding-left:18px;}
+.deco-fbx-report .real-estate-physics-controls {display:flex;flex-wrap:wrap;gap:12px;align-items:end;}
+.deco-fbx-report .real-estate-physics-controls label {margin:0;min-width:145px;}
+.deco-fbx-report .real-estate-physics-controls select {max-width:245px;}
+.deco-fbx-report .real-estate-mesh-switches {display:flex;flex-wrap:wrap;gap:14px;}
+
+/* M234 · single shared Atlas editor / Location Model apply state. */
+.shared-atlas-editor {gap:12px;}
+.shared-atlas-current {font-size:12px;line-height:1.5;overflow-wrap:anywhere;}
+.shared-atlas-editor .deco-atlas-dots {gap:8px;padding:7px 0;}
+.shared-atlas-editor .deco-atlas-dot {width:22px;height:22px;}
+.shared-atlas-editor .deco-atlas-dot span {width:12px;height:12px;}
+.shared-atlas-picker,.shared-atlas-preview {border:1px solid var(--line);border-radius:9px;padding:11px;display:grid;gap:9px;min-width:0;}
+.shared-atlas-picker input {width:100%;min-width:0;}
+.shared-atlas-choices {max-height:210px;overflow:auto;display:grid;gap:5px;}
+.shared-atlas-choices button {text-align:left;display:grid;gap:3px;min-width:0;}
+.shared-atlas-choices button strong,.shared-atlas-choices button small {overflow-wrap:anywhere;}
+.shared-model-state {display:grid;gap:3px;padding:5px 0;}
+.asset-apply-ready:not(:disabled) {border-color:var(--mint);color:var(--mint);}
+@keyframes game1-apply-pulse {0%,100% {box-shadow:0 0 0 0 rgba(62,212,142,0)} 45% {box-shadow:0 0 0 5px rgba(62,212,142,.23)}}
+@media (prefers-reduced-motion: no-preference) {
+  .asset-apply-ready:not(:disabled) {animation:game1-apply-pulse 1.65s ease-in-out infinite;}
+}
+.shared-atlas-compare {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+.shared-atlas-compare figure {margin:0;display:grid;gap:6px;min-width:0;}
+.shared-atlas-compare figure img,.shared-atlas-compare figure span {width:100%;aspect-ratio:1;object-fit:contain;border:1px solid var(--line);border-radius:7px;background:#0b1019;}
+.shared-atlas-compare figure span {display:grid;place-items:center;color:var(--muted);font-size:11px;}
+.shared-atlas-compare figcaption {font-size:11px;color:var(--muted);overflow-wrap:anywhere;}
+.shared-atlas-approval {display:flex;align-items:flex-start;gap:8px;font-size:12px;line-height:1.5;}
+@media(max-width:420px){.shared-atlas-compare {grid-template-columns:1fr;}}

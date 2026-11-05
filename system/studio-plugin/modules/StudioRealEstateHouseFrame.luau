@@ -3,17 +3,11 @@
 -- FBX revision. The authored import pivot (CFrame * PivotOffset) is the
 -- stable registration frame. Never match replacements by CFrame alone.
 local RigSwap = require(script.Parent.StudioManagedRigSwap)
+local MeshAnchor = require(script.Parent.StudioAuthoringMeshAnchor)
 local HouseFrame = {}
 
 function HouseFrame.Find(root: Instance): MeshPart?
-    local match: MeshPart? = nil
-    for _, instance in root:GetDescendants() do
-        if instance:IsA("MeshPart") and instance.Name == "house" then
-            if match then return nil end
-            match = instance
-        end
-    end
-    return match
+    return MeshAnchor.FindUniqueNamed(root, "house")
 end
 
 function HouseFrame.Relative(source: MeshPart, target: MeshPart): CFrame

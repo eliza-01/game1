@@ -34,7 +34,9 @@ class RealEstatePreciseIfCollidableM207(unittest.TestCase):
     def test_studio_enforces_physics_even_with_stale_payload(self):
         source = (ROOT / 'system/studio-plugin/modules/StudioRealEstateCollisionPolicy.luau').read_text('utf8')
         self.assertIn('local fidelity = if not noCollide then "PreciseConvexDecomposition" else settings.collisionFidelity', source)
-        self.assertIn('mesh.CollisionFidelity = FIDELITY[fidelity]', source)
+        self.assertIn('Core.Apply(mesh, not noCollide, fidelity,', source)
+        core = (ROOT / 'src/shared/world/MeshPhysicsCore.luau').read_text('utf8')
+        self.assertIn('mesh.CollisionFidelity = Core.Fidelity(if canCollide then "PreciseConvexDecomposition" else fidelity)', core)
         for importer in ('StudioRealEstateModel.luau', 'StudioRealEstatePartSync.luau'):
             self.assertIn('Collision', (ROOT / 'system/studio-plugin/modules' / importer).read_text('utf8'))
 
@@ -48,6 +50,7 @@ const nodes=Object.create(null);
 function $(id){return nodes[id]??(nodes[id]={hidden:true,innerHTML:'',textContent:'',value:'',disabled:false,addEventListener:()=>{}});}
 const ctx=vm.createContext({$,esc:s=>String(s||''),window:{},toast:()=>{},request:async()=>{},console});
 vm.runInContext(fs.readFileSync(process.argv[2],'utf8'),ctx);
+vm.runInContext(fs.readFileSync(process.argv[3],'utf8'),ctx);
 vm.runInContext(fs.readFileSync(process.argv[1],'utf8'),ctx);
 assert.equal(vm.runInContext(`realEstateEffectiveFidelity('house',{noCollide:false,collisionFidelity:'Default'})`,ctx),'PreciseConvexDecomposition');
 vm.runInContext(`realEstateState.inspect={analysis:{meshes:[{name:'house'},{name:'door'}]},textures:[]}; realEstateState.data={textureReferences:[]};
@@ -72,7 +75,7 @@ ctx['realEstateParts']=()=>['house'];
 const data=vm.runInContext(`(()=>{const s=realEstateState;s.textureRefs={house:''};s.textures={house:'file.png'};s.reuseEnabled={house:false};return realEstatePayload()})()`,ctx);
 assert.equal(data.meshOptions.house.collisionFidelity,'PreciseConvexDecomposition');
 """
-        completed = subprocess.run(['node','-e',script,str(js),str(atlas)], capture_output=True, text=True, timeout=15)
+        completed = subprocess.run(['node','-e',script,str(js),str(atlas),str(ROOT / 'system/control-center/static/mesh-authoring.js')], capture_output=True, text=True, timeout=15)
         self.assertEqual(completed.returncode, 0, completed.stderr)
 
 

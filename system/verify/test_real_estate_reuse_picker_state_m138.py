@@ -20,6 +20,7 @@ const $=id=>elements[id]??(elements[id]={value:'',innerHTML:'',hidden:true,textC
 const esc=v=>String(v??'');
 const ctx=vm.createContext({$,esc,window:{},localStorage:{setItem(){},getItem(){return null;}},request(){},toast(){}});
 vm.runInContext(fs.readFileSync(process.argv[2],'utf8'),ctx);
+vm.runInContext(fs.readFileSync(process.argv[3],'utf8'),ctx);
 vm.runInContext(fs.readFileSync(process.argv[1],'utf8'),ctx);
 vm.runInContext(`realEstateState.data={
   textureReferences:[{group:'estate',reference:'estate:other:house',label:'other',filename:'house.png',assetId:'333'}],
@@ -48,7 +49,8 @@ const selected=vm.runInContext('realEstateReuseOptions("house")',ctx);
 assert.match(selected,/<option value="atlas:5">/);
 '''
         result=subprocess.run([shutil.which('node'),'-e',code,str(js),
-                                 str(ROOT/'system/control-center/static/atlas-identity.js')],capture_output=True,text=True,timeout=20)
+                                 str(ROOT/'system/control-center/static/atlas-identity.js'),
+                                 str(ROOT/'system/control-center/static/mesh-authoring.js')],capture_output=True,text=True,timeout=20)
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)
 
     def test_index_script_version_bumped(self):

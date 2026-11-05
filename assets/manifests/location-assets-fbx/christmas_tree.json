@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 1,
+  "slug": "christmas_tree",
+  "sourceSha256": "701895213556605bcc44c40125fbb6729ddba13d767e58a860d58cc4b75ed949",
+  "analysis": {
+    "schemaVersion": 1,
+    "meshes": [
+      {
+        "name": "christmas_tree_01",
+        "armature": "christmas_tree_01_armature",
+        "vertices": 1870,
+        "bones": [
+          {
+            "name": "Bone",
+            "parent": "",
+            "matrixLocal": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              -1.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          {
+            "name": "Bone.001",
+            "parent": "Bone",
+            "matrixLocal": [
+              1.0,
+              0.0,
+              2e-07,
+              0.0,
+              2e-07,
+              0.0,
+              -1.0,
+              0.0,
+              0.0,
+              0.9999999,
+              0.0,
+              4.7806559,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          {
+            "name": "Bone.002",
+            "parent": "Bone.001",
+            "matrixLocal": [
+              1.0,
+              0.0,
+              2e-07,
+              0.0,
+              2e-07,
+              0.0,
+              -1.0,
+              0.0,
+              0.0,
+              0.9999999,
+              0.0,
+              8.7243443,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          }
+        ],
+        "influencedBones": [
+          "Bone",
+          "Bone.001",
+          "Bone.002"
+        ],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": false,
+          "canQuery": false,
+          "canTouch": false,
+          "doubleSided": true,
+          "collisionFidelity": "Box",
+          "physicsOnly": false
+        }
+      },
+      {
+        "name": "col_mesh",
+        "armature": "",
+        "vertices": 66,
+        "bones": [],
+        "influencedBones": [],
+        "role": "collider",
+        "physics": {
+          "role": "collider",
+          "canCollide": true,
+          "canQuery": true,
+          "canTouch": false,
+          "doubleSided": true,
+          "collisionFidelity": "PreciseConvexDecomposition",
+          "physicsOnly": true
+        }
+      }
+    ],
+    "hasCollider": true,
+    "armatures": [
+      "christmas_tree_01_armature"
+    ],
+    "unassignedArmatures": []
+  }
+}

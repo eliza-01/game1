@@ -49,7 +49,10 @@ class SharedPublicationStagingTests(unittest.TestCase):
             self.assertNotIn('plan_publication_weights(',source)
         for domain in ('location_asset','weapon'):
             source=(ROOT/f'system/control-center/{domain}_store.py').read_text(encoding='utf-8')
-            self.assertIn('with staged_model(self.root, model) as publication:',source)
+            call = ('with staged_model(self.root, model, texture_mode="geometry_only") as publication:'
+                    if domain == 'location_asset' else
+                    'with staged_model(self.root, model) as publication:')
+            self.assertIn(call, source)
 
 
 if __name__ == '__main__': unittest.main()

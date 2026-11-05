@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "slug": "big_tree_01",
+  "sourceSha256": "56f4ad09d2d468139b6b343a5d2fc7c94ffc8811bb24a45d666d8ec42775467d",
+  "analysis": {
+    "schemaVersion": 1,
+    "meshes": [
+      {
+        "name": "big_tree_01",
+        "armature": "",
+        "vertices": 1910,
+        "bones": [],
+        "influencedBones": [],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": null,
+          "canQuery": null,
+          "canTouch": false,
+          "doubleSided": true,
+          "collisionFidelity": null,
+          "physicsOnly": false
+        }
+      }
+    ],
+    "hasCollider": false,
+    "armatures": [],
+    "unassignedArmatures": []
+  }
+}

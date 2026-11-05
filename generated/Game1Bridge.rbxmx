@@ -323,6 +323,7 @@ return CharacterTemplate
         <Properties>
           <string name="Name">DecoAssetLoader</string>
           <string name="Source"><![CDATA[local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
+local MeshPhysics = require(script.Parent.StudioMeshPhysicsCore)
 local DecoAssetLoader = {}
 DecoAssetLoader.__index = DecoAssetLoader
 
@@ -368,7 +369,7 @@ local function applyTexture(model: Model, textureAssetId: string, usesAlpha: any
     local uri = "rbxassetid://" .. tostring(math.floor(numericId))
     local applied = 0
     for _, descendant in ipairs(model:GetDescendants()) do
-        if descendant:IsA("MeshPart") then
+        if descendant:IsA("MeshPart") and not MeshPhysics.IsCollider(descendant.Name) then
             StudioTextureAppearance.Apply(descendant, uri, usesAlpha)
             applied += 1
         end
@@ -431,6 +432,7 @@ function DecoAssetLoader:loadPublished(row: any): Model
     model.Name = tostring(row.slug or "deco_asset")
     sanitize(model)
     applyTexture(model, tostring(row.texture_asset_id or ""), row.textureUsesAlpha)
+    MeshPhysics.ApplyLocationModel(model, nil, row.meshOptions)
     return model
 end
 
@@ -443,9 +445,10 @@ return DecoAssetLoader
           <string name="Name">DecoAssetPreparation</string>
           <string name="Source"><![CDATA[-- Applied only to initial decoration placement. Studio Sync never changes
 -- physical-part policy or replaces already placed geometry.
+local MeshPhysics = require(script.Parent.StudioMeshPhysicsCore)
 local DecoAssetPreparation = {}
 
-function DecoAssetPreparation.PreparePlaced(model: Model)
+function DecoAssetPreparation.PreparePlaced(model: Model, meshOptions: any?)
     for _, descendant in ipairs(model:GetDescendants()) do
         if descendant:IsA("BasePart") then
             -- The placement ghost is anchored; placed decorations are not.
@@ -454,6 +457,9 @@ function DecoAssetPreparation.PreparePlaced(model: Model)
             descendant.CanTouch = false
         end
     end
+    -- The policy is reapplied after ghost/preview handling and before Workspace
+    -- parenting, without writing any transforms, scale or anchors.
+    MeshPhysics.ApplyLocationModel(model, nil, meshOptions)
 end
 
 return table.freeze(DecoAssetPreparation)
@@ -977,7 +983,9 @@ return DecoManager
 -- audit attributes; the replacement mechanism has no domain-specific rules.
 local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
 local RigSwap = require(script.Parent.StudioManagedRigSwap)
+local MeshAnchor = require(script.Parent.StudioAuthoringMeshAnchor)
 local Placement = require(script.Parent.DecoAssetPreparation)
+local Physics = require(script.Parent.StudioMeshPhysicsCore)
 local DecoPlacedAssetSync = {}
 
 local SLUG = "Game1DecoAssetSlug"
@@ -1036,29 +1044,6 @@ local function meshParts(model: Model): {MeshPart}
     return parts
 end
 
--- A stable published MeshPart pivot, rather than the import-dependent Model
--- bounding-box pivot, is used exactly like Real Estate's authored house anchor.
--- Accept a unique mesh, or one uniquely matching Name across the revisions.
-local function anchors(old: Model, candidate: Model): (MeshPart, MeshPart)
-    local before, after = meshParts(old), meshParts(candidate)
-    if #before == 1 and #after == 1 then return before[1], after[1] end
-    local byName = {}
-    for _, part in ipairs(after) do
-        if byName[part.Name] then byName[part.Name] = false
-        else byName[part.Name] = part end
-    end
-    local pairsFound = {}
-    for _, part in ipairs(before) do
-        if byName[part.Name] then
-            table.insert(pairsFound, {old = part, new = byName[part.Name]})
-        end
-    end
-    if #pairsFound ~= 1 then
-        error("ambiguous Location Asset authoring anchor: unique MeshPart name required")
-    end
-    return pairsFound[1].old, pairsFound[1].new
-end
-
 local function rigChildren(model: Model): {Instance}
     local result = {}
     for _, child in ipairs(model:GetChildren()) do
@@ -1113,6 +1098,16 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
     if publishedSha == "" then error("missing published FBX SHA") end
     local placed = targets(workspace, slug)
     if #placed > 1000 then error("more than 1000 placed instances of one slug") end
+    -- Only the meshes actually described by the SHA-bound FBX report are
+    -- eligible for policy refresh. Never touch manually added MeshParts.
+    local inspected = typeof(row.fbxAnalysis) == "table" and row.fbxAnalysis or nil
+    local allowedNames = nil
+    if inspected and typeof(inspected.meshes) == "table" then
+        allowedNames = {}
+        for _, entry in ipairs(inspected.meshes) do
+            if typeof(entry.name) == "string" then allowedNames[entry.name] = true end
+        end
+    end
     local needsGeometry = false
     for _, model in ipairs(placed) do
         if tostring(model:GetAttribute("Game1DecoPublishedModelSha256") or "") ~= publishedSha then
@@ -1145,9 +1140,10 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                 -- Mirror DecoPlacement's authored scale, then align via the
                 -- MeshPart's stable Blender-authored pivot (Real Estate method).
                 stage:ScaleTo(model:GetScale())
-                local existingAnchor, freshAnchor = anchors(model, stage)
+                local existingAnchor, freshAnchor, authoringAnchorPath = MeshAnchor.Match(
+                    model, stage, model:GetAttribute("Game1DecoAuthoringAnchorPath"))
                 RigSwap.AlignToAnchor(stage, freshAnchor, existingAnchor:GetPivot(), "Location Asset " .. slug)
-                Placement.PreparePlaced(stage)
+                Placement.PreparePlaced(stage, row.meshOptions)
                 -- Unowned geometry added directly to a placed root must not be
                 -- silently classified as an FBX rig and deleted. Published
                 -- direct-child names/classes must match the legacy instance.
@@ -1167,12 +1163,14 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                     end
                 end
                 transaction = RigSwap.Prepare(model, previousChildren, nextChildren)
+                transaction.authoringAnchorPath = authoringAnchorPath
                 totalMeshes += #meshParts(stage)
                 if totalMeshes > 4096 then error("more than 4096 MeshParts in scoped Sync") end
             end
             local atlasChanges = {}
             local uri = "rbxassetid://" .. atlasId
             for _, part in ipairs(oldParts) do
+                if Physics.IsCollider(part.Name) then continue end
                 local surface = part:FindFirstChildOfClass("SurfaceAppearance")
                 if part.TextureID ~= uri or (surface and surface.ColorMap ~= uri) then
                     local previousUri = if part.TextureID == uri and surface then surface.ColorMap else part.TextureID
@@ -1208,7 +1206,11 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                 historyJson = historyJson, oldHistory = model:GetAttribute(HISTORY),
                 oldSha = model:GetAttribute("Game1DecoPublishedModelSha256"),
                 oldPublishedId = model:GetAttribute("Game1DecoPublishedModelAssetId"),
-                oldReference = model:GetAttribute(REFERENCE), events = events})
+                oldReference = model:GetAttribute(REFERENCE),
+                oldAnchorPath = model:GetAttribute("Game1DecoAuthoringAnchorPath"),
+                events = events,
+                physicsBefore = if not geometry and allowedNames then
+                    Physics.CaptureLocationModel(model, allowedNames) else nil})
         end
     end)
     if not prepared then
@@ -1216,6 +1218,7 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
         error("no Place geometry modified; " .. tostring(issue))
     end
     local changedParts, geometryUpdated, changedReferences, changedModels = 0, 0, 0, 0
+    local physicsChecked = 0
     local ok, problem = pcall(function()
         for _, item in ipairs(plans) do
             local model = item.model
@@ -1227,6 +1230,7 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                 geometryUpdated += 1
                 model:SetAttribute("Game1DecoPublishedModelAssetId", modelId)
                 model:SetAttribute("Game1DecoPublishedModelSha256", publishedSha)
+                model:SetAttribute("Game1DecoAuthoringAnchorPath", item.swap.authoringAnchorPath)
             end
             if item.changeRef then
                 model:SetAttribute(REFERENCE, modelId)
@@ -1241,6 +1245,9 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                     changedParts += 1
                 end
             end
+            if item.physicsBefore and allowedNames then
+                physicsChecked += Physics.ApplyLocationModel(model, allowedNames, row.meshOptions)
+            end
             if item.historyJson then model:SetAttribute(HISTORY, item.historyJson) end
             if #item.events > 0 then changedModels += 1 end
         end
@@ -1253,7 +1260,9 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                 model:SetAttribute("Game1DecoPublishedModelAssetId", item.oldPublishedId)
                 model:SetAttribute("Game1DecoPublishedModelSha256", item.oldSha)
                 model:SetAttribute(REFERENCE, item.oldReference)
+                model:SetAttribute("Game1DecoAuthoringAnchorPath", item.oldAnchorPath)
                 model:SetAttribute(HISTORY, item.oldHistory)
+                if item.physicsBefore then Physics.RestoreLocationModel(item.physicsBefore) end
                 for _, change in ipairs(item.atlasChanges) do
                     if not item.geometry then
                         change.part.TextureID = change.texture
@@ -1296,7 +1305,8 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
     end
     return {models = changedModels, parts = changedParts, matchedModels = #placed,
         modelReferences = changedReferences, geometryUpdated = geometryUpdated,
-        meshPartsUpdated = totalMeshes, pendingGeometry = pending, replacedModels = 0,
+        meshPartsUpdated = totalMeshes, physicsChecked = physicsChecked,
+        pendingGeometry = pending, replacedModels = 0,
         changes = summary, instances = instances}
 end
 
@@ -1482,7 +1492,7 @@ function DecoPlacement:_commit()
     local pivot = ghost:GetPivot()
 
     local placed = sourceTemplate:Clone()
-    DecoAssetPreparation.PreparePlaced(placed)
+    DecoAssetPreparation.PreparePlaced(placed, row.meshOptions)
     DecoPlacedAssetSync.StampPublishedModel(placed, row)
     local instanceId = self.HttpService:GenerateGUID(false)
     placed.Name = tostring(row.slug or "deco") .. "__" .. string.sub(instanceId, 1, 8)
@@ -2794,6 +2804,170 @@ end
       </Item>
       <Item class="ModuleScript" referent="14">
         <Properties>
+          <string name="Name">StudioAuthoringMeshAnchor</string>
+          <string name="Source"><![CDATA[-- Shared authoring-pivot resolver for published rigs. Used by Real Estate
+-- and Location Assets; this module only identifies matching source anchors.
+-- The actual alignment and child-rig transaction belong to StudioManagedRigSwap.
+local MeshAnchor = {}
+
+local POSITION_EPSILON = 0.025
+local AXIS_DOT = 0.9999
+
+local function sameFrame(a: CFrame, b: CFrame): boolean
+    return (a.Position - b.Position).Magnitude <= POSITION_EPSILON
+        and a.LookVector:Dot(b.LookVector) >= AXIS_DOT
+        and a.UpVector:Dot(b.UpVector) >= AXIS_DOT
+end
+
+local function parts(root: Model): {MeshPart}
+    local result = {}
+    for _, item in ipairs(root:GetDescendants()) do
+        if item:IsA("MeshPart") then table.insert(result, item) end
+    end
+    return result
+end
+
+-- Length-prefixed segments avoid collisions when Roblox Names contain '/' or ':'.
+-- A repeated full path (same-named siblings) is NOT a unique authoring identity.
+local function path(root: Model, item: Instance): string
+    local segments = {}
+    local current: Instance? = item
+    while current and current ~= root do
+        local name = current.Name
+        table.insert(segments, 1, current.ClassName .. ":" .. tostring(#name) .. ":" .. name)
+        current = current.Parent
+    end
+    if current ~= root then error("authoring mesh anchor lies outside model") end
+    return table.concat(segments, "/")
+end
+
+local function uniqueIndex(root: Model, entries: {MeshPart}, usePath: boolean): {[string]: MeshPart | boolean}
+    local indexed = {}
+    for _, item in ipairs(entries) do
+        local key = if usePath then path(root, item) else item.Name
+        if indexed[key] ~= nil then
+            indexed[key] = false
+        else
+            indexed[key] = item
+        end
+    end
+    return indexed
+end
+
+function MeshAnchor.FindUniqueNamed(root: Instance, meshName: string): MeshPart?
+    local found: MeshPart? = nil
+    for _, item in ipairs(root:GetDescendants()) do
+        if item:IsA("MeshPart") and item.Name == meshName then
+            if found then return nil end
+            found = item
+        end
+    end
+    return found
+end
+
+-- Returns the old and published MeshPart plus the path of the published anchor.
+-- Prefer an explicitly retained anchor or PrimaryPart; otherwise use a stable
+-- hierarchy path and require agreement between the authoring-pivot transforms
+-- of multiple matches. Never pick an arbitrary mesh if pivots disagree.
+function MeshAnchor.Match(old: Model, published: Model, retainedPath: string?): (MeshPart, MeshPart, string)
+    if retainedPath ~= nil and type(retainedPath) ~= "string" then
+        error("invalid retained authoring anchor path; no Place geometry modified")
+    end
+    local before, after = parts(old), parts(published)
+    if #before == 0 or #after == 0 then
+        error("no MeshPart available to establish an authoring pivot")
+    end
+    if #before == 1 and #after == 1 then
+        if retainedPath and retainedPath ~= "" and retainedPath ~= path(old, before[1]) then
+            error("retained Location Asset authoring anchor no longer exists")
+        end
+        return before[1], after[1], path(published, after[1])
+    end
+
+    local oldPaths = uniqueIndex(old, before, true)
+    local publishedPaths = uniqueIndex(published, after, true)
+    local matches = {}
+    for key, oldPart in pairs(oldPaths) do
+        local newPart = publishedPaths[key]
+        if oldPart and newPart then
+            table.insert(matches, {old = oldPart, new = newPart,
+                oldPath = key, newPath = key})
+        end
+    end
+
+    -- Older Roblox FBX imports sometimes add/remove a container Model. Only
+    -- use Name in that case when it is unique in BOTH rigs; never guess an
+    -- occurrence index for same-named MeshParts or bones.
+    if #matches == 0 then
+        local oldNames = uniqueIndex(old, before, false)
+        local newNames = uniqueIndex(published, after, false)
+        for key, oldPart in pairs(oldNames) do
+            local newPart = newNames[key]
+            if oldPart and newPart then
+                table.insert(matches, {old = oldPart, new = newPart,
+                    oldPath = path(old, oldPart), newPath = path(published, newPart)})
+            end
+        end
+    end
+
+    if #matches == 0 then
+        error("no uniquely matching MeshPart path/name between placed and published rigs; no Place geometry modified")
+    end
+    table.sort(matches, function(a, b) return a.oldPath < b.oldPath end)
+
+    if retainedPath and retainedPath ~= "" then
+        for _, match in ipairs(matches) do
+            if match.oldPath == retainedPath then
+                return match.old, match.new, match.newPath
+            end
+        end
+        error("retained Location Asset authoring anchor is missing in the published rig; no Place geometry modified")
+    end
+    local primary = old.PrimaryPart
+    if primary and primary:IsA("MeshPart") then
+        for _, match in ipairs(matches) do
+            if match.old == primary then
+                return match.old, match.new, match.newPath
+            end
+        end
+    end
+    if #matches == 1 then
+        local match = matches[1]
+        return match.old, match.new, match.newPath
+    end
+
+    -- Multiple valid mesh names are NORMAL. They can all describe the same
+    -- authoring transform. Accept the best agreement group, but refuse an
+    -- unsupported tie or an inconsistent set instead of shifting a whole rig.
+    local transforms = {}
+    for i, match in ipairs(matches) do
+        transforms[i] = match.old:GetPivot() * match.new:GetPivot():Inverse()
+    end
+    local winner, support = nil, 0
+    for i, transform in ipairs(transforms) do
+        local count = 0
+        for _, other in ipairs(transforms) do
+            if sameFrame(transform, other) then count += 1 end
+        end
+        if count > support then
+            winner, support = i, count
+        elseif count == support and winner and not sameFrame(transform, transforms[winner]) then
+            winner = nil
+        end
+    end
+    if not winner or support < 2 then
+        error("multiple MeshPart authoring pivots disagree; specify a stable PrimaryPart before Sync; no Place geometry modified")
+    end
+    local match = matches[winner]
+    return match.old, match.new, match.newPath
+end
+
+return table.freeze(MeshAnchor)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="15">
+        <Properties>
           <string name="Name">StudioCharacterStandBuilder</string>
           <string name="Source"><![CDATA[-- Studio authoring adapter for the SAME published assembly recipe and Builder
 -- used by CharacterService. No second bind/atlas/mesh pipeline is implemented here.
@@ -2914,7 +3088,7 @@ return table.freeze(Builder)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="15">
+      <Item class="ModuleScript" referent="16">
         <Properties>
           <string name="Name">StudioCharacterStandPlacement</string>
           <string name="Source"><![CDATA[-- Edit-mode surface placement. Does not change the imported rig's orientation,
@@ -3002,7 +3176,7 @@ return table.freeze(Placement)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="16">
+      <Item class="ModuleScript" referent="17">
         <Properties>
           <string name="Name">StudioCharacterStandWidget</string>
           <string name="Source"><![CDATA[-- Dock widget contains presentation only. No asset imports or Workspace writes.
@@ -3075,7 +3249,7 @@ return table.freeze(Widget)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="17">
+      <Item class="ModuleScript" referent="18">
         <Properties>
           <string name="Name">StudioCharacterTestStand</string>
           <string name="Source"><![CDATA[-- Game1Bridge composition root for the Studio-only character assembly stand.
@@ -3282,7 +3456,7 @@ return table.freeze(TestStand)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="18">
+      <Item class="ModuleScript" referent="19">
         <Properties>
           <string name="Name">StudioDebugPreferenceBridge</string>
           <string name="Source"><![CDATA[-- Studio-only persistence bridge for Test Loadout preferences.
@@ -3402,13 +3576,13 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="19">
+      <Item class="ModuleScript" referent="20">
         <Properties>
           <string name="Name">StudioDecoSyncCommands</string>
           <string name="Source"><![CDATA[-- M216: reject legacy global commands (including M215) before they can mutate.
 return function(config: any)
     return function(command: any)
-        if command.project ~= "game1" or command.schemaVersion ~= 5
+        if command.project ~= "game1" or command.schemaVersion ~= 6
             or type(command.operationId) ~= "string" or command.operationId == ""
             or type(command.targetSlug) ~= "string" or command.targetSlug == ""
             or type(command.bindingRevision) ~= "number" or command.bindingRevision < 1
@@ -3425,7 +3599,7 @@ return function(config: any)
                 command.targetSlug, true, command.modelAssetId, command.atlasAssetId)
         end)
         local payload = {
-            project = "game1", command = "deco-refresh", schemaVersion = 5,
+            project = "game1", command = "deco-refresh", schemaVersion = 6,
             operationId = command.operationId, targetSlug = command.targetSlug,
             bindingRevision = command.bindingRevision,
         }
@@ -3451,7 +3625,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="20">
+      <Item class="ModuleScript" referent="21">
         <Properties>
           <string name="Name">StudioHousePlacementCapture</string>
           <string name="Source"><![CDATA[-- Read-only Studio authoring adapter. Selection and plot markers stay untouched.
@@ -3564,7 +3738,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="21">
+      <Item class="ModuleScript" referent="22">
         <Properties>
           <string name="Name">StudioHousePlacementPreview</string>
           <string name="Source"><![CDATA[-- Explicitly authored house preview in Workspace.Plots/NN/Houses.
@@ -4031,7 +4205,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="22">
+      <Item class="ModuleScript" referent="23">
         <Properties>
           <string name="Name">StudioManagedRigSwap</string>
           <string name="Source"><![CDATA[-- Shared Studio mechanism for replacing AUTHORING-MANAGED child rigs while
@@ -4198,7 +4372,7 @@ return table.freeze(RigSwap)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="23">
+      <Item class="ModuleScript" referent="24">
         <Properties>
           <string name="Name">StudioMarkerVisibility</string>
           <string name="Source"><![CDATA[-- Studio-only presentation toggle. No movement of markers, no metadata edits.
@@ -4342,7 +4516,151 @@ return table.freeze(Visibility)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="24">
+      <Item class="ModuleScript" referent="25">
+        <Properties>
+          <string name="Name">StudioMeshPhysicsCore</string>
+          <string name="Source"><![CDATA[-- One Studio MeshPart physics writer shared by Real Estate and Location Assets.
+-- Every collidable MeshPart uses Precise. Box is the default for no-collision.
+local Core = {}
+local FIDELITY = {
+    Box = Enum.CollisionFidelity.Box,
+    Hull = Enum.CollisionFidelity.Hull,
+    Default = Enum.CollisionFidelity.Default,
+    PreciseConvexDecomposition = Enum.CollisionFidelity.PreciseConvexDecomposition,
+}
+
+function Core.IsCollider(name: string): boolean
+    local lower = string.lower(name)
+    return lower:sub(1, 4) == "col_" or lower:find("_col_", 1, true) ~= nil
+        or lower:sub(-4) == "_col"
+end
+
+function Core.IsGlass(name: string): boolean
+    return not Core.IsCollider(name) and string.find(string.lower(name), "glass", 1, true) ~= nil
+end
+
+function Core.Fidelity(name: string): Enum.CollisionFidelity
+    local value = FIDELITY[name]
+    if value == nil then error("unsupported CollisionFidelity: " .. tostring(name)) end
+    return value
+end
+
+function Core.Apply(mesh: MeshPart, canCollide: boolean, fidelity: string, doubleSided: boolean)
+    -- CanQuery=false requires CanCollide=false; assign in safe order.
+    if canCollide then
+        mesh.CanQuery = true
+        mesh.CanCollide = true
+    else
+        mesh.CanCollide = false
+        mesh.CanQuery = false
+    end
+    mesh.CanTouch = false
+    mesh.CollisionFidelity = Core.Fidelity(if canCollide then "PreciseConvexDecomposition" else fidelity)
+    mesh.DoubleSided = doubleSided
+end
+
+local function parts(model: Model): {MeshPart}
+    local found = {}
+    for _, descendant in ipairs(model:GetDescendants()) do
+        if descendant:IsA("MeshPart") then table.insert(found, descendant) end
+    end
+    return found
+end
+
+-- Both domains use Core.Apply as the only MeshPart property writer.
+-- Location uses name classification plus saved per-mesh overrides. A missing
+-- meshOptions entry means legacy behavior: never silently migrate a Place.
+function Core.ApplyLocationModel(model: Model, allowedNames: {[string]: boolean}?, meshOptions: any?): number
+    local allParts = parts(model)
+    local hasCollider = false
+    for _, mesh in ipairs(allParts) do
+        if Core.IsCollider(mesh.Name) then hasCollider = true break end
+    end
+    local affected = 0
+    for _, mesh in ipairs(allParts) do
+        if allowedNames == nil or allowedNames[mesh.Name] == true then
+            local collider, namedGlass = Core.IsCollider(mesh.Name), Core.IsGlass(mesh.Name)
+            local raw = if typeof(meshOptions) == "table" then meshOptions[mesh.Name] else nil
+            local explicit = typeof(raw) == "table"
+            local glass = if explicit and typeof(raw.glass) == "boolean" then raw.glass else namedGlass
+            local doublesided = if explicit and typeof(raw.doubleSided) == "boolean"
+                then raw.doubleSided else true
+            local defaultNoCollide = if hasCollider then not collider else not (collider or namedGlass)
+            local noCollide = if explicit and typeof(raw.noCollide) == "boolean"
+                then raw.noCollide else defaultNoCollide
+            if explicit or hasCollider or collider or namedGlass then
+                local fidelity = if noCollide and explicit and typeof(raw.collisionFidelity) == "string"
+                    then raw.collisionFidelity elseif noCollide then "Box" else "PreciseConvexDecomposition"
+                -- All collidable MeshParts are Precise, including COL_*.
+                Core.Apply(mesh, not noCollide, fidelity, doublesided)
+            else
+                -- Legacy Location without COL: do not override pre-M232 published physics.
+                mesh.CanTouch = false
+                mesh.DoubleSided = true
+            end
+            if collider then
+                mesh.Transparency = 1
+                mesh.CastShadow = false
+                mesh:SetAttribute("Game1DecoPhysicsOnly", true)
+            else
+                mesh:SetAttribute("Game1DecoPhysicsOnly", nil)
+            end
+            if glass then
+                if mesh:GetAttribute("Game1DecoGlassApplied") ~= true then
+                    mesh.Transparency = math.max(mesh.Transparency, 0.02)
+                    mesh:SetAttribute("Game1DecoGlassApplied", true)
+                end
+            end
+            affected += 1
+        end
+    end
+    return affected
+end
+
+-- Scoped existing-placement physics updates can fail on locked Studio parts.
+-- Capture before the first change and restore across every managed instance.
+function Core.CaptureLocationModel(model: Model, allowedNames: {[string]: boolean}): {any}
+    local saved = {}
+    for _, mesh in ipairs(parts(model)) do
+        if allowedNames[mesh.Name] == true then
+            table.insert(saved, {part = mesh, canCollide = mesh.CanCollide,
+                canQuery = mesh.CanQuery, canTouch = mesh.CanTouch,
+                fidelity = mesh.CollisionFidelity, doubleSided = mesh.DoubleSided,
+                transparency = mesh.Transparency, castShadow = mesh.CastShadow,
+                physicsOnly = mesh:GetAttribute("Game1DecoPhysicsOnly"),
+                glassApplied = mesh:GetAttribute("Game1DecoGlassApplied")})
+        end
+    end
+    return saved
+end
+
+function Core.RestoreLocationModel(saved: {any})
+    for _, entry in ipairs(saved) do
+        local mesh = entry.part
+        if mesh and mesh.Parent then
+            if entry.canCollide then
+                mesh.CanQuery = true
+                mesh.CanCollide = true
+            else
+                mesh.CanCollide = false
+                mesh.CanQuery = entry.canQuery
+            end
+            mesh.CanTouch = entry.canTouch
+            mesh.CollisionFidelity = entry.fidelity
+            mesh.DoubleSided = entry.doubleSided
+            mesh.Transparency = entry.transparency
+            mesh.CastShadow = entry.castShadow
+            mesh:SetAttribute("Game1DecoPhysicsOnly", entry.physicsOnly)
+            mesh:SetAttribute("Game1DecoGlassApplied", entry.glassApplied)
+        end
+    end
+end
+
+return table.freeze(Core)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="26">
         <Properties>
           <string name="Name">StudioModelLoadCommands</string>
           <string name="Source"><![CDATA[-- Studio model-sync command: validates and imports Character, Monster/NPC and Weapon models.
@@ -4909,7 +5227,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="25">
+      <Item class="ModuleScript" referent="27">
         <Properties>
           <string name="Name">StudioPlotsCatalog</string>
           <string name="Source"><![CDATA[-- Read-only discovery contract for authored Workspace.Plots/01..50.
@@ -4971,7 +5289,7 @@ return table.freeze(Catalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="26">
+      <Item class="ModuleScript" referent="28">
         <Properties>
           <string name="Name">StudioPlotsPartPolicy</string>
           <string name="Source"><![CDATA[-- Reversible, Studio-only properties for Plots visibility and playtest preview.
@@ -5056,7 +5374,7 @@ return table.freeze(Policy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="27">
+      <Item class="ModuleScript" referent="29">
         <Properties>
           <string name="Name">StudioPlotsSelectionFilter</string>
           <string name="Source"><![CDATA[-- Studio viewport hit-test filter for hidden Plots authoring geometry.
@@ -5146,7 +5464,7 @@ return table.freeze(Filter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="28">
+      <Item class="ModuleScript" referent="30">
         <Properties>
           <string name="Name">StudioPlotsVisibility</string>
           <string name="Source"><![CDATA[-- Studio-only Plots preview: hidden -> volumes -> volumes + numbers -> hidden.
@@ -5440,32 +5758,31 @@ return table.freeze(PlotsVisibility)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="29">
+      <Item class="ModuleScript" referent="31">
         <Properties>
           <string name="Name">StudioRealEstateCollisionPolicy</string>
-          <string name="Source"><![CDATA[-- Real Estate physics layer. Only this module writes MeshPart physics.
+          <string name="Source"><![CDATA[-- Real Estate physics profile; shared MeshPhysicsCore writes MeshPart physics.
 -- All authored visual parts are DoubleSided by default; COL_* remains physics-only.
 local CollectionService = game:GetService("CollectionService")
+local Core = require(script.Parent.StudioMeshPhysicsCore)
 local Policy = {}
 local COLLIDER_TAG = "Game1RealEstateCollider"
 
 local FIDELITY = {
-    Box = Enum.CollisionFidelity.Box,
-    Hull = Enum.CollisionFidelity.Hull,
-    Default = Enum.CollisionFidelity.Default,
-    PreciseConvexDecomposition = Enum.CollisionFidelity.PreciseConvexDecomposition,
+    Box = Core.Fidelity("Box"),
+    Hull = Core.Fidelity("Hull"),
+    Default = Core.Fidelity("Default"),
+    PreciseConvexDecomposition = Core.Fidelity("PreciseConvexDecomposition"),
 }
 
 function Policy.IsCollider(name: string): boolean
-    local lower = string.lower(name)
-    return lower:sub(1, 4) == "col_" or lower:find("_col_", 1, true) ~= nil
-        or lower:sub(-4) == "_col"
+    return Core.IsCollider(name)
 end
 
 local function preciseByDefault(name: string): boolean
     local lower = string.lower(name)
     return Policy.IsCollider(name) or lower == "door" or lower:sub(1, 5) == "door_"
-        or lower:find("glass", 1, true) ~= nil
+        or Core.IsGlass(name)
 end
 
 function Policy.Apply(mesh: MeshPart, name: string, raw: any)
@@ -5483,11 +5800,8 @@ function Policy.Apply(mesh: MeshPart, name: string, raw: any)
 
     -- Roblox requires CanQuery=true for collidable parts. Touch remains off
     -- (collision physics does not require a Touched event listener).
-    mesh.CanCollide = not noCollide
-    mesh.CanQuery = not noCollide
-    mesh.CanTouch = false
-    mesh.CollisionFidelity = FIDELITY[fidelity]
-    mesh.DoubleSided = if typeof(settings.doubleSided) == "boolean" then settings.doubleSided else true
+    Core.Apply(mesh, not noCollide, fidelity,
+        if typeof(settings.doubleSided) == "boolean" then settings.doubleSided else true)
     -- Capture the *authoring policy* on the MeshPart itself. Studio copies can
     -- be revalidated without a Host Agent request or a full model reimport.
     -- This metadata is not a second registry: it is the applied snapshot.
@@ -5553,7 +5867,7 @@ return table.freeze(Policy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="30">
+      <Item class="ModuleScript" referent="32">
         <Properties>
           <string name="Name">StudioRealEstateHouseFrame</string>
           <string name="Source"><![CDATA[-- Author-space transform for all Real Estate Studio sync paths.
@@ -5561,17 +5875,11 @@ return table.freeze(Policy)
 -- FBX revision. The authored import pivot (CFrame * PivotOffset) is the
 -- stable registration frame. Never match replacements by CFrame alone.
 local RigSwap = require(script.Parent.StudioManagedRigSwap)
+local MeshAnchor = require(script.Parent.StudioAuthoringMeshAnchor)
 local HouseFrame = {}
 
 function HouseFrame.Find(root: Instance): MeshPart?
-    local match: MeshPart? = nil
-    for _, instance in root:GetDescendants() do
-        if instance:IsA("MeshPart") and instance.Name == "house" then
-            if match then return nil end
-            match = instance
-        end
-    end
-    return match
+    return MeshAnchor.FindUniqueNamed(root, "house")
 end
 
 function HouseFrame.Relative(source: MeshPart, target: MeshPart): CFrame
@@ -5586,7 +5894,7 @@ return table.freeze(HouseFrame)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="31">
+      <Item class="ModuleScript" referent="33">
         <Properties>
           <string name="Name">StudioRealEstateModel</string>
           <string name="Source"><![CDATA[-- Studio assembly for any number of independent Real Estate MeshPart rigs.
@@ -5870,7 +6178,7 @@ return table.freeze(StudioRealEstateModel)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="32">
+      <Item class="ModuleScript" referent="34">
         <Properties>
           <string name="Name">StudioRealEstatePartPlacement</string>
           <string name="Source"><![CDATA[-- Restore source-FBX mesh centres after independent Model Asset import.
@@ -5994,7 +6302,7 @@ return table.freeze(Placement)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="33">
+      <Item class="ModuleScript" referent="35">
         <Properties>
           <string name="Name">StudioRealEstatePartSync</string>
           <string name="Source"><![CDATA[-- Atomic, single-rig refresh of a managed Real Estate template.
@@ -6228,7 +6536,7 @@ return table.freeze(PartSync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="34">
+      <Item class="ModuleScript" referent="36">
         <Properties>
           <string name="Name">StudioRealEstatePlacedCollisionSync</string>
           <string name="Source"><![CDATA[-- Repair *only* authoring-managed collision rigs of already placed Estates.
@@ -6303,7 +6611,7 @@ return table.freeze(Sync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="35">
+      <Item class="ModuleScript" referent="37">
         <Properties>
           <string name="Name">StudioRealEstatePlacedPhysicsGuard</string>
           <string name="Source"><![CDATA[-- Studio Edit Mode: normalize a managed Estate pasted or dragged from
@@ -6375,7 +6683,7 @@ return table.freeze(Guard)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="36">
+      <Item class="ModuleScript" referent="38">
         <Properties>
           <string name="Name">StudioRealEstatePlacedTargets</string>
           <string name="Source"><![CDATA[-- One authoritative definition of a placed Real Estate instance.
@@ -6420,7 +6728,7 @@ return table.freeze(Targets)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="37">
+      <Item class="ModuleScript" referent="39">
         <Properties>
           <string name="Name">StudioRealEstatePlacedVisualSync</string>
           <string name="Source"><![CDATA[-- Full Real Estate sync: refresh visual rigs on *all managed placed* houses.
@@ -6539,7 +6847,7 @@ return table.freeze(VisualSync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="38">
+      <Item class="ModuleScript" referent="40">
         <Properties>
           <string name="Name">StudioRealEstateRigValidation</string>
           <string name="Source"><![CDATA[-- Validate an already-published Real Estate Model Asset as actually loaded by Roblox.
@@ -6668,7 +6976,7 @@ return table.freeze(Validation)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="39">
+      <Item class="ModuleScript" referent="41">
         <Properties>
           <string name="Name">StudioTextureAppearance</string>
           <string name="Source"><![CDATA[-- Shared Studio-side material binding for all authored MeshParts.
@@ -6755,7 +7063,7 @@ return table.freeze(StudioTextureAppearance)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="40">
+      <Item class="ModuleScript" referent="42">
         <Properties>
           <string name="Name">StudioTimelineEditorCommands</string>
           <string name="Source"><![CDATA[-- Timeline authoring session: validates requests, binds UI events and reports results.
@@ -7044,7 +7352,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="41">
+      <Item class="ModuleScript" referent="43">
         <Properties>
           <string name="Name">StudioTimelinePoseSampler</string>
           <string name="Source"><![CDATA[-- Offline pose extraction and interpolation for a preview rig. No UI or HTTP dependencies.
@@ -7223,7 +7531,7 @@ return table.freeze(StudioTimelinePoseSampler)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="42">
+      <Item class="ModuleScript" referent="44">
         <Properties>
           <string name="Name">StudioTimelinePreview</string>
           <string name="Source"><![CDATA[-- Owns the isolated ViewportFrame rig, camera interaction and animation-asset retrieval.
@@ -7439,7 +7747,7 @@ return table.freeze(StudioTimelinePreview)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="43">
+      <Item class="ModuleScript" referent="45">
         <Properties>
           <string name="Name">StudioTimelineTransport</string>
           <string name="Source"><![CDATA[-- HTTP boundary for the Timeline editor. No UI, animation or Studio model access.
@@ -7497,7 +7805,7 @@ return table.freeze(StudioTimelineTransport)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="44">
+      <Item class="ModuleScript" referent="46">
         <Properties>
           <string name="Name">StudioTimelineWidget</string>
           <string name="Source"><![CDATA[-- Timeline editor view. Builds the dock widget and exposes only its controls.

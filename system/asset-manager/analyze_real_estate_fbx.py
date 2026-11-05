@@ -11,6 +11,7 @@ from real_estate_rig_discovery import find_mesh, find_rig
 from real_estate_import_rigs import restore_authored_rigs
 from model_publication import assert_skin_complete
 from real_estate_part_placement import inspect_placements
+from fbx_mesh_inspection import describe_mesh
 
 
 def analyze(source, only_part=None, extract=False):
@@ -37,21 +38,7 @@ def analyze(source, only_part=None, extract=False):
         rig = find_rig(bpy, mesh, name)
         if name == 'house' and (not rig or rig.name.casefold() != 'house_armature'):
             raise RuntimeError('Required house_armature is missing or not assigned to mesh house.')
-        rig_name = rig.name if rig else ''
-        # The single-part, non-extract invocation inspects a staged publication.
-        # Registration/extraction still accepts unweighted authoring sources.
-        if only_part is not None and not extract and rig:
-            assert_skin_complete(rig, [mesh])
-        bones = [{
-            'name': b.name,
-            'parent': b.parent.name if b.parent else '',
-            'matrixLocal': [round(float(v), 7) for row in b.matrix_local for v in row],
-        } for b in sorted(rig.data.bones, key=lambda b: b.name.casefold())] if rig else []
-        group_names = {group.index: group.name for group in mesh.vertex_groups}
-        influences = sorted({group_names.get(group.group) for v in mesh.data.vertices for group in v.groups
-                             if group.weight > 0 and group_names.get(group.group) in {b['name'] for b in bones}})
-        record = {'name': name, 'armature': rig_name, 'vertices': len(mesh.data.vertices),
-                  'bones': bones, 'influencedBones': influences}
+        record = describe_mesh(bpy, mesh, rig)
         if name in placements:
             record['authoredPlacement'] = placements[name]
         meshes.append(record)

@@ -173,7 +173,7 @@ function DecoPlacement:_commit()
     local pivot = ghost:GetPivot()
 
     local placed = sourceTemplate:Clone()
-    DecoAssetPreparation.PreparePlaced(placed)
+    DecoAssetPreparation.PreparePlaced(placed, row.meshOptions)
     DecoPlacedAssetSync.StampPublishedModel(placed, row)
     local instanceId = self.HttpService:GenerateGUID(false)
     placed.Name = tostring(row.slug or "deco") .. "__" .. string.sub(instanceId, 1, 8)

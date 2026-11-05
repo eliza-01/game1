@@ -196,8 +196,8 @@ class IndependentAssetTests(unittest.TestCase):
         workflow=(ROOT/'system/control-center/static/real-estate-mesh-workflow.js').read_text('utf-8')
         self.assertIn('data-re-manage', script)
         self.assertIn('data-re-texture', script)
-        self.assertIn("realEstatePublish('image:'+part)",workflow)
-        self.assertIn('realEstateRegister()',workflow)
+        self.assertIn('window.game1ConsumerAtlasEditor.render',workflow)
+        self.assertIn('window.game1ConsumerAtlasEditor.wire',workflow)
         self.assertIn('real-estate.js?v=', html)
         self.assertNotIn('update_model_asset', store)
 

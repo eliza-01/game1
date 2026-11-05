@@ -162,3 +162,50 @@ reusing `StudioRealEstateHouseFrame.Align`; calibrated rows retain exact house
 pivot alignment. Never synthesize or persist an assumed historical anchor.
 M230 Studio preview protocol v4 is mandatory. See
 `docs/workflows/REAL_ESTATE_PLACEMENT_LEGACY_COMPAT_M230_RU.md`.
+
+## M231 · Location FBX collider / glass / skeleton inspection
+
+`fbx_mesh_inspection.py` is the shared Blender bone reader.
+`services.mesh_authoring_policy` is the shared name-role classifier.
+`src/shared/world/MeshPhysicsCore` (Studio alias `StudioMeshPhysicsCore`) is the single MeshPart property writer for Estate and Location.
+Estate M207 Precise for collidable remains unchanged; Location COL_* uses Box.
+Location registration via Asset Manager requests inspection; older registrations
+can be inspected explicitly without republishing. Reports are SHA-bound.
+Never auto-Sync all placed instances on analysis, and never move their roots.
+See docs/workflows/LOCATION_ASSETS_FBX_COLLISION_SKELETON_M231_RU.md.
+
+## M232 · Single FBX authoring contract (supersedes M231 collider Box)
+
+Shared `fbx_blender_report`, `fbx_mesh_inspection`, `mesh_authoring_policy`,
+`mesh-authoring.js` and `MeshPhysicsCore` are the ONLY general inspection and
+MeshPart physics mechanisms. Both Real Estate and Location Assets invoke these
+with domain-specific identities and publication rules. **CanCollide=true always
+means PreciseConvexDecomposition**, including Location COL_ meshes. Box is the
+default only for No Collide. Selected FBX must be analyzed and its editable
+mesh/bone controls shown BEFORE Register/Save. Location per-mesh options are
+SQLite-backed, exported to Runtime, and applied by scoped Studio Sync protocol
+6; legacy records stay unchanged until edited, except the erroneous collider
+fidelity. See docs/workflows/LOCATION_ASSETS_FBX_AUTHORING_M232_RU.md.
+
+## M233 · Location Model publication must never carry textures
+
+Location Assets `Republish Model` uses only the explicit `/publish-model` API and
+shared `staged_model(texture_mode="geometry_only")`. Staging strips Blender
+materials from the temporary FBX, exports without embedded/external bitmap
+references, and fails closed unless the report proves no material slots remain.
+Atlas Image IDs are published only through the independent Atlas Registry.
+Other model consumers keep their existing texture policy; no implicit Studio Sync.
+See `docs/workflows/LOCATION_ASSETS_MODEL_ONLY_PUBLICATION_M233_RU.md`.
+
+
+## M234 · One shared Atlas editor and explicit Apply / Sync
+
+Location Assets and Real Estate mesh editor MUST render their atlas bindings through
+`static/asset-atlas-editor.js`, backed by one AtlasRegistry and a common read-only
+preview/explicit publication flow (`services/atlas_source_review.py`). One active
+consumer binding; several attached selectable variants. `attach`, `select`, and
+`preview-source` NEVER upload or invoke Studio. Republish a shared atlas only after
+old/new comparison and explicit consumer-impact approval. Location Model publication
+is model-only. Both modals expose one bottom-level explicit scoped Studio Sync;
+report the actual Bridge error inline. See
+`docs/workflows/SHARED_ATLAS_EDITOR_APPLY_M234_RU.md`.

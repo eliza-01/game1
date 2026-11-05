@@ -29,10 +29,12 @@ class LocationAssetUIM219(TestCase):
         self.assertNotIn("appendChild(panel)", source)
         self.assertIn("window.game1AssetWorkflowDialog", editor)
         self.assertIn("shell.tabs(tabs,state.tab", editor)
-        self.assertIn("shell.step(title,desc", editor)
-        for action in ("save-identity", "save-fbx", "publish-model", "use-atlas",
-                       "republish", "publish-image", "sync"):
+        self.assertIn('shell.step(name,description', editor)
+        for action in ('save-identity','choose-fbx','apply-model','sync'):
             self.assertIn(action, editor)
+        self.assertIn('window.game1ConsumerAtlasEditor.render', editor)
+        self.assertNotIn('Save image source',editor)
+        self.assertNotIn("buttons('publish-image'",editor)
         self.assertIn('id="location-asset-editor-panel"', self.read('index.html'))
         self.assertIn('new-only', source)
 

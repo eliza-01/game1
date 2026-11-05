@@ -45,14 +45,17 @@ class HouseAndAttackM204(TestCase):
         policy = (ROOT / 'system/studio-plugin/modules/StudioRealEstateCollisionPolicy.luau').read_text('utf8')
         # M205: physical door, glass and COL_* get Precise; other visuals Box.
         # Collision is a real authoring option rather than overridden by Sync.
+        core = (ROOT / 'src/shared/world/MeshPhysicsCore.luau').read_text('utf8')
+        self.assertIn('Core.Apply(mesh, not noCollide, fidelity,', policy)
         for required in (
-            'mesh.CanCollide = not noCollide', 'mesh.CanTouch = false',
-            'mesh.CanQuery = not noCollide', 'mesh.CollisionFidelity = FIDELITY[fidelity]',
-            'mesh.DoubleSided = if typeof(settings.doubleSided)',
+            'mesh.CanCollide = true', 'mesh.CanCollide = false',
+            'mesh.CanTouch = false', 'mesh.CanQuery = true', 'mesh.CanQuery = false',
+            'mesh.CollisionFidelity = Core.Fidelity(if canCollide then "PreciseConvexDecomposition" else fidelity)',
+            'mesh.DoubleSided = doubleSided',
             'PreciseConvexDecomposition = Enum.CollisionFidelity.PreciseConvexDecomposition',
             'Box = Enum.CollisionFidelity.Box',
         ):
-            self.assertIn(required, policy)
+            self.assertIn(required, core)
         self.assertIn('local preciseDefault = preciseByDefault(name)', policy)
         self.assertIn('CollectionService:AddTag(mesh, COLLIDER_TAG)', policy)
         paths = {

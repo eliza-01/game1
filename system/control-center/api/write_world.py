@@ -4,8 +4,11 @@ Dependencies are supplied by the composition root; unhandled paths return None.
 """
 from urllib.parse import unquote
 from pathlib import Path
+import re
 
 from services.texture_atlas_registry import parse_filename
+from services.atlas_source_review import AtlasSourceReview
+from services.mesh_authoring_policy import is_collision_mesh
 
 
 def route(path, body, deps):
@@ -28,6 +31,77 @@ def route(path, body, deps):
     run_timeline_editor_bridge = deps["run_timeline_editor_bridge"]
     sync_monster_to_studio = deps["sync_monster_to_studio"]
     timelines = deps["timelines"]
+
+    if path == '/api/texture-atlases/preview-source':
+        try:
+            result=AtlasSourceReview(location_assets.atlases).inspect(body().get('sourcePath') or '')
+            return out(200,result)
+        except (ValueError,OSError) as error:
+            return out(400,{'error':str(error)})
+
+    if path == '/api/texture-atlases/publish-reviewed':
+        try:
+            payload=body()
+            if not isinstance(payload,dict):
+                raise ValueError('atlas review payload required')
+            credentials=publication_credentials('game1 atlas review')
+            result=AtlasSourceReview(location_assets.atlases).publish(payload,credentials)
+            # Open Cloud publication is already committed. Export failures must
+            # NOT tell the operator to retry the upload (risking duplicate IDs).
+            # Report partial exports explicitly for manual recovery instead.
+            exports = [('Location Assets', location_assets.export),
+                       ('Real Estate', deps['real_estate'].export)]
+            if 'character_components' in deps:
+                exports.append(('Characters', deps['character_components'].export))
+            if 'character_assemblies' in deps:
+                exports.append(('Character assemblies', deps['character_assemblies'].characters.export))
+            warnings = []
+            for label, export in exports:
+                try:
+                    export()
+                except Exception as error:
+                    warnings.append(f'{label} manifest export failed: {error}')
+            return out(200, {**result, 'exportWarnings': warnings})
+        except (ValueError,OSError,RuntimeError,KeyError) as error:
+            return out(400,{'error':str(error)})
+
+    if path == '/api/texture-atlases/consumer-choice':
+        # Shared HTTP transport; domain stores alone validate registration and
+        # own effective bindings. Attaching never synchronizes Studio.
+        try:
+            payload = body()
+            if not isinstance(payload, dict):
+                raise ValueError('atlas consumer request must be an object')
+            kind = str(payload.get('consumerType') or '')
+            slug = str(payload.get('slug') or '').strip()
+            part = str(payload.get('part') or '').strip()
+            action = str(payload.get('action') or '')
+            variant_id = int(payload.get('variantId') or 0)
+            if kind == 'location_asset':
+                row = location_assets.get(slug)
+                consumer = slug
+            elif kind == 'real_estate':
+                row = deps['real_estate'].get(slug)
+                if not row or part not in row.get('meshParts', []) or is_collision_mesh(part):
+                    raise ValueError('choose a visual Real Estate mesh')
+                consumer = f'{slug}:{part}'
+            else:
+                raise ValueError('unsupported atlas consumer type')
+            if not row:
+                raise ValueError('unknown asset for atlas selection')
+            if action == 'attach':
+                variants = location_assets.atlases.attach(kind, consumer, variant_id)
+                return out(200, {'attachedVariants': variants, 'studioSyncRequired': False})
+            if action != 'select':
+                raise ValueError('unsupported atlas action')
+            revision = int(payload.get('expectedRevision') or 0)
+            if kind == 'location_asset':
+                updated = location_assets.select_atlas(slug, variant_id, revision)
+            else:
+                updated = deps['real_estate'].select_atlas(slug, part, variant_id, revision, mode='existing')
+            return out(200, {'item': updated, 'studioSyncRequired': True})
+        except (ValueError, OSError, RuntimeError, KeyError) as error:
+            return out(400, {'error': str(error)})
 
     if path == "/api/location-assets/studio-sync":
         try:
@@ -163,6 +237,24 @@ def route(path, body, deps):
             return out(200, result)
         except Exception as error:
             return out(400, {"error": str(error)})
+
+    if path == '/api/location-assets/inspect':
+        try:
+            payload = body()
+            if not isinstance(payload, dict):
+                raise ValueError('expected FBX inspection request')
+            return out(200, location_assets.inspect_source_fbx(str(payload.get('sourcePath') or '')))
+        except (ValueError, RuntimeError, OSError) as error:
+            return out(400, {'error':str(error)})
+
+    if path.startswith('/api/location-assets/') and path.endswith('/inspect-fbx'):
+        try:
+            slug = path[len('/api/location-assets/'):-len('/inspect-fbx')].strip('/')
+            if not re.fullmatch(r'[a-z0-9][a-z0-9_]{0,63}', slug):
+                raise ValueError('invalid Location Asset slug')
+            return out(200, location_assets.inspect_registered_fbx(slug))
+        except Exception as error:
+            return out(400, {'error': str(error)})
 
     if path == "/api/location-assets":
         try:
@@ -310,6 +402,35 @@ def route(path, body, deps):
         except Exception as error:
             return out(400, {"error": str(error)})
 
+
+    # M233: explicit, single-resource endpoint. Old Host Agents cannot accept
+    # it as an ambiguous /publish request. Atlas publication uses only the
+    # separate /api/texture-atlases/variants/<id>/publish route.
+    location_asset_model_suffix = "/publish-model"
+    if path.startswith(location_asset_prefix) and path.endswith(location_asset_model_suffix):
+        slug = unquote(path[len(location_asset_prefix):-len(location_asset_model_suffix)].strip("/"))
+        try:
+            payload = body()
+            if not isinstance(payload, dict) or type(payload.get('forceModel', False)) is not bool:
+                raise ValueError('invalid model-only publication request')
+            if 'scope' in payload or 'atlasVariantId' in payload:
+                raise ValueError('model publication cannot specify an atlas or another scope')
+            before = location_assets.get(slug)
+            if not before:
+                raise ValueError('unknown Location Asset')
+            atlas_before = str(before.get('texture_asset_id') or '')
+            credentials = publication_credentials(str(payload.get('description') or 'game1 location model'))
+            result = location_assets.publish(slug, credentials,
+                scope='model', force_model=payload.get('forceModel', False))
+            atlas_after = str(result.get('texture_asset_id') or '')
+            if atlas_before != atlas_after:
+                raise RuntimeError('Atlas ID changed during model-only publication; inspect concurrent operations')
+            return out(200, {'resourceKind': 'Model', 'slug': slug,
+                             'model_asset_id': result.get('model_asset_id'),
+                             'texture_asset_id': atlas_after,
+                             'atlasUnchanged': True})
+        except Exception as error:
+            return out(400, {'error': str(error)})
 
     location_asset_publish_suffix = "/publish"
 

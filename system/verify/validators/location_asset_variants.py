@@ -142,7 +142,7 @@ def check_location_asset_variants(root: Path, report_error: Callable[[str], None
     # M215: placement and model refresh share the physical-part policy.
     preparation = root / 'system/studio-plugin/modules/DecoAssetPreparation.luau'
     preparation_text = preparation.read_text(encoding='utf-8') if preparation.is_file() else ''
-    if 'DecoAssetPreparation.PreparePlaced(placed)' not in deco_placement_text:
+    if 'DecoAssetPreparation.PreparePlaced(placed, row.meshOptions)' not in deco_placement_text:
         report_error('m215 DecoPlacement does not apply the shared placed-part policy')
     if 'descendant.Anchored = false' not in preparation_text:
         report_error('m49/M215 placed decoration BaseParts must be unanchored')

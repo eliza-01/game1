@@ -1,7 +1,7 @@
 -- M216: reject legacy global commands (including M215) before they can mutate.
 return function(config: any)
     return function(command: any)
-        if command.project ~= "game1" or command.schemaVersion ~= 5
+        if command.project ~= "game1" or command.schemaVersion ~= 6
             or type(command.operationId) ~= "string" or command.operationId == ""
             or type(command.targetSlug) ~= "string" or command.targetSlug == ""
             or type(command.bindingRevision) ~= "number" or command.bindingRevision < 1
@@ -18,7 +18,7 @@ return function(config: any)
                 command.targetSlug, true, command.modelAssetId, command.atlasAssetId)
         end)
         local payload = {
-            project = "game1", command = "deco-refresh", schemaVersion = 5,
+            project = "game1", command = "deco-refresh", schemaVersion = 6,
             operationId = command.operationId, targetSlug = command.targetSlug,
             bindingRevision = command.bindingRevision,
         }

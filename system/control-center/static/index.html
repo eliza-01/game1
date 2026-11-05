@@ -14,7 +14,7 @@
 <link rel="stylesheet" href="location-assets.css?v=1">
 <link rel="stylesheet" href="character-components.css?v=6">
 <link rel="stylesheet" href="character-assemblies.css?v=4">
-<link rel="stylesheet" href="deco-assets.css?v=6">
+<link rel="stylesheet" href="deco-assets.css?v=234">
 <link rel="stylesheet" href="real-estate.css?v=13&physics=205">
 </head>
 <body>
@@ -381,7 +381,7 @@
 <div><span class="eyebrow">environment library · published decor</span><h2>location assets</h2><p>register a static decoration with one FBX and a texture atlas. New atlas names follow &lt;atlas_key&gt;_&lt;width&gt;x&lt;height&gt;_atlas.png; reused variants share exactly one published Image Asset ID. publish the required assets, then place published variants through Studio DecoManager. placed instances belong to the place; registry publication and placement backups stay separate.</p><div class="deco-category-strip"><span>trees</span><span>bushes</span><span>rocks</span><span>lights</span><span>fences</span><span>decorations</span><span>ladders</span><span>flowers</span><span>buildings</span><span>props</span></div></div>
 <div class="metrics"><div><b id="location-asset-metric-total">0</b><span>registered</span></div><div><b id="location-asset-metric-published">0</b><span>published</span></div><div><b id="location-asset-metric-changed">0</b><span>changed</span></div></div>
 </div>
-<div class="panel runtime-card"><div class="runtime-state registered"><strong>DecoManager registry</strong><span>Sync Studio is scoped to the Location Asset row. It updates published ID references and atlas URIs of managed placements. Existing geometry, positions, rotations and scales are untouched.</span></div><div id="location-asset-publication-state" class="publication-missing">open cloud: checking…</div></div>
+<div class="panel runtime-card"><div class="runtime-state registered"><strong>DecoManager registry</strong><span>Sync Studio is scoped to one Location Asset and its placed instances. It updates managed published rigs, atlas IDs and saved per-mesh physics; placed root transforms remain unchanged.</span></div><div id="location-asset-publication-state" class="publication-missing">open cloud: checking…</div></div>
 <div class="deco-asset-workflow deco-asset-workflow-m220">
 <div class="panel character-card" id="location-asset-editor-panel">
 <div class="section-title"><div><span>01 · new registration</span><h3>Register Location Asset</h3></div><button id="new-location-asset-main" type="button">New asset</button></div>
@@ -393,6 +393,7 @@
 <hr class="card-separator">
 <span class="eyebrow">02 · sources</span>
 <div class="deco-source-pickers"><div class="picker"><button id="choose-location-asset-model" type="button">Choose FBX</button><small id="picked-location-asset-model">FBX not selected</small></div><div class="picker"><button id="choose-location-asset-texture" type="button">Choose PNG/JPG</button><small id="picked-location-asset-texture">Image not selected</small></div></div>
+<div id="location-asset-fbx-preview" aria-live="polite"></div>
 <div class="deco-texture-source"><label>Search registered atlases<input id="location-asset-atlas-search" type="search" placeholder="name or resolution"></label><label>Reuse an atlas variant<select id="location-asset-texture-reference"><option value="">New local atlas</option></select><small class="hint">Shared variants are independent of any model. Registering with an existing atlas never republishes it.</small></label></div>
 <div class="actions"><button id="register-location-asset" class="primary" type="button">Register new asset</button><button id="clear-location-asset-form" type="button">Clear form</button></div>
 <small class="hint">After registration, Edit opens the same resource workflow as Manage Atlas / Model in Real Estate.</small>
@@ -680,8 +681,10 @@
 <script src="studio-sync.js?v=2"></script>
 <script src="asset-atlas-actions.js?v=1"></script>
 <script src="asset-workflow-dialog.js?v=1"></script>
-<script src="deco-assets.js?v=12"></script>
-<script src="location-asset-workflow.js?v=2"></script>
+<script src="asset-atlas-editor.js?v=234"></script>
+<script src="mesh-authoring.js?v=1"></script>
+<script src="deco-assets.js?v=234"></script>
+<script src="location-asset-workflow.js?v=234"></script>
 <script src="asset-audit.js?v=2"></script>
 <script src="atlas-library.js?v=2"></script>
 <script src="options.js?v=1"></script>
@@ -689,8 +692,8 @@
 <script src="monster-assets.js?v=6"></script>
 <script src="npc-assets.js?v=5"></script>
 <script src="npc-spawns.js?v=4"></script>
-<script src="real-estate.js?v=25&rig=186&atlas=202&physics=207&fix=212"></script>
-<script src="real-estate-mesh-workflow.js?v=2&atlas=188"></script>
+<script src="real-estate.js?v=234&rig=186&atlas=202&physics=232"></script>
+<script src="real-estate-mesh-workflow.js?v=234"></script>
 <script src="real-estate-placement.js?v=2"></script>
 <script src="monster-spawns.js?v=1"></script>
 </body>

@@ -7,13 +7,8 @@ to produce exact concave collisions in Roblox.
 """
 from __future__ import annotations
 
-import re
-
-_COLLISION_TOKEN = re.compile(r"(?:^|_)col(?:_|$)", re.IGNORECASE)
-
-
-def is_collision_mesh(name: str) -> bool:
-    return isinstance(name, str) and bool(_COLLISION_TOKEN.search(name))
+from services.mesh_authoring_policy import (is_collision_mesh, is_glass_mesh,
+    precise_by_default, normalize_fidelity, FIDELITIES)
 
 
 def requires_texture(name: str) -> bool:
@@ -27,12 +22,11 @@ def default_no_collide(name: str) -> bool:
 
 
 # One authoring default for the UI, API and Studio physics policy.
-COLLISION_FIDELITIES = ('Box', 'Hull', 'Default', 'PreciseConvexDecomposition')
+COLLISION_FIDELITIES = FIDELITIES
 
 
 def precise_collision_default(name: str) -> bool:
-    lower = str(name).casefold()
-    return is_collision_mesh(lower) or lower == 'door' or lower.startswith('door_') or 'glass' in lower
+    return precise_by_default(name)
 
 
 def default_collision_fidelity(name: str) -> str:
@@ -40,13 +34,5 @@ def default_collision_fidelity(name: str) -> str:
 
 
 def normalize_collision_fidelity(name: str, value: object, *, no_collide: bool | None = None) -> str:
-    """One authoritative rule: every collidable MeshPart uses Precise.
-
-    Validate supplied values even when an older record contains Default/Hull/Box;
-    after validation, collision state determines the effective fidelity.
-    """
-    if value is not None and (not isinstance(value, str) or value not in COLLISION_FIDELITIES):
-        raise ValueError(f'{name}: invalid CollisionFidelity; choose {", ".join(COLLISION_FIDELITIES)}')
-    if no_collide is False:
-        return 'PreciseConvexDecomposition'
-    return value if value is not None else default_collision_fidelity(name)
+    return normalize_fidelity(name, value, no_collide=no_collide is not False,
+        default=default_collision_fidelity(name))

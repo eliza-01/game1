@@ -43,6 +43,7 @@ const elements=Object.create(null);
 const $=id=>elements[id]??(elements[id]={innerHTML:'',hidden:true,textContent:'',value:'',addEventListener(){}});
 const esc=value=>String(value??'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
 const ctx=vm.createContext({$,esc,window:{},localStorage:{setItem(){},getItem(){return null;}},request(){},toast(){}});
+vm.runInContext(fs.readFileSync(process.argv[2],'utf8'),ctx);
 vm.runInContext(fs.readFileSync(process.argv[1],'utf8'),ctx);
 const names=['chest_01_socket','land_spawn_01_socket'];
 const bones=names.map(name=>({name,parent:'',matrixLocal:[]}));
@@ -76,7 +77,8 @@ assert.equal($('real-estate-rig-warnings').hidden,true);
 '''
         result = subprocess.run(
             [shutil.which('node'), '-e', code,
-             str(ROOT / 'system/control-center/static/real-estate.js')],
+             str(ROOT / 'system/control-center/static/real-estate.js'),
+             str(ROOT / 'system/control-center/static/mesh-authoring.js')],
             capture_output=True, text=True, timeout=20,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

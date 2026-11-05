@@ -95,6 +95,7 @@ const ctx=vm.createContext({$,window:{game1AtlasIdentity:{
         resolution:'32x32',filename:item.filename||''}),pixelArea:()=>1024
   }},localStorage:{setItem(){},getItem(){return null}},
   esc:v=>String(v??''),toast(){},request:async()=>({})});
+vm.runInContext(fs.readFileSync('mesh-authoring.js','utf8'),ctx);
 vm.runInContext(fs.readFileSync('real-estate.js','utf8'),ctx);
 ctx.realEstateRenderAtlasLibrary=()=>{};
 ctx.realEstateRenderTextures=()=>{};

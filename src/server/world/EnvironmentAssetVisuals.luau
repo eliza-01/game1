@@ -3,6 +3,8 @@
 -- ColorMap/AlphaMode (Plugin capability), which gameplay threads cannot read
 -- or write. Published SurfaceAppearance content is preserved unchanged here.
 local EnvironmentAssetVisuals = {}
+local MeshPhysics = require(game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared")
+    :WaitForChild("world"):WaitForChild("MeshPhysicsCore"))
 
 local function textureUri(definition: any): string?
     local numericId = tonumber(definition and definition.textureAssetId)
@@ -11,7 +13,7 @@ local function textureUri(definition: any): string?
 end
 
 function EnvironmentAssetVisuals.ApplyPart(part: BasePart, definition: any): boolean
-    if not part:IsA("MeshPart") then return false end
+    if not part:IsA("MeshPart") or MeshPhysics.IsCollider(part.Name) then return false end
     local uri = textureUri(definition)
     if uri == nil then return false end
     local mesh = part :: MeshPart

@@ -12,6 +12,8 @@ from datetime import datetime, timezone
 
 from sqlite_connection import connect as connect_sqlite
 from services.texture_alpha import texture_uses_alpha
+from services.location_fbx_inspection import inspect as inspect_location_fbx
+from services.mesh_authoring_policy import normalize_location_options
 from services.texture_atlas_registry import AtlasRegistry, parse_filename
 
 from opencloud_assets import (
@@ -127,6 +129,17 @@ class LocationAssetStore:
                     published_at REAL NOT NULL
                 )"""
             )
+            if 'mesh_options_json' not in columns:
+                # Capture a consistent SQLite snapshot before the additive migration.
+                # Do not mix the backup with the authoring source/assets.
+                import sqlite3
+                backup_dir = self.runtime / 'backups'
+                backup_dir.mkdir(parents=True, exist_ok=True)
+                backup = backup_dir / ('location_mesh_options_m232_' +
+                    datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ') + '.sqlite')
+                with sqlite3.connect(str(backup)) as saved:
+                    connection.backup(saved)
+                connection.execute("ALTER TABLE location_assets ADD COLUMN mesh_options_json TEXT NOT NULL DEFAULT '{}'")
             # Owner-era texture columns remain readable only until the M203
             # atlas migration drops them; never mutate old Image Asset IDs.
 
@@ -184,9 +197,67 @@ class LocationAssetStore:
             row = connection.execute("SELECT * FROM location_assets WHERE slug=?", (normalized,)).fetchone()
         return dict(row) if row else None
 
+    def _analysis_path(self, slug: str) -> Path:
+        if not SLUG_RE.fullmatch(str(slug)):
+            raise ValueError('invalid Location Asset slug for FBX analysis')
+        return self.root / 'assets/manifests/location-assets-fbx' / f'{slug}.json'
+
+    def _fbx_analysis(self, row: dict) -> dict | None:
+        path = self._analysis_path(row['slug'])
+        if not path.is_file():
+            return None
+        try:
+            document = json.loads(path.read_text(encoding='utf-8'))
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            return None
+        if (document.get('sourceSha256') != row.get('model_sha256')
+                or not isinstance(document.get('analysis'), dict)):
+            return None
+        return document['analysis']
+
+    def _save_fbx_analysis(self, slug: str, sha: str, analysis: dict) -> None:
+        destination = self._analysis_path(slug)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        payload = {'schemaVersion': 1, 'slug': slug, 'sourceSha256': sha,
+                   'analysis': analysis}
+        staged = destination.with_suffix('.tmp')
+        staged.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+        staged.replace(destination)
+
+    def inspect_source_fbx(self, source_path: str) -> dict:
+        """Pure preview matching Real Estate /inspect. No registration or uploads."""
+        source = Path(str(source_path or '')).expanduser().resolve()
+        analysis = inspect_location_fbx(self.root, source)
+        return {'sourcePath':str(source), 'name':source.stem,
+                'analysis':analysis, 'meshOptions':normalize_location_options(analysis, {})}
+
+    def inspect_registered_fbx(self, slug: str) -> dict:
+        """Explicit inspection of a pre-M231 canonical FBX (no asset revision)."""
+        row = self._raw_get(slug)
+        if not row:
+            raise ValueError('unknown Location Asset')
+        source = self.root / str(row['model_path'])
+        if not source.is_file() or self._sha256(source) != row['model_sha256']:
+            raise ValueError('canonical FBX missing or changed; save a new revision first')
+        analysis = inspect_location_fbx(self.root, source)
+        # Another tab may have registered a new revision during inspection.
+        current = self._raw_get(slug)
+        if not current or current['model_sha256'] != row['model_sha256']:
+            raise ValueError('FBX revision changed during inspection; retry')
+        self._save_fbx_analysis(slug, row['model_sha256'], analysis)
+        self.export()
+        return self.get(slug)
+
     def _decorate(self, row, rows_by_slug=None, atlas_catalog=None) -> dict:
         """Only a direct binding determines the effective image publication."""
         result = dict(row)
+        result['fbxAnalysis'] = self._fbx_analysis(result)
+        try:
+            stored_options = json.loads(result.pop('mesh_options_json', '{}') or '{}')
+            result['meshOptions'] = stored_options if isinstance(stored_options, dict) else {}
+        except (ValueError, TypeError):
+            result['meshOptions'] = {}
+
         atlas_catalog = self.atlases.catalog() if atlas_catalog is None else atlas_catalog
         binding = self.atlases.binding('location_asset', str(result.get('slug') or ''))
         result['destructible'] = bool(result.get('destructible'))
@@ -206,8 +277,8 @@ class LocationAssetStore:
                 atlasResolution=binding['resolution'],
                 bindingRevision=binding['revision'],
                 studioSyncStatus=binding['syncStatus'],
-                atlasVariants=next((g['variants'] for g in atlas_catalog
-                                    if g['atlasKey']==binding['atlas_key']), []))
+                atlasVariants=self.atlases.attached_variants('location_asset', result['slug']))
+        result.setdefault('atlasVariants', self.atlases.attached_variants('location_asset', result['slug']))
         result['textureUsesAlpha'] = (texture_uses_alpha(self.root, str(result.get('texture_path') or ''))
                                        if binding and binding['current'] else None)
         result['atlasLegacyWarning'] = bool(binding and not parse_filename(result['texture_filename']))
@@ -266,6 +337,25 @@ class LocationAssetStore:
             raise ValueError("location asset category must be one of: " + ", ".join(CATEGORIES))
 
         selected_model = str(payload.get("modelSourcePath") or "").strip()
+        inspected = None
+        if payload.get('inspectFbx') is True:
+            if not selected_model:
+                raise ValueError('FBX inspection requires a selected model file')
+            candidate = Path(selected_model).expanduser().resolve()
+            if not candidate.is_file() or candidate.suffix.casefold() != '.fbx':
+                raise ValueError('choose a valid Location Asset FBX')
+            inspected = inspect_location_fbx(self.root, candidate)
+        # Physics authoring is explicit. Old registrations retain their original
+        # model behavior until the operator saves per-mesh controls.
+        option_source = payload.get('meshOptions')
+        prior_options = json.loads(old.get('mesh_options_json') or '{}') if old else {}
+        if option_source is not None and inspected is None:
+            inspected = self._fbx_analysis(old) if old else None
+            if inspected is None:
+                raise ValueError('Analyze the FBX before saving per-mesh physics')
+        effective_options = (normalize_location_options(inspected, option_source)
+            if option_source is not None else
+            normalize_location_options(inspected, prior_options) if inspected and prior_options else prior_options)
         selected_texture = str(payload.get('textureSourcePath') or '').strip()
         atlas_variant_id = int(payload.get('atlasVariantId') or 0)
         if payload.get('textureReferenceSlug'):
@@ -293,6 +383,8 @@ class LocationAssetStore:
         texture_moderation_state = ''
         stored_reference = ''
 
+        # Legacy API callers that omit inspectFbx can analyze the registered
+        # canonical source later; all Asset Manager writes request inspection.
         if selected_model:
             selected = Path(selected_model).expanduser().resolve()
             if not selected.is_file() or selected.suffix.lower() != ".fbx":
@@ -309,15 +401,18 @@ class LocationAssetStore:
             connection.execute("""INSERT OR REPLACE INTO location_assets (
                 slug,name_en,category,model_path,model_sha256,model_asset_id,
                 model_published_sha256,model_moderation_state,destructible,
-                revision,created_at,updated_at,published_at
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                revision,created_at,updated_at,published_at,mesh_options_json
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (slug,name_en,category,values['model_path'],values['model_sha256'],
              old.get('model_asset_id') if old else None,
              str(old.get('model_published_sha256') or '') if old else '',
              str(old.get('model_moderation_state') or '') if old else '',
              1 if destructible else 0,revision,old.get('created_at') if old else now,
-             now,old.get('published_at') if old else None))
+             now,old.get('published_at') if old else None,
+             json.dumps(effective_options, ensure_ascii=False, sort_keys=True)))
         self.atlases.bind('location_asset', slug, atlas_variant_id, allow_unpublished=True)
+        if inspected is not None:
+            self._save_fbx_analysis(slug, values['model_sha256'], inspected)
         self.export()
         return self.get(slug)
 
@@ -367,7 +462,8 @@ class LocationAssetStore:
         if scope in ('changed', 'model') and (needs_model or force_model):
             # NEVER update_model_asset: versioned publication and the M217 audit
             # must retain an immutable chain of previous -> new Model IDs.
-            with staged_model(self.root, model) as publication:
+            # No embedded textures: the independent Atlas Registry alone publishes Image IDs.
+            with staged_model(self.root, model, texture_mode="geometry_only") as publication:
                 operation = create_model_asset(
                     publication, display_name=row['name_en'], description=description,
                     creator_type=creator_type, creator_id=creator_id, api_key=api_key)
@@ -447,6 +543,17 @@ class LocationAssetStore:
     def _lua_string(value: str) -> str:
         return json.dumps(str(value), ensure_ascii=False)
 
+    @staticmethod
+    def _lua_value(value) -> str:
+        if isinstance(value, dict):
+            return 'table.freeze({' + ','.join('['+json.dumps(str(k))+']=' +
+                LocationAssetStore._lua_value(v) for k,v in sorted(value.items())) + '})'
+        if type(value) is bool:
+            return 'true' if value else 'false'
+        if value is None:
+            return 'nil'
+        return json.dumps(value, ensure_ascii=False)
+
     def export(self):
         snapshot = self.snapshot()
         manifest_path = self.root / "assets/manifests/location-assets.json"
@@ -477,6 +584,7 @@ class LocationAssetStore:
                 f"\t\t\tatlasVariantId = {int(row.get('atlasVariantId') or 0)},",
                 f"\t\t\tbindingRevision = {int(row.get('bindingRevision') or 0)},",
                 f"\t\t\tdestructible = {str(bool(row.get('destructible'))).lower()},",
+                f"\t\t\tmeshOptions = {self._lua_value(row.get('meshOptions') or {})},",
                 "\t\t}),",
             ])
         lines.extend(["\t}),", "})", ""])

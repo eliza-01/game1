@@ -15,6 +15,7 @@ import subprocess
 from PIL import Image, UnidentifiedImageError
 
 from services.texture_atlas_registry import parse_filename, digest
+from services.atlas_source_review import image_preview
 from character_core.part_names import TOKEN
 
 
@@ -32,13 +33,7 @@ class CharacterAtlasAuthoring:
             raise ValueError('atlas file exceeds the 64 MB inspection limit')
         return path
 
-    @staticmethod
-    def _preview(path):
-        with Image.open(path) as image:
-            image.thumbnail((256, 256))
-            output = BytesIO()
-            image.convert('RGBA').save(output, format='PNG')
-        return 'data:image/png;base64,' + base64.b64encode(output.getvalue()).decode('ascii')
+    _preview = staticmethod(image_preview)
 
     @staticmethod
     def _expected(path, width, height):

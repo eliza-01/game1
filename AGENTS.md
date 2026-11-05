@@ -152,3 +152,13 @@ attack session `hitTargets` prevents duplicate damage, and `headshotTarget`
 limits headshot to one explicitly aimed head per attack. `AttackAimGeometry`
 owns the pure radius test; client poses, HitStart/HitEnd and bounce precedence
 remain unchanged. See `docs/workflows/COMBAT_RETICLE_PRIMARY_MELEE_M228_RU.md`.
+
+## M230 · Legacy Plot Placement compatibility
+
+M229's author `house` pivot is mandatory for **new capture** but must not
+invalidate old M208 plot-local CFrames. Preview accepts legacy rows with absent
+`houseAnchorLocalCFrame` through the original Model-pivot semantics while
+reusing `StudioRealEstateHouseFrame.Align`; calibrated rows retain exact house
+pivot alignment. Never synthesize or persist an assumed historical anchor.
+M230 Studio preview protocol v4 is mandatory. See
+`docs/workflows/REAL_ESTATE_PLACEMENT_LEGACY_COMPAT_M230_RU.md`.

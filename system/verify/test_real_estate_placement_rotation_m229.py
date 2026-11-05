@@ -96,14 +96,31 @@ class PlacementRotationM229(TestCase):
         new = reopened.bind('house_a', 1, captured)
         self.assertEqual(new['houseAnchorLocalCFrame'], captured['houseAnchorLocalCFrame'])
 
-    def test_studio_bridge_refuses_old_binding_before_call(self):
+    def test_studio_bridge_accepts_old_binding_without_rebind(self):
         legacy = {'anchored': True, 'revision': 1, 'scale': 1,
                   'houseSlug': 'house_a', 'plotIndex': 1,
-                  'localCFrame': frame()}
+                  'localCFrame': frame(), 'houseAnchorLocalCFrame': None}
         with mock.patch('services.studio_house_placement_bridge._request_house_placement') as request:
-            with self.assertRaisesRegex(ValueError, 'Re-Bind'):
+            request.return_value = {'status': 'placed', 'anchored': True,
+                                    'anchoredPartsVerified': 1,
+                                    'rotationMode': 'legacy-model-pivot'}
+            result = preview_house_placement('house_a', 1, 'place', legacy)
+            self.assertEqual(result['rotationMode'], 'legacy-model-pivot')
+            self.assertIsNone(request.call_args.kwargs['placement']['houseAnchorLocalCFrame'])
+            request.return_value = {'status': 'placed_all', 'changed': 1,
+                                    'anchoredPartsVerified': 2, 'legacyPlacements': 1}
+            result = bulk_house_placements('house_a', 'place_all', [legacy])
+            self.assertEqual(result['legacyPlacements'], 1)
+            self.assertEqual(request.call_args.kwargs['targets'], [legacy])
+
+    def test_studio_bridge_still_rejects_corrupted_anchor(self):
+        legacy = {'anchored': True, 'revision': 1, 'scale': 1,
+                  'houseSlug': 'house_a', 'plotIndex': 1,
+                  'localCFrame': frame(), 'houseAnchorLocalCFrame': frame()[:11]}
+        with mock.patch('services.studio_house_placement_bridge._request_house_placement') as request:
+            with self.assertRaisesRegex(ValueError, 'invalid saved house-anchor'):
                 preview_house_placement('house_a', 1, 'place', legacy)
-            with self.assertRaisesRegex(ValueError, 'Re-Bind'):
+            with self.assertRaisesRegex(ValueError, 'invalid saved house-anchor'):
                 bulk_house_placements('house_a', 'place_all', [legacy])
             request.assert_not_called()
 
@@ -118,10 +135,12 @@ class PlacementRotationM229(TestCase):
         self.assertIn('houseAnchorLocalCFrame', capture)
         self.assertIn('HouseFrame.Find(clone)', preview)
         self.assertIn('HouseFrame.Align(clone, house, desiredHouse', preview)
-        self.assertIn('desiredRoot * CFrame.new(table.unpack(anchorComponents))', preview)
+        self.assertIn('local desiredHouse = desiredRoot * houseOffset', preview)
         self.assertNotIn('clone:PivotTo(volume.CFrame * CFrame.new(table.unpack(components)))', preview)
         self.assertIn('house-placement-capture-v2', bridge)
-        self.assertIn('house-placement-preview-v3', bridge)
-        self.assertIn('data.command == "house-placement-preview-v3"', router)
+        self.assertIn('house-placement-preview-v4', bridge)
+        self.assertIn('data.command == "house-placement-preview-v4"', router)
         self.assertIn('data.command == "house-placement-capture-v2"', router)
-        self.assertIn('error("Placement has legacy Model pivot data.', preview)
+        self.assertIn('legacyPivot = binding.houseAnchorLocalCFrame == nil', preview)
+        self.assertIn('clone:GetPivot():ToObjectSpace(house:GetPivot())', preview)
+        self.assertIn('if legacyPivot then "legacy-model-pivot" else "house-anchor-v2"', preview)

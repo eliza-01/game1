@@ -1,5 +1,9 @@
 # M229 · Real Estate Placement — author house pivot and rotation
 
+> **Историческая политика M229 частично отменена M230:** старые бинды теперь
+> размещаются через совместимый Model-pivot режим, без обязательного Re-Bind.
+> Актуальное правило: [M230 · Legacy Placement Compatibility](REAL_ESTATE_PLACEMENT_LEGACY_COMPAT_M230_RU.md).
+
 ## Причина
 
 M208 сохранял CFrame **корневой выбранной Model** и её масштаб. M223/M227

@@ -138,7 +138,7 @@ class BulkPreviewBridge(TestCase):
         self.assertEqual(received[1], 200)
         self.assertEqual(received[0]['action'], 'place_all')
         self.assertEqual(received[0]['plotIndex'], 0)
-        self.assertEqual(received[0]['schemaVersion'], 3)
+        self.assertEqual(received[0]['schemaVersion'], 4)
         self.assertEqual([item['plotIndex'] for item in received[0]['targets']], [1, 3])
         self.assertEqual(result['anchoredPartsVerified'], 4)
 

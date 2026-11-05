@@ -44,8 +44,8 @@ class VerifiedPreviewBridge(TestCase):
                 else:
                     raise AssertionError('Bridge never served the preview command')
                 observed.append(cmd)
-                self.assertEqual(cmd['command'], 'house-placement-preview-v3')
-                self.assertEqual(cmd['schemaVersion'], 3)
+                self.assertEqual(cmd['command'], 'house-placement-preview-v4')
+                self.assertEqual(cmd['schemaVersion'], 4)
                 self.assertEqual(cmd['action'], 'place')
                 self.assertIs(cmd['placement']['anchored'], expected_anchored)
                 response_fields = {
@@ -111,9 +111,9 @@ class VerifiedPreviewBridge(TestCase):
     def test_shared_plugin_contract_has_no_legacy_preview_dispatch(self):
         router = (ROOT / 'system/studio-plugin/Game1Bridge.server.luau').read_text()
         studio = (ROOT / 'system/studio-plugin/modules/StudioHousePlacementPreview.luau').read_text()
-        self.assertIn('data.command == "house-placement-preview-v3"', router)
+        self.assertIn('data.command == "house-placement-preview-v4"', router)
         self.assertNotIn('data.command == "house-placement-preview"', router)
-        self.assertIn('command.schemaVersion ~= 3', studio)
+        self.assertIn('command.schemaVersion ~= 4', studio)
         self.assertIn('setAndVerifyAnchored(clone, binding.anchored)', studio)
         self.assertIn('verifiedParts = setAndVerifyAnchored(clone, binding.anchored)', studio)
         self.assertIn('anchoredPartsVerified = verifiedParts', studio)

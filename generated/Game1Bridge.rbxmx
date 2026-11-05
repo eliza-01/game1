@@ -194,7 +194,7 @@ local function pollBridge()
         handleDecoRefresh(data)
     elseif data.command == "house-placement-capture-v2" then
         handleHousePlacementCapture(data)
-    elseif data.command == "house-placement-preview-v3" then handleHousePlacementPreview(data)
+    elseif data.command == "house-placement-preview-v4" then handleHousePlacementPreview(data)
     end
 end
 
@@ -3758,19 +3758,25 @@ return function(context)
             or typeof(binding.anchored) ~= "boolean" then
             error("Missing or invalid saved Placement binding (anchored must be boolean)")
         end
-        if typeof(binding.houseAnchorLocalCFrame) ~= "table" or #binding.houseAnchorLocalCFrame ~= 12 then
-            error("Placement has legacy Model pivot data. Re-Bind " .. slug
-                .. " on plot " .. tostring(index) .. " before Place; existing houses unchanged")
+        -- M208 bindings lack an explicit house MeshPart authoring pivot.
+        -- Preserve the old Model-pivot placement semantics for these records;
+        -- never mistake their original CFrame for a calibrated house anchor.
+        local legacyPivot = binding.houseAnchorLocalCFrame == nil
+        if not legacyPivot and (typeof(binding.houseAnchorLocalCFrame) ~= "table"
+            or #binding.houseAnchorLocalCFrame ~= 12) then
+            error("Invalid saved house-anchor CFrame")
         end
         local components = {}
         local anchorComponents = {}
         for i = 1, 12 do
-            local anchorValue = binding.houseAnchorLocalCFrame[i]
-            if typeof(anchorValue) ~= "number" or anchorValue ~= anchorValue
-                or math.abs(anchorValue) > 1e7 then
-                error("Invalid placement house-anchor CFrame component")
+            if not legacyPivot then
+                local anchorValue = binding.houseAnchorLocalCFrame[i]
+                if typeof(anchorValue) ~= "number" or anchorValue ~= anchorValue
+                    or math.abs(anchorValue) > 1e7 then
+                    error("Invalid placement house-anchor CFrame component")
+                end
+                anchorComponents[i] = anchorValue
             end
-            anchorComponents[i] = anchorValue
             local component = binding.localCFrame[i]
             if typeof(component) ~= "number" or component ~= component or math.abs(component) > 1e7 then
                 error("Invalid placement CFrame component")
@@ -3795,7 +3801,14 @@ return function(context)
             end
             -- Align the exact visual house frame captured at Bind, NOT the
             -- template wrapper's independently computed Model pivot.
-            local desiredHouse = desiredRoot * CFrame.new(table.unpack(anchorComponents))
+            -- Calibrated bindings use the measured original house anchor.
+            -- Legacy M208 bindings use the published clone's *own* offset;
+            -- algebraically this is the pre-M229 clone:PivotTo(desiredRoot),
+            -- but executed through our existing centralized HouseFrame.Align.
+            local houseOffset = if legacyPivot
+                then clone:GetPivot():ToObjectSpace(house:GetPivot())
+                else CFrame.new(table.unpack(anchorComponents))
+            local desiredHouse = desiredRoot * houseOffset
             HouseFrame.Align(clone, house, desiredHouse, "authored plot house")
             clone:SetAttribute("Game1RealEstateTemplate", nil)
             clone:SetAttribute("Game1PlotHousePreview", true)
@@ -3804,7 +3817,8 @@ return function(context)
             clone:SetAttribute("Game1PlacementRevision", binding.revision)
             setAndVerifyAnchored(clone, binding.anchored)
             clone:SetAttribute("Game1PlotHouseAnchored", binding.anchored)
-            clone:SetAttribute("Game1PlacementRotationMode", "house-anchor-v2")
+            clone:SetAttribute("Game1PlacementRotationMode",
+                if legacyPivot then "legacy-model-pivot" else "house-anchor-v2")
         end)
         if not prepared then
             clone:Destroy()
@@ -3812,7 +3826,8 @@ return function(context)
         end
         local previousPreviews = managedChildren(folder, index)
         return {kind = "place", plotFolder = plotFolder, folder = folder,
-            previous = previousPreviews, clone = clone, binding = binding}
+            previous = previousPreviews, clone = clone, binding = binding,
+            rotationMode = if legacyPivot then "legacy-model-pivot" else "house-anchor-v2"}
     end
 
     local function cleanupStaged(plans)
@@ -3875,13 +3890,17 @@ return function(context)
             end
         end
         ChangeHistoryService:FinishRecording(recording, Enum.FinishRecordingOperation.Commit)
-        local placedCount = 0
+        local placedCount, legacyCount = 0, 0
         for _, plan in ipairs(plans) do
-            if plan.kind == "place" then placedCount += 1 end
+            if plan.kind == "place" then
+                placedCount += 1
+                if plan.rotationMode == "legacy-model-pivot" then legacyCount += 1 end
+            end
         end
         if action == "place_all" then
             return {status = "placed_all", changed = placedCount,
-                replaced = removed, anchoredPartsVerified = totalVerifiedParts}
+                replaced = removed, anchoredPartsVerified = totalVerifiedParts,
+                legacyPlacements = legacyCount}
         elseif action == "clear_all" then
             return {status = "cleared_all", changed = removed}
         elseif action == "place" then
@@ -3890,6 +3909,7 @@ return function(context)
             return {status = "placed", changed = placedCount,
                 revision = plan.binding.revision,
                 anchored = plan.binding.anchored, anchoredPartsVerified = verifiedParts,
+                rotationMode = plan.rotationMode,
                 destination = plan.clone:GetFullName()}
         end
         return {status = "cleared", changed = removed}
@@ -3979,14 +3999,14 @@ return function(context)
 
     return function(command)
         local response = {
-            command = "house-placement-preview-v3", schemaVersion = 3,
+            command = "house-placement-preview-v4", schemaVersion = 4,
             project = "game1", operationId = command.operationId,
             houseSlug = command.houseSlug, plotIndex = command.plotIndex,
             action = command.action,
             anchored = command.anchored,
         }
         local ok, result = pcall(function()
-            if command.command ~= "house-placement-preview-v3" or command.schemaVersion ~= 3 then
+            if command.command ~= "house-placement-preview-v4" or command.schemaVersion ~= 4 then
                 error("Incompatible house-placement-preview protocol; reinstall Game1Bridge")
             end
             return run(command)

@@ -185,8 +185,8 @@ class PlacementAnchorBridgeM224(TestCase):
                 else:
                     raise AssertionError('Bridge never served command')
                 observed.append(cmd)
-                self.assertEqual(cmd['command'], 'house-placement-preview-v3')
-                self.assertEqual(cmd['schemaVersion'], 3)
+                self.assertEqual(cmd['command'], 'house-placement-preview-v4')
+                self.assertEqual(cmd['schemaVersion'], 4)
                 self.assertEqual(cmd['action'], 'anchors')
                 self.assertEqual(cmd['targets'], [{'houseSlug': 'house_a', 'plotIndex': 1}])
                 self.assertIs(cmd['anchored'], False)

@@ -19,8 +19,8 @@ def _request_house_placement(house_slug: str, plot_index: int, *, action: str,
     if action not in ('capture', 'place', 'clear', 'anchors', 'place_all', 'clear_all'):
         raise ValueError('unknown house placement action')
     operation_id = uuid.uuid4().hex
-    command = {'command': 'house-placement-capture-v2' if action == 'capture' else 'house-placement-preview-v3',
-               'schemaVersion': 2 if action == 'capture' else 3,
+    command = {'command': 'house-placement-capture-v2' if action == 'capture' else 'house-placement-preview-v4',
+               'schemaVersion': 2 if action == 'capture' else 4,
                'project': PROJECT, 'operationId': operation_id,
                'houseSlug': house_slug, 'plotIndex': plot_index}
     if action != 'capture':
@@ -122,9 +122,13 @@ def preview_house_placement(house_slug: str, plot_index: int, action: str,
         raise ValueError('a saved house-to-plot binding is required before Place')
     if action == 'place' and type(placement.get('anchored')) is not bool:
         raise ValueError('saved binding must have an explicit anchored boolean')
-    if action == 'place' and (not isinstance(placement.get('houseAnchorLocalCFrame'), list)
+    # M208 bindings contain valid plot-relative transforms but no measured
+    # house MeshPart anchor. They are supported via the original Model-pivot
+    # placement mode, not silently upgraded to M229's exact house-pivot mode.
+    if action == 'place' and placement.get('houseAnchorLocalCFrame') is not None and (
+            not isinstance(placement['houseAnchorLocalCFrame'], list)
             or len(placement['houseAnchorLocalCFrame']) != 12):
-        raise ValueError('legacy Placement binding: Re-Bind this house/plot to capture its rotation')
+        raise ValueError('invalid saved house-anchor CFrame')
     result = _request_house_placement(house_slug, plot_index, action=action,
                                       placement=placement, timeout_seconds=timeout_seconds)
     # A stale plugin must never return an apparently successful Place while
@@ -174,8 +178,10 @@ def bulk_house_placements(house_slug: str | None, action: str,
                 raise ValueError('binding anchored must be a boolean')
             if not isinstance(binding.get('localCFrame'), list) or len(binding['localCFrame']) != 12:
                 raise ValueError('binding is missing relative CFrame')
-            if not isinstance(binding.get('houseAnchorLocalCFrame'), list) or len(binding['houseAnchorLocalCFrame']) != 12:
-                raise ValueError('legacy Placement binding: Re-Bind house/plots before Place all')
+            if binding.get('houseAnchorLocalCFrame') is not None and (
+                    not isinstance(binding['houseAnchorLocalCFrame'], list)
+                    or len(binding['houseAnchorLocalCFrame']) != 12):
+                raise ValueError('invalid saved house-anchor CFrame')
             seen.add(plot)
             targets.append(binding)
         targets.sort(key=lambda binding: binding['plotIndex'])

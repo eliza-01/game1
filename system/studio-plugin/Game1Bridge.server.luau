@@ -185,7 +185,7 @@ local function pollBridge()
         handleDecoRefresh(data)
     elseif data.command == "house-placement-capture-v2" then
         handleHousePlacementCapture(data)
-    elseif data.command == "house-placement-preview-v3" then handleHousePlacementPreview(data)
+    elseif data.command == "house-placement-preview-v4" then handleHousePlacementPreview(data)
     end
 end
 

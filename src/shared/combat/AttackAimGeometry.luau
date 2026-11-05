@@ -46,6 +46,17 @@ function AttackAimGeometry.HeadshotSegment(
     return origin + direction * closestAlongRay, direction
 end
 
+-- Only a center-screen ray contact inside the attack radius may add a target
+-- independently of weapon-volume intersection. Volume contacts intentionally keep
+-- their authored physical blade length even when it extends beyond this radius.
+function AttackAimGeometry.HitWithinAttackRadius(rootPosition: Vector3, hitPosition: any, attackRange: number): boolean
+    return typeof(hitPosition) == "Vector3"
+        and finiteVector(hitPosition)
+        and finiteNumber(attackRange)
+        and attackRange > 0
+        and (hitPosition - rootPosition).Magnitude <= attackRange + Config.AttackRadiusEpsilon
+end
+
 function AttackAimGeometry.InterpolateDirection(previous: Vector3?, current: Vector3?, alpha: number): Vector3?
     if typeof(current) ~= "Vector3" then
         return nil

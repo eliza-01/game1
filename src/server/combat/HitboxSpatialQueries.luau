@@ -185,9 +185,9 @@ function HitboxSpatialQueries.AimContact(
     local bestZone = nil
     local bestBoneName = ""
 
-    -- Head is tested first and wins exact boundary ties. This does not deal
-    -- damage by itself; it only classifies the first combat hitbox under the
-    -- center-screen aim line.
+    -- Head is tested first and wins exact boundary ties. The resolver may
+    -- damage the first reticle target if the contact is inside AttackRadius;
+    -- only a head region can upgrade it to a headshot.
     if binding.headBox and binding.worldHeadCFrame then
         local distance = rayBoxDistance(
             rayOrigin,

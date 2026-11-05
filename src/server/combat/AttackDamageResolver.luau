@@ -1,4 +1,4 @@
--- Authoritative melee contact-to-damage resolution. No attack session ownership:
+-- Authoritative reticle-ray + weapon-volume melee damage resolution. No session ownership:
 -- caller owns hitTargets/headshotTarget and persists the returned headshot target.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CombatShared = ReplicatedStorage:WaitForChild("Game1Shared"):WaitForChild("combat")
@@ -33,7 +33,7 @@ function AttackDamageResolver.Apply(query: DamageQuery): (number, Model?)
     local boxCFrame = query.boxCFrame
     local boxSize = query.boxSize
     local sourceLabel = query.sourceLabel
-    local hitTargets = query.hitTargets
+    local hitTargets = query.hitTargets or {}
     local aimOrigin = query.aimOrigin
     local aimDirection = query.aimDirection
     local attackRange = query.attackRange
@@ -41,14 +41,25 @@ function AttackDamageResolver.Apply(query: DamageQuery): (number, Model?)
     local hitCount = 0
     local contacts = EntityHitboxService.QueryDamageablesInBox(character, boxCFrame, boxSize, hitTargets)
 
-    -- Weapon contact and headshot classification are deliberately independent.
-    -- The blade OBB decides which targets take melee damage. A finite reticle ray
-    -- only decides whether ONE of those contacts is upgraded to a headshot.
+    -- The reticle ray contributes ONE nearest aimed target independently of blade
+    -- contact, but only when its actual hit point is within AttackRadius. Weapon
+    -- volume contacts remain unrestricted by that radius (authored blade length).
     local aimedRegion = nil
-    if #contacts > 0 and headshotTarget == nil then
-        local rayStart, rayDirection = AttackAimGeometry.HeadshotSegment(root.Position, aimOrigin, aimDirection, attackRange)
-        if rayStart and rayDirection then
-            aimedRegion = EntityHitboxService.RaycastAimRegions(character, rayStart, rayDirection, attackRange)
+    local rayStart, rayDirection = AttackAimGeometry.HeadshotSegment(root.Position, aimOrigin, aimDirection, attackRange)
+    if rayStart and rayDirection then
+        local candidate = EntityHitboxService.RaycastAimRegions(character, rayStart, rayDirection, attackRange)
+        if candidate and AttackAimGeometry.HitWithinAttackRadius(root.Position, candidate.hitPosition, attackRange) then
+            aimedRegion = candidate
+            -- Aim first: if the blade also overlaps this target, shared hitTargets
+            -- suppresses a second damage event. Other blade contacts still land.
+            table.insert(contacts, 1, {
+                model = candidate.model,
+                hit = {
+                    hitPosition = candidate.hitPosition,
+                    geometryRole = candidate.zone,
+                },
+                mode = "reticle_ray",
+            })
         end
     end
 
@@ -58,7 +69,7 @@ function AttackDamageResolver.Apply(query: DamageQuery): (number, Model?)
         if model
             and model:IsA("Model")
             and model:GetAttribute("Damageable") == true
-            and (not hitTargets or hitTargets[model] ~= true)
+            and hitTargets[model] ~= true
         then
             local isHeadshot = headshotTarget == nil
                 and aimedRegion ~= nil
@@ -80,9 +91,7 @@ function AttackDamageResolver.Apply(query: DamageQuery): (number, Model?)
             elseif character:GetAttribute("LastAttackHitZone") == nil then
                 character:SetAttribute("LastAttackHitZone", "body")
             end
-            if hitTargets then
-                hitTargets[model] = true
-            end
+            hitTargets[model] = true
             HitEffectService.Publish(character, model, model:GetAttribute("LastCritical") == true, hitPosition)
             hitCount += 1
             if Config.DebugLogs then

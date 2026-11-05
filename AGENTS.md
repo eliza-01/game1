@@ -141,3 +141,14 @@ not deletion of files or published Roblox assets. See
 ## M227 · Bulk authored house previews
 
 `Place all` uses one selected house slug and ONLY saved Real Estate bindings from the server; it must never accept browser-supplied positions. `Clear all` is intentionally global across managed authored previews and never touches unmanaged Place objects. Single Place/Clear and bulk Place/Clear must share Studio preflight, staged clone/anchor verification, managed-only replacement and one Undo recording per command. Do not implement bulk by running individual commands 50 times. See `docs/workflows/REAL_ESTATE_BULK_PLOT_PREVIEW_M227_RU.md`.
+
+## M228 · In-range reticle melee target independent of weapon contact
+
+`AttackDamageResolver` merges the first in-range server hitbox under the validated
+center-screen reticle ray with all authored weapon-volume contacts. Range gates
+ONLY the reticle hit (using the actual contact point from `RootCollider`); the
+physical sword segment and existing radius extension remain unchanged. A shared
+attack session `hitTargets` prevents duplicate damage, and `headshotTarget`
+limits headshot to one explicitly aimed head per attack. `AttackAimGeometry`
+owns the pure radius test; client poses, HitStart/HitEnd and bounce precedence
+remain unchanged. See `docs/workflows/COMBAT_RETICLE_PRIMARY_MELEE_M228_RU.md`.

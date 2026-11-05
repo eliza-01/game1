@@ -7,6 +7,7 @@
 
 | Документ | Зачем читать | Статус |
 | --- | --- | --- |
+| [M228 — Combat reticle primary melee](workflows/COMBAT_RETICLE_PRIMARY_MELEE_M228_RU.md) | Прицельная цель в AttackRadius получает урон независимо от объёма меча, дополнительные пересечения и один headshot сохраняются | **CURRENT · STUDIO PLAY REQUIRED** |
 | [M227 — Real Estate Place all / Clear all](workflows/REAL_ESTATE_BULK_PLOT_PREVIEW_M227_RU.md) | Пакетная постановка выбранного дома по сохранённым Bind и удаление всех управляемых preview; одна Studio Undo-операция | **CURRENT · STUDIO SMOKE REQUIRED** |
 | [M226 — Studio plugin installer recovery](workflows/STUDIO_PLUGIN_INSTALLER_LOCK_RECOVERY_M226_RU.md) | Ошибка file-lock при копировании Game1Bridge: проверка SHA-256, безопасный retry и восстановление после частичной установки M225 | **CURRENT** |
 | [M223 — Asset Manager: Atlas и Plot Place/Clear](workflows/ASSET_MANAGER_ATLAS_PLOT_PREVIEW_M223_RU.md) | Sidebar order, централизованный Atlas Registry с retirement/историей, авторский Place/Clear домов по сохранённым Bind | **CURRENT · STUDIO SMOKE REQUIRED** |

@@ -59,13 +59,16 @@ class CombatRefactorM97Tests(unittest.TestCase):
         self.assertIn(aim, self.damage)
         self.assertLess(self.damage.index(query), self.damage.index(aim))
         self.assertIn('for _, target in ipairs(contacts) do', self.damage)
-        self.assertIn('and (not hitTargets or hitTargets[model] ~= true)', self.damage)
+        self.assertIn('and hitTargets[model] ~= true', self.damage)
         self.assertIn('hitTargets[model] = true', self.damage)
         self.assertIn('hitCount += 1', self.damage)
         self.assertNotIn('break', self.damage)
 
     def test_only_one_headshot_per_attack_and_state_returned(self):
-        self.assertIn('if #contacts > 0 and headshotTarget == nil then', self.damage)
+        # M228 supersedes the old M97 "blade contact required" precondition.
+        # Reticle selection is independent, but headshot state still allows only one.
+        self.assertNotIn('if #contacts > 0 and headshotTarget == nil then', self.damage)
+        self.assertIn('AttackAimGeometry.HitWithinAttackRadius(', self.damage)
         self.assertIn('local isHeadshot = headshotTarget == nil', self.damage)
         self.assertIn('and aimedRegion.zone == "head"', self.damage)
         self.assertIn('and aimedRegion.model == model', self.damage)

@@ -80,7 +80,11 @@ def check_combat_contact_contracts(
         if required not in attack_service_m29:
             report_error(f"m29 continuous weapon-contact sweep missing {required}")
 
-    if "and (not hitTargets or hitTargets[model] ~= true)" not in damage_resolver_text:
+    if not (
+        "local hitTargets = query.hitTargets or {}" in damage_resolver_text
+        and "and hitTargets[model] ~= true" in damage_resolver_text
+        and "hitTargets[model] = true" in damage_resolver_text
+    ):
         report_error("m29 one-hit-per-target damage deduplication missing")
 
     attack_config_m29 = (root / "src/shared/combat/AttackConfig.luau").read_text(encoding="utf-8")

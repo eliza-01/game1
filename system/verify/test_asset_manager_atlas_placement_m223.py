@@ -143,7 +143,11 @@ class PlacementPreviewM223(TestCase):
         self.assertIn('GetAttribute("Game1PlotHousePreview") ~= true', source)
         self.assertIn('plotFolder', source)
         self.assertIn('ChangeHistoryService:TryBeginRecording', source)
-        self.assertIn('clone:PivotTo(volume.CFrame * CFrame.new(table.unpack(components)))', source)
+        self.assertIn('local desiredRoot = volume.CFrame * CFrame.new(table.unpack(components))', source)
+        self.assertIn('HouseFrame.Align(clone, house, desiredHouse', source)
+        self.assertIn('houseAnchorLocalCFrame', source)
+        self.assertLess(source.index('HouseFrame.Align(clone, house, desiredHouse'),
+                        source.index('for _, previous in ipairs(plan.previous) do'))
         self.assertIn('Studio Edit Mode', source)
 
     def test_sidebar_and_atlas_are_separate_sections(self):

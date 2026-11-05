@@ -16,8 +16,9 @@ import uuid
 
 from sqlite_connection import connect
 
-SCHEMA_VERSION = 1  # unchanged CFrame capture protocol; anchored is additive metadata
+SCHEMA_VERSION = 1  # persisted manifest shape; capture wire protocol is versioned separately
 PLOT_COUNT = 50
+CAPTURE_SCHEMA_VERSION = 2
 
 
 def _cframe(raw, field: str) -> list[float]:
@@ -43,7 +44,7 @@ def validate_capture(capture: dict, house_slug: str, plot_index: int) -> dict:
         raise ValueError('Studio placement capture is missing')
     if capture.get('houseSlug') != house_slug or capture.get('plotIndex') != plot_index:
         raise ValueError('Studio placement does not match the selected house and plot')
-    if capture.get('schemaVersion') != SCHEMA_VERSION:
+    if capture.get('schemaVersion') != CAPTURE_SCHEMA_VERSION:
         raise ValueError('Studio placement schema version is not supported')
     if capture.get('plotVolume') not in (
         f'plot_{plot_index:02d}_volume', f'plot_{plot_index}_volume'
@@ -54,6 +55,8 @@ def validate_capture(capture: dict, house_slug: str, plot_index: int) -> dict:
     world = _cframe(capture.get('worldCFrame'), 'worldCFrame')
     plot = _cframe(capture.get('plotCFrame'), 'plotCFrame')
     local = _cframe(capture.get('localCFrame'), 'localCFrame')
+    anchor_local = _cframe(capture.get('houseAnchorLocalCFrame'), 'houseAnchorLocalCFrame')
+    anchor_world = _cframe(capture.get('houseAnchorWorldCFrame'), 'houseAnchorWorldCFrame')
     for row in range(3):
         expected_position = plot[row] + sum(plot[3 + row*3 + k] * local[k] for k in range(3))
         if abs(expected_position - world[row]) > 0.05:
@@ -63,6 +66,17 @@ def validate_capture(capture: dict, house_slug: str, plot_index: int) -> dict:
                                 for k in range(3))
             if abs(expected_axis - world[3 + row*3 + column]) > 0.01:
                 raise ValueError('world and plot-local rotations do not agree')
+    # The original Model and its house MeshPart may use different pivots.
+    # Validate the authoring offset independently from the plot transform.
+    for row in range(3):
+        expected_position = world[row] + sum(world[3 + row*3 + k] * anchor_local[k] for k in range(3))
+        if abs(expected_position - anchor_world[row]) > 0.05:
+            raise ValueError('house anchor position does not agree with selected Model pivot')
+        for column in range(3):
+            expected_axis = sum(world[3 + row*3 + k] * anchor_local[3 + k*3 + column]
+                                for k in range(3))
+            if abs(expected_axis - anchor_world[3 + row*3 + column]) > 0.01:
+                raise ValueError('house anchor rotation does not agree with selected Model pivot')
     scale = capture.get('scale')
     if type(scale) not in (int, float) or not math.isfinite(scale) or not 0.001 <= scale <= 1000:
         raise ValueError('Studio Model scale must be finite and positive')
@@ -70,6 +84,7 @@ def validate_capture(capture: dict, house_slug: str, plot_index: int) -> dict:
         'worldCFrame': world,
         'plotCFrame': plot,
         'localCFrame': local,
+        'houseAnchorLocalCFrame': anchor_local,
         'scale': float(scale),
         'plotVolume': capture['plotVolume'],
     }
@@ -91,6 +106,7 @@ class RealEstatePlacementStore:
                 model_scale REAL NOT NULL CHECK(model_scale > 0),
                 revision INTEGER NOT NULL DEFAULT 1,
                 anchored INTEGER NOT NULL DEFAULT 1 CHECK(anchored IN (0,1)),
+                house_anchor_local_cframe_json TEXT,
                 updated_at REAL NOT NULL,
                 PRIMARY KEY(plot_index, house_slug)
             )''')
@@ -105,6 +121,15 @@ class RealEstatePlacementStore:
                 with connect(backup_path) as backup:
                     db.backup(backup)
                 db.execute("ALTER TABLE real_estate_placements ADD COLUMN anchored INTEGER NOT NULL DEFAULT 1 CHECK(anchored IN (0,1))")
+            if "house_anchor_local_cframe_json" not in cols:
+                # Keep all old authoring transforms unchanged. A legacy binding
+                # needs a fresh Bind before it can guarantee visual orientation.
+                backups = self.db.parent / 'backups'
+                backups.mkdir(parents=True, exist_ok=True)
+                backup_path = backups / f'before_placement_rotation_m229_{uuid.uuid4().hex}.db'
+                with connect(backup_path) as backup:
+                    db.backup(backup)
+                db.execute("ALTER TABLE real_estate_placements ADD COLUMN house_anchor_local_cframe_json TEXT")
             # Deleting a house must retire only its placement bindings.
             db.execute('''CREATE TRIGGER IF NOT EXISTS real_estate_placements_house_delete
                 AFTER DELETE ON real_estate BEGIN
@@ -128,6 +153,8 @@ class RealEstatePlacementStore:
                 'plotVolume': row['plot_volume'], 'worldCFrame': json.loads(row['world_cframe_json']),
                 'plotCFrame': json.loads(row['plot_cframe_json']),
                 'localCFrame': json.loads(row['local_cframe_json']),
+                'houseAnchorLocalCFrame': (json.loads(row['house_anchor_local_cframe_json'])
+                    if row['house_anchor_local_cframe_json'] else None),
                 'scale': row['model_scale'], 'revision': row['revision'],
                 'anchored': bool(row['anchored']),
                 'updatedAt': row['updated_at']}
@@ -152,19 +179,21 @@ class RealEstatePlacementStore:
         with connect(self.db) as db:
             db.execute('''INSERT INTO real_estate_placements (
                 plot_index,house_slug,plot_volume,world_cframe_json,plot_cframe_json,
-                local_cframe_json,model_scale,revision,updated_at)
-                VALUES (?,?,?,?,?,?,?,1,?)
+                local_cframe_json,house_anchor_local_cframe_json,model_scale,revision,updated_at)
+                VALUES (?,?,?,?,?,?,?,?,1,?)
                 ON CONFLICT(plot_index,house_slug) DO UPDATE SET
                 plot_volume=excluded.plot_volume,
                 world_cframe_json=excluded.world_cframe_json,
                 plot_cframe_json=excluded.plot_cframe_json,
                 local_cframe_json=excluded.local_cframe_json,
+                house_anchor_local_cframe_json=excluded.house_anchor_local_cframe_json,
                 model_scale=excluded.model_scale,
                 revision=real_estate_placements.revision+1,
                 updated_at=excluded.updated_at''', (
                 plot_index, house_slug, data['plotVolume'],
                 json.dumps(data['worldCFrame']), json.dumps(data['plotCFrame']),
-                json.dumps(data['localCFrame']), data['scale'], now))
+                json.dumps(data['localCFrame']),
+                json.dumps(data['houseAnchorLocalCFrame']), data['scale'], now))
             row = dict(db.execute('SELECT * FROM real_estate_placements '
                                   'WHERE plot_index=? AND house_slug=?', (plot_index, house_slug)).fetchone())
         self.export()

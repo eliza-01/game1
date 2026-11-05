@@ -1,6 +1,7 @@
 -- Read-only Studio authoring adapter. Selection and plot markers stay untouched.
 -- No runtime ownership, no house assembly, no Workspace mutation.
 local PlotsCatalog = require(script.Parent.StudioPlotsCatalog)
+local HouseFrame = require(script.Parent.StudioRealEstateHouseFrame)
 
 return function(context)
     local HttpService = context.HttpService
@@ -48,7 +49,15 @@ return function(context)
         if not volume then
             error(string.format("Workspace.Plots/%02d/plot_%02d_volume not found", plotIndex, plotIndex))
         end
+        -- The selected Model pivot can differ from the published wrapper pivot.
+        -- The authored house MeshPart pivot is the stable visual frame shared
+        -- with Real Estate Studio Sync; capture its offset from the Model pivot.
+        local house = HouseFrame.Find(model)
+        if not house then
+            error("Selected Model must have exactly one MeshPart named house for rotation-safe Bind")
+        end
         local world = model:GetPivot()
+        local houseWorld = house:GetPivot()
         local plotFrame = volume.CFrame
         return {
             houseSlug = houseSlug,
@@ -57,17 +66,24 @@ return function(context)
             worldCFrame = components(world),
             plotCFrame = components(plotFrame),
             localCFrame = components(plotFrame:ToObjectSpace(world)),
+            houseAnchorLocalCFrame = components(world:ToObjectSpace(houseWorld)),
+            houseAnchorWorldCFrame = components(houseWorld),
             scale = model:GetScale(),
         }
     end
 
     return function(command)
         local response = {
-            command = "house-placement-capture", schemaVersion = 1,
+            command = "house-placement-capture-v2", schemaVersion = 2,
             project = "game1", operationId = command.operationId,
             houseSlug = command.houseSlug, plotIndex = command.plotIndex,
         }
-        local ok, result = pcall(capture, command)
+        local ok, result = pcall(function()
+            if command.command ~= "house-placement-capture-v2" or command.schemaVersion ~= 2 then
+                error("Incompatible Placement Bind protocol; reinstall Game1Bridge")
+            end
+            return capture(command)
+        end)
         if ok then
             for field, value in pairs(result) do
                 response[field] = value

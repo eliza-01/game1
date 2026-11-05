@@ -34,9 +34,10 @@ class PlacementAnchorM224(TestCase):
         self.houses = SimpleNamespace(get=lambda slug: {'slug': slug} if slug in ('house_a', 'house_b') else None)
         self.store = RealEstatePlacementStore(root, self.houses)
         self.capture = lambda slug, plot: {
-            'schemaVersion': 1, 'houseSlug': slug, 'plotIndex': plot,
+            'schemaVersion': 2, 'houseSlug': slug, 'plotIndex': plot,
             'plotVolume': f'plot_{plot:02d}_volume', 'worldCFrame': cf(5),
             'plotCFrame': cf(), 'localCFrame': cf(5), 'scale': 1.0,
+            'houseAnchorLocalCFrame': cf(), 'houseAnchorWorldCFrame': cf(5),
         }
         self.store.bind('house_a', 1, self.capture('house_a', 1))
         self.store.bind('house_a', 2, self.capture('house_a', 2))
@@ -184,8 +185,8 @@ class PlacementAnchorBridgeM224(TestCase):
                 else:
                     raise AssertionError('Bridge never served command')
                 observed.append(cmd)
-                self.assertEqual(cmd['command'], 'house-placement-preview-v2')
-                self.assertEqual(cmd['schemaVersion'], 2)
+                self.assertEqual(cmd['command'], 'house-placement-preview-v3')
+                self.assertEqual(cmd['schemaVersion'], 3)
                 self.assertEqual(cmd['action'], 'anchors')
                 self.assertEqual(cmd['targets'], [{'houseSlug': 'house_a', 'plotIndex': 1}])
                 self.assertIs(cmd['anchored'], False)

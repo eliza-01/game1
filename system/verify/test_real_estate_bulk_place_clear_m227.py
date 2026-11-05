@@ -18,7 +18,8 @@ from studio_bridge import PORT, TOKEN, StudioBridgeError
 def binding(house='house_a', plot=1, anchored=True):
     return {'houseSlug': house, 'plotIndex': plot, 'revision': 3, 'scale': 1.25,
             'anchored': anchored,
-            'localCFrame': [3, 2, 1, 1, 0, 0, 0, 1, 0, 0, 0, 1]}
+            'localCFrame': [3, 2, 1, 1, 0, 0, 0, 1, 0, 0, 0, 1],
+            'houseAnchorLocalCFrame': [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1]}
 
 
 class BulkPreviewRoute(TestCase):
@@ -137,7 +138,7 @@ class BulkPreviewBridge(TestCase):
         self.assertEqual(received[1], 200)
         self.assertEqual(received[0]['action'], 'place_all')
         self.assertEqual(received[0]['plotIndex'], 0)
-        self.assertEqual(received[0]['schemaVersion'], 2)
+        self.assertEqual(received[0]['schemaVersion'], 3)
         self.assertEqual([item['plotIndex'] for item in received[0]['targets']], [1, 3])
         self.assertEqual(result['anchoredPartsVerified'], 4)
 

@@ -29,7 +29,7 @@ function game1RealEstatePlacementRender(){
   $('re-placement-anchor-all').disabled=state.busy||!all.length;
   $('re-placement-free-all').disabled=state.busy||!all.length;
   const selectedBindings=state.house?all.filter(item=>item.houseSlug===state.house):[];
-  $('re-placement-place-all').disabled=state.busy||!selectedBindings.length;
+  $('re-placement-place-all').disabled=state.busy||!selectedBindings.length||selectedBindings.some(item=>!Array.isArray(item.houseAnchorLocalCFrame));
   $('re-placement-clear-all').disabled=state.busy;
   const items=state.data?.items||[];
   const filtered=state.house?items.filter(v=>v.houseSlug===state.house):items;
@@ -37,10 +37,11 @@ function game1RealEstatePlacementRender(){
     const [x,y,z]=item.worldCFrame||[];
     const position=[x,y,z].map(v=>Number(v).toFixed(2)).join(', ');
     const rotation=(item.worldCFrame||[]).slice(3).map(v=>Number(v).toFixed(3)).join(', ');
+    const rotationReady=Array.isArray(item.houseAnchorLocalCFrame)&&item.houseAnchorLocalCFrame.length===12;
     const anchored=item.anchored!==false;
     const symbol=anchored?'⚓':'≋';
     const label=anchored?'Free this house':'Anchor this house';
-    return `<tr><td><button type="button" class="re-anchor-toggle ${anchored?'is-anchored':'is-free'}" data-placement-anchor="${anchored?'free':'anchor'}" data-house="${esc(item.houseSlug)}" data-plot="${item.plotIndex}" title="${label}" aria-label="${label}" ${state.busy?'disabled':''}>${symbol}</button></td><td><div class="re-placement-row-actions"><button type="button" data-placement-action="place" data-house="${esc(item.houseSlug)}" data-plot="${item.plotIndex}" ${state.busy?'disabled':''}>Place</button><button type="button" data-placement-action="clear" data-house="${esc(item.houseSlug)}" data-plot="${item.plotIndex}" ${state.busy?'disabled':''}>Clear</button></div></td><td>${String(item.plotIndex).padStart(2,'0')}</td><td><strong>${esc(item.houseSlug)}</strong></td><td>${esc(position)}<details><summary>Rotation · CFrame</summary><small>${esc(rotation)}</small></details></td><td>${Number(item.scale).toFixed(3)}</td><td>${item.revision}</td></tr>`;
+    return `<tr><td><button type="button" class="re-anchor-toggle ${anchored?'is-anchored':'is-free'}" data-placement-anchor="${anchored?'free':'anchor'}" data-house="${esc(item.houseSlug)}" data-plot="${item.plotIndex}" title="${label}" aria-label="${label}" ${state.busy?'disabled':''}>${symbol}</button></td><td><div class="re-placement-row-actions"><button type="button" data-placement-action="place" data-house="${esc(item.houseSlug)}" data-plot="${item.plotIndex}" title="${rotationReady?'Place saved house':'Re-Bind this house to capture rotation'}" ${state.busy||!rotationReady?'disabled':''}>Place</button><button type="button" data-placement-action="clear" data-house="${esc(item.houseSlug)}" data-plot="${item.plotIndex}" ${state.busy?'disabled':''}>Clear</button></div></td><td>${String(item.plotIndex).padStart(2,'0')}</td><td><strong>${esc(item.houseSlug)}</strong>${rotationReady?'':'<small class="muted"> · Re-Bind for rotation</small>'}</td><td>${esc(position)}<details><summary>Rotation · CFrame</summary><small>${esc(rotation)}</small></details></td><td>${Number(item.scale).toFixed(3)}</td><td>${item.revision}</td></tr>`;
   }).join('')||'<tr><td colspan="7" class="muted">No bindings for this house yet.</td></tr>';
 }
 function realEstatePlacementRemember(){
@@ -63,7 +64,7 @@ async function realEstatePlacementBind(){
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({houseSlug:house,plotIndex:plot}),
     });
-    $('re-placement-status').textContent=`Bound ${house} to plot ${String(plot).padStart(2,'0')} · revision ${response.item.revision} · scale ${response.item.scale.toFixed(3)}`;
+    $('re-placement-status').textContent=`Bound ${house} to plot ${String(plot).padStart(2,'0')} · revision ${response.item.revision} · scale ${response.item.scale.toFixed(3)} · house pivot and rotation captured`;
     await game1RealEstatePlacementLoad();
   }catch(error){
     $('re-placement-status').textContent='Bind failed: '+error.message;

@@ -19,10 +19,11 @@ def cf(x=0, y=0, z=0):
 
 
 def capture(slug='house_level3_01', plot=39, scale=1.25):
-    return {'schemaVersion': 1, 'houseSlug': slug, 'plotIndex': plot,
+    return {'schemaVersion': 2, 'houseSlug': slug, 'plotIndex': plot,
             'plotVolume': f'plot_{plot:02d}_volume',
             'worldCFrame': cf(100, 5, -34), 'plotCFrame': cf(95, 0, -40),
-            'localCFrame': cf(5, 5, 6), 'scale': scale}
+            'localCFrame': cf(5, 5, 6), 'scale': scale,
+            'houseAnchorLocalCFrame': cf(), 'houseAnchorWorldCFrame': cf(100, 5, -34)}
 
 
 class Houses:
@@ -90,6 +91,7 @@ class PlacementTests(unittest.TestCase):
         authored = capture()
         authored['plotCFrame'] = [95, 0, -40] + turn
         authored['worldCFrame'] = [101, 5, -45] + turn
+        authored['houseAnchorWorldCFrame'] = authored['worldCFrame']
         stored = self.store.bind('house_level3_01', 39, authored)
         self.assertEqual(stored['worldCFrame'], authored['worldCFrame'])
         self.assertEqual(stored['plotCFrame'], authored['plotCFrame'])

@@ -2,6 +2,7 @@
 -- The placed copy is distinct from ServerStorage templates and player-owned houses.
 -- Refuses to modify any object it did not create and mark itself.
 local PlotsCatalog = require(script.Parent.StudioPlotsCatalog)
+local HouseFrame = require(script.Parent.StudioRealEstateHouseFrame)
 
 return function(context)
     local HttpService = context.HttpService
@@ -188,8 +189,19 @@ return function(context)
             or typeof(binding.anchored) ~= "boolean" then
             error("Missing or invalid saved Placement binding (anchored must be boolean)")
         end
+        if typeof(binding.houseAnchorLocalCFrame) ~= "table" or #binding.houseAnchorLocalCFrame ~= 12 then
+            error("Placement has legacy Model pivot data. Re-Bind " .. slug
+                .. " on plot " .. tostring(index) .. " before Place; existing houses unchanged")
+        end
         local components = {}
+        local anchorComponents = {}
         for i = 1, 12 do
+            local anchorValue = binding.houseAnchorLocalCFrame[i]
+            if typeof(anchorValue) ~= "number" or anchorValue ~= anchorValue
+                or math.abs(anchorValue) > 1e7 then
+                error("Invalid placement house-anchor CFrame component")
+            end
+            anchorComponents[i] = anchorValue
             local component = binding.localCFrame[i]
             if typeof(component) ~= "number" or component ~= component or math.abs(component) > 1e7 then
                 error("Invalid placement CFrame component")
@@ -207,7 +219,15 @@ return function(context)
         clone.Name = slug
         local prepared, problem = pcall(function()
             clone:ScaleTo(binding.scale)
-            clone:PivotTo(volume.CFrame * CFrame.new(table.unpack(components)))
+            local desiredRoot = volume.CFrame * CFrame.new(table.unpack(components))
+            local house = HouseFrame.Find(clone)
+            if not house then
+                error("Published house template must contain exactly one MeshPart named house")
+            end
+            -- Align the exact visual house frame captured at Bind, NOT the
+            -- template wrapper's independently computed Model pivot.
+            local desiredHouse = desiredRoot * CFrame.new(table.unpack(anchorComponents))
+            HouseFrame.Align(clone, house, desiredHouse, "authored plot house")
             clone:SetAttribute("Game1RealEstateTemplate", nil)
             clone:SetAttribute("Game1PlotHousePreview", true)
             clone:SetAttribute("Game1PlotIndex", index)
@@ -215,6 +235,7 @@ return function(context)
             clone:SetAttribute("Game1PlacementRevision", binding.revision)
             setAndVerifyAnchored(clone, binding.anchored)
             clone:SetAttribute("Game1PlotHouseAnchored", binding.anchored)
+            clone:SetAttribute("Game1PlacementRotationMode", "house-anchor-v2")
         end)
         if not prepared then
             clone:Destroy()
@@ -389,14 +410,14 @@ return function(context)
 
     return function(command)
         local response = {
-            command = "house-placement-preview-v2", schemaVersion = 2,
+            command = "house-placement-preview-v3", schemaVersion = 3,
             project = "game1", operationId = command.operationId,
             houseSlug = command.houseSlug, plotIndex = command.plotIndex,
             action = command.action,
             anchored = command.anchored,
         }
         local ok, result = pcall(function()
-            if command.command ~= "house-placement-preview-v2" or command.schemaVersion ~= 2 then
+            if command.command ~= "house-placement-preview-v3" or command.schemaVersion ~= 3 then
                 error("Incompatible house-placement-preview protocol; reinstall Game1Bridge")
             end
             return run(command)

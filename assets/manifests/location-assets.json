@@ -154,6 +154,38 @@
       ]
     },
     {
+      "atlasKey": "birch_01",
+      "baseKey": "birch",
+      "version": "01",
+      "variants": [
+        {
+          "id": 32,
+          "family_id": 26,
+          "width": 512,
+          "height": 512,
+          "filename": "birch_01_512x512_atlas.png",
+          "original_filename": "birch_01_512x512_atlas.png",
+          "source_path": "assets/source/texture-atlases/birch_01/512x512/birch_01_512x512_atlas.png",
+          "source_sha256": "59acc26d21139f32103d178ca0eed27754d84078346f0777f6afa606be05c65b",
+          "uses_alpha": true,
+          "published_id": "105396243494604",
+          "published_sha256": "59acc26d21139f32103d178ca0eed27754d84078346f0777f6afa606be05c65b",
+          "moderation_state": "Reviewing",
+          "published_at": 1793903189.185853,
+          "created_at": 1793903184.2405777,
+          "retired_at": null,
+          "atlas_key": "birch_01",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "512x512",
+          "baseKey": "birch",
+          "version": "01"
+        }
+      ]
+    },
+    {
       "atlasKey": "blossom_tree_01",
       "baseKey": "blossom_tree",
       "version": "01",
@@ -844,6 +876,38 @@
       ]
     },
     {
+      "atlasKey": "tripo_material_2314f44f-f2f6-4f62-b240-43a157b21dc8",
+      "baseKey": "tripo_material_2314f44f-f2f6-4f62-b240-43a157b21dc8",
+      "version": "",
+      "variants": [
+        {
+          "id": 31,
+          "family_id": 25,
+          "width": 512,
+          "height": 512,
+          "filename": "tripo_material_2314f44f-f2f6-4f62-b240-43a157b21dc8_512x512_atlas.png",
+          "original_filename": "tripo_material_2314f44f-f2f6-4f62-b240-43a157b21dc8_512x512_atlas.png",
+          "source_path": "assets/source/texture-atlases/tripo_material_2314f44f-f2f6-4f62-b240-43a157b21dc8/512x512/tripo_material_2314f44f-f2f6-4f62-b240-43a157b21dc8_512x512_atlas.png",
+          "source_sha256": "59acc26d21139f32103d178ca0eed27754d84078346f0777f6afa606be05c65b",
+          "uses_alpha": true,
+          "published_id": null,
+          "published_sha256": "",
+          "moderation_state": "",
+          "published_at": null,
+          "created_at": 1793903111.1920397,
+          "retired_at": null,
+          "atlas_key": "tripo_material_2314f44f-f2f6-4f62-b240-43a157b21dc8",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": false,
+          "replacementPending": false,
+          "resolution": "512x512",
+          "baseKey": "tripo_material_2314f44f-f2f6-4f62-b240-43a157b21dc8",
+          "version": ""
+        }
+      ]
+    },
+    {
       "atlasKey": "wall_torch_01",
       "baseKey": "wall_torch",
       "version": "01",
@@ -999,7 +1063,8 @@
       "textureUsesAlpha": false,
       "atlasLegacyWarning": true,
       "status": "PUBLISHED",
-      "category_label": "Buildings"
+      "category_label": "Buildings",
+      "publishedVisualMeshes": []
     },
     {
       "slug": "smithy",
@@ -1059,7 +1124,8 @@
       "textureUsesAlpha": false,
       "atlasLegacyWarning": true,
       "status": "PUBLISHED",
-      "category_label": "Buildings"
+      "category_label": "Buildings",
+      "publishedVisualMeshes": []
     },
     {
       "slug": "bush_01",
@@ -1119,7 +1185,8 @@
       "textureUsesAlpha": false,
       "atlasLegacyWarning": true,
       "status": "PUBLISHED",
-      "category_label": "Bushes"
+      "category_label": "Bushes",
+      "publishedVisualMeshes": []
     },
     {
       "slug": "pillar_with_lantern",
@@ -1179,7 +1246,8 @@
       "textureUsesAlpha": false,
       "atlasLegacyWarning": true,
       "status": "PUBLISHED",
-      "category_label": "Decorations"
+      "category_label": "Decorations",
+      "publishedVisualMeshes": []
     },
     {
       "slug": "wooden_post_01",
@@ -1239,7 +1307,8 @@
       "textureUsesAlpha": true,
       "atlasLegacyWarning": true,
       "status": "PUBLISHED",
-      "category_label": "Decorations"
+      "category_label": "Decorations",
+      "publishedVisualMeshes": []
     },
     {
       "slug": "stone_fence_01",
@@ -1299,7 +1368,8 @@
       "textureUsesAlpha": false,
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
-      "category_label": "Fences"
+      "category_label": "Fences",
+      "publishedVisualMeshes": []
     },
     {
       "slug": "stone_fence_pillar_01",
@@ -1359,7 +1429,8 @@
       "textureUsesAlpha": false,
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
-      "category_label": "Fences"
+      "category_label": "Fences",
+      "publishedVisualMeshes": []
     },
     {
       "slug": "wooden_fence_01",
@@ -1419,7 +1490,8 @@
       "textureUsesAlpha": false,
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
-      "category_label": "Fences"
+      "category_label": "Fences",
+      "publishedVisualMeshes": []
     },
     {
       "slug": "wooden_fence_pillar_01",
@@ -1479,7 +1551,8 @@
       "textureUsesAlpha": false,
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
-      "category_label": "Fences"
+      "category_label": "Fences",
+      "publishedVisualMeshes": []
     },
     {
       "slug": "stone_ladder_01",
@@ -1539,7 +1612,8 @@
       "textureUsesAlpha": false,
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
-      "category_label": "Ladders"
+      "category_label": "Ladders",
+      "publishedVisualMeshes": []
     },
     {
       "slug": "wooden_bridge_bar_01",
@@ -1599,7 +1673,8 @@
       "textureUsesAlpha": true,
       "atlasLegacyWarning": true,
       "status": "PUBLISHED",
-      "category_label": "Ladders"
+      "category_label": "Ladders",
+      "publishedVisualMeshes": []
     },
     {
       "slug": "campfirte_01",
@@ -1659,7 +1734,8 @@
       "textureUsesAlpha": true,
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
-      "category_label": "Lights"
+      "category_label": "Lights",
+      "publishedVisualMeshes": []
     },
     {
       "slug": "ground_torch_01",
@@ -1719,7 +1795,8 @@
       "textureUsesAlpha": false,
       "atlasLegacyWarning": true,
       "status": "PUBLISHED",
-      "category_label": "Lights"
+      "category_label": "Lights",
+      "publishedVisualMeshes": []
     },
     {
       "slug": "ground_torch_02",
@@ -1779,7 +1856,8 @@
       "textureUsesAlpha": false,
       "atlasLegacyWarning": true,
       "status": "PUBLISHED",
-      "category_label": "Lights"
+      "category_label": "Lights",
+      "publishedVisualMeshes": []
     },
     {
       "slug": "ground_torch_03",
@@ -1839,7 +1917,8 @@
       "textureUsesAlpha": false,
       "atlasLegacyWarning": true,
       "status": "PUBLISHED",
-      "category_label": "Lights"
+      "category_label": "Lights",
+      "publishedVisualMeshes": []
     },
     {
       "slug": "lantern_01",
@@ -1899,7 +1978,8 @@
       "textureUsesAlpha": true,
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
-      "category_label": "Lights"
+      "category_label": "Lights",
+      "publishedVisualMeshes": []
     },
     {
       "slug": "lantern_02",
@@ -1959,7 +2039,8 @@
       "textureUsesAlpha": true,
       "atlasLegacyWarning": true,
       "status": "PUBLISHED",
-      "category_label": "Lights"
+      "category_label": "Lights",
+      "publishedVisualMeshes": []
     },
     {
       "slug": "wall_torch_01",
@@ -2019,7 +2100,8 @@
       "textureUsesAlpha": false,
       "atlasLegacyWarning": true,
       "status": "PUBLISHED",
-      "category_label": "Lights"
+      "category_label": "Lights",
+      "publishedVisualMeshes": []
     },
     {
       "slug": "wall_torch_02",
@@ -2079,7 +2161,8 @@
       "textureUsesAlpha": false,
       "atlasLegacyWarning": true,
       "status": "PUBLISHED",
-      "category_label": "Lights"
+      "category_label": "Lights",
+      "publishedVisualMeshes": []
     },
     {
       "slug": "wall_torch_03",
@@ -2139,7 +2222,8 @@
       "textureUsesAlpha": false,
       "atlasLegacyWarning": true,
       "status": "PUBLISHED",
-      "category_label": "Lights"
+      "category_label": "Lights",
+      "publishedVisualMeshes": []
     },
     {
       "slug": "test_window_01",
@@ -2199,7 +2283,8 @@
       "textureUsesAlpha": true,
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
-      "category_label": "Props"
+      "category_label": "Props",
+      "publishedVisualMeshes": []
     },
     {
       "slug": "main_statue",
@@ -2259,22 +2344,23 @@
       "textureUsesAlpha": false,
       "atlasLegacyWarning": true,
       "status": "PUBLISHED",
-      "category_label": "Rocks"
+      "category_label": "Rocks",
+      "publishedVisualMeshes": []
     },
     {
       "slug": "big_tree_01",
       "name_en": "Big Tree 01",
       "category": "tree",
       "model_path": "assets/source/location-assets/tree/big_tree_01/model/big_tree_01.fbx",
-      "model_sha256": "56f4ad09d2d468139b6b343a5d2fc7c94ffc8811bb24a45d666d8ec42775467d",
-      "model_asset_id": "77517628720686",
-      "model_published_sha256": "56f4ad09d2d468139b6b343a5d2fc7c94ffc8811bb24a45d666d8ec42775467d",
+      "model_sha256": "a0156e0f74fe54b566d49ef29d77868d5a9025e8cc32feb2976b0d46492dd8fd",
+      "model_asset_id": "113465845823195",
+      "model_published_sha256": "a0156e0f74fe54b566d49ef29d77868d5a9025e8cc32feb2976b0d46492dd8fd",
       "model_moderation_state": "Approved",
       "destructible": true,
-      "revision": 1,
+      "revision": 2,
       "created_at": 1792864890.9769711,
-      "updated_at": 1792864905.9361415,
-      "published_at": 1792864905.9361415,
+      "updated_at": 1793901136.4099162,
+      "published_at": 1793901136.4099162,
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -2287,20 +2373,52 @@
             "role": "visual",
             "physics": {
               "role": "visual",
-              "canCollide": null,
-              "canQuery": null,
+              "canCollide": false,
+              "canQuery": false,
               "canTouch": false,
               "doubleSided": true,
-              "collisionFidelity": null,
+              "collisionFidelity": "Box",
               "physicsOnly": false
+            }
+          },
+          {
+            "name": "col_mesh",
+            "armature": "",
+            "vertices": 786,
+            "bones": [],
+            "influencedBones": [],
+            "role": "collider",
+            "physics": {
+              "role": "collider",
+              "canCollide": true,
+              "canQuery": true,
+              "canTouch": false,
+              "doubleSided": true,
+              "collisionFidelity": "PreciseConvexDecomposition",
+              "physicsOnly": true
             }
           }
         ],
-        "hasCollider": false,
+        "hasCollider": true,
         "armatures": [],
         "unassignedArmatures": []
       },
-      "meshOptions": {},
+      "meshOptions": {
+        "big_tree_01": {
+          "collisionFidelity": "Box",
+          "collisionMesh": false,
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true
+        },
+        "col_mesh": {
+          "collisionFidelity": "PreciseConvexDecomposition",
+          "collisionMesh": true,
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": false
+        }
+      },
       "texture_path": "assets/source/texture-atlases/big_tree_01/512x1024/big_tree_01_512x1024_atlas.png",
       "texture_filename": "big_tree_01_512x1024_atlas.png",
       "texture_sha256": "db775fc9efb4b12457ebfbf2451c6bf3d3f60cc5fb48c54b68da9ec5cfd83b5e",
@@ -2312,7 +2430,7 @@
       "atlasFamily": "big_tree_01",
       "atlasResolution": "512x1024",
       "bindingRevision": 8,
-      "studioSyncStatus": "pending_studio_sync",
+      "studioSyncStatus": "synced",
       "atlasVariants": [
         {
           "id": 7,
@@ -2418,35 +2536,211 @@
       "textureUsesAlpha": true,
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
-      "category_label": "Trees"
+      "category_label": "Trees",
+      "publishedVisualMeshes": []
     },
     {
       "slug": "birch_01",
       "name_en": "Birch 01",
       "category": "tree",
       "model_path": "assets/source/location-assets/tree/birch_01/model/birch_01.fbx",
-      "model_sha256": "9e1f926a1ceba8b15bc227133e7dee3f3b38017b507317850fe56703a028b52e",
-      "model_asset_id": "75425552383886",
-      "model_published_sha256": "9e1f926a1ceba8b15bc227133e7dee3f3b38017b507317850fe56703a028b52e",
+      "model_sha256": "ff25196a924e6c27f245429159450334a43ac16604b391640f818cfec696a327",
+      "model_asset_id": "127245547696536",
+      "model_published_sha256": "ff25196a924e6c27f245429159450334a43ac16604b391640f818cfec696a327",
       "model_moderation_state": "Approved",
       "destructible": true,
-      "revision": 1,
+      "revision": 2,
       "created_at": 1792461987.3799765,
-      "updated_at": 1792461997.0088174,
-      "published_at": 1792461997.0088174,
-      "fbxAnalysis": null,
-      "meshOptions": {},
-      "texture_path": "assets/source/texture-atlases/christmas_tree/2048x2048/migrated/9de5d31b2ae82633f6f91ee9705040c4fd5c03d579424189faa9bafe03ce6386/christmas_tree.jpg",
-      "texture_filename": "christmas_tree.jpg",
-      "texture_sha256": "9de5d31b2ae82633f6f91ee9705040c4fd5c03d579424189faa9bafe03ce6386",
-      "texture_asset_id": "130407188742566",
-      "texture_published_sha256": "9de5d31b2ae82633f6f91ee9705040c4fd5c03d579424189faa9bafe03ce6386",
+      "updated_at": 1793903073.7166655,
+      "published_at": 1793903073.7166655,
+      "fbxAnalysis": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "birch_01",
+            "armature": "birch_01_armature",
+            "vertices": 791,
+            "bones": [
+              {
+                "name": "Bone",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "Bone.001",
+                "parent": "Bone",
+                "matrixLocal": [
+                  0.9988223,
+                  0.0485191,
+                  0.0001674,
+                  0.0,
+                  0.0031862,
+                  -0.0621481,
+                  -0.9980618,
+                  0.0,
+                  -0.0484146,
+                  0.9968868,
+                  -0.0622295,
+                  4.0522251,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "Bone.002",
+                "parent": "Bone.001",
+                "matrixLocal": [
+                  0.9998968,
+                  0.0143584,
+                  0.0005088,
+                  0.1303114,
+                  0.0005968,
+                  -0.0061263,
+                  -0.999981,
+                  -0.1669158,
+                  -0.014355,
+                  0.9998782,
+                  -0.0061342,
+                  6.72964,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "Bone.003",
+                "parent": "Bone.002",
+                "matrixLocal": [
+                  0.9921571,
+                  -0.113538,
+                  0.0522841,
+                  0.1861928,
+                  0.0453692,
+                  -0.0626577,
+                  -0.9970033,
+                  -0.1907587,
+                  0.1164737,
+                  0.9915559,
+                  -0.0570152,
+                  10.6210747,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "Bone.004",
+                "parent": "Bone.003",
+                "matrixLocal": [
+                  0.997359,
+                  0.0487962,
+                  0.0537962,
+                  -0.0526471,
+                  0.0575924,
+                  -0.0800524,
+                  -0.9951255,
+                  -0.3225662,
+                  -0.0442518,
+                  0.9955955,
+                  -0.0826513,
+                  12.7069235,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [
+              "Bone",
+              "Bone.001",
+              "Bone.002",
+              "Bone.003",
+              "Bone.004"
+            ],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": false,
+              "canQuery": false,
+              "canTouch": false,
+              "doubleSided": true,
+              "collisionFidelity": "Box",
+              "physicsOnly": false
+            }
+          },
+          {
+            "name": "col_mesh",
+            "armature": "",
+            "vertices": 226,
+            "bones": [],
+            "influencedBones": [],
+            "role": "collider",
+            "physics": {
+              "role": "collider",
+              "canCollide": true,
+              "canQuery": true,
+              "canTouch": false,
+              "doubleSided": true,
+              "collisionFidelity": "PreciseConvexDecomposition",
+              "physicsOnly": true
+            }
+          }
+        ],
+        "hasCollider": true,
+        "armatures": [
+          "birch_01_armature"
+        ],
+        "unassignedArmatures": []
+      },
+      "meshOptions": {
+        "birch_01": {
+          "collisionFidelity": "Box",
+          "collisionMesh": false,
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true
+        },
+        "col_mesh": {
+          "collisionFidelity": "PreciseConvexDecomposition",
+          "collisionMesh": true,
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": false
+        }
+      },
+      "texture_path": "assets/source/texture-atlases/birch_01/512x512/birch_01_512x512_atlas.png",
+      "texture_filename": "birch_01_512x512_atlas.png",
+      "texture_sha256": "59acc26d21139f32103d178ca0eed27754d84078346f0777f6afa606be05c65b",
+      "texture_asset_id": "105396243494604",
+      "texture_published_sha256": "59acc26d21139f32103d178ca0eed27754d84078346f0777f6afa606be05c65b",
       "texture_moderation_state": "Reviewing",
       "texture_reference_slug": "",
-      "atlasVariantId": 17,
-      "atlasFamily": "christmas_tree",
-      "atlasResolution": "2048x2048",
-      "bindingRevision": 1,
+      "atlasVariantId": 32,
+      "atlasFamily": "birch_01",
+      "atlasResolution": "512x512",
+      "bindingRevision": 6,
       "studioSyncStatus": "synced",
       "atlasVariants": [
         {
@@ -2473,12 +2767,38 @@
           "resolution": "2048x2048",
           "baseKey": "christmas_tree",
           "version": ""
+        },
+        {
+          "id": 32,
+          "family_id": 26,
+          "width": 512,
+          "height": 512,
+          "filename": "birch_01_512x512_atlas.png",
+          "original_filename": "birch_01_512x512_atlas.png",
+          "source_path": "assets/source/texture-atlases/birch_01/512x512/birch_01_512x512_atlas.png",
+          "source_sha256": "59acc26d21139f32103d178ca0eed27754d84078346f0777f6afa606be05c65b",
+          "uses_alpha": true,
+          "published_id": "105396243494604",
+          "published_sha256": "59acc26d21139f32103d178ca0eed27754d84078346f0777f6afa606be05c65b",
+          "moderation_state": "Reviewing",
+          "published_at": 1793903189.185853,
+          "created_at": 1793903184.2405777,
+          "retired_at": null,
+          "atlas_key": "birch_01",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "512x512",
+          "baseKey": "birch",
+          "version": "01"
         }
       ],
-      "textureUsesAlpha": false,
-      "atlasLegacyWarning": true,
+      "textureUsesAlpha": true,
+      "atlasLegacyWarning": false,
       "status": "PUBLISHED",
-      "category_label": "Trees"
+      "category_label": "Trees",
+      "publishedVisualMeshes": []
     },
     {
       "slug": "birch_02",
@@ -2538,7 +2858,8 @@
       "textureUsesAlpha": false,
       "atlasLegacyWarning": true,
       "status": "PUBLISHED",
-      "category_label": "Trees"
+      "category_label": "Trees",
+      "publishedVisualMeshes": []
     },
     {
       "slug": "blossom_tree_01",
@@ -2654,7 +2975,8 @@
       "textureUsesAlpha": true,
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
-      "category_label": "Trees"
+      "category_label": "Trees",
+      "publishedVisualMeshes": []
     },
     {
       "slug": "christmas_tree",
@@ -2666,9 +2988,9 @@
       "model_published_sha256": "701895213556605bcc44c40125fbb6729ddba13d767e58a860d58cc4b75ed949",
       "model_moderation_state": "Approved",
       "destructible": false,
-      "revision": 4,
+      "revision": 5,
       "created_at": 1791465860.1735055,
-      "updated_at": 1793888266.1047199,
+      "updated_at": 1793906031.1496842,
       "published_at": 1793888161.6780365,
       "fbxAnalysis": {
         "schemaVersion": 1,
@@ -2812,7 +3134,7 @@
       "atlasFamily": "christmas_tree_01",
       "atlasResolution": "256x256",
       "bindingRevision": 2,
-      "studioSyncStatus": "pending_studio_sync",
+      "studioSyncStatus": "synced",
       "atlasVariants": [
         {
           "id": 29,
@@ -2843,7 +3165,8 @@
       "textureUsesAlpha": true,
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
-      "category_label": "Trees"
+      "category_label": "Trees",
+      "publishedVisualMeshes": []
     }
   ],
   "summary": {

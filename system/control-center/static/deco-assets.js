@@ -177,17 +177,21 @@ function decoAssetRender() {
     const tr = document.createElement('tr');
     const contactPolicy = row.destructible
       ? '<span class="tag">destructible</span>' : '<span class="tag published">solid · bounce</span>';
+    const visualMeshes=row.publishedVisualMeshes||[];
+    const meshLabels=visualMeshes.length?visualMeshes.map((mesh,i)=>
+      `<small>Model ${i+1} · ${esc(mesh.name)} · Mesh ID ${esc(mesh.meshId)}</small>`).join(''):
+      `<small class="muted">Mesh ID: нет данных · Find Mesh IDs в Studio</small>`;
     tr.innerHTML = `<td><b>${esc(row.name_en)}</b><small>${esc(row.slug)}</small>` +
       `<small class="deco-texture-filename">${esc(window.game1AtlasIdentity.describe({filename:decoAssetTextureFilename(row),atlasKey:row.atlasFamily||''}).key)} ${decoAtlasWarning(row)}</small>` +
       `${decoAtlasDots(row)}${row.studioSyncStatus === 'pending_studio_sync' ? '<small class="deco-sync-pending">Studio Sync pending</small>' : ''}</td>` +
       `<td>${esc(decoAssetCategoryLabel(row.category))}</td><td>${contactPolicy}</td>` +
-      `<td><small>Model ID ${esc(row.model_asset_id || '—')}</small><small>Image ID ${esc(row.texture_asset_id || '—')}</small></td>` +
+      `<td><small>Model ID ${esc(row.model_asset_id || '—')}</small>${row.model_asset_id?meshLabels:''}<small>Image ID ${esc(row.texture_asset_id || '—')}</small></td>` +
       `<td>${decoAssetStatusTag(row.status)}</td><td><div class="deco-asset-row-actions">` +
       `<button data-select type="button" ${decoAssetState.syncingSlug?'disabled':''}>Edit</button>` +
       `<button data-deco-sync type="button" ${row.status !== 'PUBLISHED' || decoAssetState.syncingSlug || decoAssetState.atlasBusy ? 'disabled' : ''} title="Sync published Model geometry and Atlas IDs in-place for every managed instance of this slug. Test on a backup Place first.">Sync Studio</button>` +
       `</div></td>`;
     tr.querySelector('[data-select]').onclick = () => decoAssetEditOpen(row.slug);
-    tr.querySelector('[data-deco-sync]').onclick = () => decoAssetSyncStudio(row.slug);
+    tr.querySelector('[data-deco-sync]').onclick = () => window.game1LocationAssetWorkflow.startScan(row.slug);
     tr.querySelectorAll('[data-atlas-variant]').forEach(button => {
       button.onclick = () => decoAssetChooseAtlasVariant(row, Number(button.dataset.atlasVariant));
     });
@@ -302,34 +306,10 @@ async function decoAssetPublish(slug, scope, forceModel=false) {
 }
 // M221: one slug, ALL its managed placements; guarded in-place meshes and atlas IDs.
 // Never rebuild, re-parent or move placed Models.
-async function decoAssetSyncStudio(slug, {throwOnError = false} = {}) {
-  const row = decoAssetRow(slug);
-  if (!row || row.status !== 'PUBLISHED') {
-    if (throwOnError) throw Error('Publish Model and Atlas before Studio Sync.');
-    return toast('Publish Model and Atlas before Studio Sync.', true);
-  }
-  if (decoAssetState.syncingSlug) {
-    if (throwOnError) throw Error('Another Location Asset Sync is running.');
-    return toast('Another Location Asset Sync is running.', true);
-  }
-  if (typeof window.confirm === 'function' && !window.confirm(
-    `Sync ${slug} in Roblox Studio? This will update published MeshPart geometry and Atlas IDs in ALL placed instances of this slug. ` +
-    'The shared managed-rig sync updates geometry and authoring physics. Save a backup Place first. Continue?'
-  )) return null;
-  decoAssetState.syncingSlug = slug;
-  decoAssetRender();
-  try {
-    const result = await window.game1StudioSync.run('location', slug);
-    const studio = result.studio;
-    await decoAssetLoad();
-    toast(window.game1StudioSync.locationSummary(slug, studio), Number(studio.matchedModels || 0) === 0);
-    await decoAssetShowSyncHistory(slug);
-    return result;
-  } catch (error) {
-    if (throwOnError) throw error; // Inline editor must show the actual Studio failure.
-    toast(`Studio Sync ${slug}: ${error.message}`, true);
-    return null;
-  } finally { decoAssetState.syncingSlug = null; decoAssetRender(); }
+// Compatibility: the old direct command is intentionally disabled.
+// A studio ID scan can only be followed by an explicit, token-checked Replace.
+function decoAssetSyncStudio(slug) {
+  return window.game1LocationAssetWorkflow.startScan(slug);
 }
 function decoAssetEditOpen(slug) {
   return window.game1LocationAssetWorkflow.open(slug);

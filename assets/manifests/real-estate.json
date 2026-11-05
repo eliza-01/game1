@@ -3444,7 +3444,7 @@
           "glass": false,
           "noCollide": true,
           "collisionFidelity": "Box",
-          "doubleSided": true,
+          "doubleSided": false,
           "collisionMesh": false,
           "destructible": false
         },
@@ -3452,7 +3452,7 @@
           "glass": false,
           "noCollide": false,
           "collisionFidelity": "PreciseConvexDecomposition",
-          "doubleSided": true,
+          "doubleSided": false,
           "collisionMesh": true,
           "destructible": false
         },
@@ -3460,7 +3460,7 @@
           "glass": false,
           "noCollide": false,
           "collisionFidelity": "PreciseConvexDecomposition",
-          "doubleSided": true,
+          "doubleSided": false,
           "collisionMesh": false,
           "destructible": false
         },
@@ -3468,7 +3468,7 @@
           "glass": false,
           "noCollide": true,
           "collisionFidelity": "Box",
-          "doubleSided": true,
+          "doubleSided": false,
           "collisionMesh": false,
           "destructible": false
         },
@@ -3476,7 +3476,7 @@
           "glass": true,
           "noCollide": false,
           "collisionFidelity": "PreciseConvexDecomposition",
-          "doubleSided": true,
+          "doubleSided": false,
           "collisionMesh": false,
           "destructible": false
         }
@@ -5533,7 +5533,7 @@
           "glass": false,
           "noCollide": true,
           "collisionFidelity": "Box",
-          "doubleSided": true,
+          "doubleSided": false,
           "collisionMesh": false,
           "destructible": false
         },
@@ -5541,7 +5541,7 @@
           "glass": false,
           "noCollide": false,
           "collisionFidelity": "PreciseConvexDecomposition",
-          "doubleSided": true,
+          "doubleSided": false,
           "collisionMesh": true,
           "destructible": false
         },
@@ -5549,7 +5549,7 @@
           "glass": false,
           "noCollide": false,
           "collisionFidelity": "PreciseConvexDecomposition",
-          "doubleSided": true,
+          "doubleSided": false,
           "collisionMesh": false,
           "destructible": false
         },
@@ -5557,7 +5557,7 @@
           "glass": false,
           "noCollide": true,
           "collisionFidelity": "Box",
-          "doubleSided": true,
+          "doubleSided": false,
           "collisionMesh": false,
           "destructible": false
         },
@@ -5565,7 +5565,7 @@
           "glass": true,
           "noCollide": false,
           "collisionFidelity": "PreciseConvexDecomposition",
-          "doubleSided": true,
+          "doubleSided": false,
           "collisionMesh": false,
           "destructible": false
         }
@@ -7880,7 +7880,7 @@
           "glass": false,
           "noCollide": true,
           "collisionFidelity": "Box",
-          "doubleSided": true,
+          "doubleSided": false,
           "collisionMesh": false,
           "destructible": false
         },
@@ -7888,7 +7888,7 @@
           "glass": false,
           "noCollide": false,
           "collisionFidelity": "PreciseConvexDecomposition",
-          "doubleSided": true,
+          "doubleSided": false,
           "collisionMesh": true,
           "destructible": false
         },
@@ -7896,7 +7896,7 @@
           "glass": false,
           "noCollide": false,
           "collisionFidelity": "PreciseConvexDecomposition",
-          "doubleSided": true,
+          "doubleSided": false,
           "collisionMesh": false,
           "destructible": false
         },
@@ -7904,7 +7904,7 @@
           "glass": false,
           "noCollide": true,
           "collisionFidelity": "Box",
-          "doubleSided": true,
+          "doubleSided": false,
           "collisionMesh": false,
           "destructible": false
         },
@@ -7912,7 +7912,7 @@
           "glass": false,
           "noCollide": true,
           "collisionFidelity": "Box",
-          "doubleSided": true,
+          "doubleSided": false,
           "collisionMesh": false,
           "destructible": false
         },
@@ -7920,7 +7920,7 @@
           "glass": true,
           "noCollide": false,
           "collisionFidelity": "PreciseConvexDecomposition",
-          "doubleSided": true,
+          "doubleSided": false,
           "collisionMesh": false,
           "destructible": false
         }
@@ -8568,6 +8568,38 @@
           "replacementPending": false,
           "resolution": "128x256",
           "baseKey": "big_tree",
+          "version": "01"
+        }
+      ]
+    },
+    {
+      "atlasKey": "birch_01",
+      "baseKey": "birch",
+      "version": "01",
+      "variants": [
+        {
+          "id": 32,
+          "family_id": 26,
+          "width": 512,
+          "height": 512,
+          "filename": "birch_01_512x512_atlas.png",
+          "original_filename": "birch_01_512x512_atlas.png",
+          "source_path": "assets/source/texture-atlases/birch_01/512x512/birch_01_512x512_atlas.png",
+          "source_sha256": "59acc26d21139f32103d178ca0eed27754d84078346f0777f6afa606be05c65b",
+          "uses_alpha": true,
+          "published_id": "105396243494604",
+          "published_sha256": "59acc26d21139f32103d178ca0eed27754d84078346f0777f6afa606be05c65b",
+          "moderation_state": "Reviewing",
+          "published_at": 1793903189.185853,
+          "created_at": 1793903184.2405777,
+          "retired_at": null,
+          "atlas_key": "birch_01",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "512x512",
+          "baseKey": "birch",
           "version": "01"
         }
       ]
@@ -9263,6 +9295,38 @@
       ]
     },
     {
+      "atlasKey": "tripo_material_2314f44f-f2f6-4f62-b240-43a157b21dc8",
+      "baseKey": "tripo_material_2314f44f-f2f6-4f62-b240-43a157b21dc8",
+      "version": "",
+      "variants": [
+        {
+          "id": 31,
+          "family_id": 25,
+          "width": 512,
+          "height": 512,
+          "filename": "tripo_material_2314f44f-f2f6-4f62-b240-43a157b21dc8_512x512_atlas.png",
+          "original_filename": "tripo_material_2314f44f-f2f6-4f62-b240-43a157b21dc8_512x512_atlas.png",
+          "source_path": "assets/source/texture-atlases/tripo_material_2314f44f-f2f6-4f62-b240-43a157b21dc8/512x512/tripo_material_2314f44f-f2f6-4f62-b240-43a157b21dc8_512x512_atlas.png",
+          "source_sha256": "59acc26d21139f32103d178ca0eed27754d84078346f0777f6afa606be05c65b",
+          "uses_alpha": true,
+          "published_id": null,
+          "published_sha256": "",
+          "moderation_state": "",
+          "published_at": null,
+          "created_at": 1793903111.1920397,
+          "retired_at": null,
+          "atlas_key": "tripo_material_2314f44f-f2f6-4f62-b240-43a157b21dc8",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": false,
+          "replacementPending": false,
+          "resolution": "512x512",
+          "baseKey": "tripo_material_2314f44f-f2f6-4f62-b240-43a157b21dc8",
+          "version": ""
+        }
+      ]
+    },
+    {
       "atlasKey": "wall_torch_01",
       "baseKey": "wall_torch",
       "version": "01",
@@ -9423,6 +9487,22 @@
       "atlasName": "big_tree",
       "atlasVersion": "01",
       "atlasResolution": "128×256"
+    },
+    {
+      "reference": "atlas:32",
+      "label": "birch_01",
+      "slug": "",
+      "filename": "birch_01_512x512_atlas.png",
+      "group": "atlas",
+      "category": "",
+      "categoryLabel": "",
+      "path": "assets/source/texture-atlases/birch_01/512x512/birch_01_512x512_atlas.png",
+      "sha256": "59acc26d21139f32103d178ca0eed27754d84078346f0777f6afa606be05c65b",
+      "assetId": "105396243494604",
+      "atlasKey": "birch_01",
+      "atlasName": "birch",
+      "atlasVersion": "01",
+      "atlasResolution": "512×512"
     },
     {
       "reference": "atlas:28",
@@ -9775,6 +9855,22 @@
       "atlasName": "structures",
       "atlasVersion": "01",
       "atlasResolution": "2048×2048"
+    },
+    {
+      "reference": "atlas:31",
+      "label": "tripo_material_2314f44f-f2f6-4f62-b240-43a157b21dc8",
+      "slug": "",
+      "filename": "tripo_material_2314f44f-f2f6-4f62-b240-43a157b21dc8_512x512_atlas.png",
+      "group": "atlas",
+      "category": "",
+      "categoryLabel": "",
+      "path": "assets/source/texture-atlases/tripo_material_2314f44f-f2f6-4f62-b240-43a157b21dc8/512x512/tripo_material_2314f44f-f2f6-4f62-b240-43a157b21dc8_512x512_atlas.png",
+      "sha256": "59acc26d21139f32103d178ca0eed27754d84078346f0777f6afa606be05c65b",
+      "assetId": "",
+      "atlasKey": "tripo_material_2314f44f-f2f6-4f62-b240-43a157b21dc8",
+      "atlasName": "tripo_material_2314f44f-f2f6-4f62-b240-43a157b21dc8",
+      "atlasVersion": "",
+      "atlasResolution": "512×512"
     },
     {
       "reference": "atlas:20",

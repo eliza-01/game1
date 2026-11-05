@@ -78,7 +78,7 @@ local decoManager = DecoManager.new({
     toolbar = toolbar,
     HttpService = HttpService,
     AssetService = AssetService,
-    Workspace = Workspace,
+    Workspace = Workspace, Selection = Selection,
     ServerStorage = ServerStorage,
     ChangeHistoryService = ChangeHistoryService,
     UserInputService = UserInputService,
@@ -369,9 +369,17 @@ local function applyTexture(model: Model, textureAssetId: string, usesAlpha: any
     local uri = "rbxassetid://" .. tostring(math.floor(numericId))
     local applied = 0
     for _, descendant in ipairs(model:GetDescendants()) do
-        if descendant:IsA("MeshPart") and not MeshPhysics.IsCollider(descendant.Name) then
-            StudioTextureAppearance.Apply(descendant, uri, usesAlpha)
-            applied += 1
+        if descendant:IsA("MeshPart") then
+            if MeshPhysics.IsCollider(descendant.Name) then
+                -- COL is physics-only. Strip old importer texture remnants from
+                -- the fresh clone; never assign Atlas IDs to collision geometry.
+                descendant.TextureID = ""
+                local surface = descendant:FindFirstChildOfClass("SurfaceAppearance")
+                if surface then surface:Destroy() end
+            else
+                StudioTextureAppearance.Apply(descendant, uri, usesAlpha)
+                applied += 1
+            end
         end
     end
     return applied
@@ -436,6 +444,13 @@ function DecoAssetLoader:loadPublished(row: any): Model
     return model
 end
 
+function DecoAssetLoader:loadForMeshInventory(modelId: string, slug: string): Model
+    -- Geometry and Mesh ID inventory are read from immutable published Models.
+    -- No separate image publication is performed.
+    return self:loadPublished({status="PUBLISHED",model_asset_id=modelId,
+        texture_asset_id="",slug=slug})
+end
+
 return DecoAssetLoader
 ]]></string>
         </Properties>
@@ -473,6 +488,7 @@ return table.freeze(DecoAssetPreparation)
 local DecoPlacement = require(script.Parent.DecoPlacement)
 local DecoTransform = require(script.Parent.DecoTransform)
 local DecoPlacedAssetSync = require(script.Parent.DecoPlacedAssetSync)
+local History = require(script.Parent.StudioPublishedMeshHistory)
 
 local DecoManager = {}
 DecoManager.__index = DecoManager
@@ -542,6 +558,7 @@ function DecoManager.new(config: any)
     self.HttpService = config.HttpService
     self.AssetService = config.AssetService
     self.Workspace = config.Workspace
+    self.Selection = config.Selection
     self.ServerStorage = config.ServerStorage
     self.ChangeHistoryService = config.ChangeHistoryService
     self.UserInputService = config.UserInputService
@@ -551,6 +568,7 @@ function DecoManager.new(config: any)
     self.currentRow = nil
     self.template = nil
     self.preview = nil
+    self.meshSyncPreview = nil
     self.loader = DecoAssetLoader.new({
         HttpService = self.HttpService,
         AssetService = self.AssetService,
@@ -788,7 +806,173 @@ function DecoManager:_setCategory(category: string)
     self:_showCurrent()
 end
 
-function DecoManager:refreshRegistry(targetSlug: string?, applyIds: boolean?, expectedModelId: string?, expectedAtlasId: string?)
+-- Phase 1: inspect immutable Model/Mesh IDs and select matches without changing Place.
+function DecoManager:previewMeshSync(slug: string, modelId: string, atlasId: string,
+    expectedRevision: number, historyIds: {string}, cached: {any}?): any
+    self.meshSyncPreview=nil
+    local registry=self.loader:fetchRegistry()
+    local row=nil
+    for _, entry in ipairs(registry.items) do
+        if tostring(entry.slug)==slug then row=entry;break end
+    end
+    if not row or row.status~="PUBLISHED" or tostring(row.model_asset_id)~=modelId
+        or tostring(row.texture_asset_id)~=atlasId or tonumber(row.bindingRevision)~=expectedRevision then
+        error("published asset changed; refresh and search again")
+    end
+    local report=History.Scan(self.Workspace,slug,row,historyIds,self.loader,cached)
+    local token=self.HttpService:GenerateGUID(false)
+    local snap={}
+    local roots={}
+    for _, root in ipairs(report.roots) do
+        roots[root]={parent=root.Parent,pivot=root:GetPivot(),scale=root:GetScale(),
+            instanceId=root:GetAttribute("Game1DecoInstanceId"),
+            slug=root:GetAttribute("Game1DecoAssetSlug"),meshCount=#History.Parts(root)}
+        for _, part in ipairs(History.Parts(root)) do
+            local surface=part:FindFirstChildOfClass("SurfaceAppearance")
+            snap[part]={meshId=History.Id(part.MeshId),texture=part.TextureID,
+                colorMap=if surface then surface.ColorMap else nil,
+                parent=part.Parent,frame=part:GetPivot(),size=part.Size}
+        end
+    end
+    report.partStates=snap
+    report.rootStates=roots
+    self.meshSyncPreview={slug=slug,modelId=modelId,atlasId=atlasId,
+        revision=expectedRevision,token=token,report=report}
+    return {scanToken=token,mode=report.mode,inventory=report.inventory,
+        expectedMeshIds=report.expectedMeshIds,parts=report.parts,
+        foundMeshParts=report.foundMeshParts,managedMeshParts=report.managedMeshParts,
+        unmanagedMeshParts=report.unmanagedMeshParts,managedModels=report.managedModels,
+        meshPending=report.meshPending,texturePending=report.texturePending,
+        geometryPending=report.geometryPending}
+end
+
+-- Phase 2 (read-only): select any number of scanned Models in Explorer.
+-- One Selection:Set call; duplicate MeshParts inside the same Model collapse.
+-- The scan token remains reusable and no Place geometry is touched.
+function DecoManager:selectMeshSyncPart(slug: string, modelId: string, atlasId: string,
+    scanToken: string, expectedRevision: number, partKeys: {string}): any
+    local preview = self.meshSyncPreview
+    if not preview or preview.slug ~= slug or preview.modelId ~= modelId
+        or preview.atlasId ~= atlasId or preview.token ~= scanToken
+        or preview.revision ~= expectedRevision then
+        error("Studio scan expired; Find again before selecting")
+    end
+    if type(partKeys)~="table" or #partKeys<1 or #partKeys>4096 then
+        error("Select requires a bounded list of scanned Models")
+    end
+    local selected,seenKeys,seenModels = {},{},{}
+    for _, partKey in ipairs(partKeys) do
+        if type(partKey)~="string" or seenKeys[partKey] then
+            error("Duplicate or invalid Studio selection key")
+        end
+        seenKeys[partKey]=true
+        local match = preview.report.partByKey[partKey]
+        if not match then error("MeshPart selection is not in current scan") end
+        local part = match.part
+        if not part or not part:IsDescendantOf(self.Workspace)
+            or History.Id(part.MeshId) ~= match.row.meshId then
+            error("Scanned MeshPart moved or changed; Find again")
+        end
+        local chosen = match.root or part:FindFirstAncestorOfClass("Model") or part
+        if not chosen:IsDescendantOf(self.Workspace)
+            or string.sub(chosen:GetFullName(),1,240) ~= match.row.modelPath then
+            error("Scanned Model changed; Find again")
+        end
+        if not seenModels[chosen] then
+            seenModels[chosen]=true
+            table.insert(selected,chosen)
+        end
+    end
+    self.Selection:Set(selected)
+    return {selectedCount=#selected,
+        selectedName=if #selected==1 then selected[1].Name else "",
+        selectedPath=if #selected==1 then string.sub(selected[1]:GetFullName(),1,1024) else ""}
+end
+
+-- Explicit legacy linking is separate from Find and from replacing geometry.
+-- All checks run on the exact Model captured by the scan, never a name lookup.
+function DecoManager:attachHistoricalMeshSync(slug: string, modelId: string, atlasId: string,
+    scanToken: string, expectedRevision: number, partKey: string): any
+    local preview=self.meshSyncPreview
+    if not preview or preview.slug~=slug or preview.modelId~=modelId
+        or preview.atlasId~=atlasId or preview.token~=scanToken
+        or preview.revision~=expectedRevision then
+        error("Studio scan expired; Find again before linking")
+    end
+    local candidate=preview.report.legacyCandidates[partKey]
+    if not candidate then error("not a verified unlinked historical Model") end
+    local model=candidate.root
+    if not model:IsDescendantOf(self.Workspace) or model.Parent~=candidate.parent
+        or model:GetPivot()~=candidate.pivot or model:GetScale()~=candidate.scale
+        or #History.Parts(model)~=candidate.meshCount then
+        error("historical Model changed since Find; no Place geometry modified")
+    end
+    local cursor: Instance?=model
+    while cursor and cursor~=self.Workspace do
+        if cursor:IsA("Model") and (cursor:GetAttribute("Game1DecoAssetSlug")~=nil
+            or cursor:GetAttribute("Game1DecoInstanceId")~=nil) then
+            error("historical Model now belongs to another asset; no Place geometry modified")
+        end
+        cursor=cursor.Parent
+    end
+    for _, descendant in ipairs(model:GetDescendants()) do
+        if descendant:IsA("Model") and (descendant:GetAttribute("Game1DecoAssetSlug")~=nil
+            or descendant:GetAttribute("Game1DecoInstanceId")~=nil) then
+            error("nested asset ownership detected; no Place geometry modified")
+        end
+    end
+    local oldPublished=self.loader:loadForMeshInventory(candidate.modelId,slug)
+    local valid,problem=pcall(function()
+        if not History.MatchesInventory(model,History.Describe(candidate.modelId,oldPublished)) then
+            error("historic Mesh ID inventory changed; no Place geometry modified")
+        end
+        DecoPlacedAssetSync.VerifyLegacyModel(model,oldPublished)
+    end)
+    oldPublished:Destroy()
+    if not valid then error("cannot safely link historical Model: "..tostring(problem)) end
+    local fields={"Game1DecoInstanceId","Game1DecoAssetSlug",
+        "Game1DecoPublishedModelAssetId","Game1DecoPublishedModelSha256",
+        "Game1DecoRegistryModelAssetId","Game1DecoSyncHistory"}
+    local previous={}
+    for _, name in ipairs(fields) do
+        previous[name]=model:GetAttribute(name)
+        if previous[name]~=nil then
+            error("historical Model has existing asset metadata; no Place geometry modified")
+        end
+    end
+    local instanceId=self.HttpService:GenerateGUID(false)
+    local changes={{kind="model_reference",oldId="",newId=candidate.modelId,count=1}}
+    local meshes=History.Describe(candidate.modelId,model).meshes
+    local entry={atUtc=os.time(),slug=slug,instanceId=instanceId,
+        changes=changes,meshIdsBefore=meshes,meshIdsAfter=meshes}
+    local encoded=self.HttpService:JSONEncode({entry})
+    self.ChangeHistoryService:SetWaypoint("Before Link Historical Location Model: "..slug)
+    local saved,reason=pcall(function()
+        model:SetAttribute("Game1DecoAssetSlug",slug)
+        model:SetAttribute("Game1DecoInstanceId",instanceId)
+        model:SetAttribute("Game1DecoPublishedModelAssetId",candidate.modelId)
+        -- SHA of an old publication is not inferred from the CURRENT model.
+        -- The next Find detects it as a pending geometry revision.
+        model:SetAttribute("Game1DecoPublishedModelSha256","")
+        model:SetAttribute("Game1DecoRegistryModelAssetId",candidate.modelId)
+        model:SetAttribute("Game1DecoSyncHistory",encoded)
+        self.ChangeHistoryService:SetWaypoint("Link Historical Location Model: "..slug)
+        self.Selection:Set({model})
+    end)
+    if not saved then
+        for _, name in ipairs(fields) do pcall(function()model:SetAttribute(name,previous[name])end) end
+        pcall(function() self.ChangeHistoryService:SetWaypoint("Rollback Historical Link: "..slug) end)
+        error("legacy Model link rolled back: "..tostring(reason))
+    end
+    self.meshSyncPreview=nil -- linking changes ownership; require a new scan
+    return {models=1,parts=0,replacedModels=0,matchedModels=1,
+        modelReferences=1,pendingGeometry=1,geometryUpdated=0,meshPartsUpdated=0,
+        registryItems=0,changes=changes,fullySynced=false,
+        instances={{instanceId=instanceId,studioPath=model:GetFullName(),
+            changes=changes,meshIdsBefore=meshes,meshIdsAfter=meshes}}}
+end
+
+function DecoManager:refreshRegistry(targetSlug: string?, applyIds: boolean?, expectedModelId: string?, expectedAtlasId: string?, scanToken: string?, expectedRevision: number?, selectedKeys: {string}?)
     self:_setStatus("Refreshing Location Assets registry…")
     local ok, result = pcall(function()
         return self.loader:fetchRegistry()
@@ -810,10 +994,56 @@ function DecoManager:refreshRegistry(targetSlug: string?, applyIds: boolean?, ex
         if not targetSlug or not expectedModelId or not expectedAtlasId then
             error("scoped Model + Atlas Studio Sync requires an explicit slug and published IDs")
         end
+        local preview=self.meshSyncPreview
+        if not preview or preview.slug~=targetSlug or preview.modelId~=expectedModelId
+            or preview.atlasId~=expectedAtlasId or preview.token~=scanToken
+            or preview.revision~=expectedRevision then
+            error("scanned Mesh ID preview expired; Find again before Replace")
+        end
+        self.meshSyncPreview=nil -- one-time token; prevent replay after failure
+        local scanned=preview.report
+        if type(selectedKeys)~="table" or #selectedKeys<1 or #selectedKeys>4096 then
+            error("select at least one stale managed MeshPart before Sync")
+        end
+        local selected, seen, wholeRig={}, {}, {}
+        for _, key in ipairs(selectedKeys) do
+            if type(key)~="string" or seen[key] then error("duplicate or invalid MeshPart selection") end
+            seen[key]=true
+            local entry=scanned.partByKey[key]
+            if not entry or not entry.root or not (entry.row.needsMesh or entry.row.needsTexture) then
+                error("selected MeshPart is not a pending managed part; Find again")
+            end
+            table.insert(selected,key)
+            if entry.row.needsMesh then wholeRig[entry.root]=true end
+        end
+        local allPending=true
+        for _, entry in ipairs(scanned.parts) do
+            if entry.managed and (entry.needsMesh or entry.needsTexture)
+                and not seen[entry.key] and not wholeRig[scanned.partByKey[entry.key].root] then
+                allPending=false
+                break
+            end
+        end
+        local latest=nil
+        for _, row in ipairs(result.items) do
+            if row.slug==targetSlug then latest=row;break end
+        end
+        if not latest or tonumber(latest.bindingRevision)~=expectedRevision then
+            error("Atlas binding revision changed since Find; no Place geometry modified")
+        end
+        for root, snap in pairs(scanned.rootStates) do
+            if root.Parent~=snap.parent or root:GetPivot()~=snap.pivot or root:GetScale()~=snap.scale
+                or root:GetAttribute("Game1DecoInstanceId")~=snap.instanceId
+                or root:GetAttribute("Game1DecoAssetSlug")~=snap.slug
+                or #History.Parts(root)~=snap.meshCount then
+                error("placed root transform changed since Find; no Place geometry modified")
+            end
+        end
         -- A waypoint BEFORE the update makes Undo possible even for an error.
         self.ChangeHistoryService:SetWaypoint("Before Location Asset Model + Atlas Sync: " .. targetSlug)
         syncResult = DecoPlacedAssetSync.RefreshIds(
-            self.Workspace, result, targetSlug, self.HttpService, expectedModelId, expectedAtlasId, self.loader)
+            self.Workspace, result, targetSlug, self.HttpService, expectedModelId, expectedAtlasId, self.loader, scanned, selected)
+        syncResult.fullySynced=allPending
         self.ChangeHistoryService:SetWaypoint("Location Asset Model + Atlas Sync: " .. targetSlug)
     end
     self:_setCategory(self.category)
@@ -825,6 +1055,7 @@ function DecoManager:refreshRegistry(targetSlug: string?, applyIds: boolean?, ex
         modelReferences = syncResult.modelReferences, pendingGeometry = syncResult.pendingGeometry,
         geometryUpdated = syncResult.geometryUpdated, meshPartsUpdated = syncResult.meshPartsUpdated,
         changes = syncResult.changes, instances = syncResult.instances,
+        fullySynced = syncResult.fullySynced == true,
         registryItems = #result.items }
 end
 
@@ -983,7 +1214,7 @@ return DecoManager
 -- audit attributes; the replacement mechanism has no domain-specific rules.
 local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
 local RigSwap = require(script.Parent.StudioManagedRigSwap)
-local MeshAnchor = require(script.Parent.StudioAuthoringMeshAnchor)
+local History = require(script.Parent.StudioPublishedMeshHistory)
 local Placement = require(script.Parent.DecoAssetPreparation)
 local Physics = require(script.Parent.StudioMeshPhysicsCore)
 local DecoPlacedAssetSync = {}
@@ -1059,6 +1290,14 @@ local function rigChildren(model: Model): {Instance}
     return result
 end
 
+-- Read-only eligibility check for explicitly linking an old, manually placed
+-- publication. Do not grant ownership if its hierarchy was edited by hand.
+function DecoPlacedAssetSync.VerifyLegacyModel(model: Model, oldPublished: Model)
+    History.VerifyChildren(oldPublished, rigChildren(model))
+    oldPublished:ScaleTo(model:GetScale())
+    History.Provenance(model, oldPublished)
+end
+
 function DecoPlacedAssetSync.StampPublishedModel(model: Model, row: any)
     if not model:IsA("Model") or model.Parent ~= nil then
         error("published identity may only be stamped on a fresh placement clone")
@@ -1085,7 +1324,7 @@ local function textureId(uri: string): string
 end
 
 function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slug: string, http: any,
-    expectedModelId: string, expectedAtlasId: string, loader: any): any
+    expectedModelId: string, expectedAtlasId: string, loader: any, preview: any, selectedKeys: {string}): any
     if type(slug) ~= "string" or slug == "" then
         error("one explicitly selected Location Asset slug is required")
     end
@@ -1096,7 +1335,35 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
     end
     local publishedSha = tostring(row.model_published_sha256 or "")
     if publishedSha == "" then error("missing published FBX SHA") end
-    local placed = targets(workspace, slug)
+    if not preview or type(preview.roots)~="table" or type(preview.geometryRoots)~="table" then
+        error("Find Mesh IDs in Studio before replacing; no Place geometry modified")
+    end
+    local chosenParts, chosenRoots, chosenGeometry={},{},{}
+    for _, key in ipairs(selectedKeys) do
+        local entry=preview.partByKey[key]
+        if not entry or not entry.root then error("invalid selected managed MeshPart") end
+        chosenParts[entry.part]=true
+        chosenRoots[entry.root]=true
+        if entry.row.needsMesh then chosenGeometry[entry.root]=true end
+    end
+    local live={}
+    for _, root in ipairs(targets(workspace,slug)) do live[root]=true end
+    local placed={}
+    for _, root in ipairs(preview.roots) do
+        if not live[root] then error("scanned Location instance no longer exists; rescan") end
+        if chosenRoots[root] then table.insert(placed,root) end
+    end
+    if #placed<1 then error("no selected managed Location instance; no Place geometry modified") end
+    for part, snap in pairs(preview.partStates or {}) do
+        if part.Parent~=snap.parent or part:GetPivot()~=snap.frame or part.Size~=snap.size
+            or History.Id(part.MeshId)~=snap.meshId or part.TextureID~=snap.texture then
+            error("Mesh identity, transform or texture changed since Find; rescan")
+        end
+        local surface=part:FindFirstChildOfClass("SurfaceAppearance")
+        if (if surface then surface.ColorMap else nil)~=snap.colorMap then
+            error("ColorMap changed since Find; rescan")
+        end
+    end
     if #placed > 1000 then error("more than 1000 placed instances of one slug") end
     -- Only the meshes actually described by the SHA-bound FBX report are
     -- eligible for policy refresh. Never touch manually added MeshParts.
@@ -1110,7 +1377,7 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
     end
     local needsGeometry = false
     for _, model in ipairs(placed) do
-        if tostring(model:GetAttribute("Game1DecoPublishedModelSha256") or "") ~= publishedSha then
+        if chosenGeometry[model] then
             needsGeometry = true
             break
         end
@@ -1128,49 +1395,55 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
     -- must fail before any placed root or texture is modified.
     local prepared, issue = pcall(function()
         for _, model in ipairs(placed) do
-            local geometry = tostring(model:GetAttribute("Game1DecoPublishedModelSha256") or "") ~= publishedSha
+            local geometry = chosenGeometry[model] == true
             local oldId = tostring(model:GetAttribute("Game1DecoPublishedModelAssetId") or "")
+            local previousModelId=oldId
             local oldRef = tostring(model:GetAttribute(REFERENCE) or oldId)
-            local changeRef = oldRef ~= modelId
+            local changeRef = geometry and oldRef ~= modelId
             local stage, transaction = nil, nil
             local oldParts = meshParts(model)
             if geometry then
                 stage = (published :: Model):Clone()
                 table.insert(staging, stage)
-                -- Mirror DecoPlacement's authored scale, then align via the
-                -- MeshPart's stable Blender-authored pivot (Real Estate method).
-                stage:ScaleTo(model:GetScale())
-                local existingAnchor, freshAnchor, authoringAnchorPath = MeshAnchor.Match(
-                    model, stage, model:GetAttribute("Game1DecoAuthoringAnchorPath"))
-                RigSwap.AlignToAnchor(stage, freshAnchor, existingAnchor:GetPivot(), "Location Asset " .. slug)
-                Placement.PreparePlaced(stage, row.meshOptions)
-                -- Unowned geometry added directly to a placed root must not be
-                -- silently classified as an FBX rig and deleted. Published
-                -- direct-child names/classes must match the legacy instance.
-                local previousChildren, nextChildren = rigChildren(model), rigChildren(stage)
-                if #previousChildren ~= #nextChildren then
-                    error("placed/published rig count differs; refusing to remove unknown geometry")
-                end
-                local nextByName = {}
-                for _, child in ipairs(nextChildren) do
-                    if nextByName[child.Name] then error("duplicate published rig child " .. child.Name) end
-                    nextByName[child.Name] = child
-                end
-                for _, child in ipairs(previousChildren) do
-                    local nextChild = nextByName[child.Name]
-                    if not nextChild or child.ClassName ~= nextChild.ClassName then
-                        error("unmatched placed rig child " .. child.Name .. "; no Place changed")
+                -- Same shared managed-rig transaction as Real Estate.
+                -- The previous immutable published Model is the authoring
+                -- reference. We identify it by MeshPart.MeshId history,
+                -- never by old/new names, hierarchy or importer order.
+                local previousId=oldId
+                if previousId=="" or previousId==modelId then
+                    local matchId=nil
+                    for _, entry in ipairs(preview.inventory or {}) do
+                        if entry.modelAssetId~=modelId and History.MatchesInventory(model,entry) then
+                            if matchId then error("ambiguous historical Model version; no Place geometry modified") end
+                            matchId=entry.modelAssetId
+                        end
                     end
+                    previousId=matchId or ""
                 end
-                transaction = RigSwap.Prepare(model, previousChildren, nextChildren)
-                transaction.authoringAnchorPath = authoringAnchorPath
+                if previousId=="" then error("old published Model ID unknown; no Place geometry modified") end
+                previousModelId=previousId
+                local previousPublished=loader:loadForMeshInventory(previousId,slug)
+                local good,problem=pcall(function()
+                    previousPublished:ScaleTo(model:GetScale())
+                    stage:ScaleTo(model:GetScale())
+                    local frame=History.Provenance(model,previousPublished)
+                    stage:PivotTo(frame * stage:GetPivot())
+                    local previousChildren,nextChildren=rigChildren(model),rigChildren(stage)
+                    History.VerifyChildren(previousPublished,previousChildren)
+                    Placement.PreparePlaced(stage,row.meshOptions)
+                    transaction = RigSwap.Prepare(model, previousChildren, nextChildren,
+                        {preferredPrimary=stage.PrimaryPart})
+                end)
+                previousPublished:Destroy()
+                if not good then error(tostring(problem)) end
                 totalMeshes += #meshParts(stage)
                 if totalMeshes > 4096 then error("more than 4096 MeshParts in scoped Sync") end
             end
             local atlasChanges = {}
             local uri = "rbxassetid://" .. atlasId
             for _, part in ipairs(oldParts) do
-                if Physics.IsCollider(part.Name) then continue end
+                if Physics.IsCollider(part.Name) or part:GetAttribute("Game1DecoPhysicsOnly") == true then continue end
+                if not geometry and not chosenParts[part] then continue end
                 local surface = part:FindFirstChildOfClass("SurfaceAppearance")
                 if part.TextureID ~= uri or (surface and surface.ColorMap ~= uri) then
                     local previousUri = if part.TextureID == uri and surface then surface.ColorMap else part.TextureID
@@ -1188,17 +1461,32 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                 end
                 eventIndex[key].count += count
             end
-            if geometry then add("model", oldId, modelId, 1) end
+            if geometry then add("model", previousModelId, modelId, 1) end
             if changeRef then add("model_reference", oldRef, modelId, 1) end
             for _, change in ipairs(atlasChanges) do add("atlas", change.oldId, atlasId, 1) end
+            local beforeMeshes=if geometry then History.Describe(previousModelId,model).meshes else {}
+            local afterMeshes=if geometry then History.Describe(modelId,stage).meshes else {}
             local history = oldHistory(model, http)
             local historyJson = nil
             if #events > 0 then
                 table.insert(history, {atUtc = os.time(), slug = slug,
-                    instanceId = tostring(model:GetAttribute(INSTANCE) or ""), changes = events})
+                    instanceId = tostring(model:GetAttribute(INSTANCE) or ""), changes = events,
+                    meshIdsBefore=beforeMeshes,meshIdsAfter=afterMeshes})
                 while #history > 32 do table.remove(history, 1) end
                 historyJson = http:JSONEncode(history)
-                if #historyJson > 30000 then error("Studio history exceeded attribute limit") end
+                while #historyJson > 30000 and #history > 1 do
+                    table.remove(history, 1)
+                    historyJson = http:JSONEncode(history)
+                end
+                if #historyJson > 30000 then
+                    -- The global JSONL/MySQL audit stores the COMPLETE Mesh ID
+                    -- sets. Never block Place on a huge Roblox attribute.
+                    history[#history].meshIdsBefore = nil
+                    history[#history].meshIdsAfter = nil
+                    history[#history].meshHistoryInDatabase = true
+                    historyJson = http:JSONEncode(history)
+                end
+                if #historyJson > 30000 then error("Studio history exceeded safe attribute limit") end
             end
             table.insert(plans, {model = model, stage = stage, swap = transaction,
                 geometry = geometry, oldId = oldId, oldRef = oldRef,
@@ -1208,7 +1496,7 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                 oldPublishedId = model:GetAttribute("Game1DecoPublishedModelAssetId"),
                 oldReference = model:GetAttribute(REFERENCE),
                 oldAnchorPath = model:GetAttribute("Game1DecoAuthoringAnchorPath"),
-                events = events,
+                events = events, meshIdsBefore=beforeMeshes,meshIdsAfter=afterMeshes,
                 physicsBefore = if not geometry and allowedNames then
                     Physics.CaptureLocationModel(model, allowedNames) else nil})
         end
@@ -1230,7 +1518,6 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                 geometryUpdated += 1
                 model:SetAttribute("Game1DecoPublishedModelAssetId", modelId)
                 model:SetAttribute("Game1DecoPublishedModelSha256", publishedSha)
-                model:SetAttribute("Game1DecoAuthoringAnchorPath", item.swap.authoringAnchorPath)
             end
             if item.changeRef then
                 model:SetAttribute(REFERENCE, modelId)
@@ -1284,7 +1571,8 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
     for _, item in ipairs(plans) do
         if #item.events > 0 then
             table.insert(instances, {instanceId = tostring(item.model:GetAttribute(INSTANCE) or ""),
-                studioPath = item.model:GetFullName(), changes = item.events})
+                studioPath = item.model:GetFullName(), changes = item.events,
+                meshIdsBefore=item.meshIdsBefore,meshIdsAfter=item.meshIdsAfter})
             for _, event in ipairs(item.events) do
                 local key = event.kind .. ":" .. event.oldId .. ":" .. event.newId
                 if not grouped[key] then
@@ -3579,46 +3867,75 @@ end
       <Item class="ModuleScript" referent="20">
         <Properties>
           <string name="Name">StudioDecoSyncCommands</string>
-          <string name="Source"><![CDATA[-- M216: reject legacy global commands (including M215) before they can mutate.
+          <string name="Source"><![CDATA[-- M238: protocol 8 adds read-only per-row Studio selection and COL atlas exclusion.
 return function(config: any)
     return function(command: any)
-        if command.project ~= "game1" or command.schemaVersion ~= 6
-            or type(command.operationId) ~= "string" or command.operationId == ""
-            or type(command.targetSlug) ~= "string" or command.targetSlug == ""
-            or type(command.bindingRevision) ~= "number" or command.bindingRevision < 1
-            or type(command.modelAssetId) ~= "string" or command.modelAssetId == ""
-            or type(command.atlasAssetId) ~= "string" or command.atlasAssetId == "" then
-            warn("[game1] rejected unsafe/unscoped Location Asset sync command")
+        if command.project~="game1" or command.schemaVersion~=9
+            or type(command.operationId)~="string" or command.operationId==""
+            or type(command.targetSlug)~="string" or command.targetSlug==""
+            or type(command.bindingRevision)~="number" or command.bindingRevision<1
+            or type(command.modelAssetId)~="string" or command.modelAssetId==""
+            or type(command.atlasAssetId)~="string" or command.atlasAssetId==""
+            or (command.phase~="scan" and command.phase~="select" and command.phase~="attach" and command.phase~="replace") then
+            warn("[game1] rejected stale/unscoped Studio Mesh ID command")
             return
         end
-        local ok, report, refreshError = pcall(function()
-            if config.RunService:IsRunning() then
-                error("Studio Edit mode required")
+        local ok, report, failure=pcall(function()
+            if config.RunService:IsRunning() then error("Studio Edit mode required") end
+            if command.phase=="scan" then
+                if type(command.modelHistory)~="table" then error("Model history required") end
+                return config.decoManager:previewMeshSync(command.targetSlug,
+                    command.modelAssetId,command.atlasAssetId,command.bindingRevision,
+                    command.modelHistory,command.modelMeshInventory)
             end
-            return config.decoManager:refreshRegistry(
-                command.targetSlug, true, command.modelAssetId, command.atlasAssetId)
+            if command.phase=="select" then
+                if type(command.scanToken)~="string" or type(command.partKeys)~="table" then
+                    error("Find Mesh IDs before Select in Studio")
+                end
+                return config.decoManager:selectMeshSyncPart(command.targetSlug,
+                    command.modelAssetId,command.atlasAssetId,command.scanToken,
+                    command.bindingRevision,command.partKeys)
+            end
+            if command.phase=="attach" then
+                if type(command.scanToken)~="string" or type(command.partKey)~="string" then
+                    error("Find Mesh IDs before linking historical Model")
+                end
+                return config.decoManager:attachHistoricalMeshSync(command.targetSlug,
+                    command.modelAssetId,command.atlasAssetId,command.scanToken,
+                    command.bindingRevision,command.partKey)
+            end
+            if type(command.scanToken)~="string" or type(command.selectedKeys)~="table" then
+                error("Find Mesh IDs and select pending MeshParts first") end
+            return config.decoManager:refreshRegistry(command.targetSlug,true,
+                command.modelAssetId,command.atlasAssetId,command.scanToken,command.bindingRevision,
+                command.selectedKeys)
         end)
-        local payload = {
-            project = "game1", command = "deco-refresh", schemaVersion = 6,
-            operationId = command.operationId, targetSlug = command.targetSlug,
-            bindingRevision = command.bindingRevision,
-        }
-        if ok and report ~= nil then
-            for _, field in ipairs({ "models", "parts", "replacedModels", "matchedModels",
-                "modelReferences", "pendingGeometry", "geometryUpdated", "meshPartsUpdated", "registryItems", "changes", "instances" }) do
-                payload[field] = report[field]
-            end
+        local payload={project="game1",command="deco-refresh",schemaVersion=9,
+            operationId=command.operationId,targetSlug=command.targetSlug,
+            bindingRevision=command.bindingRevision,phase=command.phase}
+        if ok and report then
+            local fields=if command.phase=="scan" then {
+                "scanToken","mode","inventory","foundMeshParts","managedMeshParts",
+                "unmanagedMeshParts","managedModels","texturePending","geometryPending",
+                "meshPending","parts","expectedMeshIds"
+            } elseif command.phase=="select" then {
+                "selectedName","selectedPath","selectedCount"
+            } else {
+                "models","parts","replacedModels","matchedModels","modelReferences",
+                "pendingGeometry","geometryUpdated","meshPartsUpdated","registryItems",
+                "changes","instances","fullySynced"
+            }
+            for _, field in ipairs(fields) do payload[field]=report[field] end
         else
-            payload.error = tostring(if ok then refreshError else report)
+            payload.error=tostring(if ok then failure else report)
         end
-        local posted, response = pcall(config.HttpService.RequestAsync, config.HttpService, {
-            Url = config.bridgeUrl .. "/deco-refresh-result", Method = "POST",
-            Headers = { ["X-Game1-Token"] = config.bridgeToken,
-                ["Content-Type"] = "application/json" },
-            Body = config.HttpService:JSONEncode(payload),
+        local sent,response=pcall(config.HttpService.RequestAsync,config.HttpService,{
+            Url=config.bridgeUrl.."/deco-refresh-result",Method="POST",
+            Headers={["X-Game1-Token"]=config.bridgeToken,["Content-Type"]="application/json"},
+            Body=config.HttpService:JSONEncode(payload),
         })
-        if not posted or not response.Success then
-            warn("[game1] Location Asset sync result could not be reported: " .. tostring(if posted then response.Body else response))
+        if not sent or not response.Success then
+            warn("[game1] Mesh ID Sync result could not be reported: "..tostring(if sent then response.Body else response))
         end
     end
 end
@@ -4234,7 +4551,7 @@ end
 
 -- This is a transaction, not a placed-Model clone. Old children remain alive
 -- until EVERY target has passed commit. Rollback can reattach them unchanged.
-function RigSwap.Prepare(root: Model, outgoing: {Instance}, incoming: {Instance}): any
+function RigSwap.Prepare(root: Model, outgoing: {Instance}, incoming: {Instance}, options: any?): any
     if not root:IsA("Model") or root.Parent == nil or #outgoing == 0 or #incoming == 0 then
         error("managed rig replacement requires a placed root and nonempty child lists")
     end
@@ -4301,8 +4618,23 @@ function RigSwap.Prepare(root: Model, outgoing: {Instance}, incoming: {Instance}
                 end
             end
         end
+        if not newPrimary and options and options.preferredPrimary then
+            -- Only when explicitly requested by the domain adapter.
+            -- The old/new FBX importer paths may differ; a new published
+            -- PrimaryPart is a validated anchor without guessing a name.
+            local candidate=options.preferredPrimary
+            if not candidate:IsA("BasePart") then
+                error("managed rig replacement: preferred PrimaryPart must be a BasePart")
+            end
+            for _, child in ipairs(incoming) do
+                if candidate==child or candidate:IsDescendantOf(child) then
+                    newPrimary=candidate
+                    break
+                end
+            end
+        end
         if not newPrimary then
-            error("managed rig replacement: published rig lacks matching PrimaryPart")
+            error("managed rig replacement: published rig lacks a verified PrimaryPart")
         end
     end
     local old = {}
@@ -4584,7 +4916,7 @@ function Core.ApplyLocationModel(model: Model, allowedNames: {[string]: boolean}
             local explicit = typeof(raw) == "table"
             local glass = if explicit and typeof(raw.glass) == "boolean" then raw.glass else namedGlass
             local doublesided = if explicit and typeof(raw.doubleSided) == "boolean"
-                then raw.doubleSided else true
+                then raw.doubleSided else false
             local defaultNoCollide = if hasCollider then not collider else not (collider or namedGlass)
             local noCollide = if explicit and typeof(raw.noCollide) == "boolean"
                 then raw.noCollide else defaultNoCollide
@@ -4596,7 +4928,7 @@ function Core.ApplyLocationModel(model: Model, allowedNames: {[string]: boolean}
             else
                 -- Legacy Location without COL: do not override pre-M232 published physics.
                 mesh.CanTouch = false
-                mesh.DoubleSided = true
+                mesh.DoubleSided = false
             end
             if collider then
                 mesh.Transparency = 1
@@ -5760,9 +6092,386 @@ return table.freeze(PlotsVisibility)
       </Item>
       <Item class="ModuleScript" referent="31">
         <Properties>
+          <string name="Name">StudioPublishedMeshHistory</string>
+          <string name="Source"><![CDATA[-- ID provenance of published Model assets. Real Estate and Location Assets
+-- both keep StudioManagedRigSwap as the sole child-rig transaction.
+local MeshPhysics = require(script.Parent.StudioMeshPhysicsCore)
+local Inventory = {}
+
+function Inventory.Id(value: any): string
+    return tostring(value or ""):match("(%d+)$") or ""
+end
+
+function Inventory.Parts(root: Instance): {MeshPart}
+    local parts = {}
+    for _, item in ipairs(root:GetDescendants()) do
+        if item:IsA("MeshPart") then table.insert(parts, item) end
+    end
+    return parts
+end
+
+function Inventory.Describe(modelId: string, model: Model): any
+    local counts,visualNames = {},{}
+    for _, part in ipairs(Inventory.Parts(model)) do
+        local mid = Inventory.Id(part.MeshId)
+        if mid ~= "" then
+            counts[mid] = (counts[mid] or 0) + 1
+            if not MeshPhysics.IsCollider(part.Name)
+                and part:GetAttribute("Game1DecoPhysicsOnly") ~= true then
+                visualNames[mid] = visualNames[mid] or {}
+                visualNames[mid][string.sub(part.Name,1,128)] = true
+            end
+        end
+    end
+    local meshes = {}
+    for mid, count in pairs(counts) do
+        local names={}
+        for name in pairs(visualNames[mid] or {}) do table.insert(names,name) end
+        table.sort(names)
+        table.insert(meshes,{meshId=mid,count=count,visualNames=names})
+    end
+    table.sort(meshes, function(a,b) return a.meshId<b.meshId end)
+    return {modelAssetId=modelId,meshes=meshes}
+end
+
+-- A historical publication is a candidate ONLY when the entire Mesh ID
+-- multiset of the placed instance agrees with the saved publication. A shared
+-- collider ID or one overlapping visual mesh is not proof of provenance.
+function Inventory.MatchesInventory(placed: Model, inventory: any): boolean
+    if type(inventory) ~= "table" or type(inventory.meshes) ~= "table" then return false end
+    local actual = Inventory.Describe("", placed).meshes
+    local expected = {}
+    for _, entry in ipairs(inventory.meshes) do
+        if type(entry.meshId) ~= "string" or type(entry.count) ~= "number" then return false end
+        if expected[entry.meshId] ~= nil or entry.count < 1 then return false end
+        expected[entry.meshId] = entry.count
+    end
+    if #actual ~= #inventory.meshes then return false end
+    for _, entry in ipairs(actual) do
+        if expected[entry.meshId] ~= entry.count then return false end
+    end
+    return true
+end
+
+function Inventory.Ids(model: Model): {[string]: boolean}
+    local ids = {}
+    for _, part in ipairs(Inventory.Parts(model)) do
+        local mid = Inventory.Id(part.MeshId)
+        if mid ~= "" then ids[mid] = true end
+    end
+    return ids
+end
+
+local function sameFrame(a: CFrame, b: CFrame): boolean
+    return (a.Position-b.Position).Magnitude < 0.04
+        and a.LookVector:Dot(b.LookVector)>0.9995
+        and a.UpVector:Dot(b.UpVector)>0.9995
+end
+
+function Inventory.Provenance(placed: Model, oldPublished: Model): CFrame
+    -- Only a unique MeshId in both *the old immutable publication* and its
+    -- placed instance can prove the historical authored transform. Old/new
+    -- importer names and hierarchy are intentionally irrelevant.
+    local older, placedById = {}, {}
+    for _, source in ipairs({{oldPublished,older},{placed,placedById}}) do
+        for _, part in ipairs(Inventory.Parts(source[1])) do
+            local mid = Inventory.Id(part.MeshId)
+            if mid~="" then
+                source[2][mid] = source[2][mid] or {}
+                table.insert(source[2][mid],part)
+            end
+        end
+    end
+    local transform: CFrame? = nil
+    for mid, oldParts in pairs(older) do
+        local placedParts = placedById[mid]
+        if #oldParts==1 and placedParts and #placedParts==1 then
+            local candidate = placedParts[1]:GetPivot() * oldParts[1]:GetPivot():Inverse()
+            if transform and not sameFrame(transform,candidate) then
+                error("historical Mesh IDs disagree on placed transform; no Place geometry modified")
+            end
+            transform=candidate
+        end
+    end
+    if not transform then
+        error("cannot recover authored transform from unique historical Mesh IDs; no Place geometry modified")
+    end
+    return transform
+end
+
+function Inventory.VerifyChildren(oldPublished: Model, children: {Instance})
+    -- Validate the COMPLETE physical-part multiset, not only membership.
+    -- A manually duplicated MeshPart with an existing MeshId must not be
+    -- mistaken for published geometry and silently deleted by RigSwap.
+    local expectedMeshes, expectedOtherParts = {}, {}
+    for _, part in ipairs(oldPublished:GetDescendants()) do
+        if part:IsA("MeshPart") then
+            local mid = Inventory.Id(part.MeshId)
+            expectedMeshes[mid] = (expectedMeshes[mid] or 0) + 1
+        elseif part:IsA("BasePart") then
+            expectedOtherParts[part.ClassName] = (expectedOtherParts[part.ClassName] or 0) + 1
+        end
+    end
+    local actualMeshes, actualOtherParts = {}, {}
+    for _, child in ipairs(children) do
+        local parts = {}
+        if child:IsA("BasePart") then table.insert(parts, child) end
+        for _, descendant in ipairs(child:GetDescendants()) do
+            if descendant:IsA("BasePart") then table.insert(parts, descendant) end
+        end
+        if #parts == 0 then error("unverified placed geometry subtree; no Place geometry modified") end
+        for _, part in ipairs(parts) do
+            if part:IsA("MeshPart") then
+                local mid = Inventory.Id(part.MeshId)
+                actualMeshes[mid] = (actualMeshes[mid] or 0) + 1
+            else
+                actualOtherParts[part.ClassName] = (actualOtherParts[part.ClassName] or 0) + 1
+            end
+        end
+    end
+    for mid, count in pairs(expectedMeshes) do
+        if actualMeshes[mid] ~= count then
+            error("placed MeshPart inventory differs from previous published Model; no Place geometry modified")
+        end
+    end
+    for mid in pairs(actualMeshes) do
+        if expectedMeshes[mid] == nil then
+            error("placed MeshPart outside previous published Model inventory; no Place geometry modified")
+        end
+    end
+    for className, count in pairs(expectedOtherParts) do
+        if actualOtherParts[className] ~= count then
+            error("placed physical part inventory differs from previous published Model; no Place geometry modified")
+        end
+    end
+    for className in pairs(actualOtherParts) do
+        if expectedOtherParts[className] == nil then
+            error("unverified extra physical part in managed geometry; no Place geometry modified")
+        end
+    end
+    -- The outgoing rig can also contain Bones, WrapLayers, attachments,
+    -- constraints or hand-added scripts. Merely matching MeshId counts does
+    -- NOT authorize destroying arbitrary children of those MeshParts. Compare
+    -- the full non-texture class hierarchy of the previous immutable Model
+    -- with the managed outgoing subtrees. Names are intentionally ignored:
+    -- authoring may rename parts, and Mesh IDs establish provenance.
+    -- SurfaceAppearance is the one exception, since atlas attachment is
+    -- handled separately and older publications may not contain it.
+    local function signatures(roots: {Instance}): {[string]: number}
+        local result = {}
+        local function visit(item: Instance, prefix: string)
+            if item:IsA("SurfaceAppearance") then return end
+            local path = prefix .. "/" .. item.ClassName
+            result[path] = (result[path] or 0) + 1
+            for _, child in ipairs(item:GetChildren()) do
+                visit(child, path)
+            end
+        end
+        for _, root in ipairs(roots) do visit(root, "") end
+        return result
+    end
+    local oldChildren = {}
+    for _, child in ipairs(oldPublished:GetChildren()) do
+        if child:IsA("BasePart") or (child:IsA("Model") or child:IsA("Folder"))
+            and child:FindFirstChildWhichIsA("BasePart", true) then
+            table.insert(oldChildren, child)
+        end
+    end
+    local expectedTree = signatures(oldChildren)
+    local actualTree = signatures(children)
+    for path, count in pairs(expectedTree) do
+        if actualTree[path] ~= count then
+            error("placed rig hierarchy differs from previously published Model; no Place geometry modified")
+        end
+    end
+    for path in pairs(actualTree) do
+        if expectedTree[path] == nil then
+            error("unverified placed rig descendant; no Place geometry modified")
+        end
+    end
+end
+
+-- An untagged historic MeshPart is NEVER proof of ownership by itself.
+-- Only an entire previously published Model inventory allows an explicit
+-- link action. Fail closed if any ancestor/descendant has asset ownership.
+local function hasForeignOwnership(model: Model, workspace: Workspace): boolean
+    local cursor: Instance? = model
+    while cursor and cursor ~= workspace do
+        if cursor:IsA("Model") and (cursor:GetAttribute("Game1DecoAssetSlug") ~= nil
+            or cursor:GetAttribute("Game1DecoInstanceId") ~= nil) then return true end
+        cursor=cursor.Parent
+    end
+    for _, item in ipairs(model:GetDescendants()) do
+        if item:IsA("Model") and (item:GetAttribute("Game1DecoAssetSlug") ~= nil
+            or item:GetAttribute("Game1DecoInstanceId") ~= nil) then return true end
+    end
+    return false
+end
+
+local function legacyCandidate(part: MeshPart, workspace: Workspace,
+    versions: {any}, currentModelId: string): (Model?, string?)
+    local model=part:FindFirstAncestorOfClass("Model")
+    while model and model:IsDescendantOf(workspace) do
+        if hasForeignOwnership(model, workspace) then return nil, nil end
+        local matched: string? = nil
+        local ambiguous = false
+        for _, version in ipairs(versions) do
+            if version.modelAssetId ~= currentModelId and Inventory.MatchesInventory(model,version) then
+                if matched then ambiguous=true break end
+                matched=version.modelAssetId
+            end
+        end
+        if ambiguous then return nil,nil end
+        if matched then return model,matched end
+        local parent=model.Parent
+        while parent and parent~=workspace and not parent:IsA("Model") do parent=parent.Parent end
+        model=if parent and parent:IsA("Model") then parent else nil
+    end
+    return nil,nil
+end
+
+-- Every managed MeshPart is reported. Physics-only COL MeshParts have NO
+-- atlas contract: their TextureID/ColorMap are irrelevant, even if old imported
+-- Place geometry contains a leftover image ID.
+function Inventory.Scan(workspace: Workspace, slug: string, row: any,
+    versions: {string}, loader: any, cached: {any}?): any
+    if #versions<1 or #versions>48 then error("invalid bounded Model history") end
+    local cache = {}
+    for _, entry in ipairs(cached or {}) do
+        if type(entry)=="table" and type(entry.modelAssetId)=="string" and type(entry.meshes)=="table" then
+            cache[entry.modelAssetId]=entry
+        end
+    end
+    local newModelId = tostring(row.model_asset_id or "")
+    local previousIds,currentIds,inventory,seenIds = {},{},{},{}
+    for _, modelId in ipairs(versions) do
+        if seenIds[modelId] then error("duplicate Model history ID") end
+        seenIds[modelId]=true
+        local desc=cache[modelId]
+        -- M238 cache did not retain names: enrich the CURRENT publication once.
+        -- Never guess visual IDs from Blender mesh names or historical IDs.
+        if not desc or (modelId==newModelId and #desc.meshes>0
+            and type(desc.meshes[1].visualNames)~="table") then
+            local published=loader:loadForMeshInventory(modelId,slug)
+            desc=Inventory.Describe(modelId,published)
+            published:Destroy()
+        end
+        table.insert(inventory,desc)
+        local bucket=if modelId==newModelId then currentIds else previousIds
+        for _, entry in ipairs(desc.meshes) do bucket[entry.meshId]=true end
+    end
+    if not seenIds[newModelId] then error("current Model not found in published Model history") end
+    for mid in pairs(currentIds) do previousIds[mid]=nil end
+
+    local expectedMeshIds={}
+    for mid in pairs(currentIds) do table.insert(expectedMeshIds,mid) end
+    table.sort(expectedMeshIds)
+    local roots, seenRoot, geometryRoots={}, {}, {}
+    local rows, partByKey, legacyCandidates, legacySeen={}, {}, {}, {}
+    local managedCount, unmatched=0,0
+    local authoring=workspace:FindFirstChild("Game1Authoring")
+    local camera=workspace.CurrentCamera
+    local atlasId=tostring(row.texture_asset_id or "")
+    for _, part in ipairs(workspace:GetDescendants()) do
+        if part:IsA("MeshPart") and (not authoring or not part:IsDescendantOf(authoring))
+            and (not camera or not part:IsDescendantOf(camera)) then
+            local meshId=Inventory.Id(part.MeshId)
+            local old=previousIds[meshId]==true
+            local ancestor=part.Parent
+            local owner: Model?=nil
+            while ancestor and ancestor~=workspace do
+                if ancestor:IsA("Model") and ancestor:GetAttribute("Game1DecoAssetSlug")==slug
+                    and tostring(ancestor:GetAttribute("Game1DecoInstanceId") or "")~="" then
+                    owner=ancestor
+                    break
+                end
+                ancestor=ancestor.Parent
+            end
+            if old or owner then
+                if #rows>=4096 then error("more than 4096 matching MeshParts in Workspace") end
+                local key="p"..tostring(#rows+1)
+                local surface=part:FindFirstChildOfClass("SurfaceAppearance")
+                local textureApplicable = not MeshPhysics.IsCollider(part.Name)
+                    and part:GetAttribute("Game1DecoPhysicsOnly") ~= true
+                local textureId=if textureApplicable then Inventory.Id(part.TextureID) else ""
+                local colorMapId=if textureApplicable and surface then Inventory.Id(surface.ColorMap) else ""
+                local textureCurrent=not textureApplicable or (textureId==atlasId
+                    and (not surface or colorMapId==atlasId))
+                local meshCurrent=currentIds[meshId]==true
+                local path=part:GetFullName()
+                local legacyRoot,legacyModelId=nil,nil
+                if old and not owner then
+                    legacyRoot,legacyModelId=legacyCandidate(part,workspace,inventory,newModelId)
+                    if legacyRoot and legacySeen[legacyRoot] then legacyRoot,legacyModelId=nil,nil end
+                    if legacyRoot then legacySeen[legacyRoot]=true end
+                end
+                local container=owner or part:FindFirstAncestorOfClass("Model") or part
+                local entry={key=key,name=part.Name,path=string.sub(path,1,240),
+                    modelName=string.sub(container.Name,1,128),
+                    modelPath=string.sub(container:GetFullName(),1,240),
+                    isCollider=MeshPhysics.IsCollider(part.Name),
+                    instanceId=if owner then tostring(owner:GetAttribute("Game1DecoInstanceId")) else "",
+                    meshId=meshId,textureId=textureId,colorMapId=colorMapId,
+                    hasSurface=textureApplicable and surface~=nil,textureApplicable=textureApplicable,managed=owner~=nil,
+                    attachable=legacyRoot~=nil,historicalModelId=legacyModelId or "",
+                    meshCurrent=meshCurrent,textureCurrent=textureCurrent,
+                    needsMesh=false,needsTexture=not textureCurrent}
+                table.insert(rows,entry)
+                partByKey[key]={part=part,root=owner,row=entry}
+                if legacyRoot then
+                    legacyCandidates[key]={root=legacyRoot,modelId=legacyModelId,
+                        parent=legacyRoot.Parent,pivot=legacyRoot:GetPivot(),
+                        scale=legacyRoot:GetScale(),meshCount=#Inventory.Parts(legacyRoot)}
+                end
+                if owner then
+                    managedCount+=1
+                    if not seenRoot[owner] then
+                        table.insert(roots,owner)
+                        seenRoot[owner]=true
+                    end
+                    if old or not meshCurrent
+                        or tostring(owner:GetAttribute("Game1DecoPublishedModelAssetId") or "")~=newModelId
+                        or tostring(owner:GetAttribute("Game1DecoPublishedModelSha256") or "")~=tostring(row.model_published_sha256 or "") then
+                        geometryRoots[owner]=true
+                    end
+                else
+                    unmatched+=1
+                end
+            end
+        end
+    end
+    local texturePending, meshPending, pending=0,0,0
+    for _ in pairs(geometryRoots) do pending+=1 end
+    for _, entry in ipairs(rows) do
+        if entry.managed then
+            local bound=partByKey[entry.key]
+            entry.needsMesh=geometryRoots[bound.root]==true
+            if entry.needsMesh then meshPending+=1 end
+            if entry.needsTexture then texturePending+=1 end
+        end
+    end
+    -- Find is strictly read-only and never changes Studio Selection. The user
+    -- explicitly selects a single row via the separate Select in Studio phase.
+    local mode=if pending>0 and texturePending>0 then "texture_mesh"
+        elseif pending>0 then "mesh" elseif texturePending>0 then "texture" else "current"
+    return {inventory=inventory,expectedMeshIds=expectedMeshIds,parts=rows,
+        partByKey=partByKey,legacyCandidates=legacyCandidates,
+        foundMeshParts=#rows,managedMeshParts=managedCount,
+        unmanagedMeshParts=unmatched,managedModels=#roots,
+        texturePending=texturePending,meshPending=meshPending,geometryPending=pending,mode=mode,
+        roots=roots,geometryRoots=geometryRoots,
+        publishedModelId=newModelId,publishedAtlasId=atlasId}
+end
+
+return table.freeze(Inventory)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="32">
+        <Properties>
           <string name="Name">StudioRealEstateCollisionPolicy</string>
           <string name="Source"><![CDATA[-- Real Estate physics profile; shared MeshPhysicsCore writes MeshPart physics.
--- All authored visual parts are DoubleSided by default; COL_* remains physics-only.
+-- New authored MeshParts default to single-sided; existing explicit overrides remain.
 local CollectionService = game:GetService("CollectionService")
 local Core = require(script.Parent.StudioMeshPhysicsCore)
 local Policy = {}
@@ -5801,7 +6510,7 @@ function Policy.Apply(mesh: MeshPart, name: string, raw: any)
     -- Roblox requires CanQuery=true for collidable parts. Touch remains off
     -- (collision physics does not require a Touched event listener).
     Core.Apply(mesh, not noCollide, fidelity,
-        if typeof(settings.doubleSided) == "boolean" then settings.doubleSided else true)
+        if typeof(settings.doubleSided) == "boolean" then settings.doubleSided else false)
     -- Capture the *authoring policy* on the MeshPart itself. Studio copies can
     -- be revalidated without a Host Agent request or a full model reimport.
     -- This metadata is not a second registry: it is the applied snapshot.
@@ -5867,7 +6576,7 @@ return table.freeze(Policy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="32">
+      <Item class="ModuleScript" referent="33">
         <Properties>
           <string name="Name">StudioRealEstateHouseFrame</string>
           <string name="Source"><![CDATA[-- Author-space transform for all Real Estate Studio sync paths.
@@ -5894,7 +6603,7 @@ return table.freeze(HouseFrame)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="33">
+      <Item class="ModuleScript" referent="34">
         <Properties>
           <string name="Name">StudioRealEstateModel</string>
           <string name="Source"><![CDATA[-- Studio assembly for any number of independent Real Estate MeshPart rigs.
@@ -6178,7 +6887,7 @@ return table.freeze(StudioRealEstateModel)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="34">
+      <Item class="ModuleScript" referent="35">
         <Properties>
           <string name="Name">StudioRealEstatePartPlacement</string>
           <string name="Source"><![CDATA[-- Restore source-FBX mesh centres after independent Model Asset import.
@@ -6302,7 +7011,7 @@ return table.freeze(Placement)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="35">
+      <Item class="ModuleScript" referent="36">
         <Properties>
           <string name="Name">StudioRealEstatePartSync</string>
           <string name="Source"><![CDATA[-- Atomic, single-rig refresh of a managed Real Estate template.
@@ -6536,7 +7245,7 @@ return table.freeze(PartSync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="36">
+      <Item class="ModuleScript" referent="37">
         <Properties>
           <string name="Name">StudioRealEstatePlacedCollisionSync</string>
           <string name="Source"><![CDATA[-- Repair *only* authoring-managed collision rigs of already placed Estates.
@@ -6611,7 +7320,7 @@ return table.freeze(Sync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="37">
+      <Item class="ModuleScript" referent="38">
         <Properties>
           <string name="Name">StudioRealEstatePlacedPhysicsGuard</string>
           <string name="Source"><![CDATA[-- Studio Edit Mode: normalize a managed Estate pasted or dragged from
@@ -6683,7 +7392,7 @@ return table.freeze(Guard)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="38">
+      <Item class="ModuleScript" referent="39">
         <Properties>
           <string name="Name">StudioRealEstatePlacedTargets</string>
           <string name="Source"><![CDATA[-- One authoritative definition of a placed Real Estate instance.
@@ -6728,7 +7437,7 @@ return table.freeze(Targets)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="39">
+      <Item class="ModuleScript" referent="40">
         <Properties>
           <string name="Name">StudioRealEstatePlacedVisualSync</string>
           <string name="Source"><![CDATA[-- Full Real Estate sync: refresh visual rigs on *all managed placed* houses.
@@ -6847,7 +7556,7 @@ return table.freeze(VisualSync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="40">
+      <Item class="ModuleScript" referent="41">
         <Properties>
           <string name="Name">StudioRealEstateRigValidation</string>
           <string name="Source"><![CDATA[-- Validate an already-published Real Estate Model Asset as actually loaded by Roblox.
@@ -6976,7 +7685,7 @@ return table.freeze(Validation)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="41">
+      <Item class="ModuleScript" referent="42">
         <Properties>
           <string name="Name">StudioTextureAppearance</string>
           <string name="Source"><![CDATA[-- Shared Studio-side material binding for all authored MeshParts.
@@ -7063,7 +7772,7 @@ return table.freeze(StudioTextureAppearance)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="42">
+      <Item class="ModuleScript" referent="43">
         <Properties>
           <string name="Name">StudioTimelineEditorCommands</string>
           <string name="Source"><![CDATA[-- Timeline authoring session: validates requests, binds UI events and reports results.
@@ -7352,7 +8061,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="43">
+      <Item class="ModuleScript" referent="44">
         <Properties>
           <string name="Name">StudioTimelinePoseSampler</string>
           <string name="Source"><![CDATA[-- Offline pose extraction and interpolation for a preview rig. No UI or HTTP dependencies.
@@ -7531,7 +8240,7 @@ return table.freeze(StudioTimelinePoseSampler)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="44">
+      <Item class="ModuleScript" referent="45">
         <Properties>
           <string name="Name">StudioTimelinePreview</string>
           <string name="Source"><![CDATA[-- Owns the isolated ViewportFrame rig, camera interaction and animation-asset retrieval.
@@ -7747,7 +8456,7 @@ return table.freeze(StudioTimelinePreview)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="45">
+      <Item class="ModuleScript" referent="46">
         <Properties>
           <string name="Name">StudioTimelineTransport</string>
           <string name="Source"><![CDATA[-- HTTP boundary for the Timeline editor. No UI, animation or Studio model access.
@@ -7805,7 +8514,7 @@ return table.freeze(StudioTimelineTransport)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="46">
+      <Item class="ModuleScript" referent="47">
         <Properties>
           <string name="Name">StudioTimelineWidget</string>
           <string name="Source"><![CDATA[-- Timeline editor view. Builds the dock widget and exposes only its controls.

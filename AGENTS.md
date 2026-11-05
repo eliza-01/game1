@@ -209,3 +209,54 @@ old/new comparison and explicit consumer-impact approval. Location Model publica
 is model-only. Both modals expose one bottom-level explicit scoped Studio Sync;
 report the actual Bridge error inline. See
 `docs/workflows/SHARED_ATLAS_EDITOR_APPLY_M234_RU.md`.
+
+### M236 · Location Assets published-ID Studio sync
+- Studio Sync performs read-only `Find Mesh IDs` (schema 7), then an explicit
+  token-scoped `Replace Texture` / `Replace Mesh` / `Replace Texture + Mesh`
+  based on actual differences. Never mutate Place during Find.
+- Preserve separate immutable Model Asset ID and per-version MeshPart.MeshId
+  inventories. Match older placed geometry by Mesh ID, not importer paths/names.
+- Both domain adapters use StudioManagedRigSwap for managed-child replacement.
+  Never recreate or move the placed root; abort on uncertain authored frame.
+- See `docs/workflows/LOCATION_ASSETS_ID_HISTORY_TWO_PHASE_SYNC_M236_RU.md`.
+
+## M237 · Per-MeshPart Location Studio Sync
+
+The Location studio scan must compare managed visual MeshPart MeshId and
+applicable TextureID / SurfaceAppearance.ColorMap against published IDs.
+(M238 overrides this milestone's earlier collider-texture rule: COL is physics-only.)
+Expose current published Model/Mesh/Atlas IDs, every managed part with separate
+status, and external historic matches as non-selectable diagnostics. Studio
+Sync accepts only explicit pending-part selections from the one-time scan token.
+Texture-only selections mutate selected parts; any geometry selection invokes
+shared StudioManagedRigSwap for its entire managed child rig (never the root).
+Partial sync must not acknowledge the whole Atlas Registry binding.
+See docs/workflows/LOCATION_ASSETS_MESHPART_REPORT_SELECTIVE_SYNC_M237_RU.md.
+
+## M238 · Studio selection, physics-only atlas and authoring defaults
+
+Studio Bridge protocol 8 adds read-only `select` (scanToken + partKey),
+selecting one scanned Model in Studio. `Find` never changes Studio Selection.
+Location collision MeshParts (`COL_*`, `_col`, `col_mesh`) have no atlas
+contract: report no Texture status or stale warning and never assign a new
+Atlas ID to them. Shared FBX/Real Estate/Location authoring defaults
+`DoubleSided=false`, while explicitly saved true/false remains authoritative.
+External historical Mesh ID matches are selectable in Studio Explorer but
+remain ineligible for Sync until linked to the registered asset through
+a separately authenticated, explicit `attach` authoring operation; never infer ownership from
+one matching ID. All modal rerenders preserve scroll position.
+
+## M239 · Model-grouped Location Studio diagnostics
+
+Show Studio scan results grouped by placed root Model, not separate COL/visual
+sync cards. COL is physics-only: render just collider presence (or a concise
+missing-COL warning), never Texture IDs. Each managed Model has one scoped
+Sync; Sync All always renders and is a no-op if all managed models are current.
+There is no UI Sync selection state. `Select in Studio` selects a Model;
+`Select All` selects all scanned Models (including historic unlinked references)
+with one read-only Studio Bridge phase `select` (schema 9, `partKeys`). Selection
+never modifies the Place or marks an atlas synchronized; external historic
+matches are never eligible for Replace without explicit verified linking.
+Registered Assets uses persisted current-version published `visualNames` and
+Mesh IDs; it must not infer Mesh IDs from FBX part names or list COL IDs.
+See `docs/workflows/LOCATION_ASSETS_MODEL_GROUPED_SYNC_M239_RU.md`.

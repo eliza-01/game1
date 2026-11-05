@@ -129,6 +129,13 @@ class LocationAssetStore:
                     published_at REAL NOT NULL
                 )"""
             )
+            connection.execute("""CREATE TABLE IF NOT EXISTS location_asset_mesh_id_inventory(
+                asset_slug TEXT NOT NULL,
+                model_asset_id TEXT NOT NULL,
+                meshes_json TEXT NOT NULL,
+                observed_at REAL NOT NULL,
+                PRIMARY KEY(asset_slug,model_asset_id)
+            )""")
             if 'mesh_options_json' not in columns:
                 # Capture a consistent SQLite snapshot before the additive migration.
                 # Do not mix the backup with the authoring source/assets.
@@ -293,7 +300,21 @@ class LocationAssetStore:
             ).fetchall()]
         rows_by_slug = {str(row.get("slug") or ""): row for row in rows}
         atlas_catalog = self.atlases.catalog()
-        return [self._decorate(row, rows_by_slug, atlas_catalog) for row in rows]
+        decorated = [self._decorate(row, rows_by_slug, atlas_catalog) for row in rows]
+        # Read-only library presentation: reuse the scan inventory already in SQLite.
+        # No Roblox asset loads, no inference from names in an FBX.
+        with self.connect() as db:
+            inventories = db.execute('SELECT asset_slug,model_asset_id,meshes_json '
+                'FROM location_asset_mesh_id_inventory').fetchall()
+        by_version = {(record['asset_slug'],str(record['model_asset_id'])):
+            json.loads(record['meshes_json']) for record in inventories}
+        for item in decorated:
+            item['publishedVisualMeshes'] = [
+                {'meshId':entry['meshId'],'name':name}
+                for entry in by_version.get((item['slug'],str(item.get('model_asset_id') or '')),[])
+                for name in entry.get('visualNames',[])
+            ]
+        return decorated
 
     def get(self, slug: str) -> dict | None:
         row = self._raw_get(slug)
@@ -509,6 +530,7 @@ class LocationAssetStore:
                       file, ensure_ascii=False, indent=2)
         with self.connect() as connection:
             connection.execute("DELETE FROM location_asset_publications WHERE asset_slug=?", (normalized,))
+            connection.execute("DELETE FROM location_asset_mesh_id_inventory WHERE asset_slug=?", (normalized,))
             connection.execute("DELETE FROM location_assets WHERE slug=?", (normalized,))
         self.atlases.unbind('location_asset', normalized)
         self.export()
@@ -523,6 +545,65 @@ class LocationAssetStore:
                 (str(slug or "").strip().lower(),),
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def model_publication_ids(self, slug: str) -> list[str]:
+        """The immutable published Model Asset IDs; never infer MeshPart IDs from them."""
+        if not SLUG_RE.fullmatch(slug):
+            raise ValueError('invalid Location Asset slug')
+        with self.connect() as db:
+            rows = db.execute("SELECT asset_id FROM location_asset_publications "
+                              "WHERE asset_slug=? AND kind='model' ORDER BY id DESC", (slug,)).fetchall()
+        ids = list(dict.fromkeys(str(row['asset_id']) for row in rows))
+        current = self.get(slug)
+        if current and current.get('model_asset_id'):
+            value = str(current['model_asset_id'])
+            if value not in ids:
+                ids.insert(0, value)
+        return ids[:48]
+
+    def record_mesh_id_inventory(self, slug: str, records: list[dict]) -> None:
+        """Cache Studio-observed MeshPart IDs per immutable published Model version."""
+        if not SLUG_RE.fullmatch(slug) or not isinstance(records, list) or len(records) > 48:
+            raise ValueError('invalid MeshPart inventory')
+        import re as _re
+        observed = set()
+        prepared = []
+        for record in records:
+            model_id = str(record.get('modelAssetId') or '')
+            if not _re.fullmatch(r'[1-9][0-9]{0,19}', model_id) or model_id in observed:
+                raise ValueError('invalid/duplicate published Model ID')
+            observed.add(model_id)
+            meshes = record.get('meshes')
+            if not isinstance(meshes, list) or len(meshes) > 4096:
+                raise ValueError('invalid MeshPart inventory size')
+            mesh_ids = set()
+            for item in meshes:
+                mesh_id = str(item.get('meshId') or '')
+                count = item.get('count')
+                if (not _re.fullmatch(r'[1-9][0-9]{0,19}', mesh_id)
+                        or mesh_id in mesh_ids or type(count) is not int or not 1 <= count <= 4096):
+                    raise ValueError('invalid MeshPart ID or count')
+                mesh_ids.add(mesh_id)
+                names = item.get('visualNames', [])
+                if (not isinstance(names,list) or len(names)>4096 or
+                    any(not isinstance(name,str) or not 1 <= len(name) <= 128 for name in names) or
+                    len(set(names)) != len(names)):
+                    raise ValueError('invalid published visual MeshPart names')
+            prepared.append((slug, model_id, json.dumps(meshes, separators=(',', ':')), time.time()))
+        with self.connect() as db:
+            db.executemany("INSERT INTO location_asset_mesh_id_inventory"
+                           "(asset_slug,model_asset_id,meshes_json,observed_at) VALUES(?,?,?,?) "
+                           "ON CONFLICT(asset_slug,model_asset_id) DO UPDATE SET "
+                           "meshes_json=excluded.meshes_json,observed_at=excluded.observed_at", prepared)
+
+    def mesh_id_inventory(self, slug: str) -> list[dict]:
+        if not SLUG_RE.fullmatch(slug):
+            raise ValueError('invalid Location Asset slug')
+        with self.connect() as db:
+            records = db.execute('SELECT model_asset_id,meshes_json FROM location_asset_mesh_id_inventory '
+                                 'WHERE asset_slug=? ORDER BY observed_at DESC LIMIT 48', (slug,)).fetchall()
+        return [{'modelAssetId': str(row['model_asset_id']), 'meshes': json.loads(row['meshes_json'])}
+                for row in records]
 
     def snapshot(self) -> dict:
         items = self.list()

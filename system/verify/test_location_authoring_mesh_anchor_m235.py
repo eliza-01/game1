@@ -22,13 +22,14 @@ class LocationAnchorM235(TestCase):
                          'modules/StudioAuthoringMeshAnchor.luau')
         deco = self.source('DecoPlacedAssetSync.luau')
         house = self.source('StudioRealEstateHouseFrame.luau')
-        self.assertIn('require(script.Parent.StudioAuthoringMeshAnchor)', deco)
+        self.assertIn('require(script.Parent.StudioPublishedMeshHistory)', deco)
         self.assertIn('require(script.Parent.StudioAuthoringMeshAnchor)', house)
-        self.assertIn('MeshAnchor.Match(', deco)
+        self.assertIn('History.Provenance(model,previousPublished)', deco)
+        self.assertNotIn('MeshAnchor.Match(', deco)
         self.assertIn('MeshAnchor.FindUniqueNamed(root, "house")', house)
         self.assertNotIn('unique MeshPart name required', deco)
         self.assertIn('StudioManagedRigSwap', deco)
-        self.assertIn('RigSwap.AlignToAnchor(stage, freshAnchor, existingAnchor:GetPivot()', deco)
+        self.assertIn('stage:PivotTo(frame * stage:GetPivot())', deco)
 
     def test_multi_mesh_matches_choose_consistent_authoring_frame(self):
         code = self.source('StudioAuthoringMeshAnchor.luau')
@@ -61,10 +62,9 @@ class LocationAnchorM235(TestCase):
         self.assertLess(code.index('local primary = old.PrimaryPart'),
                         code.index('if #matches == 1 then'))
         deco = self.source('DecoPlacedAssetSync.luau')
-        self.assertIn('model:GetAttribute("Game1DecoAuthoringAnchorPath")', deco)
-        self.assertIn('transaction.authoringAnchorPath = authoringAnchorPath', deco)
-        commit = deco.index('RigSwap.Commit(item.swap)')
-        self.assertLess(commit, deco.index('model:SetAttribute("Game1DecoAuthoringAnchorPath",', commit))
+        self.assertIn('History.Provenance(model,previousPublished)', deco)
+        self.assertIn('RigSwap.Prepare(model, previousChildren, nextChildren,', deco)
+        self.assertNotIn('MeshAnchor.Match(', deco)
         self.assertIn('oldAnchorPath = model:GetAttribute("Game1DecoAuthoringAnchorPath")', deco)
         self.assertIn('model:SetAttribute("Game1DecoAuthoringAnchorPath", item.oldAnchorPath)', deco)
 
@@ -72,7 +72,7 @@ class LocationAnchorM235(TestCase):
         deco = self.source('DecoPlacedAssetSync.luau')
         for unsafe in ('ApplyMesh(', 'model:Destroy()', 'model:PivotTo(', 'previous:Destroy()'):
             self.assertNotIn(unsafe, deco)
-        self.assertLess(deco.index('RigSwap.Prepare(model, previousChildren, nextChildren)'),
+        self.assertLess(deco.index('RigSwap.Prepare(model, previousChildren, nextChildren,'),
                         deco.index('RigSwap.Commit(item.swap)'))
         self.assertIn('RigSwap.Rollback(item.swap)', deco)
         self.assertIn('Game1DecoSyncHistory', deco)

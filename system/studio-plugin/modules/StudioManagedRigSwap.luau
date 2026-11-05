@@ -24,7 +24,7 @@ end
 
 -- This is a transaction, not a placed-Model clone. Old children remain alive
 -- until EVERY target has passed commit. Rollback can reattach them unchanged.
-function RigSwap.Prepare(root: Model, outgoing: {Instance}, incoming: {Instance}): any
+function RigSwap.Prepare(root: Model, outgoing: {Instance}, incoming: {Instance}, options: any?): any
     if not root:IsA("Model") or root.Parent == nil or #outgoing == 0 or #incoming == 0 then
         error("managed rig replacement requires a placed root and nonempty child lists")
     end
@@ -91,8 +91,23 @@ function RigSwap.Prepare(root: Model, outgoing: {Instance}, incoming: {Instance}
                 end
             end
         end
+        if not newPrimary and options and options.preferredPrimary then
+            -- Only when explicitly requested by the domain adapter.
+            -- The old/new FBX importer paths may differ; a new published
+            -- PrimaryPart is a validated anchor without guessing a name.
+            local candidate=options.preferredPrimary
+            if not candidate:IsA("BasePart") then
+                error("managed rig replacement: preferred PrimaryPart must be a BasePart")
+            end
+            for _, child in ipairs(incoming) do
+                if candidate==child or candidate:IsDescendantOf(child) then
+                    newPrimary=candidate
+                    break
+                end
+            end
+        end
         if not newPrimary then
-            error("managed rig replacement: published rig lacks matching PrimaryPart")
+            error("managed rig replacement: published rig lacks a verified PrimaryPart")
         end
     end
     local old = {}

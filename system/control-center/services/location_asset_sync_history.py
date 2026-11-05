@@ -63,10 +63,21 @@ class LocationAssetSyncHistory:
                     or not studio_path or len(studio_path) > 1024):
                 raise ValueError('invalid Studio instance history identity')
             seen.add(instance_id)
+            meshes = {}
+            for key in ('meshIdsBefore','meshIdsAfter'):
+                entries = item.get(key, [])
+                if not isinstance(entries, list) or len(entries)>4096:
+                    raise ValueError('invalid Mesh ID history entries')
+                for entry in entries:
+                    if (not isinstance(entry,dict) or not re.fullmatch(r'[1-9][0-9]{0,19}',str(entry.get('meshId') or ''))
+                        or type(entry.get('count')) is not int or not 1 <= entry['count'] <= 4096):
+                        raise ValueError('invalid Mesh ID history ID/count')
+                meshes[key] = entries
             validated.append({
                 'instanceId': instance_id,
                 'studioPath': studio_path,
                 'changes': cls._validate_changes(item.get('changes'), allow_empty=False),
+                **meshes,
             })
         return validated
 

@@ -69,7 +69,7 @@ local decoManager = DecoManager.new({
     toolbar = toolbar,
     HttpService = HttpService,
     AssetService = AssetService,
-    Workspace = Workspace,
+    Workspace = Workspace, Selection = Selection,
     ServerStorage = ServerStorage,
     ChangeHistoryService = ChangeHistoryService,
     UserInputService = UserInputService,

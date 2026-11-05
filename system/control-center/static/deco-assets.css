@@ -200,3 +200,37 @@
 .shared-atlas-compare figcaption {font-size:11px;color:var(--muted);overflow-wrap:anywhere;}
 .shared-atlas-approval {display:flex;align-items:flex-start;gap:8px;font-size:12px;line-height:1.5;}
 @media(max-width:420px){.shared-atlas-compare {grid-template-columns:1fr;}}
+
+/* Shared Model/Part Studio Sync reporting (Find does not modify Place). */
+#location-asset-edit-dialog .la-sync-current {display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:9px;margin:10px 0;}
+#location-asset-edit-dialog .la-sync-current>div {display:grid;gap:4px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);min-width:0;}
+#location-asset-edit-dialog .la-sync-current small {color:var(--muted);font-size:10px;}
+#location-asset-edit-dialog .la-sync-current strong {font-size:12px;overflow-wrap:anywhere;font-variant-numeric:tabular-nums;}
+#location-asset-edit-dialog .la-sync-counts {display:grid;gap:5px;margin:8px 0 12px;}
+#location-asset-edit-dialog .la-sync-counts small {color:var(--muted);}
+#location-asset-edit-dialog .la-sync-list {display:grid;gap:7px;max-height:440px;overflow-y:auto;padding:2px;}
+#location-asset-edit-dialog .la-sync-part-title {display:grid;gap:3px;min-width:0;}
+#location-asset-edit-dialog .la-sync-part-title small {color:var(--muted);overflow-wrap:anywhere;font-size:10px;}
+#location-asset-edit-dialog .la-sync-part-status {display:flex;gap:8px;flex-wrap:wrap;font-size:12px;font-weight:600;}
+#location-asset-edit-dialog .la-sync-part-status .is-current {color:var(--mint);}
+#location-asset-edit-dialog .la-sync-part-status .is-stale {color:var(--orange);}
+#location-asset-edit-dialog .la-sync-ids {color:var(--muted);font-variant-numeric:tabular-nums;overflow-wrap:anywhere;}
+#location-asset-edit-dialog .la-sync-part-actions {display:flex;gap:12px;align-items:center;justify-content:flex-end;flex-wrap:wrap;}
+#location-asset-edit-dialog .la-sync-controls {display:grid;gap:9px;padding-top:12px;}
+#location-asset-edit-dialog .la-sync-controls small {color:var(--muted);line-height:1.5;}
+#location-asset-edit-dialog .la-sync-controls summary {font-size:11px;color:var(--muted);cursor:pointer;}
+#location-asset-edit-dialog .la-sync-controls details div {overflow-wrap:anywhere;padding:3px 0;}
+
+#location-asset-edit-dialog .la-sync-external-note {color:var(--orange);line-height:1.5;}
+#location-asset-edit-dialog .la-sync-part-status .is-physics {color:var(--muted);font-weight:400;}
+#location-asset-edit-dialog .la-select-studio {white-space:nowrap;}
+
+/* M239 · Group MeshParts by placed Model; COL is an unobtrusive existence hint. */
+#location-asset-edit-dialog .la-sync-model {padding:11px;border:1px solid var(--line);border-radius:9px;background:var(--panel2);display:grid;gap:9px;min-width:0;}
+#location-asset-edit-dialog .la-sync-model.is-pending {border-color:var(--orange);}
+#location-asset-edit-dialog .la-sync-model.is-external {border-style:dashed;}
+#location-asset-edit-dialog .la-sync-visual {display:grid;gap:5px;padding:8px 0;border-top:1px solid var(--line);min-width:0;}
+#location-asset-edit-dialog .la-sync-visual>strong {font-size:12px;overflow-wrap:anywhere;}
+#location-asset-edit-dialog .la-sync-col {font-size:10px;color:var(--muted);font-weight:400;}
+#location-asset-edit-dialog .la-sync-col.is-missing {color:var(--orange);}
+#location-asset-edit-dialog .la-sync-model .la-sync-part-actions {border-top:1px solid var(--line);padding-top:7px;}

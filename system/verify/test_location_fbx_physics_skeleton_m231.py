@@ -39,12 +39,12 @@ class LocationMeshPhysicsM231(unittest.TestCase):
     def test_collider_becomes_box_and_visual_glass_pass_through(self):
         policy = location_mesh_profile('col_mesh', has_collider=True)
         self.assertEqual((policy['canCollide'],policy['canQuery'],policy['canTouch'],policy['doubleSided'],policy['collisionFidelity']),
-                         (True,True,False,True,'PreciseConvexDecomposition'))
+                         (True,True,False,False,'PreciseConvexDecomposition'))
         self.assertTrue(policy['physicsOnly'])
         for name in ('Visual', 'window_glass'):
             policy = location_mesh_profile(name, has_collider=True)
             self.assertEqual((policy['canCollide'],policy['canQuery'],policy['canTouch'],policy['doubleSided'],policy['collisionFidelity']),
-                             (False,False,False,True,'Box'))
+                             (False,False,False,False,'Box'))
             self.assertFalse(policy['physicsOnly'])
         glass = location_mesh_profile('glass', has_collider=False)
         self.assertEqual((glass['canCollide'],glass['collisionFidelity']), (True,'PreciseConvexDecomposition'))

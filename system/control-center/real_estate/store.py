@@ -51,7 +51,7 @@ def mesh_options(parts, raw: dict | None) -> dict:
             'collisionFidelity': normalize_collision_fidelity(
                 part, entry.get('collisionFidelity'), no_collide=effective_no_collide,
             ),
-            'doubleSided': entry['doubleSided'] if type(entry.get('doubleSided')) is bool else True,
+            'doubleSided': entry['doubleSided'] if type(entry.get('doubleSided')) is bool else False,
             'collisionMesh': is_collision_mesh(part),
             # Same authoring policy as Location Assets: solid weapon bounce by default.
             # Actual break/damage simulation is a separate future gameplay feature.

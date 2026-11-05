@@ -14,7 +14,7 @@
 <link rel="stylesheet" href="location-assets.css?v=1">
 <link rel="stylesheet" href="character-components.css?v=6">
 <link rel="stylesheet" href="character-assemblies.css?v=4">
-<link rel="stylesheet" href="deco-assets.css?v=234">
+<link rel="stylesheet" href="deco-assets.css?v=237">
 <link rel="stylesheet" href="real-estate.css?v=13&physics=205">
 </head>
 <body>
@@ -256,7 +256,7 @@
 <div class="details">asset slug: <strong id="real-estate-slug">house_level1_01</strong></div>
 <div class="character-grid"><label>purchase price<input id="real-estate-purchase" type="number" min="1" value="1" step="1"></label><label>minimum purchase level<input id="real-estate-min-level" type="number" min="1" value="1" step="1"></label><label>sale price<input id="real-estate-sale" type="number" min="1" value="1" step="1"></label></div>
 <hr class="card-separator"><span class="eyebrow">02 · mesh textures</span><h3>per-mesh textures</h3>
-<p class="hint">Choose an atlas for each visual mesh, or enable <strong>Reuse atlas</strong>. <code>COL_</code> / <code>_col</code> meshes are physics-only: they have no texture and default to collision enabled. <code>door</code> and <code>window_frames_glass</code> also default to collisions enabled (<strong>No Collide</strong> unchecked). Other visual meshes default to <strong>No Collide</strong>. Every mesh with <strong>CanCollide enabled</strong> uses <strong>PreciseConvexDecomposition</strong>, even if it previously stored Default, Hull or Box. Non-collidable visual meshes default to <strong>Box</strong>. All parts default to <strong>DoubleSided</strong>. The editor shows CanCollide, CanTouch and CanQuery, plus per-mesh Fidelity and DoubleSided controls.</p>
+<p class="hint">Choose an atlas for each visual mesh, or enable <strong>Reuse atlas</strong>. <code>COL_</code> / <code>_col</code> meshes are physics-only: they have no texture and default to collision enabled. <code>door</code> and <code>window_frames_glass</code> also default to collisions enabled (<strong>No Collide</strong> unchecked). Other visual meshes default to <strong>No Collide</strong>. Every mesh with <strong>CanCollide enabled</strong> uses <strong>PreciseConvexDecomposition</strong>, even if it previously stored Default, Hull or Box. Non-collidable visual meshes default to <strong>Box</strong>. DoubleSided is <strong>off by default</strong> for new mesh settings; saved overrides are retained. The editor shows CanCollide, CanTouch and CanQuery, plus per-mesh Fidelity and DoubleSided controls.</p>
 <div id="real-estate-mesh-textures" class="real-estate-texture-list"></div>
 <div id="real-estate-rig-warnings" class="real-estate-rig-warnings" hidden></div>
 <details id="real-estate-rig-details" class="real-estate-bone-details"><summary id="real-estate-rig">choose an FBX to inspect its mesh bones</summary><div id="real-estate-bone-list" class="real-estate-bone-list"></div></details>
@@ -678,13 +678,13 @@
 <script src="timelines.js?v=3"></script>
 <script src="locations.js?v=2"></script>
 <script src="shared-asset-retirement.js?v=4"></script>
-<script src="studio-sync.js?v=2"></script>
+<script src="studio-sync.js?v=237"></script>
 <script src="asset-atlas-actions.js?v=1"></script>
 <script src="asset-workflow-dialog.js?v=1"></script>
 <script src="asset-atlas-editor.js?v=234"></script>
 <script src="mesh-authoring.js?v=1"></script>
 <script src="deco-assets.js?v=234"></script>
-<script src="location-asset-workflow.js?v=234"></script>
+<script src="location-asset-workflow.js?v=237"></script>
 <script src="asset-audit.js?v=2"></script>
 <script src="atlas-library.js?v=2"></script>
 <script src="options.js?v=1"></script>

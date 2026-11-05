@@ -1,5 +1,5 @@
 -- Real Estate physics profile; shared MeshPhysicsCore writes MeshPart physics.
--- All authored visual parts are DoubleSided by default; COL_* remains physics-only.
+-- New authored MeshParts default to single-sided; existing explicit overrides remain.
 local CollectionService = game:GetService("CollectionService")
 local Core = require(script.Parent.StudioMeshPhysicsCore)
 local Policy = {}
@@ -38,7 +38,7 @@ function Policy.Apply(mesh: MeshPart, name: string, raw: any)
     -- Roblox requires CanQuery=true for collidable parts. Touch remains off
     -- (collision physics does not require a Touched event listener).
     Core.Apply(mesh, not noCollide, fidelity,
-        if typeof(settings.doubleSided) == "boolean" then settings.doubleSided else true)
+        if typeof(settings.doubleSided) == "boolean" then settings.doubleSided else false)
     -- Capture the *authoring policy* on the MeshPart itself. Studio copies can
     -- be revalidated without a Host Agent request or a full model reimport.
     -- This metadata is not a second registry: it is the applied snapshot.

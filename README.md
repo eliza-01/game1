@@ -50,3 +50,5 @@ python system/studio-plugin/validate_luau.py
 Runtime behaviour Roblox Studio, публикация через Open Cloud и источники Blender проверяются **отдельно**. Успех Python-тестов не означает проверенный Play session.
 
 **Документальный срез:** 30 октября 2026, `game1_diag_2026-10-30_13-52-46.zip` (после M162); реальные Studio состояния за пределами этого дампа не удостоверены.
+
+- [M236: Location Assets — Model/Mesh ID history and Find → Replace](docs/workflows/LOCATION_ASSETS_ID_HISTORY_TWO_PHASE_SYNC_M236_RU.md)

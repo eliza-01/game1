@@ -11,7 +11,7 @@ window.game1MeshAuthoring = (() => {
     const solidDefault=isCollider(name)||lower==='door'||lower.startsWith('door_')||isGlass(name);
     const noCollide=hasCollider ? !isCollider(name) : domain==='location'?false:!solidDefault;
     return {glass:isGlass(name),noCollide,collisionFidelity:noCollide?'Box':'PreciseConvexDecomposition',
-      doubleSided:true,collisionMesh:isCollider(name)};
+      doubleSided:false,collisionMesh:isCollider(name)};
   }
   function effectiveFidelity(flags) {
     if (flags.noCollide !== true) return 'PreciseConvexDecomposition';

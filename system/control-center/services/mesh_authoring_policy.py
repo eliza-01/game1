@@ -40,7 +40,7 @@ def mesh_defaults(name: str, *, has_collider: bool = False, domain: str = "estat
                   False if domain == 'location' else not precise_by_default(name))
     return {'glass': glass, 'noCollide': no_collide,
             'collisionFidelity': 'Box' if no_collide else 'PreciseConvexDecomposition',
-            'doubleSided': True, 'collisionMesh': collider}
+            'doubleSided': False, 'collisionMesh': collider}
 
 
 def normalize_mesh_options(name: str, raw: dict | None, *, has_collider: bool = False,
@@ -81,15 +81,15 @@ def location_mesh_profile(name: str, *, has_collider: bool) -> dict:
     glass = flags['glass']
     if collider:
         return {'role':'collider', 'canCollide': True, 'canQuery': True,
-                'canTouch': False, 'doubleSided': True,
+                'canTouch': False, 'doubleSided': False,
                 'collisionFidelity':'PreciseConvexDecomposition', 'physicsOnly':True}
     if has_collider:
         return {'role':'glass' if glass else 'visual', 'canCollide': False,
-                'canQuery': False, 'canTouch': False, 'doubleSided': True,
+                'canQuery': False, 'canTouch': False, 'doubleSided': False,
                 'collisionFidelity': 'Box', 'physicsOnly':False}
     return {'role':'glass' if glass else 'visual',
             'canCollide': True if glass else None,
             'canQuery': True if glass else None,
-            'canTouch': False, 'doubleSided': True,
+            'canTouch': False, 'doubleSided': False,
             'collisionFidelity':'PreciseConvexDecomposition' if glass else None,
             'physicsOnly':False}

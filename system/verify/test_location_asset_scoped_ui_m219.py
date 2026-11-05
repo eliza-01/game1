@@ -14,9 +14,9 @@ class LocationAssetUIM219(TestCase):
     def test_library_buttons_use_their_own_slug_not_form_selection(self):
         source = self.read('deco-assets.js')
         self.assertIn('data-deco-sync type="button"', source)
-        self.assertIn("tr.querySelector('[data-deco-sync]').onclick = () => decoAssetSyncStudio(row.slug)", source)
+        self.assertIn("tr.querySelector('[data-deco-sync]').onclick = () => window.game1LocationAssetWorkflow.startScan(row.slug)", source)
         self.assertIn("tr.querySelector('[data-select]').onclick = () => decoAssetEditOpen(row.slug)", source)
-        self.assertIn("window.game1StudioSync.run('location', slug)", source)
+        self.assertIn('window.game1LocationAssetWorkflow.startScan(row.slug)', source)
         self.assertNotIn("$('sync-location-assets')", source)
         self.assertNotIn('decoAssetRetrySync', source)
         self.assertNotIn('await decoAssetSyncStudio(row.slug)', source.split('async function decoAssetChooseAtlasVariant', 1)[1].split('function decoAssetUseCategory',1)[0])
@@ -30,7 +30,7 @@ class LocationAssetUIM219(TestCase):
         self.assertIn("window.game1AssetWorkflowDialog", editor)
         self.assertIn("shell.tabs(tabs,state.tab", editor)
         self.assertIn('shell.step(name,description', editor)
-        for action in ('save-identity','choose-fbx','apply-model','sync'):
+        for action in ('save-identity','choose-fbx','apply-model','scan','replace'):
             self.assertIn(action, editor)
         self.assertIn('window.game1ConsumerAtlasEditor.render', editor)
         self.assertNotIn('Save image source',editor)
@@ -40,7 +40,7 @@ class LocationAssetUIM219(TestCase):
 
     def test_common_dispatch_used_by_house_and_deco(self):
         self.assertIn("window.game1StudioSync.run('real-estate',slug,{part})", self.read('real-estate.js'))
-        self.assertIn("window.game1StudioSync.run('location', slug)", self.read('deco-assets.js'))
+        self.assertIn('window.game1LocationAssetWorkflow.startScan(row.slug)', self.read('deco-assets.js'))
         html = self.read('index.html')
         self.assertLess(html.index('studio-sync.js?v='), html.index('deco-assets.js?v='))
         self.assertLess(html.index('asset-workflow-dialog.js?v='), html.index('real-estate-mesh-workflow.js?v='))

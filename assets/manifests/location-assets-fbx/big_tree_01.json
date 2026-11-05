@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "slug": "big_tree_01",
-  "sourceSha256": "56f4ad09d2d468139b6b343a5d2fc7c94ffc8811bb24a45d666d8ec42775467d",
+  "sourceSha256": "a0156e0f74fe54b566d49ef29d77868d5a9025e8cc32feb2976b0d46492dd8fd",
   "analysis": {
     "schemaVersion": 1,
     "meshes": [
@@ -14,16 +14,33 @@
         "role": "visual",
         "physics": {
           "role": "visual",
-          "canCollide": null,
-          "canQuery": null,
+          "canCollide": false,
+          "canQuery": false,
           "canTouch": false,
           "doubleSided": true,
-          "collisionFidelity": null,
+          "collisionFidelity": "Box",
           "physicsOnly": false
+        }
+      },
+      {
+        "name": "col_mesh",
+        "armature": "",
+        "vertices": 786,
+        "bones": [],
+        "influencedBones": [],
+        "role": "collider",
+        "physics": {
+          "role": "collider",
+          "canCollide": true,
+          "canQuery": true,
+          "canTouch": false,
+          "doubleSided": true,
+          "collisionFidelity": "PreciseConvexDecomposition",
+          "physicsOnly": true
         }
       }
     ],
-    "hasCollider": false,
+    "hasCollider": true,
     "armatures": [],
     "unassignedArmatures": []
   }

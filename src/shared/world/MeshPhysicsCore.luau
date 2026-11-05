@@ -63,7 +63,7 @@ function Core.ApplyLocationModel(model: Model, allowedNames: {[string]: boolean}
             local explicit = typeof(raw) == "table"
             local glass = if explicit and typeof(raw.glass) == "boolean" then raw.glass else namedGlass
             local doublesided = if explicit and typeof(raw.doubleSided) == "boolean"
-                then raw.doubleSided else true
+                then raw.doubleSided else false
             local defaultNoCollide = if hasCollider then not collider else not (collider or namedGlass)
             local noCollide = if explicit and typeof(raw.noCollide) == "boolean"
                 then raw.noCollide else defaultNoCollide
@@ -75,7 +75,7 @@ function Core.ApplyLocationModel(model: Model, allowedNames: {[string]: boolean}
             else
                 -- Legacy Location without COL: do not override pre-M232 published physics.
                 mesh.CanTouch = false
-                mesh.DoubleSided = true
+                mesh.DoubleSided = false
             end
             if collider then
                 mesh.Transparency = 1

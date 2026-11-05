@@ -55,7 +55,7 @@ class LocationAuthoringM232(unittest.TestCase):
         self.assertEqual(defaults['col_mesh']['collisionFidelity'],'PreciseConvexDecomposition')
         self.assertEqual(defaults['visual']['collisionFidelity'],'Box')
         self.assertEqual(defaults['window_glass']['glass'],True)
-        self.assertEqual(defaults['visual']['doubleSided'],True)
+        self.assertEqual(defaults['visual']['doubleSided'],False)
         self.assertEqual(mesh_defaults('tree',has_collider=False,domain='location')['noCollide'],False)
         for wrong in ({'not_in_fbx':{}},{'visual':{'noCollide':'false'}},
                       {'visual':{'collisionFidelity':'Bad'}},{'visual':'bad'}):

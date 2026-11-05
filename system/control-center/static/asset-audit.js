@@ -43,11 +43,15 @@ function assetAuditLine({event, change, resource}) {
     : '<span class="database-history-unknown">—</span>';
   const unchanged = !!change.oldId && change.oldId === change.newId;
   const syncReference = event.eventKind === 'studio_sync' && change.kind === 'model_reference';
+  const meshRevisions=((event.metadata?.meshIdRevisions||event.instances)||[]).flatMap(instance=>
+    (instance.meshIdsBefore||[]).map(entry=>`old Mesh ${entry.meshId} ×${entry.count}`)
+    .concat((instance.meshIdsAfter||[]).map(entry=>`new Mesh ${entry.meshId} ×${entry.count}`)));
   const notes = [event.atUtc, event.assetDomain, event.assetSlot,
     event.eventKind === 'studio_sync' ? 'Studio Sync' : event.eventKind,
     syncReference ? 'Model ID reference only · geometry unchanged' : '',
     unchanged ? 'same ID · content revision / rebind' : '',
     event.eventKind === 'studio_sync' ? `${Number(change.count || 0)} change(s)` : '',
+    ...meshRevisions,
   ].filter(Boolean).map(esc).join(' · ');
   return `<li class="database-history-row">
     <div class="database-history-main">${name}<span class="database-history-colon">:</span>

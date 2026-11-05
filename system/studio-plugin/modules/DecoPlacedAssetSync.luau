@@ -3,7 +3,7 @@
 -- audit attributes; the replacement mechanism has no domain-specific rules.
 local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
 local RigSwap = require(script.Parent.StudioManagedRigSwap)
-local MeshAnchor = require(script.Parent.StudioAuthoringMeshAnchor)
+local History = require(script.Parent.StudioPublishedMeshHistory)
 local Placement = require(script.Parent.DecoAssetPreparation)
 local Physics = require(script.Parent.StudioMeshPhysicsCore)
 local DecoPlacedAssetSync = {}
@@ -79,6 +79,14 @@ local function rigChildren(model: Model): {Instance}
     return result
 end
 
+-- Read-only eligibility check for explicitly linking an old, manually placed
+-- publication. Do not grant ownership if its hierarchy was edited by hand.
+function DecoPlacedAssetSync.VerifyLegacyModel(model: Model, oldPublished: Model)
+    History.VerifyChildren(oldPublished, rigChildren(model))
+    oldPublished:ScaleTo(model:GetScale())
+    History.Provenance(model, oldPublished)
+end
+
 function DecoPlacedAssetSync.StampPublishedModel(model: Model, row: any)
     if not model:IsA("Model") or model.Parent ~= nil then
         error("published identity may only be stamped on a fresh placement clone")
@@ -105,7 +113,7 @@ local function textureId(uri: string): string
 end
 
 function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slug: string, http: any,
-    expectedModelId: string, expectedAtlasId: string, loader: any): any
+    expectedModelId: string, expectedAtlasId: string, loader: any, preview: any, selectedKeys: {string}): any
     if type(slug) ~= "string" or slug == "" then
         error("one explicitly selected Location Asset slug is required")
     end
@@ -116,7 +124,35 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
     end
     local publishedSha = tostring(row.model_published_sha256 or "")
     if publishedSha == "" then error("missing published FBX SHA") end
-    local placed = targets(workspace, slug)
+    if not preview or type(preview.roots)~="table" or type(preview.geometryRoots)~="table" then
+        error("Find Mesh IDs in Studio before replacing; no Place geometry modified")
+    end
+    local chosenParts, chosenRoots, chosenGeometry={},{},{}
+    for _, key in ipairs(selectedKeys) do
+        local entry=preview.partByKey[key]
+        if not entry or not entry.root then error("invalid selected managed MeshPart") end
+        chosenParts[entry.part]=true
+        chosenRoots[entry.root]=true
+        if entry.row.needsMesh then chosenGeometry[entry.root]=true end
+    end
+    local live={}
+    for _, root in ipairs(targets(workspace,slug)) do live[root]=true end
+    local placed={}
+    for _, root in ipairs(preview.roots) do
+        if not live[root] then error("scanned Location instance no longer exists; rescan") end
+        if chosenRoots[root] then table.insert(placed,root) end
+    end
+    if #placed<1 then error("no selected managed Location instance; no Place geometry modified") end
+    for part, snap in pairs(preview.partStates or {}) do
+        if part.Parent~=snap.parent or part:GetPivot()~=snap.frame or part.Size~=snap.size
+            or History.Id(part.MeshId)~=snap.meshId or part.TextureID~=snap.texture then
+            error("Mesh identity, transform or texture changed since Find; rescan")
+        end
+        local surface=part:FindFirstChildOfClass("SurfaceAppearance")
+        if (if surface then surface.ColorMap else nil)~=snap.colorMap then
+            error("ColorMap changed since Find; rescan")
+        end
+    end
     if #placed > 1000 then error("more than 1000 placed instances of one slug") end
     -- Only the meshes actually described by the SHA-bound FBX report are
     -- eligible for policy refresh. Never touch manually added MeshParts.
@@ -130,7 +166,7 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
     end
     local needsGeometry = false
     for _, model in ipairs(placed) do
-        if tostring(model:GetAttribute("Game1DecoPublishedModelSha256") or "") ~= publishedSha then
+        if chosenGeometry[model] then
             needsGeometry = true
             break
         end
@@ -148,49 +184,55 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
     -- must fail before any placed root or texture is modified.
     local prepared, issue = pcall(function()
         for _, model in ipairs(placed) do
-            local geometry = tostring(model:GetAttribute("Game1DecoPublishedModelSha256") or "") ~= publishedSha
+            local geometry = chosenGeometry[model] == true
             local oldId = tostring(model:GetAttribute("Game1DecoPublishedModelAssetId") or "")
+            local previousModelId=oldId
             local oldRef = tostring(model:GetAttribute(REFERENCE) or oldId)
-            local changeRef = oldRef ~= modelId
+            local changeRef = geometry and oldRef ~= modelId
             local stage, transaction = nil, nil
             local oldParts = meshParts(model)
             if geometry then
                 stage = (published :: Model):Clone()
                 table.insert(staging, stage)
-                -- Mirror DecoPlacement's authored scale, then align via the
-                -- MeshPart's stable Blender-authored pivot (Real Estate method).
-                stage:ScaleTo(model:GetScale())
-                local existingAnchor, freshAnchor, authoringAnchorPath = MeshAnchor.Match(
-                    model, stage, model:GetAttribute("Game1DecoAuthoringAnchorPath"))
-                RigSwap.AlignToAnchor(stage, freshAnchor, existingAnchor:GetPivot(), "Location Asset " .. slug)
-                Placement.PreparePlaced(stage, row.meshOptions)
-                -- Unowned geometry added directly to a placed root must not be
-                -- silently classified as an FBX rig and deleted. Published
-                -- direct-child names/classes must match the legacy instance.
-                local previousChildren, nextChildren = rigChildren(model), rigChildren(stage)
-                if #previousChildren ~= #nextChildren then
-                    error("placed/published rig count differs; refusing to remove unknown geometry")
-                end
-                local nextByName = {}
-                for _, child in ipairs(nextChildren) do
-                    if nextByName[child.Name] then error("duplicate published rig child " .. child.Name) end
-                    nextByName[child.Name] = child
-                end
-                for _, child in ipairs(previousChildren) do
-                    local nextChild = nextByName[child.Name]
-                    if not nextChild or child.ClassName ~= nextChild.ClassName then
-                        error("unmatched placed rig child " .. child.Name .. "; no Place changed")
+                -- Same shared managed-rig transaction as Real Estate.
+                -- The previous immutable published Model is the authoring
+                -- reference. We identify it by MeshPart.MeshId history,
+                -- never by old/new names, hierarchy or importer order.
+                local previousId=oldId
+                if previousId=="" or previousId==modelId then
+                    local matchId=nil
+                    for _, entry in ipairs(preview.inventory or {}) do
+                        if entry.modelAssetId~=modelId and History.MatchesInventory(model,entry) then
+                            if matchId then error("ambiguous historical Model version; no Place geometry modified") end
+                            matchId=entry.modelAssetId
+                        end
                     end
+                    previousId=matchId or ""
                 end
-                transaction = RigSwap.Prepare(model, previousChildren, nextChildren)
-                transaction.authoringAnchorPath = authoringAnchorPath
+                if previousId=="" then error("old published Model ID unknown; no Place geometry modified") end
+                previousModelId=previousId
+                local previousPublished=loader:loadForMeshInventory(previousId,slug)
+                local good,problem=pcall(function()
+                    previousPublished:ScaleTo(model:GetScale())
+                    stage:ScaleTo(model:GetScale())
+                    local frame=History.Provenance(model,previousPublished)
+                    stage:PivotTo(frame * stage:GetPivot())
+                    local previousChildren,nextChildren=rigChildren(model),rigChildren(stage)
+                    History.VerifyChildren(previousPublished,previousChildren)
+                    Placement.PreparePlaced(stage,row.meshOptions)
+                    transaction = RigSwap.Prepare(model, previousChildren, nextChildren,
+                        {preferredPrimary=stage.PrimaryPart})
+                end)
+                previousPublished:Destroy()
+                if not good then error(tostring(problem)) end
                 totalMeshes += #meshParts(stage)
                 if totalMeshes > 4096 then error("more than 4096 MeshParts in scoped Sync") end
             end
             local atlasChanges = {}
             local uri = "rbxassetid://" .. atlasId
             for _, part in ipairs(oldParts) do
-                if Physics.IsCollider(part.Name) then continue end
+                if Physics.IsCollider(part.Name) or part:GetAttribute("Game1DecoPhysicsOnly") == true then continue end
+                if not geometry and not chosenParts[part] then continue end
                 local surface = part:FindFirstChildOfClass("SurfaceAppearance")
                 if part.TextureID ~= uri or (surface and surface.ColorMap ~= uri) then
                     local previousUri = if part.TextureID == uri and surface then surface.ColorMap else part.TextureID
@@ -208,17 +250,32 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                 end
                 eventIndex[key].count += count
             end
-            if geometry then add("model", oldId, modelId, 1) end
+            if geometry then add("model", previousModelId, modelId, 1) end
             if changeRef then add("model_reference", oldRef, modelId, 1) end
             for _, change in ipairs(atlasChanges) do add("atlas", change.oldId, atlasId, 1) end
+            local beforeMeshes=if geometry then History.Describe(previousModelId,model).meshes else {}
+            local afterMeshes=if geometry then History.Describe(modelId,stage).meshes else {}
             local history = oldHistory(model, http)
             local historyJson = nil
             if #events > 0 then
                 table.insert(history, {atUtc = os.time(), slug = slug,
-                    instanceId = tostring(model:GetAttribute(INSTANCE) or ""), changes = events})
+                    instanceId = tostring(model:GetAttribute(INSTANCE) or ""), changes = events,
+                    meshIdsBefore=beforeMeshes,meshIdsAfter=afterMeshes})
                 while #history > 32 do table.remove(history, 1) end
                 historyJson = http:JSONEncode(history)
-                if #historyJson > 30000 then error("Studio history exceeded attribute limit") end
+                while #historyJson > 30000 and #history > 1 do
+                    table.remove(history, 1)
+                    historyJson = http:JSONEncode(history)
+                end
+                if #historyJson > 30000 then
+                    -- The global JSONL/MySQL audit stores the COMPLETE Mesh ID
+                    -- sets. Never block Place on a huge Roblox attribute.
+                    history[#history].meshIdsBefore = nil
+                    history[#history].meshIdsAfter = nil
+                    history[#history].meshHistoryInDatabase = true
+                    historyJson = http:JSONEncode(history)
+                end
+                if #historyJson > 30000 then error("Studio history exceeded safe attribute limit") end
             end
             table.insert(plans, {model = model, stage = stage, swap = transaction,
                 geometry = geometry, oldId = oldId, oldRef = oldRef,
@@ -228,7 +285,7 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                 oldPublishedId = model:GetAttribute("Game1DecoPublishedModelAssetId"),
                 oldReference = model:GetAttribute(REFERENCE),
                 oldAnchorPath = model:GetAttribute("Game1DecoAuthoringAnchorPath"),
-                events = events,
+                events = events, meshIdsBefore=beforeMeshes,meshIdsAfter=afterMeshes,
                 physicsBefore = if not geometry and allowedNames then
                     Physics.CaptureLocationModel(model, allowedNames) else nil})
         end
@@ -250,7 +307,6 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                 geometryUpdated += 1
                 model:SetAttribute("Game1DecoPublishedModelAssetId", modelId)
                 model:SetAttribute("Game1DecoPublishedModelSha256", publishedSha)
-                model:SetAttribute("Game1DecoAuthoringAnchorPath", item.swap.authoringAnchorPath)
             end
             if item.changeRef then
                 model:SetAttribute(REFERENCE, modelId)
@@ -304,7 +360,8 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
     for _, item in ipairs(plans) do
         if #item.events > 0 then
             table.insert(instances, {instanceId = tostring(item.model:GetAttribute(INSTANCE) or ""),
-                studioPath = item.model:GetFullName(), changes = item.events})
+                studioPath = item.model:GetFullName(), changes = item.events,
+                meshIdsBefore=item.meshIdsBefore,meshIdsAfter=item.meshIdsAfter})
             for _, event in ipairs(item.events) do
                 local key = event.kind .. ":" .. event.oldId .. ":" .. event.newId
                 if not grouped[key] then

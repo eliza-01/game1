@@ -128,7 +128,7 @@ class SharedConsumerAtlasM234(unittest.TestCase):
         for ui in (la,re):
             self.assertIn('window.game1ConsumerAtlasEditor.render',ui)
             self.assertIn('window.game1ConsumerAtlasEditor.wire',ui)
-            self.assertIn('Sync Model + Atlas · Studio',ui)
+            self.assertIn('Sync Model + Atlas · Studio' if ui is re else 'Find Mesh IDs · Studio', ui)
             self.assertNotIn('Save image source',ui)
             self.assertNotIn('see notification',ui)
         self.assertIn('preview-source',shared)

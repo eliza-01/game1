@@ -27,7 +27,7 @@ class RealEstatePhysicsM205(unittest.TestCase):
                 self.assertEqual(default_collision_fidelity(name), 'Box')
         effective = mesh_options([*physical, *visual], {})
         for part, flags in effective.items():
-            self.assertTrue(flags['doubleSided'], part)
+            self.assertFalse(flags['doubleSided'], part)
             self.assertEqual(flags['collisionFidelity'], default_collision_fidelity(part))
             self.assertEqual(flags['noCollide'], default_no_collide(part))
 
@@ -99,7 +99,7 @@ const opts=vm.runInContext('realEstateState.meshOptions',ctx);
 for(const part of ['door','window_frames_glass','wall_COL_01']){
   assert.equal(opts[part].noCollide,false);
   assert.equal(opts[part].collisionFidelity,'PreciseConvexDecomposition');
-  assert.equal(opts[part].doubleSided,true);
+  assert.equal(opts[part].doubleSided,false);
 }
 assert.equal(opts.house.noCollide,true);
 assert.equal(opts.house.collisionFidelity,'Box');

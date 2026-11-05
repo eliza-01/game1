@@ -138,6 +138,9 @@
       },
       "StudioMeshPhysicsCore": {
         "$path": "../../src/shared/world/MeshPhysicsCore.luau"
+      },
+      "StudioPublishedMeshHistory": {
+        "$path": "modules/StudioPublishedMeshHistory.luau"
       }
     }
   }

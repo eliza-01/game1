@@ -189,7 +189,11 @@ class MySqlAssetReplacementAudit:
             'sourceRecord': event['operationId'],
             'sourceSha256': '',
             'operationPath': '',
-            'metadata': {'schemaVersion': event.get('schemaVersion', 2)},
+            'metadata': {'schemaVersion': event.get('schemaVersion', 2),
+                'meshIdRevisions': [{'instanceId': item['instanceId'],
+                    'meshIdsBefore':item.get('meshIdsBefore',[]),
+                    'meshIdsAfter':item.get('meshIdsAfter',[])}
+                    for item in event.get('instances',[]) if item.get('meshIdsBefore') or item.get('meshIdsAfter')]},
         }
         self._append_operation(operation, event['changes'], event.get('instances', []))
 

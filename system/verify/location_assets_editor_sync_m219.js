@@ -15,7 +15,8 @@ const context = {window: {}, request: async (url, init) => {
   if (pause) await new Promise(resolve => {hold = resolve;});
   if (url === '/api/location-assets/studio-sync') return {
     studio: {targetSlug: payload.slug, replacedModels: 0, matchedModels: 4,
-      parts: 8, modelReferences: 1, pendingGeometry: 2},
+      parts: 8, modelReferences: 1, pendingGeometry: 2,
+      scanToken: '1'.repeat(32), mode: 'texture_mesh',selectedMeshParts:5},
   };
   return {studio: {realEstateStats: {placedSyncVersion: 2}}};
 }};
@@ -25,14 +26,15 @@ const sync = context.window.game1StudioSync;
 (async () => {
   await assert.rejects(sync.run('location', ''), /slug/);
   await assert.rejects(sync.run('location', 'foo bar'), /slug/);
-  await assert.rejects(sync.run('location', 'oak', {part: 'house'}), /entire asset/);
-  await assert.rejects(sync.run('global', 'oak'), /Unsupported/);
+  assert.throws(()=>sync.run('location', 'oak', {part: 'house'}), /entire asset/);
+  assert.throws(()=>sync.run('global', 'oak'), /Unsupported/);
   assert.strictEqual(calls.length, 0);
   const row = await sync.run('location', 'campfire_01');
   assert.strictEqual(calls.length, 1);
   assert.strictEqual(calls[0].url, '/api/location-assets/studio-sync');
   assert.strictEqual(calls[0].payload.slug, 'campfire_01');
   assert.strictEqual(row.studio.matchedModels, 4);
+  assert.strictEqual(calls[0].payload.phase, 'scan');
   assert(sync.locationSummary('campfire_01', row.studio).includes('placed instances 4'));
   assert(sync.locationSummary('campfire_01', row.studio).includes('geometry updated'));
   await sync.run('real-estate', 'house_level2_01', {part: 'window_frames_glass'});
@@ -40,8 +42,8 @@ const sync = context.window.game1StudioSync;
   assert.strictEqual(calls[1].payload.part, 'window_frames_glass');
   pause = true;
   const p = sync.run('location', 'bush_01');
-  await assert.rejects(sync.run('location', 'bush_01'), /already running/);
-  await assert.rejects(sync.run('real-estate', 'house_level2_01'), /Another Studio Sync/);
+  await assert.rejects(sync.run('location', 'bush_01'), /another command/i);
+  await assert.rejects(sync.run('real-estate', 'house_level2_01'), /another command/i);
   hold();
   await p;
   pause = false;
@@ -50,22 +52,11 @@ const sync = context.window.game1StudioSync;
   // Browser action receives a row slug, even if another asset is active in the
   // registration form. This caught the misleading pre-M219 selection UX.
   const locationSource = fs.readFileSync(path.join(staticDir, 'deco-assets.js'), 'utf8');
-  const head = locationSource.indexOf('// M221: one slug, ALL its managed placements');
-  const tail = locationSource.indexOf('function decoAssetEditOpen(', head);
-  assert(head > 0 && tail > head);
-  sandbox.decoAssetState = {data: {items: [{slug:'campfire_01',status:'PUBLISHED'}]},
-    selected:'another_asset', syncingSlug:null};
-  sandbox.decoAssetRow = slug => sandbox.decoAssetState.data.items.find(x => x.slug === slug);
-  sandbox.decoAssetRender = () => {};
-  sandbox.decoAssetLoad = async () => {};
-  sandbox.decoAssetShowSyncHistory = async () => {};
-  const notices = [];
-  sandbox.toast = (message, error) => notices.push({message, error});
-  vm.runInContext(locationSource.slice(head,tail), sandbox);
-  await sandbox.decoAssetSyncStudio('campfire_01');
-  assert.strictEqual(calls.at(-1).payload.slug, 'campfire_01');
-  assert.strictEqual(sandbox.decoAssetState.selected, 'another_asset');
-  assert.strictEqual(Boolean(notices.at(-1).error), false); // pending FBX is a warning, not a failed ID Sync
-  assert.strictEqual(sandbox.decoAssetState.syncingSlug, null);
+  assert(locationSource.includes('window.game1LocationAssetWorkflow.startScan(row.slug)'));
+  assert.strictEqual(calls.at(-1).payload.phase,'scan');
+  await sync.replaceLocation('campfire_01','1'.repeat(32),['p1']);
+  assert.strictEqual(calls.at(-1).payload.phase,'replace');
+  assert.strictEqual(calls.at(-1).payload.scanToken,'1'.repeat(32));
+  assert.deepStrictEqual(calls.at(-1).payload.selectedKeys,['p1']);
   console.log('M219 client Studio Sync contracts: OK');
 })().catch(error => {console.error(error); process.exitCode = 1;});

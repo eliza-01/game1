@@ -45,9 +45,17 @@ local function applyTexture(model: Model, textureAssetId: string, usesAlpha: any
     local uri = "rbxassetid://" .. tostring(math.floor(numericId))
     local applied = 0
     for _, descendant in ipairs(model:GetDescendants()) do
-        if descendant:IsA("MeshPart") and not MeshPhysics.IsCollider(descendant.Name) then
-            StudioTextureAppearance.Apply(descendant, uri, usesAlpha)
-            applied += 1
+        if descendant:IsA("MeshPart") then
+            if MeshPhysics.IsCollider(descendant.Name) then
+                -- COL is physics-only. Strip old importer texture remnants from
+                -- the fresh clone; never assign Atlas IDs to collision geometry.
+                descendant.TextureID = ""
+                local surface = descendant:FindFirstChildOfClass("SurfaceAppearance")
+                if surface then surface:Destroy() end
+            else
+                StudioTextureAppearance.Apply(descendant, uri, usesAlpha)
+                applied += 1
+            end
         end
     end
     return applied
@@ -110,6 +118,13 @@ function DecoAssetLoader:loadPublished(row: any): Model
     applyTexture(model, tostring(row.texture_asset_id or ""), row.textureUsesAlpha)
     MeshPhysics.ApplyLocationModel(model, nil, row.meshOptions)
     return model
+end
+
+function DecoAssetLoader:loadForMeshInventory(modelId: string, slug: string): Model
+    -- Geometry and Mesh ID inventory are read from immutable published Models.
+    -- No separate image publication is performed.
+    return self:loadPublished({status="PUBLISHED",model_asset_id=modelId,
+        texture_asset_id="",slug=slug})
 end
 
 return DecoAssetLoader

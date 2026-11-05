@@ -57,6 +57,12 @@ class FakeAssets:
             return None
         return {'slug': slug, 'status': 'PUBLISHED', 'bindingRevision': 3,
                 'model_asset_id': '12345', 'texture_asset_id': '98765'}
+    def model_publication_ids(self, slug):
+        return ['12345']
+    def mesh_id_inventory(self, slug):
+        return []
+    def record_mesh_id_inventory(self, slug, rows):
+        self.observed_meshes = rows
     def export(self):
         self.exports += 1
 
@@ -70,7 +76,7 @@ class SafetyM216(TestCase):
         self.report = {'operationId': 'a' * 32, 'models': 1, 'parts': 2,
                        'matchedModels': 2, 'modelReferences': 1,
                        'pendingGeometry': 2, 'geometryUpdated': 0, 'meshPartsUpdated': 0,
-                       'replacedModels': 0, 'registryItems': 26,
+                       'replacedModels': 0, 'registryItems': 26, 'fullySynced': True,
                        'changes': [
                            {'kind': 'model_reference', 'oldId': '10', 'newId': '12345', 'count': 1},
                            {'kind': 'atlas', 'oldId': '33', 'newId': '98765', 'count': 2},
@@ -104,15 +110,16 @@ class SafetyM216(TestCase):
 
     def test_only_target_slug_is_sent_and_logged(self):
         status, reply = route('/api/location-assets/studio-sync',
-                              lambda: {'slug': 'oak_tree'}, self.deps)
+                              lambda: {'slug': 'oak_tree','phase':'replace','scanToken':'1'*32,'selectedKeys':['p1']}, self.deps)
         self.assertEqual(status, 200, reply)
         self.scoped.assert_called_once_with(slug='oak_tree', binding_revision=3,
-                                            model_asset_id='12345', atlas_asset_id='98765')
+                                            model_asset_id='12345', atlas_asset_id='98765',
+                                            phase='replace',scan_token='1'*32,selected_keys=['p1'])
         self.assertEqual(self.loc.atlases.marked, ('location_asset', 'oak_tree', 3))
         self.assertEqual(self.loc.exports, 1)
         event = self.history.list('oak_tree')[0]
         self.assertEqual(event['changes'], self.report['changes'])
-        self.assertEqual(event['instances'], self.report['instances'])
+        self.assertEqual([x['changes'] for x in event['instances']], [x['changes'] for x in self.report['instances']])
         self.assertEqual(event['pendingGeometry'], 2)
         self.assertEqual(self.history.list('different_asset'), [])
 
@@ -120,7 +127,7 @@ class SafetyM216(TestCase):
         self.deps['location_asset_sync_history'] = mock.Mock()
         self.deps['location_asset_sync_history'].append.side_effect = OSError('disk full')
         status, reply = route('/api/location-assets/studio-sync',
-                              lambda: {'slug': 'oak_tree'}, self.deps)
+                              lambda: {'slug': 'oak_tree','phase':'replace','scanToken':'1'*32,'selectedKeys':['p1']}, self.deps)
         self.assertEqual(status, 400)
         self.assertIn('disk full', reply['error'])
         self.assertIsNone(self.loc.atlases.marked)
@@ -155,7 +162,7 @@ class SafetyM216(TestCase):
         sync = self.source('system/studio-plugin/modules/DecoPlacedAssetSync.luau')
         manager = self.source('system/studio-plugin/modules/DecoManager.luau')
         command = self.source('system/studio-plugin/modules/StudioDecoSyncCommands.luau')
-        self.assertIn('schemaVersion ~= 6', command)
+        self.assertIn('schemaVersion~=9', command)
         self.assertIn('command.targetSlug', command)
         self.assertIn('DecoPlacedAssetSync.RefreshIds(', manager)
         self.assertNotIn('DecoPlacedAssetSync.RefreshModels(', manager)
@@ -176,7 +183,7 @@ class SafetyM216(TestCase):
         self.assertIn('Game1DecoPublishedModelSha256', sync)
         self.assertIn('studioPath = item.model:GetFullName()', sync)
         self.assertIn('instances = instances', sync)
-        self.assertIn('"changes", "instances"', command)
+        self.assertIn('"changes","instances"', command)
 
     def test_sync_finds_legacy_places_by_stable_identity_without_reparenting(self):
         sync = self.source('system/studio-plugin/modules/DecoPlacedAssetSync.luau')
@@ -190,8 +197,8 @@ class SafetyM216(TestCase):
     def test_ui_scopes_sync_and_shows_history(self):
         js = self.source('system/control-center/static/deco-assets.js')
         html = self.source('system/control-center/static/index.html')
-        self.assertIn("window.game1StudioSync.run('location', slug)", js)
-        self.assertIn("tr.querySelector('[data-deco-sync]').onclick = () => decoAssetSyncStudio(row.slug)", js)
+        self.assertIn('window.game1LocationAssetWorkflow.startScan(slug)', js)
+        self.assertIn("tr.querySelector('[data-deco-sync]').onclick = () => window.game1LocationAssetWorkflow.startScan(row.slug)", js)
         self.assertIn('decoAssetShowSyncHistory', js)
         self.assertIn('location-asset-studio-history', html)
         self.assertNotIn("request('/api/location-assets/studio-sync', { method: 'POST' })", js)
@@ -215,7 +222,7 @@ class SafetyM216(TestCase):
             try:
                 result['value'] = bridge.run_deco_refresh_bridge(
                     timeout_seconds=5, slug='oak_tree', binding_revision=3,
-                    model_asset_id='12345', atlas_asset_id='98765')
+                    model_asset_id='12345', atlas_asset_id='98765',phase='replace',scan_token='1'*32,selected_keys=['p1'])
             except Exception as error:
                 result['error'] = str(error)
         with mock.patch.object(bridge, 'PORT', port):
@@ -228,7 +235,7 @@ class SafetyM216(TestCase):
                     break
                 except (URLError, OSError):
                     time.sleep(.01)
-            self.assertEqual(command['schemaVersion'], 6)
+            self.assertEqual(command['schemaVersion'], 9)
             self.assertEqual(command['targetSlug'], 'oak_tree')
             with self.assertRaises(HTTPError):
                 self._request(port, '/deco-refresh-result', 'POST', {
@@ -239,7 +246,7 @@ class SafetyM216(TestCase):
             self.assertFalse(thread.is_alive())
         self.assertNotIn('error', result)
         self.assertEqual(result['value']['changes'], self.report['changes'])
-        self.assertEqual(result['value']['instances'], self.report['instances'])
+        self.assertEqual([x['changes'] for x in result['value']['instances']], [x['changes'] for x in self.report['instances']])
         self.assertEqual(result['value']['operationId'], command['operationId'])
 
 

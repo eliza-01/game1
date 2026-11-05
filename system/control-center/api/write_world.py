@@ -125,14 +125,36 @@ def route(path, body, deps):
             revision = row.get('bindingRevision')
             if type(revision) is not int or revision < 1:
                 raise ValueError('invalid Location Asset atlas binding revision')
-            studio = deps['sync_location_assets_to_studio'](
-                slug=slug, binding_revision=revision,
-                model_asset_id=str(row.get('model_asset_id') or ''),
-                atlas_asset_id=str(row.get('texture_asset_id') or ''))
-            # Record changes BEFORE acknowledging a successful atlas binding.
+            phase = str(payload.get('phase') or 'scan')
+            if phase not in ('scan','select','attach','replace'):
+                raise ValueError('unknown Studio ID sync phase')
+            kwargs = dict(slug=slug, binding_revision=revision,
+                          model_asset_id=str(row.get('model_asset_id') or ''),
+                          atlas_asset_id=str(row.get('texture_asset_id') or ''),phase=phase)
+            if phase == 'scan':
+                kwargs['model_history'] = location_assets.model_publication_ids(slug)
+                kwargs['model_mesh_inventory'] = location_assets.mesh_id_inventory(slug)
+            else:
+                kwargs['scan_token'] = str(payload.get('scanToken') or '')
+                if phase == 'select':
+                    kwargs['part_keys'] = payload.get('partKeys')
+                elif phase == 'attach':
+                    kwargs['part_key'] = payload.get('partKey')
+                else:
+                    kwargs['selected_keys'] = payload.get('selectedKeys')
+            studio = deps['sync_location_assets_to_studio'](**kwargs)
+            if phase == 'scan':
+                if {entry.get('modelAssetId') for entry in studio['inventory']} != set(kwargs['model_history']):
+                    raise ValueError('Studio Mesh ID inventory does not match published Model history')
+                location_assets.record_mesh_id_inventory(slug, studio['inventory'])
+                return out(200, {'studio': studio})
+            if phase == 'select':
+                return out(200, {'studio': studio})  # No Place/audit/atlas mutation.
+            # Only a successful explicit Replace acknowledges Studio ID changes.
             deps['location_asset_sync_history'].append(
                 slug=slug, binding_revision=revision, studio=studio)
-            location_assets.atlases.mark_synced('location_asset', slug, revision)
+            if phase == 'replace' and studio['fullySynced']:
+                location_assets.atlases.mark_synced('location_asset', slug, revision)
             location_assets.export()
             return out(200, {'studio': studio})
         except Exception as error:

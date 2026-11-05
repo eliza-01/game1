@@ -1,0 +1,166 @@
+{
+  "schemaVersion": 1,
+  "slug": "birch_01",
+  "sourceSha256": "ff25196a924e6c27f245429159450334a43ac16604b391640f818cfec696a327",
+  "analysis": {
+    "schemaVersion": 1,
+    "meshes": [
+      {
+        "name": "birch_01",
+        "armature": "birch_01_armature",
+        "vertices": 791,
+        "bones": [
+          {
+            "name": "Bone",
+            "parent": "",
+            "matrixLocal": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              -1.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          {
+            "name": "Bone.001",
+            "parent": "Bone",
+            "matrixLocal": [
+              0.9988223,
+              0.0485191,
+              0.0001674,
+              0.0,
+              0.0031862,
+              -0.0621481,
+              -0.9980618,
+              0.0,
+              -0.0484146,
+              0.9968868,
+              -0.0622295,
+              4.0522251,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          {
+            "name": "Bone.002",
+            "parent": "Bone.001",
+            "matrixLocal": [
+              0.9998968,
+              0.0143584,
+              0.0005088,
+              0.1303114,
+              0.0005968,
+              -0.0061263,
+              -0.999981,
+              -0.1669158,
+              -0.014355,
+              0.9998782,
+              -0.0061342,
+              6.72964,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          {
+            "name": "Bone.003",
+            "parent": "Bone.002",
+            "matrixLocal": [
+              0.9921571,
+              -0.113538,
+              0.0522841,
+              0.1861928,
+              0.0453692,
+              -0.0626577,
+              -0.9970033,
+              -0.1907587,
+              0.1164737,
+              0.9915559,
+              -0.0570152,
+              10.6210747,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          {
+            "name": "Bone.004",
+            "parent": "Bone.003",
+            "matrixLocal": [
+              0.997359,
+              0.0487962,
+              0.0537962,
+              -0.0526471,
+              0.0575924,
+              -0.0800524,
+              -0.9951255,
+              -0.3225662,
+              -0.0442518,
+              0.9955955,
+              -0.0826513,
+              12.7069235,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          }
+        ],
+        "influencedBones": [
+          "Bone",
+          "Bone.001",
+          "Bone.002",
+          "Bone.003",
+          "Bone.004"
+        ],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": false,
+          "canQuery": false,
+          "canTouch": false,
+          "doubleSided": true,
+          "collisionFidelity": "Box",
+          "physicsOnly": false
+        }
+      },
+      {
+        "name": "col_mesh",
+        "armature": "",
+        "vertices": 226,
+        "bones": [],
+        "influencedBones": [],
+        "role": "collider",
+        "physics": {
+          "role": "collider",
+          "canCollide": true,
+          "canQuery": true,
+          "canTouch": false,
+          "doubleSided": true,
+          "collisionFidelity": "PreciseConvexDecomposition",
+          "physicsOnly": true
+        }
+      }
+    ],
+    "hasCollider": true,
+    "armatures": [
+      "birch_01_armature"
+    ],
+    "unassignedArmatures": []
+  }
+}

@@ -226,7 +226,7 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                     local previousChildren=rigChildren(model)
                     History.VerifyChildren(previousPublished,previousChildren)
                     local anchor=Geometry.Align(stage,previousPublished,model)
-                    Placement.PreparePlaced(stage,row.meshOptions)
+                    Placement.PreparePlaced(stage,row.meshOptions,row.surfaceMaterial,row.materialDefinition and row.materialDefinition.robloxMaterial)
                     transaction = RigSwap.Prepare(model, previousChildren, rigChildren(stage),
                         {preferredPrimary=anchor})
                 end)

@@ -17,6 +17,9 @@ local CATEGORY_FOLDERS = {
     flower = "Flowers",
     building = "Buildings",
     prop = "Props",
+    bridge = "Bridges",
+    pillar = "Pillars",
+    post = "Posts",
 }
 
 local function prepareGhost(model: Model)
@@ -173,7 +176,7 @@ function DecoPlacement:_commit()
     local pivot = ghost:GetPivot()
 
     local placed = sourceTemplate:Clone()
-    DecoAssetPreparation.PreparePlaced(placed, row.meshOptions)
+    DecoAssetPreparation.PreparePlaced(placed, row.meshOptions,row.surfaceMaterial,row.materialDefinition and row.materialDefinition.robloxMaterial)
     DecoPlacedAssetSync.StampPublishedModel(placed, row)
     local instanceId = self.HttpService:GenerateGUID(false)
     placed.Name = tostring(row.slug or "deco") .. "__" .. string.sub(instanceId, 1, 8)

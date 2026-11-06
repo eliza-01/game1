@@ -30,6 +30,8 @@ def build_catalog(location_assets) -> dict:
                                      if hasattr(location_assets, 'aliases_for') else []),
             'modelAssetId': model, 'atlasAssetId': atlas,
             'publishedSha': str(row.get('model_published_sha256') or ''),
+            'surfaceMaterial': str(row.get('surfaceMaterial') or 'default'),
+            'robloxMaterial': str((row.get('materialDefinition') or {}).get('robloxMaterial') or ''),
             'models': [{'modelAssetId': identifier,
                         'meshes': inventory.get(identifier, {}).get('meshes', [])}
                        for identifier in history],
@@ -39,7 +41,7 @@ def build_catalog(location_assets) -> dict:
     # Mesh inventory is an observed cache; filling it during Scan must not
     # invalidate the immediately following repair token. Publication identity
     # and atlas bindings, not cache population, define the stable digest.
-    identities = [{k: item[k] for k in ('slug', 'modelAssetId', 'atlasAssetId', 'publishedSha')}
+    identities = [{k: item[k] for k in ('slug', 'modelAssetId', 'atlasAssetId', 'publishedSha', 'surfaceMaterial', 'robloxMaterial')}
                   | {'versions': [model['modelAssetId'] for model in item['models']],
                      'aliases': item['aliases']}
                   for item in items]
@@ -69,6 +71,10 @@ def validate_report(report: dict, catalog: dict) -> list[dict]:
         for flag in ('needsMesh', 'needsTexture', 'needsStructure', 'duplicateId', 'ambiguous', 'hasModel', 'canSync'):
             if type(row.get(flag)) is not bool:
                 raise ValueError('invalid scan flag: ' + flag)
+        # Schema 1 older Studio plugins omit the new material-only flag.
+        # Validate strictly when present, while allowing read-only historical scans.
+        if 'needsMaterial' in row and type(row['needsMaterial']) is not bool:
+            raise ValueError('invalid scan flag: needsMaterial')
         if not isinstance(row.get('issues'), list) or len(row['issues']) > 12 or any(
                 not isinstance(s, str) or len(s) > 250 for s in row['issues']):
             raise ValueError('invalid diagnostic issues')

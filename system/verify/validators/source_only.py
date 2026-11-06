@@ -46,8 +46,8 @@ def check_source_only_contract(
 
     if location_asset_manifest_path.is_file():
         location_asset_manifest = json.loads(location_asset_manifest_path.read_text(encoding="utf-8"))
-        if location_asset_manifest.get("schemaVersion") != 4:
-            report_error("m52 Location Asset manifest schema must be 4")
+        if location_asset_manifest.get("schemaVersion") not in (4,5):
+            report_error("m52 Location Asset manifest schema must be 5")
         for row in location_asset_manifest.get("items") or []:
             if not str(row.get("model_path") or "").startswith("assets/source/location-assets/"):
                 report_error(f"m52 Location Asset model path is not canonical source-only: {row.get('slug')}")

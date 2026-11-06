@@ -36,8 +36,11 @@ def check_with_altered_inputs(root, report_error, *, sources, **kwargs):
         sources = sources._replace(assets_js=sources.assets_js.replace(
             'description:game1PublicationDescription(', 'removed_description_payload('))
     if scenario == "m128":
+        # Since M249, LocationAssetStore imports the canonical taxonomy instead
+        # of maintaining an inline Props lookup. Remove that binding to ensure
+        # the validator still fails rather than silently accepting missing Prop.
         sources = sources._replace(store_text=sources.store_text.replace(
-            '"prop": "Props"', '"prop": "INVALID"'))
+            'CATEGORIES = taxonomy.CATEGORIES', 'CATEGORIES = ("tree",)'))
     if scenario in ("m55", "combined"):
         sources = sources._replace(assets_js=sources.assets_js.replace(
             "decoAssetUseCategory(category);", "removed_library_category_sync();"))
@@ -92,7 +95,7 @@ class VerifyExitCodeM171Tests(unittest.TestCase):
     def test_m128_missing_props_store_category_is_failure(self):
         result = self.run_verify("m128")
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn('m128 Location Assets Props integration missing "prop": "Props"', result.stdout)
+        self.assertIn('m128 Location Assets Props integration missing CATEGORIES = taxonomy.CATEGORIES', result.stdout)
         self.assertNotIn("verify ok", result.stdout)
 
     def test_early_and_late_errors_preserve_order_and_exit_failure(self):

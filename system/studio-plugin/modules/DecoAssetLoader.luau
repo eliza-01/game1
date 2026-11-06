@@ -118,6 +118,7 @@ function DecoAssetLoader:loadPublished(row: any): Model
     sanitize(model)
     applyTexture(model, tostring(row.texture_asset_id or ""), row.textureUsesAlpha)
     MeshPhysics.ApplyLocationModel(model, nil, row.meshOptions)
+    MeshPhysics.ApplyLocationSurfaceMaterial(model,row.surfaceMaterial,row.robloxMaterial or (row.materialDefinition and row.materialDefinition.robloxMaterial))
     MeshNames.Normalize(model, tostring(row.slug or ""))
     return model
 end

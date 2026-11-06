@@ -456,6 +456,7 @@ function DecoAssetLoader:loadPublished(row: any): Model
     sanitize(model)
     applyTexture(model, tostring(row.texture_asset_id or ""), row.textureUsesAlpha)
     MeshPhysics.ApplyLocationModel(model, nil, row.meshOptions)
+    MeshPhysics.ApplyLocationSurfaceMaterial(model,row.surfaceMaterial,row.robloxMaterial or (row.materialDefinition and row.materialDefinition.robloxMaterial))
     MeshNames.Normalize(model, tostring(row.slug or ""))
     return model
 end
@@ -479,7 +480,7 @@ return DecoAssetLoader
 local MeshPhysics = require(script.Parent.StudioMeshPhysicsCore)
 local DecoAssetPreparation = {}
 
-function DecoAssetPreparation.PreparePlaced(model: Model, meshOptions: any?)
+function DecoAssetPreparation.PreparePlaced(model: Model, meshOptions: any?, materialKey: string?, physicalMaterial: string?)
     for _, descendant in ipairs(model:GetDescendants()) do
         if descendant:IsA("BasePart") then
             -- The placement ghost is anchored; placed decorations are not.
@@ -491,6 +492,7 @@ function DecoAssetPreparation.PreparePlaced(model: Model, meshOptions: any?)
     -- The policy is reapplied after ghost/preview handling and before Workspace
     -- parenting, without writing any transforms, scale or anchors.
     MeshPhysics.ApplyLocationModel(model, nil, meshOptions)
+    MeshPhysics.ApplyLocationSurfaceMaterial(model,materialKey,physicalMaterial)
 end
 
 return table.freeze(DecoAssetPreparation)
@@ -509,18 +511,11 @@ local History = require(script.Parent.StudioPublishedMeshHistory)
 local DecoManager = {}
 DecoManager.__index = DecoManager
 
-local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building", "prop" }
+local CATEGORY_ORDER = { "tree", "bush", "flower", "rock", "light", "fence", "ladder", "bridge", "pillar", "post", "prop", "decoration", "building" }
 local CATEGORY_LABELS = {
-    tree = "Trees",
-    bush = "Bushes",
-    rock = "Rocks",
-    light = "Lights",
-    fence = "Fences",
-    decoration = "Decorations",
-    ladder = "Ladders",
-    flower = "Flowers",
-    building = "Buildings",
-    prop = "Props",
+    tree="Tree", bush="Bush", flower="Flower", rock="Rock",
+    light="Light", fence="Fence", ladder="Ladder", bridge="Bridge",
+    pillar="Pillar", post="Post", prop="Prop", decoration="Decoration", building="Building",
 }
 
 local function newLabel(parent: Instance, text: string, size: UDim2, position: UDim2, textSize: number, bold: boolean?): TextLabel
@@ -1456,7 +1451,7 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                     local previousChildren=rigChildren(model)
                     History.VerifyChildren(previousPublished,previousChildren)
                     local anchor=Geometry.Align(stage,previousPublished,model)
-                    Placement.PreparePlaced(stage,row.meshOptions)
+                    Placement.PreparePlaced(stage,row.meshOptions,row.surfaceMaterial,row.materialDefinition and row.materialDefinition.robloxMaterial)
                     transaction = RigSwap.Prepare(model, previousChildren, rigChildren(stage),
                         {preferredPrimary=anchor})
                 end)
@@ -1650,6 +1645,9 @@ local CATEGORY_FOLDERS = {
     flower = "Flowers",
     building = "Buildings",
     prop = "Props",
+    bridge = "Bridges",
+    pillar = "Pillars",
+    post = "Posts",
 }
 
 local function prepareGhost(model: Model)
@@ -1806,7 +1804,7 @@ function DecoPlacement:_commit()
     local pivot = ghost:GetPivot()
 
     local placed = sourceTemplate:Clone()
-    DecoAssetPreparation.PreparePlaced(placed, row.meshOptions)
+    DecoAssetPreparation.PreparePlaced(placed, row.meshOptions,row.surfaceMaterial,row.materialDefinition and row.materialDefinition.robloxMaterial)
     DecoPlacedAssetSync.StampPublishedModel(placed, row)
     local instanceId = self.HttpService:GenerateGUID(false)
     placed.Name = tostring(row.slug or "deco") .. "__" .. string.sub(instanceId, 1, 8)
@@ -5187,6 +5185,50 @@ function Core.ApplyLocationModel(model: Model, allowedNames: {[string]: boolean}
     return affected
 end
 
+-- Semantic surface for future impact/footstep audio and interaction.
+-- This does not own collision flags, sizes, meshes or appearance textures.
+-- Only a selected explicit physical material changes Roblox Material; "default"
+-- leaves historical authored Materials intact (including collision geometry).
+function Core.ApplyLocationSurfaceMaterial(model: Model, surfaceKey: string?, physicalName: string?): number
+    local key = if type(surfaceKey) == "string" and surfaceKey ~= "" then surfaceKey else "default"
+    local material: Enum.Material? = nil
+    if physicalName ~= nil and physicalName ~= "" then
+        material = Enum.Material[physicalName]
+        if material == nil then error("unsupported Location physical material " .. tostring(physicalName)) end
+    end
+    local changed = 0
+    for _, mesh in ipairs(parts(model)) do
+        -- COL receives exactly the same semantic/physical material as visual parts,
+        -- but continues to be invisible with its own Precise collision policy.
+        local differs = mesh:GetAttribute("Game1LocationSurfaceMaterial") ~= key
+        if material ~= nil and mesh.Material ~= material then differs = true end
+        if differs then
+            mesh:SetAttribute("Game1LocationSurfaceMaterial", key)
+            if material ~= nil then mesh.Material = material end
+            changed += 1
+        end
+    end
+    return changed
+end
+
+function Core.CaptureLocationSurfaceMaterial(model: Model): {any}
+    local old = {}
+    for _, mesh in ipairs(parts(model)) do
+        table.insert(old,{part=mesh,material=mesh.Material,
+            key=mesh:GetAttribute("Game1LocationSurfaceMaterial")})
+    end
+    return old
+end
+
+function Core.RestoreLocationSurfaceMaterial(saved: {any})
+    for _,entry in ipairs(saved) do
+        if entry.part.Parent then
+            entry.part.Material=entry.material
+            entry.part:SetAttribute("Game1LocationSurfaceMaterial",entry.key)
+        end
+    end
+end
+
 -- Scoped existing-placement physics updates can fail on locked Studio parts.
 -- Capture before the first change and restore across every managed instance.
 function Core.CaptureLocationModel(model: Model, allowedNames: {[string]: boolean}): {any}
@@ -5973,7 +6015,8 @@ local function ensureVersions(catalog: any, service: any): ({any}, {any}, {strin
         table.insert(inventory, {slug=item.slug,models=published})
         table.insert(versions, {slug=item.slug,aliases=item.aliases or {},
             atlas=item.atlasAssetId,model=item.modelAssetId,
-            sha=item.publishedSha, models=published})
+            sha=item.publishedSha,material=item.surfaceMaterial or "default",
+            physicalMaterial=item.robloxMaterial or "",models=published})
     end
     return versions,inventory,warnings
 end
@@ -6177,6 +6220,20 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
                 end
             end
         end
+        local needsMaterial=false
+        if eligible and entry.material~="default" then
+            local physical=if entry.physicalMaterial~="" then Enum.Material[entry.physicalMaterial] else nil
+            for _, candidatePart in ipairs(root and root:GetDescendants() or {part}) do
+                if candidatePart:IsA("MeshPart") then
+                    local different=candidatePart:GetAttribute("Game1LocationSurfaceMaterial")~=entry.material
+                    if physical~=nil and candidatePart.Material~=physical then different=true end
+                    if different then
+                        needsMaterial=true
+                        break
+                    end
+                end
+            end
+        end
         local colliders=0
         if root then
             for _,child in ipairs(root:GetDescendants()) do
@@ -6187,6 +6244,7 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
         if not eligible then warn("Один Mesh ID встречается у нескольких Location Assets") end
         if not root then warn("Нет отдельной Model для этого экземпляра") end
         if eligible and requiresCol(entry) and colliders==0 then warn("Нет обязательного COL-меша") end
+        if needsMaterial then warn("Материал поверхности требует Sync: "..entry.material) end
         if eligible and oldAmbiguous then
             oldId=""
             warn("Один Mesh ID встречается в нескольких версиях; геометрия требует ручной проверки")
@@ -6252,14 +6310,14 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
             modelAssetId=if eligible then oldId else "",meshId=original.meshId,
             textureId=original.textureId,expectedMeshId=if eligible then entry.model else "",
             expectedTextureId=if eligible then entry.atlas else "",colCount=colliders,
-            needsMesh=needsMesh,needsTexture=needsTexture,needsStructure=not root or badName or meshNameMismatch or assigned==""
+            needsMesh=needsMesh,needsTexture=needsTexture,needsMaterial=needsMaterial,needsStructure=not root or badName or meshNameMismatch or assigned==""
                 or (root and root:GetAttribute("Game1DecoAssetSlug")~=entry.slug)
                 or (eligible and requiresCol(entry) and colliders==0),
             duplicateId=false,ambiguous=not eligible or provenForeignClaim,
             hasModel=root~=nil,canSync=eligible and not foreignClaim and root~=nil and assigned~=""
                 and claimed==entry.slug and (not needsMesh or oldId~="")
                 and (needsMesh or not (requiresCol(entry) and colliders==0)),
-            status=if not eligible then "ambiguous" elseif needsMesh or needsTexture then "pending" else "current",
+            status=if not eligible then "ambiguous" elseif needsMesh or needsTexture or needsMaterial then "pending" else "current",
             issues=issues,hierarchy=fullHierarchy,transform={cframe={part.CFrame:GetComponents()},
                 size={part.Size.X,part.Size.Y,part.Size.Z},position=positionOf(part),
                 anchored=part.Anchored,canCollide=part.CanCollide},
@@ -6495,6 +6553,11 @@ function Repair.Apply(refs: {any}, ctx: any): any
                     if renamedPart.Parent~=nil then renamedPart.Name=oldPartName end
                 end)
             end
+            if ref.entry.material and ref.entry.material~="default" then
+                local prior=Physics.CaptureLocationSurfaceMaterial(root)
+                table.insert(undo,function() Physics.RestoreLocationSurfaceMaterial(prior) end)
+                Physics.ApplyLocationSurfaceMaterial(root,ref.entry.material,ref.entry.physicalMaterial)
+            end
             if part.CFrame~=originalCFrame or part.Size~=originalSize then
                 error("Repair changed existing geometry transform; rolling back")
             end
@@ -6567,7 +6630,8 @@ local function stageRig(ref: any, ctx: any): any
     if not root or root.Parent==nil then error("Repair this placement first") end
     if ref.oldVersion=="" then error("historical publication not unique") end
     local publishedRow={slug=ref.entry.slug,status="PUBLISHED",
-        model_asset_id=ref.entry.model,texture_asset_id=ref.entry.atlas}
+        model_asset_id=ref.entry.model,texture_asset_id=ref.entry.atlas,
+        surfaceMaterial=ref.entry.material,robloxMaterial=ref.entry.physicalMaterial}
     local stage=ctx.loader:loadPublished(publishedRow)
     local previous=ctx.loader:loadForMeshInventory(ref.oldVersion,ref.entry.slug)
     local good,result=pcall(function()
@@ -6602,7 +6666,7 @@ function Sync.Apply(refs: {any}, ctx: any): any
             else
                 table.insert(blocked,ref.row.key..": "..tostring(stage):sub(1,180))
             end
-        elseif ref.row.needsTexture then
+        elseif ref.row.needsTexture or ref.row.needsMaterial then
             local changes={}
             for _,part in ipairs(ref.visuals) do
                 local surface=part:FindFirstChildOfClass("SurfaceAppearance")
@@ -6610,6 +6674,7 @@ function Sync.Apply(refs: {any}, ctx: any): any
                     surface=surface,color=if surface then surface.ColorMap else nil})
             end
             table.insert(plan,{ref=ref,appearance=changes,
+                priorSurface=Physics.CaptureLocationSurfaceMaterial(ref.root),
                 priorHistory=ref.root:GetAttribute("Game1DecoSyncHistory")})
         end
     end
@@ -6633,10 +6698,15 @@ function Sync.Apply(refs: {any}, ctx: any): any
                 root:SetAttribute("Game1DecoRegistryModelAssetId",ref.entry.model)
                 root:SetAttribute("Game1DecoPublishedModelSha256",ref.entry.sha)
             else
-                local uri="rbxassetid://"..ref.entry.atlas
-                for _,change in ipairs(item.appearance) do
-                    Texture.Apply(change.part,uri,nil,true)
+                if ref.row.needsTexture then
+                    local uri="rbxassetid://"..ref.entry.atlas
+                    for _,change in ipairs(item.appearance) do
+                        Texture.Apply(change.part,uri,nil,true)
+                    end
                 end
+            end
+            if ref.row.needsMaterial then
+                Physics.ApplyLocationSurfaceMaterial(root,ref.entry.material,ref.entry.physicalMaterial)
             end
             local events={}
             if item.swap then
@@ -6675,6 +6745,9 @@ function Sync.Apply(refs: {any}, ctx: any): any
                     for _,change in ipairs(item.appearance) do
                         change.part.TextureID=change.uri
                         if change.surface then change.surface.ColorMap=change.color end
+                    end
+                    if item.priorSurface then
+                        Physics.RestoreLocationSurfaceMaterial(item.priorSurface)
                     end
                 end
                 item.ref.root:SetAttribute("Game1DecoSyncHistory",item.priorHistory)

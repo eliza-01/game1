@@ -24,7 +24,8 @@ class LocationAssetPropsCategoryTests(unittest.TestCase):
             store = LocationAssetStore(root)
 
             categories = store.options()["categories"]
-            self.assertEqual(categories[-1], {"id": "prop", "label": "Props"})
+            self.assertEqual(next(c for c in categories if c['id']=='prop'),
+                             {'id':'prop','label':'Prop','group':'prop'})
             self.assertEqual([row["id"] for row in categories], list(CATEGORIES))
 
             row = store.register({
@@ -34,7 +35,7 @@ class LocationAssetPropsCategoryTests(unittest.TestCase):
                 "textureSourcePath": str(atlas),
             })
             self.assertEqual(row["category"], "prop")
-            self.assertEqual(row["category_label"], "Props")
+            self.assertEqual(row["category_label"], "Prop")
             self.assertEqual(row["status"], "LOCAL_ONLY")
             self.assertEqual(row["atlasFamily"], "prop_kit")
             self.assertTrue((root / row["model_path"]).is_file())
@@ -46,8 +47,9 @@ class LocationAssetPropsCategoryTests(unittest.TestCase):
             self.assertIn('category = "prop"', registry)
 
     def test_existing_categories_stay_available(self):
-        self.assertEqual(CATEGORIES[:-1], (
-            "tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building"
+        self.assertEqual(CATEGORIES, (
+            "tree", "bush", "flower", "rock", "light", "fence", "ladder",
+            "bridge", "pillar", "post", "prop", "decoration", "building"
         ))
 
 

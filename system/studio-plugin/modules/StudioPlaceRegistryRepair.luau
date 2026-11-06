@@ -192,6 +192,11 @@ function Repair.Apply(refs: {any}, ctx: any): any
                     if renamedPart.Parent~=nil then renamedPart.Name=oldPartName end
                 end)
             end
+            if ref.entry.material and ref.entry.material~="default" then
+                local prior=Physics.CaptureLocationSurfaceMaterial(root)
+                table.insert(undo,function() Physics.RestoreLocationSurfaceMaterial(prior) end)
+                Physics.ApplyLocationSurfaceMaterial(root,ref.entry.material,ref.entry.physicalMaterial)
+            end
             if part.CFrame~=originalCFrame or part.Size~=originalSize then
                 error("Repair changed existing geometry transform; rolling back")
             end

@@ -1,47 +1,249 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "project": "game1",
   "options": {
-    "categories": [
+    "categoryGroups": [
       {
-        "id": "tree",
-        "label": "Trees"
+        "id": "flora",
+        "label": "Flora",
+        "categories": [
+          {
+            "id": "tree",
+            "label": "Tree",
+            "group": "flora"
+          },
+          {
+            "id": "bush",
+            "label": "Bush",
+            "group": "flora"
+          },
+          {
+            "id": "flower",
+            "label": "Flower",
+            "group": "flora"
+          },
+          {
+            "id": "rock",
+            "label": "Rock",
+            "group": "flora"
+          }
+        ]
       },
       {
-        "id": "bush",
-        "label": "Bushes"
-      },
-      {
-        "id": "rock",
-        "label": "Rocks"
-      },
-      {
-        "id": "light",
-        "label": "Lights"
-      },
-      {
-        "id": "fence",
-        "label": "Fences"
-      },
-      {
-        "id": "decoration",
-        "label": "Decorations"
-      },
-      {
-        "id": "ladder",
-        "label": "Ladders"
-      },
-      {
-        "id": "flower",
-        "label": "Flowers"
-      },
-      {
-        "id": "building",
-        "label": "Buildings"
+        "id": "structure",
+        "label": "Structure",
+        "categories": [
+          {
+            "id": "light",
+            "label": "Light",
+            "group": "structure"
+          },
+          {
+            "id": "fence",
+            "label": "Fence",
+            "group": "structure"
+          },
+          {
+            "id": "ladder",
+            "label": "Ladder",
+            "group": "structure"
+          },
+          {
+            "id": "bridge",
+            "label": "Bridge",
+            "group": "structure"
+          },
+          {
+            "id": "pillar",
+            "label": "Pillar",
+            "group": "structure"
+          },
+          {
+            "id": "post",
+            "label": "Post",
+            "group": "structure"
+          }
+        ]
       },
       {
         "id": "prop",
-        "label": "Props"
+        "label": "Prop",
+        "categories": [
+          {
+            "id": "prop",
+            "label": "Prop",
+            "group": "prop"
+          },
+          {
+            "id": "decoration",
+            "label": "Decoration",
+            "group": "prop"
+          },
+          {
+            "id": "building",
+            "label": "Building",
+            "group": "prop"
+          }
+        ]
+      }
+    ],
+    "categories": [
+      {
+        "id": "tree",
+        "label": "Tree",
+        "group": "flora"
+      },
+      {
+        "id": "bush",
+        "label": "Bush",
+        "group": "flora"
+      },
+      {
+        "id": "flower",
+        "label": "Flower",
+        "group": "flora"
+      },
+      {
+        "id": "rock",
+        "label": "Rock",
+        "group": "flora"
+      },
+      {
+        "id": "light",
+        "label": "Light",
+        "group": "structure"
+      },
+      {
+        "id": "fence",
+        "label": "Fence",
+        "group": "structure"
+      },
+      {
+        "id": "ladder",
+        "label": "Ladder",
+        "group": "structure"
+      },
+      {
+        "id": "bridge",
+        "label": "Bridge",
+        "group": "structure"
+      },
+      {
+        "id": "pillar",
+        "label": "Pillar",
+        "group": "structure"
+      },
+      {
+        "id": "post",
+        "label": "Post",
+        "group": "structure"
+      },
+      {
+        "id": "prop",
+        "label": "Prop",
+        "group": "prop"
+      },
+      {
+        "id": "decoration",
+        "label": "Decoration",
+        "group": "prop"
+      },
+      {
+        "id": "building",
+        "label": "Building",
+        "group": "prop"
+      }
+    ],
+    "surfaceMaterials": [
+      {
+        "id": "default",
+        "label": "Default · unchanged",
+        "robloxMaterial": "",
+        "soundFamily": "generic"
+      },
+      {
+        "id": "wood",
+        "label": "Wood",
+        "robloxMaterial": "Wood",
+        "soundFamily": "wood"
+      },
+      {
+        "id": "stone",
+        "label": "Stone",
+        "robloxMaterial": "Slate",
+        "soundFamily": "stone"
+      },
+      {
+        "id": "rock",
+        "label": "Rock",
+        "robloxMaterial": "Rock",
+        "soundFamily": "stone"
+      },
+      {
+        "id": "concrete",
+        "label": "Concrete",
+        "robloxMaterial": "Concrete",
+        "soundFamily": "stone"
+      },
+      {
+        "id": "brick",
+        "label": "Brick",
+        "robloxMaterial": "Brick",
+        "soundFamily": "stone"
+      },
+      {
+        "id": "metal",
+        "label": "Metal",
+        "robloxMaterial": "Metal",
+        "soundFamily": "metal"
+      },
+      {
+        "id": "glass",
+        "label": "Glass",
+        "robloxMaterial": "Glass",
+        "soundFamily": "glass"
+      },
+      {
+        "id": "plastic",
+        "label": "Plastic",
+        "robloxMaterial": "Plastic",
+        "soundFamily": "plastic"
+      },
+      {
+        "id": "fabric",
+        "label": "Fabric",
+        "robloxMaterial": "Fabric",
+        "soundFamily": "fabric"
+      },
+      {
+        "id": "foliage",
+        "label": "Foliage",
+        "robloxMaterial": "LeafyGrass",
+        "soundFamily": "foliage"
+      },
+      {
+        "id": "grass",
+        "label": "Grass",
+        "robloxMaterial": "Grass",
+        "soundFamily": "foliage"
+      },
+      {
+        "id": "soil",
+        "label": "Soil",
+        "robloxMaterial": "Ground",
+        "soundFamily": "earth"
+      },
+      {
+        "id": "sand",
+        "label": "Sand",
+        "robloxMaterial": "Sand",
+        "soundFamily": "earth"
+      },
+      {
+        "id": "ice",
+        "label": "Ice",
+        "robloxMaterial": "Ice",
+        "soundFamily": "ice"
       }
     ]
   },
@@ -1087,8 +1289,16 @@
       "created_at": 1791473596.458907,
       "updated_at": 1792461837.7483227,
       "published_at": 1791473606.3923557,
+      "surface_material": "default",
       "fbxAnalysis": null,
       "meshOptions": {},
+      "surfaceMaterial": "default",
+      "materialDefinition": {
+        "id": "default",
+        "label": "Default · unchanged",
+        "robloxMaterial": "",
+        "soundFamily": "generic"
+      },
       "texture_path": "assets/source/texture-atlases/smithy/2048x2048/migrated/d5a4d7b01345f0ad009f62e9ec3e90cf0b8dd206840dbc82c1691f3f8d0d7872/smithy.png",
       "texture_filename": "smithy.png",
       "texture_sha256": "d5a4d7b01345f0ad009f62e9ec3e90cf0b8dd206840dbc82c1691f3f8d0d7872",
@@ -1131,7 +1341,7 @@
       "textureUsesAlpha": false,
       "atlasLegacyWarning": true,
       "status": "PUBLISHED",
-      "category_label": "Buildings",
+      "category_label": "Building",
       "publishedVisualMeshes": [
         {
           "meshId": "112631288118441",
@@ -1153,8 +1363,16 @@
       "created_at": 1791473215.556618,
       "updated_at": 1792461847.5852742,
       "published_at": 1791473269.232121,
+      "surface_material": "default",
       "fbxAnalysis": null,
       "meshOptions": {},
+      "surfaceMaterial": "default",
+      "materialDefinition": {
+        "id": "default",
+        "label": "Default · unchanged",
+        "robloxMaterial": "",
+        "soundFamily": "generic"
+      },
       "texture_path": "assets/source/texture-atlases/smithy/2048x2048/migrated/d5a4d7b01345f0ad009f62e9ec3e90cf0b8dd206840dbc82c1691f3f8d0d7872/smithy.png",
       "texture_filename": "smithy.png",
       "texture_sha256": "d5a4d7b01345f0ad009f62e9ec3e90cf0b8dd206840dbc82c1691f3f8d0d7872",
@@ -1197,7 +1415,7 @@
       "textureUsesAlpha": false,
       "atlasLegacyWarning": true,
       "status": "PUBLISHED",
-      "category_label": "Buildings",
+      "category_label": "Building",
       "publishedVisualMeshes": [
         {
           "meshId": "99690489780806",
@@ -1219,6 +1437,7 @@
       "created_at": 1791474388.6629841,
       "updated_at": 1793930533.7606688,
       "published_at": 1793930533.7606688,
+      "surface_material": "default",
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -1276,6 +1495,13 @@
           "glass": false,
           "noCollide": false
         }
+      },
+      "surfaceMaterial": "default",
+      "materialDefinition": {
+        "id": "default",
+        "label": "Default · unchanged",
+        "robloxMaterial": "",
+        "soundFamily": "generic"
       },
       "texture_path": "assets/source/texture-atlases/bush_01/256x256/bush_01_256x256_atlas.png",
       "texture_filename": "bush_01_256x256_atlas.png",
@@ -1344,7 +1570,7 @@
       "textureUsesAlpha": true,
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
-      "category_label": "Bushes",
+      "category_label": "Bush",
       "publishedVisualMeshes": [
         {
           "meshId": "85890571174919",
@@ -1366,8 +1592,16 @@
       "created_at": 1791443599.8616817,
       "updated_at": 1791443607.9077108,
       "published_at": 1791443607.9077108,
+      "surface_material": "default",
       "fbxAnalysis": null,
       "meshOptions": {},
+      "surfaceMaterial": "default",
+      "materialDefinition": {
+        "id": "default",
+        "label": "Default · unchanged",
+        "robloxMaterial": "",
+        "soundFamily": "generic"
+      },
       "texture_path": "assets/source/texture-atlases/main_statue/2048x2048/migrated/8f8ade9148ff40e8b5933c6abeb5e2c55e68a95d89147d6b317cee7412c5e8bf/main_statue.jpg",
       "texture_filename": "main_statue.jpg",
       "texture_sha256": "8f8ade9148ff40e8b5933c6abeb5e2c55e68a95d89147d6b317cee7412c5e8bf",
@@ -1410,7 +1644,7 @@
       "textureUsesAlpha": false,
       "atlasLegacyWarning": true,
       "status": "PUBLISHED",
-      "category_label": "Decorations",
+      "category_label": "Decoration",
       "publishedVisualMeshes": [
         {
           "meshId": "114946535304404",
@@ -1432,8 +1666,16 @@
       "created_at": 1792461639.815563,
       "updated_at": 1792461820.1005793,
       "published_at": 1792461820.1005793,
+      "surface_material": "default",
       "fbxAnalysis": null,
       "meshOptions": {},
+      "surfaceMaterial": "default",
+      "materialDefinition": {
+        "id": "default",
+        "label": "Default · unchanged",
+        "robloxMaterial": "",
+        "soundFamily": "generic"
+      },
       "texture_path": "assets/source/texture-atlases/wooden_post_kit/1280x1280/migrated/39bee931b1c93f1d6f0d00d32746676eb35f93eaf30c44ab2e1369cbd78bb119/wooden_post_kit.png",
       "texture_filename": "wooden_post_kit.png",
       "texture_sha256": "39bee931b1c93f1d6f0d00d32746676eb35f93eaf30c44ab2e1369cbd78bb119",
@@ -1476,7 +1718,7 @@
       "textureUsesAlpha": true,
       "atlasLegacyWarning": true,
       "status": "PUBLISHED",
-      "category_label": "Decorations",
+      "category_label": "Decoration",
       "publishedVisualMeshes": [
         {
           "meshId": "112700278781894",
@@ -1498,6 +1740,7 @@
       "created_at": 1791569735.1051111,
       "updated_at": 1793910980.0773807,
       "published_at": 1793910980.0773807,
+      "surface_material": "default",
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -1556,6 +1799,13 @@
           "noCollide": true
         }
       },
+      "surfaceMaterial": "default",
+      "materialDefinition": {
+        "id": "default",
+        "label": "Default · unchanged",
+        "robloxMaterial": "",
+        "soundFamily": "generic"
+      },
       "texture_path": "assets/source/texture-atlases/structures_01/2048x2048/structures_01_2048x2048_atlas.jpg",
       "texture_filename": "structures_01_2048x2048_atlas.jpg",
       "texture_sha256": "2f41320116f4b423de010f4c906b5b16eabc981c055bb4fc478c84437a95bb88",
@@ -1598,7 +1848,7 @@
       "textureUsesAlpha": false,
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
-      "category_label": "Fences",
+      "category_label": "Fence",
       "publishedVisualMeshes": [
         {
           "meshId": "81960285954051",
@@ -1620,6 +1870,7 @@
       "created_at": 1791569780.5610075,
       "updated_at": 1793988677.8449352,
       "published_at": 1793988677.8449352,
+      "surface_material": "default",
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -1677,6 +1928,13 @@
           "glass": false,
           "noCollide": true
         }
+      },
+      "surfaceMaterial": "default",
+      "materialDefinition": {
+        "id": "default",
+        "label": "Default · unchanged",
+        "robloxMaterial": "",
+        "soundFamily": "generic"
       },
       "texture_path": "assets/source/texture-atlases/stone_pillar_01/128x128/stone_pillar_01_128x128_atlas.png",
       "texture_filename": "stone_pillar_01_128x128_atlas.png",
@@ -1745,7 +2003,7 @@
       "textureUsesAlpha": true,
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
-      "category_label": "Fences",
+      "category_label": "Fence",
       "publishedVisualMeshes": [
         {
           "meshId": "134444739900464",
@@ -1767,8 +2025,40 @@
       "created_at": 1791582079.0043566,
       "updated_at": 1791582102.8554742,
       "published_at": 1791582102.8554742,
-      "fbxAnalysis": null,
+      "surface_material": "default",
+      "fbxAnalysis": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "wooden_fence_01",
+            "armature": "",
+            "vertices": 783,
+            "bones": [],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          }
+        ],
+        "hasCollider": false,
+        "armatures": [],
+        "unassignedArmatures": []
+      },
       "meshOptions": {},
+      "surfaceMaterial": "default",
+      "materialDefinition": {
+        "id": "default",
+        "label": "Default · unchanged",
+        "robloxMaterial": "",
+        "soundFamily": "generic"
+      },
       "texture_path": "assets/source/texture-atlases/structures_01/2048x2048/structures_01_2048x2048_atlas.jpg",
       "texture_filename": "structures_01_2048x2048_atlas.jpg",
       "texture_sha256": "2f41320116f4b423de010f4c906b5b16eabc981c055bb4fc478c84437a95bb88",
@@ -1811,7 +2101,7 @@
       "textureUsesAlpha": false,
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
-      "category_label": "Fences",
+      "category_label": "Fence",
       "publishedVisualMeshes": [
         {
           "meshId": "122368672664906",
@@ -1833,8 +2123,16 @@
       "created_at": 1791582446.2359698,
       "updated_at": 1791582458.3048537,
       "published_at": 1791582458.3048537,
+      "surface_material": "default",
       "fbxAnalysis": null,
       "meshOptions": {},
+      "surfaceMaterial": "default",
+      "materialDefinition": {
+        "id": "default",
+        "label": "Default · unchanged",
+        "robloxMaterial": "",
+        "soundFamily": "generic"
+      },
       "texture_path": "assets/source/texture-atlases/structures_01/2048x2048/structures_01_2048x2048_atlas.jpg",
       "texture_filename": "structures_01_2048x2048_atlas.jpg",
       "texture_sha256": "2f41320116f4b423de010f4c906b5b16eabc981c055bb4fc478c84437a95bb88",
@@ -1877,7 +2175,7 @@
       "textureUsesAlpha": false,
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
-      "category_label": "Fences",
+      "category_label": "Fence",
       "publishedVisualMeshes": [
         {
           "meshId": "108701846802023",
@@ -1899,6 +2197,7 @@
       "created_at": 1791576204.461649,
       "updated_at": 1791583589.037727,
       "published_at": 1791576221.5396745,
+      "surface_material": "default",
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -1925,6 +2224,13 @@
         "unassignedArmatures": []
       },
       "meshOptions": {},
+      "surfaceMaterial": "default",
+      "materialDefinition": {
+        "id": "default",
+        "label": "Default · unchanged",
+        "robloxMaterial": "",
+        "soundFamily": "generic"
+      },
       "texture_path": "assets/source/texture-atlases/structures_01/2048x2048/structures_01_2048x2048_atlas.jpg",
       "texture_filename": "structures_01_2048x2048_atlas.jpg",
       "texture_sha256": "2f41320116f4b423de010f4c906b5b16eabc981c055bb4fc478c84437a95bb88",
@@ -1967,7 +2273,7 @@
       "textureUsesAlpha": false,
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
-      "category_label": "Ladders",
+      "category_label": "Ladder",
       "publishedVisualMeshes": [
         {
           "meshId": "114730514469013",
@@ -1989,6 +2295,7 @@
       "created_at": 1792407624.9011502,
       "updated_at": 1793925350.9916499,
       "published_at": 1793925350.9916499,
+      "surface_material": "default",
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -2022,6 +2329,13 @@
           "glass": false,
           "noCollide": false
         }
+      },
+      "surfaceMaterial": "default",
+      "materialDefinition": {
+        "id": "default",
+        "label": "Default · unchanged",
+        "robloxMaterial": "",
+        "soundFamily": "generic"
       },
       "texture_path": "assets/source/texture-atlases/restoration_01/2048x2048/revisions/2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683/restoration_01_2048x2048_atlas.png",
       "texture_filename": "restoration_01_2048x2048_atlas.png",
@@ -2090,7 +2404,7 @@
       "textureUsesAlpha": true,
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
-      "category_label": "Ladders",
+      "category_label": "Ladder",
       "publishedVisualMeshes": [
         {
           "meshId": "99664944787392",
@@ -2112,8 +2426,16 @@
       "created_at": 1792517965.2518861,
       "updated_at": 1793732904.9424636,
       "published_at": 1793732904.9424636,
+      "surface_material": "default",
       "fbxAnalysis": null,
       "meshOptions": {},
+      "surfaceMaterial": "default",
+      "materialDefinition": {
+        "id": "default",
+        "label": "Default · unchanged",
+        "robloxMaterial": "",
+        "soundFamily": "generic"
+      },
       "texture_path": "assets/source/texture-atlases/campfire_01/256x512/campfire_01_256x512_atlas.png",
       "texture_filename": "campfire_01_256x512_atlas.png",
       "texture_sha256": "f7b8f7c74484cae4599166c01b77d14d20222aee85e04e2fc94e128205cc0553",
@@ -2156,7 +2478,7 @@
       "textureUsesAlpha": true,
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
-      "category_label": "Lights",
+      "category_label": "Light",
       "publishedVisualMeshes": [
         {
           "meshId": "70451663424090",
@@ -2178,8 +2500,16 @@
       "created_at": 1792109428.4855547,
       "updated_at": 1792109440.378192,
       "published_at": 1792109440.378192,
+      "surface_material": "default",
       "fbxAnalysis": null,
       "meshOptions": {},
+      "surfaceMaterial": "default",
+      "materialDefinition": {
+        "id": "default",
+        "label": "Default · unchanged",
+        "robloxMaterial": "",
+        "soundFamily": "generic"
+      },
       "texture_path": "assets/source/texture-atlases/wall_torch_01/2048x2048/migrated/f2e5349b2b7de2cac11340d2fb091ebd9bae397672e7cdcdba462db9466ec104/wall_torch_01.jpg",
       "texture_filename": "wall_torch_01.jpg",
       "texture_sha256": "f2e5349b2b7de2cac11340d2fb091ebd9bae397672e7cdcdba462db9466ec104",
@@ -2222,7 +2552,7 @@
       "textureUsesAlpha": false,
       "atlasLegacyWarning": true,
       "status": "PUBLISHED",
-      "category_label": "Lights",
+      "category_label": "Light",
       "publishedVisualMeshes": [
         {
           "meshId": "79923563217669",
@@ -2244,8 +2574,16 @@
       "created_at": 1792109461.491199,
       "updated_at": 1792109491.1612,
       "published_at": 1792109491.1612,
+      "surface_material": "default",
       "fbxAnalysis": null,
       "meshOptions": {},
+      "surfaceMaterial": "default",
+      "materialDefinition": {
+        "id": "default",
+        "label": "Default · unchanged",
+        "robloxMaterial": "",
+        "soundFamily": "generic"
+      },
       "texture_path": "assets/source/texture-atlases/wall_torch_01/2048x2048/migrated/f2e5349b2b7de2cac11340d2fb091ebd9bae397672e7cdcdba462db9466ec104/wall_torch_01.jpg",
       "texture_filename": "wall_torch_01.jpg",
       "texture_sha256": "f2e5349b2b7de2cac11340d2fb091ebd9bae397672e7cdcdba462db9466ec104",
@@ -2288,7 +2626,7 @@
       "textureUsesAlpha": false,
       "atlasLegacyWarning": true,
       "status": "PUBLISHED",
-      "category_label": "Lights",
+      "category_label": "Light",
       "publishedVisualMeshes": [
         {
           "meshId": "105353449494456",
@@ -2310,8 +2648,16 @@
       "created_at": 1792109502.154667,
       "updated_at": 1792109515.2829225,
       "published_at": 1792109515.2829225,
+      "surface_material": "default",
       "fbxAnalysis": null,
       "meshOptions": {},
+      "surfaceMaterial": "default",
+      "materialDefinition": {
+        "id": "default",
+        "label": "Default · unchanged",
+        "robloxMaterial": "",
+        "soundFamily": "generic"
+      },
       "texture_path": "assets/source/texture-atlases/wall_torch_01/2048x2048/migrated/f2e5349b2b7de2cac11340d2fb091ebd9bae397672e7cdcdba462db9466ec104/wall_torch_01.jpg",
       "texture_filename": "wall_torch_01.jpg",
       "texture_sha256": "f2e5349b2b7de2cac11340d2fb091ebd9bae397672e7cdcdba462db9466ec104",
@@ -2354,7 +2700,7 @@
       "textureUsesAlpha": false,
       "atlasLegacyWarning": true,
       "status": "PUBLISHED",
-      "category_label": "Lights",
+      "category_label": "Light",
       "publishedVisualMeshes": [
         {
           "meshId": "100390554987785",
@@ -2376,8 +2722,16 @@
       "created_at": 1791577146.911755,
       "updated_at": 1792869859.5723166,
       "published_at": 1792869859.5723166,
+      "surface_material": "default",
       "fbxAnalysis": null,
       "meshOptions": {},
+      "surfaceMaterial": "default",
+      "materialDefinition": {
+        "id": "default",
+        "label": "Default · unchanged",
+        "robloxMaterial": "",
+        "soundFamily": "generic"
+      },
       "texture_path": "assets/source/texture-atlases/lantern_01/64x128/lantern_01_64x128_atlas.png",
       "texture_filename": "lantern_01_64x128_atlas.png",
       "texture_sha256": "ca9a12aacf3ad5305a6baa34baa728198a272b8d81188ae7163f915f7e1d992e",
@@ -2420,7 +2774,7 @@
       "textureUsesAlpha": true,
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
-      "category_label": "Lights",
+      "category_label": "Light",
       "publishedVisualMeshes": [
         {
           "meshId": "87221438976155",
@@ -2442,8 +2796,16 @@
       "created_at": 1792462062.488145,
       "updated_at": 1792462077.721065,
       "published_at": 1792462077.721065,
+      "surface_material": "default",
       "fbxAnalysis": null,
       "meshOptions": {},
+      "surfaceMaterial": "default",
+      "materialDefinition": {
+        "id": "default",
+        "label": "Default · unchanged",
+        "robloxMaterial": "",
+        "soundFamily": "generic"
+      },
       "texture_path": "assets/source/texture-atlases/wooden_post_kit/1280x1280/migrated/39bee931b1c93f1d6f0d00d32746676eb35f93eaf30c44ab2e1369cbd78bb119/wooden_post_kit.png",
       "texture_filename": "wooden_post_kit.png",
       "texture_sha256": "39bee931b1c93f1d6f0d00d32746676eb35f93eaf30c44ab2e1369cbd78bb119",
@@ -2486,7 +2848,7 @@
       "textureUsesAlpha": true,
       "atlasLegacyWarning": true,
       "status": "PUBLISHED",
-      "category_label": "Lights",
+      "category_label": "Light",
       "publishedVisualMeshes": [
         {
           "meshId": "123940774206882",
@@ -2508,8 +2870,16 @@
       "created_at": 1792108239.9875693,
       "updated_at": 1792108399.6092346,
       "published_at": 1792108399.6092346,
+      "surface_material": "default",
       "fbxAnalysis": null,
       "meshOptions": {},
+      "surfaceMaterial": "default",
+      "materialDefinition": {
+        "id": "default",
+        "label": "Default · unchanged",
+        "robloxMaterial": "",
+        "soundFamily": "generic"
+      },
       "texture_path": "assets/source/texture-atlases/wall_torch_01/2048x2048/migrated/f2e5349b2b7de2cac11340d2fb091ebd9bae397672e7cdcdba462db9466ec104/wall_torch_01.jpg",
       "texture_filename": "wall_torch_01.jpg",
       "texture_sha256": "f2e5349b2b7de2cac11340d2fb091ebd9bae397672e7cdcdba462db9466ec104",
@@ -2552,7 +2922,7 @@
       "textureUsesAlpha": false,
       "atlasLegacyWarning": true,
       "status": "PUBLISHED",
-      "category_label": "Lights",
+      "category_label": "Light",
       "publishedVisualMeshes": [
         {
           "meshId": "103128778677096",
@@ -2574,8 +2944,16 @@
       "created_at": 1792108403.641672,
       "updated_at": 1792108424.1820817,
       "published_at": 1792108424.1820817,
+      "surface_material": "default",
       "fbxAnalysis": null,
       "meshOptions": {},
+      "surfaceMaterial": "default",
+      "materialDefinition": {
+        "id": "default",
+        "label": "Default · unchanged",
+        "robloxMaterial": "",
+        "soundFamily": "generic"
+      },
       "texture_path": "assets/source/texture-atlases/wall_torch_01/2048x2048/migrated/f2e5349b2b7de2cac11340d2fb091ebd9bae397672e7cdcdba462db9466ec104/wall_torch_01.jpg",
       "texture_filename": "wall_torch_01.jpg",
       "texture_sha256": "f2e5349b2b7de2cac11340d2fb091ebd9bae397672e7cdcdba462db9466ec104",
@@ -2618,7 +2996,7 @@
       "textureUsesAlpha": false,
       "atlasLegacyWarning": true,
       "status": "PUBLISHED",
-      "category_label": "Lights",
+      "category_label": "Light",
       "publishedVisualMeshes": [
         {
           "meshId": "102742395274777",
@@ -2640,8 +3018,16 @@
       "created_at": 1792108517.1060743,
       "updated_at": 1792108537.2191844,
       "published_at": 1792108537.2191844,
+      "surface_material": "default",
       "fbxAnalysis": null,
       "meshOptions": {},
+      "surfaceMaterial": "default",
+      "materialDefinition": {
+        "id": "default",
+        "label": "Default · unchanged",
+        "robloxMaterial": "",
+        "soundFamily": "generic"
+      },
       "texture_path": "assets/source/texture-atlases/wall_torch_01/2048x2048/migrated/f2e5349b2b7de2cac11340d2fb091ebd9bae397672e7cdcdba462db9466ec104/wall_torch_01.jpg",
       "texture_filename": "wall_torch_01.jpg",
       "texture_sha256": "f2e5349b2b7de2cac11340d2fb091ebd9bae397672e7cdcdba462db9466ec104",
@@ -2684,7 +3070,7 @@
       "textureUsesAlpha": false,
       "atlasLegacyWarning": true,
       "status": "PUBLISHED",
-      "category_label": "Lights",
+      "category_label": "Light",
       "publishedVisualMeshes": [
         {
           "meshId": "109862216524831",
@@ -2706,8 +3092,16 @@
       "created_at": 1792931156.8872106,
       "updated_at": 1792931169.0824056,
       "published_at": 1792931169.0824056,
+      "surface_material": "default",
       "fbxAnalysis": null,
       "meshOptions": {},
+      "surfaceMaterial": "default",
+      "materialDefinition": {
+        "id": "default",
+        "label": "Default · unchanged",
+        "robloxMaterial": "",
+        "soundFamily": "generic"
+      },
       "texture_path": "assets/source/texture-atlases/restoration_01/2048x2048/revisions/2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683/restoration_01_2048x2048_atlas.png",
       "texture_filename": "restoration_01_2048x2048_atlas.png",
       "texture_sha256": "2d3d480a4f0f66485645838fa99c06762b7a4e2700a0aece70d075d92fb0a683",
@@ -2750,7 +3144,7 @@
       "textureUsesAlpha": true,
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
-      "category_label": "Props",
+      "category_label": "Prop",
       "publishedVisualMeshes": [
         {
           "meshId": "104904401036524",
@@ -2776,8 +3170,16 @@
       "created_at": 1791439769.9058099,
       "updated_at": 1791440120.3517294,
       "published_at": 1791440120.3517294,
+      "surface_material": "default",
       "fbxAnalysis": null,
       "meshOptions": {},
+      "surfaceMaterial": "default",
+      "materialDefinition": {
+        "id": "default",
+        "label": "Default · unchanged",
+        "robloxMaterial": "",
+        "soundFamily": "generic"
+      },
       "texture_path": "assets/source/texture-atlases/main_statue/2048x2048/migrated/8f8ade9148ff40e8b5933c6abeb5e2c55e68a95d89147d6b317cee7412c5e8bf/main_statue.jpg",
       "texture_filename": "main_statue.jpg",
       "texture_sha256": "8f8ade9148ff40e8b5933c6abeb5e2c55e68a95d89147d6b317cee7412c5e8bf",
@@ -2820,7 +3222,7 @@
       "textureUsesAlpha": false,
       "atlasLegacyWarning": true,
       "status": "PUBLISHED",
-      "category_label": "Rocks",
+      "category_label": "Rock",
       "publishedVisualMeshes": [
         {
           "meshId": "75815650289792",
@@ -2842,6 +3244,7 @@
       "created_at": 1792864890.9769711,
       "updated_at": 1793901136.4099162,
       "published_at": 1793901136.4099162,
+      "surface_material": "default",
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -2899,6 +3302,13 @@
           "glass": false,
           "noCollide": false
         }
+      },
+      "surfaceMaterial": "default",
+      "materialDefinition": {
+        "id": "default",
+        "label": "Default · unchanged",
+        "robloxMaterial": "",
+        "soundFamily": "generic"
       },
       "texture_path": "assets/source/texture-atlases/big_tree_01/512x1024/big_tree_01_512x1024_atlas.png",
       "texture_filename": "big_tree_01_512x1024_atlas.png",
@@ -3017,7 +3427,7 @@
       "textureUsesAlpha": true,
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
-      "category_label": "Trees",
+      "category_label": "Tree",
       "publishedVisualMeshes": [
         {
           "meshId": "94864502535085",
@@ -3039,6 +3449,7 @@
       "created_at": 1792461987.3799765,
       "updated_at": 1793903073.7166655,
       "published_at": 1793903073.7166655,
+      "surface_material": "default",
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -3216,6 +3627,13 @@
           "noCollide": false
         }
       },
+      "surfaceMaterial": "default",
+      "materialDefinition": {
+        "id": "default",
+        "label": "Default · unchanged",
+        "robloxMaterial": "",
+        "soundFamily": "generic"
+      },
       "texture_path": "assets/source/texture-atlases/birch_01/512x512/birch_01_512x512_atlas.png",
       "texture_filename": "birch_01_512x512_atlas.png",
       "texture_sha256": "59acc26d21139f32103d178ca0eed27754d84078346f0777f6afa606be05c65b",
@@ -3283,7 +3701,7 @@
       "textureUsesAlpha": true,
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
-      "category_label": "Trees",
+      "category_label": "Tree",
       "publishedVisualMeshes": [
         {
           "meshId": "132288181730621",
@@ -3305,8 +3723,16 @@
       "created_at": 1792462015.1383383,
       "updated_at": 1792462028.8508034,
       "published_at": 1792462028.8508034,
+      "surface_material": "default",
       "fbxAnalysis": null,
       "meshOptions": {},
+      "surfaceMaterial": "default",
+      "materialDefinition": {
+        "id": "default",
+        "label": "Default · unchanged",
+        "robloxMaterial": "",
+        "soundFamily": "generic"
+      },
       "texture_path": "assets/source/texture-atlases/christmas_tree/2048x2048/migrated/9de5d31b2ae82633f6f91ee9705040c4fd5c03d579424189faa9bafe03ce6386/christmas_tree.jpg",
       "texture_filename": "christmas_tree.jpg",
       "texture_sha256": "9de5d31b2ae82633f6f91ee9705040c4fd5c03d579424189faa9bafe03ce6386",
@@ -3349,7 +3775,7 @@
       "textureUsesAlpha": false,
       "atlasLegacyWarning": true,
       "status": "PUBLISHED",
-      "category_label": "Trees",
+      "category_label": "Tree",
       "publishedVisualMeshes": [
         {
           "meshId": "85357811441510",
@@ -3371,6 +3797,7 @@
       "created_at": 1793887548.4962683,
       "updated_at": 1793887582.637806,
       "published_at": 1793887582.637806,
+      "surface_material": "default",
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -3429,6 +3856,13 @@
           "noCollide": false
         }
       },
+      "surfaceMaterial": "default",
+      "materialDefinition": {
+        "id": "default",
+        "label": "Default · unchanged",
+        "robloxMaterial": "",
+        "soundFamily": "generic"
+      },
       "texture_path": "assets/source/texture-atlases/blossom_tree_01/2048x2048/blossom_tree_01_2048x2048_atlas.png",
       "texture_filename": "blossom_tree_01_2048x2048_atlas.png",
       "texture_sha256": "9eb117cb05a64a0da996fc8151f1c6bfb3c0388305074a570681d185c850cca0",
@@ -3471,7 +3905,7 @@
       "textureUsesAlpha": true,
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
-      "category_label": "Trees",
+      "category_label": "Tree",
       "publishedVisualMeshes": [
         {
           "meshId": "90624667941191",
@@ -3493,6 +3927,7 @@
       "created_at": 1791465860.1735055,
       "updated_at": 1793906031.1496842,
       "published_at": 1793888161.6780365,
+      "surface_material": "default",
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -3624,6 +4059,13 @@
           "noCollide": false
         }
       },
+      "surfaceMaterial": "default",
+      "materialDefinition": {
+        "id": "default",
+        "label": "Default · unchanged",
+        "robloxMaterial": "",
+        "soundFamily": "generic"
+      },
       "texture_path": "assets/source/texture-atlases/christmas_tree_01/256x256/christmas_tree_01_256x256_atlas.png",
       "texture_filename": "christmas_tree_01_256x256_atlas.png",
       "texture_sha256": "750104974984d9909df2da3bbb807db3dbcb5db0bdbd768f7f319cb63f2875e2",
@@ -3666,7 +4108,7 @@
       "textureUsesAlpha": true,
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
-      "category_label": "Trees",
+      "category_label": "Tree",
       "publishedVisualMeshes": [
         {
           "meshId": "136766989683296",

@@ -49,6 +49,8 @@ function decoAssetSetForm() {
   $('location-asset-category').value = categories.some(c => c.id === decoAssetState.libraryCategory)
     ? decoAssetState.libraryCategory : (categories[0]?.id || 'tree');
   $('location-asset-destructible').checked = false;
+  $('location-asset-surface-material').value = 'default';
+  window.game1LocationCategoryPicker?.refresh($('location-asset-category'));
   $('picked-location-asset-model').textContent = 'Choose the FBX for this new asset';
   decoAssetRenderInspection();
   $('picked-location-asset-texture').textContent = 'Choose PNG/JPG or reuse a registered atlas';
@@ -133,7 +135,8 @@ function decoAssetUseCategory(category, {updateEditor = true} = {}) {
   if (!(decoAssetState.data?.options?.categories || []).some(c => c.id === category)) return;
   decoAssetState.libraryCategory = category;
   decoAssetRemember(DECO_LIBRARY_CATEGORY_KEY, category);
-  if (updateEditor) $('location-asset-category').value = category;
+  if (updateEditor) { $('location-asset-category').value = category;
+    window.game1LocationCategoryPicker?.refresh($('location-asset-category')); }
 }
 function decoAssetRenderLibraryFilter() {
   const filter = $('location-asset-library-category');
@@ -148,6 +151,7 @@ function decoAssetRenderLibraryFilter() {
     decoAssetState.libraryCategory = 'all';
   }
   filter.value = decoAssetState.libraryCategory;
+  window.game1LocationCategoryPicker?.mount(filter, decoAssetState.data?.options);
 }
 function decoAssetRender() {
   if (!decoAssetState.data) return;
@@ -162,6 +166,15 @@ function decoAssetRender() {
       option.value = category.id; option.textContent = category.label; categories.appendChild(option);
     }
     categories.value = categories[0]?.value || 'tree';
+  }
+  window.game1LocationCategoryPicker?.mount(categories, decoAssetState.data?.options);
+  const materials=$('location-asset-surface-material');
+  if(!materials.options.length){
+    for(const material of decoAssetState.data.options?.surfaceMaterials||[]){
+      const opt=document.createElement('option');opt.value=material.id;opt.textContent=material.label;
+      materials.appendChild(opt);
+    }
+    materials.value='default';
   }
   decoAssetRenderTextureReferences();
   decoAssetRenderLibraryFilter();
@@ -184,7 +197,7 @@ function decoAssetRender() {
     tr.innerHTML = `<td><b>${esc(row.name_en)}</b><small>${esc(row.slug)}</small>` +
       `<small class="deco-texture-filename">${esc(window.game1AtlasIdentity.describe({filename:decoAssetTextureFilename(row),atlasKey:row.atlasFamily||''}).key)} ${decoAtlasWarning(row)}</small>` +
       `${decoAtlasDots(row)}${row.studioSyncStatus === 'pending_studio_sync' ? '<small class="deco-sync-pending">Studio Sync pending</small>' : ''}</td>` +
-      `<td>${esc(decoAssetCategoryLabel(row.category))}</td><td>${contactPolicy}</td>` +
+      `<td>${esc(decoAssetCategoryLabel(row.category))}<small>${esc(row.materialDefinition?.label||'Default')}</small></td><td>${contactPolicy}</td>` +
       `<td><small>Model ID ${esc(row.model_asset_id || '—')}</small>${row.model_asset_id?meshLabels:''}<small>Image ID ${esc(row.texture_asset_id || '—')}</small></td>` +
       `<td>${decoAssetStatusTag(row.status)}</td><td><div class="deco-asset-row-actions">` +
       `<button data-select type="button" ${decoAssetState.syncingSlug?'disabled':''}>Edit</button>` +
@@ -256,6 +269,7 @@ async function decoAssetRegister() {
     const payload = {
       nameEn: $('location-asset-name').value.trim(), slug:$('location-asset-slug').value.trim(),
       category:$('location-asset-category').value, destructible: $('location-asset-destructible').checked,
+      surfaceMaterial:$('location-asset-surface-material').value,
       modelSourcePath:decoAssetState.modelPath, textureSourcePath:decoAssetState.texturePath,
       atlasVariantId:decoAssetState.atlasVariantId, createOnly:true, inspectFbx:true,
       meshOptions:decoAssetState.meshOptions,
@@ -279,6 +293,7 @@ async function decoAssetSaveEdits(slug, payload, expectedRevision) {
     body:JSON.stringify({
       slug, nameEn:payload.nameEn ?? row.name_en, category:payload.category ?? row.category,
       destructible:payload.destructible ?? Boolean(row.destructible),
+      surfaceMaterial:payload.surfaceMaterial ?? row.surfaceMaterial ?? 'default',
       modelSourcePath:payload.modelSourcePath || '', textureSourcePath:payload.textureSourcePath || '',
       atlasVariantId:payload.textureSourcePath ? 0 : (payload.atlasVariantId ?? row.atlasVariantId),
       expectedRevision, editOnly:true, inspectFbx:Boolean(payload.modelSourcePath),

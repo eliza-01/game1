@@ -96,6 +96,50 @@ function Core.ApplyLocationModel(model: Model, allowedNames: {[string]: boolean}
     return affected
 end
 
+-- Semantic surface for future impact/footstep audio and interaction.
+-- This does not own collision flags, sizes, meshes or appearance textures.
+-- Only a selected explicit physical material changes Roblox Material; "default"
+-- leaves historical authored Materials intact (including collision geometry).
+function Core.ApplyLocationSurfaceMaterial(model: Model, surfaceKey: string?, physicalName: string?): number
+    local key = if type(surfaceKey) == "string" and surfaceKey ~= "" then surfaceKey else "default"
+    local material: Enum.Material? = nil
+    if physicalName ~= nil and physicalName ~= "" then
+        material = Enum.Material[physicalName]
+        if material == nil then error("unsupported Location physical material " .. tostring(physicalName)) end
+    end
+    local changed = 0
+    for _, mesh in ipairs(parts(model)) do
+        -- COL receives exactly the same semantic/physical material as visual parts,
+        -- but continues to be invisible with its own Precise collision policy.
+        local differs = mesh:GetAttribute("Game1LocationSurfaceMaterial") ~= key
+        if material ~= nil and mesh.Material ~= material then differs = true end
+        if differs then
+            mesh:SetAttribute("Game1LocationSurfaceMaterial", key)
+            if material ~= nil then mesh.Material = material end
+            changed += 1
+        end
+    end
+    return changed
+end
+
+function Core.CaptureLocationSurfaceMaterial(model: Model): {any}
+    local old = {}
+    for _, mesh in ipairs(parts(model)) do
+        table.insert(old,{part=mesh,material=mesh.Material,
+            key=mesh:GetAttribute("Game1LocationSurfaceMaterial")})
+    end
+    return old
+end
+
+function Core.RestoreLocationSurfaceMaterial(saved: {any})
+    for _,entry in ipairs(saved) do
+        if entry.part.Parent then
+            entry.part.Material=entry.material
+            entry.part:SetAttribute("Game1LocationSurfaceMaterial",entry.key)
+        end
+    end
+end
+
 -- Scoped existing-placement physics updates can fail on locked Studio parts.
 -- Capture before the first change and restore across every managed instance.
 function Core.CaptureLocationModel(model: Model, allowedNames: {[string]: boolean}): {any}

@@ -11,7 +11,7 @@
     (acc[row.slug] ||= []).push(row);return acc;
   }, {});
   const needsRepair = row => !row.ambiguous && (row.needsStructure || row.duplicateId);
-  const needsSync = row => row.canSync && (row.needsMesh || row.needsTexture);
+  const needsSync = row => row.canSync && (row.needsMesh || row.needsTexture || row.needsMaterial);
 
   function buttons() {
     for (const name of ['pr-scan','pr-select-all','pr-repair-all','pr-sync-all']) {
@@ -54,6 +54,7 @@
       <div class="pr-path" title="${html(row.path)}">${html(row.path)}</div>
       <div class="pr-status-row"><span class="${row.needsMesh?'pr-old':'pr-ok'}">Mesh ${row.needsMesh?'✕ устарел':'✓ актуален'}</span>
         <span class="${row.needsTexture?'pr-old':'pr-ok'}">Texture ${row.needsTexture?'✕ устарела':'✓ актуальна'}</span>
+        ${row.needsMaterial?'<span class="pr-old">Материал ✕ требует Sync</span>':''}
         <small>Mesh ID ${html(row.meshId)} · Texture ID ${html(row.textureId||'—')}</small></div>
       ${issues?`<div class="pr-issues">${issues}</div>`:''}
       <div class="actions"><button type="button" data-pr-action="select" data-key="${html(row.key)}">Select in Studio</button>
@@ -69,7 +70,7 @@
     }
     const s=data.summary;
     metrics.innerHTML=[['Размещений',s.placements],['Mesh устарел',s.outdatedMesh],
-      ['Texture устарела',s.outdatedTexture],['Структура',s.structure],
+      ['Texture устарела',s.outdatedTexture],['Материал',s.outdatedMaterial],['Структура',s.structure],
       ['Повтор ID',s.duplicateIds],['Неоднозначно',s.ambiguous]].map(([n,v])=>
       `<div class="pr-metric"><b>${Number(v)||0}</b><span>${html(n)}</span></div>`).join('');
     const entries=Object.entries(groups()).sort((a,b)=>a[0].localeCompare(b[0]));

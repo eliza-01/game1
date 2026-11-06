@@ -3,7 +3,7 @@
 local MeshPhysics = require(script.Parent.StudioMeshPhysicsCore)
 local DecoAssetPreparation = {}
 
-function DecoAssetPreparation.PreparePlaced(model: Model, meshOptions: any?)
+function DecoAssetPreparation.PreparePlaced(model: Model, meshOptions: any?, materialKey: string?, physicalMaterial: string?)
     for _, descendant in ipairs(model:GetDescendants()) do
         if descendant:IsA("BasePart") then
             -- The placement ghost is anchored; placed decorations are not.
@@ -15,6 +15,7 @@ function DecoAssetPreparation.PreparePlaced(model: Model, meshOptions: any?)
     -- The policy is reapplied after ghost/preview handling and before Workspace
     -- parenting, without writing any transforms, scale or anchors.
     MeshPhysics.ApplyLocationModel(model, nil, meshOptions)
+    MeshPhysics.ApplyLocationSurfaceMaterial(model,materialKey,physicalMaterial)
 end
 
 return table.freeze(DecoAssetPreparation)

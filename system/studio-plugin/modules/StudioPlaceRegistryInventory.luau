@@ -55,7 +55,8 @@ local function ensureVersions(catalog: any, service: any): ({any}, {any}, {strin
         table.insert(inventory, {slug=item.slug,models=published})
         table.insert(versions, {slug=item.slug,aliases=item.aliases or {},
             atlas=item.atlasAssetId,model=item.modelAssetId,
-            sha=item.publishedSha, models=published})
+            sha=item.publishedSha,material=item.surfaceMaterial or "default",
+            physicalMaterial=item.robloxMaterial or "",models=published})
     end
     return versions,inventory,warnings
 end
@@ -259,6 +260,20 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
                 end
             end
         end
+        local needsMaterial=false
+        if eligible and entry.material~="default" then
+            local physical=if entry.physicalMaterial~="" then Enum.Material[entry.physicalMaterial] else nil
+            for _, candidatePart in ipairs(root and root:GetDescendants() or {part}) do
+                if candidatePart:IsA("MeshPart") then
+                    local different=candidatePart:GetAttribute("Game1LocationSurfaceMaterial")~=entry.material
+                    if physical~=nil and candidatePart.Material~=physical then different=true end
+                    if different then
+                        needsMaterial=true
+                        break
+                    end
+                end
+            end
+        end
         local colliders=0
         if root then
             for _,child in ipairs(root:GetDescendants()) do
@@ -269,6 +284,7 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
         if not eligible then warn("Один Mesh ID встречается у нескольких Location Assets") end
         if not root then warn("Нет отдельной Model для этого экземпляра") end
         if eligible and requiresCol(entry) and colliders==0 then warn("Нет обязательного COL-меша") end
+        if needsMaterial then warn("Материал поверхности требует Sync: "..entry.material) end
         if eligible and oldAmbiguous then
             oldId=""
             warn("Один Mesh ID встречается в нескольких версиях; геометрия требует ручной проверки")
@@ -334,14 +350,14 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
             modelAssetId=if eligible then oldId else "",meshId=original.meshId,
             textureId=original.textureId,expectedMeshId=if eligible then entry.model else "",
             expectedTextureId=if eligible then entry.atlas else "",colCount=colliders,
-            needsMesh=needsMesh,needsTexture=needsTexture,needsStructure=not root or badName or meshNameMismatch or assigned==""
+            needsMesh=needsMesh,needsTexture=needsTexture,needsMaterial=needsMaterial,needsStructure=not root or badName or meshNameMismatch or assigned==""
                 or (root and root:GetAttribute("Game1DecoAssetSlug")~=entry.slug)
                 or (eligible and requiresCol(entry) and colliders==0),
             duplicateId=false,ambiguous=not eligible or provenForeignClaim,
             hasModel=root~=nil,canSync=eligible and not foreignClaim and root~=nil and assigned~=""
                 and claimed==entry.slug and (not needsMesh or oldId~="")
                 and (needsMesh or not (requiresCol(entry) and colliders==0)),
-            status=if not eligible then "ambiguous" elseif needsMesh or needsTexture then "pending" else "current",
+            status=if not eligible then "ambiguous" elseif needsMesh or needsTexture or needsMaterial then "pending" else "current",
             issues=issues,hierarchy=fullHierarchy,transform={cframe={part.CFrame:GetComponents()},
                 size={part.Size.X,part.Size.Y,part.Size.Z},position=positionOf(part),
                 anchored=part.Anchored,canCollide=part.CanCollide},

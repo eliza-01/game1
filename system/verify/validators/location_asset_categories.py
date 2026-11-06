@@ -36,8 +36,8 @@ def check_location_asset_categories(root: Path, report_error: Callable[[str], No
     for required in [
         'id="new-location-asset-main"',
         'id="location-asset-library-category"',
-        'ladders</span>',
-        'flowers</span>',
+        'Flora · tree · bush · flower · rock',
+        'Structure · light · fence · ladder · bridge · pillar · post',
         'id="location-asset-editor-panel"',
         'Register new asset',
     ]:
@@ -51,16 +51,16 @@ def check_location_asset_categories(root: Path, report_error: Callable[[str], No
     if 'description:game1PublicationDescription(' not in deco_assets_js_text:
         report_error('m54 Location Assets publication payload missing description')
     for required in [
-        '"ladder": "Ladders"',
-        '"flower": "Flowers"',
+        'CATEGORIES = taxonomy.CATEGORIES',
+        'CATEGORY_LABELS = taxonomy.CATEGORY_LABELS',
         "description = f'{description} · {asset_name}'",
     ]:
         if required not in location_asset_store_text:
             report_error(f"m54 LocationAssetStore missing {required}")
     for required in [
-        'ladder = "Ladders"',
-        'flower = "Flowers"',
-        'local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building", "prop" }',
+        'ladder="Ladder"',
+        'flower="Flower"',
+        'local CATEGORY_ORDER = { "tree", "bush", "flower", "rock",',
         'local column = (index - 1) % 4',
     ]:
         if required not in deco_manager_text:
@@ -73,9 +73,9 @@ def check_location_asset_categories(root: Path, report_error: Callable[[str], No
 
     # m55 Location Assets: Buildings + synchronized editor/library category context.
     for required in [
-        '"building": "Buildings"',
-        'building = "Buildings"',
-        'buildings</span>',
+        'CATEGORY_LABELS = taxonomy.CATEGORY_LABELS',
+        'building="Building"',
+        'decoration · building</span>',
         'function decoAssetUseCategory(category',
         "$('location-asset-category').onchange",
     ]:
@@ -83,11 +83,11 @@ def check_location_asset_categories(root: Path, report_error: Callable[[str], No
             report_error(f"m55 Buildings/category synchronization missing {required}")
     # m128 Props category is backed by the API, browser controls, and DecoManager.
     for required, source in [
-        ('"prop": "Props"', location_asset_store_text),
-        ('prop = "Props"', deco_manager_text),
+        ('CATEGORIES = taxonomy.CATEGORIES', location_asset_store_text),
+        ('prop="Prop"', deco_manager_text),
         ('prop = "Props"', deco_placement_text),
-        ('props</span>', index_m43_text),
-        ('buildings · props</small>', index_m43_text),
+        ('Prop · prop · decoration · building', index_m43_text),
+        ('flora · structure · prop', index_m43_text),
     ]:
         if required not in source:
             report_error(f"m128 Location Assets Props integration missing {required}")

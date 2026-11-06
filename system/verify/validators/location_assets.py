@@ -47,19 +47,21 @@ def check_location_assets_core(root: Path, report_error: Callable[[str], None], 
 
     if location_asset_manifest_path.is_file():
         location_asset_manifest = json.loads(location_asset_manifest_path.read_text(encoding="utf-8"))
-        if location_asset_manifest.get("schemaVersion") != 4 or location_asset_manifest.get("project") != "game1":
+        if location_asset_manifest.get("schemaVersion") not in (4,5) or location_asset_manifest.get("project") != "game1":
             report_error("m43 location-assets.json schema/project is invalid")
         category_ids = [row.get("id") for row in ((location_asset_manifest.get("options") or {}).get("categories") or [])]
         # Generated manifests may still have the previous category set until
         # the first Control Center startup re-exports them from LocationAssetStore.
-        expected_categories = ["tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building"]
-        if category_ids not in (expected_categories, expected_categories + ["prop"]):
+        expected_categories = ["tree", "bush", "flower", "rock", "light", "fence", "ladder", "bridge", "pillar", "post", "prop", "decoration", "building"]
+        legacy_categories = ["tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building", "prop"]
+        revision = location_asset_manifest.get("schemaVersion")
+        if (revision == 5 and category_ids != expected_categories) or (revision == 4 and category_ids != legacy_categories):
             report_error("m128 Location Assets manifest categories have invalid canonical order")
 
     location_asset_store_text = location_asset_store_path.read_text(encoding="utf-8") if location_asset_store_path.is_file() else ""
     for required in [
         "class LocationAssetStore",
-        'CATEGORIES = ("tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building", "prop")',
+        'CATEGORIES = taxonomy.CATEGORIES',
         "assets/source/location-assets",
         "model_path TEXT NOT NULL DEFAULT ''",
         "AtlasRegistry(self.root)",
@@ -169,7 +171,7 @@ def check_location_assets_core(root: Path, report_error: Callable[[str], None], 
         'DecoPreviewWorld',
         '"Save Assets Data"',
         'self.agentBaseUrl .. "/api/location-assets/layout"',
-        'local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building", "prop" }',
+        'local CATEGORY_ORDER = { "tree", "bush", "flower", "rock", "light", "fence", "ladder", "bridge", "pillar", "post", "prop", "decoration", "building" }',
     ]:
         if required not in deco_manager_text:
             report_error(f"m43 DecoManager missing {required}")

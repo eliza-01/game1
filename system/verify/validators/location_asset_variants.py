@@ -39,8 +39,8 @@ def check_location_asset_variants(root: Path, report_error: Callable[[str], None
 
     # M203 replaces model-as-texture-owner with independent atlas variants.
     for required in [
-        'SCHEMA_VERSION = 4',
-        '"decoration": "Decorations"',
+        'SCHEMA_VERSION = 5',
+        'CATEGORY_LABELS = taxonomy.CATEGORY_LABELS',
         "atlasVariantId",
         "texture_atlas_bindings" if False else "self.atlases.binding",
     ]:
@@ -52,7 +52,7 @@ def check_location_asset_variants(root: Path, report_error: Callable[[str], None
             report_error(f"m203 owner-based atlas implementation remains: {forbidden}")
     for required in [
         'id="location-asset-texture-reference"',
-        'decorations</span>',
+        'decoration · building</span>',
         'atlas variant',
     ]:
         if required not in index_m43_text:
@@ -67,10 +67,10 @@ def check_location_asset_variants(root: Path, report_error: Callable[[str], None
     if 'textureReferenceSlug:' in deco_assets_js_text:
         report_error('m203 Location Assets UI must not submit model-owner references')
     for required in [
-        'decoration = "Decorations"',
-        'ladder = "Ladders"',
-        'flower = "Flowers"',
-        'local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building", "prop" }',
+        'decoration="Decoration"',
+        'ladder="Ladder"',
+        'flower="Flower"',
+        'local CATEGORY_ORDER = { "tree", "bush", "flower", "rock",',
         'local row = math.floor((index - 1) / 4)',
     ]:
         if required not in deco_manager_text:
@@ -142,7 +142,7 @@ def check_location_asset_variants(root: Path, report_error: Callable[[str], None
     # M215: placement and model refresh share the physical-part policy.
     preparation = root / 'system/studio-plugin/modules/DecoAssetPreparation.luau'
     preparation_text = preparation.read_text(encoding='utf-8') if preparation.is_file() else ''
-    if 'DecoAssetPreparation.PreparePlaced(placed, row.meshOptions)' not in deco_placement_text:
+    if 'DecoAssetPreparation.PreparePlaced(placed, row.meshOptions' not in deco_placement_text:
         report_error('m215 DecoPlacement does not apply the shared placed-part policy')
     if 'descendant.Anchored = false' not in preparation_text:
         report_error('m49/M215 placed decoration BaseParts must be unanchored')

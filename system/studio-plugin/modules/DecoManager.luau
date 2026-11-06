@@ -7,18 +7,11 @@ local History = require(script.Parent.StudioPublishedMeshHistory)
 local DecoManager = {}
 DecoManager.__index = DecoManager
 
-local CATEGORY_ORDER = { "tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building", "prop" }
+local CATEGORY_ORDER = { "tree", "bush", "flower", "rock", "light", "fence", "ladder", "bridge", "pillar", "post", "prop", "decoration", "building" }
 local CATEGORY_LABELS = {
-    tree = "Trees",
-    bush = "Bushes",
-    rock = "Rocks",
-    light = "Lights",
-    fence = "Fences",
-    decoration = "Decorations",
-    ladder = "Ladders",
-    flower = "Flowers",
-    building = "Buildings",
-    prop = "Props",
+    tree="Tree", bush="Bush", flower="Flower", rock="Rock",
+    light="Light", fence="Fence", ladder="Ladder", bridge="Bridge",
+    pillar="Pillar", post="Post", prop="Prop", decoration="Decoration", building="Building",
 }
 
 local function newLabel(parent: Instance, text: string, size: UDim2, position: UDim2, textSize: number, bold: boolean?): TextLabel

@@ -52,13 +52,14 @@ window.game1LocationAssetWorkflow = (() => {
       {id:'atlas',label:'Texture · atlas'}];
     const card=(name,description,content,status='',css='ready')=>shell.step(name,description,content,status,css);
     const identityData=state.identityDraft||{nameEn:item.name_en,slug:item.slug,
-      category:item.category,destructible:Boolean(item.destructible)};
+      category:item.category,surfaceMaterial:item.surfaceMaterial||'default',destructible:Boolean(item.destructible)};
     const identity=card('Registration details','Metadata changes never publish assets or modify Studio.',
       `<div class="deco-manage-fields"><label>Name<input data-la-name maxlength="120" value="${e(identityData.nameEn)}"></label>`+
       `<label>Slug<input data-la-slug maxlength="64" pattern="[a-z0-9_]+" value="${e(identityData.slug)}"></label>`+
       `<small class="muted">Изменение slug сохраняет опубликованные ID и историю. После переименования Place Registry покажет старые экземпляры для Repair.</small>`+
       `<label>Category<select data-la-category>${(decoAssetState.data?.options?.categories||[]).map(c=>
         `<option value="${e(c.id)}" ${c.id===identityData.category?'selected':''}>${e(c.label)}</option>`).join('')}</select></label>`+
+      `<label>Surface material<select data-la-material>${(decoAssetState.data?.options?.surfaceMaterials||[]).map(m=>`<option value="${e(m.id)}" ${m.id===identityData.surfaceMaterial?'selected':''}>${e(m.label)}</option>`).join('')}</select><small class="muted">Physical surface and future impact/footstep sound family; COL receives the same.</small></label>`+
       `<label class="deco-policy-toggle"><input type="checkbox" data-la-destructible ${identityData.destructible?'checked':''}> Destructible</label></div>`+
       `<div class="actions">${button('save-identity','Apply Changes',busy)}${button('delete','Retire asset',busy)}</div>`,
       `Revision ${Number(item.revision||0)}`);
@@ -182,8 +183,10 @@ window.game1LocationAssetWorkflow = (() => {
     const nameInput=d.querySelector('[data-la-name]');
     const slugInput=d.querySelector('[data-la-slug]');
     if(nameInput&&slugInput){
+      window.game1LocationCategoryPicker?.mount(d.querySelector('[data-la-category]'),decoAssetState.data?.options);
       const updateDraft=()=>{state.identityDraft={nameEn:nameInput.value,
         slug:slugInput.value,category:d.querySelector('[data-la-category]').value,
+        surfaceMaterial:d.querySelector('[data-la-material]').value,
         destructible:d.querySelector('[data-la-destructible]').checked};};
       slugInput.oninput=()=>{state.manualSlug=true;updateDraft();};
       nameInput.oninput=()=>{
@@ -191,6 +194,7 @@ window.game1LocationAssetWorkflow = (() => {
         updateDraft();
       };
       d.querySelector('[data-la-category]').onchange=updateDraft;
+      d.querySelector('[data-la-material]').onchange=updateDraft;
       d.querySelector('[data-la-destructible]').onchange=updateDraft;
     }
     d.querySelectorAll('[data-la-action="select-studio"]').forEach(b=>{
@@ -227,6 +231,7 @@ window.game1LocationAssetWorkflow = (() => {
       const nextSlug=d.querySelector('[data-la-slug]').value.trim().toLowerCase();
       const data={nameEn:d.querySelector('[data-la-name]').value.trim(),
         category:d.querySelector('[data-la-category]').value,
+        surfaceMaterial:d.querySelector('[data-la-material]').value,
         destructible:d.querySelector('[data-la-destructible]').checked};
       return run('Applying metadata',async()=>{
       if(!/^[a-z0-9][a-z0-9_]{0,63}$/.test(nextSlug))throw Error('Slug: только a-z, 0-9 и _, не больше 64 символов');

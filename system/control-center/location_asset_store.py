@@ -15,6 +15,7 @@ from services.texture_alpha import texture_uses_alpha
 from services import location_asset_rename
 from services.location_fbx_inspection import inspect as inspect_location_fbx
 from services.mesh_authoring_policy import normalize_location_options
+from services import location_asset_taxonomy as taxonomy
 from services.texture_atlas_registry import AtlasRegistry, parse_filename
 
 from opencloud_assets import (
@@ -22,22 +23,11 @@ from opencloud_assets import (
     wait_for_operation,
 )
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 PROJECT = "game1"
-CATEGORIES = ("tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building", "prop")
+CATEGORIES = taxonomy.CATEGORIES
+CATEGORY_LABELS = taxonomy.CATEGORY_LABELS
 TEXTURE_SUFFIXES = (".png", ".jpg", ".jpeg")
-CATEGORY_LABELS = {
-    "tree": "Trees",
-    "bush": "Bushes",
-    "rock": "Rocks",
-    "light": "Lights",
-    "fence": "Fences",
-    "decoration": "Decorations",
-    "ladder": "Ladders",
-    "flower": "Flowers",
-    "building": "Buildings",
-    "prop": "Props",
-}
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_]{0,63}$")
 
 
@@ -153,6 +143,16 @@ class LocationAssetStore:
                 current_slug TEXT NOT NULL,
                 renamed_at REAL NOT NULL
             )""")
+            if 'surface_material' not in columns:
+                # Additive, idempotent: old rows keep their existing physical appearance.
+                import sqlite3
+                backup_dir = self.runtime / 'backups'
+                backup_dir.mkdir(parents=True, exist_ok=True)
+                path = backup_dir / ('location_surface_material_m249_' +
+                    datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ') + '.sqlite')
+                with sqlite3.connect(str(path)) as saved:
+                    connection.backup(saved)
+                connection.execute("ALTER TABLE location_assets ADD COLUMN surface_material TEXT NOT NULL DEFAULT 'default'")
             # Owner-era texture columns remain readable only until the M203
             # atlas migration drops them; never mutate old Image Asset IDs.
 
@@ -189,12 +189,7 @@ class LocationAssetStore:
         return location_asset_rename.rename(self, old_slug, payload)
 
     def options(self) -> dict:
-        return {
-            "categories": [
-                {"id": category, "label": CATEGORY_LABELS[category]}
-                for category in CATEGORIES
-            ]
-        }
+        return taxonomy.options()
 
     @staticmethod
     def _texture_current(row: dict) -> bool:
@@ -290,6 +285,8 @@ class LocationAssetStore:
         atlas_catalog = self.atlases.catalog() if atlas_catalog is None else atlas_catalog
         binding = self.atlases.binding('location_asset', str(result.get('slug') or ''))
         result['destructible'] = bool(result.get('destructible'))
+        result['surfaceMaterial'] = result.get('surface_material') or 'default'
+        result['materialDefinition'] = taxonomy.MATERIAL_BY_ID.get(result['surfaceMaterial'], taxonomy.MATERIAL_BY_ID['default']).copy()
         for field, default in (('texture_path',''),('texture_filename',''),('texture_sha256',''),
                                ('texture_asset_id',None),('texture_published_sha256',''),
                                ('texture_moderation_state',''),('texture_reference_slug','')):
@@ -381,6 +378,8 @@ class LocationAssetStore:
             raise ValueError('Location Asset changed since Edit opened; refresh before saving')
         category = str(payload.get("category") or (old.get("category") if old else "") or "").strip().lower()
         destructible = parse_bool(payload.get("destructible"), bool(old.get("destructible")) if old else False)
+        surface_material = taxonomy.surface_material(payload.get('surfaceMaterial',
+            old.get('surface_material', 'default') if old else 'default'))
         if category not in CATEGORIES:
             raise ValueError("location asset category must be one of: " + ", ".join(CATEGORIES))
 
@@ -449,15 +448,15 @@ class LocationAssetStore:
             connection.execute("""INSERT OR REPLACE INTO location_assets (
                 slug,name_en,category,model_path,model_sha256,model_asset_id,
                 model_published_sha256,model_moderation_state,destructible,
-                revision,created_at,updated_at,published_at,mesh_options_json
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                revision,created_at,updated_at,published_at,mesh_options_json,surface_material
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (slug,name_en,category,values['model_path'],values['model_sha256'],
              old.get('model_asset_id') if old else None,
              str(old.get('model_published_sha256') or '') if old else '',
              str(old.get('model_moderation_state') or '') if old else '',
              1 if destructible else 0,revision,old.get('created_at') if old else now,
              now,old.get('published_at') if old else None,
-             json.dumps(effective_options, ensure_ascii=False, sort_keys=True)))
+             json.dumps(effective_options, ensure_ascii=False, sort_keys=True),surface_material))
         self.atlases.bind('location_asset', slug, atlas_variant_id, allow_unpublished=True)
         if inspected is not None:
             self._save_fbx_analysis(slug, values['model_sha256'], inspected)
@@ -687,6 +686,9 @@ class LocationAssetStore:
                 f"\t\t\tslug = {self._lua_string(row['slug'])},",
                 f"\t\t\tname = {self._lua_string(row['name_en'])},",
                 f"\t\t\tcategory = {self._lua_string(row['category'])},",
+                f"\t\t\tsurfaceMaterial = {self._lua_string(row.get('surfaceMaterial') or 'default')},",
+                f"\t\t\trobloxMaterial = {self._lua_string(row['materialDefinition']['robloxMaterial'])},",
+                f"\t\t\tsoundFamily = {self._lua_string(row['materialDefinition']['soundFamily'])},",
                 f"\t\t\tstatus = {self._lua_string(row['status'])},",
                 f"\t\t\tmodelAssetId = {self._lua_string(row.get('model_asset_id') or '')},",
                 f"\t\t\ttextureAssetId = {self._lua_string(row.get('texture_asset_id') or '')},",

@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "slug": "wooden_fence_01",
+  "sourceSha256": "b2090a38d58468a84351dfb7b4dfaee5a5e58ae54a7bb906306725a418f5f3e4",
+  "analysis": {
+    "schemaVersion": 1,
+    "meshes": [
+      {
+        "name": "wooden_fence_01",
+        "armature": "",
+        "vertices": 783,
+        "bones": [],
+        "influencedBones": [],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": null,
+          "canQuery": null,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": null,
+          "physicsOnly": false
+        }
+      }
+    ],
+    "hasCollider": false,
+    "armatures": [],
+    "unassignedArmatures": []
+  }
+}

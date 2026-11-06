@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "slug": "stone_pillar_01",
+  "sourceSha256": "4bb33438e5d4b16964d4c6f4fdcec7ef0b83cdad80464049624617430afd94ec",
+  "analysis": {
+    "schemaVersion": 1,
+    "meshes": [
+      {
+        "name": "col_mesh",
+        "armature": "",
+        "vertices": 28,
+        "bones": [],
+        "influencedBones": [],
+        "role": "collider",
+        "physics": {
+          "role": "collider",
+          "canCollide": true,
+          "canQuery": true,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": "PreciseConvexDecomposition",
+          "physicsOnly": true
+        }
+      },
+      {
+        "name": "stone_pillar_01",
+        "armature": "",
+        "vertices": 1154,
+        "bones": [],
+        "influencedBones": [],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": false,
+          "canQuery": false,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": "Box",
+          "physicsOnly": false
+        }
+      }
+    ],
+    "hasCollider": true,
+    "armatures": [],
+    "unassignedArmatures": []
+  }
+}

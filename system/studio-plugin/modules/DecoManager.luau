@@ -387,7 +387,10 @@ function DecoManager:selectMeshSyncPart(slug: string, modelId: string, atlasId: 
             or History.Id(part.MeshId) ~= match.row.meshId then
             error("Scanned MeshPart moved or changed; Find again")
         end
-        local chosen = match.root or part:FindFirstAncestorOfClass("Model") or part
+        -- Use the exact target captured by Find. For unlinked visual meshes,
+        -- selecting an arbitrary parent grouping Model would misidentify the
+        -- placement and fail the scan path comparison.
+        local chosen = match.selectTarget or match.root or part
         if not chosen:IsDescendantOf(self.Workspace)
             or string.sub(chosen:GetFullName(),1,240) ~= match.row.modelPath then
             error("Scanned Model changed; Find again")

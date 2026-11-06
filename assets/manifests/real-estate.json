@@ -9295,6 +9295,38 @@
       ]
     },
     {
+      "atlasKey": "stone_pillar_01",
+      "baseKey": "stone_pillar",
+      "version": "01",
+      "variants": [
+        {
+          "id": 34,
+          "family_id": 28,
+          "width": 128,
+          "height": 128,
+          "filename": "stone_pillar_01_128x128_atlas.png",
+          "original_filename": "stone_pillar_01_128x128_atlas.png",
+          "source_path": "assets/source/texture-atlases/stone_pillar_01/128x128/stone_pillar_01_128x128_atlas.png",
+          "source_sha256": "2004f6a668a7bca6b48c5ede668f4d888b17cfff34e610b9f39a8ba568fddc39",
+          "uses_alpha": true,
+          "published_id": "94149950119448",
+          "published_sha256": "2004f6a668a7bca6b48c5ede668f4d888b17cfff34e610b9f39a8ba568fddc39",
+          "moderation_state": "Reviewing",
+          "published_at": 1793988719.9427536,
+          "created_at": 1793988715.5665512,
+          "retired_at": null,
+          "atlas_key": "stone_pillar_01",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "128x128",
+          "baseKey": "stone_pillar",
+          "version": "01"
+        }
+      ]
+    },
+    {
       "atlasKey": "structures_01",
       "baseKey": "structures",
       "version": "01",
@@ -9887,6 +9919,22 @@
       "atlasName": "smithy",
       "atlasVersion": "",
       "atlasResolution": ""
+    },
+    {
+      "reference": "atlas:34",
+      "label": "stone_pillar_01",
+      "slug": "",
+      "filename": "stone_pillar_01_128x128_atlas.png",
+      "group": "atlas",
+      "category": "",
+      "categoryLabel": "",
+      "path": "assets/source/texture-atlases/stone_pillar_01/128x128/stone_pillar_01_128x128_atlas.png",
+      "sha256": "2004f6a668a7bca6b48c5ede668f4d888b17cfff34e610b9f39a8ba568fddc39",
+      "assetId": "94149950119448",
+      "atlasKey": "stone_pillar_01",
+      "atlasName": "stone_pillar",
+      "atlasVersion": "01",
+      "atlasResolution": "128×128"
     },
     {
       "reference": "atlas:8",

@@ -1,5 +1,5 @@
 /* Real Estate registry view. Global request(), toast(), esc(), $ provided by Character Assets. */
-const realEstateState = {data:null, selected:null, inspect:null, textures:{}, textureRefs:{}, reuseEnabled:{}, reuseFilters:{}, meshOptions:{}, atlasHouse:'', atlasMode:'all', acceptWarnings:false, atlasBusy:false};
+const realEstateState = {data:null, selected:null, inspect:null, textures:{}, textureRefs:{}, reuseEnabled:{}, reuseFilters:{}, meshOptions:{}, acceptWarnings:false, atlasBusy:false};
 const REAL_ESTATE_SELECTED = 'game1.realEstate.selected';
 let realEstatePublicationPoll = null;
 function realEstatePublicationBusy(slug){
@@ -605,98 +605,6 @@ async function realEstateDelete(row){
     toast(`Retired ${result.deleted.length} registration(s) · Studio templates unchanged`);
   }});
 }
-async function realEstateRepublishAtlas(variant){
-  if(realEstateState.atlasBusy)return;
-  const name=variant.filename||variant.atlas_key+'_'+variant.resolution+'_atlas.png';
-  try{
-    const file=await request('/api/files/choose-real-estate-texture',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({initialPath:''})});
-    if(!file?.path)return null;
-    if(!window.confirm(`Republish ${name} from ${file.path}?\n\nRoblox will assign a NEW Image Asset ID. All consumers of this atlas variant (including Location Assets) will switch to the new ID after successful publication.`))return;
-    realEstateState.atlasBusy=true;
-    realEstateRender();
-    const result=await window.game1AtlasWorkflow.republish(variant.id,file.path);
-    await realEstateLoad();
-    const errors=result.studioErrors||[];
-    toast(result.unchanged?`Atlas bytes unchanged · no upload: ${name}`:
-      `Atlas republished · new Roblox Image ID ${result.variant?.published_id||'—'}${errors.length?' · Studio Sync pending: '+errors.join('; '):''}`,Boolean(errors.length));
-    return result;
-  }catch(error){toast('Atlas republish: '+error.message,true);return null;}
-  finally{realEstateState.atlasBusy=false;realEstateRender();}
-}
-async function realEstateRepublishLegacy(ownerSlug,part){
-  const row=realEstateRows().find(item=>item.slug===ownerSlug);
-  if(!row){toast('The owning house is no longer registered',true);return;}
-  if(realEstatePublicationBusy(ownerSlug)){toast('Wait for this house publication',true);return;}
-  if(!window.confirm(`Replace and republish the legacy atlas of ${ownerSlug} / ${part}?\n\nChoose the replacement texture. A successful upload creates a NEW Roblox Image Asset ID. This flow changes only the owning mesh. Other consumers still resolve their reuse reference.`))return;
-  realEstateForm(row);
-  if(!await realEstateBrowseTexture(part))return;
-  if(!await realEstateRegister())return;
-  await realEstatePublish('image:'+part);
-}
-function realEstateRenderAtlasLibrary(rows){
-  const houseSelect=$('real-estate-atlas-house');
-  const modeSelect=$('real-estate-atlas-mode');
-  if(!houseSelect||!modeSelect)return;
-  if(realEstateState.atlasHouse&&!rows.some(r=>r.slug===realEstateState.atlasHouse))realEstateState.atlasHouse='';
-  houseSelect.innerHTML='<option value="">all houses</option>'+rows.map(r=>`<option value="${esc(r.slug)}">${esc(r.slug)}</option>`).join('');
-  houseSelect.value=realEstateState.atlasHouse;
-  modeSelect.value=realEstateState.atlasMode;
-  const row=rows.find(r=>r.slug===realEstateState.atlasHouse);
-  const used=new Set(Object.values(row?.textures||{}).map(t=>Number(t.atlasVariantId)).filter(Boolean));
-  const series=new Set(Object.values(row?.textures||{}).map(t=>{
-    const key=String(t.atlasKey||'');
-    return /^(.+)_([0-9]{2,})$/.exec(key)?.[1]||'';
-  }).filter(Boolean));
-  const catalog=realEstateState.data?.atlasCatalog||[];
-  const variants=[];
-  for(const family of catalog){
-    for(const variant of family.variants||[]){
-      const isUsed=used.has(Number(variant.id));
-      const related=Boolean(row&&(family.atlasKey===row.slug||family.atlasKey.startsWith(row.slug+'_')||(family.baseKey&&series.has(family.baseKey))));
-      if(row&&realEstateState.atlasMode==='used'&&!isUsed)continue;
-      if(row&&realEstateState.atlasMode==='related'&&!isUsed&&!related)continue;
-      variants.push({...variant,atlasKey:family.atlasKey,isUsed});
-    }
-  }
-  variants.sort((a,b)=>a.atlasKey.localeCompare(b.atlasKey)||Number(b.width)*Number(b.height)-Number(a.width)*Number(a.height));
-  // Older Real Estate Image Assets may not have a parseable atlas name or
-  // Atlas Variant ID. Surface these as legacy publications, never invent a
-  // canonical family/variant for them or silently republish on selection.
-  const legacyMap=new Map();
-  for(const estate of rows){
-    for(const [part,tex] of Object.entries(estate.textures||{})){
-      if(realEstateIsCollider(part)||!tex.assetId||tex.atlasVariantId)continue;
-      const key=String(tex.assetId);
-      const entry=legacyMap.get(key)||{id:key,filename:tex.filename||tex.path?.split('/').pop()||'',owners:[],users:[]};
-      entry.users.push(estate.slug+' / '+part);
-      if(!tex.reuseReference)entry.owners.push({slug:estate.slug,part});
-      legacyMap.set(key,entry);
-    }
-  }
-  const legacy=[...legacyMap.values()].filter(item=>{
-    if(!row||realEstateState.atlasMode==='all')return true;
-    if(realEstateState.atlasMode==='used')return item.users.some(name=>name.startsWith(row.slug+' / '));
-    return item.users.some(name=>name.startsWith(row.slug+' / ')) ||
-      item.owners.some(owner=>owner.slug===row.slug);
-  });
-  const tbody=$('real-estate-atlas-rows');
-  tbody.innerHTML=variants.map(v=>{
-    const consumers=rows.flatMap(r=>Object.entries(r.textures||{}).filter(([,t])=>Number(t.atlasVariantId)===Number(v.id)).map(([part])=>r.slug+' / '+part));
-    const hint=consumers.length?consumers.join(', '):'No current Real Estate consumers';
-    return `<tr><td><strong>${esc(window.game1AtlasIdentity.describe({atlasKey:v.atlasKey,filename:v.filename}).key)}</strong><br><small>${esc(window.game1AtlasIdentity.describe({atlasKey:v.atlasKey,filename:v.filename}).name)} · variant ${esc(window.game1AtlasIdentity.describe({atlasKey:v.atlasKey,filename:v.filename}).variant||'—')}</small></td><td>${esc(v.resolution||'')}</td><td><code>${esc(v.published_id||'not published')}</code></td><td><small title="${esc(hint)}">${esc(hint)}</small></td><td><button type="button" data-re-atlas-republish="${Number(v.id)}" ${!v.current||realEstateState.atlasBusy||!realEstateState.data?.publication?.configured?'disabled':''}>Republish · new ID</button></td></tr>`;
-  }).join('')+legacy.map(item=>{
-    const owner=item.owners[0];
-    return `<tr class="real-estate-atlas-legacy"><td><strong>${esc(window.game1AtlasIdentity.describe({filename:item.filename}).key)}</strong><br><small>${esc(item.filename)}</small></td><td>unknown</td><td><code>${esc(item.id)}</code></td><td><small>${esc(item.users.join(', '))}</small></td><td>${owner?`<button type="button" data-re-legacy-slug="${esc(owner.slug)}" data-re-legacy-part="${esc(owner.part)}" ${realEstateState.atlasBusy||!realEstateState.data?.publication?.configured?'disabled':''}>Replace / republish · new ID</button>`:'<small>Owner not available</small>'}</td></tr>`;
-  }).join('')||'<tr><td colspan="5" class="muted">No registered atlases match the filter.</td></tr>';
-  $('real-estate-atlas-count').textContent=String(variants.length+legacy.length);
-  for(const btn of tbody.querySelectorAll('[data-re-atlas-republish]')){
-    const variant=variants.find(v=>Number(v.id)===Number(btn.dataset.reAtlasRepublish));
-    btn.onclick=()=>realEstateRepublishAtlas(variant);
-  }
-  for(const btn of tbody.querySelectorAll('[data-re-legacy-slug]')){
-    btn.onclick=()=>realEstateRepublishLegacy(btn.dataset.reLegacySlug,btn.dataset.reLegacyPart);
-  }
-}
 function realEstateRender(){
   const rows=realEstateRows();
   $('real-estate-count').textContent=rows.length;
@@ -727,8 +635,8 @@ function realEstateRender(){
       </div>
       <small class="real-estate-mesh-source-label">${item.meshSources?.[part]?'Independent FBX revision':'Original house FBX'}</small>
       </div>`).join('');
-    return `<tr class="${item.slug===realEstateState.selected?'active':''}" data-house="${esc(item.slug)}"><td><b>${esc(item.slug)}</b><br><small>level ${esc(item.house_level)} · variant ${esc(item.variant)}</small></td><td><small>buy ${esc(item.purchase_price)} · sell ${esc(item.sale_price)}<br>level required ${esc(item.min_level)}</small></td><td><small>${textureLines}</small></td><td class="real-estate-assets-cell">${assetLines}</td><td><div class="real-estate-row-actions"><button type="button" data-re-edit>Edit house</button><button type="button" data-re-fbx title="Replace whole-house FBX; changed parts require new Model Asset IDs">Replace full FBX</button><button type="button" data-re-publish ${!canPublish||isBusy||item.status==='PUBLISHED'?'disabled':''}>Publish all changes</button><button type="button" data-re-sync ${isBusy||item.status!=='PUBLISHED'?'disabled':''}>Sync entire house</button><button type="button" class="real-estate-delete" data-re-delete ${isBusy?'disabled':''}>Delete house</button></div></td></tr>`;
-  }).join('')||'<tr><td colspan="5" class="muted">No registered houses yet.</td></tr>';
+    return `<tr class="${item.slug===realEstateState.selected?'active':''}" data-house="${esc(item.slug)}"><td class="real-estate-house-cell"><b>${esc(item.slug)}</b><small>level ${esc(item.house_level)} · variant ${esc(item.variant)}</small><small class="real-estate-house-economy">buy ${esc(item.purchase_price)} · sell ${esc(item.sale_price)}</small><small class="real-estate-house-economy">level required ${esc(item.min_level)}</small></td><td><small>${textureLines}</small></td><td class="real-estate-assets-cell">${assetLines}</td><td><div class="real-estate-row-actions"><button type="button" data-re-edit>Edit house</button><button type="button" data-re-fbx title="Replace whole-house FBX; changed parts require new Model Asset IDs">Replace full FBX</button><button type="button" data-re-publish ${!canPublish||isBusy||item.status==='PUBLISHED'?'disabled':''}>Publish all changes</button><button type="button" data-re-sync ${isBusy||item.status!=='PUBLISHED'?'disabled':''}>Sync entire house</button><button type="button" class="real-estate-delete" data-re-delete ${isBusy?'disabled':''}>Delete house</button></div></td></tr>`;
+  }).join('')||'<tr><td colspan="4" class="muted">No registered houses yet.</td></tr>';
   for(const tr of tbody.querySelectorAll('[data-house]')){
     const row=rows.find(item=>item.slug===tr.dataset.house);
     tr.querySelector('[data-re-edit]').onclick=()=>realEstateForm(row);
@@ -755,7 +663,6 @@ function realEstateRender(){
       button.onclick=()=>realEstateSync(row.slug).then(()=>realEstateLoad());
     }
   }
-  realEstateRenderAtlasLibrary(rows);
   const row=realEstateSelected();
   const busy=row&&realEstatePublicationBusy(row.slug);
   $('real-estate-publish').disabled=!row||!realEstateState.data?.publication?.configured||row.status==='PUBLISHED'||busy;
@@ -790,8 +697,6 @@ $('real-estate-register').onclick=realEstateRegister;
 $('real-estate-publish').onclick=()=>realEstatePublish('all');
 $('real-estate-sync').onclick=()=>realEstateSync(realEstateState.selected);
 $('real-estate-library-refresh').onclick=realEstateLoad;
-$('real-estate-atlas-house').onchange=event=>{realEstateState.atlasHouse=event.target.value;realEstateRender();};
-$('real-estate-atlas-mode').onchange=event=>{realEstateState.atlasMode=event.target.value;if(!realEstateState.atlasHouse&&realEstateState.atlasMode!=='all')realEstateState.atlasHouse=realEstateState.selected||'';realEstateRender();};
 for(const id of ['real-estate-type','real-estate-level','real-estate-variant'])$(id).addEventListener('input',realEstateIdentity);
 
 if (!$('real-estate-view').hidden) realEstateLoad();

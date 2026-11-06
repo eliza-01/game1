@@ -25,12 +25,13 @@ class RealEstateInspectionM183(unittest.TestCase):
                 self.assertEqual(len(publish_bones_for_mesh(part)), expected)
                 self.assertEqual(len(part['bones']), 2, 'source manifest must not be modified')
 
-    def test_atlas_registry_is_below_registered_houses(self):
+    def test_atlas_registry_is_shared_but_not_duplicated_inside_houses(self):
         html = (ROOT / 'system/control-center/static/index.html').read_text(encoding='utf-8')
         real_estate = html.split('id="real-estate-view"', 1)[1].split('id="locations-view"', 1)[0]
-        self.assertEqual(real_estate.count('id="real-estate-atlas-rows"'), 1)
         self.assertEqual(real_estate.count('id="real-estate-library-rows"'), 1)
-        self.assertLess(real_estate.index('id="real-estate-library-rows"'), real_estate.index('id="real-estate-atlas-rows"'))
+        self.assertNotIn('id="real-estate-atlas-rows"', real_estate)
+        self.assertNotIn('central atlas registry', real_estate)
+        self.assertIn('id="nav-atlas"', html)
         self.assertIn('real-estate.js?v=24', html)
 
     @unittest.skipUnless(shutil.which('node'), 'Node.js is required for browser JS test')

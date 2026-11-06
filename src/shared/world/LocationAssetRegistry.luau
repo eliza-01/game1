@@ -81,18 +81,18 @@ return table.freeze({
 			destructible = false,
 			meshOptions = table.freeze({["col_mesh"]=table.freeze({["collisionFidelity"]="PreciseConvexDecomposition",["collisionMesh"]=true,["doubleSided"]=false,["glass"]=false,["noCollide"]=false}),["stone_fence_01"]=table.freeze({["collisionFidelity"]="Box",["collisionMesh"]=false,["doubleSided"]=false,["glass"]=false,["noCollide"]=true})}),
 		}),
-		["stone_fence_pillar_01"] = table.freeze({
-			slug = "stone_fence_pillar_01",
-			name = "Stone Fence Pillar 01",
+		["stone_pillar_01"] = table.freeze({
+			slug = "stone_pillar_01",
+			name = "Stone Pillar 01",
 			category = "fence",
 			status = "PUBLISHED",
-			modelAssetId = "119135753549307",
-			textureAssetId = "119920676388867",
-			textureUsesAlpha = false,
-			atlasVariantId = 8,
-			bindingRevision = 1,
+			modelAssetId = "118429300119417",
+			textureAssetId = "94149950119448",
+			textureUsesAlpha = true,
+			atlasVariantId = 34,
+			bindingRevision = 2,
 			destructible = false,
-			meshOptions = table.freeze({}),
+			meshOptions = table.freeze({["col_mesh"]=table.freeze({["collisionFidelity"]="PreciseConvexDecomposition",["collisionMesh"]=true,["doubleSided"]=false,["glass"]=false,["noCollide"]=false}),["stone_pillar_01"]=table.freeze({["collisionFidelity"]="Box",["collisionMesh"]=false,["doubleSided"]=false,["glass"]=false,["noCollide"]=true})}),
 		}),
 		["wooden_fence_01"] = table.freeze({
 			slug = "wooden_fence_01",
@@ -356,6 +356,7 @@ return table.freeze({
 		}),
 	}),
 	aliases = table.freeze({
+		["stone_fence_pillar_01"] = "stone_pillar_01",
 		["wooden_bridge_bar_01"] = "wooden_bar_01",
 	}),
 })

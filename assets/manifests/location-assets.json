@@ -46,6 +46,7 @@
     ]
   },
   "aliases": {
+    "stone_fence_pillar_01": "stone_pillar_01",
     "wooden_bridge_bar_01": "wooden_bar_01"
   },
   "atlases": [
@@ -879,6 +880,38 @@
       ]
     },
     {
+      "atlasKey": "stone_pillar_01",
+      "baseKey": "stone_pillar",
+      "version": "01",
+      "variants": [
+        {
+          "id": 34,
+          "family_id": 28,
+          "width": 128,
+          "height": 128,
+          "filename": "stone_pillar_01_128x128_atlas.png",
+          "original_filename": "stone_pillar_01_128x128_atlas.png",
+          "source_path": "assets/source/texture-atlases/stone_pillar_01/128x128/stone_pillar_01_128x128_atlas.png",
+          "source_sha256": "2004f6a668a7bca6b48c5ede668f4d888b17cfff34e610b9f39a8ba568fddc39",
+          "uses_alpha": true,
+          "published_id": "94149950119448",
+          "published_sha256": "2004f6a668a7bca6b48c5ede668f4d888b17cfff34e610b9f39a8ba568fddc39",
+          "moderation_state": "Reviewing",
+          "published_at": 1793988719.9427536,
+          "created_at": 1793988715.5665512,
+          "retired_at": null,
+          "atlas_key": "stone_pillar_01",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "128x128",
+          "baseKey": "stone_pillar",
+          "version": "01"
+        }
+      ]
+    },
+    {
       "atlasKey": "structures_01",
       "baseKey": "structures",
       "version": "01",
@@ -1574,32 +1607,88 @@
       ]
     },
     {
-      "slug": "stone_fence_pillar_01",
-      "name_en": "Stone Fence Pillar 01",
+      "slug": "stone_pillar_01",
+      "name_en": "Stone Pillar 01",
       "category": "fence",
-      "model_path": "assets/source/location-assets/fence/stone_fence_pillar_01/model/stone_fence_pillar_01.fbx",
-      "model_sha256": "fe355cc231c543ff7051d7b4eb795c7f224bd5eebbe3ec64c8d87657032cdfe6",
-      "model_asset_id": "119135753549307",
-      "model_published_sha256": "fe355cc231c543ff7051d7b4eb795c7f224bd5eebbe3ec64c8d87657032cdfe6",
+      "model_path": "assets/source/location-assets/fence/stone_pillar_01/model/stone_pillar_01.fbx",
+      "model_sha256": "4bb33438e5d4b16964d4c6f4fdcec7ef0b83cdad80464049624617430afd94ec",
+      "model_asset_id": "118429300119417",
+      "model_published_sha256": "4bb33438e5d4b16964d4c6f4fdcec7ef0b83cdad80464049624617430afd94ec",
       "model_moderation_state": "Approved",
       "destructible": false,
-      "revision": 2,
+      "revision": 4,
       "created_at": 1791569780.5610075,
-      "updated_at": 1793282756.7744691,
-      "published_at": 1791569790.1664019,
-      "fbxAnalysis": null,
-      "meshOptions": {},
-      "texture_path": "assets/source/texture-atlases/structures_01/2048x2048/structures_01_2048x2048_atlas.jpg",
-      "texture_filename": "structures_01_2048x2048_atlas.jpg",
-      "texture_sha256": "2f41320116f4b423de010f4c906b5b16eabc981c055bb4fc478c84437a95bb88",
-      "texture_asset_id": "119920676388867",
-      "texture_published_sha256": "2f41320116f4b423de010f4c906b5b16eabc981c055bb4fc478c84437a95bb88",
-      "texture_moderation_state": "",
+      "updated_at": 1793988677.8449352,
+      "published_at": 1793988677.8449352,
+      "fbxAnalysis": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "col_mesh",
+            "armature": "",
+            "vertices": 28,
+            "bones": [],
+            "influencedBones": [],
+            "role": "collider",
+            "physics": {
+              "role": "collider",
+              "canCollide": true,
+              "canQuery": true,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": "PreciseConvexDecomposition",
+              "physicsOnly": true
+            }
+          },
+          {
+            "name": "stone_pillar_01",
+            "armature": "",
+            "vertices": 1154,
+            "bones": [],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": false,
+              "canQuery": false,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": "Box",
+              "physicsOnly": false
+            }
+          }
+        ],
+        "hasCollider": true,
+        "armatures": [],
+        "unassignedArmatures": []
+      },
+      "meshOptions": {
+        "col_mesh": {
+          "collisionFidelity": "PreciseConvexDecomposition",
+          "collisionMesh": true,
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": false
+        },
+        "stone_pillar_01": {
+          "collisionFidelity": "Box",
+          "collisionMesh": false,
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true
+        }
+      },
+      "texture_path": "assets/source/texture-atlases/stone_pillar_01/128x128/stone_pillar_01_128x128_atlas.png",
+      "texture_filename": "stone_pillar_01_128x128_atlas.png",
+      "texture_sha256": "2004f6a668a7bca6b48c5ede668f4d888b17cfff34e610b9f39a8ba568fddc39",
+      "texture_asset_id": "94149950119448",
+      "texture_published_sha256": "2004f6a668a7bca6b48c5ede668f4d888b17cfff34e610b9f39a8ba568fddc39",
+      "texture_moderation_state": "Reviewing",
       "texture_reference_slug": "",
-      "atlasVariantId": 8,
-      "atlasFamily": "structures_01",
-      "atlasResolution": "2048x2048",
-      "bindingRevision": 1,
+      "atlasVariantId": 34,
+      "atlasFamily": "stone_pillar_01",
+      "atlasResolution": "128x128",
+      "bindingRevision": 2,
       "studioSyncStatus": "synced",
       "atlasVariants": [
         {
@@ -1626,16 +1715,41 @@
           "resolution": "2048x2048",
           "baseKey": "structures",
           "version": "01"
+        },
+        {
+          "id": 34,
+          "family_id": 28,
+          "width": 128,
+          "height": 128,
+          "filename": "stone_pillar_01_128x128_atlas.png",
+          "original_filename": "stone_pillar_01_128x128_atlas.png",
+          "source_path": "assets/source/texture-atlases/stone_pillar_01/128x128/stone_pillar_01_128x128_atlas.png",
+          "source_sha256": "2004f6a668a7bca6b48c5ede668f4d888b17cfff34e610b9f39a8ba568fddc39",
+          "uses_alpha": true,
+          "published_id": "94149950119448",
+          "published_sha256": "2004f6a668a7bca6b48c5ede668f4d888b17cfff34e610b9f39a8ba568fddc39",
+          "moderation_state": "Reviewing",
+          "published_at": 1793988719.9427536,
+          "created_at": 1793988715.5665512,
+          "retired_at": null,
+          "atlas_key": "stone_pillar_01",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "128x128",
+          "baseKey": "stone_pillar",
+          "version": "01"
         }
       ],
-      "textureUsesAlpha": false,
+      "textureUsesAlpha": true,
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
       "category_label": "Fences",
       "publishedVisualMeshes": [
         {
-          "meshId": "112049281261824",
-          "name": "stone_fence_pillar_01"
+          "meshId": "134444739900464",
+          "name": "stone_pillar_01"
         }
       ]
     },

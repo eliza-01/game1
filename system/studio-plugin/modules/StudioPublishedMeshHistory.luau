@@ -249,7 +249,7 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
         end
     end
     local newModelId = tostring(row.model_asset_id or "")
-    local previousIds,currentIds,inventory,seenIds = {},{},{},{}
+    local previousIds,currentIds,currentVisualIds,inventory,seenIds = {},{},{},{},{}
     for _, modelId in ipairs(versions) do
         if seenIds[modelId] then error("duplicate Model history ID") end
         seenIds[modelId]=true
@@ -264,7 +264,16 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
         end
         table.insert(inventory,desc)
         local bucket=if modelId==newModelId then currentIds else previousIds
-        for _, entry in ipairs(desc.meshes) do bucket[entry.meshId]=true end
+        for _, entry in ipairs(desc.meshes) do
+            bucket[entry.meshId]=true
+            -- An unchanged published Mesh ID is still an identity. It must
+            -- be discoverable without a Deco placement stamp (manual copies,
+            -- renamed slugs), but a collider ID must not claim unrelated parts.
+            if modelId==newModelId and type(entry.visualNames)=="table"
+                and #entry.visualNames>0 then
+                currentVisualIds[entry.meshId]=true
+            end
+        end
     end
     if not seenIds[newModelId] then error("current Model not found in published Model history") end
     for mid in pairs(currentIds) do previousIds[mid]=nil end
@@ -284,7 +293,10 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
             local meshId=Inventory.Id(part.MeshId)
             local old=previousIds[meshId]==true
             local owner = Ownership.ForPart(workspace, part, slug)
-            if old or owner then
+            local currentUnlinked = owner==nil and currentVisualIds[meshId]==true
+                and not MeshPhysics.IsCollider(part.Name)
+                and part:GetAttribute("Game1DecoPhysicsOnly") ~= true
+            if old or owner or currentUnlinked then
                 if #rows>=4096 then error("more than 4096 matching MeshParts in Workspace") end
                 local key="p"..tostring(#rows+1)
                 local surface=part:FindFirstChildOfClass("SurfaceAppearance")
@@ -302,7 +314,10 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
                     if legacyRoot and legacySeen[legacyRoot] then legacyRoot,legacyModelId=nil,nil end
                     if legacyRoot then legacySeen[legacyRoot]=true end
                 end
-                local container=owner or part:FindFirstAncestorOfClass("Model") or part
+                -- Untagged current-version meshes inside author-created folders
+                -- are independent placements, NOT one giant grouping Model.
+                -- Historical whole-model candidates retain their verified root.
+                local container=owner or legacyRoot or part
                 local entry={key=key,name=part.Name,path=string.sub(path,1,240),
                     modelName=string.sub(container.Name,1,128),
                     modelPath=string.sub(container:GetFullName(),1,240),
@@ -312,9 +327,11 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
                     hasSurface=textureApplicable and surface~=nil,textureApplicable=textureApplicable,managed=owner~=nil,
                     attachable=legacyRoot~=nil,historicalModelId=legacyModelId or "",
                     meshCurrent=meshCurrent,textureCurrent=textureCurrent,
-                    needsMesh=false,needsTexture=not textureCurrent}
+                    needsMesh=false,needsTexture=not textureCurrent,
+                    currentUnlinked=currentUnlinked}
                 table.insert(rows,entry)
-                partByKey[key]={part=part,root=owner,row=entry}
+                partByKey[key]={part=part,root=owner,row=entry,
+                    selectTarget=container}
                 if legacyRoot then
                     legacyCandidates[key]={root=legacyRoot,modelId=legacyModelId,
                         parent=legacyRoot.Parent,pivot=legacyRoot:GetPivot(),

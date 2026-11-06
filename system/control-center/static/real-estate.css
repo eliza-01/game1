@@ -2,7 +2,27 @@
 .real-estate-workflow #real-estate-fbx { overflow-wrap:anywhere; font-size:12px; }
 .real-estate-workflow #real-estate-rig { white-space:normal; overflow-wrap:anywhere; max-height:220px; overflow-y:auto; }
 #real-estate-tree button { overflow-wrap:anywhere; text-align:left; width:100%; }
-.real-estate-library { margin-top:20px; }
+/* M247 · Identity: a true vertical form, with consistent rhythm. */
+#real-estate-view .real-estate-identity-fields {
+  display:grid; grid-template-columns:minmax(0,1fr); gap:11px;
+  max-width:540px; min-width:0; margin:14px 0;
+}
+#real-estate-view .real-estate-identity-fields label {margin:0; min-width:0;}
+#real-estate-view .real-estate-identity-fields input {
+  box-sizing:border-box; width:100%; max-width:100%; margin-top:6px;
+}
+/* The houses list is tall, but has its own scrollbar once it exceeds 2.5× the old limit. */
+.real-estate-library { margin-top:20px; min-width:0; }
+#real-estate-view .real-estate-library > .table-wrap { max-height:1300px; }
+#real-estate-view .real-estate-library .section-title {margin-bottom:12px;}
+#real-estate-view .real-estate-library > .hint {margin-top:12px; line-height:1.5;}
+.real-estate-house-cell {min-width:152px;}
+.real-estate-house-cell > b,
+.real-estate-house-cell > small {display:block; margin:0; overflow-wrap:anywhere;}
+.real-estate-house-cell > b {margin-bottom:5px;}
+.real-estate-house-cell > small {font-size:11px; line-height:1.45; color:var(--muted);}
+.real-estate-house-cell > .real-estate-house-economy:nth-of-type(2) {margin-top:8px;}
+
 .real-estate-library table { width:100%; }
 .real-estate-library td { vertical-align:top; }
 .real-estate-row-actions { display:flex; flex-wrap:wrap; gap:5px; min-width:210px; }
@@ -47,8 +67,8 @@
 }
 #real-estate-view .real-estate-texture-owned select,
 #real-estate-view .real-estate-texture-shared select {
-  display:block; width:100%; max-width:100%; min-width:0;
-  field-sizing:fixed;
+  display:block; width:max-content; max-width:100%; min-width:0;
+  field-sizing:content; justify-self:start;
 }
 .real-estate-texture-owned button { width:auto; max-width:100%; padding:7px 10px; white-space:nowrap; }
 .real-estate-texture-path {
@@ -76,6 +96,9 @@
 
 /* Estate selectors use their option content, never overflow the panel. */
 #real-estate-view select { width:max-content; max-width:100%; min-width:0; field-sizing:content; }
+/* No select stretches to fill an entire row; long options may shrink to fit. */
+#real-estate-view .real-estate-reuse-filters select,
+#real-estate-view .real-estate-placement-controls select { width:max-content; max-width:100%; field-sizing:content; }
 
 /* Split each registered mesh into independent, readable model/image identities. */
 .real-estate-assets-cell { min-width:240px; }
@@ -96,13 +119,8 @@
 .real-estate-texture-filename { color:var(--mint); }
 .real-estate-atlas-dots { margin:2px 0 0; }
 
-/* M130 · Shared atlas list, glass mesh options, safe retirement. */
-.real-estate-atlas-filters {display:flex;flex-wrap:wrap;gap:12px;margin:10px 0;}
-.real-estate-atlas-filters label {display:grid;gap:4px;font-size:12px;min-width:180px;}
-.real-estate-atlas-filters select {max-width:300px;width:100%;}
-.real-estate-atlas-filters + .table-wrap table {width:100%;}
+/* Atlas authoring remains in per-mesh workflow and the shared Atlas section. */
 .real-estate-delete {border-color:#9a5454;color:#df9999;}
-@media(max-width:740px) {.real-estate-atlas-filters label {flex:1;}}
 
 /* M131: FBX socket roles (read-only authoring diagnostics). */
 .real-estate-rig-mode { display:block; color:var(--text-muted,#9da9b3); font-size:11px; margin-top:5px; }
@@ -126,7 +144,7 @@
 .real-estate-atlas-version-tag { margin-left:5px; font-size:10px; color:var(--muted); white-space:nowrap; }
 .real-estate-atlas-version-picker { display:inline-flex; align-items:center; flex-wrap:wrap; gap:5px;
   margin:5px 0 2px; color:var(--muted); font-size:10px; max-width:100%; }
-#real-estate-view .real-estate-atlas-version-picker select { width:auto; max-width:100%; min-width:145px;
+#real-estate-view .real-estate-atlas-version-picker select { width:max-content; max-width:100%; min-width:0; field-sizing:content;
   font-size:11px; padding:4px 6px; }
 
 /* M144: collider's weapon-contact policy, independent from character physics. */
@@ -156,7 +174,7 @@
 .real-estate-step-status.ready {color:var(--mint);}
 .real-estate-step-status.pending {color:var(--orange);}
 .real-estate-step-status.issue {color:var(--danger);}
-.real-estate-mesh-dialog select {width:100%;min-width:0;}
+.real-estate-mesh-dialog select {width:max-content;max-width:100%;min-width:0;field-sizing:content;}
 .real-estate-workflow-result {padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--panel2);font-size:11px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5;}
 .real-estate-workflow-result[hidden] {display:none;}
 .real-estate-workflow-result.issue {border-color:var(--danger);}
@@ -181,7 +199,7 @@
 /* M223 authoring-only house plot operations. */
 .re-plot-picker{display:flex;flex-direction:column;gap:5px;min-width:0;font-size:12px}
 .re-plot-picker-row{display:flex;align-items:center;gap:5px;min-width:0}
-#real-estate-view .re-plot-picker-row select{flex:1 1 auto;min-width:95px;max-width:175px}
+#real-estate-view .re-plot-picker-row select{flex:0 1 auto;width:max-content;min-width:0;max-width:175px;field-sizing:content}
 .re-plot-picker-row button{flex:0 0 auto;padding:8px 9px}
 .re-placement-row-actions{display:flex;gap:5px;flex-wrap:wrap;min-width:125px}
 .re-placement-row-actions button{font-size:11px;padding:6px 9px}

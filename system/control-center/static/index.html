@@ -16,7 +16,7 @@
 <link rel="stylesheet" href="character-components.css?v=6">
 <link rel="stylesheet" href="character-assemblies.css?v=4">
 <link rel="stylesheet" href="deco-assets.css?v=237">
-<link rel="stylesheet" href="real-estate.css?v=13&physics=205">
+<link rel="stylesheet" href="real-estate.css?v=247&physics=205">
 </head>
 <body>
 <header>
@@ -254,9 +254,9 @@
 <span class="eyebrow">01 · house identity</span><h3>register house</h3>
 <p>Select <code>house_level1_01.fbx</code> to auto-fill the type, level and variant. You may edit them before registration. Supported JPG, JPEG, PNG and WebP textures appear after Blender inspects its meshes. Use Browse to choose from other folders.</p>
 <div class="actions"><button id="real-estate-choose" type="button">choose FBX…</button><span id="real-estate-fbx" class="muted">no FBX selected</span></div>
-<div class="character-grid"><label>house type<input id="real-estate-type" type="text" value="house" maxlength="48"></label><label>house level<input id="real-estate-level" type="number" min="1" value="1" step="1"></label><label>variant<input id="real-estate-variant" type="text" value="01" maxlength="8"></label></div>
+<div class="real-estate-identity-fields"><label>house type<input id="real-estate-type" type="text" value="house" maxlength="48"></label><label>house level<input id="real-estate-level" type="number" min="1" value="1" step="1"></label><label>variant<input id="real-estate-variant" type="text" value="01" maxlength="8"></label></div>
 <div class="details">asset slug: <strong id="real-estate-slug">house_level1_01</strong></div>
-<div class="character-grid"><label>purchase price<input id="real-estate-purchase" type="number" min="1" value="1" step="1"></label><label>minimum purchase level<input id="real-estate-min-level" type="number" min="1" value="1" step="1"></label><label>sale price<input id="real-estate-sale" type="number" min="1" value="1" step="1"></label></div>
+<div class="real-estate-identity-fields"><label>purchase price<input id="real-estate-purchase" type="number" min="1" value="1" step="1"></label><label>minimum purchase level<input id="real-estate-min-level" type="number" min="1" value="1" step="1"></label><label>sale price<input id="real-estate-sale" type="number" min="1" value="1" step="1"></label></div>
 <hr class="card-separator"><span class="eyebrow">02 · mesh textures</span><h3>per-mesh textures</h3>
 <p class="hint">Choose an atlas for each visual mesh, or enable <strong>Reuse atlas</strong>. <code>COL_</code> / <code>_col</code> meshes are physics-only: they have no texture and default to collision enabled. <code>door</code> and <code>window_frames_glass</code> also default to collisions enabled (<strong>No Collide</strong> unchecked). Other visual meshes default to <strong>No Collide</strong>. Every mesh with <strong>CanCollide enabled</strong> uses <strong>PreciseConvexDecomposition</strong>, even if it previously stored Default, Hull or Box. Non-collidable visual meshes default to <strong>Box</strong>. DoubleSided is <strong>off by default</strong> for new mesh settings; saved overrides are retained. The editor shows CanCollide, CanTouch and CanQuery, plus per-mesh Fidelity and DoubleSided controls.</p>
 <div id="real-estate-mesh-textures" class="real-estate-texture-list"></div>
@@ -271,11 +271,7 @@
 <div id="real-estate-publish-status" class="status-box">register a house first</div>
 <div class="actions"><button id="real-estate-publish" class="primary" type="button" disabled>publish changed assets</button><button id="real-estate-sync" type="button" disabled>sync Studio → ServerStorage</button></div>
 <small class="hint">After publishing, Sync Studio imports the complete house model with its selected textures into ServerStorage/real_estate/&lt;slug&gt;/model. Player ownership and purchase-based runtime placement are future stages; placement points are authored in section 04.</small>
-<div class="real-estate-library"><div class="section-title"><div><span>registered library</span><h3>houses <small id="real-estate-library-count">0</small></h3></div><button id="real-estate-library-refresh" type="button">refresh</button></div><div class="table-wrap"><table><thead><tr><th>house</th><th>economy</th><th>source textures</th><th>assets</th><th>actions</th></tr></thead><tbody id="real-estate-library-rows"></tbody></table></div><small class="hint">Replace FBX or either texture independently. Each replacement is saved immediately. Publish the changed Model/Image as a NEW Roblox Asset ID; other published IDs remain unchanged. Sync Studio after every present mesh and its texture is current.</small></div>
-<div class="real-estate-library"><div class="section-title"><div><span>central atlas registry</span><h3>uploaded atlases <small id="real-estate-atlas-count">0</small></h3></div></div>
-<p class="hint">Shared across Location Assets and Real Estate. Republish always creates a NEW Roblox Image Asset ID; current consumers switch after successful upload. Legacy texture names must first be migrated to standard-named atlas variants.</p>
-<div class="real-estate-atlas-filters"><label>house<select id="real-estate-atlas-house"><option value="">all houses</option></select></label><label>show<select id="real-estate-atlas-mode"><option value="all">all registered atlases</option><option value="used">used by this house</option><option value="related">used or named for this house</option></select></label></div>
-<div class="table-wrap"><table><thead><tr><th>atlas / filename</th><th>resolution</th><th>Roblox Image ID</th><th>Real Estate users</th><th>action</th></tr></thead><tbody id="real-estate-atlas-rows"></tbody></table></div></div>
+<div class="real-estate-library"><div class="section-title"><div><span>registered library</span><h3>houses <small id="real-estate-library-count">0</small></h3></div><button id="real-estate-library-refresh" type="button">refresh</button></div><div class="table-wrap"><table><thead><tr><th>house</th><th>source textures</th><th>assets</th><th>actions</th></tr></thead><tbody id="real-estate-library-rows"></tbody></table></div><small class="hint">Replace FBX or either texture independently. Each replacement is saved immediately. Publish the changed Model/Image as a NEW Roblox Asset ID; other published IDs remain unchanged. Sync Studio after every present mesh and its texture is current.</small></div>
 <div class="panel character-card real-estate-placement" id="real-estate-placement">
 <span class="eyebrow">04 · placement</span><h3>house placement · 50 plots</h3>
 <p class="hint">Choose a registered house and a numbered plot. In Studio Edit mode select exactly one Model in Workspace whose name matches the house slug, position/rotate/scale it, then click <strong>Bind selected Model</strong>. Saved bindings are independent for every house and plot.</p>
@@ -740,7 +736,7 @@
 <script src="monster-assets.js?v=6"></script>
 <script src="npc-assets.js?v=5"></script>
 <script src="npc-spawns.js?v=4"></script>
-<script src="real-estate.js?v=234&rig=186&atlas=202&physics=232"></script>
+<script src="real-estate.js?v=247&rig=186&atlas=202&physics=232"></script>
 <script src="real-estate-mesh-workflow.js?v=234"></script>
 <script src="real-estate-placement.js?v=2"></script>
 <script src="monster-spawns.js?v=1"></script>

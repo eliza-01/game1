@@ -133,8 +133,8 @@ window.game1LocationAssetWorkflow = (() => {
         visuals.map(meshLine).join('')+
         `<small class="la-sync-col ${colliders.length?'':'is-missing'}">`+
         (colliders.length?`COL ✓ · ${colliders.length}`:'⚠ COL-меш не найден')+`</small>`+
-        (!model.managed?'<small class="la-sync-external-note">Историческая модель без привязки. '+
-          'Sync недоступен до подтверждения принадлежности.</small>':'')+
+        (!model.managed?'<small class="la-sync-external-note">Найдено по Mesh ID, без привязки к текущему ассету. '+
+          'Для исправления идентификаторов используйте Repair в Place Registry; Find не изменяет Place.</small>':'')+
         `<div class="la-sync-part-actions">`+
           `${button('select-studio','Select in Studio',busy,'la-select-studio')}`+
           (legacy?button('attach-historical','Link historical model',busy):'')+

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 5,
+  "schemaVersion": 6,
   "project": "game1",
   "options": {
     "categoryGroups": [
@@ -1290,9 +1290,11 @@
       "updated_at": 1792461837.7483227,
       "published_at": 1791473606.3923557,
       "surface_material": "default",
+      "alpha_enabled": 0,
       "fbxAnalysis": null,
       "meshOptions": {},
       "surfaceMaterial": "default",
+      "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
         "label": "Default · unchanged",
@@ -1364,9 +1366,11 @@
       "updated_at": 1792461847.5852742,
       "published_at": 1791473269.232121,
       "surface_material": "default",
+      "alpha_enabled": 0,
       "fbxAnalysis": null,
       "meshOptions": {},
       "surfaceMaterial": "default",
+      "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
         "label": "Default · unchanged",
@@ -1438,6 +1442,7 @@
       "updated_at": 1793930533.7606688,
       "published_at": 1793930533.7606688,
       "surface_material": "default",
+      "alpha_enabled": 0,
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -1497,6 +1502,7 @@
         }
       },
       "surfaceMaterial": "default",
+      "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
         "label": "Default · unchanged",
@@ -1593,9 +1599,11 @@
       "updated_at": 1791443607.9077108,
       "published_at": 1791443607.9077108,
       "surface_material": "default",
+      "alpha_enabled": 0,
       "fbxAnalysis": null,
       "meshOptions": {},
       "surfaceMaterial": "default",
+      "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
         "label": "Default · unchanged",
@@ -1667,9 +1675,11 @@
       "updated_at": 1792461820.1005793,
       "published_at": 1792461820.1005793,
       "surface_material": "default",
+      "alpha_enabled": 0,
       "fbxAnalysis": null,
       "meshOptions": {},
       "surfaceMaterial": "default",
+      "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
         "label": "Default · unchanged",
@@ -1741,6 +1751,7 @@
       "updated_at": 1793910980.0773807,
       "published_at": 1793910980.0773807,
       "surface_material": "default",
+      "alpha_enabled": 0,
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -1800,6 +1811,7 @@
         }
       },
       "surfaceMaterial": "default",
+      "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
         "label": "Default · unchanged",
@@ -1871,6 +1883,7 @@
       "updated_at": 1793988677.8449352,
       "published_at": 1793988677.8449352,
       "surface_material": "default",
+      "alpha_enabled": 0,
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -1930,6 +1943,7 @@
         }
       },
       "surfaceMaterial": "default",
+      "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
         "label": "Default · unchanged",
@@ -2026,6 +2040,7 @@
       "updated_at": 1791582102.8554742,
       "published_at": 1791582102.8554742,
       "surface_material": "default",
+      "alpha_enabled": 0,
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -2053,6 +2068,7 @@
       },
       "meshOptions": {},
       "surfaceMaterial": "default",
+      "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
         "label": "Default · unchanged",
@@ -2124,9 +2140,11 @@
       "updated_at": 1791582458.3048537,
       "published_at": 1791582458.3048537,
       "surface_material": "default",
+      "alpha_enabled": 0,
       "fbxAnalysis": null,
       "meshOptions": {},
       "surfaceMaterial": "default",
+      "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
         "label": "Default · unchanged",
@@ -2198,6 +2216,7 @@
       "updated_at": 1791583589.037727,
       "published_at": 1791576221.5396745,
       "surface_material": "default",
+      "alpha_enabled": 0,
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -2225,6 +2244,7 @@
       },
       "meshOptions": {},
       "surfaceMaterial": "default",
+      "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
         "label": "Default · unchanged",
@@ -2296,6 +2316,7 @@
       "updated_at": 1793925350.9916499,
       "published_at": 1793925350.9916499,
       "surface_material": "default",
+      "alpha_enabled": 0,
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -2331,6 +2352,7 @@
         }
       },
       "surfaceMaterial": "default",
+      "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
         "label": "Default · unchanged",
@@ -2427,9 +2449,11 @@
       "updated_at": 1793732904.9424636,
       "published_at": 1793732904.9424636,
       "surface_material": "default",
+      "alpha_enabled": 0,
       "fbxAnalysis": null,
       "meshOptions": {},
       "surfaceMaterial": "default",
+      "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
         "label": "Default · unchanged",
@@ -2501,9 +2525,11 @@
       "updated_at": 1792109440.378192,
       "published_at": 1792109440.378192,
       "surface_material": "default",
+      "alpha_enabled": 0,
       "fbxAnalysis": null,
       "meshOptions": {},
       "surfaceMaterial": "default",
+      "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
         "label": "Default · unchanged",
@@ -2575,9 +2601,11 @@
       "updated_at": 1792109491.1612,
       "published_at": 1792109491.1612,
       "surface_material": "default",
+      "alpha_enabled": 0,
       "fbxAnalysis": null,
       "meshOptions": {},
       "surfaceMaterial": "default",
+      "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
         "label": "Default · unchanged",
@@ -2649,9 +2677,11 @@
       "updated_at": 1792109515.2829225,
       "published_at": 1792109515.2829225,
       "surface_material": "default",
+      "alpha_enabled": 0,
       "fbxAnalysis": null,
       "meshOptions": {},
       "surfaceMaterial": "default",
+      "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
         "label": "Default · unchanged",
@@ -2723,9 +2753,11 @@
       "updated_at": 1792869859.5723166,
       "published_at": 1792869859.5723166,
       "surface_material": "default",
+      "alpha_enabled": 0,
       "fbxAnalysis": null,
       "meshOptions": {},
       "surfaceMaterial": "default",
+      "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
         "label": "Default · unchanged",
@@ -2797,9 +2829,11 @@
       "updated_at": 1792462077.721065,
       "published_at": 1792462077.721065,
       "surface_material": "default",
+      "alpha_enabled": 0,
       "fbxAnalysis": null,
       "meshOptions": {},
       "surfaceMaterial": "default",
+      "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
         "label": "Default · unchanged",
@@ -2871,9 +2905,11 @@
       "updated_at": 1792108399.6092346,
       "published_at": 1792108399.6092346,
       "surface_material": "default",
+      "alpha_enabled": 0,
       "fbxAnalysis": null,
       "meshOptions": {},
       "surfaceMaterial": "default",
+      "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
         "label": "Default · unchanged",
@@ -2945,9 +2981,11 @@
       "updated_at": 1792108424.1820817,
       "published_at": 1792108424.1820817,
       "surface_material": "default",
+      "alpha_enabled": 0,
       "fbxAnalysis": null,
       "meshOptions": {},
       "surfaceMaterial": "default",
+      "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
         "label": "Default · unchanged",
@@ -3019,9 +3057,11 @@
       "updated_at": 1792108537.2191844,
       "published_at": 1792108537.2191844,
       "surface_material": "default",
+      "alpha_enabled": 0,
       "fbxAnalysis": null,
       "meshOptions": {},
       "surfaceMaterial": "default",
+      "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
         "label": "Default · unchanged",
@@ -3093,9 +3133,11 @@
       "updated_at": 1792931169.0824056,
       "published_at": 1792931169.0824056,
       "surface_material": "default",
+      "alpha_enabled": 0,
       "fbxAnalysis": null,
       "meshOptions": {},
       "surfaceMaterial": "default",
+      "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
         "label": "Default · unchanged",
@@ -3171,9 +3213,11 @@
       "updated_at": 1791440120.3517294,
       "published_at": 1791440120.3517294,
       "surface_material": "default",
+      "alpha_enabled": 0,
       "fbxAnalysis": null,
       "meshOptions": {},
       "surfaceMaterial": "default",
+      "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
         "label": "Default · unchanged",
@@ -3245,6 +3289,7 @@
       "updated_at": 1793901136.4099162,
       "published_at": 1793901136.4099162,
       "surface_material": "default",
+      "alpha_enabled": 0,
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -3304,6 +3349,7 @@
         }
       },
       "surfaceMaterial": "default",
+      "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
         "label": "Default · unchanged",
@@ -3450,6 +3496,7 @@
       "updated_at": 1793903073.7166655,
       "published_at": 1793903073.7166655,
       "surface_material": "default",
+      "alpha_enabled": 0,
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -3628,6 +3675,7 @@
         }
       },
       "surfaceMaterial": "default",
+      "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
         "label": "Default · unchanged",
@@ -3724,9 +3772,11 @@
       "updated_at": 1792462028.8508034,
       "published_at": 1792462028.8508034,
       "surface_material": "default",
+      "alpha_enabled": 0,
       "fbxAnalysis": null,
       "meshOptions": {},
       "surfaceMaterial": "default",
+      "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
         "label": "Default · unchanged",
@@ -3798,6 +3848,7 @@
       "updated_at": 1793887582.637806,
       "published_at": 1793887582.637806,
       "surface_material": "default",
+      "alpha_enabled": 0,
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -3857,6 +3908,7 @@
         }
       },
       "surfaceMaterial": "default",
+      "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
         "label": "Default · unchanged",
@@ -3928,6 +3980,7 @@
       "updated_at": 1793906031.1496842,
       "published_at": 1793888161.6780365,
       "surface_material": "default",
+      "alpha_enabled": 0,
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -4060,6 +4113,7 @@
         }
       },
       "surfaceMaterial": "default",
+      "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
         "label": "Default · unchanged",

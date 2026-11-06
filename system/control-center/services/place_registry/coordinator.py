@@ -112,6 +112,7 @@ class LocationPlaceRegistry:
         return {'placements': len(rows), 'outdatedMesh': sum(r['needsMesh'] for r in rows),
                 'outdatedTexture': sum(r['needsTexture'] for r in rows),
                 'outdatedMaterial': sum(bool(r.get('needsMaterial')) for r in rows),
+                'outdatedAlpha': sum(bool(r.get('needsAlpha')) for r in rows),
                 'structure': sum(r['needsStructure'] for r in rows),
                 'duplicateIds': sum(r['duplicateId'] for r in rows),
                 'ambiguous': sum(r['ambiguous'] for r in rows)}

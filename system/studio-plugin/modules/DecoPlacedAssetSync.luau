@@ -156,8 +156,9 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
             error("Mesh identity, transform or texture changed since Find; rescan")
         end
         local surface=part:FindFirstChildOfClass("SurfaceAppearance")
-        if (if surface then surface.ColorMap else nil)~=snap.colorMap then
-            error("ColorMap changed since Find; rescan")
+        if (if surface then surface.ColorMap else nil)~=snap.colorMap
+            or surface~=snap.surface or (if surface then surface.AlphaMode else nil)~=snap.alphaMode then
+            error("ColorMap or AlphaMode changed since Find; rescan")
         end
     end
     if #placed > 1000 then error("more than 1000 placed instances of one slug") end
@@ -248,6 +249,16 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                         colorMap = if surface then surface.ColorMap else nil})
                 end
             end
+            local alphaChanges={}
+            if not geometry then
+                for _, part in ipairs(oldParts) do
+                    if chosenParts[part] and not Physics.IsCollider(part.Name)
+                        and part:GetAttribute("Game1DecoPhysicsOnly")~=true
+                        and not StudioTextureAppearance.AlphaCurrent(part,row.alphaEnabled==true) then
+                        table.insert(alphaChanges,StudioTextureAppearance.Capture(part))
+                    end
+                end
+            end
             local events, eventIndex = {}, {}
             local function add(kind: string, oldValue: string, newValue: string, count: number)
                 local key = kind .. ":" .. oldValue .. ":" .. newValue
@@ -260,6 +271,10 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
             if geometry then add("model", previousModelId, modelId, 1) end
             if changeRef then add("model_reference", oldRef, modelId, 1) end
             for _, change in ipairs(atlasChanges) do add("atlas", change.oldId, atlasId, 1) end
+            for _, change in ipairs(alphaChanges) do
+                add("alpha",if change.mode then tostring(change.mode) else "missing",
+                    if row.alphaEnabled==true then "Transparency" else "Opaque",1)
+            end
             local beforeMeshes=if geometry then History.Describe(previousModelId,model).meshes else {}
             local afterMeshes=if geometry then History.Describe(modelId,stage).meshes else {}
             local history = oldHistory(model, http)
@@ -286,7 +301,7 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
             end
             table.insert(plans, {model = model, stage = stage, swap = transaction,
                 geometry = geometry, oldId = oldId, oldRef = oldRef,
-                changeRef = changeRef, atlasChanges = atlasChanges,
+                changeRef = changeRef, atlasChanges = atlasChanges,alphaChanges=alphaChanges,
                 historyJson = historyJson, oldHistory = model:GetAttribute(HISTORY),
                 oldSha = model:GetAttribute("Game1DecoPublishedModelSha256"),
                 oldPublishedId = model:GetAttribute("Game1DecoPublishedModelAssetId"),
@@ -328,6 +343,11 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                     changedParts += 1
                 end
             end
+            for _, change in ipairs(item.alphaChanges) do
+                if StudioTextureAppearance.ApplyAlpha(change.mesh,row.alphaEnabled==true,uri) then
+                    changedParts+=1
+                end
+            end
             if item.physicsBefore and allowedNames then
                 physicsChecked += Physics.ApplyLocationModel(model, allowedNames, row.meshOptions)
             end
@@ -351,6 +371,9 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                         change.part.TextureID = change.texture
                         if change.surface then change.surface.ColorMap = change.colorMap end
                     end
+                end
+                for _, change in ipairs(item.alphaChanges) do
+                    StudioTextureAppearance.Restore(change)
                 end
             end)
             if item.swap then RigSwap.Rollback(item.swap) end

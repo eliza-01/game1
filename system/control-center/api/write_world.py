@@ -274,6 +274,15 @@ def route(path, body, deps):
         except Exception as error:
             return out(400, {"error": str(error)})
 
+    if path.startswith('/api/location-assets/') and path.endswith('/appearance'):
+        try:
+            slug = path[len('/api/location-assets/'):-len('/appearance')].strip('/')
+            if not re.fullmatch(r'[a-z0-9][a-z0-9_]{0,63}', slug):
+                raise ValueError('invalid Location Asset slug')
+            return out(200, location_assets.update_alpha(slug, body()))
+        except (ValueError, RuntimeError, OSError) as error:
+            return out(400, {'error': str(error)})
+
     if path == '/api/location-assets/inspect':
         try:
             payload = body()

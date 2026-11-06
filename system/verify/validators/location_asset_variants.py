@@ -39,7 +39,7 @@ def check_location_asset_variants(root: Path, report_error: Callable[[str], None
 
     # M203 replaces model-as-texture-owner with independent atlas variants.
     for required in [
-        'SCHEMA_VERSION = 5',
+        'SCHEMA_VERSION = 6',
         'CATEGORY_LABELS = taxonomy.CATEGORY_LABELS',
         "atlasVariantId",
         "texture_atlas_bindings" if False else "self.atlases.binding",

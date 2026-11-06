@@ -306,6 +306,9 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
                 local colorMapId=if textureApplicable and surface then Inventory.Id(surface.ColorMap) else ""
                 local textureCurrent=not textureApplicable or (textureId==atlasId
                     and (not surface or colorMapId==atlasId))
+                local alphaEnabled=row.alphaEnabled==true
+                local alphaCurrent=not textureApplicable or (surface~=nil and
+                    surface.AlphaMode==(if alphaEnabled then Enum.AlphaMode.Transparency else Enum.AlphaMode.Opaque))
                 local meshCurrent=currentIds[meshId]==true
                 local path=part:GetFullName()
                 local legacyRoot,legacyModelId=nil,nil
@@ -327,7 +330,8 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
                     hasSurface=textureApplicable and surface~=nil,textureApplicable=textureApplicable,managed=owner~=nil,
                     attachable=legacyRoot~=nil,historicalModelId=legacyModelId or "",
                     meshCurrent=meshCurrent,textureCurrent=textureCurrent,
-                    needsMesh=false,needsTexture=not textureCurrent,
+                    needsMesh=false,needsTexture=not textureCurrent,needsAlpha=not alphaCurrent,
+                    alphaEnabled=alphaEnabled,alphaCurrent=alphaCurrent,
                     currentUnlinked=currentUnlinked}
                 table.insert(rows,entry)
                 partByKey[key]={part=part,root=owner,row=entry,
@@ -354,7 +358,7 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
             end
         end
     end
-    local texturePending, meshPending, pending=0,0,0
+    local texturePending, meshPending, alphaPending, pending=0,0,0,0
     for _ in pairs(geometryRoots) do pending+=1 end
     for _, entry in ipairs(rows) do
         if entry.managed then
@@ -362,17 +366,19 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
             entry.needsMesh=geometryRoots[bound.root]==true
             if entry.needsMesh then meshPending+=1 end
             if entry.needsTexture then texturePending+=1 end
+            if entry.needsAlpha then alphaPending+=1 end
         end
     end
     -- Find is strictly read-only and never changes Studio Selection. The user
     -- explicitly selects a single row via the separate Select in Studio phase.
-    local mode=if pending>0 and texturePending>0 then "texture_mesh"
-        elseif pending>0 then "mesh" elseif texturePending>0 then "texture" else "current"
+    local mode=if pending>0 and (texturePending>0 or alphaPending>0) then "texture_mesh"
+        elseif pending>0 then "mesh" elseif texturePending>0 then "texture"
+        elseif alphaPending>0 then "alpha" else "current"
     return {inventory=inventory,expectedMeshIds=expectedMeshIds,parts=rows,
         partByKey=partByKey,legacyCandidates=legacyCandidates,
         foundMeshParts=#rows,managedMeshParts=managedCount,
         unmanagedMeshParts=unmatched,managedModels=#roots,
-        texturePending=texturePending,meshPending=meshPending,geometryPending=pending,mode=mode,
+        texturePending=texturePending,alphaPending=alphaPending,meshPending=meshPending,geometryPending=pending,mode=mode,
         roots=roots,geometryRoots=geometryRoots,
         publishedModelId=newModelId,publishedAtlasId=atlasId}
 end

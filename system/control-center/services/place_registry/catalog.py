@@ -31,6 +31,7 @@ def build_catalog(location_assets) -> dict:
             'modelAssetId': model, 'atlasAssetId': atlas,
             'publishedSha': str(row.get('model_published_sha256') or ''),
             'surfaceMaterial': str(row.get('surfaceMaterial') or 'default'),
+            'alphaEnabled': bool(row.get('alphaEnabled', False)),
             'robloxMaterial': str((row.get('materialDefinition') or {}).get('robloxMaterial') or ''),
             'models': [{'modelAssetId': identifier,
                         'meshes': inventory.get(identifier, {}).get('meshes', [])}
@@ -41,7 +42,7 @@ def build_catalog(location_assets) -> dict:
     # Mesh inventory is an observed cache; filling it during Scan must not
     # invalidate the immediately following repair token. Publication identity
     # and atlas bindings, not cache population, define the stable digest.
-    identities = [{k: item[k] for k in ('slug', 'modelAssetId', 'atlasAssetId', 'publishedSha', 'surfaceMaterial', 'robloxMaterial')}
+    identities = [{k: item[k] for k in ('slug', 'modelAssetId', 'atlasAssetId', 'publishedSha', 'surfaceMaterial', 'robloxMaterial', 'alphaEnabled')}
                   | {'versions': [model['modelAssetId'] for model in item['models']],
                      'aliases': item['aliases']}
                   for item in items]
@@ -75,6 +76,8 @@ def validate_report(report: dict, catalog: dict) -> list[dict]:
         # Validate strictly when present, while allowing read-only historical scans.
         if 'needsMaterial' in row and type(row['needsMaterial']) is not bool:
             raise ValueError('invalid scan flag: needsMaterial')
+        if 'needsAlpha' in row and type(row['needsAlpha']) is not bool:
+            raise ValueError('invalid scan flag: needsAlpha')
         if not isinstance(row.get('issues'), list) or len(row['issues']) > 12 or any(
                 not isinstance(s, str) or len(s) > 250 for s in row['issues']):
             raise ValueError('invalid diagnostic issues')

@@ -338,18 +338,19 @@ function DecoManager:previewMeshSync(slug: string, modelId: string, atlasId: str
             local surface=part:FindFirstChildOfClass("SurfaceAppearance")
             snap[part]={meshId=History.Id(part.MeshId),texture=part.TextureID,
                 colorMap=if surface then surface.ColorMap else nil,
-                parent=part.Parent,frame=part:GetPivot(),size=part.Size}
+                parent=part.Parent,frame=part:GetPivot(),size=part.Size,
+                surface=surface,alphaMode=if surface then surface.AlphaMode else nil}
         end
     end
     report.partStates=snap
     report.rootStates=roots
     self.meshSyncPreview={slug=slug,modelId=modelId,atlasId=atlasId,
-        revision=expectedRevision,token=token,report=report}
+        alphaEnabled=row.alphaEnabled==true,revision=expectedRevision,token=token,report=report}
     return {scanToken=token,mode=report.mode,inventory=report.inventory,
         expectedMeshIds=report.expectedMeshIds,parts=report.parts,
         foundMeshParts=report.foundMeshParts,managedMeshParts=report.managedMeshParts,
         unmanagedMeshParts=report.unmanagedMeshParts,managedModels=report.managedModels,
-        meshPending=report.meshPending,texturePending=report.texturePending,
+        meshPending=report.meshPending,texturePending=report.texturePending,alphaPending=report.alphaPending,
         geometryPending=report.geometryPending}
 end
 
@@ -520,7 +521,7 @@ function DecoManager:refreshRegistry(targetSlug: string?, applyIds: boolean?, ex
             if type(key)~="string" or seen[key] then error("duplicate or invalid MeshPart selection") end
             seen[key]=true
             local entry=scanned.partByKey[key]
-            if not entry or not entry.root or not (entry.row.needsMesh or entry.row.needsTexture) then
+            if not entry or not entry.root or not (entry.row.needsMesh or entry.row.needsTexture or entry.row.needsAlpha) then
                 error("selected MeshPart is not a pending managed part; Find again")
             end
             table.insert(selected,key)
@@ -528,7 +529,7 @@ function DecoManager:refreshRegistry(targetSlug: string?, applyIds: boolean?, ex
         end
         local allPending=true
         for _, entry in ipairs(scanned.parts) do
-            if entry.managed and (entry.needsMesh or entry.needsTexture)
+            if entry.managed and (entry.needsMesh or entry.needsTexture or entry.needsAlpha)
                 and not seen[entry.key] and not wholeRig[scanned.partByKey[entry.key].root] then
                 allPending=false
                 break
@@ -538,7 +539,8 @@ function DecoManager:refreshRegistry(targetSlug: string?, applyIds: boolean?, ex
         for _, row in ipairs(result.items) do
             if row.slug==targetSlug then latest=row;break end
         end
-        if not latest or tonumber(latest.bindingRevision)~=expectedRevision then
+        if not latest or tonumber(latest.bindingRevision)~=expectedRevision
+            or (latest.alphaEnabled==true)~=(preview.alphaEnabled==true) then
             error("Atlas binding revision changed since Find; no Place geometry modified")
         end
         for root, snap in pairs(scanned.rootStates) do

@@ -78,4 +78,74 @@ function StudioTextureAppearance.Apply(mesh: MeshPart, uri: string, usesAlpha: a
     return true
 end
 
+-- Location-only alpha policy. Unlike Apply(), this NEVER substitutes Overlay
+-- for Opaque, and it does not alter MeshPart.Transparency or physics.
+function StudioTextureAppearance.AlphaMode(enabled: boolean): Enum.AlphaMode
+    if type(enabled) ~= "boolean" then error("alphaEnabled must be boolean",2) end
+    local mode = if enabled then Enum.AlphaMode.Transparency else Enum.AlphaMode.Opaque
+    if mode == nil then error("Opaque AlphaMode unavailable in this Studio",2) end
+    return mode
+end
+
+function StudioTextureAppearance.AlphaCurrent(mesh: MeshPart, enabled: boolean): boolean
+    local appearance=mesh:FindFirstChildOfClass("SurfaceAppearance")
+    return appearance~=nil and appearance.AlphaMode==StudioTextureAppearance.AlphaMode(enabled)
+end
+
+function StudioTextureAppearance.Capture(mesh: MeshPart): any
+    local surface=mesh:FindFirstChildOfClass("SurfaceAppearance")
+    return {mesh=mesh,texture=mesh.TextureID,surface=surface,
+        color=if surface then surface.ColorMap else nil,
+        mode=if surface then surface.AlphaMode else nil}
+end
+
+function StudioTextureAppearance.Restore(snapshot: any)
+    local mesh=snapshot.mesh
+    mesh.TextureID=snapshot.texture
+    local current=mesh:FindFirstChildOfClass("SurfaceAppearance")
+    if snapshot.surface then
+        if current~=snapshot.surface and current then current:Destroy() end
+        if snapshot.surface.Parent~=mesh then snapshot.surface.Parent=mesh end
+        snapshot.surface.ColorMap=snapshot.color
+        snapshot.surface.AlphaMode=snapshot.mode
+    elseif current then
+        current:Destroy() -- newly introduced by a failed transaction
+    end
+end
+
+function StudioTextureAppearance.ApplyAlpha(mesh: MeshPart, enabled: boolean, uri: string?): boolean
+    local mode=StudioTextureAppearance.AlphaMode(enabled)
+    local surface=mesh:FindFirstChildOfClass("SurfaceAppearance")
+    if surface and surface.AlphaMode==mode then return false end
+    if surface then
+        surface.AlphaMode=mode
+        return true
+    end
+    local content=uri or mesh.TextureID
+    if content=="" then error("Alpha requires a published ColorMap; no change made",2) end
+    local created=Instance.new("SurfaceAppearance")
+    local ok,reason=pcall(function()
+        created.Name="SurfaceAppearance"
+        created.ColorMap=content
+        created.AlphaMode=mode
+        created.Parent=mesh
+    end)
+    if not ok then created:Destroy();error(tostring(reason),2) end
+    return true
+end
+
+function StudioTextureAppearance.ApplyLocation(mesh: MeshPart, uri: string, enabled: boolean): boolean
+    local snapshot=StudioTextureAppearance.Capture(mesh)
+    local ok,result=pcall(function()
+        local ids=StudioTextureAppearance.Apply(mesh,uri,nil,true)
+        local alpha=StudioTextureAppearance.ApplyAlpha(mesh,enabled,uri)
+        return ids or alpha
+    end)
+    if not ok then
+        pcall(StudioTextureAppearance.Restore,snapshot)
+        error("Location appearance rolled back: "..tostring(result),2)
+    end
+    return result
+end
+
 return table.freeze(StudioTextureAppearance)

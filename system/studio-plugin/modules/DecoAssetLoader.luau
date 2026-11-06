@@ -38,7 +38,7 @@ local function sanitize(model: Model)
     end
 end
 
-local function applyTexture(model: Model, textureAssetId: string, usesAlpha: any)
+local function applyTexture(model: Model, textureAssetId: string, alphaEnabled: boolean)
     local numericId = tonumber(textureAssetId)
     if numericId == nil or numericId <= 0 then
         return 0
@@ -47,14 +47,14 @@ local function applyTexture(model: Model, textureAssetId: string, usesAlpha: any
     local applied = 0
     for _, descendant in ipairs(model:GetDescendants()) do
         if descendant:IsA("MeshPart") then
-            if MeshPhysics.IsCollider(descendant.Name) then
+            if MeshPhysics.IsCollider(descendant.Name) or descendant:GetAttribute("Game1DecoPhysicsOnly")==true then
                 -- COL is physics-only. Strip old importer texture remnants from
                 -- the fresh clone; never assign Atlas IDs to collision geometry.
                 descendant.TextureID = ""
                 local surface = descendant:FindFirstChildOfClass("SurfaceAppearance")
                 if surface then surface:Destroy() end
             else
-                StudioTextureAppearance.Apply(descendant, uri, usesAlpha)
+                StudioTextureAppearance.ApplyLocation(descendant, uri, alphaEnabled)
                 applied += 1
             end
         end
@@ -116,7 +116,7 @@ function DecoAssetLoader:loadPublished(row: any): Model
     local model = canonicalModel(loaded)
     model.Name = tostring(row.slug or "deco_asset")
     sanitize(model)
-    applyTexture(model, tostring(row.texture_asset_id or ""), row.textureUsesAlpha)
+    applyTexture(model, tostring(row.texture_asset_id or ""), row.alphaEnabled)
     MeshPhysics.ApplyLocationModel(model, nil, row.meshOptions)
     MeshPhysics.ApplyLocationSurfaceMaterial(model,row.surfaceMaterial,row.robloxMaterial or (row.materialDefinition and row.materialDefinition.robloxMaterial))
     MeshNames.Normalize(model, tostring(row.slug or ""))

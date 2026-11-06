@@ -31,7 +31,7 @@ class MeshpartM237(TestCase):
         self.assertIn('textureCurrent=not textureApplicable', scan)
         self.assertIn('if Physics.IsCollider(part.Name)', sync)
         self.assertIn('descendant.TextureID = ""', loader)
-        self.assertIn('StudioTextureAppearance.Apply(descendant, uri, usesAlpha)', loader)
+        self.assertIn('StudioTextureAppearance.ApplyLocation(descendant, uri, alphaEnabled)', loader)
 
     def test_selective_rig_scope_and_one_use_preview(self):
         manager = self.source('system/studio-plugin/modules/DecoManager.luau')

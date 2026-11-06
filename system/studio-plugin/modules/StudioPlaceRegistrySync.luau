@@ -34,7 +34,7 @@ local function stageRig(ref: any, ctx: any): any
     if ref.oldVersion=="" then error("historical publication not unique") end
     local publishedRow={slug=ref.entry.slug,status="PUBLISHED",
         model_asset_id=ref.entry.model,texture_asset_id=ref.entry.atlas,
-        surfaceMaterial=ref.entry.material,robloxMaterial=ref.entry.physicalMaterial}
+        surfaceMaterial=ref.entry.material,robloxMaterial=ref.entry.physicalMaterial,alphaEnabled=ref.entry.alphaEnabled}
     local stage=ctx.loader:loadPublished(publishedRow)
     local previous=ctx.loader:loadForMeshInventory(ref.oldVersion,ref.entry.slug)
     local good,result=pcall(function()
@@ -69,12 +69,10 @@ function Sync.Apply(refs: {any}, ctx: any): any
             else
                 table.insert(blocked,ref.row.key..": "..tostring(stage):sub(1,180))
             end
-        elseif ref.row.needsTexture or ref.row.needsMaterial then
+        elseif ref.row.needsTexture or ref.row.needsMaterial or ref.row.needsAlpha then
             local changes={}
             for _,part in ipairs(ref.visuals) do
-                local surface=part:FindFirstChildOfClass("SurfaceAppearance")
-                table.insert(changes,{part=part,uri=part.TextureID,
-                    surface=surface,color=if surface then surface.ColorMap else nil})
+                table.insert(changes,Texture.Capture(part))
             end
             table.insert(plan,{ref=ref,appearance=changes,
                 priorSurface=Physics.CaptureLocationSurfaceMaterial(ref.root),
@@ -101,10 +99,14 @@ function Sync.Apply(refs: {any}, ctx: any): any
                 root:SetAttribute("Game1DecoRegistryModelAssetId",ref.entry.model)
                 root:SetAttribute("Game1DecoPublishedModelSha256",ref.entry.sha)
             else
-                if ref.row.needsTexture then
+                if ref.row.needsTexture or ref.row.needsAlpha then
                     local uri="rbxassetid://"..ref.entry.atlas
                     for _,change in ipairs(item.appearance) do
-                        Texture.Apply(change.part,uri,nil,true)
+                        if ref.row.needsTexture then
+                            Texture.ApplyLocation(change.mesh,uri,ref.entry.alphaEnabled)
+                        else
+                            Texture.ApplyAlpha(change.mesh,ref.entry.alphaEnabled,uri)
+                        end
                     end
                 end
             end
@@ -118,6 +120,9 @@ function Sync.Apply(refs: {any}, ctx: any): any
             if ref.row.needsTexture then
                 table.insert(events,{kind="atlas",oldId=ref.row.textureId,
                     newId=ref.entry.atlas,count=#ref.visuals})
+            end
+            if ref.row.needsAlpha then
+                table.insert(events,{kind="alpha",oldId="previous",newId=if ref.entry.alphaEnabled then "Transparency" else "Opaque",count=#ref.visuals})
             end
             local previous={}
             local raw=root:GetAttribute("Game1DecoSyncHistory")
@@ -146,8 +151,7 @@ function Sync.Apply(refs: {any}, ctx: any): any
                     item.ref.root:SetAttribute("Game1DecoRegistryModelAssetId",item.priorRegistry)
                 else
                     for _,change in ipairs(item.appearance) do
-                        change.part.TextureID=change.uri
-                        if change.surface then change.surface.ColorMap=change.color end
+                        Texture.Restore(change)
                     end
                     if item.priorSurface then
                         Physics.RestoreLocationSurfaceMaterial(item.priorSurface)

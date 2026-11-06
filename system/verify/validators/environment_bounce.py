@@ -39,8 +39,8 @@ def check_environment_bounce(root: Path, report_error: Callable[[str], None], *,
 
     if location_asset_manifest_path.is_file():
         location_asset_manifest = json.loads(location_asset_manifest_path.read_text(encoding="utf-8"))
-        if location_asset_manifest.get("schemaVersion") not in (4,5):
-            report_error("m52 Location Asset manifest must use schemaVersion 5")
+        if location_asset_manifest.get("schemaVersion") not in (4,5,6):
+            report_error("m52 Location Asset manifest must use schemaVersion 5 or 6")
         for row in location_asset_manifest.get("items") or []:
             if not isinstance(row.get("destructible"), bool):
                 report_error(f"m50 Location Asset destructible policy missing/invalid for {row.get('slug')}")

@@ -3,7 +3,7 @@
  */
 window.game1LocationAssetWorkflow = (() => {
   const state={slug:'',tab:'model',busy:false,result:'',error:false,manualSlug:false,identityDraft:null,
-    pendingModel:'',inspection:null,meshOptions:{},physicsDirty:false,scan:null,scanStale:false,
+    pendingModel:'',inspection:null,meshOptions:{},physicsDirty:false,scan:null,scanStale:false,alphaDraft:null,
     atlas:window.game1ConsumerAtlasEditor.newState()};
   const shell=window.game1AssetWorkflowDialog;
   const e=value=>esc(String(value??''));
@@ -11,7 +11,7 @@ window.game1LocationAssetWorkflow = (() => {
   const button=(action,label,disabled=false,css='')=>
     `<button type="button" class="${css}" data-la-action="${action}" ${disabled?'disabled':''}>${label}</button>`;
   const dialog=()=>shell.ensure('location-asset-edit-dialog','Manage Location Asset',()=>{
-    state.slug='';state.pendingModel='';state.scan=null;state.scanStale=false;state.identityDraft=null;state.atlas=window.game1ConsumerAtlasEditor.newState();
+    state.slug='';state.pendingModel='';state.scan=null;state.scanStale=false;state.identityDraft=null;state.alphaDraft=null;state.atlas=window.game1ConsumerAtlasEditor.newState();
   });
   const close=()=>{const d=document.getElementById('location-asset-edit-dialog');if(d?.open)d.close();};
   function open(slug,initialTab='identity'){
@@ -20,7 +20,7 @@ window.game1LocationAssetWorkflow = (() => {
     if(state.busy)return toast('Finish the current operation first.',true);
     const d=dialog();if(d.open && state.slug!==slug)d.close();
     state.slug=slug;state.tab=initialTab;state.busy=false;state.scan=null;state.scanStale=false;state.pendingModel='';state.manualSlug=false;state.identityDraft=null;
-    state.inspection=item.fbxAnalysis||null;
+    state.alphaDraft=null;state.inspection=item.fbxAnalysis||null;
     state.meshOptions=window.game1MeshAuthoring.seeded(state.inspection,item.meshOptions||{});
     state.physicsDirty=false;state.atlas=window.game1ConsumerAtlasEditor.newState();
     message('');render();if(!d.open)d.showModal();
@@ -75,13 +75,21 @@ window.game1LocationAssetWorkflow = (() => {
         busy||(!changed&&!needsPublication)||(needsPublication&&!publicationReady),
         changed||needsPublication?'asset-apply-ready':'')}</div>`,
       modelCurrent?'Published':'Changes pending',modelCurrent?'ready':'pending');
-    const atlas=window.game1ConsumerAtlasEditor.render(state.atlas,{
+    const activeAlpha=Boolean(item.alphaEnabled);
+    const selectedAlpha=state.alphaDraft===null?activeAlpha:state.alphaDraft;
+    const alphaDirty=selectedAlpha!==activeAlpha;
+    const alphaEditor=`<section class="la-alpha-settings"><label class="deco-policy-toggle">`+
+      `<input type="checkbox" data-la-alpha ${selectedAlpha?'checked':''} ${busy?'disabled':''}> Alpha transparency</label>`+
+      `<small>${selectedAlpha?'Вкл. · Transparency':'Выкл. · Opaque'} · независимо от альфа-канала общего атласа; COL не изменяется.</small>`+
+      `<div class="actions">${button('apply-alpha','Apply Changes',busy||!alphaDirty,alphaDirty?'asset-apply-ready':'')}</div></section>`;
+    const atlas=alphaEditor+window.game1ConsumerAtlasEditor.render(state.atlas,{
       currentId:item.atlasVariantId||0,linked:item.atlasVariants||[],
       catalog:decoAssetState.data?.atlases||[],busy});
     const preview=state.scan;
     const scanValid=preview&&preview.modelId===String(item.model_asset_id||'')&&
       preview.atlasId===String(item.texture_asset_id||'')&&
-      preview.revision===Number(item.bindingRevision||0);
+      preview.revision===Number(item.bindingRevision||0)&&
+      preview.alphaEnabled===Boolean(item.alphaEnabled);
     const selected=scanValid?preview.studio:null;
     const reportStale=Boolean(state.scanStale);
     // One card per placed Model; COLLIDER geometry is only a compact existence hint.
@@ -100,7 +108,7 @@ window.game1LocationAssetWorkflow = (() => {
       }
       model.parts.push(part);
     }
-    const pendingKeys=model=>model.parts.filter(p=>p.managed&&(p.needsMesh||p.needsTexture)).map(p=>p.key);
+    const pendingKeys=model=>model.parts.filter(p=>p.managed&&(p.needsMesh||p.needsTexture||p.needsAlpha)).map(p=>p.key);
     const inventory=selected?.inventory||[];
     const currentVersion=inventory.find(v=>v.modelAssetId===String(item.model_asset_id||''));
     const oldVersions=inventory.filter(v=>v!==currentVersion);
@@ -119,7 +127,8 @@ window.game1LocationAssetWorkflow = (() => {
         (p.textureApplicable?`<span class="${p.textureCurrent?'is-current':'is-stale'}">Texture ${textureStatus}</span>`:'')+`</div>`+
         `<small class="la-sync-ids">Mesh ID ${e(p.meshId||'—')}`+
         (p.textureApplicable?` · Texture ${e(p.textureId||'—')}`+
-          (p.hasSurface?` · ColorMap ${e(p.colorMapId||'—')}`:''):'')+`</small></div>`;
+          (p.hasSurface?` · ColorMap ${e(p.colorMapId||'—')}`:'')+
+          ` · Alpha ${p.alphaCurrent?'✓':'✕'} ${p.alphaEnabled?'Transparency':'Opaque'}`:'')+`</small></div>`;
     };
     const modelLine=(model,i)=>{
       const visuals=model.parts.filter(p=>!p.isCollider);
@@ -154,11 +163,12 @@ window.game1LocationAssetWorkflow = (() => {
         `<small>Привязано: ${Number(selected.managedModels||0)} · `+
         `Исторических без привязки: ${grouped.filter(g=>!g.managed).length}</small>`+
         `<small>Геометрию обновить: ${Number(selected.geometryPending||0)} моделей · `+
-        `Текстуру обновить: ${Number(selected.texturePending||0)} MeshPart</small></div>`+
+        `Текстуру обновить: ${Number(selected.texturePending||0)} MeshPart · `+
+        `Alpha обновить: ${Number(selected.alphaPending||0)} MeshPart</small></div>`+
         `<div class="la-sync-list">${grouped.map(modelLine).join('')||'<small>MeshPart не найдены.</small>'}</div>`:'')+
         `<div class="la-sync-controls"><div class="actions">`+
         `${button('select-all','Select All · Studio',busy||!grouped.length||reportStale)}`+
-        `${button('replace-all','Sync All',busy||reportStale||item.status!=='PUBLISHED', selected&&parts.some(p=>p.managed&&(p.needsMesh||p.needsTexture))?'asset-apply-ready':'')}</div>`+
+        `${button('replace-all','Sync All',busy||reportStale||item.status!=='PUBLISHED', selected&&parts.some(p=>p.managed&&(p.needsMesh||p.needsTexture||p.needsAlpha))?'asset-apply-ready':'')}</div>`+
         `<small>Sync обновляет только устаревшие ресурсы. При замене Mesh обновляется весь rig модели. `+
         `COL не получает текстуры. Перед изменением Place потребуется подтверждение.</small>`+
         (selected?`<details><summary>История Model / Mesh ID</summary>${inventoryDisplay}</details>`:'')+
@@ -209,10 +219,12 @@ window.game1LocationAssetWorkflow = (() => {
         const part=(state.scan?.studio?.parts||[]).find(p=>p.key===key);
         if(!part)return;
         const keys=(state.scan.studio.parts||[]).filter(p=>p.managed&&
-          p.instanceId===part.instanceId&&(p.needsMesh||p.needsTexture)).map(p=>p.key);
+          p.instanceId===part.instanceId&&(p.needsMesh||p.needsTexture||p.needsAlpha)).map(p=>p.key);
         return syncSelected(keys);
       };
     });
+    const alphaInput=d.querySelector('[data-la-alpha]');
+    if(alphaInput)alphaInput.onchange=()=>{state.alphaDraft=alphaInput.checked;render();};
     if(state.tab==='atlas')window.game1ConsumerAtlasEditor.wire(d,state.atlas,{
       consumerType:'location_asset',slug:state.slug,
       revision:item.bindingRevision||0,busy:state.busy,
@@ -224,6 +236,18 @@ window.game1LocationAssetWorkflow = (() => {
   }
   async function execute(action){
     const item=row();if(!item)return;
+    if(action==='apply-alpha')return run('Сохранение Alpha',async()=>{
+      const current=row();if(!current)throw Error('Location Asset не найден');
+      const value=state.alphaDraft===null?Boolean(current.alphaEnabled):state.alphaDraft;
+      if(value===Boolean(current.alphaEnabled))return;
+      const saved=await request(`/api/location-assets/${encodeURIComponent(state.slug)}/appearance`,{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({alphaEnabled:value,expectedRevision:Number(current.revision)}),
+      });
+      await decoAssetLoad();
+      state.alphaDraft=null;state.scanStale=true;
+      message(`Alpha ${saved.alphaEnabled?'включён':'выключен'}. Model/Atlas ID не изменены. Нужен Sync размещённых моделей.`);
+    });
     if(action==='delete')return decoAssetDelete(state.slug);
     if(action==='save-identity'){
       // Capture the user's edits BEFORE run() re-renders the modal as busy.
@@ -290,7 +314,8 @@ window.game1LocationAssetWorkflow = (() => {
     if(action==='scan')return run('Finding published Mesh IDs in Studio',async()=>{
       const result=await window.game1StudioSync.scanLocation(state.slug);
       state.scan={studio:result.studio,modelId:String(item.model_asset_id||''),
-        atlasId:String(item.texture_asset_id||''),revision:Number(item.bindingRevision||0)};
+        atlasId:String(item.texture_asset_id||''),revision:Number(item.bindingRevision||0),
+        alphaEnabled:Boolean(item.alphaEnabled)};
       state.scanStale=false;
       await decoAssetLoad(); // Registered Assets now shows scanned visual Mesh IDs.
       message(`Найдено MeshPart: ${result.studio.foundMeshParts}. `+
@@ -312,7 +337,8 @@ window.game1LocationAssetWorkflow = (() => {
       const item=row(),scan=state.scan;
       if(!item||!scan||state.scanStale||scan.modelId!==String(item.model_asset_id||'')||
         scan.atlasId!==String(item.texture_asset_id||'')||
-        scan.revision!==Number(item.bindingRevision||0))throw Error('Проверка устарела. Нажми Find.');
+        scan.revision!==Number(item.bindingRevision||0)||
+        scan.alphaEnabled!==Boolean(item.alphaEnabled))throw Error('Проверка устарела. Нажми Find.');
       if(!Array.isArray(partKeys)||!partKeys.length||
         partKeys.some(key=>!(scan.studio.parts||[]).some(part=>part.key===key)))
         throw Error('Нечего выделять в Studio');
@@ -324,14 +350,15 @@ window.game1LocationAssetWorkflow = (() => {
     const item=row();if(!item||state.busy)return;
     const valid=state.scan&&state.scan.modelId===String(item.model_asset_id||'')&&
       state.scan.atlasId===String(item.texture_asset_id||'')&&
-      state.scan.revision===Number(item.bindingRevision||0);
+      state.scan.revision===Number(item.bindingRevision||0)&&
+      state.scan.alphaEnabled===Boolean(item.alphaEnabled);
     if(!valid||state.scanStale){
       state.scanStale=true;
       await execute('scan');
       if(!state.scan||state.scanStale)return;
     }
     const keys=(state.scan.studio.parts||[]).filter(p=>p.managed&&
-      (p.needsMesh||p.needsTexture)).map(p=>p.key);
+      (p.needsMesh||p.needsTexture||p.needsAlpha)).map(p=>p.key);
     if(!keys.length){
       message(state.scan.studio.unmanagedMeshParts?
         'Среди привязанных моделей изменений нет. Исторические модели не изменены.':
@@ -345,7 +372,8 @@ window.game1LocationAssetWorkflow = (() => {
       const item=row(),scan=state.scan;
       if(!item||!scan||state.scanStale||scan.modelId!==String(item.model_asset_id||'')||
         scan.atlasId!==String(item.texture_asset_id||'')||
-        scan.revision!==Number(item.bindingRevision||0))throw Error('Scan is stale; Find again');
+        scan.revision!==Number(item.bindingRevision||0)||
+        scan.alphaEnabled!==Boolean(item.alphaEnabled))throw Error('Scan is stale; Find again');
       const part=(scan.studio.parts||[]).find(p=>p.key===partKey&&!p.managed&&p.attachable);
       if(!part)throw Error('Историческую модель нельзя безопасно привязать');
       if(typeof window.confirm!=='function')throw Error('Explicit confirmation unavailable');
@@ -358,7 +386,8 @@ window.game1LocationAssetWorkflow = (() => {
       await window.game1StudioSync.attachLocation(state.slug,token,partKey);
       const updated=await window.game1StudioSync.scanLocation(state.slug);
       state.scan={studio:updated.studio,modelId:String(item.model_asset_id||''),
-        atlasId:String(item.texture_asset_id||''),revision:Number(item.bindingRevision||0)};
+        atlasId:String(item.texture_asset_id||''),revision:Number(item.bindingRevision||0),
+        alphaEnabled:Boolean(item.alphaEnabled)};
       state.scanStale=false;
       message(`Модель привязана к ${state.slug}. Геометрия не изменена. Проверь статусы и нажми Sync.`);
     });
@@ -368,7 +397,8 @@ window.game1LocationAssetWorkflow = (() => {
     if(!current)throw Error('Location Asset больше не зарегистрирован');
     const refreshed=await window.game1StudioSync.scanLocation(state.slug);
     state.scan={studio:refreshed.studio,modelId:String(current.model_asset_id||''),
-      atlasId:String(current.texture_asset_id||''),revision:Number(current.bindingRevision||0)};
+      atlasId:String(current.texture_asset_id||''),revision:Number(current.bindingRevision||0),
+      alphaEnabled:Boolean(current.alphaEnabled)};
     state.scanStale=false;
   }
   async function syncSelected(keys){
@@ -376,18 +406,19 @@ window.game1LocationAssetWorkflow = (() => {
       const item=row(),scan=state.scan;
       if(!item||!scan||state.scanStale||scan.modelId!==String(item.model_asset_id||'')||
         scan.atlasId!==String(item.texture_asset_id||'')||
-        scan.revision!==Number(item.bindingRevision||0)){
+        scan.revision!==Number(item.bindingRevision||0)||
+        scan.alphaEnabled!==Boolean(item.alphaEnabled)){
         throw Error('Отчёт Find устарел; повтори сканирование');
       }
       const pending=new Map((scan.studio.parts||[]).filter(p=>p.managed&&
-        (p.needsMesh||p.needsTexture)).map(p=>[p.key,p]));
+        (p.needsMesh||p.needsTexture||p.needsAlpha)).map(p=>[p.key,p]));
       if(!Array.isArray(keys)||!keys.length||new Set(keys).size!==keys.length||
         keys.some(key=>!pending.has(key)))throw Error('Нет доступных для Sync MeshPart');
       const chosen=keys.map(key=>pending.get(key));
-      const mesh=chosen.some(p=>p.needsMesh),texture=chosen.some(p=>p.needsTexture);
-      const label=mesh&&texture?'Replace Texture + Mesh':mesh?'Replace Mesh':'Replace Texture';
+      const mesh=chosen.some(p=>p.needsMesh),texture=chosen.some(p=>p.needsTexture),alpha=chosen.some(p=>p.needsAlpha);
+      const label=mesh&&texture?'Replace Texture + Mesh':mesh?'Replace Mesh':texture?'Replace Texture':alpha?'Sync Alpha':'Sync';
       if(typeof window.confirm!=='function')throw Error('Explicit confirmation is unavailable');
-      const scope=mesh?'Mesh: заменится весь rig соответствующей модели. ':'Texture: обновятся выбранные визуальные MeshPart. ';
+      const scope=mesh?'Mesh: заменится весь rig соответствующей модели. ':texture?'Texture: обновятся выбранные визуальные MeshPart. ':'Alpha: изменится только SurfaceAppearance.AlphaMode. ';
       if(!window.confirm(`${label}: ${keys.length} MeshPart (${state.slug}). `+
         scope+'Сделай резервную копию Place. Продолжить?')){
         message('Sync отменён. Place не изменён.');return;

@@ -47,7 +47,7 @@ def check_location_assets_core(root: Path, report_error: Callable[[str], None], 
 
     if location_asset_manifest_path.is_file():
         location_asset_manifest = json.loads(location_asset_manifest_path.read_text(encoding="utf-8"))
-        if location_asset_manifest.get("schemaVersion") not in (4,5) or location_asset_manifest.get("project") != "game1":
+        if location_asset_manifest.get("schemaVersion") not in (4,5,6) or location_asset_manifest.get("project") != "game1":
             report_error("m43 location-assets.json schema/project is invalid")
         category_ids = [row.get("id") for row in ((location_asset_manifest.get("options") or {}).get("categories") or [])]
         # Generated manifests may still have the previous category set until
@@ -55,7 +55,7 @@ def check_location_assets_core(root: Path, report_error: Callable[[str], None], 
         expected_categories = ["tree", "bush", "flower", "rock", "light", "fence", "ladder", "bridge", "pillar", "post", "prop", "decoration", "building"]
         legacy_categories = ["tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building", "prop"]
         revision = location_asset_manifest.get("schemaVersion")
-        if (revision == 5 and category_ids != expected_categories) or (revision == 4 and category_ids != legacy_categories):
+        if (revision in (5,6) and category_ids != expected_categories) or (revision == 4 and category_ids != legacy_categories):
             report_error("m128 Location Assets manifest categories have invalid canonical order")
 
     location_asset_store_text = location_asset_store_path.read_text(encoding="utf-8") if location_asset_store_path.is_file() else ""
@@ -135,7 +135,7 @@ def check_location_assets_core(root: Path, report_error: Callable[[str], None], 
     for required in [
         'self.AssetService:LoadAssetAsync(assetId)',
         'row.status or ""',
-        'StudioTextureAppearance.Apply(descendant, uri, usesAlpha)',
+        'StudioTextureAppearance.ApplyLocation(descendant, uri, alphaEnabled)',
         'Url = self.agentBaseUrl .. "/api/location-assets"',
     ]:
         if required not in deco_loader_text:

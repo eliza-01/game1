@@ -376,7 +376,7 @@ local function sanitize(model: Model)
     end
 end
 
-local function applyTexture(model: Model, textureAssetId: string, usesAlpha: any)
+local function applyTexture(model: Model, textureAssetId: string, alphaEnabled: boolean)
     local numericId = tonumber(textureAssetId)
     if numericId == nil or numericId <= 0 then
         return 0
@@ -385,14 +385,14 @@ local function applyTexture(model: Model, textureAssetId: string, usesAlpha: any
     local applied = 0
     for _, descendant in ipairs(model:GetDescendants()) do
         if descendant:IsA("MeshPart") then
-            if MeshPhysics.IsCollider(descendant.Name) then
+            if MeshPhysics.IsCollider(descendant.Name) or descendant:GetAttribute("Game1DecoPhysicsOnly")==true then
                 -- COL is physics-only. Strip old importer texture remnants from
                 -- the fresh clone; never assign Atlas IDs to collision geometry.
                 descendant.TextureID = ""
                 local surface = descendant:FindFirstChildOfClass("SurfaceAppearance")
                 if surface then surface:Destroy() end
             else
-                StudioTextureAppearance.Apply(descendant, uri, usesAlpha)
+                StudioTextureAppearance.ApplyLocation(descendant, uri, alphaEnabled)
                 applied += 1
             end
         end
@@ -454,7 +454,7 @@ function DecoAssetLoader:loadPublished(row: any): Model
     local model = canonicalModel(loaded)
     model.Name = tostring(row.slug or "deco_asset")
     sanitize(model)
-    applyTexture(model, tostring(row.texture_asset_id or ""), row.textureUsesAlpha)
+    applyTexture(model, tostring(row.texture_asset_id or ""), row.alphaEnabled)
     MeshPhysics.ApplyLocationModel(model, nil, row.meshOptions)
     MeshPhysics.ApplyLocationSurfaceMaterial(model,row.surfaceMaterial,row.robloxMaterial or (row.materialDefinition and row.materialDefinition.robloxMaterial))
     MeshNames.Normalize(model, tostring(row.slug or ""))
@@ -842,18 +842,19 @@ function DecoManager:previewMeshSync(slug: string, modelId: string, atlasId: str
             local surface=part:FindFirstChildOfClass("SurfaceAppearance")
             snap[part]={meshId=History.Id(part.MeshId),texture=part.TextureID,
                 colorMap=if surface then surface.ColorMap else nil,
-                parent=part.Parent,frame=part:GetPivot(),size=part.Size}
+                parent=part.Parent,frame=part:GetPivot(),size=part.Size,
+                surface=surface,alphaMode=if surface then surface.AlphaMode else nil}
         end
     end
     report.partStates=snap
     report.rootStates=roots
     self.meshSyncPreview={slug=slug,modelId=modelId,atlasId=atlasId,
-        revision=expectedRevision,token=token,report=report}
+        alphaEnabled=row.alphaEnabled==true,revision=expectedRevision,token=token,report=report}
     return {scanToken=token,mode=report.mode,inventory=report.inventory,
         expectedMeshIds=report.expectedMeshIds,parts=report.parts,
         foundMeshParts=report.foundMeshParts,managedMeshParts=report.managedMeshParts,
         unmanagedMeshParts=report.unmanagedMeshParts,managedModels=report.managedModels,
-        meshPending=report.meshPending,texturePending=report.texturePending,
+        meshPending=report.meshPending,texturePending=report.texturePending,alphaPending=report.alphaPending,
         geometryPending=report.geometryPending}
 end
 
@@ -1024,7 +1025,7 @@ function DecoManager:refreshRegistry(targetSlug: string?, applyIds: boolean?, ex
             if type(key)~="string" or seen[key] then error("duplicate or invalid MeshPart selection") end
             seen[key]=true
             local entry=scanned.partByKey[key]
-            if not entry or not entry.root or not (entry.row.needsMesh or entry.row.needsTexture) then
+            if not entry or not entry.root or not (entry.row.needsMesh or entry.row.needsTexture or entry.row.needsAlpha) then
                 error("selected MeshPart is not a pending managed part; Find again")
             end
             table.insert(selected,key)
@@ -1032,7 +1033,7 @@ function DecoManager:refreshRegistry(targetSlug: string?, applyIds: boolean?, ex
         end
         local allPending=true
         for _, entry in ipairs(scanned.parts) do
-            if entry.managed and (entry.needsMesh or entry.needsTexture)
+            if entry.managed and (entry.needsMesh or entry.needsTexture or entry.needsAlpha)
                 and not seen[entry.key] and not wholeRig[scanned.partByKey[entry.key].root] then
                 allPending=false
                 break
@@ -1042,7 +1043,8 @@ function DecoManager:refreshRegistry(targetSlug: string?, applyIds: boolean?, ex
         for _, row in ipairs(result.items) do
             if row.slug==targetSlug then latest=row;break end
         end
-        if not latest or tonumber(latest.bindingRevision)~=expectedRevision then
+        if not latest or tonumber(latest.bindingRevision)~=expectedRevision
+            or (latest.alphaEnabled==true)~=(preview.alphaEnabled==true) then
             error("Atlas binding revision changed since Find; no Place geometry modified")
         end
         for root, snap in pairs(scanned.rootStates) do
@@ -1381,8 +1383,9 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
             error("Mesh identity, transform or texture changed since Find; rescan")
         end
         local surface=part:FindFirstChildOfClass("SurfaceAppearance")
-        if (if surface then surface.ColorMap else nil)~=snap.colorMap then
-            error("ColorMap changed since Find; rescan")
+        if (if surface then surface.ColorMap else nil)~=snap.colorMap
+            or surface~=snap.surface or (if surface then surface.AlphaMode else nil)~=snap.alphaMode then
+            error("ColorMap or AlphaMode changed since Find; rescan")
         end
     end
     if #placed > 1000 then error("more than 1000 placed instances of one slug") end
@@ -1473,6 +1476,16 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                         colorMap = if surface then surface.ColorMap else nil})
                 end
             end
+            local alphaChanges={}
+            if not geometry then
+                for _, part in ipairs(oldParts) do
+                    if chosenParts[part] and not Physics.IsCollider(part.Name)
+                        and part:GetAttribute("Game1DecoPhysicsOnly")~=true
+                        and not StudioTextureAppearance.AlphaCurrent(part,row.alphaEnabled==true) then
+                        table.insert(alphaChanges,StudioTextureAppearance.Capture(part))
+                    end
+                end
+            end
             local events, eventIndex = {}, {}
             local function add(kind: string, oldValue: string, newValue: string, count: number)
                 local key = kind .. ":" .. oldValue .. ":" .. newValue
@@ -1485,6 +1498,10 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
             if geometry then add("model", previousModelId, modelId, 1) end
             if changeRef then add("model_reference", oldRef, modelId, 1) end
             for _, change in ipairs(atlasChanges) do add("atlas", change.oldId, atlasId, 1) end
+            for _, change in ipairs(alphaChanges) do
+                add("alpha",if change.mode then tostring(change.mode) else "missing",
+                    if row.alphaEnabled==true then "Transparency" else "Opaque",1)
+            end
             local beforeMeshes=if geometry then History.Describe(previousModelId,model).meshes else {}
             local afterMeshes=if geometry then History.Describe(modelId,stage).meshes else {}
             local history = oldHistory(model, http)
@@ -1511,7 +1528,7 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
             end
             table.insert(plans, {model = model, stage = stage, swap = transaction,
                 geometry = geometry, oldId = oldId, oldRef = oldRef,
-                changeRef = changeRef, atlasChanges = atlasChanges,
+                changeRef = changeRef, atlasChanges = atlasChanges,alphaChanges=alphaChanges,
                 historyJson = historyJson, oldHistory = model:GetAttribute(HISTORY),
                 oldSha = model:GetAttribute("Game1DecoPublishedModelSha256"),
                 oldPublishedId = model:GetAttribute("Game1DecoPublishedModelAssetId"),
@@ -1553,6 +1570,11 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                     changedParts += 1
                 end
             end
+            for _, change in ipairs(item.alphaChanges) do
+                if StudioTextureAppearance.ApplyAlpha(change.mesh,row.alphaEnabled==true,uri) then
+                    changedParts+=1
+                end
+            end
             if item.physicsBefore and allowedNames then
                 physicsChecked += Physics.ApplyLocationModel(model, allowedNames, row.meshOptions)
             end
@@ -1576,6 +1598,9 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                         change.part.TextureID = change.texture
                         if change.surface then change.surface.ColorMap = change.colorMap end
                     end
+                end
+                for _, change in ipairs(item.alphaChanges) do
+                    StudioTextureAppearance.Restore(change)
                 end
             end)
             if item.swap then RigSwap.Rollback(item.swap) end
@@ -6016,7 +6041,7 @@ local function ensureVersions(catalog: any, service: any): ({any}, {any}, {strin
         table.insert(versions, {slug=item.slug,aliases=item.aliases or {},
             atlas=item.atlasAssetId,model=item.modelAssetId,
             sha=item.publishedSha,material=item.surfaceMaterial or "default",
-            physicalMaterial=item.robloxMaterial or "",models=published})
+            physicalMaterial=item.robloxMaterial or "",alphaEnabled=item.alphaEnabled==true,models=published})
     end
     return versions,inventory,warnings
 end
@@ -6142,6 +6167,7 @@ local function hierarchy(anchor: Instance): {any}
             entry.collisionFidelity=tostring(obj.CollisionFidelity)
         elseif obj:IsA("SurfaceAppearance") then
             entry.colorMap=id(obj.ColorMap)
+            entry.alphaMode=tostring(obj.AlphaMode)
             entry.normalMap=id(obj.NormalMap)
             entry.roughnessMap=id(obj.RoughnessMap)
             entry.metalnessMap=id(obj.MetalnessMap)
@@ -6220,6 +6246,17 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
                 end
             end
         end
+        local needsAlpha=false
+        if eligible then
+            for _, visualPart in ipairs(visualParts) do
+                local appearance=visualPart:FindFirstChildOfClass("SurfaceAppearance")
+                local mode=if entry.alphaEnabled then Enum.AlphaMode.Transparency else Enum.AlphaMode.Opaque
+                if not appearance or appearance.AlphaMode~=mode then
+                    needsAlpha=true
+                    break
+                end
+            end
+        end
         local needsMaterial=false
         if eligible and entry.material~="default" then
             local physical=if entry.physicalMaterial~="" then Enum.Material[entry.physicalMaterial] else nil
@@ -6245,6 +6282,7 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
         if not root then warn("Нет отдельной Model для этого экземпляра") end
         if eligible and requiresCol(entry) and colliders==0 then warn("Нет обязательного COL-меша") end
         if needsMaterial then warn("Материал поверхности требует Sync: "..entry.material) end
+        if needsAlpha then warn("AlphaMode требует Sync") end
         if eligible and oldAmbiguous then
             oldId=""
             warn("Один Mesh ID встречается в нескольких версиях; геометрия требует ручной проверки")
@@ -6310,14 +6348,14 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
             modelAssetId=if eligible then oldId else "",meshId=original.meshId,
             textureId=original.textureId,expectedMeshId=if eligible then entry.model else "",
             expectedTextureId=if eligible then entry.atlas else "",colCount=colliders,
-            needsMesh=needsMesh,needsTexture=needsTexture,needsMaterial=needsMaterial,needsStructure=not root or badName or meshNameMismatch or assigned==""
+            needsMesh=needsMesh,needsTexture=needsTexture,needsMaterial=needsMaterial,needsAlpha=needsAlpha,needsStructure=not root or badName or meshNameMismatch or assigned==""
                 or (root and root:GetAttribute("Game1DecoAssetSlug")~=entry.slug)
                 or (eligible and requiresCol(entry) and colliders==0),
             duplicateId=false,ambiguous=not eligible or provenForeignClaim,
             hasModel=root~=nil,canSync=eligible and not foreignClaim and root~=nil and assigned~=""
                 and claimed==entry.slug and (not needsMesh or oldId~="")
                 and (needsMesh or not (requiresCol(entry) and colliders==0)),
-            status=if not eligible then "ambiguous" elseif needsMesh or needsTexture or needsMaterial then "pending" else "current",
+            status=if not eligible then "ambiguous" elseif needsMesh or needsTexture or needsMaterial or needsAlpha then "pending" else "current",
             issues=issues,hierarchy=fullHierarchy,transform={cframe={part.CFrame:GetComponents()},
                 size={part.Size.X,part.Size.Y,part.Size.Z},position=positionOf(part),
                 anchored=part.Anchored,canCollide=part.CanCollide},
@@ -6631,7 +6669,7 @@ local function stageRig(ref: any, ctx: any): any
     if ref.oldVersion=="" then error("historical publication not unique") end
     local publishedRow={slug=ref.entry.slug,status="PUBLISHED",
         model_asset_id=ref.entry.model,texture_asset_id=ref.entry.atlas,
-        surfaceMaterial=ref.entry.material,robloxMaterial=ref.entry.physicalMaterial}
+        surfaceMaterial=ref.entry.material,robloxMaterial=ref.entry.physicalMaterial,alphaEnabled=ref.entry.alphaEnabled}
     local stage=ctx.loader:loadPublished(publishedRow)
     local previous=ctx.loader:loadForMeshInventory(ref.oldVersion,ref.entry.slug)
     local good,result=pcall(function()
@@ -6666,12 +6704,10 @@ function Sync.Apply(refs: {any}, ctx: any): any
             else
                 table.insert(blocked,ref.row.key..": "..tostring(stage):sub(1,180))
             end
-        elseif ref.row.needsTexture or ref.row.needsMaterial then
+        elseif ref.row.needsTexture or ref.row.needsMaterial or ref.row.needsAlpha then
             local changes={}
             for _,part in ipairs(ref.visuals) do
-                local surface=part:FindFirstChildOfClass("SurfaceAppearance")
-                table.insert(changes,{part=part,uri=part.TextureID,
-                    surface=surface,color=if surface then surface.ColorMap else nil})
+                table.insert(changes,Texture.Capture(part))
             end
             table.insert(plan,{ref=ref,appearance=changes,
                 priorSurface=Physics.CaptureLocationSurfaceMaterial(ref.root),
@@ -6698,10 +6734,14 @@ function Sync.Apply(refs: {any}, ctx: any): any
                 root:SetAttribute("Game1DecoRegistryModelAssetId",ref.entry.model)
                 root:SetAttribute("Game1DecoPublishedModelSha256",ref.entry.sha)
             else
-                if ref.row.needsTexture then
+                if ref.row.needsTexture or ref.row.needsAlpha then
                     local uri="rbxassetid://"..ref.entry.atlas
                     for _,change in ipairs(item.appearance) do
-                        Texture.Apply(change.part,uri,nil,true)
+                        if ref.row.needsTexture then
+                            Texture.ApplyLocation(change.mesh,uri,ref.entry.alphaEnabled)
+                        else
+                            Texture.ApplyAlpha(change.mesh,ref.entry.alphaEnabled,uri)
+                        end
                     end
                 end
             end
@@ -6715,6 +6755,9 @@ function Sync.Apply(refs: {any}, ctx: any): any
             if ref.row.needsTexture then
                 table.insert(events,{kind="atlas",oldId=ref.row.textureId,
                     newId=ref.entry.atlas,count=#ref.visuals})
+            end
+            if ref.row.needsAlpha then
+                table.insert(events,{kind="alpha",oldId="previous",newId=if ref.entry.alphaEnabled then "Transparency" else "Opaque",count=#ref.visuals})
             end
             local previous={}
             local raw=root:GetAttribute("Game1DecoSyncHistory")
@@ -6743,8 +6786,7 @@ function Sync.Apply(refs: {any}, ctx: any): any
                     item.ref.root:SetAttribute("Game1DecoRegistryModelAssetId",item.priorRegistry)
                 else
                     for _,change in ipairs(item.appearance) do
-                        change.part.TextureID=change.uri
-                        if change.surface then change.surface.ColorMap=change.color end
+                        Texture.Restore(change)
                     end
                     if item.priorSurface then
                         Physics.RestoreLocationSurfaceMaterial(item.priorSurface)
@@ -7614,6 +7656,9 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
                 local colorMapId=if textureApplicable and surface then Inventory.Id(surface.ColorMap) else ""
                 local textureCurrent=not textureApplicable or (textureId==atlasId
                     and (not surface or colorMapId==atlasId))
+                local alphaEnabled=row.alphaEnabled==true
+                local alphaCurrent=not textureApplicable or (surface~=nil and
+                    surface.AlphaMode==(if alphaEnabled then Enum.AlphaMode.Transparency else Enum.AlphaMode.Opaque))
                 local meshCurrent=currentIds[meshId]==true
                 local path=part:GetFullName()
                 local legacyRoot,legacyModelId=nil,nil
@@ -7635,7 +7680,8 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
                     hasSurface=textureApplicable and surface~=nil,textureApplicable=textureApplicable,managed=owner~=nil,
                     attachable=legacyRoot~=nil,historicalModelId=legacyModelId or "",
                     meshCurrent=meshCurrent,textureCurrent=textureCurrent,
-                    needsMesh=false,needsTexture=not textureCurrent,
+                    needsMesh=false,needsTexture=not textureCurrent,needsAlpha=not alphaCurrent,
+                    alphaEnabled=alphaEnabled,alphaCurrent=alphaCurrent,
                     currentUnlinked=currentUnlinked}
                 table.insert(rows,entry)
                 partByKey[key]={part=part,root=owner,row=entry,
@@ -7662,7 +7708,7 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
             end
         end
     end
-    local texturePending, meshPending, pending=0,0,0
+    local texturePending, meshPending, alphaPending, pending=0,0,0,0
     for _ in pairs(geometryRoots) do pending+=1 end
     for _, entry in ipairs(rows) do
         if entry.managed then
@@ -7670,17 +7716,19 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
             entry.needsMesh=geometryRoots[bound.root]==true
             if entry.needsMesh then meshPending+=1 end
             if entry.needsTexture then texturePending+=1 end
+            if entry.needsAlpha then alphaPending+=1 end
         end
     end
     -- Find is strictly read-only and never changes Studio Selection. The user
     -- explicitly selects a single row via the separate Select in Studio phase.
-    local mode=if pending>0 and texturePending>0 then "texture_mesh"
-        elseif pending>0 then "mesh" elseif texturePending>0 then "texture" else "current"
+    local mode=if pending>0 and (texturePending>0 or alphaPending>0) then "texture_mesh"
+        elseif pending>0 then "mesh" elseif texturePending>0 then "texture"
+        elseif alphaPending>0 then "alpha" else "current"
     return {inventory=inventory,expectedMeshIds=expectedMeshIds,parts=rows,
         partByKey=partByKey,legacyCandidates=legacyCandidates,
         foundMeshParts=#rows,managedMeshParts=managedCount,
         unmanagedMeshParts=unmatched,managedModels=#roots,
-        texturePending=texturePending,meshPending=meshPending,geometryPending=pending,mode=mode,
+        texturePending=texturePending,alphaPending=alphaPending,meshPending=meshPending,geometryPending=pending,mode=mode,
         roots=roots,geometryRoots=geometryRoots,
         publishedModelId=newModelId,publishedAtlasId=atlasId}
 end
@@ -8988,6 +9036,76 @@ function StudioTextureAppearance.Apply(mesh: MeshPart, uri: string, usesAlpha: a
         error("SurfaceAppearance binding failed for " .. mesh:GetFullName() .. ": " .. tostring(reason), 2)
     end
     return true
+end
+
+-- Location-only alpha policy. Unlike Apply(), this NEVER substitutes Overlay
+-- for Opaque, and it does not alter MeshPart.Transparency or physics.
+function StudioTextureAppearance.AlphaMode(enabled: boolean): Enum.AlphaMode
+    if type(enabled) ~= "boolean" then error("alphaEnabled must be boolean",2) end
+    local mode = if enabled then Enum.AlphaMode.Transparency else Enum.AlphaMode.Opaque
+    if mode == nil then error("Opaque AlphaMode unavailable in this Studio",2) end
+    return mode
+end
+
+function StudioTextureAppearance.AlphaCurrent(mesh: MeshPart, enabled: boolean): boolean
+    local appearance=mesh:FindFirstChildOfClass("SurfaceAppearance")
+    return appearance~=nil and appearance.AlphaMode==StudioTextureAppearance.AlphaMode(enabled)
+end
+
+function StudioTextureAppearance.Capture(mesh: MeshPart): any
+    local surface=mesh:FindFirstChildOfClass("SurfaceAppearance")
+    return {mesh=mesh,texture=mesh.TextureID,surface=surface,
+        color=if surface then surface.ColorMap else nil,
+        mode=if surface then surface.AlphaMode else nil}
+end
+
+function StudioTextureAppearance.Restore(snapshot: any)
+    local mesh=snapshot.mesh
+    mesh.TextureID=snapshot.texture
+    local current=mesh:FindFirstChildOfClass("SurfaceAppearance")
+    if snapshot.surface then
+        if current~=snapshot.surface and current then current:Destroy() end
+        if snapshot.surface.Parent~=mesh then snapshot.surface.Parent=mesh end
+        snapshot.surface.ColorMap=snapshot.color
+        snapshot.surface.AlphaMode=snapshot.mode
+    elseif current then
+        current:Destroy() -- newly introduced by a failed transaction
+    end
+end
+
+function StudioTextureAppearance.ApplyAlpha(mesh: MeshPart, enabled: boolean, uri: string?): boolean
+    local mode=StudioTextureAppearance.AlphaMode(enabled)
+    local surface=mesh:FindFirstChildOfClass("SurfaceAppearance")
+    if surface and surface.AlphaMode==mode then return false end
+    if surface then
+        surface.AlphaMode=mode
+        return true
+    end
+    local content=uri or mesh.TextureID
+    if content=="" then error("Alpha requires a published ColorMap; no change made",2) end
+    local created=Instance.new("SurfaceAppearance")
+    local ok,reason=pcall(function()
+        created.Name="SurfaceAppearance"
+        created.ColorMap=content
+        created.AlphaMode=mode
+        created.Parent=mesh
+    end)
+    if not ok then created:Destroy();error(tostring(reason),2) end
+    return true
+end
+
+function StudioTextureAppearance.ApplyLocation(mesh: MeshPart, uri: string, enabled: boolean): boolean
+    local snapshot=StudioTextureAppearance.Capture(mesh)
+    local ok,result=pcall(function()
+        local ids=StudioTextureAppearance.Apply(mesh,uri,nil,true)
+        local alpha=StudioTextureAppearance.ApplyAlpha(mesh,enabled,uri)
+        return ids or alpha
+    end)
+    if not ok then
+        pcall(StudioTextureAppearance.Restore,snapshot)
+        error("Location appearance rolled back: "..tostring(result),2)
+    end
+    return result
 end
 
 return table.freeze(StudioTextureAppearance)

@@ -29,7 +29,7 @@ class LocationTaxonomySurfaceM249(TestCase):
     def test_new_database_schema_and_material_default(self):
         with TemporaryDirectory() as tmp:
             root=Path(tmp); store=LocationAssetStore(root)
-            self.assertEqual(store.snapshot()['schemaVersion'],5)
+            self.assertEqual(store.snapshot()['schemaVersion'],6)
             with store.connect() as db:
                 columns={row[1] for row in db.execute('PRAGMA table_info(location_assets)')}
                 self.assertIn('surface_material',columns)

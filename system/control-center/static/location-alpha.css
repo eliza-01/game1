@@ -1,0 +1,7 @@
+/* Only Location Assets editor; never cascade into Real Estate. */
+.la-alpha-settings {display:flex;flex-direction:column;align-items:flex-start;gap:10px;
+  padding:14px 16px;margin:0 0 14px;border:1px solid var(--line,#263847);
+  border-radius:10px;max-width:100%;box-sizing:border-box}
+.la-alpha-settings .deco-policy-toggle {display:flex;align-items:center;gap:8px;margin:0}
+.la-alpha-settings small {display:block;max-width:70ch;line-height:1.5}
+.la-alpha-settings .actions {margin:2px 0 0;padding:0}

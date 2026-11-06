@@ -260,3 +260,28 @@ matches are never eligible for Replace without explicit verified linking.
 Registered Assets uses persisted current-version published `visualNames` and
 Mesh IDs; it must not infer Mesh IDs from FBX part names or list COL IDs.
 See `docs/workflows/LOCATION_ASSETS_MODEL_GROUPED_SYNC_M239_RU.md`.
+
+## M243 · Location ownership parity and per-group Sync
+
+Location Find and `DecoPlacedAssetSync` MUST share `StudioLocationPlacementOwner`: never
+use a separate nested-Model exclusion policy at Sync time. A marked ancestor
+may not claim the parts of a nearer differently marked placement; reject
+geometry changes that would overwrite nested independent rigs. Place Registry
+`Sync group` uses the existing authenticated, journaled Location-only Sync
+operation with the normal explicit backup confirmation; Real Estate edit/sync
+is unaffected. See docs/workflows/LOCATION_PLACE_REGISTRY_GROUP_SYNC_AND_OWNER_M243_RU.md.
+
+## M244 · Location placement fidelity and stale ownership labels
+
+Location Studio Find reports are retained across Sync; a consumed token is locked
+and a new read-only Find is automatic after success or failure. When another
+Find cannot run, the previous report is displayed but cannot authorize writes.
+`StudioLocationPlacedGeometry` is the *single Location-only* policy shared by
+scoped Location Sync and Place Registry Sync. For verified unrigged one-visual
+publications preserve placed visual `CFrame`, `Size`, `PivotOffset` and map new
+COL by the same per-axis transform; never silently drop manually customized
+multipart/skinned geometry. The shared `StudioManagedRigSwap` remains unchanged.
+A foreign `Game1DecoAssetSlug` attribute is not proof of a foreign owner: confirm
+full historical Mesh ID inventory before blocking Repair. Explicit Repair must
+correct stale published Model ID/SHA metadata. See
+`docs/workflows/LOCATION_SYNC_PLACEMENT_STATE_M244_RU.md`.

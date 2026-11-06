@@ -82,7 +82,9 @@
         <div class="pr-group-content"><div class="pr-group-actions">
           <button type="button" data-pr-action="repair-group" data-group="${html(slug)}"
             data-pr-blocked="${repairs===0}">Repair group (${repairs})</button>
-          <small>Исправить структуру и ID только этой группы</small></div>
+          <button type="button" data-pr-action="sync-group" data-group="${html(slug)}"
+            data-pr-blocked="${syncs===0}">Sync group (${syncs})</button>
+          <small>Только ${html(slug)} · Repair исправляет структуру, Sync обновляет устаревшие ресурсы</small></div>
           <div class="pr-rows">${rows.map(item).join('')}</div></div></details>`;
     }).join('');
     buttons();
@@ -111,12 +113,17 @@
         const selected=r.selected||[];
         const slugs=[...new Set(selected.map(x=>x.slug))];
         const scope=selected.length?`${selected.length} размещений · ${slugs.join(', ')}`:'Запись старого формата';
-        const status=r.status==='undone'?'Отменено':r.status==='no_changes'?'Без изменений':
+        const skipped=Array.isArray(r.report?.skipped)?r.report.skipped:[];
+        const status=r.status==='undone'?'Отменено':
+          r.status==='no_changes'?(skipped.length?'Пропущено':'Без изменений'):
           r.status==='legacy'?'До M241':'Применено';
+        const skippedDetails=skipped.length?
+          `<small class="pr-log-skipped">Причины пропуска (${skipped.length}): ${skipped.map(html).join('; ')}</small>`:'';
         return `<div class="pr-action-row"><div class="pr-action-info">
           <strong>#${html(r.id)} · ${title} · ${new Date(r.recordedUtc*1000).toLocaleString('ru-RU')}</strong>
           <small>${html(scope)} · изменено ${r.affected} · перед ревизией #${r.beforeRevision}</small>
-          <span class="pr-state${r.status==='undone'?' pr-state-undone':''}">${status}</span></div>
+          <span class="pr-state${r.status==='undone'?' pr-state-undone':''}">${status}</span>
+          ${skippedDetails}</div>
           ${r.status==='applied'?`<button type="button" data-pr-undo="${r.id}" ${r.canUndo?'':'disabled title="Сначала отмените более новые операции"'}>Undo</button>`:''}
         </div>`;
       }).join(''):'<p class="hint">Журнал пуст. Repair и Sync будут появляться здесь автоматически.</p>';
@@ -195,9 +202,10 @@
     const button=event.target.closest('button[data-pr-action]');
     if(!button||!active())return;
     const {prAction:phase,key,group}=button.dataset;
-    if(phase==='repair-group') {
-      const keys=(groups()[group]||[]).filter(needsRepair).map(r=>r.key);
-      mutate('repair',keys,`${group} · ${keys.length} размещений`);
+    if(phase==='repair-group'||phase==='sync-group') {
+      const isRepair=phase==='repair-group';
+      const keys=(groups()[group]||[]).filter(isRepair?needsRepair:needsSync).map(r=>r.key);
+      mutate(isRepair?'repair':'sync',keys,`${group} · ${keys.length} размещений`);
     } else if(phase==='select')run('select',[key]);
     else mutate(phase,[key],`размещение ${key}`);
   });

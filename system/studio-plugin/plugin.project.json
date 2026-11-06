@@ -43,6 +43,8 @@
       "StudioPlaceRegistryCommands": {"$path": "modules/StudioPlaceRegistryCommands.luau"},
       "StudioPlaceRegistryInventory": {"$path": "modules/StudioPlaceRegistryInventory.luau"},
       "StudioLocationMeshNames": {"$path": "modules/StudioLocationMeshNames.luau"},
+      "StudioLocationPlacementOwner": {"$path": "modules/StudioLocationPlacementOwner.luau"},
+      "StudioLocationPlacedGeometry": {"$path": "modules/StudioLocationPlacedGeometry.luau"},
       "StudioPlaceRegistryRepair": {"$path": "modules/StudioPlaceRegistryRepair.luau"},
       "StudioPlaceRegistrySync": {"$path": "modules/StudioPlaceRegistrySync.luau"},
       "NpcSpawnPreview": {

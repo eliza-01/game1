@@ -221,6 +221,38 @@
       ]
     },
     {
+      "atlasKey": "bush_01",
+      "baseKey": "bush",
+      "version": "01",
+      "variants": [
+        {
+          "id": 33,
+          "family_id": 27,
+          "width": 256,
+          "height": 256,
+          "filename": "bush_01_256x256_atlas.png",
+          "original_filename": "bush_01_256x256_atlas.png",
+          "source_path": "assets/source/texture-atlases/bush_01/256x256/bush_01_256x256_atlas.png",
+          "source_sha256": "8efc8a08db2158b374959aa71e8be7bb1043e03b0af6f9ee6dd4b9e9de36babc",
+          "uses_alpha": true,
+          "published_id": "95618035804245",
+          "published_sha256": "8efc8a08db2158b374959aa71e8be7bb1043e03b0af6f9ee6dd4b9e9de36babc",
+          "moderation_state": "Reviewing",
+          "published_at": 1793931507.5976868,
+          "created_at": 1793931502.6602368,
+          "retired_at": null,
+          "atlas_key": "bush_01",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "256x256",
+          "baseKey": "bush",
+          "version": "01"
+        }
+      ]
+    },
+    {
       "atlasKey": "campfire_01",
       "baseKey": "campfire",
       "version": "01",
@@ -1145,28 +1177,84 @@
       "name_en": "bush_01",
       "category": "bush",
       "model_path": "assets/source/location-assets/bush/bush_01/model/bush_01.fbx",
-      "model_sha256": "a3d6048b198df79f4026c88a8cf849cb8b348daf2b6c90ca024c5297e7ef0e98",
-      "model_asset_id": "101368135428674",
-      "model_published_sha256": "a3d6048b198df79f4026c88a8cf849cb8b348daf2b6c90ca024c5297e7ef0e98",
+      "model_sha256": "b5e29c596dcc41dbecd958a6006fc65099cb0971d8131251e3c3ae58b0cafa10",
+      "model_asset_id": "95987432802428",
+      "model_published_sha256": "b5e29c596dcc41dbecd958a6006fc65099cb0971d8131251e3c3ae58b0cafa10",
       "model_moderation_state": "Approved",
       "destructible": false,
-      "revision": 2,
+      "revision": 3,
       "created_at": 1791474388.6629841,
-      "updated_at": 1791475115.7066147,
-      "published_at": 1791475115.7066147,
-      "fbxAnalysis": null,
-      "meshOptions": {},
-      "texture_path": "assets/source/texture-atlases/christmas_tree/2048x2048/migrated/9de5d31b2ae82633f6f91ee9705040c4fd5c03d579424189faa9bafe03ce6386/christmas_tree.jpg",
-      "texture_filename": "christmas_tree.jpg",
-      "texture_sha256": "9de5d31b2ae82633f6f91ee9705040c4fd5c03d579424189faa9bafe03ce6386",
-      "texture_asset_id": "130407188742566",
-      "texture_published_sha256": "9de5d31b2ae82633f6f91ee9705040c4fd5c03d579424189faa9bafe03ce6386",
+      "updated_at": 1793930533.7606688,
+      "published_at": 1793930533.7606688,
+      "fbxAnalysis": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "bush_01",
+            "armature": "",
+            "vertices": 1500,
+            "bones": [],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": false,
+              "canQuery": false,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": "Box",
+              "physicsOnly": false
+            }
+          },
+          {
+            "name": "col_mesh",
+            "armature": "",
+            "vertices": 8,
+            "bones": [],
+            "influencedBones": [],
+            "role": "collider",
+            "physics": {
+              "role": "collider",
+              "canCollide": true,
+              "canQuery": true,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": "PreciseConvexDecomposition",
+              "physicsOnly": true
+            }
+          }
+        ],
+        "hasCollider": true,
+        "armatures": [],
+        "unassignedArmatures": []
+      },
+      "meshOptions": {
+        "bush_01": {
+          "collisionFidelity": "Box",
+          "collisionMesh": false,
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true
+        },
+        "col_mesh": {
+          "collisionFidelity": "PreciseConvexDecomposition",
+          "collisionMesh": true,
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": false
+        }
+      },
+      "texture_path": "assets/source/texture-atlases/bush_01/256x256/bush_01_256x256_atlas.png",
+      "texture_filename": "bush_01_256x256_atlas.png",
+      "texture_sha256": "8efc8a08db2158b374959aa71e8be7bb1043e03b0af6f9ee6dd4b9e9de36babc",
+      "texture_asset_id": "95618035804245",
+      "texture_published_sha256": "8efc8a08db2158b374959aa71e8be7bb1043e03b0af6f9ee6dd4b9e9de36babc",
       "texture_moderation_state": "Reviewing",
       "texture_reference_slug": "",
-      "atlasVariantId": 17,
-      "atlasFamily": "christmas_tree",
-      "atlasResolution": "2048x2048",
-      "bindingRevision": 1,
+      "atlasVariantId": 33,
+      "atlasFamily": "bush_01",
+      "atlasResolution": "256x256",
+      "bindingRevision": 2,
       "studioSyncStatus": "synced",
       "atlasVariants": [
         {
@@ -1193,16 +1281,41 @@
           "resolution": "2048x2048",
           "baseKey": "christmas_tree",
           "version": ""
+        },
+        {
+          "id": 33,
+          "family_id": 27,
+          "width": 256,
+          "height": 256,
+          "filename": "bush_01_256x256_atlas.png",
+          "original_filename": "bush_01_256x256_atlas.png",
+          "source_path": "assets/source/texture-atlases/bush_01/256x256/bush_01_256x256_atlas.png",
+          "source_sha256": "8efc8a08db2158b374959aa71e8be7bb1043e03b0af6f9ee6dd4b9e9de36babc",
+          "uses_alpha": true,
+          "published_id": "95618035804245",
+          "published_sha256": "8efc8a08db2158b374959aa71e8be7bb1043e03b0af6f9ee6dd4b9e9de36babc",
+          "moderation_state": "Reviewing",
+          "published_at": 1793931507.5976868,
+          "created_at": 1793931502.6602368,
+          "retired_at": null,
+          "atlas_key": "bush_01",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "256x256",
+          "baseKey": "bush",
+          "version": "01"
         }
       ],
-      "textureUsesAlpha": false,
-      "atlasLegacyWarning": true,
+      "textureUsesAlpha": true,
+      "atlasLegacyWarning": false,
       "status": "PUBLISHED",
       "category_label": "Bushes",
       "publishedVisualMeshes": [
         {
-          "meshId": "87041308668424",
-          "name": "tripo_node_2314f44f-f2f6-4f62-b240-43a157b21dc8"
+          "meshId": "85890571174919",
+          "name": "bush_01"
         }
       ]
     },
@@ -1807,7 +1920,7 @@
       "atlasFamily": "restoration_01",
       "atlasResolution": "2048x2048",
       "bindingRevision": 2,
-      "studioSyncStatus": "pending_studio_sync",
+      "studioSyncStatus": "synced",
       "atlasVariants": [
         {
           "id": 4,

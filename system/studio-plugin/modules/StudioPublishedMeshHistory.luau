@@ -1,6 +1,7 @@
 -- ID provenance of published Model assets. Real Estate and Location Assets
 -- both keep StudioManagedRigSwap as the sole child-rig transaction.
 local MeshPhysics = require(script.Parent.StudioMeshPhysicsCore)
+local Ownership = require(script.Parent.StudioLocationPlacementOwner)
 local Inventory = {}
 
 function Inventory.Id(value: any): string
@@ -282,16 +283,7 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
             and (not camera or not part:IsDescendantOf(camera)) then
             local meshId=Inventory.Id(part.MeshId)
             local old=previousIds[meshId]==true
-            local ancestor=part.Parent
-            local owner: Model?=nil
-            while ancestor and ancestor~=workspace do
-                if ancestor:IsA("Model") and ancestor:GetAttribute("Game1DecoAssetSlug")==slug
-                    and tostring(ancestor:GetAttribute("Game1DecoInstanceId") or "")~="" then
-                    owner=ancestor
-                    break
-                end
-                ancestor=ancestor.Parent
-            end
+            local owner = Ownership.ForPart(workspace, part, slug)
             if old or owner then
                 if #rows>=4096 then error("more than 4096 matching MeshParts in Workspace") end
                 local key="p"..tostring(#rows+1)

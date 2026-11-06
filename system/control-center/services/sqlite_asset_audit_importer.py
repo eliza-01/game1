@@ -10,6 +10,8 @@ import sqlite3
 import threading
 import re
 
+from services.asset_audit_historical_identity import slug_at_publication
+
 
 @dataclass(frozen=True)
 class PublicationSpec:
@@ -118,16 +120,31 @@ class SqliteAssetAuditImporter:
                 raise RuntimeError(f'{spec.database}/{spec.table} audit columns missing: {missing}')
             rows = [dict(row) for row in connection.execute(
                 f'SELECT * FROM "{spec.table}" ORDER BY id')]
+            # M242 intentionally moves old publications to the current authoring
+            # slug. Reconstruct their *original* audit key using the recorded
+            # rename timestamps; MySQL operations remain immutable.
+            aliases = ([dict(row) for row in connection.execute(
+                'SELECT old_slug,current_slug,renamed_at FROM location_asset_slug_aliases')]
+                if spec.database == 'game1.db'
+                and spec.domain in ('location_asset', 'texture_atlas_legacy')
+                and 'location_asset_slug_aliases' in self._tables(connection) else [])
         previous_by_identity: dict[tuple[str, str, str], str] = {}
         events = []
         for row in rows:
             asset_id = str(row.get(spec.asset_id_column) or '')
             if not asset_id.isdigit():
                 continue
-            key = str(row.get(spec.key_column) or '')
+            current_key = str(row.get(spec.key_column) or '')
+            key = current_key
+            if (spec.domain == 'location_asset' or
+                    (spec.domain == 'texture_atlas_legacy'
+                     and row.get('consumer_type') == 'location_asset')):
+                key = slug_at_publication(current_key, row[spec.published_column], aliases)
             slot = ':'.join(str(row.get(column) or '') for column in spec.slot_columns)
             asset_type = self._asset_type(spec, row)
-            identity = (key, slot, asset_type)
+            # Revision chaining follows the current authoring identity while
+            # the per-event assetKey above remains the original historical key.
+            identity = (current_key, slot, asset_type)
             previous = previous_by_identity.get(identity, '')
             previous_by_identity[identity] = asset_id
             source_system = f'sqlite:{spec.database}:{spec.table}'

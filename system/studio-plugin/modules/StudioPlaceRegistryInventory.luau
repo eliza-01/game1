@@ -53,7 +53,8 @@ local function ensureVersions(catalog: any, service: any): ({any}, {any}, {strin
             table.insert(published, info)
         end
         table.insert(inventory, {slug=item.slug,models=published})
-        table.insert(versions, {slug=item.slug,atlas=item.atlasAssetId,model=item.modelAssetId,
+        table.insert(versions, {slug=item.slug,aliases=item.aliases or {},
+            atlas=item.atlasAssetId,model=item.modelAssetId,
             sha=item.publishedSha, models=published})
     end
     return versions,inventory,warnings
@@ -288,8 +289,34 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
             end
         end
         local foreignClaim=eligible and claimed~="" and claimed~=entry.slug and not oldClaim
+        local provenForeignClaim=false
+        if foreignClaim and root then
+            -- A copied/slightly renamed model can carry someone else's old
+            -- Game1DecoAssetSlug. That attribute is NOT proof of ownership.
+            -- Only the complete published MeshId inventory of the claimed
+            -- asset may outweigh the unambiguous historical MeshId we found.
+            for _,other in ipairs(versions) do
+                local claimsOther=other.slug==claimed
+                for _,alias in ipairs(other.aliases or {}) do
+                    if alias==claimed then claimsOther=true break end
+                end
+                if claimsOther then
+                    for _,publication in ipairs(other.models) do
+                        if History.MatchesInventory(root,publication) then
+                            provenForeignClaim=true
+                            break
+                        end
+                    end
+                    break
+                end
+            end
+        end
         if oldClaim then warn("Исторический slug: "..claimed.." → "..entry.slug.."; требуется Repair") end
-        if foreignClaim then warn("Model явно принадлежит другому Location Asset") end
+        if foreignClaim and provenForeignClaim then
+            warn("Конфликт двух подтверждённых Location Assets; требуется ручная проверка")
+        elseif foreignClaim then
+            warn("Устаревшая метка slug: "..claimed.." → "..entry.slug.." (по Mesh ID); Repair исправит")
+        end
         if assigned=="" then warn("Нет Placement ID") else
             duplicateGroups[assigned]=duplicateGroups[assigned] or {}
             table.insert(duplicateGroups[assigned],#rows+1)
@@ -310,7 +337,7 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
             needsMesh=needsMesh,needsTexture=needsTexture,needsStructure=not root or badName or meshNameMismatch or assigned==""
                 or (root and root:GetAttribute("Game1DecoAssetSlug")~=entry.slug)
                 or (eligible and requiresCol(entry) and colliders==0),
-            duplicateId=false,ambiguous=not eligible or foreignClaim,
+            duplicateId=false,ambiguous=not eligible or provenForeignClaim,
             hasModel=root~=nil,canSync=eligible and not foreignClaim and root~=nil and assigned~=""
                 and claimed==entry.slug and (not needsMesh or oldId~="")
                 and (needsMesh or not (requiresCol(entry) and colliders==0)),

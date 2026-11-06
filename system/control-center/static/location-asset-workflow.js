@@ -3,7 +3,7 @@
  */
 window.game1LocationAssetWorkflow = (() => {
   const state={slug:'',tab:'model',busy:false,result:'',error:false,manualSlug:false,identityDraft:null,
-    pendingModel:'',inspection:null,meshOptions:{},physicsDirty:false,scan:null,
+    pendingModel:'',inspection:null,meshOptions:{},physicsDirty:false,scan:null,scanStale:false,
     atlas:window.game1ConsumerAtlasEditor.newState()};
   const shell=window.game1AssetWorkflowDialog;
   const e=value=>esc(String(value??''));
@@ -11,7 +11,7 @@ window.game1LocationAssetWorkflow = (() => {
   const button=(action,label,disabled=false,css='')=>
     `<button type="button" class="${css}" data-la-action="${action}" ${disabled?'disabled':''}>${label}</button>`;
   const dialog=()=>shell.ensure('location-asset-edit-dialog','Manage Location Asset',()=>{
-    state.slug='';state.pendingModel='';state.scan=null;state.identityDraft=null;state.atlas=window.game1ConsumerAtlasEditor.newState();
+    state.slug='';state.pendingModel='';state.scan=null;state.scanStale=false;state.identityDraft=null;state.atlas=window.game1ConsumerAtlasEditor.newState();
   });
   const close=()=>{const d=document.getElementById('location-asset-edit-dialog');if(d?.open)d.close();};
   function open(slug,initialTab='identity'){
@@ -19,7 +19,7 @@ window.game1LocationAssetWorkflow = (() => {
     if(!item)return toast('Location Asset no longer exists; refresh.',true);
     if(state.busy)return toast('Finish the current operation first.',true);
     const d=dialog();if(d.open && state.slug!==slug)d.close();
-    state.slug=slug;state.tab=initialTab;state.busy=false;state.scan=null;state.pendingModel='';state.manualSlug=false;state.identityDraft=null;
+    state.slug=slug;state.tab=initialTab;state.busy=false;state.scan=null;state.scanStale=false;state.pendingModel='';state.manualSlug=false;state.identityDraft=null;
     state.inspection=item.fbxAnalysis||null;
     state.meshOptions=window.game1MeshAuthoring.seeded(state.inspection,item.meshOptions||{});
     state.physicsDirty=false;state.atlas=window.game1ConsumerAtlasEditor.newState();
@@ -82,6 +82,7 @@ window.game1LocationAssetWorkflow = (() => {
       preview.atlasId===String(item.texture_asset_id||'')&&
       preview.revision===Number(item.bindingRevision||0);
     const selected=scanValid?preview.studio:null;
+    const reportStale=Boolean(state.scanStale);
     // One card per placed Model; COLLIDER geometry is only a compact existence hint.
     // Selection and Sync operate on different contracts: Select is Explorer-only.
     const parts=selected?.parts||[];
@@ -137,7 +138,7 @@ window.game1LocationAssetWorkflow = (() => {
         `<div class="la-sync-part-actions">`+
           `${button('select-studio','Select in Studio',busy,'la-select-studio')}`+
           (legacy?button('attach-historical','Link historical model',busy):'')+
-          (model.managed?button('sync-one','Sync',!pending||busy):'')+'</div></div>';
+          (model.managed?button('sync-one','Sync',!pending||busy||reportStale):'')+'</div></div>';
     };
     const footer=card('Studio · Mesh & Texture Sync',
       'Поиск проверяет размещённые модели. Select выделяет в Studio; Sync обновляет только привязанные модели.',
@@ -148,14 +149,15 @@ window.game1LocationAssetWorkflow = (() => {
         `<div><small>Актуальный Texture ID · Atlas</small><strong>${e(item.texture_asset_id||'—')}</strong></div></div>`+
         `<div class="la-sync-counts"><strong>Найдено ${Number(selected.foundMeshParts||0)} MeshPart · `+
         `${grouped.length} моделей</strong>`+
+        (reportStale?'<small class="la-sync-warning">Отчёт сохранён для просмотра. Требуется новый Find перед Sync.</small>':'')+
         `<small>Привязано: ${Number(selected.managedModels||0)} · `+
         `Исторических без привязки: ${grouped.filter(g=>!g.managed).length}</small>`+
         `<small>Геометрию обновить: ${Number(selected.geometryPending||0)} моделей · `+
         `Текстуру обновить: ${Number(selected.texturePending||0)} MeshPart</small></div>`+
         `<div class="la-sync-list">${grouped.map(modelLine).join('')||'<small>MeshPart не найдены.</small>'}</div>`:'')+
         `<div class="la-sync-controls"><div class="actions">`+
-        `${button('select-all','Select All · Studio',busy||!grouped.length)}`+
-        `${button('replace-all','Sync All',busy||item.status!=='PUBLISHED', selected&&parts.some(p=>p.managed&&(p.needsMesh||p.needsTexture))?'asset-apply-ready':'')}</div>`+
+        `${button('select-all','Select All · Studio',busy||!grouped.length||reportStale)}`+
+        `${button('replace-all','Sync All',busy||reportStale||item.status!=='PUBLISHED', selected&&parts.some(p=>p.managed&&(p.needsMesh||p.needsTexture))?'asset-apply-ready':'')}</div>`+
         `<small>Sync обновляет только устаревшие ресурсы. При замене Mesh обновляется весь rig модели. `+
         `COL не получает текстуры. Перед изменением Place потребуется подтверждение.</small>`+
         (selected?`<details><summary>История Model / Mesh ID</summary>${inventoryDisplay}</details>`:'')+
@@ -284,6 +286,7 @@ window.game1LocationAssetWorkflow = (() => {
       const result=await window.game1StudioSync.scanLocation(state.slug);
       state.scan={studio:result.studio,modelId:String(item.model_asset_id||''),
         atlasId:String(item.texture_asset_id||''),revision:Number(item.bindingRevision||0)};
+      state.scanStale=false;
       await decoAssetLoad(); // Registered Assets now shows scanned visual Mesh IDs.
       message(`Найдено MeshPart: ${result.studio.foundMeshParts}. `+
         `Без привязки: ${result.studio.unmanagedMeshParts}. Place не изменён.`);
@@ -302,7 +305,7 @@ window.game1LocationAssetWorkflow = (() => {
   async function selectInStudio(partKeys){
     return run('Выделение моделей в Studio',async()=>{
       const item=row(),scan=state.scan;
-      if(!item||!scan||scan.modelId!==String(item.model_asset_id||'')||
+      if(!item||!scan||state.scanStale||scan.modelId!==String(item.model_asset_id||'')||
         scan.atlasId!==String(item.texture_asset_id||'')||
         scan.revision!==Number(item.bindingRevision||0))throw Error('Проверка устарела. Нажми Find.');
       if(!Array.isArray(partKeys)||!partKeys.length||
@@ -317,10 +320,10 @@ window.game1LocationAssetWorkflow = (() => {
     const valid=state.scan&&state.scan.modelId===String(item.model_asset_id||'')&&
       state.scan.atlasId===String(item.texture_asset_id||'')&&
       state.scan.revision===Number(item.bindingRevision||0);
-    if(!valid){
-      state.scan=null;
+    if(!valid||state.scanStale){
+      state.scanStale=true;
       await execute('scan');
-      if(!state.scan)return;
+      if(!state.scan||state.scanStale)return;
     }
     const keys=(state.scan.studio.parts||[]).filter(p=>p.managed&&
       (p.needsMesh||p.needsTexture)).map(p=>p.key);
@@ -335,7 +338,7 @@ window.game1LocationAssetWorkflow = (() => {
   async function attachHistorical(partKey){
     return run('Linking verified historical Model',async()=>{
       const item=row(),scan=state.scan;
-      if(!item||!scan||scan.modelId!==String(item.model_asset_id||'')||
+      if(!item||!scan||state.scanStale||scan.modelId!==String(item.model_asset_id||'')||
         scan.atlasId!==String(item.texture_asset_id||'')||
         scan.revision!==Number(item.bindingRevision||0))throw Error('Scan is stale; Find again');
       const part=(scan.studio.parts||[]).find(p=>p.key===partKey&&!p.managed&&p.attachable);
@@ -346,26 +349,35 @@ window.game1LocationAssetWorkflow = (() => {
         message('Привязка отменена. Place не изменён.');return;
       }
       const token=scan.studio.scanToken;
-      state.scan=null;
+      state.scanStale=true;
       await window.game1StudioSync.attachLocation(state.slug,token,partKey);
       const updated=await window.game1StudioSync.scanLocation(state.slug);
       state.scan={studio:updated.studio,modelId:String(item.model_asset_id||''),
         atlasId:String(item.texture_asset_id||''),revision:Number(item.bindingRevision||0)};
+      state.scanStale=false;
       message(`Модель привязана к ${state.slug}. Геометрия не изменена. Проверь статусы и нажми Sync.`);
     });
+  }
+  async function refreshSyncReport(){
+    const current=row();
+    if(!current)throw Error('Location Asset больше не зарегистрирован');
+    const refreshed=await window.game1StudioSync.scanLocation(state.slug);
+    state.scan={studio:refreshed.studio,modelId:String(current.model_asset_id||''),
+      atlasId:String(current.texture_asset_id||''),revision:Number(current.bindingRevision||0)};
+    state.scanStale=false;
   }
   async function syncSelected(keys){
     return run('Синхронизация моделей',async()=>{
       const item=row(),scan=state.scan;
-      if(!item||!scan||scan.modelId!==String(item.model_asset_id||'')||
+      if(!item||!scan||state.scanStale||scan.modelId!==String(item.model_asset_id||'')||
         scan.atlasId!==String(item.texture_asset_id||'')||
         scan.revision!==Number(item.bindingRevision||0)){
-        throw Error('Publication changed after Find; scan again');
+        throw Error('Отчёт Find устарел; повтори сканирование');
       }
       const pending=new Map((scan.studio.parts||[]).filter(p=>p.managed&&
         (p.needsMesh||p.needsTexture)).map(p=>[p.key,p]));
       if(!Array.isArray(keys)||!keys.length||new Set(keys).size!==keys.length||
-        keys.some(key=>!pending.has(key)))throw Error('Select pending managed MeshParts');
+        keys.some(key=>!pending.has(key)))throw Error('Нет доступных для Sync MeshPart');
       const chosen=keys.map(key=>pending.get(key));
       const mesh=chosen.some(p=>p.needsMesh),texture=chosen.some(p=>p.needsTexture);
       const label=mesh&&texture?'Replace Texture + Mesh':mesh?'Replace Mesh':'Replace Texture';
@@ -375,12 +387,29 @@ window.game1LocationAssetWorkflow = (() => {
         scope+'Сделай резервную копию Place. Продолжить?')){
         message('Sync отменён. Place не изменён.');return;
       }
-      const token=scan.studio.scanToken;
-      state.scan=null; // single-use token, including on failure
-      const result=await window.game1StudioSync.replaceLocation(state.slug,token,keys);
-      message(window.game1StudioSync.locationSummary(state.slug,result.studio)+
-        (result.studio.fullySynced?' Синхронизация завершена.':' Частичное обновление; проверь остаток через Find.'));
-      await decoAssetLoad();await decoAssetShowSyncHistory(state.slug);
+      // The token is single use, but keep the displayed snapshot while Studio
+      // works. If Sync fails, the last report is still readable (stale/locked).
+      state.scanStale=true;
+      let result;
+      try{
+        result=await window.game1StudioSync.replaceLocation(state.slug,scan.studio.scanToken,keys);
+      }catch(error){
+        try{await refreshSyncReport();}
+        catch(_refreshError){state.scanStale=true;}
+        throw error;
+      }
+      const summary=window.game1StudioSync.locationSummary(state.slug,result.studio)+
+        (result.studio.fullySynced?' Синхронизация завершена.':' Частичное обновление.');
+      try{
+        await decoAssetLoad();
+        await decoAssetShowSyncHistory(state.slug);
+        await refreshSyncReport();
+        message(summary+' Список обновлён.');
+      }catch(error){
+        state.scanStale=true;
+        message(summary+' Повторный Find не удался: '+(error?.message||String(error))+
+          '. Старый отчёт сохранён; нажми Find.',true);
+      }
     });
   }
   function startScan(slug){

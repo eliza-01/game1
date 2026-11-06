@@ -6,6 +6,8 @@ local RigSwap = require(script.Parent.StudioManagedRigSwap)
 local History = require(script.Parent.StudioPublishedMeshHistory)
 local Placement = require(script.Parent.DecoAssetPreparation)
 local Physics = require(script.Parent.StudioMeshPhysicsCore)
+local Ownership = require(script.Parent.StudioLocationPlacementOwner)
+local Geometry = require(script.Parent.StudioLocationPlacedGeometry)
 local DecoPlacedAssetSync = {}
 
 local SLUG = "Game1DecoAssetSlug"
@@ -34,23 +36,17 @@ end
 
 local function targets(workspace: Workspace, slug: string): {Model}
     local found = {}
-    local authoring = workspace:FindFirstChild("Game1Authoring")
-    local camera = workspace.CurrentCamera
     for _, descendant in ipairs(workspace:GetDescendants()) do
         if descendant:IsA("Model") and descendant:GetAttribute(SLUG) == slug
-            and tostring(descendant:GetAttribute(INSTANCE) or "") ~= ""
-            and (not authoring or not descendant:IsDescendantOf(authoring))
-            and (not camera or not descendant:IsDescendantOf(camera)) then
-            local ancestor: Instance? = descendant.Parent
-            local nested = false
-            while ancestor and ancestor ~= workspace do
-                if ancestor:IsA("Model") and ancestor:GetAttribute(SLUG) ~= nil then
-                    nested = true
+            and tostring(descendant:GetAttribute(INSTANCE) or "") ~= "" then
+            -- Same ownership resolver as Find. A nested, individually stamped
+            -- asset is valid; its parent grouping Model must not shadow it.
+            for _, part in ipairs(descendant:GetDescendants()) do
+                if part:IsA("MeshPart") and Ownership.ForPart(workspace, part, slug) == descendant then
+                    table.insert(found, descendant)
                     break
                 end
-                ancestor = ancestor.Parent
             end
-            if not nested then table.insert(found, descendant) end
         end
     end
     return found
@@ -139,8 +135,19 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
     for _, root in ipairs(targets(workspace,slug)) do live[root]=true end
     local placed={}
     for _, root in ipairs(preview.roots) do
-        if not live[root] then error("scanned Location instance no longer exists; rescan") end
+        if not live[root] then
+            error("scanned Location placement ownership changed; Find again before Sync")
+        end
         if chosenRoots[root] then table.insert(placed,root) end
+    end
+    -- Ensure that every selected part still resolves to the exact scanned
+    -- owner. A grouping Model, a copied Instance ID, or a moved nested rig
+    -- must never redirect the Sync into an adjacent/parent asset.
+    for part in pairs(chosenParts) do
+        local selectedOwner = Ownership.ForPart(workspace, part, slug)
+        if not selectedOwner or not chosenRoots[selectedOwner] then
+            error("scanned MeshPart ownership changed; Find again before Sync")
+        end
     end
     if #placed<1 then error("no selected managed Location instance; no Place geometry modified") end
     for part, snap in pairs(preview.partStates or {}) do
@@ -192,6 +199,9 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
             local stage, transaction = nil, nil
             local oldParts = meshParts(model)
             if geometry then
+                if Ownership.HasNestedPlacements(model) then
+                    error("nested Location placements must be synced separately; no Place geometry modified")
+                end
                 stage = (published :: Model):Clone()
                 table.insert(staging, stage)
                 -- Same shared managed-rig transaction as Real Estate.
@@ -213,15 +223,12 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                 previousModelId=previousId
                 local previousPublished=loader:loadForMeshInventory(previousId,slug)
                 local good,problem=pcall(function()
-                    previousPublished:ScaleTo(model:GetScale())
-                    stage:ScaleTo(model:GetScale())
-                    local frame=History.Provenance(model,previousPublished)
-                    stage:PivotTo(frame * stage:GetPivot())
-                    local previousChildren,nextChildren=rigChildren(model),rigChildren(stage)
+                    local previousChildren=rigChildren(model)
                     History.VerifyChildren(previousPublished,previousChildren)
+                    local anchor=Geometry.Align(stage,previousPublished,model)
                     Placement.PreparePlaced(stage,row.meshOptions)
-                    transaction = RigSwap.Prepare(model, previousChildren, nextChildren,
-                        {preferredPrimary=stage.PrimaryPart})
+                    transaction = RigSwap.Prepare(model, previousChildren, rigChildren(stage),
+                        {preferredPrimary=anchor})
                 end)
                 previousPublished:Destroy()
                 if not good then error(tostring(problem)) end

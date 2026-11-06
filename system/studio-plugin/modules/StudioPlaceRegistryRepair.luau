@@ -7,9 +7,9 @@ local Repair = {}
 local function safeForWrapper(part: MeshPart): boolean
     -- Parenting parts with external attachments/joints changes their authoring
     -- lifecycle; do not guess which other system owns such connections.
-    if part.Parent:IsA("Model") and part.Parent.PrimaryPart==part then
-        return false -- Don't detach the manually grouped Model's pivot anchor.
-    end
+    -- PrimaryPart is allowed: after wrapping, the MeshPart is still a
+    -- descendant of its grouping Model. Preserve and verify that anchor in
+    -- the wrapping transaction instead of silently skipping the placement.
     for _, child in ipairs(part:GetDescendants()) do
         if child:IsA("JointInstance") or child:IsA("Constraint") then return false end
     end
@@ -88,7 +88,11 @@ function Repair.Apply(refs: {any}, ctx: any): any
             table.insert(eligible,ref)
         end
     end
-    if #eligible==0 then return {changed=0,skipped=blocked} end
+    if #eligible==0 then
+        return {changed=0,skipped=blocked,
+            note=if #blocked>0 then "Repair не изменил Place: причины пропуска в журнале"
+                else "Нет подходящих размещений для Repair"}
+    end
     local recording=ctx.history:TryBeginRecording(ctx.recordingName,"Repair Location Place Registry")
     if not recording then error("Studio Undo recording unavailable; Place unchanged") end
     local undo={}
@@ -102,25 +106,44 @@ function Repair.Apply(refs: {any}, ctx: any): any
             local originalSize=part.Size
             local root=ref.root
             if not root then
-                local groupPivot=if parent:IsA("Model") then parent:GetPivot() else nil
-                local groupWorldPivot=if parent:IsA("Model") then parent.WorldPivot else nil
+                local group=if parent:IsA("Model") then parent else nil
+                local groupPivot=if group then group:GetPivot() else nil
+                local groupWorldPivot=if group then group.WorldPivot else nil
+                local groupPrimary=if group then group.PrimaryPart else nil
                 root=Instance.new("Model")
                 root.Name="_Game1LocationRepairStaging"
+                -- Register rollback BEFORE parenting the wrapper and moving
+                -- the visual part. Even a failed assignment must roll back.
+                local wrapper=root
+                table.insert(undo,function()
+                    if part.Parent==wrapper then part.Parent=parent end
+                    wrapper:Destroy()
+                    if group then
+                        if groupPrimary then
+                            group.PrimaryPart=groupPrimary
+                        elseif groupWorldPivot then
+                            group.WorldPivot=groupWorldPivot
+                        end
+                    end
+                end)
                 root.Parent=parent
                 part.Parent=root
                 root.PrimaryPart=part
-                if groupPivot and parent:IsA("Model") and not parent.PrimaryPart then
-                    -- A manually grouped Model's auto-pivot must not drift
-                    -- when its visual children become standalone placements.
-                    parent.WorldPivot=groupPivot
-                end
-                table.insert(undo,function()
-                    part.Parent=parent
-                    root:Destroy()
-                    if groupWorldPivot and parent:IsA("Model") and not parent.PrimaryPart then
-                        parent.WorldPivot=groupWorldPivot
+                if group then
+                    if groupPrimary then
+                        -- Group PrimaryPart remains the SAME MeshPart, now a
+                        -- descendant through the newly created child Model.
+                        if group.PrimaryPart~=groupPrimary then
+                            group.PrimaryPart=groupPrimary
+                        end
+                    elseif groupPivot then
+                        -- Auto-pivot may change when a direct child is wrapped.
+                        group.WorldPivot=groupPivot
                     end
-                end)
+                    if group.PrimaryPart~=groupPrimary or group:GetPivot()~=groupPivot then
+                        error("grouping Model PrimaryPart/pivot changed during Repair")
+                    end
+                end
                 changed+=1
                 ref.root=root
             end
@@ -147,11 +170,17 @@ function Repair.Apply(refs: {any}, ctx: any): any
             root:SetAttribute("Game1DecoInstanceId",pid)
             root:SetAttribute("Game1DecoAssetSlug",ref.entry.slug)
             root:SetAttribute("Game1DecoRegistryModelAssetId",ref.entry.model)
-            if ref.oldVersion~="" and root:GetAttribute("Game1DecoPublishedModelAssetId")==nil then
+            -- The copied model may carry metadata from a DIFFERENT asset.
+            -- The confirmed complete published Mesh ID inventory takes
+            -- precedence during explicit Repair. Never keep a false old Model
+            -- ID: downstream geometry Sync would load the wrong source rig.
+            if ref.oldVersion~="" then
                 root:SetAttribute("Game1DecoPublishedModelAssetId",ref.oldVersion)
             end
             if ref.oldVersion==ref.entry.model and ref.entry.sha~="" then
                 root:SetAttribute("Game1DecoPublishedModelSha256",ref.entry.sha)
+            else
+                root:SetAttribute("Game1DecoPublishedModelSha256",nil)
             end
             rename(root,ref.entry.slug,pid)
             -- A single visual MeshPart has the same public name as its Location

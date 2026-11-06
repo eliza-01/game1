@@ -8637,6 +8637,38 @@
       ]
     },
     {
+      "atlasKey": "bush_01",
+      "baseKey": "bush",
+      "version": "01",
+      "variants": [
+        {
+          "id": 33,
+          "family_id": 27,
+          "width": 256,
+          "height": 256,
+          "filename": "bush_01_256x256_atlas.png",
+          "original_filename": "bush_01_256x256_atlas.png",
+          "source_path": "assets/source/texture-atlases/bush_01/256x256/bush_01_256x256_atlas.png",
+          "source_sha256": "8efc8a08db2158b374959aa71e8be7bb1043e03b0af6f9ee6dd4b9e9de36babc",
+          "uses_alpha": true,
+          "published_id": "95618035804245",
+          "published_sha256": "8efc8a08db2158b374959aa71e8be7bb1043e03b0af6f9ee6dd4b9e9de36babc",
+          "moderation_state": "Reviewing",
+          "published_at": 1793931507.5976868,
+          "created_at": 1793931502.6602368,
+          "retired_at": null,
+          "atlas_key": "bush_01",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "256x256",
+          "baseKey": "bush",
+          "version": "01"
+        }
+      ]
+    },
+    {
       "atlasKey": "campfire_01",
       "baseKey": "campfire",
       "version": "01",
@@ -9519,6 +9551,22 @@
       "atlasName": "blossom_tree",
       "atlasVersion": "01",
       "atlasResolution": "2048×2048"
+    },
+    {
+      "reference": "atlas:33",
+      "label": "bush_01",
+      "slug": "",
+      "filename": "bush_01_256x256_atlas.png",
+      "group": "atlas",
+      "category": "",
+      "categoryLabel": "",
+      "path": "assets/source/texture-atlases/bush_01/256x256/bush_01_256x256_atlas.png",
+      "sha256": "8efc8a08db2158b374959aa71e8be7bb1043e03b0af6f9ee6dd4b9e9de36babc",
+      "assetId": "95618035804245",
+      "atlasKey": "bush_01",
+      "atlasName": "bush",
+      "atlasVersion": "01",
+      "atlasResolution": "256×256"
     },
     {
       "reference": "atlas:27",

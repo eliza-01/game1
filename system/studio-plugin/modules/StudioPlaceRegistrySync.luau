@@ -5,6 +5,7 @@ local RigSwap=require(script.Parent.StudioManagedRigSwap)
 local History=require(script.Parent.StudioPublishedMeshHistory)
 local Texture=require(script.Parent.StudioTextureAppearance)
 local Physics=require(script.Parent.StudioMeshPhysicsCore)
+local Geometry=require(script.Parent.StudioLocationPlacedGeometry)
 local Sync={}
 
 local function visuals(root: Instance): {MeshPart}
@@ -27,81 +28,6 @@ local function rigChildren(root: Model): {Instance}
     return result
 end
 
-local function safeSimpleStage(stage: Model, oldPublished: Model): boolean
-    if #visuals(stage)~=1 or #visuals(oldPublished)~=1 then return false end
-    for _,model in ipairs({stage,oldPublished}) do
-        for _,child in ipairs(model:GetDescendants()) do
-            if child:IsA("Bone") or child:IsA("JointInstance")
-                or child:IsA("Constraint") or child:IsA("WrapLayer") then return false end
-        end
-    end
-    return true
-end
-
-local function adaptSingle(stage: Model, source: MeshPart, target: MeshPart, oldSource: MeshPart)
-    -- Preserve the placement's authored, potentially non-uniform *scale* relative
-    -- to the immutable OLD published Mesh. Never assume new and old asset sizes
-    -- are identical. Only unrigged geometry is supported here.
-    local sx=target.Size.X/oldSource.Size.X
-    local sy=target.Size.Y/oldSource.Size.Y
-    local sz=target.Size.Z/oldSource.Size.Z
-    if math.min(sx,sy,sz)<0.001 or math.max(sx,sy,sz)>1000 then
-        error("unsupported legacy MeshPart scale")
-    end
-    local sourceFrame=source.CFrame
-    local sizes={}
-    for _,child in ipairs(stage:GetDescendants()) do
-        if child:IsA("BasePart") then
-            local localFrame=sourceFrame:ToObjectSpace(child.CFrame)
-            local pos=localFrame.Position
-            sizes[child]={size=Vector3.new(child.Size.X*sx,child.Size.Y*sy,child.Size.Z*sz),
-                frame=target.CFrame*CFrame.new(pos.X*sx,pos.Y*sy,pos.Z*sz)*localFrame.Rotation}
-        end
-    end
-    for part,value in pairs(sizes) do
-        part.Size=value.size
-        part.CFrame=value.frame
-    end
-    -- Authoring pivot may be nonzero. Anchor by the placed MeshPart's CFrame,
-    -- not by the containing hand-made grouping Model pivot.
-    RigSwap.AlignToAnchor(stage,source,target:GetPivot(),"Location legacy anchor")
-end
-
-local function verifyMultiPartSizes(oldPublished: Model, placed: Model)
-    -- Different importer paths are allowed, but changed per-part sizes are not
-    -- silently discarded in a multi-part/skinned rig replacement.
-    local expected,actual={},{}
-    local function gather(model: Model, output: any)
-        for _,part in ipairs(model:GetDescendants()) do
-            if part:IsA("MeshPart") then
-                local mesh=History.Id(part.MeshId)
-                output[mesh]=output[mesh] or {}
-                table.insert(output[mesh],part.Size)
-            end
-        end
-    end
-    gather(oldPublished,expected)
-    gather(placed,actual)
-    for mesh,sizes in pairs(expected) do
-        local located=actual[mesh]
-        if not located or #located~=#sizes then error("legacy rig size count changed") end
-        local function order(list)
-            table.sort(list,function(a,b)
-                if a.X~=b.X then return a.X<b.X end
-                if a.Y~=b.Y then return a.Y<b.Y end
-                return a.Z<b.Z
-            end)
-        end
-        order(located)
-        order(sizes)
-        for i,size in ipairs(sizes) do
-            if (size-located[i]).Magnitude>0.05 then
-                error("custom multi-part scaling requires manual inspection; no Place mutation")
-            end
-        end
-    end
-end
-
 local function stageRig(ref: any, ctx: any): any
     local root=ref.root
     if not root or root.Parent==nil then error("Repair this placement first") end
@@ -114,19 +40,8 @@ local function stageRig(ref: any, ctx: any): any
         local oldParts=rigChildren(root)
         History.VerifyChildren(previous,oldParts)
         if #oldParts==0 then error("no managed geometry children") end
-        local candidate=visuals(stage)
-        if safeSimpleStage(stage,previous) and #ref.visuals==1 then
-            adaptSingle(stage,candidate[1],ref.part,visuals(previous)[1])
-        else
-            -- Existing multi-part/skinned route: preserve the full published
-            -- rig and use its immutable old-version authored provenance.
-            previous:ScaleTo(root:GetScale())
-            verifyMultiPartSizes(previous,root)
-            stage:ScaleTo(root:GetScale())
-            local authored=History.Provenance(root,previous)
-            stage:PivotTo(authored*stage:GetPivot())
-        end
-        return RigSwap.Prepare(root,oldParts,rigChildren(stage),{preferredPrimary=stage.PrimaryPart or candidate[1]})
+        local anchor=Geometry.Align(stage,previous,root)
+        return RigSwap.Prepare(root,oldParts,rigChildren(stage),{preferredPrimary=anchor})
     end)
     previous:Destroy()
     if not good then stage:Destroy();error(tostring(result)) end

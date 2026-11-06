@@ -56,8 +56,8 @@ class M221InPlaceGeometry(TestCase):
         deco = self.source('system/studio-plugin/modules/DecoPlacedAssetSync.luau')
         helper = self.source('system/studio-plugin/modules/StudioManagedRigSwap.luau')
         self.assertIn('stage = (published :: Model):Clone()', deco)
-        self.assertIn('stage:ScaleTo(model:GetScale())', deco)
-        self.assertIn('History.Provenance(model,previousPublished)', deco)
+        self.assertIn('Geometry.Align(stage,previousPublished,model)', deco)
+        self.assertIn('Geometry.Align(stage,previousPublished,model)', deco)
         self.assertIn('rigChildren(stage)', deco)
         self.assertIn('for _, child in ipairs(plan.incoming) do child.Parent = plan.root end', helper)
         self.assertNotIn('WrapLayer', helper)
@@ -66,7 +66,7 @@ class M221InPlaceGeometry(TestCase):
 
     def test_preflight_before_mutation_and_audit_after_commit(self):
         deco = self.source('system/studio-plugin/modules/DecoPlacedAssetSync.luau')
-        prep = deco.index('RigSwap.Prepare(model, previousChildren, nextChildren,')
+        prep = deco.index('RigSwap.Prepare(model, previousChildren, rigChildren(stage),')
         commit = deco.index('RigSwap.Commit(item.swap)')
         stamp = deco.index('model:SetAttribute("Game1DecoPublishedModelSha256", publishedSha)', commit)
         self.assertLess(prep, commit)

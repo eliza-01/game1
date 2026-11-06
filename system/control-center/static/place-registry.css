@@ -61,6 +61,7 @@
 #place-registry-view .pr-action-info small{color:var(--muted);line-height:1.45}
 #place-registry-view .pr-action-info .pr-state{color:var(--mint);font-size:12px}
 #place-registry-view .pr-action-info .pr-state-undone{color:var(--muted)}
+#place-registry-view .pr-action-info .pr-log-skipped{color:var(--orange);white-space:normal;overflow-wrap:anywhere}
 #place-registry-view .pr-revision-details{font-size:11px;max-height:360px;overflow:auto;
     white-space:pre-wrap;word-break:break-word;margin-top:10px}
 @media(max-width:680px){

@@ -49,6 +49,9 @@ from studio_save import request_active_studio_save
 from character_core.identity import CharacterIdentityService
 from studio_bridge import run_model_load_bridge, run_monster_spawn_bridge, run_timeline_editor_bridge, run_location_authoring_bridge
 from services.studio_deco_bridge import run_deco_refresh_bridge
+from services.studio_place_registry_bridge import run_place_registry_bridge
+from services.place_registry.coordinator import LocationPlaceRegistry
+from services.place_registry.revisions import PlaceRevisionStore
 from services.location_asset_sync_history import LocationAssetSyncHistory
 from services.mysql_asset_replacement_audit import MySqlAssetReplacementAudit, MySqlAuditConfig
 from services.sqlite_asset_audit_importer import SqliteAssetAuditImporter
@@ -100,6 +103,7 @@ timelines = TimelineStore(ROOT, store, animations, monsters, monster_animations)
 locations = LocationStore(ROOT, run_location_authoring_bridge)
 location_assets = LocationAssetStore(ROOT)
 location_asset_sync_history = LocationAssetSyncHistory(ROOT, database=asset_audit_repository)
+place_registry = LocationPlaceRegistry(location_assets, PlaceRevisionStore(ROOT), run_place_registry_bridge)
 real_estate = RealEstateStore(ROOT, location_assets=location_assets)
 real_estate_placements = RealEstatePlacementStore(ROOT, real_estate)
 real_estate.placement_store = real_estate_placements
@@ -162,6 +166,7 @@ READ_SOURCES = MappingProxyType({
     "weapons": weapons, "monsters": monsters, "monster_animations": monster_animations,
     "npcs": npcs, "npc_animations": npc_animations, "npc_equipment": npc_equipment,
     "location_assets": location_assets, "location_asset_sync_history": location_asset_sync_history,
+    "place_registry": place_registry,
     "asset_replacement_audit": asset_replacement_audit, "real_estate": real_estate,
     "real_estate_placements": real_estate_placements,
     "real_estate_publications": real_estate_publications, "npc_spawns": npc_spawns,
@@ -205,6 +210,7 @@ WRITE_SOURCES = MappingProxyType({
     "location_asset_sync_history": location_asset_sync_history,
     "asset_replacement_audit": asset_replacement_audit,
     "sync_location_assets_to_studio": run_deco_refresh_bridge,
+    "place_registry": place_registry,
     "locations": locations,
     "monster_animations": monster_animations,
     "monster_spawns": monster_spawns,

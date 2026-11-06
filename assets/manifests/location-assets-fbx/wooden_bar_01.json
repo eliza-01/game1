@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "slug": "wooden_bar_01",
+  "sourceSha256": "68102dbe1dd310487c40a8d4d31226851523f26ec78fa8fb91d344fbc49dc014",
+  "analysis": {
+    "schemaVersion": 1,
+    "meshes": [
+      {
+        "name": "wooden_bar_01",
+        "armature": "",
+        "vertices": 24,
+        "bones": [],
+        "influencedBones": [],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": null,
+          "canQuery": null,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": null,
+          "physicsOnly": false
+        }
+      }
+    ],
+    "hasCollider": false,
+    "armatures": [],
+    "unassignedArmatures": []
+  }
+}

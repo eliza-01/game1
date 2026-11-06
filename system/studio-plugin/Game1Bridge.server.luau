@@ -17,6 +17,7 @@ local StudioActorSpawnCommands = require(script.Parent.modules.StudioActorSpawnC
 local StudioTimelineEditorCommands = require(script.Parent.modules.StudioTimelineEditorCommands)
 local DecoManager = require(script.Parent.modules.DecoManager)
 local StudioDecoSyncCommands = require(script.Parent.modules.StudioDecoSyncCommands)
+local StudioPlaceRegistryCommands = require(script.Parent.modules.StudioPlaceRegistryCommands)
 local StudioCharacterTestStand = require(script.Parent.modules.StudioCharacterTestStand)
 local StudioHousePlacementCapture = require(script.Parent.modules.StudioHousePlacementCapture)
 local StudioHousePlacementPreview = require(script.Parent.modules.StudioHousePlacementPreview)
@@ -146,6 +147,17 @@ local handleDecoRefresh = StudioDecoSyncCommands({
     bridgeToken = BRIDGE_TOKEN,
 })
 
+local handlePlaceRegistry = StudioPlaceRegistryCommands({
+    HttpService = HttpService,
+    Workspace = Workspace,
+    Selection = Selection,
+    ChangeHistoryService = ChangeHistoryService,
+    RunService = RunService,
+    decoManager = decoManager,
+    bridgeUrl = BRIDGE_URL,
+    bridgeToken = BRIDGE_TOKEN,
+})
+
 local handleHousePlacementCapture = StudioHousePlacementCapture({
     HttpService = HttpService,
     Selection = Selection,
@@ -183,6 +195,8 @@ local function pollBridge()
         locationCommands.handle(data)
     elseif data.command == "deco-refresh" then
         handleDecoRefresh(data)
+    elseif data.command == "location-place-registry" then
+        handlePlaceRegistry(data)
     elseif data.command == "house-placement-capture-v2" then
         handleHousePlacementCapture(data)
     elseif data.command == "house-placement-preview-v4" then handleHousePlacementPreview(data)

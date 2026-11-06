@@ -40,6 +40,11 @@
       "StudioDecoSyncCommands": {
         "$path": "modules/StudioDecoSyncCommands.luau"
       },
+      "StudioPlaceRegistryCommands": {"$path": "modules/StudioPlaceRegistryCommands.luau"},
+      "StudioPlaceRegistryInventory": {"$path": "modules/StudioPlaceRegistryInventory.luau"},
+      "StudioLocationMeshNames": {"$path": "modules/StudioLocationMeshNames.luau"},
+      "StudioPlaceRegistryRepair": {"$path": "modules/StudioPlaceRegistryRepair.luau"},
+      "StudioPlaceRegistrySync": {"$path": "modules/StudioPlaceRegistrySync.luau"},
       "NpcSpawnPreview": {
         "$path": "modules/NpcSpawnPreview.luau"
       },

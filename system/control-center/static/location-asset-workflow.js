@@ -2,7 +2,7 @@
  * Atlas presentation/selection is the SAME consumer editor as Real Estate.
  */
 window.game1LocationAssetWorkflow = (() => {
-  const state={slug:'',tab:'model',busy:false,result:'',error:false,
+  const state={slug:'',tab:'model',busy:false,result:'',error:false,manualSlug:false,identityDraft:null,
     pendingModel:'',inspection:null,meshOptions:{},physicsDirty:false,scan:null,
     atlas:window.game1ConsumerAtlasEditor.newState()};
   const shell=window.game1AssetWorkflowDialog;
@@ -11,7 +11,7 @@ window.game1LocationAssetWorkflow = (() => {
   const button=(action,label,disabled=false,css='')=>
     `<button type="button" class="${css}" data-la-action="${action}" ${disabled?'disabled':''}>${label}</button>`;
   const dialog=()=>shell.ensure('location-asset-edit-dialog','Manage Location Asset',()=>{
-    state.slug='';state.pendingModel='';state.scan=null;state.atlas=window.game1ConsumerAtlasEditor.newState();
+    state.slug='';state.pendingModel='';state.scan=null;state.identityDraft=null;state.atlas=window.game1ConsumerAtlasEditor.newState();
   });
   const close=()=>{const d=document.getElementById('location-asset-edit-dialog');if(d?.open)d.close();};
   function open(slug,initialTab='identity'){
@@ -19,7 +19,7 @@ window.game1LocationAssetWorkflow = (() => {
     if(!item)return toast('Location Asset no longer exists; refresh.',true);
     if(state.busy)return toast('Finish the current operation first.',true);
     const d=dialog();if(d.open && state.slug!==slug)d.close();
-    state.slug=slug;state.tab=initialTab;state.busy=false;state.scan=null;state.pendingModel='';
+    state.slug=slug;state.tab=initialTab;state.busy=false;state.scan=null;state.pendingModel='';state.manualSlug=false;state.identityDraft=null;
     state.inspection=item.fbxAnalysis||null;
     state.meshOptions=window.game1MeshAuthoring.seeded(state.inspection,item.meshOptions||{});
     state.physicsDirty=false;state.atlas=window.game1ConsumerAtlasEditor.newState();
@@ -51,12 +51,15 @@ window.game1LocationAssetWorkflow = (() => {
     const tabs=[{id:'identity',label:'Identity'},{id:'model',label:'Model · FBX'},
       {id:'atlas',label:'Texture · atlas'}];
     const card=(name,description,content,status='',css='ready')=>shell.step(name,description,content,status,css);
+    const identityData=state.identityDraft||{nameEn:item.name_en,slug:item.slug,
+      category:item.category,destructible:Boolean(item.destructible)};
     const identity=card('Registration details','Metadata changes never publish assets or modify Studio.',
-      `<div class="deco-manage-fields"><label>Name<input data-la-name maxlength="120" value="${e(item.name_en)}"></label>`+
-      `<label>Slug<input readonly value="${e(item.slug)}"></label>`+
+      `<div class="deco-manage-fields"><label>Name<input data-la-name maxlength="120" value="${e(identityData.nameEn)}"></label>`+
+      `<label>Slug<input data-la-slug maxlength="64" pattern="[a-z0-9_]+" value="${e(identityData.slug)}"></label>`+
+      `<small class="muted">Изменение slug сохраняет опубликованные ID и историю. После переименования Place Registry покажет старые экземпляры для Repair.</small>`+
       `<label>Category<select data-la-category>${(decoAssetState.data?.options?.categories||[]).map(c=>
-        `<option value="${e(c.id)}" ${c.id===item.category?'selected':''}>${e(c.label)}</option>`).join('')}</select></label>`+
-      `<label class="deco-policy-toggle"><input type="checkbox" data-la-destructible ${item.destructible?'checked':''}> Destructible</label></div>`+
+        `<option value="${e(c.id)}" ${c.id===identityData.category?'selected':''}>${e(c.label)}</option>`).join('')}</select></label>`+
+      `<label class="deco-policy-toggle"><input type="checkbox" data-la-destructible ${identityData.destructible?'checked':''}> Destructible</label></div>`+
       `<div class="actions">${button('save-identity','Apply Changes',busy)}${button('delete','Retire asset',busy)}</div>`,
       `Revision ${Number(item.revision||0)}`);
     const inspection=state.inspection;
@@ -174,6 +177,20 @@ window.game1LocationAssetWorkflow = (() => {
     d.querySelector('[data-la-close]').onclick=()=>{if(!busy)d.close();};
     d.querySelectorAll('[data-la-tab]').forEach(b=>b.onclick=()=>{if(!busy){state.tab=b.dataset.laTab;render();}});
     d.querySelectorAll('[data-la-action]').forEach(b=>b.onclick=()=>execute(b.dataset.laAction));
+    const nameInput=d.querySelector('[data-la-name]');
+    const slugInput=d.querySelector('[data-la-slug]');
+    if(nameInput&&slugInput){
+      const updateDraft=()=>{state.identityDraft={nameEn:nameInput.value,
+        slug:slugInput.value,category:d.querySelector('[data-la-category]').value,
+        destructible:d.querySelector('[data-la-destructible]').checked};};
+      slugInput.oninput=()=>{state.manualSlug=true;updateDraft();};
+      nameInput.oninput=()=>{
+        if(!state.manualSlug)slugInput.value=decoAssetSlugify(nameInput.value);
+        updateDraft();
+      };
+      d.querySelector('[data-la-category]').onchange=updateDraft;
+      d.querySelector('[data-la-destructible]').onchange=updateDraft;
+    }
     d.querySelectorAll('[data-la-action="select-studio"]').forEach(b=>{
       b.onclick=()=>selectInStudio([b.closest('[data-la-model-key]').dataset.laModelKey]);
     });
@@ -202,13 +219,37 @@ window.game1LocationAssetWorkflow = (() => {
   async function execute(action){
     const item=row();if(!item)return;
     if(action==='delete')return decoAssetDelete(state.slug);
-    if(action==='save-identity')return run('Applying metadata',async()=>{
-      const d=dialog();await decoAssetSaveEdits(state.slug,{
-        nameEn:d.querySelector('[data-la-name]').value.trim(),
+    if(action==='save-identity'){
+      // Capture the user's edits BEFORE run() re-renders the modal as busy.
+      const d=dialog();
+      const nextSlug=d.querySelector('[data-la-slug]').value.trim().toLowerCase();
+      const data={nameEn:d.querySelector('[data-la-name]').value.trim(),
         category:d.querySelector('[data-la-category]').value,
-        destructible:d.querySelector('[data-la-destructible]').checked},item.revision);
-      message('Metadata updated. No publication or Studio changes.');
-    });
+        destructible:d.querySelector('[data-la-destructible]').checked};
+      return run('Applying metadata',async()=>{
+      if(!/^[a-z0-9][a-z0-9_]{0,63}$/.test(nextSlug))throw Error('Slug: только a-z, 0-9 и _, не больше 64 символов');
+      if(!data.nameEn)throw Error('Название не может быть пустым');
+      if(nextSlug!==state.slug){
+        if(!window.confirm(`Изменить slug ${state.slug} → ${nextSlug}?\n`+
+          `Model/Mesh/Atlas ID не меняются. Исторические экземпляры сохраняются; `+
+          `Place Registry потребует Repair для обновления имён и атрибутов.`)){
+          message('Переименование отменено.');return;
+        }
+        const changed=await request(`/api/location-assets/${encodeURIComponent(state.slug)}/rename-identity`,{
+          method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({...data,slug:nextSlug,expectedRevision:Number(item.revision)}),
+        });
+        state.slug=changed.slug;state.manualSlug=false;state.identityDraft=null;state.scan=null;
+        await decoAssetLoad();await decoAssetShowSyncHistory(state.slug);
+        message(`Slug обновлён: ${changed.previousSlug} → ${changed.slug}. `+
+          'Place Registry распознаёт старые Mesh ID. Выполни Scan, затем Repair имён размещений.');
+      }else{
+        await decoAssetSaveEdits(state.slug,data,item.revision);
+        state.manualSlug=false;state.identityDraft=null;
+        message('Метаданные обновлены. Публикация и Studio не изменены.');
+      }
+      });
+    }
     if(action==='choose-fbx')return run('Inspecting FBX',async()=>{
       const chosen=await request('/api/files/choose-location-asset-model',{method:'POST'});
       if(!chosen?.path){message('FBX selection cancelled.');return;}

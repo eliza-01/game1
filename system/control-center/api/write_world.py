@@ -12,6 +12,20 @@ from services.mesh_authoring_policy import is_collision_mesh
 
 
 def route(path, body, deps):
+    if path == '/api/location-place-registry':
+        try:
+            payload = body()
+            if not isinstance(payload, dict):
+                raise ValueError('invalid Location Place Registry request')
+            phase = str(payload.get('phase') or '')
+            token = str(payload.get('scanToken') or '')
+            keys = payload.get('keys')
+            return 200, {'studio': deps['place_registry'].operate(
+                phase, scan_token=token, keys=keys,
+                **({'action_id': payload.get('actionId')} if phase == 'undo' else {}))}
+        except (ValueError, OSError, RuntimeError, KeyError) as error:
+            return 400, {'error': str(error)}
+
     if not path.startswith(('/api/texture-atlases', '/api/location-assets', '/api/npc-spawns', '/api/monster-spawns', '/api/options', '/api/locations', '/api/timelines',)):
         return None
 
@@ -428,6 +442,16 @@ def route(path, body, deps):
     # M233: explicit, single-resource endpoint. Old Host Agents cannot accept
     # it as an ambiguous /publish request. Atlas publication uses only the
     # separate /api/texture-atlases/variants/<id>/publish route.
+    # M242: identity migration is atomic and independent of FBX/Atlas publication.
+    # Never route a slug change through create-only registration.
+    location_asset_rename_suffix = "/rename-identity"
+    if path.startswith(location_asset_prefix) and path.endswith(location_asset_rename_suffix):
+        slug = unquote(path[len(location_asset_prefix):-len(location_asset_rename_suffix)].strip('/'))
+        try:
+            return out(200, location_assets.rename_identity(slug, body()))
+        except (ValueError, OSError, RuntimeError) as error:
+            return out(400, {'error': str(error)})
+
     location_asset_model_suffix = "/publish-model"
     if path.startswith(location_asset_prefix) and path.endswith(location_asset_model_suffix):
         slug = unquote(path[len(location_asset_prefix):-len(location_asset_model_suffix)].strip("/"))

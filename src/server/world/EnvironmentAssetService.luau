@@ -84,7 +84,13 @@ local function registerModel(model: Model, deferRebuild: boolean?)
         return
     end
 
+    -- Slugs may change in Asset Manager without modifying an authored Place.
+    -- Historical aliases resolve to the current immutable published definition.
     local definition = LocationAssetRegistry.assets[locationAssetId]
+    if definition == nil then
+        local aliases = LocationAssetRegistry.aliases or {}
+        definition = LocationAssetRegistry.assets[aliases[locationAssetId]]
+    end
     if type(definition) ~= "table" or tostring(definition.status or "") ~= "PUBLISHED" then
         warn(("[game1][environment] placed asset %s references unknown/unpublished location asset %s")
             :format(model:GetFullName(), locationAssetId))

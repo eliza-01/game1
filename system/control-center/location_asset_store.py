@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 
 from sqlite_connection import connect as connect_sqlite
 from services.texture_alpha import texture_uses_alpha
+from services import location_asset_rename
 from services.location_fbx_inspection import inspect as inspect_location_fbx
 from services.mesh_authoring_policy import normalize_location_options
 from services.texture_atlas_registry import AtlasRegistry, parse_filename
@@ -147,6 +148,11 @@ class LocationAssetStore:
                 with sqlite3.connect(str(backup)) as saved:
                     connection.backup(saved)
                 connection.execute("ALTER TABLE location_assets ADD COLUMN mesh_options_json TEXT NOT NULL DEFAULT '{}'")
+            connection.execute("""CREATE TABLE IF NOT EXISTS location_asset_slug_aliases(
+                old_slug TEXT PRIMARY KEY,
+                current_slug TEXT NOT NULL,
+                renamed_at REAL NOT NULL
+            )""")
             # Owner-era texture columns remain readable only until the M203
             # atlas migration drops them; never mutate old Image Asset IDs.
 
@@ -171,6 +177,16 @@ class LocationAssetStore:
             for chunk in iter(lambda: stream.read(1024 * 1024), b""):
                 digest.update(chunk)
         return digest.hexdigest()
+
+    @staticmethod
+    def options_category_ids() -> tuple[str, ...]:
+        return CATEGORIES
+
+    def aliases_for(self, slug: str) -> list[str]:
+        return location_asset_rename.aliases(self, slug)
+
+    def rename_identity(self, old_slug: str, payload: dict) -> dict:
+        return location_asset_rename.rename(self, old_slug, payload)
 
     def options(self) -> dict:
         return {
@@ -212,7 +228,13 @@ class LocationAssetStore:
     def _fbx_analysis(self, row: dict) -> dict | None:
         path = self._analysis_path(row['slug'])
         if not path.is_file():
-            return None
+            for alias in reversed(self.aliases_for(row['slug'])):
+                candidate = self._analysis_path(alias)
+                if candidate.is_file():
+                    path = candidate
+                    break
+            else:
+                return None
         try:
             document = json.loads(path.read_text(encoding='utf-8'))
         except (OSError, UnicodeError, json.JSONDecodeError):
@@ -341,6 +363,11 @@ class LocationAssetStore:
             raise ValueError("location asset slug must be lowercase snake_case")
         if old is None:
             old = self._raw_get(slug)
+        if old is None:
+            with self.connect() as db:
+                if db.execute('SELECT 1 FROM location_asset_slug_aliases WHERE old_slug=?',
+                              (slug,)).fetchone():
+                    raise ValueError('slug belongs to a renamed Location Asset; reserved for history')
         # Registration and editing have separate authoring contracts. A stale
         # editor must never accidentally create a new asset or overwrite an
         # unrelated slug that somebody registered in another tab.
@@ -607,10 +634,14 @@ class LocationAssetStore:
 
     def snapshot(self) -> dict:
         items = self.list()
+        with self.connect() as db:
+            aliases = {row['old_slug']: row['current_slug'] for row in db.execute(
+                'SELECT old_slug,current_slug FROM location_asset_slug_aliases ORDER BY old_slug')}
         return {
             "schemaVersion": SCHEMA_VERSION,
             "project": PROJECT,
             "options": self.options(),
+            "aliases": aliases,
             "atlases": self.atlases.catalog(),
             "items": items,
             "summary": {
@@ -668,5 +699,8 @@ class LocationAssetStore:
                 f"\t\t\tmeshOptions = {self._lua_value(row.get('meshOptions') or {})},",
                 "\t\t}),",
             ])
+        lines.extend(["\t}),", "\taliases = table.freeze({"])
+        for old_slug, new_slug in sorted(snapshot.get('aliases', {}).items()):
+            lines.append(f"\t\t[{self._lua_string(old_slug)}] = {self._lua_string(new_slug)},")
         lines.extend(["\t}),", "})", ""])
         registry_path.write_text("\n".join(lines), encoding="utf-8")

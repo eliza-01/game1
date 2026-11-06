@@ -1,5 +1,6 @@
 local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
 local MeshPhysics = require(script.Parent.StudioMeshPhysicsCore)
+local MeshNames = require(script.Parent.StudioLocationMeshNames)
 local DecoAssetLoader = {}
 DecoAssetLoader.__index = DecoAssetLoader
 
@@ -117,6 +118,7 @@ function DecoAssetLoader:loadPublished(row: any): Model
     sanitize(model)
     applyTexture(model, tostring(row.texture_asset_id or ""), row.textureUsesAlpha)
     MeshPhysics.ApplyLocationModel(model, nil, row.meshOptions)
+    MeshNames.Normalize(model, tostring(row.slug or ""))
     return model
 end
 

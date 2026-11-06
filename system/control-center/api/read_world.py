@@ -46,6 +46,39 @@ def route(parsed, sources, info):
         except (ValueError, OSError) as error:
             return 400, {'error': str(error)}
 
+    if path == '/api/location-place-registry/actions':
+        try:
+            limit = int((parse_qs(parsed.query).get('limit') or ['40'])[0])
+            return 200, {'actions': sources['place_registry'].action_journal(limit)}
+        except (ValueError, OSError) as error:
+            return 400, {'error': str(error)}
+
+    if path == '/api/location-place-registry/diff':
+        try:
+            query = parse_qs(parsed.query)
+            before = int((query.get('before') or ['0'])[0])
+            after = int((query.get('after') or ['0'])[0])
+            return 200, sources['place_registry'].diff(before, after)
+        except (ValueError, OSError) as error:
+            return 400, {'error': str(error)}
+
+    if path == "/api/location-place-registry/revisions":
+        try:
+            query = parse_qs(parsed.query)
+            limit = int((query.get('limit') or ['20'])[0])
+            return 200, {'revisions': sources['place_registry'].revisions_page(limit)}
+        except (ValueError, OSError) as error:
+            return 400, {'error': str(error)}
+
+    if path.startswith('/api/location-place-registry/revisions/'):
+        try:
+            identifier = path.rsplit('/', 1)[-1]
+            if not identifier.isdigit():
+                raise ValueError('invalid revision ID')
+            return 200, sources['place_registry'].revision(int(identifier))
+        except (ValueError, OSError) as error:
+            return 400, {'error': str(error)}
+
     if path == "/api/location-assets/studio-history":
         try:
             query = parse_qs(parsed.query)

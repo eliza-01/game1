@@ -12,6 +12,7 @@
 <link rel="stylesheet" href="asset-section-order.css?v=1">
 <link rel="stylesheet" href="character-animations.css?v=1">
 <link rel="stylesheet" href="location-assets.css?v=1">
+<link rel="stylesheet" href="place-registry.css?v=241">
 <link rel="stylesheet" href="character-components.css?v=6">
 <link rel="stylesheet" href="character-assemblies.css?v=4">
 <link rel="stylesheet" href="deco-assets.css?v=237">
@@ -34,6 +35,7 @@
 <button id="nav-monsters" class="asset-section" type="button"><b>monsters</b><small>rigs · stats · animations</small></button>
 <button id="nav-locations" class="asset-section" type="button"><b>locations</b><small>polygon registry · studio authoring</small></button>
 <button id="nav-location-assets" class="asset-section" type="button"><b>location assets</b><small>trees · bushes · rocks · lights · fences · decorations · ladders · flowers · buildings · props</small></button>
+<button id="nav-place-registry" class="asset-section" type="button"><b>place registry</b><small>location assets · audit · repair · revisions</small></button>
 <button id="nav-database" class="asset-section" type="button"><b>database</b><small>asset audit · ID history</small></button>
 <div id="database-nav" class="database-subnav" hidden><button id="nav-asset-audit" type="button" class="database-subnav-item">Asset History</button></div>
 <button id="nav-atlas" class="asset-section" type="button"><b>atlas</b><small>variants · consumers · retirement</small></button>
@@ -407,6 +409,51 @@
 </div>
 </div>
 
+<div id="place-registry-view" hidden>
+  <div class="panel hero pr-hero"><div><span class="eyebrow">Location Assets · учёт декораций</span>
+    <h2>Place Registry</h2>
+    <p>Ревизия только зарегистрированных Location Assets. Поиск по Mesh ID и истории публикаций.
+       Прочие объекты Place не затрагиваются.</p></div></div>
+
+  <div class="panel place-registry-panel pr-toolbar">
+    <div class="section-title"><div><span>01 · Контроль</span><h3>Инвентаризация и действия</h3></div></div>
+    <label class="pr-backup"><input id="pr-backup" type="checkbox">
+      <span>Бэкап Place (.rbxl) сделан. Разрешаю Repair и Sync.</span></label>
+    <div class="pr-toolbar-actions actions">
+      <button id="pr-scan" class="primary" type="button">Scan Place</button>
+      <button id="pr-select-all" type="button" disabled>Select All · Studio</button>
+      <button id="pr-repair-all" type="button" disabled>Repair All</button>
+      <button id="pr-sync-all" type="button" disabled>Sync All</button>
+    </div>
+    <label class="pr-auto"><input type="checkbox" id="pr-auto-scan">
+      <span>Автопроверка раз в 10 минут (только Scan, пока открыт раздел)</span></label>
+    <div id="pr-action-status" class="pr-feedback" role="status" aria-live="polite"></div>
+    <div id="pr-status" role="status" aria-live="polite" class="hint">Нажми Scan Place для первой ревизии.</div>
+  </div>
+
+  <div class="panel place-registry-panel">
+    <div class="section-title"><div><span>02 · Декорации</span><h3>Результаты проверки</h3></div></div>
+    <div id="pr-metrics" class="pr-metrics"></div>
+    <div id="pr-groups" class="pr-groups"></div>
+  </div>
+
+  <div class="panel place-registry-panel">
+    <div class="section-title"><div><span>03 · Журнал</span><h3>Repair / Sync / Undo</h3></div>
+      <button id="pr-refresh-actions" type="button">Обновить</button></div>
+    <p class="hint pr-lead">Каждая операция Repair/Sync записана отдельно. Undo отменяет последнюю операцию
+      через историю Roblox Studio. Более ранние действия можно отменить по очереди; сканирование не меняет Place.</p>
+    <div id="pr-action-log" class="pr-action-log"></div>
+  </div>
+
+  <div class="panel place-registry-panel">
+    <div class="section-title"><div><span>04 · Снимки</span><h3>Ревизии Location Assets</h3></div>
+      <button id="pr-refresh-revisions" type="button">Обновить</button></div>
+    <p class="hint pr-lead">Снимки распознанных декораций и их состояний хранятся в SQLite.
+       Это не замена полноценной резервной копии .rbxl.</p>
+    <div id="pr-revisions"></div><pre id="pr-revision-details" class="pr-revision-details" hidden></pre>
+  </div>
+</div>
+
 <div id="database-view" hidden>
 <div class="panel hero">
 <div><span class="eyebrow">game1 · read-only audit database</span><h2>Database</h2><p>История публикаций и замен Roblox Asset ID из MySQL. Просмотр не изменяет зарегистрированные ассеты, атласы и Roblox Studio.</p></div>
@@ -684,6 +731,7 @@
 <script src="asset-atlas-editor.js?v=234"></script>
 <script src="mesh-authoring.js?v=1"></script>
 <script src="deco-assets.js?v=234"></script>
+<script src="place-registry.js?v=241"></script>
 <script src="location-asset-workflow.js?v=237"></script>
 <script src="asset-audit.js?v=2"></script>
 <script src="atlas-library.js?v=2"></script>

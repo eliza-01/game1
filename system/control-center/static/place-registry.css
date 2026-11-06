@@ -1,0 +1,72 @@
+/* M241: Place Registry-only layout; no global panel or modal overrides. */
+#place-registry-view{display:flex;flex-direction:column;gap:16px;min-width:0;padding-bottom:26px}
+#place-registry-view[hidden]{display:none}
+#place-registry-view>.panel{margin:0;min-width:0}
+#place-registry-view .place-registry-panel{padding:20px 22px}
+#place-registry-view .section-title{margin:0 0 16px;align-items:center;flex-wrap:wrap}
+#place-registry-view .section-title>button{flex:none}
+#place-registry-view .pr-lead{margin:0 0 14px;line-height:1.55}
+#place-registry-view .pr-hero{align-items:flex-start}
+#place-registry-view .pr-toolbar{display:grid;gap:13px}
+#place-registry-view .pr-toolbar .section-title{margin-bottom:0}
+#place-registry-view .pr-toolbar-actions{gap:9px;align-items:center}
+#place-registry-view .pr-toolbar-actions button{min-height:38px}
+#place-registry-view .pr-auto,#place-registry-view .pr-backup{display:flex;align-items:flex-start;gap:10px;
+    margin:0;line-height:1.5;font-size:12px;color:var(--muted);cursor:pointer}
+#place-registry-view .pr-backup{padding:12px 13px;border-radius:10px;border:1px solid var(--line);
+    background:var(--panel2);color:var(--text);font-size:13px}
+#place-registry-view .pr-auto input,#place-registry-view .pr-backup input{width:16px;height:16px;flex:none;margin:2px 0 0}
+#place-registry-view .pr-feedback{min-height:20px;font-size:12px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+#place-registry-view .pr-feedback:empty{min-height:0}
+#place-registry-view #pr-status{font-size:12px;line-height:1.5;margin:0}
+#place-registry-view .pr-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(126px,1fr));gap:10px;margin:0 0 16px}
+#place-registry-view .pr-metric{background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+    padding:12px;display:grid;gap:4px;min-width:0}
+#place-registry-view .pr-metric b{font-size:22px;font-variant-numeric:tabular-nums}
+#place-registry-view .pr-metric span{font-size:11px;color:var(--muted)}
+#place-registry-view .pr-groups{display:grid;gap:12px;min-width:0}
+#place-registry-view .pr-groups details{min-width:0;border:1px solid var(--line);border-radius:12px;
+    padding:0;overflow:hidden;background:var(--panel2)}
+#place-registry-view .pr-groups summary{cursor:pointer;display:flex;justify-content:space-between;
+    align-items:center;gap:12px;flex-wrap:wrap;padding:13px 16px;font-size:14px;list-style-position:inside}
+#place-registry-view .pr-groups summary span{color:var(--muted);font-size:12px}
+#place-registry-view .pr-group-content{padding:0 14px 14px;min-width:0}
+#place-registry-view .pr-group-actions{padding:10px 0 12px;display:flex;gap:8px;flex-wrap:wrap;
+    align-items:center;border-top:1px solid var(--line)}
+#place-registry-view .pr-group-actions small{color:var(--muted)}
+#place-registry-view .pr-group-actions button{font-size:12px;padding:7px 11px}
+#place-registry-view .pr-rows{display:grid;gap:9px;max-height:600px;overflow:auto;min-width:0}
+#place-registry-view .pr-item{min-width:0;border:1px solid var(--line);border-radius:9px;
+    padding:13px 14px;background:var(--panel)}
+#place-registry-view .pr-ambiguous{border-style:dashed}
+#place-registry-view .pr-item-heading{display:flex;gap:6px 15px;justify-content:space-between;
+    align-items:center;flex-wrap:wrap}
+#place-registry-view .pr-item-heading code{font-size:10px;color:var(--muted);overflow-wrap:anywhere}
+#place-registry-view .pr-path{font-size:11px;color:var(--muted);overflow-wrap:anywhere;margin:7px 0 11px;line-height:1.45}
+#place-registry-view .pr-status-row{display:flex;gap:8px 16px;flex-wrap:wrap;align-items:center;font-size:12px}
+#place-registry-view .pr-status-row small{color:var(--muted);overflow-wrap:anywhere}
+#place-registry-view .pr-ok{color:var(--mint)}
+#place-registry-view .pr-old{color:var(--orange)}
+#place-registry-view .pr-issues{margin-top:10px;display:flex;gap:6px;flex-wrap:wrap}
+#place-registry-view .pr-warning{font-size:11px;border:1px solid #916539;color:#dbb180;
+    padding:4px 8px;border-radius:6px}
+#place-registry-view .pr-item .actions{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
+#place-registry-view .pr-item .actions button{font-size:12px;padding:7px 11px}
+#place-registry-view .pr-revision-row,#place-registry-view .pr-action-row{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding:10px 0}
+#place-registry-view .pr-revision-row:last-child,#place-registry-view .pr-action-row:last-child{border-bottom:0}
+#place-registry-view .pr-revision{flex:1 1 250px;width:auto;display:block;text-align:left;padding:10px}
+#place-registry-view .pr-revision-row>button:not(.pr-revision),#place-registry-view .pr-action-row>button{font-size:12px;padding:8px 11px}
+#place-registry-view .pr-action-info{display:grid;gap:5px;flex:1 1 280px;min-width:0;overflow-wrap:anywhere}
+#place-registry-view .pr-action-info small{color:var(--muted);line-height:1.45}
+#place-registry-view .pr-action-info .pr-state{color:var(--mint);font-size:12px}
+#place-registry-view .pr-action-info .pr-state-undone{color:var(--muted)}
+#place-registry-view .pr-revision-details{font-size:11px;max-height:360px;overflow:auto;
+    white-space:pre-wrap;word-break:break-word;margin-top:10px}
+@media(max-width:680px){
+  #place-registry-view .place-registry-panel{padding:15px 13px}
+  #place-registry-view .pr-toolbar-actions button{flex:1 1 135px}
+  #place-registry-view .pr-groups summary{padding:12px}
+  #place-registry-view .pr-group-content{padding:0 9px 9px}
+  #place-registry-view .pr-item{padding:12px 10px}
+}

@@ -6,6 +6,18 @@ if(-not $env:LOCALAPPDATA){throw 'LOCALAPPDATA is not available'}
 $Plugins=Join-Path $env:LOCALAPPDATA 'Roblox\Plugins'
 $Installed=Join-Path $Plugins 'Game1Bridge.rbxmx'
 $Temp=Join-Path $env:TEMP ("Game1Bridge-build-{0}.rbxmx" -f $PID)
+$RojoExe=(Get-Command rojo -ErrorAction Stop).Source
+$RokitManifest=Join-Path $Root 'rokit.toml'
+if($env:USERPROFILE -and (Test-Path -LiteralPath $RokitManifest -PathType Leaf)){
+    $Pinned=(Select-String -LiteralPath $RokitManifest -Pattern 'rojo-rbx/rojo@([0-9.]+)' | Select-Object -First 1)
+    if($Pinned){
+        $RokitRojo=Join-Path $env:USERPROFILE ('.rokit\tool-storage\rojo-rbx\rojo\{0}\rojo.exe' -f $Pinned.Matches[0].Groups[1].Value)
+        # Invoke the real pinned binary when available. Rokit's shim itself
+        # requires a discoverable home directory and can fail in managed CI or
+        # sandboxed shells even though the installed tool is fully usable.
+        if(Test-Path -LiteralPath $RokitRojo -PathType Leaf){$RojoExe=$RokitRojo}
+    }
+}
 
 New-Item -ItemType Directory -Force (Split-Path $Generated)|Out-Null
 New-Item -ItemType Directory -Force $Plugins|Out-Null
@@ -35,7 +47,7 @@ if($LASTEXITCODE -ne 0){throw 'Studio Luau preflight failed; installed plugin wa
 
 Push-Location $PSScriptRoot
 try {
-    rojo build plugin.project.json -o $Temp
+    & $RojoExe build plugin.project.json -o $Temp
     if($LASTEXITCODE -ne 0){throw 'Rojo Studio plugin build failed; installed plugin was not replaced'}
 } finally {
     Pop-Location
@@ -102,6 +114,8 @@ foreach($Marker in @(
     'StudioManagedRigSwap',
     'StudioLocationPlacementOwner',
     'StudioLocationPlacedGeometry',
+    'StudioLocationPublishedGeometry',
+    'StudioLocationPlacementHistory',
     'StudioRealEstatePlacedTargets',
     'StudioDecoSyncCommands',
     'StudioTextureAppearance',

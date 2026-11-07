@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "slug": "campfire_01",
+  "sourceSha256": "c0e9641793e4f787dba318807834b94ed0f6d60f4b176d1edf5c9680b09774a3",
+  "analysis": {
+    "schemaVersion": 1,
+    "meshes": [
+      {
+        "name": "campfire_01",
+        "armature": "campfire_01_armature",
+        "vertices": 279,
+        "bones": [
+          {
+            "name": "fire_bone",
+            "parent": "",
+            "matrixLocal": [
+              1.0,
+              0.0,
+              2e-07,
+              0.0,
+              -2e-07,
+              0.0871556,
+              0.9961948,
+              -0.025732,
+              -0.0,
+              -0.9961948,
+              0.0871555,
+              1.2133821,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          }
+        ],
+        "influencedBones": [],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": false,
+          "canQuery": false,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": "Box",
+          "physicsOnly": false
+        }
+      },
+      {
+        "name": "col_mesh",
+        "armature": "",
+        "vertices": 60,
+        "bones": [],
+        "influencedBones": [],
+        "role": "collider",
+        "physics": {
+          "role": "collider",
+          "canCollide": true,
+          "canQuery": true,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": "PreciseConvexDecomposition",
+          "physicsOnly": true
+        }
+      }
+    ],
+    "hasCollider": true,
+    "armatures": [
+      "campfire_01_armature"
+    ],
+    "unassignedArmatures": []
+  }
+}

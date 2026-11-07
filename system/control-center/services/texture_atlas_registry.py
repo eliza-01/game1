@@ -635,6 +635,22 @@ class AtlasRegistry:
         for consumer_id, revision in revisions.items():
             self.mark_synced(consumer_type, consumer_id, revision)
 
+    def publish_initial(self, variant_id: int, credentials: dict, description: str) -> dict:
+        """Publish only a never-published variant; never replace a shared atlas.
+
+        Enforce the invariant under the SAME upload lock as ensure_published,
+        avoiding a race between checking current ID and the actual upload.
+        """
+        with _UPLOAD_LOCK:
+            variant = self.get_variant(variant_id)
+            if not variant or variant['retired']:
+                raise ValueError('atlas variant is unavailable')
+            if variant.get('published_id'):
+                raise ValueError('atlas already has an Image ID; use explicit shared atlas review for replacement')
+            if variant.get('replacementPending'):
+                raise ValueError('shared atlas replacement requires explicit review')
+            return self.ensure_published(variant_id, credentials, description)
+
     def ensure_published(self, variant_id: int, credentials: dict, description: str) -> dict:
         """Publish a new variant or a replacement as a NEW Roblox Image Asset ID.
 

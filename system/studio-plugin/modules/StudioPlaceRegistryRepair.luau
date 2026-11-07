@@ -2,6 +2,9 @@
 -- Hand-made grouping containers are retained; only matching visual parts get wrappers.
 local Physics = require(script.Parent.StudioMeshPhysicsCore)
 local MeshNames = require(script.Parent.StudioLocationMeshNames)
+local Published = require(script.Parent.StudioLocationPublishedGeometry)
+local History = require(script.Parent.StudioPublishedMeshHistory)
+local PlacementHistory = require(script.Parent.StudioLocationPlacementHistory)
 local Repair = {}
 
 local function safeForWrapper(part: MeshPart): boolean
@@ -25,43 +28,94 @@ local function rename(root: Model, slug: string, placementId: string)
 end
 
 local function restoreCol(ref: any, template: any)
-    if not ref.root or ref.row.needsMesh or not ref.needsCol then return false end
+    if not ref.root or not ref.needsCol then return nil end
+    -- A new publication can add COL without changing the visual MeshId.
+    -- Repair that additive difference without swapping the old visible rig.
+    if not ref.currentVisual or #ref.visuals ~= 1 then
+        error("COL требует полного обновления визуальной геометрии; отдельный Repair невозможен")
+    end
     local sourceVisual: MeshPart?=nil
     local sourceCol: MeshPart?=nil
     for _, child in ipairs(template:GetDescendants()) do
         if child:IsA("MeshPart") then
-            if child.Name:lower()=="col_mesh" or child.Name:lower():match("^col_") then
+            if Physics.IsCollider(child.Name) or child:GetAttribute("Game1DecoPhysicsOnly")==true then
                 if sourceCol then error("more than one collider; manual repair required") end
                 sourceCol=child
             else
                 if sourceVisual then error("multi-part rig requires manual collider repair") end
                 sourceVisual=child
             end
-        elseif child:IsA("Bone") or child:IsA("Motor6D") then
-            error("rigged geometry requires full geometry sync before restoring COL")
         end
     end
-    if not sourceVisual or not sourceCol or #ref.visuals~=1 then
-        error("no unique published visual+COL pair")
+    if not sourceVisual or not sourceCol then
+        error("нет однозначной опубликованной пары visual + COL")
+    end
+    if History.Id(sourceVisual.MeshId) ~= History.Id(ref.part.MeshId) then
+        error("визуальный Mesh ID отличается: добавление COL без полного Sync запрещено")
+    end
+    if not ref.part.Anchored then
+        error("незакреплённый visual MeshPart: нельзя добавить отдельный COL без проверки соединений")
+    end
+    -- Bones and visual-only effects are allowed and are preserved in Place.
+    -- FBX import can put a Motor6D *inside* COL whose other endpoint is an
+    -- importer-only RootPart. The placed collider is anchored and receives an
+    -- explicit world CFrame below, so that local connector is neither needed
+    -- nor safe to retain. A connector owned elsewhere in the rig is different:
+    -- cloning COL alone would silently change another subtree, so fail closed.
+    for _, child in ipairs(template:GetDescendants()) do
+        local linked = false
+        if child:IsA("JointInstance") or child:IsA("WeldConstraint") then
+            linked = child.Part0 == sourceCol or child.Part1 == sourceCol
+        elseif child:IsA("Constraint") then
+            linked = (child.Attachment0 ~= nil and child.Attachment0:IsDescendantOf(sourceCol))
+                or (child.Attachment1 ~= nil and child.Attachment1:IsDescendantOf(sourceCol))
+        end
+        if linked and not child:IsDescendantOf(sourceCol) then
+            error("опубликованный COL связан с другими частями rig; требуется проверка полного Sync")
+        end
     end
     local part=ref.part
     local ratio=Vector3.new(part.Size.X/sourceVisual.Size.X,
         part.Size.Y/sourceVisual.Size.Y,part.Size.Z/sourceVisual.Size.Z)
-    if ratio.X<=0 or ratio.Y<=0 or ratio.Z<=0 then error("invalid collider size ratio") end
+    if ratio.X~=ratio.X or ratio.Y~=ratio.Y or ratio.Z~=ratio.Z
+        or ratio.X<0.001 or ratio.Y<0.001 or ratio.Z<0.001
+        or ratio.X>1000 or ratio.Y>1000 or ratio.Z>1000 then
+        error("недопустимый масштаб для восстановления COL")
+    end
     local relative=sourceVisual.CFrame:ToObjectSpace(sourceCol.CFrame)
     local col=sourceCol:Clone()
-    local point=relative.Position
-    col.CFrame=part.CFrame * CFrame.new(point.X*ratio.X,point.Y*ratio.Y,point.Z*ratio.Z) * relative.Rotation
-    col.Size=Vector3.new(sourceCol.Size.X*ratio.X,sourceCol.Size.Y*ratio.Y,sourceCol.Size.Z*ratio.Z)
-    col.Anchored=part.Anchored
-    Physics.Apply(col,true,"PreciseConvexDecomposition",false)
-    col.Transparency=1
-    col.CastShadow=false
-    col.TextureID=""
-    local appearance=col:FindFirstChildOfClass("SurfaceAppearance")
-    if appearance then appearance:Destroy() end
-    col:SetAttribute("Game1DecoPhysicsOnly",true)
-    col.Parent=ref.root
+    local ok,reason=pcall(function()
+        -- Do not leave cloned Motor6D/constraints pointing at the temporary
+        -- published Model. Attachments/Bones and other collider-owned metadata
+        -- remain intact; only mechanisms that cannot operate independently are
+        -- removed from this explicitly anchored additive collider.
+        for _, child in ipairs(col:GetDescendants()) do
+            if child:IsA("JointInstance") or child:IsA("Constraint") then
+                child:Destroy()
+            end
+        end
+        local point=relative.Position
+        col.CFrame=part.CFrame * CFrame.new(point.X*ratio.X,point.Y*ratio.Y,point.Z*ratio.Z) * relative.Rotation
+        col.Size=Vector3.new(sourceCol.Size.X*ratio.X,sourceCol.Size.Y*ratio.Y,sourceCol.Size.Z*ratio.Z)
+        col.Anchored=part.Anchored
+        Physics.Apply(col,true,"PreciseConvexDecomposition",false)
+        col.Transparency=1
+        col.CastShadow=false
+        col.TextureID=""
+        local appearance=col:FindFirstChildOfClass("SurfaceAppearance")
+        if appearance then appearance:Destroy() end
+        col:SetAttribute("Game1DecoPhysicsOnly",true)
+        local pivot=ref.root:GetPivot()
+        col.Parent=ref.root
+        if ref.root.PrimaryPart==nil then ref.root.WorldPivot=pivot end
+        if ref.root:GetPivot()~=pivot then
+            error("восстановление COL изменило pivot размещённой Model")
+        end
+    end)
+    if not ok then
+        col:Destroy()
+        error(tostring(reason))
+    end
     return col
 end
 
@@ -82,6 +136,10 @@ function Repair.Apply(refs: {any}, ctx: any): any
     for _, ref in ipairs(refs) do
         if ref.row.ambiguous then
             table.insert(blocked,ref.row.key..": неоднозначное происхождение")
+        elseif ref.needsCol and ref.oldVersion=="" then
+            table.insert(blocked,ref.row.key..": невозможно подтвердить предыдущую Model-публикацию; COL Repair запрещён")
+        elseif not ref.row.needsStructure and not ref.row.duplicateId then
+            table.insert(blocked,ref.row.key..": структура уже актуальна; Repair не нужен")
         elseif not ref.root and not safeForWrapper(ref.part) then
             table.insert(blocked,ref.row.key..": связи меша запрещают изменение родителя")
         else
@@ -97,8 +155,9 @@ function Repair.Apply(refs: {any}, ctx: any): any
     if not recording then error("Studio Undo recording unavailable; Place unchanged") end
     local undo={}
     local changed=0
+    local collidersCreated=0
+    local loaded={}
     local ok,problem=pcall(function()
-        local loaded={}
         for _,ref in ipairs(eligible) do
             local part=ref.part
             local parent=part.Parent
@@ -144,21 +203,20 @@ function Repair.Apply(refs: {any}, ctx: any): any
                         error("grouping Model PrimaryPart/pivot changed during Repair")
                     end
                 end
-                changed+=1
                 ref.root=root
             end
             local oldName=root.Name
             local oldAttrs={}
             for _,name in ipairs({"Game1DecoInstanceId","Game1DecoAssetSlug",
                 "Game1DecoRegistryModelAssetId","Game1DecoPublishedModelAssetId",
-                "Game1DecoPublishedModelSha256"}) do oldAttrs[name]=root:GetAttribute(name) end
+                "Game1DecoPublishedModelSha256","Game1DecoSyncHistory"}) do oldAttrs[name]=root:GetAttribute(name) end
             table.insert(undo,function()
                 if root.Parent~=nil then
                     root.Name=oldName
                     for name,value in pairs(oldAttrs) do root:SetAttribute(name,value) end
                     for _,name in ipairs({"Game1DecoInstanceId","Game1DecoAssetSlug",
                         "Game1DecoRegistryModelAssetId","Game1DecoPublishedModelAssetId",
-                        "Game1DecoPublishedModelSha256"}) do
+                        "Game1DecoPublishedModelSha256","Game1DecoSyncHistory"}) do
                         if oldAttrs[name]==nil then root:SetAttribute(name,nil) end
                     end
                 end
@@ -192,39 +250,54 @@ function Repair.Apply(refs: {any}, ctx: any): any
                     if renamedPart.Parent~=nil then renamedPart.Name=oldPartName end
                 end)
             end
-            if ref.entry.material and ref.entry.material~="default" then
-                local prior=Physics.CaptureLocationSurfaceMaterial(root)
-                table.insert(undo,function() Physics.RestoreLocationSurfaceMaterial(prior) end)
-                Physics.ApplyLocationSurfaceMaterial(root,ref.entry.material,ref.entry.physicalMaterial)
-            end
             if part.CFrame~=originalCFrame or part.Size~=originalSize then
                 error("Repair changed existing geometry transform; rolling back")
             end
-            changed+=1
-            -- Rebuilding a rig AND COL in a single repair would cause its historical
-            -- multiset to stop matching. The new COL arrives with explicit Sync.
-            if ref.needsCol and not ref.row.needsMesh then
+            -- Repair must also fix additive published collider changes when the
+            -- visual MeshId is unchanged between Model publications.
+            if ref.needsCol then
                 local template=loaded[ref.entry.slug]
                 if not template then
                     template=ctx.loader:loadForMeshInventory(ref.entry.model,ref.entry.slug)
                     loaded[ref.entry.slug]=template
                 end
+                local beforeMeshes=History.Describe(ref.oldVersion,root).meshes
                 local made=restoreCol(ref,template)
                 if made then
                     table.insert(undo,function() made:Destroy() end)
+                    collidersCreated+=1
+                    -- Both the previously published single visual and the
+                    -- restored COL now match the CURRENT published Mesh inventory.
+                    -- Never stamp the latest version without this verification.
+                    if not Published.CurrentShape(ref.entry,root) then
+                        error("восстановленный COL не соответствует актуальному опубликованному rig")
+                    end
+                    local beforePhysics=Physics.CaptureLocationModel(root,{[part.Name]=true})
+                    table.insert(undo,function() Physics.RestoreLocationModel(beforePhysics) end)
+                    Physics.Apply(part,false,"Box",part.DoubleSided)
+                    root:SetAttribute("Game1DecoPublishedModelAssetId",ref.entry.model)
+                    root:SetAttribute("Game1DecoPublishedModelSha256",ref.entry.sha)
+                    PlacementHistory.Append(root,ctx.http,ref.entry.slug,{{
+                        kind=if ref.oldVersion==ref.entry.model then "collider_restore" else "model",
+                        oldId=ref.oldVersion,newId=ref.entry.model,count=1}},
+                        beforeMeshes,History.Describe(ref.entry.model,root).meshes)
                 end
             end
+            changed+=1
         end
-        for _,template in pairs(loaded) do template:Destroy() end
     end)
+    -- Destroy staged published references on both success AND failure. They
+    -- must never leak across repeated Studio Repair attempts.
+    for _,template in pairs(loaded) do pcall(function() template:Destroy() end) end
     if not ok then
         for i=#undo,1,-1 do pcall(undo[i]) end
         ctx.history:FinishRecording(recording,Enum.FinishRecordingOperation.Cancel)
         error("Repair отменён: "..tostring(problem))
     end
     ctx.history:FinishRecording(recording,Enum.FinishRecordingOperation.Commit)
-    return {changed=changed,skipped=blocked,undo=true,
-        note="Repair обновил структуру/ID; перед Sync требуется новый Scan"}
+    return {changed=changed,collidersCreated=collidersCreated,skipped=blocked,undo=true,
+        note="Repair обновил структуру/ID и восстановил COL: "..tostring(collidersCreated)
+            .."; перед Sync требуется новый Scan"}
 end
 
 return Repair

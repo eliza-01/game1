@@ -285,3 +285,17 @@ A foreign `Game1DecoAssetSlug` attribute is not proof of a foreign owner: confir
 full historical Mesh ID inventory before blocking Repair. Explicit Repair must
 correct stale published Model ID/SHA metadata. See
 `docs/workflows/LOCATION_SYNC_PLACEMENT_STATE_M244_RU.md`.
+
+## M252 · Location publication reconciliation and additive COL repair
+
+Location Place Registry MUST compare the complete published MeshPart multiset,
+not merely a visual MeshId: two immutable Model publications may reuse the
+visual ID while adding COL. `StudioLocationPublishedGeometry` owns this read-only
+policy; copied `Game1DecoPublishedModelAssetId` is trusted only after matching
+its entire historical inventory. Location `Repair` may add a unique independent
+COL to an anchored, verified same-visual mesh without replacing existing Bone,
+Fire or other authored children, and MUST disable legacy visual collision while
+preserving transforms and undo. Unknown joints or ambiguous provenance fail
+closed. `Repair` does NOT apply Surface Material/Alpha; those are explicit Sync
+operations. No-op and blocked operations must report truthful change counts.
+See `docs/workflows/LOCATION_PLACE_REGISTRY_RECONCILIATION_M252_RU.md`.

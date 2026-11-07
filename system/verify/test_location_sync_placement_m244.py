@@ -28,9 +28,19 @@ class LocationSyncPlacementM244(unittest.TestCase):
                      'source.CFrame ~= target.CFrame', 'validRatio(ratio.X)',
                      'verifyMultipart(previous, placed)', 'History.Provenance(placed, previous)'):
             self.assertIn(call, helper)
+        self.assertIn('local function uniformRatio(', helper)
+        self.assertIn('stage:ScaleTo(stage:GetScale() * newScale)', helper)
+        self.assertIn('target.CFrame * source.CFrame:Inverse()', helper)
+        self.assertIn('if oldScale == nil or newScale == nil then return nil end', helper)
         row_sync = self.source('system/studio-plugin/modules/DecoPlacedAssetSync.luau')
         registry_sync = self.source('system/studio-plugin/modules/StudioPlaceRegistrySync.luau')
         self.assertIn('Geometry.Align(stage,previousPublished,model)', row_sync)
+        self.assertIn('Placement.PrepareSynced(stage,', row_sync)
+        self.assertNotIn('Placement.PreparePlaced(stage,', row_sync)
+        preparation = self.source('system/studio-plugin/modules/DecoAssetPreparation.luau')
+        synced = preparation.split('function DecoAssetPreparation.PrepareSynced', 1)[1]
+        self.assertIn('MeshPhysics.ApplyLocationModel', synced)
+        self.assertNotIn('Anchored = false', synced)
         self.assertIn('Geometry.Align(stage,previous,root)', registry_sync)
         self.assertNotIn('stage:ScaleTo(model:GetScale())', row_sync)
         # This policy MUST NOT change shared Real Estate geometry transactions.

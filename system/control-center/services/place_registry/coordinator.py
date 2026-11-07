@@ -109,7 +109,7 @@ class LocationPlaceRegistry:
 
     @staticmethod
     def _summary(rows):
-        return {'placements': len(rows), 'outdatedMesh': sum(r['needsMesh'] for r in rows),
+        return {'placements': len(rows), 'outdatedMesh': sum(r['needsMesh'] or r.get('needsRig', False) for r in rows),
                 'outdatedTexture': sum(r['needsTexture'] for r in rows),
                 'outdatedMaterial': sum(bool(r.get('needsMaterial')) for r in rows),
                 'outdatedAlpha': sum(bool(r.get('needsAlpha')) for r in rows),

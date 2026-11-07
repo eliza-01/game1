@@ -7,6 +7,7 @@ JSON snapshots. Existing M240 history is retained in its original table.
 from __future__ import annotations
 
 import json
+from contextlib import closing
 from pathlib import Path
 import re
 import sqlite3
@@ -18,7 +19,7 @@ _OPERATION_ID = re.compile(r'^[0-9a-f]{32}$')
 class PlaceOperationJournal:
     def __init__(self, revision_db_path: str | Path):
         self.path = Path(revision_db_path)
-        with self._connect() as db:
+        with closing(self._connect()) as db, db:
             existing = db.execute("SELECT 1 FROM sqlite_master WHERE type='table' "
                                   "AND name='location_place_operation_journal'").fetchone()
             if existing is None and self.path.exists():
@@ -27,7 +28,7 @@ class PlaceOperationJournal:
                 backup_dir = self.path.parent / 'backups'
                 backup_dir.mkdir(parents=True, exist_ok=True)
                 backup = backup_dir / f'location_place_m241_{time.time_ns()}.sqlite'
-                with sqlite3.connect(backup) as target:
+                with closing(sqlite3.connect(backup)) as target, target:
                     db.backup(target)
             db.execute('''CREATE TABLE IF NOT EXISTS location_place_operation_journal (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,7 +58,7 @@ class PlaceOperationJournal:
         if type(result.get('changed')) is not int or result['changed'] < 0:
             raise ValueError('Invalid Studio mutation result')
         status = 'applied' if result['changed'] > 0 and result.get('undo') is True else 'no_changes'
-        with self._connect() as db:
+        with closing(self._connect()) as db, db:
             cursor = db.execute('''INSERT INTO location_place_operation_journal
                 (recorded_utc,place_id,before_revision,operation_id,action,status,affected,selected_json,report_json)
                 VALUES (?,?,?,?,?,?,?,?,?)''',
@@ -69,7 +70,7 @@ class PlaceOperationJournal:
     def page(self, limit: int = 40):
         if type(limit) is not int or not 1 <= limit <= 100:
             raise ValueError('Journal page limit must be 1..100')
-        with self._connect() as db:
+        with closing(self._connect()) as db, db:
             rows = db.execute('''SELECT * FROM location_place_operation_journal
                                  ORDER BY id DESC LIMIT ?''', (limit,)).fetchall()
             # Legacy M240 journal entries stay visible, but cannot be matched
@@ -99,7 +100,7 @@ class PlaceOperationJournal:
     def undo_candidate(self, action_id: int) -> dict:
         if type(action_id) is not int or action_id < 1:
             raise ValueError('Invalid journal action ID')
-        with self._connect() as db:
+        with closing(self._connect()) as db, db:
             row = db.execute('''SELECT * FROM location_place_operation_journal
                                 WHERE id=?''', (action_id,)).fetchone()
             last = db.execute('''SELECT id FROM location_place_operation_journal
@@ -109,7 +110,7 @@ class PlaceOperationJournal:
         return {'id':row['id'], 'operation_id':row['operation_id'], 'place_id':row['place_id']}
 
     def mark_undone(self, action_id: int, operation_id: str):
-        with self._connect() as db:
+        with closing(self._connect()) as db, db:
             updated = db.execute('''UPDATE location_place_operation_journal
                     SET status='undone',undone_utc=? WHERE id=? AND operation_id=? AND status='applied' ''',
                     (int(time.time()), action_id, operation_id))

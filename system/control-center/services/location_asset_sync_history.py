@@ -18,6 +18,7 @@ from services.mysql_asset_replacement_audit import (
 
 SLUG = re.compile(r'^[a-z0-9][a-z0-9_]{0,63}$')
 ID = re.compile(r'^[0-9]{0,20}$')
+ALPHA_MODE = re.compile(r'^(?:missing|Overlay|Transparency|TintMask|Opaque)$')
 INSTANCE_ID = re.compile(r'^[A-Za-z0-9_-]{1,128}$')
 OPERATION_ID = re.compile(r'^[0-9a-f]{32}$')
 
@@ -35,15 +36,30 @@ class LocationAssetSyncHistory:
             raise ValueError('invalid Studio ID change history size')
         validated = []
         for item in changes:
-            if not isinstance(item, dict) or item.get('kind') not in ('atlas', 'model_reference', 'model'):
+            if not isinstance(item, dict) or item.get('kind') not in (
+                    'atlas', 'model_reference', 'model', 'alpha'):
                 raise ValueError('invalid Studio ID change history type')
+            kind = item['kind']
             old = str(item.get('oldId', ''))
             new = str(item.get('newId', ''))
+            if kind == 'alpha':
+                # Protocol 9 originally serialized EnumItems with tostring().
+                # Normalize that installed-plugin form at the boundary so the
+                # Host Agent fix is effective before Studio is restarted.
+                prefix = 'Enum.AlphaMode.'
+                if old.startswith(prefix):
+                    old = old[len(prefix):]
+                if new.startswith(prefix):
+                    new = new[len(prefix):]
             count = item.get('count')
-            if (not ID.fullmatch(old) or not ID.fullmatch(new) or not new
-                    or type(count) is not int or not 0 < count <= 100000):
+            values_valid = (ALPHA_MODE.fullmatch(old) is not None
+                            and ALPHA_MODE.fullmatch(new) is not None
+                            and new != 'missing') if kind == 'alpha' else (
+                                ID.fullmatch(old) is not None
+                                and ID.fullmatch(new) is not None and bool(new))
+            if (not values_valid or type(count) is not int or not 0 < count <= 100000):
                 raise ValueError('invalid Studio ID change history entry')
-            validated.append({'kind': item['kind'], 'oldId': old, 'newId': new, 'count': count})
+            validated.append({'kind': kind, 'oldId': old, 'newId': new, 'count': count})
         return validated
 
     @classmethod

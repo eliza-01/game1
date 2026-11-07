@@ -24,7 +24,7 @@ function Core.Fidelity(name: string): Enum.CollisionFidelity
     return value
 end
 
-function Core.Apply(mesh: MeshPart, canCollide: boolean, fidelity: string, doubleSided: boolean)
+local function applyRuntimeProperties(mesh: MeshPart, canCollide: boolean, doubleSided: boolean)
     -- CanQuery=false requires CanCollide=false; assign in safe order.
     if canCollide then
         mesh.CanQuery = true
@@ -34,8 +34,19 @@ function Core.Apply(mesh: MeshPart, canCollide: boolean, fidelity: string, doubl
         mesh.CanQuery = false
     end
     mesh.CanTouch = false
-    mesh.CollisionFidelity = Core.Fidelity(if canCollide then "PreciseConvexDecomposition" else fidelity)
     mesh.DoubleSided = doubleSided
+end
+
+function Core.ApplyRuntime(mesh: MeshPart, canCollide: boolean, doubleSided: boolean)
+    -- CollisionFidelity is PluginOrOpenCloud-only. Runtime reapplies the
+    -- gameplay flags, while the Studio authoring pipeline remains the sole
+    -- writer of the persisted decomposition policy.
+    applyRuntimeProperties(mesh, canCollide, doubleSided)
+end
+
+function Core.Apply(mesh: MeshPart, canCollide: boolean, fidelity: string, doubleSided: boolean)
+    applyRuntimeProperties(mesh, canCollide, doubleSided)
+    mesh.CollisionFidelity = Core.Fidelity(if canCollide then "PreciseConvexDecomposition" else fidelity)
 end
 
 local function parts(model: Model): {MeshPart}
@@ -49,7 +60,7 @@ end
 -- Both domains use Core.Apply as the only MeshPart property writer.
 -- Location uses name classification plus saved per-mesh overrides. A missing
 -- meshOptions entry means legacy behavior: never silently migrate a Place.
-function Core.ApplyLocationModel(model: Model, allowedNames: {[string]: boolean}?, meshOptions: any?): number
+local function applyLocationModel(model: Model, allowedNames: {[string]: boolean}?, meshOptions: any?, runtimeSafe: boolean): number
     local allParts = parts(model)
     local hasCollider = false
     for _, mesh in ipairs(allParts) do
@@ -71,7 +82,11 @@ function Core.ApplyLocationModel(model: Model, allowedNames: {[string]: boolean}
                 local fidelity = if noCollide and explicit and typeof(raw.collisionFidelity) == "string"
                     then raw.collisionFidelity elseif noCollide then "Box" else "PreciseConvexDecomposition"
                 -- All collidable MeshParts are Precise, including COL_*.
-                Core.Apply(mesh, not noCollide, fidelity, doublesided)
+                if runtimeSafe then
+                    Core.ApplyRuntime(mesh, not noCollide, doublesided)
+                else
+                    Core.Apply(mesh, not noCollide, fidelity, doublesided)
+                end
             else
                 -- Legacy Location without COL: do not override pre-M232 published physics.
                 mesh.CanTouch = false
@@ -94,6 +109,14 @@ function Core.ApplyLocationModel(model: Model, allowedNames: {[string]: boolean}
         end
     end
     return affected
+end
+
+function Core.ApplyLocationModel(model: Model, allowedNames: {[string]: boolean}?, meshOptions: any?): number
+    return applyLocationModel(model, allowedNames, meshOptions, false)
+end
+
+function Core.ApplyLocationModelRuntime(model: Model, allowedNames: {[string]: boolean}?, meshOptions: any?): number
+    return applyLocationModel(model, allowedNames, meshOptions, true)
 end
 
 -- Semantic surface for future impact/footstep audio and interaction.

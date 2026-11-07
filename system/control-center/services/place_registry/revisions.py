@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from contextlib import closing
 from pathlib import Path
 import sqlite3
 import time
@@ -13,7 +14,7 @@ class PlaceRevisionStore:
     def __init__(self, root: str | Path):
         self.path = Path(root) / '.control-center' / 'location-place-revisions.sqlite'
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with self._connect() as db:
+        with closing(self._connect()) as db, db:
             db.executescript('''
                 CREATE TABLE IF NOT EXISTS location_place_revisions (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,7 +50,7 @@ class PlaceRevisionStore:
         fingerprint = hashlib.sha256(data).hexdigest()
         place_id = int(report.get('placeId') or 0)
         issue_count = sum(bool(p.get('issues')) for p in report['placements'])
-        with self._connect() as db:
+        with closing(self._connect()) as db, db:
             previous = db.execute('SELECT id, fingerprint FROM location_place_revisions '
                                   'WHERE place_id=? ORDER BY id DESC LIMIT 1', (place_id,)).fetchone()
             if previous and previous['fingerprint'] == fingerprint:
@@ -66,7 +67,7 @@ class PlaceRevisionStore:
     def page(self, limit: int = 20):
         if type(limit) is not int or limit < 1 or limit > 100:
             raise ValueError('limit must be 1..100')
-        with self._connect() as db:
+        with closing(self._connect()) as db, db:
             rows = db.execute('SELECT id, recorded_utc, place_id, fingerprint, total, issues '
                               'FROM location_place_revisions ORDER BY id DESC LIMIT ?', (limit,)).fetchall()
         return [dict(v) for v in rows]
@@ -74,7 +75,7 @@ class PlaceRevisionStore:
     def get(self, revision_id: int):
         if type(revision_id) is not int or revision_id < 1:
             raise ValueError('invalid revision ID')
-        with self._connect() as db:
+        with closing(self._connect()) as db, db:
             row = db.execute('SELECT payload FROM location_place_revisions WHERE id=?',
                              (revision_id,)).fetchone()
         if row is None:
@@ -100,7 +101,7 @@ class PlaceRevisionStore:
     def log_action(self, before_revision: int, action: str, report: dict):
         if action not in ('repair', 'sync') or type(before_revision) is not int or before_revision < 1:
             raise ValueError('invalid Place mutation audit')
-        with self._connect() as db:
+        with closing(self._connect()) as db, db:
             db.execute('INSERT INTO location_place_actions '
                        '(recorded_utc,before_revision,action,affected,report) VALUES(?,?,?,?,?)',
                        (int(time.time()), before_revision, action,

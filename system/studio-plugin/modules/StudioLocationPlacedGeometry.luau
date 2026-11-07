@@ -36,6 +36,47 @@ local function sameSize(a: Vector3, b: Vector3): boolean
     return (a - b).Magnitude < 0.025
 end
 
+local function uniformRatio(target: Vector3, source: Vector3): number?
+    local ratio = Vector3.new(target.X / source.X, target.Y / source.Y, target.Z / source.Z)
+    if not validRatio(ratio.X) or not validRatio(ratio.Y) or not validRatio(ratio.Z) then
+        return nil
+    end
+    local average = (ratio.X + ratio.Y + ratio.Z) / 3
+    local tolerance = math.max(0.001, average * 0.002)
+    if math.abs(ratio.X - average) > tolerance
+        or math.abs(ratio.Y - average) > tolerance
+        or math.abs(ratio.Z - average) > tolerance then
+        return nil
+    end
+    return average
+end
+
+local function alignSingleVisualRig(stage: Model, placed: Model,
+    oldVisual: MeshPart, source: MeshPart, target: MeshPart): BasePart?
+    -- A legacy one-visual publication can gain Bones/sockets and a COL in its
+    -- next immutable publication. Model:GetScale() remains 1 when the old
+    -- MeshPart was uniformly resized by hand. Transfer only a proven uniform
+    -- scale through ScaleTo so Bones, Attachments and the new COL stay aligned.
+    local oldScale = uniformRatio(target.Size, oldVisual.Size)
+    local newScale = uniformRatio(target.Size, source.Size)
+    if oldScale == nil or newScale == nil then return nil end
+    local scaleAgreement = math.max(0.001, oldScale * 0.002)
+    if math.abs(oldScale - newScale) > scaleAgreement then return nil end
+    stage:ScaleTo(stage:GetScale() * newScale)
+    local transform = target.CFrame * source.CFrame:Inverse()
+    stage:PivotTo(transform * stage:GetPivot())
+    source.PivotOffset = target.PivotOffset
+    for _, part in ipairs(stage:GetDescendants()) do
+        if part:IsA("BasePart") then part.Anchored = target.Anchored end
+    end
+    if not sameSize(source.Size, target.Size) or source.CFrame ~= target.CFrame
+        or source:GetPivot() ~= target:GetPivot() then
+        error("не удалось сохранить uniform Scale/CFrame/PivotOffset rig; Place не изменён")
+    end
+    if placed.PrimaryPart == target then stage.PrimaryPart = source end
+    return source
+end
+
 local function verifyMultipart(previous: Model, placed: Model)
     -- In a nontrivial rig, ScaleTo only tracks Model scale, not manual Size
     -- modifications. Refuse the update if any part's real size differs.
@@ -76,6 +117,11 @@ end
 -- Returns the validated primary anchor of the incoming stage.
 function Geometry.Align(stage: Model, previous: Model, placed: Model): BasePart?
     local oldVisuals, newVisuals, placedVisuals = visuals(previous), visuals(stage), visuals(placed)
+    if #oldVisuals == 1 and #newVisuals == 1 and #placedVisuals == 1 then
+        local aligned = alignSingleVisualRig(stage, placed,
+            oldVisuals[1], newVisuals[1], placedVisuals[1])
+        if aligned then return aligned end
+    end
     if #oldVisuals == 1 and #newVisuals == 1 and #placedVisuals == 1
         and simple(previous) and simple(stage) and simple(placed) then
         local source = newVisuals[1]

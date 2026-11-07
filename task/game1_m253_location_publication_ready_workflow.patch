@@ -1,0 +1,741 @@
+diff --git a/docs/workflows/LOCATION_ATLAS_FIRST_PUBLICATION_M253_RU.md b/docs/workflows/LOCATION_ATLAS_FIRST_PUBLICATION_M253_RU.md
+new file mode 100644
+index 0000000..484e17e
+--- /dev/null
++++ b/docs/workflows/LOCATION_ATLAS_FIRST_PUBLICATION_M253_RU.md
+@@ -0,0 +1,59 @@
++# M253 · Location Assets — единый шаг первой публикации
++
++## Первопричина
++
++`Register new asset` сохранял исходный FBX и копировал атлас в общий `AtlasRegistry`.
++`AtlasRegistry.bind(... allow_unpublished=True)` намеренно не создавал Roblox Image ID.
++Ранее редактор показывал привязанный **неопубликованный** вариант как отключённую точку,
++а `Upload new atlas` заново спрашивал файл. Первую публикацию сохранённого источника
++из модального окна выполнить было нельзя.
++
++## UX
++
++После регистрации нового ассета открывается вкладка **Publish**. Она также появляется
++при наличии неопубликованных ресурсов (Model и/или активного Atlas), показывает их
++отдельно и предлагает одну основную операцию **Publish ready**. В `Texture · atlas`
++неопубликованная точка открывает эту вкладку; рядом с обычными действиями доступна
++ссылка `Publish this atlas`. Изменения общих опубликованных вариантов должны проходить
++старый сценарий сравнения источников и явного подтверждения — здесь они не публикуются.
++
++Операция показывает текущий этап запроса: **Atlas → Model**. Никаких фиктивных
++процентов. Если Atlas опубликован, а Model не удалось опубликовать, его Image ID
++остаётся сохранённым. Следующая попытка работает только с непрошедшей частью.
++Самостоятельные кнопки изменения FBX / общей замены атласа сохранены для осознанных
++действий над уже опубликованными версиями.
++
++## Контракты и безопасность
++
++- `location-publication-state.js` — чистая политика определения готовности, без API.
++- `location-asset-workflow.js` — единственный координатор последовательной публикации.
++- `POST /api/location-assets/{slug}/publish-pending-atlas` — принимает `variantId`
++  и `expectedRevision` (оба целые), проверяет существование Location Asset,
++  **активную привязку** и ожидаемую версию; затем делегирует Atlas Registry.
++- `AtlasRegistry.publish_initial` — под тем же `RLock`, что и стандартная публикация,
++  запрещает повторно публиковать вариант с уже существующим `published_id`.
++  Общие операции загрузки, dedup, аудит и восстановление зависших загрузок
++  продолжают выполняться в `ensure_published`.
++- `asset_replacement_audit` импортирует историю до и после публикации; ошибка
++  импорта после успешной загрузки возвращается предупреждением, а не сигналом
++  к повторной загрузке.
++- Сервер возвращает `resourceKind=Atlas`, `publishedAssetId`, `studioSyncRequired=true`.
++- Публикация Model выполняется старым `/publish-model`, подтверждает независимость
++  атласа (`atlasUnchanged`); плагин Studio и Place не изменяются автоматически.
++- Исходники уже сохранены в проекте. Новый выбор файла при первой публикации не нужен.
++
++## Проверка после установки
++
++1. На тестовом ассете выбери FBX и PNG/JPG, затем `Register new asset`.
++2. На вкладке Publish проверь две независимые строки, счётчик и доступную кнопку.
++3. Опубликуй: сначала дождись Image ID, затем Model ID. При каждом запросе
++   отображается индикатор текущего этапа.
++4. Повторно открой ассет — `Publish` не должен требоваться.
++5. Убедись, что `Texture · atlas` показывает активный опубликованный вариант.
++6. Проверь, что Sync в Studio выполняется **отдельно** и не стартует от публикации.
++7. Изменение пикселей уже опубликованного общего атласа не должно попадать в
++   `Publish ready`: используется существующий reviewed republish.
++
++Проверить работу Open Cloud на настоящем ассете и восстановление при потере сети
++во время публикации можно только в Host Agent. Наличие Image ID следует проверять
++в Registry/Asset Manager до повторного запроса. Реальная Roblox Studio не тестировалась.
+diff --git a/system/control-center/api/write_dispatch.py b/system/control-center/api/write_dispatch.py
+index 04d540e..83df57d 100644
+--- a/system/control-center/api/write_dispatch.py
++++ b/system/control-center/api/write_dispatch.py
+@@ -4,7 +4,8 @@ from services.shared_asset_retirement import SharedAssetRetirement
+ 
+ 
+ def _requires_asset_audit(path):
+-    return (path == '/api/texture-atlases/publish-reviewed'
++    return (path.endswith('/publish-pending-atlas')
++            or path == '/api/texture-atlases/publish-reviewed'
+             or path == '/api/asset-retirement/execute'
+             or path == '/api/characters/workflow'
+             or path.endswith(('/publish', '/publish-missing', '/republish',
+@@ -40,7 +41,7 @@ def dispatch_post(path, body, deps):
+                 try:
+                     audit.sync_all()
+                 except Exception as error:
+-                    if path == '/api/texture-atlases/publish-reviewed':
++                    if path == '/api/texture-atlases/publish-reviewed' or path.endswith('/publish-pending-atlas'):
+                         result = dict(response[1])
+                         result.setdefault('exportWarnings', []).append(
+                             f'Asset History import failed after publication: {error}')
+diff --git a/system/control-center/api/write_world.py b/system/control-center/api/write_world.py
+index ec9afa0..1c16387 100644
+--- a/system/control-center/api/write_world.py
++++ b/system/control-center/api/write_world.py
+@@ -46,6 +46,26 @@ def route(path, body, deps):
+     sync_monster_to_studio = deps["sync_monster_to_studio"]
+     timelines = deps["timelines"]
+ 
++    if path.startswith('/api/location-assets/') and path.endswith('/publish-pending-atlas'):
++        from services.location_atlas_publication import publish_pending_atlas
++        try:
++            slug = path[len('/api/location-assets/'):-len('/publish-pending-atlas')].strip('/')
++            if not re.fullmatch(r'[a-z0-9][a-z0-9_]{0,63}', slug):
++                raise ValueError('invalid Location Asset slug')
++            payload = body()
++            if not isinstance(payload, dict) or type(payload.get('variantId')) is not int or type(payload.get('expectedRevision')) is not int:
++                raise ValueError('variantId and expectedRevision must be integers')
++            if payload['variantId'] <= 0 or payload['expectedRevision'] < 0:
++                raise ValueError('invalid atlas publication revision')
++            result = publish_pending_atlas(location_assets, slug,
++                variant_id=payload['variantId'], expected_revision=payload['expectedRevision'],
++                credentials=publication_credentials('game1 atlas first publication'),
++                exports=[('Location Assets', location_assets.export),
++                         ('Real Estate', deps['real_estate'].export)])
++            return out(200, result)
++        except (ValueError, OSError, RuntimeError, KeyError) as error:
++            return out(400, {'error': str(error)})
++
+     if path == '/api/texture-atlases/preview-source':
+         try:
+             result=AtlasSourceReview(location_assets.atlases).inspect(body().get('sourcePath') or '')
+diff --git a/system/control-center/services/location_atlas_publication.py b/system/control-center/services/location_atlas_publication.py
+new file mode 100644
+index 0000000..14eb4b0
+--- /dev/null
++++ b/system/control-center/services/location_atlas_publication.py
+@@ -0,0 +1,34 @@
++"""Initial publication of an atlas bound to a registered Location Asset.
++
++The AtlasRegistry owns uploading and history. This adapter only checks the
++consumer and the exact bound revision; it never publishes an existing shared
++Image ID as a side effect of creating a Model.
++"""
++from __future__ import annotations
++
++
++def publish_pending_atlas(location_assets, slug: str, *, variant_id: int,
++                          expected_revision: int, credentials: dict,
++                          exports=()) -> dict:
++    item = location_assets.get(slug)
++    if not item:
++        raise ValueError('unknown Location Asset')
++    binding = location_assets.atlases.binding('location_asset', slug)
++    if not binding or int(binding['variant_id']) != variant_id:
++        raise ValueError('selected atlas changed; reopen the asset before publishing')
++    if int(binding['revision']) != expected_revision:
++        raise ValueError('atlas binding changed; refresh and review the selected atlas')
++    # Registry performs the publication under its upload lock. In particular
++    # the first-publication contract must not republish an existing shared ID.
++    published = location_assets.atlases.publish_initial(
++        variant_id, credentials, f'Location Asset {slug} atlas')
++    warnings = []
++    for name, export in exports:
++        try:
++            export()
++        except Exception as error:
++            # Upload already succeeded. Do not return a retry-inducing 400.
++            warnings.append(f'{name} registry export failed after publication: {error}')
++    return {'resourceKind': 'Atlas', 'variant': published,
++            'publishedAssetId': str(published['published_id']),
++            'studioSyncRequired': True, 'exportWarnings': warnings}
+diff --git a/system/control-center/services/texture_atlas_registry.py b/system/control-center/services/texture_atlas_registry.py
+index a0b6d67..030f4db 100644
+--- a/system/control-center/services/texture_atlas_registry.py
++++ b/system/control-center/services/texture_atlas_registry.py
+@@ -635,6 +635,22 @@ class AtlasRegistry:
+         for consumer_id, revision in revisions.items():
+             self.mark_synced(consumer_type, consumer_id, revision)
+ 
++    def publish_initial(self, variant_id: int, credentials: dict, description: str) -> dict:
++        """Publish only a never-published variant; never replace a shared atlas.
++
++        Enforce the invariant under the SAME upload lock as ensure_published,
++        avoiding a race between checking current ID and the actual upload.
++        """
++        with _UPLOAD_LOCK:
++            variant = self.get_variant(variant_id)
++            if not variant or variant['retired']:
++                raise ValueError('atlas variant is unavailable')
++            if variant.get('published_id'):
++                raise ValueError('atlas already has an Image ID; use explicit shared atlas review for replacement')
++            if variant.get('replacementPending'):
++                raise ValueError('shared atlas replacement requires explicit review')
++            return self.ensure_published(variant_id, credentials, description)
++
+     def ensure_published(self, variant_id: int, credentials: dict, description: str) -> dict:
+         """Publish a new variant or a replacement as a NEW Roblox Image Asset ID.
+ 
+diff --git a/system/control-center/static/asset-atlas-editor.js b/system/control-center/static/asset-atlas-editor.js
+index 83fee17..65107a9 100644
+--- a/system/control-center/static/asset-atlas-editor.js
++++ b/system/control-center/static/asset-atlas-editor.js
+@@ -9,9 +9,10 @@ window.game1ConsumerAtlasEditor = (() => {
+   const variants = catalog => (catalog||[]).flatMap(group =>
+     (group.variants||[]).map(v => ({...v,atlasKey:group.atlasKey})));
+   const available = catalog => variants(catalog).filter(v => v.current && v.published_id && !v.retired);
+-  function render(state,{currentId=0,linked=[],catalog=[],busy=false}={}){
++  function render(state,{currentId=0,linked=[],catalog=[],busy=false,openPublish=false}={}){
+     const active=Number(currentId||0);
+-    const selected=variants(catalog).find(v=>Number(v.id)===active)||null;
++    const selected=variants(catalog).find(v=>Number(v.id)===active)||
++      linked.find(v=>Number(v.id)===active)||null;
+     const attached=new Map();
+     for(const v of linked)attached.set(Number(v.id),v);
+     if(selected)attached.set(active,selected);
+@@ -21,17 +22,19 @@ window.game1ConsumerAtlasEditor = (() => {
+       (!state.search||`${v.filename} ${v.atlasKey} ${v.resolution} ${v.published_id}`.toLowerCase().includes(state.search.toLowerCase()))
+       && !attached.has(Number(v.id)));
+     const disabled=busy||state.busy;
++    const unpublished=selected&&!selected.retired&&!selected.published_id;
+     const current=selected?`${html(selected.filename)} · ${html(selected.resolution)} · Image ID ${html(selected.published_id||'not published')}`:
+       'No atlas selected';
+     return `<section class="real-estate-mesh-step shared-atlas-editor" aria-label="Atlas variants">
+-        <div class="real-estate-mesh-step-head"><strong>Attached atlases</strong><span class="real-estate-step-status ${selected?.current?'ready':'pending'}">${selected?.current?'Published':'Choose atlas'}</span></div>
++        <div class="real-estate-mesh-step-head"><strong>Attached atlases</strong><span class="real-estate-step-status ${selected?.current?'ready':'pending'}">${selected?.current?'Published':unpublished?'Publish required':selected?'Review required':'Choose atlas'}</span></div>
+         <div class="shared-atlas-current">${current}</div>
+         <div class="deco-atlas-dots" role="group" aria-label="Attached atlas variants">${dots.map((v,i)=>{
+           const on=Number(v.id)===active;
+           const tip=`${v.filename} · ${v.resolution} · Image ID ${v.published_id||'unpublished'}`;
+-          return `<button type="button" class="deco-atlas-dot ${on?'is-active':''}" style="--dot-color:${colors[i%colors.length]}" data-ca-choice="${Number(v.id)}" aria-label="${html(tip)}" title="${html(tip)}" aria-pressed="${on}" ${disabled||!v.current?'disabled':''}><span></span></button>`;
++          return `<button type="button" class="deco-atlas-dot ${on?'is-active':''}" style="--dot-color:${colors[i%colors.length]}" data-ca-choice="${Number(v.id)}" aria-label="${html(tip)}" title="${html(tip)}" aria-pressed="${on}" ${disabled||(!v.current&&!(openPublish&&on&&!v.published_id))?'disabled':''} ${openPublish&&on&&!v.published_id?'data-ca-open-publish':''}><span></span></button>`;
+         }).join('')}</div>
+-        <small>Switch the active atlas by clicking a dot. No upload or automatic Studio Sync.</small>
++        <small>Switch published variants by clicking a dot. No automatic Studio Sync.</small>
++        ${unpublished&&openPublish?`<div class="shared-atlas-unpublished"><span>Atlas registered · Image ID not published</span><button type="button" data-ca-open-publish>Publish this atlas</button></div>`:''}
+         <div class="actions"><button type="button" data-ca-toggle ${disabled?'disabled':''}>Connect existing atlas</button><button type="button" data-ca-upload ${disabled?'disabled':''}>Upload new atlas</button></div>
+         ${state.picker?`<div class="shared-atlas-picker"><label>Search all published atlases<input type="search" data-ca-search value="${html(state.search)}" placeholder="Filename · resolution · Image ID"></label>
+           <div class="shared-atlas-choices">${choices.length?choices.map(v=>`<button type="button" data-ca-attach="${Number(v.id)}" ${disabled?'disabled':''}><strong>${html(v.filename)}</strong><small>${html(v.resolution)} · ${html(v.published_id)}</small></button>`).join(''):'<small>No published, unattached atlases match the search.</small>'}</div></div>`:''}
+@@ -67,9 +70,14 @@ window.game1ConsumerAtlasEditor = (() => {
+       state.search=input.value;const offset=input.selectionStart;opts.onRender();
+       const next=find('[data-ca-search]');next?.focus();try{next?.setSelectionRange(offset,offset);}catch{}
+     };
+-    for(const b of container.querySelectorAll('[data-ca-choice]'))b.onclick=()=>run('Switching atlas',async()=>{
+-      await requestChoice('select',Number(b.dataset.caChoice));opts.onMessage('Active atlas changed. Sync Studio explicitly when ready.');
+-    });
++    for(const b of container.querySelectorAll('[data-ca-choice]'))b.onclick=()=>{
++      if(b.hasAttribute('data-ca-open-publish'))return opts.onOpenPublish?.();
++      return run('Switching atlas',async()=>{
++        await requestChoice('select',Number(b.dataset.caChoice));opts.onMessage('Active atlas changed. Sync Studio explicitly when ready.');
++      });
++    };
++    for(const b of container.querySelectorAll('.shared-atlas-unpublished [data-ca-open-publish]'))
++      b.onclick=()=>opts.onOpenPublish?.();
+     for(const b of container.querySelectorAll('[data-ca-attach]'))b.onclick=()=>run('Attaching atlas',async()=>{
+       await requestChoice('attach',Number(b.dataset.caAttach));state.picker=false;
+       opts.onMessage('Atlas attached. Select its dot to make it active; no Studio Sync performed.');
+diff --git a/system/control-center/static/deco-assets.css b/system/control-center/static/deco-assets.css
+index 91a2c6c..d752b4d 100644
+--- a/system/control-center/static/deco-assets.css
++++ b/system/control-center/static/deco-assets.css
+@@ -234,3 +234,28 @@
+ #location-asset-edit-dialog .la-sync-col {font-size:10px;color:var(--muted);font-weight:400;}
+ #location-asset-edit-dialog .la-sync-col.is-missing {color:var(--orange);}
+ #location-asset-edit-dialog .la-sync-model .la-sync-part-actions {border-top:1px solid var(--line);padding-top:7px;}
++
++/* M253 · First-time publication status is visible where the atlas is chosen. */
++#location-asset-edit-dialog .real-estate-mesh-tabs button[data-la-tab="publish"] {
++  border-color:var(--mint);color:var(--mint);font-weight:650;
++}
++#location-asset-edit-dialog .real-estate-mesh-tabs button[data-la-tab="publish"][aria-selected="false"] {
++  animation:game1-apply-pulse 1.65s ease-in-out infinite;
++}
++#location-asset-edit-dialog .la-publication-stack {display:grid;gap:9px;margin:12px 0;}
++#location-asset-edit-dialog .la-publication-resource {display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0;padding:12px;border:1px solid var(--line);border-radius:9px;background:var(--panel2);}
++#location-asset-edit-dialog .la-publication-resource>div {display:grid;gap:5px;min-width:0;}
++#location-asset-edit-dialog .la-publication-resource strong {overflow-wrap:anywhere;font-size:12px;}
++#location-asset-edit-dialog .la-publication-resource small {color:var(--muted);}
++#location-asset-edit-dialog .la-publication-stage {display:flex;align-items:center;gap:9px;min-height:30px;margin:12px 0;font-size:12px;overflow-wrap:anywhere;}
++#location-asset-edit-dialog .la-publication-warning {color:var(--orange);font-size:12px;line-height:1.5;}
++#location-asset-edit-dialog .la-publish-spinner {display:inline-block;width:16px;height:16px;flex:none;border:2px solid var(--line);border-top-color:var(--mint);border-radius:50%;animation:game1-publish-spin .8s linear infinite;}
++@keyframes game1-publish-spin {to {transform:rotate(360deg);}}
++.shared-atlas-editor .shared-atlas-unpublished {display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:9px 11px;border:1px solid var(--orange);border-radius:8px;font-size:12px;color:var(--orange);}
++.shared-atlas-editor .shared-atlas-unpublished button {font-weight:650;white-space:nowrap;}
++.shared-atlas-editor .deco-atlas-dot[data-ca-open-publish] {border-style:dashed;border-color:var(--orange);opacity:1;}
++@media(prefers-reduced-motion:reduce){
++  #location-asset-edit-dialog .real-estate-mesh-tabs button[data-la-tab="publish"] {animation:none;}
++  #location-asset-edit-dialog .la-publish-spinner {animation:none;border-top-color:var(--mint);}
++}
++#location-asset-edit-dialog .la-operation-status {display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;margin:9px 0;font-size:12px;color:var(--mint);}
+diff --git a/system/control-center/static/deco-assets.js b/system/control-center/static/deco-assets.js
+index 27e8f74..c2856bd 100644
+--- a/system/control-center/static/deco-assets.js
++++ b/system/control-center/static/deco-assets.js
+@@ -259,7 +259,9 @@ async function decoAssetChooseTexture() {
+     decoAssetState.atlasVariantId = match ? Number(match.id) : 0;
+     decoAssetState.texturePath = match ? '' : chosen.path;
+     $('picked-location-asset-texture').textContent = match
+-      ? `Existing atlas ${match.filename} selected · changed bytes require Edit → Republish after registration`
++      ? (match.published_id
++        ? `Published atlas ${match.filename} selected · changed bytes require explicit review in Edit`
++        : `Registered atlas ${match.filename} selected · after registration open Publish to create Image ID`)
+       : chosen.path;
+     decoAssetRenderTextureReferences();
+   } catch (error) { toast(error.message, true); }
+@@ -281,8 +283,8 @@ async function decoAssetRegister() {
+     });
+     await decoAssetLoad();
+     decoAssetSetForm();
+-    toast(`Registered ${row.slug} · use Edit to publish its Model and Atlas independently`);
+-    decoAssetEditOpen(row.slug);
++    toast(`Registered ${row.slug} · ready to publish`);
++    window.game1LocationAssetWorkflow.open(row.slug, 'publish');
+   } catch (error) { toast(`Register: ${error.message}`, true); }
+ }
+ async function decoAssetSaveEdits(slug, payload, expectedRevision) {
+diff --git a/system/control-center/static/index.html b/system/control-center/static/index.html
+index 125f4d3..ac3eec9 100644
+--- a/system/control-center/static/index.html
++++ b/system/control-center/static/index.html
+@@ -17,7 +17,7 @@
+ <link rel="stylesheet" href="character-assemblies.css?v=4">
+ <link rel="stylesheet" href="location-category-picker.css?v=249">
+ <link rel="stylesheet" href="location-alpha.css?v=250">
+-<link rel="stylesheet" href="deco-assets.css?v=237">
++<link rel="stylesheet" href="deco-assets.css?v=253">
+ <link rel="stylesheet" href="real-estate.css?v=247&physics=205">
+ </head>
+ <body>
+@@ -727,12 +727,13 @@
+ <script src="studio-sync.js?v=237"></script>
+ <script src="asset-atlas-actions.js?v=1"></script>
+ <script src="asset-workflow-dialog.js?v=1"></script>
+-<script src="asset-atlas-editor.js?v=234"></script>
++<script src="asset-atlas-editor.js?v=253"></script>
+ <script src="mesh-authoring.js?v=1"></script>
+ <script src="location-category-picker.js?v=249"></script>
+-<script src="deco-assets.js?v=249"></script>
++<script src="deco-assets.js?v=253"></script>
+ <script src="place-registry.js?v=250"></script>
+-<script src="location-asset-workflow.js?v=250"></script>
++<script src="location-publication-state.js?v=253"></script>
++<script src="location-asset-workflow.js?v=253"></script>
+ <script src="asset-audit.js?v=2"></script>
+ <script src="atlas-library.js?v=2"></script>
+ <script src="options.js?v=1"></script>
+diff --git a/system/control-center/static/location-asset-workflow.js b/system/control-center/static/location-asset-workflow.js
+index c9ef30a..1e1ad10 100644
+--- a/system/control-center/static/location-asset-workflow.js
++++ b/system/control-center/static/location-asset-workflow.js
+@@ -3,7 +3,7 @@
+  */
+ window.game1LocationAssetWorkflow = (() => {
+   const state={slug:'',tab:'model',busy:false,result:'',error:false,manualSlug:false,identityDraft:null,
+-    pendingModel:'',inspection:null,meshOptions:{},physicsDirty:false,scan:null,scanStale:false,alphaDraft:null,
++    pendingModel:'',inspection:null,meshOptions:{},physicsDirty:false,scan:null,scanStale:false,alphaDraft:null,publication:null,
+     atlas:window.game1ConsumerAtlasEditor.newState()};
+   const shell=window.game1AssetWorkflowDialog;
+   const e=value=>esc(String(value??''));
+@@ -11,7 +11,7 @@ window.game1LocationAssetWorkflow = (() => {
+   const button=(action,label,disabled=false,css='')=>
+     `<button type="button" class="${css}" data-la-action="${action}" ${disabled?'disabled':''}>${label}</button>`;
+   const dialog=()=>shell.ensure('location-asset-edit-dialog','Manage Location Asset',()=>{
+-    state.slug='';state.pendingModel='';state.scan=null;state.scanStale=false;state.identityDraft=null;state.alphaDraft=null;state.atlas=window.game1ConsumerAtlasEditor.newState();
++    state.slug='';state.pendingModel='';state.scan=null;state.scanStale=false;state.identityDraft=null;state.alphaDraft=null;state.publication=null;state.atlas=window.game1ConsumerAtlasEditor.newState();
+   });
+   const close=()=>{const d=document.getElementById('location-asset-edit-dialog');if(d?.open)d.close();};
+   function open(slug,initialTab='identity'){
+@@ -20,7 +20,7 @@ window.game1LocationAssetWorkflow = (() => {
+     if(state.busy)return toast('Finish the current operation first.',true);
+     const d=dialog();if(d.open && state.slug!==slug)d.close();
+     state.slug=slug;state.tab=initialTab;state.busy=false;state.scan=null;state.scanStale=false;state.pendingModel='';state.manualSlug=false;state.identityDraft=null;
+-    state.alphaDraft=null;state.inspection=item.fbxAnalysis||null;
++    state.alphaDraft=null;state.publication=null;state.inspection=item.fbxAnalysis||null;
+     state.meshOptions=window.game1MeshAuthoring.seeded(state.inspection,item.meshOptions||{});
+     state.physicsDirty=false;state.atlas=window.game1ConsumerAtlasEditor.newState();
+     message('');render();if(!d.open)d.showModal();
+@@ -29,10 +29,10 @@ window.game1LocationAssetWorkflow = (() => {
+   function message(text,isError=false){state.result=String(text||'');state.error=Boolean(isError);}
+   async function run(label,task){
+     if(state.busy)return;
+-    state.busy=true;message(`${label}…`);render();
++    state.busy=true;state.operationLabel=label;message(`${label}…`);render();
+     try{return await task();}
+     catch(error){message(error?.message||String(error),true);return null;}
+-    finally{state.busy=false;render();}
++    finally{state.busy=false;state.operationLabel='';render();}
+   }
+   function render(){
+     const d=document.getElementById('location-asset-edit-dialog');
+@@ -48,8 +48,12 @@ window.game1LocationAssetWorkflow = (() => {
+     const changed=Boolean(state.pendingModel||state.physicsDirty);
+     const needsPublication=Boolean(state.pendingModel||!modelCurrent);
+     const publicationReady=Boolean(configured&&(state.pendingModel||item.model_path));
++    const publication=window.game1LocationPublication.plan(item,
++      decoAssetState.data?.atlases||[],Boolean(state.pendingModel));
++    const showPublish=publication.count>0||state.tab==='publish'||Boolean(state.publication);
+     const tabs=[{id:'identity',label:'Identity'},{id:'model',label:'Model · FBX'},
+-      {id:'atlas',label:'Texture · atlas'}];
++      {id:'atlas',label:'Texture · atlas'},
++      ...(showPublish?[{id:'publish',label:`Publish${publication.count?' · '+publication.count:''}`}]:[])];
+     const card=(name,description,content,status='',css='ready')=>shell.step(name,description,content,status,css);
+     const identityData=state.identityDraft||{nameEn:item.name_en,slug:item.slug,
+       category:item.category,surfaceMaterial:item.surfaceMaterial||'default',destructible:Boolean(item.destructible)};
+@@ -84,7 +88,33 @@ window.game1LocationAssetWorkflow = (() => {
+       `<div class="actions">${button('apply-alpha','Apply Changes',busy||!alphaDirty,alphaDirty?'asset-apply-ready':'')}</div></section>`;
+     const atlas=alphaEditor+window.game1ConsumerAtlasEditor.render(state.atlas,{
+       currentId:item.atlasVariantId||0,linked:item.atlasVariants||[],
+-      catalog:decoAssetState.data?.atlases||[],busy});
++      catalog:decoAssetState.data?.atlases||[],busy,openPublish:publication.atlasNeeded});
++    // Publication is a separate operation from source registration and Studio Sync.
++    // Busy stages show the actual awaited network operation, not a fabricated %.
++    const publicationStatus=(key,label,pending)=>{
++      const progress=state.publication?.[key]||'';
++      const text=progress==='running'?'Publishing…':progress==='done'?'Published ✓':
++        progress==='error'?'Publication failed':pending?'Ready for publication':'Published ✓';
++      return `<div class="la-publication-resource"><div><strong>${label}</strong><small>${text}</small></div>`+
++        `<span class="${progress==='running'?'la-publish-spinner':''}" aria-hidden="true"></span></div>`;
++    };
++    const publishPanel=card('Publish resources',
++      'Регистрация сохраняет исходники. Публикация создаёт Roblox ID. Studio Sync выполняется отдельно.',
++      `<div class="la-publication-stack">`+
++      publicationStatus('atlas',`Atlas · ${e(publication.variant?.filename||'не выбран')}`,publication.atlasNeeded)+
++      publicationStatus('model','Model · FBX',publication.modelNeeded)+`</div>`+
++      (state.physicsDirty&&!publication.modelNeeded?'<p class="la-publication-warning">Есть изменения физических настроек MeshPart. Сохрани их через Model · FBX → Apply Changes.</p>':'')+
++      (publication.reviewRequired?'<p class="la-publication-warning">Атлас уже имеет Image ID, но изменён. Для замены общего атласа открой Texture · atlas и подтверди замену после просмотра.</p>':'')+
++      `<div class="la-publication-stage" role="status" aria-live="polite">`+
++      (state.publication?.active?`<span class="${state.publication.running?'la-publish-spinner':''}" aria-hidden="true"></span><span>${e(state.publication.active)}</span>`:
++        publication.count?'Готово к публикации · Place не будет изменён.':'Все выбранные ресурсы опубликованы.')+
++      `</div><div class="actions">${button('publish-ready',`Publish ready · ${publication.count}`,
++        busy||!publication.count||!configured,'la-publish-primary '+(publication.count?'asset-apply-ready':''))}</div>`+
++      (!configured&&publication.count?'<small class="la-publication-warning">Настрой Open Cloud, чтобы опубликовать ресурсы.</small>':'')+
++      `<small>Публикация атласа не перепубликует Model. Публикация Model не публикует атлас. `+
++      `Если один этап завершится ошибкой, успешный ID сохранится, повторятся только незавершённые этапы.</small>`,
++      publication.count?`${publication.count} ожидает публикации`:'Готово',publication.count?'pending':'ready');
++    const busyStatus=busy&&state.tab!=='publish'?`<div class="la-operation-status" role="status" aria-live="polite"><span class="la-publish-spinner" aria-hidden="true"></span>${e(state.operationLabel||state.result||'Подготовка ресурса…')}</div>`:'';
+     const preview=state.scan;
+     const scanValid=preview&&preview.modelId===String(item.model_asset_id||'')&&
+       preview.atlasId===String(item.texture_asset_id||'')&&
+@@ -176,8 +206,8 @@ window.game1LocationAssetWorkflow = (() => {
+       selected?'Проверка завершена':'Сначала Find',selected?'ready':'pending');
+     d.innerHTML=`<div class="real-estate-mesh-dialog-head"><div><small class="eyebrow">Location Asset · ${e(item.slug)}</small>`+
+       `<h3>Manage ${e(item.name_en)}</h3></div><button type="button" data-la-close aria-label="Close">✕</button></div>`+
+-      `<div class="real-estate-mesh-dialog-body" aria-busy="${busy}">${shell.tabs(tabs,state.tab,'data-la-tab')}`+
+-      `${state.tab==='identity'?identity:state.tab==='model'?model:atlas}${footer}`+
++      `<div class="real-estate-mesh-dialog-body" aria-busy="${busy}">${shell.tabs(tabs,state.tab,'data-la-tab')}${busyStatus}`+
++      `${state.tab==='identity'?identity:state.tab==='model'?model:state.tab==='atlas'?atlas:publishPanel}${state.tab==='publish'?'':footer}`+
+       `<div class="real-estate-workflow-result ${state.error?'issue':''}" role="status" ${state.result?'':'hidden'}>${e(state.result)}</div></div>`;
+     d.querySelector('.real-estate-mesh-dialog-body').scrollTop=scrollBody;
+     const newList=d.querySelector('.la-sync-list');if(newList)newList.scrollTop=scrollList;
+@@ -231,6 +261,7 @@ window.game1LocationAssetWorkflow = (() => {
+       getRevision:()=>row()?.bindingRevision||0,getCurrentId:()=>row()?.atlasVariantId||0,
+       catalog:decoAssetState.data?.atlases||[],
+       filePicker:'/api/files/choose-location-asset-texture',
++      onOpenPublish:()=>{state.tab='publish';render();},
+       onMessage:message,onRender:render,onRefresh:decoAssetLoad,
+     });
+   }
+@@ -248,6 +279,69 @@ window.game1LocationAssetWorkflow = (() => {
+       state.alphaDraft=null;state.scanStale=true;
+       message(`Alpha ${saved.alphaEnabled?'включён':'выключен'}. Model/Atlas ID не изменены. Нужен Sync размещённых моделей.`);
+     });
++    if(action==='publish-ready')return run('Publishing new resources',async()=>{
++      const initial=window.game1LocationPublication.plan(row(),decoAssetState.data?.atlases||[],Boolean(state.pendingModel));
++      if(!initial.count){message('Все выбранные ресурсы уже опубликованы.');return;}
++      state.tab='publish';
++      state.publication={atlas:initial.atlasNeeded?'waiting':'',
++        model:initial.modelNeeded?'waiting':'',active:'',running:false};
++      const stage=(key,label,status)=>{
++        state.publication[key]=status;
++        state.publication.active=label;
++        state.publication.running=status==='running';
++        render();
++      };
++      let completed=0;
++      try{
++        // Publish atlas first: the registration has already staged its source
++        // in the independent Atlas Registry; do not make the user choose it again.
++        if(initial.atlasNeeded){
++          stage('atlas','Публикуем выбранный Atlas в Roblox Open Cloud…','running');
++          const current=row();
++          const result=await request(`/api/location-assets/${encodeURIComponent(state.slug)}/publish-pending-atlas`,{
++            method:'POST',headers:{'Content-Type':'application/json'},
++            body:JSON.stringify({variantId:Number(initial.variant.id),
++              expectedRevision:Number(current.bindingRevision||0)}),
++          });
++          if(result.resourceKind!=='Atlas'||!result.publishedAssetId)
++            throw Error('Atlas publication did not confirm a new Image ID; inspect history before retrying');
++          stage('atlas',`Atlas опубликован · Image ID ${result.publishedAssetId}`,'done');
++          completed++;
++          await decoAssetLoad();
++          state.scanStale=true;
++          if(result.exportWarnings?.length)message(result.exportWarnings.join(' | '),true);
++        }
++        if(initial.modelNeeded){
++          if(state.pendingModel||state.physicsDirty){
++            stage('model','Сохраняем выбранный FBX и настройки мешей…','running');
++            await decoAssetSaveEdits(state.slug,{
++              ...(state.pendingModel?{modelSourcePath:state.pendingModel}:{}),
++              meshOptions:state.meshOptions},Number(row().revision));
++            state.pendingModel='';state.physicsDirty=false;
++            state.inspection=row()?.fbxAnalysis||state.inspection;
++          }
++          stage('model','Публикуем Model в Roblox Open Cloud…','running');
++          const result=await decoAssetPublish(state.slug,'model',false);
++          stage('model',`Model опубликован · Model ID ${result.model_asset_id}`,'done');
++          completed++;
++          state.scanStale=true;
++        }
++        state.publication.active=`Готово: опубликовано ${completed} ресурс(а). Studio Sync отдельно.`;
++        state.publication.running=false;
++        if(!state.error)message(state.publication.active);
++      }catch(error){
++        // A remote upload can complete even when the response is lost. Refresh
++        // published IDs before a user retries; never assume a failed HTTP
++        // response means Roblox did not create an asset.
++        await decoAssetLoad();
++        const key=state.publication.model==='running'?'model':'atlas';
++        state.publication[key]='error';
++        state.publication.active=`Ошибка этапа ${key==='atlas'?'Atlas':'Model'}: ${error?.message||String(error)}. `+
++          `Уже подтверждено: ${completed}. Проверь обновлённые ID перед повторным запуском.`;
++        state.publication.running=false;
++        throw Error(state.publication.active);
++      }
++    });
+     if(action==='delete')return decoAssetDelete(state.slug);
+     if(action==='save-identity'){
+       // Capture the user's edits BEFORE run() re-renders the modal as busy.
+diff --git a/system/control-center/static/location-publication-state.js b/system/control-center/static/location-publication-state.js
+new file mode 100644
+index 0000000..9f7ed33
+--- /dev/null
++++ b/system/control-center/static/location-publication-state.js
+@@ -0,0 +1,20 @@
++/* Location Assets publication policy. Pure UI decisions; no network or Studio.
++ * Never queue replacement of an already published shared atlas. */
++window.game1LocationPublication = (() => {
++  const variantFor = (item, catalog = []) => {
++    const id = Number(item?.atlasVariantId || 0);
++    if (!id) return null;
++    return (item?.atlasVariants || []).find(v => Number(v.id) === id) ||
++      catalog.flatMap(family => family.variants || []).find(v => Number(v.id) === id) || null;
++  };
++  function plan(item, catalog = [], hasNewFbx = false) {
++    const selected = variantFor(item, catalog);
++    const modelNeeded = Boolean(hasNewFbx || (item?.model_path &&
++      (!item.model_asset_id || item.model_sha256 !== item.model_published_sha256)));
++    const atlasNeeded = Boolean(selected && !selected.retired && !selected.published_id);
++    const reviewRequired = Boolean(selected && !selected.retired && selected.published_id && !selected.current);
++    return {variant: selected, modelNeeded, atlasNeeded, reviewRequired,
++      count: Number(modelNeeded) + Number(atlasNeeded)};
++  }
++  return Object.freeze({plan});
++})();
+diff --git a/system/verify/location_meshpart_sync_m237.js b/system/verify/location_meshpart_sync_m237.js
+index 92af299..4da53df 100644
+--- a/system/verify/location_meshpart_sync_m237.js
++++ b/system/verify/location_meshpart_sync_m237.js
+@@ -43,6 +43,7 @@ sandbox.window.game1StudioSync={scanLocation:async()=>({studio:scan}),
+   replaceLocation:async(_,__,selectedKeys)=>{calls.push(selectedKeys);return {studio:{fullySynced:false}};},
+   locationSummary:()=>''};
+ sandbox.window.confirm=()=>true;
++vm.runInNewContext(fs.readFileSync(path.join(root,'location-publication-state.js'),'utf8'),sandbox);
+ vm.runInNewContext(fs.readFileSync(path.join(root,'location-asset-workflow.js'),'utf8'),sandbox);
+ (async()=>{
+   await sandbox.window.game1LocationAssetWorkflow.startScan('christmas_tree');
+@@ -50,7 +51,7 @@ vm.runInNewContext(fs.readFileSync(path.join(root,'location-asset-workflow.js'),
+   for(const fragment of ['Актуальные Mesh ID','116267630909794','130407188742566',
+     'Найдено 4 MeshPart · 2 моделей','Mesh ✓ актуальный','Mesh ✕ устаревший',
+     'Texture ✕ устаревший','Select All · Studio','Sync All',
+-    'Историческая модель без привязки']){
++    'Найдено по Mesh ID, без привязки к текущему ассету']){
+     assert(html.includes(fragment),fragment);
+   }
+   assert.strictEqual((html.match(/data-la-model-key=/g)||[]).length,2,'Models grouped');
+diff --git a/system/verify/location_model_group_sync_m239.js b/system/verify/location_model_group_sync_m239.js
+index 1e390d1..10d4906 100644
+--- a/system/verify/location_model_group_sync_m239.js
++++ b/system/verify/location_model_group_sync_m239.js
+@@ -82,6 +82,7 @@ context.window.game1StudioSync={
+   replaceLocation:async(_slug,_token,keys)=>{calls.sync.push(keys);return {studio:{fullySynced:true}};},
+   locationSummary:()=>'',
+ };
++vm.runInNewContext(fs.readFileSync(path.join(root,'location-publication-state.js'),'utf8'),context);
+ vm.runInNewContext(fs.readFileSync(path.join(root,'location-asset-workflow.js'),'utf8'),context);
+ (async()=>{
+   context.window.game1LocationAssetWorkflow.open('birch_01');
+diff --git a/system/verify/location_publication_m253.js b/system/verify/location_publication_m253.js
+new file mode 100644
+index 0000000..8b0ca1f
+--- /dev/null
++++ b/system/verify/location_publication_m253.js
+@@ -0,0 +1,22 @@
++/* M253: UI policy and registered atlas editor support first-time publication. */
++const fs=require('node:fs');const vm=require('node:vm');const assert=require('node:assert/strict');
++const root=require('node:path').resolve(__dirname,'../control-center/static');
++const sandbox={window:{},console};vm.createContext(sandbox);
++vm.runInContext(fs.readFileSync(root+'/location-publication-state.js','utf8'),sandbox);
++const plan=sandbox.window.game1LocationPublication.plan;
++const atlas={id:38,filename:'bush_02_512x512_atlas.png',published_id:null,current:false,retired:false};
++const item={atlasVariantId:38,atlasVariants:[atlas],model_path:'bush_02.fbx',model_sha256:'abc',
++  model_published_sha256:'',model_asset_id:''};
++let x=plan(item);assert.equal(x.count,2);assert.equal(x.atlasNeeded,true);assert.equal(x.modelNeeded,true);
++assert.equal(x.reviewRequired,false);
++const modelPublished={...item,model_asset_id:'123456',model_published_sha256:'abc'};
++x=plan(modelPublished);assert.equal(x.count,1);assert.equal(x.modelNeeded,false);
++x=plan({...modelPublished,atlasVariants:[{...atlas,published_id:'8888',current:true}]});
++assert.equal(x.count,0);
++x=plan({...modelPublished,atlasVariants:[{...atlas,published_id:'8888',current:false}]});
++assert.equal(x.count,0);assert.equal(x.reviewRequired,true);
++x=plan(modelPublished,[],true);assert.equal(x.count,2);
++const html=fs.readFileSync(root+'/asset-atlas-editor.js','utf8');
++assert.match(html,/data-ca-open-publish/);
++assert.match(html,/onOpenPublish/);
++console.log('M253 publication policy: 5 scenarios passed');
+diff --git a/system/verify/location_studio_select_m238.js b/system/verify/location_studio_select_m238.js
+index cb2d958..77bfe2a 100644
+--- a/system/verify/location_studio_select_m238.js
++++ b/system/verify/location_studio_select_m238.js
+@@ -51,6 +51,7 @@ ctx.window.game1StudioSync={scanLocation:async()=>({studio:scan}),
+   selectLocation:async(_,__,partKeys)=>({studio:{selectedCount:partKeys.length,selectedPath:''}}),
+   replaceLocation:async()=>({studio:{fullySynced:false}}),locationSummary:()=>''};
+ ctx.window.confirm=()=>true;
++vm.runInNewContext(fs.readFileSync(path.join(root,'location-publication-state.js'),'utf8'),ctx);
+ vm.runInNewContext(fs.readFileSync(path.join(root,'location-asset-workflow.js'),'utf8'),ctx);
+ (async()=>{
+   await ctx.window.game1LocationAssetWorkflow.startScan('christmas_tree');
+@@ -61,7 +62,7 @@ vm.runInNewContext(fs.readFileSync(path.join(root,'location-asset-workflow.js'),
+   assert(dialog.innerHTML.includes('COL ✓ · 1'));
+   assert(!dialog.innerHTML.includes('2. col_mesh'),
+     'COL MeshPart must not render as a separate row');
+-  assert(dialog.innerHTML.includes('Историческая модель без привязки'));
++  assert(dialog.innerHTML.includes('Найдено по Mesh ID, без привязки к текущему ассету'));
+   assert(dialog.innerHTML.includes('Link historical model'));
+   scroll.body=187;scroll.list=245;
+   ctx.window.game1LocationAssetWorkflow.render();
+diff --git a/system/verify/test_location_publication_m253.py b/system/verify/test_location_publication_m253.py
+new file mode 100644
+index 0000000..139c9ae
+--- /dev/null
++++ b/system/verify/test_location_publication_m253.py
+@@ -0,0 +1,112 @@
++"""M253: registered but unpublished Location Atlas is publishable without re-choosing a file."""
++from __future__ import annotations
++
++import sys
++from pathlib import Path
++from tempfile import TemporaryDirectory
++from unittest import TestCase, mock
++from PIL import Image
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / 'system/control-center'))
++from location_asset_store import LocationAssetStore
++from api.write_world import route
++from services.location_atlas_publication import publish_pending_atlas
++
++
++class FirstPublicationM253(TestCase):
++    def setUp(self):
++        folder = TemporaryDirectory()
++        self.addCleanup(folder.cleanup)
++        self.root = Path(folder.name)
++        image = self.root / 'bush_02_32x32_atlas.png'
++        Image.new('RGBA', (32,32), (40,100,70,127)).save(image)
++        self.model = self.root / 'bush_02.fbx'
++        self.model.write_bytes(b'test source; publication never reads this file')
++        self.assets = LocationAssetStore(self.root)
++        self.row = self.assets.register(dict(
++            nameEn='Bush 02', slug='bush_02', category='bush',
++            modelSourcePath=str(self.model),textureSourcePath=str(image)))
++        self.id = self.row['atlasVariantId']
++        self.original_model = self.row['model_asset_id']
++
++    def fake_publish(self, variant_id, creds, description):
++        self.assertEqual(variant_id,self.id)
++        self.assertIn('bush_02',description)
++        self.assertTrue(creds.get('apiKey'))
++        with self.assets.connect() as db:
++            db.execute('UPDATE texture_atlas_variants SET published_id=?,published_sha256=source_sha256 WHERE id=?',
++                       ('899911',variant_id))
++        return self.assets.atlases.get_variant(variant_id)
++
++    def test_new_registration_pending_and_first_publication_does_not_publish_model(self):
++        fresh = self.assets.get('bush_02')
++        self.assertFalse(fresh['texture_asset_id'])
++        self.assertFalse(self.assets.atlases.get_variant(self.id)['current'])
++        with mock.patch.object(self.assets.atlases,'ensure_published',side_effect=self.fake_publish) as upload:
++            response=publish_pending_atlas(self.assets,'bush_02',variant_id=self.id,
++                expected_revision=fresh['bindingRevision'],credentials={'apiKey':'test'})
++            upload.assert_called_once()
++        self.assertEqual(response['publishedAssetId'],'899911')
++        self.assertEqual(response['resourceKind'],'Atlas')
++        self.assertTrue(response['studioSyncRequired'])
++        self.assertEqual(self.assets.get('bush_02')['model_asset_id'],self.original_model)
++        self.assertEqual(self.assets.get('bush_02')['texture_asset_id'],'899911')
++        with self.assertRaisesRegex(ValueError,'already has an Image ID'):
++            self.assets.atlases.publish_initial(self.id,{},'must not republish')
++
++    def test_wrong_consumer_and_stale_binding_never_upload(self):
++        with mock.patch.object(self.assets.atlases,'ensure_published') as upload:
++            for slug,variant,rev in [('another',self.id,self.row['bindingRevision']),
++                                     ('bush_02',self.id+10,self.row['bindingRevision']),
++                                     ('bush_02',self.id,self.row['bindingRevision']+1)]:
++                with self.subTest(slug=slug,variant=variant,rev=rev), self.assertRaises(ValueError):
++                    publish_pending_atlas(self.assets,slug,variant_id=variant,
++                        expected_revision=rev,credentials={})
++            upload.assert_not_called()
++
++    def test_export_failure_after_upload_returns_warning_not_retry_error(self):
++        with mock.patch.object(self.assets.atlases,'ensure_published',side_effect=self.fake_publish):
++            response=publish_pending_atlas(self.assets,'bush_02',variant_id=self.id,
++                expected_revision=self.row['bindingRevision'],credentials={'apiKey':'test'},
++                exports=[('Test',mock.Mock(side_effect=OSError('disk full')))])
++        self.assertIn('disk full',response['exportWarnings'][0])
++        self.assertEqual(response['publishedAssetId'],'899911')
++
++    def test_http_route_contract_and_payload_validation(self):
++        deps=dict.fromkeys(('deco_layouts','locations','monster_spawns','npc_place_spawn',
++                'npc_register_spawn','npc_spawns','options_store','request_active_studio_save',
++                'run_timeline_editor_bridge','sync_monster_to_studio','timelines'))
++        deps.update(location_assets=self.assets,real_estate=mock.Mock(),
++                    publication_credentials=lambda _description:{'apiKey':'test'})
++        url='/api/location-assets/bush_02/publish-pending-atlas'
++        payload={'variantId':self.id,'expectedRevision':self.row['bindingRevision']}
++        with mock.patch.object(self.assets.atlases,'ensure_published',side_effect=self.fake_publish):
++            status,response=route(url,lambda:payload,deps)
++        self.assertEqual(status,200,response)
++        self.assertEqual(response['publishedAssetId'],'899911')
++        self.assertEqual(response['resourceKind'],'Atlas')
++        for invalid in ({'variantId':str(self.id),'expectedRevision':1},
++                        {'variantId':self.id,'expectedRevision':'1'},
++                        {'variantId':True,'expectedRevision':1}):
++            status,_=route(url,lambda invalid=invalid:invalid,deps)
++            self.assertEqual(status,400)
++        status,response=route(url,lambda:payload,deps)
++        self.assertEqual(status,400)
++        self.assertIn('already has an Image ID',response['error'])
++
++    def test_client_workflow_has_explicit_publication_stages(self):
++        ui=(ROOT/'system/control-center/static/location-asset-workflow.js').read_text('utf8')
++        server=(ROOT/'system/control-center/api/write_dispatch.py').read_text('utf8')
++        self.assertIn("state.tab='publish'",ui)
++        self.assertIn("action==='publish-ready'",ui)
++        self.assertIn('publish-pending-atlas',ui)
++        self.assertIn('result.resourceKind',ui)
++        self.assertIn('onOpenPublish',ui)
++        self.assertIn('upload', (ROOT/'system/control-center/services/texture_atlas_registry.py').read_text('utf8'))
++        self.assertIn('publish-pending-atlas',server)
++
++
++if __name__ == '__main__':
++    import unittest
++    unittest.main()

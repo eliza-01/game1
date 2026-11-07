@@ -42,6 +42,8 @@
       },
       "StudioPlaceRegistryCommands": {"$path": "modules/StudioPlaceRegistryCommands.luau"},
       "StudioPlaceRegistryInventory": {"$path": "modules/StudioPlaceRegistryInventory.luau"},
+      "StudioLocationPublishedGeometry": {"$path": "modules/StudioLocationPublishedGeometry.luau"},
+      "StudioLocationPlacementHistory": {"$path": "modules/StudioLocationPlacementHistory.luau"},
       "StudioLocationMeshNames": {"$path": "modules/StudioLocationMeshNames.luau"},
       "StudioLocationPlacementOwner": {"$path": "modules/StudioLocationPlacementOwner.luau"},
       "StudioLocationPlacedGeometry": {"$path": "modules/StudioLocationPlacedGeometry.luau"},

@@ -227,7 +227,7 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                     local previousChildren=rigChildren(model)
                     History.VerifyChildren(previousPublished,previousChildren)
                     local anchor=Geometry.Align(stage,previousPublished,model)
-                    Placement.PreparePlaced(stage,row.meshOptions,row.surfaceMaterial,row.materialDefinition and row.materialDefinition.robloxMaterial)
+                    Placement.PrepareSynced(stage,row.meshOptions,row.surfaceMaterial,row.materialDefinition and row.materialDefinition.robloxMaterial)
                     transaction = RigSwap.Prepare(model, previousChildren, rigChildren(stage),
                         {preferredPrimary=anchor})
                 end)
@@ -272,7 +272,10 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
             if changeRef then add("model_reference", oldRef, modelId, 1) end
             for _, change in ipairs(atlasChanges) do add("atlas", change.oldId, atlasId, 1) end
             for _, change in ipairs(alphaChanges) do
-                add("alpha",if change.mode then tostring(change.mode) else "missing",
+                -- Persist the stable enum name. tostring(EnumItem) includes the
+                -- "Enum.AlphaMode." prefix and does not fit the audit value
+                -- contract used after Studio has already committed the edit.
+                add("alpha",if change.mode then change.mode.Name else "missing",
                     if row.alphaEnabled==true then "Transparency" else "Opaque",1)
             end
             local beforeMeshes=if geometry then History.Describe(previousModelId,model).meshes else {}

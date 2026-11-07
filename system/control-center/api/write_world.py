@@ -46,6 +46,26 @@ def route(path, body, deps):
     sync_monster_to_studio = deps["sync_monster_to_studio"]
     timelines = deps["timelines"]
 
+    if path.startswith('/api/location-assets/') and path.endswith('/publish-pending-atlas'):
+        from services.location_atlas_publication import publish_pending_atlas
+        try:
+            slug = path[len('/api/location-assets/'):-len('/publish-pending-atlas')].strip('/')
+            if not re.fullmatch(r'[a-z0-9][a-z0-9_]{0,63}', slug):
+                raise ValueError('invalid Location Asset slug')
+            payload = body()
+            if not isinstance(payload, dict) or type(payload.get('variantId')) is not int or type(payload.get('expectedRevision')) is not int:
+                raise ValueError('variantId and expectedRevision must be integers')
+            if payload['variantId'] <= 0 or payload['expectedRevision'] < 0:
+                raise ValueError('invalid atlas publication revision')
+            result = publish_pending_atlas(location_assets, slug,
+                variant_id=payload['variantId'], expected_revision=payload['expectedRevision'],
+                credentials=publication_credentials('game1 atlas first publication'),
+                exports=[('Location Assets', location_assets.export),
+                         ('Real Estate', deps['real_estate'].export)])
+            return out(200, result)
+        except (ValueError, OSError, RuntimeError, KeyError) as error:
+            return out(400, {'error': str(error)})
+
     if path == '/api/texture-atlases/preview-source':
         try:
             result=AtlasSourceReview(location_assets.atlases).inspect(body().get('sourcePath') or '')
@@ -128,14 +148,22 @@ def route(path, body, deps):
             row = location_assets.get(slug)
             if not row:
                 raise ValueError('unknown location asset')
-            if row.get('status') != 'PUBLISHED':
-                raise ValueError('publish this Location Asset before Studio Sync')
+            # Studio Sync consumes the last published immutable IDs, not the
+            # aggregate authoring status.  A newly edited asset is commonly
+            # UPDATE_AVAILABLE while its previous Model/Atlas publications
+            # remain valid Sync inputs.  Gate each resource explicitly so the
+            # action stays available without ever sending a local file to
+            # Studio as though it were a published Roblox asset.
+            if not str(row.get('model_asset_id') or ''):
+                raise ValueError('publish the Location Asset Model before Studio Sync')
             # The M203 independent binding is a direct slug->variant relation.
             # Legacy inherited bindings cannot be acknowledged by a scoped Sync.
             if row.get('atlasBindingSourceSlug') not in (None, '', slug):
                 raise ValueError('independent atlas binding required for scoped Studio Sync')
             if not location_assets.atlases.binding('location_asset', slug):
                 raise ValueError('direct atlas binding not found')
+            if not str(row.get('texture_asset_id') or ''):
+                raise ValueError('publish the selected Location Asset Atlas before Studio Sync')
             revision = row.get('bindingRevision')
             if type(revision) is not int or revision < 1:
                 raise ValueError('invalid Location Asset atlas binding revision')

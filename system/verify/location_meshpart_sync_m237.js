@@ -43,6 +43,7 @@ sandbox.window.game1StudioSync={scanLocation:async()=>({studio:scan}),
   replaceLocation:async(_,__,selectedKeys)=>{calls.push(selectedKeys);return {studio:{fullySynced:false}};},
   locationSummary:()=>''};
 sandbox.window.confirm=()=>true;
+vm.runInNewContext(fs.readFileSync(path.join(root,'location-publication-state.js'),'utf8'),sandbox);
 vm.runInNewContext(fs.readFileSync(path.join(root,'location-asset-workflow.js'),'utf8'),sandbox);
 (async()=>{
   await sandbox.window.game1LocationAssetWorkflow.startScan('christmas_tree');
@@ -50,7 +51,7 @@ vm.runInNewContext(fs.readFileSync(path.join(root,'location-asset-workflow.js'),
   for(const fragment of ['Актуальные Mesh ID','116267630909794','130407188742566',
     'Найдено 4 MeshPart · 2 моделей','Mesh ✓ актуальный','Mesh ✕ устаревший',
     'Texture ✕ устаревший','Select All · Studio','Sync All',
-    'Историческая модель без привязки']){
+    'Найдено по Mesh ID, без привязки к текущему ассету']){
     assert(html.includes(fragment),fragment);
   }
   assert.strictEqual((html.match(/data-la-model-key=/g)||[]).length,2,'Models grouped');

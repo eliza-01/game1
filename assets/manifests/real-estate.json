@@ -8669,6 +8669,63 @@
       ]
     },
     {
+      "atlasKey": "bush_02",
+      "baseKey": "bush",
+      "version": "02",
+      "variants": [
+        {
+          "id": 38,
+          "family_id": 31,
+          "width": 512,
+          "height": 512,
+          "filename": "bush_02_512x512_atlas.png",
+          "original_filename": "bush_02_512x512_atlas.png",
+          "source_path": "assets/source/texture-atlases/bush_02/512x512/bush_02_512x512_atlas.png",
+          "source_sha256": "99d73d546a2dd410a92d990af353bed5e534b65505e6e78e46be58617da650d8",
+          "uses_alpha": true,
+          "published_id": null,
+          "published_sha256": "",
+          "moderation_state": "",
+          "published_at": null,
+          "created_at": 1794029745.0137124,
+          "retired_at": null,
+          "atlas_key": "bush_02",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": false,
+          "replacementPending": false,
+          "resolution": "512x512",
+          "baseKey": "bush",
+          "version": "02"
+        },
+        {
+          "id": 39,
+          "family_id": 31,
+          "width": 256,
+          "height": 256,
+          "filename": "bush_02_256x256_atlas.png",
+          "original_filename": "bush_02_256x256_atlas.png",
+          "source_path": "assets/source/texture-atlases/bush_02/256x256/bush_02_256x256_atlas.png",
+          "source_sha256": "9add94f2c544f769c9a2dcbb77640963b0816ee7a4bfa7267dab5f984db546fb",
+          "uses_alpha": true,
+          "published_id": "132935707489810",
+          "published_sha256": "9add94f2c544f769c9a2dcbb77640963b0816ee7a4bfa7267dab5f984db546fb",
+          "moderation_state": "Reviewing",
+          "published_at": 1794029796.473871,
+          "created_at": 1794029792.7732327,
+          "retired_at": null,
+          "atlas_key": "bush_02",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "256x256",
+          "baseKey": "bush",
+          "version": "02"
+        }
+      ]
+    },
+    {
       "atlasKey": "campfire_01",
       "baseKey": "campfire",
       "version": "01",
@@ -9019,6 +9076,31 @@
       "version": "01",
       "variants": [
         {
+          "id": 36,
+          "family_id": 2,
+          "width": 256,
+          "height": 512,
+          "filename": "lantern_01_256x512_atlas.png",
+          "original_filename": "lantern_01_256x512_atlas.png",
+          "source_path": "assets/source/texture-atlases/lantern_01/256x512/lantern_01_256x512_atlas.png",
+          "source_sha256": "60d15719665fb49f73256e8bfc10c5083c74b95645dbbb34807b82d3c77f9321",
+          "uses_alpha": true,
+          "published_id": "74839303464750",
+          "published_sha256": "60d15719665fb49f73256e8bfc10c5083c74b95645dbbb34807b82d3c77f9321",
+          "moderation_state": "Reviewing",
+          "published_at": 1794026041.6063218,
+          "created_at": 1794026037.3819716,
+          "retired_at": null,
+          "atlas_key": "lantern_01",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "256x512",
+          "baseKey": "lantern",
+          "version": "01"
+        },
+        {
           "id": 3,
           "family_id": 2,
           "width": 64,
@@ -9295,6 +9377,38 @@
       ]
     },
     {
+      "atlasKey": "stone_fence_01",
+      "baseKey": "stone_fence",
+      "version": "01",
+      "variants": [
+        {
+          "id": 35,
+          "family_id": 29,
+          "width": 256,
+          "height": 512,
+          "filename": "stone_fence_01_256x512_atlas.png",
+          "original_filename": "stone_fence_01_256x512_atlas.png",
+          "source_path": "assets/source/texture-atlases/stone_fence_01/256x512/stone_fence_01_256x512_atlas.png",
+          "source_sha256": "81342862d13fd7d1792a11957d0cb8af6bde9d25b6f1f1f5cc169cda944f5fbe",
+          "uses_alpha": true,
+          "published_id": "112528588819051",
+          "published_sha256": "81342862d13fd7d1792a11957d0cb8af6bde9d25b6f1f1f5cc169cda944f5fbe",
+          "moderation_state": "Reviewing",
+          "published_at": 1794019277.4065356,
+          "created_at": 1794019272.9487169,
+          "retired_at": null,
+          "atlas_key": "stone_fence_01",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "256x512",
+          "baseKey": "stone_fence",
+          "version": "01"
+        }
+      ]
+    },
+    {
       "atlasKey": "stone_pillar_01",
       "baseKey": "stone_pillar",
       "version": "01",
@@ -9323,6 +9437,38 @@
           "resolution": "128x128",
           "baseKey": "stone_pillar",
           "version": "01"
+        }
+      ]
+    },
+    {
+      "atlasKey": "stone_pillar_02",
+      "baseKey": "stone_pillar",
+      "version": "02",
+      "variants": [
+        {
+          "id": 37,
+          "family_id": 30,
+          "width": 128,
+          "height": 256,
+          "filename": "stone_pillar_02_128x256_atlas.png",
+          "original_filename": "stone_pillar_02_128x256_atlas.png",
+          "source_path": "assets/source/texture-atlases/stone_pillar_02/128x256/stone_pillar_02_128x256_atlas.png",
+          "source_sha256": "b770c0aa9d7ff5eea5d7a48d0b5c20d1d0365601287457f646f51de2ddd010ad",
+          "uses_alpha": true,
+          "published_id": "101117475420735",
+          "published_sha256": "b770c0aa9d7ff5eea5d7a48d0b5c20d1d0365601287457f646f51de2ddd010ad",
+          "moderation_state": "Reviewing",
+          "published_at": 1794066393.8433344,
+          "created_at": 1794028065.6058714,
+          "retired_at": null,
+          "atlas_key": "stone_pillar_02",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "128x256",
+          "baseKey": "stone_pillar",
+          "version": "02"
         }
       ]
     },
@@ -9601,6 +9747,38 @@
       "atlasResolution": "256×256"
     },
     {
+      "reference": "atlas:38",
+      "label": "bush_02",
+      "slug": "",
+      "filename": "bush_02_512x512_atlas.png",
+      "group": "atlas",
+      "category": "",
+      "categoryLabel": "",
+      "path": "assets/source/texture-atlases/bush_02/512x512/bush_02_512x512_atlas.png",
+      "sha256": "99d73d546a2dd410a92d990af353bed5e534b65505e6e78e46be58617da650d8",
+      "assetId": "",
+      "atlasKey": "bush_02",
+      "atlasName": "bush",
+      "atlasVersion": "02",
+      "atlasResolution": "512×512"
+    },
+    {
+      "reference": "atlas:39",
+      "label": "bush_02",
+      "slug": "",
+      "filename": "bush_02_256x256_atlas.png",
+      "group": "atlas",
+      "category": "",
+      "categoryLabel": "",
+      "path": "assets/source/texture-atlases/bush_02/256x256/bush_02_256x256_atlas.png",
+      "sha256": "9add94f2c544f769c9a2dcbb77640963b0816ee7a4bfa7267dab5f984db546fb",
+      "assetId": "132935707489810",
+      "atlasKey": "bush_02",
+      "atlasName": "bush",
+      "atlasVersion": "02",
+      "atlasResolution": "256×256"
+    },
+    {
       "reference": "atlas:27",
       "label": "campfire_01",
       "slug": "",
@@ -9777,6 +9955,22 @@
       "atlasResolution": "4096×4096"
     },
     {
+      "reference": "atlas:36",
+      "label": "lantern_01",
+      "slug": "",
+      "filename": "lantern_01_256x512_atlas.png",
+      "group": "atlas",
+      "category": "",
+      "categoryLabel": "",
+      "path": "assets/source/texture-atlases/lantern_01/256x512/lantern_01_256x512_atlas.png",
+      "sha256": "60d15719665fb49f73256e8bfc10c5083c74b95645dbbb34807b82d3c77f9321",
+      "assetId": "74839303464750",
+      "atlasKey": "lantern_01",
+      "atlasName": "lantern",
+      "atlasVersion": "01",
+      "atlasResolution": "256×512"
+    },
+    {
       "reference": "atlas:3",
       "label": "lantern_01",
       "slug": "",
@@ -9921,6 +10115,22 @@
       "atlasResolution": ""
     },
     {
+      "reference": "atlas:35",
+      "label": "stone_fence_01",
+      "slug": "",
+      "filename": "stone_fence_01_256x512_atlas.png",
+      "group": "atlas",
+      "category": "",
+      "categoryLabel": "",
+      "path": "assets/source/texture-atlases/stone_fence_01/256x512/stone_fence_01_256x512_atlas.png",
+      "sha256": "81342862d13fd7d1792a11957d0cb8af6bde9d25b6f1f1f5cc169cda944f5fbe",
+      "assetId": "112528588819051",
+      "atlasKey": "stone_fence_01",
+      "atlasName": "stone_fence",
+      "atlasVersion": "01",
+      "atlasResolution": "256×512"
+    },
+    {
       "reference": "atlas:34",
       "label": "stone_pillar_01",
       "slug": "",
@@ -9935,6 +10145,22 @@
       "atlasName": "stone_pillar",
       "atlasVersion": "01",
       "atlasResolution": "128×128"
+    },
+    {
+      "reference": "atlas:37",
+      "label": "stone_pillar_02",
+      "slug": "",
+      "filename": "stone_pillar_02_128x256_atlas.png",
+      "group": "atlas",
+      "category": "",
+      "categoryLabel": "",
+      "path": "assets/source/texture-atlases/stone_pillar_02/128x256/stone_pillar_02_128x256_atlas.png",
+      "sha256": "b770c0aa9d7ff5eea5d7a48d0b5c20d1d0365601287457f646f51de2ddd010ad",
+      "assetId": "101117475420735",
+      "atlasKey": "stone_pillar_02",
+      "atlasName": "stone_pillar",
+      "atlasVersion": "02",
+      "atlasResolution": "128×256"
     },
     {
       "reference": "atlas:8",

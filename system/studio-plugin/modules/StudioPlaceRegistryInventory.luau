@@ -2,6 +2,7 @@
 -- No Workspace classification by name/category; only immutable published Mesh IDs.
 local History = require(script.Parent.StudioPublishedMeshHistory)
 local Physics = require(script.Parent.StudioMeshPhysicsCore)
+local Published = require(script.Parent.StudioLocationPublishedGeometry)
 local Inventory = {}
 
 local function id(uri: any): string
@@ -81,41 +82,6 @@ local function signatures(versions: {any}): ({[string]: {any}}, {[string]: any})
         end
     end
     return byMesh,bySlug
-end
-
-local function versionFor(entry: any, meshId: string): (string, boolean)
-    local matched={}
-    for _, version in ipairs(entry.models) do
-        for _, mesh in ipairs(version.meshes) do
-            if mesh.meshId==meshId and #mesh.visualNames>0 then
-                table.insert(matched,version.modelAssetId)
-                break
-            end
-        end
-    end
-    return matched[1] or "", #matched>1
-end
-
-local function currentMesh(entry: any, meshId: string): boolean
-    for _, version in ipairs(entry.models) do
-        if version.modelAssetId==entry.model then
-            for _, m in ipairs(version.meshes) do
-                if m.meshId==meshId and #m.visualNames>0 then return true end
-            end
-        end
-    end
-    return false
-end
-
-local function requiresCol(entry: any): boolean
-    for _, version in ipairs(entry.models) do
-        if version.modelAssetId==entry.model then
-            for _, mesh in ipairs(version.meshes) do
-                if #mesh.visualNames==0 then return true end
-            end
-        end
-    end
-    return false
 end
 
 -- Only a Model whose WHOLE MeshPart multiset matches one historical published
@@ -198,6 +164,7 @@ local function state(part: MeshPart): any
     local surface=part:FindFirstChildOfClass("SurfaceAppearance")
     return {parent=part.Parent, frame=part.CFrame, size=part.Size,
         meshId=id(part.MeshId), textureId=id(part.TextureID),
+        collider=Physics.IsCollider(part.Name) or part:GetAttribute("Game1DecoPhysicsOnly")==true,
         colorMap=if surface then id(surface.ColorMap) else ""}
 end
 
@@ -246,10 +213,13 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
         local placement: Instance = root or part
         local original = state(part)
         local oldId,oldAmbiguous="",true
-        if eligible then oldId,oldAmbiguous=versionFor(entry,id(part.MeshId)) end
+        if eligible then oldId,oldAmbiguous=Published.ResolveOldVersion(entry,root,id(part.MeshId)) end
         local issues={}
         local function warn(code: string) table.insert(issues,code) end
-        local needsMesh=eligible and not currentMesh(entry,id(part.MeshId))
+        local needsMesh=eligible and not Published.VisualCurrent(entry,id(part.MeshId))
+        -- The visible MeshId may be unchanged across publications. Check the
+        -- entire published shape (including COL), not only that one MeshId.
+        local needsRig=eligible and root~=nil and not Published.CurrentShape(entry,root)
         local needsTexture=false
         if eligible then
             for _, visualPart in ipairs(visualParts) do
@@ -295,7 +265,8 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
         end
         if not eligible then warn("Один Mesh ID встречается у нескольких Location Assets") end
         if not root then warn("Нет отдельной Model для этого экземпляра") end
-        if eligible and requiresCol(entry) and colliders==0 then warn("Нет обязательного COL-меша") end
+        if eligible and Published.RequiresCollider(entry) and colliders==0 then warn("Нет обязательного COL-меша") end
+        if needsRig and not needsMesh then warn("Новая версия модели отличается по составу MeshPart, хотя визуальный Mesh ID совпадает") end
         if needsMaterial then warn("Материал поверхности требует Sync: "..entry.material) end
         if needsAlpha then warn("AlphaMode требует Sync") end
         if eligible and oldAmbiguous then
@@ -358,27 +329,43 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
         local key="p"..tostring(#rows+1)
         local visualStates={}
         for _,child in ipairs(visualParts) do visualStates[child]=state(child) end
+        local meshStates={}
+        if root then
+            for _,child in ipairs(root:GetDescendants()) do
+                if child:IsA("MeshPart") then meshStates[child]=state(child) end
+            end
+        else
+            meshStates[part]=state(part)
+        end
         local row={key=key,slug=if eligible then entry.slug else candidate.owners[1].slug,
             name=placement.Name,path=placement:GetFullName(),placementId=assigned,
             modelAssetId=if eligible then oldId else "",meshId=original.meshId,
             textureId=original.textureId,expectedMeshId=if eligible then entry.model else "",
             expectedTextureId=if eligible then entry.atlas else "",colCount=colliders,
-            needsMesh=needsMesh,needsTexture=needsTexture,needsMaterial=needsMaterial,needsAlpha=needsAlpha,needsStructure=not root or badName or meshNameMismatch or assigned==""
+            needsMesh=needsMesh,needsRig=needsRig,needsTexture=needsTexture,needsMaterial=needsMaterial,needsAlpha=needsAlpha,needsStructure=not root or badName or meshNameMismatch or assigned==""
                 or (root and root:GetAttribute("Game1DecoAssetSlug")~=entry.slug)
-                or (eligible and requiresCol(entry) and colliders==0),
+                or (eligible and Published.RequiresCollider(entry) and colliders==0),
             duplicateId=false,ambiguous=not eligible or provenForeignClaim,
             hasModel=root~=nil,canSync=eligible and not foreignClaim and root~=nil and assigned~=""
-                and claimed==entry.slug and (not needsMesh or oldId~="")
-                and (needsMesh or not (requiresCol(entry) and colliders==0)),
-            status=if not eligible then "ambiguous" elseif needsMesh or needsTexture or needsMaterial or needsAlpha then "pending" else "current",
+                and claimed==entry.slug and (not needsMesh and not needsRig or oldId~="")
+                and not (Published.RequiresCollider(entry) and colliders==0),
+            status=if not eligible then "ambiguous" elseif needsMesh or needsRig or needsTexture or needsMaterial or needsAlpha
+                or not root or badName or meshNameMismatch or assigned==""
+                or oldClaim or foreignClaim or (Published.RequiresCollider(entry) and colliders==0)
+                then "pending" else "current",
             issues=issues,hierarchy=fullHierarchy,transform={cframe={part.CFrame:GetComponents()},
                 size={part.Size.X,part.Size.Y,part.Size.Z},position=positionOf(part),
                 anchored=part.Anchored,canCollide=part.CanCollide},
         }
         table.insert(rows,row)
         refs[key]={part=part,root=root,placement=placement,visuals=visualParts,
-            visualStates=visualStates,row=row,entry=if eligible then entry else nil,
-            oldVersion=oldId,needsCol=eligible and requiresCol(entry) and colliders==0}
+            visualStates=visualStates,meshStates=meshStates,
+            rootParent=if root then root.Parent else nil,
+            rootPivot=if root then root:GetPivot() else nil,
+            rootPrimary=if root then root.PrimaryPart else nil,
+            row=row,entry=if eligible then entry else nil,
+            oldVersion=oldId,needsCol=eligible and Published.RequiresCollider(entry) and colliders==0,
+            currentVisual=eligible and Published.VisualCurrent(entry,id(part.MeshId))}
     end
     for _,indexes in pairs(duplicateGroups) do
         if #indexes>1 then
@@ -396,9 +383,25 @@ end
 
 function Inventory.Validate(ref: any): boolean
     if not ref or ref.part.Parent==nil or ref.placement.Parent==nil then return false end
-    for part,old in pairs(ref.visualStates) do
+    if ref.root then
+        if ref.root.Parent~=ref.rootParent or ref.root.PrimaryPart~=ref.rootPrimary
+            or ref.root:GetPivot()~=ref.rootPivot then return false end
+        local seen=0
+        for _,child in ipairs(ref.root:GetDescendants()) do
+            if child:IsA("MeshPart") then
+                if not ref.meshStates[child] then return false end
+                seen+=1
+            end
+        end
+        local expected=0
+        for _ in pairs(ref.meshStates) do expected+=1 end
+        if seen~=expected then return false end
+    end
+    for part,old in pairs(ref.meshStates) do
         if part.Parent~=old.parent or part.CFrame~=old.frame or part.Size~=old.size
-            or id(part.MeshId)~=old.meshId or id(part.TextureID)~=old.textureId then return false end
+            or id(part.MeshId)~=old.meshId or id(part.TextureID)~=old.textureId
+            or (Physics.IsCollider(part.Name) or part:GetAttribute("Game1DecoPhysicsOnly")==true)~=old.collider
+            then return false end
         local surface=part:FindFirstChildOfClass("SurfaceAppearance")
         if (if surface then id(surface.ColorMap) else "")~=old.colorMap then return false end
     end

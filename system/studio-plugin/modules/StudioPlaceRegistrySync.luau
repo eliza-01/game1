@@ -6,6 +6,7 @@ local History=require(script.Parent.StudioPublishedMeshHistory)
 local Texture=require(script.Parent.StudioTextureAppearance)
 local Physics=require(script.Parent.StudioMeshPhysicsCore)
 local Geometry=require(script.Parent.StudioLocationPlacedGeometry)
+local PlacementHistory=require(script.Parent.StudioLocationPlacementHistory)
 local Sync={}
 
 local function visuals(root: Instance): {MeshPart}
@@ -61,7 +62,7 @@ function Sync.Apply(refs: {any}, ctx: any): any
             table.insert(blocked,ref.row.key..": требуется Repair или проверка происхождения")
             continue
         end
-        if ref.row.needsMesh then
+        if ref.row.needsMesh or ref.row.needsRig then
             local ok,stage=pcall(stageRig,ref,ctx)
             if ok then
                 table.insert(plan,stage)
@@ -79,7 +80,9 @@ function Sync.Apply(refs: {any}, ctx: any): any
                 priorHistory=ref.root:GetAttribute("Game1DecoSyncHistory")})
         end
     end
-    if #plan==0 then return {changed=0,skipped=blocked} end
+    if #plan==0 then return {changed=0,skipped=blocked,
+        note=if #blocked>0 then "Sync не изменил Place: проверьте причины пропуска"
+            else "Нет устаревших ресурсов для Sync"} end
     local recording=ctx.history:TryBeginRecording(ctx.recordingName,"Sync Location Place Registry")
     if not recording then
         for _,item in ipairs(stages) do item.stage:Destroy() end
@@ -121,22 +124,23 @@ function Sync.Apply(refs: {any}, ctx: any): any
                 table.insert(events,{kind="atlas",oldId=ref.row.textureId,
                     newId=ref.entry.atlas,count=#ref.visuals})
             end
+            if ref.row.needsMaterial then
+                local previousMaterial="published geometry"
+                if item.priorSurface then
+                    for _,before in ipairs(item.priorSurface) do
+                        if before.part==ref.part then
+                            previousMaterial=tostring(before.key or "default")
+                            break
+                        end
+                    end
+                end
+                table.insert(events,{kind="material",oldId=previousMaterial,
+                    newId=ref.entry.material,count=#ref.visuals})
+            end
             if ref.row.needsAlpha then
                 table.insert(events,{kind="alpha",oldId="previous",newId=if ref.entry.alphaEnabled then "Transparency" else "Opaque",count=#ref.visuals})
             end
-            local previous={}
-            local raw=root:GetAttribute("Game1DecoSyncHistory")
-            if type(raw)=="string" then
-                local decodedOk,decoded=pcall(ctx.http.JSONDecode,ctx.http,raw)
-                if not decodedOk or type(decoded)~="table" then error("corrupted existing Studio Sync history") end
-                previous=decoded
-            end
-            table.insert(previous,{atUtc=os.time(),slug=ref.entry.slug,
-                instanceId=tostring(root:GetAttribute("Game1DecoInstanceId") or ""),changes=events})
-            while #previous>12 do table.remove(previous,1) end
-            local newHistory=ctx.http:JSONEncode(previous)
-            if #newHistory>30000 then error("Studio Sync history too large") end
-            root:SetAttribute("Game1DecoSyncHistory",newHistory)
+            PlacementHistory.Append(root,ctx.http,ref.entry.slug,events)
             changes+=1
         end
     end)

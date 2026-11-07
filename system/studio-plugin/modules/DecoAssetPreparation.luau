@@ -18,4 +18,12 @@ function DecoAssetPreparation.PreparePlaced(model: Model, meshOptions: any?, mat
     MeshPhysics.ApplyLocationSurfaceMaterial(model,materialKey,physicalMaterial)
 end
 
+-- Geometry Sync stages a replacement for an existing placement. Apply the
+-- published collision/material policy without resetting its captured anchor
+-- state; StudioLocationPlacedGeometry owns Anchored/Scale/CFrame preservation.
+function DecoAssetPreparation.PrepareSynced(model: Model, meshOptions: any?, materialKey: string?, physicalMaterial: string?)
+    MeshPhysics.ApplyLocationModel(model, nil, meshOptions)
+    MeshPhysics.ApplyLocationSurfaceMaterial(model,materialKey,physicalMaterial)
+end
+
 return table.freeze(DecoAssetPreparation)

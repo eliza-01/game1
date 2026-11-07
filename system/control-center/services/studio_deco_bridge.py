@@ -165,7 +165,7 @@ def run_deco_refresh_bridge(*, timeout_seconds: float = 75.0,
     if phase == 'scan':
         mode = result.get('mode')
         token = str(result.get('scanToken') or '')
-        if mode not in ('texture','mesh','texture_mesh','current') or not re.fullmatch(r'[0-9a-fA-F-]{32,36}', token):
+        if mode not in ('texture','mesh','texture_mesh','alpha','current') or not re.fullmatch(r'[0-9a-fA-F-]{32,36}', token):
             raise StudioBridgeError('invalid Studio ID scan result')
         for key in ('foundMeshParts','managedMeshParts','unmanagedMeshParts',
                     'managedModels','texturePending','geometryPending'):
@@ -187,6 +187,7 @@ def run_deco_refresh_bridge(*, timeout_seconds: float = 75.0,
         managed=0
         texture_pending=0
         mesh_pending=0
+        alpha_pending=0
         for index, part in enumerate(parts, 1):
             if not isinstance(part, dict) or part.get('key') != f'p{index}':
                 raise StudioBridgeError('invalid Studio MeshPart report identity')
@@ -201,6 +202,16 @@ def run_deco_refresh_bridge(*, timeout_seconds: float = 75.0,
                 val=part.get(field)
                 if not isinstance(val,str) or len(val)>128:
                     raise StudioBridgeError('invalid Studio MeshPart ID: '+field)
+            # M250: accept older Studio scans without Alpha fields, but validate
+            # every Alpha flag sent by an Alpha-aware Studio plugin.
+            for flag in ('needsAlpha', 'alphaCurrent', 'alphaEnabled'):
+                if flag in part and type(part[flag]) is not bool:
+                    raise StudioBridgeError('invalid Studio MeshPart Alpha flag: ' + flag)
+            if ('needsAlpha' in part and 'alphaCurrent' in part
+                    and part['needsAlpha'] == part['alphaCurrent']):
+                raise StudioBridgeError('inconsistent Studio MeshPart Alpha state')
+            if not part['textureApplicable'] and part.get('needsAlpha', False):
+                raise StudioBridgeError('COL MeshPart must not require Alpha Sync')
             if part['attachable'] and (part['managed'] or not re.fullmatch(r'[1-9][0-9]{0,19}',part['historicalModelId'])):
                 raise StudioBridgeError('invalid historical Model linking candidate')
             if part['isCollider'] and part['textureApplicable']:
@@ -212,14 +223,25 @@ def run_deco_refresh_bridge(*, timeout_seconds: float = 75.0,
                 managed+=1
                 if not part['textureCurrent']: texture_pending+=1
                 if part['needsMesh']: mesh_pending+=1
+                if part.get('needsAlpha', False): alpha_pending+=1
             elif part['needsMesh']:
                 raise StudioBridgeError('unmanaged MeshPart must not be sync eligible')
         if managed!=values['managedMeshParts'] or texture_pending!=values['texturePending']:
             raise StudioBridgeError('Studio per-part report count mismatch')
         if mesh_pending!=result.get('meshPending'):
             raise StudioBridgeError('Studio mesh count mismatch')
+        reported_alpha = result.get('alphaPending', 0)
+        if (type(reported_alpha) is not int or not 0 <= reported_alpha <= 4096
+                or reported_alpha != alpha_pending):
+            raise StudioBridgeError(
+                f'Studio alpha count mismatch: reported={reported_alpha!r}, '
+                f'computed={alpha_pending}, managed={managed}'
+            )
+        if mode == 'alpha' and (alpha_pending == 0 or texture_pending or values['geometryPending']):
+            raise StudioBridgeError('inconsistent Studio Alpha-only scan mode')
         values.update(mode=mode, scanToken=token, inventory=inventory,
-                      expectedMeshIds=expected,parts=parts,meshPending=mesh_pending)
+                      expectedMeshIds=expected,parts=parts,meshPending=mesh_pending,
+                      alphaPending=alpha_pending)
         return values
     if type(result.get('fullySynced')) is not bool:
         raise StudioBridgeError('invalid partial-sync acknowledgement')

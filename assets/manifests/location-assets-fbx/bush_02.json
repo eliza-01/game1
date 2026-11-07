@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "slug": "bush_02",
+  "sourceSha256": "f5f8c1958584c192de61f862ad03b8d657e75c1aeacf1638fbbe6de5f3874c22",
+  "analysis": {
+    "schemaVersion": 1,
+    "meshes": [
+      {
+        "name": "bush_02",
+        "armature": "",
+        "vertices": 482,
+        "bones": [],
+        "influencedBones": [],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": false,
+          "canQuery": false,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": "Box",
+          "physicsOnly": false
+        }
+      },
+      {
+        "name": "col_mesh",
+        "armature": "",
+        "vertices": 8,
+        "bones": [],
+        "influencedBones": [],
+        "role": "collider",
+        "physics": {
+          "role": "collider",
+          "canCollide": true,
+          "canQuery": true,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": "PreciseConvexDecomposition",
+          "physicsOnly": true
+        }
+      }
+    ],
+    "hasCollider": true,
+    "armatures": [],
+    "unassignedArmatures": []
+  }
+}

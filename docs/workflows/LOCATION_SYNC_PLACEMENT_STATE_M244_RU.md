@@ -22,6 +22,16 @@
 между `DecoPlacedAssetSync` и `StudioPlaceRegistrySync`. Физическое применение
 дочернего rig по-прежнему принадлежит `StudioManagedRigSwap`.
 
+Одномешевое legacy-размещение может получить Bones/Attachments и отдельный COL
+в следующей публикации. Если старый visual был масштабирован равномерно и
+пропорции старого и нового published visual совпадают, Sync переносит этот
+коэффициент через `Model:ScaleTo`, затем точно восстанавливает CFrame и
+PivotOffset visual-якоря. Это масштабирует sockets и COL вместе с rig.
+Неравномерный ручной Size по-прежнему отклоняется до изменения Place.
+Geometry Sync использует отдельный `PrepareSynced`: published collision и
+material policy применяются к stage, но placement-состояние `Anchored` не
+сбрасывается логикой первоначального размещения.
+
 Для простой геометрии (по одному визуальному MeshPart, без Bones/Joint/Wrap/
 Attachment) из предыдущей публикации и нового rig:
 

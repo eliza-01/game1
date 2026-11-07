@@ -5,13 +5,14 @@
 window.game1ConsumerAtlasEditor = (() => {
   const colors = ['#d9ac43','#a47bdf','#4f95ee','#54b991','#939ba8'];
   const html = value => esc(String(value ?? ''));
-  const newState = () => ({search:'',picker:false,busy:false,pending:null});
+  const newState = () => ({search:'',picker:false,busy:false,pending:null,publicationOfferId:0});
   const variants = catalog => (catalog||[]).flatMap(group =>
     (group.variants||[]).map(v => ({...v,atlasKey:group.atlasKey})));
   const available = catalog => variants(catalog).filter(v => v.current && v.published_id && !v.retired);
-  function render(state,{currentId=0,linked=[],catalog=[],busy=false}={}){
+  function render(state,{currentId=0,linked=[],catalog=[],busy=false,openPublish=false,offerPublication=false}={}){
     const active=Number(currentId||0);
-    const selected=variants(catalog).find(v=>Number(v.id)===active)||null;
+    const selected=variants(catalog).find(v=>Number(v.id)===active)||
+      linked.find(v=>Number(v.id)===active)||null;
     const attached=new Map();
     for(const v of linked)attached.set(Number(v.id),v);
     if(selected)attached.set(active,selected);
@@ -21,17 +22,29 @@ window.game1ConsumerAtlasEditor = (() => {
       (!state.search||`${v.filename} ${v.atlasKey} ${v.resolution} ${v.published_id}`.toLowerCase().includes(state.search.toLowerCase()))
       && !attached.has(Number(v.id)));
     const disabled=busy||state.busy;
+    const unpublished=selected&&!selected.retired&&!selected.published_id;
+    const offer=dots.find(v=>Number(v.id)===Number(state.publicationOfferId)&&
+      !v.retired&&!v.published_id)||null;
     const current=selected?`${html(selected.filename)} · ${html(selected.resolution)} · Image ID ${html(selected.published_id||'not published')}`:
       'No atlas selected';
     return `<section class="real-estate-mesh-step shared-atlas-editor" aria-label="Atlas variants">
-        <div class="real-estate-mesh-step-head"><strong>Attached atlases</strong><span class="real-estate-step-status ${selected?.current?'ready':'pending'}">${selected?.current?'Published':'Choose atlas'}</span></div>
+        <div class="real-estate-mesh-step-head"><strong>Attached atlases</strong><span class="real-estate-step-status ${selected?.current?'ready':'pending'}">${selected?.current?'Published':unpublished?'Publish required':selected?'Review required':'Choose atlas'}</span></div>
         <div class="shared-atlas-current">${current}</div>
         <div class="deco-atlas-dots" role="group" aria-label="Attached atlas variants">${dots.map((v,i)=>{
           const on=Number(v.id)===active;
           const tip=`${v.filename} · ${v.resolution} · Image ID ${v.published_id||'unpublished'}`;
-          return `<button type="button" class="deco-atlas-dot ${on?'is-active':''}" style="--dot-color:${colors[i%colors.length]}" data-ca-choice="${Number(v.id)}" aria-label="${html(tip)}" title="${html(tip)}" aria-pressed="${on}" ${disabled||!v.current?'disabled':''}><span></span></button>`;
+          const unpublishedOffer=offerPublication&&!v.retired&&!v.published_id;
+          const label=unpublishedOffer?`${tip} · Нажмите, чтобы предложить публикацию`:tip;
+          return `<button type="button" class="deco-atlas-dot ${on?'is-active':''}" style="--dot-color:${colors[i%colors.length]}" data-ca-choice="${Number(v.id)}" aria-label="${html(label)}" title="${html(label)}" aria-pressed="${on}" ${disabled||(!v.current&&!unpublishedOffer&&!(openPublish&&on&&!v.published_id))?'disabled':''} ${unpublishedOffer?'data-ca-offer-publication':openPublish&&on&&!v.published_id?'data-ca-open-publish':''}><span></span></button>`;
         }).join('')}</div>
-        <small>Switch the active atlas by clicking a dot. No upload or automatic Studio Sync.</small>
+        <small>Switch published variants by clicking a dot. No automatic Studio Sync.</small>
+        ${offerPublication&&offer?`<div class="shared-atlas-publication-offer" role="group" aria-label="Публикация атласа">
+          <strong>Опубликовать атлас?</strong>
+          <small>${html(offer.filename)} · ${html(offer.resolution)} · Image ID ещё нет</small>
+          <small>Roblox создаст новый Image ID. Активный атлас и Studio не изменятся.</small>
+          <div class="actions"><button type="button" data-ca-publish-offer ${disabled?'disabled':''}>Опубликовать атлас</button><button type="button" data-ca-cancel-offer ${disabled?'disabled':''}>Отмена</button></div>
+        </div>`:''}
+        ${unpublished&&openPublish&&!offerPublication?`<div class="shared-atlas-unpublished"><span>Atlas registered · Image ID not published</span><button type="button" data-ca-open-publish>Publish this atlas</button></div>`:''}
         <div class="actions"><button type="button" data-ca-toggle ${disabled?'disabled':''}>Connect existing atlas</button><button type="button" data-ca-upload ${disabled?'disabled':''}>Upload new atlas</button></div>
         ${state.picker?`<div class="shared-atlas-picker"><label>Search all published atlases<input type="search" data-ca-search value="${html(state.search)}" placeholder="Filename · resolution · Image ID"></label>
           <div class="shared-atlas-choices">${choices.length?choices.map(v=>`<button type="button" data-ca-attach="${Number(v.id)}" ${disabled?'disabled':''}><strong>${html(v.filename)}</strong><small>${html(v.resolution)} · ${html(v.published_id)}</small></button>`).join(''):'<small>No published, unattached atlases match the search.</small>'}</div></div>`:''}
@@ -67,9 +80,30 @@ window.game1ConsumerAtlasEditor = (() => {
       state.search=input.value;const offset=input.selectionStart;opts.onRender();
       const next=find('[data-ca-search]');next?.focus();try{next?.setSelectionRange(offset,offset);}catch{}
     };
-    for(const b of container.querySelectorAll('[data-ca-choice]'))b.onclick=()=>run('Switching atlas',async()=>{
-      await requestChoice('select',Number(b.dataset.caChoice));opts.onMessage('Active atlas changed. Sync Studio explicitly when ready.');
-    });
+    for(const b of container.querySelectorAll('[data-ca-choice]'))b.onclick=()=>{
+      if(b.hasAttribute('data-ca-offer-publication')){
+        state.publicationOfferId=Number(b.dataset.caChoice);
+        opts.onRender();
+        return;
+      }
+      if(b.hasAttribute('data-ca-open-publish'))return opts.onOpenPublish?.();
+      state.publicationOfferId=0;
+      return run('Switching atlas',async()=>{
+        await requestChoice('select',Number(b.dataset.caChoice));opts.onMessage('Active atlas changed. Sync Studio explicitly when ready.');
+      });
+    };
+    const offered=find('[data-ca-publish-offer]');if(offered)offered.onclick=async()=>{
+      const id=Number(state.publicationOfferId);
+      if(!id||!opts.onPublishAtlas)return;
+      const success=await opts.onPublishAtlas(id);
+      if(success)state.publicationOfferId=0;
+      opts.onRender();
+    };
+    const dismiss=find('[data-ca-cancel-offer]');if(dismiss)dismiss.onclick=()=>{
+      state.publicationOfferId=0;opts.onRender();
+    };
+    for(const b of container.querySelectorAll('.shared-atlas-unpublished [data-ca-open-publish]'))
+      b.onclick=()=>opts.onOpenPublish?.();
     for(const b of container.querySelectorAll('[data-ca-attach]'))b.onclick=()=>run('Attaching atlas',async()=>{
       await requestChoice('attach',Number(b.dataset.caAttach));state.picker=false;
       opts.onMessage('Atlas attached. Select its dot to make it active; no Studio Sync performed.');

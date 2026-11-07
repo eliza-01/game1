@@ -55,7 +55,7 @@ local function applyStaticRuntimePhysics(model: Model, definition: any)
     end
     -- The same Location policy as DecoManager: COL_* remains queryable and
     -- physical, visual/glass meshes remain nonqueryable when a COL exists.
-    MeshPhysics.ApplyLocationModel(model, nil, definition.meshOptions)
+    MeshPhysics.ApplyLocationModelRuntime(model, nil, definition.meshOptions)
 end
 
 local function unregisterModel(model: Model, deferRebuild: boolean?)
@@ -180,7 +180,7 @@ function EnvironmentAssetService.Start()
                 if cursor:IsA("Model") and definitionsByModel[cursor] then
                     EnvironmentAssetVisuals.ApplyPart(descendant, definitionsByModel[cursor])
                     descendant.Anchored = true
-                    MeshPhysics.ApplyLocationModel(cursor, nil, definitionsByModel[cursor].meshOptions)
+                    MeshPhysics.ApplyLocationModelRuntime(cursor, nil, definitionsByModel[cursor].meshOptions)
                     break
                 end
                 cursor = cursor.Parent

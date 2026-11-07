@@ -4,7 +4,8 @@ from services.shared_asset_retirement import SharedAssetRetirement
 
 
 def _requires_asset_audit(path):
-    return (path == '/api/texture-atlases/publish-reviewed'
+    return (path.endswith('/publish-pending-atlas')
+            or path == '/api/texture-atlases/publish-reviewed'
             or path == '/api/asset-retirement/execute'
             or path == '/api/characters/workflow'
             or path.endswith(('/publish', '/publish-missing', '/republish',
@@ -40,7 +41,7 @@ def dispatch_post(path, body, deps):
                 try:
                     audit.sync_all()
                 except Exception as error:
-                    if path == '/api/texture-atlases/publish-reviewed':
+                    if path == '/api/texture-atlases/publish-reviewed' or path.endswith('/publish-pending-atlas'):
                         result = dict(response[1])
                         result.setdefault('exportWarnings', []).append(
                             f'Asset History import failed after publication: {error}')

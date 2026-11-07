@@ -28,7 +28,7 @@ class PlaceRegistryPrimaryPartM246(TestCase):
     def test_wrapper_rollback_is_registered_before_reparent(self):
         src = (ROOT / 'system/studio-plugin/modules/StudioPlaceRegistryRepair.luau').read_text('utf-8')
         block = src[src.index('if not root then\n                local group='):
-                    src.index('                changed+=1', src.index('if not root then\n                local group='))]
+                    src.index('                ref.root=root', src.index('if not root then\n                local group='))]
         self.assertLess(block.index('table.insert(undo,function()'), block.index('part.Parent=root'))
         self.assertLess(block.index('part.Parent=parent'), block.index('wrapper:Destroy()'))
         self.assertIn('group.PrimaryPart=groupPrimary', block)

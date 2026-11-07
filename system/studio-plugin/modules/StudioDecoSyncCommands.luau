@@ -48,7 +48,7 @@ return function(config: any)
             local fields=if command.phase=="scan" then {
                 "scanToken","mode","inventory","foundMeshParts","managedMeshParts",
                 "unmanagedMeshParts","managedModels","texturePending","geometryPending",
-                "meshPending","parts","expectedMeshIds"
+                "meshPending","alphaPending","parts","expectedMeshIds"
             } elseif command.phase=="select" then {
                 "selectedName","selectedPath","selectedCount"
             } else {

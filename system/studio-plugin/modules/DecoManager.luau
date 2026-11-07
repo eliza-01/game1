@@ -313,6 +313,32 @@ function DecoManager:_setCategory(category: string)
     self:_showCurrent()
 end
 
+function DecoManager:_showSlug(slug: string): boolean
+    if not self.registry or type(self.registry.items) ~= "table" then return false end
+    local selected = nil
+    for _, row in ipairs(self.registry.items) do
+        if tostring(row.slug or "") == slug and tostring(row.status or "") == "PUBLISHED" then
+            selected = row
+            break
+        end
+    end
+    if not selected or CATEGORY_LABELS[selected.category] == nil then return false end
+    self.category = selected.category
+    for key, button in pairs(self.categoryButtons) do
+        button.BackgroundColor3 = if key == self.category
+            then Color3.fromRGB(49, 112, 96) else Color3.fromRGB(37, 45, 55)
+    end
+    local rows = self:_rows()
+    for index, row in ipairs(rows) do
+        if tostring(row.slug or "") == slug then
+            self.index = index
+            self:_showCurrent()
+            return true
+        end
+    end
+    return false
+end
+
 -- Phase 1: inspect immutable Model/Mesh IDs and select matches without changing Place.
 function DecoManager:previewMeshSync(slug: string, modelId: string, atlasId: string,
     expectedRevision: number, historyIds: {string}, cached: {any}?): any
@@ -327,6 +353,11 @@ function DecoManager:previewMeshSync(slug: string, modelId: string, atlasId: str
         error("published asset changed; refresh and search again")
     end
     local report=History.Scan(self.Workspace,slug,row,historyIds,self.loader,cached)
+    -- Find and the visible Deco Manager must consume the same registry
+    -- snapshot. When the widget is open, keep the exact Location Asset focused
+    -- and rebuild its template/preview from the current published IDs.
+    self.registry=registry
+    if self.widget.Enabled then self:_showSlug(slug) end
     local token=self.HttpService:GenerateGUID(false)
     local snap={}
     local roots={}
@@ -494,6 +525,7 @@ function DecoManager:refreshRegistry(targetSlug: string?, applyIds: boolean?, ex
         self:_setStatus("Asset Manager unavailable · " .. tostring(result))
         return nil, tostring(result)
     end
+    local selectedSlug = targetSlug or (self.currentRow and tostring(self.currentRow.slug or "")) or ""
     self.registry = result
     -- Catalog browsing never alters any placed Model. Explicit Studio Sync
     -- requires exactly one slug and two publication IDs verified by the plugin.
@@ -558,7 +590,9 @@ function DecoManager:refreshRegistry(targetSlug: string?, applyIds: boolean?, ex
         syncResult.fullySynced=allPending
         self.ChangeHistoryService:SetWaypoint("Location Asset Model + Atlas Sync: " .. targetSlug)
     end
-    self:_setCategory(self.category)
+    if selectedSlug == "" or not self:_showSlug(selectedSlug) then
+        self:_setCategory(self.category)
+    end
     self:_setStatus(("Registry refreshed · %d placed, %d atlas IDs, %d updated meshes, %d model references, %d stale FBX"):format(
         syncResult.matchedModels, syncResult.parts, syncResult.meshPartsUpdated,
         syncResult.modelReferences, syncResult.pendingGeometry))

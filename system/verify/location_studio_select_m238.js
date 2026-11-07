@@ -51,6 +51,7 @@ ctx.window.game1StudioSync={scanLocation:async()=>({studio:scan}),
   selectLocation:async(_,__,partKeys)=>({studio:{selectedCount:partKeys.length,selectedPath:''}}),
   replaceLocation:async()=>({studio:{fullySynced:false}}),locationSummary:()=>''};
 ctx.window.confirm=()=>true;
+vm.runInNewContext(fs.readFileSync(path.join(root,'location-publication-state.js'),'utf8'),ctx);
 vm.runInNewContext(fs.readFileSync(path.join(root,'location-asset-workflow.js'),'utf8'),ctx);
 (async()=>{
   await ctx.window.game1LocationAssetWorkflow.startScan('christmas_tree');
@@ -61,7 +62,7 @@ vm.runInNewContext(fs.readFileSync(path.join(root,'location-asset-workflow.js'),
   assert(dialog.innerHTML.includes('COL ✓ · 1'));
   assert(!dialog.innerHTML.includes('2. col_mesh'),
     'COL MeshPart must not render as a separate row');
-  assert(dialog.innerHTML.includes('Историческая модель без привязки'));
+  assert(dialog.innerHTML.includes('Найдено по Mesh ID, без привязки к текущему ассету'));
   assert(dialog.innerHTML.includes('Link historical model'));
   scroll.body=187;scroll.list=245;
   ctx.window.game1LocationAssetWorkflow.render();

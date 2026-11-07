@@ -115,7 +115,7 @@ class LocationMeshPhysicsM231(unittest.TestCase):
         self.assertIn('Core.Apply(mesh, not noCollide, fidelity,',estate)
         self.assertIn('MeshPhysics.ApplyLocationModel(model, nil, row.meshOptions)',loader)
         self.assertIn('MeshPhysics.ApplyLocationModel(model, nil, meshOptions)',placement)
-        self.assertIn('MeshPhysics.ApplyLocationModel(model, nil, definition.meshOptions)',runtime)
+        self.assertIn('MeshPhysics.ApplyLocationModelRuntime(model, nil, definition.meshOptions)',runtime)
         self.assertIn('MeshPhysics.ApplyLocationModel(cursor, nil, definitionsByModel[cursor].meshOptions)',runtime)
         self.assertNotIn('descendant.CanQuery = true',runtime)
         self.assertIn('Core.Apply(mesh, not noCollide, fidelity, doublesided)',core)

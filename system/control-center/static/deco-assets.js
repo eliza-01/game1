@@ -201,7 +201,7 @@ function decoAssetRender() {
       `<td><small>Model ID ${esc(row.model_asset_id || '—')}</small>${row.model_asset_id?meshLabels:''}<small>Image ID ${esc(row.texture_asset_id || '—')}</small></td>` +
       `<td>${decoAssetStatusTag(row.status)}</td><td><div class="deco-asset-row-actions">` +
       `<button data-select type="button" ${decoAssetState.syncingSlug?'disabled':''}>Edit</button>` +
-      `<button data-deco-sync type="button" ${row.status !== 'PUBLISHED' || decoAssetState.syncingSlug || decoAssetState.atlasBusy ? 'disabled' : ''} title="Sync published Model geometry and Atlas IDs in-place for every managed instance of this slug. Test on a backup Place first.">Sync Studio</button>` +
+      `<button data-deco-sync type="button" ${decoAssetState.syncingSlug || decoAssetState.atlasBusy ? 'disabled' : ''} title="Find placed models and sync the latest published Model and Atlas IDs for this slug. Unpublished resources are reported after opening instead of disabling the action.">Sync Studio</button>` +
       `</div></td>`;
     tr.querySelector('[data-select]').onclick = () => decoAssetEditOpen(row.slug);
     tr.querySelector('[data-deco-sync]').onclick = () => window.game1LocationAssetWorkflow.startScan(row.slug);
@@ -259,7 +259,9 @@ async function decoAssetChooseTexture() {
     decoAssetState.atlasVariantId = match ? Number(match.id) : 0;
     decoAssetState.texturePath = match ? '' : chosen.path;
     $('picked-location-asset-texture').textContent = match
-      ? `Existing atlas ${match.filename} selected · changed bytes require Edit → Republish after registration`
+      ? (match.published_id
+        ? `Published atlas ${match.filename} selected · changed bytes require explicit review in Edit`
+        : `Registered atlas ${match.filename} selected · after registration open Publish to create Image ID`)
       : chosen.path;
     decoAssetRenderTextureReferences();
   } catch (error) { toast(error.message, true); }
@@ -281,8 +283,8 @@ async function decoAssetRegister() {
     });
     await decoAssetLoad();
     decoAssetSetForm();
-    toast(`Registered ${row.slug} · use Edit to publish its Model and Atlas independently`);
-    decoAssetEditOpen(row.slug);
+    toast(`Registered ${row.slug} · ready to publish`);
+    window.game1LocationAssetWorkflow.open(row.slug, 'publish');
   } catch (error) { toast(`Register: ${error.message}`, true); }
 }
 async function decoAssetSaveEdits(slug, payload, expectedRevision) {

@@ -3,7 +3,7 @@
  */
 window.game1LocationAssetWorkflow = (() => {
   const state={slug:'',tab:'model',busy:false,result:'',error:false,manualSlug:false,identityDraft:null,
-    pendingModel:'',inspection:null,meshOptions:{},physicsDirty:false,scan:null,scanStale:false,alphaDraft:null,
+    pendingModel:'',inspection:null,meshOptions:{},physicsDirty:false,scan:null,scanStale:false,alphaDraft:null,publication:null,
     atlas:window.game1ConsumerAtlasEditor.newState()};
   const shell=window.game1AssetWorkflowDialog;
   const e=value=>esc(String(value??''));
@@ -11,7 +11,7 @@ window.game1LocationAssetWorkflow = (() => {
   const button=(action,label,disabled=false,css='')=>
     `<button type="button" class="${css}" data-la-action="${action}" ${disabled?'disabled':''}>${label}</button>`;
   const dialog=()=>shell.ensure('location-asset-edit-dialog','Manage Location Asset',()=>{
-    state.slug='';state.pendingModel='';state.scan=null;state.scanStale=false;state.identityDraft=null;state.alphaDraft=null;state.atlas=window.game1ConsumerAtlasEditor.newState();
+    state.slug='';state.pendingModel='';state.scan=null;state.scanStale=false;state.identityDraft=null;state.alphaDraft=null;state.publication=null;state.atlas=window.game1ConsumerAtlasEditor.newState();
   });
   const close=()=>{const d=document.getElementById('location-asset-edit-dialog');if(d?.open)d.close();};
   function open(slug,initialTab='identity'){
@@ -20,7 +20,7 @@ window.game1LocationAssetWorkflow = (() => {
     if(state.busy)return toast('Finish the current operation first.',true);
     const d=dialog();if(d.open && state.slug!==slug)d.close();
     state.slug=slug;state.tab=initialTab;state.busy=false;state.scan=null;state.scanStale=false;state.pendingModel='';state.manualSlug=false;state.identityDraft=null;
-    state.alphaDraft=null;state.inspection=item.fbxAnalysis||null;
+    state.alphaDraft=null;state.publication=null;state.inspection=item.fbxAnalysis||null;
     state.meshOptions=window.game1MeshAuthoring.seeded(state.inspection,item.meshOptions||{});
     state.physicsDirty=false;state.atlas=window.game1ConsumerAtlasEditor.newState();
     message('');render();if(!d.open)d.showModal();
@@ -29,10 +29,10 @@ window.game1LocationAssetWorkflow = (() => {
   function message(text,isError=false){state.result=String(text||'');state.error=Boolean(isError);}
   async function run(label,task){
     if(state.busy)return;
-    state.busy=true;message(`${label}…`);render();
+    state.busy=true;state.operationLabel=label;message(`${label}…`);render();
     try{return await task();}
     catch(error){message(error?.message||String(error),true);return null;}
-    finally{state.busy=false;render();}
+    finally{state.busy=false;state.operationLabel='';render();}
   }
   function render(){
     const d=document.getElementById('location-asset-edit-dialog');
@@ -48,8 +48,12 @@ window.game1LocationAssetWorkflow = (() => {
     const changed=Boolean(state.pendingModel||state.physicsDirty);
     const needsPublication=Boolean(state.pendingModel||!modelCurrent);
     const publicationReady=Boolean(configured&&(state.pendingModel||item.model_path));
+    const publication=window.game1LocationPublication.plan(item,
+      decoAssetState.data?.atlases||[],Boolean(state.pendingModel));
+    const showPublish=publication.count>0||state.tab==='publish'||Boolean(state.publication);
     const tabs=[{id:'identity',label:'Identity'},{id:'model',label:'Model · FBX'},
-      {id:'atlas',label:'Texture · atlas'}];
+      {id:'atlas',label:'Texture · atlas'},
+      ...(showPublish?[{id:'publish',label:`Publish${publication.count?' · '+publication.count:''}`}]:[])];
     const card=(name,description,content,status='',css='ready')=>shell.step(name,description,content,status,css);
     const identityData=state.identityDraft||{nameEn:item.name_en,slug:item.slug,
       category:item.category,surfaceMaterial:item.surfaceMaterial||'default',destructible:Boolean(item.destructible)};
@@ -84,7 +88,34 @@ window.game1LocationAssetWorkflow = (() => {
       `<div class="actions">${button('apply-alpha','Apply Changes',busy||!alphaDirty,alphaDirty?'asset-apply-ready':'')}</div></section>`;
     const atlas=alphaEditor+window.game1ConsumerAtlasEditor.render(state.atlas,{
       currentId:item.atlasVariantId||0,linked:item.atlasVariants||[],
-      catalog:decoAssetState.data?.atlases||[],busy});
+      catalog:decoAssetState.data?.atlases||[],busy,openPublish:publication.atlasNeeded,
+      offerPublication:true});
+    // Publication is a separate operation from source registration and Studio Sync.
+    // Busy stages show the actual awaited network operation, not a fabricated %.
+    const publicationStatus=(key,label,pending)=>{
+      const progress=state.publication?.[key]||'';
+      const text=progress==='running'?'Publishing…':progress==='done'?'Published ✓':
+        progress==='error'?'Publication failed':pending?'Ready for publication':'Published ✓';
+      return `<div class="la-publication-resource"><div><strong>${label}</strong><small>${text}</small></div>`+
+        `<span class="${progress==='running'?'la-publish-spinner':''}" aria-hidden="true"></span></div>`;
+    };
+    const publishPanel=card('Publish resources',
+      'Регистрация сохраняет исходники. Публикация создаёт Roblox ID. Studio Sync выполняется отдельно.',
+      `<div class="la-publication-stack">`+
+      publicationStatus('atlas',`Atlas · ${e(publication.variant?.filename||'не выбран')}`,publication.atlasNeeded)+
+      publicationStatus('model','Model · FBX',publication.modelNeeded)+`</div>`+
+      (state.physicsDirty&&!publication.modelNeeded?'<p class="la-publication-warning">Есть изменения физических настроек MeshPart. Сохрани их через Model · FBX → Apply Changes.</p>':'')+
+      (publication.reviewRequired?'<p class="la-publication-warning">Атлас уже имеет Image ID, но изменён. Для замены общего атласа открой Texture · atlas и подтверди замену после просмотра.</p>':'')+
+      `<div class="la-publication-stage" role="status" aria-live="polite">`+
+      (state.publication?.active?`<span class="${state.publication.running?'la-publish-spinner':''}" aria-hidden="true"></span><span>${e(state.publication.active)}</span>`:
+        publication.count?'Готово к публикации · Place не будет изменён.':'Все выбранные ресурсы опубликованы.')+
+      `</div><div class="actions">${button('publish-ready',`Publish ready · ${publication.count}`,
+        busy||!publication.count||!configured,'la-publish-primary '+(publication.count?'asset-apply-ready':''))}</div>`+
+      (!configured&&publication.count?'<small class="la-publication-warning">Настрой Open Cloud, чтобы опубликовать ресурсы.</small>':'')+
+      `<small>Публикация атласа не перепубликует Model. Публикация Model не публикует атлас. `+
+      `Если один этап завершится ошибкой, успешный ID сохранится, повторятся только незавершённые этапы.</small>`,
+      publication.count?`${publication.count} ожидает публикации`:'Готово',publication.count?'pending':'ready');
+    const busyStatus=busy&&state.tab!=='publish'?`<div class="la-operation-status" role="status" aria-live="polite"><span class="la-publish-spinner" aria-hidden="true"></span>${e(state.operationLabel||state.result||'Подготовка ресурса…')}</div>`:'';
     const preview=state.scan;
     const scanValid=preview&&preview.modelId===String(item.model_asset_id||'')&&
       preview.atlasId===String(item.texture_asset_id||'')&&
@@ -152,7 +183,7 @@ window.game1LocationAssetWorkflow = (() => {
     };
     const footer=card('Studio · Mesh & Texture Sync',
       'Поиск проверяет размещённые модели. Select выделяет в Studio; Sync обновляет только привязанные модели.',
-      `<div class="actions">${button('scan','Find Mesh IDs · Studio',busy||item.status!=='PUBLISHED')}</div>`+
+      `<div class="actions">${button('scan','Find Mesh IDs · Studio',busy)}</div>`+
       (selected?`<div class="la-sync-current"><div><small>Актуальный Model ID</small><strong>${e(item.model_asset_id||'—')}</strong></div>`+
         `<div><small>Актуальные Mesh ID (визуальные)</small>`+
         `<strong>${visualIds.map(e).join(' · ')||'—'}</strong></div>`+
@@ -168,7 +199,7 @@ window.game1LocationAssetWorkflow = (() => {
         `<div class="la-sync-list">${grouped.map(modelLine).join('')||'<small>MeshPart не найдены.</small>'}</div>`:'')+
         `<div class="la-sync-controls"><div class="actions">`+
         `${button('select-all','Select All · Studio',busy||!grouped.length||reportStale)}`+
-        `${button('replace-all','Sync All',busy||reportStale||item.status!=='PUBLISHED', selected&&parts.some(p=>p.managed&&(p.needsMesh||p.needsTexture||p.needsAlpha))?'asset-apply-ready':'')}</div>`+
+        `${button('replace-all','Sync All',busy||reportStale, selected&&parts.some(p=>p.managed&&(p.needsMesh||p.needsTexture||p.needsAlpha))?'asset-apply-ready':'')}</div>`+
         `<small>Sync обновляет только устаревшие ресурсы. При замене Mesh обновляется весь rig модели. `+
         `COL не получает текстуры. Перед изменением Place потребуется подтверждение.</small>`+
         (selected?`<details><summary>История Model / Mesh ID</summary>${inventoryDisplay}</details>`:'')+
@@ -176,8 +207,8 @@ window.game1LocationAssetWorkflow = (() => {
       selected?'Проверка завершена':'Сначала Find',selected?'ready':'pending');
     d.innerHTML=`<div class="real-estate-mesh-dialog-head"><div><small class="eyebrow">Location Asset · ${e(item.slug)}</small>`+
       `<h3>Manage ${e(item.name_en)}</h3></div><button type="button" data-la-close aria-label="Close">✕</button></div>`+
-      `<div class="real-estate-mesh-dialog-body" aria-busy="${busy}">${shell.tabs(tabs,state.tab,'data-la-tab')}`+
-      `${state.tab==='identity'?identity:state.tab==='model'?model:atlas}${footer}`+
+      `<div class="real-estate-mesh-dialog-body" aria-busy="${busy}">${shell.tabs(tabs,state.tab,'data-la-tab')}${busyStatus}`+
+      `${state.tab==='identity'?identity:state.tab==='model'?model:state.tab==='atlas'?atlas:publishPanel}${state.tab==='publish'?'':footer}`+
       `<div class="real-estate-workflow-result ${state.error?'issue':''}" role="status" ${state.result?'':'hidden'}>${e(state.result)}</div></div>`;
     d.querySelector('.real-estate-mesh-dialog-body').scrollTop=scrollBody;
     const newList=d.querySelector('.la-sync-list');if(newList)newList.scrollTop=scrollList;
@@ -231,8 +262,32 @@ window.game1LocationAssetWorkflow = (() => {
       getRevision:()=>row()?.bindingRevision||0,getCurrentId:()=>row()?.atlasVariantId||0,
       catalog:decoAssetState.data?.atlases||[],
       filePicker:'/api/files/choose-location-asset-texture',
+      onOpenPublish:()=>{state.tab='publish';render();},
+      onPublishAtlas:variantId=>run('Публикация выбранного атласа',async()=>{
+        const result=await publishInitialAtlas(variantId);
+        const warnings=(result.exportWarnings||[]).join(' | ');
+        message(`Atlas опубликован · Image ID ${result.publishedAssetId}. `+
+          'Активная привязка и Studio не изменены.'+(warnings?` Предупреждение: ${warnings}`:''),Boolean(warnings));
+        return true;
+      }),
       onMessage:message,onRender:render,onRefresh:decoAssetLoad,
     });
+  }
+  // Shared first-publication operation: used both by Publish ready and by an
+  // unpublished atlas dot. Neither operation selects an atlas or Syncs Studio.
+  async function publishInitialAtlas(variantId){
+    const current=row();
+    if(!current)throw Error('Location Asset больше не найден');
+    const result=await request(`/api/location-assets/${encodeURIComponent(state.slug)}/publish-pending-atlas`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({variantId:Number(variantId),
+        expectedRevision:Number(current.bindingRevision||0)}),
+    });
+    if(result.resourceKind!=='Atlas'||!result.publishedAssetId)
+      throw Error('Atlas publication did not confirm a new Image ID; inspect history before retrying');
+    await decoAssetLoad();
+    state.scanStale=true;
+    return result;
   }
   async function execute(action){
     const item=row();if(!item)return;
@@ -247,6 +302,60 @@ window.game1LocationAssetWorkflow = (() => {
       await decoAssetLoad();
       state.alphaDraft=null;state.scanStale=true;
       message(`Alpha ${saved.alphaEnabled?'включён':'выключен'}. Model/Atlas ID не изменены. Нужен Sync размещённых моделей.`);
+    });
+    if(action==='publish-ready')return run('Publishing new resources',async()=>{
+      const initial=window.game1LocationPublication.plan(row(),decoAssetState.data?.atlases||[],Boolean(state.pendingModel));
+      if(!initial.count){message('Все выбранные ресурсы уже опубликованы.');return;}
+      state.tab='publish';
+      state.publication={atlas:initial.atlasNeeded?'waiting':'',
+        model:initial.modelNeeded?'waiting':'',active:'',running:false};
+      const stage=(key,label,status)=>{
+        state.publication[key]=status;
+        state.publication.active=label;
+        state.publication.running=status==='running';
+        render();
+      };
+      let completed=0;
+      try{
+        // Publish atlas first: the registration has already staged its source
+        // in the independent Atlas Registry; do not make the user choose it again.
+        if(initial.atlasNeeded){
+          stage('atlas','Публикуем выбранный Atlas в Roblox Open Cloud…','running');
+          const result=await publishInitialAtlas(initial.variant.id);
+          stage('atlas',`Atlas опубликован · Image ID ${result.publishedAssetId}`,'done');
+          completed++;
+          if(result.exportWarnings?.length)message(result.exportWarnings.join(' | '),true);
+        }
+        if(initial.modelNeeded){
+          if(state.pendingModel||state.physicsDirty){
+            stage('model','Сохраняем выбранный FBX и настройки мешей…','running');
+            await decoAssetSaveEdits(state.slug,{
+              ...(state.pendingModel?{modelSourcePath:state.pendingModel}:{}),
+              meshOptions:state.meshOptions},Number(row().revision));
+            state.pendingModel='';state.physicsDirty=false;
+            state.inspection=row()?.fbxAnalysis||state.inspection;
+          }
+          stage('model','Публикуем Model в Roblox Open Cloud…','running');
+          const result=await decoAssetPublish(state.slug,'model',false);
+          stage('model',`Model опубликован · Model ID ${result.model_asset_id}`,'done');
+          completed++;
+          state.scanStale=true;
+        }
+        state.publication.active=`Готово: опубликовано ${completed} ресурс(а). Studio Sync отдельно.`;
+        state.publication.running=false;
+        if(!state.error)message(state.publication.active);
+      }catch(error){
+        // A remote upload can complete even when the response is lost. Refresh
+        // published IDs before a user retries; never assume a failed HTTP
+        // response means Roblox did not create an asset.
+        await decoAssetLoad();
+        const key=state.publication.model==='running'?'model':'atlas';
+        state.publication[key]='error';
+        state.publication.active=`Ошибка этапа ${key==='atlas'?'Atlas':'Model'}: ${error?.message||String(error)}. `+
+          `Уже подтверждено: ${completed}. Проверь обновлённые ID перед повторным запуском.`;
+        state.publication.running=false;
+        throw Error(state.publication.active);
+      }
     });
     if(action==='delete')return decoAssetDelete(state.slug);
     if(action==='save-identity'){

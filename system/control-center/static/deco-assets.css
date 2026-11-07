@@ -234,3 +234,36 @@
 #location-asset-edit-dialog .la-sync-col {font-size:10px;color:var(--muted);font-weight:400;}
 #location-asset-edit-dialog .la-sync-col.is-missing {color:var(--orange);}
 #location-asset-edit-dialog .la-sync-model .la-sync-part-actions {border-top:1px solid var(--line);padding-top:7px;}
+
+/* M253 · First-time publication status is visible where the atlas is chosen. */
+#location-asset-edit-dialog .real-estate-mesh-tabs button[data-la-tab="publish"] {
+  border-color:var(--mint);color:var(--mint);font-weight:650;
+}
+#location-asset-edit-dialog .real-estate-mesh-tabs button[data-la-tab="publish"][aria-selected="false"] {
+  animation:game1-apply-pulse 1.65s ease-in-out infinite;
+}
+#location-asset-edit-dialog .la-publication-stack {display:grid;gap:9px;margin:12px 0;}
+#location-asset-edit-dialog .la-publication-resource {display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0;padding:12px;border:1px solid var(--line);border-radius:9px;background:var(--panel2);}
+#location-asset-edit-dialog .la-publication-resource>div {display:grid;gap:5px;min-width:0;}
+#location-asset-edit-dialog .la-publication-resource strong {overflow-wrap:anywhere;font-size:12px;}
+#location-asset-edit-dialog .la-publication-resource small {color:var(--muted);}
+#location-asset-edit-dialog .la-publication-stage {display:flex;align-items:center;gap:9px;min-height:30px;margin:12px 0;font-size:12px;overflow-wrap:anywhere;}
+#location-asset-edit-dialog .la-publication-warning {color:var(--orange);font-size:12px;line-height:1.5;}
+#location-asset-edit-dialog .la-publish-spinner {display:inline-block;width:16px;height:16px;flex:none;border:2px solid var(--line);border-top-color:var(--mint);border-radius:50%;animation:game1-publish-spin .8s linear infinite;}
+@keyframes game1-publish-spin {to {transform:rotate(360deg);}}
+.shared-atlas-editor .shared-atlas-unpublished {display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:9px 11px;border:1px solid var(--orange);border-radius:8px;font-size:12px;color:var(--orange);}
+.shared-atlas-editor .shared-atlas-unpublished button {font-weight:650;white-space:nowrap;}
+.shared-atlas-editor .deco-atlas-dot[data-ca-open-publish] {border-style:dashed;border-color:var(--orange);opacity:1;}
+@media(prefers-reduced-motion:reduce){
+  #location-asset-edit-dialog .real-estate-mesh-tabs button[data-la-tab="publish"] {animation:none;}
+  #location-asset-edit-dialog .la-publish-spinner {animation:none;border-top-color:var(--mint);}
+}
+#location-asset-edit-dialog .la-operation-status {display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;margin:9px 0;font-size:12px;color:var(--mint);}
+
+/* M254 · Inline invitation for unpublished Location atlas variants. */
+.shared-atlas-editor .deco-atlas-dot[data-ca-offer-publication] {border:1px dashed var(--orange);opacity:1;cursor:pointer;}
+.shared-atlas-editor .deco-atlas-dot[data-ca-offer-publication]:is(:hover,:focus-visible) {background:color-mix(in srgb,var(--orange) 14%,transparent);outline-offset:2px;}
+.shared-atlas-editor .shared-atlas-publication-offer {display:grid;gap:7px;min-width:0;margin:9px 0 12px;padding:12px 14px;border:1px solid var(--orange);border-radius:10px;background:var(--panel2);}
+.shared-atlas-editor .shared-atlas-publication-offer strong {font-size:13px;color:var(--orange);}
+.shared-atlas-editor .shared-atlas-publication-offer small {color:var(--muted);overflow-wrap:anywhere;}
+.shared-atlas-editor .shared-atlas-publication-offer .actions {margin-top:3px;}

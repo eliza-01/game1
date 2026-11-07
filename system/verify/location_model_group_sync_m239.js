@@ -82,6 +82,7 @@ context.window.game1StudioSync={
   replaceLocation:async(_slug,_token,keys)=>{calls.sync.push(keys);return {studio:{fullySynced:true}};},
   locationSummary:()=>'',
 };
+vm.runInNewContext(fs.readFileSync(path.join(root,'location-publication-state.js'),'utf8'),context);
 vm.runInNewContext(fs.readFileSync(path.join(root,'location-asset-workflow.js'),'utf8'),context);
 (async()=>{
   context.window.game1LocationAssetWorkflow.open('birch_01');

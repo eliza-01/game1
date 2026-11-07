@@ -72,6 +72,8 @@ def validate_report(report: dict, catalog: dict) -> list[dict]:
         for flag in ('needsMesh', 'needsTexture', 'needsStructure', 'duplicateId', 'ambiguous', 'hasModel', 'canSync'):
             if type(row.get(flag)) is not bool:
                 raise ValueError('invalid scan flag: ' + flag)
+        if 'needsRig' in row and type(row['needsRig']) is not bool:
+            raise ValueError('invalid scan flag: needsRig')
         # Schema 1 older Studio plugins omit the new material-only flag.
         # Validate strictly when present, while allowing read-only historical scans.
         if 'needsMaterial' in row and type(row['needsMaterial']) is not bool:

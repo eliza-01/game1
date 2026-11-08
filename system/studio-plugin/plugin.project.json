@@ -169,6 +169,9 @@
       "StudioPublishedMeshHistory": {
         "$path": "modules/StudioPublishedMeshHistory.luau"
       },
+      "StudioPlacedRigBoneEffects": {
+        "$path": "modules/StudioPlacedRigBoneEffects.luau"
+      },
       "StudioLocationRigCarrier": {
         "$path": "modules/StudioLocationRigCarrier.luau"
       },

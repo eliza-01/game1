@@ -4,6 +4,7 @@ local Carrier = require(script.Parent.StudioLocationRigCarrier)
 -- is a separate Model. No general ApplyMesh or MeshId writes.
 local RigSwap=require(script.Parent.StudioManagedRigSwap)
 local History=require(script.Parent.StudioPublishedMeshHistory)
+local BoneEffects = require(script.Parent.StudioPlacedRigBoneEffects)
 local Texture=require(script.Parent.StudioTextureAppearance)
 local Physics=require(script.Parent.StudioMeshPhysicsCore)
 local Geometry=require(script.Parent.StudioLocationPlacedGeometry)
@@ -44,6 +45,7 @@ local function stageRig(ref: any, ctx: any): any
         History.VerifyChildren(previous,oldParts)
         if #oldParts==0 then error("no managed geometry children") end
         local anchor=Geometry.Align(stage,previous,root)
+        BoneEffects.CopyToIncoming(oldParts,rigChildren(stage))
         return RigSwap.Prepare(root,oldParts,rigChildren(stage),{preferredPrimary=anchor})
     end)
     previous:Destroy()

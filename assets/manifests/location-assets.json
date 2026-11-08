@@ -644,6 +644,63 @@
       ]
     },
     {
+      "atlasKey": "ground_torch_01",
+      "baseKey": "ground_torch",
+      "version": "01",
+      "variants": [
+        {
+          "id": 41,
+          "family_id": 32,
+          "width": 512,
+          "height": 512,
+          "filename": "ground_torch_01_512x512_atlas.png",
+          "original_filename": "ground_torch_01_512x512_atlas.png",
+          "source_path": "assets/source/texture-atlases/ground_torch_01/512x512/ground_torch_01_512x512_atlas.png",
+          "source_sha256": "399fa78203f7275e3e8d74ed2d4a92e77d358dfa2801356d168f9a4c83b5859b",
+          "uses_alpha": true,
+          "published_id": "116362991193690",
+          "published_sha256": "399fa78203f7275e3e8d74ed2d4a92e77d358dfa2801356d168f9a4c83b5859b",
+          "moderation_state": "Reviewing",
+          "published_at": 1794107311.8176115,
+          "created_at": 1794107307.9335408,
+          "retired_at": null,
+          "atlas_key": "ground_torch_01",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "512x512",
+          "baseKey": "ground_torch",
+          "version": "01"
+        },
+        {
+          "id": 40,
+          "family_id": 32,
+          "width": 128,
+          "height": 128,
+          "filename": "ground_torch_01_128x128_atlas.png",
+          "original_filename": "ground_torch_01_128x128_atlas.png",
+          "source_path": "assets/source/texture-atlases/ground_torch_01/128x128/ground_torch_01_128x128_atlas.png",
+          "source_sha256": "40c8678e768365542611273ea2bd6b283e56f348ee9fa5c0a6fce6a6dc1e39ac",
+          "uses_alpha": true,
+          "published_id": "119831110703019",
+          "published_sha256": "40c8678e768365542611273ea2bd6b283e56f348ee9fa5c0a6fce6a6dc1e39ac",
+          "moderation_state": "Reviewing",
+          "published_at": 1794106114.9258444,
+          "created_at": 1794106111.3803103,
+          "retired_at": null,
+          "atlas_key": "ground_torch_01",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "128x128",
+          "baseKey": "ground_torch",
+          "version": "01"
+        }
+      ]
+    },
+    {
       "atlasKey": "head_01_male",
       "baseKey": "head_01_male",
       "version": "",
@@ -2742,41 +2799,215 @@
       "name_en": "Ground Torch 01",
       "category": "light",
       "model_path": "assets/source/location-assets/light/ground_torch_01/model/ground_torch_01.fbx",
-      "model_sha256": "b9786a2a75766511621ad4d56bdc77a29a8930f17efa35c6d368d7b6d521076a",
-      "model_asset_id": "106808887921132",
-      "model_published_sha256": "b9786a2a75766511621ad4d56bdc77a29a8930f17efa35c6d368d7b6d521076a",
+      "model_sha256": "97b084d881e17c2298c0e2f45e20e4555a21f18aa5bea6c8eeba81178344b020",
+      "model_asset_id": "131758360108923",
+      "model_published_sha256": "97b084d881e17c2298c0e2f45e20e4555a21f18aa5bea6c8eeba81178344b020",
       "model_moderation_state": "Approved",
       "destructible": false,
-      "revision": 1,
+      "revision": 4,
       "created_at": 1792109428.4855547,
-      "updated_at": 1792109440.378192,
-      "published_at": 1792109440.378192,
-      "surface_material": "default",
+      "updated_at": 1794105974.1723387,
+      "published_at": 1794105974.1723387,
+      "surface_material": "metal",
       "alpha_enabled": 0,
-      "fbxAnalysis": null,
-      "rigManifest": null,
-      "needsFbxInspection": true,
+      "fbxAnalysis": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "col_mesh",
+            "armature": "",
+            "vertices": 224,
+            "bones": [],
+            "influencedBones": [],
+            "role": "collider",
+            "physics": {
+              "role": "collider",
+              "canCollide": true,
+              "canQuery": true,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": "PreciseConvexDecomposition",
+              "physicsOnly": true
+            }
+          },
+          {
+            "name": "ground_torch_01",
+            "armature": "ground_torch_01_armature",
+            "vertices": 2007,
+            "bones": [
+              {
+                "name": "fire_bone",
+                "parent": "",
+                "matrixLocal": [
+                  -0.0,
+                  0.0,
+                  -1.0,
+                  -0.0,
+                  1.0,
+                  0.0,
+                  -0.0,
+                  0.0,
+                  0.0,
+                  -0.9999999,
+                  0.0,
+                  -1.0043287,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [
+              "fire_bone"
+            ],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": false,
+              "canQuery": false,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": "Box",
+              "physicsOnly": false
+            }
+          },
+          {
+            "name": "rig_carrier",
+            "armature": "ground_torch_01_armature",
+            "vertices": 3,
+            "bones": [
+              {
+                "name": "fire_bone",
+                "parent": "",
+                "matrixLocal": [
+                  -0.0,
+                  0.0,
+                  -1.0,
+                  -0.0,
+                  1.0,
+                  0.0,
+                  -0.0,
+                  0.0,
+                  0.0,
+                  -0.9999999,
+                  0.0,
+                  -1.0043287,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [
+              "fire_bone"
+            ],
+            "role": "carrier",
+            "physics": {
+              "role": "carrier",
+              "canCollide": false,
+              "canQuery": false,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": "Box",
+              "physicsOnly": true
+            }
+          }
+        ],
+        "hasCollider": true,
+        "armatures": [
+          "ground_torch_01_armature"
+        ],
+        "unassignedArmatures": []
+      },
+      "rigManifest": {
+        "boneHash": "3420e01815df197298e170e57797003f9e1be95e092cf0a3e598ebfa0994542b",
+        "bones": [
+          {
+            "matrix": [
+              -0.0,
+              0.0,
+              -1.0,
+              -0.0,
+              1.0,
+              -0.0,
+              -0.0,
+              1e-07,
+              -0.0,
+              -0.9999999,
+              0.0,
+              -1.0043288,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "name": "fire_bone",
+            "parent": ""
+          }
+        ],
+        "carrierName": "rig_carrier",
+        "inventoryHash": "b6a8d587ff1da97d05cef46dd8ceada4192080c2e848320a630b79e01b2b91d6",
+        "parts": [
+          {
+            "name": "col_mesh",
+            "role": "collider",
+            "vertices": 224
+          },
+          {
+            "name": "ground_torch_01",
+            "role": "visual",
+            "vertices": 2007
+          },
+          {
+            "name": "rig_carrier",
+            "role": "rig_carrier",
+            "vertices": 3
+          }
+        ],
+        "rigKind": "skinned",
+        "schemaVersion": 2,
+        "sourceSha256": "",
+        "structuralHash": "06b48813894c4d7a49d5831be17f2ca0dfff1e371e5dec3ee4f0f8e55409d544"
+      },
+      "needsFbxInspection": false,
       "legacyStaticPublication": false,
-      "meshOptions": {},
-      "surfaceMaterial": "default",
+      "meshOptions": {
+        "col_mesh": {
+          "collisionFidelity": "PreciseConvexDecomposition",
+          "collisionMesh": true,
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": false
+        },
+        "ground_torch_01": {
+          "collisionFidelity": "Box",
+          "collisionMesh": false,
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true
+        }
+      },
+      "surfaceMaterial": "metal",
       "alphaEnabled": false,
       "materialDefinition": {
-        "id": "default",
-        "label": "Default · unchanged",
-        "robloxMaterial": "",
-        "soundFamily": "generic"
+        "id": "metal",
+        "label": "Metal",
+        "robloxMaterial": "Metal",
+        "soundFamily": "metal"
       },
-      "texture_path": "assets/source/texture-atlases/wall_torch_01/2048x2048/migrated/f2e5349b2b7de2cac11340d2fb091ebd9bae397672e7cdcdba462db9466ec104/wall_torch_01.jpg",
-      "texture_filename": "wall_torch_01.jpg",
-      "texture_sha256": "f2e5349b2b7de2cac11340d2fb091ebd9bae397672e7cdcdba462db9466ec104",
-      "texture_asset_id": "133426040591241",
-      "texture_published_sha256": "f2e5349b2b7de2cac11340d2fb091ebd9bae397672e7cdcdba462db9466ec104",
+      "texture_path": "assets/source/texture-atlases/ground_torch_01/512x512/ground_torch_01_512x512_atlas.png",
+      "texture_filename": "ground_torch_01_512x512_atlas.png",
+      "texture_sha256": "399fa78203f7275e3e8d74ed2d4a92e77d358dfa2801356d168f9a4c83b5859b",
+      "texture_asset_id": "116362991193690",
+      "texture_published_sha256": "399fa78203f7275e3e8d74ed2d4a92e77d358dfa2801356d168f9a4c83b5859b",
       "texture_moderation_state": "Reviewing",
       "texture_reference_slug": "",
-      "atlasVariantId": 20,
-      "atlasFamily": "wall_torch_01",
-      "atlasResolution": "2048x2048",
-      "bindingRevision": 1,
+      "atlasVariantId": 41,
+      "atlasFamily": "ground_torch_01",
+      "atlasResolution": "512x512",
+      "bindingRevision": 3,
       "studioSyncStatus": "synced",
       "atlasVariants": [
         {
@@ -2803,16 +3034,66 @@
           "resolution": "2048x2048",
           "baseKey": "wall_torch",
           "version": "01"
+        },
+        {
+          "id": 41,
+          "family_id": 32,
+          "width": 512,
+          "height": 512,
+          "filename": "ground_torch_01_512x512_atlas.png",
+          "original_filename": "ground_torch_01_512x512_atlas.png",
+          "source_path": "assets/source/texture-atlases/ground_torch_01/512x512/ground_torch_01_512x512_atlas.png",
+          "source_sha256": "399fa78203f7275e3e8d74ed2d4a92e77d358dfa2801356d168f9a4c83b5859b",
+          "uses_alpha": true,
+          "published_id": "116362991193690",
+          "published_sha256": "399fa78203f7275e3e8d74ed2d4a92e77d358dfa2801356d168f9a4c83b5859b",
+          "moderation_state": "Reviewing",
+          "published_at": 1794107311.8176115,
+          "created_at": 1794107307.9335408,
+          "retired_at": null,
+          "atlas_key": "ground_torch_01",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "512x512",
+          "baseKey": "ground_torch",
+          "version": "01"
+        },
+        {
+          "id": 40,
+          "family_id": 32,
+          "width": 128,
+          "height": 128,
+          "filename": "ground_torch_01_128x128_atlas.png",
+          "original_filename": "ground_torch_01_128x128_atlas.png",
+          "source_path": "assets/source/texture-atlases/ground_torch_01/128x128/ground_torch_01_128x128_atlas.png",
+          "source_sha256": "40c8678e768365542611273ea2bd6b283e56f348ee9fa5c0a6fce6a6dc1e39ac",
+          "uses_alpha": true,
+          "published_id": "119831110703019",
+          "published_sha256": "40c8678e768365542611273ea2bd6b283e56f348ee9fa5c0a6fce6a6dc1e39ac",
+          "moderation_state": "Reviewing",
+          "published_at": 1794106114.9258444,
+          "created_at": 1794106111.3803103,
+          "retired_at": null,
+          "atlas_key": "ground_torch_01",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "128x128",
+          "baseKey": "ground_torch",
+          "version": "01"
         }
       ],
-      "textureUsesAlpha": false,
-      "atlasLegacyWarning": true,
+      "textureUsesAlpha": true,
+      "atlasLegacyWarning": false,
       "status": "PUBLISHED",
       "category_label": "Light",
       "publishedVisualMeshes": [
         {
-          "meshId": "79923563217669",
-          "name": "torch_04"
+          "meshId": "129094987162444",
+          "name": "ground_torch_01"
         }
       ],
       "aliases": []

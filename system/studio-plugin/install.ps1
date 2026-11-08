@@ -112,6 +112,7 @@ foreach($Marker in @(
     'StudioRealEstatePlacedCollisionSync',
     'StudioRealEstatePlacedVisualSync',
     'StudioManagedRigSwap',
+    'StudioPlacedRigBoneEffects',
     'StudioLocationPlacementOwner',
     'StudioLocationPlacedGeometry',
     'StudioLocationPublishedGeometry',

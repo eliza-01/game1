@@ -3,6 +3,7 @@ local Carrier = require(script.Parent.StudioLocationRigCarrier)
 -- both keep StudioManagedRigSwap as the sole child-rig transaction.
 local MeshPhysics = require(script.Parent.StudioMeshPhysicsCore)
 local Ownership = require(script.Parent.StudioLocationPlacementOwner)
+local BoneEffects = require(script.Parent.StudioPlacedRigBoneEffects)
 local Inventory = {}
 
 function Inventory.Id(value: any): string
@@ -166,12 +167,15 @@ function Inventory.VerifyChildren(oldPublished: Model, children: {Instance})
     -- the full non-texture class hierarchy of the previous immutable Model
     -- with the managed outgoing subtrees. Names are intentionally ignored:
     -- authoring may rename parts, and Mesh IDs establish provenance.
-    -- SurfaceAppearance is the one exception, since atlas attachment is
-    -- handled separately and older publications may not contain it.
+    -- SurfaceAppearance is atlas-managed. Portable Bone effects and safe
+    -- Bone > Attachment > effects subtrees are cloned onto the staged rig by
+    -- StudioPlacedRigBoneEffects. Ignore only complete, whitelisted subtrees:
+    -- any extra Script, geometry or unknown Attachment child still blocks Sync.
+    -- Other unknown descendants still fail closed.
     local function signatures(roots: {Instance}): {[string]: number}
         local result = {}
         local function visit(item: Instance, prefix: string)
-            if item:IsA("SurfaceAppearance") then return end
+            if item:IsA("SurfaceAppearance") or BoneEffects.IsPortable(item) then return end
             local path = prefix .. "/" .. item.ClassName
             result[path] = (result[path] or 0) + 1
             for _, child in ipairs(item:GetChildren()) do

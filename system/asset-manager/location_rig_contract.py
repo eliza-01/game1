@@ -84,3 +84,26 @@ def validate(parts: list[dict], bones: list[dict], *, source_sha256: str = '') -
             'structuralHash': canonical_hash(structural),
             'inventoryHash': canonical_hash(normalized_parts),
             'boneHash': canonical_hash(normalized_bones)}
+
+
+def assert_bone_rest_roundtrip(before: list[dict], after: list[dict], *, tolerance: float = 0.0001) -> None:
+    """Check rig identity across one FBX conversion, not mesh inventory identity.
+
+    Different asset revisions may intentionally have different bones. Only the
+    round-trip *within* one revision must preserve the authored animation rig.
+    Blender may introduce small floating-point differences to rest matrices.
+    """
+    old = {bone['name']: bone for bone in before}
+    new = {bone['name']: bone for bone in after}
+    if old.keys() != new.keys():
+        lost = sorted(old.keys() - new.keys())
+        added = sorted(new.keys() - old.keys())
+        raise ValueError(f'FBX round-trip changed Bone set (lost={lost}, added={added})')
+    for name in sorted(old):
+        previous, current = old[name], new[name]
+        if previous['parent'] != current['parent']:
+            raise ValueError(f'FBX round-trip changed Bone parent: {name}')
+        if (len(previous['matrix']) != len(current['matrix']) or
+                any(abs(a - b) > tolerance for a, b in
+                    zip(previous['matrix'], current['matrix']))):
+            raise ValueError(f'FBX round-trip changed Bone rest pose: {name}')

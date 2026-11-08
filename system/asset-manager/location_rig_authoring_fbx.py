@@ -14,7 +14,7 @@ from blender_rig_carrier import create_rig_carrier
 from model_publication import (
     assert_skin_complete, clean_scene, export_model, linked_meshes, prepare_rig,
 )
-from location_rig_contract import CARRIER, ROOT, role, validate
+from location_rig_contract import CARRIER, ROOT, role, validate, assert_bone_rest_roundtrip
 
 
 def bone_rows(armature):
@@ -77,8 +77,10 @@ def main(source, output, report_path):
         raise ValueError('export lost canonical armature')
     reopened = describe(published_objects, rigs[0])
     assert_skin_complete(rigs[0], linked_meshes(rigs[0]))
-    if reopened['boneHash'] != manifest['boneHash'] or reopened['inventoryHash'] != manifest['inventoryHash']:
-        raise ValueError('FBX round-trip changed carrier or Bone inventory')
+    # FBX may split or expand mesh objects. Validate the reopened result and
+    # preserve its own manifest rather than requiring the input mesh inventory.
+    # Bone continuity still matters to animation compatibility within a revision.
+    assert_bone_rest_roundtrip(manifest['bones'], reopened['bones'])
     reopened['sourceSha256'] = hashlib.sha256(output.read_bytes()).hexdigest()
     reopened['skinPreparation'] = skin_report
     report_path.parent.mkdir(parents=True, exist_ok=True)

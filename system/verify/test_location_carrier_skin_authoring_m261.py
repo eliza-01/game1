@@ -119,7 +119,9 @@ class SkinAuthoringTests(unittest.TestCase):
         bpy.ops = SimpleNamespace(import_scene=SimpleNamespace(fbx=imp))
         module = self._load('location_rig_authoring_fbx', bpy=bpy,
                             mathutils=SimpleNamespace(Vector=lambda v:v))
-        manifest = {'schemaVersion':2,'structuralHash':'struct','inventoryHash':'inv','boneHash':'bone'}
+        manifest = {'schemaVersion':2,'structuralHash':'struct','inventoryHash':'inv','boneHash':'bone',
+                    'bones':[{'name':name, 'parent':'', 'matrix':[1.,0.,0.,0.]*4}
+                             for name in ('Bone', 'Bone.001')]}
         with tempfile.TemporaryDirectory() as d:
             source = Path(d) / 'source.fbx'
             output = Path(d) / 'authored.fbx'

@@ -1314,6 +1314,7 @@ return DecoManager
 local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
 local RigSwap = require(script.Parent.StudioManagedRigSwap)
 local History = require(script.Parent.StudioPublishedMeshHistory)
+local BoneEffects = require(script.Parent.StudioPlacedRigBoneEffects)
 local Placement = require(script.Parent.DecoAssetPreparation)
 local Physics = require(script.Parent.StudioMeshPhysicsCore)
 local Ownership = require(script.Parent.StudioLocationPlacementOwner)
@@ -1556,6 +1557,7 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                     History.VerifyChildren(previousPublished,previousChildren)
                     local anchor=Geometry.Align(stage,previousPublished,model)
                     Placement.PrepareSynced(stage,row.meshOptions,row.surfaceMaterial,row.materialDefinition and row.materialDefinition.robloxMaterial)
+                    BoneEffects.CopyToIncoming(previousChildren, rigChildren(stage))
                     transaction = RigSwap.Prepare(model, previousChildren, rigChildren(stage),
                         {preferredPrimary=anchor})
                 end)
@@ -7266,6 +7268,7 @@ return Repair
 -- is a separate Model. No general ApplyMesh or MeshId writes.
 local RigSwap=require(script.Parent.StudioManagedRigSwap)
 local History=require(script.Parent.StudioPublishedMeshHistory)
+local BoneEffects = require(script.Parent.StudioPlacedRigBoneEffects)
 local Texture=require(script.Parent.StudioTextureAppearance)
 local Physics=require(script.Parent.StudioMeshPhysicsCore)
 local Geometry=require(script.Parent.StudioLocationPlacedGeometry)
@@ -7306,6 +7309,7 @@ local function stageRig(ref: any, ctx: any): any
         History.VerifyChildren(previous,oldParts)
         if #oldParts==0 then error("no managed geometry children") end
         local anchor=Geometry.Align(stage,previous,root)
+        BoneEffects.CopyToIncoming(oldParts,rigChildren(stage))
         return RigSwap.Prepare(root,oldParts,rigChildren(stage),{preferredPrimary=anchor})
     end)
     previous:Destroy()
@@ -7455,6 +7459,121 @@ return Sync
       </Item>
       <Item class="ModuleScript" referent="38">
         <Properties>
+          <string name="Name">StudioPlacedRigBoneEffects</string>
+          <string name="Source"><![CDATA[-- Placement-owned visual decorations attached to authored Bones. Accept either
+-- leaf effects directly under a Bone or one Attachment under a Bone containing
+-- ONLY leaf effects. Keep the Attachment as a unit: its CFrame/Axis and its
+-- children's properties must survive the managed rig swap unchanged.
+-- Arbitrary descendants, scripts and geometry are never portable.
+local BoneEffects = {}
+
+local MAX_EFFECTS_PER_RIG = 128
+
+local function isLeafEffect(item: Instance): boolean
+    return #item:GetChildren() == 0
+        and (item:IsA("ParticleEmitter") or item:IsA("PointLight")
+            or item:IsA("SpotLight") or item:IsA("SurfaceLight"))
+end
+
+-- Only top-level decorations are portable. An effect below an Attachment is
+-- intentionally NOT portable on its own, so it is never cloned twice or
+-- detached from the authored Attachment transform.
+function BoneEffects.IsPortable(item: Instance): boolean
+    if item.Parent == nil or not item.Parent:IsA("Bone") then return false end
+    if isLeafEffect(item) then return true end
+    -- Bone inherits Attachment in Roblox: accept only the concrete class.
+    -- Otherwise a nested Bone with effects could be mistaken for decoration.
+    if item.ClassName ~= "Attachment" then return false end
+    for _, child in ipairs(item:GetChildren()) do
+        if not isLeafEffect(child) then return false end
+    end
+    return true
+end
+
+local function boneKey(bone: Bone): string
+    local names = {}
+    local cursor: Instance? = bone
+    while cursor and cursor:IsA("Bone") do
+        table.insert(names, 1, cursor.Name)
+        cursor = cursor.Parent
+    end
+    return table.concat(names, "\0")
+end
+
+local function bones(roots: {Instance}): {[string]: Bone}
+    local result = {}
+    for _, root in ipairs(roots) do
+        for _, item in ipairs(root:GetDescendants()) do
+            if item:IsA("Bone") then
+                local key = boneKey(item)
+                if result[key] then
+                    error("ambiguous duplicated Bone path in Location rig: " .. item.Name)
+                end
+                result[key] = item
+            end
+        end
+    end
+    return result
+end
+
+-- Called only AFTER StudioPublishedMeshHistory.VerifyChildren has proved the
+-- outgoing physical rig and its non-effect descendants. This clones, never
+-- moves, each top-level effect/Attachment onto the staged rig. Until the
+-- managed swap finalizes, old effects remain untouched for rollback. If a
+-- Bone no longer exists, refuse the swap rather than losing or misplacing it.
+function BoneEffects.CopyToIncoming(outgoing: {Instance}, incoming: {Instance}): number
+    local portable = {}
+    local nodeCount = 0
+    for _, root in ipairs(outgoing) do
+        for _, item in ipairs(root:GetDescendants()) do
+            if BoneEffects.IsPortable(item) then
+                table.insert(portable, item)
+                -- Count both parent Attachments and their child effects.
+                -- The rigid whitelist above limits attachment depth to one.
+                nodeCount += 1 + #item:GetChildren()
+                if nodeCount > MAX_EFFECTS_PER_RIG then
+                    error("too many placed Bone decorations to transfer; no Place geometry modified")
+                end
+            end
+        end
+    end
+    if #portable == 0 then return 0 end
+    -- Do not inspect/match Bone paths for ordinary rigs without decorations.
+    local oldBones = bones(outgoing)
+    local newBones = bones(incoming)
+    local copied = 0
+    for _, item in ipairs(portable) do
+        local parent = item.Parent :: Bone
+        local key = boneKey(parent)
+        if oldBones[key] ~= parent then
+            error("ambiguous placed Bone effect owner: " .. parent.Name)
+        end
+        local destination = newBones[key]
+        if not destination then
+            error("placed Bone decoration " .. item.Name .. " cannot follow missing Bone "
+                .. parent.Name .. "; no Place geometry modified")
+        end
+        if destination:FindFirstChild(item.Name) then
+            error("placed Bone decoration name conflicts with new publication: " .. item.Name
+                .. "; no Place geometry modified")
+        end
+        copied += 1
+        local clone = item:Clone()
+        if not clone then
+            error("placed Bone decoration is not cloneable: " .. item.Name
+                .. "; no Place geometry modified")
+        end
+        clone.Parent = destination
+    end
+    return copied
+end
+
+return table.freeze(BoneEffects)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="39">
+        <Properties>
           <string name="Name">StudioPlotsCatalog</string>
           <string name="Source"><![CDATA[-- Read-only discovery contract for authored Workspace.Plots/01..50.
 -- Neither folder creation nor volume/number reparenting belongs to the preview.
@@ -7515,7 +7634,7 @@ return table.freeze(Catalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="39">
+      <Item class="ModuleScript" referent="40">
         <Properties>
           <string name="Name">StudioPlotsPartPolicy</string>
           <string name="Source"><![CDATA[-- Reversible, Studio-only properties for Plots visibility and playtest preview.
@@ -7600,7 +7719,7 @@ return table.freeze(Policy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="40">
+      <Item class="ModuleScript" referent="41">
         <Properties>
           <string name="Name">StudioPlotsSelectionFilter</string>
           <string name="Source"><![CDATA[-- Studio viewport hit-test filter for hidden Plots authoring geometry.
@@ -7690,7 +7809,7 @@ return table.freeze(Filter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="41">
+      <Item class="ModuleScript" referent="42">
         <Properties>
           <string name="Name">StudioPlotsVisibility</string>
           <string name="Source"><![CDATA[-- Studio-only Plots preview: hidden -> volumes -> volumes + numbers -> hidden.
@@ -7984,7 +8103,7 @@ return table.freeze(PlotsVisibility)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="42">
+      <Item class="ModuleScript" referent="43">
         <Properties>
           <string name="Name">StudioPublishedMeshHistory</string>
           <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
@@ -7992,6 +8111,7 @@ return table.freeze(PlotsVisibility)
 -- both keep StudioManagedRigSwap as the sole child-rig transaction.
 local MeshPhysics = require(script.Parent.StudioMeshPhysicsCore)
 local Ownership = require(script.Parent.StudioLocationPlacementOwner)
+local BoneEffects = require(script.Parent.StudioPlacedRigBoneEffects)
 local Inventory = {}
 
 function Inventory.Id(value: any): string
@@ -8155,12 +8275,15 @@ function Inventory.VerifyChildren(oldPublished: Model, children: {Instance})
     -- the full non-texture class hierarchy of the previous immutable Model
     -- with the managed outgoing subtrees. Names are intentionally ignored:
     -- authoring may rename parts, and Mesh IDs establish provenance.
-    -- SurfaceAppearance is the one exception, since atlas attachment is
-    -- handled separately and older publications may not contain it.
+    -- SurfaceAppearance is atlas-managed. Portable Bone effects and safe
+    -- Bone > Attachment > effects subtrees are cloned onto the staged rig by
+    -- StudioPlacedRigBoneEffects. Ignore only complete, whitelisted subtrees:
+    -- any extra Script, geometry or unknown Attachment child still blocks Sync.
+    -- Other unknown descendants still fail closed.
     local function signatures(roots: {Instance}): {[string]: number}
         local result = {}
         local function visit(item: Instance, prefix: string)
-            if item:IsA("SurfaceAppearance") then return end
+            if item:IsA("SurfaceAppearance") or BoneEffects.IsPortable(item) then return end
             local path = prefix .. "/" .. item.ClassName
             result[path] = (result[path] or 0) + 1
             for _, child in ipairs(item:GetChildren()) do
@@ -8396,7 +8519,7 @@ return table.freeze(Inventory)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="43">
+      <Item class="ModuleScript" referent="44">
         <Properties>
           <string name="Name">StudioRealEstateCollisionPolicy</string>
           <string name="Source"><![CDATA[-- Real Estate physics profile; shared MeshPhysicsCore writes MeshPart physics.
@@ -8505,7 +8628,7 @@ return table.freeze(Policy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="44">
+      <Item class="ModuleScript" referent="45">
         <Properties>
           <string name="Name">StudioRealEstateHouseFrame</string>
           <string name="Source"><![CDATA[-- Author-space transform for all Real Estate Studio sync paths.
@@ -8532,7 +8655,7 @@ return table.freeze(HouseFrame)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="45">
+      <Item class="ModuleScript" referent="46">
         <Properties>
           <string name="Name">StudioRealEstateModel</string>
           <string name="Source"><![CDATA[-- Studio assembly for any number of independent Real Estate MeshPart rigs.
@@ -8816,7 +8939,7 @@ return table.freeze(StudioRealEstateModel)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="46">
+      <Item class="ModuleScript" referent="47">
         <Properties>
           <string name="Name">StudioRealEstatePartPlacement</string>
           <string name="Source"><![CDATA[-- Restore source-FBX mesh centres after independent Model Asset import.
@@ -8940,7 +9063,7 @@ return table.freeze(Placement)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="47">
+      <Item class="ModuleScript" referent="48">
         <Properties>
           <string name="Name">StudioRealEstatePartSync</string>
           <string name="Source"><![CDATA[-- Atomic, single-rig refresh of a managed Real Estate template.
@@ -9174,7 +9297,7 @@ return table.freeze(PartSync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="48">
+      <Item class="ModuleScript" referent="49">
         <Properties>
           <string name="Name">StudioRealEstatePlacedCollisionSync</string>
           <string name="Source"><![CDATA[-- Repair *only* authoring-managed collision rigs of already placed Estates.
@@ -9249,7 +9372,7 @@ return table.freeze(Sync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="49">
+      <Item class="ModuleScript" referent="50">
         <Properties>
           <string name="Name">StudioRealEstatePlacedPhysicsGuard</string>
           <string name="Source"><![CDATA[-- Studio Edit Mode: normalize a managed Estate pasted or dragged from
@@ -9321,7 +9444,7 @@ return table.freeze(Guard)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="50">
+      <Item class="ModuleScript" referent="51">
         <Properties>
           <string name="Name">StudioRealEstatePlacedTargets</string>
           <string name="Source"><![CDATA[-- One authoritative definition of a placed Real Estate instance.
@@ -9366,7 +9489,7 @@ return table.freeze(Targets)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="51">
+      <Item class="ModuleScript" referent="52">
         <Properties>
           <string name="Name">StudioRealEstatePlacedVisualSync</string>
           <string name="Source"><![CDATA[-- Full Real Estate sync: refresh visual rigs on *all managed placed* houses.
@@ -9485,7 +9608,7 @@ return table.freeze(VisualSync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="52">
+      <Item class="ModuleScript" referent="53">
         <Properties>
           <string name="Name">StudioRealEstateRigValidation</string>
           <string name="Source"><![CDATA[-- Validate an already-published Real Estate Model Asset as actually loaded by Roblox.
@@ -9614,7 +9737,7 @@ return table.freeze(Validation)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="53">
+      <Item class="ModuleScript" referent="54">
         <Properties>
           <string name="Name">StudioSkinnedMeshConnection</string>
           <string name="Source"><![CDATA[--!strict
@@ -9684,7 +9807,7 @@ return table.freeze(Connection)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="54">
+      <Item class="ModuleScript" referent="55">
         <Properties>
           <string name="Name">StudioTextureAppearance</string>
           <string name="Source"><![CDATA[-- Shared Studio-side material binding for all authored MeshParts.
@@ -9841,7 +9964,7 @@ return table.freeze(StudioTextureAppearance)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="55">
+      <Item class="ModuleScript" referent="56">
         <Properties>
           <string name="Name">StudioTimelineEditorCommands</string>
           <string name="Source"><![CDATA[-- Timeline authoring session: validates requests, binds UI events and reports results.
@@ -10130,7 +10253,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="56">
+      <Item class="ModuleScript" referent="57">
         <Properties>
           <string name="Name">StudioTimelinePoseSampler</string>
           <string name="Source"><![CDATA[-- Offline pose extraction and interpolation for a preview rig. No UI or HTTP dependencies.
@@ -10309,7 +10432,7 @@ return table.freeze(StudioTimelinePoseSampler)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="57">
+      <Item class="ModuleScript" referent="58">
         <Properties>
           <string name="Name">StudioTimelinePreview</string>
           <string name="Source"><![CDATA[-- Owns the isolated ViewportFrame rig, camera interaction and animation-asset retrieval.
@@ -10525,7 +10648,7 @@ return table.freeze(StudioTimelinePreview)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="58">
+      <Item class="ModuleScript" referent="59">
         <Properties>
           <string name="Name">StudioTimelineTransport</string>
           <string name="Source"><![CDATA[-- HTTP boundary for the Timeline editor. No UI, animation or Studio model access.
@@ -10583,7 +10706,7 @@ return table.freeze(StudioTimelineTransport)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="59">
+      <Item class="ModuleScript" referent="60">
         <Properties>
           <string name="Name">StudioTimelineWidget</string>
           <string name="Source"><![CDATA[-- Timeline editor view. Builds the dock widget and exposes only its controls.

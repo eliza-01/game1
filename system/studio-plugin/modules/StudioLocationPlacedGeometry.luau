@@ -1,3 +1,4 @@
+local Carrier = require(script.Parent.StudioLocationRigCarrier)
 -- Location-only geometry placement policy, shared by row Sync and Place Registry.
 -- The transaction itself belongs to StudioManagedRigSwap (also used by Estate).
 -- Preserve manual per-part Size/CFrame on simple, unrigged published revisions;
@@ -9,7 +10,7 @@ local Geometry = {}
 local function visuals(model: Model): {MeshPart}
     local result = {}
     for _, descendant in ipairs(model:GetDescendants()) do
-        if descendant:IsA("MeshPart") and not Physics.IsCollider(descendant.Name)
+        if descendant:IsA("MeshPart") and not Carrier.IsCarrier(descendant) and not Physics.IsCollider(descendant.Name)
             and descendant:GetAttribute("Game1DecoPhysicsOnly") ~= true then
             table.insert(result, descendant)
         end
@@ -34,6 +35,12 @@ end
 
 local function sameSize(a: Vector3, b: Vector3): boolean
     return (a - b).Magnitude < 0.025
+end
+
+local function sameFrame(a: CFrame, b: CFrame): boolean
+    return (a.Position - b.Position).Magnitude <= 0.025
+        and a.LookVector:Dot(b.LookVector) >= 0.9999
+        and a.UpVector:Dot(b.UpVector) >= 0.9999
 end
 
 local function uniformRatio(target: Vector3, source: Vector3): number?
@@ -69,8 +76,8 @@ local function alignSingleVisualRig(stage: Model, placed: Model,
     for _, part in ipairs(stage:GetDescendants()) do
         if part:IsA("BasePart") then part.Anchored = target.Anchored end
     end
-    if not sameSize(source.Size, target.Size) or source.CFrame ~= target.CFrame
-        or source:GetPivot() ~= target:GetPivot() then
+    if not sameSize(source.Size, target.Size) or not sameFrame(source.CFrame, target.CFrame)
+        or not sameFrame(source:GetPivot(), target:GetPivot()) then
         error("не удалось сохранить uniform Scale/CFrame/PivotOffset rig; Place не изменён")
     end
     if placed.PrimaryPart == target then stage.PrimaryPart = source end
@@ -152,8 +159,8 @@ function Geometry.Align(stage: Model, previous: Model, placed: Model): BasePart?
         -- Keep the precise authored mesh pivot as well as its visible CFrame:
         -- a published FBX may have a different PivotOffset than the old version.
         source.PivotOffset = target.PivotOffset
-        if not sameSize(source.Size, target.Size) or source.CFrame ~= target.CFrame
-            or source:GetPivot() ~= target:GetPivot() then
+        if not sameSize(source.Size, target.Size) or not sameFrame(source.CFrame, target.CFrame)
+            or not sameFrame(source:GetPivot(), target:GetPivot()) then
             error("не удалось сохранить CFrame/Size/PivotOffset; Place не изменён")
         end
         if placed.PrimaryPart == target then stage.PrimaryPart = source end

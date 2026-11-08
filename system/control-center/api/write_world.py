@@ -489,6 +489,19 @@ def route(path, body, deps):
         except (ValueError, OSError, RuntimeError) as error:
             return out(400, {'error': str(error)})
 
+    if path.startswith(location_asset_prefix) and path.endswith('/prepare-canonical-fbx'):
+        slug = unquote(path[len(location_asset_prefix):-len('/prepare-canonical-fbx')].strip('/'))
+        try:
+            if not re.fullmatch(r'[a-z0-9][a-z0-9_]{0,63}', slug):
+                raise ValueError('invalid Location Asset slug')
+            payload = body()
+            if not isinstance(payload, dict) or set(payload) != {'expectedRevision'}:
+                raise ValueError('expectedRevision is required for explicit rig authoring')
+            from services.location_rig_authoring import prepare_canonical_fbx
+            return out(200, prepare_canonical_fbx(location_assets, slug, payload['expectedRevision']))
+        except (ValueError, OSError, RuntimeError, KeyError) as error:
+            return out(400, {'error': str(error)})
+
     location_asset_model_suffix = "/publish-model"
     if path.startswith(location_asset_prefix) and path.endswith(location_asset_model_suffix):
         slug = unquote(path[len(location_asset_prefix):-len(location_asset_model_suffix)].strip("/"))

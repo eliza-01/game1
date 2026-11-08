@@ -34,6 +34,26 @@ window.game1LocationAssetWorkflow = (() => {
     catch(error){message(error?.message||String(error),true);return null;}
     finally{state.busy=false;state.operationLabel='';render();}
   }
+  async function prepareAuthoredRigIfMissing(setStage){
+    const current=row();
+    if(!current)throw Error('Location Asset no longer exists');
+    const analysis=current.fbxAnalysis||state.inspection;
+    if(!analysis)throw Error('Analyze registered FBX before publication');
+    if(!window.game1LocationPublication.needsCanonicalFbx({model_path:current.model_path,fbxAnalysis:analysis}))return false;
+    setStage?.('Подготавливаем канонический rig_carrier в Blender (новая FBX-ревизия)…');
+    const prepared=await request(`/api/location-assets/${encodeURIComponent(state.slug)}/prepare-canonical-fbx`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({expectedRevision:Number(current.revision)}),
+    });
+    if(prepared.resourceKind!=='ModelSource'||prepared.atlasUnchanged!==true||!prepared.structuralHash)
+      throw Error('Blender authoring did not confirm canonical FBX and unchanged Atlas');
+    await decoAssetLoad();
+    state.inspection=row()?.fbxAnalysis||null;
+    state.meshOptions=window.game1MeshAuthoring.seeded(state.inspection,row()?.meshOptions||{});
+    state.physicsDirty=false;
+    state.scanStale=true;
+    return true;
+  }
   function render(){
     const d=document.getElementById('location-asset-edit-dialog');
     if(!d||!state.slug)return;
@@ -46,10 +66,10 @@ window.game1LocationAssetWorkflow = (() => {
     const configured=Boolean(decoAssetState.data?.publication?.configured);
     const modelCurrent=Boolean(item.model_asset_id&&item.model_sha256===item.model_published_sha256);
     const changed=Boolean(state.pendingModel||state.physicsDirty);
-    const needsPublication=Boolean(state.pendingModel||!modelCurrent);
-    const publicationReady=Boolean(configured&&(state.pendingModel||item.model_path));
     const publication=window.game1LocationPublication.plan(item,
       decoAssetState.data?.atlases||[],Boolean(state.pendingModel));
+    const needsPublication=publication.modelNeeded;
+    const publicationReady=Boolean(configured&&(state.pendingModel||item.model_path));
     const showPublish=publication.count>0||state.tab==='publish'||Boolean(state.publication);
     const tabs=[{id:'identity',label:'Identity'},{id:'model',label:'Model · FBX'},
       {id:'atlas',label:'Texture · atlas'},
@@ -68,13 +88,16 @@ window.game1LocationAssetWorkflow = (() => {
       `<div class="actions">${button('save-identity','Apply Changes',busy)}${button('delete','Retire asset',busy)}</div>`,
       `Revision ${Number(item.revision||0)}`);
     const inspection=state.inspection;
+    const needsAuthoredRig=window.game1LocationPublication.needsCanonicalFbx({
+      model_path:state.pendingModel||item.model_path, fbxAnalysis:inspection});
     const model=card('Model · FBX',
       'Review mesh names, skeleton and collision settings. A changed FBX is published as a NEW Model ID; physics-only changes do not publish.',
       `<small class="deco-manage-value">${e(state.pendingModel||item.model_path||'No FBX selected')}</small>`+
       window.game1MeshAuthoring.inspectionView(inspection,state.meshOptions)+
+      (needsAuthoredRig?'<small class="la-publication-warning">В FBX есть кости, но нет rig_carrier. Перед публикацией Blender подготовит каноническую FBX-версию. Исходник будет сохранён, Atlas ID не изменится.</small>':'')+
       `<div class="actions">${button('choose-fbx','Choose FBX',busy)}${button('inspect-fbx','Analyze saved FBX',busy||!item.model_path)}</div>`+
       `<div class="shared-model-state"><small>Roblox Model ID: <strong>${e(item.model_asset_id||'Not published')}</strong></small>`+
-      `<small>${modelCurrent?'Current FBX revision is published.': 'Publication required for current FBX revision.'}</small></div>`+
+      `<small>${needsAuthoredRig?'Canonical rig_carrier authoring required before new Model ID.':modelCurrent?'Current FBX revision is published.': 'Publication required for current FBX revision.'}</small></div>`+
       `<div class="actions">${button('apply-model',needsPublication?'Publish and Apply':'Apply Changes',
         busy||(!changed&&!needsPublication)||(needsPublication&&!publicationReady),
         changed||needsPublication?'asset-apply-ready':'')}</div>`,
@@ -115,6 +138,7 @@ window.game1LocationAssetWorkflow = (() => {
       `<small>Публикация атласа не перепубликует Model. Публикация Model не публикует атлас. `+
       `Если один этап завершится ошибкой, успешный ID сохранится, повторятся только незавершённые этапы.</small>`,
       publication.count?`${publication.count} ожидает публикации`:'Готово',publication.count?'pending':'ready');
+    const errorStatus=state.error&&state.result?`<div class="real-estate-workflow-result issue la-operation-error" role="alert">${e(state.result)}</div>`:'';
     const busyStatus=busy&&state.tab!=='publish'?`<div class="la-operation-status" role="status" aria-live="polite"><span class="la-publish-spinner" aria-hidden="true"></span>${e(state.operationLabel||state.result||'Подготовка ресурса…')}</div>`:'';
     const preview=state.scan;
     const scanValid=preview&&preview.modelId===String(item.model_asset_id||'')&&
@@ -126,20 +150,9 @@ window.game1LocationAssetWorkflow = (() => {
     // One card per placed Model; COLLIDER geometry is only a compact existence hint.
     // Selection and Sync operate on different contracts: Select is Explorer-only.
     const parts=selected?.parts||[];
-    const grouped=[];
-    const byModel=new Map();
-    for(const part of parts){
-      const identity=part.managed&&part.instanceId
-        ?`managed:${part.instanceId}`:`model:${part.modelPath||part.path}`;
-      let model=byModel.get(identity);
-      if(!model){
-        model={identity,parts:[],managed:part.managed,modelName:part.modelName||part.name,
-          modelPath:part.modelPath||part.path};
-        grouped.push(model);byModel.set(identity,model);
-      }
-      model.parts.push(part);
-    }
-    const pendingKeys=model=>model.parts.filter(p=>p.managed&&(p.needsMesh||p.needsTexture||p.needsAlpha)).map(p=>p.key);
+    const grouped=window.game1LocationSyncGrouping.models(parts);
+    const pendingKeys=model=>model.parts.filter(p=>p.managed&&!p.republishRequired&&!p.needsFbxInspection&&
+      (p.needsMesh||p.needsTexture||p.needsAlpha)).map(p=>p.key);
     const inventory=selected?.inventory||[];
     const currentVersion=inventory.find(v=>v.modelAssetId===String(item.model_asset_id||''));
     const oldVersions=inventory.filter(v=>v!==currentVersion);
@@ -165,6 +178,9 @@ window.game1LocationAssetWorkflow = (() => {
       const visuals=model.parts.filter(p=>!p.isCollider);
       const colliders=model.parts.filter(p=>p.isCollider);
       const pending=pendingKeys(model).length>0;
+      const republish=model.parts.some(p=>p.republishRequired);
+      const needsNewPlacement=model.parts.some(p=>p.needsCanonicalReplacement);
+      const needsInspection=model.parts.some(p=>p.needsFbxInspection);
       const legacy=model.parts.find(p=>!p.managed&&p.attachable);
       const label=visuals[0]?.name||model.modelName;
       return `<div class="la-sync-model ${pending?'is-pending':''} ${model.managed?'':'is-external'}" `+
@@ -174,11 +190,15 @@ window.game1LocationAssetWorkflow = (() => {
         visuals.map(meshLine).join('')+
         `<small class="la-sync-col ${colliders.length?'':'is-missing'}">`+
         (colliders.length?`COL ✓ · ${colliders.length}`:'⚠ COL-меш не найден')+`</small>`+
+        (republish?'<small class="la-sync-external-note">Импортный RootPart или некорректная структура — требуется исправить исходный FBX и перепубликовать Model. rig_carrier нужен только при наличии Bone. Атлас остаётся прежним. Repair не изменит скелет.</small>':'')+
+        (needsNewPlacement?'<small class="la-sync-external-note">Новый Model ID имеет каноническую структуру. Явный Sync загрузит эту опубликованную Model и целиком заменит подтверждённый старый дочерний rig. Корневая Model, parent, pivot, CFrame и масштаб размещения сохраняются; Repair не используется.</small>':'')+
+        (needsInspection?'<small class="la-sync-external-note">Неизвестно, есть ли кости в опубликованном FBX. Сначала Analyze saved FBX; перепубликация пока не требуется.</small>':'')+
         (!model.managed?'<small class="la-sync-external-note">Найдено по Mesh ID, без привязки к текущему ассету. '+
           'Для исправления идентификаторов используйте Repair в Place Registry; Find не изменяет Place.</small>':'')+
         `<div class="la-sync-part-actions">`+
           `${button('select-studio','Select in Studio',busy,'la-select-studio')}`+
           (legacy?button('attach-historical','Link historical model',busy):'')+
+          (needsInspection?button('inspect-fbx','Analyze saved FBX',busy):'')+
           (model.managed?button('sync-one','Sync',!pending||busy||reportStale):'')+'</div></div>';
     };
     const footer=card('Studio · Mesh & Texture Sync',
@@ -199,7 +219,7 @@ window.game1LocationAssetWorkflow = (() => {
         `<div class="la-sync-list">${grouped.map(modelLine).join('')||'<small>MeshPart не найдены.</small>'}</div>`:'')+
         `<div class="la-sync-controls"><div class="actions">`+
         `${button('select-all','Select All · Studio',busy||!grouped.length||reportStale)}`+
-        `${button('replace-all','Sync All',busy||reportStale, selected&&parts.some(p=>p.managed&&(p.needsMesh||p.needsTexture||p.needsAlpha))?'asset-apply-ready':'')}</div>`+
+        `${button('replace-all','Sync All',busy||reportStale, selected&&parts.some(p=>p.managed&&!p.republishRequired&&!p.needsFbxInspection&&(p.needsMesh||p.needsTexture||p.needsAlpha))?'asset-apply-ready':'')}</div>`+
         `<small>Sync обновляет только устаревшие ресурсы. При замене Mesh обновляется весь rig модели. `+
         `COL не получает текстуры. Перед изменением Place потребуется подтверждение.</small>`+
         (selected?`<details><summary>История Model / Mesh ID</summary>${inventoryDisplay}</details>`:'')+
@@ -207,10 +227,10 @@ window.game1LocationAssetWorkflow = (() => {
       selected?'Проверка завершена':'Сначала Find',selected?'ready':'pending');
     d.innerHTML=`<div class="real-estate-mesh-dialog-head"><div><small class="eyebrow">Location Asset · ${e(item.slug)}</small>`+
       `<h3>Manage ${e(item.name_en)}</h3></div><button type="button" data-la-close aria-label="Close">✕</button></div>`+
-      `<div class="real-estate-mesh-dialog-body" aria-busy="${busy}">${shell.tabs(tabs,state.tab,'data-la-tab')}${busyStatus}`+
+      `<div class="real-estate-mesh-dialog-body" aria-busy="${busy}">${shell.tabs(tabs,state.tab,'data-la-tab')}${errorStatus}${busyStatus}`+
       `${state.tab==='identity'?identity:state.tab==='model'?model:state.tab==='atlas'?atlas:publishPanel}${state.tab==='publish'?'':footer}`+
-      `<div class="real-estate-workflow-result ${state.error?'issue':''}" role="status" ${state.result?'':'hidden'}>${e(state.result)}</div></div>`;
-    d.querySelector('.real-estate-mesh-dialog-body').scrollTop=scrollBody;
+      `${state.error?'':`<div class="real-estate-workflow-result" role="status" ${state.result?'':'hidden'}>${e(state.result)}</div>`}</div>`;
+    d.querySelector('.real-estate-mesh-dialog-body').scrollTop=state.error?0:scrollBody;
     const newList=d.querySelector('.la-sync-list');if(newList)newList.scrollTop=scrollList;
     const history=d.querySelector('.la-sync-controls details');if(history)history.open=historyOpen;
     if(state.tab==='model')window.game1MeshAuthoring.wire(d,state.meshOptions,()=>{
@@ -250,7 +270,8 @@ window.game1LocationAssetWorkflow = (() => {
         const part=(state.scan?.studio?.parts||[]).find(p=>p.key===key);
         if(!part)return;
         const keys=(state.scan.studio.parts||[]).filter(p=>p.managed&&
-          p.instanceId===part.instanceId&&(p.needsMesh||p.needsTexture||p.needsAlpha)).map(p=>p.key);
+          p.instanceId===part.instanceId&&!p.republishRequired&&!p.needsFbxInspection&&
+          (p.needsMesh||p.needsTexture||p.needsAlpha)).map(p=>p.key);
         return syncSelected(keys);
       };
     });
@@ -335,6 +356,7 @@ window.game1LocationAssetWorkflow = (() => {
             state.pendingModel='';state.physicsDirty=false;
             state.inspection=row()?.fbxAnalysis||state.inspection;
           }
+          await prepareAuthoredRigIfMissing(label=>stage('model',label,'running'));
           stage('model','Публикуем Model в Roblox Open Cloud…','running');
           const result=await decoAssetPublish(state.slug,'model',false);
           stage('model',`Model опубликован · Model ID ${result.model_asset_id}`,'done');
@@ -348,7 +370,9 @@ window.game1LocationAssetWorkflow = (() => {
         // A remote upload can complete even when the response is lost. Refresh
         // published IDs before a user retries; never assume a failed HTTP
         // response means Roblox did not create an asset.
-        await decoAssetLoad();
+        try{await decoAssetLoad();}catch(refreshError){
+          // Preserve the original publication failure if ID refresh also fails.
+        }
         const key=state.publication.model==='running'?'model':'atlas';
         state.publication[key]='error';
         state.publication.active=`Ошибка этапа ${key==='atlas'?'Atlas':'Model'}: ${error?.message||String(error)}. `+
@@ -403,7 +427,8 @@ window.game1LocationAssetWorkflow = (() => {
       await request(`/api/location-assets/${encodeURIComponent(state.slug)}/inspect-fbx`,{method:'POST'});
       await decoAssetLoad();state.inspection=row()?.fbxAnalysis||null;
       state.meshOptions=window.game1MeshAuthoring.seeded(state.inspection,row()?.meshOptions||{});
-      state.physicsDirty=false;message('FBX analysis updated without publication.');
+      state.physicsDirty=false;state.scanStale=true;
+      message('FBX analysis updated without publication. Run Find again to confirm the placement.');
     });
     if(action==='apply-model')return run('Applying Model changes',async()=>{
       const needsSave=Boolean(state.pendingModel||state.physicsDirty);
@@ -415,7 +440,9 @@ window.game1LocationAssetWorkflow = (() => {
         state.inspection=row()?.fbxAnalysis||state.inspection;
       }
       const current=row();
-      if(!current.model_asset_id||current.model_sha256!==current.model_published_sha256){
+      if(!current.model_asset_id||current.model_sha256!==current.model_published_sha256||
+          window.game1LocationPublication.needsCanonicalFbx(current)){
+        await prepareAuthoredRigIfMissing(label=>{state.operationLabel=label;render();});
         const result=await decoAssetPublish(state.slug,'model',false);
         message(`Model published · new ID ${result.model_asset_id}. Atlas ID ${result.texture_asset_id||'—'} unchanged. Use Studio Sync below to update placed instances.`);
       }else message('Mesh settings applied. Published Model ID unchanged. Use Studio Sync below to apply physics in Place.');
@@ -467,7 +494,7 @@ window.game1LocationAssetWorkflow = (() => {
       if(!state.scan||state.scanStale)return;
     }
     const keys=(state.scan.studio.parts||[]).filter(p=>p.managed&&
-      (p.needsMesh||p.needsTexture||p.needsAlpha)).map(p=>p.key);
+      !p.republishRequired&&!p.needsFbxInspection&&(p.needsMesh||p.needsTexture||p.needsAlpha)).map(p=>p.key);
     if(!keys.length){
       message(state.scan.studio.unmanagedMeshParts?
         'Среди привязанных моделей изменений нет. Исторические модели не изменены.':
@@ -520,7 +547,7 @@ window.game1LocationAssetWorkflow = (() => {
         throw Error('Отчёт Find устарел; повтори сканирование');
       }
       const pending=new Map((scan.studio.parts||[]).filter(p=>p.managed&&
-        (p.needsMesh||p.needsTexture||p.needsAlpha)).map(p=>[p.key,p]));
+        !p.republishRequired&&!p.needsFbxInspection&&(p.needsMesh||p.needsTexture||p.needsAlpha)).map(p=>[p.key,p]));
       if(!Array.isArray(keys)||!keys.length||new Set(keys).size!==keys.length||
         keys.some(key=>!pending.has(key)))throw Error('Нет доступных для Sync MeshPart');
       const chosen=keys.map(key=>pending.get(key));

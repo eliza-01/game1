@@ -1,3 +1,4 @@
+local Carrier = require(script.Parent.StudioLocationRigCarrier)
 -- Location Assets adapter for the same child-rig replacement transaction used
 -- by Real Estate. Only this adapter knows the Location slug, publication and
 -- audit attributes; the replacement mechanism has no domain-specific rules.
@@ -14,6 +15,14 @@ local SLUG = "Game1DecoAssetSlug"
 local INSTANCE = "Game1DecoInstanceId"
 local HISTORY = "Game1DecoSyncHistory"
 local REFERENCE = "Game1DecoRegistryModelAssetId"
+
+local function belongsToSlug(value: any, slug: string, aliases: {string}?): boolean
+    if value == slug then return true end
+    for _, alias in ipairs(aliases or {}) do
+        if value == alias then return true end
+    end
+    return false
+end
 
 local function id(value: any): string
     local n = tonumber(value)
@@ -34,15 +43,15 @@ local function rowFor(registry: any, slug: string): any
     error("Location Asset not registered: " .. slug)
 end
 
-local function targets(workspace: Workspace, slug: string): {Model}
+local function targets(workspace: Workspace, slug: string, aliases: {string}?): {Model}
     local found = {}
     for _, descendant in ipairs(workspace:GetDescendants()) do
-        if descendant:IsA("Model") and descendant:GetAttribute(SLUG) == slug
+        if descendant:IsA("Model") and belongsToSlug(descendant:GetAttribute(SLUG), slug, aliases)
             and tostring(descendant:GetAttribute(INSTANCE) or "") ~= "" then
             -- Same ownership resolver as Find. A nested, individually stamped
             -- asset is valid; its parent grouping Model must not shadow it.
             for _, part in ipairs(descendant:GetDescendants()) do
-                if part:IsA("MeshPart") and Ownership.ForPart(workspace, part, slug) == descendant then
+                if part:IsA("MeshPart") and Ownership.ForPart(workspace, part, slug, aliases) == descendant then
                     table.insert(found, descendant)
                     break
                 end
@@ -132,7 +141,7 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
         if entry.row.needsMesh then chosenGeometry[entry.root]=true end
     end
     local live={}
-    for _, root in ipairs(targets(workspace,slug)) do live[root]=true end
+    for _, root in ipairs(targets(workspace,slug,row.aliases)) do live[root]=true end
     local placed={}
     for _, root in ipairs(preview.roots) do
         if not live[root] then
@@ -144,12 +153,22 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
     -- owner. A grouping Model, a copied Instance ID, or a moved nested rig
     -- must never redirect the Sync into an adjacent/parent asset.
     for part in pairs(chosenParts) do
-        local selectedOwner = Ownership.ForPart(workspace, part, slug)
+        local selectedOwner = Ownership.ForPart(workspace, part, slug, row.aliases)
         if not selectedOwner or not chosenRoots[selectedOwner] then
             error("scanned MeshPart ownership changed; Find again before Sync")
         end
     end
     if #placed<1 then error("no selected managed Location instance; no Place geometry modified") end
+    -- The INCOMING publication must be canonical. The outgoing placement may
+    -- legitimately be an older immutable topology (including a two-part rig
+    -- without carrier). Its complete historical Model inventory is verified
+    -- below before StudioManagedRigSwap replaces the managed child rig.
+    if row.needsFbxInspection==true then
+        error("analyze the saved FBX before migrating placed rigs; Place unchanged")
+    end
+    if not Carrier.IsCanonicalPublication(row.rigManifest,row.legacyStaticPublication) then
+        error("current Model publication is not canonical; republish before Studio migration")
+    end
     for part, snap in pairs(preview.partStates or {}) do
         if part.Parent~=snap.parent or part:GetPivot()~=snap.frame or part.Size~=snap.size
             or History.Id(part.MeshId)~=snap.meshId or part.TextureID~=snap.texture then
@@ -239,7 +258,8 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
             local atlasChanges = {}
             local uri = "rbxassetid://" .. atlasId
             for _, part in ipairs(oldParts) do
-                if Physics.IsCollider(part.Name) or part:GetAttribute("Game1DecoPhysicsOnly") == true then continue end
+                if Carrier.IsCarrier(part) or Physics.IsCollider(part.Name)
+                    or part:GetAttribute("Game1DecoPhysicsOnly") == true then continue end
                 if not geometry and not chosenParts[part] then continue end
                 local surface = part:FindFirstChildOfClass("SurfaceAppearance")
                 if part.TextureID ~= uri or (surface and surface.ColorMap ~= uri) then
@@ -252,7 +272,7 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
             local alphaChanges={}
             if not geometry then
                 for _, part in ipairs(oldParts) do
-                    if chosenParts[part] and not Physics.IsCollider(part.Name)
+                    if chosenParts[part] and not Carrier.IsCarrier(part) and not Physics.IsCollider(part.Name)
                         and part:GetAttribute("Game1DecoPhysicsOnly")~=true
                         and not StudioTextureAppearance.AlphaCurrent(part,row.alphaEnabled==true) then
                         table.insert(alphaChanges,StudioTextureAppearance.Capture(part))
@@ -309,6 +329,7 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                 oldSha = model:GetAttribute("Game1DecoPublishedModelSha256"),
                 oldPublishedId = model:GetAttribute("Game1DecoPublishedModelAssetId"),
                 oldReference = model:GetAttribute(REFERENCE),
+                oldSlug = model:GetAttribute(SLUG), oldName = model.Name,
                 oldAnchorPath = model:GetAttribute("Game1DecoAuthoringAnchorPath"),
                 events = events, meshIdsBefore=beforeMeshes,meshIdsAfter=afterMeshes,
                 physicsBefore = if not geometry and allowedNames then
@@ -324,12 +345,17 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
     local ok, problem = pcall(function()
         for _, item in ipairs(plans) do
             local model = item.model
-            if model.Parent == nil or model:GetAttribute(SLUG) ~= slug then
+            if model.Parent == nil or not belongsToSlug(model:GetAttribute(SLUG),slug,row.aliases) then
                 error("placed Location Asset changed during sync")
             end
             if item.swap then
                 RigSwap.Commit(item.swap)
                 geometryUpdated += 1
+                -- Rename only the retained root identity. The root Instance,
+                -- parent, pivot and scale are guarded by RigSwap and stay put.
+                model:SetAttribute(SLUG,slug)
+                local instanceId=tostring(model:GetAttribute(INSTANCE) or "")
+                if instanceId~="" then model.Name=slug.."__"..instanceId:sub(1,8) end
                 model:SetAttribute("Game1DecoPublishedModelAssetId", modelId)
                 model:SetAttribute("Game1DecoPublishedModelSha256", publishedSha)
             end
@@ -366,6 +392,8 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                 model:SetAttribute("Game1DecoPublishedModelAssetId", item.oldPublishedId)
                 model:SetAttribute("Game1DecoPublishedModelSha256", item.oldSha)
                 model:SetAttribute(REFERENCE, item.oldReference)
+                model:SetAttribute(SLUG,item.oldSlug)
+                model.Name=item.oldName
                 model:SetAttribute("Game1DecoAuthoringAnchorPath", item.oldAnchorPath)
                 model:SetAttribute(HISTORY, item.oldHistory)
                 if item.physicsBefore then Physics.RestoreLocationModel(item.physicsBefore) end

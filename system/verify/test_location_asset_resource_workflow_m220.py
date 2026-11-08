@@ -10,7 +10,9 @@ from PIL import Image
 
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'system/control-center'))
+sys.path.insert(0,str(ROOT/'system/asset-manager'))
 from location_asset_store import LocationAssetStore
+from location_rig_contract import validate
 
 
 class M220LocationResourceWorkflow(TestCase):
@@ -37,7 +39,12 @@ class M220LocationResourceWorkflow(TestCase):
 
     def model_publish(self, asset_ids):
         @contextmanager
-        def staged(root,model, *, texture_mode="embedded"):
+        def staged(root,model, *, texture_mode="embedded", report_receiver=None):
+            self.assertIsNotNone(report_receiver)
+            frame=[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]
+            report_receiver["locationRigManifest"]=validate(
+                [{"name":"rig_carrier","vertices":3},{"name":"pine_01","vertices":15}],
+                [{"name":"root","parent":"","matrix":frame}])
             self.assertEqual(texture_mode, "geometry_only")
             self.assertEqual(Path(model).suffix,'.fbx')
             yield model

@@ -8,10 +8,11 @@ import json
 import struct
 import sys
 from pathlib import Path
-from mathutils import Vector
 
 # The same slot vocabulary as Control Center; Blender runs in a separate Python.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "control-center"))
+from blender_rig_carrier import create_rig_carrier
 from character_core.part_names import parse_part, rigid_pivot_mount_for_part
 
 
@@ -166,16 +167,7 @@ def main(source, report_path, output_dir=None, *, rig_only=False):
     if output_dir:
         # Persistent invisible carrier, independent of every replaceable mesh.
         # All weights are on helper triangles, never on visible components.
-        verts=[];faces=[]
-        for b in primary.data.bones:
-            p=b.head_local;start=len(verts)
-            verts.extend([tuple(p),tuple(p+Vector((.001,0,0))),tuple(p+Vector((0,.001,0)))])
-            faces.append((start,start+1,start+2))
-        data=bpy.data.meshes.new('rig_carrier');data.from_pydata(verts,[],faces)
-        carrier=bpy.data.objects.new('rig_carrier',data);bpy.context.scene.collection.objects.link(carrier)
-        carrier.parent=primary;carrier.matrix_world=primary.matrix_world.copy()
-        for i,b in enumerate(primary.data.bones):carrier.vertex_groups.new(name=b.name).add([i*3,i*3+1,i*3+2],1,'REPLACE')
-        mod=carrier.modifiers.new('rig_bind','ARMATURE');mod.object=primary
+        carrier = create_rig_carrier(primary)
         export(output_dir/'rig.fbx',[primary,carrier])
     report_path.write_text(json.dumps(dict(schema_version=1,armature=primary.name,bones=skeleton(primary),parts=parts,part_errors=part_errors),indent=2),encoding='utf8')
 

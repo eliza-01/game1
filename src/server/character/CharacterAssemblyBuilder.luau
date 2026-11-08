@@ -2,6 +2,8 @@
 -- Builds an unparented template. Asset loading/cache and gameplay physics stay
 -- with CharacterService/CharacterRigService. No animation or inventory writes.
 local CharacterAtlasBinder = require(script.Parent:WaitForChild("CharacterAtlasBinder"))
+local SkinConnection = require(game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared")
+    :WaitForChild("rig"):WaitForChild("SkinnedMeshConnection"))
 local Builder = {}
 local slots = { "upper", "lower", "gloves", "boots", "head", "eyes", "eyebrows", "hair" }
 local HAIR_GRIP_NAME = "CharacterMount"
@@ -151,13 +153,7 @@ function Builder.Build(recipe: any, loadAsset: (number) -> Model?): Model
                     assert(delta.Position.Magnitude < 0.005 and math.abs(angle) < 0.005, "incompatible bind for " .. name)
                 end
                 for _, bone in incoming do bone:Destroy() end
-                local weld = Instance.new("Weld")
-                weld.Name = "CharacterSkinWeld"
-                weld.Part0 = carrier
-                weld.Part1 = mesh
-                weld.C0 = carrier.CFrame:ToObjectSpace(mesh.CFrame)
-                weld.C1 = CFrame.identity
-                weld.Parent = mesh
+                SkinConnection.Connect(imported, carrier, mesh, "CharacterSkinWeld")
             end
             CharacterAtlasBinder.Apply(mesh, part.atlas_image_id)
         end

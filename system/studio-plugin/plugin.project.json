@@ -40,15 +40,33 @@
       "StudioDecoSyncCommands": {
         "$path": "modules/StudioDecoSyncCommands.luau"
       },
-      "StudioPlaceRegistryCommands": {"$path": "modules/StudioPlaceRegistryCommands.luau"},
-      "StudioPlaceRegistryInventory": {"$path": "modules/StudioPlaceRegistryInventory.luau"},
-      "StudioLocationPublishedGeometry": {"$path": "modules/StudioLocationPublishedGeometry.luau"},
-      "StudioLocationPlacementHistory": {"$path": "modules/StudioLocationPlacementHistory.luau"},
-      "StudioLocationMeshNames": {"$path": "modules/StudioLocationMeshNames.luau"},
-      "StudioLocationPlacementOwner": {"$path": "modules/StudioLocationPlacementOwner.luau"},
-      "StudioLocationPlacedGeometry": {"$path": "modules/StudioLocationPlacedGeometry.luau"},
-      "StudioPlaceRegistryRepair": {"$path": "modules/StudioPlaceRegistryRepair.luau"},
-      "StudioPlaceRegistrySync": {"$path": "modules/StudioPlaceRegistrySync.luau"},
+      "StudioPlaceRegistryCommands": {
+        "$path": "modules/StudioPlaceRegistryCommands.luau"
+      },
+      "StudioPlaceRegistryInventory": {
+        "$path": "modules/StudioPlaceRegistryInventory.luau"
+      },
+      "StudioLocationPublishedGeometry": {
+        "$path": "modules/StudioLocationPublishedGeometry.luau"
+      },
+      "StudioLocationPlacementHistory": {
+        "$path": "modules/StudioLocationPlacementHistory.luau"
+      },
+      "StudioLocationMeshNames": {
+        "$path": "modules/StudioLocationMeshNames.luau"
+      },
+      "StudioLocationPlacementOwner": {
+        "$path": "modules/StudioLocationPlacementOwner.luau"
+      },
+      "StudioLocationPlacedGeometry": {
+        "$path": "modules/StudioLocationPlacedGeometry.luau"
+      },
+      "StudioPlaceRegistryRepair": {
+        "$path": "modules/StudioPlaceRegistryRepair.luau"
+      },
+      "StudioPlaceRegistrySync": {
+        "$path": "modules/StudioPlaceRegistrySync.luau"
+      },
       "NpcSpawnPreview": {
         "$path": "modules/NpcSpawnPreview.luau"
       },
@@ -150,6 +168,15 @@
       },
       "StudioPublishedMeshHistory": {
         "$path": "modules/StudioPublishedMeshHistory.luau"
+      },
+      "StudioLocationRigCarrier": {
+        "$path": "modules/StudioLocationRigCarrier.luau"
+      },
+      "StudioLocationPublishedRigNormalize": {
+        "$path": "modules/StudioLocationPublishedRigNormalize.luau"
+      },
+      "StudioSkinnedMeshConnection": {
+        "$path": "../../src/shared/rig/SkinnedMeshConnection.luau"
       }
     }
   }

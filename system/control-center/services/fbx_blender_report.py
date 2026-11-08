@@ -20,7 +20,7 @@ def _blender_failure(diagnostic: str, exit_code: int) -> str:
     if match:
         kind, message = match[-1]
         if kind in {"ModuleNotFoundError", "ImportError"}:
-            return ("Real Estate Blender helper could not be loaded (" + message.strip()
+            return ("Blender publication helper could not be loaded (" + message.strip()
                     + "). Check that the latest project files are installed.")
         return message.strip()
     # A native crash or abrupt termination has no Python traceback.

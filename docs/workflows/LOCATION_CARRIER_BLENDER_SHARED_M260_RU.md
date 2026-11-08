@@ -1,0 +1,9 @@
+# M260 · Общий Blender `rig_carrier`: Character + Location
+
+Причина сбоя M259: `location_rig_authoring_fbx.py`, запущенный через `blender --background --python`, не гарантировал включение собственного каталога в `sys.path`. `model_publication` лежит в `system/asset-manager`, но Blender искал его в стандартном Python path. Open Cloud ещё не вызывался, Model/Atlas ID не изменялись.
+
+Исправление: оба Blender-авторинга (`character_components_fbx.py` и `location_rig_authoring_fbx.py`) используют **один** `blender_rig_carrier.create_rig_carrier` — ту же оригинальную схему Character: по одному минимальному треугольнику на кость, вес 1.0 на соответствующую Bone, Armature modifier и parent к исходной armature. Оба инструмента добавляют каталог `system/asset-manager` в Blender sys.path. Из Location удалена параллельная реализация carrier. В Studio не создаются MeshPart и не проводится Repair скелета.
+
+Статический Location FBX без костей не создаёт carrier и публикуется без конвертации. Скелетный FBX получает carrier в **новой** authored FBX-ревизии, проверяется через round-trip, затем публикуется в независимой Model-операции. Исходный FBX и Atlas Image ID сохраняются. Любая ошибка до подтверждения Roblox Model ID завершает операцию и видна в верхней части вкладки Model или Publish, без вечного спиннера и скрытого результата внизу страницы.
+
+Первичная проверка на рабочем месте: `lantern_01` со скелетом → `Publish and Apply` → manifest с `rig_carrier` → реальный новый Model ID → `Find`/`Scan` в Studio; проверить нулевой `RootPart`, наличие Bones под carrier, визуал и COL, отсутствие изменений у Atlas. Затем статический `bush_02` → без carrier и без ненужной перепубликации. **Без реального Blender и Roblox Studio полное соответствие Skinning/FBX импорта не считается подтверждённым.**

@@ -1,8 +1,10 @@
+local Carrier = require(script.Parent.StudioLocationRigCarrier)
 -- M240: Registry-backed Location Assets ONLY. Scan is strictly read-only.
 -- No Workspace classification by name/category; only immutable published Mesh IDs.
 local History = require(script.Parent.StudioPublishedMeshHistory)
 local Physics = require(script.Parent.StudioMeshPhysicsCore)
 local Published = require(script.Parent.StudioLocationPublishedGeometry)
+local CarrierRig = require(script.Parent.StudioLocationRigCarrier)
 local Inventory = {}
 
 local function id(uri: any): string
@@ -10,7 +12,7 @@ local function id(uri: any): string
 end
 
 local function visual(part: MeshPart): boolean
-    return not Physics.IsCollider(part.Name) and part:GetAttribute("Game1DecoPhysicsOnly") ~= true
+    return not Carrier.IsCarrier(part) and not Physics.IsCollider(part.Name) and part:GetAttribute("Game1DecoPhysicsOnly") ~= true
 end
 
 local function hasForeignOwner(obj: Instance): boolean
@@ -57,7 +59,9 @@ local function ensureVersions(catalog: any, service: any): ({any}, {any}, {strin
         table.insert(versions, {slug=item.slug,aliases=item.aliases or {},
             atlas=item.atlasAssetId,model=item.modelAssetId,
             sha=item.publishedSha,material=item.surfaceMaterial or "default",
-            physicalMaterial=item.robloxMaterial or "",alphaEnabled=item.alphaEnabled==true,models=published})
+            physicalMaterial=item.robloxMaterial or "",alphaEnabled=item.alphaEnabled==true,models=published,
+            rigManifest=item.rigManifest,legacyStaticPublication=item.legacyStaticPublication==true,
+            needsFbxInspection=item.needsFbxInspection==true})
     end
     return versions,inventory,warnings
 end
@@ -246,7 +250,7 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
         if eligible and entry.material~="default" then
             local physical=if entry.physicalMaterial~="" then Enum.Material[entry.physicalMaterial] else nil
             for _, candidatePart in ipairs(root and root:GetDescendants() or {part}) do
-                if candidatePart:IsA("MeshPart") then
+                if candidatePart:IsA("MeshPart") and not Carrier.IsCarrier(candidatePart) then
                     local different=candidatePart:GetAttribute("Game1LocationSurfaceMaterial")~=entry.material
                     if physical~=nil and candidatePart.Material~=physical then different=true end
                     if different then
@@ -263,6 +267,35 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
                     or child:GetAttribute("Game1DecoPhysicsOnly")==true) then colliders+=1 end
             end
         end
+        local structuralState = if root then CarrierRig.Diagnose(root,if eligible then entry.rigManifest else nil,
+            eligible and entry.legacyStaticPublication)
+            else "repair_required"
+        local hasImporterRoot = structuralState == "legacy_import_root"
+        -- A legacy imported RootPart is a defect of the FBX publication.
+        -- NEVER advertise an in-Place skeleton Repair for this state.
+        local needsInspection = eligible and entry.needsFbxInspection==true
+        local requiresRepublish = eligible and not needsInspection
+            and not CarrierRig.IsCanonicalPublication(entry.rigManifest,entry.legacyStaticPublication)
+        local needsReplacement = eligible and structuralState ~= "current"
+            and not requiresRepublish and not needsInspection
+        if eligible and structuralState == "legacy_import_root" then
+            if requiresRepublish then
+                warn("Импортный RootPart — требуется перепубликация FBX; атлас не меняется")
+            else
+                warn("Импортный RootPart в старом размещении — каноническая публикация уже есть; требуется обновление экземпляра, не Repair")
+            end
+        elseif needsInspection then
+            warn("Сначала Analyze saved FBX: отсутствует проверка наличия Bone; перепубликация пока не требуется")
+        elseif eligible and requiresRepublish then
+            warn("Структура FBX неканоническая ("..structuralState.."); требуется перепубликация FBX")
+        elseif eligible and structuralState ~= "current" then
+            if oldId~="" then
+                warn("Историческая структура подтверждена публикацией "..oldId
+                    .."; Sync заменит дочерний rig канонической Model: "..structuralState)
+            else
+                warn("Структура размещения не соответствует канонической публикации: "..structuralState)
+            end
+        end
         if not eligible then warn("Один Mesh ID встречается у нескольких Location Assets") end
         if not root then warn("Нет отдельной Model для этого экземпляра") end
         if eligible and Published.RequiresCollider(entry) and colliders==0 then warn("Нет обязательного COL-меша") end
@@ -273,7 +306,8 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
             oldId=""
             warn("Один Mesh ID встречается в нескольких версиях; геометрия требует ручной проверки")
         end
-        local meshNameMismatch=eligible and #visualParts==1 and visualParts[1].Name~=entry.slug
+        local meshNameMismatch=eligible and not entry.rigManifest and not entry.legacyStaticPublication
+            and #visualParts==1 and visualParts[1].Name~=entry.slug
         if meshNameMismatch then warn("Имя MeshPart не соответствует slug ассета") end
         local badName=false
         if eligible and root and root.Name~=entry.slug.."__"..tostring(root:GetAttribute("Game1DecoInstanceId") or ""):sub(1,8) then
@@ -311,7 +345,8 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
                 end
             end
         end
-        if oldClaim then warn("Исторический slug: "..claimed.." → "..entry.slug.."; требуется Repair") end
+        if oldClaim then warn("Исторический slug: "..claimed.." → "..entry.slug
+            .."; Sync мигрирует идентичность вместе с опубликованным rig") end
         if foreignClaim and provenForeignClaim then
             warn("Конфликт двух подтверждённых Location Assets; требуется ручная проверка")
         elseif foreignClaim then
@@ -342,15 +377,24 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
             modelAssetId=if eligible then oldId else "",meshId=original.meshId,
             textureId=original.textureId,expectedMeshId=if eligible then entry.model else "",
             expectedTextureId=if eligible then entry.atlas else "",colCount=colliders,
-            needsMesh=needsMesh,needsRig=needsRig,needsTexture=needsTexture,needsMaterial=needsMaterial,needsAlpha=needsAlpha,needsStructure=not root or badName or meshNameMismatch or assigned==""
+            needsMesh=needsMesh,needsRig=needsRig,needsTexture=needsTexture,needsMaterial=needsMaterial,needsAlpha=needsAlpha,needsStructure=structuralState ~= "current" or not root or badName or meshNameMismatch or assigned==""
                 or (root and root:GetAttribute("Game1DecoAssetSlug")~=entry.slug)
                 or (eligible and Published.RequiresCollider(entry) and colliders==0),
             duplicateId=false,ambiguous=not eligible or provenForeignClaim,
-            hasModel=root~=nil,canSync=eligible and not foreignClaim and root~=nil and assigned~=""
-                and claimed==entry.slug and (not needsMesh and not needsRig or oldId~="")
-                and not (Published.RequiresCollider(entry) and colliders==0),
+            -- Repair remains metadata-only. A verified old publication is
+            -- migrated by Sync through the shared whole-child-rig swap.
+            canRepair=eligible and structuralState == "current" and root~=nil
+                and not needsMesh and not needsRig,
+            requiresRepublish=requiresRepublish == true,
+            needsFbxInspection=needsInspection == true,
+            needsCanonicalReplacement=needsReplacement == true,
+            hasModel=root~=nil,structuralState=structuralState,canSync=eligible and not foreignClaim
+                and root~=nil and assigned~="" and (claimed==entry.slug or oldClaim)
+                and not requiresRepublish and not needsInspection
+                and (structuralState=="current" or (needsReplacement and oldId~=""))
+                and (not needsMesh and not needsRig or oldId~=""),
             status=if not eligible then "ambiguous" elseif needsMesh or needsRig or needsTexture or needsMaterial or needsAlpha
-                or not root or badName or meshNameMismatch or assigned==""
+                or structuralState ~= "current" or not root or badName or meshNameMismatch or assigned==""
                 or oldClaim or foreignClaim or (Published.RequiresCollider(entry) and colliders==0)
                 then "pending" else "current",
             issues=issues,hierarchy=fullHierarchy,transform={cframe={part.CFrame:GetComponents()},
@@ -363,8 +407,8 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
             rootParent=if root then root.Parent else nil,
             rootPivot=if root then root:GetPivot() else nil,
             rootPrimary=if root then root.PrimaryPart else nil,
-            row=row,entry=if eligible then entry else nil,
-            oldVersion=oldId,needsCol=eligible and Published.RequiresCollider(entry) and colliders==0,
+            row=row,entry=if eligible then entry else nil,structuralState=structuralState,
+            oldVersion=oldId,hasImporterRoot=hasImporterRoot,needsCol=eligible and Published.RequiresCollider(entry) and colliders==0,
             currentVisual=eligible and Published.VisualCurrent(entry,id(part.MeshId))}
     end
     for _,indexes in pairs(duplicateGroups) do

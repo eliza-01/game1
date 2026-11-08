@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "slug": "christmas_tree",
-  "sourceSha256": "701895213556605bcc44c40125fbb6729ddba13d767e58a860d58cc4b75ed949",
+  "sourceSha256": "df7bda144ac4064a6f693a2eb44e6db082197165c9433626b386b57f5381ebe2",
   "analysis": {
     "schemaVersion": 1,
     "meshes": [
@@ -88,7 +88,7 @@
           "canCollide": false,
           "canQuery": false,
           "canTouch": false,
-          "doubleSided": true,
+          "doubleSided": false,
           "collisionFidelity": "Box",
           "physicsOnly": false
         }
@@ -96,7 +96,7 @@
       {
         "name": "col_mesh",
         "armature": "",
-        "vertices": 66,
+        "vertices": 75,
         "bones": [],
         "influencedBones": [],
         "role": "collider",
@@ -105,7 +105,7 @@
           "canCollide": true,
           "canQuery": true,
           "canTouch": false,
-          "doubleSided": true,
+          "doubleSided": false,
           "collisionFidelity": "PreciseConvexDecomposition",
           "physicsOnly": true
         }

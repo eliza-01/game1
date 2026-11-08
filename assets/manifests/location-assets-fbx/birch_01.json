@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "slug": "birch_01",
-  "sourceSha256": "ff25196a924e6c27f245429159450334a43ac16604b391640f818cfec696a327",
+  "sourceSha256": "20475518d5f5dc6b6506373d583c38a2f3679d9082acc0450d9bac24e26c1114",
   "analysis": {
     "schemaVersion": 1,
     "meshes": [
@@ -134,7 +134,7 @@
           "canCollide": false,
           "canQuery": false,
           "canTouch": false,
-          "doubleSided": true,
+          "doubleSided": false,
           "collisionFidelity": "Box",
           "physicsOnly": false
         }
@@ -151,7 +151,7 @@
           "canCollide": true,
           "canQuery": true,
           "canTouch": false,
-          "doubleSided": true,
+          "doubleSided": false,
           "collisionFidelity": "PreciseConvexDecomposition",
           "physicsOnly": true
         }

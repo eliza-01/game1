@@ -14,6 +14,10 @@ function Core.IsCollider(name: string): boolean
         or lower:sub(-4) == "_col"
 end
 
+function Core.IsLocationCarrier(part: Instance): boolean
+    return part:IsA("MeshPart") and part.Name == "rig_carrier"
+end
+
 function Core.IsGlass(name: string): boolean
     return not Core.IsCollider(name) and string.find(string.lower(name), "glass", 1, true) ~= nil
 end
@@ -68,7 +72,7 @@ local function applyLocationModel(model: Model, allowedNames: {[string]: boolean
     end
     local affected = 0
     for _, mesh in ipairs(allParts) do
-        if allowedNames == nil or allowedNames[mesh.Name] == true then
+        if not Core.IsLocationCarrier(mesh) and (allowedNames == nil or allowedNames[mesh.Name] == true) then
             local collider, namedGlass = Core.IsCollider(mesh.Name), Core.IsGlass(mesh.Name)
             local raw = if typeof(meshOptions) == "table" then meshOptions[mesh.Name] else nil
             local explicit = typeof(raw) == "table"
@@ -132,6 +136,7 @@ function Core.ApplyLocationSurfaceMaterial(model: Model, surfaceKey: string?, ph
     end
     local changed = 0
     for _, mesh in ipairs(parts(model)) do
+        if Core.IsLocationCarrier(mesh) then continue end
         -- COL receives exactly the same semantic/physical material as visual parts,
         -- but continues to be invisible with its own Precise collision policy.
         local differs = mesh:GetAttribute("Game1LocationSurfaceMaterial") ~= key

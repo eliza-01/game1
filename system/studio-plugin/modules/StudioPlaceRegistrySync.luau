@@ -1,3 +1,4 @@
+local Carrier = require(script.Parent.StudioLocationRigCarrier)
 -- Explicit Place Registry sync. Uses THE SAME StudioManagedRigSwap as Real Estate.
 -- A manually grouped Model is never the swap target; each verified placement
 -- is a separate Model. No general ApplyMesh or MeshId writes.
@@ -12,7 +13,7 @@ local Sync={}
 local function visuals(root: Instance): {MeshPart}
     local out={}
     for _,child in ipairs(root:GetDescendants()) do
-        if child:IsA("MeshPart") and not Physics.IsCollider(child.Name)
+        if child:IsA("MeshPart") and not Carrier.IsCarrier(child) and not Physics.IsCollider(child.Name)
             and child:GetAttribute("Game1DecoPhysicsOnly")~=true then table.insert(out,child) end
     end
     return out
@@ -35,7 +36,7 @@ local function stageRig(ref: any, ctx: any): any
     if ref.oldVersion=="" then error("historical publication not unique") end
     local publishedRow={slug=ref.entry.slug,status="PUBLISHED",
         model_asset_id=ref.entry.model,texture_asset_id=ref.entry.atlas,
-        surfaceMaterial=ref.entry.material,robloxMaterial=ref.entry.physicalMaterial,alphaEnabled=ref.entry.alphaEnabled}
+        surfaceMaterial=ref.entry.material,robloxMaterial=ref.entry.physicalMaterial,alphaEnabled=ref.entry.alphaEnabled,rigManifest=ref.entry.rigManifest}
     local stage=ctx.loader:loadPublished(publishedRow)
     local previous=ctx.loader:loadForMeshInventory(ref.oldVersion,ref.entry.slug)
     local good,result=pcall(function()
@@ -51,6 +52,8 @@ local function stageRig(ref: any, ctx: any): any
         priorId=root:GetAttribute("Game1DecoPublishedModelAssetId"),
         priorSha=root:GetAttribute("Game1DecoPublishedModelSha256"),
         priorRegistry=root:GetAttribute("Game1DecoRegistryModelAssetId"),
+        priorSlug=root:GetAttribute("Game1DecoAssetSlug"),
+        priorName=root.Name,
         priorHistory=root:GetAttribute("Game1DecoSyncHistory")}
 end
 
@@ -98,6 +101,9 @@ function Sync.Apply(refs: {any}, ctx: any): any
             table.insert(committed,item)
             if item.swap then
                 RigSwap.Commit(item.swap)
+                root:SetAttribute("Game1DecoAssetSlug",ref.entry.slug)
+                local instanceId=tostring(root:GetAttribute("Game1DecoInstanceId") or "")
+                if instanceId~="" then root.Name=ref.entry.slug.."__"..instanceId:sub(1,8) end
                 root:SetAttribute("Game1DecoPublishedModelAssetId",ref.entry.model)
                 root:SetAttribute("Game1DecoRegistryModelAssetId",ref.entry.model)
                 root:SetAttribute("Game1DecoPublishedModelSha256",ref.entry.sha)
@@ -153,6 +159,8 @@ function Sync.Apply(refs: {any}, ctx: any): any
                     item.ref.root:SetAttribute("Game1DecoPublishedModelAssetId",item.priorId)
                     item.ref.root:SetAttribute("Game1DecoPublishedModelSha256",item.priorSha)
                     item.ref.root:SetAttribute("Game1DecoRegistryModelAssetId",item.priorRegistry)
+                    item.ref.root:SetAttribute("Game1DecoAssetSlug",item.priorSlug)
+                    item.ref.root.Name=item.priorName
                 else
                     for _,change in ipairs(item.appearance) do
                         Texture.Restore(change)

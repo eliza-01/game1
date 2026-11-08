@@ -14,8 +14,10 @@ from contextlib import contextmanager
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'system/control-center'))
+sys.path.insert(0, str(ROOT / 'system/asset-manager'))
 from model_publication_service import staged_model
 from location_asset_store import LocationAssetStore
+from location_rig_contract import validate
 from api.write_world import route
 from PIL import Image
 
@@ -33,8 +35,9 @@ class ModelOnlyM233(unittest.TestCase):
                 self.assertEqual(command[-1], 'geometry_only')
                 output, report = map(Path, command[-3:-1])
                 output.write_bytes(b'prepared geometry only')
-                report.write_text(json.dumps({'schemaVersion': 1, 'restTransformsChanged': False,
-                                              'textureMode': 'geometry_only', 'materialSlots': 0}))
+                report.write_text(json.dumps({'schemaVersion': 2, 'restTransformsChanged': False,
+                                              'textureMode': 'geometry_only', 'materialSlots': 0,
+                                              'locationRigManifest': {'schemaVersion':2, 'structuralHash':'test'}}))
                 return SimpleNamespace(returncode=0)
 
             with mock.patch('model_publication_service.blender_executable', return_value=Path('blender')), \
@@ -53,8 +56,9 @@ class ModelOnlyM233(unittest.TestCase):
 
             def prepare(command, **kwargs):
                 Path(command[-3]).write_bytes(b'fbx')
-                Path(command[-2]).write_text(json.dumps({'schemaVersion': 1,
-                    'restTransformsChanged': False, 'textureMode': 'embedded', 'materialSlots': 1}))
+                Path(command[-2]).write_text(json.dumps({'schemaVersion': 2,
+                    'restTransformsChanged': False, 'textureMode': 'embedded', 'materialSlots': 1,
+                    'locationRigManifest': {'schemaVersion':2,'structuralHash':'test'}}))
                 return SimpleNamespace(returncode=0)
 
             with mock.patch('model_publication_service.blender_executable', return_value=Path('blender')), \
@@ -78,7 +82,12 @@ class ModelOnlyM233(unittest.TestCase):
                     'published_sha256=source_sha256 WHERE id=?', ('700123', row['atlasVariantId']))
 
             @contextmanager
-            def stage(_, model, *, texture_mode='embedded'):
+            def stage(_, model, *, texture_mode='embedded', report_receiver=None):
+                self.assertIsNotNone(report_receiver)
+                frame=[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]
+                report_receiver['locationRigManifest']=validate(
+                    [{'name':'rig_carrier','vertices':3},{'name':'campfire_01','vertices':15}],
+                    [{'name':'root','parent':'','matrix':frame}])
                 self.assertEqual(texture_mode, 'geometry_only')
                 yield model
 

@@ -1,3 +1,4 @@
+local Carrier = require(script.Parent.StudioLocationRigCarrier)
 -- ID provenance of published Model assets. Real Estate and Location Assets
 -- both keep StudioManagedRigSwap as the sole child-rig transaction.
 local MeshPhysics = require(script.Parent.StudioMeshPhysicsCore)
@@ -22,7 +23,7 @@ function Inventory.Describe(modelId: string, model: Model): any
         local mid = Inventory.Id(part.MeshId)
         if mid ~= "" then
             counts[mid] = (counts[mid] or 0) + 1
-            if not MeshPhysics.IsCollider(part.Name)
+            if not Carrier.IsCarrier(part) and not MeshPhysics.IsCollider(part.Name)
                 and part:GetAttribute("Game1DecoPhysicsOnly") ~= true then
                 visualNames[mid] = visualNames[mid] or {}
                 visualNames[mid][string.sub(part.Name,1,128)] = true
@@ -92,7 +93,11 @@ function Inventory.Provenance(placed: Model, oldPublished: Model): CFrame
     for mid, oldParts in pairs(older) do
         local placedParts = placedById[mid]
         if #oldParts==1 and placedParts and #placedParts==1 then
-            local candidate = placedParts[1]:GetPivot() * oldParts[1]:GetPivot():Inverse()
+            -- MeshPart.CFrame is the geometry frame. GetPivot includes PivotOffset,
+            -- which the managed-rig transaction may rebase to preserve the
+            -- placed Model pivot when a new PrimaryPart is installed. Never
+            -- mistake that metadata change for a changed authored transform.
+            local candidate = placedParts[1].CFrame * oldParts[1].CFrame:Inverse()
             if transform and not sameFrame(transform,candidate) then
                 error("historical Mesh IDs disagree on placed transform; no Place geometry modified")
             end
@@ -288,11 +293,15 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
     local camera=workspace.CurrentCamera
     local atlasId=tostring(row.texture_asset_id or "")
     for _, part in ipairs(workspace:GetDescendants()) do
-        if part:IsA("MeshPart") and (not authoring or not part:IsDescendantOf(authoring))
+        if part:IsA("MeshPart") and not Carrier.IsCarrier(part)
+            and (not authoring or not part:IsDescendantOf(authoring))
             and (not camera or not part:IsDescendantOf(camera)) then
             local meshId=Inventory.Id(part.MeshId)
             local old=previousIds[meshId]==true
-            local owner = Ownership.ForPart(workspace, part, slug)
+            -- A retained slug alias is the SAME registered asset identity.
+            -- Treat its nearest stamped root as one managed placement so a
+            -- two-part legacy rig is not rendered as two unrelated assets.
+            local owner = Ownership.ForPart(workspace, part, slug, row.aliases)
             local currentUnlinked = owner==nil and currentVisualIds[meshId]==true
                 and not MeshPhysics.IsCollider(part.Name)
                 and part:GetAttribute("Game1DecoPhysicsOnly") ~= true
@@ -310,6 +319,14 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
                 local alphaCurrent=not textureApplicable or (surface~=nil and
                     surface.AlphaMode==(if alphaEnabled then Enum.AlphaMode.Transparency else Enum.AlphaMode.Opaque))
                 local meshCurrent=currentIds[meshId]==true
+                -- Authored skeleton layout is validated independently of MeshId:
+                -- the visual Mesh ID may be unchanged across publications.
+                local rigState=if owner then Carrier.Diagnose(owner,row.rigManifest,row.legacyStaticPublication) else ""
+                local inspectionRequired=owner~=nil and row.needsFbxInspection==true
+                local republishRequired=owner~=nil and not inspectionRequired
+                    and not Carrier.IsCanonicalPublication(row.rigManifest,row.legacyStaticPublication)
+                local needsCanonicalReplacement=owner~=nil and rigState~="current"
+                    and not republishRequired and not inspectionRequired
                 local path=part:GetFullName()
                 local legacyRoot,legacyModelId=nil,nil
                 if old and not owner then
@@ -332,7 +349,10 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
                     meshCurrent=meshCurrent,textureCurrent=textureCurrent,
                     needsMesh=false,needsTexture=not textureCurrent,needsAlpha=not alphaCurrent,
                     alphaEnabled=alphaEnabled,alphaCurrent=alphaCurrent,
-                    currentUnlinked=currentUnlinked}
+                    currentUnlinked=currentUnlinked,
+                    rigState=rigState,republishRequired=republishRequired,
+                    needsFbxInspection=inspectionRequired,
+                    needsCanonicalReplacement=needsCanonicalReplacement}
                 table.insert(rows,entry)
                 partByKey[key]={part=part,root=owner,row=entry,
                     selectTarget=container}
@@ -347,7 +367,7 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
                         table.insert(roots,owner)
                         seenRoot[owner]=true
                     end
-                    if old or not meshCurrent
+                    if republishRequired or needsCanonicalReplacement or old or not meshCurrent
                         or tostring(owner:GetAttribute("Game1DecoPublishedModelAssetId") or "")~=newModelId
                         or tostring(owner:GetAttribute("Game1DecoPublishedModelSha256") or "")~=tostring(row.model_published_sha256 or "") then
                         geometryRoots[owner]=true

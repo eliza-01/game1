@@ -29,7 +29,7 @@ class MeshpartM237(TestCase):
         loader = self.source('system/studio-plugin/modules/DecoAssetLoader.luau')
         self.assertIn('not MeshPhysics.IsCollider(part.Name)', scan)
         self.assertIn('textureCurrent=not textureApplicable', scan)
-        self.assertIn('if Physics.IsCollider(part.Name)', sync)
+        self.assertIn('not Carrier.IsCarrier(part) and not Physics.IsCollider(part.Name)', sync)
         self.assertIn('descendant.TextureID = ""', loader)
         self.assertIn('StudioTextureAppearance.ApplyLocation(descendant, uri, alphaEnabled)', loader)
 

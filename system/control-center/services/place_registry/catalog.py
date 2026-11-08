@@ -33,6 +33,10 @@ def build_catalog(location_assets) -> dict:
             'surfaceMaterial': str(row.get('surfaceMaterial') or 'default'),
             'alphaEnabled': bool(row.get('alphaEnabled', False)),
             'robloxMaterial': str((row.get('materialDefinition') or {}).get('robloxMaterial') or ''),
+            'rigManifest': (location_assets.rig_manifest(slug, model)
+                            if hasattr(location_assets, 'rig_manifest') else None),
+            'legacyStaticPublication': bool(row.get('legacyStaticPublication')),
+            'needsFbxInspection': bool(row.get('needsFbxInspection')),
             'models': [{'modelAssetId': identifier,
                         'meshes': inventory.get(identifier, {}).get('meshes', [])}
                        for identifier in history],
@@ -44,7 +48,10 @@ def build_catalog(location_assets) -> dict:
     # and atlas bindings, not cache population, define the stable digest.
     identities = [{k: item[k] for k in ('slug', 'modelAssetId', 'atlasAssetId', 'publishedSha', 'surfaceMaterial', 'robloxMaterial', 'alphaEnabled')}
                   | {'versions': [model['modelAssetId'] for model in item['models']],
-                     'aliases': item['aliases']}
+                     'aliases': item['aliases'],
+                     'rigHash': (item.get('rigManifest') or {}).get('structuralHash', ''),
+                     'legacyStatic': item['legacyStaticPublication'],
+                     'inspectionNeeded': item['needsFbxInspection']}
                   for item in items]
     data['digest'] = hashlib.sha256(json.dumps(identities, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
     return data
@@ -72,6 +79,17 @@ def validate_report(report: dict, catalog: dict) -> list[dict]:
         for flag in ('needsMesh', 'needsTexture', 'needsStructure', 'duplicateId', 'ambiguous', 'hasModel', 'canSync'):
             if type(row.get(flag)) is not bool:
                 raise ValueError('invalid scan flag: ' + flag)
+        if 'structuralState' in row and row['structuralState'] not in (
+                'current','legacy_import_root','missing_rig_carrier','invalid_rig_carrier',
+                'multiple_rig_carriers','bone_manifest_mismatch','published_structure_mismatch',
+                'repair_required','manual_review_required'):
+            raise ValueError('invalid structural State')
+        for flag in ('canRepair', 'requiresRepublish', 'needsCanonicalReplacement', 'needsFbxInspection'):
+            if flag in row and type(row[flag]) is not bool:
+                raise ValueError('invalid scan flag: ' + flag)
+        if (row.get('canRepair', False) and (row.get('requiresRepublish', False)
+                or row.get('structuralState', 'current') != 'current')):
+            raise ValueError('noncanonical Location placement cannot authorize Repair')
         if 'needsRig' in row and type(row['needsRig']) is not bool:
             raise ValueError('invalid scan flag: needsRig')
         # Schema 1 older Studio plugins omit the new material-only flag.

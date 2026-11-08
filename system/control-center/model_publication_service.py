@@ -8,7 +8,7 @@ from blender_runtime import blender_executable
 
 
 @contextmanager
-def staged_model(project_root: Path, source: Path, *, texture_mode: str = "embedded"):
+def staged_model(project_root: Path, source: Path, *, texture_mode: str = "embedded", report_receiver: dict | None = None):
     """Stage a Model. Location uses geometry_only; existing Weapon keeps embedded."""
     if texture_mode not in ("embedded", "geometry_only"):
         raise ValueError("unsupported model publication texture mode")
@@ -32,11 +32,17 @@ def staged_model(project_root: Path, source: Path, *, texture_mode: str = "embed
             detail = (completed.stderr or completed.stdout or 'missing output').strip()
             raise ValueError('Model publication preparation failed: ' + detail[-1500:])
         result = json.loads(report.read_text(encoding='utf-8'))
-        if result.get('schemaVersion') != 1 or result.get('restTransformsChanged') is not False:
+        if result.get('schemaVersion') != (2 if texture_mode == 'geometry_only' else 1) or result.get('restTransformsChanged') is not False:
             raise ValueError('Invalid model publication preparation report')
         if texture_mode == 'geometry_only' and (
             result.get('textureMode') != 'geometry_only' or
             result.get('materialSlots') != 0
         ):
             raise ValueError('Geometry-only publication did not prove texture-free FBX; upload aborted')
+        if texture_mode == 'geometry_only':
+            manifest = result.get('locationRigManifest')
+            if not isinstance(manifest, dict) or manifest.get('schemaVersion') != 2 or not manifest.get('structuralHash'):
+                raise ValueError('Location publication has no verified static/skinned FBX manifest')
+        if report_receiver is not None:
+            report_receiver.update(result)
         yield output

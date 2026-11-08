@@ -37,7 +37,7 @@ function DecoTransform.supportOffset(model: Model): number
     local hasPart = false
 
     for _, descendant in ipairs(model:GetDescendants()) do
-        if descendant:IsA("BasePart") then
+        if descendant:IsA("BasePart") and descendant.Name ~= "rig_carrier" then
             hasPart = true
             local half = descendant.Size * 0.5
             for _, x in ipairs({ -1, 1 }) do

@@ -46,7 +46,7 @@ class StudioSelectM238(TestCase):
         self.assertIn('textureApplicable = not MeshPhysics.IsCollider(part.Name)', scan)
         self.assertIn('textureCurrent=not textureApplicable', scan)
         self.assertIn('needsTexture=not textureCurrent', scan)
-        self.assertIn('if Physics.IsCollider(part.Name)', apply)
+        self.assertIn('not Carrier.IsCarrier(part) and not Physics.IsCollider(part.Name)', apply)
         self.assertIn('descendant.TextureID = ""', loader)
         self.assertIn('if surface then surface:Destroy() end', loader)
         self.assertNotIn('selection:Set(selected)', scan)

@@ -128,6 +128,23 @@ class LocationAssetStore:
                 observed_at REAL NOT NULL,
                 PRIMARY KEY(asset_slug,model_asset_id)
             )""")
+            if not connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='location_asset_rig_manifests'").fetchone():
+                # Additive M256 storage. Back up current identity and publications.
+                import sqlite3
+                target_dir = self.runtime / 'backups'
+                target_dir.mkdir(parents=True, exist_ok=True)
+                target = target_dir / ('location_rig_manifest_m256_' +
+                    datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ') + '.sqlite')
+                with sqlite3.connect(str(target)) as saved:
+                    connection.backup(saved)
+            connection.execute("""CREATE TABLE IF NOT EXISTS location_asset_rig_manifests(
+                asset_slug TEXT NOT NULL,
+                model_asset_id TEXT NOT NULL,
+                source_sha256 TEXT NOT NULL,
+                manifest_json TEXT NOT NULL,
+                created_at REAL NOT NULL,
+                PRIMARY KEY(asset_slug, model_asset_id)
+            )""")
             if 'mesh_options_json' not in columns:
                 # Capture a consistent SQLite snapshot before the additive migration.
                 # Do not mix the backup with the authoring source/assets.
@@ -288,6 +305,27 @@ class LocationAssetStore:
         """Only a direct binding determines the effective image publication."""
         result = dict(row)
         result['fbxAnalysis'] = self._fbx_analysis(result)
+        result['rigManifest'] = (self.rig_manifest(str(result.get('slug') or ''),
+                                 str(result.get('model_asset_id') or ''))
+                                 if result.get('model_asset_id') else None)
+        analysis = result['fbxAnalysis']
+        # Legacy static publications have no v2 rig manifest. A SHA-bound
+        # inspection proves the *published* FBX contains no skeleton; Studio
+        # independently checks its loaded geometry for Bones and RootPart.
+        result['needsFbxInspection'] = bool(
+            result.get('model_asset_id') and not result['rigManifest']
+            and result.get('model_sha256')
+            and result.get('model_sha256') == result.get('model_published_sha256')
+            and analysis is None)
+        result['legacyStaticPublication'] = bool(
+            result.get('model_asset_id') and not result['rigManifest']
+            and result.get('model_sha256')
+            and result.get('model_sha256') == result.get('model_published_sha256')
+            and isinstance(analysis, dict)
+            and isinstance(analysis.get('meshes'), list) and analysis['meshes']
+            and not analysis.get('unassignedArmatures')
+            and not any(mesh.get('bones') or str(mesh.get('name', '')).casefold() == 'rig_carrier'
+                        for mesh in analysis['meshes']))
         try:
             stored_options = json.loads(result.pop('mesh_options_json', '{}') or '{}')
             result['meshOptions'] = stored_options if isinstance(stored_options, dict) else {}
@@ -417,6 +455,9 @@ class LocationAssetStore:
         # model behavior until the operator saves per-mesh controls.
         option_source = payload.get('meshOptions')
         prior_options = json.loads(old.get('mesh_options_json') or '{}') if old else {}
+        # M256 pre-authoring registries may have erroneously exposed carrier as
+        # editable visual physics. That generated slot is never authoritative.
+        prior_options.pop('rig_carrier', None)
         if option_source is not None and inspected is None:
             inspected = self._fbx_analysis(old) if old else None
             if inspected is None:
@@ -531,7 +572,9 @@ class LocationAssetStore:
             # NEVER update_model_asset: versioned publication and the M217 audit
             # must retain an immutable chain of previous -> new Model IDs.
             # No embedded textures: the independent Atlas Registry alone publishes Image IDs.
-            with staged_model(self.root, model, texture_mode="geometry_only") as publication:
+            prepared = {}
+            with staged_model(self.root, model, texture_mode="geometry_only",
+                              report_receiver=prepared) as publication:
                 operation = create_model_asset(
                     publication, display_name=row['name_en'], description=description,
                     creator_type=creator_type, creator_id=creator_id, api_key=api_key)
@@ -542,6 +585,12 @@ class LocationAssetStore:
                     SET model_asset_id=?,model_published_sha256=?,model_moderation_state=?,
                         updated_at=?,published_at=? WHERE slug=?''',
                     (result.asset_id, row['model_sha256'], result.moderation_state or '', now, now, slug))
+                manifest = prepared['locationRigManifest']
+                connection.execute('''INSERT INTO location_asset_rig_manifests(
+                    asset_slug,model_asset_id,source_sha256,manifest_json,created_at
+                ) VALUES(?,?,?,?,?)''',
+                    (slug, str(result.asset_id), str(row['model_sha256']),
+                     json.dumps(manifest, sort_keys=True, ensure_ascii=False), now))
                 connection.execute('''INSERT INTO location_asset_publications(
                     asset_slug,kind,revision,asset_id,operation_path,sha256,moderation_state,published_at
                 ) VALUES(?,?,?,?,?,?,?,?)''',
@@ -569,15 +618,19 @@ class LocationAssetStore:
             history = [dict(item) for item in connection.execute(
                 'SELECT * FROM location_asset_publications WHERE asset_slug=? ORDER BY id',
                 (normalized,))]
+        with self.connect() as connection:
+            manifests = [dict(item) for item in connection.execute(
+                'SELECT * FROM location_asset_rig_manifests WHERE asset_slug=?', (normalized,))]
         archive = self.root / '.control-center' / 'location-assets-retired'
         archive.mkdir(parents=True, exist_ok=True)
         target = archive / (normalized + '_' + datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ') + '.json')
         with target.open('x', encoding='utf-8') as file:
-            json.dump({'asset': raw, 'publications': history, 'sourceFilesPreserved': True},
+            json.dump({'asset': raw, 'publications': history, 'rigManifests': manifests, 'sourceFilesPreserved': True},
                       file, ensure_ascii=False, indent=2)
         with self.connect() as connection:
             connection.execute("DELETE FROM location_asset_publications WHERE asset_slug=?", (normalized,))
             connection.execute("DELETE FROM location_asset_mesh_id_inventory WHERE asset_slug=?", (normalized,))
+            connection.execute("DELETE FROM location_asset_rig_manifests WHERE asset_slug=?", (normalized,))
             connection.execute("DELETE FROM location_assets WHERE slug=?", (normalized,))
         self.atlases.unbind('location_asset', normalized)
         self.export()
@@ -592,6 +645,14 @@ class LocationAssetStore:
                 (str(slug or "").strip().lower(),),
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def rig_manifest(self, slug: str, model_asset_id: str) -> dict | None:
+        """Immutable Blender-verified v2 manifest, or None for a legacy model."""
+        with self.connect() as db:
+            row = db.execute('SELECT manifest_json FROM location_asset_rig_manifests '
+                             'WHERE asset_slug=? AND model_asset_id=?',
+                             (slug, str(model_asset_id))).fetchone()
+        return json.loads(row['manifest_json']) if row else None
 
     def model_publication_ids(self, slug: str) -> list[str]:
         """The immutable published Model Asset IDs; never infer MeshPart IDs from them."""
@@ -657,6 +718,14 @@ class LocationAssetStore:
         with self.connect() as db:
             aliases = {row['old_slug']: row['current_slug'] for row in db.execute(
                 'SELECT old_slug,current_slug FROM location_asset_slug_aliases ORDER BY old_slug')}
+        # Studio ownership must understand retained identities after a rename.
+        # Keep the top-level map for runtime compatibility and also attach the
+        # bounded reverse list to each authoring row consumed by DecoManager.
+        by_current: dict[str, list[str]] = {}
+        for old_slug, current_slug in aliases.items():
+            by_current.setdefault(current_slug, []).append(old_slug)
+        for item in items:
+            item['aliases'] = sorted(by_current.get(item['slug'], []))
         return {
             "schemaVersion": SCHEMA_VERSION,
             "project": PROJECT,

@@ -25,10 +25,13 @@ class LocationSyncPlacementM244(unittest.TestCase):
         for call in ('target.Size.X / source.Size.X', 'target.Size.Y / source.Size.Y',
                      'target.Size.Z / source.Size.Z', 'part.CFrame = value.frame',
                      'source.PivotOffset = target.PivotOffset',
-                     'source.CFrame ~= target.CFrame', 'validRatio(ratio.X)',
+                     'sameFrame(source.CFrame, target.CFrame)', 'validRatio(ratio.X)',
                      'verifyMultipart(previous, placed)', 'History.Provenance(placed, previous)'):
             self.assertIn(call, helper)
         self.assertIn('local function uniformRatio(', helper)
+        self.assertIn('local function sameFrame(', helper)
+        self.assertIn('a.LookVector:Dot(b.LookVector) >= 0.9999', helper)
+        self.assertNotIn('source.CFrame ~= target.CFrame', helper)
         self.assertIn('stage:ScaleTo(stage:GetScale() * newScale)', helper)
         self.assertIn('target.CFrame * source.CFrame:Inverse()', helper)
         self.assertIn('if oldScale == nil or newScale == nil then return nil end', helper)
@@ -55,7 +58,7 @@ class LocationSyncPlacementM244(unittest.TestCase):
         self.assertIn('canSync=eligible and not foreignClaim', inventory)
         self.assertNotIn('Model явно принадлежит другому Location Asset', inventory)
         repair = self.source('system/studio-plugin/modules/StudioPlaceRegistryRepair.luau')
-        self.assertIn('root:SetAttribute("Game1DecoAssetSlug",ref.entry.slug)', repair)
+        self.assertIn('Game1DecoAssetSlug = ref.entry.slug', repair)
 
     def test_find_report_survives_replace_and_rescans(self):
         source = self.source('system/control-center/static/location-asset-workflow.js')

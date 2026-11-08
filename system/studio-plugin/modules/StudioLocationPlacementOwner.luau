@@ -5,7 +5,16 @@ local Owner = {}
 local SLUG = "Game1DecoAssetSlug"
 local INSTANCE = "Game1DecoInstanceId"
 
-function Owner.ForPart(workspace: Workspace, part: MeshPart, slug: string): Model?
+local function ownsSlug(value: any, slug: string, aliases: {string}?): boolean
+    if value == slug then return true end
+    for _, alias in ipairs(aliases or {}) do
+        if value == alias then return true end
+    end
+    return false
+end
+
+function Owner.ForPart(workspace: Workspace, part: MeshPart, slug: string,
+    aliases: {string}?): Model?
     if not part:IsDescendantOf(workspace) then return nil end
     local authoring = workspace:FindFirstChild("Game1Authoring")
     local camera = workspace.CurrentCamera
@@ -17,7 +26,7 @@ function Owner.ForPart(workspace: Workspace, part: MeshPart, slug: string): Mode
             or cursor:GetAttribute(INSTANCE) ~= nil) then
             -- Stop at the first claimed Model even if it belongs to another
             -- slug or lacks a valid ID. Never borrow an outer group's owner.
-            if cursor:GetAttribute(SLUG) == slug
+            if ownsSlug(cursor:GetAttribute(SLUG), slug, aliases)
                 and tostring(cursor:GetAttribute(INSTANCE) or "") ~= "" then
                 return cursor
             end

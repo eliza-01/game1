@@ -1,0 +1,107 @@
+{
+  "boneHash": "5cd352dfffdf202098ad67c20419436a605f627797c7a339e5372b6201ab4e47",
+  "bones": [
+    {
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "Bone",
+      "parent": ""
+    },
+    {
+      "matrix": [
+        1.0,
+        0.0,
+        2e-07,
+        0.0,
+        2e-07,
+        0.0,
+        -1.0,
+        0.0,
+        0.0,
+        0.9999999,
+        0.0,
+        4.7806559,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "Bone.001",
+      "parent": "Bone"
+    },
+    {
+      "matrix": [
+        1.0,
+        0.0,
+        2e-07,
+        0.0,
+        2e-07,
+        0.0,
+        -1.0,
+        0.0,
+        0.0,
+        0.9999999,
+        0.0,
+        8.7243443,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "Bone.002",
+      "parent": "Bone.001"
+    }
+  ],
+  "carrierName": "rig_carrier",
+  "inventoryHash": "da81a9aa62e1a6ce3232a02fe867139f0b86f60d9d292ce5de355c5084512327",
+  "parts": [
+    {
+      "name": "christmas_tree_01",
+      "role": "visual",
+      "vertices": 1870
+    },
+    {
+      "name": "col_mesh",
+      "role": "collider",
+      "vertices": 75
+    },
+    {
+      "name": "rig_carrier",
+      "role": "rig_carrier",
+      "vertices": 9
+    }
+  ],
+  "rigKind": "skinned",
+  "schemaVersion": 2,
+  "skinPreparation": {
+    "minimumInfluence": 0.05,
+    "minimumVerticesPerBone": 1,
+    "patchedBoneCount": 0,
+    "patchedBones": [],
+    "prunedVertices": 0,
+    "survivingBoneCount": 3,
+    "unweightedVertexPolicy": "nearest-authored-bone-head-v1",
+    "unweightedVerticesAfter": 0,
+    "unweightedVerticesBefore": 1,
+    "verticesOverFourAfter": 0,
+    "verticesOverFourBefore": 0
+  },
+  "sourceSha256": "fb1c7635d8e8530cad006c28186855b63ccc5242b72371902c570bebaeb38b0a",
+  "structuralHash": "41977f6f7bce55298b08eb163141a8a059544ef31e0eaa8a017b603b0553ce51"
+}

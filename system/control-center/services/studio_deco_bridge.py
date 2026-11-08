@@ -204,6 +204,17 @@ def run_deco_refresh_bridge(*, timeout_seconds: float = 75.0,
                     raise StudioBridgeError('invalid Studio MeshPart ID: '+field)
             # M250: accept older Studio scans without Alpha fields, but validate
             # every Alpha flag sent by an Alpha-aware Studio plugin.
+            # Newer Studio plugins report publication topology independently
+            # from Mesh/Texture IDs. Reject malformed flags, keep older reports.
+            if 'republishRequired' in part and type(part['republishRequired']) is not bool:
+                raise StudioBridgeError('invalid Location republish flag')
+            if 'needsCanonicalReplacement' in part and type(part['needsCanonicalReplacement']) is not bool:
+                raise StudioBridgeError('invalid Location canonical-replacement flag')
+            if 'needsFbxInspection' in part and type(part['needsFbxInspection']) is not bool:
+                raise StudioBridgeError('invalid Location FBX-inspection flag')
+            if 'rigState' in part and (not isinstance(part['rigState'], str)
+                    or len(part['rigState']) > 80):
+                raise StudioBridgeError('invalid Location rig state')
             for flag in ('needsAlpha', 'alphaCurrent', 'alphaEnabled'):
                 if flag in part and type(part[flag]) is not bool:
                     raise StudioBridgeError('invalid Studio MeshPart Alpha flag: ' + flag)

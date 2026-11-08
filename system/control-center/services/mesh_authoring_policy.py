@@ -11,6 +11,10 @@ _COLLIDER = re.compile(r'(?:^|_)col(?:_|$)', re.IGNORECASE)
 FIDELITIES = ('Box', 'Hull', 'Default', 'PreciseConvexDecomposition')
 
 
+def is_location_carrier(name: str) -> bool:
+    return isinstance(name, str) and name.casefold() == 'rig_carrier'
+
+
 def is_collision_mesh(name: str) -> bool:
     return isinstance(name, str) and bool(_COLLIDER.search(name))
 
@@ -63,7 +67,7 @@ def normalize_mesh_options(name: str, raw: dict | None, *, has_collider: bool = 
 
 def normalize_location_options(analysis: dict, raw: dict | None) -> dict:
     """Reject stale/unknown mesh names and derive collision fidelity on the server."""
-    meshes = [m['name'] for m in analysis['meshes']]
+    meshes = [m['name'] for m in analysis['meshes'] if not is_location_carrier(m['name'])]
     if raw is not None and not isinstance(raw, dict):
         raise ValueError('meshOptions must be an object')
     raw = raw or {}
@@ -76,6 +80,10 @@ def normalize_location_options(analysis: dict, raw: dict | None) -> dict:
 
 def location_mesh_profile(name: str, *, has_collider: bool) -> dict:
     """Inspector defaults. Explicit authoring overrides are stored separately."""
+    if is_location_carrier(name):
+        return {'role':'carrier', 'canCollide':False, 'canQuery':False,
+                'canTouch':False, 'doubleSided':False,
+                'collisionFidelity':'Box', 'physicsOnly':True}
     flags = mesh_defaults(name, has_collider=has_collider)
     collider = flags['collisionMesh']
     glass = flags['glass']

@@ -299,3 +299,73 @@ preserving transforms and undo. Unknown joints or ambiguous provenance fail
 closed. `Repair` does NOT apply Surface Material/Alpha; those are explicit Sync
 operations. No-op and blocked operations must report truthful change counts.
 See `docs/workflows/LOCATION_PLACE_REGISTRY_RECONCILIATION_M252_RU.md`.
+
+## M255 · Imported RootPart normalization for Location Assets only
+
+`StudioLocationImportRoot` is the sole guarded converter of Roblox FBX-imported
+invisible RootPart rigs to visual MeshPart-owned Bones and explicit rigid COL
+welds. New Location templates are normalized by `DecoAssetLoader` before
+placement. Existing placed rigs require explicit, journaled Place Registry
+Repair and are blocked from Sync until then. Preserve Bone rest/posed world
+frames, all MeshPart CFrame/Size and Model pivot; reject unknown external
+joints, multiple visual rigs and removal of the only physical collider.
+Real Estate/Character assembly and immutable Open Cloud assets are unaffected.
+See `docs/workflows/LOCATION_IMPORTED_ROOTLESS_M255_RU.md`.
+
+## M265 · Shared Character / Location skinned MeshPart connection
+
+Character and Studio Location must use the SAME `src/shared/rig/SkinnedMeshConnection.luau` source. The Studio plugin maps it directly from `src/shared` (no duplicated implementation). After canonical published Location rig validation and detached importer RootPart normalization, link only disconnected visual/COL MeshParts to the authored `rig_carrier`. Preserve valid importer Motor6D/Weld paths and never add a cycle or duplicate joint. This assembly completion is performed only on fresh, unplaced model clones; it never repairs existing Place geometry, changes source weights/Bones, touches Atlas/Model IDs, or creates synthetic carriers. See `docs/workflows/LOCATION_SKIN_CONNECTION_M265_RU.md`. Roblox Studio skin/physics smoke verification remains mandatory.
+
+## M264 · Location placement float-tolerant verification
+
+Location legacy rig alignment verifies post-`ScaleTo`/`PivotTo` CFrame and pivot
+with the same bounded tolerance as `StudioManagedRigSwap` (0.025 studs and axis
+dot 0.9999), never exact floating-point equality. Size tolerance remains 0.025.
+The staged transaction still fails before commit on any material transform drift.
+See `docs/workflows/LOCATION_PLACEMENT_FLOAT_TOLERANCE_M264_RU.md`.
+
+## M263 · Roblox importer Motor6D assembly in canonical Location rigs
+
+Roblox may add an inert `RootPart` and internal `Motor6D` joints while importing
+a multipart skinned FBX. This alone is not legacy authoring evidence. On a
+fresh detached `LoadAssetAsync` clone only, `StudioLocationPublishedRigNormalize`
+may remove one verified inert importer RootPart, move its original root Bones
+to the authored `rig_carrier`, and remove only verified joints to that root,
+while proving Model pivot, MeshPart transforms and Bone world/pose frames did
+not change. `StudioLocationRigCarrier` may retain a Motor6D only when both
+endpoints are distinct manifest MeshParts inside the same skinned v2 Model;
+static assets, unknown children/joints, external/missing endpoints, duplicate
+pairs and cyclic assemblies fail closed. M262 then migrates the normalized
+published child rig through `StudioManagedRigSwap`; placed legacy roots are
+never normalized in situ. See
+`docs/workflows/LOCATION_IMPORTER_MOTOR_ASSEMBLY_M263_RU.md`.
+
+## M262 · Historical Location rig migration by immutable publication
+
+Retained Location slug aliases are the same placement identity for scoped Find
+and Sync. A legacy visual + COL publication must be grouped by its verified root
+Model/Placement ID, not rendered as separate assets per MeshPart. With a
+canonical current publication, explicit Sync may replace the complete verified
+historical managed child rig through `StudioManagedRigSwap`; it must load the
+new immutable Roblox Model rather than synthesize parts or use `ApplyMesh`.
+Preserve the placed root Instance, parent, pivot, scale, Placement ID and visual
+placement transform; migrate slug/Model metadata only on commit and roll it back
+with geometry on failure. Unknown or edited historical hierarchies fail closed.
+See `docs/workflows/LOCATION_LEGACY_RIG_PUBLICATION_MIGRATION_M262_RU.md`.
+
+## M256 · Location rig carrier v2 (migration in progress)
+
+The M255 single-visual Bone-owner fallback is superseded by the real FBX-authored `rig_carrier` contract. For Location assets, never synthesize carrier MeshParts in Studio or silently mutate imported `RootPart`; use the separate, explicit, transactional Place Registry carrier migration only with proven published manifests and visual/collider transforms. This is **not a completed catalog migration** until all source FBXs have been republished and Studio tests pass. See `docs/workflows/LOCATION_RIG_CARRIER_M256_RU.md`.
+
+## M257 · Canonical FBX publication, no skeleton Repair
+
+Legacy imported `RootPart` and missing/invalid `rig_carrier` are **FBX publication** issues. Never move Bones or install a carrier via Place Registry Repair. Reauthor and republish the Model FBX with real Blender-authored carrier; preserve existing atlas Image ID and immutable Model history. Place Registry Find/Scan show the publication requirement and disable structural Repair. Existing placements are not silently mutated; Studio Sync remains independently guarded. See `docs/workflows/LOCATION_RIG_CARRIER_M256_RU.md`.
+
+## M260 · One Blender rig_carrier authoring mechanism
+
+Character and skinned Location FBX must call `system/asset-manager/blender_rig_carrier.py`.
+Never duplicate carrier geometry/weights by domain, synthesize one in Studio, or
+require carrier for static Location assets. Blender entrypoints must explicitly
+import shared modules independent of working directory. Publication failures
+must remain visible and must not publish Atlas or modify placed instances.
+See `docs/workflows/LOCATION_CARRIER_BLENDER_SHARED_M260_RU.md`.

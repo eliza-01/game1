@@ -13,7 +13,8 @@ local function textureUri(definition: any): string?
 end
 
 function EnvironmentAssetVisuals.ApplyPart(part: BasePart, definition: any): boolean
-    if not part:IsA("MeshPart") or MeshPhysics.IsCollider(part.Name) then return false end
+    if not part:IsA("MeshPart") or MeshPhysics.IsCollider(part.Name)
+        or MeshPhysics.IsLocationCarrier(part) then return false end
     local uri = textureUri(definition)
     if uri == nil then return false end
     local mesh = part :: MeshPart

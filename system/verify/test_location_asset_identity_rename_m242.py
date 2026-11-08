@@ -123,9 +123,9 @@ class LocationAssetIdentityRenameM242(TestCase):
         manifest=(ROOT/'system/studio-plugin/plugin.project.json').read_text()
         self.assertIn('function Naming.SingleVisual',names)
         self.assertIn('if found then return nil',names)  # multi-visual rigs keep authored names
-        self.assertIn('MeshNames.Normalize(model,',loader)
-        self.assertIn('MeshNames.Normalize(root,',repair)
-        self.assertIn('table.insert(undo,function()',repair)
+        self.assertNotIn('MeshNames.Normalize(model,',loader)  # immutable v2 rig names
+        self.assertNotIn('MeshNames.Normalize(root,',repair)
+        self.assertIn('table.insert(undo, function()',repair)
         self.assertIn('entry.aliases or {}',scanner)
         self.assertIn('meshNameMismatch',scanner)
         self.assertIn('StudioLocationMeshNames',manifest)

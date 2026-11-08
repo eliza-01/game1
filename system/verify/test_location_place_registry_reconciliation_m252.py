@@ -51,34 +51,24 @@ class PublicationReconciliationM252(unittest.TestCase):
         self.assertIn('root:GetPivot()~=ref.rootPivot',inventory)
         self.assertIn('seen~=expected',inventory)
 
-    def test_additive_collider_uses_current_visual_and_preserves_custom_children(self):
+    def test_repair_cannot_reconstruct_published_collider_or_skeleton(self):
         repair = source('StudioPlaceRegistryRepair.luau')
-        self.assertIn('if not ref.currentVisual or #ref.visuals ~= 1 then', repair)
-        self.assertIn('History.Id(sourceVisual.MeshId) ~= History.Id(ref.part.MeshId)', repair)
-        self.assertIn('if linked and not child:IsDescendantOf(sourceCol) then', repair)
-        self.assertIn('опубликованный COL связан с другими частями rig', repair)
-        self.assertIn('child:IsA("JointInstance") or child:IsA("WeldConstraint")', repair)
-        self.assertIn('elseif child:IsA("Constraint") then', repair)
-        self.assertIn('child.Attachment0:IsDescendantOf(sourceCol)', repair)
-        self.assertIn('if child:IsA("JointInstance") or child:IsA("Constraint") then', repair)
-        self.assertIn('child:Destroy()', repair)
-        self.assertNotIn('rigged geometry requires full geometry sync before restoring COL', repair)
-        self.assertIn('Physics.Apply(part,false,"Box",part.DoubleSided)', repair)
-        self.assertIn('col.Transparency=1', repair)
-        self.assertIn('Published.CurrentShape(ref.entry,root)', repair)
-        self.assertIn('root:SetAttribute("Game1DecoPublishedModelAssetId",ref.entry.model)', repair)
-        self.assertIn('root:GetPivot()~=pivot', repair)
-        self.assertIn('if not ok then\n        col:Destroy()', repair)
-        self.assertIn('part.CFrame~=originalCFrame or part.Size~=originalSize', repair)
+        self.assertNotIn('restoreCol(', repair)
+        self.assertNotIn('Instance.new("MeshPart")', repair)
+        self.assertNotIn('Instance.new("Model")', repair)
+        self.assertNotIn('CarrierMigration', repair)
+        self.assertIn('требуется перепубликация FBX', repair)
+        self.assertIn('не через Repair', repair)
 
-    def test_repair_is_structure_only_idempotent_and_cleans_templates(self):
+    def test_repair_is_identity_only_and_idempotent(self):
         repair = source('StudioPlaceRegistryRepair.luau')
         self.assertIn('not ref.row.needsStructure and not ref.row.duplicateId', repair)
-        self.assertIn('ref.needsCol and ref.oldVersion==""', repair)
-        self.assertIn('for _,template in pairs(loaded) do pcall', repair)
-        self.assertNotIn('Physics.ApplyLocationSurfaceMaterial(root,ref.entry.material', repair)
-        self.assertIn('return {changed=0,skipped=blocked', repair)
-        self.assertIn('ctx.history:FinishRecording(recording,Enum.FinishRecordingOperation.Cancel)', repair)
+        self.assertIn('if dirty then', repair)
+        self.assertIn('changed += 1', repair)
+        self.assertIn('Model pivot/PrimaryPart/parent', repair)
+        self.assertNotIn('Physics.ApplyLocationSurfaceMaterial', repair)
+        self.assertIn('changed = 0, skipped = blocked', repair)
+        self.assertIn('FinishRecording(recording, Enum.FinishRecordingOperation.Cancel)', repair)
 
     def test_sync_distinguishes_rig_material_and_alpha_and_reports_skips(self):
         sync = source('StudioPlaceRegistrySync.luau')

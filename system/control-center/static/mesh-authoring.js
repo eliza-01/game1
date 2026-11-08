@@ -5,6 +5,7 @@ window.game1MeshAuthoring = (() => {
   const e = value => esc(String(value ?? ''));
   const fidelityChoices = ['Box','Hull','Default','PreciseConvexDecomposition'];
   const isCollider = name => /(?:^|_)col(?:_|$)/i.test(name);
+  const isCarrier = name => String(name||'').toLowerCase()==='rig_carrier';
   const isGlass = name => String(name||'').toLowerCase().includes('glass') && !isCollider(name);
   function defaults(name,hasCollider=false,domain='estate') {
     const lower=String(name||'').toLowerCase();
@@ -34,8 +35,10 @@ window.game1MeshAuthoring = (() => {
   }
   function seeded(analysis, stored={}) {
     const next={};
-    for(const part of analysis?.meshes||[])
+    for(const part of analysis?.meshes||[]) {
+      if(isCarrier(part.name))continue;
       next[part.name]=normalize(part.name,stored?.[part.name],!!analysis.hasCollider,'location');
+    }
     return next;
   }
   function boneList(bones,influencedBones=[],roleForName=null) {
@@ -53,11 +56,11 @@ window.game1MeshAuthoring = (() => {
       <div class="deco-fbx-report-header"><strong>FBX · ${meshes.length} MeshPart(s)</strong><small>${armatures.length} armature(s) · ${analysis.hasCollider?'COL collision mesh detected':'No COL collider'}</small></div>
       ${!analysis.hasCollider?'<small class="real-estate-physics-caution">No dedicated COL mesh: review visual collisions before publishing.</small>':''}
       ${meshes.map(mesh=>{
-        const name=mesh.name,flags=normalize(name,options[name],!!analysis.hasCollider,'location'),role=isCollider(name)?'COL · collision geometry':isGlass(name)?'Glass':'Visual';
+        const name=mesh.name,flags=normalize(name,options[name],!!analysis.hasCollider,'location'),role=isCarrier(name)?'rig_carrier · shared Bone owner':isCollider(name)?'COL · collision geometry':isGlass(name)?'Glass':'Visual';
         const bones=mesh.bones||[];
         return `<section class="deco-fbx-mesh" data-fbx-mesh="${e(name)}">
           <div class="deco-fbx-mesh-title"><strong>${e(name)}</strong><small>${role} · ${Number(mesh.vertices)||0} vertices</small></div>
-          <div class="real-estate-mesh-switches" role="group" aria-label="${e(name)} physics settings">
+          ${isCarrier(name)?'<small>Authored carrier · no visual, atlas, collision or editable physics</small>':`<div class="real-estate-mesh-switches" role="group" aria-label="${e(name)} physics settings">
             <label class="real-estate-physics-toggle"><input type="checkbox" data-mesh-field="noCollide" ${flags.noCollide?'checked':''}> No Collide</label>
             ${!isCollider(name)?`<label class="real-estate-glass-toggle"><input type="checkbox" data-mesh-field="glass" ${flags.glass?'checked':''}> Glass · 0.02</label>`:''}
           </div>
@@ -67,7 +70,7 @@ window.game1MeshAuthoring = (() => {
             </select></label>
             <label><input type="checkbox" data-mesh-field="doubleSided" ${flags.doubleSided?'checked':''}> DoubleSided</label>
             <small class="real-estate-physics-state" data-mesh-status>${status(flags)}</small>
-          </div>
+          </div>`}
           <details class="deco-fbx-skeleton"><summary>${e(mesh.armature||'No Armature')} · ${bones.length} bones · ${(mesh.influencedBones||[]).length} weighted</summary>
             ${bones.length?boneList(bones,mesh.influencedBones):'<small>No bones</small>'}
           </details>
@@ -79,6 +82,7 @@ window.game1MeshAuthoring = (() => {
   function wire(container,options,onChange,hasCollider=false){
     container.querySelectorAll('[data-fbx-mesh]').forEach(meshRow=>{
       const name=meshRow.dataset.fbxMesh;
+      if(isCarrier(name))return;
       meshRow.querySelectorAll('[data-mesh-field]').forEach(control=>control.onchange=()=>{
         const field=control.dataset.meshField;
         const row=options[name]||normalize(name,{},hasCollider,'location');

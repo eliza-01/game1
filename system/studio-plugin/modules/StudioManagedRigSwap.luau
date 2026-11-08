@@ -147,16 +147,30 @@ function RigSwap.Commit(plan: any)
         end
         for _, child in ipairs(plan.incoming) do child.Parent = plan.root end
         if plan.newPrimary then
+            -- Replacing a placed PrimaryPart must not redefine the placed Model pivot.
+            -- Import revisions can give COL/visual/carrier different part pivots
+            -- and orientations. PivotOffset is metadata: rebase the NEW part
+            -- onto the saved root pivot without moving any MeshPart CFrame.
+            plan.newPrimary.PivotOffset = plan.newPrimary.CFrame:ToObjectSpace(plan.pivot)
             plan.root.PrimaryPart = plan.newPrimary
         elseif not plan.primary then
             -- WorldPivot is editor metadata; setting it does not move any part.
             -- Without this, Roblox auto-pivot may change when geometry changes.
             plan.root.WorldPivot = plan.pivot
         end
-        if not sameFrame(plan.root:GetPivot(), plan.pivot)
-            or math.abs(plan.root:GetScale() - plan.scale) > 0.000001
+        local actualPivot, actualScale = plan.root:GetPivot(), plan.root:GetScale()
+        if not sameFrame(actualPivot, plan.pivot)
+            or math.abs(actualScale - plan.scale) > 0.000001
             or plan.root.Parent ~= plan.parent then
-            error("placed root pivot, scale or parent changed; transaction rolled back")
+            local positionDelta = (actualPivot.Position - plan.pivot.Position).Magnitude
+            local details = string.format(
+                "placed root pivot, scale or parent changed; transaction rolled back "
+                .. "(position=%.6f look=%.6f up=%.6f scale=%.9f->%.9f parent=%s)",
+                positionDelta,
+                actualPivot.LookVector:Dot(plan.pivot.LookVector),
+                actualPivot.UpVector:Dot(plan.pivot.UpVector),
+                plan.scale, actualScale, tostring(plan.root.Parent == plan.parent))
+            error(details)
         end
     end)
     if not ok then

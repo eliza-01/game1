@@ -339,6 +339,9 @@ return CharacterTemplate
           <string name="Source"><![CDATA[local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
 local MeshPhysics = require(script.Parent.StudioMeshPhysicsCore)
 local MeshNames = require(script.Parent.StudioLocationMeshNames)
+local Carrier = require(script.Parent.StudioLocationRigCarrier)
+local SkinConnection = require(script.Parent.StudioSkinnedMeshConnection)
+local PublishedRigNormalize = require(script.Parent.StudioLocationPublishedRigNormalize)
 local DecoAssetLoader = {}
 DecoAssetLoader.__index = DecoAssetLoader
 
@@ -385,7 +388,10 @@ local function applyTexture(model: Model, textureAssetId: string, alphaEnabled: 
     local applied = 0
     for _, descendant in ipairs(model:GetDescendants()) do
         if descendant:IsA("MeshPart") then
-            if MeshPhysics.IsCollider(descendant.Name) or descendant:GetAttribute("Game1DecoPhysicsOnly")==true then
+            if Carrier.IsCarrier(descendant) then
+                -- Carrier is a real published mesh, never an Atlas consumer.
+                Carrier.Prepare(descendant)
+            elseif MeshPhysics.IsCollider(descendant.Name) or descendant:GetAttribute("Game1DecoPhysicsOnly")==true then
                 -- COL is physics-only. Strip old importer texture remnants from
                 -- the fresh clone; never assign Atlas IDs to collision geometry.
                 descendant.TextureID = ""
@@ -454,18 +460,52 @@ function DecoAssetLoader:loadPublished(row: any): Model
     local model = canonicalModel(loaded)
     model.Name = tostring(row.slug or "deco_asset")
     sanitize(model)
+    -- A static FBX has no Bones and must not acquire a carrier. Legacy static
+    -- publications are allowed only after SHA-bound source inspection, then
+    -- independently validated against the loaded Roblox Model.
+    -- LoadAssetAsync can wrap a valid Blender-authored carrier rig in an inert
+    -- RootPart + Motor6D assembly. Normalize only this detached fresh clone;
+    -- placed Models are replaced transactionally and are never edited in situ.
+    local authoredPivot = PublishedRigNormalize.Apply(model, row.rigManifest)
+    local carrier = Carrier.Validate(model, row.rigManifest, row.legacyStaticPublication)
+    if carrier then
+        Carrier.Prepare(carrier)
+        -- Roblox skinning finds Bones on connected MeshParts within one Model.
+        -- Importer Motor6Ds may already form a valid assembly; retain those.
+        -- RootPart normalization can also leave disconnected visual/COL parts.
+        -- Complete only missing paths on this detached clone, never on Place.
+        for _, part in ipairs(model:GetDescendants()) do
+            if part:IsA("MeshPart") and part ~= carrier then
+                local weldName = if MeshPhysics.IsCollider(part.Name) then "LocationRigWeld"
+                    else "LocationSkinWeld"
+                SkinConnection.Connect(model, carrier, part, weldName)
+            end
+        end
+        carrier.PivotOffset = carrier.CFrame:ToObjectSpace(authoredPivot)
+        model.PrimaryPart = carrier
+        if (model:GetPivot().Position-authoredPivot.Position).Magnitude>0.002 then
+            error("rig_carrier PrimaryPart changed the authored Model pivot")
+        end
+    end
     applyTexture(model, tostring(row.texture_asset_id or ""), row.alphaEnabled)
     MeshPhysics.ApplyLocationModel(model, nil, row.meshOptions)
     MeshPhysics.ApplyLocationSurfaceMaterial(model,row.surfaceMaterial,row.robloxMaterial or (row.materialDefinition and row.materialDefinition.robloxMaterial))
-    MeshNames.Normalize(model, tostring(row.slug or ""))
+    -- Version-2 authored names belong to the immutable publication manifest.
+    -- Renaming a visual to the current slug would silently invalidate it.
     return model
 end
 
 function DecoAssetLoader:loadForMeshInventory(modelId: string, slug: string): Model
     -- Geometry and Mesh ID inventory are read from immutable published Models.
     -- No separate image publication is performed.
-    return self:loadPublished({status="PUBLISHED",model_asset_id=modelId,
-        texture_asset_id="",slug=slug})
+    -- Only historical forensics: older immutable Model publications may have
+    -- RootPart and no carrier. No normalization or staging mutation is allowed.
+    local id = tonumber(modelId)
+    if not id or id <= 0 then error("invalid historical Model ID") end
+    local asset = self.AssetService:LoadAssetAsync(id)
+    local model = canonicalModel(asset)
+    model.Name = slug
+    return model
 end
 
 return DecoAssetLoader
@@ -1267,7 +1307,8 @@ return DecoManager
       <Item class="ModuleScript" referent="7">
         <Properties>
           <string name="Name">DecoPlacedAssetSync</string>
-          <string name="Source"><![CDATA[-- Location Assets adapter for the same child-rig replacement transaction used
+          <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
+-- Location Assets adapter for the same child-rig replacement transaction used
 -- by Real Estate. Only this adapter knows the Location slug, publication and
 -- audit attributes; the replacement mechanism has no domain-specific rules.
 local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
@@ -1283,6 +1324,14 @@ local SLUG = "Game1DecoAssetSlug"
 local INSTANCE = "Game1DecoInstanceId"
 local HISTORY = "Game1DecoSyncHistory"
 local REFERENCE = "Game1DecoRegistryModelAssetId"
+
+local function belongsToSlug(value: any, slug: string, aliases: {string}?): boolean
+    if value == slug then return true end
+    for _, alias in ipairs(aliases or {}) do
+        if value == alias then return true end
+    end
+    return false
+end
 
 local function id(value: any): string
     local n = tonumber(value)
@@ -1303,15 +1352,15 @@ local function rowFor(registry: any, slug: string): any
     error("Location Asset not registered: " .. slug)
 end
 
-local function targets(workspace: Workspace, slug: string): {Model}
+local function targets(workspace: Workspace, slug: string, aliases: {string}?): {Model}
     local found = {}
     for _, descendant in ipairs(workspace:GetDescendants()) do
-        if descendant:IsA("Model") and descendant:GetAttribute(SLUG) == slug
+        if descendant:IsA("Model") and belongsToSlug(descendant:GetAttribute(SLUG), slug, aliases)
             and tostring(descendant:GetAttribute(INSTANCE) or "") ~= "" then
             -- Same ownership resolver as Find. A nested, individually stamped
             -- asset is valid; its parent grouping Model must not shadow it.
             for _, part in ipairs(descendant:GetDescendants()) do
-                if part:IsA("MeshPart") and Ownership.ForPart(workspace, part, slug) == descendant then
+                if part:IsA("MeshPart") and Ownership.ForPart(workspace, part, slug, aliases) == descendant then
                     table.insert(found, descendant)
                     break
                 end
@@ -1401,7 +1450,7 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
         if entry.row.needsMesh then chosenGeometry[entry.root]=true end
     end
     local live={}
-    for _, root in ipairs(targets(workspace,slug)) do live[root]=true end
+    for _, root in ipairs(targets(workspace,slug,row.aliases)) do live[root]=true end
     local placed={}
     for _, root in ipairs(preview.roots) do
         if not live[root] then
@@ -1413,12 +1462,22 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
     -- owner. A grouping Model, a copied Instance ID, or a moved nested rig
     -- must never redirect the Sync into an adjacent/parent asset.
     for part in pairs(chosenParts) do
-        local selectedOwner = Ownership.ForPart(workspace, part, slug)
+        local selectedOwner = Ownership.ForPart(workspace, part, slug, row.aliases)
         if not selectedOwner or not chosenRoots[selectedOwner] then
             error("scanned MeshPart ownership changed; Find again before Sync")
         end
     end
     if #placed<1 then error("no selected managed Location instance; no Place geometry modified") end
+    -- The INCOMING publication must be canonical. The outgoing placement may
+    -- legitimately be an older immutable topology (including a two-part rig
+    -- without carrier). Its complete historical Model inventory is verified
+    -- below before StudioManagedRigSwap replaces the managed child rig.
+    if row.needsFbxInspection==true then
+        error("analyze the saved FBX before migrating placed rigs; Place unchanged")
+    end
+    if not Carrier.IsCanonicalPublication(row.rigManifest,row.legacyStaticPublication) then
+        error("current Model publication is not canonical; republish before Studio migration")
+    end
     for part, snap in pairs(preview.partStates or {}) do
         if part.Parent~=snap.parent or part:GetPivot()~=snap.frame or part.Size~=snap.size
             or History.Id(part.MeshId)~=snap.meshId or part.TextureID~=snap.texture then
@@ -1508,7 +1567,8 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
             local atlasChanges = {}
             local uri = "rbxassetid://" .. atlasId
             for _, part in ipairs(oldParts) do
-                if Physics.IsCollider(part.Name) or part:GetAttribute("Game1DecoPhysicsOnly") == true then continue end
+                if Carrier.IsCarrier(part) or Physics.IsCollider(part.Name)
+                    or part:GetAttribute("Game1DecoPhysicsOnly") == true then continue end
                 if not geometry and not chosenParts[part] then continue end
                 local surface = part:FindFirstChildOfClass("SurfaceAppearance")
                 if part.TextureID ~= uri or (surface and surface.ColorMap ~= uri) then
@@ -1521,7 +1581,7 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
             local alphaChanges={}
             if not geometry then
                 for _, part in ipairs(oldParts) do
-                    if chosenParts[part] and not Physics.IsCollider(part.Name)
+                    if chosenParts[part] and not Carrier.IsCarrier(part) and not Physics.IsCollider(part.Name)
                         and part:GetAttribute("Game1DecoPhysicsOnly")~=true
                         and not StudioTextureAppearance.AlphaCurrent(part,row.alphaEnabled==true) then
                         table.insert(alphaChanges,StudioTextureAppearance.Capture(part))
@@ -1578,6 +1638,7 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                 oldSha = model:GetAttribute("Game1DecoPublishedModelSha256"),
                 oldPublishedId = model:GetAttribute("Game1DecoPublishedModelAssetId"),
                 oldReference = model:GetAttribute(REFERENCE),
+                oldSlug = model:GetAttribute(SLUG), oldName = model.Name,
                 oldAnchorPath = model:GetAttribute("Game1DecoAuthoringAnchorPath"),
                 events = events, meshIdsBefore=beforeMeshes,meshIdsAfter=afterMeshes,
                 physicsBefore = if not geometry and allowedNames then
@@ -1593,12 +1654,17 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
     local ok, problem = pcall(function()
         for _, item in ipairs(plans) do
             local model = item.model
-            if model.Parent == nil or model:GetAttribute(SLUG) ~= slug then
+            if model.Parent == nil or not belongsToSlug(model:GetAttribute(SLUG),slug,row.aliases) then
                 error("placed Location Asset changed during sync")
             end
             if item.swap then
                 RigSwap.Commit(item.swap)
                 geometryUpdated += 1
+                -- Rename only the retained root identity. The root Instance,
+                -- parent, pivot and scale are guarded by RigSwap and stay put.
+                model:SetAttribute(SLUG,slug)
+                local instanceId=tostring(model:GetAttribute(INSTANCE) or "")
+                if instanceId~="" then model.Name=slug.."__"..instanceId:sub(1,8) end
                 model:SetAttribute("Game1DecoPublishedModelAssetId", modelId)
                 model:SetAttribute("Game1DecoPublishedModelSha256", publishedSha)
             end
@@ -1635,6 +1701,8 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                 model:SetAttribute("Game1DecoPublishedModelAssetId", item.oldPublishedId)
                 model:SetAttribute("Game1DecoPublishedModelSha256", item.oldSha)
                 model:SetAttribute(REFERENCE, item.oldReference)
+                model:SetAttribute(SLUG,item.oldSlug)
+                model.Name=item.oldName
                 model:SetAttribute("Game1DecoAuthoringAnchorPath", item.oldAnchorPath)
                 model:SetAttribute(HISTORY, item.oldHistory)
                 if item.physicsBefore then Physics.RestoreLocationModel(item.physicsBefore) end
@@ -2013,7 +2081,7 @@ function DecoTransform.supportOffset(model: Model): number
     local hasPart = false
 
     for _, descendant in ipairs(model:GetDescendants()) do
-        if descendant:IsA("BasePart") then
+        if descendant:IsA("BasePart") and descendant.Name ~= "rig_carrier" then
             hasPart = true
             local half = descendant.Size * 0.5
             for _, x in ipairs({ -1, 1 }) do
@@ -4619,7 +4687,8 @@ end
       <Item class="ModuleScript" referent="23">
         <Properties>
           <string name="Name">StudioLocationMeshNames</string>
-          <string name="Source"><![CDATA[-- One narrow authoring naming policy for the single-visual Location Asset case.
+          <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
+-- One narrow authoring naming policy for the single-visual Location Asset case.
 -- Published asset binaries, collider names and multi-mesh rig topology stay immutable.
 local Physics = require(script.Parent.StudioMeshPhysicsCore)
 local Naming = {}
@@ -4627,7 +4696,7 @@ local Naming = {}
 function Naming.SingleVisual(root: Instance): MeshPart?
     local found: MeshPart? = nil
     for _, item in ipairs(root:GetDescendants()) do
-        if item:IsA("MeshPart") and not Physics.IsCollider(item.Name)
+        if item:IsA("MeshPart") and not Carrier.IsCarrier(item) and not Physics.IsCollider(item.Name)
             and item:GetAttribute("Game1DecoPhysicsOnly") ~= true then
             if found then return nil end
             found = item
@@ -4651,7 +4720,8 @@ return Naming
       <Item class="ModuleScript" referent="24">
         <Properties>
           <string name="Name">StudioLocationPlacedGeometry</string>
-          <string name="Source"><![CDATA[-- Location-only geometry placement policy, shared by row Sync and Place Registry.
+          <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
+-- Location-only geometry placement policy, shared by row Sync and Place Registry.
 -- The transaction itself belongs to StudioManagedRigSwap (also used by Estate).
 -- Preserve manual per-part Size/CFrame on simple, unrigged published revisions;
 -- fail closed for changed multipart/skinned geometry instead of losing edits.
@@ -4662,7 +4732,7 @@ local Geometry = {}
 local function visuals(model: Model): {MeshPart}
     local result = {}
     for _, descendant in ipairs(model:GetDescendants()) do
-        if descendant:IsA("MeshPart") and not Physics.IsCollider(descendant.Name)
+        if descendant:IsA("MeshPart") and not Carrier.IsCarrier(descendant) and not Physics.IsCollider(descendant.Name)
             and descendant:GetAttribute("Game1DecoPhysicsOnly") ~= true then
             table.insert(result, descendant)
         end
@@ -4687,6 +4757,12 @@ end
 
 local function sameSize(a: Vector3, b: Vector3): boolean
     return (a - b).Magnitude < 0.025
+end
+
+local function sameFrame(a: CFrame, b: CFrame): boolean
+    return (a.Position - b.Position).Magnitude <= 0.025
+        and a.LookVector:Dot(b.LookVector) >= 0.9999
+        and a.UpVector:Dot(b.UpVector) >= 0.9999
 end
 
 local function uniformRatio(target: Vector3, source: Vector3): number?
@@ -4722,8 +4798,8 @@ local function alignSingleVisualRig(stage: Model, placed: Model,
     for _, part in ipairs(stage:GetDescendants()) do
         if part:IsA("BasePart") then part.Anchored = target.Anchored end
     end
-    if not sameSize(source.Size, target.Size) or source.CFrame ~= target.CFrame
-        or source:GetPivot() ~= target:GetPivot() then
+    if not sameSize(source.Size, target.Size) or not sameFrame(source.CFrame, target.CFrame)
+        or not sameFrame(source:GetPivot(), target:GetPivot()) then
         error("не удалось сохранить uniform Scale/CFrame/PivotOffset rig; Place не изменён")
     end
     if placed.PrimaryPart == target then stage.PrimaryPart = source end
@@ -4805,8 +4881,8 @@ function Geometry.Align(stage: Model, previous: Model, placed: Model): BasePart?
         -- Keep the precise authored mesh pivot as well as its visible CFrame:
         -- a published FBX may have a different PivotOffset than the old version.
         source.PivotOffset = target.PivotOffset
-        if not sameSize(source.Size, target.Size) or source.CFrame ~= target.CFrame
-            or source:GetPivot() ~= target:GetPivot() then
+        if not sameSize(source.Size, target.Size) or not sameFrame(source.CFrame, target.CFrame)
+            or not sameFrame(source:GetPivot(), target:GetPivot()) then
             error("не удалось сохранить CFrame/Size/PivotOffset; Place не изменён")
         end
         if placed.PrimaryPart == target then stage.PrimaryPart = source end
@@ -4878,7 +4954,16 @@ local Owner = {}
 local SLUG = "Game1DecoAssetSlug"
 local INSTANCE = "Game1DecoInstanceId"
 
-function Owner.ForPart(workspace: Workspace, part: MeshPart, slug: string): Model?
+local function ownsSlug(value: any, slug: string, aliases: {string}?): boolean
+    if value == slug then return true end
+    for _, alias in ipairs(aliases or {}) do
+        if value == alias then return true end
+    end
+    return false
+end
+
+function Owner.ForPart(workspace: Workspace, part: MeshPart, slug: string,
+    aliases: {string}?): Model?
     if not part:IsDescendantOf(workspace) then return nil end
     local authoring = workspace:FindFirstChild("Game1Authoring")
     local camera = workspace.CurrentCamera
@@ -4890,7 +4975,7 @@ function Owner.ForPart(workspace: Workspace, part: MeshPart, slug: string): Mode
             or cursor:GetAttribute(INSTANCE) ~= nil) then
             -- Stop at the first claimed Model even if it belongs to another
             -- slug or lacks a valid ID. Never borrow an outer group's owner.
-            if cursor:GetAttribute(SLUG) == slug
+            if ownsSlug(cursor:GetAttribute(SLUG), slug, aliases)
                 and tostring(cursor:GetAttribute(INSTANCE) or "") ~= "" then
                 return cursor
             end
@@ -4995,6 +5080,363 @@ return table.freeze(Published)
         </Properties>
       </Item>
       <Item class="ModuleScript" referent="28">
+        <Properties>
+          <string name="Name">StudioLocationPublishedRigNormalize</string>
+          <string name="Source"><![CDATA[-- Location-only normalization of Roblox importer scaffolding on a FRESH,
+-- detached LoadAssetAsync clone. Never run this on a placed Model.
+local Normalize = {}
+
+local function closeFrame(a: CFrame, b: CFrame): boolean
+    return (a.Position - b.Position).Magnitude < 0.0001
+        and a.LookVector:Dot(b.LookVector) > 0.999999
+        and a.UpVector:Dot(b.UpVector) > 0.999999
+end
+
+function Normalize.Apply(model: Model, manifest: any): CFrame
+    if model.Parent ~= nil then
+        error("published Location normalization requires a detached Model")
+    end
+    local authoredPivot = model:GetPivot()
+    local roots = {}
+    for _, obj in ipairs(model:GetDescendants()) do
+        if obj.Name == "RootPart" then table.insert(roots, obj) end
+    end
+    if #roots == 0 then return authoredPivot end
+    if #roots ~= 1 or not roots[1]:IsA("Part") or roots[1].Parent ~= model then
+        error("published Location asset has an unsupported importer RootPart")
+    end
+    if type(manifest) ~= "table" or manifest.schemaVersion ~= 2
+        or manifest.rigKind ~= "skinned" or manifest.carrierName ~= "rig_carrier" then
+        error("importer RootPart normalization requires a skinned v2 manifest")
+    end
+    local root = roots[1] :: Part
+    if root.Transparency < 0.99 then
+        error("published Location RootPart is visible authored geometry")
+    end
+    local expected = {}
+    for _, row in ipairs(manifest.parts or {}) do
+        if type(row.name) ~= "string" or expected[row.name] ~= nil then
+            error("invalid Location manifest during importer normalization")
+        end
+        expected[row.name] = row.role
+    end
+    local hasCollider = false
+    for name, role in pairs(expected) do
+        if role == "collider" then
+            local collider = model:FindFirstChild(name)
+            hasCollider = collider ~= nil and collider:IsA("MeshPart")
+            if hasCollider then break end
+        end
+    end
+    -- Roblox import currently leaves CanCollide/CanQuery enabled on its
+    -- transparent assembly RootPart. Those flags are importer defaults, not
+    -- authored physics. Removal is safe only when the same immutable manifest
+    -- supplies a real collider that survives normalization and is configured
+    -- by StudioMeshPhysicsCore immediately after validation.
+    if not hasCollider then
+        error("published Location RootPart has no authored collider replacement")
+    end
+    local carrier = model:FindFirstChild("rig_carrier")
+    if not carrier or not carrier:IsA("MeshPart") or expected[carrier.Name] ~= "rig_carrier" then
+        error("importer RootPart has no authored rig_carrier target")
+    end
+    local rootBones = {}
+    for _, child in ipairs(root:GetChildren()) do
+        if child:IsA("Bone") then
+            table.insert(rootBones, child)
+        elseif not child:IsA("Motor6D") then
+            error("importer RootPart contains unsupported child: " .. child.ClassName)
+        end
+    end
+    local rootMotors = {}
+    for _, obj in ipairs(model:GetDescendants()) do
+        if obj:IsA("JointInstance") and (obj.Part0 == root or obj.Part1 == root) then
+            if not obj:IsA("Motor6D") then
+                error("importer RootPart contains unsupported joint: " .. obj.ClassName)
+            end
+            local other = if obj.Part0 == root then obj.Part1 else obj.Part0
+            if not other or not other:IsA("MeshPart") or not other:IsDescendantOf(model)
+                or expected[other.Name] == nil then
+                error("importer RootPart Motor6D has an unsafe endpoint")
+            end
+            table.insert(rootMotors, obj)
+        end
+    end
+    local partState = {}
+    for _, obj in ipairs(model:GetDescendants()) do
+        if obj:IsA("MeshPart") then
+            partState[obj] = {frame = obj.CFrame, size = obj.Size}
+        end
+    end
+    local boneState = {}
+    for _, bone in ipairs(rootBones) do
+        boneState[bone] = {world = bone.WorldCFrame, transform = bone.Transform}
+    end
+    if model.PrimaryPart == root then model.PrimaryPart = nil end
+    for _, motor in ipairs(rootMotors) do motor:Destroy() end
+    for _, bone in ipairs(rootBones) do
+        local state = boneState[bone]
+        bone.Parent = carrier
+        bone.CFrame = carrier.CFrame:ToObjectSpace(state.world)
+        bone.Transform = state.transform
+    end
+    root:Destroy()
+    if model.PrimaryPart == nil then model.WorldPivot = authoredPivot end
+    for part, state in pairs(partState) do
+        if part.Parent == nil or part.CFrame ~= state.frame or part.Size ~= state.size then
+            error("importer normalization changed published MeshPart transform")
+        end
+    end
+    for bone, state in pairs(boneState) do
+        if bone.Parent == nil or not closeFrame(bone.WorldCFrame, state.world)
+            or bone.Transform ~= state.transform then
+            error("importer normalization changed published Bone pose")
+        end
+    end
+    if not closeFrame(model:GetPivot(), authoredPivot) then
+        error("importer normalization changed published Model pivot")
+    end
+    return authoredPivot
+end
+
+return table.freeze(Normalize)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="29">
+        <Properties>
+          <string name="Name">StudioLocationRigCarrier</string>
+          <string name="Source"><![CDATA[-- Canonical Location-only rig carrier policy. Imported FBX mesh; never synthetic.
+-- Character and Real Estate have their own domain assembly rules.
+local Carrier = {}
+
+function Carrier.IsCarrier(part: Instance): boolean
+    return part:IsA("MeshPart") and part.Name == "rig_carrier"
+end
+
+function Carrier.IsVisual(part: MeshPart, physics: any): boolean
+    return not Carrier.IsCarrier(part)
+        and not physics.IsCollider(part.Name)
+        and part:GetAttribute("Game1DecoPhysicsOnly") ~= true
+end
+
+local function boneRows(root: Instance): {[string]: string}
+    local rows = {}
+    for _, obj in ipairs(root:GetDescendants()) do
+        if obj:IsA("Bone") then
+            if rows[obj.Name] ~= nil then
+                error("rig_carrier contains duplicate Bone: " .. obj.Name)
+            end
+            local parent = obj.Parent
+            rows[obj.Name] = if parent:IsA("Bone") then parent.Name else ""
+        end
+    end
+    return rows
+end
+
+-- Static Location: no skeleton and no carrier. Skinned Location: the only
+-- canonical Bone owner is one Blender-authored rig_carrier. Never synthesize it
+-- or reparent Bones into a visual MeshPart on a placed asset.
+local function isStaticManifest(manifest: any): boolean
+    return type(manifest) == "table" and manifest.rigKind == "static"
+        and manifest.carrierName == nil and type(manifest.bones) == "table"
+        and #manifest.bones == 0
+end
+
+function Carrier.HasAuthoredManifest(manifest: any): boolean
+    if type(manifest) ~= "table" or manifest.schemaVersion ~= 2
+        or type(manifest.parts) ~= "table" or type(manifest.bones) ~= "table"
+        or type(manifest.structuralHash) ~= "string" or #manifest.structuralHash ~= 64 then
+        return false
+    end
+    if isStaticManifest(manifest) then
+        for _, part in ipairs(manifest.parts) do
+            if part.role == "rig_carrier" or part.name == "rig_carrier" then return false end
+        end
+        return true
+    end
+    -- Older authored v2 manifests had no rigKind, but always contained Bones.
+    return (manifest.rigKind == nil or manifest.rigKind == "skinned")
+        and manifest.carrierName == "rig_carrier" and #manifest.bones > 0
+end
+
+function Carrier.IsCanonicalPublication(manifest: any, legacyStatic: boolean?): boolean
+    return Carrier.HasAuthoredManifest(manifest) or legacyStatic == true
+end
+
+local function validateStatic(model: Model)
+    local visuals = 0
+    for _, child in ipairs(model:GetDescendants()) do
+        if child:IsA("Motor6D") then
+            error("static Location publication unexpectedly contains Motor6D")
+        elseif child:IsA("Bone") then
+            error("static Location publication unexpectedly contains Bones")
+        elseif child.Name == "rig_carrier" then
+            error("static Location publication must not contain rig_carrier")
+        elseif child:IsA("MeshPart") and child.Name ~= "col_mesh"
+            and child.Name:sub(1, 4) ~= "col_" then
+            visuals += 1
+        end
+    end
+    if visuals == 0 then error("static Location publication has no visual MeshPart") end
+end
+
+-- Roblox may add a Motor6D assembly when it imports a multipart skinned FBX,
+-- even though the authored FBX contains only Meshes, an Armature and Bones.
+-- It is publication structure, not evidence of the legacy RootPart layout, if
+-- and only if both endpoints are manifest MeshParts inside this one Model.
+local function validateImporterMotors(model: Model, manifest: any,
+    expected: {[string]: string})
+    local pairsSeen = {}
+    local partCount = 0
+    for _ in pairs(expected) do partCount += 1 end
+    local motorCount = 0
+    for _, child in ipairs(model:GetDescendants()) do
+        if child:IsA("Motor6D") then
+            if isStaticManifest(manifest) then
+                error("static Location publication unexpectedly contains Motor6D")
+            end
+            local part0, part1 = child.Part0, child.Part1
+            if not part0 or not part1 or part0 == part1
+                or not part0:IsA("MeshPart") or not part1:IsA("MeshPart")
+                or not part0:IsDescendantOf(model) or not part1:IsDescendantOf(model)
+                or expected[part0.Name] == nil or expected[part1.Name] == nil then
+                error("published Location asset contains unsafe importer Motor6D: " .. child.Name)
+            end
+            local first, second = part0.Name, part1.Name
+            if second < first then first, second = second, first end
+            local key = first .. "\0" .. second
+            if pairsSeen[key] then
+                error("published Location asset contains duplicate importer Motor6D pair")
+            end
+            pairsSeen[key] = true
+            motorCount += 1
+        end
+    end
+    -- A valid imported assembly is a forest/tree over the published parts. A
+    -- cycle or parallel edge can constrain transforms unpredictably.
+    if motorCount >= partCount then
+        error("published Location asset contains cyclic importer Motor6D assembly")
+    end
+end
+
+function Carrier.Validate(model: Model, manifest: any, legacyStatic: boolean?): MeshPart?
+    if not Carrier.IsCanonicalPublication(manifest, legacyStatic) then
+        error("Location publication is missing its canonical FBX structure; republish if it has Bones")
+    end
+    for _, child in ipairs(model:GetDescendants()) do
+        if child.Name == "RootPart" then
+            error("published Location asset contains RootPart; republish FBX")
+        end
+    end
+    if legacyStatic == true and not Carrier.HasAuthoredManifest(manifest) then
+        validateStatic(model)
+        return nil
+    end
+    local static = isStaticManifest(manifest)
+    local actualCarrier: MeshPart? = nil
+    local expected, seen = {}, {}
+    for _, part in ipairs(manifest.parts) do
+        if type(part.name) ~= "string" or type(part.role) ~= "string"
+            or expected[part.name] ~= nil then
+            error("invalid/duplicate Location publication manifest role")
+        end
+        expected[part.name] = part.role
+    end
+    validateImporterMotors(model, manifest, expected)
+    for _, child in ipairs(model:GetDescendants()) do
+        if child:IsA("MeshPart") then
+            if seen[child.Name] then error("duplicate published Location MeshPart name") end
+            seen[child.Name] = true
+            local role = if Carrier.IsCarrier(child) then "rig_carrier"
+                elseif child.Name == "col_mesh" or child.Name:sub(1,4) == "col_" then "collider"
+                else "visual"
+            if expected[child.Name] ~= role then
+                error("published Location MeshPart role differs from authored manifest: " .. child.Name)
+            end
+            if Carrier.IsCarrier(child) then
+                if actualCarrier then error("multiple published rig_carrier MeshParts") end
+                if child.Parent ~= model then error("rig_carrier must be a direct child of Location Model") end
+                actualCarrier = child
+            end
+        end
+    end
+    for name in pairs(expected) do
+        if not seen[name] then error("published Location mesh missing: " .. name) end
+    end
+    if static then
+        if actualCarrier then error("static Location has an unexpected rig_carrier") end
+        validateStatic(model)
+        return nil
+    end
+    if not actualCarrier or not actualCarrier.MeshId:match("%d+$") then
+        error("published Location rig_carrier has no genuine MeshPart MeshId")
+    end
+    for _,obj in ipairs(model:GetDescendants()) do
+        if obj:IsA("Bone") and not obj:IsDescendantOf(actualCarrier) then
+            error("Bone outside published rig_carrier: " .. obj.Name)
+        end
+    end
+    local rows = boneRows(actualCarrier)
+    local count = 0
+    for _,bone in ipairs(manifest.bones) do
+        if type(bone.name) ~= "string" or rows[bone.name] ~= (bone.parent or "") then
+            error("published Bone hierarchy differs from authoring manifest: " .. tostring(bone.name))
+        end
+        count += 1
+    end
+    local actual = 0
+    for _ in pairs(rows) do actual += 1 end
+    if actual ~= count then error("published rig_carrier lost Bones on import") end
+    return actualCarrier
+end
+
+function Carrier.Diagnose(model: Model, manifest: any, legacyStatic: boolean?): string
+    if model:FindFirstChild("RootPart") then return "legacy_import_root" end
+    if not Carrier.IsCanonicalPublication(manifest, legacyStatic) then
+        return "manual_review_required"
+    end
+    local carrierCount = 0
+    local carrier: Instance? = nil
+    for _, obj in ipairs(model:GetDescendants()) do
+        if obj.Name == "rig_carrier" then
+            carrierCount += 1
+            carrier = obj
+        end
+    end
+    if carrierCount > 1 then return "multiple_rig_carriers" end
+    local static = isStaticManifest(manifest) or (legacyStatic == true and not Carrier.HasAuthoredManifest(manifest))
+    if static and carrierCount > 0 then return "invalid_rig_carrier" end
+    if not static and carrierCount == 0 then return "missing_rig_carrier" end
+    if not static and (not carrier or not carrier:IsA("MeshPart")) then return "invalid_rig_carrier" end
+    local ok, err = pcall(Carrier.Validate, model, manifest, legacyStatic)
+    if ok then return "current" end
+    local detail = tostring(err)
+    if detail:find("Bone", 1, true) then return "bone_manifest_mismatch" end
+    return "published_structure_mismatch"
+end
+
+function Carrier.Prepare(carrier: MeshPart)
+    if not Carrier.IsCarrier(carrier) or not carrier.MeshId:match("%d+$") then
+        error("synthetic or wrongly named Location rig_carrier forbidden")
+    end
+    carrier.Transparency = 1
+    carrier.CastShadow = false
+    carrier.CanCollide = false
+    carrier.CanTouch = false
+    carrier.CanQuery = false
+    carrier.Massless = true
+    carrier.TextureID = ""
+    local surface = carrier:FindFirstChildOfClass("SurfaceAppearance")
+    if surface then surface:Destroy() end
+    carrier:SetAttribute("Game1LocationRigCarrier", true)
+end
+
+return table.freeze(Carrier)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="30">
         <Properties>
           <string name="Name">StudioManagedRigSwap</string>
           <string name="Source"><![CDATA[-- Shared Studio mechanism for replacing AUTHORING-MANAGED child rigs while
@@ -5146,16 +5588,30 @@ function RigSwap.Commit(plan: any)
         end
         for _, child in ipairs(plan.incoming) do child.Parent = plan.root end
         if plan.newPrimary then
+            -- Replacing a placed PrimaryPart must not redefine the placed Model pivot.
+            -- Import revisions can give COL/visual/carrier different part pivots
+            -- and orientations. PivotOffset is metadata: rebase the NEW part
+            -- onto the saved root pivot without moving any MeshPart CFrame.
+            plan.newPrimary.PivotOffset = plan.newPrimary.CFrame:ToObjectSpace(plan.pivot)
             plan.root.PrimaryPart = plan.newPrimary
         elseif not plan.primary then
             -- WorldPivot is editor metadata; setting it does not move any part.
             -- Without this, Roblox auto-pivot may change when geometry changes.
             plan.root.WorldPivot = plan.pivot
         end
-        if not sameFrame(plan.root:GetPivot(), plan.pivot)
-            or math.abs(plan.root:GetScale() - plan.scale) > 0.000001
+        local actualPivot, actualScale = plan.root:GetPivot(), plan.root:GetScale()
+        if not sameFrame(actualPivot, plan.pivot)
+            or math.abs(actualScale - plan.scale) > 0.000001
             or plan.root.Parent ~= plan.parent then
-            error("placed root pivot, scale or parent changed; transaction rolled back")
+            local positionDelta = (actualPivot.Position - plan.pivot.Position).Magnitude
+            local details = string.format(
+                "placed root pivot, scale or parent changed; transaction rolled back "
+                .. "(position=%.6f look=%.6f up=%.6f scale=%.9f->%.9f parent=%s)",
+                positionDelta,
+                actualPivot.LookVector:Dot(plan.pivot.LookVector),
+                actualPivot.UpVector:Dot(plan.pivot.UpVector),
+                plan.scale, actualScale, tostring(plan.root.Parent == plan.parent))
+            error(details)
         end
     end)
     if not ok then
@@ -5176,7 +5632,7 @@ return table.freeze(RigSwap)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="29">
+      <Item class="ModuleScript" referent="31">
         <Properties>
           <string name="Name">StudioMarkerVisibility</string>
           <string name="Source"><![CDATA[-- Studio-only presentation toggle. No movement of markers, no metadata edits.
@@ -5320,7 +5776,7 @@ return table.freeze(Visibility)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="30">
+      <Item class="ModuleScript" referent="32">
         <Properties>
           <string name="Name">StudioMeshPhysicsCore</string>
           <string name="Source"><![CDATA[-- One Studio MeshPart physics writer shared by Real Estate and Location Assets.
@@ -5337,6 +5793,10 @@ function Core.IsCollider(name: string): boolean
     local lower = string.lower(name)
     return lower:sub(1, 4) == "col_" or lower:find("_col_", 1, true) ~= nil
         or lower:sub(-4) == "_col"
+end
+
+function Core.IsLocationCarrier(part: Instance): boolean
+    return part:IsA("MeshPart") and part.Name == "rig_carrier"
 end
 
 function Core.IsGlass(name: string): boolean
@@ -5393,7 +5853,7 @@ local function applyLocationModel(model: Model, allowedNames: {[string]: boolean
     end
     local affected = 0
     for _, mesh in ipairs(allParts) do
-        if allowedNames == nil or allowedNames[mesh.Name] == true then
+        if not Core.IsLocationCarrier(mesh) and (allowedNames == nil or allowedNames[mesh.Name] == true) then
             local collider, namedGlass = Core.IsCollider(mesh.Name), Core.IsGlass(mesh.Name)
             local raw = if typeof(meshOptions) == "table" then meshOptions[mesh.Name] else nil
             local explicit = typeof(raw) == "table"
@@ -5457,6 +5917,7 @@ function Core.ApplyLocationSurfaceMaterial(model: Model, surfaceKey: string?, ph
     end
     local changed = 0
     for _, mesh in ipairs(parts(model)) do
+        if Core.IsLocationCarrier(mesh) then continue end
         -- COL receives exactly the same semantic/physical material as visual parts,
         -- but continues to be invisible with its own Precise collision policy.
         local differs = mesh:GetAttribute("Game1LocationSurfaceMaterial") ~= key
@@ -5531,7 +5992,7 @@ return table.freeze(Core)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="31">
+      <Item class="ModuleScript" referent="33">
         <Properties>
           <string name="Name">StudioModelLoadCommands</string>
           <string name="Source"><![CDATA[-- Studio model-sync command: validates and imports Character, Monster/NPC and Weapon models.
@@ -6098,7 +6559,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="32">
+      <Item class="ModuleScript" referent="34">
         <Properties>
           <string name="Name">StudioPlaceRegistryCommands</string>
           <string name="Source"><![CDATA[-- M240: separate Studio Bridge controller, NOT an extension of DecoManager.
@@ -6214,14 +6675,16 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="33">
+      <Item class="ModuleScript" referent="35">
         <Properties>
           <string name="Name">StudioPlaceRegistryInventory</string>
-          <string name="Source"><![CDATA[-- M240: Registry-backed Location Assets ONLY. Scan is strictly read-only.
+          <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
+-- M240: Registry-backed Location Assets ONLY. Scan is strictly read-only.
 -- No Workspace classification by name/category; only immutable published Mesh IDs.
 local History = require(script.Parent.StudioPublishedMeshHistory)
 local Physics = require(script.Parent.StudioMeshPhysicsCore)
 local Published = require(script.Parent.StudioLocationPublishedGeometry)
+local CarrierRig = require(script.Parent.StudioLocationRigCarrier)
 local Inventory = {}
 
 local function id(uri: any): string
@@ -6229,7 +6692,7 @@ local function id(uri: any): string
 end
 
 local function visual(part: MeshPart): boolean
-    return not Physics.IsCollider(part.Name) and part:GetAttribute("Game1DecoPhysicsOnly") ~= true
+    return not Carrier.IsCarrier(part) and not Physics.IsCollider(part.Name) and part:GetAttribute("Game1DecoPhysicsOnly") ~= true
 end
 
 local function hasForeignOwner(obj: Instance): boolean
@@ -6276,7 +6739,9 @@ local function ensureVersions(catalog: any, service: any): ({any}, {any}, {strin
         table.insert(versions, {slug=item.slug,aliases=item.aliases or {},
             atlas=item.atlasAssetId,model=item.modelAssetId,
             sha=item.publishedSha,material=item.surfaceMaterial or "default",
-            physicalMaterial=item.robloxMaterial or "",alphaEnabled=item.alphaEnabled==true,models=published})
+            physicalMaterial=item.robloxMaterial or "",alphaEnabled=item.alphaEnabled==true,models=published,
+            rigManifest=item.rigManifest,legacyStaticPublication=item.legacyStaticPublication==true,
+            needsFbxInspection=item.needsFbxInspection==true})
     end
     return versions,inventory,warnings
 end
@@ -6465,7 +6930,7 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
         if eligible and entry.material~="default" then
             local physical=if entry.physicalMaterial~="" then Enum.Material[entry.physicalMaterial] else nil
             for _, candidatePart in ipairs(root and root:GetDescendants() or {part}) do
-                if candidatePart:IsA("MeshPart") then
+                if candidatePart:IsA("MeshPart") and not Carrier.IsCarrier(candidatePart) then
                     local different=candidatePart:GetAttribute("Game1LocationSurfaceMaterial")~=entry.material
                     if physical~=nil and candidatePart.Material~=physical then different=true end
                     if different then
@@ -6482,6 +6947,35 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
                     or child:GetAttribute("Game1DecoPhysicsOnly")==true) then colliders+=1 end
             end
         end
+        local structuralState = if root then CarrierRig.Diagnose(root,if eligible then entry.rigManifest else nil,
+            eligible and entry.legacyStaticPublication)
+            else "repair_required"
+        local hasImporterRoot = structuralState == "legacy_import_root"
+        -- A legacy imported RootPart is a defect of the FBX publication.
+        -- NEVER advertise an in-Place skeleton Repair for this state.
+        local needsInspection = eligible and entry.needsFbxInspection==true
+        local requiresRepublish = eligible and not needsInspection
+            and not CarrierRig.IsCanonicalPublication(entry.rigManifest,entry.legacyStaticPublication)
+        local needsReplacement = eligible and structuralState ~= "current"
+            and not requiresRepublish and not needsInspection
+        if eligible and structuralState == "legacy_import_root" then
+            if requiresRepublish then
+                warn("Импортный RootPart — требуется перепубликация FBX; атлас не меняется")
+            else
+                warn("Импортный RootPart в старом размещении — каноническая публикация уже есть; требуется обновление экземпляра, не Repair")
+            end
+        elseif needsInspection then
+            warn("Сначала Analyze saved FBX: отсутствует проверка наличия Bone; перепубликация пока не требуется")
+        elseif eligible and requiresRepublish then
+            warn("Структура FBX неканоническая ("..structuralState.."); требуется перепубликация FBX")
+        elseif eligible and structuralState ~= "current" then
+            if oldId~="" then
+                warn("Историческая структура подтверждена публикацией "..oldId
+                    .."; Sync заменит дочерний rig канонической Model: "..structuralState)
+            else
+                warn("Структура размещения не соответствует канонической публикации: "..structuralState)
+            end
+        end
         if not eligible then warn("Один Mesh ID встречается у нескольких Location Assets") end
         if not root then warn("Нет отдельной Model для этого экземпляра") end
         if eligible and Published.RequiresCollider(entry) and colliders==0 then warn("Нет обязательного COL-меша") end
@@ -6492,7 +6986,8 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
             oldId=""
             warn("Один Mesh ID встречается в нескольких версиях; геометрия требует ручной проверки")
         end
-        local meshNameMismatch=eligible and #visualParts==1 and visualParts[1].Name~=entry.slug
+        local meshNameMismatch=eligible and not entry.rigManifest and not entry.legacyStaticPublication
+            and #visualParts==1 and visualParts[1].Name~=entry.slug
         if meshNameMismatch then warn("Имя MeshPart не соответствует slug ассета") end
         local badName=false
         if eligible and root and root.Name~=entry.slug.."__"..tostring(root:GetAttribute("Game1DecoInstanceId") or ""):sub(1,8) then
@@ -6530,7 +7025,8 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
                 end
             end
         end
-        if oldClaim then warn("Исторический slug: "..claimed.." → "..entry.slug.."; требуется Repair") end
+        if oldClaim then warn("Исторический slug: "..claimed.." → "..entry.slug
+            .."; Sync мигрирует идентичность вместе с опубликованным rig") end
         if foreignClaim and provenForeignClaim then
             warn("Конфликт двух подтверждённых Location Assets; требуется ручная проверка")
         elseif foreignClaim then
@@ -6561,15 +7057,24 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
             modelAssetId=if eligible then oldId else "",meshId=original.meshId,
             textureId=original.textureId,expectedMeshId=if eligible then entry.model else "",
             expectedTextureId=if eligible then entry.atlas else "",colCount=colliders,
-            needsMesh=needsMesh,needsRig=needsRig,needsTexture=needsTexture,needsMaterial=needsMaterial,needsAlpha=needsAlpha,needsStructure=not root or badName or meshNameMismatch or assigned==""
+            needsMesh=needsMesh,needsRig=needsRig,needsTexture=needsTexture,needsMaterial=needsMaterial,needsAlpha=needsAlpha,needsStructure=structuralState ~= "current" or not root or badName or meshNameMismatch or assigned==""
                 or (root and root:GetAttribute("Game1DecoAssetSlug")~=entry.slug)
                 or (eligible and Published.RequiresCollider(entry) and colliders==0),
             duplicateId=false,ambiguous=not eligible or provenForeignClaim,
-            hasModel=root~=nil,canSync=eligible and not foreignClaim and root~=nil and assigned~=""
-                and claimed==entry.slug and (not needsMesh and not needsRig or oldId~="")
-                and not (Published.RequiresCollider(entry) and colliders==0),
+            -- Repair remains metadata-only. A verified old publication is
+            -- migrated by Sync through the shared whole-child-rig swap.
+            canRepair=eligible and structuralState == "current" and root~=nil
+                and not needsMesh and not needsRig,
+            requiresRepublish=requiresRepublish == true,
+            needsFbxInspection=needsInspection == true,
+            needsCanonicalReplacement=needsReplacement == true,
+            hasModel=root~=nil,structuralState=structuralState,canSync=eligible and not foreignClaim
+                and root~=nil and assigned~="" and (claimed==entry.slug or oldClaim)
+                and not requiresRepublish and not needsInspection
+                and (structuralState=="current" or (needsReplacement and oldId~=""))
+                and (not needsMesh and not needsRig or oldId~=""),
             status=if not eligible then "ambiguous" elseif needsMesh or needsRig or needsTexture or needsMaterial or needsAlpha
-                or not root or badName or meshNameMismatch or assigned==""
+                or structuralState ~= "current" or not root or badName or meshNameMismatch or assigned==""
                 or oldClaim or foreignClaim or (Published.RequiresCollider(entry) and colliders==0)
                 then "pending" else "current",
             issues=issues,hierarchy=fullHierarchy,transform={cframe={part.CFrame:GetComponents()},
@@ -6582,8 +7087,8 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
             rootParent=if root then root.Parent else nil,
             rootPivot=if root then root:GetPivot() else nil,
             rootPrimary=if root then root.PrimaryPart else nil,
-            row=row,entry=if eligible then entry else nil,
-            oldVersion=oldId,needsCol=eligible and Published.RequiresCollider(entry) and colliders==0,
+            row=row,entry=if eligible then entry else nil,structuralState=structuralState,
+            oldVersion=oldId,hasImporterRoot=hasImporterRoot,needsCol=eligible and Published.RequiresCollider(entry) and colliders==0,
             currentVisual=eligible and Published.VisualCurrent(entry,id(part.MeshId))}
     end
     for _,indexes in pairs(duplicateGroups) do
@@ -6631,319 +7136,132 @@ return Inventory
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="34">
+      <Item class="ModuleScript" referent="36">
         <Properties>
           <string name="Name">StudioPlaceRegistryRepair</string>
-          <string name="Source"><![CDATA[-- Studio-only explicit, undo-recorded migration of Location placements.
--- Hand-made grouping containers are retained; only matching visual parts get wrappers.
-local Physics = require(script.Parent.StudioMeshPhysicsCore)
-local MeshNames = require(script.Parent.StudioLocationMeshNames)
-local Published = require(script.Parent.StudioLocationPublishedGeometry)
-local History = require(script.Parent.StudioPublishedMeshHistory)
-local PlacementHistory = require(script.Parent.StudioLocationPlacementHistory)
+          <string name="Source"><![CDATA[-- Metadata-only Repair for canonical Location FBX placements.
+-- RootPart, missing carrier, Bones, visual/COL topology are publication issues;
+-- NEVER reconstruct them in Studio or disguise a copy as authored geometry.
 local Repair = {}
 
-local function safeForWrapper(part: MeshPart): boolean
-    -- Parenting parts with external attachments/joints changes their authoring
-    -- lifecycle; do not guess which other system owns such connections.
-    -- PrimaryPart is allowed: after wrapping, the MeshPart is still a
-    -- descendant of its grouping Model. Preserve and verify that anchor in
-    -- the wrapping transaction instead of silently skipping the placement.
-    for _, child in ipairs(part:GetDescendants()) do
-        if child:IsA("JointInstance") or child:IsA("Constraint") then return false end
-    end
-    return true
-end
+local ATTRIBUTES = {
+    "Game1DecoInstanceId", "Game1DecoAssetSlug", "Game1DecoRegistryModelAssetId",
+    "Game1DecoPublishedModelAssetId", "Game1DecoPublishedModelSha256",
+}
 
 local function assignedId(http: any): string
     return http:GenerateGUID(false)
 end
 
-local function rename(root: Model, slug: string, placementId: string)
-    root.Name=slug.."__"..placementId:sub(1,8)
+local function originalState(model: Model): any
+    local attrs = {}
+    for _, name in ipairs(ATTRIBUTES) do attrs[name] = model:GetAttribute(name) end
+    return {name = model.Name, attributes = attrs, pivot = model:GetPivot(),
+        primary = model.PrimaryPart, parent = model.Parent}
 end
 
-local function restoreCol(ref: any, template: any)
-    if not ref.root or not ref.needsCol then return nil end
-    -- A new publication can add COL without changing the visual MeshId.
-    -- Repair that additive difference without swapping the old visible rig.
-    if not ref.currentVisual or #ref.visuals ~= 1 then
-        error("COL требует полного обновления визуальной геометрии; отдельный Repair невозможен")
+local function restore(model: Model, state: any)
+    if model.Parent ~= state.parent then error("Repair rollback lost Location Model") end
+    model.Name = state.name
+    for _, name in ipairs(ATTRIBUTES) do
+        model:SetAttribute(name, state.attributes[name])
     end
-    local sourceVisual: MeshPart?=nil
-    local sourceCol: MeshPart?=nil
-    for _, child in ipairs(template:GetDescendants()) do
-        if child:IsA("MeshPart") then
-            if Physics.IsCollider(child.Name) or child:GetAttribute("Game1DecoPhysicsOnly")==true then
-                if sourceCol then error("more than one collider; manual repair required") end
-                sourceCol=child
-            else
-                if sourceVisual then error("multi-part rig requires manual collider repair") end
-                sourceVisual=child
-            end
-        end
-    end
-    if not sourceVisual or not sourceCol then
-        error("нет однозначной опубликованной пары visual + COL")
-    end
-    if History.Id(sourceVisual.MeshId) ~= History.Id(ref.part.MeshId) then
-        error("визуальный Mesh ID отличается: добавление COL без полного Sync запрещено")
-    end
-    if not ref.part.Anchored then
-        error("незакреплённый visual MeshPart: нельзя добавить отдельный COL без проверки соединений")
-    end
-    -- Bones and visual-only effects are allowed and are preserved in Place.
-    -- FBX import can put a Motor6D *inside* COL whose other endpoint is an
-    -- importer-only RootPart. The placed collider is anchored and receives an
-    -- explicit world CFrame below, so that local connector is neither needed
-    -- nor safe to retain. A connector owned elsewhere in the rig is different:
-    -- cloning COL alone would silently change another subtree, so fail closed.
-    for _, child in ipairs(template:GetDescendants()) do
-        local linked = false
-        if child:IsA("JointInstance") or child:IsA("WeldConstraint") then
-            linked = child.Part0 == sourceCol or child.Part1 == sourceCol
-        elseif child:IsA("Constraint") then
-            linked = (child.Attachment0 ~= nil and child.Attachment0:IsDescendantOf(sourceCol))
-                or (child.Attachment1 ~= nil and child.Attachment1:IsDescendantOf(sourceCol))
-        end
-        if linked and not child:IsDescendantOf(sourceCol) then
-            error("опубликованный COL связан с другими частями rig; требуется проверка полного Sync")
-        end
-    end
-    local part=ref.part
-    local ratio=Vector3.new(part.Size.X/sourceVisual.Size.X,
-        part.Size.Y/sourceVisual.Size.Y,part.Size.Z/sourceVisual.Size.Z)
-    if ratio.X~=ratio.X or ratio.Y~=ratio.Y or ratio.Z~=ratio.Z
-        or ratio.X<0.001 or ratio.Y<0.001 or ratio.Z<0.001
-        or ratio.X>1000 or ratio.Y>1000 or ratio.Z>1000 then
-        error("недопустимый масштаб для восстановления COL")
-    end
-    local relative=sourceVisual.CFrame:ToObjectSpace(sourceCol.CFrame)
-    local col=sourceCol:Clone()
-    local ok,reason=pcall(function()
-        -- Do not leave cloned Motor6D/constraints pointing at the temporary
-        -- published Model. Attachments/Bones and other collider-owned metadata
-        -- remain intact; only mechanisms that cannot operate independently are
-        -- removed from this explicitly anchored additive collider.
-        for _, child in ipairs(col:GetDescendants()) do
-            if child:IsA("JointInstance") or child:IsA("Constraint") then
-                child:Destroy()
-            end
-        end
-        local point=relative.Position
-        col.CFrame=part.CFrame * CFrame.new(point.X*ratio.X,point.Y*ratio.Y,point.Z*ratio.Z) * relative.Rotation
-        col.Size=Vector3.new(sourceCol.Size.X*ratio.X,sourceCol.Size.Y*ratio.Y,sourceCol.Size.Z*ratio.Z)
-        col.Anchored=part.Anchored
-        Physics.Apply(col,true,"PreciseConvexDecomposition",false)
-        col.Transparency=1
-        col.CastShadow=false
-        col.TextureID=""
-        local appearance=col:FindFirstChildOfClass("SurfaceAppearance")
-        if appearance then appearance:Destroy() end
-        col:SetAttribute("Game1DecoPhysicsOnly",true)
-        local pivot=ref.root:GetPivot()
-        col.Parent=ref.root
-        if ref.root.PrimaryPart==nil then ref.root.WorldPivot=pivot end
-        if ref.root:GetPivot()~=pivot then
-            error("восстановление COL изменило pivot размещённой Model")
-        end
-    end)
-    if not ok then
-        col:Destroy()
-        error(tostring(reason))
-    end
-    return col
 end
 
 function Repair.Apply(refs: {any}, ctx: any): any
-    local eligible,blocked={},{}
-    local allIds={}
-    local originals=ctx.allRefs or refs
-    -- Scan order is deterministic. Keep one existing copy's ID; fix the rest.
+    local blocked, eligible, allIds, kept = {}, {}, {}, {}
+    local originals = ctx.allRefs or refs
     for _, ref in ipairs(originals) do
-        local key=ref.row.placementId
-        if key~="" then allIds[key]=(allIds[key] or 0)+1 end
-    end
-    local kept={}
-    for _, ref in ipairs(originals) do
-        local key=ref.row.placementId
-        if key~="" and not kept[key] then kept[key]=ref end
+        local pid = ref.row.placementId
+        if pid ~= "" then
+            allIds[pid] = (allIds[pid] or 0) + 1
+            if not kept[pid] then kept[pid] = ref end
+        end
     end
     for _, ref in ipairs(refs) do
         if ref.row.ambiguous then
-            table.insert(blocked,ref.row.key..": неоднозначное происхождение")
-        elseif ref.needsCol and ref.oldVersion=="" then
-            table.insert(blocked,ref.row.key..": невозможно подтвердить предыдущую Model-публикацию; COL Repair запрещён")
+            table.insert(blocked, ref.row.key .. ": неоднозначное происхождение")
+        elseif ref.structuralState == "legacy_import_root" then
+            table.insert(blocked, ref.row.key .. ": Импортный RootPart — требуется перепубликация FBX; Repair запрещён")
+        elseif ref.structuralState ~= "current" then
+            table.insert(blocked, ref.row.key .. ": неканонический rig " .. tostring(ref.structuralState)
+                .. "; требуется перепубликация FBX, не Repair")
+        elseif not ref.root or ref.root.Parent == nil then
+            table.insert(blocked, ref.row.key .. ": нет подтверждённой Model, требуется публикация FBX")
+        elseif ref.needsCol or ref.row.needsRig or ref.row.needsMesh then
+            table.insert(blocked, ref.row.key .. ": изменение геометрии выполняется из опубликованной Model, не через Repair")
         elseif not ref.row.needsStructure and not ref.row.duplicateId then
-            table.insert(blocked,ref.row.key..": структура уже актуальна; Repair не нужен")
-        elseif not ref.root and not safeForWrapper(ref.part) then
-            table.insert(blocked,ref.row.key..": связи меша запрещают изменение родителя")
+            table.insert(blocked, ref.row.key .. ": метаданные уже актуальны")
         else
-            table.insert(eligible,ref)
+            table.insert(eligible, ref)
         end
     end
-    if #eligible==0 then
-        return {changed=0,skipped=blocked,
-            note=if #blocked>0 then "Repair не изменил Place: причины пропуска в журнале"
-                else "Нет подходящих размещений для Repair"}
+    if #eligible == 0 then
+        return {changed = 0, skipped = blocked,
+            note = "Repair не изменил Place; для RootPart требуется перепубликация FBX"}
     end
-    local recording=ctx.history:TryBeginRecording(ctx.recordingName,"Repair Location Place Registry")
-    if not recording then error("Studio Undo recording unavailable; Place unchanged") end
-    local undo={}
-    local changed=0
-    local collidersCreated=0
-    local loaded={}
-    local ok,problem=pcall(function()
-        for _,ref in ipairs(eligible) do
-            local part=ref.part
-            local parent=part.Parent
-            local originalCFrame=part.CFrame
-            local originalSize=part.Size
-            local root=ref.root
-            if not root then
-                local group=if parent:IsA("Model") then parent else nil
-                local groupPivot=if group then group:GetPivot() else nil
-                local groupWorldPivot=if group then group.WorldPivot else nil
-                local groupPrimary=if group then group.PrimaryPart else nil
-                root=Instance.new("Model")
-                root.Name="_Game1LocationRepairStaging"
-                -- Register rollback BEFORE parenting the wrapper and moving
-                -- the visual part. Even a failed assignment must roll back.
-                local wrapper=root
-                table.insert(undo,function()
-                    if part.Parent==wrapper then part.Parent=parent end
-                    wrapper:Destroy()
-                    if group then
-                        if groupPrimary then
-                            group.PrimaryPart=groupPrimary
-                        elseif groupWorldPivot then
-                            group.WorldPivot=groupWorldPivot
-                        end
-                    end
-                end)
-                root.Parent=parent
-                part.Parent=root
-                root.PrimaryPart=part
-                if group then
-                    if groupPrimary then
-                        -- Group PrimaryPart remains the SAME MeshPart, now a
-                        -- descendant through the newly created child Model.
-                        if group.PrimaryPart~=groupPrimary then
-                            group.PrimaryPart=groupPrimary
-                        end
-                    elseif groupPivot then
-                        -- Auto-pivot may change when a direct child is wrapped.
-                        group.WorldPivot=groupPivot
-                    end
-                    if group.PrimaryPart~=groupPrimary or group:GetPivot()~=groupPivot then
-                        error("grouping Model PrimaryPart/pivot changed during Repair")
-                    end
-                end
-                ref.root=root
+    local recording = ctx.history:TryBeginRecording(ctx.recordingName, "Repair Location Placement Identity")
+    if not recording then error("Studio Undo unavailable; Place unchanged") end
+    local undo = {}
+    local changed = 0
+    local ok, problem = pcall(function()
+        for _, ref in ipairs(eligible) do
+            local model = ref.root
+            local before = originalState(model)
+            if model:GetPivot() ~= ref.rootPivot or model.PrimaryPart ~= ref.rootPrimary then
+                error("Location placement changed after Scan; Place unchanged")
             end
-            local oldName=root.Name
-            local oldAttrs={}
-            for _,name in ipairs({"Game1DecoInstanceId","Game1DecoAssetSlug",
-                "Game1DecoRegistryModelAssetId","Game1DecoPublishedModelAssetId",
-                "Game1DecoPublishedModelSha256","Game1DecoSyncHistory"}) do oldAttrs[name]=root:GetAttribute(name) end
-            table.insert(undo,function()
-                if root.Parent~=nil then
-                    root.Name=oldName
-                    for name,value in pairs(oldAttrs) do root:SetAttribute(name,value) end
-                    for _,name in ipairs({"Game1DecoInstanceId","Game1DecoAssetSlug",
-                        "Game1DecoRegistryModelAssetId","Game1DecoPublishedModelAssetId",
-                        "Game1DecoPublishedModelSha256","Game1DecoSyncHistory"}) do
-                        if oldAttrs[name]==nil then root:SetAttribute(name,nil) end
-                    end
-                end
-            end)
-            local pid=ref.row.placementId
-            if pid=="" or (allIds[pid] or 0)>1 and kept[pid]~=ref then
-                pid=assignedId(ctx.http)
+            table.insert(undo, function() restore(model, before) end)
+            local pid = ref.row.placementId
+            if pid == "" or ((allIds[pid] or 0) > 1 and kept[pid] ~= ref) then
+                pid = assignedId(ctx.http)
             end
-            root:SetAttribute("Game1DecoInstanceId",pid)
-            root:SetAttribute("Game1DecoAssetSlug",ref.entry.slug)
-            root:SetAttribute("Game1DecoRegistryModelAssetId",ref.entry.model)
-            -- The copied model may carry metadata from a DIFFERENT asset.
-            -- The confirmed complete published Mesh ID inventory takes
-            -- precedence during explicit Repair. Never keep a false old Model
-            -- ID: downstream geometry Sync would load the wrong source rig.
-            if ref.oldVersion~="" then
-                root:SetAttribute("Game1DecoPublishedModelAssetId",ref.oldVersion)
+            local updates = {
+                Game1DecoInstanceId = pid,
+                Game1DecoAssetSlug = ref.entry.slug,
+                Game1DecoRegistryModelAssetId = ref.entry.model,
+                -- Current v2 geometry is already validated by Inventory.
+                Game1DecoPublishedModelAssetId = ref.entry.model,
+                Game1DecoPublishedModelSha256 = ref.entry.sha,
+            }
+            local newName = ref.entry.slug .. "__" .. pid:sub(1, 8)
+            local dirty = model.Name ~= newName
+            for key, value in pairs(updates) do
+                if model:GetAttribute(key) ~= value then dirty = true end
             end
-            if ref.oldVersion==ref.entry.model and ref.entry.sha~="" then
-                root:SetAttribute("Game1DecoPublishedModelSha256",ref.entry.sha)
-            else
-                root:SetAttribute("Game1DecoPublishedModelSha256",nil)
+            if dirty then
+                model.Name = newName
+                for key, value in pairs(updates) do model:SetAttribute(key, value) end
+                changed += 1
             end
-            rename(root,ref.entry.slug,pid)
-            -- A single visual MeshPart has the same public name as its Location
-            -- Asset, without a unique suffix. Keep COL_* and multi-part authoring
-            -- names intact: they encode physics and rig topology.
-            local renamedPart, oldPartName = MeshNames.Normalize(root, ref.entry.slug)
-            if renamedPart then
-                table.insert(undo,function()
-                    if renamedPart.Parent~=nil then renamedPart.Name=oldPartName end
-                end)
+            if model:GetPivot() ~= before.pivot or model.PrimaryPart ~= before.primary
+                or model.Parent ~= before.parent then
+                error("Repair changed Model pivot/PrimaryPart/parent; rolling back")
             end
-            if part.CFrame~=originalCFrame or part.Size~=originalSize then
-                error("Repair changed existing geometry transform; rolling back")
-            end
-            -- Repair must also fix additive published collider changes when the
-            -- visual MeshId is unchanged between Model publications.
-            if ref.needsCol then
-                local template=loaded[ref.entry.slug]
-                if not template then
-                    template=ctx.loader:loadForMeshInventory(ref.entry.model,ref.entry.slug)
-                    loaded[ref.entry.slug]=template
-                end
-                local beforeMeshes=History.Describe(ref.oldVersion,root).meshes
-                local made=restoreCol(ref,template)
-                if made then
-                    table.insert(undo,function() made:Destroy() end)
-                    collidersCreated+=1
-                    -- Both the previously published single visual and the
-                    -- restored COL now match the CURRENT published Mesh inventory.
-                    -- Never stamp the latest version without this verification.
-                    if not Published.CurrentShape(ref.entry,root) then
-                        error("восстановленный COL не соответствует актуальному опубликованному rig")
-                    end
-                    local beforePhysics=Physics.CaptureLocationModel(root,{[part.Name]=true})
-                    table.insert(undo,function() Physics.RestoreLocationModel(beforePhysics) end)
-                    Physics.Apply(part,false,"Box",part.DoubleSided)
-                    root:SetAttribute("Game1DecoPublishedModelAssetId",ref.entry.model)
-                    root:SetAttribute("Game1DecoPublishedModelSha256",ref.entry.sha)
-                    PlacementHistory.Append(root,ctx.http,ref.entry.slug,{{
-                        kind=if ref.oldVersion==ref.entry.model then "collider_restore" else "model",
-                        oldId=ref.oldVersion,newId=ref.entry.model,count=1}},
-                        beforeMeshes,History.Describe(ref.entry.model,root).meshes)
-                end
-            end
-            changed+=1
         end
     end)
-    -- Destroy staged published references on both success AND failure. They
-    -- must never leak across repeated Studio Repair attempts.
-    for _,template in pairs(loaded) do pcall(function() template:Destroy() end) end
     if not ok then
-        for i=#undo,1,-1 do pcall(undo[i]) end
-        ctx.history:FinishRecording(recording,Enum.FinishRecordingOperation.Cancel)
-        error("Repair отменён: "..tostring(problem))
+        for i = #undo, 1, -1 do pcall(undo[i]) end
+        ctx.history:FinishRecording(recording, Enum.FinishRecordingOperation.Cancel)
+        error("Repair отменён: " .. tostring(problem))
     end
-    ctx.history:FinishRecording(recording,Enum.FinishRecordingOperation.Commit)
-    return {changed=changed,collidersCreated=collidersCreated,skipped=blocked,undo=true,
-        note="Repair обновил структуру/ID и восстановил COL: "..tostring(collidersCreated)
-            .."; перед Sync требуется новый Scan"}
+    ctx.history:FinishRecording(recording,
+        if changed > 0 then Enum.FinishRecordingOperation.Commit
+        else Enum.FinishRecordingOperation.Cancel)
+    return {changed = changed, skipped = blocked, undo = changed > 0,
+        note = if changed > 0 then "Исправлены только идентификаторы/имена канонических моделей"
+            else "Метаданные уже актуальны; Place не изменён"}
 end
 
 return Repair
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="35">
+      <Item class="ModuleScript" referent="37">
         <Properties>
           <string name="Name">StudioPlaceRegistrySync</string>
-          <string name="Source"><![CDATA[-- Explicit Place Registry sync. Uses THE SAME StudioManagedRigSwap as Real Estate.
+          <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
+-- Explicit Place Registry sync. Uses THE SAME StudioManagedRigSwap as Real Estate.
 -- A manually grouped Model is never the swap target; each verified placement
 -- is a separate Model. No general ApplyMesh or MeshId writes.
 local RigSwap=require(script.Parent.StudioManagedRigSwap)
@@ -6957,7 +7275,7 @@ local Sync={}
 local function visuals(root: Instance): {MeshPart}
     local out={}
     for _,child in ipairs(root:GetDescendants()) do
-        if child:IsA("MeshPart") and not Physics.IsCollider(child.Name)
+        if child:IsA("MeshPart") and not Carrier.IsCarrier(child) and not Physics.IsCollider(child.Name)
             and child:GetAttribute("Game1DecoPhysicsOnly")~=true then table.insert(out,child) end
     end
     return out
@@ -6980,7 +7298,7 @@ local function stageRig(ref: any, ctx: any): any
     if ref.oldVersion=="" then error("historical publication not unique") end
     local publishedRow={slug=ref.entry.slug,status="PUBLISHED",
         model_asset_id=ref.entry.model,texture_asset_id=ref.entry.atlas,
-        surfaceMaterial=ref.entry.material,robloxMaterial=ref.entry.physicalMaterial,alphaEnabled=ref.entry.alphaEnabled}
+        surfaceMaterial=ref.entry.material,robloxMaterial=ref.entry.physicalMaterial,alphaEnabled=ref.entry.alphaEnabled,rigManifest=ref.entry.rigManifest}
     local stage=ctx.loader:loadPublished(publishedRow)
     local previous=ctx.loader:loadForMeshInventory(ref.oldVersion,ref.entry.slug)
     local good,result=pcall(function()
@@ -6996,6 +7314,8 @@ local function stageRig(ref: any, ctx: any): any
         priorId=root:GetAttribute("Game1DecoPublishedModelAssetId"),
         priorSha=root:GetAttribute("Game1DecoPublishedModelSha256"),
         priorRegistry=root:GetAttribute("Game1DecoRegistryModelAssetId"),
+        priorSlug=root:GetAttribute("Game1DecoAssetSlug"),
+        priorName=root.Name,
         priorHistory=root:GetAttribute("Game1DecoSyncHistory")}
 end
 
@@ -7043,6 +7363,9 @@ function Sync.Apply(refs: {any}, ctx: any): any
             table.insert(committed,item)
             if item.swap then
                 RigSwap.Commit(item.swap)
+                root:SetAttribute("Game1DecoAssetSlug",ref.entry.slug)
+                local instanceId=tostring(root:GetAttribute("Game1DecoInstanceId") or "")
+                if instanceId~="" then root.Name=ref.entry.slug.."__"..instanceId:sub(1,8) end
                 root:SetAttribute("Game1DecoPublishedModelAssetId",ref.entry.model)
                 root:SetAttribute("Game1DecoRegistryModelAssetId",ref.entry.model)
                 root:SetAttribute("Game1DecoPublishedModelSha256",ref.entry.sha)
@@ -7098,6 +7421,8 @@ function Sync.Apply(refs: {any}, ctx: any): any
                     item.ref.root:SetAttribute("Game1DecoPublishedModelAssetId",item.priorId)
                     item.ref.root:SetAttribute("Game1DecoPublishedModelSha256",item.priorSha)
                     item.ref.root:SetAttribute("Game1DecoRegistryModelAssetId",item.priorRegistry)
+                    item.ref.root:SetAttribute("Game1DecoAssetSlug",item.priorSlug)
+                    item.ref.root.Name=item.priorName
                 else
                     for _,change in ipairs(item.appearance) do
                         Texture.Restore(change)
@@ -7128,7 +7453,7 @@ return Sync
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="36">
+      <Item class="ModuleScript" referent="38">
         <Properties>
           <string name="Name">StudioPlotsCatalog</string>
           <string name="Source"><![CDATA[-- Read-only discovery contract for authored Workspace.Plots/01..50.
@@ -7190,7 +7515,7 @@ return table.freeze(Catalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="37">
+      <Item class="ModuleScript" referent="39">
         <Properties>
           <string name="Name">StudioPlotsPartPolicy</string>
           <string name="Source"><![CDATA[-- Reversible, Studio-only properties for Plots visibility and playtest preview.
@@ -7275,7 +7600,7 @@ return table.freeze(Policy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="38">
+      <Item class="ModuleScript" referent="40">
         <Properties>
           <string name="Name">StudioPlotsSelectionFilter</string>
           <string name="Source"><![CDATA[-- Studio viewport hit-test filter for hidden Plots authoring geometry.
@@ -7365,7 +7690,7 @@ return table.freeze(Filter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="39">
+      <Item class="ModuleScript" referent="41">
         <Properties>
           <string name="Name">StudioPlotsVisibility</string>
           <string name="Source"><![CDATA[-- Studio-only Plots preview: hidden -> volumes -> volumes + numbers -> hidden.
@@ -7659,10 +7984,11 @@ return table.freeze(PlotsVisibility)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="40">
+      <Item class="ModuleScript" referent="42">
         <Properties>
           <string name="Name">StudioPublishedMeshHistory</string>
-          <string name="Source"><![CDATA[-- ID provenance of published Model assets. Real Estate and Location Assets
+          <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
+-- ID provenance of published Model assets. Real Estate and Location Assets
 -- both keep StudioManagedRigSwap as the sole child-rig transaction.
 local MeshPhysics = require(script.Parent.StudioMeshPhysicsCore)
 local Ownership = require(script.Parent.StudioLocationPlacementOwner)
@@ -7686,7 +8012,7 @@ function Inventory.Describe(modelId: string, model: Model): any
         local mid = Inventory.Id(part.MeshId)
         if mid ~= "" then
             counts[mid] = (counts[mid] or 0) + 1
-            if not MeshPhysics.IsCollider(part.Name)
+            if not Carrier.IsCarrier(part) and not MeshPhysics.IsCollider(part.Name)
                 and part:GetAttribute("Game1DecoPhysicsOnly") ~= true then
                 visualNames[mid] = visualNames[mid] or {}
                 visualNames[mid][string.sub(part.Name,1,128)] = true
@@ -7756,7 +8082,11 @@ function Inventory.Provenance(placed: Model, oldPublished: Model): CFrame
     for mid, oldParts in pairs(older) do
         local placedParts = placedById[mid]
         if #oldParts==1 and placedParts and #placedParts==1 then
-            local candidate = placedParts[1]:GetPivot() * oldParts[1]:GetPivot():Inverse()
+            -- MeshPart.CFrame is the geometry frame. GetPivot includes PivotOffset,
+            -- which the managed-rig transaction may rebase to preserve the
+            -- placed Model pivot when a new PrimaryPart is installed. Never
+            -- mistake that metadata change for a changed authored transform.
+            local candidate = placedParts[1].CFrame * oldParts[1].CFrame:Inverse()
             if transform and not sameFrame(transform,candidate) then
                 error("historical Mesh IDs disagree on placed transform; no Place geometry modified")
             end
@@ -7952,11 +8282,15 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
     local camera=workspace.CurrentCamera
     local atlasId=tostring(row.texture_asset_id or "")
     for _, part in ipairs(workspace:GetDescendants()) do
-        if part:IsA("MeshPart") and (not authoring or not part:IsDescendantOf(authoring))
+        if part:IsA("MeshPart") and not Carrier.IsCarrier(part)
+            and (not authoring or not part:IsDescendantOf(authoring))
             and (not camera or not part:IsDescendantOf(camera)) then
             local meshId=Inventory.Id(part.MeshId)
             local old=previousIds[meshId]==true
-            local owner = Ownership.ForPart(workspace, part, slug)
+            -- A retained slug alias is the SAME registered asset identity.
+            -- Treat its nearest stamped root as one managed placement so a
+            -- two-part legacy rig is not rendered as two unrelated assets.
+            local owner = Ownership.ForPart(workspace, part, slug, row.aliases)
             local currentUnlinked = owner==nil and currentVisualIds[meshId]==true
                 and not MeshPhysics.IsCollider(part.Name)
                 and part:GetAttribute("Game1DecoPhysicsOnly") ~= true
@@ -7974,6 +8308,14 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
                 local alphaCurrent=not textureApplicable or (surface~=nil and
                     surface.AlphaMode==(if alphaEnabled then Enum.AlphaMode.Transparency else Enum.AlphaMode.Opaque))
                 local meshCurrent=currentIds[meshId]==true
+                -- Authored skeleton layout is validated independently of MeshId:
+                -- the visual Mesh ID may be unchanged across publications.
+                local rigState=if owner then Carrier.Diagnose(owner,row.rigManifest,row.legacyStaticPublication) else ""
+                local inspectionRequired=owner~=nil and row.needsFbxInspection==true
+                local republishRequired=owner~=nil and not inspectionRequired
+                    and not Carrier.IsCanonicalPublication(row.rigManifest,row.legacyStaticPublication)
+                local needsCanonicalReplacement=owner~=nil and rigState~="current"
+                    and not republishRequired and not inspectionRequired
                 local path=part:GetFullName()
                 local legacyRoot,legacyModelId=nil,nil
                 if old and not owner then
@@ -7996,7 +8338,10 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
                     meshCurrent=meshCurrent,textureCurrent=textureCurrent,
                     needsMesh=false,needsTexture=not textureCurrent,needsAlpha=not alphaCurrent,
                     alphaEnabled=alphaEnabled,alphaCurrent=alphaCurrent,
-                    currentUnlinked=currentUnlinked}
+                    currentUnlinked=currentUnlinked,
+                    rigState=rigState,republishRequired=republishRequired,
+                    needsFbxInspection=inspectionRequired,
+                    needsCanonicalReplacement=needsCanonicalReplacement}
                 table.insert(rows,entry)
                 partByKey[key]={part=part,root=owner,row=entry,
                     selectTarget=container}
@@ -8011,7 +8356,7 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
                         table.insert(roots,owner)
                         seenRoot[owner]=true
                     end
-                    if old or not meshCurrent
+                    if republishRequired or needsCanonicalReplacement or old or not meshCurrent
                         or tostring(owner:GetAttribute("Game1DecoPublishedModelAssetId") or "")~=newModelId
                         or tostring(owner:GetAttribute("Game1DecoPublishedModelSha256") or "")~=tostring(row.model_published_sha256 or "") then
                         geometryRoots[owner]=true
@@ -8051,7 +8396,7 @@ return table.freeze(Inventory)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="41">
+      <Item class="ModuleScript" referent="43">
         <Properties>
           <string name="Name">StudioRealEstateCollisionPolicy</string>
           <string name="Source"><![CDATA[-- Real Estate physics profile; shared MeshPhysicsCore writes MeshPart physics.
@@ -8160,7 +8505,7 @@ return table.freeze(Policy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="42">
+      <Item class="ModuleScript" referent="44">
         <Properties>
           <string name="Name">StudioRealEstateHouseFrame</string>
           <string name="Source"><![CDATA[-- Author-space transform for all Real Estate Studio sync paths.
@@ -8187,7 +8532,7 @@ return table.freeze(HouseFrame)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="43">
+      <Item class="ModuleScript" referent="45">
         <Properties>
           <string name="Name">StudioRealEstateModel</string>
           <string name="Source"><![CDATA[-- Studio assembly for any number of independent Real Estate MeshPart rigs.
@@ -8471,7 +8816,7 @@ return table.freeze(StudioRealEstateModel)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="44">
+      <Item class="ModuleScript" referent="46">
         <Properties>
           <string name="Name">StudioRealEstatePartPlacement</string>
           <string name="Source"><![CDATA[-- Restore source-FBX mesh centres after independent Model Asset import.
@@ -8595,7 +8940,7 @@ return table.freeze(Placement)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="45">
+      <Item class="ModuleScript" referent="47">
         <Properties>
           <string name="Name">StudioRealEstatePartSync</string>
           <string name="Source"><![CDATA[-- Atomic, single-rig refresh of a managed Real Estate template.
@@ -8829,7 +9174,7 @@ return table.freeze(PartSync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="46">
+      <Item class="ModuleScript" referent="48">
         <Properties>
           <string name="Name">StudioRealEstatePlacedCollisionSync</string>
           <string name="Source"><![CDATA[-- Repair *only* authoring-managed collision rigs of already placed Estates.
@@ -8904,7 +9249,7 @@ return table.freeze(Sync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="47">
+      <Item class="ModuleScript" referent="49">
         <Properties>
           <string name="Name">StudioRealEstatePlacedPhysicsGuard</string>
           <string name="Source"><![CDATA[-- Studio Edit Mode: normalize a managed Estate pasted or dragged from
@@ -8976,7 +9321,7 @@ return table.freeze(Guard)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="48">
+      <Item class="ModuleScript" referent="50">
         <Properties>
           <string name="Name">StudioRealEstatePlacedTargets</string>
           <string name="Source"><![CDATA[-- One authoritative definition of a placed Real Estate instance.
@@ -9021,7 +9366,7 @@ return table.freeze(Targets)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="49">
+      <Item class="ModuleScript" referent="51">
         <Properties>
           <string name="Name">StudioRealEstatePlacedVisualSync</string>
           <string name="Source"><![CDATA[-- Full Real Estate sync: refresh visual rigs on *all managed placed* houses.
@@ -9140,7 +9485,7 @@ return table.freeze(VisualSync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="50">
+      <Item class="ModuleScript" referent="52">
         <Properties>
           <string name="Name">StudioRealEstateRigValidation</string>
           <string name="Source"><![CDATA[-- Validate an already-published Real Estate Model Asset as actually loaded by Roblox.
@@ -9269,7 +9614,77 @@ return table.freeze(Validation)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="51">
+      <Item class="ModuleScript" referent="53">
+        <Properties>
+          <string name="Name">StudioSkinnedMeshConnection</string>
+          <string name="Source"><![CDATA[--!strict
+-- Shared skin/rigid-assembly connection used by Character and Studio Location.
+-- Roblox resolves skinned mesh Bone names across physically connected parts
+-- inside ONE Model. Authoring/importer joints remain authoritative: only add
+-- a Weld when no existing joint path connects this part to its Bone carrier.
+local Connection = {}
+
+local function inAssembly(part: BasePart, model: Model): boolean
+    return part:FindFirstAncestorOfClass("Model") == model
+end
+
+local function connected(model: Model, carrier: MeshPart, target: MeshPart): boolean
+    local neighbours: {[BasePart]: {BasePart}} = {}
+    for _, instance in ipairs(model:GetDescendants()) do
+        if instance:IsA("JointInstance") or instance:IsA("WeldConstraint") then
+            local a, b = instance.Part0, instance.Part1
+            if a == nil or b == nil or a == b or not inAssembly(a, model)
+                or not inAssembly(b, model) then
+                error("skinned assembly contains an invalid or external joint: " .. instance.Name)
+            end
+            if neighbours[a] == nil then neighbours[a] = {} end
+            if neighbours[b] == nil then neighbours[b] = {} end
+            table.insert(neighbours[a], b)
+            table.insert(neighbours[b], a)
+        end
+    end
+    local seen: {[BasePart]: boolean} = {[carrier] = true}
+    local queue: {BasePart} = {carrier}
+    local head = 1
+    while head <= #queue do
+        local part = queue[head]
+        head += 1
+        if part == target then return true end
+        for _, other in ipairs(neighbours[part] or {}) do
+            if not seen[other] then
+                seen[other] = true
+                table.insert(queue, other)
+            end
+        end
+    end
+    return false
+end
+
+-- The published/imported mesh retains its authored skin weights; this helper
+-- only supplies the assembly path to the already authored canonical Bones.
+-- It neither copies Bones nor changes CFrames, collision flags or anchors.
+function Connection.Connect(model: Model, carrier: MeshPart, mesh: MeshPart, weldName: string): boolean
+    assert(model:IsA("Model") and carrier:IsA("MeshPart") and mesh:IsA("MeshPart"),
+        "skinned connection requires a Model and two MeshParts")
+    assert(carrier ~= mesh and inAssembly(carrier, model) and inAssembly(mesh, model),
+        "skinned mesh and carrier must belong to the same direct Model")
+    assert(type(weldName) == "string" and weldName ~= "", "missing skin weld name")
+    if connected(model, carrier, mesh) then return false end
+    local weld = Instance.new("Weld")
+    weld.Name = weldName
+    weld.Part0 = carrier
+    weld.Part1 = mesh
+    weld.C0 = carrier.CFrame:ToObjectSpace(mesh.CFrame)
+    weld.C1 = CFrame.identity
+    weld.Parent = mesh
+    return true
+end
+
+return table.freeze(Connection)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="54">
         <Properties>
           <string name="Name">StudioTextureAppearance</string>
           <string name="Source"><![CDATA[-- Shared Studio-side material binding for all authored MeshParts.
@@ -9426,7 +9841,7 @@ return table.freeze(StudioTextureAppearance)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="52">
+      <Item class="ModuleScript" referent="55">
         <Properties>
           <string name="Name">StudioTimelineEditorCommands</string>
           <string name="Source"><![CDATA[-- Timeline authoring session: validates requests, binds UI events and reports results.
@@ -9715,7 +10130,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="53">
+      <Item class="ModuleScript" referent="56">
         <Properties>
           <string name="Name">StudioTimelinePoseSampler</string>
           <string name="Source"><![CDATA[-- Offline pose extraction and interpolation for a preview rig. No UI or HTTP dependencies.
@@ -9894,7 +10309,7 @@ return table.freeze(StudioTimelinePoseSampler)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="54">
+      <Item class="ModuleScript" referent="57">
         <Properties>
           <string name="Name">StudioTimelinePreview</string>
           <string name="Source"><![CDATA[-- Owns the isolated ViewportFrame rig, camera interaction and animation-asset retrieval.
@@ -10110,7 +10525,7 @@ return table.freeze(StudioTimelinePreview)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="55">
+      <Item class="ModuleScript" referent="58">
         <Properties>
           <string name="Name">StudioTimelineTransport</string>
           <string name="Source"><![CDATA[-- HTTP boundary for the Timeline editor. No UI, animation or Studio model access.
@@ -10168,7 +10583,7 @@ return table.freeze(StudioTimelineTransport)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="56">
+      <Item class="ModuleScript" referent="59">
         <Properties>
           <string name="Name">StudioTimelineWidget</string>
           <string name="Source"><![CDATA[-- Timeline editor view. Builds the dock widget and exposes only its controls.

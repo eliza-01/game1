@@ -1,0 +1,208 @@
+{
+  "schemaVersion": 1,
+  "slug": "christmas_tree_01",
+  "sourceSha256": "fb1c7635d8e8530cad006c28186855b63ccc5242b72371902c570bebaeb38b0a",
+  "analysis": {
+    "schemaVersion": 1,
+    "meshes": [
+      {
+        "name": "christmas_tree_01",
+        "armature": "christmas_tree_01_armature",
+        "vertices": 1870,
+        "bones": [
+          {
+            "name": "Bone",
+            "parent": "",
+            "matrixLocal": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              -1.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          {
+            "name": "Bone.001",
+            "parent": "Bone",
+            "matrixLocal": [
+              1.0,
+              0.0,
+              2e-07,
+              0.0,
+              2e-07,
+              0.0,
+              -1.0,
+              0.0,
+              0.0,
+              0.9999999,
+              0.0,
+              4.7806559,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          {
+            "name": "Bone.002",
+            "parent": "Bone.001",
+            "matrixLocal": [
+              1.0,
+              0.0,
+              2e-07,
+              0.0,
+              2e-07,
+              0.0,
+              -1.0,
+              0.0,
+              0.0,
+              0.9999999,
+              0.0,
+              8.7243443,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          }
+        ],
+        "influencedBones": [
+          "Bone",
+          "Bone.001",
+          "Bone.002"
+        ],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": false,
+          "canQuery": false,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": "Box",
+          "physicsOnly": false
+        }
+      },
+      {
+        "name": "col_mesh",
+        "armature": "",
+        "vertices": 75,
+        "bones": [],
+        "influencedBones": [],
+        "role": "collider",
+        "physics": {
+          "role": "collider",
+          "canCollide": true,
+          "canQuery": true,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": "PreciseConvexDecomposition",
+          "physicsOnly": true
+        }
+      },
+      {
+        "name": "rig_carrier",
+        "armature": "christmas_tree_01_armature",
+        "vertices": 9,
+        "bones": [
+          {
+            "name": "Bone",
+            "parent": "",
+            "matrixLocal": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              -1.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          {
+            "name": "Bone.001",
+            "parent": "Bone",
+            "matrixLocal": [
+              1.0,
+              0.0,
+              2e-07,
+              0.0,
+              2e-07,
+              0.0,
+              -1.0,
+              0.0,
+              0.0,
+              0.9999999,
+              0.0,
+              4.7806559,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          {
+            "name": "Bone.002",
+            "parent": "Bone.001",
+            "matrixLocal": [
+              1.0,
+              0.0,
+              2e-07,
+              0.0,
+              2e-07,
+              0.0,
+              -1.0,
+              0.0,
+              0.0,
+              0.9999999,
+              0.0,
+              8.7243443,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          }
+        ],
+        "influencedBones": [
+          "Bone",
+          "Bone.001",
+          "Bone.002"
+        ],
+        "role": "carrier",
+        "physics": {
+          "role": "carrier",
+          "canCollide": false,
+          "canQuery": false,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": "Box",
+          "physicsOnly": true
+        }
+      }
+    ],
+    "hasCollider": true,
+    "armatures": [
+      "christmas_tree_01_armature"
+    ],
+    "unassignedArmatures": []
+  }
+}

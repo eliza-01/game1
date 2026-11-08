@@ -19,7 +19,7 @@ const rows = [
   {key:'p1',slug:'stone_fence',name:'old',canSync:true,needsMesh:true,needsTexture:false},
   {key:'p2',slug:'stone_fence',name:'blocked',canSync:false,needsMesh:true,needsTexture:true},
   {key:'p3',slug:'birch',name:'other',canSync:true,needsMesh:false,needsTexture:true},
-  {key:'p4',slug:'stone_fence',name:'repair only',canSync:false,needsStructure:true},
+  {key:'p4',slug:'stone_fence',name:'repair only',canSync:false,canRepair:true,needsStructure:true},
 ];
 const scans = () => ({studio:{placements:rows,summary:{placements:4,outdatedMesh:2,outdatedTexture:2,
   structure:1,duplicateIds:0,ambiguous:0},scanToken:'12345678-1234-1234-1234-123456789012',

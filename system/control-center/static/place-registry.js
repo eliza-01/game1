@@ -10,7 +10,7 @@
   const groups = () => (source.scan?.placements || []).reduce((acc,row) => {
     (acc[row.slug] ||= []).push(row);return acc;
   }, {});
-  const needsRepair = row => !row.ambiguous && (row.needsStructure || row.duplicateId);
+  const needsRepair = row => row.canRepair === true && !row.requiresRepublish && !row.ambiguous && (row.needsStructure || row.duplicateId);
   const needsSync = row => row.canSync && (row.needsMesh || row.needsRig || row.needsTexture || row.needsMaterial || row.needsAlpha);
 
   function buttons() {
@@ -19,7 +19,8 @@
       if (!button) continue;
       const write = name === 'pr-repair-all' || name === 'pr-sync-all';
       button.disabled = source.busy || (name !== 'pr-scan' && !active()) ||
-        (write && (source.scan?.incomplete || !byId('pr-backup').checked));
+        (write && (source.scan?.incomplete || !byId('pr-backup').checked ||
+          (name === 'pr-repair-all' && !(source.scan?.placements || []).some(needsRepair))));
     }
     for (const button of byId('pr-groups').querySelectorAll('button[data-pr-action]')) {
       const write = button.dataset.prAction !== 'select';

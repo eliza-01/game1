@@ -1,6 +1,9 @@
 local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
 local MeshPhysics = require(script.Parent.StudioMeshPhysicsCore)
 local MeshNames = require(script.Parent.StudioLocationMeshNames)
+local Carrier = require(script.Parent.StudioLocationRigCarrier)
+local SkinConnection = require(script.Parent.StudioSkinnedMeshConnection)
+local PublishedRigNormalize = require(script.Parent.StudioLocationPublishedRigNormalize)
 local DecoAssetLoader = {}
 DecoAssetLoader.__index = DecoAssetLoader
 
@@ -47,7 +50,10 @@ local function applyTexture(model: Model, textureAssetId: string, alphaEnabled: 
     local applied = 0
     for _, descendant in ipairs(model:GetDescendants()) do
         if descendant:IsA("MeshPart") then
-            if MeshPhysics.IsCollider(descendant.Name) or descendant:GetAttribute("Game1DecoPhysicsOnly")==true then
+            if Carrier.IsCarrier(descendant) then
+                -- Carrier is a real published mesh, never an Atlas consumer.
+                Carrier.Prepare(descendant)
+            elseif MeshPhysics.IsCollider(descendant.Name) or descendant:GetAttribute("Game1DecoPhysicsOnly")==true then
                 -- COL is physics-only. Strip old importer texture remnants from
                 -- the fresh clone; never assign Atlas IDs to collision geometry.
                 descendant.TextureID = ""
@@ -116,18 +122,52 @@ function DecoAssetLoader:loadPublished(row: any): Model
     local model = canonicalModel(loaded)
     model.Name = tostring(row.slug or "deco_asset")
     sanitize(model)
+    -- A static FBX has no Bones and must not acquire a carrier. Legacy static
+    -- publications are allowed only after SHA-bound source inspection, then
+    -- independently validated against the loaded Roblox Model.
+    -- LoadAssetAsync can wrap a valid Blender-authored carrier rig in an inert
+    -- RootPart + Motor6D assembly. Normalize only this detached fresh clone;
+    -- placed Models are replaced transactionally and are never edited in situ.
+    local authoredPivot = PublishedRigNormalize.Apply(model, row.rigManifest)
+    local carrier = Carrier.Validate(model, row.rigManifest, row.legacyStaticPublication)
+    if carrier then
+        Carrier.Prepare(carrier)
+        -- Roblox skinning finds Bones on connected MeshParts within one Model.
+        -- Importer Motor6Ds may already form a valid assembly; retain those.
+        -- RootPart normalization can also leave disconnected visual/COL parts.
+        -- Complete only missing paths on this detached clone, never on Place.
+        for _, part in ipairs(model:GetDescendants()) do
+            if part:IsA("MeshPart") and part ~= carrier then
+                local weldName = if MeshPhysics.IsCollider(part.Name) then "LocationRigWeld"
+                    else "LocationSkinWeld"
+                SkinConnection.Connect(model, carrier, part, weldName)
+            end
+        end
+        carrier.PivotOffset = carrier.CFrame:ToObjectSpace(authoredPivot)
+        model.PrimaryPart = carrier
+        if (model:GetPivot().Position-authoredPivot.Position).Magnitude>0.002 then
+            error("rig_carrier PrimaryPart changed the authored Model pivot")
+        end
+    end
     applyTexture(model, tostring(row.texture_asset_id or ""), row.alphaEnabled)
     MeshPhysics.ApplyLocationModel(model, nil, row.meshOptions)
     MeshPhysics.ApplyLocationSurfaceMaterial(model,row.surfaceMaterial,row.robloxMaterial or (row.materialDefinition and row.materialDefinition.robloxMaterial))
-    MeshNames.Normalize(model, tostring(row.slug or ""))
+    -- Version-2 authored names belong to the immutable publication manifest.
+    -- Renaming a visual to the current slug would silently invalidate it.
     return model
 end
 
 function DecoAssetLoader:loadForMeshInventory(modelId: string, slug: string): Model
     -- Geometry and Mesh ID inventory are read from immutable published Models.
     -- No separate image publication is performed.
-    return self:loadPublished({status="PUBLISHED",model_asset_id=modelId,
-        texture_asset_id="",slug=slug})
+    -- Only historical forensics: older immutable Model publications may have
+    -- RootPart and no carrier. No normalization or staging mutation is allowed.
+    local id = tonumber(modelId)
+    if not id or id <= 0 then error("invalid historical Model ID") end
+    local asset = self.AssetService:LoadAssetAsync(id)
+    local model = canonicalModel(asset)
+    model.Name = slug
+    return model
 end
 
 return DecoAssetLoader

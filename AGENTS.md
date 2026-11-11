@@ -369,3 +369,19 @@ require carrier for static Location assets. Blender entrypoints must explicitly
 import shared modules independent of working directory. Publication failures
 must remain visible and must not publish Atlas or modify placed instances.
 See `docs/workflows/LOCATION_CARRIER_BLENDER_SHARED_M260_RU.md`.
+
+## M280 · One authored Bone socket facing contract, solid face colors
+
+Every **directional** Blender Bone socket uses Tail -> Head as its facing
+axis: imported `-BoneFrame.UpVector`. An ordinary Attachment uses `LookVector`.
+All such transforms belong to `src/shared/world/SocketFacing.luau`, with
+`HouseSpawnOrientation.Upright` responsible only for avatar world-up projection.
+Do not copy raw Bone CFrame onto front-facing items or add per-asset 90°
+compensation. Hair builder/client share `FullFrame`, and compound extras remain
+root-local. Static locator-only sockets (smoke, handles) are not forced into a
+facing contract. See `docs/workflows/CHARACTER_BONE_SOCKET_AND_FACE_COLORS_M280_RU.md`.
+
+Character Assembly eye/brow slots are **solid-color**, with `face_colors` per
+side and no atlas picker/appearance. Shared CharacterColorBinder is the one
+runtime tint mechanism also used by compound hair. Armor and head atlas
+contracts remain unchanged. Never republish mesh/image assets just to tint.

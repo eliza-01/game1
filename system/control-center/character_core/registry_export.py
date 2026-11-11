@@ -3,42 +3,27 @@ from __future__ import annotations
 
 
 import json
-from character_core.archetype_contract import SCHEMA_VERSION, PROJECT, RACES, GENDERS
+from character_core.archetype_contract import SCHEMA_VERSION, PROJECT, RACES, GENDERS, DEFAULT_STATS
 
 class CharacterRegistryExportMixin:
     def runtime_selection(self):
-        active_id = self.active_id()
-        if not active_id:
-            return {"mode": "bootstrap", "activeArchetypeId": None, "reason": "no active archetype selected"}
-        row = self.get(active_id)
-        if not row:
-            return {"mode": "bootstrap", "activeArchetypeId": None, "reason": "active archetype is missing"}
-        if row.get('visual_mode') == 'assembly':
-            ready = bool(row.get('assembly_resolved', {}).get('ready'))
-            return dict(mode='assembled' if ready else 'bootstrap', activeArchetypeId=active_id,
-                        displayName=row['display_name'], race=row['race'], gender=row['gender'],
-                        reason='' if ready else 'assembly dependencies are not published')
-        asset_id = str(row.get("model_asset_id") or "").strip()
-        if not asset_id:
-            return {
-                "mode": "bootstrap",
-                "activeArchetypeId": active_id,
-                "reason": "active archetype has no published model asset id",
-            }
-        return {
-            "mode": "registered",
-            "activeArchetypeId": active_id,
-            "displayName": row["display_name"],
-            "race": row.get("race") or "",
-            "gender": row.get("gender") or "",
-            "modelAssetId": asset_id,
-        }
+        default_id = self.active_id()
+        admin_id = self.admin_id()
+        default = self.get(default_id) if default_id else None
+        admin = self.get(admin_id) if admin_id else None
+        return dict(mode='assembled' if default and default.get('assembly_resolved', {}).get('ready') else 'unconfigured',
+                    defaultArchetypeId=default_id, studioAdminArchetypeId=admin_id,
+                    defaultReady=bool(default and default.get('assembly_resolved', {}).get('ready')),
+                    adminReady=bool(admin and admin.get('assembly_resolved', {}).get('ready')),
+                    reason='' if default else 'register and set a default character assembly')
 
     def snapshot(self):
         return {
             "schemaVersion": SCHEMA_VERSION,
             "items": self.list(),
             "activeArchetypeId": self.active_id(),
+            "defaultArchetypeId": self.active_id(),
+            "studioAdminArchetypeId": self.admin_id(),
             "runtime": self.runtime_selection(),
             "options": self.options(),
         }
@@ -88,6 +73,8 @@ class CharacterRegistryExportMixin:
             "racePool": list(RACES),
             "genderPool": list(GENDERS),
             "activeArchetypeId": self.active_id(),
+            "defaultArchetypeId": self.active_id(),
+            "studioAdminArchetypeId": self.admin_id(),
             "archetypes": rows,
         }
         manifest = self.root / "assets/manifests/character-archetypes.json"
@@ -109,6 +96,8 @@ class CharacterRegistryExportMixin:
             f"\tschemaVersion = {SCHEMA_VERSION},",
             '\tproject = "game1",',
             f"\tactiveArchetypeId = {lua(self.active_id())},",
+            f"\tdefaultArchetypeId = {lua(self.active_id())},",
+            f"\tstudioAdminArchetypeId = {lua(self.admin_id())},",
             "\tarchetypes = {",
         ]
         for row in rows:

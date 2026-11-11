@@ -51,12 +51,17 @@ def check_character_manifest(
                 if identity in identities:
                     err(f"duplicate character identity: {race}/{gender}")
                 identities.add(identity)
-        if row.get('visualMode') == 'assembly':
+        if row.get('visualMode') != 'assembly':
+            err(f"character {row.get('id')} is not a v2 assembly; migrate legacy records")
+        else:
             assembly = row.get('assembly')
-            if not isinstance(assembly, dict) or assembly.get('schema_version') != 1:
-                err(f"character {row.get('id')} needs an assembly v1 recipe")
-            elif set(assembly.get('parts') or {}) != {'upper','lower','gloves','boots','head','eyes','eyebrows','hair'}:
-                err(f"character {row.get('id')} must select eight default parts")
+            if not isinstance(assembly, dict) or assembly.get('schema_version') != 2:
+                err(f"character {row.get('id')} needs an assembly v2 recipe")
+            elif assembly.get('ready'):
+                if 'head' not in (assembly.get('parts') or {}):
+                    err(f"character {row.get('id')} needs a head for a ready v2 assembly")
+                if not (assembly.get('rig') or {}).get('asset_id'):
+                    err(f"character {row.get('id')} needs a published rig")
         model = row.get("model")
         skeleton = row.get("skeleton")
         if not isinstance(model, dict):
@@ -98,12 +103,14 @@ def check_character_rig(
         err("registered character visual must ground-align from visible geometry, excluding RootPart")
     if 'VisualFootContactSource' not in rig_text or '"visible_geometry"' not in rig_text:
         err("character visual ground-contact diagnostics are missing")
-    if "row == nil" not in character_service_text:
-        err("runtime compatibility root must be allowed only for the bootstrap placeholder")
-    if "findRegisteredTemplate" not in character_service_text or '"characters"' not in character_service_text:
-        err("registered character runtime must resolve managed ServerStorage templates")
-    if "getAssetTemplate" not in character_service_text:
-        err("published registered character fallback is missing")
+    if 'row.visualMode ~= "assembly"' not in character_service_text:
+        err("runtime must reject retired whole-model characters")
+    if 'findRegisteredTemplate' in character_service_text:
+        err("whole-model ServerStorage character lookup is retired")
+    if 'CharacterAssemblyBuilder.Build' not in character_service_text or 'getAssetTemplate' not in character_service_text:
+        err("runtime must build the v2 assembly from published Character components")
+    if 'CharacterRegistry.defaultArchetypeId' not in character_service_text or 'CharacterRegistry.studioAdminArchetypeId' not in character_service_text:
+        err("runtime must distinguish default character and Studio admin assembly")
 
     return character_service_text, rig_text
 
@@ -113,8 +120,8 @@ def check_character_publication(
 ) -> tuple:
     registry_path = ROOT / "src/shared/character/CharacterRegistry.luau"
     registry_text = registry_path.read_text(encoding="utf-8") if registry_path.is_file() else ""
-    if "activeArchetypeId" not in registry_text:
-        err("generated character registry has no active archetype field")
+    if "defaultArchetypeId" not in registry_text or "studioAdminArchetypeId" not in registry_text:
+        err("generated character registry has no v2 default/Studio admin selection")
     if archetypes and ("race =" not in registry_text or "gender =" not in registry_text):
         err("generated character registry does not expose race/gender")
 

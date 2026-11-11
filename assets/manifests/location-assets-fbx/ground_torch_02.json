@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 1,
+  "slug": "ground_torch_02",
+  "sourceSha256": "6027ac69a8b33bf62b0742e0d8cc0ba08dfd54eab3f8802158c3df2d0ae6ea13",
+  "analysis": {
+    "schemaVersion": 1,
+    "meshes": [
+      {
+        "name": "col_mesh",
+        "armature": "",
+        "vertices": 345,
+        "bones": [],
+        "influencedBones": [],
+        "role": "collider",
+        "physics": {
+          "role": "collider",
+          "canCollide": true,
+          "canQuery": true,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": "PreciseConvexDecomposition",
+          "physicsOnly": true
+        }
+      },
+      {
+        "name": "ground_torch_02",
+        "armature": "ground_torch_02_armature",
+        "vertices": 2083,
+        "bones": [
+          {
+            "name": "fire_bone",
+            "parent": "",
+            "matrixLocal": [
+              -0.0,
+              0.0,
+              -1.0,
+              -0.0,
+              1.0,
+              0.0,
+              -0.0,
+              1e-07,
+              0.0,
+              -0.9999999,
+              0.0,
+              0.1886034,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          }
+        ],
+        "influencedBones": [
+          "fire_bone"
+        ],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": false,
+          "canQuery": false,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": "Box",
+          "physicsOnly": false
+        }
+      },
+      {
+        "name": "rig_carrier",
+        "armature": "ground_torch_02_armature",
+        "vertices": 3,
+        "bones": [
+          {
+            "name": "fire_bone",
+            "parent": "",
+            "matrixLocal": [
+              -0.0,
+              0.0,
+              -1.0,
+              -0.0,
+              1.0,
+              0.0,
+              -0.0,
+              1e-07,
+              0.0,
+              -0.9999999,
+              0.0,
+              0.1886034,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          }
+        ],
+        "influencedBones": [
+          "fire_bone"
+        ],
+        "role": "carrier",
+        "physics": {
+          "role": "carrier",
+          "canCollide": false,
+          "canQuery": false,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": "Box",
+          "physicsOnly": true
+        }
+      }
+    ],
+    "hasCollider": true,
+    "armatures": [
+      "ground_torch_02_armature"
+    ],
+    "unassignedArmatures": []
+  }
+}

@@ -3,12 +3,12 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local InsertService = game:GetService("InsertService")
 local ServerStorage = game:GetService("ServerStorage")
 local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local CharacterShared = Shared:WaitForChild("character")
 local CharacterMovementConfig = require(CharacterShared:WaitForChild("CharacterMovementConfig"))
 local CharacterRegistry = require(CharacterShared:WaitForChild("CharacterRegistry"))
-local BootstrapConfig = require(CharacterShared:WaitForChild("BootstrapConfig"))
 
 local CharacterRigService = require(script.Parent:WaitForChild("CharacterRigService"))
 local CharacterAssemblyBuilder = require(script.Parent:WaitForChild("CharacterAssemblyBuilder"))
@@ -41,45 +41,35 @@ local function findArchetype(archetypeId: string?): any?
 end
 
 local function registeredAssetId(row: any?): number?
-    if not row then
+    -- A published rig and resolved v2 recipe are the only supported spawn source.
+    if not row or row.visualMode ~= "assembly" then
         return nil
     end
-    if row.visualMode == "assembly" then
-        return if row.assembly and row.assembly.ready then tonumber(row.assembly.rig.asset_id) else nil
+    local recipe = row.assembly
+    if not recipe or recipe.schema_version ~= 2 or recipe.ready ~= true or type(recipe.rig) ~= "table" then
+        return nil
     end
-    if type(row.model) == "table" then
-        return tonumber(row.model.assetId)
-    end
-    return tonumber(row.modelAssetId)
+    return tonumber(recipe.rig.asset_id)
 end
 
 local function selectedCharacter(requestedOverride: string?): (any?, number?, string, string, string?, string?, string?)
     local requestedId = tostring(requestedOverride or "")
     if requestedId == "" then
-        requestedId = tostring(CharacterRegistry.activeArchetypeId or "")
+        local configured = if RunService:IsStudio()
+            then CharacterRegistry.studioAdminArchetypeId or CharacterRegistry.defaultArchetypeId
+            else CharacterRegistry.defaultArchetypeId
+        requestedId = tostring(configured or "")
     end
     local row = findArchetype(requestedId)
     local assetId = registeredAssetId(row)
     if row and assetId then
-        return row,
-            assetId,
-            tostring(row.id),
-            tostring(row.displayName or row.id),
-            requestedId,
-            tostring(row.race or ""),
-            tostring(row.gender or "")
+        return row, assetId, tostring(row.id), tostring(row.displayName or row.id),
+            requestedId, tostring(row.race or ""), tostring(row.gender or "")
     end
-    if requestedId ~= "" then
-        warn("[game1] selected character is unavailable; refusing bootstrap substitution", requestedId)
-        return row, nil, requestedId, requestedId, requestedId, nil, nil
-    end
-    return nil,
-        tonumber(BootstrapConfig.CharacterModelAssetId),
-        "bootstrap",
-        BootstrapConfig.CharacterLabel,
-        requestedId ~= "" and requestedId or nil,
-        nil,
-        nil
+    local reason = if requestedId == "" then "no default/admin v2 assembly selected"
+        else "assembly not ready or unavailable: " .. requestedId
+    warn("[game1] no character can spawn:", reason)
+    return row, nil, requestedId, reason, requestedId, nil, nil
 end
 
 local function getAssetTemplate(assetId: number, cacheKey: string): Model?
@@ -114,77 +104,24 @@ local function getAssetTemplate(assetId: number, cacheKey: string): Model?
     return template
 end
 
-local function findRegisteredTemplate(row: any): Model?
-    local node: Instance = ServerStorage
-    for _, segment in {
-        "characters",
-        tostring(row.race or ""),
-        tostring(row.gender or ""),
-        tostring(row.id or ""),
-        "model",
-    } do
-        if segment == "" then
-            node = ServerStorage
-            break
-        end
-        local child = node:FindFirstChild(segment)
-        if not child then
-            node = ServerStorage
-            break
-        end
-        node = child
-    end
-    if node ~= ServerStorage then
-        local named = node:FindFirstChild(tostring(row.id or ""))
-        if named and named:IsA("Model") then
-            return named
-        end
-        local model = node:FindFirstChildWhichIsA("Model")
-        if model then
-            return model
-        end
-    end
-
-    -- m3 stored the first registered model directly under ServerStorage.
-    -- Keep reading that saved-place layout until it is explicitly migrated.
-    for _, name in { tostring(row.displayName or ""), tostring(row.id or "") } do
-        if name ~= "" then
-            local direct = ServerStorage:FindFirstChild(name)
-            if direct and direct:IsA("Model") then
-                return direct
-            end
-        end
-    end
-    return nil
-end
-
 local function templateFor(row: any?, assetId: number): (Model?, string?)
-    if row and row.visualMode == "assembly" then
-        local cacheKey = "assembly-" .. tostring(row.assembly.fingerprint)
-        local cached = cache:FindFirstChild(cacheKey)
-        if cached and cached:IsA("Model") then return cached end
-        local ok, result = pcall(CharacterAssemblyBuilder.Build, row.assembly, function(componentAssetId: number)
-            return getAssetTemplate(componentAssetId, "component-" .. tostring(componentAssetId))
-        end)
-        if not ok then
-            warn("[game1] character assembly failed", row.id, result)
-            return nil, tostring(result)
-        end
-        local template = result :: Model
-        template.Name = cacheKey
-        template.Parent = cache
-        return template
+    if not row or row.visualMode ~= "assembly" or not row.assembly then
+        return nil, "v2 assembled character is required"
     end
-    if row then
-        local stored = findRegisteredTemplate(row)
-        if stored then
-            return stored
-        end
-        warn(("[game1] registered character %s is not in ServerStorage; loading published asset %d")
-            :format(tostring(row.id), assetId))
-        return getAssetTemplate(assetId, "registered-" .. tostring(assetId))
+    local cacheKey = "assembly-" .. tostring(row.assembly.fingerprint)
+    local cached = cache:FindFirstChild(cacheKey)
+    if cached and cached:IsA("Model") then return cached end
+    local ok, result = pcall(CharacterAssemblyBuilder.Build, row.assembly, function(componentAssetId: number)
+        return getAssetTemplate(componentAssetId, "component-" .. tostring(componentAssetId))
+    end)
+    if not ok then
+        warn("[game1] character assembly failed", row.id, result)
+        return nil, tostring(result)
     end
-    return getAssetTemplate(assetId, "bootstrap-" .. tostring(assetId))
+    local template = result :: Model
+    template.Name = cacheKey
+    template.Parent = cache
+    return template
 end
 
 local function destroyPreviousCharacter(player: Player)
@@ -229,7 +166,7 @@ createCharacter = function(player: Player, requestedArchetypeId: string?, revive
 
     local row, assetId, archetype, label, requestedArchetype, race, gender = selectedCharacter(requestedArchetypeId)
     if not assetId then
-        player:SetAttribute("CharacterLoadError", "Selected character is unavailable: " .. tostring(requestedArchetype or ""))
+        player:SetAttribute("CharacterLoadError", "No ready v2 character: " .. tostring(label))
         spawning[player] = nil
         return nil
     end

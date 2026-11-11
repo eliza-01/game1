@@ -171,33 +171,27 @@ class CharacterStore(CharacterModelWorkflowMixin, CharacterRegistryExportMixin):
         self.export()
         return self.snapshot()
 
-    def active_id(self):
+    def _profile_id(self, key):
         with self.connect() as connection:
-            row = connection.execute("SELECT value FROM project_settings WHERE key=?", (ACTIVE_KEY,)).fetchone()
-            value = str(row["value"]).strip() if row else ""
-            return value or None
+            row = connection.execute('SELECT value FROM project_settings WHERE key=?', (key,)).fetchone()
+            return str(row['value']).strip() or None if row else None
+
+    def active_id(self):
+        """Default character creation recipe; never the old whole-model active key."""
+        return self._profile_id('default_character_assembly_id')
+
+    def admin_id(self):
+        """Studio-only test character recipe, not game administrator privileges."""
+        return self._profile_id('studio_admin_assembly_id')
 
     def set_active(self, character_id):
-        character_id = str(character_id or "").strip().lower()
-        row = self.get(character_id)
-        if not row:
-            raise ValueError(f"unknown character archetype: {character_id}")
-        if row.get('visual_mode') == 'assembly':
-            if not row.get('assembly_resolved', {}).get('ready'):
-                raise ValueError('publish all selected assembly dependencies before activating it')
-        elif not str(row.get("model_asset_id") or "").strip():
-            raise ValueError("publish the character model before activating it")
-        with self.connect() as connection:
-            connection.execute(
-                "INSERT OR REPLACE INTO project_settings(key,value) VALUES(?,?)",
-                (ACTIVE_KEY, character_id),
-            )
-        self.export()
-        return self.snapshot()
+        if not self.assemblies:
+            raise ValueError('character assemblies not initialized')
+        return self.assemblies.select_profile(character_id, 'default')
 
     def clear_active(self):
         with self.connect() as connection:
-            connection.execute("DELETE FROM project_settings WHERE key=?", (ACTIVE_KEY,))
+            connection.execute("DELETE FROM project_settings WHERE key='default_character_assembly_id'")
         self.export()
         return self.snapshot()
 

@@ -34,7 +34,7 @@ class LocationImporterMotorAssemblyTests(unittest.TestCase):
     def test_importer_root_normalization_is_fresh_clone_only_and_transform_guarded(self):
         source = (ROOT / 'system/studio-plugin/modules/StudioLocationPublishedRigNormalize.luau').read_text('utf-8')
         for marker in ('model.Parent ~= nil', 'root.Transparency < 0.99',
-                       'RootPart has no authored collider replacement',
+                       'published Location is missing declared collider:',
                        'bone.WorldCFrame', 'bone.Transform',
                        'part.CFrame ~= state.frame', 'part.Size ~= state.size',
                        'model.WorldPivot = authoredPivot',

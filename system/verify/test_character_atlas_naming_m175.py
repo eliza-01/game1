@@ -33,11 +33,14 @@ class CharacterAtlasNamingM175(TestCase):
         Image.new('RGB', size, 'green').save(target)
         return target
 
-    def test_multiword_sets_are_parsed_from_last_slot_suffix(self):
+    def test_mesh_identity_stays_independent_from_multiword_atlas_set_name(self):
         for slot in ('upper', 'lower', 'gloves', 'boots'):
-            parsed = parse_part('fullplate_imperial_' + slot)
-            self.assertEqual(parsed['set_id'], 'fullplate_imperial')
+            parsed = parse_part('human_male_m001_' + slot)
+            self.assertEqual(parsed['set_id'], '')
+            self.assertEqual(parsed['mesh_family_id'], 'human_male_m001')
             self.assertEqual(parsed['slot'], slot)
+            with self.assertRaises(ValueError):
+                parse_part('fullplate_imperial_' + slot)
         with self.assertRaisesRegex(ValueError, 'snake_case'):
             parse_part('fullplate imperial_upper')
 
@@ -103,8 +106,8 @@ class CharacterAtlasNamingM175(TestCase):
         self.assertLess(html.index('id="cp-atlas-naming-guide"'), html.index('id="cp-atlas-register"'))
         for word in ('fullplate_imperial_upper_', 'fullplate_imperial_lower_',
                      'fullplate_imperial_gloves_', 'fullplate_imperial_boots_',
-                     'head_01_male_', 'head_01_female_', 'hair_01_common_',
-                     'eyes_01_', 'eyebrows_01_', 'eyes_01_spiral_'):
+                     'human_t001_head_', 'human_t001_hair_',
+                     'human_t001_eye_', 'human_t001_eyebrow_'):
             self.assertIn(word, html)
         self.assertIn('character-tooltip-atlas', (static/'character-workflow.js').read_text())
         self.assertIn('white-space:pre-line', (static/'character-components.css').read_text())

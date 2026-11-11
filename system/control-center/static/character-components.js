@@ -2,39 +2,21 @@
 (() => {
   const base='/api/characters/components';
   const el=id=>document.getElementById('cp-'+id);
-  const atlasPresentation=window.game1CharacterAtlasPresentation;
+
   let catalog=null,plan=null,busy=false,approvalResolve=null,sort={column:'id',ascending:true};
   const post=(url,data={})=>request(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
   const text=(tag,value)=>{const node=document.createElement(tag);node.textContent=String(value??'');return node;};
   function status(message,error=false){el('status').textContent=message;el('status').classList.toggle('error',error);}
-  // Row dropdowns are recreated by refresh() while an atlas operation is busy.
-  // Unlock the *current* DOM controls, not the discarded select that fired onchange.
-  function syncAtlasControls(){
-    const disabled=busy||!!window.game1CharacterPublications?.isRunning();
-    for(const select of el('rows').querySelectorAll('[data-cp-atlas-select]'))select.disabled=disabled;
-  }
   function lock(value){
     busy=value;
     const publishing=!!window.game1CharacterPublications?.isRunning();
     el('choose').disabled=value||publishing;
     el('refresh').disabled=value;
     window.game1CharacterPublications?.setBusy(value);
-    syncAtlasControls();
+    for(const field of el('rows').querySelectorAll('select'))field.disabled=value||publishing;
   }
-  function atlasOptions(select,partId,selected='') {
-    select.append(new Option('Without atlas / solid material',''));
-    for(const v of atlasPresentation.optionsForPart(partId,catalog?.atlas_families)){
-      const option=new Option(`${v.preferred?'★ ':''}${v.atlasKey} · ${v.width}×${v.height}${v.current?'':' · unpublished'}`,v.id);
-      option.disabled=!v.current;select.append(option);
-    }
-    select.value=selected;
-    setAtlasSelectionRank(select);
-  }
-  function setAtlasSelectionRank(select){
-    const rank=atlasPresentation.variantRank(catalog?.atlas_families,select.value);
-    if(rank===null)delete select.dataset.cpAtlasRank;
-    else select.dataset.cpAtlasRank=String(rank);
-  }
+  const allowedValue=row=>(row.allowedGenders||[]).slice().sort().join(',');
+  const genderOptions=[['male','Male'],['female','Female'],['female,male','Unisex']];
   async function run(action){if(busy||window.game1CharacterPublications?.isRunning()){toast('Wait for the current publication queue to finish.',true);return;}lock(true);try{await action();}catch(error){status(error.message,true);}finally{lock(false);}}
   async function refresh(){catalog=await request(base);render();window.dispatchEvent(new Event('character-components-changed'));}
   function render(){
@@ -42,7 +24,7 @@
     const host=el('rows');host.replaceChildren();
     for(const button of document.querySelectorAll('[data-cp-sort]')){
       const active=button.dataset.cpSort===sort.column;
-      const label={id:'name',slot:'part',set_id:'set'}[button.dataset.cpSort];
+      const label={id:'name',slot:'part'}[button.dataset.cpSort]||'name';
       button.textContent=label+(active?(sort.ascending?' ↑':' ↓'):'');
       button.parentElement.setAttribute('aria-sort',active?(sort.ascending?'ascending':'descending'):'none');
     }
@@ -59,27 +41,31 @@
       const issues=[];
       if(!published)issues.push(row.model_asset_id?'New revision is not published':'Model not published');
       if(row.pending_operation)issues.push('Publication pending');
-      if(row.kind==='part'&&row.atlas&&(!row.atlas.current||row.atlas.replacementPending))
-        issues.push('Bound atlas needs publication');
       const health=text('td',issues.length?'!':'✓');health.className=issues.length?'cp-health-warning':'cp-health-ok';
       health.title=issues.length?issues.join(' · '):'Current publication and dependencies';
       tr.append(health,text('td',row.id),text('td',row.kind==='rig'?'rig':row.role==='effect'?'eyes · effect':row.slot),
-        text('td',row.set_id||'—'),text('td',row.rig_id),text('td',`${row.status} · r${row.revision}`),text('td',row.model_asset_id||'—'));
+        text('td',row.mesh_family_id||'—'),text('td',row.rig_id),text('td',`${row.status} · r${row.revision}`),text('td',row.model_asset_id||'—'));
       const atlas=document.createElement('td');
       if(row.kind==='part'){
-        const select=document.createElement('select');select.setAttribute('aria-label','Atlas for '+row.id);
-        select.dataset.cpAtlasSelect=row.id;
-        atlasOptions(select,row.id,row.atlas?.variant_id||'');
-        // Unbinding is deliberately not inferred from an empty dropdown.
-        select.querySelector('option').disabled=!!row.atlas;
+        const select=document.createElement('select');select.setAttribute('aria-label','Allowed genders for '+row.id);
+        if(!row.allowedGenders?.length){
+          const unset=new Option('Не задано · выбери совместимость','');
+          unset.disabled=true;
+          select.append(unset);
+        }
+        for(const [value,label] of genderOptions)select.append(new Option(label,value));
+        select.value=allowedValue(row);
         select.disabled=busy||window.game1CharacterPublications.isRunning();
         select.onchange=()=>run(async()=>{
-          setAtlasSelectionRank(select);
-          if(!select.value)return;
-          await post(base+'/atlas',{id:row.id,variantId:Number(select.value),expectedRevision:row.atlas?.revision||0});
-          await refresh();status('Atlas selected. Shared Image Asset ID reused; no mesh upload.');
+          await post(base+'/compatibility',{id:row.id,allowedGenders:select.value.split(','),expectedAllowedGenders:row.allowedGenders});
+          await refresh();status('Compatibility saved without changing the published Model Asset ID.');
         });
         atlas.append(select);
+        if(row.mesh_family_id){
+          const assign=text('button','→ Armor');assign.type='button';
+          assign.onclick=()=>window.game1ArmorCatalog?.assignResource('mesh',row.id);
+          atlas.append(assign);
+        }
       }else atlas.textContent='—';
       tr.append(atlas);
       const actions=document.createElement('td');
@@ -94,6 +80,11 @@
     const host=el('preview');host.replaceChildren();
     host.append(text('h4','FBX inspection · no registration or upload yet'));
     host.append(text('p',`Rig: ${plan.rig_id} · ${plan.bone_count} bones · ${plan.parts.length} parts`));
+    const normalized=plan.parts.reduce((count,part)=>count+(part.normalized_vertices||0),0);
+    if(normalized){
+      const note=text('p',`Skin weights: ${normalized} vertex/vertices normalized automatically in the temporary FBX publication copy. Source FBX and Blender scene are unchanged; bone assignments are preserved.`);
+      host.append(note);
+    }
     if(plan.partial_required){
       const warning=text('p',`PARTIAL INSPECTION · ${plan.part_errors.length} component error(s): ${plan.part_error}. ${plan.parts.length} valid parts detected, including any rigid hair. Registering these requires explicit approval; rejected meshes will not be extracted or modified.`);
       warning.className='character-preview-warning';host.append(warning);
@@ -106,10 +97,6 @@
       const warning=text('p',`RIG REPLACEMENT · ${plan.rig.id} · r${plan.rig.existing_revision} → r${plan.rig.existing_revision+1}. ${plan.rig.warning}. This creates a NEW Model Asset ID on publication. Existing character assemblies stay pinned to the previous published rig; their meshes/animations are not silently migrated.`);
       warning.className='character-preview-warning';host.append(warning);
     }
-    if(plan.new_sets.length){
-      const sets=text('p','New clothing sets created on Register: '+plan.new_sets.join(', '));
-      sets.className='character-preview-warning';host.append(sets);
-    }
     if((plan.registered||plan.conflicts).length){
       const warning=text('p',`${(plan.registered||plan.conflicts).length} registered component(s) already exist. They will be KEPT unless you explicitly select Replace for individual rows; published Model IDs remain assigned until any approved replacement is published.`);
       warning.className='character-preview-warning';host.append(warning);
@@ -119,11 +106,18 @@
     for(const row of plan.parts){
       const item=document.createElement('div');item.className='character-preview-row';
       item.append(text('strong',row.id),text('span',
-        `${row.slot}${row.role==='effect'?' · effect (not a default face slot)':''}${row.set_id?' · set '+row.set_id:''}${row.attachment_mode==='pivot'?' · rigid pivot → hair_mount':''} · ${row.triangles} tris · `+
+        `${row.slot}${row.role==='effect'?' · effect (not a default face slot)':''}${row.mesh_family_id?' · '+row.mesh_family_id:''}${row.attachment_mode==='pivot'?' · rigid pivot → hair_mount':''}${row.extras?.length?' · '+row.extras.length+' extra MeshPart(s) in ONE asset':''} · ${row.triangles} tris · `+
         (row.published_asset_id?'published · replacement approval needed':row.existing_revision?'already registered':'new component')));
       host.append(item);
     }
     host.append(text('p','Register extracts independent source FBX files. Use the publication queue afterwards; saving a character recipe is a separate step.'));
+  }
+  function compatibilityPicker(row){
+    const select=document.createElement('select');select.dataset.cpCompatibility=row.id;
+    select.setAttribute('aria-label','Allowed genders for '+row.id);
+    for(const [value,label] of genderOptions)select.append(new Option(label,value));
+    select.value=(row.allowedGenders||[]).slice().sort().join(',');
+    return select;
   }
   function approve(){
     const newRows=plan.parts.filter(row=>!row.existing_revision);
@@ -133,7 +127,7 @@
       for(const row of newRows){
         const label=document.createElement('label');const check=document.createElement('input');
         check.type='checkbox';check.value=row.id;check.dataset.newPart='1';check.checked=true;
-        label.append(check,document.createTextNode(` Add NEW ${row.id} · ${row.slot}${row.attachment_mode==='pivot'?' · pivot → hair_mount':''}`));
+        label.append(check,document.createTextNode(` Add NEW ${row.id} · ${row.slot}${row.attachment_mode==='pivot'?' · pivot → hair_mount':''}`),compatibilityPicker(row));
         el('conflicts').append(label);
       }
     }
@@ -149,6 +143,11 @@
         : ' Rig only · keep all existing mesh components and published IDs unchanged'));
       el('conflicts').append(label);
     }
+    const normalized=plan.parts.reduce((count,part)=>count+(part.normalized_vertices||0),0);
+    if(normalized){
+      const note=text('p',`Skin weights: ${normalized} vertex/vertices normalized automatically in the temporary FBX publication copy. Source FBX and Blender scene are unchanged; bone assignments are preserved.`);
+      el('conflicts').append(note);
+    }
     if(plan.partial_required){
       const label=document.createElement('label');const check=document.createElement('input');check.type='checkbox';check.dataset.partialApproval='1';
       label.append(check,document.createTextNode(` Register ONLY ${plan.parts.length} validated components; skip ${plan.part_errors.length} invalid component(s) shown in Inspect`));
@@ -157,7 +156,7 @@
     if((plan.registered||plan.conflicts).length)el('conflicts').append(text('p','REPLACE REGISTERED COMPONENTS · optional, unchecked by default'));
     for(const row of plan.registered||plan.conflicts){
       const label=document.createElement('label');const check=document.createElement('input');check.type='checkbox';check.value=row.id;check.dataset.meshApproval='1';
-      label.append(check,document.createTextNode(` Replace ${row.id} · ${row.published_asset_id?'published '+row.published_asset_id:'registered r'+row.existing_revision}${row.content_unchanged?' · mesh content is unchanged':''}`));
+      label.append(check,document.createTextNode(` Replace ${row.id} · ${row.published_asset_id?'published '+row.published_asset_id:'registered r'+row.existing_revision}${row.content_unchanged?' · mesh content is unchanged':''}`),compatibilityPicker(row));
       el('conflicts').append(label);
     }
     const validate=()=>{
@@ -185,19 +184,21 @@
     const checked=selector=>[...el('conflicts').querySelectorAll(selector)].filter(input=>input.checked).map(input=>input.value);
     finishApproval({replacements:only?[]:checked('[data-mesh-approval]'),newParts:only?[]:checked('[data-new-part]'),
       replaceRig:!!el('conflicts').querySelector('input[value^="rig:"]:checked'),rigOnly:only,
-      allowPartial:!!el('conflicts').querySelector('[data-partial-approval]:checked')&&!only});
+      allowPartial:!!el('conflicts').querySelector('[data-partial-approval]:checked')&&!only,
+      compatibility:Object.fromEntries([...el('conflicts').querySelectorAll('[data-cp-compatibility]')]
+        .map(select=>[select.dataset.cpCompatibility,select.value.split(',')]))});
   };
   el('choose').onclick=()=>run(async()=>{
     const picked=await post('/api/files/choose-character-model');if(!picked.path)return;
-    plan=null;el('preview').replaceChildren();el('source').textContent=picked.path;status('Reading FBX mesh names and rig…');
+    plan=null;el('preview').replaceChildren();el('source').textContent=picked.path;status('Reading FBX geometry families and rig…');
     plan=await post(base+'/inspect',{sourcePath:picked.path});preview();
-    status('Inspection complete. Review the parts and any new sets before registering. Nothing has been changed or uploaded.');
+    status('Inspection complete. Review the geometry and allowedGenders before registering. Nothing has been changed or uploaded.');
     // One explicit Register action in the review modal. No second button outside.
     if(!(plan.parts.length||plan.rig?.changed||plan.partial_required))return;
     const approval=await approve();
     if(approval===null){status('Registration cancelled. No components were modified.');return;}
     status('Registering approved rig revision and extracting component FBX files…');
-    await post(base+'/register',{token:plan.token,replacements:approval.replacements,newParts:approval.newParts,replaceRig:approval.replaceRig,rigOnly:approval.rigOnly,allowPartial:approval.allowPartial||false});
+    await post(base+'/register',{token:plan.token,replacements:approval.replacements,newParts:approval.newParts,compatibility:approval.compatibility,replaceRig:approval.replaceRig,rigOnly:approval.rigOnly,allowPartial:approval.allowPartial||false});
     plan=null;el('preview').replaceChildren();
     await refresh();status('Registration complete. Previous published IDs are preserved until publication succeeds. No Roblox Model Asset was uploaded during registration. Select the changed rig and parts in step 02 to publish NEW Model Asset IDs.');
   });

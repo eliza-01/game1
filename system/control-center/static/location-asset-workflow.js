@@ -27,6 +27,15 @@ window.game1LocationAssetWorkflow = (() => {
     decoAssetShowSyncHistory(slug);
   }
   function message(text,isError=false){state.result=String(text||'');state.error=Boolean(isError);}
+  function rememberStudioVerification(item,studio){
+    if(!item||!studio)return;
+    decoAssetState.studioVerifications ||= {};
+    decoAssetState.studioVerifications[item.slug]={
+      modelId:String(item.model_asset_id||''),atlasId:String(item.texture_asset_id||''),
+      bindingRevision:Number(item.bindingRevision||0),authoringRevision:Number(item.revision||0),
+      alphaEnabled:Boolean(item.alphaEnabled),verification:studio.verification||'review_required',
+    };
+  }
   async function run(label,task){
     if(state.busy)return;
     state.busy=true;state.operationLabel=label;message(`${label}…`);render();
@@ -453,9 +462,15 @@ window.game1LocationAssetWorkflow = (() => {
         atlasId:String(item.texture_asset_id||''),revision:Number(item.bindingRevision||0),
         alphaEnabled:Boolean(item.alphaEnabled)};
       state.scanStale=false;
+      rememberStudioVerification(item,result.studio);
       await decoAssetLoad(); // Registered Assets now shows scanned visual Mesh IDs.
+      const confirmation=result.studio.verification==='current'
+        ? ' Изменений нет; опубликованные ID подтверждены без Replace.'
+        : result.studio.verification==='pending'
+          ? ' Есть реальные изменения — проверь список перед Sync.'
+          : ' Нужна проверка непривязанных или некорректных моделей.';
       message(`Найдено MeshPart: ${result.studio.foundMeshParts}. `+
-        `Без привязки: ${result.studio.unmanagedMeshParts}. Place не изменён.`);
+        `Без привязки: ${result.studio.unmanagedMeshParts}. Place не изменён.`+confirmation);
     });
     if(action==='select-all'){
       const models=new Map();
@@ -525,6 +540,8 @@ window.game1LocationAssetWorkflow = (() => {
         atlasId:String(item.texture_asset_id||''),revision:Number(item.bindingRevision||0),
         alphaEnabled:Boolean(item.alphaEnabled)};
       state.scanStale=false;
+      rememberStudioVerification(row(),updated.studio);
+      await decoAssetLoad();
       message(`Модель привязана к ${state.slug}. Геометрия не изменена. Проверь статусы и нажми Sync.`);
     });
   }
@@ -536,6 +553,7 @@ window.game1LocationAssetWorkflow = (() => {
       atlasId:String(current.texture_asset_id||''),revision:Number(current.bindingRevision||0),
       alphaEnabled:Boolean(current.alphaEnabled)};
     state.scanStale=false;
+    rememberStudioVerification(row(),refreshed.studio);
   }
   async function syncSelected(keys){
     return run('Синхронизация моделей',async()=>{
@@ -573,9 +591,10 @@ window.game1LocationAssetWorkflow = (() => {
       const summary=window.game1StudioSync.locationSummary(state.slug,result.studio)+
         (result.studio.fullySynced?' Синхронизация завершена.':' Частичное обновление.');
       try{
-        await decoAssetLoad();
+        await decoAssetLoad(); // Refresh published identity before rescanning.
         await decoAssetShowSyncHistory(state.slug);
         await refreshSyncReport();
+        if(typeof decoAssetRender==='function')decoAssetRender(); // Use the new Find verdict.
         message(summary+' Список обновлён.');
       }catch(error){
         state.scanStale=true;

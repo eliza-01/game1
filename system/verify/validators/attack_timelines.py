@@ -1,6 +1,7 @@
 """Attack Timeline data, damage windows and authoring contract (M168)."""
 
 import json
+import re
 from pathlib import Path
 from typing import Callable
 
@@ -122,10 +123,11 @@ def check_attack_timelines(root: Path, report_error: Callable[[str], None], *,
         'id="nav-timelines"',
         'id="timelines-view"',
         'id="timeline-open-studio"',
-        'timelines.js?v=3',
     ]:
         if required not in index_m35_text:
             report_error(f"m35 Asset Manager timeline UI missing {required}")
+    if not re.search(r'timelines\.js\?v=\d+', index_m35_text):
+        report_error('m35 Asset Manager timeline UI missing versioned timelines.js')
     for required in [
         "/api/timelines/open",
         "/api/timelines/editor-state",

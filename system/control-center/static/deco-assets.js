@@ -6,6 +6,7 @@ const decoAssetState = {
   data: null, modelPath: '', texturePath: '', atlasVariantId: 0,
   inspection: null, meshOptions: {},
   libraryCategory: 'all', syncingSlug: null, atlasBusy: false,
+  studioVerifications: {}, // read-only Find evidence, not inferred from atlas revision
 };
 const DECO_LIBRARY_CATEGORY_KEY = 'game1.locationAssets.libraryCategory';
 const DECO_ATLAS_COLORS = ['#d9ac43', '#a47bdf', '#4f95ee', '#54b991', '#939ba8'];
@@ -32,6 +33,22 @@ function decoAssetTextureFilename(row) {
 }
 function decoAssetStatusTag(status) {
   return `<span class="tag ${String(status || '').toLowerCase()}">${esc(status || '')}</span>`;
+}
+// The Atlas binding revision is not evidence of stale Workspace geometry.
+// Display warnings only when this session's Studio Find verified a difference.
+function decoAssetStudioSyncNote(row){
+  const proof = decoAssetState.studioVerifications?.[row.slug];
+  const proofCurrent = proof && proof.modelId === String(row.model_asset_id || '')
+    && proof.atlasId === String(row.texture_asset_id || '')
+    && proof.bindingRevision === Number(row.bindingRevision || 0)
+    && proof.authoringRevision === Number(row.revision || 0)
+    && proof.alphaEnabled === Boolean(row.alphaEnabled);
+  if(!proofCurrent)return '';
+  if(proof.verification === 'pending')
+    return '<small class="deco-sync-pending">Studio Sync pending · verified by Find</small>';
+  if(proof.verification === 'review_required')
+    return '<small class="muted">Studio · review required</small>';
+  return '';
 }
 function decoAssetSyncSlug() {
   $('location-asset-slug').value = decoAssetSlugify($('location-asset-name').value);
@@ -188,6 +205,7 @@ function decoAssetRender() {
     decoAssetState.libraryCategory === 'all' || row.category === decoAssetState.libraryCategory);
   for (const row of visible) {
     const tr = document.createElement('tr');
+    const studioSyncNote = decoAssetStudioSyncNote(row);
     const contactPolicy = row.destructible
       ? '<span class="tag">destructible</span>' : '<span class="tag published">solid · bounce</span>';
     const visualMeshes=row.publishedVisualMeshes||[];
@@ -196,7 +214,7 @@ function decoAssetRender() {
       `<small class="muted">Mesh ID: нет данных · Find Mesh IDs в Studio</small>`;
     tr.innerHTML = `<td><b>${esc(row.name_en)}</b><small>${esc(row.slug)}</small>` +
       `<small class="deco-texture-filename">${esc(window.game1AtlasIdentity.describe({filename:decoAssetTextureFilename(row),atlasKey:row.atlasFamily||''}).key)} ${decoAtlasWarning(row)}</small>` +
-      `${decoAtlasDots(row)}${row.studioSyncStatus === 'pending_studio_sync' ? '<small class="deco-sync-pending">Studio Sync pending</small>' : ''}</td>` +
+      `${decoAtlasDots(row)}${studioSyncNote}</td>` +
       `<td>${esc(decoAssetCategoryLabel(row.category))}<small>${esc(row.materialDefinition?.label||'Default')}</small></td><td>${contactPolicy}</td>` +
       `<td><small>Model ID ${esc(row.model_asset_id || '—')}</small>${row.model_asset_id?meshLabels:''}<small>Image ID ${esc(row.texture_asset_id || '—')}</small></td>` +
       `<td>${decoAssetStatusTag(row.status)}</td><td><div class="deco-asset-row-actions">` +

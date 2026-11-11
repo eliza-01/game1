@@ -26,7 +26,7 @@ class PartialHairInspectionTests(unittest.TestCase):
         self.bones = [dict(name='root', parent='', matrix=IDENTITY[:]),
                       dict(name='hair_mount', parent='root', matrix=IDENTITY[:])]
         self.info = dict(armature='human_armature', bones=self.bones, parts=[
-            dict(name='hair_03_common', armature='', skeleton=[], used_bones=[],
+            dict(name='human_common_m003_hair', armature='', skeleton=[], used_bones=[],
                  attachment='hair_mount', attachment_mode='pivot', vertices=4,
                  triangles=2, content_sha256='hair-content', materials=[]),
         ], part_errors=[dict(name='eyebrows_01_l', message='eyebrows_01_l: unsupported component name')])
@@ -36,12 +36,12 @@ class PartialHairInspectionTests(unittest.TestCase):
         if output:
             output.mkdir(parents=True, exist_ok=True)
             (output / 'rig.fbx').write_bytes(b'rig')
-            (output / 'hair_03_common.fbx').write_bytes(b'hair')
+            (output / 'human_common_m003_hair.fbx').write_bytes(b'hair')
         return copy.deepcopy(self.info)
 
     def test_inspect_keeps_hair_and_requires_explicit_partial_approval(self):
         plan = self.store.inspect(self.source)
-        self.assertEqual([part['id'] for part in plan['parts']], ['hair_03_common'])
+        self.assertEqual([part['id'] for part in plan['parts']], ['human_common_m003_hair'])
         self.assertEqual(plan['parts'][0]['attachment_mode'], 'pivot')
         self.assertTrue(plan['partial_required'])
         self.assertFalse(plan['rig_only_required'])
@@ -50,20 +50,20 @@ class PartialHairInspectionTests(unittest.TestCase):
             self.store.register(plan['token'], [])
         self.assertEqual(self.store.snapshot()['items'], [])
         self.store.register(plan['token'], [], allow_partial=True)
-        self.assertIsNotNone(self.store.get('part', 'hair_03_common'))
+        self.assertIsNotNone(self.store.get('part', 'human_common_m003_hair'))
         self.assertIsNone(self.store.get('part', 'eyebrows_01_l'))
-        self.assertTrue((self.root / self.store.get('part', 'hair_03_common')['prepared_path']).is_file())
+        self.assertTrue((self.root / self.store.get('part', 'human_common_m003_hair')['prepared_path']).is_file())
 
     def test_changed_rig_can_still_be_replaced_with_rig_only_without_touching_parts(self):
         plan = self.store.inspect(self.source)
         self.store.register(plan['token'], [], allow_partial=True)
-        before = self.store.get('part', 'hair_03_common')
+        before = self.store.get('part', 'human_common_m003_hair')
         self.info['bones'][0]['matrix'][3] = 1.0
         plan = self.store.inspect(self.source)
         self.assertTrue(plan['rig']['changed'])
         self.assertTrue(plan['partial_required'])
         self.store.register(plan['token'], [], replace_rig=True, rig_only=True)
-        self.assertEqual(self.store.get('part', 'hair_03_common'), before)
+        self.assertEqual(self.store.get('part', 'human_common_m003_hair'), before)
         self.assertEqual(self.store.get('rig', 'human')['revision'], 2)
         with connect(self.store.db) as db:
             self.assertEqual(db.execute("SELECT count(*) FROM character_component_history WHERE kind='part'").fetchone()[0], 0)
@@ -86,7 +86,7 @@ class PartialHairInspectionTests(unittest.TestCase):
     def test_no_broadening_of_eyebrow_naming(self):
         with self.assertRaises(ValueError):
             parse_part('eyebrows_01_l')
-        self.assertEqual(parse_part('hair_03_common')['slot'], 'hair')
+        self.assertEqual(parse_part('human_common_m003_hair')['slot'], 'hair')
 
     def test_blender_adapter_scans_valid_hair_even_when_bad_eyebrow_precedes_it(self):
         from test_character_rigid_hair_m194 import FakeMesh, HairImportTests
@@ -96,7 +96,7 @@ class PartialHairInspectionTests(unittest.TestCase):
             report = Path(directory) / 'report.json'
             adapter.main(Path(directory) / 'source.fbx', report)
             info = json.loads(report.read_text())
-        self.assertEqual([part['name'] for part in info['parts']], ['hair_03_common'])
+        self.assertEqual([part['name'] for part in info['parts']], ['human_common_m003_hair'])
         self.assertEqual(info['parts'][0]['attachment_mode'], 'pivot')
         self.assertEqual(info['part_errors'][0]['name'], 'eyebrows_01_l')
 

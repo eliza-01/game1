@@ -1,0 +1,3238 @@
+<roblox version="4">
+  <Item class="Folder" referent="0">
+    <Properties>
+      <string name="Name">Game1LandscapePainter</string>
+    </Properties>
+    <Item class="Script" referent="1">
+      <Properties>
+        <string name="Name">Main</string>
+        <token name="RunContext">0</token>
+        <string name="Source"><![CDATA[-- Standalone Game1 Edit-mode landscape authoring. No DecoManager runtime dependency.
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local HttpService = game:GetService("HttpService")
+local Workspace = game:GetService("Workspace")
+local ChangeHistoryService = game:GetService("ChangeHistoryService")
+local Selection = game:GetService("Selection")
+
+local LandscapeWidget = require(script.Parent.modules.LandscapeWidget)
+local LandscapeAssetsWidget = require(script.Parent.modules.LandscapeAssetsWidget)
+local BranchPlacement = require(script.Parent.modules.BranchPlacement)
+local LandscapeProfiles = require(script.Parent.modules.LandscapeProfiles)
+local LandscapeAssetCatalog = require(script.Parent.modules.LandscapeAssetCatalog)
+local LandscapeAssetPlacement = require(script.Parent.modules.LandscapeAssetPlacement)
+
+local toolbar = plugin:CreateToolbar("game1 · landscape")
+local toggle = toolbar:CreateButton("LandscapePainter", "Landscape / asset placement in Edit mode", "")
+toggle.ClickableWhenViewportHidden = true
+local info = DockWidgetPluginGuiInfo.new(Enum.InitialDockState.Right,
+    false, false, 350, 650, 290, 370)
+local widget = plugin:CreateDockWidgetPluginGuiAsync("Game1LandscapePainterV1", info)
+widget.Title = "game1 · Landscape Painter"
+local mouse = plugin:GetMouse()
+local active = nil -- nil | "branch" | "asset"
+local ui, assetUI
+local branchSaveScheduled = false
+local function status(message)
+    if ui then ui:SetStatus(message) end
+end
+local branch = BranchPlacement.new(Workspace, ChangeHistoryService, mouse, status)
+local profiles = LandscapeProfiles.new(plugin, HttpService)
+local catalog = LandscapeAssetCatalog.new()
+local assets = LandscapeAssetPlacement.new(Workspace, ChangeHistoryService,
+    mouse, Selection, catalog, profiles, status)
+
+local function stop()
+    if not active then return end
+    active = nil
+    branch:Stop()
+    assets:Stop()
+    ui:SetActive(false)
+    assetUI:SetActive(false)
+    plugin:Deactivate()
+end
+
+local function start(kind)
+    if RunService:IsRunning() then
+        status("Доступно только в режиме Edit · останови Play")
+        return
+    end
+    if active == kind then stop(); return end
+    if active then stop() end
+    plugin:Activate(true)
+    if kind == "asset" and not assets:Start() then
+        plugin:Deactivate()
+        return
+    end
+    active = kind
+    if kind == "branch" then branch:Start() end
+    ui:SetActive(kind == "branch")
+    assetUI:SetActive(kind == "asset")
+end
+
+local function safe(action)
+    local ok, result = pcall(action)
+    if not ok then status("Landscape Painter: " .. tostring(result)) end
+    return ok, result
+end
+
+ui = LandscapeWidget.new(widget, {
+    toggleMode = function() start("branch") end,
+    settingsChanged = function(diameter, level, color)
+        branch:SetSettings(diameter, level, color)
+        -- Live preview follows every drag, but persistent Studio settings
+        -- are written at most once per 0.35s rather than on each mouse pixel.
+        if not branchSaveScheduled then
+            branchSaveScheduled = true
+            task.delay(0.35, function()
+                branchSaveScheduled = false
+                plugin:SetSetting("LandscapeThickness", ui.thickness)
+                plugin:SetSetting("LandscapeLevel", ui.level)
+                plugin:SetSetting("LandscapeColor", ui.color:ToHex())
+            end)
+        end
+    end,
+    finish = stop,
+    status = status,
+})
+assetUI = LandscapeAssetsWidget.new(ui.content, {
+    toggleAsset = function() start("asset") end,
+    refreshCatalog = function()
+        safe(function()
+            local rows = catalog:Refresh()
+            assetUI:SetCatalog(rows)
+            status("Каталог: " .. #rows .. " опубликованных Location Assets")
+        end)
+    end,
+    selectAsset = function(row)
+        safe(function()
+            assets:SelectAsset(row)
+            assetUI:SelectAsset(row)
+        end)
+    end,
+    configChanged = function(config)
+        safe(function() assets:SetConfiguration(config) end)
+    end,
+    targetModeChanged = function(mode)
+        safe(function()
+            assets:SetTargetMode(mode)
+            status(if mode == "stem" then "Прицел видит только стебли"
+                elseif mode == "surface" then "Прицел видит только поверхности"
+                else "Прицел: автоматическое крепление к стеблю или поверхности")
+        end)
+    end,
+    saveProfile = function(name, config)
+        safe(function()
+            local row = profiles:Create(name, config)
+            local rows, activeId = profiles:List()
+            assetUI:SetProfiles(rows, activeId)
+            assetUI:SelectProfile(row.id)
+            status("Профиль сохранён: " .. row.name)
+        end)
+    end,
+    useProfile = function(id, enabled)
+        safe(function()
+            profiles:Use(id, enabled)
+            local rows, activeId = profiles:List()
+            assetUI:SetProfiles(rows, activeId)
+            assets:UpdateCursor(true)
+            status(if enabled then "Use: профиль применяется к каждому новому размещению"
+                else "Use выключен · используется текущий поворот")
+        end)
+    end,
+    applyProfile = function(id)
+        safe(function()
+            local item = profiles:Find(id)
+            if not item then error("профиль не найден") end
+            assets:ApplyToSelection(item)
+        end)
+    end,
+    removeProfile = function(id)
+        safe(function()
+            profiles:Remove(id)
+            local rows, activeId = profiles:List()
+            assetUI:SetProfiles(rows, activeId)
+            assets:UpdateCursor(true)
+            status("Профиль удалён")
+        end)
+    end,
+    status = status,
+})
+local savedThickness = plugin:GetSetting("LandscapeThickness")
+local savedLevel = plugin:GetSetting("LandscapeLevel")
+local savedColor = plugin:GetSetting("LandscapeColor")
+if typeof(savedThickness) == "number" and savedThickness >= 0.04 and savedThickness <= 4 then
+    ui.thickness = savedThickness
+end
+if typeof(savedLevel) == "number" and savedLevel >= 0 and savedLevel <= 4 then
+    ui.level = math.floor(savedLevel)
+end
+if typeof(savedColor) == "string" and savedColor:match("^%x%x%x%x%x%x$") then
+    ui.color = Color3.fromHex("#" .. savedColor)
+end
+ui:Refresh()
+branch:SetSettings(ui.thickness, ui.level, ui.color)
+local savedProfiles, savedActive = profiles:List()
+assetUI:SetProfiles(savedProfiles, savedActive)
+
+mouse.Move:Connect(function()
+    if active == "branch" then branch:UpdateCursor(false)
+    elseif active == "asset" then assets:UpdateCursor(false) end
+end)
+mouse.Button1Down:Connect(function()
+    if active == "branch" then branch:Click()
+    elseif active == "asset" then assets:Click() end
+end)
+UserInputService.InputBegan:Connect(function(input, processed)
+    if not active or processed then return end
+    if input.KeyCode == Enum.KeyCode.Return or input.KeyCode == Enum.KeyCode.KeypadEnter
+        or input.KeyCode == Enum.KeyCode.Escape then
+        stop()
+    end
+end)
+plugin.Deactivation:Connect(function()
+    if active then stop() end
+end)
+toggle.Click:Connect(function()
+    widget.Enabled = not widget.Enabled
+    if not widget.Enabled then stop() end
+end)
+widget:GetPropertyChangedSignal("Enabled"):Connect(function()
+    if not widget.Enabled then stop() end
+end)
+plugin.Unloading:Connect(function()
+    stop()
+    branch.preview:Clear()
+    assets:Destroy()
+end)
+]]></string>
+      </Properties>
+    </Item>
+    <Item class="Folder" referent="2">
+      <Properties>
+        <string name="Name">modules</string>
+      </Properties>
+      <Item class="ModuleScript" referent="3">
+        <Properties>
+          <string name="Name">BranchGeometry</string>
+          <string name="Source"><![CDATA[local BranchGeometry = {}
+
+local function stableFrame(startPoint: Vector3, endPoint: Vector3): CFrame
+    local direction = (endPoint - startPoint).Unit
+    local reference = if math.abs(direction:Dot(Vector3.yAxis)) > 0.94
+        then Vector3.xAxis else Vector3.yAxis
+    local back = direction:Cross(reference).Unit
+    local up = back:Cross(direction).Unit
+    return CFrame.fromMatrix((startPoint + endPoint) * 0.5, direction, up, back)
+end
+
+function BranchGeometry.Apply(part: Part, from: Vector3, to: Vector3,
+    diameter: number, color: Color3, isPreview: boolean)
+    local length = (to - from).Magnitude
+    if length < 0.001 then
+        part.Transparency = 1
+        return
+    end
+    part.Name = "Stem"
+    part.Shape = Enum.PartType.Cylinder
+    part.Material = Enum.Material.SmoothPlastic
+    part.Anchored = true
+    part.CanCollide = false
+    part.CanTouch = false
+    part.CanQuery = false
+    part.CastShadow = not isPreview
+    part.Size = Vector3.new(length, diameter, diameter)
+    part.CFrame = stableFrame(from, to)
+    part.Color = color
+    part.Transparency = if isPreview then 0.35 else 0
+end
+
+-- Raise the center of the cylinder half its thickness away from the hit face.
+-- Keep authored anchors in unmodified world coordinates for later re-authoring.
+function BranchGeometry.VisiblePoint(anchor, diameter: number): Vector3
+    return anchor.position + anchor.normal * (diameter * 0.5 + 0.015)
+end
+
+function BranchGeometry.CreateSegments(container: Instance, anchors, diameter, color, isPreview)
+    for index = 1, #anchors - 1 do
+        local a = BranchGeometry.VisiblePoint(anchors[index], diameter)
+        local b = BranchGeometry.VisiblePoint(anchors[index + 1], diameter)
+        if (a - b).Magnitude > 0.001 then
+            local part = Instance.new("Part")
+            BranchGeometry.Apply(part, a, b, diameter, color, isPreview)
+            part.Name = string.format("Stem_%02d", index)
+            -- Stored on new strokes for an accurate outward facing when assets
+            -- are attached anywhere along a curved surface-following stem.
+            if not isPreview then
+                part:SetAttribute("LandscapeStemNormalA", anchors[index].normal)
+                part:SetAttribute("LandscapeStemNormalB", anchors[index + 1].normal)
+            end
+            part.Parent = container
+        end
+    end
+end
+
+return BranchGeometry
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="4">
+        <Properties>
+          <string name="Name">BranchPath</string>
+          <string name="Source"><![CDATA[-- Pure recursive surface-follow subdivision. Geometry and Studio UI depend on this,
+-- not the other way around. Each level doubles the number of segments.
+local BranchPath = {}
+
+local function midpointNormal(a: Vector3, b: Vector3): Vector3
+    local combined = a + b
+    if combined.Magnitude < 0.001 then
+        return a
+    end
+    return combined.Unit
+end
+
+-- Anchors are {position: Vector3, normal: Vector3} in world space.
+-- project(position, expectedNormal, spanLength) -> {position, normal}?;
+-- a projection is only accepted if the face points toward the same side.
+function BranchPath.Build(startAnchor, endAnchor, levels: number, project)
+    assert(typeof(startAnchor.position) == "Vector3", "start position required")
+    assert(typeof(endAnchor.position) == "Vector3", "end position required")
+    assert(typeof(startAnchor.normal) == "Vector3", "start normal required")
+    assert(typeof(endAnchor.normal) == "Vector3", "end normal required")
+    assert(type(project) == "function", "surface projection callback required")
+    assert(type(levels) == "number" and levels >= 0 and levels <= 4 and levels % 1 == 0,
+        "follow level must be 0..4")
+
+    local stats = { snapped = 0, missed = 0 }
+    local function divide(a, b, remaining)
+        if remaining == 0 then
+            return {a, b}
+        end
+        local midpoint = (a.position + b.position) * 0.5
+        local normal = midpointNormal(a.normal, b.normal)
+        local found = project(midpoint, normal, (b.position - a.position).Magnitude)
+        local middle
+        if found and typeof(found.position) == "Vector3"
+            and typeof(found.normal) == "Vector3"
+            and found.normal.Magnitude > 0.001
+            and found.normal.Unit:Dot(normal) >= 0.25 then
+            middle = {position = found.position, normal = found.normal.Unit}
+            stats.snapped += 1
+        else
+            middle = {position = midpoint, normal = normal}
+            stats.missed += 1
+        end
+        local first = divide(a, middle, remaining - 1)
+        local second = divide(middle, b, remaining - 1)
+        table.remove(first) -- midpoint appears only once
+        for _, item in ipairs(second) do
+            table.insert(first, item)
+        end
+        return first
+    end
+    return divide(startAnchor, endAnchor, levels), stats
+end
+
+return BranchPath
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="5">
+        <Properties>
+          <string name="Name">BranchPlacement</string>
+          <string name="Source"><![CDATA[local HttpService = game:GetService("HttpService")
+local BranchPath = require(script.Parent.BranchPath)
+local BranchGeometry = require(script.Parent.BranchGeometry)
+local BranchPreview = require(script.Parent.BranchPreview)
+
+local BranchPlacement = {}
+BranchPlacement.__index = BranchPlacement
+
+local MAX_RAY_LENGTH = 2048
+local MAX_SEGMENT_LENGTH = 250
+
+function BranchPlacement.new(workspace, history, pluginMouse, setStatus)
+    local self = setmetatable({}, BranchPlacement)
+    self.workspace = workspace
+    self.history = history
+    self.mouse = pluginMouse
+    self.setStatus = setStatus
+    self.preview = BranchPreview.new(workspace)
+    self.active = false
+    self.anchor = nil
+    self.cursor = nil
+    self.strokeId = nil
+    self.segmentNumber = 0
+    self.lastMove = 0
+    self.thickness = 0.24
+    self.level = 0
+    self.color = Color3.fromRGB(89, 123, 60)
+    return self
+end
+
+function BranchPlacement:SetSettings(diameter, level, color)
+    self.thickness = math.clamp(diameter, 0.04, 4)
+    self.level = math.clamp(math.floor(level), 0, 4)
+    self.color = color
+    if self.active then self:UpdateCursor(true) end
+end
+
+function BranchPlacement:Start()
+    self.active = true
+    self.anchor = nil
+    self.strokeId = HttpService:GenerateGUID(false)
+    self.segmentNumber = 0
+    self.lastMove = 0
+    self.setStatus("Кликни первую точку на поверхности")
+    self:UpdateCursor(true)
+end
+
+function BranchPlacement:Stop()
+    self.active = false
+    self.anchor = nil
+    self.cursor = nil
+    self.preview:Clear()
+    self.setStatus("Готово · выбери «Ветка», чтобы начать снова")
+end
+
+function BranchPlacement:Raycast(origin: Vector3, direction: Vector3)
+    local filter = {}
+    local output = self.workspace:FindFirstChild("Game1LandscapeDecor")
+    if output then table.insert(filter, output) end
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = filter
+    params.IgnoreWater = true
+    return self.workspace:Raycast(origin, direction, params)
+end
+
+function BranchPlacement:ProjectToFacingSurface(point: Vector3, outwardNormal: Vector3, spanLength: number)
+    -- Search *from the visible side* back into the surface. A reverse-facing
+    -- triangle or an opposite wall face is not accepted as a valid snap.
+    local reach = math.clamp(spanLength * 0.75, 1.5, 14)
+    local result = self:Raycast(point + outwardNormal * reach, -outwardNormal * (reach * 2))
+    if not result or result.Normal:Dot(outwardNormal) < 0.25 then
+        return nil
+    end
+    if (result.Position - point).Magnitude > reach then
+        return nil
+    end
+    return {position = result.Position, normal = result.Normal}
+end
+
+function BranchPlacement:PathTo(nextAnchor)
+    if not self.anchor then return nil, nil end
+    return BranchPath.Build(self.anchor, nextAnchor, self.level,
+        function(point, normal, length)
+            return self:ProjectToFacingSurface(point, normal, length)
+        end)
+end
+
+function BranchPlacement:UpdateCursor(force)
+    if not self.active then return end
+    local now = os.clock()
+    if not force and now - self.lastMove < 1 / 30 then return end
+    self.lastMove = now
+    local ray = self.mouse.UnitRay
+    local hit = self:Raycast(ray.Origin, ray.Direction * MAX_RAY_LENGTH)
+    if not hit then
+        self.cursor = nil
+        self.preview:Hide()
+        return
+    end
+    local nextAnchor = {position = hit.Position, normal = hit.Normal}
+    self.cursor = nextAnchor
+    local anchors
+    if self.anchor and (self.anchor.position - nextAnchor.position).Magnitude > 0.02 then
+        anchors = self:PathTo(nextAnchor)
+    end
+    self.preview:Show(anchors, nextAnchor, self.thickness, self.color)
+end
+
+local function storeAnchor(model, prefix, anchor)
+    model:SetAttribute(prefix .. "Point", anchor.position)
+    model:SetAttribute(prefix .. "Normal", anchor.normal)
+end
+
+function BranchPlacement:Commit(toAnchor)
+    local fromAnchor = self.anchor
+    if not fromAnchor then return false end
+    if (toAnchor.position - fromAnchor.position).Magnitude > MAX_SEGMENT_LENGTH then
+        self.setStatus("Слишком длинный отрезок (максимум 250 studs)")
+        return false
+    end
+    local anchors, stats = self:PathTo(toAnchor)
+    if not anchors or #anchors < 2 or (toAnchor.position - fromAnchor.position).Magnitude < 0.05 then
+        self.setStatus("Поставь следующую точку чуть дальше")
+        return false
+    end
+    local record = self.history:TryBeginRecording("Game1LandscapeBranch", "Draw landscape branch")
+    if not record then
+        self.setStatus("Studio не разрешила запись Undo · ветка не создана")
+        return false
+    end
+    local ok, err = pcall(function()
+        local root = self.workspace:FindFirstChild("Game1LandscapeDecor")
+        if root and not root:IsA("Folder") then
+            error("Workspace.Game1LandscapeDecor must be a Folder")
+        end
+        if not root then
+            root = Instance.new("Folder")
+            root.Name = "Game1LandscapeDecor"
+            root.Parent = self.workspace
+        end
+        local branches = root:FindFirstChild("Branches")
+        if branches and not branches:IsA("Folder") then
+            error("Game1LandscapeDecor.Branches must be a Folder")
+        end
+        if not branches then
+            branches = Instance.new("Folder")
+            branches.Name = "Branches"
+            branches.Parent = root
+        end
+        local model = Instance.new("Model")
+        model.Name = "Branch_" .. HttpService:GenerateGUID(false):sub(1, 8)
+        model:SetAttribute("SchemaVersion", 1)
+        model:SetAttribute("AuthoringTool", "Game1LandscapePainter")
+        model:SetAttribute("StrokeId", self.strokeId)
+        model:SetAttribute("SegmentIndex", self.segmentNumber + 1)
+        model:SetAttribute("Thickness", self.thickness)
+        model:SetAttribute("ColorHex", "#" .. self.color:ToHex())
+        model:SetAttribute("SurfaceFollowLevel", self.level)
+        model:SetAttribute("SnappedMidpoints", stats.snapped)
+        model:SetAttribute("UnsnappedMidpoints", stats.missed)
+        storeAnchor(model, "Start", fromAnchor)
+        storeAnchor(model, "End", toAnchor)
+        BranchGeometry.CreateSegments(model, anchors, self.thickness, self.color, false)
+        if #model:GetChildren() == 0 then error("No visible geometry was generated") end
+        model.Parent = branches
+    end)
+    if not ok then
+        self.history:FinishRecording(record, Enum.FinishRecordingOperation.Cancel)
+        self.setStatus("Ошибка размещения: " .. tostring(err))
+        return false
+    end
+    self.history:FinishRecording(record, Enum.FinishRecordingOperation.Commit)
+    self.segmentNumber += 1
+    local note = if stats.missed > 0 then " · " .. stats.missed .. " точек без прилегания" else ""
+    self.setStatus("Ветка размещена · продолжай или Enter для завершения" .. note)
+    return true
+end
+
+function BranchPlacement:Click()
+    if not self.active then return end
+    -- Always refresh the hit on click; the cursor preview might have been
+    -- throttled during fast movement.
+    self:UpdateCursor(true)
+    if not self.cursor then
+        self.setStatus("Наведи курсор на поверхность")
+        return
+    end
+    local selected = {position = self.cursor.position, normal = self.cursor.normal}
+    if not self.anchor then
+        self.anchor = selected
+        self.setStatus("Первая точка поставлена · выбери следующую")
+        return
+    end
+    if self:Commit(selected) then
+        self.anchor = selected -- continuous polyline until Enter
+    end
+end
+
+return BranchPlacement
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="6">
+        <Properties>
+          <string name="Name">BranchPreview</string>
+          <string name="Source"><![CDATA[-- Temporary Studio overlays: all preview instances live under CoreGui,
+-- never inside Workspace or Camera, so saving the Place cannot retain them.
+local BranchGeometry = require(script.Parent.BranchGeometry)
+
+local BranchPreview = {}
+BranchPreview.__index = BranchPreview
+
+local function segmentFrame(from: Vector3, to: Vector3)
+    local direction = (to - from).Unit -- cylinder adornment height runs along local Y
+    local reference = if math.abs(direction:Dot(Vector3.yAxis)) > 0.94
+        then Vector3.xAxis else Vector3.yAxis
+    local right = reference:Cross(direction).Unit
+    local back = right:Cross(direction).Unit
+    return CFrame.fromMatrix((from + to) * 0.5, right, direction, back)
+end
+
+function BranchPreview.new(workspace)
+    local self = setmetatable({}, BranchPreview)
+    self.workspace = workspace
+    self.folder = nil
+    self.parts = {}
+    self.marker = nil
+    return self
+end
+
+function BranchPreview:Clear()
+    if self.folder then self.folder:Destroy() end
+    self.folder = nil
+    self.parts = {}
+    self.marker = nil
+end
+
+function BranchPreview:Ensure()
+    if self.folder then return true end
+    local coreGui = game:GetService("CoreGui")
+    local folder = Instance.new("Folder")
+    folder.Name = "Game1LandscapePainterOverlay"
+    folder.Parent = coreGui
+    local marker = Instance.new("SphereHandleAdornment")
+    marker.Name = "Cursor"
+    marker.Adornee = self.workspace.Terrain
+    marker.AlwaysOnTop = false
+    marker.Transparency = 0.12
+    marker.Parent = folder
+    self.folder = folder
+    self.marker = marker
+    return true
+end
+
+function BranchPreview:Show(anchors, cursor, diameter, color)
+    if not self:Ensure() then return end
+    local terrainFrame = self.workspace.Terrain.CFrame
+    self.marker.Radius = math.max(0.11, diameter * 0.5)
+    self.marker.CFrame = terrainFrame:ToObjectSpace(CFrame.new(BranchGeometry.VisiblePoint(cursor, diameter)))
+    self.marker.Color3 = color
+    self.marker.Visible = true
+    local required = if anchors then #anchors - 1 else 0
+    for i = 1, required do
+        local a = BranchGeometry.VisiblePoint(anchors[i], diameter)
+        local b = BranchGeometry.VisiblePoint(anchors[i + 1], diameter)
+        local length = (b - a).Magnitude
+        local part = self.parts[i]
+        if not part then
+            part = Instance.new("CylinderHandleAdornment")
+            part.Name = "Preview" .. tostring(i)
+            part.Adornee = self.workspace.Terrain
+            part.Transparency = 0.35
+            part.AlwaysOnTop = false
+            part.Parent = self.folder
+            self.parts[i] = part
+        end
+        if length > 0.001 then
+            part.Height = length
+            part.Radius = diameter * 0.5
+            part.CFrame = terrainFrame:ToObjectSpace(segmentFrame(a, b))
+            part.Color3 = color
+            part.Visible = true
+        else
+            part.Visible = false
+        end
+    end
+    for i = required + 1, #self.parts do
+        self.parts[i].Visible = false
+    end
+end
+
+function BranchPreview:Hide()
+    if self.marker then self.marker.Visible = false end
+    for _, part in ipairs(self.parts) do part.Visible = false end
+end
+
+return BranchPreview
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="7">
+        <Properties>
+          <string name="Name">DecoAssetLoader</string>
+          <string name="Source"><![CDATA[local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
+local MeshPhysics = require(script.Parent.StudioMeshPhysicsCore)
+local MeshNames = require(script.Parent.StudioLocationMeshNames)
+local Carrier = require(script.Parent.StudioLocationRigCarrier)
+local SkinConnection = require(script.Parent.StudioSkinnedMeshConnection)
+local PublishedRigNormalize = require(script.Parent.StudioLocationPublishedRigNormalize)
+local DecoAssetLoader = {}
+DecoAssetLoader.__index = DecoAssetLoader
+
+local function canonicalModel(loaded: Instance): Model
+    local imported: Instance = loaded
+    local children = loaded:GetChildren()
+    if loaded:IsA("Model") and #children == 1 then
+        imported = children[1]
+        imported.Parent = nil
+        loaded:Destroy()
+    end
+    if imported:IsA("Model") then
+        return imported
+    end
+    local model = Instance.new("Model")
+    model.Name = "ImportedDeco"
+    imported.Parent = model
+    return model
+end
+
+local function sanitize(model: Model)
+    -- Location assets are static decoration. Animation runtime objects and the
+    -- importer-generated InitialPoses cache are not part of the authored asset
+    -- and make transient placement clones unnecessarily fragile. Keep Bones,
+    -- because a skinned MeshPart can still need its bind skeleton for rendering.
+    for _, descendant in ipairs(model:GetDescendants()) do
+        if descendant:IsA("Script") or descendant:IsA("LocalScript") or descendant:IsA("AnimationController") or descendant:IsA("Animator") then
+            descendant:Destroy()
+        elseif descendant:IsA("Folder") and descendant.Name == "InitialPoses" then
+            descendant:Destroy()
+        elseif descendant:IsA("BasePart") then
+            descendant.Anchored = true
+            descendant.CanTouch = false
+        end
+    end
+end
+
+local function applyTexture(model: Model, textureAssetId: string, alphaEnabled: boolean)
+    local numericId = tonumber(textureAssetId)
+    if numericId == nil or numericId <= 0 then
+        return 0
+    end
+    local uri = "rbxassetid://" .. tostring(math.floor(numericId))
+    local applied = 0
+    for _, descendant in ipairs(model:GetDescendants()) do
+        if descendant:IsA("MeshPart") then
+            if Carrier.IsCarrier(descendant) then
+                -- Carrier is a real published mesh, never an Atlas consumer.
+                Carrier.Prepare(descendant)
+            elseif MeshPhysics.IsCollider(descendant.Name) or descendant:GetAttribute("Game1DecoPhysicsOnly")==true then
+                -- COL is physics-only. Strip old importer texture remnants from
+                -- the fresh clone; never assign Atlas IDs to collision geometry.
+                descendant.TextureID = ""
+                local surface = descendant:FindFirstChildOfClass("SurfaceAppearance")
+                if surface then surface:Destroy() end
+            else
+                StudioTextureAppearance.ApplyLocation(descendant, uri, alphaEnabled)
+                applied += 1
+            end
+        end
+    end
+    return applied
+end
+
+function DecoAssetLoader.new(config: any)
+    return setmetatable({
+        HttpService = config.HttpService,
+        AssetService = config.AssetService,
+        agentBaseUrl = config.agentBaseUrl,
+        agentToken = config.agentToken,
+    }, DecoAssetLoader)
+end
+
+function DecoAssetLoader:fetchRegistry(): any
+    local response = self.HttpService:RequestAsync({
+        Url = self.agentBaseUrl .. "/api/location-assets",
+        Method = "GET",
+        Headers = { ["X-Control-Token"] = self.agentToken },
+    })
+    if not response.Success then
+        error(("Location Assets registry HTTP %d: %s"):format(response.StatusCode, response.Body))
+    end
+    local decoded = self.HttpService:JSONDecode(response.Body)
+    if type(decoded) ~= "table" or type(decoded.items) ~= "table" then
+        error("Location Assets registry returned an invalid payload")
+    end
+    return decoded
+end
+
+function DecoAssetLoader:loadPublished(row: any): Model
+    if type(row) ~= "table" or tostring(row.status or "") ~= "PUBLISHED" then
+        error("DecoManager can load only PUBLISHED location assets")
+    end
+    local assetId = tonumber(row.model_asset_id)
+    if assetId == nil or assetId <= 0 then
+        error("selected location asset has no published model Asset ID")
+    end
+
+    local loaded: Instance? = nil
+    local lastError = ""
+    for _ = 1, 6 do
+        local ok, value = pcall(function()
+            return self.AssetService:LoadAssetAsync(assetId)
+        end)
+        if ok and value ~= nil then
+            loaded = value
+            break
+        end
+        lastError = tostring(value)
+        task.wait(0.4)
+    end
+    if loaded == nil then
+        error("could not load location asset " .. tostring(assetId) .. ": " .. lastError)
+    end
+
+    local model = canonicalModel(loaded)
+    model.Name = tostring(row.slug or "deco_asset")
+    sanitize(model)
+    -- A static FBX has no Bones and must not acquire a carrier. Legacy static
+    -- publications are allowed only after SHA-bound source inspection, then
+    -- independently validated against the loaded Roblox Model.
+    -- LoadAssetAsync can wrap a valid Blender-authored carrier rig in an inert
+    -- RootPart + Motor6D assembly. Normalize only this detached fresh clone;
+    -- placed Models are replaced transactionally and are never edited in situ.
+    local authoredPivot = PublishedRigNormalize.Apply(model, row.rigManifest)
+    local carrier = Carrier.Validate(model, row.rigManifest, row.legacyStaticPublication)
+    if carrier then
+        Carrier.Prepare(carrier)
+        -- Roblox skinning finds Bones on connected MeshParts within one Model.
+        -- Importer Motor6Ds may already form a valid assembly; retain those.
+        -- RootPart normalization can also leave disconnected visual/COL parts.
+        -- Complete only missing paths on this detached clone, never on Place.
+        for _, part in ipairs(model:GetDescendants()) do
+            if part:IsA("MeshPart") and part ~= carrier then
+                local weldName = if MeshPhysics.IsCollider(part.Name) then "LocationRigWeld"
+                    else "LocationSkinWeld"
+                SkinConnection.Connect(model, carrier, part, weldName)
+            end
+        end
+        carrier.PivotOffset = carrier.CFrame:ToObjectSpace(authoredPivot)
+        model.PrimaryPart = carrier
+        if (model:GetPivot().Position-authoredPivot.Position).Magnitude>0.002 then
+            error("rig_carrier PrimaryPart changed the authored Model pivot")
+        end
+    end
+    applyTexture(model, tostring(row.texture_asset_id or ""), row.alphaEnabled)
+    MeshPhysics.ApplyLocationModel(model, nil, row.meshOptions)
+    MeshPhysics.ApplyLocationSurfaceMaterial(model,row.surfaceMaterial,row.robloxMaterial or (row.materialDefinition and row.materialDefinition.robloxMaterial))
+    -- Version-2 authored names belong to the immutable publication manifest.
+    -- Renaming a visual to the current slug would silently invalidate it.
+    return model
+end
+
+function DecoAssetLoader:loadForMeshInventory(modelId: string, slug: string): Model
+    -- Geometry and Mesh ID inventory are read from immutable published Models.
+    -- No separate image publication is performed.
+    -- Only historical forensics: older immutable Model publications may have
+    -- RootPart and no carrier. No normalization or staging mutation is allowed.
+    local id = tonumber(modelId)
+    if not id or id <= 0 then error("invalid historical Model ID") end
+    local asset = self.AssetService:LoadAssetAsync(id)
+    local model = canonicalModel(asset)
+    model.Name = slug
+    return model
+end
+
+return DecoAssetLoader
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="8">
+        <Properties>
+          <string name="Name">LandscapeAdjustments</string>
+          <string name="Source"><![CDATA[-- Shared direct-manipulation controls for Landscape Painter. No Workspace ownership.
+-- Pointer drag is tracked on UserInputService so it continues outside the track.
+local UserInputService = game:GetService("UserInputService")
+local Adjustments = {}
+local BG = Color3.fromRGB(24, 37, 48)
+local TEXT = Color3.fromRGB(224, 237, 237)
+local MUTED = Color3.fromRGB(153, 174, 185)
+local ACCENT = Color3.fromRGB(62, 205, 175)
+
+local function make(class, props, parent)
+    local instance = Instance.new(class)
+    for key, value in pairs(props) do instance[key] = value end
+    instance.Parent = parent
+    return instance
+end
+
+local function round(frame, radius)
+    make("UICorner", {CornerRadius = UDim.new(0, radius or 7)}, frame)
+end
+
+function Adjustments.Slider(parent, options)
+    local minimum, maximum = options.min, options.max
+    local step = options.step or 0
+    local logarithmic = options.logarithmic == true
+    assert(maximum > minimum and (not logarithmic or minimum > 0), "invalid slider range")
+    local frame = make("Frame", {BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 65)}, parent)
+    if parent.Name == "LandscapeUI" then frame.LayoutOrder = #parent:GetChildren() end
+    local heading = make("TextLabel", {BackgroundTransparency = 1, Text = options.label,
+        TextColor3 = MUTED, Font = Enum.Font.Gotham, TextSize = 12,
+        TextXAlignment = Enum.TextXAlignment.Left, Size = UDim2.new(1, -78, 0, 25)}, frame)
+    local valueButton = make("TextButton", {Text = "", BackgroundColor3 = BG,
+        TextColor3 = TEXT, BorderSizePixel = 0, AutoButtonColor = true,
+        Font = Enum.Font.Code, TextSize = 13, Size = UDim2.fromOffset(76, 27),
+        AnchorPoint = Vector2.new(1, 0), Position = UDim2.fromScale(1, 0)}, frame)
+    round(valueButton, 6)
+    local exact = make("TextBox", {Visible = false, BackgroundColor3 = BG,
+        TextColor3 = ACCENT, BorderSizePixel = 0, ClearTextOnFocus = false,
+        Font = Enum.Font.Code, TextSize = 13, Size = UDim2.fromScale(1, 1)}, valueButton)
+    local track = make("TextButton", {Text = "", BackgroundColor3 = BG,
+        BorderSizePixel = 0, Active = true, AutoButtonColor = false,
+        Size = UDim2.new(1, -16, 0, 17), Position = UDim2.fromOffset(8, 39)}, frame)
+    round(track, 9)
+    local fill = make("Frame", {BackgroundColor3 = ACCENT, BorderSizePixel = 0,
+        Size = UDim2.fromScale(0, 1)}, track)
+    round(fill, 9)
+    local thumb = make("Frame", {BackgroundColor3 = TEXT, BorderSizePixel = 0,
+        Size = UDim2.fromOffset(16, 16), AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.fromScale(0, 0.5), ZIndex = 2}, track)
+    round(thumb, 8)
+    -- Transparent input layer stays above the handle/fill, so dragging starts
+    -- on the thumb too (GUI children do not steal pointer events).
+    local hitbox = make("TextButton", {Text = "", BackgroundTransparency = 1,
+        AutoButtonColor = false, BorderSizePixel = 0, Active = true,
+        ZIndex = 5, Size = UDim2.fromScale(1, 1)}, track)
+    local value = options.value or minimum
+    local dragging = false
+    local activeTouch = nil
+    local connections = {}
+    local function fraction(number)
+        local ratio = if logarithmic then
+            math.log(number / minimum) / math.log(maximum / minimum)
+            else (number - minimum) / (maximum - minimum)
+        return math.clamp(ratio, 0, 1)
+    end
+    local function fromFraction(ratio)
+        local raw = if logarithmic then minimum * (maximum / minimum) ^ ratio
+            else minimum + (maximum - minimum) * ratio
+        if step > 0 then raw = math.floor(raw / step + 0.5) * step end
+        return math.clamp(raw, minimum, maximum)
+    end
+    local function redraw()
+        local ratio = fraction(value)
+        fill.Size = UDim2.fromScale(ratio, 1)
+        thumb.Position = UDim2.fromScale(ratio, 0.5)
+        valueButton.Text = string.format(options.format or "%.2f", value) .. (options.suffix or "")
+    end
+    local function setValue(nextValue, notify)
+        if typeof(nextValue) ~= "number" or nextValue ~= nextValue then return end
+        nextValue = math.clamp(nextValue, minimum, maximum)
+        if step > 0 then nextValue = math.clamp(math.floor(nextValue / step + 0.5) * step, minimum, maximum) end
+        local changed = math.abs(value - nextValue) > 0.000001
+        value = nextValue
+        redraw()
+        if changed and notify then options.changed(value) end
+    end
+    local function drag(position)
+        local width = math.max(1, track.AbsoluteSize.X)
+        setValue(fromFraction(math.clamp((position.X - track.AbsolutePosition.X) / width, 0, 1)), true)
+    end
+    table.insert(connections, hitbox.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            drag(input.Position)
+        elseif input.UserInputType == Enum.UserInputType.Touch then
+            activeTouch = input
+            drag(input.Position)
+        end
+    end))
+    table.insert(connections, UserInputService.InputChanged:Connect(function(input)
+        if (dragging and input.UserInputType == Enum.UserInputType.MouseMovement) or input == activeTouch then
+            drag(input.Position)
+        end
+    end))
+    table.insert(connections, UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+        if input == activeTouch then activeTouch = nil end
+    end))
+    table.insert(connections, valueButton.MouseButton1Click:Connect(function()
+        exact.Text = tostring(value)
+        exact.Visible = true
+        exact:CaptureFocus()
+    end))
+    table.insert(connections, exact.FocusLost:Connect(function()
+        local parsed = tonumber(exact.Text)
+        if parsed then setValue(parsed, true) end
+        exact.Visible = false
+    end))
+    table.insert(connections, frame.Destroying:Connect(function()
+        for _, connection in ipairs(connections) do connection:Disconnect() end
+    end))
+    redraw()
+    return {frame = frame, Set = function(_, number) setValue(number, false) end,
+        Get = function() return value end}
+end
+
+-- Compact HSV picker: presets for common work, a hue strip and an SV plane
+-- for any other color. Exact hex input is available, but never required.
+function Adjustments.Color(parent, options)
+    local picker = make("Frame", {BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 192)}, parent)
+    if parent.Name == "LandscapeUI" then picker.LayoutOrder = #parent:GetChildren() end
+    local presets = make("Frame", {BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 30)}, picker)
+    make("UIListLayout", {FillDirection = Enum.FillDirection.Horizontal,
+        Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder}, presets)
+    local hue, saturation, brightness = options.value:ToHSV()
+    local value = options.value
+    local swatches = {}
+    local redraw
+    local function publish()
+        local nextValue = Color3.fromHSV(hue, saturation, brightness)
+        if nextValue ~= value then
+            value = nextValue
+            options.changed(value)
+        end
+    end
+    local function setColor(nextValue, notify)
+        if typeof(nextValue) ~= "Color3" then return end
+        hue, saturation, brightness = nextValue:ToHSV()
+        value = nextValue
+        if notify then options.changed(value) end
+    end
+    for index, rgb in ipairs(options.presets or {}) do
+        local item = make("TextButton", {Text = "", BackgroundColor3 = rgb,
+            BorderSizePixel = 0, AutoButtonColor = true, LayoutOrder = index,
+            Size = UDim2.fromOffset(26, 26)}, presets)
+        round(item, 6)
+        swatches[index] = item
+        item.MouseButton1Click:Connect(function() setColor(rgb, true); redraw() end)
+    end
+    local plane = make("TextButton", {Text = "", BorderSizePixel = 0, Active = true,
+        AutoButtonColor = false, Position = UDim2.fromOffset(3, 36),
+        Size = UDim2.new(1, -6, 0, 91)}, picker)
+    round(plane, 5)
+    local white = make("Frame", {Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(1, 1, 1),
+        BorderSizePixel = 0}, plane)
+    make("UIGradient", {Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1)})}, white)
+    local shade = make("Frame", {Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(0, 0, 0),
+        BorderSizePixel = 0}, plane)
+    make("UIGradient", {Rotation = 90, Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(1, 0)})}, shade)
+    local cursor = make("Frame", {Size = UDim2.fromOffset(12, 12),
+        AnchorPoint = Vector2.new(0.5, 0.5), BackgroundColor3 = TEXT,
+        BorderSizePixel = 0, ZIndex = 4}, plane)
+    round(cursor, 6)
+    local planeHitbox = make("TextButton", {Text = "", BackgroundTransparency = 1,
+        BorderSizePixel = 0, AutoButtonColor = false, Active = true,
+        ZIndex = 6, Size = UDim2.fromScale(1, 1)}, plane)
+    local hueTrack = make("TextButton", {Text = "", BorderSizePixel = 0,
+        AutoButtonColor = false, Active = true, BackgroundColor3 = Color3.new(1, 1, 1),
+        Size = UDim2.new(1, -6, 0, 16), Position = UDim2.fromOffset(3, 135)}, picker)
+    round(hueTrack, 6)
+    make("UIGradient", {Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromHSV(0, 1, 1)),
+        ColorSequenceKeypoint.new(1/6, Color3.fromHSV(1/6, 1, 1)),
+        ColorSequenceKeypoint.new(2/6, Color3.fromHSV(2/6, 1, 1)),
+        ColorSequenceKeypoint.new(3/6, Color3.fromHSV(3/6, 1, 1)),
+        ColorSequenceKeypoint.new(4/6, Color3.fromHSV(4/6, 1, 1)),
+        ColorSequenceKeypoint.new(5/6, Color3.fromHSV(5/6, 1, 1)),
+        ColorSequenceKeypoint.new(1, Color3.fromHSV(1, 1, 1)),
+    })}, hueTrack)
+    local hueCursor = make("Frame", {Size = UDim2.fromOffset(9, 22),
+        AnchorPoint = Vector2.new(0.5, 0.5), BackgroundColor3 = TEXT,
+        BorderSizePixel = 0, ZIndex = 3}, hueTrack)
+    round(hueCursor, 5)
+    local hueHitbox = make("TextButton", {Text = "", BackgroundTransparency = 1,
+        BorderSizePixel = 0, AutoButtonColor = false, Active = true,
+        ZIndex = 6, Size = UDim2.fromScale(1, 1)}, hueTrack)
+    local hexButton = make("TextButton", {Text = "", TextColor3 = TEXT,
+        BackgroundColor3 = BG, BorderSizePixel = 0, Font = Enum.Font.Code,
+        TextSize = 13, Size = UDim2.new(1, 0, 0, 30),
+        Position = UDim2.fromOffset(0, 158)}, picker)
+    round(hexButton, 6)
+    local hexExact = make("TextBox", {Visible = false, ClearTextOnFocus = false,
+        TextColor3 = TEXT, BackgroundColor3 = BG, BorderSizePixel = 0,
+        Font = Enum.Font.Code, TextSize = 13, Size = UDim2.fromScale(1, 1)}, hexButton)
+    local dragKind = nil
+    local dragTouch = nil
+    local connections = {}
+    redraw = function()
+        plane.BackgroundColor3 = Color3.fromHSV(hue, 1, 1)
+        cursor.Position = UDim2.fromScale(saturation, 1 - brightness)
+        hueCursor.Position = UDim2.fromScale(hue, 0.5)
+        hexButton.Text = "●  #" .. value:ToHex():upper() .. "  ·  нажми для HEX"
+    end
+    local function applyPointer(kind, position)
+        local target = if kind == "hue" then hueTrack else plane
+        local x = math.clamp((position.X - target.AbsolutePosition.X) / math.max(1, target.AbsoluteSize.X), 0, 1)
+        if kind == "hue" then hue = x % 1 else
+            saturation = x
+            brightness = 1 - math.clamp((position.Y - target.AbsolutePosition.Y) / math.max(1, target.AbsoluteSize.Y), 0, 1)
+        end
+        publish()
+        redraw()
+    end
+    for _, pair in ipairs({{planeHitbox, "sv"}, {hueHitbox, "hue"}}) do
+        local target, kind = pair[1], pair[2]
+        table.insert(connections, target.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragKind = kind
+                applyPointer(kind, input.Position)
+            elseif input.UserInputType == Enum.UserInputType.Touch then
+                dragKind = kind
+                dragTouch = input
+                applyPointer(kind, input.Position)
+            end
+        end))
+    end
+    table.insert(connections, UserInputService.InputChanged:Connect(function(input)
+        if dragKind and (input == dragTouch or (not dragTouch and input.UserInputType == Enum.UserInputType.MouseMovement)) then
+            applyPointer(dragKind, input.Position)
+        end
+    end))
+    table.insert(connections, UserInputService.InputEnded:Connect(function(input)
+        if input == dragTouch or (not dragTouch and input.UserInputType == Enum.UserInputType.MouseButton1) then
+            dragKind = nil
+            dragTouch = nil
+        end
+    end))
+    table.insert(connections, hexButton.MouseButton1Click:Connect(function()
+        hexExact.Text = "#" .. value:ToHex():upper()
+        hexExact.Visible = true
+        hexExact:CaptureFocus()
+    end))
+    table.insert(connections, hexExact.FocusLost:Connect(function()
+        local text = hexExact.Text
+        if text:match("^#?%x%x%x%x%x%x$") then
+            setColor(Color3.fromHex(if text:sub(1, 1) == "#" then text else "#" .. text), true)
+        end
+        hexExact.Visible = false
+        redraw()
+    end))
+    -- Preset buttons share this refresh path with external Set calls.
+    table.insert(connections, picker.Destroying:Connect(function()
+        for _, connection in ipairs(connections) do connection:Disconnect() end
+    end))
+    redraw()
+    return {frame = picker, Set = function(_, color) setColor(color, false); redraw() end,
+        Get = function() return value end}
+end
+
+return table.freeze(Adjustments)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="9">
+        <Properties>
+          <string name="Name">LandscapeAssetCatalog</string>
+          <string name="Source"><![CDATA[-- Read-only published Location Asset registry, exactly the same source and
+-- the same validated published-Model loader as Game1Bridge / DecoManager.
+-- No writes to the registry and no duplicate asset database.
+local HttpService = game:GetService("HttpService")
+local AssetService = game:GetService("AssetService")
+local DecoAssetLoader = require(script.Parent.DecoAssetLoader)
+
+local Catalog = {}
+Catalog.__index = Catalog
+
+local URL = "http://127.0.0.1:43821"
+local TOKEN = "Game1LocalControlV1"
+
+function Catalog.new()
+    local loader = DecoAssetLoader.new({
+        HttpService = HttpService, AssetService = AssetService,
+        agentBaseUrl = URL, agentToken = TOKEN,
+    })
+    return setmetatable({loader = loader, rows = {}}, Catalog)
+end
+
+function Catalog:Refresh()
+    local snapshot = self.loader:fetchRegistry()
+    local rows = {}
+    for _, row in ipairs(snapshot.items) do
+        if type(row) == "table" and row.status == "PUBLISHED"
+            and type(row.slug) == "string" and row.slug ~= ""
+            and tonumber(row.model_asset_id) and tonumber(row.model_asset_id) > 0 then
+            table.insert(rows, row)
+        end
+    end
+    table.sort(rows, function(a, b)
+        return a.slug:lower() < b.slug:lower()
+    end)
+    self.rows = rows
+    return rows
+end
+
+function Catalog:Load(row)
+    -- Uses the shared normalization/skin connection/texture binding policy.
+    local model = self.loader:loadPublished(row)
+    if model.Parent ~= nil then
+        model:Destroy()
+        error("published location model must be detached before authoring")
+    end
+    return model
+end
+
+return Catalog
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="10">
+        <Properties>
+          <string name="Name">LandscapeAssetPlacement</string>
+          <string name="Source"><![CDATA[-- Edit-mode pivot placement with a surface reticle, reversible history,
+-- optional procedural tether, and a detached published-model template.
+local HttpService = game:GetService("HttpService")
+local Surface = require(script.Parent.LandscapeSurface)
+local StemTarget = require(script.Parent.LandscapeStemTarget)
+local BranchGeometry = require(script.Parent.BranchGeometry)
+local BranchPreview = require(script.Parent.BranchPreview)
+local Profiles = require(script.Parent.LandscapeProfiles)
+
+local Placement = {}
+Placement.__index = Placement
+local RAY_LENGTH = 2048
+local MAX_PREVIEW_HZ = 30
+local ROOT_NAME = "Game1LandscapeDecor"
+local ASSETS_NAME = "Assets"
+local LINE_NAME = "LandscapeAttachmentLine"
+local STEM_LINK_NAME = "LandscapeAnchorStem"
+local STEM_ATTACHMENTS_NAME = "Attachments"
+
+local function makeTether(model: Model, hitPoint: Vector3, targetPoint: Vector3, settings)
+    if not settings.tetherEnabled then return end
+    if (targetPoint - hitPoint).Magnitude < 0.01 then error("подвес слишком короткий") end
+    local line = Instance.new("Part")
+    BranchGeometry.Apply(line, hitPoint, targetPoint,
+        settings.thickness, Color3.fromHex(settings.color), false)
+    line.Name = LINE_NAME
+    line:SetAttribute("Game1LandscapeAttachment", true)
+    line.Parent = model
+end
+
+local function replaceTether(model: Model, point: Vector3, target: Vector3, settings)
+    local old = model:FindFirstChild(LINE_NAME)
+    if old and (not old:IsA("Part") or old:GetAttribute("Game1LandscapeAttachment") ~= true) then
+        error("LandscapeAttachmentLine занято сторонним объектом")
+    end
+    -- Generate a detached new line before modifying the existing assembly.
+    local line = nil
+    if settings.tetherEnabled then
+        local container = Instance.new("Model")
+        local ok, reason = pcall(makeTether, container, point, target, settings)
+        if not ok then container:Destroy(); error(reason) end
+        line = container:FindFirstChild(LINE_NAME)
+        if line then line.Parent = nil end
+        container:Destroy()
+    end
+    if old then old:Destroy() end
+    if line then line.Parent = model end
+end
+
+local function authoredFolder(workspace)
+    local root = workspace:FindFirstChild(ROOT_NAME)
+    if root and not root:IsA("Folder") then error(ROOT_NAME .. " must be a Folder") end
+    if not root then
+        root = Instance.new("Folder")
+        root.Name = ROOT_NAME
+        root.Parent = workspace
+    end
+    local folder = root:FindFirstChild(ASSETS_NAME)
+    if folder and not folder:IsA("Folder") then error(ROOT_NAME .. ".Assets must be a Folder") end
+    if not folder then
+        folder = Instance.new("Folder")
+        folder.Name = ASSETS_NAME
+        folder.Parent = root
+    end
+    return folder
+end
+
+function Placement.new(workspace, history, mouse, selection, catalog, profiles, status)
+    local self = setmetatable({}, Placement)
+    self.workspace = workspace
+    self.history = history
+    self.mouse = mouse
+    self.selection = selection
+    self.catalog = catalog
+    self.profiles = profiles
+    self.status = status
+    self.preview = BranchPreview.new(workspace)
+    self.config = Profiles.Validate({yaw = 0, pitch = 0, roll = 0,
+        tetherEnabled = false, length = 2, thickness = 0.02, color = "#343B38"})
+    self.template = nil
+    self.ghost = nil
+    self.row = nil
+    self.cursor = nil
+    self.active = false
+    self.lastMove = 0
+    self.pendingConfigPreview = false
+    self.targetMode = "auto" -- auto | surface | stem
+    self.stemParts = {}
+    self.stemFolder = nil
+    self.lastStemScan = 0
+    self.lastTargetKind = nil
+    return self
+end
+
+function Placement:SetConfiguration(config)
+    self.config = Profiles.Validate(config)
+    if not self.active then return end
+    -- Slider drags can fire many times per second. Preserve fluid preview
+    -- without rebuilding a large published mesh more than 30 times/second.
+    if os.clock() - self.lastMove >= 1 / MAX_PREVIEW_HZ then
+        self:UpdateCursor(false)
+    elseif not self.pendingConfigPreview then
+        self.pendingConfigPreview = true
+        task.delay(1 / MAX_PREVIEW_HZ, function()
+            self.pendingConfigPreview = false
+            if self.active then self:UpdateCursor(true) end
+        end)
+    end
+end
+
+function Placement:Effective()
+    local _, activeId = self.profiles:List()
+    local active = if activeId then self.profiles:Find(activeId) else nil
+    return active or self.config
+end
+
+function Placement:SelectAsset(row)
+    -- A failed LoadAssetAsync must not discard the previously selected asset.
+    local model = self.catalog:Load(row)
+    local previous = self.template
+    self:HideGhost()
+    self.template = model
+    self.row = row
+    if previous then previous:Destroy() end
+    self.status("Выбран " .. row.slug .. " · наведи прицел на стебель или поверхность")
+    self:UpdateCursor(true)
+end
+
+function Placement:SetTargetMode(mode)
+    if mode ~= "auto" and mode ~= "surface" and mode ~= "stem" then
+        error("Неизвестный режим прицела")
+    end
+    self.targetMode = mode
+    self.lastTargetKind = nil
+    if self.active then self:UpdateCursor(true) end
+end
+
+function Placement:ScanStems(force)
+    if force or os.clock() - self.lastStemScan > 0.5 then
+        self.stemParts, self.stemFolder = StemTarget.Collect(self.workspace)
+        self.lastStemScan = os.clock()
+    end
+end
+
+function Placement:ResolveHit()
+    local surface = Surface.Raycast(self.workspace, self.mouse, RAY_LENGTH)
+    if self.targetMode == "surface" then return surface end
+    self:ScanStems(false)
+    local stem = StemTarget.Find(self.stemParts, self.stemFolder,
+        self.mouse.UnitRay, surface, RAY_LENGTH)
+    if stem then return stem end
+    if self.targetMode == "stem" then return nil end
+    return surface
+end
+
+function Placement:Start(): boolean
+    if not self.row or not self.template then
+        self.status("Сначала выбери опубликованный ассет в каталоге")
+        return false
+    end
+    self.active = true
+    self.lastMove = 0
+    self:ScanStems(true)
+    self.status("Прицел активен · ЛКМ размещает на поверхности или стебле · Enter завершает")
+    self:UpdateCursor(true)
+    return true
+end
+
+function Placement:HideGhost()
+    if self.ghost then self.ghost:Destroy(); self.ghost = nil end
+    self.preview:Clear()
+end
+
+function Placement:Stop()
+    self.active = false
+    self.cursor = nil
+    self.lastTargetKind = nil
+    self:HideGhost()
+end
+
+function Placement:EnsureGhost()
+    if self.ghost and self.ghost.Parent ~= nil and self.ghost.Parent ~= self.workspace.CurrentCamera then
+        self.ghost:Destroy()
+        self.ghost = nil
+    end
+    if self.ghost then return self.ghost end
+    if not self.template or not self.workspace.CurrentCamera then return nil end
+    local clone = self.template:Clone()
+    clone.Name = "__Game1LandscapePreview"
+    for _, obj in ipairs(clone:GetDescendants()) do
+        if obj:IsA("BasePart") then
+            obj.Anchored = true
+            obj.CanCollide = false
+            obj.CanTouch = false
+            obj.CanQuery = false
+            obj.CastShadow = false
+            obj.Transparency = math.max(obj.Transparency, 0.5)
+        end
+    end
+    clone.Archivable = false
+    clone.Parent = self.workspace.CurrentCamera
+    self.ghost = clone
+    return clone
+end
+
+function Placement:UpdateCursor(force)
+    if not self.active then return end
+    local now = os.clock()
+    if not force and now - self.lastMove < 1 / MAX_PREVIEW_HZ then return end
+    self.lastMove = now
+    local hit = self:ResolveHit()
+    if not hit then
+        self.cursor = nil
+        self.preview:Hide()
+        if self.ghost then self.ghost.Parent = nil end
+        return
+    end
+    self.cursor = {point = hit.Position, normal = hit.Normal,
+        kind = hit.kind or "surface", stem = hit.stem, branch = hit.branch}
+    if self.lastTargetKind ~= self.cursor.kind then
+        self.lastTargetKind = self.cursor.kind
+        if self.cursor.kind == "stem" then
+            self.status("Цель: стебель · Pivot ассета крепится к нему · ЛКМ размещает")
+        else
+            self.status("Цель: поверхность · ЛКМ размещает")
+        end
+    end
+    local config = self:Effective()
+    local pivot = Surface.Pivot(hit.Position, hit.Normal, config)
+    local ghost = self:EnsureGhost()
+    if ghost then
+        if ghost.Parent == nil then ghost.Parent = self.workspace.CurrentCamera end
+        ghost:PivotTo(pivot)
+    end
+    local anchors = nil
+    if config.tetherEnabled then
+        anchors = {
+            {position = hit.Position, normal = hit.Normal},
+            {position = pivot.Position, normal = Vector3.zero},
+        }
+    end
+    self.preview:Show(anchors, {position = hit.Position, normal = hit.Normal},
+        if config.tetherEnabled then config.thickness else 0.2,
+        if config.tetherEnabled then Color3.fromHex(config.color) else Color3.fromRGB(65, 207, 169))
+end
+
+local function writeMetadata(model, cursor, row, config)
+    model:SetAttribute("LandscapeSchemaVersion", 1)
+    model:SetAttribute("LandscapeAuthoringTool", "Game1LandscapePainter")
+    model:SetAttribute("LandscapeAssetSlug", row.slug)
+    model:SetAttribute("LandscapeModelAssetId", tostring(row.model_asset_id))
+    model:SetAttribute("LandscapeSurfacePoint", cursor.point)
+    model:SetAttribute("LandscapeSurfaceNormal", cursor.normal)
+    model:SetAttribute("LandscapeYaw", config.yaw)
+    model:SetAttribute("LandscapePitch", config.pitch)
+    model:SetAttribute("LandscapeRoll", config.roll)
+    model:SetAttribute("LandscapeTetherEnabled", config.tetherEnabled)
+    model:SetAttribute("LandscapeTetherLength", config.length)
+    model:SetAttribute("LandscapeTetherThickness", config.thickness)
+    model:SetAttribute("LandscapeTetherColor", config.color)
+    model:SetAttribute("LandscapeAnchorKind", cursor.kind or "surface")
+end
+
+local function attachToStem(instance: Model, cursor)
+    local stem = cursor.stem
+    local branch = cursor.branch
+    if not stem or not branch or not stem:IsDescendantOf(branch)
+        or branch:GetAttribute("AuthoringTool") ~= "Game1LandscapePainter" then
+        error("Стебель больше не существует · наведи прицел повторно")
+    end
+    local link = Instance.new("ObjectValue")
+    link.Name = STEM_LINK_NAME
+    link.Value = stem
+    link.Parent = instance
+    instance:SetAttribute("LandscapeStemLocalPoint", stem.CFrame:PointToObjectSpace(cursor.point))
+    instance:SetAttribute("LandscapeStemLocalNormal", stem.CFrame:VectorToObjectSpace(cursor.normal))
+    instance:SetAttribute("LandscapeBranchStrokeId", branch:GetAttribute("StrokeId"))
+    local attachments = branch:FindFirstChild(STEM_ATTACHMENTS_NAME)
+    if attachments and not attachments:IsA("Folder") then
+        error("У стебля занято имя Attachments")
+    end
+    if not attachments then
+        attachments = Instance.new("Folder")
+        attachments.Name = STEM_ATTACHMENTS_NAME
+        attachments.Parent = branch
+    end
+    return attachments
+end
+
+function Placement:Click()
+    if not self.active then return end
+    self:UpdateCursor(true)
+    local cursor = self.cursor
+    if not cursor then
+        self.status(if self.targetMode == "stem" then "Прицел не видит стебель"
+            else "Прицел не видит точку размещения")
+        return
+    end
+    local row, template = self.row, self.template
+    if not row or not template then return end
+    local config = self:Effective()
+    local record = self.history:TryBeginRecording("Game1LandscapeAsset", "Place landscape asset")
+    if not record then self.status("Studio не разрешила создать Undo-запись"); return end
+    local instance = nil
+    local ok, reason = pcall(function()
+        local folder = authoredFolder(self.workspace)
+        instance = template:Clone()
+        instance.Name = row.slug .. "_" .. HttpService:GenerateGUID(false):sub(1, 8)
+        local pivot = Surface.Pivot(cursor.point, cursor.normal, config)
+        instance:PivotTo(pivot)
+        makeTether(instance, cursor.point, pivot.Position, config)
+        writeMetadata(instance, cursor, row, config)
+        if cursor.kind == "stem" then
+            instance.Parent = attachToStem(instance, cursor)
+        else
+            instance.Parent = folder
+        end
+    end)
+    if not ok then
+        if instance then instance:Destroy() end
+        self.history:FinishRecording(record, Enum.FinishRecordingOperation.Cancel)
+        self.status("Размещение отменено: " .. tostring(reason))
+        return
+    end
+    self.history:FinishRecording(record, Enum.FinishRecordingOperation.Commit)
+    local targetNote = if cursor.kind == "stem" then " · прикреплено к стеблю"
+        else " · на поверхности"
+    self.status("Размещено: " .. row.slug .. targetNote ..
+        " · следующий клик ставит ещё один")
+end
+
+local function selectedModel(selection)
+    local chosen = selection:Get()
+    if #chosen ~= 1 then error("Выдели одну Model в Explorer или во viewport") end
+    local current = chosen[1]
+    if current:IsA("Model") then return current end
+    while current and current ~= game do
+        if current:IsA("Model") and current:GetAttribute("LandscapeAuthoringTool") == "Game1LandscapePainter" then
+            return current
+        end
+        current = current.Parent
+    end
+    error("Нужна Model; для выбора дочернего MeshPart выдели корневую модель")
+end
+
+function Placement:ApplyToSelection(config)
+    config = Profiles.Validate(config)
+    local model = selectedModel(self.selection)
+    if not model:IsDescendantOf(self.workspace) then
+        error("Apply работает только с Model в Workspace")
+    end
+    local point = model:GetAttribute("LandscapeSurfacePoint")
+    local normal = model:GetAttribute("LandscapeSurfaceNormal")
+    local managed = model:GetAttribute("LandscapeAuthoringTool") == "Game1LandscapePainter"
+        and typeof(point) == "Vector3" and typeof(normal) == "Vector3"
+        and normal.Magnitude > 0.0001
+    -- A managed stem anchor travels with its parent Branch model. Rebuild
+    -- the world-space point from the referenced segment before Apply, not
+    -- from stale position Attributes saved before a Studio move operation.
+    local anchoredStem = model:GetAttribute("LandscapeAnchorKind") == "stem"
+    if anchoredStem then
+        local link = model:FindFirstChild(STEM_LINK_NAME)
+        local localPoint = model:GetAttribute("LandscapeStemLocalPoint")
+        local localNormal = model:GetAttribute("LandscapeStemLocalNormal")
+        if not managed or not link or not link:IsA("ObjectValue")
+            or not link.Value or not link.Value:IsA("Part")
+            or typeof(localPoint) ~= "Vector3" or typeof(localNormal) ~= "Vector3"
+            or localNormal.Magnitude < 0.0001 then
+            error("Крепление к стеблю повреждено · Apply отменён")
+        end
+        local stems = self.workspace:FindFirstChild(ROOT_NAME)
+        stems = if stems then stems:FindFirstChild("Branches") else nil
+        local branch = StemTarget.IsAuthoredStem(link.Value, stems)
+        if not branch or not model:IsDescendantOf(branch) then
+            error("Исходный стебель недоступен · Apply отменён")
+        end
+        point = link.Value.CFrame:PointToWorldSpace(localPoint)
+        normal = link.Value.CFrame:VectorToWorldSpace(localNormal).Unit
+    end
+    if not managed and config.tetherEnabled then
+        error("Для подвеса нужна точка крепления: сначала размести ассет прицелом")
+    end
+    local record = self.history:TryBeginRecording("Game1LandscapeApplyProfile", "Apply landscape profile")
+    if not record then error("Studio не разрешила Undo-запись") end
+    local previousPivot = model:GetPivot()
+    local oldLine = model:FindFirstChild(LINE_NAME)
+    local savedLine = if oldLine then oldLine:Clone() else nil
+    local previousAttributes = {}
+    for _, key in ipairs({"LandscapeYaw", "LandscapePitch", "LandscapeRoll",
+        "LandscapeTetherEnabled", "LandscapeTetherLength",
+        "LandscapeTetherThickness", "LandscapeTetherColor",
+        "LandscapeSurfacePoint", "LandscapeSurfaceNormal"}) do
+        previousAttributes[key] = model:GetAttribute(key)
+    end
+    local ok, reason = pcall(function()
+        local pivot = if managed then Surface.Pivot(point, normal, config) else
+            CFrame.new(previousPivot.Position) * CFrame.Angles(
+                math.rad(config.pitch), math.rad(config.yaw), math.rad(config.roll))
+        model:PivotTo(pivot)
+        if managed then
+            replaceTether(model, point, pivot.Position, config)
+            -- For regular surface placement the point is unchanged; for a
+            -- moved branch this refreshes the authored world-space cache.
+            model:SetAttribute("LandscapeSurfacePoint", point)
+            model:SetAttribute("LandscapeSurfaceNormal", normal)
+            -- Do not overwrite the registered Model ID.
+            model:SetAttribute("LandscapeYaw", config.yaw)
+            model:SetAttribute("LandscapePitch", config.pitch)
+            model:SetAttribute("LandscapeRoll", config.roll)
+            model:SetAttribute("LandscapeTetherEnabled", config.tetherEnabled)
+            model:SetAttribute("LandscapeTetherLength", config.length)
+            model:SetAttribute("LandscapeTetherThickness", config.thickness)
+            model:SetAttribute("LandscapeTetherColor", config.color)
+        end
+    end)
+    if not ok then
+        pcall(function()
+            model:PivotTo(previousPivot)
+            local existing = model:FindFirstChild(LINE_NAME)
+            if existing and existing:GetAttribute("Game1LandscapeAttachment") == true then existing:Destroy() end
+            if savedLine then savedLine.Parent = model; savedLine = nil end
+            for key, value in pairs(previousAttributes) do model:SetAttribute(key, value) end
+        end)
+        if savedLine then savedLine:Destroy() end
+        self.history:FinishRecording(record, Enum.FinishRecordingOperation.Cancel)
+        error(reason)
+    end
+    if savedLine then savedLine:Destroy() end
+    self.history:FinishRecording(record, Enum.FinishRecordingOperation.Commit)
+    if managed then
+        self.status("Профиль применён к " .. model.Name .. " · точка крепления сохранена")
+    else
+        self.status("Поворот применён к " .. model.Name .. " · без подвеса (нет surface anchor)")
+    end
+end
+
+function Placement:Destroy()
+    self:Stop()
+    if self.template then self.template:Destroy(); self.template = nil end
+end
+
+return Placement
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="11">
+        <Properties>
+          <string name="Name">LandscapeAssetsWidget</string>
+          <string name="Source"><![CDATA[-- Catalog/pivot/profile controls for the independent Landscape Painter dock.
+-- Widgets emit actions; they never mutate Workspace or the asset registry.
+local Adjustments = require(script.Parent.LandscapeAdjustments)
+local AssetsWidget = {}
+AssetsWidget.__index = AssetsWidget
+local PANEL = Color3.fromRGB(24, 37, 48)
+local TEXT = Color3.fromRGB(224, 237, 237)
+local MUTED = Color3.fromRGB(153, 174, 185)
+local ACCENT = Color3.fromRGB(62, 205, 175)
+
+local function add(kind, props, parent)
+    local object = Instance.new(kind)
+    for key, value in pairs(props) do object[key] = value end
+    if parent and parent.Name == "LandscapeUI" and object:IsA("GuiObject") then
+        object.LayoutOrder = #parent:GetChildren() + 1
+    end
+    object.Parent = parent
+    return object
+end
+local function label(parent, message, height, color)
+    return add("TextLabel", {BackgroundTransparency = 1, Text = message,
+        TextColor3 = color or MUTED, TextWrapped = true,
+        TextXAlignment = Enum.TextXAlignment.Left, Font = Enum.Font.Gotham,
+        TextSize = 12, Size = UDim2.new(1, 0, 0, height or 24)}, parent)
+end
+local function button(parent, title, height)
+    local control = add("TextButton", {Text = title, TextColor3 = TEXT,
+        BackgroundColor3 = PANEL, Font = Enum.Font.GothamBold,
+        TextSize = 13, BorderSizePixel = 0, AutoButtonColor = true,
+        Size = UDim2.new(1, 0, 0, height or 36)}, parent)
+    add("UICorner", {CornerRadius = UDim.new(0, 7)}, control)
+    return control
+end
+local function field(parent, value)
+    local control = add("TextBox", {Text = value, TextColor3 = TEXT,
+        BackgroundColor3 = PANEL, BorderSizePixel = 0,
+        TextSize = 13, Font = Enum.Font.Code, ClearTextOnFocus = false,
+        Size = UDim2.new(1, 0, 0, 34)}, parent)
+    add("UICorner", {CornerRadius = UDim.new(0, 7)}, control)
+    return control
+end
+local function section(parent, title)
+    local header = label(parent, title, 27, ACCENT)
+    header.Font = Enum.Font.GothamBold
+    return header
+end
+local function scrollList(parent, height)
+    local frame = add("ScrollingFrame", {BackgroundTransparency = 1,
+        BorderSizePixel = 0, ScrollBarThickness = 4,
+        Size = UDim2.new(1, 0, 0, height),
+        AutomaticCanvasSize = Enum.AutomaticSize.Y,
+        ScrollingDirection = Enum.ScrollingDirection.Y,
+        CanvasSize = UDim2.fromOffset(0, 0)}, parent)
+    add("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 5)}, frame)
+    return frame
+end
+local function clearChildren(frame)
+    for _, child in ipairs(frame:GetChildren()) do
+        if child:IsA("GuiObject") then child:Destroy() end
+    end
+end
+
+function AssetsWidget.new(parent, actions)
+    local self = setmetatable({}, AssetsWidget)
+    self.actions = actions
+    self.rows = {}
+    self.profiles = {}
+    self.selectedSlug = nil
+    self.selectedProfile = nil
+    self.activeId = nil
+    self.active = false
+    self.targetMode = "auto"
+    self.config = {yaw = 0, pitch = 0, roll = 0,
+        tetherEnabled = false, length = 2, thickness = 0.02,
+        color = "#343B38"}
+
+    section(parent, "02 · Ассеты · прицел / Pivot")
+    self.mode = button(parent, "Начать · Размещение ассета", 41)
+    self.mode.MouseButton1Click:Connect(actions.toggleAsset)
+    self.target = button(parent, "Прицел: Авто · стебель / поверхность", 35)
+    self.target.MouseButton1Click:Connect(function()
+        self.targetMode = if self.targetMode == "auto" then "stem"
+            elseif self.targetMode == "stem" then "surface" else "auto"
+        actions.targetModeChanged(self.targetMode)
+        self:Refresh()
+    end)
+    label(parent, "Авто находит Stem_XX даже у старых веток без CanQuery. Стебель — только ветки; Поверхность — стены/земля.", 50)
+    label(parent, "Опубликованные Location Assets — тот же каталог, что у DecoManager", 37)
+    local reload = button(parent, "Обновить каталог", 33)
+    reload.MouseButton1Click:Connect(actions.refreshCatalog)
+    self.search = field(parent, "")
+    self.search.PlaceholderText = "Поиск по названию ассета"
+    self.catalogList = scrollList(parent, 133)
+    self.search:GetPropertyChangedSignal("Text"):Connect(function() self:RenderCatalog() end)
+    self.chosen = label(parent, "Ассет не выбран", 27, TEXT)
+
+    section(parent, "03 · Поворот ассета")
+    label(parent, "Прицел совмещает Pivot с поверхностью. Настраивай поворот по живому превью.", 42)
+    self.axes = {}
+    for _, definition in ipairs({
+        {key = "yaw", name = "Yaw · по нормали"},
+        {key = "pitch", name = "Pitch · наклон"},
+        {key = "roll", name = "Roll · крен"},
+    }) do
+        local key = definition.key
+        self.axes[key] = Adjustments.Slider(parent, {
+            label = definition.name, min = -180, max = 180,
+            step = 1, value = self.config[key], suffix = "°", format = "%.0f",
+            changed = function(value)
+                self.config[key] = value
+                self:Changed()
+            end,
+        })
+    end
+    local presets = add("Frame", {BackgroundTransparency = 1,
+        Size = UDim2.new(1, 0, 0, 35)}, parent)
+    add("UIListLayout", {FillDirection = Enum.FillDirection.Horizontal,
+        SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 5)}, presets)
+    for _, item in ipairs({
+        {label = "Сброс", angle = 0, all = true},
+        {label = "↶ 90°", angle = -90},
+        {label = "↷ 90°", angle = 90},
+        {label = "180°", angle = 180},
+    }) do
+        local action = button(presets, item.label, 33)
+        action.Size = UDim2.new(0.24, 0, 0, 33)
+        action.MouseButton1Click:Connect(function()
+            if item.all then
+                self.config.yaw, self.config.pitch, self.config.roll = 0, 0, 0
+            else
+                self.config.yaw = item.angle
+            end
+            self:Changed()
+        end)
+    end
+
+    section(parent, "04 · Подвес · видимый отрезок")
+    self.tether = button(parent, "○ Подвес выключен")
+    self.tether.MouseButton1Click:Connect(function()
+        self.config.tetherEnabled = not self.config.tetherEnabled
+        self:Changed()
+    end)
+    self.length = Adjustments.Slider(parent, {
+        label = "Длина подвеса · studs", min = 0.05, max = 100,
+        logarithmic = true, step = 0.05, value = self.config.length,
+        format = "%.2f", changed = function(value)
+            self.config.length = value
+            self:Changed()
+        end,
+    })
+    self.thickness = Adjustments.Slider(parent, {
+        label = "Толщина нити · studs", min = 0.02, max = 4,
+        logarithmic = true, step = 0.01, value = self.config.thickness,
+        format = "%.2f", changed = function(value)
+            self.config.thickness = value
+            self:Changed()
+        end,
+    })
+    label(parent, "Цвет подвеса", 20)
+    self.color = Adjustments.Color(parent, {
+        value = Color3.fromHex(self.config.color),
+        presets = {
+            Color3.fromRGB(52, 59, 56), Color3.fromRGB(97, 74, 50),
+            Color3.fromRGB(163, 144, 109), Color3.fromRGB(227, 222, 198),
+            Color3.fromRGB(78, 120, 85), Color3.fromRGB(62, 62, 72),
+        },
+        changed = function(value)
+            self.config.color = "#" .. value:ToHex():upper()
+            self:Changed()
+        end,
+    })
+
+    section(parent, "05 · Профили размещения")
+    label(parent, "Use: для каждого нового размещения. Apply: изменить выделенную модель, без нового ассета.", 43)
+    self.name = field(parent, "")
+    self.name.PlaceholderText = "Название нового профиля"
+    local save = button(parent, "Сохранить новый профиль")
+    save.MouseButton1Click:Connect(function()
+        actions.saveProfile(self.name.Text, self.config)
+    end)
+    self.profileList = scrollList(parent, 124)
+    self.profileStatus = label(parent, "Профиль не выбран", 30, TEXT)
+    self.use = button(parent, "Use · включить для новых размещений")
+    self.use.MouseButton1Click:Connect(function()
+        if not self.selectedProfile then actions.status("Выбери профиль"); return end
+        actions.useProfile(self.selectedProfile, self.activeId ~= self.selectedProfile)
+    end)
+    local apply = button(parent, "Apply · к выделенной Model")
+    apply.MouseButton1Click:Connect(function()
+        if not self.selectedProfile then actions.status("Выбери профиль"); return end
+        actions.applyProfile(self.selectedProfile)
+    end)
+    local delete = button(parent, "Удалить выбранный профиль")
+    delete.MouseButton1Click:Connect(function()
+        if self.selectedProfile then actions.removeProfile(self.selectedProfile) end
+    end)
+    self:Refresh()
+    return self
+end
+
+function AssetsWidget:Changed()
+    self:Refresh()
+    self.actions.configChanged(table.clone(self.config))
+end
+
+function AssetsWidget:SetConfig(config)
+    for _, key in ipairs({"yaw", "pitch", "roll", "length", "thickness", "color", "tetherEnabled"}) do
+        -- Equivalent rotations share one readable slider range (-180..180).
+        self.config[key] = if key == "yaw" or key == "pitch" or key == "roll"
+            then (config[key] + 180) % 360 - 180 else config[key]
+    end
+    self:Changed()
+end
+
+function AssetsWidget:SetActive(active)
+    self.active = active
+    self:Refresh()
+end
+
+function AssetsWidget:Refresh()
+    for axis, slider in pairs(self.axes) do slider:Set(self.config[axis]) end
+    self.length:Set(self.config.length)
+    self.thickness:Set(self.config.thickness)
+    self.color:Set(Color3.fromHex(self.config.color))
+    self.tether.Text = if self.config.tetherEnabled then "● Подвес включён" else "○ Подвес выключен"
+    self.mode.Text = if self.active then "● Прицел активен · Enter завершить" else "Начать · Размещение ассета"
+    self.target.Text = if self.targetMode == "auto" then "Прицел: Авто · стебель / поверхность"
+        elseif self.targetMode == "stem" then "Прицел: Только стебель"
+        else "Прицел: Только поверхность"
+    self.use.Text = if self.selectedProfile and self.activeId == self.selectedProfile
+        then "● Use · активно (нажми, чтобы снять)" else "○ Use · для новых размещений"
+    if self.activeId then
+        self.profileStatus.Text = "Use активен · новые размещения используют сохранённый профиль. Выключи Use для ручных настроек."
+        self.profileStatus.Size = UDim2.new(1, 0, 0, 52)
+    else
+        self.profileStatus.Size = UDim2.new(1, 0, 0, 30)
+        if not self.selectedProfile then self.profileStatus.Text = "Профиль не выбран" end
+    end
+end
+
+function AssetsWidget:SetCatalog(rows)
+    self.rows = rows
+    self:RenderCatalog()
+end
+
+function AssetsWidget:RenderCatalog()
+    clearChildren(self.catalogList)
+    local query = self.search.Text:lower()
+    local count = 0
+    for _, row in ipairs(self.rows) do
+        if count >= 80 then break end
+        if row.slug:lower():find(query, 1, true) then
+            count += 1
+            local prefix = if row.slug == self.selectedSlug then "● " else "   "
+            local item = button(self.catalogList,
+                prefix .. tostring(row.name_en or row.slug) .. " · " .. row.slug, 30)
+            item.LayoutOrder = count
+            item.MouseButton1Click:Connect(function()
+                self.actions.selectAsset(row)
+            end)
+        end
+    end
+    if count == 0 then label(self.catalogList, "Нет совпадений · обнови каталог", 28) end
+end
+
+function AssetsWidget:SelectAsset(row)
+    self.selectedSlug = row.slug
+    self.chosen.Text = "Выбрано: " .. row.slug .. " · Model " .. tostring(row.model_asset_id)
+    self:RenderCatalog()
+end
+
+function AssetsWidget:SelectProfile(id)
+    for _, item in ipairs(self.profiles) do
+        if item.id == id then
+            self.selectedProfile = id
+            self.profileStatus.Text = "Профиль: " .. item.name
+            self:SetConfig(item)
+            return
+        end
+    end
+end
+
+function AssetsWidget:SetProfiles(rows, activeId)
+    self.profiles = rows
+    self.activeId = activeId
+    if self.selectedProfile then
+        local found = false
+        for _, item in ipairs(rows) do
+            if item.id == self.selectedProfile then found = true end
+        end
+        if not found then
+            self.selectedProfile = nil
+            self.profileStatus.Text = "Профиль не выбран"
+        end
+    end
+    clearChildren(self.profileList)
+    for index, item in ipairs(rows) do
+        local title = (if item.id == activeId then "● " else "○ ") .. item.name
+        local control = button(self.profileList, title, 31)
+        control.LayoutOrder = index
+        control.MouseButton1Click:Connect(function()
+            self.selectedProfile = item.id
+            self.profileStatus.Text = "Профиль: " .. item.name
+            self:SetConfig(item)
+            self:Refresh()
+        end)
+    end
+    self:Refresh()
+end
+
+return AssetsWidget
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="12">
+        <Properties>
+          <string name="Name">LandscapeProfiles</string>
+          <string name="Source"><![CDATA[-- Plugin-local placement authoring presets. No new asset catalog or server DB.
+-- Only one Use profile may be active; Apply is explicit and never automatic.
+local Profiles = {}
+Profiles.__index = Profiles
+
+local KEY = "Game1LandscapeProfilesV1"
+local MAX_PROFILES = 60
+local MAX_NAME = 50
+
+local function finite(value, minValue, maxValue): boolean
+    return type(value) == "number" and value == value and value ~= math.huge
+        and value ~= -math.huge and value >= minValue and value <= maxValue
+end
+
+function Profiles.Validate(settings)
+    assert(type(settings) == "table", "profile settings missing")
+    for _, axis in ipairs({"yaw", "pitch", "roll"}) do
+        assert(finite(settings[axis], -360, 360), axis .. " must be -360..360")
+    end
+    assert(type(settings.tetherEnabled) == "boolean", "tetherEnabled must be boolean")
+    assert(finite(settings.length, 0.05, 100), "tether length must be 0.05..100")
+    assert(finite(settings.thickness, 0.02, 4), "tether thickness must be 0.02..4")
+    assert(type(settings.color) == "string" and settings.color:match("^#%x%x%x%x%x%x$") ~= nil,
+        "tether color must be #RRGGBB")
+    return {
+        yaw = settings.yaw, pitch = settings.pitch, roll = settings.roll,
+        tetherEnabled = settings.tetherEnabled, length = settings.length,
+        thickness = settings.thickness, color = settings.color:upper(),
+    }
+end
+
+local function cleaned(data)
+    local records = {}
+    if type(data) == "table" and type(data.profiles) == "table" then
+        for _, item in ipairs(data.profiles) do
+            if #records >= MAX_PROFILES then break end
+            if type(item) == "table" and type(item.name) == "string"
+                and #item.name > 0 and #item.name <= MAX_NAME
+                and type(item.id) == "string" and item.id:match("^[%w%-]+$") then
+                local ok, settings = pcall(Profiles.Validate, item)
+                if ok then
+                    settings.id = item.id
+                    settings.name = item.name
+                    table.insert(records, settings)
+                end
+            end
+        end
+    end
+    local activeId = if type(data) == "table" then data.activeId else nil
+    if type(activeId) ~= "string" then activeId = nil end
+    local exists = false
+    for _, row in ipairs(records) do
+        if row.id == activeId then exists = true end
+    end
+    return {profiles = records, activeId = if exists then activeId else nil}
+end
+
+function Profiles.new(plugin, httpService)
+    local raw = plugin:GetSetting(KEY)
+    local self = setmetatable({plugin = plugin, http = httpService}, Profiles)
+    self.data = cleaned(raw)
+    return self
+end
+
+function Profiles:List()
+    return self.data.profiles, self.data.activeId
+end
+
+function Profiles:Find(id)
+    for _, row in ipairs(self.data.profiles) do
+        if row.id == id then return row end
+    end
+    return nil
+end
+
+function Profiles:Save()
+    self.plugin:SetSetting(KEY, self.data)
+end
+
+function Profiles:Create(name, settings)
+    assert(type(name) == "string" and name:match("%S") and #name <= MAX_NAME,
+        "имя профиля должно быть от 1 до 50 символов")
+    if #self.data.profiles >= MAX_PROFILES then error("лимит профилей: " .. MAX_PROFILES) end
+    local item = Profiles.Validate(settings)
+    item.name = name
+    item.id = self.http:GenerateGUID(false)
+    table.insert(self.data.profiles, item)
+    self:Save()
+    return item
+end
+
+function Profiles:Use(id, enabled)
+    if enabled then
+        assert(self:Find(id), "выбранного профиля больше нет")
+        self.data.activeId = id
+    elseif self.data.activeId == id then
+        self.data.activeId = nil
+    end
+    self:Save()
+end
+
+function Profiles:Remove(id)
+    for i, row in ipairs(self.data.profiles) do
+        if row.id == id then
+            table.remove(self.data.profiles, i)
+            if self.data.activeId == id then self.data.activeId = nil end
+            self:Save()
+            return
+        end
+    end
+    error("профиль не найден")
+end
+
+return Profiles
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="13">
+        <Properties>
+          <string name="Name">LandscapeStemTarget</string>
+          <string name="Source"><![CDATA[-- Studio-only snapping to authored Landscape Painter stems. Existing M282 stems
+-- have CanQuery=false; we intentionally do not modify Place just to pick them.
+-- Scanner works on named authored cylinders, never arbitrary Workspace geometry.
+local StemTarget = {}
+
+local DECOR_ROOT = "Game1LandscapeDecor"
+local MAX_PICK_RADIUS = 0.85
+local MIN_PICK_RADIUS = 0.12
+
+local function branchFolder(workspace)
+    local root = workspace:FindFirstChild(DECOR_ROOT)
+    local folder = if root then root:FindFirstChild("Branches") else nil
+    if folder and folder:IsA("Folder") then return folder end
+    return nil
+end
+
+function StemTarget.IsAuthoredStem(part, folder)
+    if not folder or not part:IsA("Part") or part.Shape ~= Enum.PartType.Cylinder
+        or part.Name:match("^Stem_%d+$") == nil or not part:IsDescendantOf(folder) then
+        return nil
+    end
+    local branch = part.Parent
+    if not branch or not branch:IsA("Model") or branch.Parent ~= folder
+        or branch:GetAttribute("AuthoringTool") ~= "Game1LandscapePainter" then
+        return nil
+    end
+    return branch
+end
+
+function StemTarget.Collect(workspace)
+    local folder = branchFolder(workspace)
+    local parts = {}
+    if folder then
+        for _, branch in ipairs(folder:GetChildren()) do
+            if branch:IsA("Model") and branch:GetAttribute("AuthoringTool") == "Game1LandscapePainter" then
+                for _, part in ipairs(branch:GetChildren()) do
+                    if StemTarget.IsAuthoredStem(part, folder) then
+                        table.insert(parts, part)
+                    end
+                end
+            end
+        end
+    end
+    return parts, folder
+end
+
+-- Closest point on a finite segment to a camera ray (t>=0, 0<=s<=1).
+-- Does not depend on CanQuery or touch/collision state of the segment.
+function StemTarget.Closest(rayOrigin: Vector3, rayDirection: Vector3,
+    startPoint: Vector3, endPoint: Vector3)
+    local segment = endPoint - startPoint
+    local lengthSq = segment:Dot(segment)
+    if lengthSq < 0.000001 then return nil end
+    local direction = rayDirection.Unit
+    local offset = startPoint - rayOrigin
+    local b = direction:Dot(segment)
+    local d = direction:Dot(offset)
+    local e = segment:Dot(offset)
+    local denominator = lengthSq - b * b
+    local s = if denominator > 0.000001
+        then math.clamp((b * d - e) / denominator, 0, 1)
+        else 0
+    local t = math.max(0, d + b * s)
+    if t == 0 then
+        s = math.clamp((rayOrigin - startPoint):Dot(segment) / lengthSq, 0, 1)
+    end
+    local onStem = startPoint + segment * s
+    return onStem, t, (rayOrigin + direction * t - onStem).Magnitude, s
+end
+
+local function outsideNormal(part, branch, fraction: number, tangent: Vector3, rayOrigin: Vector3)
+    local a = part:GetAttribute("LandscapeStemNormalA")
+    local b = part:GetAttribute("LandscapeStemNormalB")
+    if typeof(a) ~= "Vector3" or typeof(b) ~= "Vector3" then
+        -- M282/M286 strokes have only model-level endpoint normals.
+        a = branch:GetAttribute("StartNormal")
+        b = branch:GetAttribute("EndNormal")
+    end
+    local normal = if typeof(a) == "Vector3" and typeof(b) == "Vector3"
+        then a:Lerp(b, fraction) else Vector3.zero
+    if normal.Magnitude < 0.01 and typeof(a) == "Vector3" then normal = a end
+    -- A cylinder's radial normal must be perpendicular to its axis.
+    normal -= tangent * normal:Dot(tangent)
+    if normal.Magnitude < 0.01 then
+        normal = rayOrigin - part.Position
+        normal -= tangent * normal:Dot(tangent)
+    end
+    if normal.Magnitude < 0.01 then
+        normal = part.CFrame.UpVector
+    end
+    return normal.Unit
+end
+
+function StemTarget.Find(parts, folder, unitRay, surfaceHit, maxDistance: number)
+    if not folder then return nil end
+    local best = nil
+    local direction = unitRay.Direction.Unit
+    local origin = unitRay.Origin
+    -- An authored stem in front of a wall is eligible; a stem behind it isn't.
+    local stopDistance = if surfaceHit then (surfaceHit.Position - origin).Magnitude + 0.15
+        else maxDistance
+    for _, part in ipairs(parts) do
+        local branch = StemTarget.IsAuthoredStem(part, folder)
+        if branch and part.Size.X >= 0.001 then
+            local half = part.Size.X * 0.5
+            local tangent = part.CFrame.RightVector
+            local a = part.Position - tangent * half
+            local b = part.Position + tangent * half
+            local onStem, t, distance, fraction = StemTarget.Closest(origin, direction, a, b)
+            if onStem and t <= maxDistance and t <= stopDistance then
+                -- A modest camera-distance tolerance makes very thin stems usable.
+                local tolerance = math.clamp(t * 0.0075, MIN_PICK_RADIUS, MAX_PICK_RADIUS)
+                    + part.Size.Y * 0.5
+                if distance <= tolerance then
+                    local score = distance / tolerance
+                    if not best or score < best.score - 0.02
+                        or (math.abs(score - best.score) <= 0.02 and t < best.t) then
+                        local normal = outsideNormal(part, branch, fraction, tangent, origin)
+                        local point = onStem + normal * (part.Size.Y * 0.5 + 0.005)
+                        best = {
+                            Position = point, Normal = normal,
+                            kind = "stem", stem = part, branch = branch,
+                            score = score, t = t,
+                        }
+                    end
+                end
+            end
+        end
+    end
+    return best
+end
+
+return table.freeze(StemTarget)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="14">
+        <Properties>
+          <string name="Name">LandscapeSurface</string>
+          <string name="Source"><![CDATA[-- Shared surface facing rule for landscape placement.
+-- A published object's local front (-Z) points along the hit outward normal.
+-- This is independent of camera direction and handles walls / ceilings.
+local Surface = {}
+
+function Surface.Facing(position: Vector3, normal: Vector3): CFrame
+    if normal.Magnitude < 0.0001 then error("surface normal is missing") end
+    local facing = normal.Unit
+    local up = if math.abs(facing:Dot(Vector3.yAxis)) > 0.97
+        then Vector3.zAxis else Vector3.yAxis
+    return CFrame.lookAt(position, position + facing, up)
+end
+
+function Surface.Pivot(point: Vector3, normal: Vector3, settings): CFrame
+    local offset = if settings.tetherEnabled then settings.length else 0
+    local base = Surface.Facing(point + normal.Unit * offset, normal)
+    return base * CFrame.Angles(
+        math.rad(settings.pitch), math.rad(settings.yaw), math.rad(settings.roll))
+end
+
+function Surface.Raycast(workspace, mouse, maxDistance: number)
+    local ray = mouse.UnitRay
+    local ignore = {}
+    local decor = workspace:FindFirstChild("Game1LandscapeDecor")
+    if decor then table.insert(ignore, decor) end
+    local camera = workspace.CurrentCamera
+    if camera then table.insert(ignore, camera) end
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = ignore
+    params.IgnoreWater = true
+    return workspace:Raycast(ray.Origin, ray.Direction * maxDistance, params)
+end
+
+return table.freeze(Surface)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="15">
+        <Properties>
+          <string name="Name">LandscapeWidget</string>
+          <string name="Source"><![CDATA[-- Small self-contained Studio dock. The authoring tool owns all scene changes.
+local Adjustments = require(script.Parent.LandscapeAdjustments)
+local LandscapeWidget = {}
+LandscapeWidget.__index = LandscapeWidget
+
+local BACKGROUND = Color3.fromRGB(14, 22, 30)
+local PANEL = Color3.fromRGB(24, 37, 48)
+local OUTLINE = Color3.fromRGB(44, 66, 78)
+local TEXT = Color3.fromRGB(224, 237, 237)
+local MUTED = Color3.fromRGB(153, 174, 185)
+local ACCENT = Color3.fromRGB(62, 205, 175)
+
+local function create(class, props, parent)
+    local object = Instance.new(class)
+    for key, value in pairs(props) do object[key] = value end
+    if parent and parent.Name == "LandscapeUI" and object:IsA("GuiObject") then
+        object.LayoutOrder = #parent:GetChildren() + 1
+    end
+    object.Parent = parent
+    return object
+end
+
+local function rounded(object, radius)
+    create("UICorner", {CornerRadius = UDim.new(0, radius or 8)}, object)
+end
+
+local function caption(parent, text, height, color)
+    return create("TextLabel", {
+        BackgroundTransparency = 1,
+        Text = text,
+        TextColor3 = color or MUTED,
+        Font = Enum.Font.Gotham,
+        TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextWrapped = true,
+        Size = UDim2.new(1, 0, 0, height or 21),
+    }, parent)
+end
+
+local function button(parent, text, color, height)
+    local control = create("TextButton", {
+        BackgroundColor3 = color or PANEL,
+        BorderSizePixel = 0,
+        AutoButtonColor = true,
+        Text = text,
+        TextColor3 = if color == ACCENT then BACKGROUND else TEXT,
+        Font = Enum.Font.GothamBold,
+        TextSize = 13,
+        Size = UDim2.new(1, 0, 0, height or 38),
+    }, parent)
+    rounded(control)
+    return control
+end
+
+function LandscapeWidget.new(widget, actions)
+    local self = setmetatable({}, LandscapeWidget)
+    self.actions = actions
+    self.thickness = 0.24
+    self.level = 0
+    self.color = Color3.fromRGB(89, 123, 60)
+    self.active = false
+
+    local scroll = create("ScrollingFrame", {
+        Name = "LandscapeUI", BackgroundColor3 = BACKGROUND,
+        BorderSizePixel = 0, Size = UDim2.fromScale(1, 1),
+        ScrollBarThickness = 5, CanvasSize = UDim2.new(0, 0, 0, 0),
+        AutomaticCanvasSize = Enum.AutomaticSize.Y,
+        ScrollingDirection = Enum.ScrollingDirection.Y,
+    }, widget)
+    self.content = scroll
+    create("UIListLayout", {Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder}, scroll)
+    create("UIPadding", {
+        PaddingTop = UDim.new(0, 13), PaddingBottom = UDim.new(0, 13),
+        PaddingLeft = UDim.new(0, 15), PaddingRight = UDim.new(0, 15),
+    }, scroll)
+
+    local headline = caption(scroll, "GAME1  /  LANDSCAPE", 22, ACCENT)
+    headline.Font = Enum.Font.GothamBold
+    headline.TextSize = 13
+    local title = caption(scroll, "Декорирование поверхности", 31, TEXT)
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 17
+    caption(scroll, "01 · Ветка / лиана", 24, MUTED)
+
+    local mode = button(scroll, "Начать · Ветка", ACCENT, 42)
+    self.modeButton = mode
+    mode.MouseButton1Click:Connect(function()
+        actions.toggleMode()
+    end)
+
+    local example = create("Frame", {BackgroundColor3 = PANEL, BorderSizePixel = 0,
+        Size = UDim2.new(1, 0, 0, 56)}, scroll)
+    rounded(example)
+    local line = create("Frame", {Name = "BranchSample", BackgroundColor3 = self.color,
+        BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(0.7, 0, 0, 5)}, example)
+    rounded(line, 5)
+    self.line = line
+
+    self.thicknessSlider = Adjustments.Slider(scroll, {
+        label = "Толщина стебля · studs", min = 0.04, max = 4,
+        value = self.thickness, step = 0.01, logarithmic = true,
+        format = "%.2f", changed = function(value)
+            self.thickness = value
+            actions.settingsChanged(self.thickness, self.level, self.color)
+            self:Refresh()
+        end,
+    })
+
+    caption(scroll, "Цвет стебля · палитра / выбор оттенка", 20)
+    self.colorPicker = Adjustments.Color(scroll, {
+        value = self.color,
+        presets = {
+            Color3.fromRGB(89, 123, 60), Color3.fromRGB(51, 93, 64),
+            Color3.fromRGB(128, 95, 58), Color3.fromRGB(87, 65, 49),
+            Color3.fromRGB(186, 168, 124), Color3.fromRGB(219, 213, 190),
+        },
+        changed = function(value)
+            self.color = value
+            actions.settingsChanged(self.thickness, self.level, self.color)
+            self:Refresh()
+        end,
+    })
+
+    caption(scroll, "Повторение поверхности", 20)
+    local levelBar = create("Frame", {BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 38)}, scroll)
+    local minus = create("TextButton", {Text = "−", BackgroundColor3 = PANEL, TextColor3 = TEXT,
+        Font = Enum.Font.GothamBold, TextSize = 22, BorderSizePixel = 0,
+        Size = UDim2.new(0, 44, 0, 36)}, levelBar)
+    rounded(minus)
+    local plus = create("TextButton", {Text = "+", BackgroundColor3 = PANEL, TextColor3 = TEXT,
+        Font = Enum.Font.GothamBold, TextSize = 22, BorderSizePixel = 0,
+        AnchorPoint = Vector2.new(1, 0), Position = UDim2.fromScale(1, 0),
+        Size = UDim2.new(0, 44, 0, 36)}, levelBar)
+    rounded(plus)
+    local value = create("TextLabel", {BackgroundTransparency = 1, Text = "0",
+        TextColor3 = ACCENT, Font = Enum.Font.GothamBold, TextSize = 20,
+        Size = UDim2.new(1, -96, 0, 36), Position = UDim2.new(0, 48, 0, 0)}, levelBar)
+    self.levelLabel = value
+    local explanation = caption(scroll, "0 = прямо · 1 = 2 сегмента · 2 = 4 · 3 = 8 · 4 = 16", 34)
+    explanation.TextWrapped = true
+    local function changeLevel(delta)
+        self.level = math.clamp(self.level + delta, 0, 4)
+        actions.settingsChanged(self.thickness, self.level, self.color)
+        self:Refresh()
+    end
+    minus.MouseButton1Click:Connect(function() changeLevel(-1) end)
+    plus.MouseButton1Click:Connect(function() changeLevel(1) end)
+
+    local stop = button(scroll, "Завершить · Enter", PANEL, 38)
+    stop.MouseButton1Click:Connect(actions.finish)
+    self.statusLabel = caption(scroll, "Выбери «Ветка» для размещения", 58, MUTED)
+    self.statusLabel.TextWrapped = true
+    caption(scroll, "ЛКМ — следующая точка · Enter — закончить · Esc — отменить текущую линию", 52)
+    caption(scroll, "Геометрия сохраняется в Workspace / Game1LandscapeDecor / Branches. Ctrl+Z отменяет размещение.", 58)
+    self:Refresh()
+    return self
+end
+
+function LandscapeWidget:Refresh()
+    self.colorPicker:Set(self.color)
+    self.thicknessSlider:Set(self.thickness)
+    self.levelLabel.Text = tostring(self.level)
+    self.line.BackgroundColor3 = self.color
+    self.line.Size = UDim2.new(0.70, 0, 0, math.clamp(math.floor(self.thickness * 16), 3, 28))
+    self.modeButton.Text = if self.active then "● Ветка · размещение активно" else "Начать · Ветка"
+    self.modeButton.BackgroundColor3 = if self.active then PANEL else ACCENT
+    self.modeButton.TextColor3 = if self.active then ACCENT else BACKGROUND
+end
+
+function LandscapeWidget:SetActive(active)
+    self.active = active
+    self:Refresh()
+end
+
+function LandscapeWidget:SetStatus(message)
+    self.statusLabel.Text = message
+end
+
+return LandscapeWidget
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="16">
+        <Properties>
+          <string name="Name">StudioLocationMeshNames</string>
+          <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
+-- One narrow authoring naming policy for the single-visual Location Asset case.
+-- Published asset binaries, collider names and multi-mesh rig topology stay immutable.
+local Physics = require(script.Parent.StudioMeshPhysicsCore)
+local Naming = {}
+
+function Naming.SingleVisual(root: Instance): MeshPart?
+    local found: MeshPart? = nil
+    for _, item in ipairs(root:GetDescendants()) do
+        if item:IsA("MeshPart") and not Carrier.IsCarrier(item) and not Physics.IsCollider(item.Name)
+            and item:GetAttribute("Game1DecoPhysicsOnly") ~= true then
+            if found then return nil end
+            found = item
+        end
+    end
+    return found
+end
+
+function Naming.Normalize(root: Instance, slug: string): (MeshPart?, string?)
+    local part = Naming.SingleVisual(root)
+    if not part or part.Name == slug then return nil, nil end
+    local oldName = part.Name
+    part.Name = slug
+    return part, oldName
+end
+
+return Naming
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="17">
+        <Properties>
+          <string name="Name">StudioLocationPublishedRigNormalize</string>
+          <string name="Source"><![CDATA[-- Location-only normalization of Roblox importer scaffolding on a FRESH,
+-- detached LoadAssetAsync clone. Never run this on a placed Model.
+local Normalize = {}
+
+local function closeFrame(a: CFrame, b: CFrame): boolean
+    return (a.Position - b.Position).Magnitude < 0.0001
+        and a.LookVector:Dot(b.LookVector) > 0.999999
+        and a.UpVector:Dot(b.UpVector) > 0.999999
+end
+
+function Normalize.Apply(model: Model, manifest: any): CFrame
+    if model.Parent ~= nil then
+        error("published Location normalization requires a detached Model")
+    end
+    local authoredPivot = model:GetPivot()
+    local roots = {}
+    for _, obj in ipairs(model:GetDescendants()) do
+        if obj.Name == "RootPart" then table.insert(roots, obj) end
+    end
+    if #roots == 0 then return authoredPivot end
+    if #roots ~= 1 or not roots[1]:IsA("Part") or roots[1].Parent ~= model then
+        error("published Location asset has an unsupported importer RootPart")
+    end
+    if type(manifest) ~= "table" or manifest.schemaVersion ~= 2
+        or manifest.rigKind ~= "skinned" or manifest.carrierName ~= "rig_carrier" then
+        error("importer RootPart normalization requires a skinned v2 manifest")
+    end
+    local root = roots[1] :: Part
+    if root.Transparency < 0.99 then
+        error("published Location RootPart is visible authored geometry")
+    end
+    local expected = {}
+    for _, row in ipairs(manifest.parts or {}) do
+        if type(row.name) ~= "string" or expected[row.name] ~= nil then
+            error("invalid Location manifest during importer normalization")
+        end
+        expected[row.name] = row.role
+    end
+    -- A COLLIDER is optional for Location Assets, including skinned ones.
+    -- The transparent Roblox importer RootPart is never authored collision:
+    -- its default CanCollide/CanQuery flags must not force a fake COL mesh.
+    -- If the immutable FBX manifest *does* declare COL geometry, require it
+    -- before removing the importer scaffolding. StudioMeshPhysicsCore applies
+    -- the existing visual/COL physics policy after Carrier.Validate.
+    for name, role in pairs(expected) do
+        if role == "collider" then
+            local collider = model:FindFirstChild(name, true)
+            if not collider or not collider:IsA("MeshPart") then
+                error("published Location is missing declared collider: " .. name)
+            end
+        end
+    end
+    local carrier = model:FindFirstChild("rig_carrier")
+    if not carrier or not carrier:IsA("MeshPart") or expected[carrier.Name] ~= "rig_carrier" then
+        error("importer RootPart has no authored rig_carrier target")
+    end
+    local rootBones = {}
+    for _, child in ipairs(root:GetChildren()) do
+        if child:IsA("Bone") then
+            table.insert(rootBones, child)
+        elseif not child:IsA("Motor6D") then
+            error("importer RootPart contains unsupported child: " .. child.ClassName)
+        end
+    end
+    local rootMotors = {}
+    for _, obj in ipairs(model:GetDescendants()) do
+        if obj:IsA("JointInstance") and (obj.Part0 == root or obj.Part1 == root) then
+            if not obj:IsA("Motor6D") then
+                error("importer RootPart contains unsupported joint: " .. obj.ClassName)
+            end
+            local other = if obj.Part0 == root then obj.Part1 else obj.Part0
+            if not other or not other:IsA("MeshPart") or not other:IsDescendantOf(model)
+                or expected[other.Name] == nil then
+                error("importer RootPart Motor6D has an unsafe endpoint")
+            end
+            table.insert(rootMotors, obj)
+        end
+    end
+    local partState = {}
+    for _, obj in ipairs(model:GetDescendants()) do
+        if obj:IsA("MeshPart") then
+            partState[obj] = {frame = obj.CFrame, size = obj.Size}
+        end
+    end
+    local boneState = {}
+    for _, bone in ipairs(rootBones) do
+        boneState[bone] = {world = bone.WorldCFrame, transform = bone.Transform}
+    end
+    if model.PrimaryPart == root then model.PrimaryPart = nil end
+    for _, motor in ipairs(rootMotors) do motor:Destroy() end
+    for _, bone in ipairs(rootBones) do
+        local state = boneState[bone]
+        bone.Parent = carrier
+        bone.CFrame = carrier.CFrame:ToObjectSpace(state.world)
+        bone.Transform = state.transform
+    end
+    root:Destroy()
+    if model.PrimaryPart == nil then model.WorldPivot = authoredPivot end
+    for part, state in pairs(partState) do
+        if part.Parent == nil or part.CFrame ~= state.frame or part.Size ~= state.size then
+            error("importer normalization changed published MeshPart transform")
+        end
+    end
+    for bone, state in pairs(boneState) do
+        if bone.Parent == nil or not closeFrame(bone.WorldCFrame, state.world)
+            or bone.Transform ~= state.transform then
+            error("importer normalization changed published Bone pose")
+        end
+    end
+    if not closeFrame(model:GetPivot(), authoredPivot) then
+        error("importer normalization changed published Model pivot")
+    end
+    return authoredPivot
+end
+
+return table.freeze(Normalize)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="18">
+        <Properties>
+          <string name="Name">StudioLocationRigCarrier</string>
+          <string name="Source"><![CDATA[-- Canonical Location-only rig carrier policy. Imported FBX mesh; never synthetic.
+-- Character and Real Estate have their own domain assembly rules.
+local Carrier = {}
+
+function Carrier.IsCarrier(part: Instance): boolean
+    return part:IsA("MeshPart") and part.Name == "rig_carrier"
+end
+
+function Carrier.IsVisual(part: MeshPart, physics: any): boolean
+    return not Carrier.IsCarrier(part)
+        and not physics.IsCollider(part.Name)
+        and part:GetAttribute("Game1DecoPhysicsOnly") ~= true
+end
+
+local function boneRows(root: Instance): {[string]: string}
+    local rows = {}
+    for _, obj in ipairs(root:GetDescendants()) do
+        if obj:IsA("Bone") then
+            if rows[obj.Name] ~= nil then
+                error("rig_carrier contains duplicate Bone: " .. obj.Name)
+            end
+            local parent = obj.Parent
+            rows[obj.Name] = if parent:IsA("Bone") then parent.Name else ""
+        end
+    end
+    return rows
+end
+
+-- Static Location: no skeleton and no carrier. Skinned Location: the only
+-- canonical Bone owner is one Blender-authored rig_carrier. Never synthesize it
+-- or reparent Bones into a visual MeshPart on a placed asset.
+local function isStaticManifest(manifest: any): boolean
+    return type(manifest) == "table" and manifest.rigKind == "static"
+        and manifest.carrierName == nil and type(manifest.bones) == "table"
+        and #manifest.bones == 0
+end
+
+function Carrier.HasAuthoredManifest(manifest: any): boolean
+    if type(manifest) ~= "table" or manifest.schemaVersion ~= 2
+        or type(manifest.parts) ~= "table" or type(manifest.bones) ~= "table"
+        or type(manifest.structuralHash) ~= "string" or #manifest.structuralHash ~= 64 then
+        return false
+    end
+    if isStaticManifest(manifest) then
+        for _, part in ipairs(manifest.parts) do
+            if part.role == "rig_carrier" or part.name == "rig_carrier" then return false end
+        end
+        return true
+    end
+    -- Older authored v2 manifests had no rigKind, but always contained Bones.
+    return (manifest.rigKind == nil or manifest.rigKind == "skinned")
+        and manifest.carrierName == "rig_carrier" and #manifest.bones > 0
+end
+
+function Carrier.IsCanonicalPublication(manifest: any, legacyStatic: boolean?): boolean
+    return Carrier.HasAuthoredManifest(manifest) or legacyStatic == true
+end
+
+local function validateStatic(model: Model)
+    local visuals = 0
+    for _, child in ipairs(model:GetDescendants()) do
+        if child:IsA("Motor6D") then
+            error("static Location publication unexpectedly contains Motor6D")
+        elseif child:IsA("Bone") then
+            error("static Location publication unexpectedly contains Bones")
+        elseif child.Name == "rig_carrier" then
+            error("static Location publication must not contain rig_carrier")
+        elseif child:IsA("MeshPart") and child.Name ~= "col_mesh"
+            and child.Name:sub(1, 4) ~= "col_" then
+            visuals += 1
+        end
+    end
+    if visuals == 0 then error("static Location publication has no visual MeshPart") end
+end
+
+-- Roblox may add a Motor6D assembly when it imports a multipart skinned FBX,
+-- even though the authored FBX contains only Meshes, an Armature and Bones.
+-- It is publication structure, not evidence of the legacy RootPart layout, if
+-- and only if both endpoints are manifest MeshParts inside this one Model.
+local function validateImporterMotors(model: Model, manifest: any,
+    expected: {[string]: string})
+    local pairsSeen = {}
+    local partCount = 0
+    for _ in pairs(expected) do partCount += 1 end
+    local motorCount = 0
+    for _, child in ipairs(model:GetDescendants()) do
+        if child:IsA("Motor6D") then
+            if isStaticManifest(manifest) then
+                error("static Location publication unexpectedly contains Motor6D")
+            end
+            local part0, part1 = child.Part0, child.Part1
+            if not part0 or not part1 or part0 == part1
+                or not part0:IsA("MeshPart") or not part1:IsA("MeshPart")
+                or not part0:IsDescendantOf(model) or not part1:IsDescendantOf(model)
+                or expected[part0.Name] == nil or expected[part1.Name] == nil then
+                error("published Location asset contains unsafe importer Motor6D: " .. child.Name)
+            end
+            local first, second = part0.Name, part1.Name
+            if second < first then first, second = second, first end
+            local key = first .. "\0" .. second
+            if pairsSeen[key] then
+                error("published Location asset contains duplicate importer Motor6D pair")
+            end
+            pairsSeen[key] = true
+            motorCount += 1
+        end
+    end
+    -- A valid imported assembly is a forest/tree over the published parts. A
+    -- cycle or parallel edge can constrain transforms unpredictably.
+    if motorCount >= partCount then
+        error("published Location asset contains cyclic importer Motor6D assembly")
+    end
+end
+
+function Carrier.Validate(model: Model, manifest: any, legacyStatic: boolean?): MeshPart?
+    if not Carrier.IsCanonicalPublication(manifest, legacyStatic) then
+        error("Location publication is missing its canonical FBX structure; republish if it has Bones")
+    end
+    for _, child in ipairs(model:GetDescendants()) do
+        if child.Name == "RootPart" then
+            error("published Location asset contains RootPart; republish FBX")
+        end
+    end
+    if legacyStatic == true and not Carrier.HasAuthoredManifest(manifest) then
+        validateStatic(model)
+        return nil
+    end
+    local static = isStaticManifest(manifest)
+    local actualCarrier: MeshPart? = nil
+    local expected, seen = {}, {}
+    for _, part in ipairs(manifest.parts) do
+        if type(part.name) ~= "string" or type(part.role) ~= "string"
+            or expected[part.name] ~= nil then
+            error("invalid/duplicate Location publication manifest role")
+        end
+        expected[part.name] = part.role
+    end
+    validateImporterMotors(model, manifest, expected)
+    for _, child in ipairs(model:GetDescendants()) do
+        if child:IsA("MeshPart") then
+            if seen[child.Name] then error("duplicate published Location MeshPart name") end
+            seen[child.Name] = true
+            local role = if Carrier.IsCarrier(child) then "rig_carrier"
+                elseif child.Name == "col_mesh" or child.Name:sub(1,4) == "col_" then "collider"
+                else "visual"
+            if expected[child.Name] ~= role then
+                error("published Location MeshPart role differs from authored manifest: " .. child.Name)
+            end
+            if Carrier.IsCarrier(child) then
+                if actualCarrier then error("multiple published rig_carrier MeshParts") end
+                if child.Parent ~= model then error("rig_carrier must be a direct child of Location Model") end
+                actualCarrier = child
+            end
+        end
+    end
+    for name in pairs(expected) do
+        if not seen[name] then error("published Location mesh missing: " .. name) end
+    end
+    if static then
+        if actualCarrier then error("static Location has an unexpected rig_carrier") end
+        validateStatic(model)
+        return nil
+    end
+    if not actualCarrier or not actualCarrier.MeshId:match("%d+$") then
+        error("published Location rig_carrier has no genuine MeshPart MeshId")
+    end
+    for _,obj in ipairs(model:GetDescendants()) do
+        if obj:IsA("Bone") and not obj:IsDescendantOf(actualCarrier) then
+            error("Bone outside published rig_carrier: " .. obj.Name)
+        end
+    end
+    local rows = boneRows(actualCarrier)
+    local count = 0
+    for _,bone in ipairs(manifest.bones) do
+        if type(bone.name) ~= "string" or rows[bone.name] ~= (bone.parent or "") then
+            error("published Bone hierarchy differs from authoring manifest: " .. tostring(bone.name))
+        end
+        count += 1
+    end
+    local actual = 0
+    for _ in pairs(rows) do actual += 1 end
+    if actual ~= count then error("published rig_carrier lost Bones on import") end
+    return actualCarrier
+end
+
+function Carrier.Diagnose(model: Model, manifest: any, legacyStatic: boolean?): string
+    if model:FindFirstChild("RootPart") then return "legacy_import_root" end
+    if not Carrier.IsCanonicalPublication(manifest, legacyStatic) then
+        return "manual_review_required"
+    end
+    local carrierCount = 0
+    local carrier: Instance? = nil
+    for _, obj in ipairs(model:GetDescendants()) do
+        if obj.Name == "rig_carrier" then
+            carrierCount += 1
+            carrier = obj
+        end
+    end
+    if carrierCount > 1 then return "multiple_rig_carriers" end
+    local static = isStaticManifest(manifest) or (legacyStatic == true and not Carrier.HasAuthoredManifest(manifest))
+    if static and carrierCount > 0 then return "invalid_rig_carrier" end
+    if not static and carrierCount == 0 then return "missing_rig_carrier" end
+    if not static and (not carrier or not carrier:IsA("MeshPart")) then return "invalid_rig_carrier" end
+    local ok, err = pcall(Carrier.Validate, model, manifest, legacyStatic)
+    if ok then return "current" end
+    local detail = tostring(err)
+    if detail:find("Bone", 1, true) then return "bone_manifest_mismatch" end
+    return "published_structure_mismatch"
+end
+
+function Carrier.Prepare(carrier: MeshPart)
+    if not Carrier.IsCarrier(carrier) or not carrier.MeshId:match("%d+$") then
+        error("synthetic or wrongly named Location rig_carrier forbidden")
+    end
+    carrier.Transparency = 1
+    carrier.CastShadow = false
+    carrier.CanCollide = false
+    carrier.CanTouch = false
+    carrier.CanQuery = false
+    carrier.Massless = true
+    carrier.TextureID = ""
+    local surface = carrier:FindFirstChildOfClass("SurfaceAppearance")
+    if surface then surface:Destroy() end
+    carrier:SetAttribute("Game1LocationRigCarrier", true)
+end
+
+return table.freeze(Carrier)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="19">
+        <Properties>
+          <string name="Name">StudioMeshPhysicsCore</string>
+          <string name="Source"><![CDATA[-- One Studio MeshPart physics writer shared by Real Estate and Location Assets.
+-- Every collidable MeshPart uses Precise. Box is the default for no-collision.
+local Core = {}
+local FIDELITY = {
+    Box = Enum.CollisionFidelity.Box,
+    Hull = Enum.CollisionFidelity.Hull,
+    Default = Enum.CollisionFidelity.Default,
+    PreciseConvexDecomposition = Enum.CollisionFidelity.PreciseConvexDecomposition,
+}
+
+function Core.IsCollider(name: string): boolean
+    local lower = string.lower(name)
+    return lower:sub(1, 4) == "col_" or lower:find("_col_", 1, true) ~= nil
+        or lower:sub(-4) == "_col"
+end
+
+function Core.IsLocationCarrier(part: Instance): boolean
+    return part:IsA("MeshPart") and part.Name == "rig_carrier"
+end
+
+function Core.IsGlass(name: string): boolean
+    return not Core.IsCollider(name) and string.find(string.lower(name), "glass", 1, true) ~= nil
+end
+
+function Core.Fidelity(name: string): Enum.CollisionFidelity
+    local value = FIDELITY[name]
+    if value == nil then error("unsupported CollisionFidelity: " .. tostring(name)) end
+    return value
+end
+
+local function applyRuntimeProperties(mesh: MeshPart, canCollide: boolean, doubleSided: boolean)
+    -- CanQuery=false requires CanCollide=false; assign in safe order.
+    if canCollide then
+        mesh.CanQuery = true
+        mesh.CanCollide = true
+    else
+        mesh.CanCollide = false
+        mesh.CanQuery = false
+    end
+    mesh.CanTouch = false
+    mesh.DoubleSided = doubleSided
+end
+
+function Core.ApplyRuntime(mesh: MeshPart, canCollide: boolean, doubleSided: boolean)
+    -- CollisionFidelity is PluginOrOpenCloud-only. Runtime reapplies the
+    -- gameplay flags, while the Studio authoring pipeline remains the sole
+    -- writer of the persisted decomposition policy.
+    applyRuntimeProperties(mesh, canCollide, doubleSided)
+end
+
+function Core.Apply(mesh: MeshPart, canCollide: boolean, fidelity: string, doubleSided: boolean)
+    applyRuntimeProperties(mesh, canCollide, doubleSided)
+    mesh.CollisionFidelity = Core.Fidelity(if canCollide then "PreciseConvexDecomposition" else fidelity)
+end
+
+local function parts(model: Model): {MeshPart}
+    local found = {}
+    for _, descendant in ipairs(model:GetDescendants()) do
+        if descendant:IsA("MeshPart") then table.insert(found, descendant) end
+    end
+    return found
+end
+
+-- Both domains use Core.Apply as the only MeshPart property writer.
+-- Location uses name classification plus saved per-mesh overrides. A missing
+-- meshOptions entry means legacy behavior: never silently migrate a Place.
+local function applyLocationModel(model: Model, allowedNames: {[string]: boolean}?, meshOptions: any?, runtimeSafe: boolean): number
+    local allParts = parts(model)
+    local hasCollider = false
+    for _, mesh in ipairs(allParts) do
+        if Core.IsCollider(mesh.Name) then hasCollider = true break end
+    end
+    local affected = 0
+    for _, mesh in ipairs(allParts) do
+        if not Core.IsLocationCarrier(mesh) and (allowedNames == nil or allowedNames[mesh.Name] == true) then
+            local collider, namedGlass = Core.IsCollider(mesh.Name), Core.IsGlass(mesh.Name)
+            local raw = if typeof(meshOptions) == "table" then meshOptions[mesh.Name] else nil
+            local explicit = typeof(raw) == "table"
+            local glass = if explicit and typeof(raw.glass) == "boolean" then raw.glass else namedGlass
+            local doublesided = if explicit and typeof(raw.doubleSided) == "boolean"
+                then raw.doubleSided else false
+            local defaultNoCollide = if hasCollider then not collider else not (collider or namedGlass)
+            local noCollide = if explicit and typeof(raw.noCollide) == "boolean"
+                then raw.noCollide else defaultNoCollide
+            if explicit or hasCollider or collider or namedGlass then
+                local fidelity = if noCollide and explicit and typeof(raw.collisionFidelity) == "string"
+                    then raw.collisionFidelity elseif noCollide then "Box" else "PreciseConvexDecomposition"
+                -- All collidable MeshParts are Precise, including COL_*.
+                if runtimeSafe then
+                    Core.ApplyRuntime(mesh, not noCollide, doublesided)
+                else
+                    Core.Apply(mesh, not noCollide, fidelity, doublesided)
+                end
+            else
+                -- Legacy Location without COL: do not override pre-M232 published physics.
+                mesh.CanTouch = false
+                mesh.DoubleSided = false
+            end
+            if collider then
+                mesh.Transparency = 1
+                mesh.CastShadow = false
+                mesh:SetAttribute("Game1DecoPhysicsOnly", true)
+            else
+                mesh:SetAttribute("Game1DecoPhysicsOnly", nil)
+            end
+            if glass then
+                if mesh:GetAttribute("Game1DecoGlassApplied") ~= true then
+                    mesh.Transparency = math.max(mesh.Transparency, 0.02)
+                    mesh:SetAttribute("Game1DecoGlassApplied", true)
+                end
+            end
+            affected += 1
+        end
+    end
+    return affected
+end
+
+function Core.ApplyLocationModel(model: Model, allowedNames: {[string]: boolean}?, meshOptions: any?): number
+    return applyLocationModel(model, allowedNames, meshOptions, false)
+end
+
+function Core.ApplyLocationModelRuntime(model: Model, allowedNames: {[string]: boolean}?, meshOptions: any?): number
+    return applyLocationModel(model, allowedNames, meshOptions, true)
+end
+
+-- Semantic surface for future impact/footstep audio and interaction.
+-- This does not own collision flags, sizes, meshes or appearance textures.
+-- Only a selected explicit physical material changes Roblox Material; "default"
+-- leaves historical authored Materials intact (including collision geometry).
+function Core.ApplyLocationSurfaceMaterial(model: Model, surfaceKey: string?, physicalName: string?): number
+    local key = if type(surfaceKey) == "string" and surfaceKey ~= "" then surfaceKey else "default"
+    local material: Enum.Material? = nil
+    if physicalName ~= nil and physicalName ~= "" then
+        material = Enum.Material[physicalName]
+        if material == nil then error("unsupported Location physical material " .. tostring(physicalName)) end
+    end
+    local changed = 0
+    for _, mesh in ipairs(parts(model)) do
+        if Core.IsLocationCarrier(mesh) then continue end
+        -- COL receives exactly the same semantic/physical material as visual parts,
+        -- but continues to be invisible with its own Precise collision policy.
+        local differs = mesh:GetAttribute("Game1LocationSurfaceMaterial") ~= key
+        if material ~= nil and mesh.Material ~= material then differs = true end
+        if differs then
+            mesh:SetAttribute("Game1LocationSurfaceMaterial", key)
+            if material ~= nil then mesh.Material = material end
+            changed += 1
+        end
+    end
+    return changed
+end
+
+function Core.CaptureLocationSurfaceMaterial(model: Model): {any}
+    local old = {}
+    for _, mesh in ipairs(parts(model)) do
+        table.insert(old,{part=mesh,material=mesh.Material,
+            key=mesh:GetAttribute("Game1LocationSurfaceMaterial")})
+    end
+    return old
+end
+
+function Core.RestoreLocationSurfaceMaterial(saved: {any})
+    for _,entry in ipairs(saved) do
+        if entry.part.Parent then
+            entry.part.Material=entry.material
+            entry.part:SetAttribute("Game1LocationSurfaceMaterial",entry.key)
+        end
+    end
+end
+
+-- Scoped existing-placement physics updates can fail on locked Studio parts.
+-- Capture before the first change and restore across every managed instance.
+function Core.CaptureLocationModel(model: Model, allowedNames: {[string]: boolean}): {any}
+    local saved = {}
+    for _, mesh in ipairs(parts(model)) do
+        if allowedNames[mesh.Name] == true then
+            table.insert(saved, {part = mesh, canCollide = mesh.CanCollide,
+                canQuery = mesh.CanQuery, canTouch = mesh.CanTouch,
+                fidelity = mesh.CollisionFidelity, doubleSided = mesh.DoubleSided,
+                transparency = mesh.Transparency, castShadow = mesh.CastShadow,
+                physicsOnly = mesh:GetAttribute("Game1DecoPhysicsOnly"),
+                glassApplied = mesh:GetAttribute("Game1DecoGlassApplied")})
+        end
+    end
+    return saved
+end
+
+function Core.RestoreLocationModel(saved: {any})
+    for _, entry in ipairs(saved) do
+        local mesh = entry.part
+        if mesh and mesh.Parent then
+            if entry.canCollide then
+                mesh.CanQuery = true
+                mesh.CanCollide = true
+            else
+                mesh.CanCollide = false
+                mesh.CanQuery = entry.canQuery
+            end
+            mesh.CanTouch = entry.canTouch
+            mesh.CollisionFidelity = entry.fidelity
+            mesh.DoubleSided = entry.doubleSided
+            mesh.Transparency = entry.transparency
+            mesh.CastShadow = entry.castShadow
+            mesh:SetAttribute("Game1DecoPhysicsOnly", entry.physicsOnly)
+            mesh:SetAttribute("Game1DecoGlassApplied", entry.glassApplied)
+        end
+    end
+end
+
+return table.freeze(Core)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="20">
+        <Properties>
+          <string name="Name">StudioSkinnedMeshConnection</string>
+          <string name="Source"><![CDATA[--!strict
+-- Shared skin/rigid-assembly connection used by Character and Studio Location.
+-- Roblox resolves skinned mesh Bone names across physically connected parts
+-- inside ONE Model. Authoring/importer joints remain authoritative: only add
+-- a Weld when no existing joint path connects this part to its Bone carrier.
+local Connection = {}
+
+local function inAssembly(part: BasePart, model: Model): boolean
+    return part:FindFirstAncestorOfClass("Model") == model
+end
+
+local function connected(model: Model, carrier: MeshPart, target: MeshPart): boolean
+    local neighbours: {[BasePart]: {BasePart}} = {}
+    for _, instance in ipairs(model:GetDescendants()) do
+        if instance:IsA("JointInstance") or instance:IsA("WeldConstraint") then
+            local a, b = instance.Part0, instance.Part1
+            if a == nil or b == nil or a == b or not inAssembly(a, model)
+                or not inAssembly(b, model) then
+                error("skinned assembly contains an invalid or external joint: " .. instance.Name)
+            end
+            if neighbours[a] == nil then neighbours[a] = {} end
+            if neighbours[b] == nil then neighbours[b] = {} end
+            table.insert(neighbours[a], b)
+            table.insert(neighbours[b], a)
+        end
+    end
+    local seen: {[BasePart]: boolean} = {[carrier] = true}
+    local queue: {BasePart} = {carrier}
+    local head = 1
+    while head <= #queue do
+        local part = queue[head]
+        head += 1
+        if part == target then return true end
+        for _, other in ipairs(neighbours[part] or {}) do
+            if not seen[other] then
+                seen[other] = true
+                table.insert(queue, other)
+            end
+        end
+    end
+    return false
+end
+
+-- The published/imported mesh retains its authored skin weights; this helper
+-- only supplies the assembly path to the already authored canonical Bones.
+-- It neither copies Bones nor changes CFrames, collision flags or anchors.
+function Connection.Connect(model: Model, carrier: MeshPart, mesh: MeshPart, weldName: string): boolean
+    assert(model:IsA("Model") and carrier:IsA("MeshPart") and mesh:IsA("MeshPart"),
+        "skinned connection requires a Model and two MeshParts")
+    assert(carrier ~= mesh and inAssembly(carrier, model) and inAssembly(mesh, model),
+        "skinned mesh and carrier must belong to the same direct Model")
+    assert(type(weldName) == "string" and weldName ~= "", "missing skin weld name")
+    if connected(model, carrier, mesh) then return false end
+    local weld = Instance.new("Weld")
+    weld.Name = weldName
+    weld.Part0 = carrier
+    weld.Part1 = mesh
+    weld.C0 = carrier.CFrame:ToObjectSpace(mesh.CFrame)
+    weld.C1 = CFrame.identity
+    weld.Parent = mesh
+    return true
+end
+
+return table.freeze(Connection)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="21">
+        <Properties>
+          <string name="Name">StudioTextureAppearance</string>
+          <string name="Source"><![CDATA[-- Shared Studio-side material binding for all authored MeshParts.
+-- Keep TextureID even when SurfaceAppearance owns ColorMap: imported skinned
+-- rigs in the previous project required this compatibility invariant.
+local StudioTextureAppearance = {}
+
+function StudioTextureAppearance.Apply(mesh: MeshPart, uri: string, usesAlpha: any, idsOnly: boolean?): boolean
+    if uri == "" then
+        return false
+    end
+    local surface = mesh:FindFirstChildOfClass("SurfaceAppearance")
+    if idsOnly == true then
+        -- M216 placed Location Asset sync. Only existing Asset ID fields are
+        -- mutable; do not create SurfaceAppearance or rewrite AlphaMode/physics.
+        if mesh.TextureID == uri and (surface == nil or surface.ColorMap == uri) then
+            return false
+        end
+        local previousTexture = mesh.TextureID
+        local previousMap = if surface then surface.ColorMap else nil
+        local applied, reason = pcall(function()
+            mesh.TextureID = uri
+            if surface ~= nil then
+                surface.ColorMap = uri
+            end
+        end)
+        if not applied then
+            pcall(function()
+                mesh.TextureID = previousTexture
+                if surface ~= nil and previousMap ~= nil then
+                    surface.ColorMap = previousMap
+                end
+            end)
+            error("ID-only appearance binding failed for " .. mesh:GetFullName() .. ": " .. tostring(reason), 2)
+        end
+        return true
+    end
+    local desiredMode = if usesAlpha == true then Enum.AlphaMode.Transparency else Enum.AlphaMode.Overlay
+    local modeKnown = typeof(usesAlpha) == "boolean"
+    local alreadyCurrent = mesh.TextureID == uri
+        and surface ~= nil and surface.ColorMap == uri
+        and (not modeKnown or surface.AlphaMode == desiredMode)
+    if alreadyCurrent then
+        return false
+    end
+
+    -- Do not change normals, roughness, metalness, mesh geometry or physics.
+    -- Parent a new appearance only after its properties have been set.
+    local created = false
+    if surface == nil then
+        surface = Instance.new("SurfaceAppearance")
+        surface.Name = "SurfaceAppearance"
+        created = true
+    end
+    local previousTexture = mesh.TextureID
+    local previousMap = surface.ColorMap
+    local previousMode = surface.AlphaMode
+    local ok, reason = pcall(function()
+        mesh.TextureID = uri
+        surface.ColorMap = uri
+        if modeKnown then
+            surface.AlphaMode = desiredMode
+        end
+        if created then
+            surface.Parent = mesh
+        end
+    end)
+    if not ok then
+        pcall(function()
+            mesh.TextureID = previousTexture
+            if created then
+                surface:Destroy()
+            else
+                surface.ColorMap = previousMap
+                surface.AlphaMode = previousMode
+            end
+        end)
+        error("SurfaceAppearance binding failed for " .. mesh:GetFullName() .. ": " .. tostring(reason), 2)
+    end
+    return true
+end
+
+-- Location-only alpha policy. Unlike Apply(), this NEVER substitutes Overlay
+-- for Opaque, and it does not alter MeshPart.Transparency or physics.
+function StudioTextureAppearance.AlphaMode(enabled: boolean): Enum.AlphaMode
+    if type(enabled) ~= "boolean" then error("alphaEnabled must be boolean",2) end
+    local mode = if enabled then Enum.AlphaMode.Transparency else Enum.AlphaMode.Opaque
+    if mode == nil then error("Opaque AlphaMode unavailable in this Studio",2) end
+    return mode
+end
+
+function StudioTextureAppearance.AlphaCurrent(mesh: MeshPart, enabled: boolean): boolean
+    local appearance=mesh:FindFirstChildOfClass("SurfaceAppearance")
+    return appearance~=nil and appearance.AlphaMode==StudioTextureAppearance.AlphaMode(enabled)
+end
+
+function StudioTextureAppearance.Capture(mesh: MeshPart): any
+    local surface=mesh:FindFirstChildOfClass("SurfaceAppearance")
+    return {mesh=mesh,texture=mesh.TextureID,surface=surface,
+        color=if surface then surface.ColorMap else nil,
+        mode=if surface then surface.AlphaMode else nil}
+end
+
+function StudioTextureAppearance.Restore(snapshot: any)
+    local mesh=snapshot.mesh
+    mesh.TextureID=snapshot.texture
+    local current=mesh:FindFirstChildOfClass("SurfaceAppearance")
+    if snapshot.surface then
+        if current~=snapshot.surface and current then current:Destroy() end
+        if snapshot.surface.Parent~=mesh then snapshot.surface.Parent=mesh end
+        snapshot.surface.ColorMap=snapshot.color
+        snapshot.surface.AlphaMode=snapshot.mode
+    elseif current then
+        current:Destroy() -- newly introduced by a failed transaction
+    end
+end
+
+function StudioTextureAppearance.ApplyAlpha(mesh: MeshPart, enabled: boolean, uri: string?): boolean
+    local mode=StudioTextureAppearance.AlphaMode(enabled)
+    local surface=mesh:FindFirstChildOfClass("SurfaceAppearance")
+    if surface and surface.AlphaMode==mode then return false end
+    if surface then
+        surface.AlphaMode=mode
+        return true
+    end
+    local content=uri or mesh.TextureID
+    if content=="" then error("Alpha requires a published ColorMap; no change made",2) end
+    local created=Instance.new("SurfaceAppearance")
+    local ok,reason=pcall(function()
+        created.Name="SurfaceAppearance"
+        created.ColorMap=content
+        created.AlphaMode=mode
+        created.Parent=mesh
+    end)
+    if not ok then created:Destroy();error(tostring(reason),2) end
+    return true
+end
+
+function StudioTextureAppearance.ApplyLocation(mesh: MeshPart, uri: string, enabled: boolean): boolean
+    local snapshot=StudioTextureAppearance.Capture(mesh)
+    local ok,result=pcall(function()
+        local ids=StudioTextureAppearance.Apply(mesh,uri,nil,true)
+        local alpha=StudioTextureAppearance.ApplyAlpha(mesh,enabled,uri)
+        return ids or alpha
+    end)
+    if not ok then
+        pcall(StudioTextureAppearance.Restore,snapshot)
+        error("Location appearance rolled back: "..tostring(result),2)
+    end
+    return result
+end
+
+return table.freeze(StudioTextureAppearance)
+]]></string>
+        </Properties>
+      </Item>
+    </Item>
+  </Item>
+</roblox>

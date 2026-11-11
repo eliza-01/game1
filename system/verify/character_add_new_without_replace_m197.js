@@ -66,6 +66,8 @@ const old = ['head_01_male','newborn_boots','newborn_gloves','newborn_lower','ne
 const row = (id,revision=1) => ({id,slot:id.split('_').at(-1),set_id:'',rig_id:'human',role:'part',
   triangles:1,existing_revision:revision,published_asset_id:revision?'asset_'+id:'',content_unchanged:false});
 const oldRows = old.map(id=>row(id));
+// Simulate a skinned head with corrected weights in an otherwise standard Inspect response.
+oldRows[0].normalized_vertices = process.argv.includes('--normalized')?23:0;
 const hair = {...row('hair_03_common', 0),slot:'hair',attachment_mode:'pivot'};
 const plan = {token:'token', rig_id:'human',bone_count:77,parts:[hair,...oldRows],
   conflicts:oldRows, registered:oldRows, new_sets:[],partial_required:false,rig_only_required:false,
@@ -103,6 +105,12 @@ const settle=async()=>{for(let i=0;i<6;i++)await new Promise(resolve=>setImmedia
   el('choose').onclick();
   await settle();
   assert.equal(el('conflict').open,true,'Inspect opens review dialog');
+  if (process.argv.includes('--normalized')) {
+    const modalNotes = el('conflicts').children.filter(child => child.tagName === 'p')
+      .map(child => child.textContent);
+    assert(modalNotes.some(message => message.includes('23 vertex/vertices normalized automatically')),
+      'normalization report remains visible in approval modal without a JavaScript error');
+  }
   const newChecks=el('conflicts').querySelectorAll('[data-new-part]');
   const replaceChecks=el('conflicts').querySelectorAll('[data-mesh-approval]');
   assert.equal(newChecks.length,1,'new hair appears in review');

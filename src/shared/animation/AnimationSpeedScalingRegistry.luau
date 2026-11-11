@@ -45,6 +45,10 @@ return table.freeze({
 			stat = "RunSpeed",
 			unitsPerPercent = 1.4,
 		}),
+		["77341804648662"] = table.freeze({
+			stat = "RunSpeed",
+			unitsPerPercent = 0.8,
+		}),
 		["85145236963317"] = table.freeze({
 			stat = "RunSpeed",
 			unitsPerPercent = 0.8,
@@ -55,97 +59,21 @@ return table.freeze({
 		}),
 	}),
 	catalog = table.freeze({
-		["122840035798169"] = table.freeze({
-			label = "character / human_female / 1hs_attack_01",
+		["82219458610259"] = table.freeze({
+			label = "character / human_female / hands_attack_01",
 			channel = "attack",
 		}),
-		["111523407571664"] = table.freeze({
-			label = "character / human_female / 1hs_attack_02",
-			channel = "attack",
-		}),
-		["132390395868663"] = table.freeze({
-			label = "character / human_female / 1hs_attack_03",
-			channel = "attack",
-		}),
-		["78672231936532"] = table.freeze({
-			label = "character / human_female / 1hs_combat_idle",
+		["72958203766772"] = table.freeze({
+			label = "character / human_female / hands_combat_idle",
 			channel = "combat_idle",
 		}),
-		["104882544264186"] = table.freeze({
-			label = "character / human_female / 1hs_idle",
+		["134447739445281"] = table.freeze({
+			label = "character / human_female / hands_idle",
 			channel = "idle",
 		}),
-		["70447016661017"] = table.freeze({
-			label = "character / human_female / 1hs_run",
+		["77341804648662"] = table.freeze({
+			label = "character / human_female / hands_run",
 			channel = "run",
-		}),
-		["82213044013946"] = table.freeze({
-			label = "character / human_female / 1hs_walk",
-			channel = "walk",
-		}),
-		["81644864777234"] = table.freeze({
-			label = "character / human_female / base_death",
-			channel = "death",
-		}),
-		["83724299950111"] = table.freeze({
-			label = "character / human_female / base_revive",
-			channel = "revive",
-		}),
-		["83055454480514"] = table.freeze({
-			label = "character / human_male / 1hs_attack_01",
-			channel = "attack",
-		}),
-		["104219318952480"] = table.freeze({
-			label = "character / human_male / 1hs_attack_02",
-			channel = "attack",
-		}),
-		["121285730411608"] = table.freeze({
-			label = "character / human_male / 1hs_attack_03",
-			channel = "attack",
-		}),
-		["85239390595044"] = table.freeze({
-			label = "character / human_male / 1hs_combat_idle",
-			channel = "combat_idle",
-		}),
-		["81010793636677"] = table.freeze({
-			label = "character / human_male / 1hs_idle",
-			channel = "idle",
-		}),
-		["85145236963317"] = table.freeze({
-			label = "character / human_male / 1hs_run",
-			channel = "run",
-		}),
-		["84605403834959"] = table.freeze({
-			label = "character / human_male / 1hs_walk",
-			channel = "walk",
-		}),
-		["138556723203566"] = table.freeze({
-			label = "character / human_male / base_death",
-			channel = "death",
-		}),
-		["81850127715492"] = table.freeze({
-			label = "character / human_male / base_revive",
-			channel = "revive",
-		}),
-		["131417903911496"] = table.freeze({
-			label = "character / human_male / hands_attack_01",
-			channel = "attack",
-		}),
-		["81420323965197"] = table.freeze({
-			label = "character / human_male / hands_combat_idle",
-			channel = "combat_idle",
-		}),
-		["110559292454231"] = table.freeze({
-			label = "character / human_male / hands_idle",
-			channel = "idle",
-		}),
-		["92273150940176"] = table.freeze({
-			label = "character / human_male / hands_run",
-			channel = "run",
-		}),
-		["88979624612642"] = table.freeze({
-			label = "character / human_male / hands_walk",
-			channel = "walk",
 		}),
 		["101898400862842"] = table.freeze({
 			label = "monster / gremlin / attack_01",
@@ -233,11 +161,4 @@ return table.freeze({
 		}),
 		["122295588324584"] = table.freeze({
 			label = "npc / warsmith / base_run",
-			channel = "run",
-		}),
-		["116868377220889"] = table.freeze({
-			label = "npc / warsmith / base_walk",
-			channel = "walk",
-		}),
-	}),
-})
+			channel = "

@@ -26,15 +26,26 @@ assert(#cycles:Advance(.3,4)==4,"hitch work must be bounded to two partial cycle
 cursor:Reset();assert(#cursor:Advance(0,0)==1,"restart")
 local fixture=Instance.new("Model");fixture.Name="face_events_fixture"
 local templates=Instance.new("Folder")
-local spiral=Instance.new("Part");spiral.Name="eyes_01_spiral";spiral:SetAttribute("FaceLocalCFrame",CFrame.identity);spiral.Parent=templates
+for _,side in {"l","r"} do
+    local spiral=Instance.new("MeshPart")
+    spiral.Name="human_common_m001_eye_"..side.."_spiral"
+    spiral:SetAttribute("FaceLocalCFrame",CFrame.identity)
+    spiral.Parent=templates
+end
 local originals={}
 local ok,reason=xpcall(function()
     local carrier=Instance.new("Part");carrier.Name="rig_carrier";carrier.Anchored=true;carrier.Parent=fixture
+    local head=Instance.new("Bone");head.Name="face_head";head.Parent=carrier
     for _,side in {"l","r"} do
         for _,kind in {"eye","brow"} do
-            local bone=Instance.new("Bone");bone.Name="face_"..kind.."_"..side;bone.CFrame=CFrame.new(if side=="l" then -.2 else .2,1,0);bone.Parent=carrier
-            local part=Instance.new("Part");part.Name=(if kind=="eye" then "eyes_01_" else "eyebrows_01_")..side
-            part.Size=Vector3.new(.1,.2,.04);part.CFrame=bone.WorldCFrame;part.Anchored=true;part.Parent=fixture
+            local bone=Instance.new("Bone");bone.Name="face_"..kind.."_"..side
+            bone.CFrame=CFrame.new(if side=="l" then -.2 else .2,1,0);bone.Parent=head
+            local part=Instance.new("MeshPart")
+            local slot=(if kind=="eye" then "eye_" else "eyebrow_")..side
+            part.Name="human_common_m001_"..slot
+            part.Size=Vector3.new(.1,.2,.04);part.CFrame=bone.WorldCFrame
+            part.Anchored=true;part.Parent=fixture
+            part:SetAttribute("CharacterPartSlot",slot)
             table.insert(originals,part)
         end
     end

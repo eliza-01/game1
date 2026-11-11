@@ -12,12 +12,12 @@
     paragraph.textContent=message;return paragraph;
   }
   function render(catalog){
-    const items=catalog?.items||[],sets=catalog?.sets||[];
+    const items=catalog?.items||[];
     const rigs=items.filter(item=>item.kind==='rig').length;
     const published=items.filter(item=>!!item.model_asset_id&&item.published_revision===item.revision).length;
     const awaiting=items.length-published;
     el('counts').replaceChildren(
-      metric('Риги',rigs),metric('Части',items.length-rigs),metric('Сеты',sets.length),
+      metric('Риги',rigs),metric('MeshParts',items.length-rigs),metric('m001 семьи',new Set(items.map(x=>x.mesh_family_id).filter(Boolean)).size),
       metric('Опубликовано',`${published}/${items.length}`,items.length&&awaiting===0?'good':''),
       metric('К публикации',awaiting,awaiting?'alert':'good'));
     const hint=note('Совет: проверь FBX, зарегистрируй части и публикуй только изменённые.','advice');
@@ -25,7 +25,7 @@
       ? note(`Внимание: ${awaiting} компонент(ов) требуют публикации. Старые Model ID сохраняются до успешной замены.`,'summary-warning')
       : note(items.length?'Готово: все компоненты опубликованы.':'Пока нет компонентов. Начни с выбора FBX.','summary-ready');
     el('flow-summary').replaceChildren(hint,state);
-    el('sets').textContent=sets.length?'Сеты: '+sets.join(', '):'Сетов пока нет. Первый комплект появится при регистрации части.';
+    el('sets').textContent='Броня регистрируется отдельно в Armor Catalog. Имя геометрии не создаёт комплект автоматически.';
   }
   window.game1CharacterComponentSummary={render};
 })();

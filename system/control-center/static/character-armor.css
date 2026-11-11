@@ -1,0 +1,15 @@
+/* Compact armor authoring with one editor for the selected logical part. */
+#armor-panel .armor-head {display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap}
+#armor-panel .armor-layout {display:grid;grid-template-columns:minmax(14rem,0.7fr) minmax(23rem,1.5fr);gap:1rem;margin-top:1rem}
+#armor-panel .armor-layout > section {min-width:0;border:1px solid var(--border,#4445);border-radius:10px;padding:1rem}
+#armor-panel .armor-set, #armor-panel .armor-piece-row > button:first-child{display:block;width:100%;text-align:left;margin:.35rem 0}
+#armor-panel .armor-selected {font-weight:700;outline:2px solid var(--accent,#569e9a)}
+#armor-panel .armor-piece-row{display:flex;align-items:center;gap:.3rem}
+#armor-panel .armor-piece-row > button:first-child {flex:1;min-width:0;overflow-wrap:anywhere}
+#armor-panel .armor-set-form, #armor-panel .armor-variant-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(11rem,1fr));gap:.6rem;align-items:end;margin:.7rem 0}
+#armor-panel label{display:flex;flex-direction:column;gap:.2rem}
+#armor-panel .armor-controls{display:flex;gap:.6rem;align-items:end;flex-wrap:wrap;margin:.6rem 0}
+#armor-panel .armor-variant-form button{align-self:end}
+#armor-panel #armor-status.error{color:var(--danger,#d85e5e)}
+#armor-panel .armor-help {opacity:.77;font-size:.9rem}
+@media(max-width:850px){#armor-panel .armor-layout{grid-template-columns:1fr}}

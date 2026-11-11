@@ -1,4 +1,4 @@
-"""Modular Characters registry v1. Existing archetypes/animation tables are untouched.
+"""Character geometry registry v2. Existing archetypes/animation tables are untouched.
 
 Inspection is non-registering; commit uses an immutable FBX snapshot, optimistic
 revisions and explicit replacement approval. External uploads are checkpoints.
@@ -14,9 +14,8 @@ import time
 import uuid
 from sqlite_connection import connect
 from services.texture_atlas_registry import AtlasRegistry
-from character_core.part_names import parse_part, rig_id, skeleton_matches, TOKEN
+from character_core.part_names import parse_part, default_allowed_genders, rig_id, skeleton_matches, TOKEN, hair_color_channels, part_matches_source_rig, rig_family_and_gender
 from character_core.component_fbx import inspect_fbx, inspect_rig_fbx
-from character_core.rig_revisions import pin_unversioned_assemblies
 
 _LOCK=threading.RLock()
 
@@ -45,7 +44,7 @@ class CharacterComponents:
                 with connect(backup) as target:db.backup(target)
             db.executescript('''
                 CREATE TABLE IF NOT EXISTS character_component_schema(version INTEGER PRIMARY KEY);
-                INSERT OR IGNORE INTO character_component_schema VALUES(1);
+                INSERT OR IGNORE INTO character_component_schema VALUES(2);
                 CREATE TABLE IF NOT EXISTS character_component_records(
                     kind TEXT NOT NULL,id TEXT NOT NULL,rig_id TEXT NOT NULL,slot TEXT NOT NULL,
                     set_id TEXT NOT NULL DEFAULT '',gender TEXT NOT NULL DEFAULT 'common',role TEXT NOT NULL,
@@ -54,7 +53,8 @@ class CharacterComponents:
                     model_asset_id TEXT NOT NULL DEFAULT '',published_revision INTEGER NOT NULL DEFAULT 0,
                     pending_operation TEXT NOT NULL DEFAULT '',created_at REAL NOT NULL,
                     PRIMARY KEY(kind,id));
-                CREATE TABLE IF NOT EXISTS character_component_sets(id TEXT PRIMARY KEY,created_at REAL NOT NULL);
+                CREATE TABLE IF NOT EXISTS character_mesh_families(
+                    id TEXT PRIMARY KEY,rig_profile_id TEXT NOT NULL,created_at REAL NOT NULL);
                 CREATE TABLE IF NOT EXISTS character_component_imports(
                     id TEXT PRIMARY KEY,plan_json TEXT NOT NULL,committed INTEGER NOT NULL DEFAULT 0,created_at REAL NOT NULL);
                 CREATE TABLE IF NOT EXISTS character_component_history(
@@ -64,6 +64,14 @@ class CharacterComponents:
                     id INTEGER PRIMARY KEY,kind TEXT NOT NULL,component_id TEXT NOT NULL,revision INTEGER NOT NULL,
                     asset_id TEXT NOT NULL,operation_path TEXT NOT NULL,published_at REAL NOT NULL);
             ''')
+        with connect(self.db) as db:
+            columns={r['name'] for r in db.execute('PRAGMA table_info(character_component_records)')}
+            if 'mesh_family_id' not in columns:
+                db.execute("ALTER TABLE character_component_records ADD COLUMN mesh_family_id TEXT NOT NULL DEFAULT ''")
+            if 'allowed_genders_json' not in columns:
+                db.execute("ALTER TABLE character_component_records ADD COLUMN allowed_genders_json TEXT NOT NULL DEFAULT '[]'")
+            db.execute('DELETE FROM character_component_schema WHERE version<>2')
+            db.execute('INSERT OR IGNORE INTO character_component_schema VALUES(2)')
         self.atlases=AtlasRegistry(self.root)
 
     def get(self,kind,key):
@@ -72,10 +80,39 @@ class CharacterComponents:
             row=db.execute('SELECT * FROM character_component_records WHERE kind=? AND id=?',(kind,key)).fetchone()
         return dict(row) if row else None
 
+    def part_compatible_with_rig(self, part, target_rig_id):
+        """Cross-rig reuse is safe only for common geometry with matching bind pose.
+
+        Allowed genders describe an item in the game, but do not guarantee
+        its skin weights fit an unrelated Armature. Compare the *published*
+        bones, never trust a name or a pending revision.
+        """
+        if part['rig_id'] == target_rig_id:
+            return True
+        if part['gender'] != 'common':
+            return False
+        try:
+            source_family, _ = rig_family_and_gender(part['rig_id'])
+            target_family, _ = rig_family_and_gender(target_rig_id)
+            if source_family != target_family:
+                return False
+            source = self.get('rig', part['rig_id'])
+            target = self.get('rig', target_rig_id)
+            if not source or not target:
+                return False
+            a = self.publication_metadata(source)['bones']
+            b = self.publication_metadata(target)['bones']
+            skeleton_matches(a, b)
+            return True
+        except (ValueError, KeyError, TypeError):
+            return False
+
     def _snapshot_row(self,row):
         row=dict(row);row['metadata']=json.loads(row.pop('metadata_json'))
+        row['allowedGenders']=json.loads(row.pop('allowed_genders_json'))
         row['status']='published' if row['published_revision']==row['revision'] else ('replacement_pending' if row['model_asset_id'] else 'registered')
-        row['atlas']=self.atlases.binding('character_part',row['id']) if row['kind']=='part' else None
+        # Appearance is owned by ArmorCatalog, never bound to geometry directly.
+        row['atlas']=None
         return row
 
     def publication_metadata(self,row):
@@ -94,8 +131,8 @@ class CharacterComponents:
     def snapshot(self):
         with connect(self.db) as db:
             rows=db.execute("SELECT * FROM character_component_records ORDER BY CASE kind WHEN 'rig' THEN 0 ELSE 1 END,id").fetchall()
-            sets=[r['id'] for r in db.execute('SELECT id FROM character_component_sets ORDER BY id')]
-        return dict(schema_version=1,items=[self._snapshot_row(r) for r in rows],sets=sets,
+            families=[dict(r) for r in db.execute('SELECT * FROM character_mesh_families ORDER BY id')]
+        return dict(schema_version=2,items=[self._snapshot_row(r) for r in rows],mesh_families=families,
                     atlas_families=self.atlases.catalog(domain='character'))
 
     def inspect(self,source):
@@ -118,6 +155,31 @@ class CharacterComponents:
                 except Exception:
                     raise exc  # Preserve the original detailed FBX failure.
             key=rig_id(info['armature'])
+            rig_in_source=info.get('rig_present', True)
+            if not rig_in_source:
+                # A rigless rigid hair FBX does not carry a bind skeleton. Prefer
+                # the matching gendered rig if present, then an existing shared
+                # family rig. A common hair may target the only existing
+                # gendered rig, but never pick arbitrarily between two.
+                existing_rig=self.get('rig',key)
+                if not existing_rig:
+                    family, specific_gender = rig_family_and_gender(key)
+                    candidates=([family] if specific_gender else
+                                [family+'_male',family+'_female'])
+                    available=[candidate for candidate in candidates if self.get('rig',candidate)]
+                    if len(available) == 1:
+                        key=available[0]
+                        info['armature']=key+'_armature'
+                        existing_rig=self.get('rig',key)
+                    elif len(available) > 1:
+                        raise ValueError('rigless common hair matches multiple rig profiles; '
+                                         'include the intended Armature in the FBX')
+                if not existing_rig:
+                    raise ValueError(key + ': register a compatible primary rig before importing standalone hair')
+                saved_bones=json.loads(existing_rig['metadata_json'])['bones']
+                if 'hair_mount' not in {bone['name'] for bone in saved_bones}:
+                    raise ValueError(key + ': registered rig has no hair_mount')
+                info['bones']=saved_bones
             for bone in info['bones']:
                 if not TOKEN.fullmatch(bone['name']) or len(bone['matrix'])!=16 or not all(math.isfinite(v) for v in bone['matrix']):
                     raise ValueError('bone names must be lower_case_snake_case with finite bind matrices')
@@ -144,15 +206,24 @@ class CharacterComponents:
                             if not TOKEN.fullmatch(bone['name']) or len(bone['matrix'])!=16 or not all(math.isfinite(v) for v in bone['matrix']):
                                 raise ValueError('bone names must be lower_case_snake_case with finite bind matrices')
                         meta=parse_part(part['name'])
+                        if not part_matches_source_rig(meta, key):
+                            raise ValueError(
+                                f"{part['name']}: incompatible with {key}_armature; "
+                                "mesh family and gender must match the source rig"
+                            )
                         if meta['id'] in seen:
                             raise ValueError('duplicate mesh names: '+meta['id'])
+                        if part.get('extras'):
+                            if meta['slot'] != 'hair' or part.get('attachment_mode') != 'pivot':
+                                raise ValueError(part['name'] + ': extras require rigid pivot hair')
+                            hair_color_channels(part)
                         if part.get('attachment_mode') == 'pivot':
                             if (meta['slot'] != 'hair' or part.get('attachment') != 'hair_mount'
                                     or part.get('armature') or part.get('skeleton') or part.get('used_bones')):
                                 raise ValueError(part['name']+': invalid rigid hair pivot attachment')
                             if not any(b['name']=='hair_mount' for b in info['bones']):
                                 raise ValueError('rigid hair requires hair_mount in primary rig')
-                        parts.append({**part,**meta,'rig_id':key})
+                        parts.append({**part,**meta,'rig_id':key, 'allowed_genders':default_allowed_genders(meta)})
                         seen.add(meta['id'])
                     except ValueError as exc:
                         part_errors.append(dict(name=part.get('name',''),message=str(exc)))
@@ -171,13 +242,15 @@ class CharacterComponents:
             for p in parts:
                 old_part=self.get('part',p['id'])
                 if old_part and old_part['rig_id']!=key:raise ValueError(p['id']+': belongs to another rig')
-                rows.append(dict(id=p['id'],slot=p['slot'],set_id=p['set_id'],role=p['role'],
-                    attachment_mode=p.get('attachment_mode',''),
+                rows.append(dict(id=p['id'],slot=p['slot'],mesh_family_id=p['mesh_family_id'],
+                    allowedGenders=json.loads(old_part['allowed_genders_json']) if old_part else p['allowed_genders'],role=p['role'],
+                    attachment_mode=p.get('attachment_mode',''),extras=p.get('extras',[]),
                     vertices=p['vertices'],triangles=p['triangles'],
+                    normalized_vertices=p.get('normalized_vertices',0),
                     existing_revision=old_part['revision'] if old_part else 0,
                     published_asset_id=old_part['model_asset_id'] if old_part else '',
                     content_unchanged=bool(old_part and old_part['content_sha256']==p['content_sha256'])))
-            plan=dict(schema_version=1,token=ident,source=str(frozen.relative_to(self.root)),sha256=sha(frozen),
+            plan=dict(schema_version=2,rig_in_source=rig_in_source,token=ident,source=str(frozen.relative_to(self.root)),sha256=sha(frozen),
                 rig_id=key,bones=info['bones'],armature=info['armature'],parts=parts,rows=rows,
                 rig_revision=old['revision'] if old else 0,
                 rig_published_asset_id=old['model_asset_id'] if old else '',
@@ -187,8 +260,7 @@ class CharacterComponents:
             with connect(self.db) as db:
                 db.execute('INSERT INTO character_component_imports(id,plan_json,created_at) VALUES(?,?,?)',
                            (ident,json.dumps(plan),time.time()))
-            return dict(schema_version=1,token=ident,rig_id=key,bone_count=len(info['bones']),parts=rows,
-                new_sets=sorted({p['set_id'] for p in parts if p['set_id']} - set(self.snapshot()['sets'])),
+            return dict(schema_version=2,token=ident,rig_id=key,bone_count=len(info['bones']),parts=rows,
                 conflicts=[p for p in rows if p['published_asset_id']],
                 registered=[p for p in rows if p['existing_revision']],
                 rig_only_required=rig_only_required,partial_required=partial_required,
@@ -200,7 +272,7 @@ class CharacterComponents:
             shutil.rmtree(directory)
             raise
 
-    def register(self,token,replacements,*,replace_rig=False,rig_only=False,allow_partial=False,new_parts=None):
+    def register(self,token,replacements,*,replace_rig=False,rig_only=False,allow_partial=False,new_parts=None,compatibility=None):
         with _LOCK:
             with connect(self.db) as db:
                 saved=db.execute('SELECT * FROM character_component_imports WHERE id=?',(token,)).fetchone()
@@ -231,6 +303,13 @@ class CharacterComponents:
                 raise ComponentConflict('rig-only registration cannot modify mesh components')
             approved_replacements=set(replacements)
             approved_new=set(new_parts)
+            from character_core.armor import gender_pair
+            if compatibility is None: compatibility={}
+            if not isinstance(compatibility,dict) or set(compatibility)-{p['id'] for p in plan['rows']}:
+                raise ComponentConflict('unknown part in gender compatibility selection')
+            inspected_allowed={p['id']:p['allowedGenders'] for p in plan['rows']}
+            allowed_by_id={p['id']:gender_pair(compatibility.get(p['id'],inspected_allowed[p['id']]))
+                           for p in plan['parts']}
             if type(replace_rig) is not bool or replace_rig != bool(plan.get('rig_changed')):
                 raise ComponentConflict('explicit Replace Rig approval is required when bind pose, parent or bone set changes')
             def validate(db):
@@ -259,14 +338,17 @@ class CharacterComponents:
                 info=self.analyze_rig(self.root,folder/'source.fbx',prepared)
             else:
                 info=self.analyze(self.root,folder/'source.fbx',prepared)
-            skeleton_matches(plan['bones'],info['bones'])
+            if info.get('rig_present', True) != plan.get('rig_in_source', True):
+                raise ComponentConflict('FBX rig presence changed during extraction')
+            if plan.get('rig_in_source', True):
+                skeleton_matches(plan['bones'],info['bones'])
             if not rig_only:
                 expected={p['name']:p['content_sha256'] for p in plan['parts']}
                 actual={p['name']:p['content_sha256'] for p in info['parts'] if p['name'] in expected}
                 if (actual!=expected or len(actual)!=len(expected)
                         or info.get('part_errors',[])!=plan.get('part_errors',[])[:len(info.get('part_errors',[]))]):
                     raise ComponentConflict('FBX changed during extraction')
-            entries=[('rig',plan['rig_id'],dict(bones=plan['bones'],armature=plan['armature']),None)]
+            entries=[('rig',plan['rig_id'],dict(bones=plan['bones'],armature=plan['armature']),None)] if plan.get('rig_in_source', True) else []
             if not rig_only:
                 selected_parts=approved_replacements | approved_new
                 entries.extend(('part',p['id'],p,p) for p in plan['parts'] if p['id'] in selected_parts)
@@ -282,30 +364,44 @@ class CharacterComponents:
                     if old:
                         db.execute('INSERT INTO character_component_history(kind,component_id,revision,record_json,changed_at) VALUES(?,?,?,?,?)',
                             (kind,key,old['revision'],json.dumps(dict(old)),time.time()))
-                        if kind=='rig' and plan.get('rig_changed') and old['published_revision']:
-                            # Pin existing live recipes before changing the profile. They keep
-                            # resolving the previous published rig even after republishing.
-                            pin_unversioned_assemblies(db,key,old['published_revision'])
                     revision=old['revision']+1 if old else 1
+                    if part and part['mesh_family_id']:
+                        family=part['mesh_family_id']
+                        family_row=db.execute('SELECT rig_profile_id FROM character_mesh_families WHERE id=?',(family,)).fetchone()
+                        if family_row and family_row['rig_profile_id'] != plan['rig_id']:
+                            raise ComponentConflict(family+': mesh family already belongs to another rig profile')
+                        db.execute('INSERT OR IGNORE INTO character_mesh_families(id,rig_profile_id,created_at) VALUES(?,?,?)',
+                                   (family,plan['rig_id'],time.time()))
                     db.execute('''INSERT INTO character_component_records
-                        (kind,id,rig_id,slot,set_id,gender,role,revision,content_sha256,source_path,prepared_path,prepared_sha256,metadata_json,created_at)
-                        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(kind,id) DO UPDATE SET
+                        (kind,id,rig_id,slot,set_id,gender,role,revision,content_sha256,source_path,prepared_path,prepared_sha256,metadata_json,created_at,mesh_family_id,allowed_genders_json)
+                        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(kind,id) DO UPDATE SET
                         revision=excluded.revision,content_sha256=excluded.content_sha256,source_path=excluded.source_path,
-                        prepared_path=excluded.prepared_path,prepared_sha256=excluded.prepared_sha256,metadata_json=excluded.metadata_json''',
+                        prepared_path=excluded.prepared_path,prepared_sha256=excluded.prepared_sha256,metadata_json=excluded.metadata_json,
+                        mesh_family_id=excluded.mesh_family_id,allowed_genders_json=excluded.allowed_genders_json''',
                         (kind,key,plan['rig_id'],part['slot'] if part else 'rig',part['set_id'] if part else '',
                          part['gender'] if part else 'common',part['role'] if part else 'core',revision,content,
-                         str((folder/'source.fbx').relative_to(self.root)),str(artifact.relative_to(self.root)),sha(artifact),json.dumps(meta),time.time()))
-                    if part and part['set_id']:
-                        db.execute('INSERT OR IGNORE INTO character_component_sets VALUES(?,?)',(part['set_id'],time.time()))
+                         str((folder/'source.fbx').relative_to(self.root)),str(artifact.relative_to(self.root)),sha(artifact),json.dumps(meta),time.time(),
+                         part['mesh_family_id'] if part else '',json.dumps(allowed_by_id[part['id']]) if part else '[]'))
                 db.execute('UPDATE character_component_imports SET committed=1 WHERE id=?',(token,))
             self.export()
             return self.snapshot()
 
-    def bind_atlas(self,key,variant,revision):
-        if not self.get('part',key):raise ValueError('unknown part')
-        # Preserve explicitly bound legacy shared variants. New choices are
-        # domain-scoped in the Character catalog and Character authoring route.
-        self.atlases.bind('character_part',key,int(variant),expected_revision=revision)
+    def set_compatibility(self,key,allowed,expected):
+        """Metadata-only authoring: changing gender NEVER changes Mesh publication revision."""
+        from character_core.armor import gender_pair
+        allowed=gender_pair(allowed)
+        # Existing pre-v2 components have an unassigned compatibility ([]).
+        # It is a valid optimistic-lock baseline, but never a valid new value.
+        if expected != []:
+            expected=gender_pair(expected)
+        with connect(self.db) as db:
+            db.execute('BEGIN IMMEDIATE')
+            row=db.execute("SELECT * FROM character_component_records WHERE kind='part' AND id=?",(key,)).fetchone()
+            if not row:raise ValueError('unknown character part')
+            if json.loads(row['allowed_genders_json']) != expected:
+                raise ComponentConflict('gender compatibility changed; refresh first')
+            db.execute("UPDATE character_component_records SET allowed_genders_json=? WHERE kind='part' AND id=?",
+                       (json.dumps(allowed),key))
         self.export();return self.snapshot()
 
     def publish(self,kind,key,credentials,*,expected_revision=None,on_progress=None):

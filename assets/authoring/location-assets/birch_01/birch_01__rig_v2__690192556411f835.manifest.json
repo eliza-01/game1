@@ -1,0 +1,151 @@
+{
+  "boneHash": "14b445ed529c76a927399d391a35fa90ebfd9eeb54d1634405c9bb80c7db5810",
+  "bones": [
+    {
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "Bone",
+      "parent": ""
+    },
+    {
+      "matrix": [
+        0.9988223,
+        0.0485191,
+        0.0001674,
+        0.0,
+        0.0031862,
+        -0.0621481,
+        -0.9980618,
+        0.0,
+        -0.0484146,
+        0.9968869,
+        -0.0622295,
+        4.0522251,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "Bone.001",
+      "parent": "Bone"
+    },
+    {
+      "matrix": [
+        0.9998968,
+        0.0143584,
+        0.0005088,
+        0.1303113,
+        0.0005968,
+        -0.0061263,
+        -0.999981,
+        -0.1669157,
+        -0.014355,
+        0.9998781,
+        -0.0061342,
+        6.7296386,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "Bone.002",
+      "parent": "Bone.001"
+    },
+    {
+      "matrix": [
+        0.9921572,
+        -0.1135379,
+        0.0522841,
+        0.1861928,
+        0.0453692,
+        -0.0626577,
+        -0.9970033,
+        -0.1907587,
+        0.1164736,
+        0.991556,
+        -0.0570152,
+        10.6210756,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "Bone.003",
+      "parent": "Bone.002"
+    },
+    {
+      "matrix": [
+        0.9973592,
+        0.0487962,
+        0.0537962,
+        -0.0526471,
+        0.0575924,
+        -0.0800524,
+        -0.9951255,
+        -0.3225662,
+        -0.0442519,
+        0.9955956,
+        -0.0826513,
+        12.7069254,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "Bone.004",
+      "parent": "Bone.003"
+    }
+  ],
+  "carrierName": "rig_carrier",
+  "inventoryHash": "25017b900072a8f3b0b038465ebfef93028206338d1513e624aba5746ead11fd",
+  "parts": [
+    {
+      "name": "birch_01",
+      "role": "visual",
+      "vertices": 791
+    },
+    {
+      "name": "col_mesh",
+      "role": "collider",
+      "vertices": 226
+    },
+    {
+      "name": "rig_carrier",
+      "role": "rig_carrier",
+      "vertices": 15
+    }
+  ],
+  "rigKind": "skinned",
+  "schemaVersion": 2,
+  "skinPreparation": {
+    "minimumInfluence": 0.05,
+    "minimumVerticesPerBone": 1,
+    "patchedBoneCount": 0,
+    "patchedBones": [],
+    "prunedVertices": 0,
+    "survivingBoneCount": 5,
+    "unweightedVertexPolicy": "nearest-authored-bone-head-v1",
+    "unweightedVerticesAfter": 0,
+    "unweightedVerticesBefore": 0,
+    "verticesOverFourAfter": 0,
+    "verticesOverFourBefore": 0
+  },
+  "sourceSha256": "690192556411f8353a4578b25dccabccbe24a35f935f1e5828e4af24f0c1776d",
+  "structuralHash": "7c2fc0418a8b8613a149a23bdd5ce1539135a75d0a33a64007dc92f8f5314f6f"
+}

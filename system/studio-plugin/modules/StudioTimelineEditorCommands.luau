@@ -40,6 +40,7 @@ return function(services)
     local postTimelineAgent = transport.PostAgent
     local postTimelineEditorResult = transport.PostResult
     local loadTimelinePreviewModel = previewService.LoadModel
+    local loadTimelineAdminModel = previewService.LoadAdminModel
     local loadTimelineSequence = previewService.LoadSequence
     local timelineSequenceDuration = previewService.SequenceDuration
     local timelineEditor = {
@@ -94,6 +95,9 @@ return function(services)
         if duration > 0 and #timelineEditor.poseTracks > 0 then
             local ok, err = pcall(function()
                 poseSampler.Apply(timelineEditor.poseTracks, duration * normalized)
+                if timelineEditor.preview then
+                    previewService.RefreshAccessories(timelineEditor.preview)
+                end
             end)
             if not ok then
                 timelineStatus.Text = "Pose preview failed: " .. tostring(err)
@@ -196,23 +200,37 @@ return function(services)
             timelineEditor.events = if type(data.events) == "table" then data.events else {}
             timelineEditor.selectedEvent = "Hit"
 
-            local preview = loadTimelinePreviewModel(modelAssetId)
-            timelineEditor.preview = preview
+            -- Validate the *published clip* before loading the visual rig.
+            -- Source-document duration alone is not proof of playable keys.
             local sequence = loadTimelineSequence(animationAssetId)
             local sequenceDuration = timelineSequenceDuration(sequence)
-            if sequenceDuration <= 0 then
-                sequence:Destroy()
-                error("selected attack animation contains no timed keyframes")
+            local preview: Model? = nil
+            local tracks: any = nil
+            local buildOk, buildError = pcall(function()
+                if tostring(data.subjectType or "") == "characters" then
+                    preview = loadTimelineAdminModel(tostring(data.subjectId or ""))
+                else
+                    preview = loadTimelinePreviewModel(modelAssetId)
+                end
+                tracks = poseSampler.Build(preview, sequence)
+            end)
+            sequence:Destroy()
+            if not buildOk then
+                error("timeline preview could not prepare the published rig: " .. tostring(buildError))
+            end
+            if #tracks == 0 then
+                error(("animation %d has timed poses but none match the Bones/Motor6Ds of model %d. "
+                    .. "Verify that the animation was exported for the published rig and that Bone names are unchanged.")
+                    :format(animationAssetId, modelAssetId))
             end
             timelineEditor.duration = sequenceDuration
-            timelineEditor.poseTracks = poseSampler.Build(preview, sequence)
-            sequence:Destroy()
-            if #timelineEditor.poseTracks == 0 then
-                error("selected attack has no Pose targets matching the preview rig")
-            end
+            timelineEditor.preview = preview
+            timelineEditor.poseTracks = tracks
 
             timelineTitle.Text = timelineEditor.subjectName .. " · " .. timelineEditor.clipName
-            timelineHint.Text = "Preview is rendered inside this plugin. Scrub, choose an event, then Confirm point."
+            timelineHint.Text = if tostring(data.subjectType or "") == "characters"
+                then "Studio admin assembly · drag to orbit, scrub animation, then confirm hit points"
+                else "Preview is rendered inside this plugin. Scrub, choose an event, then Confirm point."
             timelineStatus.Text = ("Ready · %.3f s · %d animated target(s)"):format(
                 timelineEditor.duration,
                 #timelineEditor.poseTracks
@@ -233,9 +251,15 @@ return function(services)
         end, debug.traceback)
 
         if not ok then
-            result.error = tostring(operationError)
-            timelineStatus.Text = "Timeline editor error: " .. tostring(operationError)
-            warn("[game1 plugin] timeline editor failed: " .. tostring(operationError))
+            destroyTimelinePreview()
+            timelineEditor.sessionId = ""
+            local tracebackText = tostring(operationError)
+            local firstLine = tracebackText:match("^[^\n]*") or tracebackText
+            -- Detailed traceback stays in Studio Output; the Asset Manager
+            -- only needs the actionable first line.
+            result.error = firstLine:match("^.-:%d+: (.*)$") or firstLine
+            timelineStatus.Text = "Timeline editor error: " .. result.error
+            warn("[game1 plugin] timeline editor failed: " .. tracebackText)
         end
         local postOk, postError = pcall(postTimelineEditorResult, result)
         if not postOk then

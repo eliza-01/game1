@@ -4,6 +4,7 @@
   const safe=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const missingKey='game1.animations.showMissing';
   let api, sortKey='context', sortDir=1, showMissing=false, scan=null, replacing=null, replacementPath='', busy=false;
+  let timelineByClip=null; // null means the separate timeline registry has not been checked
   try{showMissing=localStorage.getItem(missingKey)==='1'}catch{}
   function pendingRows(){
     const data=api.state().animations||{}, items=data.items||[], catalog=data.filenameRules||[];
@@ -20,13 +21,26 @@
   }
   function renderRows(){const s=api.state(), host=$('animation-rows');host.replaceChildren();$('animation-filter-label').textContent=s.animationFilter.replace('weapon:','');
     for(const row of sortedRows()){
+      const attack= !row.missing && row.slot==='attack' && !!row.asset_id && !row.document_only;
+      const timing=attack&&timelineByClip?.get(row.clip_id);
+      const timingLabel=timelineByClip===null?'таймлайн: не проверен':timing?.configured?'таймлайн: готов':'таймлайн: нужен HitStart / HitEnd';
       const tr=document.createElement('tr');tr.className=(row.binding_id&&row.binding_id===s.animationSelected?'active ':'')+(row.missing?'animation-empty-row':'');
-      tr.innerHTML=`<td><span class="context-chip ${safe(row.scope)}">${safe(context(row))}</span></td><td><b>${safe(row.slot)}</b></td><td>${row.variant?String(row.variant).padStart(2,'0'):'—'}</td><td>${safe(row.name||'—')}${row.source_path?`<br><small class="animation-source-path" title="${safe(row.source_path)}">${safe(row.source_path)}</small>`:''}</td><td>${safe(row.asset_id||'—')}</td><td><span class="tag ${safe(String(row.status).toLowerCase())}">${safe(row.status)}</span></td><td>${row.missing?'—':`<input data-weight class="weight-input" type="number" min="1" max="10000" value="${safe(row.weight||100)}">`}</td><td>${row.missing?'Требуется файл':`<div class="row-actions"><button data-open>детали</button>${row.document_only?'программное состояние':row.asset_id?`<button data-replace>${row.status==='CHANGED'?'проверить / replace':'replace'}</button>`:`<button data-publish ${row.status==='LOCAL_ONLY'?'':'disabled'}>publish</button>`}<button data-delete class="danger">удалить</button></div>`}</td>`;
-      if(!row.missing){tr.querySelector('[data-open]').onclick=()=>{s.animationSelected=row.binding_id;api.render()};tr.querySelector('[data-weight]').onchange=e=>api.weight(row.binding_id,e.target.value);tr.querySelector('[data-publish]')?.addEventListener('click',()=>api.publish(row.clip_id));tr.querySelector('[data-replace]')?.addEventListener('click',()=>openReplacement(row));tr.querySelector('[data-delete]').onclick=()=>api.remove(row.binding_id)}
+      tr.innerHTML=`<td><span class="context-chip ${safe(row.scope)}">${safe(context(row))}</span></td><td><b>${safe(row.slot)}</b></td><td>${row.variant?String(row.variant).padStart(2,'0'):'—'}</td><td>${safe(row.name||'—')}${row.source_path?`<br><small class="animation-source-path" title="${safe(row.source_path)}">${safe(row.source_path)}</small>`:''}</td><td>${safe(row.asset_id||'—')}</td><td><span class="tag ${safe(String(row.status).toLowerCase())}">${safe(row.status)}</span>${attack?`<small class="animation-timeline-status ${timing?.configured?'ready':'required'}">${safe(timingLabel)}</small>`:''}</td><td>${row.missing?'—':`<input data-weight class="weight-input" type="number" min="1" max="10000" value="${safe(row.weight||100)}">`}</td><td>${row.missing?'Требуется файл':`<div class="row-actions"><button data-open>детали</button>${row.document_only?'программное состояние':row.asset_id?`<button data-replace>${row.status==='CHANGED'?'проверить / replace':'replace'}</button>`:`<button data-publish ${row.status==='LOCAL_ONLY'?'':'disabled'}>publish</button>`}${attack?'<button data-timeline type="button">таймлайн удара</button>':''}<button data-delete class="danger">удалить</button></div>`}</td>`;
+      if(!row.missing){tr.querySelector('[data-open]').onclick=()=>{s.animationSelected=row.binding_id;api.render()};tr.querySelector('[data-weight]').onchange=e=>api.weight(row.binding_id,e.target.value);tr.querySelector('[data-publish]')?.addEventListener('click',()=>api.publish(row.clip_id));tr.querySelector('[data-replace]')?.addEventListener('click',()=>openReplacement(row));tr.querySelector('[data-timeline]')?.addEventListener('click',()=>api.openTimeline(row.clip_id));tr.querySelector('[data-delete]').onclick=()=>api.remove(row.binding_id)}
       tr.dataset.context=context(row);tr.dataset.slot=row.slot;host.append(tr);
     }
     if(!host.children.length)host.innerHTML='<tr><td colspan="8" class="muted">Нет анимаций в этом разделе.</td></tr>';
     for(const th of document.querySelectorAll('[data-animation-sort]')){const active=th.dataset.animationSort===sortKey;th.setAttribute('aria-sort',active?(sortDir===1?'ascending':'descending'):'none');th.classList.toggle('animation-sort-active',active);th.textContent=th.dataset.animationSort+(active?(sortDir===1?' ↑':' ↓'):' ↕')}
+  }
+  async function refreshAttackTimelines(){
+    if(!api)return;
+    try{
+      const snapshot=await api.request('/api/timelines');
+      timelineByClip=new Map((snapshot.items||[]).map(row=>[row.clipId,row]));
+    }catch{
+      timelineByClip=null; // network errors cannot be interpreted as a missing timeline
+    }
+    renderRows();
   }
   function renderRules(){const host=$('animation-filename-rules'), data=api.state().animations||{}, rules=data.filenameRules||[];
     const sets=['base','emotions',...(data.weaponSets||[])];host.innerHTML=sets.map(context=>{const rows=rules.filter(r=>r.context===context);if(!rows.length)return '';return `<section class="filename-rule-group"><div class="filename-rule-context">${safe(context)}</div><div class="filename-rule-table"><div class="filename-rule-head"><span>state</span><span>canonical filename</span><span>variant</span></div>${rows.map(r=>`<button class="filename-rule-row animation-rule-link" data-context="${safe(context)}" data-slot="${safe(r.state)}" type="button"><code>${safe(r.state)}</code><code>${safe(r.canonicalFilename)}</code><span>${r.variants?safe(r.variantPattern||'01..n'):'—'}</span></button>`).join('')}</div></section>`}).join('');
@@ -76,5 +90,5 @@
     document.querySelectorAll('[data-animation-sort]').forEach(th=>{const action=()=>{const key=th.dataset.animationSort;sortDir=sortKey===key?-sortDir:1;sortKey=key;api.render()};th.addEventListener('click',action);th.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();action()}})});
     document.querySelectorAll('[data-animation-close]').forEach(b=>b.addEventListener('click',()=>b.closest('dialog').close()));$('animation-register-selected').onclick=registerSelected;$('animation-scan-review').addEventListener('change',syncScanPublishButton);$('animation-replace-choose').onclick=chooseReplacement;$('animation-replace-confirm').onclick=stageReplacement;$('animation-replace-check').onclick=checkReplacement;
   }
-  window.game1AnimationUI={init,renderRows,renderRules,scanFolder};
+  window.game1AnimationUI={init,renderRows,renderRules,scanFolder,refreshAttackTimelines};
 })();

@@ -114,16 +114,5 @@ def route(path, body, deps):
     prefix = "/api/characters/"
 
     if path.startswith(prefix):
-        character_id = unquote(path[len(prefix):])
-        try:
-            usage = animations.character_usage(character_id)
-            if usage["clips"] or usage["bindings"]:
-                raise ValueError(
-                    f"delete the character animation profile first: {usage['clips']} clip(s), {usage['bindings']} binding(s)"
-                )
-            store.delete(character_id)
-            animations.delete_empty_profile(character_id)
-            return out(200, {"ok": True})
-        except Exception as error:
-            return out(400, {"error": str(error)})
+        return out(410, {"error": "use explicit Character Catalog migration for retired records; v2 deletion is not implemented"})
     return None

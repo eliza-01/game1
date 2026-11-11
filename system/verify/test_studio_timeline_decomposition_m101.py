@@ -54,7 +54,7 @@ class TimelineDecompositionM101(unittest.TestCase):
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, source)
-        self.assertLess(source.index('destroyTimelinePreview()'), source.index('local preview = loadTimelinePreviewModel'))
+        self.assertLess(source.index('destroyTimelinePreview()'), source.index('local sequence = loadTimelineSequence(animationAssetId)'))
 
     def test_pose_sampler_preserves_target_mapping_and_easing(self):
         source = SOURCES['StudioTimelinePoseSampler']
@@ -76,7 +76,7 @@ class TimelineDecompositionM101(unittest.TestCase):
         source = SOURCES['StudioTimelinePreview']
         for marker in (
             'AssetService:LoadAssetAsync(assetId)', 'for _ = 1, 6 do',
-            'AnimationClipProvider:GetAnimationClipAsync(contentId)', 'for _ = 1, 4 do',
+            'AnimationClipProvider:GetAnimationClipAsync(contentId)', 'for attempt = 1, MAX_CLIP_FETCHES do',
             'clip:IsA("KeyframeSequence")', 'prepareTimelinePreviewModel(preview)',
             'preview.Parent = timelineWorld', 'timelineViewportEmpty.Visible = false',
             'activePreview:Destroy()', 'timelineWorld:GetChildren()',

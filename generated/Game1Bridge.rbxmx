@@ -3448,6 +3448,26 @@ function Builder.Profiles(): {any}
     return result
 end
 
+-- Studio admin is a separate explicit setting, not the first ready archetype.
+-- The Attack Timeline must preview the same recipe as Studio Play.
+function Builder.AdminProfile(expectedCharacterId: string): any
+    local character = registryRoot()
+    local registry = require(character:WaitForChild("CharacterRegistry"))
+    local adminId = tostring(registry.studioAdminArchetypeId or "")
+    assert(adminId ~= "", "Set as admin is not configured in Character Assembly v2")
+    local mismatch = string.format(
+        "Timeline character %s is not the Studio admin (%s). Choose the matching character or update Set as admin.",
+        expectedCharacterId, adminId)
+    assert(expectedCharacterId == adminId, mismatch)
+    for _, profile in ipairs(Builder.Profiles()) do
+        if profile.id == adminId then
+            assert(profile.mode == "assembly", "Studio admin requires a ready Character Assembly v2")
+            return profile
+        end
+    end
+    error("Studio admin assembly " .. adminId .. " is not READY; save a complete recipe in Asset Manager")
+end
+
 local function getBuilder()
     local server = nil
     for _, candidate in game:GetService("ServerScriptService"):GetChildren() do
@@ -5122,21 +5142,19 @@ function Normalize.Apply(model: Model, manifest: any): CFrame
         end
         expected[row.name] = row.role
     end
-    local hasCollider = false
+    -- A COLLIDER is optional for Location Assets, including skinned ones.
+    -- The transparent Roblox importer RootPart is never authored collision:
+    -- its default CanCollide/CanQuery flags must not force a fake COL mesh.
+    -- If the immutable FBX manifest *does* declare COL geometry, require it
+    -- before removing the importer scaffolding. StudioMeshPhysicsCore applies
+    -- the existing visual/COL physics policy after Carrier.Validate.
     for name, role in pairs(expected) do
         if role == "collider" then
-            local collider = model:FindFirstChild(name)
-            hasCollider = collider ~= nil and collider:IsA("MeshPart")
-            if hasCollider then break end
+            local collider = model:FindFirstChild(name, true)
+            if not collider or not collider:IsA("MeshPart") then
+                error("published Location is missing declared collider: " .. name)
+            end
         end
-    end
-    -- Roblox import currently leaves CanCollide/CanQuery enabled on its
-    -- transparent assembly RootPart. Those flags are importer defaults, not
-    -- authored physics. Removal is safe only when the same immutable manifest
-    -- supplies a real collider that survives normalization and is configured
-    -- by StudioMeshPhysicsCore immediately after validation.
-    if not hasCollider then
-        error("published Location RootPart has no authored collider replacement")
     end
     local carrier = model:FindFirstChild("rig_carrier")
     if not carrier or not carrier:IsA("MeshPart") or expected[carrier.Name] ~= "rig_carrier" then
@@ -10009,6 +10027,7 @@ return function(services)
     local postTimelineAgent = transport.PostAgent
     local postTimelineEditorResult = transport.PostResult
     local loadTimelinePreviewModel = previewService.LoadModel
+    local loadTimelineAdminModel = previewService.LoadAdminModel
     local loadTimelineSequence = previewService.LoadSequence
     local timelineSequenceDuration = previewService.SequenceDuration
     local timelineEditor = {
@@ -10063,6 +10082,9 @@ return function(services)
         if duration > 0 and #timelineEditor.poseTracks > 0 then
             local ok, err = pcall(function()
                 poseSampler.Apply(timelineEditor.poseTracks, duration * normalized)
+                if timelineEditor.preview then
+                    previewService.RefreshAccessories(timelineEditor.preview)
+                end
             end)
             if not ok then
                 timelineStatus.Text = "Pose preview failed: " .. tostring(err)
@@ -10165,23 +10187,37 @@ return function(services)
             timelineEditor.events = if type(data.events) == "table" then data.events else {}
             timelineEditor.selectedEvent = "Hit"
 
-            local preview = loadTimelinePreviewModel(modelAssetId)
-            timelineEditor.preview = preview
+            -- Validate the *published clip* before loading the visual rig.
+            -- Source-document duration alone is not proof of playable keys.
             local sequence = loadTimelineSequence(animationAssetId)
             local sequenceDuration = timelineSequenceDuration(sequence)
-            if sequenceDuration <= 0 then
-                sequence:Destroy()
-                error("selected attack animation contains no timed keyframes")
+            local preview: Model? = nil
+            local tracks: any = nil
+            local buildOk, buildError = pcall(function()
+                if tostring(data.subjectType or "") == "characters" then
+                    preview = loadTimelineAdminModel(tostring(data.subjectId or ""))
+                else
+                    preview = loadTimelinePreviewModel(modelAssetId)
+                end
+                tracks = poseSampler.Build(preview, sequence)
+            end)
+            sequence:Destroy()
+            if not buildOk then
+                error("timeline preview could not prepare the published rig: " .. tostring(buildError))
+            end
+            if #tracks == 0 then
+                error(("animation %d has timed poses but none match the Bones/Motor6Ds of model %d. "
+                    .. "Verify that the animation was exported for the published rig and that Bone names are unchanged.")
+                    :format(animationAssetId, modelAssetId))
             end
             timelineEditor.duration = sequenceDuration
-            timelineEditor.poseTracks = poseSampler.Build(preview, sequence)
-            sequence:Destroy()
-            if #timelineEditor.poseTracks == 0 then
-                error("selected attack has no Pose targets matching the preview rig")
-            end
+            timelineEditor.preview = preview
+            timelineEditor.poseTracks = tracks
 
             timelineTitle.Text = timelineEditor.subjectName .. " · " .. timelineEditor.clipName
-            timelineHint.Text = "Preview is rendered inside this plugin. Scrub, choose an event, then Confirm point."
+            timelineHint.Text = if tostring(data.subjectType or "") == "characters"
+                then "Studio admin assembly · drag to orbit, scrub animation, then confirm hit points"
+                else "Preview is rendered inside this plugin. Scrub, choose an event, then Confirm point."
             timelineStatus.Text = ("Ready · %.3f s · %d animated target(s)"):format(
                 timelineEditor.duration,
                 #timelineEditor.poseTracks
@@ -10202,9 +10238,15 @@ return function(services)
         end, debug.traceback)
 
         if not ok then
-            result.error = tostring(operationError)
-            timelineStatus.Text = "Timeline editor error: " .. tostring(operationError)
-            warn("[game1 plugin] timeline editor failed: " .. tostring(operationError))
+            destroyTimelinePreview()
+            timelineEditor.sessionId = ""
+            local tracebackText = tostring(operationError)
+            local firstLine = tracebackText:match("^[^\n]*") or tracebackText
+            -- Detailed traceback stays in Studio Output; the Asset Manager
+            -- only needs the actionable first line.
+            result.error = firstLine:match("^.-:%d+: (.*)$") or firstLine
+            timelineStatus.Text = "Timeline editor error: " .. result.error
+            warn("[game1 plugin] timeline editor failed: " .. tracebackText)
         end
         local postOk, postError = pcall(postTimelineEditorResult, result)
         if not postOk then
@@ -10437,6 +10479,7 @@ return table.freeze(StudioTimelinePoseSampler)
           <string name="Name">StudioTimelinePreview</string>
           <string name="Source"><![CDATA[-- Owns the isolated ViewportFrame rig, camera interaction and animation-asset retrieval.
 local StudioTimelinePreview = {}
+local StudioCharacterStandBuilder = require(script.Parent.StudioCharacterStandBuilder)
 
 function StudioTimelinePreview.new(services)
     local AssetService = services.AssetService
@@ -10607,31 +10650,109 @@ function StudioTimelinePreview.new(services)
         return preview
     end
 
+    -- Preview Studio Play's actual admin assembly (rig + parts + materials),
+    -- never the invisible rig-only Model. The build uses the shared server
+    -- CharacterAssemblyBuilder through StudioCharacterStandBuilder.
+    local function loadTimelineAdminModel(characterId: string): Model
+        local profile = StudioCharacterStandBuilder.AdminProfile(characterId)
+        local preview = StudioCharacterStandBuilder.Build(AssetService, profile)
+        preview.Name = TIMELINE_PREVIEW_NAME
+        preview:SetAttribute("Game1TimelinePreview", true)
+        local visible = 0
+        for _, descendant in ipairs(preview:GetDescendants()) do
+            if descendant:IsA("MeshPart") and descendant.Transparency < 0.99 then
+                visible += 1
+            end
+        end
+        if visible == 0 then
+            preview:Destroy()
+            error("Studio admin assembly contains no visible MeshParts; check published components")
+        end
+        prepareTimelinePreviewModel(preview)
+        preview.Parent = timelineWorld
+        frameTimelinePreview(preview)
+        timelineViewportEmpty.Visible = false
+        activePreview = preview
+        return preview
+    end
+
+    local hairFollower = nil
+    local function refreshTimelineAccessories(preview: Model)
+        -- The same HairAttachmentController that positions pivot hair in Play,
+        -- called once per scrubbed pose instead of starting a render loop.
+        if hairFollower == nil then
+            local scripts = game:GetService("StarterPlayer"):FindFirstChild("StarterPlayerScripts")
+            local client = scripts and scripts:FindFirstChild("Game1Client")
+            local character = client and client:FindFirstChild("character")
+            local source = character and character:FindFirstChild("HairAttachmentController")
+            if source and source:IsA("ModuleScript") then
+                hairFollower = require(source)
+            else
+                return -- The preview remains usable without optional pivot hair.
+            end
+        end
+        if hairFollower.UpdateCharacter then hairFollower.UpdateCharacter(preview) end
+    end
+
+    -- AnimationClipProvider can transiently return an empty KeyframeSequence for a
+    -- published animation. Do not mistake that response for an authored 0-second
+    -- attack, and never invent keyframes or infer them from timeline metadata.
+    local MAX_CLIP_FETCHES = 5
+    local CLIP_RETRY_SECONDS = 0.4
+
+    local function timelineSequenceDetails(sequence: KeyframeSequence): (number, number, number)
+        local duration = 0
+        local keyframeCount = 0
+        local poseCount = 0
+        for _, keyframe in ipairs(sequence:GetKeyframes()) do
+            keyframeCount += 1
+            duration = math.max(duration, keyframe.Time)
+            for _, descendant in ipairs(keyframe:GetDescendants()) do
+                if descendant:IsA("Pose") then
+                    poseCount += 1
+                end
+            end
+        end
+        return duration, keyframeCount, poseCount
+    end
+
     local function loadTimelineSequence(animationAssetId: number): KeyframeSequence
         local contentId = "rbxassetid://" .. tostring(math.floor(animationAssetId))
-        local lastError = ""
-        for _ = 1, 4 do
+        local lastDiagnostic = "no response"
+        for attempt = 1, MAX_CLIP_FETCHES do
             local ok, clip = pcall(function()
                 return AnimationClipProvider:GetAnimationClipAsync(contentId)
             end)
             if ok and clip ~= nil then
                 if not clip:IsA("KeyframeSequence") then
+                    local clipClass = clip.ClassName
                     clip:Destroy()
-                    error("Attack Timeline requires a KeyframeSequence animation asset")
+                    -- CurveAnimations need a curve sampler; they are not empty
+                    -- KeyframeSequences and must not be silently misdiagnosed.
+                    error(("animation %d is %s, not KeyframeSequence; the timeline pose preview does not yet support this clip format")
+                        :format(animationAssetId, clipClass))
                 end
-                return clip
+                local duration, frameCount, poseCount = timelineSequenceDetails(clip)
+                if duration > 0.000001 and poseCount > 0 then
+                    return clip
+                end
+                lastDiagnostic = ("keyframes=%d, poses=%d, last keyframe=%.6fs, loaded length=%.6fs")
+                    :format(frameCount, poseCount, duration, clip.Length)
+                clip:Destroy()
+            else
+                lastDiagnostic = "request failed: " .. tostring(clip)
             end
-            lastError = tostring(clip)
-            task.wait(0.4)
+            if attempt < MAX_CLIP_FETCHES then
+                task.wait(CLIP_RETRY_SECONDS)
+            end
         end
-        error("could not load animation clip " .. tostring(animationAssetId) .. ": " .. lastError)
+        error(("published animation %d has no usable timed poses after %d Studio requests (%s). "
+            .. "Verify the published clip's keys in Roblox Animation Editor. No hit events were changed.")
+            :format(animationAssetId, MAX_CLIP_FETCHES, lastDiagnostic))
     end
 
     local function timelineSequenceDuration(sequence: KeyframeSequence): number
-        local duration = 0
-        for _, keyframe in ipairs(sequence:GetKeyframes()) do
-            duration = math.max(duration, keyframe.Time)
-        end
+        local duration = timelineSequenceDetails(sequence)
         return duration
     end
 
@@ -10639,6 +10760,8 @@ function StudioTimelinePreview.new(services)
     return {
         DestroyPreview = destroyTimelinePreview,
         LoadModel = loadTimelinePreviewModel,
+        LoadAdminModel = loadTimelineAdminModel,
+        RefreshAccessories = refreshTimelineAccessories,
         LoadSequence = loadTimelineSequence,
         SequenceDuration = timelineSequenceDuration,
     }

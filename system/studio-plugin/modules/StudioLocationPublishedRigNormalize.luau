@@ -36,21 +36,19 @@ function Normalize.Apply(model: Model, manifest: any): CFrame
         end
         expected[row.name] = row.role
     end
-    local hasCollider = false
+    -- A COLLIDER is optional for Location Assets, including skinned ones.
+    -- The transparent Roblox importer RootPart is never authored collision:
+    -- its default CanCollide/CanQuery flags must not force a fake COL mesh.
+    -- If the immutable FBX manifest *does* declare COL geometry, require it
+    -- before removing the importer scaffolding. StudioMeshPhysicsCore applies
+    -- the existing visual/COL physics policy after Carrier.Validate.
     for name, role in pairs(expected) do
         if role == "collider" then
-            local collider = model:FindFirstChild(name)
-            hasCollider = collider ~= nil and collider:IsA("MeshPart")
-            if hasCollider then break end
+            local collider = model:FindFirstChild(name, true)
+            if not collider or not collider:IsA("MeshPart") then
+                error("published Location is missing declared collider: " .. name)
+            end
         end
-    end
-    -- Roblox import currently leaves CanCollide/CanQuery enabled on its
-    -- transparent assembly RootPart. Those flags are importer defaults, not
-    -- authored physics. Removal is safe only when the same immutable manifest
-    -- supplies a real collider that survives normalization and is configured
-    -- by StudioMeshPhysicsCore immediately after validation.
-    if not hasCollider then
-        error("published Location RootPart has no authored collider replacement")
     end
     local carrier = model:FindFirstChild("rig_carrier")
     if not carrier or not carrier:IsA("MeshPart") or expected[carrier.Name] ~= "rig_carrier" then

@@ -1,0 +1,16 @@
+schema_version = "1.0.0"
+id = "game1_mesh_cleanup"
+version = "1.2.0"
+name = "Game1 Mesh Cleanup"
+tagline = "Repair duplicate faces, seams and normals across scene meshes"
+maintainer = "Eyesland"
+type = "add-on"
+blender_version_min = "5.2.0"
+license = ["SPDX:GPL-3.0-or-later"]
+tags = ["Mesh", "Object"]
+
+[permissions]
+files = "Write mip-safe copies of alpha textures next to their sources"
+
+[build]
+paths_exclude_pattern = ["__pycache__/", "/.git/", "/tests/", "*.zip"]

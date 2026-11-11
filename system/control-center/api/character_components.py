@@ -12,7 +12,7 @@ def read(path,sources):
         job_id=path[len(queue_root):].strip('/') or None
         job=sources['character_publications'].get(job_id)
         if job_id and job is None:return 404,{'error':'publication queue not found'}
-        return 200,{'schema_version':1,'job':job}
+        return 200,{'schema_version':2,'job':job}
     if path!=ROOT:return None
     data=sources['character_components'].snapshot()
     data['publication']=sources['publication_config']()
@@ -40,13 +40,13 @@ def write(path,body,deps):
         if path==ROOT+'/register':
             result=store.register(payload.get('token'),payload.get('replacements',[]),
                 replace_rig=payload.get('replaceRig',False),rig_only=payload.get('rigOnly',False),
-                allow_partial=payload.get('allowPartial',False),new_parts=payload.get('newParts'))
+                allow_partial=payload.get('allowPartial',False),new_parts=payload.get('newParts'),
+                compatibility=payload.get('compatibility'))
             if 'character_assemblies' in deps:deps['character_assemblies'].characters.export()
             return 200,result
-        if path==ROOT+'/atlas':
-            revision=payload.get('expectedRevision')
-            if revision is None:raise ValueError('expectedRevision is required')
-            result=store.bind_atlas(str(payload.get('id') or ''),payload.get('variantId'),int(revision))
+        if path==ROOT+'/compatibility':
+            result=store.set_compatibility(str(payload.get('id') or ''),payload.get('allowedGenders'),
+                payload.get('expectedAllowedGenders'))
             if 'character_assemblies' in deps:deps['character_assemblies'].characters.export()
             return 200,result
         if path==ROOT+'/publish':
@@ -56,6 +56,6 @@ def write(path,body,deps):
             return 200,result
         return 404,{'error':'unknown character component operation'}
     except ComponentConflict as error:
-        return 409,{'error':str(error),'code':'inspection_conflict','schema_version':1}
+        return 409,{'error':str(error),'code':'inspection_conflict','schema_version':2}
     except Exception as error:
-        return 400,{'error':str(error),'schema_version':1}
+        return 400,{'error':str(error),'schema_version':2}

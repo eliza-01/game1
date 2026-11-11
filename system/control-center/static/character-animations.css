@@ -33,3 +33,8 @@
 .animation-invalid{border-color:color-mix(in srgb,var(--orange) 35%,var(--line));color:var(--orange)}
 .animation-review-result{color:var(--text);font-weight:650;line-height:1.5;overflow-wrap:anywhere}
 @media(max-width:600px){.animation-operation-actions{justify-content:stretch}.animation-operation-actions button{flex:1}}
+
+/* Animation publication and gameplay hit timing are independent contracts. */
+.animation-timeline-status{display:block;margin-top:5px;font-size:11px;line-height:1.35;white-space:normal}
+.animation-timeline-status.ready{color:#42cda4}
+.animation-timeline-status.required{color:#e7ae75}

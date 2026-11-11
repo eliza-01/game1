@@ -119,11 +119,28 @@ local function signature(actions: {ProximityPrompt}): string
     return table.concat(parts, "|")
 end
 
+-- Both keyboard shortcuts and mobile action buttons use the same server-owned
+-- socket contract. The server checks distance, offered action and cooldown.
+local function requestAction(prompt: ProximityPrompt)
+    if not prompt.Enabled or not prompt:IsDescendantOf(Workspace) then return end
+    local socket = prompt.Parent
+    if not socket or not socket:IsA("Attachment") then return end
+    local key = prompt.KeyboardKeyCode.Name
+    if key ~= "E" and key ~= "F" then return end
+    local folder = ReplicatedStorage:FindFirstChild("Game1Remotes")
+    local remote = folder and folder:FindFirstChild("HouseSocketInteract")
+    if remote and remote:IsA("RemoteEvent") then
+        remote:FireServer(socket, key)
+    end
+end
+
 local function makeGui(socket: Attachment, actions: {ProximityPrompt}): BillboardGui
     local gui = Instance.new("BillboardGui")
     gui.Name = "Game1HousePrompt"
     gui.Adornee = socket
-    gui.Size = UDim2.fromOffset(272, 12 + #actions * 40)
+    local touch = UserInputService.TouchEnabled
+    gui.Size = UDim2.fromOffset(272, 12 + #actions * (if touch then 48 else 40))
+    gui.Active = touch
     gui.StudsOffsetWorldSpace = Vector3.new(0, 1.45, 0)
     gui.AlwaysOnTop = true
     gui.LightInfluence = 0
@@ -142,7 +159,27 @@ local function makeGui(socket: Attachment, actions: {ProximityPrompt}): Billboar
     stroke.Transparency = 0.12
     stroke.Parent = background
     for index, prompt in actions do
-        local y = 6 + (index - 1) * 40
+        local y = 6 + (index - 1) * (if touch then 48 else 40)
+        if touch then
+            -- One large direct-tap target for every available action, no E/F.
+            local action = Instance.new("TextButton")
+            action.Name = "TouchAction_" .. prompt.KeyboardKeyCode.Name
+            action.Position = UDim2.fromOffset(6, y)
+            action.Size = UDim2.new(1, -12, 0, 42)
+            action.BackgroundColor3 = Color3.fromRGB(37, 51, 62)
+            action.TextColor3 = Color3.fromRGB(244, 246, 249)
+            action.Font = Enum.Font.GothamSemibold
+            action.TextSize = 14
+            action.Text = prompt.ActionText
+            action.AutoButtonColor = true
+            action.Active = true
+            action.Parent = background
+            rounded(action, 8)
+            action.Activated:Connect(function()
+                requestAction(prompt)
+            end)
+            continue
+        end
         local key = Instance.new("TextLabel")
         key.Name = "Key"
         key.Position = UDim2.fromOffset(8, y)
@@ -339,12 +376,7 @@ function Controller.Start()
             end
         end
         if not matching then return end
-        local folder = ReplicatedStorage:FindFirstChild("Game1Remotes")
-        local remote = folder and folder:FindFirstChild("HouseSocketInteract")
-        local socket = matching.Parent
-        if remote and remote:IsA("RemoteEvent") and socket and socket:IsA("Attachment") then
-            remote:FireServer(socket, key)
-        end
+        requestAction(matching)
     end)
     ProximityPromptService.PromptShown:Connect(function(prompt)
         if SpatialRoot.IsCustom(player) then return end

@@ -44,7 +44,9 @@ class HouseSpawnOrientationM153(unittest.TestCase):
 
     def test_shared_projection_keeps_world_up_and_separates_bone_and_attachment(self):
         source = read("src/shared/world/HouseSpawnOrientation.luau")
-        self.assertIn("if fromBone then -socketFrame.UpVector else socketFrame.LookVector", source)
+        self.assertIn("SocketFacing.Forward(socketFrame, fromBone)", source)
+        facing = read("src/shared/world/SocketFacing.luau")
+        self.assertIn("if fromBone then -frame.UpVector else frame.LookVector", facing)
         self.assertIn("Vector3.new(authoredForward.X, 0, authoredForward.Z)", source)
         self.assertIn("CFrame.lookAlong(position, horizontalForward / magnitude, WORLD_UP)", source)
         self.assertIn("WORLD_UP = Vector3.yAxis", source)

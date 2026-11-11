@@ -135,6 +135,19 @@ class TimelineStore:
     def _timeline_map(self) -> dict[str, dict]:
         return {str(row.get("clipId") or ""): row for row in self._load().get("timelines") or []}
 
+    @staticmethod
+    def _character_preview(character: dict) -> tuple[str, str]:
+        """Use the v2 assembly's published rig for timeline pose preview.
+
+        Assembly recipes intentionally have no whole-character Model Asset ID.
+        The timeline editor only needs the Bone hierarchy for pose sampling;
+        never fabricate a whole-model publication or use a legacy model.
+        """
+        if character.get("visual_mode") == "assembly":
+            rig = (character.get("assembly_resolved") or {}).get("rig") or {}
+            return str(rig.get("asset_id") or ""), "rig"
+        return str(character.get("model_asset_id") or ""), "model"
+
     def _attack_rows(self) -> list[dict]:
         timeline_map = self._timeline_map()
         rows: list[dict] = []
@@ -145,11 +158,17 @@ class TimelineStore:
                     continue
                 clip_id = str(clip.get("clip_id") or "")
                 timeline = timeline_map.get(clip_id) or {}
+                preview_id, preview_mode = self._character_preview(character)
+                required_events = timeline.get("events") if isinstance(timeline.get("events"), dict) else {}
+                configured = (float(timeline.get("duration") or 0) > 0
+                              and all(name in required_events for name in ("HitStart", "HitEnd"))
+                              and not bool(timeline.get("reviewRequired")))
                 rows.append({
                     "subjectType": "characters",
                     "subjectId": character_id,
                     "subjectName": str(character.get("display_name") or character_id),
-                    "modelAssetId": str(character.get("model_asset_id") or ""),
+                    "modelAssetId": preview_id,
+                    "previewMode": preview_mode,
                     "clipId": clip_id,
                     "clipName": str(clip.get("name") or clip_id),
                     "animationAssetId": str(clip.get("asset_id") or ""),
@@ -157,7 +176,7 @@ class TimelineStore:
                     "variant": int(clip.get("variant") or 0),
                     "duration": float(timeline.get("duration") or 0),
                     "events": dict(timeline.get("events") or {}),
-                    "configured": bool(timeline) and not bool(timeline.get("reviewRequired")),
+                    "configured": configured,
                     "needsReview": bool(timeline.get("reviewRequired")),
                 })
         for monster in self.monsters.list():
@@ -209,7 +228,7 @@ class TimelineStore:
         if not row:
             raise ValueError(f"unknown registered attack animation: {clip_id}")
         if not str(row.get("modelAssetId") or "").isdigit():
-            raise ValueError("publish the selected character/monster model before opening the timeline editor")
+            raise ValueError("publish the selected rig/model before opening the timeline editor")
         if not str(row.get("animationAssetId") or "").isdigit():
             raise ValueError("publish the selected attack animation before opening the timeline editor")
         return row

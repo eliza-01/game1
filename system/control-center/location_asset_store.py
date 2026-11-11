@@ -353,7 +353,10 @@ class LocationAssetStore:
                 atlasFamily=binding['atlas_key'],
                 atlasResolution=binding['resolution'],
                 bindingRevision=binding['revision'],
-                studioSyncStatus=binding['syncStatus'],
+                # An unacknowledged *atlas binding* is not proof that any
+                # placed mesh is stale. Only a Studio Find report can establish
+                # an actionable difference. Keep the unverified state neutral.
+                studioSyncStatus=('synced' if binding['syncStatus'] == 'synced' else 'unverified'),
                 atlasVariants=self.atlases.attached_variants('location_asset', result['slug']))
         result.setdefault('atlasVariants', self.atlases.attached_variants('location_asset', result['slug']))
         result['textureUsesAlpha'] = (texture_uses_alpha(self.root, str(result.get('texture_path') or ''))

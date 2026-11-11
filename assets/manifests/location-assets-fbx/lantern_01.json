@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "slug": "lantern_01",
-  "sourceSha256": "426a0545b11166453ae40936747920976eab21be745d67db837eef184d049c22",
+  "sourceSha256": "8a7854e3bd9787b4f088b614d7fe7ad73de48e844440c821a0049cdb8003e801",
   "analysis": {
     "schemaVersion": 1,
     "meshes": [
@@ -84,6 +84,71 @@
           "doubleSided": false,
           "collisionFidelity": "Box",
           "physicsOnly": false
+        }
+      },
+      {
+        "name": "rig_carrier",
+        "armature": "lantern_01_armature",
+        "vertices": 6,
+        "bones": [
+          {
+            "name": "bind_01_socket",
+            "parent": "",
+            "matrixLocal": [
+              -0.0,
+              0.0,
+              -1.0,
+              -0.0466435,
+              1.0,
+              0.0,
+              -0.0,
+              0.0060394,
+              0.0,
+              -0.9999999,
+              0.0,
+              3.5294206,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          {
+            "name": "light_01_socket",
+            "parent": "",
+            "matrixLocal": [
+              -0.0,
+              0.0,
+              -1.0,
+              0.0,
+              1.0,
+              0.0,
+              -0.0,
+              -0.0043594,
+              0.0,
+              -0.9999999,
+              0.0,
+              1.0902271,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          }
+        ],
+        "influencedBones": [
+          "bind_01_socket",
+          "light_01_socket"
+        ],
+        "role": "carrier",
+        "physics": {
+          "role": "carrier",
+          "canCollide": false,
+          "canQuery": false,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": "Box",
+          "physicsOnly": true
         }
       }
     ],

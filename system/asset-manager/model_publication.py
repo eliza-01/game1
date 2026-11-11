@@ -7,7 +7,10 @@ on at least one vertex; at most four influences. Rest transforms never change.
 import bpy
 from math import isfinite
 from pathlib import Path
-from bone_weight_survival import MAX_INFLUENCES, SURVIVAL_WEIGHT, plan_publication_weights
+from bone_weight_survival import (
+    MAX_INFLUENCES, SURVIVAL_WEIGHT, plan_publication_weights,
+    normalize_positive_weights,
+)
 
 POSITIVE_EPSILON = 1e-8
 ROBLOX_MAX_INFLUENCES = MAX_INFLUENCES
@@ -73,6 +76,56 @@ def active_bone_weights(mesh_obj, vertex, index_to_name):
         if weight > POSITIVE_EPSILON:
             result[bone_name] = weight
     return result
+
+
+
+def normalize_existing_component_skin(armature, mesh):
+    """Validate an authored Character skin and normalize only its existing weights.
+
+    This is called in the isolated Blender FBX-import process, BEFORE Inspect
+    hashes the part and BEFORE extracting its staged publication FBX. The
+    artist's .blend and the selected source FBX are never edited. No nearest
+    bone selection, added bone influences or four-weight pruning is allowed:
+    those are not safe assumptions for facial animation.
+
+    Changes are planned first, so a mesh with any invalid vertex is rejected
+    without partially normalizing its other vertices.
+    """
+    bone_names = {bone.name for bone in armature.data.bones}
+    groups = {group.index: group.name for group in mesh.vertex_groups
+              if group.name in bone_names}
+    changes = []
+    used_bones = set()
+    for vertex in mesh.data.vertices:
+        weights = {}
+        for assignment in vertex.groups:
+            name = groups.get(assignment.group)
+            if name is None:
+                continue  # Non-bone vertex groups remain untouched.
+            weight = float(assignment.weight)
+            if not isfinite(weight) or weight < 0:
+                raise ValueError(f'{mesh.name}: vertex {vertex.index} has invalid bone weight for {name}')
+            if weight > POSITIVE_EPSILON:
+                weights[name] = weight
+        if not weights:
+            raise ValueError(f'{mesh.name}: vertex {vertex.index} has no weights to bones of '
+                             f'{armature.name}; assign deform weights in Blender')
+        if len(weights) > MAX_INFLUENCES:
+            raise ValueError(f'{mesh.name}: vertex {vertex.index} has {len(weights)} bone influences '
+                             '(Roblox supports at most 4; adjust the skinning in Blender)')
+        total = sum(weights.values())
+        if not isfinite(total) or total <= 0:
+            raise ValueError(f'{mesh.name}: vertex {vertex.index} has invalid bone weight sum')
+        if abs(total - 1.0) > 1e-4:
+            changes.append((vertex.index, normalize_positive_weights(weights)))
+        used_bones.update(weights)
+
+    # Only relative proportions change; no bind transforms, membership or
+    # extra (non-bone) vertex group weights are altered.
+    for index, weights in changes:
+        for name, weight in weights.items():
+            mesh.vertex_groups.get(name).add([index], weight, 'REPLACE')
+    return {'used_bones': sorted(used_bones), 'normalized_vertices': len(changes)}
 
 
 def count_over_limit(armature, meshes):

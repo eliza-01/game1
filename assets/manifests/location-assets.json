@@ -701,59 +701,66 @@
       ]
     },
     {
-      "atlasKey": "head_01_male",
-      "baseKey": "head_01_male",
-      "version": "",
+      "atlasKey": "ground_torch_02",
+      "baseKey": "ground_torch",
+      "version": "02",
       "variants": [
         {
-          "id": 11,
-          "family_id": 8,
+          "id": 47,
+          "family_id": 42,
           "width": 512,
           "height": 512,
-          "filename": "head_01_male_512x512_atlas.png",
-          "original_filename": "head_01_male_512x512_atlas.png",
-          "source_path": "assets/source/texture-atlases/head_01_male/512x512/head_01_male_512x512_atlas.png",
-          "source_sha256": "1e7997a1597dacb6fc421e8485df8fa7ad7d5ae3862454de07f13a7205248e58",
+          "filename": "ground_torch_02_512x512_atlas.png",
+          "original_filename": "ground_torch_02_512x512_atlas.png",
+          "source_path": "assets/source/texture-atlases/ground_torch_02/512x512/ground_torch_02_512x512_atlas.png",
+          "source_sha256": "c743c333f6d736367cb20eca726be37e64b9de957f046ec81fc6a50b45c00cc3",
           "uses_alpha": true,
-          "published_id": "76925163781035",
-          "published_sha256": "1e7997a1597dacb6fc421e8485df8fa7ad7d5ae3862454de07f13a7205248e58",
+          "published_id": "83802266377985",
+          "published_sha256": "c743c333f6d736367cb20eca726be37e64b9de957f046ec81fc6a50b45c00cc3",
           "moderation_state": "Reviewing",
-          "published_at": 1793629486.0227144,
-          "created_at": 1793629482.414679,
+          "published_at": 1794356589.468821,
+          "created_at": 1794356585.6342673,
           "retired_at": null,
-          "atlas_key": "head_01_male",
+          "atlas_key": "ground_torch_02",
           "replacement_sha256": null,
           "retired": false,
           "current": true,
           "replacementPending": false,
           "resolution": "512x512",
-          "baseKey": "head_01_male",
-          "version": ""
-        },
+          "baseKey": "ground_torch",
+          "version": "02"
+        }
+      ]
+    },
+    {
+      "atlasKey": "ground_torch_03",
+      "baseKey": "ground_torch",
+      "version": "03",
+      "variants": [
         {
-          "id": 30,
-          "family_id": 8,
-          "width": 256,
-          "height": 256,
-          "filename": "head_01_male_256x256_atlas.png",
-          "original_filename": "head_01_male_256x256_atlas.png",
-          "source_path": "assets/source/texture-atlases/head_01_male/256x256/head_01_male_256x256_atlas.png",
-          "source_sha256": "d833c6d28a100a77593b2aa59be8596df1d6480dba5c1823a95e54cf3b2fa1e2",
+          "id": 48,
+          "family_id": 43,
+          "width": 1024,
+          "height": 1024,
+          "filename": "ground_torch_03_1024x1024_atlas.png",
+          "original_filename": "ground_torch_03_1024x1024_atlas.png",
+          "source_path": "assets/source/texture-atlases/ground_torch_03/1024x1024/ground_torch_03_1024x1024_atlas.png",
+          "source_sha256": "17659d7fb95d06bc103beb0e3ec3b7acfe07bd06b5c80fe5ce2c50830ea7e898",
           "uses_alpha": true,
-          "published_id": "84266255931000",
-          "published_sha256": "d833c6d28a100a77593b2aa59be8596df1d6480dba5c1823a95e54cf3b2fa1e2",
+          "published_id": "84689691975944",
+          "published_sha256": "17659d7fb95d06bc103beb0e3ec3b7acfe07bd06b5c80fe5ce2c50830ea7e898",
           "moderation_state": "Reviewing",
-          "published_at": 1793889326.8811104,
-          "created_at": 1793889322.6861074,
+          "published_at": 1794356743.5169647,
+          "created_at": 1794356736.8447978,
           "retired_at": null,
-          "atlas_key": "head_01_male",
+          "atlas_key": "ground_torch_03",
           "replacement_sha256": null,
           "retired": false,
           "current": true,
           "replacementPending": false,
-          "resolution": "256x256",
-          "baseKey": "head_01_male",
-          "version": ""
+          "resolution": "1024x1024",
+          "baseKey": "ground_torch",
+          "version": "03"
         }
       ]
     },
@@ -918,6 +925,248 @@
       ]
     },
     {
+      "atlasKey": "human_common_m001_t001_boots",
+      "baseKey": "human_common_m001_t001_boots",
+      "version": "",
+      "variants": [
+        {
+          "id": 12,
+          "family_id": 37,
+          "width": 512,
+          "height": 512,
+          "filename": "human_common_m001_t001_boots_512x512_atlas.png",
+          "original_filename": "newborn_boots_512x512_atlas.png",
+          "source_path": "assets/source/texture-atlases/human_common_m001_t001_boots/512x512/human_common_m001_t001_boots_512x512_atlas.png",
+          "source_sha256": "455e581a5c58f693c7f48d6a179cea4632ad461a58bcb5c88de46a8bf9bd1855",
+          "uses_alpha": true,
+          "published_id": "132696983496934",
+          "published_sha256": "455e581a5c58f693c7f48d6a179cea4632ad461a58bcb5c88de46a8bf9bd1855",
+          "moderation_state": "Reviewing",
+          "published_at": 1793629503.4751477,
+          "created_at": 1793629499.803513,
+          "retired_at": null,
+          "atlas_key": "human_common_m001_t001_boots",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "512x512",
+          "baseKey": "human_common_m001_t001_boots",
+          "version": ""
+        }
+      ]
+    },
+    {
+      "atlasKey": "human_common_m001_t001_gloves",
+      "baseKey": "human_common_m001_t001_gloves",
+      "version": "",
+      "variants": [
+        {
+          "id": 13,
+          "family_id": 38,
+          "width": 256,
+          "height": 256,
+          "filename": "human_common_m001_t001_gloves_256x256_atlas.png",
+          "original_filename": "newborn_gloves_256x256_atlas.png",
+          "source_path": "assets/source/texture-atlases/human_common_m001_t001_gloves/256x256/human_common_m001_t001_gloves_256x256_atlas.png",
+          "source_sha256": "06b1f91463692288afefef95b4f3903ef5aa7c5a275d5b27fed04ac25fa4b7ee",
+          "uses_alpha": true,
+          "published_id": "135524533752769",
+          "published_sha256": "06b1f91463692288afefef95b4f3903ef5aa7c5a275d5b27fed04ac25fa4b7ee",
+          "moderation_state": "Reviewing",
+          "published_at": 1793629522.410063,
+          "created_at": 1793629518.7281086,
+          "retired_at": null,
+          "atlas_key": "human_common_m001_t001_gloves",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "256x256",
+          "baseKey": "human_common_m001_t001_gloves",
+          "version": ""
+        }
+      ]
+    },
+    {
+      "atlasKey": "human_common_m001_t001_lower",
+      "baseKey": "human_common_m001_t001_lower",
+      "version": "",
+      "variants": [
+        {
+          "id": 44,
+          "family_id": 35,
+          "width": 1024,
+          "height": 512,
+          "filename": "human_common_m001_t001_lower_1024x512_atlas.png",
+          "original_filename": "human_common_m001_t001_lower_1024x512_atlas.png",
+          "source_path": "assets/source/texture-atlases/human_common_m001_t001_lower/1024x512/human_common_m001_t001_lower_1024x512_atlas.png",
+          "source_sha256": "65fc333c2cd1819867a769f187cd6d4f3fee757b7be5a4571047dc18e44a66c3",
+          "uses_alpha": true,
+          "published_id": "81341252015506",
+          "published_sha256": "65fc333c2cd1819867a769f187cd6d4f3fee757b7be5a4571047dc18e44a66c3",
+          "moderation_state": "",
+          "published_at": 1794273288.7961328,
+          "created_at": 1794273288.5334213,
+          "retired_at": null,
+          "atlas_key": "human_common_m001_t001_lower",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "1024x512",
+          "baseKey": "human_common_m001_t001_lower",
+          "version": ""
+        }
+      ]
+    },
+    {
+      "atlasKey": "human_common_m001_t001_upper",
+      "baseKey": "human_common_m001_t001_upper",
+      "version": "",
+      "variants": [
+        {
+          "id": 9,
+          "family_id": 39,
+          "width": 512,
+          "height": 512,
+          "filename": "human_common_m001_t001_upper_512x512_atlas.png",
+          "original_filename": "newborn_upper_512x512_atlas.png",
+          "source_path": "assets/source/texture-atlases/human_common_m001_t001_upper/512x512/human_common_m001_t001_upper_512x512_atlas.png",
+          "source_sha256": "d9d62491f090821f5e24a7a79671cfe0b5a506cf44a5c884aedda9649d4e9875",
+          "uses_alpha": true,
+          "published_id": "130840873415092",
+          "published_sha256": "d9d62491f090821f5e24a7a79671cfe0b5a506cf44a5c884aedda9649d4e9875",
+          "moderation_state": "Reviewing",
+          "published_at": 1793458414.8865848,
+          "created_at": 1793458411.1526465,
+          "retired_at": null,
+          "atlas_key": "human_common_m001_t001_upper",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "512x512",
+          "baseKey": "human_common_m001_t001_upper",
+          "version": ""
+        },
+        {
+          "id": 15,
+          "family_id": 39,
+          "width": 256,
+          "height": 256,
+          "filename": "human_common_m001_t001_upper_256x256_atlas.png",
+          "original_filename": "newborn_upper_256x256_atlas.png",
+          "source_path": "assets/source/texture-atlases/human_common_m001_t001_upper/256x256/human_common_m001_t001_upper_256x256_atlas.png",
+          "source_sha256": "8b8b9fec3dd805a196dbc48f42d5db0fec54d7d44e131761ad4358e394d92741",
+          "uses_alpha": true,
+          "published_id": "114627765941728",
+          "published_sha256": "8b8b9fec3dd805a196dbc48f42d5db0fec54d7d44e131761ad4358e394d92741",
+          "moderation_state": "Reviewing",
+          "published_at": 1793630622.4854963,
+          "created_at": 1793630618.817804,
+          "retired_at": null,
+          "atlas_key": "human_common_m001_t001_upper",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "256x256",
+          "baseKey": "human_common_m001_t001_upper",
+          "version": ""
+        }
+      ]
+    },
+    {
+      "atlasKey": "human_common_m001_t002_upper",
+      "baseKey": "human_common_m001_t002_upper",
+      "version": "",
+      "variants": [
+        {
+          "id": 42,
+          "family_id": 40,
+          "width": 512,
+          "height": 512,
+          "filename": "human_common_m001_t002_upper_512x512_atlas.png",
+          "original_filename": "pinky_upper_512x512_atlas.png",
+          "source_path": "assets/source/texture-atlases/human_common_m001_t002_upper/512x512/human_common_m001_t002_upper_512x512_atlas.png",
+          "source_sha256": "68af676fd8658a2f42d8e56de6609d18a382fb995864b4d89c7d8d54d9acd232",
+          "uses_alpha": true,
+          "published_id": "127623255150603",
+          "published_sha256": "68af676fd8658a2f42d8e56de6609d18a382fb995864b4d89c7d8d54d9acd232",
+          "moderation_state": "Reviewing",
+          "published_at": 1794234370.2357638,
+          "created_at": 1794233151.8804188,
+          "retired_at": null,
+          "atlas_key": "human_common_m001_t002_upper",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "512x512",
+          "baseKey": "human_common_m001_t002_upper",
+          "version": ""
+        }
+      ]
+    },
+    {
+      "atlasKey": "human_male_m001_t001_head",
+      "baseKey": "human_male_m001_t001_head",
+      "version": "",
+      "variants": [
+        {
+          "id": 11,
+          "family_id": 36,
+          "width": 512,
+          "height": 512,
+          "filename": "human_male_m001_t001_head_512x512_atlas.png",
+          "original_filename": "head_01_male_512x512_atlas.png",
+          "source_path": "assets/source/texture-atlases/human_male_m001_t001_head/512x512/human_male_m001_t001_head_512x512_atlas.png",
+          "source_sha256": "1e7997a1597dacb6fc421e8485df8fa7ad7d5ae3862454de07f13a7205248e58",
+          "uses_alpha": true,
+          "published_id": "76925163781035",
+          "published_sha256": "1e7997a1597dacb6fc421e8485df8fa7ad7d5ae3862454de07f13a7205248e58",
+          "moderation_state": "Reviewing",
+          "published_at": 1793629486.0227144,
+          "created_at": 1793629482.414679,
+          "retired_at": null,
+          "atlas_key": "human_male_m001_t001_head",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "512x512",
+          "baseKey": "human_male_m001_t001_head",
+          "version": ""
+        },
+        {
+          "id": 30,
+          "family_id": 36,
+          "width": 256,
+          "height": 256,
+          "filename": "human_male_m001_t001_head_256x256_atlas.png",
+          "original_filename": "head_01_male_256x256_atlas.png",
+          "source_path": "assets/source/texture-atlases/human_male_m001_t001_head/256x256/human_male_m001_t001_head_256x256_atlas.png",
+          "source_sha256": "d833c6d28a100a77593b2aa59be8596df1d6480dba5c1823a95e54cf3b2fa1e2",
+          "uses_alpha": true,
+          "published_id": "84266255931000",
+          "published_sha256": "d833c6d28a100a77593b2aa59be8596df1d6480dba5c1823a95e54cf3b2fa1e2",
+          "moderation_state": "Reviewing",
+          "published_at": 1793889326.8811104,
+          "created_at": 1793889322.6861074,
+          "retired_at": null,
+          "atlas_key": "human_male_m001_t001_head",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "256x256",
+          "baseKey": "human_male_m001_t001_head",
+          "version": ""
+        }
+      ]
+    },
+    {
       "atlasKey": "lantern_01",
       "baseKey": "lantern",
       "version": "01",
@@ -944,6 +1193,31 @@
           "current": true,
           "replacementPending": false,
           "resolution": "256x512",
+          "baseKey": "lantern",
+          "version": "01"
+        },
+        {
+          "id": 46,
+          "family_id": 2,
+          "width": 128,
+          "height": 128,
+          "filename": "lantern_01_128x128_atlas.png",
+          "original_filename": "lantern_01_128x128_atlas.png",
+          "source_path": "assets/source/texture-atlases/lantern_01/128x128/lantern_01_128x128_atlas.png",
+          "source_sha256": "4226b42fa332e6db017f555d91c791bfc9427aea203736ff0d9b53bcf7acc1dd",
+          "uses_alpha": true,
+          "published_id": "139928560438135",
+          "published_sha256": "4226b42fa332e6db017f555d91c791bfc9427aea203736ff0d9b53bcf7acc1dd",
+          "moderation_state": "Reviewing",
+          "published_at": 1794355775.8354034,
+          "created_at": 1794355767.1818166,
+          "retired_at": null,
+          "atlas_key": "lantern_01",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "128x128",
           "baseKey": "lantern",
           "version": "01"
         },
@@ -975,6 +1249,70 @@
       ]
     },
     {
+      "atlasKey": "lantern_03",
+      "baseKey": "lantern",
+      "version": "03",
+      "variants": [
+        {
+          "id": 49,
+          "family_id": 44,
+          "width": 128,
+          "height": 128,
+          "filename": "lantern_03_128x128_atlas.png",
+          "original_filename": "lantern_03_128x128_atlas.png",
+          "source_path": "assets/source/texture-atlases/lantern_03/128x128/lantern_03_128x128_atlas.png",
+          "source_sha256": "4226b42fa332e6db017f555d91c791bfc9427aea203736ff0d9b53bcf7acc1dd",
+          "uses_alpha": true,
+          "published_id": "139928560438135",
+          "published_sha256": "4226b42fa332e6db017f555d91c791bfc9427aea203736ff0d9b53bcf7acc1dd",
+          "moderation_state": "",
+          "published_at": 1794414357.4234924,
+          "created_at": 1794414357.2193787,
+          "retired_at": null,
+          "atlas_key": "lantern_03",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "128x128",
+          "baseKey": "lantern",
+          "version": "03"
+        }
+      ]
+    },
+    {
+      "atlasKey": "leaves_n_flowers",
+      "baseKey": "leaves_n_flowers",
+      "version": "",
+      "variants": [
+        {
+          "id": 43,
+          "family_id": 34,
+          "width": 1024,
+          "height": 1024,
+          "filename": "leaves_n_flowers_1024x1024_atlas.png",
+          "original_filename": "leaves_n_flowers_1024x1024_atlas.png",
+          "source_path": "assets/source/texture-atlases/leaves_n_flowers/1024x1024/revisions/2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717/leaves_n_flowers_1024x1024_atlas.png",
+          "source_sha256": "2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717",
+          "uses_alpha": true,
+          "published_id": "83232615212572",
+          "published_sha256": "2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717",
+          "moderation_state": "Reviewing",
+          "published_at": 1794272123.260854,
+          "created_at": 1794268719.8272274,
+          "retired_at": null,
+          "atlas_key": "leaves_n_flowers",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "1024x1024",
+          "baseKey": "leaves_n_flowers",
+          "version": ""
+        }
+      ]
+    },
+    {
       "atlasKey": "main_statue",
       "baseKey": "main_statue",
       "version": "",
@@ -1002,159 +1340,6 @@
           "replacementPending": false,
           "resolution": "2048x2048",
           "baseKey": "main_statue",
-          "version": ""
-        }
-      ]
-    },
-    {
-      "atlasKey": "newborn_boots",
-      "baseKey": "newborn_boots",
-      "version": "",
-      "variants": [
-        {
-          "id": 12,
-          "family_id": 9,
-          "width": 512,
-          "height": 512,
-          "filename": "newborn_boots_512x512_atlas.png",
-          "original_filename": "newborn_boots_512x512_atlas.png",
-          "source_path": "assets/source/texture-atlases/newborn_boots/512x512/newborn_boots_512x512_atlas.png",
-          "source_sha256": "455e581a5c58f693c7f48d6a179cea4632ad461a58bcb5c88de46a8bf9bd1855",
-          "uses_alpha": true,
-          "published_id": "132696983496934",
-          "published_sha256": "455e581a5c58f693c7f48d6a179cea4632ad461a58bcb5c88de46a8bf9bd1855",
-          "moderation_state": "Reviewing",
-          "published_at": 1793629503.4751477,
-          "created_at": 1793629499.803513,
-          "retired_at": null,
-          "atlas_key": "newborn_boots",
-          "replacement_sha256": null,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "512x512",
-          "baseKey": "newborn_boots",
-          "version": ""
-        }
-      ]
-    },
-    {
-      "atlasKey": "newborn_gloves",
-      "baseKey": "newborn_gloves",
-      "version": "",
-      "variants": [
-        {
-          "id": 13,
-          "family_id": 10,
-          "width": 256,
-          "height": 256,
-          "filename": "newborn_gloves_256x256_atlas.png",
-          "original_filename": "newborn_gloves_256x256_atlas.png",
-          "source_path": "assets/source/texture-atlases/newborn_gloves/256x256/newborn_gloves_256x256_atlas.png",
-          "source_sha256": "06b1f91463692288afefef95b4f3903ef5aa7c5a275d5b27fed04ac25fa4b7ee",
-          "uses_alpha": true,
-          "published_id": "135524533752769",
-          "published_sha256": "06b1f91463692288afefef95b4f3903ef5aa7c5a275d5b27fed04ac25fa4b7ee",
-          "moderation_state": "Reviewing",
-          "published_at": 1793629522.410063,
-          "created_at": 1793629518.7281086,
-          "retired_at": null,
-          "atlas_key": "newborn_gloves",
-          "replacement_sha256": null,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "256x256",
-          "baseKey": "newborn_gloves",
-          "version": ""
-        }
-      ]
-    },
-    {
-      "atlasKey": "newborn_lower",
-      "baseKey": "newborn_lower",
-      "version": "",
-      "variants": [
-        {
-          "id": 14,
-          "family_id": 11,
-          "width": 1024,
-          "height": 512,
-          "filename": "newborn_lower_1024x512_atlas.png",
-          "original_filename": "newborn_lower_1024x512_atlas.png",
-          "source_path": "assets/source/texture-atlases/newborn_lower/1024x512/newborn_lower_1024x512_atlas.png",
-          "source_sha256": "65fc333c2cd1819867a769f187cd6d4f3fee757b7be5a4571047dc18e44a66c3",
-          "uses_alpha": true,
-          "published_id": "81341252015506",
-          "published_sha256": "65fc333c2cd1819867a769f187cd6d4f3fee757b7be5a4571047dc18e44a66c3",
-          "moderation_state": "Reviewing",
-          "published_at": 1793629539.199955,
-          "created_at": 1793629535.3873286,
-          "retired_at": null,
-          "atlas_key": "newborn_lower",
-          "replacement_sha256": null,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "1024x512",
-          "baseKey": "newborn_lower",
-          "version": ""
-        }
-      ]
-    },
-    {
-      "atlasKey": "newborn_upper",
-      "baseKey": "newborn_upper",
-      "version": "",
-      "variants": [
-        {
-          "id": 9,
-          "family_id": 6,
-          "width": 512,
-          "height": 512,
-          "filename": "newborn_upper_512x512_atlas.png",
-          "original_filename": "newborn_upper_512x512_atlas.png",
-          "source_path": "assets/source/texture-atlases/newborn_upper/512x512/newborn_upper_512x512_atlas.png",
-          "source_sha256": "d9d62491f090821f5e24a7a79671cfe0b5a506cf44a5c884aedda9649d4e9875",
-          "uses_alpha": true,
-          "published_id": "130840873415092",
-          "published_sha256": "d9d62491f090821f5e24a7a79671cfe0b5a506cf44a5c884aedda9649d4e9875",
-          "moderation_state": "Reviewing",
-          "published_at": 1793458414.8865848,
-          "created_at": 1793458411.1526465,
-          "retired_at": null,
-          "atlas_key": "newborn_upper",
-          "replacement_sha256": null,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "512x512",
-          "baseKey": "newborn_upper",
-          "version": ""
-        },
-        {
-          "id": 15,
-          "family_id": 6,
-          "width": 256,
-          "height": 256,
-          "filename": "newborn_upper_256x256_atlas.png",
-          "original_filename": "newborn_upper_256x256_atlas.png",
-          "source_path": "assets/source/texture-atlases/newborn_upper/256x256/newborn_upper_256x256_atlas.png",
-          "source_sha256": "8b8b9fec3dd805a196dbc48f42d5db0fec54d7d44e131761ad4358e394d92741",
-          "uses_alpha": true,
-          "published_id": "114627765941728",
-          "published_sha256": "8b8b9fec3dd805a196dbc48f42d5db0fec54d7d44e131761ad4358e394d92741",
-          "moderation_state": "Reviewing",
-          "published_at": 1793630622.4854963,
-          "created_at": 1793630618.817804,
-          "retired_at": null,
-          "atlas_key": "newborn_upper",
-          "replacement_sha256": null,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "256x256",
-          "baseKey": "newborn_upper",
           "version": ""
         }
       ]
@@ -1416,6 +1601,38 @@
       ]
     },
     {
+      "atlasKey": "wooden_post_01",
+      "baseKey": "wooden_post",
+      "version": "01",
+      "variants": [
+        {
+          "id": 45,
+          "family_id": 41,
+          "width": 128,
+          "height": 512,
+          "filename": "wooden_post_01_128x512_atlas.png",
+          "original_filename": "wooden_post_01_128x512_atlas.png",
+          "source_path": "assets/source/texture-atlases/wooden_post_01/128x512/wooden_post_01_128x512_atlas.png",
+          "source_sha256": "16ac46129548c29e40bf4e36d4db140a46bd8c85211c2161d67d2f45a85e632b",
+          "uses_alpha": true,
+          "published_id": "114886857058987",
+          "published_sha256": "16ac46129548c29e40bf4e36d4db140a46bd8c85211c2161d67d2f45a85e632b",
+          "moderation_state": "Reviewing",
+          "published_at": 1794282072.489323,
+          "created_at": 1794282068.658483,
+          "retired_at": null,
+          "atlas_key": "wooden_post_01",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "128x512",
+          "baseKey": "wooden_post",
+          "version": "01"
+        }
+      ]
+    },
+    {
       "atlasKey": "wooden_post_kit",
       "baseKey": "wooden_post_kit",
       "version": "",
@@ -1642,6 +1859,390 @@
       "aliases": []
     },
     {
+      "slug": "ivy_02",
+      "name_en": "Ivy 02",
+      "category": "bush",
+      "model_path": "assets/source/location-assets/bush/ivy_02/model/ivy_02.fbx",
+      "model_sha256": "f18f6cf3c95ba96b377d04344247e130fa1d24b5d0428d9ab8374f9a0ceb0cd1",
+      "model_asset_id": "132393421464750",
+      "model_published_sha256": "f18f6cf3c95ba96b377d04344247e130fa1d24b5d0428d9ab8374f9a0ceb0cd1",
+      "model_moderation_state": "Approved",
+      "destructible": false,
+      "revision": 1,
+      "created_at": 1794276051.857426,
+      "updated_at": 1794276073.532448,
+      "published_at": 1794276073.532448,
+      "surface_material": "grass",
+      "alpha_enabled": 0,
+      "fbxAnalysis": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "ivy_02",
+            "armature": "",
+            "vertices": 405,
+            "bones": [],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          }
+        ],
+        "hasCollider": false,
+        "armatures": [],
+        "unassignedArmatures": []
+      },
+      "rigManifest": {
+        "boneHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "bones": [],
+        "carrierName": null,
+        "inventoryHash": "4a0044f8a167dbbf06d8b530690183d1f1da2525b49f094b6ff6c6575e01269d",
+        "parts": [
+          {
+            "name": "ivy_02",
+            "role": "visual",
+            "vertices": 405
+          }
+        ],
+        "rigKind": "static",
+        "schemaVersion": 2,
+        "sourceSha256": "",
+        "structuralHash": "0f2e1ddf745e46ec6bff4c8cb976d7c9dc87179532ae82efec8408eceaa82867"
+      },
+      "needsFbxInspection": false,
+      "legacyStaticPublication": false,
+      "meshOptions": {
+        "ivy_02": {
+          "collisionFidelity": "Box",
+          "collisionMesh": false,
+          "doubleSided": true,
+          "glass": false,
+          "noCollide": true
+        }
+      },
+      "surfaceMaterial": "grass",
+      "alphaEnabled": false,
+      "materialDefinition": {
+        "id": "grass",
+        "label": "Grass",
+        "robloxMaterial": "Grass",
+        "soundFamily": "foliage"
+      },
+      "texture_path": "assets/source/texture-atlases/leaves_n_flowers/1024x1024/revisions/2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717/leaves_n_flowers_1024x1024_atlas.png",
+      "texture_filename": "leaves_n_flowers_1024x1024_atlas.png",
+      "texture_sha256": "2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717",
+      "texture_asset_id": "83232615212572",
+      "texture_published_sha256": "2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717",
+      "texture_moderation_state": "Reviewing",
+      "texture_reference_slug": "",
+      "atlasVariantId": 43,
+      "atlasFamily": "leaves_n_flowers",
+      "atlasResolution": "1024x1024",
+      "bindingRevision": 1,
+      "studioSyncStatus": "unverified",
+      "atlasVariants": [
+        {
+          "id": 43,
+          "family_id": 34,
+          "width": 1024,
+          "height": 1024,
+          "filename": "leaves_n_flowers_1024x1024_atlas.png",
+          "original_filename": "leaves_n_flowers_1024x1024_atlas.png",
+          "source_path": "assets/source/texture-atlases/leaves_n_flowers/1024x1024/revisions/2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717/leaves_n_flowers_1024x1024_atlas.png",
+          "source_sha256": "2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717",
+          "uses_alpha": true,
+          "published_id": "83232615212572",
+          "published_sha256": "2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717",
+          "moderation_state": "Reviewing",
+          "published_at": 1794272123.260854,
+          "created_at": 1794268719.8272274,
+          "retired_at": null,
+          "atlas_key": "leaves_n_flowers",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "1024x1024",
+          "baseKey": "leaves_n_flowers",
+          "version": ""
+        }
+      ],
+      "textureUsesAlpha": true,
+      "atlasLegacyWarning": false,
+      "status": "PUBLISHED",
+      "category_label": "Bush",
+      "publishedVisualMeshes": [
+        {
+          "meshId": "96395292520138",
+          "name": "ivy_02"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "slug": "ivy_03",
+      "name_en": "Ivy 03",
+      "category": "bush",
+      "model_path": "assets/source/location-assets/bush/ivy_03/model/ivy_03.fbx",
+      "model_sha256": "cd41e2343dba31d6a6b256fce12112ff7956dd6cfab3e9ac878533cede948c4a",
+      "model_asset_id": "123907031275738",
+      "model_published_sha256": "cd41e2343dba31d6a6b256fce12112ff7956dd6cfab3e9ac878533cede948c4a",
+      "model_moderation_state": "Approved",
+      "destructible": false,
+      "revision": 2,
+      "created_at": 1794268720.0646126,
+      "updated_at": 1794271502.612349,
+      "published_at": 1794271502.612349,
+      "surface_material": "grass",
+      "alpha_enabled": 0,
+      "fbxAnalysis": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "ivy_03",
+            "armature": "",
+            "vertices": 657,
+            "bones": [],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          }
+        ],
+        "hasCollider": false,
+        "armatures": [],
+        "unassignedArmatures": []
+      },
+      "rigManifest": {
+        "boneHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "bones": [],
+        "carrierName": null,
+        "inventoryHash": "e6f4eb046ec58a43661537c129937a0767301b56385748119b82280c6ccf0a38",
+        "parts": [
+          {
+            "name": "ivy_03",
+            "role": "visual",
+            "vertices": 657
+          }
+        ],
+        "rigKind": "static",
+        "schemaVersion": 2,
+        "sourceSha256": "",
+        "structuralHash": "647299c9213f24235f63d1b9b0951fd8287fd754f94f440ae63424a32d16951b"
+      },
+      "needsFbxInspection": false,
+      "legacyStaticPublication": false,
+      "meshOptions": {
+        "ivy_03": {
+          "collisionFidelity": "Box",
+          "collisionMesh": false,
+          "doubleSided": true,
+          "glass": false,
+          "noCollide": true
+        }
+      },
+      "surfaceMaterial": "grass",
+      "alphaEnabled": false,
+      "materialDefinition": {
+        "id": "grass",
+        "label": "Grass",
+        "robloxMaterial": "Grass",
+        "soundFamily": "foliage"
+      },
+      "texture_path": "assets/source/texture-atlases/leaves_n_flowers/1024x1024/revisions/2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717/leaves_n_flowers_1024x1024_atlas.png",
+      "texture_filename": "leaves_n_flowers_1024x1024_atlas.png",
+      "texture_sha256": "2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717",
+      "texture_asset_id": "83232615212572",
+      "texture_published_sha256": "2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717",
+      "texture_moderation_state": "Reviewing",
+      "texture_reference_slug": "",
+      "atlasVariantId": 43,
+      "atlasFamily": "leaves_n_flowers",
+      "atlasResolution": "1024x1024",
+      "bindingRevision": 2,
+      "studioSyncStatus": "synced",
+      "atlasVariants": [
+        {
+          "id": 43,
+          "family_id": 34,
+          "width": 1024,
+          "height": 1024,
+          "filename": "leaves_n_flowers_1024x1024_atlas.png",
+          "original_filename": "leaves_n_flowers_1024x1024_atlas.png",
+          "source_path": "assets/source/texture-atlases/leaves_n_flowers/1024x1024/revisions/2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717/leaves_n_flowers_1024x1024_atlas.png",
+          "source_sha256": "2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717",
+          "uses_alpha": true,
+          "published_id": "83232615212572",
+          "published_sha256": "2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717",
+          "moderation_state": "Reviewing",
+          "published_at": 1794272123.260854,
+          "created_at": 1794268719.8272274,
+          "retired_at": null,
+          "atlas_key": "leaves_n_flowers",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "1024x1024",
+          "baseKey": "leaves_n_flowers",
+          "version": ""
+        }
+      ],
+      "textureUsesAlpha": true,
+      "atlasLegacyWarning": false,
+      "status": "PUBLISHED",
+      "category_label": "Bush",
+      "publishedVisualMeshes": [
+        {
+          "meshId": "129286240339384",
+          "name": "ivy_03"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "slug": "ivy_05",
+      "name_en": "Ivy 05",
+      "category": "bush",
+      "model_path": "assets/source/location-assets/bush/ivy_05/model/ivy_05.fbx",
+      "model_sha256": "d2de444737ca78fca79532388bf7a399d3ccae1c611156bd5454e61173502dfa",
+      "model_asset_id": "122555277961937",
+      "model_published_sha256": "d2de444737ca78fca79532388bf7a399d3ccae1c611156bd5454e61173502dfa",
+      "model_moderation_state": "Approved",
+      "destructible": false,
+      "revision": 2,
+      "created_at": 1794276114.6875803,
+      "updated_at": 1794276177.1030004,
+      "published_at": 1794276130.6505659,
+      "surface_material": "default",
+      "alpha_enabled": 0,
+      "fbxAnalysis": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "ivy_05",
+            "armature": "",
+            "vertices": 391,
+            "bones": [],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          }
+        ],
+        "hasCollider": false,
+        "armatures": [],
+        "unassignedArmatures": []
+      },
+      "rigManifest": {
+        "boneHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "bones": [],
+        "carrierName": null,
+        "inventoryHash": "f7f6ef0a994cfa1910dcfb470189da08af078e1f9e05961a7b28bdf505fb9c6b",
+        "parts": [
+          {
+            "name": "ivy_05",
+            "role": "visual",
+            "vertices": 391
+          }
+        ],
+        "rigKind": "static",
+        "schemaVersion": 2,
+        "sourceSha256": "",
+        "structuralHash": "047bcb1434104afd569689f9d51f409460c480a6633c8c1ea221f62a74c79eb4"
+      },
+      "needsFbxInspection": false,
+      "legacyStaticPublication": false,
+      "meshOptions": {
+        "ivy_05": {
+          "collisionFidelity": "Box",
+          "collisionMesh": false,
+          "doubleSided": true,
+          "glass": false,
+          "noCollide": true
+        }
+      },
+      "surfaceMaterial": "default",
+      "alphaEnabled": false,
+      "materialDefinition": {
+        "id": "default",
+        "label": "Default · unchanged",
+        "robloxMaterial": "",
+        "soundFamily": "generic"
+      },
+      "texture_path": "assets/source/texture-atlases/leaves_n_flowers/1024x1024/revisions/2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717/leaves_n_flowers_1024x1024_atlas.png",
+      "texture_filename": "leaves_n_flowers_1024x1024_atlas.png",
+      "texture_sha256": "2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717",
+      "texture_asset_id": "83232615212572",
+      "texture_published_sha256": "2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717",
+      "texture_moderation_state": "Reviewing",
+      "texture_reference_slug": "",
+      "atlasVariantId": 43,
+      "atlasFamily": "leaves_n_flowers",
+      "atlasResolution": "1024x1024",
+      "bindingRevision": 1,
+      "studioSyncStatus": "unverified",
+      "atlasVariants": [
+        {
+          "id": 43,
+          "family_id": 34,
+          "width": 1024,
+          "height": 1024,
+          "filename": "leaves_n_flowers_1024x1024_atlas.png",
+          "original_filename": "leaves_n_flowers_1024x1024_atlas.png",
+          "source_path": "assets/source/texture-atlases/leaves_n_flowers/1024x1024/revisions/2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717/leaves_n_flowers_1024x1024_atlas.png",
+          "source_sha256": "2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717",
+          "uses_alpha": true,
+          "published_id": "83232615212572",
+          "published_sha256": "2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717",
+          "moderation_state": "Reviewing",
+          "published_at": 1794272123.260854,
+          "created_at": 1794268719.8272274,
+          "retired_at": null,
+          "atlas_key": "leaves_n_flowers",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "1024x1024",
+          "baseKey": "leaves_n_flowers",
+          "version": ""
+        }
+      ],
+      "textureUsesAlpha": true,
+      "atlasLegacyWarning": false,
+      "status": "PUBLISHED",
+      "category_label": "Bush",
+      "publishedVisualMeshes": [
+        {
+          "meshId": "121501655225543",
+          "name": "ivy_05"
+        }
+      ],
+      "aliases": []
+    },
+    {
       "slug": "bush_02",
       "name_en": "bush 02",
       "category": "bush",
@@ -1737,7 +2338,7 @@
       "atlasFamily": "bush_02",
       "atlasResolution": "256x256",
       "bindingRevision": 2,
-      "studioSyncStatus": "pending_studio_sync",
+      "studioSyncStatus": "unverified",
       "atlasVariants": [
         {
           "id": 38,
@@ -2039,86 +2640,6 @@
         {
           "meshId": "114946535304404",
           "name": "tripo_node_6a166a91-6aea-46cc-b8ce-75bbf9041fbd"
-        }
-      ],
-      "aliases": []
-    },
-    {
-      "slug": "wooden_post_01",
-      "name_en": "Wooden Post 01",
-      "category": "decoration",
-      "model_path": "assets/source/location-assets/decoration/wooden_post_01/model/wooden_post_01.fbx",
-      "model_sha256": "107c71813dc8c8277a832935b4c4fcc15ebe19d10caa11465eb39ddc90343549",
-      "model_asset_id": "114995884110860",
-      "model_published_sha256": "107c71813dc8c8277a832935b4c4fcc15ebe19d10caa11465eb39ddc90343549",
-      "model_moderation_state": "Approved",
-      "destructible": false,
-      "revision": 2,
-      "created_at": 1792461639.815563,
-      "updated_at": 1792461820.1005793,
-      "published_at": 1792461820.1005793,
-      "surface_material": "default",
-      "alpha_enabled": 0,
-      "fbxAnalysis": null,
-      "rigManifest": null,
-      "needsFbxInspection": true,
-      "legacyStaticPublication": false,
-      "meshOptions": {},
-      "surfaceMaterial": "default",
-      "alphaEnabled": false,
-      "materialDefinition": {
-        "id": "default",
-        "label": "Default · unchanged",
-        "robloxMaterial": "",
-        "soundFamily": "generic"
-      },
-      "texture_path": "assets/source/texture-atlases/wooden_post_kit/1280x1280/migrated/39bee931b1c93f1d6f0d00d32746676eb35f93eaf30c44ab2e1369cbd78bb119/wooden_post_kit.png",
-      "texture_filename": "wooden_post_kit.png",
-      "texture_sha256": "39bee931b1c93f1d6f0d00d32746676eb35f93eaf30c44ab2e1369cbd78bb119",
-      "texture_asset_id": "126928306131485",
-      "texture_published_sha256": "39bee931b1c93f1d6f0d00d32746676eb35f93eaf30c44ab2e1369cbd78bb119",
-      "texture_moderation_state": "Approved",
-      "texture_reference_slug": "",
-      "atlasVariantId": 22,
-      "atlasFamily": "wooden_post_kit__import_39bee931b",
-      "atlasResolution": "1280x1280",
-      "bindingRevision": 1,
-      "studioSyncStatus": "synced",
-      "atlasVariants": [
-        {
-          "id": 22,
-          "family_id": 18,
-          "width": 1280,
-          "height": 1280,
-          "filename": "wooden_post_kit.png",
-          "original_filename": "wooden_post_kit.png",
-          "source_path": "assets/source/texture-atlases/wooden_post_kit/1280x1280/migrated/39bee931b1c93f1d6f0d00d32746676eb35f93eaf30c44ab2e1369cbd78bb119/wooden_post_kit.png",
-          "source_sha256": "39bee931b1c93f1d6f0d00d32746676eb35f93eaf30c44ab2e1369cbd78bb119",
-          "uses_alpha": true,
-          "published_id": "126928306131485",
-          "published_sha256": "39bee931b1c93f1d6f0d00d32746676eb35f93eaf30c44ab2e1369cbd78bb119",
-          "moderation_state": "Approved",
-          "published_at": 1793661745.075649,
-          "created_at": 1793661745.075649,
-          "retired_at": null,
-          "atlas_key": "wooden_post_kit__import_39bee931b",
-          "replacement_sha256": null,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "1280x1280",
-          "baseKey": "wooden_post_kit__import_39bee931b",
-          "version": ""
-        }
-      ],
-      "textureUsesAlpha": true,
-      "atlasLegacyWarning": true,
-      "status": "PUBLISHED",
-      "category_label": "Decoration",
-      "publishedVisualMeshes": [
-        {
-          "meshId": "112700278781894",
-          "name": "wooden_post_01"
         }
       ],
       "aliases": []
@@ -2636,15 +3157,15 @@
       "name_en": "Campfire 01",
       "category": "light",
       "model_path": "assets/source/location-assets/light/campfire_01/model/campfire_01.fbx",
-      "model_sha256": "c0e9641793e4f787dba318807834b94ed0f6d60f4b176d1edf5c9680b09774a3",
-      "model_asset_id": "85955870892092",
-      "model_published_sha256": "c0e9641793e4f787dba318807834b94ed0f6d60f4b176d1edf5c9680b09774a3",
+      "model_sha256": "8323f265be8707128e5f1822f26abc88f4073c19d93f3a8473a0e2e9c1980130",
+      "model_asset_id": "130064092512022",
+      "model_published_sha256": "8323f265be8707128e5f1822f26abc88f4073c19d93f3a8473a0e2e9c1980130",
       "model_moderation_state": "Approved",
       "destructible": false,
-      "revision": 9,
+      "revision": 10,
       "created_at": 1792517965.2518861,
-      "updated_at": 1794020173.3533173,
-      "published_at": 1794020173.3533173,
+      "updated_at": 1794278320.9412763,
+      "published_at": 1794278320.9412763,
       "surface_material": "wood",
       "alpha_enabled": 0,
       "fbxAnalysis": {
@@ -2678,7 +3199,9 @@
                 ]
               }
             ],
-            "influencedBones": [],
+            "influencedBones": [
+              "fire_bone"
+            ],
             "role": "visual",
             "physics": {
               "role": "visual",
@@ -2706,6 +3229,48 @@
               "collisionFidelity": "PreciseConvexDecomposition",
               "physicsOnly": true
             }
+          },
+          {
+            "name": "rig_carrier",
+            "armature": "campfire_01_armature",
+            "vertices": 3,
+            "bones": [
+              {
+                "name": "fire_bone",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  2e-07,
+                  0.0,
+                  -2e-07,
+                  0.0871556,
+                  0.9961948,
+                  -0.025732,
+                  -0.0,
+                  -0.9961948,
+                  0.0871555,
+                  1.2133821,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [
+              "fire_bone"
+            ],
+            "role": "carrier",
+            "physics": {
+              "role": "carrier",
+              "canCollide": false,
+              "canQuery": false,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": "Box",
+              "physicsOnly": true
+            }
           }
         ],
         "hasCollider": true,
@@ -2714,7 +3279,56 @@
         ],
         "unassignedArmatures": []
       },
-      "rigManifest": null,
+      "rigManifest": {
+        "boneHash": "7263cbc51d37fac11f1218b28cec8f119314b8302394852fd1409d5940fdfe19",
+        "bones": [
+          {
+            "matrix": [
+              1.0,
+              0.0,
+              2e-07,
+              0.0,
+              -2e-07,
+              0.0871556,
+              0.9961948,
+              -0.025732,
+              -0.0,
+              -0.9961948,
+              0.0871555,
+              1.2133821,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "name": "fire_bone",
+            "parent": ""
+          }
+        ],
+        "carrierName": "rig_carrier",
+        "inventoryHash": "8fbedcc27dc6b4c676882c12bc1ac52dd84d1b55fcff3c25ead10743a3fb425b",
+        "parts": [
+          {
+            "name": "campfire_01",
+            "role": "visual",
+            "vertices": 279
+          },
+          {
+            "name": "col_mesh",
+            "role": "collider",
+            "vertices": 60
+          },
+          {
+            "name": "rig_carrier",
+            "role": "rig_carrier",
+            "vertices": 3
+          }
+        ],
+        "rigKind": "skinned",
+        "schemaVersion": 2,
+        "sourceSha256": "",
+        "structuralHash": "641061970ac6e5037a94baa4dbfe28a7fbe157f089f7ce1aaaf9817107af3483"
+      },
       "needsFbxInspection": false,
       "legacyStaticPublication": false,
       "meshOptions": {
@@ -2786,7 +3400,7 @@
       "category_label": "Light",
       "publishedVisualMeshes": [
         {
-          "meshId": "70451663424090",
+          "meshId": "127690947645680",
           "name": "campfire_01"
         }
       ],
@@ -3103,41 +3717,215 @@
       "name_en": "Ground Torch 02",
       "category": "light",
       "model_path": "assets/source/location-assets/light/ground_torch_02/model/ground_torch_02.fbx",
-      "model_sha256": "09e636d1134dd3ee53d14c52b059709c2a38b7e11f983a72a3b4d167a3311d83",
-      "model_asset_id": "89813996391916",
-      "model_published_sha256": "09e636d1134dd3ee53d14c52b059709c2a38b7e11f983a72a3b4d167a3311d83",
+      "model_sha256": "6027ac69a8b33bf62b0742e0d8cc0ba08dfd54eab3f8802158c3df2d0ae6ea13",
+      "model_asset_id": "76201535696876",
+      "model_published_sha256": "6027ac69a8b33bf62b0742e0d8cc0ba08dfd54eab3f8802158c3df2d0ae6ea13",
       "model_moderation_state": "Approved",
-      "destructible": false,
-      "revision": 1,
+      "destructible": true,
+      "revision": 4,
       "created_at": 1792109461.491199,
-      "updated_at": 1792109491.1612,
-      "published_at": 1792109491.1612,
-      "surface_material": "default",
+      "updated_at": 1794356552.7842677,
+      "published_at": 1794356552.7842677,
+      "surface_material": "metal",
       "alpha_enabled": 0,
-      "fbxAnalysis": null,
-      "rigManifest": null,
-      "needsFbxInspection": true,
+      "fbxAnalysis": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "col_mesh",
+            "armature": "",
+            "vertices": 345,
+            "bones": [],
+            "influencedBones": [],
+            "role": "collider",
+            "physics": {
+              "role": "collider",
+              "canCollide": true,
+              "canQuery": true,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": "PreciseConvexDecomposition",
+              "physicsOnly": true
+            }
+          },
+          {
+            "name": "ground_torch_02",
+            "armature": "ground_torch_02_armature",
+            "vertices": 2083,
+            "bones": [
+              {
+                "name": "fire_bone",
+                "parent": "",
+                "matrixLocal": [
+                  -0.0,
+                  0.0,
+                  -1.0,
+                  -0.0,
+                  1.0,
+                  0.0,
+                  -0.0,
+                  1e-07,
+                  0.0,
+                  -0.9999999,
+                  0.0,
+                  0.1886034,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [
+              "fire_bone"
+            ],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": false,
+              "canQuery": false,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": "Box",
+              "physicsOnly": false
+            }
+          },
+          {
+            "name": "rig_carrier",
+            "armature": "ground_torch_02_armature",
+            "vertices": 3,
+            "bones": [
+              {
+                "name": "fire_bone",
+                "parent": "",
+                "matrixLocal": [
+                  -0.0,
+                  0.0,
+                  -1.0,
+                  -0.0,
+                  1.0,
+                  0.0,
+                  -0.0,
+                  1e-07,
+                  0.0,
+                  -0.9999999,
+                  0.0,
+                  0.1886034,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [
+              "fire_bone"
+            ],
+            "role": "carrier",
+            "physics": {
+              "role": "carrier",
+              "canCollide": false,
+              "canQuery": false,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": "Box",
+              "physicsOnly": true
+            }
+          }
+        ],
+        "hasCollider": true,
+        "armatures": [
+          "ground_torch_02_armature"
+        ],
+        "unassignedArmatures": []
+      },
+      "rigManifest": {
+        "boneHash": "5d32ca335fbbc16f98017da63fc391a19e2e27eb329358023f16b7eeb9e85761",
+        "bones": [
+          {
+            "matrix": [
+              -0.0,
+              0.0,
+              -1.0,
+              -0.0,
+              1.0,
+              -0.0,
+              -0.0,
+              1e-07,
+              -0.0,
+              -0.9999999,
+              0.0,
+              0.1886033,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "name": "fire_bone",
+            "parent": ""
+          }
+        ],
+        "carrierName": "rig_carrier",
+        "inventoryHash": "20a1362ccc77b6bbd6b963f4c25e29ff757ab0a61d00d08082ff0c7959278c86",
+        "parts": [
+          {
+            "name": "col_mesh",
+            "role": "collider",
+            "vertices": 345
+          },
+          {
+            "name": "ground_torch_02",
+            "role": "visual",
+            "vertices": 2083
+          },
+          {
+            "name": "rig_carrier",
+            "role": "rig_carrier",
+            "vertices": 3
+          }
+        ],
+        "rigKind": "skinned",
+        "schemaVersion": 2,
+        "sourceSha256": "",
+        "structuralHash": "dcff47c1ad88141643e613c7527021efca99fc05efdd43c386bd94145e873bc5"
+      },
+      "needsFbxInspection": false,
       "legacyStaticPublication": false,
-      "meshOptions": {},
-      "surfaceMaterial": "default",
+      "meshOptions": {
+        "col_mesh": {
+          "collisionFidelity": "PreciseConvexDecomposition",
+          "collisionMesh": true,
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": false
+        },
+        "ground_torch_02": {
+          "collisionFidelity": "Box",
+          "collisionMesh": false,
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true
+        }
+      },
+      "surfaceMaterial": "metal",
       "alphaEnabled": false,
       "materialDefinition": {
-        "id": "default",
-        "label": "Default · unchanged",
-        "robloxMaterial": "",
-        "soundFamily": "generic"
+        "id": "metal",
+        "label": "Metal",
+        "robloxMaterial": "Metal",
+        "soundFamily": "metal"
       },
-      "texture_path": "assets/source/texture-atlases/wall_torch_01/2048x2048/migrated/f2e5349b2b7de2cac11340d2fb091ebd9bae397672e7cdcdba462db9466ec104/wall_torch_01.jpg",
-      "texture_filename": "wall_torch_01.jpg",
-      "texture_sha256": "f2e5349b2b7de2cac11340d2fb091ebd9bae397672e7cdcdba462db9466ec104",
-      "texture_asset_id": "133426040591241",
-      "texture_published_sha256": "f2e5349b2b7de2cac11340d2fb091ebd9bae397672e7cdcdba462db9466ec104",
+      "texture_path": "assets/source/texture-atlases/ground_torch_02/512x512/ground_torch_02_512x512_atlas.png",
+      "texture_filename": "ground_torch_02_512x512_atlas.png",
+      "texture_sha256": "c743c333f6d736367cb20eca726be37e64b9de957f046ec81fc6a50b45c00cc3",
+      "texture_asset_id": "83802266377985",
+      "texture_published_sha256": "c743c333f6d736367cb20eca726be37e64b9de957f046ec81fc6a50b45c00cc3",
       "texture_moderation_state": "Reviewing",
       "texture_reference_slug": "",
-      "atlasVariantId": 20,
-      "atlasFamily": "wall_torch_01",
-      "atlasResolution": "2048x2048",
-      "bindingRevision": 1,
+      "atlasVariantId": 47,
+      "atlasFamily": "ground_torch_02",
+      "atlasResolution": "512x512",
+      "bindingRevision": 2,
       "studioSyncStatus": "synced",
       "atlasVariants": [
         {
@@ -3164,16 +3952,41 @@
           "resolution": "2048x2048",
           "baseKey": "wall_torch",
           "version": "01"
+        },
+        {
+          "id": 47,
+          "family_id": 42,
+          "width": 512,
+          "height": 512,
+          "filename": "ground_torch_02_512x512_atlas.png",
+          "original_filename": "ground_torch_02_512x512_atlas.png",
+          "source_path": "assets/source/texture-atlases/ground_torch_02/512x512/ground_torch_02_512x512_atlas.png",
+          "source_sha256": "c743c333f6d736367cb20eca726be37e64b9de957f046ec81fc6a50b45c00cc3",
+          "uses_alpha": true,
+          "published_id": "83802266377985",
+          "published_sha256": "c743c333f6d736367cb20eca726be37e64b9de957f046ec81fc6a50b45c00cc3",
+          "moderation_state": "Reviewing",
+          "published_at": 1794356589.468821,
+          "created_at": 1794356585.6342673,
+          "retired_at": null,
+          "atlas_key": "ground_torch_02",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "512x512",
+          "baseKey": "ground_torch",
+          "version": "02"
         }
       ],
-      "textureUsesAlpha": false,
-      "atlasLegacyWarning": true,
+      "textureUsesAlpha": true,
+      "atlasLegacyWarning": false,
       "status": "PUBLISHED",
       "category_label": "Light",
       "publishedVisualMeshes": [
         {
-          "meshId": "105353449494456",
-          "name": "torch_05"
+          "meshId": "113342380027415",
+          "name": "ground_torch_02"
         }
       ],
       "aliases": []
@@ -3183,42 +3996,216 @@
       "name_en": "Ground Torch 03",
       "category": "light",
       "model_path": "assets/source/location-assets/light/ground_torch_03/model/ground_torch_03.fbx",
-      "model_sha256": "8bbe265c5915411c60f13c19d84f1093af19a76162c463d73522bd6c952b3886",
-      "model_asset_id": "92102512366656",
-      "model_published_sha256": "8bbe265c5915411c60f13c19d84f1093af19a76162c463d73522bd6c952b3886",
+      "model_sha256": "a5cf143fe1fa3d4bb82860a887e707dda84c3dbe0b2455979b4a3cb1af583596",
+      "model_asset_id": "136663516698032",
+      "model_published_sha256": "a5cf143fe1fa3d4bb82860a887e707dda84c3dbe0b2455979b4a3cb1af583596",
       "model_moderation_state": "Approved",
-      "destructible": false,
-      "revision": 1,
+      "destructible": true,
+      "revision": 4,
       "created_at": 1792109502.154667,
-      "updated_at": 1792109515.2829225,
-      "published_at": 1792109515.2829225,
-      "surface_material": "default",
+      "updated_at": 1794356777.513668,
+      "published_at": 1794356777.513668,
+      "surface_material": "metal",
       "alpha_enabled": 0,
-      "fbxAnalysis": null,
-      "rigManifest": null,
-      "needsFbxInspection": true,
+      "fbxAnalysis": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "col_mesh",
+            "armature": "",
+            "vertices": 400,
+            "bones": [],
+            "influencedBones": [],
+            "role": "collider",
+            "physics": {
+              "role": "collider",
+              "canCollide": true,
+              "canQuery": true,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": "PreciseConvexDecomposition",
+              "physicsOnly": true
+            }
+          },
+          {
+            "name": "ground_torch_03",
+            "armature": "ground_torch_03_armature",
+            "vertices": 1856,
+            "bones": [
+              {
+                "name": "fire_bone",
+                "parent": "",
+                "matrixLocal": [
+                  -0.0,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.0,
+                  -0.0,
+                  0.0,
+                  -0.9999999,
+                  0.0,
+                  0.0370417,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [
+              "fire_bone"
+            ],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": false,
+              "canQuery": false,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": "Box",
+              "physicsOnly": false
+            }
+          },
+          {
+            "name": "rig_carrier",
+            "armature": "ground_torch_03_armature",
+            "vertices": 3,
+            "bones": [
+              {
+                "name": "fire_bone",
+                "parent": "",
+                "matrixLocal": [
+                  -0.0,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.0,
+                  -0.0,
+                  0.0,
+                  -0.9999999,
+                  0.0,
+                  0.0370417,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [
+              "fire_bone"
+            ],
+            "role": "carrier",
+            "physics": {
+              "role": "carrier",
+              "canCollide": false,
+              "canQuery": false,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": "Box",
+              "physicsOnly": true
+            }
+          }
+        ],
+        "hasCollider": true,
+        "armatures": [
+          "ground_torch_03_armature"
+        ],
+        "unassignedArmatures": []
+      },
+      "rigManifest": {
+        "boneHash": "a89bc2e2efd9869da61a7a7f8538fcc2b0cdd59a4370a2a9d144fb9d8d2eb824",
+        "bones": [
+          {
+            "matrix": [
+              -0.0,
+              0.0,
+              -1.0,
+              0.0,
+              1.0,
+              -0.0,
+              -0.0,
+              -0.0,
+              -0.0,
+              -0.9999999,
+              0.0,
+              0.0370398,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "name": "fire_bone",
+            "parent": ""
+          }
+        ],
+        "carrierName": "rig_carrier",
+        "inventoryHash": "fb23055328a93d140d7a54e1a985fc987b3f7b99c7b7b4b3fa230d68183dd8cb",
+        "parts": [
+          {
+            "name": "col_mesh",
+            "role": "collider",
+            "vertices": 400
+          },
+          {
+            "name": "ground_torch_03",
+            "role": "visual",
+            "vertices": 1856
+          },
+          {
+            "name": "rig_carrier",
+            "role": "rig_carrier",
+            "vertices": 3
+          }
+        ],
+        "rigKind": "skinned",
+        "schemaVersion": 2,
+        "sourceSha256": "",
+        "structuralHash": "41b65fc343d497a0f55b351f5bdfb243d1994877b82d07d15b6ae7782164bdb0"
+      },
+      "needsFbxInspection": false,
       "legacyStaticPublication": false,
-      "meshOptions": {},
-      "surfaceMaterial": "default",
+      "meshOptions": {
+        "col_mesh": {
+          "collisionFidelity": "PreciseConvexDecomposition",
+          "collisionMesh": true,
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": false
+        },
+        "ground_torch_03": {
+          "collisionFidelity": "Box",
+          "collisionMesh": false,
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true
+        }
+      },
+      "surfaceMaterial": "metal",
       "alphaEnabled": false,
       "materialDefinition": {
-        "id": "default",
-        "label": "Default · unchanged",
-        "robloxMaterial": "",
-        "soundFamily": "generic"
+        "id": "metal",
+        "label": "Metal",
+        "robloxMaterial": "Metal",
+        "soundFamily": "metal"
       },
-      "texture_path": "assets/source/texture-atlases/wall_torch_01/2048x2048/migrated/f2e5349b2b7de2cac11340d2fb091ebd9bae397672e7cdcdba462db9466ec104/wall_torch_01.jpg",
-      "texture_filename": "wall_torch_01.jpg",
-      "texture_sha256": "f2e5349b2b7de2cac11340d2fb091ebd9bae397672e7cdcdba462db9466ec104",
-      "texture_asset_id": "133426040591241",
-      "texture_published_sha256": "f2e5349b2b7de2cac11340d2fb091ebd9bae397672e7cdcdba462db9466ec104",
+      "texture_path": "assets/source/texture-atlases/ground_torch_03/1024x1024/ground_torch_03_1024x1024_atlas.png",
+      "texture_filename": "ground_torch_03_1024x1024_atlas.png",
+      "texture_sha256": "17659d7fb95d06bc103beb0e3ec3b7acfe07bd06b5c80fe5ce2c50830ea7e898",
+      "texture_asset_id": "84689691975944",
+      "texture_published_sha256": "17659d7fb95d06bc103beb0e3ec3b7acfe07bd06b5c80fe5ce2c50830ea7e898",
       "texture_moderation_state": "Reviewing",
       "texture_reference_slug": "",
-      "atlasVariantId": 20,
-      "atlasFamily": "wall_torch_01",
-      "atlasResolution": "2048x2048",
-      "bindingRevision": 1,
-      "studioSyncStatus": "synced",
+      "atlasVariantId": 48,
+      "atlasFamily": "ground_torch_03",
+      "atlasResolution": "1024x1024",
+      "bindingRevision": 2,
+      "studioSyncStatus": "unverified",
       "atlasVariants": [
         {
           "id": 20,
@@ -3244,18 +4231,38 @@
           "resolution": "2048x2048",
           "baseKey": "wall_torch",
           "version": "01"
+        },
+        {
+          "id": 48,
+          "family_id": 43,
+          "width": 1024,
+          "height": 1024,
+          "filename": "ground_torch_03_1024x1024_atlas.png",
+          "original_filename": "ground_torch_03_1024x1024_atlas.png",
+          "source_path": "assets/source/texture-atlases/ground_torch_03/1024x1024/ground_torch_03_1024x1024_atlas.png",
+          "source_sha256": "17659d7fb95d06bc103beb0e3ec3b7acfe07bd06b5c80fe5ce2c50830ea7e898",
+          "uses_alpha": true,
+          "published_id": "84689691975944",
+          "published_sha256": "17659d7fb95d06bc103beb0e3ec3b7acfe07bd06b5c80fe5ce2c50830ea7e898",
+          "moderation_state": "Reviewing",
+          "published_at": 1794356743.5169647,
+          "created_at": 1794356736.8447978,
+          "retired_at": null,
+          "atlas_key": "ground_torch_03",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "1024x1024",
+          "baseKey": "ground_torch",
+          "version": "03"
         }
       ],
-      "textureUsesAlpha": false,
-      "atlasLegacyWarning": true,
+      "textureUsesAlpha": true,
+      "atlasLegacyWarning": false,
       "status": "PUBLISHED",
       "category_label": "Light",
-      "publishedVisualMeshes": [
-        {
-          "meshId": "100390554987785",
-          "name": "torch_06"
-        }
-      ],
+      "publishedVisualMeshes": [],
       "aliases": []
     },
     {
@@ -3263,15 +4270,15 @@
       "name_en": "Lantern 01",
       "category": "light",
       "model_path": "assets/source/location-assets/light/lantern_01/model/lantern_01.fbx",
-      "model_sha256": "426a0545b11166453ae40936747920976eab21be745d67db837eef184d049c22",
-      "model_asset_id": "85535114227999",
-      "model_published_sha256": "426a0545b11166453ae40936747920976eab21be745d67db837eef184d049c22",
+      "model_sha256": "8a7854e3bd9787b4f088b614d7fe7ad73de48e844440c821a0049cdb8003e801",
+      "model_asset_id": "139526633880726",
+      "model_published_sha256": "8a7854e3bd9787b4f088b614d7fe7ad73de48e844440c821a0049cdb8003e801",
       "model_moderation_state": "Approved",
       "destructible": false,
-      "revision": 3,
+      "revision": 5,
       "created_at": 1791577146.911755,
-      "updated_at": 1794026007.3117607,
-      "published_at": 1794026007.3117607,
+      "updated_at": 1794415183.4159954,
+      "published_at": 1794415183.4159954,
       "surface_material": "default",
       "alpha_enabled": 0,
       "fbxAnalysis": {
@@ -3357,6 +4364,71 @@
               "collisionFidelity": "Box",
               "physicsOnly": false
             }
+          },
+          {
+            "name": "rig_carrier",
+            "armature": "lantern_01_armature",
+            "vertices": 6,
+            "bones": [
+              {
+                "name": "bind_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  -0.0,
+                  0.0,
+                  -1.0,
+                  -0.0466435,
+                  1.0,
+                  0.0,
+                  -0.0,
+                  0.0060394,
+                  0.0,
+                  -0.9999999,
+                  0.0,
+                  3.5294206,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "light_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  -0.0,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.0,
+                  -0.0043594,
+                  0.0,
+                  -0.9999999,
+                  0.0,
+                  1.0902271,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [
+              "bind_01_socket",
+              "light_01_socket"
+            ],
+            "role": "carrier",
+            "physics": {
+              "role": "carrier",
+              "canCollide": false,
+              "canQuery": false,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": "Box",
+              "physicsOnly": true
+            }
           }
         ],
         "hasCollider": true,
@@ -3365,7 +4437,78 @@
         ],
         "unassignedArmatures": []
       },
-      "rigManifest": null,
+      "rigManifest": {
+        "boneHash": "bd13cd5811d8f6275ecf5bc35256ae6800f2df95b39725b8da4dfda00fb426ed",
+        "bones": [
+          {
+            "matrix": [
+              -0.0,
+              0.0,
+              -1.0,
+              -0.0466435,
+              1.0,
+              0.0,
+              -0.0,
+              0.0060394,
+              0.0,
+              -0.9999999,
+              0.0,
+              3.5294206,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "name": "bind_01_socket",
+            "parent": ""
+          },
+          {
+            "matrix": [
+              -0.0,
+              0.0,
+              -1.0,
+              0.0,
+              1.0,
+              0.0,
+              -0.0,
+              -0.0043594,
+              0.0,
+              -0.9999999,
+              0.0,
+              1.0902271,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "name": "light_01_socket",
+            "parent": ""
+          }
+        ],
+        "carrierName": "rig_carrier",
+        "inventoryHash": "51cac264e2ab413463524402b0cc7dc83466cdb685f01b6d9c2db31fae12d329",
+        "parts": [
+          {
+            "name": "col_mesh",
+            "role": "collider",
+            "vertices": 109
+          },
+          {
+            "name": "lantern_01",
+            "role": "visual",
+            "vertices": 847
+          },
+          {
+            "name": "rig_carrier",
+            "role": "rig_carrier",
+            "vertices": 6
+          }
+        ],
+        "rigKind": "skinned",
+        "schemaVersion": 2,
+        "sourceSha256": "",
+        "structuralHash": "6a690ed4ede0516c120610415ad7a46e523cdac33f83e6621602c87083d0b9ba"
+      },
       "needsFbxInspection": false,
       "legacyStaticPublication": false,
       "meshOptions": {
@@ -3431,6 +4574,31 @@
           "version": "01"
         },
         {
+          "id": 46,
+          "family_id": 2,
+          "width": 128,
+          "height": 128,
+          "filename": "lantern_01_128x128_atlas.png",
+          "original_filename": "lantern_01_128x128_atlas.png",
+          "source_path": "assets/source/texture-atlases/lantern_01/128x128/lantern_01_128x128_atlas.png",
+          "source_sha256": "4226b42fa332e6db017f555d91c791bfc9427aea203736ff0d9b53bcf7acc1dd",
+          "uses_alpha": true,
+          "published_id": "139928560438135",
+          "published_sha256": "4226b42fa332e6db017f555d91c791bfc9427aea203736ff0d9b53bcf7acc1dd",
+          "moderation_state": "Reviewing",
+          "published_at": 1794355775.8354034,
+          "created_at": 1794355767.1818166,
+          "retired_at": null,
+          "atlas_key": "lantern_01",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "128x128",
+          "baseKey": "lantern",
+          "version": "01"
+        },
+        {
           "id": 3,
           "family_id": 2,
           "width": 64,
@@ -3460,12 +4628,7 @@
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
       "category_label": "Light",
-      "publishedVisualMeshes": [
-        {
-          "meshId": "71572613064153",
-          "name": "lantern_01"
-        }
-      ],
+      "publishedVisualMeshes": [],
       "aliases": []
     },
     {
@@ -3546,6 +4709,301 @@
           "name": "lantern_02"
         }
       ],
+      "aliases": []
+    },
+    {
+      "slug": "lantern_03",
+      "name_en": "Lantern 03",
+      "category": "light",
+      "model_path": "assets/source/location-assets/light/lantern_03/model/lantern_03.fbx",
+      "model_sha256": "6662519a1d0128571266f9985e09ae8916d8cd629624dba3384e0f9859c3db5f",
+      "model_asset_id": "134486373834800",
+      "model_published_sha256": "6662519a1d0128571266f9985e09ae8916d8cd629624dba3384e0f9859c3db5f",
+      "model_moderation_state": "Approved",
+      "destructible": false,
+      "revision": 7,
+      "created_at": 1794355767.3776286,
+      "updated_at": 1794414936.8656244,
+      "published_at": 1794414699.4105468,
+      "surface_material": "metal",
+      "alpha_enabled": 0,
+      "fbxAnalysis": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "lantern_03",
+            "armature": "lantern_03_armature",
+            "vertices": 170,
+            "bones": [
+              {
+                "name": "light_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  -0.0,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.0,
+                  0.0,
+                  0.0,
+                  -0.9999999,
+                  0.0,
+                  -1.2674228,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [
+              "light_01_socket"
+            ],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          },
+          {
+            "name": "rig_carrier",
+            "armature": "lantern_03_armature",
+            "vertices": 3,
+            "bones": [
+              {
+                "name": "light_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  -0.0,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.0,
+                  0.0,
+                  0.0,
+                  -0.9999999,
+                  0.0,
+                  -1.2674228,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [
+              "light_01_socket"
+            ],
+            "role": "carrier",
+            "physics": {
+              "role": "carrier",
+              "canCollide": false,
+              "canQuery": false,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": "Box",
+              "physicsOnly": true
+            }
+          }
+        ],
+        "hasCollider": false,
+        "armatures": [
+          "lantern_03_armature"
+        ],
+        "unassignedArmatures": []
+      },
+      "rigManifest": {
+        "boneHash": "9ceec9191415873243f347fcc974f463d70bb4ac36948253493897463da5695d",
+        "bones": [
+          {
+            "matrix": [
+              -0.0,
+              0.0,
+              -1.0,
+              0.0,
+              1.0,
+              0.0,
+              -0.0,
+              0.0,
+              0.0,
+              -0.9999999,
+              0.0,
+              -1.2674228,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "name": "light_01_socket",
+            "parent": ""
+          }
+        ],
+        "carrierName": "rig_carrier",
+        "inventoryHash": "1b21fcce8220bd8da8650766dd8ece281885171b77a47dcb71dadfd23d084bb9",
+        "parts": [
+          {
+            "name": "lantern_03",
+            "role": "visual",
+            "vertices": 170
+          },
+          {
+            "name": "rig_carrier",
+            "role": "rig_carrier",
+            "vertices": 3
+          }
+        ],
+        "rigKind": "skinned",
+        "schemaVersion": 2,
+        "sourceSha256": "",
+        "structuralHash": "75a50bdf664741d532ff3ff550930c8fc8e370252d6bab06e8361403616ebf2b"
+      },
+      "needsFbxInspection": false,
+      "legacyStaticPublication": false,
+      "meshOptions": {
+        "lantern_03": {
+          "collisionFidelity": "PreciseConvexDecomposition",
+          "collisionMesh": false,
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": false
+        }
+      },
+      "surfaceMaterial": "metal",
+      "alphaEnabled": false,
+      "materialDefinition": {
+        "id": "metal",
+        "label": "Metal",
+        "robloxMaterial": "Metal",
+        "soundFamily": "metal"
+      },
+      "texture_path": "assets/source/texture-atlases/lantern_03/128x128/lantern_03_128x128_atlas.png",
+      "texture_filename": "lantern_03_128x128_atlas.png",
+      "texture_sha256": "4226b42fa332e6db017f555d91c791bfc9427aea203736ff0d9b53bcf7acc1dd",
+      "texture_asset_id": "139928560438135",
+      "texture_published_sha256": "4226b42fa332e6db017f555d91c791bfc9427aea203736ff0d9b53bcf7acc1dd",
+      "texture_moderation_state": "",
+      "texture_reference_slug": "",
+      "atlasVariantId": 49,
+      "atlasFamily": "lantern_03",
+      "atlasResolution": "128x128",
+      "bindingRevision": 6,
+      "studioSyncStatus": "synced",
+      "atlasVariants": [
+        {
+          "id": 36,
+          "family_id": 2,
+          "width": 256,
+          "height": 512,
+          "filename": "lantern_01_256x512_atlas.png",
+          "original_filename": "lantern_01_256x512_atlas.png",
+          "source_path": "assets/source/texture-atlases/lantern_01/256x512/lantern_01_256x512_atlas.png",
+          "source_sha256": "60d15719665fb49f73256e8bfc10c5083c74b95645dbbb34807b82d3c77f9321",
+          "uses_alpha": true,
+          "published_id": "74839303464750",
+          "published_sha256": "60d15719665fb49f73256e8bfc10c5083c74b95645dbbb34807b82d3c77f9321",
+          "moderation_state": "Reviewing",
+          "published_at": 1794026041.6063218,
+          "created_at": 1794026037.3819716,
+          "retired_at": null,
+          "atlas_key": "lantern_01",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "256x512",
+          "baseKey": "lantern",
+          "version": "01"
+        },
+        {
+          "id": 46,
+          "family_id": 2,
+          "width": 128,
+          "height": 128,
+          "filename": "lantern_01_128x128_atlas.png",
+          "original_filename": "lantern_01_128x128_atlas.png",
+          "source_path": "assets/source/texture-atlases/lantern_01/128x128/lantern_01_128x128_atlas.png",
+          "source_sha256": "4226b42fa332e6db017f555d91c791bfc9427aea203736ff0d9b53bcf7acc1dd",
+          "uses_alpha": true,
+          "published_id": "139928560438135",
+          "published_sha256": "4226b42fa332e6db017f555d91c791bfc9427aea203736ff0d9b53bcf7acc1dd",
+          "moderation_state": "Reviewing",
+          "published_at": 1794355775.8354034,
+          "created_at": 1794355767.1818166,
+          "retired_at": null,
+          "atlas_key": "lantern_01",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "128x128",
+          "baseKey": "lantern",
+          "version": "01"
+        },
+        {
+          "id": 49,
+          "family_id": 44,
+          "width": 128,
+          "height": 128,
+          "filename": "lantern_03_128x128_atlas.png",
+          "original_filename": "lantern_03_128x128_atlas.png",
+          "source_path": "assets/source/texture-atlases/lantern_03/128x128/lantern_03_128x128_atlas.png",
+          "source_sha256": "4226b42fa332e6db017f555d91c791bfc9427aea203736ff0d9b53bcf7acc1dd",
+          "uses_alpha": true,
+          "published_id": "139928560438135",
+          "published_sha256": "4226b42fa332e6db017f555d91c791bfc9427aea203736ff0d9b53bcf7acc1dd",
+          "moderation_state": "",
+          "published_at": 1794414357.4234924,
+          "created_at": 1794414357.2193787,
+          "retired_at": null,
+          "atlas_key": "lantern_03",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "128x128",
+          "baseKey": "lantern",
+          "version": "03"
+        },
+        {
+          "id": 3,
+          "family_id": 2,
+          "width": 64,
+          "height": 128,
+          "filename": "lantern_01_64x128_atlas.png",
+          "original_filename": "lantern_01_64x128_atlas.png",
+          "source_path": "assets/source/texture-atlases/lantern_01/64x128/lantern_01_64x128_atlas.png",
+          "source_sha256": "ca9a12aacf3ad5305a6baa34baa728198a272b8d81188ae7163f915f7e1d992e",
+          "uses_alpha": true,
+          "published_id": "111478705558346",
+          "published_sha256": "ca9a12aacf3ad5305a6baa34baa728198a272b8d81188ae7163f915f7e1d992e",
+          "moderation_state": "Reviewing",
+          "published_at": 1792869836.3859174,
+          "created_at": 1792869829.3721356,
+          "retired_at": null,
+          "atlas_key": "lantern_01",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "64x128",
+          "baseKey": "lantern",
+          "version": "01"
+        }
+      ],
+      "textureUsesAlpha": true,
+      "atlasLegacyWarning": false,
+      "status": "PUBLISHED",
+      "category_label": "Light",
+      "publishedVisualMeshes": [],
       "aliases": []
     },
     {
@@ -4129,7 +5587,7 @@
       "atlasFamily": "stone_pillar_02",
       "atlasResolution": "128x256",
       "bindingRevision": 1,
-      "studioSyncStatus": "pending_studio_sync",
+      "studioSyncStatus": "unverified",
       "atlasVariants": [
         {
           "id": 37,
@@ -4165,6 +5623,285 @@
         {
           "meshId": "79569085063588",
           "name": "stone_pillar_02"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "slug": "wooden_post_01",
+      "name_en": "Wooden Post 01",
+      "category": "post",
+      "model_path": "assets/source/location-assets/post/wooden_post_01/model/wooden_post_01.fbx",
+      "model_sha256": "2fde84ee6f684c2aaa8d5fd432bbf1bf36e237f9ecb00669ea4490e3392f77a6",
+      "model_asset_id": "95091470763492",
+      "model_published_sha256": "2fde84ee6f684c2aaa8d5fd432bbf1bf36e237f9ecb00669ea4490e3392f77a6",
+      "model_moderation_state": "Approved",
+      "destructible": true,
+      "revision": 5,
+      "created_at": 1792461639.815563,
+      "updated_at": 1794281772.9289348,
+      "published_at": 1794281772.9289348,
+      "surface_material": "wood",
+      "alpha_enabled": 0,
+      "fbxAnalysis": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "col_mesh",
+            "armature": "",
+            "vertices": 32,
+            "bones": [],
+            "influencedBones": [],
+            "role": "collider",
+            "physics": {
+              "role": "collider",
+              "canCollide": true,
+              "canQuery": true,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": "PreciseConvexDecomposition",
+              "physicsOnly": true
+            }
+          },
+          {
+            "name": "rig_carrier",
+            "armature": "wooden_post_01_armature",
+            "vertices": 3,
+            "bones": [
+              {
+                "name": "lantern_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  2.4914579,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  0.0076838,
+                  0.0,
+                  1.0,
+                  0.0,
+                  9.5313044,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [
+              "lantern_01_socket"
+            ],
+            "role": "carrier",
+            "physics": {
+              "role": "carrier",
+              "canCollide": false,
+              "canQuery": false,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": "Box",
+              "physicsOnly": true
+            }
+          },
+          {
+            "name": "wooden_post_01",
+            "armature": "wooden_post_01_armature",
+            "vertices": 399,
+            "bones": [
+              {
+                "name": "lantern_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  2.4914579,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  0.0076838,
+                  0.0,
+                  1.0,
+                  0.0,
+                  9.5313044,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [
+              "lantern_01_socket"
+            ],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": false,
+              "canQuery": false,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": "Box",
+              "physicsOnly": false
+            }
+          }
+        ],
+        "hasCollider": true,
+        "armatures": [
+          "wooden_post_01_armature"
+        ],
+        "unassignedArmatures": []
+      },
+      "rigManifest": {
+        "boneHash": "ffc1f6e7e97e528bbe05d703b275f0a66822d57b4d35714e7e41686db0555d63",
+        "bones": [
+          {
+            "matrix": [
+              1.0,
+              0.0,
+              0.0,
+              2.4914579,
+              0.0,
+              0.0,
+              -1.0,
+              0.0076838,
+              0.0,
+              1.0,
+              0.0,
+              9.5313044,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "name": "lantern_01_socket",
+            "parent": ""
+          }
+        ],
+        "carrierName": "rig_carrier",
+        "inventoryHash": "530e3f165f7db07539c8b286299a417cf7d75434f112a1f8645684c2b5e05376",
+        "parts": [
+          {
+            "name": "col_mesh",
+            "role": "collider",
+            "vertices": 32
+          },
+          {
+            "name": "rig_carrier",
+            "role": "rig_carrier",
+            "vertices": 3
+          },
+          {
+            "name": "wooden_post_01",
+            "role": "visual",
+            "vertices": 399
+          }
+        ],
+        "rigKind": "skinned",
+        "schemaVersion": 2,
+        "sourceSha256": "",
+        "structuralHash": "f625fc49355c0b3ba468a12c172bc2ff35bcd7bba42cbc7d6bb31c80dc609e43"
+      },
+      "needsFbxInspection": false,
+      "legacyStaticPublication": false,
+      "meshOptions": {
+        "col_mesh": {
+          "collisionFidelity": "PreciseConvexDecomposition",
+          "collisionMesh": true,
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": false
+        },
+        "wooden_post_01": {
+          "collisionFidelity": "Box",
+          "collisionMesh": false,
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true
+        }
+      },
+      "surfaceMaterial": "wood",
+      "alphaEnabled": false,
+      "materialDefinition": {
+        "id": "wood",
+        "label": "Wood",
+        "robloxMaterial": "Wood",
+        "soundFamily": "wood"
+      },
+      "texture_path": "assets/source/texture-atlases/wooden_post_01/128x512/wooden_post_01_128x512_atlas.png",
+      "texture_filename": "wooden_post_01_128x512_atlas.png",
+      "texture_sha256": "16ac46129548c29e40bf4e36d4db140a46bd8c85211c2161d67d2f45a85e632b",
+      "texture_asset_id": "114886857058987",
+      "texture_published_sha256": "16ac46129548c29e40bf4e36d4db140a46bd8c85211c2161d67d2f45a85e632b",
+      "texture_moderation_state": "Reviewing",
+      "texture_reference_slug": "",
+      "atlasVariantId": 45,
+      "atlasFamily": "wooden_post_01",
+      "atlasResolution": "128x512",
+      "bindingRevision": 2,
+      "studioSyncStatus": "synced",
+      "atlasVariants": [
+        {
+          "id": 22,
+          "family_id": 18,
+          "width": 1280,
+          "height": 1280,
+          "filename": "wooden_post_kit.png",
+          "original_filename": "wooden_post_kit.png",
+          "source_path": "assets/source/texture-atlases/wooden_post_kit/1280x1280/migrated/39bee931b1c93f1d6f0d00d32746676eb35f93eaf30c44ab2e1369cbd78bb119/wooden_post_kit.png",
+          "source_sha256": "39bee931b1c93f1d6f0d00d32746676eb35f93eaf30c44ab2e1369cbd78bb119",
+          "uses_alpha": true,
+          "published_id": "126928306131485",
+          "published_sha256": "39bee931b1c93f1d6f0d00d32746676eb35f93eaf30c44ab2e1369cbd78bb119",
+          "moderation_state": "Approved",
+          "published_at": 1793661745.075649,
+          "created_at": 1793661745.075649,
+          "retired_at": null,
+          "atlas_key": "wooden_post_kit__import_39bee931b",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "1280x1280",
+          "baseKey": "wooden_post_kit__import_39bee931b",
+          "version": ""
+        },
+        {
+          "id": 45,
+          "family_id": 41,
+          "width": 128,
+          "height": 512,
+          "filename": "wooden_post_01_128x512_atlas.png",
+          "original_filename": "wooden_post_01_128x512_atlas.png",
+          "source_path": "assets/source/texture-atlases/wooden_post_01/128x512/wooden_post_01_128x512_atlas.png",
+          "source_sha256": "16ac46129548c29e40bf4e36d4db140a46bd8c85211c2161d67d2f45a85e632b",
+          "uses_alpha": true,
+          "published_id": "114886857058987",
+          "published_sha256": "16ac46129548c29e40bf4e36d4db140a46bd8c85211c2161d67d2f45a85e632b",
+          "moderation_state": "Reviewing",
+          "published_at": 1794282072.489323,
+          "created_at": 1794282068.658483,
+          "retired_at": null,
+          "atlas_key": "wooden_post_01",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "128x512",
+          "baseKey": "wooden_post",
+          "version": "01"
+        }
+      ],
+      "textureUsesAlpha": true,
+      "atlasLegacyWarning": false,
+      "status": "PUBLISHED",
+      "category_label": "Post",
+      "publishedVisualMeshes": [
+        {
+          "meshId": "94912543753491",
+          "name": "wooden_post_01"
         }
       ],
       "aliases": []
@@ -4549,15 +6286,15 @@
       "name_en": "Birch 01",
       "category": "tree",
       "model_path": "assets/source/location-assets/tree/birch_01/model/birch_01.fbx",
-      "model_sha256": "20475518d5f5dc6b6506373d583c38a2f3679d9082acc0450d9bac24e26c1114",
-      "model_asset_id": "127245547696536",
-      "model_published_sha256": "ff25196a924e6c27f245429159450334a43ac16604b391640f818cfec696a327",
+      "model_sha256": "690192556411f8353a4578b25dccabccbe24a35f935f1e5828e4af24f0c1776d",
+      "model_asset_id": "110075621214873",
+      "model_published_sha256": "690192556411f8353a4578b25dccabccbe24a35f935f1e5828e4af24f0c1776d",
       "model_moderation_state": "Approved",
       "destructible": true,
-      "revision": 3,
+      "revision": 4,
       "created_at": 1792461987.3799765,
-      "updated_at": 1794087367.5264773,
-      "published_at": 1793903073.7166655,
+      "updated_at": 1794280897.511054,
+      "published_at": 1794280897.511054,
       "surface_material": "default",
       "alpha_enabled": 0,
       "fbxAnalysis": {
@@ -4603,7 +6340,7 @@
                   -0.9980618,
                   0.0,
                   -0.0484146,
-                  0.9968868,
+                  0.9968869,
                   -0.0622295,
                   4.0522251,
                   0.0,
@@ -4619,15 +6356,15 @@
                   0.9998968,
                   0.0143584,
                   0.0005088,
-                  0.1303114,
+                  0.1303113,
                   0.0005968,
                   -0.0061263,
                   -0.999981,
-                  -0.1669158,
+                  -0.1669157,
                   -0.014355,
-                  0.9998782,
+                  0.9998781,
                   -0.0061342,
-                  6.72964,
+                  6.7296386,
                   0.0,
                   0.0,
                   0.0,
@@ -4638,18 +6375,18 @@
                 "name": "Bone.003",
                 "parent": "Bone.002",
                 "matrixLocal": [
-                  0.9921571,
-                  -0.113538,
+                  0.9921572,
+                  -0.1135379,
                   0.0522841,
                   0.1861928,
                   0.0453692,
                   -0.0626577,
                   -0.9970033,
                   -0.1907587,
-                  0.1164737,
-                  0.9915559,
+                  0.1164736,
+                  0.991556,
                   -0.0570152,
-                  10.6210747,
+                  10.6210756,
                   0.0,
                   0.0,
                   0.0,
@@ -4660,7 +6397,7 @@
                 "name": "Bone.004",
                 "parent": "Bone.003",
                 "matrixLocal": [
-                  0.997359,
+                  0.9973592,
                   0.0487962,
                   0.0537962,
                   -0.0526471,
@@ -4668,10 +6405,10 @@
                   -0.0800524,
                   -0.9951255,
                   -0.3225662,
-                  -0.0442518,
-                  0.9955955,
+                  -0.0442519,
+                  0.9955956,
                   -0.0826513,
-                  12.7069235,
+                  12.7069254,
                   0.0,
                   0.0,
                   0.0,
@@ -4713,6 +6450,140 @@
               "collisionFidelity": "PreciseConvexDecomposition",
               "physicsOnly": true
             }
+          },
+          {
+            "name": "rig_carrier",
+            "armature": "birch_01_armature",
+            "vertices": 15,
+            "bones": [
+              {
+                "name": "Bone",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "Bone.001",
+                "parent": "Bone",
+                "matrixLocal": [
+                  0.9988223,
+                  0.0485191,
+                  0.0001674,
+                  0.0,
+                  0.0031862,
+                  -0.0621481,
+                  -0.9980618,
+                  0.0,
+                  -0.0484146,
+                  0.9968869,
+                  -0.0622295,
+                  4.0522251,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "Bone.002",
+                "parent": "Bone.001",
+                "matrixLocal": [
+                  0.9998968,
+                  0.0143584,
+                  0.0005088,
+                  0.1303113,
+                  0.0005968,
+                  -0.0061263,
+                  -0.999981,
+                  -0.1669157,
+                  -0.014355,
+                  0.9998781,
+                  -0.0061342,
+                  6.7296386,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "Bone.003",
+                "parent": "Bone.002",
+                "matrixLocal": [
+                  0.9921572,
+                  -0.1135379,
+                  0.0522841,
+                  0.1861928,
+                  0.0453692,
+                  -0.0626577,
+                  -0.9970033,
+                  -0.1907587,
+                  0.1164736,
+                  0.991556,
+                  -0.0570152,
+                  10.6210756,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "Bone.004",
+                "parent": "Bone.003",
+                "matrixLocal": [
+                  0.9973592,
+                  0.0487962,
+                  0.0537962,
+                  -0.0526471,
+                  0.0575924,
+                  -0.0800524,
+                  -0.9951255,
+                  -0.3225662,
+                  -0.0442519,
+                  0.9955956,
+                  -0.0826513,
+                  12.7069254,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [
+              "Bone",
+              "Bone.001",
+              "Bone.002",
+              "Bone.003",
+              "Bone.004"
+            ],
+            "role": "carrier",
+            "physics": {
+              "role": "carrier",
+              "canCollide": false,
+              "canQuery": false,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": "Box",
+              "physicsOnly": true
+            }
           }
         ],
         "hasCollider": true,
@@ -4721,7 +6592,144 @@
         ],
         "unassignedArmatures": []
       },
-      "rigManifest": null,
+      "rigManifest": {
+        "boneHash": "f8bc3463790decc40556cf401b366dc9a9fc21be45f6e4f7a9e1fcdfe02c53aa",
+        "bones": [
+          {
+            "matrix": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              -1.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "name": "Bone",
+            "parent": ""
+          },
+          {
+            "matrix": [
+              0.9988223,
+              0.0485191,
+              0.0001674,
+              0.0,
+              0.0031862,
+              -0.0621481,
+              -0.9980618,
+              0.0,
+              -0.0484146,
+              0.9968869,
+              -0.0622295,
+              4.0522251,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "name": "Bone.001",
+            "parent": "Bone"
+          },
+          {
+            "matrix": [
+              0.9998968,
+              0.0143583,
+              0.0005088,
+              0.1303113,
+              0.0005968,
+              -0.0061263,
+              -0.999981,
+              -0.1669157,
+              -0.014355,
+              0.9998781,
+              -0.0061342,
+              6.7296371,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "name": "Bone.002",
+            "parent": "Bone.001"
+          },
+          {
+            "matrix": [
+              0.9921572,
+              -0.1135378,
+              0.0522841,
+              0.1861927,
+              0.0453692,
+              -0.0626577,
+              -0.9970033,
+              -0.1907587,
+              0.1164735,
+              0.991556,
+              -0.0570151,
+              10.6210747,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "name": "Bone.003",
+            "parent": "Bone.002"
+          },
+          {
+            "matrix": [
+              0.9973591,
+              0.0487963,
+              0.0537962,
+              -0.0526468,
+              0.0575924,
+              -0.0800524,
+              -0.9951255,
+              -0.3225661,
+              -0.0442519,
+              0.9955956,
+              -0.0826513,
+              12.7069244,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "name": "Bone.004",
+            "parent": "Bone.003"
+          }
+        ],
+        "carrierName": "rig_carrier",
+        "inventoryHash": "25017b900072a8f3b0b038465ebfef93028206338d1513e624aba5746ead11fd",
+        "parts": [
+          {
+            "name": "birch_01",
+            "role": "visual",
+            "vertices": 791
+          },
+          {
+            "name": "col_mesh",
+            "role": "collider",
+            "vertices": 226
+          },
+          {
+            "name": "rig_carrier",
+            "role": "rig_carrier",
+            "vertices": 15
+          }
+        ],
+        "rigKind": "skinned",
+        "schemaVersion": 2,
+        "sourceSha256": "",
+        "structuralHash": "93792e421c1cbb67d170f9d90a8872d668aea36de4ff34c598c1f5b46d74ee5c"
+      },
       "needsFbxInspection": false,
       "legacyStaticPublication": false,
       "meshOptions": {
@@ -4814,11 +6822,11 @@
       ],
       "textureUsesAlpha": true,
       "atlasLegacyWarning": false,
-      "status": "UPDATE_AVAILABLE",
+      "status": "PUBLISHED",
       "category_label": "Tree",
       "publishedVisualMeshes": [
         {
-          "meshId": "132288181730621",
+          "meshId": "92601949463844",
           "name": "birch_01"
         }
       ],
@@ -5434,8 +7442,8 @@
     }
   ],
   "summary": {
-    "registered": 29,
-    "published": 28,
-    "changed": 1
+    "registered": 33,
+    "published": 33,
+    "changed": 0
   }
 }

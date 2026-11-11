@@ -118,7 +118,7 @@ local function buildCatalog(player: Player)
 
     local selectedArchetype = tostring(player:GetAttribute("SelectedCharacterArchetype") or "")
     if selectedArchetype == "" then
-        selectedArchetype = tostring(CharacterRegistry.activeArchetypeId or "")
+        selectedArchetype = tostring((if RunService:IsStudio() then CharacterRegistry.studioAdminArchetypeId or CharacterRegistry.defaultArchetypeId else CharacterRegistry.defaultArchetypeId) or "")
     end
     local selectedWeaponSlug = tostring(player:GetAttribute("SelectedWeaponSlug") or "")
     local character = player.Character

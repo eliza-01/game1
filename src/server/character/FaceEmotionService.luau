@@ -9,8 +9,17 @@ function Service.Set(character: Model, emotion: string?)
     character:SetAttribute(Contract.attribute, emotion)
 end
 
+local function hasFaceSlot(character: Model, slot: string): boolean
+    for _, object in character:GetDescendants() do
+        if object:IsA("MeshPart") and object:GetAttribute("CharacterPartSlot") == slot then
+            return true
+        end
+    end
+    return false
+end
+
 function Service.Bind(character: Model)
-    if bound[character] or not character:FindFirstChild("eyes_01_l",true) or not character:FindFirstChild("eyes_01_r",true) then return end
+    if bound[character] or not hasFaceSlot(character, "eye_l") or not hasFaceSlot(character, "eye_r") then return end
     local animator=character:FindFirstChildWhichIsA("Animator",true)
     local profile=Registry.profiles[tostring(character:GetAttribute("AnimationProfileId") or "")]
     if not animator or not profile then return end

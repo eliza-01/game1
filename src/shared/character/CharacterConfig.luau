@@ -27,6 +27,7 @@ CharacterConfig.CameraPitch = math.rad(-12)
 CharacterConfig.CameraMinPitch = math.rad(-65)
 CharacterConfig.CameraMaxPitch = math.rad(35)
 CharacterConfig.CameraMouseSensitivity = 0.004
+CharacterConfig.CameraTouchRotationSpeed = 2.6 -- rad/s at full right-stick deflection
 CharacterConfig.CameraRotationResponse = 75
 CharacterConfig.CameraZoomStep = 1.25
 CharacterConfig.CameraCollisionPadding = 0.3

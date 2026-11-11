@@ -7,7 +7,6 @@ local Timeline=require(Shared:WaitForChild("AnimationEventTimeline"))
 local Contract=require(Shared:WaitForChild("FaceEmotionContract"))
 local Resolver=require(script.Parent:WaitForChild("AnimationResolver"))
 local Presenter=require(script.Parent:WaitForChild("FacePresentation"))
-local CombinedPresenter=require(script.Parent:WaitForChild("CombinedFacePresentation"))
 local Idle=require(Shared:WaitForChild("FaceIdleDefaults"))
 local Controller={}
 local started=false
@@ -19,7 +18,7 @@ end
 
 function Controller.Bind(character: Model, descriptors: {any}?)
     if sessions[character] then return sessions[character] end
-    local presenter=Presenter.new(character) or CombinedPresenter.new(character)
+    local presenter=Presenter.new(character)
     local animator=character:FindFirstChildWhichIsA("Animator",true)
     if not presenter or not animator then
         if presenter then presenter:Destroy() end
@@ -36,6 +35,11 @@ function Controller.Bind(character: Model, descriptors: {any}?)
             if compatible then
                 if doc.mode=="procedural" then procedural[string.gsub(doc.clip_name,"^emotions_","")]=doc
                 elseif descriptor.animationId~="" then byAsset[identity(descriptor.animationId)]=doc end
+            elseif target and tostring(target.asset_id or "") ~= "" then
+                -- A migrated character can retain older published animation records.
+                -- Report the mismatch, never silently retarget the old KeyframeSequence.
+                warn(string.format("[game1][face] %s targets rig Model ID %s; character uses %s. Re-register/re-export for the active rig.",
+                    tostring(doc.clip_name), tostring(target.asset_id), tostring(asset)))
             end
         end
     end

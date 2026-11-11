@@ -126,8 +126,7 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
             publishWeaponPose()
         end
     end)
-    UserInputService.InputBegan:Connect(function(input, processed)
-        if input.UserInputType ~= CharacterConfig.InputBindings.AttackPrimary[1] or UiInputGuard.BlocksWorldInput(input, processed) then return end
+    local function attemptAttack()
 
         local player = Players.LocalPlayer
         local character = player.Character
@@ -214,6 +213,14 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
             clipId = action.clipId,
             clientAttackId = sequence,
         })
+    end
+
+    AttackController.RequestAttack = attemptAttack
+    UserInputService.InputBegan:Connect(function(input, processed)
+        if input.UserInputType == CharacterConfig.InputBindings.AttackPrimary[1]
+            and not UiInputGuard.BlocksWorldInput(input, processed) then
+            attemptAttack()
+        end
     end)
 end
 return AttackController

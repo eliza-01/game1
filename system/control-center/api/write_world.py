@@ -7,6 +7,8 @@ from pathlib import Path
 import re
 
 from services.texture_atlas_registry import parse_filename
+
+from services.location_studio_sync_verification import classify_scan
 from services.atlas_source_review import AtlasSourceReview
 from services.mesh_authoring_policy import is_collision_mesh
 
@@ -189,6 +191,22 @@ def route(path, body, deps):
                 if {entry.get('modelAssetId') for entry in studio['inventory']} != set(kwargs['model_history']):
                     raise ValueError('Studio Mesh ID inventory does not match published Model history')
                 location_assets.record_mesh_id_inventory(slug, studio['inventory'])
+                studio['verification'] = classify_scan(studio)
+                if studio['verification'] == 'current':
+                    # Read-only Find is sufficient to acknowledge a revision
+                    # when *all* managed geometry is current, and nothing
+                    # unlinked/unknown remains. The published identity may
+                    # change during the Studio RPC: never acknowledge a stale
+                    # snapshot. mark_synced also requires the same revision.
+                    latest = location_assets.get(slug)
+                    identity = ('model_asset_id', 'model_published_sha256',
+                                'texture_asset_id', 'bindingRevision', 'revision',
+                                'alphaEnabled')
+                    if latest and all(latest.get(key) == row.get(key) for key in identity):
+                        if location_assets.atlases.mark_synced('location_asset', slug, revision):
+                            location_assets.export()
+                    else:
+                        studio['verification'] = 'review_required'
                 return out(200, {'studio': studio})
             if phase == 'select':
                 return out(200, {'studio': studio})  # No Place/audit/atlas mutation.

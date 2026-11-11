@@ -39,6 +39,18 @@
       }
     },
     {
+      "clipId": "human_female__weapon__hands__attack__01",
+      "duration": 1.875,
+      "events": {
+        "HitStart": {
+          "normalizedTime": 0.21845794392523366
+        },
+        "HitEnd": {
+          "normalizedTime": 0.6915887850467289
+        }
+      }
+    },
+    {
       "clipId": "human_male__weapon__1hs__attack__01",
       "duration": 1.5,
       "events": {

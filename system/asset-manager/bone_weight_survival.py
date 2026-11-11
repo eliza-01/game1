@@ -14,7 +14,7 @@ SURVIVAL_WEIGHT = 0.05
 ANCHOR_WEIGHT = 0.055  # survives FBX float rounding and normalization
 
 
-def _normalize(weights: dict[str, float]) -> dict[str, float]:
+def normalize_positive_weights(weights: dict[str, float]) -> dict[str, float]:
     if not weights:
         return {}
     total = sum(weights.values())
@@ -65,7 +65,7 @@ def plan_publication_weights(
         if len(ordered) > MAX_INFLUENCES:
             over_limit_before += 1
             pruned_vertices += 1
-        vertex['weights'] = _normalize(dict(ordered[:MAX_INFLUENCES]))
+        vertex['weights'] = normalize_positive_weights(dict(ordered[:MAX_INFLUENCES]))
         if not vertex['weights']:
             # Fill only uncovered vertices. Use authored bone heads in the same
             # world space as vertices; lexical ties make the policy reproducible.

@@ -1,0 +1,69 @@
+{
+  "name": "Game1LandscapePainter",
+  "tree": {
+    "$className": "Folder",
+    "Main": {
+      "$path": "LandscapePainter.server.luau"
+    },
+    "modules": {
+      "$className": "Folder",
+      "BranchPath": {
+        "$path": "modules/BranchPath.luau"
+      },
+      "BranchGeometry": {
+        "$path": "modules/BranchGeometry.luau"
+      },
+      "BranchPreview": {
+        "$path": "modules/BranchPreview.luau"
+      },
+      "BranchPlacement": {
+        "$path": "modules/BranchPlacement.luau"
+      },
+      "LandscapeWidget": {
+        "$path": "modules/LandscapeWidget.luau"
+      },
+      "LandscapeSurface": {
+        "$path": "modules/LandscapeSurface.luau"
+      },
+      "LandscapeStemTarget": {
+        "$path": "modules/LandscapeStemTarget.luau"
+      },
+      "LandscapeProfiles": {
+        "$path": "modules/LandscapeProfiles.luau"
+      },
+      "LandscapeAssetCatalog": {
+        "$path": "modules/LandscapeAssetCatalog.luau"
+      },
+      "LandscapeAssetPlacement": {
+        "$path": "modules/LandscapeAssetPlacement.luau"
+      },
+      "LandscapeAssetsWidget": {
+        "$path": "modules/LandscapeAssetsWidget.luau"
+      },
+      "DecoAssetLoader": {
+        "$path": "../studio-plugin/modules/DecoAssetLoader.luau"
+      },
+      "StudioTextureAppearance": {
+        "$path": "../studio-plugin/modules/StudioTextureAppearance.luau"
+      },
+      "StudioMeshPhysicsCore": {
+        "$path": "../../src/shared/world/MeshPhysicsCore.luau"
+      },
+      "StudioLocationMeshNames": {
+        "$path": "../studio-plugin/modules/StudioLocationMeshNames.luau"
+      },
+      "StudioLocationRigCarrier": {
+        "$path": "../studio-plugin/modules/StudioLocationRigCarrier.luau"
+      },
+      "StudioSkinnedMeshConnection": {
+        "$path": "../../src/shared/rig/SkinnedMeshConnection.luau"
+      },
+      "StudioLocationPublishedRigNormalize": {
+        "$path": "../studio-plugin/modules/StudioLocationPublishedRigNormalize.luau"
+      },
+      "LandscapeAdjustments": {
+        "$path": "modules/LandscapeAdjustments.luau"
+      }
+    }
+  }
+}

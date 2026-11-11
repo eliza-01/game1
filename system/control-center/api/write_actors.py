@@ -8,12 +8,36 @@ from services.character_registration_flow import run as run_character_registrati
 
 
 def route(path, body, deps):
-    if not path.startswith(('/api/characters', '/api/weapons', '/api/npcs', '/api/monsters', '/api/npc-equipment',)):
+    if not path.startswith(('/api/armor', '/api/characters', '/api/weapons', '/api/npcs', '/api/monsters', '/api/npc-equipment',)):
         return None
+
+    if path.startswith('/api/armor/'):
+        try:
+            payload=body()
+            armor=deps['armor']
+            actions={
+                '/api/armor/sets': armor.save_set,
+                '/api/armor/pieces': armor.add_piece,
+                '/api/armor/pieces/remove': armor.remove_piece,
+                '/api/armor/variants': armor.set_variant,
+            }
+            handler=actions.get(path)
+            if not handler:return 404,{'error':'unknown armor operation'}
+            result=handler(payload)
+            deps['character_assemblies'].characters.export()
+            return 200,result
+        except (ValueError,TypeError,KeyError) as error:
+            return 400,{'error':str(error),'schema_version':2}
 
     response = character_components.write(path, body, deps)
     if response is not None:
         return response
+    if path == '/api/characters/assemblies/profile':
+        try:
+            payload = body()
+            return 200, deps['character_assemblies'].select_profile(payload.get('id'), payload.get('purpose'))
+        except (ValueError, TypeError) as error:
+            return 400, {'error': str(error), 'schema_version': 2}
     if path == '/api/characters/assemblies':
         try:
             return 200, deps['character_assemblies'].save(body())
@@ -34,20 +58,8 @@ def route(path, body, deps):
     sync_weapon_to_studio = deps["sync_weapon_to_studio"]
     weapons = deps["weapons"]
 
-    if path == "/api/characters/workflow":
-        # One request owns the ordered checkpoints; partial outcomes are returned
-        # as a structured report instead of hiding successful remote uploads.
-        return out(200, run_character_registration_flow(
-            body(), store=store,
-            publication_credentials=publication_credentials,
-            sync_character_to_studio=sync_character_to_studio,
-        ))
-
-    if path == "/api/characters":
-        try:
-            return out(200, store.register(body()))
-        except Exception as error:
-            return out(400, {"error": str(error)})
+    if path in ('/api/characters/workflow', '/api/characters'):
+        return out(410, {'error': 'whole-model Character registration is retired; use Character Components and Assemblies v2'})
 
     if path == "/api/weapons":
         try:
@@ -96,6 +108,9 @@ def route(path, body, deps):
             return out(400, {"error": str(error)})
 
     prefix = "/api/characters/"
+    if path.startswith(prefix) and path.endswith((
+        '/identity', '/replace-model', '/model', '/activate', '/publish', '/sync', '/stats')):
+        return out(410, {'error': 'whole-model Character workflow retired; use Armor Catalog and Assemblies v2'})
 
     identity_suffix = "/identity"
 

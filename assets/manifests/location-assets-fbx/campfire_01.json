@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "slug": "campfire_01",
-  "sourceSha256": "c0e9641793e4f787dba318807834b94ed0f6d60f4b176d1edf5c9680b09774a3",
+  "sourceSha256": "8323f265be8707128e5f1822f26abc88f4073c19d93f3a8473a0e2e9c1980130",
   "analysis": {
     "schemaVersion": 1,
     "meshes": [
@@ -33,7 +33,9 @@
             ]
           }
         ],
-        "influencedBones": [],
+        "influencedBones": [
+          "fire_bone"
+        ],
         "role": "visual",
         "physics": {
           "role": "visual",
@@ -59,6 +61,48 @@
           "canTouch": false,
           "doubleSided": false,
           "collisionFidelity": "PreciseConvexDecomposition",
+          "physicsOnly": true
+        }
+      },
+      {
+        "name": "rig_carrier",
+        "armature": "campfire_01_armature",
+        "vertices": 3,
+        "bones": [
+          {
+            "name": "fire_bone",
+            "parent": "",
+            "matrixLocal": [
+              1.0,
+              0.0,
+              2e-07,
+              0.0,
+              -2e-07,
+              0.0871556,
+              0.9961948,
+              -0.025732,
+              -0.0,
+              -0.9961948,
+              0.0871555,
+              1.2133821,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          }
+        ],
+        "influencedBones": [
+          "fire_bone"
+        ],
+        "role": "carrier",
+        "physics": {
+          "role": "carrier",
+          "canCollide": false,
+          "canQuery": false,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": "Box",
           "physicsOnly": true
         }
       }

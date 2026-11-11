@@ -23,6 +23,7 @@ local renderedYaw = 0
 local renderedPitch = CharacterConfig.CameraPitch
 local distance = CharacterConfig.CameraDistance
 local discardNextMouseDelta = false
+local touchLookAxis = Vector2.zero
 
 local raycastParameters = RaycastParams.new()
 raycastParameters.FilterType = Enum.RaycastFilterType.Exclude
@@ -51,7 +52,16 @@ local function releaseMouse()
 	end
 end
 
-local function updateCameraInput()
+local function updateCameraInput(deltaTime: number)
+	-- Continuous touch thumbstick (radians/sec) shares the desktop camera's target.
+	if touchLookAxis.Magnitude > 0.001 then
+		targetYaw -= touchLookAxis.X * CharacterConfig.CameraTouchRotationSpeed * deltaTime
+		targetPitch = math.clamp(
+			targetPitch + touchLookAxis.Y * CharacterConfig.CameraTouchRotationSpeed * deltaTime,
+			CharacterConfig.CameraMinPitch,
+			CharacterConfig.CameraMaxPitch
+		)
+	end
 	if not rotating then
 		return
 	end
@@ -118,6 +128,11 @@ local function updateCamera(deltaTime: number)
 	end
 
 	camera.CFrame = CFrame.lookAt(cameraPosition, target, Vector3.yAxis)
+end
+
+function CameraController.SetTouchLookAxis(axis: Vector2)
+	local magnitude = axis.Magnitude
+	touchLookAxis = if magnitude > 1 then axis.Unit else axis
 end
 
 function CameraController.Start()

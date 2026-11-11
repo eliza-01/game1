@@ -284,8 +284,13 @@ function WeaponEquipService.ListAvailable(): { any }
 end
 
 function WeaponEquipService.EquipStartup(character: Model)
-    local slug = tostring(WeaponRegistry.activeWeaponSlug or "")
-    character:SetAttribute("WeaponLoadoutSource", "startup")
+    local player = game:GetService("Players"):GetPlayerFromCharacter(character)
+    -- A playtest choice survives respawn in this session; never read a
+    -- Studio Test Loadout value as implicit ownership in the live game.
+    local selected = player and player:GetAttribute("Game1PlaytestWeaponChosen") == true
+    local slug = if selected then tostring(player:GetAttribute("SelectedWeaponSlug") or "")
+        else tostring(WeaponRegistry.activeWeaponSlug or "")
+    character:SetAttribute("WeaponLoadoutSource", if selected then "playtest-selector" else "startup")
     if slug == "" then
         WeaponEquipService.Unequip(character)
         return

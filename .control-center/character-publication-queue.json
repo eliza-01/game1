@@ -244,6 +244,134 @@
           "asset_id": "89684073021930"
         }
       ]
+    },
+    {
+      "schema_version": 1,
+      "id": "62bc2753-35c4-4e65-8008-e707b4b35cca",
+      "status": "completed",
+      "started_at": 1794272934.1585846,
+      "finished_at": 1794273051.4379332,
+      "items": [
+        {
+          "kind": "rig",
+          "id": "human_female",
+          "revision": 1,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "134874851448365"
+        },
+        {
+          "kind": "part",
+          "id": "human_common_m001_boots",
+          "revision": 1,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "89751778683119"
+        },
+        {
+          "kind": "part",
+          "id": "human_common_m001_eye_l",
+          "revision": 1,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "109477519119435"
+        },
+        {
+          "kind": "part",
+          "id": "human_common_m001_eye_r",
+          "revision": 1,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "77502187653505"
+        },
+        {
+          "kind": "part",
+          "id": "human_common_m001_eyebrow_l",
+          "revision": 1,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "96041697638875"
+        },
+        {
+          "kind": "part",
+          "id": "human_common_m001_eyebrow_r",
+          "revision": 1,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "88353012521312"
+        },
+        {
+          "kind": "part",
+          "id": "human_common_m001_gloves",
+          "revision": 1,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "127410733314519"
+        },
+        {
+          "kind": "part",
+          "id": "human_female_m001_head",
+          "revision": 1,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "120680843372006"
+        },
+        {
+          "kind": "part",
+          "id": "human_female_m001_lower",
+          "revision": 1,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "116052017559063"
+        },
+        {
+          "kind": "part",
+          "id": "human_female_m001_upper",
+          "revision": 1,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "90300066845686"
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "4d986077-7f9c-4b49-9c1f-7995387ef64d",
+      "status": "completed",
+      "started_at": 1794279579.3152227,
+      "finished_at": 1794279591.9464686,
+      "items": [
+        {
+          "kind": "part",
+          "id": "human_female_m001_hair",
+          "revision": 1,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "93538100175421"
+        }
+      ]
     }
   ]
 }

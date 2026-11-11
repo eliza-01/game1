@@ -28,6 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from character_store import CharacterStore
 from character_core.components import CharacterComponents
 from character_core.assemblies import CharacterAssemblies
+from character_core.armor import ArmorCatalog
 from character_core.publication_queue import CharacterPublicationQueue
 from animation_store import AnimationStore
 from weapon_store import WeaponStore
@@ -76,8 +77,11 @@ asset_audit_repository = MySqlAssetReplacementAudit(MySqlAuditConfig.from_enviro
 asset_replacement_audit = SqliteAssetAuditImporter(ROOT, asset_audit_repository)
 store = CharacterStore(ROOT)
 character_components = CharacterComponents(ROOT)
-character_assemblies = CharacterAssemblies(ROOT, store, character_components)
+armor = ArmorCatalog(character_components)
+character_assemblies = CharacterAssemblies(ROOT, store, character_components, armor)
+# Export v2-resolved recipes after their resolver has been wired into CharacterStore.
 store.export()
+
 def export_character_publication():
     store.export()
     asset_replacement_audit.sync_all()
@@ -162,7 +166,7 @@ def publication_credentials(description: str = ""):
 
 # Application composition root for read-only HTTP adapters. Built once, not per request.
 READ_SOURCES = MappingProxyType({
-    "characters": store, "animations": animations, "character_components": character_components, "character_assemblies": character_assemblies, "character_publications": character_publications,
+    "characters": store, "animations": animations, "character_components": character_components, "armor": armor, "character_assemblies": character_assemblies, "character_publications": character_publications,
     "weapons": weapons, "monsters": monsters, "monster_animations": monster_animations,
     "npcs": npcs, "npc_animations": npc_animations, "npc_equipment": npc_equipment,
     "location_assets": location_assets, "location_asset_sync_history": location_asset_sync_history,
@@ -184,7 +188,7 @@ WRITE_SOURCES = MappingProxyType({
     "animations": animations,
     "character_identity": character_identity,
     "character_components": character_components,
-    "character_assemblies": character_assemblies, "character_publications": character_publications,
+    "armor": armor, "character_assemblies": character_assemblies, "character_publications": character_publications,
     "choose_animation_folder": choose_animation_folder,
     "choose_character_animation_file": choose_character_animation_file,
     "choose_character_fbx": choose_character_fbx,

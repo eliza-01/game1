@@ -10,11 +10,12 @@
 <link rel="stylesheet" href="database-history.css?v=3">
 <link rel="stylesheet" href="atlas-library.css?v=2">
 <link rel="stylesheet" href="asset-section-order.css?v=1">
-<link rel="stylesheet" href="character-animations.css?v=1">
+<link rel="stylesheet" href="character-animations.css?v=2">
 <link rel="stylesheet" href="location-assets.css?v=1">
 <link rel="stylesheet" href="place-registry.css?v=241">
 <link rel="stylesheet" href="character-components.css?v=6">
-<link rel="stylesheet" href="character-assemblies.css?v=4">
+<link rel="stylesheet" href="character-assemblies.css?v=5">
+<link rel="stylesheet" href="character-armor.css?v=1">
 <link rel="stylesheet" href="location-category-picker.css?v=249">
 <link rel="stylesheet" href="location-alpha.css?v=250">
 <link rel="stylesheet" href="deco-assets.css?v=254">
@@ -86,38 +87,57 @@
 <section class="content">
 <div id="characters-view">
 <div class="panel hero">
-<div><span class="eyebrow">modular characters · v1 / parallel legacy compatibility</span><h2>characters</h2></div>
+<div><span class="eyebrow">modular characters · v2 / reusable armor</span><h2>characters</h2></div>
 <div class="metrics"><div><b id="metric-total">0</b><span>whole-model registered</span></div><div><b id="metric-published">0</b><span>whole-model published</span></div><div><b id="metric-active">0</b><span>whole-model startup</span></div></div>
 </div>
+<div class="panel" id="armor-panel">
+<div class="armor-head"><div><span class="eyebrow">01 · armor catalog</span><h3>Комплекты брони</h3><small class="hint">Комплект → части → пол → геометрия m001 + текстура t001. Публикация здесь не требуется.</small></div></div>
+<form id="armor-set-form" class="armor-set-form">
+<label>Название комплекта<input id="armor-name" name="displayName" required maxlength="120" placeholder="Starter, Basic Cloth, Leather…"></label>
+<label>Тип брони<select id="armor-type" name="armorType"><option value="light">Лёгкая</option><option value="heavy">Тяжёлая</option><option value="magic">Магическая</option></select></label>
+<button type="submit" id="armor-create" class="primary">Зарегистрировать комплект</button>
+<button type="button" id="armor-set-new" hidden>Отмена</button>
+</form>
+<div class="armor-layout"><section aria-label="Комплекты"><h4>Зарегистрированные сеты</h4><div id="armor-set-list"></div></section>
+<section aria-label="Редактор комплекта"><div class="armor-head"><h4 id="armor-set-title">Выбери комплект</h4><button type="button" id="armor-set-edit" hidden>Изменить название/тип</button></div>
+<p id="armor-readiness" class="armor-help"></p><div id="armor-slots"></div>
+<div id="armor-add-controls" class="armor-controls" hidden><label>Добавить необязательную часть<select id="armor-add-slot"></select></label><button type="button" id="armor-add">Добавить часть</button></div>
+<div id="armor-variant-controls" hidden><h4 id="armor-variant-title"></h4>
+<div class="armor-variant-form"><label>Вариант<select id="armor-gender"><option value="unisex">Unisex · оба пола</option><option value="male">Male</option><option value="female">Female</option></select></label>
+<label>Геометрия<select id="armor-mesh"></select></label><label>Атлас / appearance<select id="armor-atlas"></select></label>
+<button type="button" id="armor-save" class="primary">Сохранить вариант</button></div><p id="armor-variant-note" class="armor-help"></p></div>
+<details id="armor-stats" hidden><summary>Характеристики брони · позже</summary><p class="armor-help">Защита, бонусы, требования и формулы — отдельный модуль. Сейчас этот каталог отвечает только за визуальные зависимости.</p></details>
+</section></div><p id="armor-status" role="status" aria-live="polite"></p>
+</div>
 <div class="panel" id="character-components-panel">
-<span class="eyebrow">01 · register a shared rig and reusable parts</span><h3>Rig &amp; parts</h3>
+<span class="eyebrow">02 · register rig and reusable geometry</span><h3>Rig &amp; parts</h3>
 <div id="cp-counts" class="cp-metrics" aria-label="Статистика компонентов"></div>
 <div id="cp-flow-summary" class="cp-guidance" role="status" aria-live="polite">Загрузка компонентов…</div>
-<details open><summary>Mesh naming standard</summary><p><code>&lt;set&gt;_upper</code> · <code>&lt;set&gt;_lower</code> · <code>&lt;set&gt;_gloves</code> · <code>&lt;set&gt;_boots</code><br><code>head_01_male</code> / <code>head_01_female</code><br><code>hair_01_male</code> / <code>hair_01_female</code> / <code>hair_01_common</code><br><code>eyes_01</code> · <code>eyebrows_01</code> · <code>eyes_01_spiral</code> (effect)<br>Main rig: <code>human_armature</code>. Hair may carry its own <code>hair_01_common_armature</code>, or use its Object Pivot (without Armature) on <code>hair_mount</code>.</p></details>
+<details><summary>Mesh naming standard</summary><p><code>human_male_m001_upper</code> · <code>human_female_m001_lower</code> · <code>human_common_m001_gloves</code> · <code>human_male_m002_boots</code><br><code>human_male_m001_head</code> / <code>human_female_m001_head</code><br><code>human_common_m001_eye_l</code> + <code>human_common_m001_eye_r</code><br><code>human_male_m001_eyebrow_l</code> + <code>human_male_m001_eyebrow_r</code><br><code>human_female_m001_hair</code> · <code>human_common_m001_hair</code><br>Main rig: <code>human_armature</code>. Each eye/brow is an independent MeshPart (no merge). Hair may have its own <code>human_female_m001_hair_armature</code> or use its Object Pivot on <code>hair_mount</code>.</p></details>
 <div class="cp-toolbar"><button id="cp-choose" class="primary" type="button">Choose FBX · inspect</button><button id="cp-refresh" type="button">Refresh</button></div>
-<small id="cp-source" class="hint">No FBX selected.</small><div id="cp-status" role="status" aria-live="polite"></div><div id="cp-preview" class="character-inspection-preview" aria-live="polite"></div><p id="cp-sets" class="hint"></p><div class="cp-toolbar" id="cp-publication-step"><strong class="character-phase-label">02 · Публикация компонентов</strong><span id="cp-publish-count">0 выбрано</span><button id="cp-publication-open" class="cp-queue-button" type="button">Queue</button></div>
-<div class="table-wrap"><table id="cp-table"><thead><tr><th aria-label="health"></th><th><button class="cp-sort" type="button" data-cp-sort="id">name</button></th><th><button class="cp-sort" type="button" data-cp-sort="slot">part</button></th><th><button class="cp-sort" type="button" data-cp-sort="set_id">set</button></th><th>rig</th><th>status</th><th>Model Asset ID</th><th>shared atlas</th><th class="cp-publish-selection"><input id="cp-publish-select-all" type="checkbox" aria-label="Select all unpublished components"></th><th class="cp-publication-column"><span>publication</span></th></tr></thead><tbody id="cp-rows"></tbody></table></div>
+<small id="cp-source" class="hint">No FBX selected.</small><div id="cp-status" role="status" aria-live="polite"></div><div id="cp-preview" class="character-inspection-preview" aria-live="polite"></div><p id="cp-sets" class="hint"></p><div class="cp-toolbar" id="cp-publication-step"><strong class="character-phase-label">03 · Публикация компонентов</strong><span id="cp-publish-count">0 выбрано</span><button id="cp-publication-open" class="cp-queue-button" type="button">Queue</button></div>
+<div class="table-wrap"><table id="cp-table"><thead><tr><th aria-label="health"></th><th><button class="cp-sort" type="button" data-cp-sort="id">name</button></th><th><button class="cp-sort" type="button" data-cp-sort="slot">part</button></th><th><span>mesh family</span></th><th>rig</th><th>status</th><th>Model Asset ID</th><th>allowedGenders / assign</th><th class="cp-publish-selection"><input id="cp-publish-select-all" type="checkbox" aria-label="Select all unpublished components"></th><th class="cp-publication-column"><span>publication</span></th></tr></thead><tbody id="cp-rows"></tbody></table></div>
 <div class="cp-publish-bulk"><button id="cp-publish-all" type="button" disabled>Publish selected</button></div>
 <section class="cp-atlas-section" aria-label="Character shared atlases">
-<div class="cp-toolbar"><button id="cp-atlas-naming-guide" class="character-help" type="button" aria-label="Правила именования атласов персонажей" data-character-atlas-guide data-character-tip="АТЛАСЫ ПЕРСОНАЖЕЙ&#10;Формат: &lt;имя&gt;_&lt;ширина&gt;x&lt;высота&gt;_atlas.png (также JPG/JPEG).&#10;Только a–z, 0–9 и _. Размер в имени должен совпадать с изображением.&#10;Сет fullplate imperial → fullplate_imperial.&#10;Верх: fullplate_imperial_upper_2048x2048_atlas.png&#10;Низ: fullplate_imperial_lower_2048x2048_atlas.png&#10;Перчатки: fullplate_imperial_gloves_2048x2048_atlas.png&#10;Ботинки: fullplate_imperial_boots_2048x2048_atlas.png&#10;Общий сет: fullplate_imperial_2048x2048_atlas.png&#10;Голова: head_01_male_1024x1024_atlas.png / head_01_female_1024x1024_atlas.png&#10;Волосы: hair_01_male_1024x1024_atlas.png / hair_01_female_1024x1024_atlas.png / hair_01_common_1024x1024_atlas.png&#10;Глаза: eyes_01_512x512_atlas.png / eyes_01_spiral_512x512_atlas.png (эффект)&#10;Брови: eyebrows_01_512x512_atlas.png&#10;Один атлас можно назначить нескольким частям. Замена требует подтверждения и создаёт новый Image ID.">?</button><button id="cp-atlas-register" class="primary" type="button">Register Atlas</button><span class="hint">Character atlases only · separate Image Assets</span></div>
-<div class="table-wrap"><table id="cp-atlas-table"><thead><tr><th>atlas</th><th>resolution</th><th>Image Asset ID</th><th>publication</th></tr></thead><tbody id="cp-atlas-rows"></tbody></table></div>
+<div class="cp-toolbar"><button id="cp-atlas-naming-guide" class="character-help" type="button" aria-label="Правила именования атласов персонажей" data-character-atlas-guide data-character-tip="АТЛАСЫ ПЕРСОНАЖЕЙ&#10;Формат: &lt;имя&gt;_&lt;ширина&gt;x&lt;высота&gt;_atlas.png (также JPG/JPEG).&#10;Только a–z, 0–9 и _. Размер в имени должен совпадать с изображением.&#10;Сет fullplate imperial → fullplate_imperial.&#10;Верх: fullplate_imperial_upper_2048x2048_atlas.png&#10;Низ: fullplate_imperial_lower_2048x2048_atlas.png&#10;Перчатки: fullplate_imperial_gloves_2048x2048_atlas.png&#10;Ботинки: fullplate_imperial_boots_2048x2048_atlas.png&#10;Общий сет: fullplate_imperial_2048x2048_atlas.png&#10;Голова: human_t001_head_1024x1024_atlas.png&#10;Волосы: human_t001_hair_1024x1024_atlas.png&#10;Глаза: human_t001_eye_512x512_atlas.png&#10;Брови: human_t001_eyebrow_512x512_atlas.png&#10;Имя текстуры не обязано совпадать с MeshPart: один атлас может обслуживать обе стороны и разные m001/m002&#10;Один атлас можно назначить нескольким слотам разных комплектов. Замена требует подтверждения и создаёт новый Image ID.">?</button><button id="cp-atlas-register" class="primary" type="button">Register Atlas</button><span class="hint">Character atlases only · separate Image Assets</span></div>
+<div class="table-wrap"><table id="cp-atlas-table"><thead><tr><th>atlas</th><th>resolution</th><th>Image Asset ID</th><th>publication</th><th>Use</th></tr></thead><tbody id="cp-atlas-rows"></tbody></table></div>
 </section>
 <dialog id="cp-atlas-dialog" aria-labelledby="cp-atlas-title"><h3 id="cp-atlas-title">Character atlas · review</h3><p id="cp-atlas-report" aria-live="polite"></p><div class="cp-atlas-compare"><figure><div class="cp-atlas-image"><img id="cp-atlas-old-preview" alt="Currently registered atlas preview"></div><figcaption>Existing atlas</figcaption></figure><figure><div class="cp-atlas-image"><img id="cp-atlas-new-preview" alt="Selected atlas preview"></div><figcaption>Selected file</figcaption></figure></div><div id="cp-atlas-info" class="character-flow-note"></div><div id="cp-atlas-validation" role="alert"></div><div id="cp-atlas-expected" class="hint"></div><label id="cp-atlas-approval-label" hidden><input type="checkbox" id="cp-atlas-approval"> Confirm replacement and publication under a new Image Asset ID</label><div id="cp-atlas-stages" class="cp-atlas-stages" aria-live="polite"></div><div class="actions"><button id="cp-atlas-show-folder" type="button" hidden>Show in folder</button><button id="cp-atlas-reselect" type="button">Choose another file</button><button id="cp-atlas-confirm" class="primary" type="button" disabled>Publish atlas</button><button id="cp-atlas-close" type="button">Close</button></div></dialog>
 <small class="hint">Atlas binding changes the appearance reference, not the mesh Model Asset ID. Same Atlas Registry as Location Assets: &lt;atlas_key&gt;_&lt;width&gt;x&lt;height&gt;_atlas.png. One published Image Asset ID is reused by every bound part. Solid-color eyes and eyebrows do not require an atlas.</small>
 </div>
 
-<div class="panel" id="character-assemblies-panel">
-<div class="ca-heading"><div><span class="eyebrow">03 · assemble a playable character</span><h3>Character assemblies</h3></div>
-<button type="button" class="character-help" aria-label="О сборках персонажей" data-character-tip="Собирайте персонажа из опубликованных частей разных сетов. Пол задаёт голова; волосы — того же пола или common. Сохранение не публикует модели и не меняет Startup.">?</button></div>
+<details class="panel" id="character-assemblies-panel"><summary>Базовый персонаж и Studio admin · открыть редактор</summary>
+<div class="ca-heading"><div><span class="eyebrow">04 · Character assembly v2</span><h3>Базовая сборка персонажа</h3></div>
+<button type="button" class="character-help" aria-label="О сборках персонажей" data-character-tip="Выберите пол явно; тело берётся из Armor Catalog, а лицо — из базовых MeshParts. Сохранение не публикует модели и не меняет Startup.">?</button></div>
 <section class="ca-registry" aria-label="Зарегистрированные персонажи">
-<div class="ca-section-heading"><div><h4>Зарегистрированные персонажи</h4><small class="hint">Выберите сборку для редактирования.</small></div>
+<div class="ca-section-heading"><div><h4>Зарегистрированные персонажи</h4><small class="hint">Default — первоначальный персонаж при создании. Set as admin — тестовый персонаж в Studio Play.</small></div>
 <div class="actions"><button id="ca-new" class="primary" type="button">New character</button><button id="ca-refresh" type="button">Refresh</button></div></div>
-<div class="table-wrap"><table><thead><tr><th>character</th><th>rig</th><th>head</th><th>outfit</th><th>readiness / missing</th><th>actions</th></tr></thead><tbody id="ca-rows"></tbody></table></div>
+<div class="table-wrap"><table><thead><tr><th>character</th><th>rig</th><th>gender</th><th>armor set</th><th>readiness / missing</th><th>actions</th></tr></thead><tbody id="ca-rows"></tbody></table></div>
 </section>
 <section id="ca-editor-section" class="ca-editor" aria-label="Редактор сборки">
 <div class="ca-section-heading"><h4>Редактор персонажа</h4></div>
 <div id="ca-editor-summary" class="character-flow-note" role="status" aria-live="polite">Выберите персонажа или создайте новый.</div>
-<div class="ca-grid ca-identity-grid"><label>Character ID<input id="ca-id" autocomplete="off"></label><label>Display name<input id="ca-name"></label><label>Rig<select id="ca-rig"></select></label><label>Starter set<select id="ca-set"></select></label></div>
+<div class="ca-grid ca-identity-grid"><label>Character ID<input id="ca-id" autocomplete="off"></label><label>Display name<input id="ca-name"></label><label>Rig<select id="ca-rig"></select></label><label>Armor set<select id="ca-set"></select></label><label>Gender<select id="ca-gender"><option value="male">Male</option><option value="female">Female</option></select></label></div>
 <div id="ca-parts" class="ca-parts-grid"></div>
 <div id="ca-mix" class="character-flow-note ca-outfit-state" aria-live="polite"></div>
 <div id="ca-readiness" class="character-flow-note ca-readiness-state" aria-live="polite"></div>
@@ -125,8 +145,8 @@
 <div class="actions ca-editor-actions"><button id="ca-save" type="button" disabled>Save recipe &amp; starting stats</button><button id="ca-reset" class="character-reset" type="button">Reset edits</button><button type="button" class="character-help" aria-label="О сохранении и Startup" data-character-tip="Save сохраняет рецепт и стартовые характеристики в проект. Studio получает реестр через Rojo. Для Startup нужны опубликованные части; изменения проверяются при новом Play.">?</button></div>
 <div id="ca-status" role="status" aria-live="polite"></div>
 </section>
-</div>
-<details class="cp-legacy"><summary>Legacy whole-model characters · compatibility only (no automatic migration)</summary>
+</details>
+<details class="cp-legacy" hidden style="display:none"><summary>Archived whole-model authoring (disabled)</summary>
 <div class="cp-toolbar"><button id="new-legacy-character" type="button">New whole-model character (legacy)</button><span class="hint">Use only for old full-FBX archetypes. Modular sets and parts are registered above.</span></div>
 <div class="panel runtime-card"><div id="runtime-state" class="runtime-state bootstrap"><strong>bootstrap</strong><span>loading runtime source…</span></div><div id="publication-state" class="publication-missing">open cloud: checking…</div></div>
 <div class="character-workflow">
@@ -305,9 +325,9 @@
 </div>
 <div class="panel character-card">
 <div class="section-title"><div><span>02 · events</span><h3 id="timeline-selected-title">select attack</h3></div><span id="timeline-studio-state" class="pill">studio idle</span></div>
-<small class="hint">Studio owns the visual pose picker. Move the scrubber there, select an event and press Confirm point. This panel updates automatically; nothing is written until Save timeline.</small>
+<small class="hint">Prefer the Studio pose picker for exact HitStart / HitEnd. If Roblox cannot load the preview, enter the verified clip duration and event positions manually below; do not copy timing from another weapon. Nothing changes until Save timeline.</small>
 <div id="timeline-events" class="timeline-events"><span class="muted">select an attack animation.</span></div>
-<div class="details-grid timeline-meta"><div><b>source duration</b><span id="timeline-duration">—</span></div><div><b>clip id</b><span id="timeline-clip-id">—</span></div></div>
+<div class="details-grid timeline-meta"><div><b>source duration</b><span id="timeline-duration">—</span><label class="hint">manual seconds (if Studio preview fails)<input id="timeline-duration-input" type="number" min="0.001" max="600" step="any" placeholder="actual clip length"></label></div><div><b>clip id</b><span id="timeline-clip-id">—</span></div></div>
 <div class="actions"><button id="timeline-open-studio" class="primary" type="button" disabled>open in studio</button><button id="timeline-save" type="button" disabled>save timeline</button></div>
 <div id="timeline-status" class="status-box"><strong>ready</strong><span>choose an attack.</span></div>
 </div>
@@ -709,19 +729,20 @@
 </main>
 <div id="toast" class="toast"></div>
 <script src="publication-descriptions.js?v=1"></script>
-<script src="character-assets.js?v=23"></script>
+<script src="character-assets.js?v=24"></script>
 <script src="asset-section-order.js?v=1"></script>
-<script src="character-animation-ui.js?v=2"></script>
+<script src="character-animation-ui.js?v=3"></script>
 <script src="character-workflow.js?v=2"></script>
 <script src="character-publications.js?v=2"></script>
 <script src="character-component-summary.js?v=1"></script>
 <script src="character-atlas-presentation.js?v=1"></script>
-<script src="character-components.js?v=12"></script>
+<script src="character-armor.js?v=1"></script>
+<script src="character-components.js?v=15"></script>
 <script src="atlas-identity.js?v=1"></script>
-<script src="character-atlas-ui.js?v=3"></script>
-<script src="character-assemblies.js?v=4"></script>
+<script src="character-atlas-ui.js?v=4"></script>
+<script src="character-assemblies.js?v=7"></script>
 <script src="animation-speed.js?v=3"></script>
-<script src="timelines.js?v=3"></script>
+<script src="timelines.js?v=5"></script>
 <script src="locations.js?v=2"></script>
 <script src="shared-asset-retirement.js?v=4"></script>
 <script src="studio-sync.js?v=237"></script>

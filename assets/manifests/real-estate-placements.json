@@ -1,7 +1,7 @@
 {
   "items": [
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.81964111328125,
         -6.624515533447266,
@@ -131,7 +131,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.190948486328125,
         -10.407089233398438,
@@ -326,7 +326,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.813995361328125,
         -6.898880958557129,
@@ -391,7 +391,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         1.079833984375,
         -10.870304107666016,
@@ -456,7 +456,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.19091796875,
         -10.407083511352539,
@@ -651,7 +651,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.81964111328125,
         -6.624504089355469,
@@ -781,7 +781,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.190948486328125,
         -10.407083511352539,
@@ -976,7 +976,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.8192138671875,
         -6.920129776000977,
@@ -1106,7 +1106,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.19091796875,
         -10.407085418701172,
@@ -1301,7 +1301,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.819366455078125,
         -6.920135498046875,
@@ -1431,7 +1431,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.190948486328125,
         -10.407089233398438,
@@ -1626,7 +1626,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.798736572265625,
         -7.226722717285156,
@@ -1756,7 +1756,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.19097900390625,
         -10.407087326049805,
@@ -1951,7 +1951,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.8193435668945312,
         -6.920135498046875,
@@ -2081,7 +2081,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": null,
       "houseSlug": "house_level3_01",
       "localCFrame": [
@@ -2263,7 +2263,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.8193359375,
         -6.920133590698242,
@@ -2393,7 +2393,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.19097900390625,
         -10.407085418701172,
@@ -2588,7 +2588,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.8193359375,
         -6.920143127441406,
@@ -2718,7 +2718,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": null,
       "houseSlug": "house_level3_01",
       "localCFrame": [
@@ -2900,7 +2900,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.8193359375,
         -6.920135498046875,
@@ -3030,7 +3030,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": null,
       "houseSlug": "house_level3_01",
       "localCFrame": [
@@ -3212,7 +3212,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.8193359375,
         -6.920135498046875,
@@ -3342,7 +3342,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": null,
       "houseSlug": "house_level3_01",
       "localCFrame": [
@@ -3524,7 +3524,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.8193359375,
         -6.920135498046875,
@@ -3654,7 +3654,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.190948486328125,
         -10.407087326049805,
@@ -3849,7 +3849,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.819366455078125,
         -6.920138359069824,
@@ -3979,7 +3979,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.1909332275390625,
         -10.407087326049805,
@@ -4174,7 +4174,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.8193817138671875,
         -6.920135498046875,
@@ -4304,7 +4304,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": null,
       "houseSlug": "house_level3_01",
       "localCFrame": [
@@ -4486,7 +4486,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.8193359375,
         -6.920135498046875,
@@ -4616,7 +4616,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": null,
       "houseSlug": "house_level3_01",
       "localCFrame": [
@@ -4798,7 +4798,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.8193283081054688,
         -6.920143127441406,
@@ -4928,7 +4928,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": null,
       "houseSlug": "house_level3_01",
       "localCFrame": [
@@ -5110,7 +5110,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.819366455078125,
         -6.920135498046875,
@@ -5240,7 +5240,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": null,
       "houseSlug": "house_level3_01",
       "localCFrame": [
@@ -5422,7 +5422,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.8193359375,
         -6.920135498046875,
@@ -5552,7 +5552,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": null,
       "houseSlug": "house_level3_01",
       "localCFrame": [
@@ -5734,7 +5734,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.8193359375,
         -6.920135498046875,
@@ -5864,7 +5864,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": null,
       "houseSlug": "house_level3_01",
       "localCFrame": [
@@ -6046,7 +6046,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.8193359375,
         -6.9201202392578125,
@@ -6176,7 +6176,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": null,
       "houseSlug": "house_level3_01",
       "localCFrame": [
@@ -6358,7 +6358,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.8193359375,
         -6.9201507568359375,
@@ -6488,7 +6488,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": null,
       "houseSlug": "house_level3_01",
       "localCFrame": [
@@ -6670,7 +6670,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.8193359375,
         -6.9201202392578125,
@@ -6800,7 +6800,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.19091796875,
         -10.407081604003906,
@@ -6995,7 +6995,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.81939697265625,
         -6.920143127441406,
@@ -7125,7 +7125,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": null,
       "houseSlug": "house_level3_01",
       "localCFrame": [
@@ -7307,7 +7307,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.8193359375,
         -6.9201202392578125,
@@ -7437,7 +7437,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": null,
       "houseSlug": "house_level3_01",
       "localCFrame": [
@@ -7619,7 +7619,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.8193359375,
         -6.9201507568359375,
@@ -7749,7 +7749,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": null,
       "houseSlug": "house_level3_01",
       "localCFrame": [
@@ -7931,7 +7931,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.819305419921875,
         -6.9201202392578125,
@@ -8061,7 +8061,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": null,
       "houseSlug": "house_level3_01",
       "localCFrame": [
@@ -8243,7 +8243,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.8193359375,
         -6.9201202392578125,
@@ -8373,7 +8373,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": null,
       "houseSlug": "house_level3_01",
       "localCFrame": [
@@ -8555,7 +8555,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.8193359375,
         -6.920135498046875,
@@ -8685,7 +8685,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": null,
       "houseSlug": "house_level3_01",
       "localCFrame": [
@@ -8867,7 +8867,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.8193359375,
         -6.9201507568359375,
@@ -8997,7 +8997,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.19091796875,
         -10.407096862792969,
@@ -9192,7 +9192,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.819366455078125,
         -6.9201507568359375,
@@ -9322,7 +9322,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.19097900390625,
         -10.407081604003906,
@@ -9517,7 +9517,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.8193206787109375,
         -6.920131683349609,
@@ -9647,7 +9647,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": null,
       "houseSlug": "house_level3_01",
       "localCFrame": [
@@ -9829,7 +9829,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.8193359375,
         -6.920135498046875,
@@ -9959,7 +9959,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": null,
       "houseSlug": "house_level3_01",
       "localCFrame": [
@@ -10141,7 +10141,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.8193359375,
         -6.920136451721191,
@@ -10271,7 +10271,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": null,
       "houseSlug": "house_level3_01",
       "localCFrame": [
@@ -10453,7 +10453,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.81927490234375,
         -6.920133590698242,
@@ -10583,7 +10583,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": null,
       "houseSlug": "house_level3_01",
       "localCFrame": [
@@ -10765,7 +10765,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.81939697265625,
         -6.920134544372559,
@@ -10895,7 +10895,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.19091796875,
         -10.407084465026855,
@@ -11090,7 +11090,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.819305419921875,
         -6.920133590698242,
@@ -11220,7 +11220,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.190948486328125,
         -10.407083511352539,
@@ -11415,7 +11415,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.81939697265625,
         -6.920135498046875,
@@ -11545,7 +11545,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.190948486328125,
         -10.407087326049805,
@@ -11740,7 +11740,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.819366455078125,
         -6.920135498046875,
@@ -11870,7 +11870,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": null,
       "houseSlug": "house_level3_01",
       "localCFrame": [
@@ -12052,7 +12052,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.8193359375,
         -6.920135498046875,
@@ -12182,7 +12182,7 @@
       ]
     },
     {
-      "anchored": false,
+      "anchored": true,
       "houseAnchorLocalCFrame": [
         -0.190948486328125,
         -10.407084465026855,

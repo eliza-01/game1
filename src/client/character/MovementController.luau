@@ -18,6 +18,8 @@ local MovementController = {}
 local localPlayer = Players.LocalPlayer
 local started = false
 local keysDown: { [Enum.KeyCode]: boolean } = {}
+local touchAxis = Vector2.zero
+local touchMovementActive = false
 local jumpRequested = false
 local airLockUntil = 0
 local facingLockDirection: Vector3? = nil
@@ -169,6 +171,9 @@ local function bindCharacter(newCharacter: Model)
 end
 
 local function inputAxis(): Vector2
+	if touchMovementActive then
+		return touchAxis
+	end
 	local x = 0
 	local y = 0
 
@@ -424,7 +429,8 @@ local function updateMovement()
 
 	local now = os.clock()
 	local axis = inputAxis()
-	local backwardActive = isBackwardAxis(axis)
+	-- Touch stick uses camera-relative motion in every direction; S backpedal is PC-only.
+	local backwardActive = not touchMovementActive and isBackwardAxis(axis)
 	local backwardCameraSteering = backwardActive and rightMouseDown()
 	applyMovementMode(forcedWalk or walkModifierDown(), backwardActive)
 	local movementLocked = now < movementLockUntil
@@ -490,6 +496,24 @@ local function updateMovement()
 	end
 end
 
+function MovementController.SetTouchMovement(axis: Vector2, active: boolean)
+	-- A finger owns the movement input until release, even at the stick's neutral point.
+	touchMovementActive = active == true
+	if not touchMovementActive then
+		touchAxis = Vector2.zero
+	else
+		local magnitude = axis.Magnitude
+		touchAxis = if magnitude > 1 then axis.Unit else axis
+	end
+end
+
+function MovementController.RequestJump()
+	-- Same jump path as Space; grounding and attack locks are checked in updateMovement.
+	if not UserInputService:GetFocusedTextBox() then
+		jumpRequested = true
+	end
+end
+
 function MovementController.IsMoving(): boolean
 	if movementLockUntil > os.clock() then
 		return false
@@ -510,7 +534,7 @@ function MovementController.BeginAttackMovement(weaponType: any, duration: numbe
 	end
 	if controllerManager and character then
 		local axis = inputAxis()
-		applyMovementMode(walkModifierDown(), isBackwardAxis(axis))
+		applyMovementMode(walkModifierDown(), not touchMovementActive and isBackwardAxis(axis))
 	end
 	return resolved
 end
@@ -523,7 +547,7 @@ function MovementController.EndAttackMovement()
 	end
 	if controllerManager and character then
 		local axis = inputAxis()
-		applyMovementMode(forcedWalk or walkModifierDown(), isBackwardAxis(axis))
+		applyMovementMode(forcedWalk or walkModifierDown(), not touchMovementActive and isBackwardAxis(axis))
 	end
 end
 
@@ -538,7 +562,7 @@ function MovementController.EndForcedWalk()
 	forcedWalk = false
 	if controllerManager and character then
 		local axis = inputAxis()
-		applyMovementMode(walkModifierDown(), isBackwardAxis(axis))
+		applyMovementMode(walkModifierDown(), not touchMovementActive and isBackwardAxis(axis))
 	end
 end
 
@@ -635,7 +659,7 @@ function MovementController.Start()
 		if input.UserInputType == Enum.UserInputType.Keyboard then
 			keysDown[input.KeyCode] = true
 			if input.KeyCode == CharacterConfig.InputBindings.Jump[1] then
-				jumpRequested = true
+				MovementController.RequestJump()
 			end
 		end
 	end)

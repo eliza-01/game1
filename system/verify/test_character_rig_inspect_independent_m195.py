@@ -23,7 +23,7 @@ class RigIndependentInspectTests(unittest.TestCase):
         self.info = dict(
             armature='human_armature',
             bones=[dict(name='root', parent='', matrix=IDENTITY[:])],
-            parts=[dict(name='head_01_male', vertices=3, triangles=1,
+            parts=[dict(name='human_male_m001_head', vertices=3, triangles=1,
                         content_sha256='headhash', armature='human_armature',
                         skeleton=[dict(name='root', parent='', matrix=IDENTITY[:])],
                         used_bones=['root'])],
@@ -57,10 +57,10 @@ class RigIndependentInspectTests(unittest.TestCase):
         self.assertFalse(plan['rig_only_required'])
         self.store.register(plan['token'], [])
         with connect(self.store.db) as db:
-            for kind, key in [('rig', 'human'), ('part', 'head_01_male')]:
+            for kind, key in [('rig', 'human'), ('part', 'human_male_m001_head')]:
                 db.execute("UPDATE character_component_records SET model_asset_id='12345', "
                            'published_revision=revision WHERE kind=? AND id=?', (kind, key))
-        return self.store.get('part', 'head_01_male')
+        return self.store.get('part', 'human_male_m001_head')
 
     def change_rig(self):
         self.info['bones'][0]['matrix'][3] = 2.0
@@ -82,7 +82,7 @@ class RigIndependentInspectTests(unittest.TestCase):
         self.assertEqual(self.store.get('rig', 'human')['revision'], 2)
         self.assertEqual(self.store.get('rig', 'human')['published_revision'], 1)
         self.assertEqual(self.store.get('rig', 'human')['model_asset_id'], '12345')
-        self.assertEqual(self.store.get('part', 'head_01_male'), before)
+        self.assertEqual(self.store.get('part', 'human_male_m001_head'), before)
         self.assertEqual(len(result['items']), 2)
         with connect(self.store.db) as db:
             self.assertEqual(db.execute("SELECT count(*) FROM character_component_history WHERE kind='part'").fetchone()[0], 0)
@@ -120,11 +120,11 @@ class RigIndependentInspectTests(unittest.TestCase):
         self.change_rig()
         plan = self.store.inspect(self.source)
         self.assertFalse(plan['rig_only_required'])
-        self.assertEqual(plan['parts'][0]['id'], 'head_01_male')
+        self.assertEqual(plan['parts'][0]['id'], 'human_male_m001_head')
         self.assertEqual(self.rig_calls, [])
-        self.store.register(plan['token'], ['head_01_male'], replace_rig=True)
+        self.store.register(plan['token'], ['human_male_m001_head'], replace_rig=True)
         self.assertEqual(self.rig_calls, [])
-        self.assertEqual(self.store.get('part', 'head_01_male')['revision'], 2)
+        self.assertEqual(self.store.get('part', 'human_male_m001_head')['revision'], 2)
 
 
 class RigBlenderAdapterTests(unittest.TestCase):

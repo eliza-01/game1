@@ -1,6 +1,9 @@
 --!strict
 -- Runtime-only visuals. No Model or Image publishing, and no persistent
 -- authored assets. Stubs are intentionally primitive Parts until real assets exist.
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local SocketFacing = require(ReplicatedStorage:WaitForChild("Game1Shared")
+    :WaitForChild("world"):WaitForChild("SocketFacing"))
 local Effects = {}
 
 local function parentPart(socket: Attachment): BasePart?
@@ -27,7 +30,9 @@ function Effects.CreatePlaceholder(house: Model, socket: Attachment, kind: strin
     part.CanTouch = false
     part.CanQuery = false
     part.CastShadow = false
-    part.CFrame = if socket:IsA("Bone") then socket.TransformedWorldCFrame else socket.WorldCFrame
+    local isBone = socket:IsA("Bone")
+    local authoredFrame = if isBone then (socket :: Bone).TransformedWorldCFrame else socket.WorldCFrame
+    part.CFrame = SocketFacing.FullFrame(authoredFrame, isBone)
     part:SetAttribute("Game1SocketPlaceholder", kind)
     part.Parent = house
     local weld = Instance.new("WeldConstraint")

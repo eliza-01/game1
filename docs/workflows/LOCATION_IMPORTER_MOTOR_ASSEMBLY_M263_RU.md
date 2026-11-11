@@ -19,9 +19,13 @@ skinned FBX, даже если исходный FBX содержит тольк�
   доказывает неизменность Model pivot, MeshPart `CFrame`/`Size`, Bone world/rest
   frame и pose `Transform`. Неизвестный child/joint или внешний endpoint
   останавливает операцию до изменения Place.
-- Импортёрские `CanCollide/CanQuery` defaults на прозрачном RootPart допустимы
-  только при наличии отдельного manifest-подтверждённого COL MeshPart. Без COL
-  normalizer закрывает операцию до изменения Place.
+- **Уточнение M288:** `COL` для Location Asset необязателен. Прозрачный
+  импортёрский `RootPart` не является авторской физикой, независимо от его
+  стандартных `CanCollide/CanQuery`. Если manifest содержит `collider`, его
+  MeshPart обязан существовать; если не содержит — normalizer удаляет
+  служебный `RootPart` после всех остальных проверок. Настройки коллизии
+  визуальных MeshPart без COL остаются ответственностью
+  `StudioMeshPhysicsCore`, а не normalizer.
 - Static-публикация не может содержать `Motor6D`.
 - В skinned v2-публикации допустим только importer `Motor6D`, у которого
   `Part0` и `Part1` — разные `MeshPart` из SHA-bound manifest этой публикации

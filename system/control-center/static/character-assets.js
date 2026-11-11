@@ -142,7 +142,7 @@ function renderAnimations(){
   $('animation-table-title').textContent=`${state.animationCharacter||'character'} · animation profile`;
   renderAnimationFolderControls();
 }
-async function loadAnimations(){try{populateAnimationCharacters();const character=state.animationCharacter||$('animation-character').value||'';state.animations=await request('/api/animations?character='+encodeURIComponent(character));state.animationCharacter=state.animations.characterId||character;if($('animation-character').value!==state.animationCharacter)$('animation-character').value=state.animationCharacter;const profileRoot=normalizeAnimationFolderPath(state.animations.profile?.scan_root||'');if(!state.animationFolder&&profileRoot)setAnimationFolder(profileRoot,true);renderAnimations()}catch(error){toast(error.message,true)}}
+async function loadAnimations(){try{populateAnimationCharacters();const character=state.animationCharacter||$('animation-character').value||'';state.animations=await request('/api/animations?character='+encodeURIComponent(character));state.animationCharacter=state.animations.characterId||character;if($('animation-character').value!==state.animationCharacter)$('animation-character').value=state.animationCharacter;const profileRoot=normalizeAnimationFolderPath(state.animations.profile?.scan_root||'');if(!state.animationFolder&&profileRoot)setAnimationFolder(profileRoot,true);renderAnimations();window.game1AnimationUI?.refreshAttackTimelines()}catch(error){toast(error.message,true)}}
 async function chooseAnimationFolder(){try{setAnimationFolder($('animation-folder-path').value,false);const result=await request('/api/files/choose-animation-folder',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({initialPath:state.animationFolder})});if(!result.path)return;setAnimationFolder(result.path,true);renderAnimations()}catch(error){toast(error.message,true)}}
 async function scanAnimations(){
   setAnimationFolder($('animation-folder-path').value,true);
@@ -168,4 +168,5 @@ if (typeof game1SyncPublicationDescription === "function" && typeof $("display-n
 window.addEventListener('load',()=>window.game1AnimationUI?.init({
   state:()=>state,render:renderAnimations,load:loadAnimations,request,toast,
   weight:setAnimationWeight,remove:removeAnimationBinding,publish:publishAnimation,
+  openTimeline:(clipId)=>{window.game1TimelinesSelectAttack?.(state.animationCharacter,clipId);setView('timelines')},
 }));

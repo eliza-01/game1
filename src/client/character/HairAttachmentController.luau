@@ -8,6 +8,7 @@ local HAIR_GRIP_NAME = "CharacterMount"
 
 type HairState = {
     hair: MeshPart,
+    group: Model,
     targetBone: Bone,
     grip: Attachment,
     targetName: string,
@@ -28,16 +29,23 @@ local function findState(character: Model): HairState?
     local targetName = tostring(hair:GetAttribute("HairTargetBoneName") or "")
     local target = character:FindFirstChild(targetName, true)
     local grip = hair:FindFirstChild(HAIR_GRIP_NAME)
-    if not target or not target:IsA("Bone") or not grip or not grip:IsA("Attachment") then
+    local group = hair.Parent
+    if not target or not target:IsA("Bone") or not grip or not grip:IsA("Attachment")
+        or not group or not group:IsA("Model") or group:GetAttribute("Game1HairCompound") ~= true
+        or group.PrimaryPart ~= hair then
         return nil
     end
     return {
         hair = hair,
+        group = group,
         targetBone = target,
         grip = grip,
         targetName = targetName,
     }
 end
+
+local SocketFacing = require(game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared")
+    :WaitForChild("world"):WaitForChild("SocketFacing"))
 
 local function targetSocketCFrame(targetBone: Bone): CFrame
     local parent = targetBone.Parent
@@ -51,6 +59,7 @@ local function updateCharacter(character: Model)
     local state: HairState? = cache[character]
     if not state
         or not state.hair.Parent
+        or not state.group.Parent
         or not state.targetBone.Parent
         or not state.grip.Parent
         or state.targetName ~= tostring(state.hair:GetAttribute("HairTargetBoneName") or "")
@@ -62,9 +71,9 @@ local function updateCharacter(character: Model)
         return
     end
 
-    local socketFrame = targetSocketCFrame(state.targetBone)
+    local socketFrame = SocketFacing.FullFrame(targetSocketCFrame(state.targetBone), true)
     local delta = socketFrame * state.grip.WorldCFrame:Inverse()
-    state.hair:PivotTo(delta * state.hair:GetPivot())
+    state.group:PivotTo(delta * state.group:GetPivot())
 end
 
 local function update()
@@ -83,6 +92,10 @@ local function update()
         end
     end
 end
+
+-- Reuse the exact runtime mount-following rule for Studio timeline previews.
+-- Calling this once never starts a RenderStepped connection.
+HairAttachmentController.UpdateCharacter = updateCharacter
 
 function HairAttachmentController.Start()
     if started then

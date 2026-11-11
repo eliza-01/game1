@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "slug": "ivy_02",
+  "sourceSha256": "f18f6cf3c95ba96b377d04344247e130fa1d24b5d0428d9ab8374f9a0ceb0cd1",
+  "analysis": {
+    "schemaVersion": 1,
+    "meshes": [
+      {
+        "name": "ivy_02",
+        "armature": "",
+        "vertices": 405,
+        "bones": [],
+        "influencedBones": [],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": null,
+          "canQuery": null,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": null,
+          "physicsOnly": false
+        }
+      }
+    ],
+    "hasCollider": false,
+    "armatures": [],
+    "unassignedArmatures": []
+  }
+}

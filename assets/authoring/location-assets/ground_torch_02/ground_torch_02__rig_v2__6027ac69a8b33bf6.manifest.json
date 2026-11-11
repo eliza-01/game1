@@ -1,0 +1,63 @@
+{
+  "boneHash": "b9a9671ccad06f48086e6de58e9543cd6e5259218e17265c3d1598835f158ce4",
+  "bones": [
+    {
+      "matrix": [
+        -0.0,
+        0.0,
+        -1.0,
+        -0.0,
+        1.0,
+        0.0,
+        -0.0,
+        1e-07,
+        0.0,
+        -0.9999999,
+        0.0,
+        0.1886034,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "fire_bone",
+      "parent": ""
+    }
+  ],
+  "carrierName": "rig_carrier",
+  "inventoryHash": "20a1362ccc77b6bbd6b963f4c25e29ff757ab0a61d00d08082ff0c7959278c86",
+  "parts": [
+    {
+      "name": "col_mesh",
+      "role": "collider",
+      "vertices": 345
+    },
+    {
+      "name": "ground_torch_02",
+      "role": "visual",
+      "vertices": 2083
+    },
+    {
+      "name": "rig_carrier",
+      "role": "rig_carrier",
+      "vertices": 3
+    }
+  ],
+  "rigKind": "skinned",
+  "schemaVersion": 2,
+  "skinPreparation": {
+    "minimumInfluence": 0.05,
+    "minimumVerticesPerBone": 1,
+    "patchedBoneCount": 0,
+    "patchedBones": [],
+    "prunedVertices": 0,
+    "survivingBoneCount": 1,
+    "unweightedVertexPolicy": "nearest-authored-bone-head-v1",
+    "unweightedVerticesAfter": 0,
+    "unweightedVerticesBefore": 6,
+    "verticesOverFourAfter": 0,
+    "verticesOverFourBefore": 0
+  },
+  "sourceSha256": "6027ac69a8b33bf62b0742e0d8cc0ba08dfd54eab3f8802158c3df2d0ae6ea13",
+  "structuralHash": "d3b579afca06a0ce1617933bd0112e9ad440a69c8d189ae81fffd88205ef4d7d"
+}

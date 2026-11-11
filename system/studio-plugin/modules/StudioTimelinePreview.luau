@@ -1,5 +1,6 @@
 -- Owns the isolated ViewportFrame rig, camera interaction and animation-asset retrieval.
 local StudioTimelinePreview = {}
+local StudioCharacterStandBuilder = require(script.Parent.StudioCharacterStandBuilder)
 
 function StudioTimelinePreview.new(services)
     local AssetService = services.AssetService
@@ -170,31 +171,109 @@ function StudioTimelinePreview.new(services)
         return preview
     end
 
+    -- Preview Studio Play's actual admin assembly (rig + parts + materials),
+    -- never the invisible rig-only Model. The build uses the shared server
+    -- CharacterAssemblyBuilder through StudioCharacterStandBuilder.
+    local function loadTimelineAdminModel(characterId: string): Model
+        local profile = StudioCharacterStandBuilder.AdminProfile(characterId)
+        local preview = StudioCharacterStandBuilder.Build(AssetService, profile)
+        preview.Name = TIMELINE_PREVIEW_NAME
+        preview:SetAttribute("Game1TimelinePreview", true)
+        local visible = 0
+        for _, descendant in ipairs(preview:GetDescendants()) do
+            if descendant:IsA("MeshPart") and descendant.Transparency < 0.99 then
+                visible += 1
+            end
+        end
+        if visible == 0 then
+            preview:Destroy()
+            error("Studio admin assembly contains no visible MeshParts; check published components")
+        end
+        prepareTimelinePreviewModel(preview)
+        preview.Parent = timelineWorld
+        frameTimelinePreview(preview)
+        timelineViewportEmpty.Visible = false
+        activePreview = preview
+        return preview
+    end
+
+    local hairFollower = nil
+    local function refreshTimelineAccessories(preview: Model)
+        -- The same HairAttachmentController that positions pivot hair in Play,
+        -- called once per scrubbed pose instead of starting a render loop.
+        if hairFollower == nil then
+            local scripts = game:GetService("StarterPlayer"):FindFirstChild("StarterPlayerScripts")
+            local client = scripts and scripts:FindFirstChild("Game1Client")
+            local character = client and client:FindFirstChild("character")
+            local source = character and character:FindFirstChild("HairAttachmentController")
+            if source and source:IsA("ModuleScript") then
+                hairFollower = require(source)
+            else
+                return -- The preview remains usable without optional pivot hair.
+            end
+        end
+        if hairFollower.UpdateCharacter then hairFollower.UpdateCharacter(preview) end
+    end
+
+    -- AnimationClipProvider can transiently return an empty KeyframeSequence for a
+    -- published animation. Do not mistake that response for an authored 0-second
+    -- attack, and never invent keyframes or infer them from timeline metadata.
+    local MAX_CLIP_FETCHES = 5
+    local CLIP_RETRY_SECONDS = 0.4
+
+    local function timelineSequenceDetails(sequence: KeyframeSequence): (number, number, number)
+        local duration = 0
+        local keyframeCount = 0
+        local poseCount = 0
+        for _, keyframe in ipairs(sequence:GetKeyframes()) do
+            keyframeCount += 1
+            duration = math.max(duration, keyframe.Time)
+            for _, descendant in ipairs(keyframe:GetDescendants()) do
+                if descendant:IsA("Pose") then
+                    poseCount += 1
+                end
+            end
+        end
+        return duration, keyframeCount, poseCount
+    end
+
     local function loadTimelineSequence(animationAssetId: number): KeyframeSequence
         local contentId = "rbxassetid://" .. tostring(math.floor(animationAssetId))
-        local lastError = ""
-        for _ = 1, 4 do
+        local lastDiagnostic = "no response"
+        for attempt = 1, MAX_CLIP_FETCHES do
             local ok, clip = pcall(function()
                 return AnimationClipProvider:GetAnimationClipAsync(contentId)
             end)
             if ok and clip ~= nil then
                 if not clip:IsA("KeyframeSequence") then
+                    local clipClass = clip.ClassName
                     clip:Destroy()
-                    error("Attack Timeline requires a KeyframeSequence animation asset")
+                    -- CurveAnimations need a curve sampler; they are not empty
+                    -- KeyframeSequences and must not be silently misdiagnosed.
+                    error(("animation %d is %s, not KeyframeSequence; the timeline pose preview does not yet support this clip format")
+                        :format(animationAssetId, clipClass))
                 end
-                return clip
+                local duration, frameCount, poseCount = timelineSequenceDetails(clip)
+                if duration > 0.000001 and poseCount > 0 then
+                    return clip
+                end
+                lastDiagnostic = ("keyframes=%d, poses=%d, last keyframe=%.6fs, loaded length=%.6fs")
+                    :format(frameCount, poseCount, duration, clip.Length)
+                clip:Destroy()
+            else
+                lastDiagnostic = "request failed: " .. tostring(clip)
             end
-            lastError = tostring(clip)
-            task.wait(0.4)
+            if attempt < MAX_CLIP_FETCHES then
+                task.wait(CLIP_RETRY_SECONDS)
+            end
         end
-        error("could not load animation clip " .. tostring(animationAssetId) .. ": " .. lastError)
+        error(("published animation %d has no usable timed poses after %d Studio requests (%s). "
+            .. "Verify the published clip's keys in Roblox Animation Editor. No hit events were changed.")
+            :format(animationAssetId, MAX_CLIP_FETCHES, lastDiagnostic))
     end
 
     local function timelineSequenceDuration(sequence: KeyframeSequence): number
-        local duration = 0
-        for _, keyframe in ipairs(sequence:GetKeyframes()) do
-            duration = math.max(duration, keyframe.Time)
-        end
+        local duration = timelineSequenceDetails(sequence)
         return duration
     end
 
@@ -202,6 +281,8 @@ function StudioTimelinePreview.new(services)
     return {
         DestroyPreview = destroyTimelinePreview,
         LoadModel = loadTimelinePreviewModel,
+        LoadAdminModel = loadTimelineAdminModel,
+        RefreshAccessories = refreshTimelineAccessories,
         LoadSequence = loadTimelineSequence,
         SequenceDuration = timelineSequenceDuration,
     }

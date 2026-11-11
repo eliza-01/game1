@@ -4,12 +4,13 @@
 -- Bone +Y (Head -> Tail) is UpVector, so forward is -UpVector.
 -- Ordinary Roblox Attachments follow the normal -Z / LookVector convention.
 -- Characters always stand along the WORLD Y axis, independent of bone roll.
+local SocketFacing = require(script.Parent:WaitForChild("SocketFacing"))
 local Orientation = {}
 local WORLD_UP = Vector3.yAxis
 local MIN_FORWARD_LENGTH = 1e-4
 
 function Orientation.Upright(socketFrame: CFrame, fromBone: boolean, clearance: number): CFrame?
-    local authoredForward = if fromBone then -socketFrame.UpVector else socketFrame.LookVector
+    local authoredForward = SocketFacing.Forward(socketFrame, fromBone)
     local horizontalForward = Vector3.new(authoredForward.X, 0, authoredForward.Z)
     local magnitude = horizontalForward.Magnitude
     if magnitude < MIN_FORWARD_LENGTH then

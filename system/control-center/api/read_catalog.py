@@ -12,6 +12,8 @@ def _query(parsed, name: str) -> str:
 
 def route(parsed, sources, publication_config):
     path = parsed.path
+    if path == '/api/armor':
+        return 200, sources['armor'].snapshot()
     if path == '/api/characters/assemblies':
         return 200, sources['character_assemblies'].snapshot()
     response = character_components.read(path, sources)

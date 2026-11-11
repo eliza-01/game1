@@ -28,7 +28,7 @@ class FakeMatrix:
 class FakeMesh:
     type = 'MESH'
 
-    def __init__(self, name='hair_03_common', weights=False):
+    def __init__(self, name='human_common_m003_hair', weights=False):
         self.name = name
         self.matrix_world = FakeMatrix()
         self.parent = SimpleNamespace(name='human_armature')
@@ -69,9 +69,9 @@ class HairImportTests(unittest.TestCase):
         return adapter, bpy, rig, mesh
 
     def test_slot_policy_is_explicit_not_generic_rigless_fallback(self):
-        self.assertEqual(rigid_pivot_mount_for_part('hair_03_common'), 'hair_mount')
-        self.assertEqual(rigid_pivot_mount_for_part('hair_03_male'), 'hair_mount')
-        for name in ('head_01_male', 'newborn_upper', 'eyes_01', 'hair_fake', 'hat_01'):
+        self.assertEqual(rigid_pivot_mount_for_part('human_common_m003_hair'), 'hair_mount')
+        self.assertEqual(rigid_pivot_mount_for_part('human_male_m003_hair'), 'hair_mount')
+        for name in ('human_male_m001_head', 'newborn_upper', 'human_common_m001_eye_l', 'hair_fake', 'hat_01'):
             self.assertEqual(rigid_pivot_mount_for_part(name), '')
 
     def test_blender_report_emits_rigid_hair_without_bone_bind(self):
@@ -83,7 +83,7 @@ class HairImportTests(unittest.TestCase):
         self.assertEqual(data['armature'], 'human_armature')
         self.assertEqual(len(data['parts']), 1)
         hair = data['parts'][0]
-        self.assertEqual(hair['name'], 'hair_03_common')
+        self.assertEqual(hair['name'], 'human_common_m003_hair')
         self.assertEqual(hair['armature'], '')
         self.assertEqual(hair['skeleton'], [])
         self.assertEqual(hair['used_bones'], [])
@@ -93,9 +93,9 @@ class HairImportTests(unittest.TestCase):
 
     def test_blender_rejects_other_unskinned_parts_and_invalid_hair(self):
         for name, weights, mount, message in (
-            ('head_01_male', False, True, 'one Armature modifier'),
-            ('hair_03_common', True, True, 'deform weights'),
-            ('hair_03_common', False, False, 'hair_mount'),
+            ('human_male_m001_head', False, True, 'one Armature modifier'),
+            ('human_common_m003_hair', True, True, 'deform weights'),
+            ('human_common_m003_hair', False, False, 'hair_mount'),
         ):
             with self.subTest(name=name, weights=weights, mount=mount):
                 adapter, *_ = self.load_adapter(FakeMesh(name, weights), mount)
@@ -110,15 +110,15 @@ class HairImportTests(unittest.TestCase):
         source.data.copy = MagicMock(return_value=cloned.data)
         source.copy = MagicMock(return_value=cloned)
         with patch.object(adapter, 'export') as export:
-            adapter.export_rigid_pivot_mesh(source, Path('hair_03_common.fbx'))
+            adapter.export_rigid_pivot_mesh(source, Path('human_common_m003_hair.fbx'))
             export.assert_called_once()
             path, objects = export.call_args.args
-            self.assertEqual(path.name, 'hair_03_common.fbx')
+            self.assertEqual(path.name, 'human_common_m003_hair.fbx')
             self.assertEqual(objects, [cloned])
             self.assertIsNone(cloned.parent)
             self.assertIs(cloned.matrix_world, source.matrix_world)
-            self.assertEqual(cloned.name, 'hair_03_common')
-            self.assertEqual(source.name, 'hair_03_common')
+            self.assertEqual(cloned.name, 'human_common_m003_hair')
+            self.assertEqual(source.name, 'human_common_m003_hair')
             bpy.data.objects.remove.assert_called_once_with(cloned, do_unlink=True)
 
     def test_registry_accepts_pivot_hair_with_no_skin_metadata(self):
@@ -128,25 +128,25 @@ class HairImportTests(unittest.TestCase):
             source.write_bytes(b'fixture')
             bones = [dict(name='root', parent='', matrix=[1, 0, 0, 0] * 4),
                      dict(name='hair_mount', parent='root', matrix=[1, 0, 0, 0] * 4)]
-            row = dict(name='hair_03_common', armature='', skeleton=[], used_bones=[],
+            row = dict(name='human_common_m003_hair', armature='', skeleton=[], used_bones=[],
                        attachment='hair_mount', attachment_mode='pivot', vertices=3, triangles=1,
                        content_sha256='hair', materials=[])
             def analyze(_root, _source, output=None):
                 if output:
                     output.mkdir(parents=True, exist_ok=True)
                     (output / 'rig.fbx').write_bytes(b'core')
-                    (output / 'hair_03_common.fbx').write_bytes(b'hair')
+                    (output / 'human_common_m003_hair.fbx').write_bytes(b'hair')
                 return dict(armature='human_armature', bones=bones, parts=[row])
             store = CharacterComponents(root, analyzer=analyze)
             plan = store.inspect(source)
             self.assertEqual(plan['parts'][0]['attachment_mode'], 'pivot')
             store.register(plan['token'], [])
-            hair = store.get('part', 'hair_03_common')
+            hair = store.get('part', 'human_common_m003_hair')
             self.assertEqual(json.loads(hair['metadata_json'])['attachment_mode'], 'pivot')
             self.assertTrue((root / hair['prepared_path']).is_file())
             self.assertEqual((root / hair['prepared_path']).read_bytes(), b'hair')
             # Reject a tampered inspect response: pivot is only for rigless hair.
-            row['name'] = 'head_01_male'
+            row['name'] = 'human_male_m001_head'
             with self.assertRaisesRegex(ValueError, 'invalid rigid hair'):
                 store.inspect(source)
 
@@ -155,8 +155,8 @@ class HairImportTests(unittest.TestCase):
         rig_service = (ROOT.parent / 'src/server/character/CharacterRigService.luau').read_text()
         controller = (ROOT.parent / 'src/client/character/HairAttachmentController.luau').read_text()
         self.assertIn('grip.CFrame = mesh.CFrame:ToObjectSpace(CFrame.new(gripPoint))', source)
-        self.assertIn('local delta = socketFrame * grip.WorldCFrame:Inverse()', source)
-        self.assertIn('alignHairToSocket(mesh, anchor, targetSocketCFrame(target))', source)
+        self.assertIn('local delta = socketFrame * anchor.WorldCFrame:Inverse()', source)
+        self.assertIn('group:PivotTo(delta * group:GetPivot())', source)
         self.assertIn('mesh:SetAttribute("Game1HairAttachment", true)', source)
         self.assertIn('mesh.Anchored = true', source)
         self.assertIn('mesh.CFrame:ToObjectSpace(target.WorldCFrame)', source)

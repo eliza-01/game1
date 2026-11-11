@@ -25,6 +25,26 @@ function Builder.Profiles(): {any}
     return result
 end
 
+-- Studio admin is a separate explicit setting, not the first ready archetype.
+-- The Attack Timeline must preview the same recipe as Studio Play.
+function Builder.AdminProfile(expectedCharacterId: string): any
+    local character = registryRoot()
+    local registry = require(character:WaitForChild("CharacterRegistry"))
+    local adminId = tostring(registry.studioAdminArchetypeId or "")
+    assert(adminId ~= "", "Set as admin is not configured in Character Assembly v2")
+    local mismatch = string.format(
+        "Timeline character %s is not the Studio admin (%s). Choose the matching character or update Set as admin.",
+        expectedCharacterId, adminId)
+    assert(expectedCharacterId == adminId, mismatch)
+    for _, profile in ipairs(Builder.Profiles()) do
+        if profile.id == adminId then
+            assert(profile.mode == "assembly", "Studio admin requires a ready Character Assembly v2")
+            return profile
+        end
+    end
+    error("Studio admin assembly " .. adminId .. " is not READY; save a complete recipe in Asset Manager")
+end
+
 local function getBuilder()
     local server = nil
     for _, candidate in game:GetService("ServerScriptService"):GetChildren() do

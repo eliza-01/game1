@@ -37,8 +37,14 @@
       "LandscapeAssetPlacement": {
         "$path": "modules/LandscapeAssetPlacement.luau"
       },
+      "LandscapeSwayAuthoring": {
+        "$path": "modules/LandscapeSwayAuthoring.luau"
+      },
       "LandscapeAssetsWidget": {
         "$path": "modules/LandscapeAssetsWidget.luau"
+      },
+      "DecoTransform": {
+        "$path": "../studio-plugin/modules/DecoTransform.luau"
       },
       "DecoAssetLoader": {
         "$path": "../studio-plugin/modules/DecoAssetLoader.luau"

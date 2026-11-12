@@ -33,6 +33,10 @@ return table.freeze({
 		}),
 	}),
 	custom = table.freeze({
+		["105422326147906"] = table.freeze({
+			stat = "AttackSpeed",
+			unitsPerPercent = 1.5,
+		}),
 		["116868377220889"] = table.freeze({
 			stat = "RunSpeed",
 			unitsPerPercent = 5.0,
@@ -41,13 +45,25 @@ return table.freeze({
 			stat = "RunSpeed",
 			unitsPerPercent = 2.4,
 		}),
+		["130243478044042"] = table.freeze({
+			stat = "RunSpeed",
+			unitsPerPercent = 0.6,
+		}),
 		["132123582014306"] = table.freeze({
 			stat = "RunSpeed",
 			unitsPerPercent = 1.4,
 		}),
-		["77341804648662"] = table.freeze({
+		["134879106022438"] = table.freeze({
 			stat = "RunSpeed",
 			unitsPerPercent = 0.8,
+		}),
+		["72958203766772"] = table.freeze({
+			stat = "AttackSpeed",
+			unitsPerPercent = 0.8,
+		}),
+		["77341804648662"] = table.freeze({
+			stat = "RunSpeed",
+			unitsPerPercent = 0.55,
 		}),
 		["85145236963317"] = table.freeze({
 			stat = "RunSpeed",
@@ -59,6 +75,26 @@ return table.freeze({
 		}),
 	}),
 	catalog = table.freeze({
+		["127579361053055"] = table.freeze({
+			label = "character / human_female / bow_attack_01",
+			channel = "attack",
+		}),
+		["105422326147906"] = table.freeze({
+			label = "character / human_female / bow_combat_idle",
+			channel = "combat_idle",
+		}),
+		["114054767776363"] = table.freeze({
+			label = "character / human_female / bow_idle",
+			channel = "idle",
+		}),
+		["130243478044042"] = table.freeze({
+			label = "character / human_female / bow_run",
+			channel = "run",
+		}),
+		["134879106022438"] = table.freeze({
+			label = "character / human_female / bow_walk",
+			channel = "walk",
+		}),
 		["82219458610259"] = table.freeze({
 			label = "character / human_female / hands_attack_01",
 			channel = "attack",
@@ -161,4 +197,11 @@ return table.freeze({
 		}),
 		["122295588324584"] = table.freeze({
 			label = "npc / warsmith / base_run",
-			channel = "
+			channel = "run",
+		}),
+		["116868377220889"] = table.freeze({
+			label = "npc / warsmith / base_walk",
+			channel = "walk",
+		}),
+	}),
+})

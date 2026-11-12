@@ -26,6 +26,9 @@ local ui, assetUI
 local branchSaveScheduled = false
 local function status(message)
     if ui then ui:SetStatus(message) end
+    -- Keep placement errors next to the Start button, not only at the end
+    -- of the long scrolling dock.
+    if assetUI then assetUI:SetStatus(message) end
 end
 local branch = BranchPlacement.new(Workspace, ChangeHistoryService, mouse, status)
 local profiles = LandscapeProfiles.new(plugin, HttpService)
@@ -35,6 +38,7 @@ local assets = LandscapeAssetPlacement.new(Workspace, ChangeHistoryService,
 
 local function stop()
     if not active then return end
+    -- Clear ownership before Deactivate, which itself fires Deactivation.
     active = nil
     branch:Stop()
     assets:Stop()
@@ -50,13 +54,30 @@ local function start(kind)
     end
     if active == kind then stop(); return end
     if active then stop() end
+
+    -- PluginMouse only receives viewport input from an activated plugin.
     plugin:Activate(true)
-    if kind == "asset" and not assets:Start() then
-        plugin:Deactivate()
+    if not plugin:IsActivatedWithExclusiveMouse() then
+        status("Studio не передала Landscape Painter управление мышью · выбери инструмент снова")
         return
     end
+
+    -- Own the input session BEFORE the first cursor update. Previously an
+    -- error during initial preview prevented active from being assigned,
+    -- silently disabling both Move and Button1Down after pressing Start.
     active = kind
-    if kind == "branch" then branch:Start() end
+    local ok, started = pcall(function()
+        if kind == "asset" then return assets:Start() end
+        branch:Start()
+        return true
+    end)
+    if not ok or not started then
+        stop()
+        status(if not ok then "Ошибка запуска Landscape Painter: " .. tostring(started)
+            else "Сначала выбери загруженный опубликованный ассет в каталоге")
+        if not ok then warn("[Game1LandscapePainter] start: " .. tostring(started)) end
+        return
+    end
     ui:SetActive(kind == "branch")
     assetUI:SetActive(kind == "asset")
 end
@@ -166,13 +187,37 @@ branch:SetSettings(ui.thickness, ui.level, ui.color)
 local savedProfiles, savedActive = profiles:List()
 assetUI:SetProfiles(savedProfiles, savedActive)
 
+-- Studio event callbacks are not protected by the UI's safe(action) wrapper.
+-- Report failures where they can actually be seen; never silently abandon
+-- an active session because a preview or commit callback threw.
+local lastInputError = nil
+local function handleViewportInput(operation, callback)
+    local ok, reason = pcall(callback)
+    if ok then
+        lastInputError = nil
+    else
+        local message = "Landscape Painter / " .. operation .. ": " .. tostring(reason)
+        if message ~= lastInputError then
+            lastInputError = message
+            status(message)
+            warn("[Game1LandscapePainter] " .. message)
+        end
+    end
+end
+
 mouse.Move:Connect(function()
-    if active == "branch" then branch:UpdateCursor(false)
-    elseif active == "asset" then assets:UpdateCursor(false) end
+    if active == "branch" then
+        handleViewportInput("cursor", function() branch:UpdateCursor(false) end)
+    elseif active == "asset" then
+        handleViewportInput("cursor", function() assets:UpdateCursor(false) end)
+    end
 end)
 mouse.Button1Down:Connect(function()
-    if active == "branch" then branch:Click()
-    elseif active == "asset" then assets:Click() end
+    if active == "branch" then
+        handleViewportInput("click", function() branch:Click() end)
+    elseif active == "asset" then
+        handleViewportInput("click", function() assets:Click() end)
+    end
 end)
 UserInputService.InputBegan:Connect(function(input, processed)
     if not active or processed then return end
@@ -182,7 +227,10 @@ UserInputService.InputBegan:Connect(function(input, processed)
     end
 end)
 plugin.Deactivation:Connect(function()
-    if active then stop() end
+    if active then
+        stop()
+        status("Прицел остановлен Studio: другой инструмент забрал мышь · нажми «Начать» ещё раз")
+    end
 end)
 toggle.Click:Connect(function()
     widget.Enabled = not widget.Enabled

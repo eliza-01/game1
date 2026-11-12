@@ -106,6 +106,10 @@ function AnimationResolver.ResolveAction(character: Model, slot: string)
 		if weaponRow then
 			return weaponRow
 		end
+		if weaponSet == "bow" then
+			-- A bow cannot play a fallback melee clip and fire an arrow.
+			return nil
+		end
 	end
 	return AnimationResolver.Resolve(character, "base", nil, slot)
 end

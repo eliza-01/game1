@@ -35,6 +35,9 @@ local ui, assetUI
 local branchSaveScheduled = false
 local function status(message)
     if ui then ui:SetStatus(message) end
+    -- Keep placement errors next to the Start button, not only at the end
+    -- of the long scrolling dock.
+    if assetUI then assetUI:SetStatus(message) end
 end
 local branch = BranchPlacement.new(Workspace, ChangeHistoryService, mouse, status)
 local profiles = LandscapeProfiles.new(plugin, HttpService)
@@ -44,6 +47,7 @@ local assets = LandscapeAssetPlacement.new(Workspace, ChangeHistoryService,
 
 local function stop()
     if not active then return end
+    -- Clear ownership before Deactivate, which itself fires Deactivation.
     active = nil
     branch:Stop()
     assets:Stop()
@@ -59,13 +63,30 @@ local function start(kind)
     end
     if active == kind then stop(); return end
     if active then stop() end
+
+    -- PluginMouse only receives viewport input from an activated plugin.
     plugin:Activate(true)
-    if kind == "asset" and not assets:Start() then
-        plugin:Deactivate()
+    if not plugin:IsActivatedWithExclusiveMouse() then
+        status("Studio не передала Landscape Painter управление мышью · выбери инструмент снова")
         return
     end
+
+    -- Own the input session BEFORE the first cursor update. Previously an
+    -- error during initial preview prevented active from being assigned,
+    -- silently disabling both Move and Button1Down after pressing Start.
     active = kind
-    if kind == "branch" then branch:Start() end
+    local ok, started = pcall(function()
+        if kind == "asset" then return assets:Start() end
+        branch:Start()
+        return true
+    end)
+    if not ok or not started then
+        stop()
+        status(if not ok then "Ошибка запуска Landscape Painter: " .. tostring(started)
+            else "Сначала выбери загруженный опубликованный ассет в каталоге")
+        if not ok then warn("[Game1LandscapePainter] start: " .. tostring(started)) end
+        return
+    end
     ui:SetActive(kind == "branch")
     assetUI:SetActive(kind == "asset")
 end
@@ -175,13 +196,37 @@ branch:SetSettings(ui.thickness, ui.level, ui.color)
 local savedProfiles, savedActive = profiles:List()
 assetUI:SetProfiles(savedProfiles, savedActive)
 
+-- Studio event callbacks are not protected by the UI's safe(action) wrapper.
+-- Report failures where they can actually be seen; never silently abandon
+-- an active session because a preview or commit callback threw.
+local lastInputError = nil
+local function handleViewportInput(operation, callback)
+    local ok, reason = pcall(callback)
+    if ok then
+        lastInputError = nil
+    else
+        local message = "Landscape Painter / " .. operation .. ": " .. tostring(reason)
+        if message ~= lastInputError then
+            lastInputError = message
+            status(message)
+            warn("[Game1LandscapePainter] " .. message)
+        end
+    end
+end
+
 mouse.Move:Connect(function()
-    if active == "branch" then branch:UpdateCursor(false)
-    elseif active == "asset" then assets:UpdateCursor(false) end
+    if active == "branch" then
+        handleViewportInput("cursor", function() branch:UpdateCursor(false) end)
+    elseif active == "asset" then
+        handleViewportInput("cursor", function() assets:UpdateCursor(false) end)
+    end
 end)
 mouse.Button1Down:Connect(function()
-    if active == "branch" then branch:Click()
-    elseif active == "asset" then assets:Click() end
+    if active == "branch" then
+        handleViewportInput("click", function() branch:Click() end)
+    elseif active == "asset" then
+        handleViewportInput("click", function() assets:Click() end)
+    end
 end)
 UserInputService.InputBegan:Connect(function(input, processed)
     if not active or processed then return end
@@ -191,7 +236,10 @@ UserInputService.InputBegan:Connect(function(input, processed)
     end
 end)
 plugin.Deactivation:Connect(function()
-    if active then stop() end
+    if active then
+        stop()
+        status("Прицел остановлен Studio: другой инструмент забрал мышь · нажми «Начать» ещё раз")
+    end
 end)
 toggle.Click:Connect(function()
     widget.Enabled = not widget.Enabled
@@ -774,9 +822,14 @@ function DecoAssetLoader:loadPublished(row: any): Model
     -- LoadAssetAsync can wrap a valid Blender-authored carrier rig in an inert
     -- RootPart + Motor6D assembly. Normalize only this detached fresh clone;
     -- placed Models are replaced transactionally and are never edited in situ.
-    local authoredPivot = PublishedRigNormalize.Apply(model, row.rigManifest)
+    PublishedRigNormalize.Apply(model, row.rigManifest)
     local carrier = Carrier.Validate(model, row.rigManifest, row.legacyStaticPublication)
     if carrier then
+        -- The outer Roblox Model pivot can belong to an importer wrapper or
+        -- a deleted RootPart. It is NOT the authored rig pivot. Capture the
+        -- native MeshPart pivot before adjusting the assembly.
+        local nativeCarrierPivot = carrier:GetPivot()
+        local nativeCarrierOffset = carrier.PivotOffset
         Carrier.Prepare(carrier)
         -- Roblox skinning finds Bones on connected MeshParts within one Model.
         -- Importer Motor6Ds may already form a valid assembly; retain those.
@@ -789,10 +842,14 @@ function DecoAssetLoader:loadPublished(row: any): Model
                 SkinConnection.Connect(model, carrier, part, weldName)
             end
         end
-        carrier.PivotOffset = carrier.CFrame:ToObjectSpace(authoredPivot)
+        -- Promote the actual imported rig_carrier to PrimaryPart without
+        -- rebasing its PivotOffset to the unrelated outer Model pivot. Both
+        -- DecoManager and Landscape Painter must use this unchanged rig origin.
         model.PrimaryPart = carrier
-        if (model:GetPivot().Position-authoredPivot.Position).Magnitude>0.002 then
-            error("rig_carrier PrimaryPart changed the authored Model pivot")
+        if carrier.PivotOffset ~= nativeCarrierOffset
+            or carrier:GetPivot() ~= nativeCarrierPivot
+            or model:GetPivot() ~= nativeCarrierPivot then
+            error("published rig_carrier pivot changed during Location assembly")
         end
     end
     applyTexture(model, tostring(row.texture_asset_id or ""), row.alphaEnabled)
@@ -821,6 +878,89 @@ return DecoAssetLoader
         </Properties>
       </Item>
       <Item class="ModuleScript" referent="8">
+        <Properties>
+          <string name="Name">DecoTransform</string>
+          <string name="Source"><![CDATA[local DecoTransform = {}
+
+local WORLD_UP = Vector3.yAxis
+
+local function rotationOnly(cframe: CFrame): CFrame
+    return CFrame.fromMatrix(Vector3.zero, cframe.XVector, cframe.YVector, cframe.ZVector)
+end
+
+local function surfaceFrame(normal: Vector3, cameraLook: Vector3): CFrame
+    local up = if normal.Magnitude > 0.001 then normal.Unit else WORLD_UP
+    local forward = cameraLook - up * cameraLook:Dot(up)
+    if forward.Magnitude < 0.01 then
+        local fallback = if math.abs(up.Y) < 0.95 then WORLD_UP else Vector3.zAxis
+        forward = fallback - up * fallback:Dot(up)
+    end
+    return CFrame.lookAt(Vector3.zero, forward.Unit, up)
+end
+
+function DecoTransform.authoredPivotRotation(model: Model): CFrame
+    return rotationOnly(model:GetPivot())
+end
+
+function DecoTransform.previewPivot(model: Model): CFrame
+    -- Re-center the model without replacing the imported FBX basis. Roblox can
+    -- encode FBX axis conversion in the model/part pivot; forcing identity here
+    -- makes otherwise-correct Z-up source assets appear rotated in the viewport.
+    return DecoTransform.authoredPivotRotation(model)
+end
+
+function DecoTransform.supportOffset(model: Model): number
+    -- Measure the lowest rendered part point against Roblox world-up in the
+    -- asset's authored pose. This is independent of the model pivot's local axes.
+    -- The same offset remains valid after surfaceFrame rotates the whole authored
+    -- pose from world-up onto the hit normal.
+    local pivot = model:GetPivot()
+    local minimum = math.huge
+    local hasPart = false
+
+    for _, descendant in ipairs(model:GetDescendants()) do
+        if descendant:IsA("BasePart") and descendant.Name ~= "rig_carrier" then
+            hasPart = true
+            local half = descendant.Size * 0.5
+            for _, x in ipairs({ -1, 1 }) do
+                for _, y in ipairs({ -1, 1 }) do
+                    for _, z in ipairs({ -1, 1 }) do
+                        local point = descendant.CFrame:PointToWorldSpace(Vector3.new(
+                            half.X * x,
+                            half.Y * y,
+                            half.Z * z
+                        ))
+                        local height = (point - pivot.Position):Dot(WORLD_UP)
+                        minimum = math.min(minimum, height)
+                    end
+                end
+            end
+        end
+    end
+
+    if not hasPart then
+        error("location asset model contains no BasePart geometry")
+    end
+    return math.max(0, -minimum)
+end
+
+function DecoTransform.placementPivot(
+    authoredPivotRotation: CFrame,
+    targetPosition: Vector3,
+    surfaceNormal: Vector3,
+    cameraLook: Vector3
+): CFrame
+    -- surfaceFrame is a delta from canonical Roblox world-up to the requested
+    -- surface. authoredPivotRotation is multiplied afterwards so importer-authored
+    -- FBX basis compensation is preserved instead of overwritten.
+    return CFrame.new(targetPosition) * surfaceFrame(surfaceNormal, cameraLook) * authoredPivotRotation
+end
+
+return DecoTransform
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="9">
         <Properties>
           <string name="Name">LandscapeAdjustments</string>
           <string name="Source"><![CDATA[-- Shared direct-manipulation controls for Landscape Painter. No Workspace ownership.
@@ -1095,7 +1235,7 @@ return table.freeze(Adjustments)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="9">
+      <Item class="ModuleScript" referent="10">
         <Properties>
           <string name="Name">LandscapeAssetCatalog</string>
           <string name="Source"><![CDATA[-- Read-only published Location Asset registry, exactly the same source and
@@ -1143,6 +1283,13 @@ function Catalog:Load(row)
         model:Destroy()
         error("published location model must be detached before authoring")
     end
+    -- Authoring requires two independent copies: a disposable cursor ghost
+    -- and an Undo-recorded placed Model. Asset import may mark individual
+    -- instances as non-archivable; normalize only the detached local template.
+    model.Archivable = true
+    for _, descendant in ipairs(model:GetDescendants()) do
+        descendant.Archivable = true
+    end
     return model
 end
 
@@ -1150,7 +1297,7 @@ return Catalog
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="10">
+      <Item class="ModuleScript" referent="11">
         <Properties>
           <string name="Name">LandscapeAssetPlacement</string>
           <string name="Source"><![CDATA[-- Edit-mode pivot placement with a surface reticle, reversible history,
@@ -1161,6 +1308,8 @@ local StemTarget = require(script.Parent.LandscapeStemTarget)
 local BranchGeometry = require(script.Parent.BranchGeometry)
 local BranchPreview = require(script.Parent.BranchPreview)
 local Profiles = require(script.Parent.LandscapeProfiles)
+local SwayAuthoring = require(script.Parent.LandscapeSwayAuthoring)
+local DecoTransform = require(script.Parent.DecoTransform)
 
 local Placement = {}
 Placement.__index = Placement
@@ -1231,10 +1380,13 @@ function Placement.new(workspace, history, mouse, selection, catalog, profiles, 
     self.status = status
     self.preview = BranchPreview.new(workspace)
     self.config = Profiles.Validate({yaw = 0, pitch = 0, roll = 0,
-        tetherEnabled = false, length = 2, thickness = 0.02, color = "#343B38"})
+        tetherEnabled = false, swayEnabled = false,
+        length = 2, thickness = 0.02, color = "#343B38"})
     self.template = nil
     self.ghost = nil
     self.row = nil
+    self.authoredPivotRotation = nil
+    self.authoredSupportOffset = nil
     self.cursor = nil
     self.active = false
     self.lastMove = 0
@@ -1244,6 +1396,7 @@ function Placement.new(workspace, history, mouse, selection, catalog, profiles, 
     self.stemFolder = nil
     self.lastStemScan = 0
     self.lastTargetKind = nil
+    self.lastPreviewError = nil
     return self
 end
 
@@ -1272,10 +1425,20 @@ end
 function Placement:SelectAsset(row)
     -- A failed LoadAssetAsync must not discard the previously selected asset.
     local model = self.catalog:Load(row)
+    -- Cache the canonical imported pose before anything is previewed or
+    -- augmented with a tether. It is the same geometry-frame calculation as
+    -- DecoManager, not a new pivot chosen from the model's bounding box.
+    local ok, rotation, support = pcall(function()
+        return DecoTransform.authoredPivotRotation(model),
+            DecoTransform.supportOffset(model)
+    end)
+    if not ok then model:Destroy(); error("Не удалось прочитать pivot ассета: " .. tostring(rotation)) end
     local previous = self.template
     self:HideGhost()
     self.template = model
     self.row = row
+    self.authoredPivotRotation = rotation
+    self.authoredSupportOffset = support
     if previous then previous:Destroy() end
     self.status("Выбран " .. row.slug .. " · наведи прицел на стебель или поверхность")
     self:UpdateCursor(true)
@@ -1299,13 +1462,21 @@ end
 
 function Placement:ResolveHit()
     local surface = Surface.Raycast(self.workspace, self.mouse, RAY_LENGTH)
-    if self.targetMode == "surface" then return surface end
+    -- Roblox RaycastResult has Position/Normal but no kind/stem/branch fields.
+    -- Convert it to the same target record returned by StemTarget.Find before
+    -- UpdateCursor reads those fields. Keep the raw hit for stem occlusion.
+    local surfaceTarget = if surface then {
+        Position = surface.Position,
+        Normal = surface.Normal,
+        kind = "surface",
+    } else nil
+    if self.targetMode == "surface" then return surfaceTarget end
     self:ScanStems(false)
     local stem = StemTarget.Find(self.stemParts, self.stemFolder,
         self.mouse.UnitRay, surface, RAY_LENGTH)
     if stem then return stem end
     if self.targetMode == "stem" then return nil end
-    return surface
+    return surfaceTarget
 end
 
 function Placement:Start(): boolean
@@ -1330,6 +1501,7 @@ function Placement:Stop()
     self.active = false
     self.cursor = nil
     self.lastTargetKind = nil
+    self.lastPreviewError = nil
     self:HideGhost()
 end
 
@@ -1341,6 +1513,7 @@ function Placement:EnsureGhost()
     if self.ghost then return self.ghost end
     if not self.template or not self.workspace.CurrentCamera then return nil end
     local clone = self.template:Clone()
+    if not clone then error("Невозможно скопировать опубликованный ассет для предпросмотра") end
     clone.Name = "__Game1LandscapePreview"
     for _, obj in ipairs(clone:GetDescendants()) do
         if obj:IsA("BasePart") then
@@ -1368,6 +1541,12 @@ function Placement:UpdateCursor(force)
         self.cursor = nil
         self.preview:Hide()
         if self.ghost then self.ghost.Parent = nil end
+        if self.lastTargetKind ~= "none" then
+            self.lastTargetKind = "none"
+            self.status(if self.targetMode == "stem" then
+                "Нет стебля под прицелом · выбери Авто или Поверхность для земли/стен"
+                else "Прицел не видит поверхность · наведи на Terrain или доступный для Raycast Part")
+        end
         return
     end
     self.cursor = {point = hit.Position, normal = hit.Normal,
@@ -1375,32 +1554,58 @@ function Placement:UpdateCursor(force)
     if self.lastTargetKind ~= self.cursor.kind then
         self.lastTargetKind = self.cursor.kind
         if self.cursor.kind == "stem" then
-            self.status("Цель: стебель · Pivot ассета крепится к нему · ЛКМ размещает")
+            self.status("Цель: стебель · точка крепления выбрана · ЛКМ размещает")
         else
-            self.status("Цель: поверхность · ЛКМ размещает")
+            self.status("Цель: поверхность · геометрия касается поверхности, исходный Pivot сохранён · ЛКМ размещает")
         end
     end
     local config = self:Effective()
-    local pivot = Surface.Pivot(hit.Position, hit.Normal, config)
-    local ghost = self:EnsureGhost()
-    if ghost then
-        if ghost.Parent == nil then ghost.Parent = self.workspace.CurrentCamera end
-        ghost:PivotTo(pivot)
+    local camera = self.workspace.CurrentCamera
+    local cameraLook = if camera then camera.CFrame.LookVector else Vector3.new(0, 0, -1)
+    local pivot = Surface.Pivot(hit.Position, hit.Normal, config,
+        self.authoredPivotRotation, self.authoredSupportOffset, cameraLook,
+        self.cursor.kind)
+    -- Share the same calculated frame for preview, click placement and rope.
+    self.cursor.pivot = pivot
+    self.cursor.facingDirection = cameraLook
+    -- A failure to draw the temporary ghost/adornment must not invalidate
+    -- the computed hit or disable click-to-place. Keep the two views isolated.
+    local ghostOK, ghostError = pcall(function()
+        local ghost = self:EnsureGhost()
+        if ghost then
+            if ghost.Parent == nil then ghost.Parent = self.workspace.CurrentCamera end
+            ghost:PivotTo(pivot)
+        end
+    end)
+    local markerOK, markerError = pcall(function()
+        local anchors = nil
+        if config.tetherEnabled then
+            anchors = {
+                {position = hit.Position, normal = hit.Normal},
+                {position = pivot.Position, normal = Vector3.zero},
+            }
+        end
+        self.preview:Show(anchors, {position = hit.Position, normal = hit.Normal},
+            if config.tetherEnabled then config.thickness else 0.2,
+            if config.tetherEnabled then Color3.fromHex(config.color) else Color3.fromRGB(65, 207, 169))
+    end)
+    if not ghostOK or not markerOK then
+        local message = if not ghostOK then tostring(ghostError) else tostring(markerError)
+        if self.lastPreviewError ~= message then
+            self.lastPreviewError = message
+            self.status("Ошибка отображения прицела: " .. message .. " · размещение ЛКМ доступно")
+            warn("[Game1LandscapePainter] preview: " .. message)
+        end
+    else
+        self.lastPreviewError = nil
     end
-    local anchors = nil
-    if config.tetherEnabled then
-        anchors = {
-            {position = hit.Position, normal = hit.Normal},
-            {position = pivot.Position, normal = Vector3.zero},
-        }
-    end
-    self.preview:Show(anchors, {position = hit.Position, normal = hit.Normal},
-        if config.tetherEnabled then config.thickness else 0.2,
-        if config.tetherEnabled then Color3.fromHex(config.color) else Color3.fromRGB(65, 207, 169))
 end
 
-local function writeMetadata(model, cursor, row, config)
-    model:SetAttribute("LandscapeSchemaVersion", 1)
+local function writeMetadata(model, cursor, row, config, authoredRotation, supportOffset)
+    model:SetAttribute("LandscapeSchemaVersion", 3)
+    model:SetAttribute("LandscapeAuthoredPivotRotation", authoredRotation)
+    model:SetAttribute("LandscapeAuthoredSupportOffset", supportOffset)
+    model:SetAttribute("LandscapeFacingDirection", cursor.facingDirection)
     model:SetAttribute("LandscapeAuthoringTool", "Game1LandscapePainter")
     model:SetAttribute("LandscapeAssetSlug", row.slug)
     model:SetAttribute("LandscapeModelAssetId", tostring(row.model_asset_id))
@@ -1410,6 +1615,7 @@ local function writeMetadata(model, cursor, row, config)
     model:SetAttribute("LandscapePitch", config.pitch)
     model:SetAttribute("LandscapeRoll", config.roll)
     model:SetAttribute("LandscapeTetherEnabled", config.tetherEnabled)
+    model:SetAttribute("LandscapeSwayEnabled", config.swayEnabled)
     model:SetAttribute("LandscapeTetherLength", config.length)
     model:SetAttribute("LandscapeTetherThickness", config.thickness)
     model:SetAttribute("LandscapeTetherColor", config.color)
@@ -1461,10 +1667,13 @@ function Placement:Click()
         local folder = authoredFolder(self.workspace)
         instance = template:Clone()
         instance.Name = row.slug .. "_" .. HttpService:GenerateGUID(false):sub(1, 8)
-        local pivot = Surface.Pivot(cursor.point, cursor.normal, config)
+        local pivot = cursor.pivot
+        if typeof(pivot) ~= "CFrame" then error("Предпросмотр не определил pivot размещения") end
         instance:PivotTo(pivot)
         makeTether(instance, cursor.point, pivot.Position, config)
-        writeMetadata(instance, cursor, row, config)
+        SwayAuthoring.Sync(instance, config)
+        writeMetadata(instance, cursor, row, config,
+            self.authoredPivotRotation, self.authoredSupportOffset)
         if cursor.kind == "stem" then
             instance.Parent = attachToStem(instance, cursor)
         else
@@ -1480,7 +1689,8 @@ function Placement:Click()
     self.history:FinishRecording(record, Enum.FinishRecordingOperation.Commit)
     local targetNote = if cursor.kind == "stem" then " · прикреплено к стеблю"
         else " · на поверхности"
-    self.status("Размещено: " .. row.slug .. targetNote ..
+    local physicsNote = if config.swayEnabled then " · событийное покачивание (Play)" else " · Anchored"
+    self.status("Размещено: " .. row.slug .. targetNote .. physicsNote ..
         " · следующий клик ставит ещё один")
 end
 
@@ -1535,25 +1745,61 @@ function Placement:ApplyToSelection(config)
     if not managed and config.tetherEnabled then
         error("Для подвеса нужна точка крепления: сначала размести ассет прицелом")
     end
+    local authoredRotation = model:GetAttribute("LandscapeAuthoredPivotRotation")
+    local supportOffset = model:GetAttribute("LandscapeAuthoredSupportOffset")
+    local facingDirection = model:GetAttribute("LandscapeFacingDirection")
+    if managed and (typeof(authoredRotation) ~= "CFrame"
+        or typeof(supportOffset) ~= "number"
+        or typeof(facingDirection) ~= "Vector3") then
+        -- A pre-M295 model has no saved FBX basis. Its current world
+        -- rotation is NOT its original rig rotation. Only the matching
+        -- published template can repair it reliably.
+        if not self.row or not self.template
+            or tostring(self.row.model_asset_id) ~= tostring(model:GetAttribute("LandscapeModelAssetId"))
+            or self.authoredPivotRotation == nil or self.authoredSupportOffset == nil then
+            error("Старое размещение: выбери в каталоге тот же опубликованный ассет, затем Apply для исправления pivot")
+        end
+        authoredRotation = self.authoredPivotRotation
+        supportOffset = self.authoredSupportOffset
+        local camera = self.workspace.CurrentCamera
+        facingDirection = if camera then camera.CFrame.LookVector else Vector3.new(0, 0, -1)
+    end
     local record = self.history:TryBeginRecording("Game1LandscapeApplyProfile", "Apply landscape profile")
     if not record then error("Studio не разрешила Undo-запись") end
     local previousPivot = model:GetPivot()
+    local previousPoint = model:GetAttribute("LandscapeSurfacePoint")
+    local oldConfig = {
+        yaw = model:GetAttribute("LandscapeYaw") or 0,
+        pitch = model:GetAttribute("LandscapePitch") or 0,
+        roll = model:GetAttribute("LandscapeRoll") or 0,
+        tetherEnabled = model:GetAttribute("LandscapeTetherEnabled") == true,
+        swayEnabled = model:GetAttribute("LandscapeSwayEnabled") == true,
+        length = model:GetAttribute("LandscapeTetherLength") or 2,
+        thickness = model:GetAttribute("LandscapeTetherThickness") or 0.02,
+        color = model:GetAttribute("LandscapeTetherColor") or "#343B38",
+    }
     local oldLine = model:FindFirstChild(LINE_NAME)
     local savedLine = if oldLine then oldLine:Clone() else nil
     local previousAttributes = {}
-    for _, key in ipairs({"LandscapeYaw", "LandscapePitch", "LandscapeRoll",
-        "LandscapeTetherEnabled", "LandscapeTetherLength",
+    local attributeKeys = {"LandscapeYaw", "LandscapePitch", "LandscapeRoll",
+        "LandscapeTetherEnabled", "LandscapeSwayEnabled", "LandscapeTetherLength",
         "LandscapeTetherThickness", "LandscapeTetherColor",
-        "LandscapeSurfacePoint", "LandscapeSurfaceNormal"}) do
+        "LandscapeSurfacePoint", "LandscapeSurfaceNormal", "LandscapeSchemaVersion",
+        "LandscapeAuthoredPivotRotation", "LandscapeAuthoredSupportOffset",
+        "LandscapeFacingDirection"}
+    for _, key in ipairs(attributeKeys) do
         previousAttributes[key] = model:GetAttribute(key)
     end
     local ok, reason = pcall(function()
-        local pivot = if managed then Surface.Pivot(point, normal, config) else
+        local targetKind = if anchoredStem then "stem" else "surface"
+        local pivot = if managed then Surface.Pivot(point, normal, config,
+            authoredRotation, supportOffset, facingDirection, targetKind) else
             CFrame.new(previousPivot.Position) * CFrame.Angles(
                 math.rad(config.pitch), math.rad(config.yaw), math.rad(config.roll))
         model:PivotTo(pivot)
         if managed then
             replaceTether(model, point, pivot.Position, config)
+            SwayAuthoring.Sync(model, config)
             -- For regular surface placement the point is unchanged; for a
             -- moved branch this refreshes the authored world-space cache.
             model:SetAttribute("LandscapeSurfacePoint", point)
@@ -1563,18 +1809,28 @@ function Placement:ApplyToSelection(config)
             model:SetAttribute("LandscapePitch", config.pitch)
             model:SetAttribute("LandscapeRoll", config.roll)
             model:SetAttribute("LandscapeTetherEnabled", config.tetherEnabled)
+            model:SetAttribute("LandscapeSwayEnabled", config.swayEnabled)
             model:SetAttribute("LandscapeTetherLength", config.length)
             model:SetAttribute("LandscapeTetherThickness", config.thickness)
             model:SetAttribute("LandscapeTetherColor", config.color)
+            model:SetAttribute("LandscapeSchemaVersion", 3)
+            model:SetAttribute("LandscapeAuthoredPivotRotation", authoredRotation)
+            model:SetAttribute("LandscapeAuthoredSupportOffset", supportOffset)
+            model:SetAttribute("LandscapeFacingDirection", facingDirection)
         end
     end)
     if not ok then
         pcall(function()
+            -- Restore the static authoring state; Undo.Cancel restores the
+            -- complete prior model if the editor transaction fails.
+            SwayAuthoring.Sync(model, oldConfig)
             model:PivotTo(previousPivot)
             local existing = model:FindFirstChild(LINE_NAME)
             if existing and existing:GetAttribute("Game1LandscapeAttachment") == true then existing:Destroy() end
             if savedLine then savedLine.Parent = model; savedLine = nil end
-            for key, value in pairs(previousAttributes) do model:SetAttribute(key, value) end
+            for _, key in ipairs(attributeKeys) do
+                model:SetAttribute(key, previousAttributes[key])
+            end
         end)
         if savedLine then savedLine:Destroy() end
         self.history:FinishRecording(record, Enum.FinishRecordingOperation.Cancel)
@@ -1583,7 +1839,8 @@ function Placement:ApplyToSelection(config)
     if savedLine then savedLine:Destroy() end
     self.history:FinishRecording(record, Enum.FinishRecordingOperation.Commit)
     if managed then
-        self.status("Профиль применён к " .. model.Name .. " · точка крепления сохранена")
+        local physicsNote = if config.swayEnabled then " · покачивание по событиям" else " · Anchored"
+        self.status("Профиль применён к " .. model.Name .. " · крепление сохранено" .. physicsNote)
     else
         self.status("Поворот применён к " .. model.Name .. " · без подвеса (нет surface anchor)")
     end
@@ -1598,7 +1855,7 @@ return Placement
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="11">
+      <Item class="ModuleScript" referent="12">
         <Properties>
           <string name="Name">LandscapeAssetsWidget</string>
           <string name="Source"><![CDATA[-- Catalog/pivot/profile controls for the independent Landscape Painter dock.
@@ -1675,12 +1932,13 @@ function AssetsWidget.new(parent, actions)
     self.active = false
     self.targetMode = "auto"
     self.config = {yaw = 0, pitch = 0, roll = 0,
-        tetherEnabled = false, length = 2, thickness = 0.02,
+        tetherEnabled = false, swayEnabled = false, length = 2, thickness = 0.02,
         color = "#343B38"}
 
     section(parent, "02 · Ассеты · прицел / Pivot")
     self.mode = button(parent, "Начать · Размещение ассета", 41)
     self.mode.MouseButton1Click:Connect(actions.toggleAsset)
+    self.modeStatus = label(parent, "Выбери ассет, затем нажми «Начать»", 54, MUTED)
     self.target = button(parent, "Прицел: Авто · стебель / поверхность", 35)
     self.target.MouseButton1Click:Connect(function()
         self.targetMode = if self.targetMode == "auto" then "stem"
@@ -1699,7 +1957,7 @@ function AssetsWidget.new(parent, actions)
     self.chosen = label(parent, "Ассет не выбран", 27, TEXT)
 
     section(parent, "03 · Поворот ассета")
-    label(parent, "Прицел совмещает Pivot с поверхностью. Настраивай поворот по живому превью.", 42)
+    label(parent, "Без подвеса Pivot стоит в точке крепления. С подвесом он ниже на длину нити.", 42)
     self.axes = {}
     for _, definition in ipairs({
         {key = "yaw", name = "Yaw · по нормали"},
@@ -1738,12 +1996,20 @@ function AssetsWidget.new(parent, actions)
         end)
     end
 
-    section(parent, "04 · Подвес · видимый отрезок")
+    section(parent, "04 · Подвес · реакция на события")
     self.tether = button(parent, "○ Подвес выключен")
     self.tether.MouseButton1Click:Connect(function()
         self.config.tetherEnabled = not self.config.tetherEnabled
+        if not self.config.tetherEnabled then self.config.swayEnabled = false end
         self:Changed()
     end)
+    self.sway = button(parent, "☐ Покачивание от ударов / ветра", 37)
+    self.sway.MouseButton1Click:Connect(function()
+        self.config.swayEnabled = not self.config.swayEnabled
+        if self.config.swayEnabled then self.config.tetherEnabled = true end
+        self:Changed()
+    end)
+    label(parent, "С галочкой: визуальное качание от удара, стрелы или ветра. Объект Anchored; верёвка декоративная.", 50)
     self.length = Adjustments.Slider(parent, {
         label = "Длина подвеса · studs", min = 0.05, max = 100,
         logarithmic = true, step = 0.05, value = self.config.length,
@@ -1803,17 +2069,28 @@ function AssetsWidget.new(parent, actions)
 end
 
 function AssetsWidget:Changed()
+    -- A Use profile previously overrode the visible checkbox silently.
+    -- Once the user edits any manual control, the UI becomes authoritative.
+    if self.activeId then
+        self.actions.useProfile(self.activeId, false)
+    end
     self:Refresh()
     self.actions.configChanged(table.clone(self.config))
 end
 
 function AssetsWidget:SetConfig(config)
-    for _, key in ipairs({"yaw", "pitch", "roll", "length", "thickness", "color", "tetherEnabled"}) do
+    for _, key in ipairs({"yaw", "pitch", "roll", "length", "thickness", "color", "tetherEnabled", "swayEnabled"}) do
         -- Equivalent rotations share one readable slider range (-180..180).
         self.config[key] = if key == "yaw" or key == "pitch" or key == "roll"
             then (config[key] + 180) % 360 - 180 else config[key]
     end
-    self:Changed()
+    -- Selecting/restoring a saved profile is not a manual edit.
+    self:Refresh()
+    self.actions.configChanged(table.clone(self.config))
+end
+
+function AssetsWidget:SetStatus(message)
+    self.modeStatus.Text = tostring(message)
 end
 
 function AssetsWidget:SetActive(active)
@@ -1827,6 +2104,7 @@ function AssetsWidget:Refresh()
     self.thickness:Set(self.config.thickness)
     self.color:Set(Color3.fromHex(self.config.color))
     self.tether.Text = if self.config.tetherEnabled then "● Подвес включён" else "○ Подвес выключен"
+    self.sway.Text = if self.config.swayEnabled then "☑ Покачивание · Play" else "☐ Покачивание от ударов / ветра"
     self.mode.Text = if self.active then "● Прицел активен · Enter завершить" else "Начать · Размещение ассета"
     self.target.Text = if self.targetMode == "auto" then "Прицел: Авто · стебель / поверхность"
         elseif self.targetMode == "stem" then "Прицел: Только стебель"
@@ -1834,7 +2112,7 @@ function AssetsWidget:Refresh()
     self.use.Text = if self.selectedProfile and self.activeId == self.selectedProfile
         then "● Use · активно (нажми, чтобы снять)" else "○ Use · для новых размещений"
     if self.activeId then
-        self.profileStatus.Text = "Use активен · новые размещения используют сохранённый профиль. Выключи Use для ручных настроек."
+        self.profileStatus.Text = "Use активен · параметры ниже соответствуют профилю. Любая ручная правка автоматически выключит Use."
         self.profileStatus.Size = UDim2.new(1, 0, 0, 52)
     else
         self.profileStatus.Size = UDim2.new(1, 0, 0, 30)
@@ -1876,6 +2154,9 @@ end
 function AssetsWidget:SelectProfile(id)
     for _, item in ipairs(self.profiles) do
         if item.id == id then
+            if self.activeId and self.activeId ~= id then
+                self.actions.useProfile(self.activeId, false)
+            end
             self.selectedProfile = id
             self.profileStatus.Text = "Профиль: " .. item.name
             self:SetConfig(item)
@@ -1903,11 +2184,22 @@ function AssetsWidget:SetProfiles(rows, activeId)
         local control = button(self.profileList, title, 31)
         control.LayoutOrder = index
         control.MouseButton1Click:Connect(function()
+            if self.activeId and self.activeId ~= item.id then
+                self.actions.useProfile(self.activeId, false)
+            end
             self.selectedProfile = item.id
             self.profileStatus.Text = "Профиль: " .. item.name
             self:SetConfig(item)
             self:Refresh()
         end)
+    end
+    if activeId then
+        for _, item in ipairs(rows) do
+            if item.id == activeId then
+                self:SetConfig(item)
+                return
+            end
+        end
     end
     self:Refresh()
 end
@@ -1916,7 +2208,7 @@ return AssetsWidget
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="12">
+      <Item class="ModuleScript" referent="13">
         <Properties>
           <string name="Name">LandscapeProfiles</string>
           <string name="Source"><![CDATA[-- Plugin-local placement authoring presets. No new asset catalog or server DB.
@@ -1939,13 +2231,19 @@ function Profiles.Validate(settings)
         assert(finite(settings[axis], -360, 360), axis .. " must be -360..360")
     end
     assert(type(settings.tetherEnabled) == "boolean", "tetherEnabled must be boolean")
+    -- Decode the old persisted checkbox once; new profiles contain sway only.
+    local swayEnabled = if settings.swayEnabled ~= nil then settings.swayEnabled
+        else settings.physicsEnabled == true
+    assert(type(swayEnabled) == "boolean", "swayEnabled must be boolean")
+    assert(not swayEnabled or settings.tetherEnabled, "sway requires tetherEnabled")
     assert(finite(settings.length, 0.05, 100), "tether length must be 0.05..100")
     assert(finite(settings.thickness, 0.02, 4), "tether thickness must be 0.02..4")
     assert(type(settings.color) == "string" and settings.color:match("^#%x%x%x%x%x%x$") ~= nil,
         "tether color must be #RRGGBB")
     return {
         yaw = settings.yaw, pitch = settings.pitch, roll = settings.roll,
-        tetherEnabled = settings.tetherEnabled, length = settings.length,
+        tetherEnabled = settings.tetherEnabled, swayEnabled = swayEnabled,
+        length = settings.length,
         thickness = settings.thickness, color = settings.color:upper(),
     }
 end
@@ -2036,7 +2334,7 @@ return Profiles
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="13">
+      <Item class="ModuleScript" referent="14">
         <Properties>
           <string name="Name">LandscapeStemTarget</string>
           <string name="Source"><![CDATA[-- Studio-only snapping to authored Landscape Painter stems. Existing M282 stems
@@ -2045,8 +2343,8 @@ return Profiles
 local StemTarget = {}
 
 local DECOR_ROOT = "Game1LandscapeDecor"
-local MAX_PICK_RADIUS = 0.85
-local MIN_PICK_RADIUS = 0.12
+local MAX_PICK_RADIUS = 1.2
+local MIN_PICK_RADIUS = 0.24
 
 local function branchFolder(workspace)
     local root = workspace:FindFirstChild(DECOR_ROOT)
@@ -2149,8 +2447,10 @@ function StemTarget.Find(parts, folder, unitRay, surfaceHit, maxDistance: number
             local b = part.Position + tangent * half
             local onStem, t, distance, fraction = StemTarget.Closest(origin, direction, a, b)
             if onStem and t <= maxDistance and t <= stopDistance then
-                -- A modest camera-distance tolerance makes very thin stems usable.
-                local tolerance = math.clamp(t * 0.0075, MIN_PICK_RADIUS, MAX_PICK_RADIUS)
+                -- Clickable radius is larger than the physical 0.05-stud stem.
+                -- Approximate a fixed on-screen targeting cone while retaining
+                -- wall occlusion and only considering authored stem geometry.
+                local tolerance = math.clamp(t * 0.012, MIN_PICK_RADIUS, MAX_PICK_RADIUS)
                     + part.Size.Y * 0.5
                 if distance <= tolerance then
                     local score = distance / tolerance
@@ -2175,27 +2475,34 @@ return table.freeze(StemTarget)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="14">
+      <Item class="ModuleScript" referent="15">
         <Properties>
           <string name="Name">LandscapeSurface</string>
-          <string name="Source"><![CDATA[-- Shared surface facing rule for landscape placement.
--- A published object's local front (-Z) points along the hit outward normal.
--- This is independent of camera direction and handles walls / ceilings.
+          <string name="Source"><![CDATA[-- Canonical Location placement frame. Imported MeshPart/PivotOffset/Bone
+-- coordinates remain owned by DecoAssetLoader; this module only calculates
+-- where to move the intact model. Do not rebuild or move the rig's own pivot.
+local DecoTransform = require(script.Parent.DecoTransform)
+
 local Surface = {}
 
-function Surface.Facing(position: Vector3, normal: Vector3): CFrame
+function Surface.Pivot(point: Vector3, normal: Vector3, settings,
+    authoredRotation: CFrame, supportOffset: number, cameraLook: Vector3,
+    targetKind: string): CFrame
     if normal.Magnitude < 0.0001 then error("surface normal is missing") end
-    local facing = normal.Unit
-    local up = if math.abs(facing:Dot(Vector3.yAxis)) > 0.97
-        then Vector3.zAxis else Vector3.yAxis
-    return CFrame.lookAt(position, position + facing, up)
-end
-
-function Surface.Pivot(point: Vector3, normal: Vector3, settings): CFrame
-    local offset = if settings.tetherEnabled then settings.length else 0
-    local base = Surface.Facing(point + normal.Unit * offset, normal)
-    return base * CFrame.Angles(
-        math.rad(settings.pitch), math.rad(settings.yaw), math.rad(settings.roll))
+    -- A surface contact is geometry-to-surface, not pivot-to-surface. This is
+    -- the same authored-geometry offset used by DecoManager (including Z-up
+    -- FBX axis correction); the original pivot stays inside the rig.
+    -- For an authored stem the selected socket IS the pivot location.
+    -- A tether always ends at the genuine authored pivot below its mount.
+    local position = if settings.tetherEnabled then
+        point - Vector3.yAxis * settings.length
+        elseif targetKind == "surface" then
+        point + normal.Unit * supportOffset
+        else point
+    local frame = DecoTransform.placementPivot(authoredRotation,
+        position, normal, cameraLook)
+    return frame * CFrame.Angles(math.rad(settings.pitch),
+        math.rad(settings.yaw), math.rad(settings.roll))
 end
 
 function Surface.Raycast(workspace, mouse, maxDistance: number)
@@ -2216,7 +2523,102 @@ return table.freeze(Surface)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="15">
+      <Item class="ModuleScript" referent="16">
+        <Properties>
+          <string name="Name">LandscapeSwayAuthoring</string>
+          <string name="Source"><![CDATA[-- Editor ownership: static visual attachments and an invisible query hit target.
+-- Cleanup is a one-time conversion when applying an older physical placement.
+local Authoring = {}
+local TARGET = "LandscapeSwayTarget"
+local GENERATED = "Game1LandscapePhysics"
+
+local function updateTarget(model: Model, config)
+    local existing = model:FindFirstChild(TARGET)
+    if existing then
+        if not existing:IsA("BasePart") or existing:GetAttribute("Game1LandscapeSwayTarget") ~= true then
+            error(TARGET .. " is reserved for the editor")
+        end
+        existing:Destroy()
+    end
+    if not (config.tetherEnabled and config.swayEnabled) then return end
+
+    local pivot = model:GetPivot()
+    local low, high = Vector3.new(math.huge, math.huge, math.huge), Vector3.new(-math.huge, -math.huge, -math.huge)
+    local found = false
+    for _, part in ipairs(model:GetDescendants()) do
+        if part:IsA("MeshPart") and part.Name ~= "rig_carrier"
+            and part:GetAttribute("Game1LandscapeAttachment") ~= true
+            and part:GetAttribute("Game1DecoPhysicsOnly") ~= true
+            and part.Name:lower():sub(1, 4) ~= "col_" then
+            local relative = pivot:ToObjectSpace(part.CFrame)
+            local half = part.Size * 0.5
+            for _, x in ipairs({-1, 1}) do
+                for _, y in ipairs({-1, 1}) do
+                    for _, z in ipairs({-1, 1}) do
+                        local point = relative:PointToWorldSpace(Vector3.new(x * half.X, y * half.Y, z * half.Z))
+                        low = Vector3.new(math.min(low.X, point.X), math.min(low.Y, point.Y), math.min(low.Z, point.Z))
+                        high = Vector3.new(math.max(high.X, point.X), math.max(high.Y, point.Y), math.max(high.Z, point.Z))
+                    end
+                end
+            end
+            found = true
+        end
+    end
+    if not found then error("Покачивание требует видимый MeshPart") end
+    local size = high - low
+    if size.Magnitude > 300 then error("Слишком большой ассет для sway-hitbox") end
+    local part = Instance.new("Part")
+    part.Name = TARGET
+    part:SetAttribute("Game1LandscapeSwayTarget", true)
+    part.Size = Vector3.new(math.max(0.12, size.X), math.max(0.12, size.Y), math.max(0.12, size.Z))
+    part.CFrame = pivot * CFrame.new((high + low) * 0.5)
+    part.Transparency = 1
+    part.CanCollide = false
+    part.CanTouch = false
+    part.CanQuery = true
+    part.CastShadow = false
+    part.Anchored = true
+    part.Parent = model
+end
+
+function Authoring.Sync(model: Model, config)
+    -- Remove native constraints created by M294-M299. This module never adds any.
+    for _, instance in ipairs(model:GetDescendants()) do
+        if instance:GetAttribute(GENERATED) == true then instance:Destroy() end
+    end
+    for _, part in ipairs(model:GetDescendants()) do
+        if part:IsA("BasePart") then
+            local collide = part:GetAttribute("Game1LandscapeOriginalCanCollide")
+            local query = part:GetAttribute("Game1LandscapeOriginalCanQuery")
+            if typeof(collide) == "boolean" and typeof(query) == "boolean" then
+                if collide then
+                    part.CanQuery = true
+                    part.CanCollide = true
+                else
+                    part.CanCollide = false
+                    part.CanQuery = query
+                end
+                part:SetAttribute("Game1LandscapeOriginalCanCollide", nil)
+                part:SetAttribute("Game1LandscapeOriginalCanQuery", nil)
+            end
+            local massless = part:GetAttribute("Game1LandscapeOriginalMassless")
+            if typeof(massless) == "boolean" then
+                part.Massless = massless
+                part:SetAttribute("Game1LandscapeOriginalMassless", nil)
+            end
+            part.Anchored = true
+        end
+    end
+    updateTarget(model, config)
+    model:SetAttribute("LandscapeSwayEnabled", config.tetherEnabled and config.swayEnabled)
+    model:SetAttribute("LandscapeTetherPhysicsEnabled", nil)
+end
+
+return table.freeze(Authoring)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="17">
         <Properties>
           <string name="Name">LandscapeWidget</string>
           <string name="Source"><![CDATA[-- Small self-contained Studio dock. The authoring tool owns all scene changes.
@@ -2402,7 +2804,7 @@ return LandscapeWidget
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="16">
+      <Item class="ModuleScript" referent="18">
         <Properties>
           <string name="Name">StudioLocationMeshNames</string>
           <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
@@ -2435,7 +2837,7 @@ return Naming
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="17">
+      <Item class="ModuleScript" referent="19">
         <Properties>
           <string name="Name">StudioLocationPublishedRigNormalize</string>
           <string name="Source"><![CDATA[-- Location-only normalization of Roblox importer scaffolding on a FRESH,
@@ -2557,7 +2959,7 @@ return table.freeze(Normalize)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="18">
+      <Item class="ModuleScript" referent="20">
         <Properties>
           <string name="Name">StudioLocationRigCarrier</string>
           <string name="Source"><![CDATA[-- Canonical Location-only rig carrier policy. Imported FBX mesh; never synthetic.
@@ -2790,7 +3192,7 @@ return table.freeze(Carrier)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="19">
+      <Item class="ModuleScript" referent="21">
         <Properties>
           <string name="Name">StudioMeshPhysicsCore</string>
           <string name="Source"><![CDATA[-- One Studio MeshPart physics writer shared by Real Estate and Location Assets.
@@ -3006,7 +3408,7 @@ return table.freeze(Core)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="20">
+      <Item class="ModuleScript" referent="22">
         <Properties>
           <string name="Name">StudioSkinnedMeshConnection</string>
           <string name="Source"><![CDATA[--!strict
@@ -3076,7 +3478,7 @@ return table.freeze(Connection)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="21">
+      <Item class="ModuleScript" referent="23">
         <Properties>
           <string name="Name">StudioTextureAppearance</string>
           <string name="Source"><![CDATA[-- Shared Studio-side material binding for all authored MeshParts.

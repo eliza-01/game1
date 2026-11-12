@@ -235,6 +235,76 @@ class AtlasRegistry:
                 imported += cur.rowcount
         return imported
 
+    def index_existing_published_image(self, *, source_path: str, atlas_key: str,
+                                       published_id: str, expected_sha256: str) -> dict:
+        """Explicit metadata-only indexing of an already uploaded weapon Image ID.
+
+        Never call Open Cloud or change existing consumer bindings. Identity and
+        source bytes must match the historical publication exactly.
+        """
+        if not re.fullmatch(r'[a-z0-9][a-z0-9_]{0,90}', atlas_key):
+            raise ValueError('invalid imported weapon atlas family')
+        if not str(published_id).isdigit() or not re.fullmatch(r'[0-9a-f]{64}', str(expected_sha256)):
+            raise ValueError('published texture metadata missing or incomplete')
+        source = (self.root / source_path).resolve()
+        if not source.is_relative_to(self.root) or not source.is_file():
+            raise ValueError('published source texture is missing locally')
+        if digest(source) != expected_sha256:
+            raise ValueError('texture differs from published image; refusing metadata import')
+        with Image.open(source) as image:
+            if image.format not in ('PNG', 'JPEG'):
+                raise ValueError('legacy texture must be PNG/JPEG; no silent conversion')
+            width, height = image.size
+            if width < 1 or height < 1 or max(width,height) > 16384:
+                raise ValueError('texture dimensions out of range')
+            uses_alpha = bool(image.mode in ('RGBA', 'LA') or 'transparency' in image.info)
+            extension = '.png' if image.format == 'PNG' else '.jpg'
+            image.verify()
+        # A weapon, arrow and Location Asset may use the SAME published image.
+        # Its Image ID must have a single atlas identity, not duplicated families.
+        with self.connect() as db:
+            same_id = db.execute('''SELECT id,source_sha256,width,height,retired_at
+                FROM texture_atlas_variants WHERE published_id=?''', (published_id,)).fetchall()
+        if same_id:
+            if len(same_id) != 1 or same_id[0]['retired_at'] is not None or \
+               same_id[0]['source_sha256'] != expected_sha256 or \
+               (same_id[0]['width'], same_id[0]['height']) != (width, height):
+                raise ValueError('published Image ID already belongs to a different atlas identity; review it manually')
+            return self.get_variant(int(same_id[0]['id']))
+        filename = f'{atlas_key}_{width}x{height}_atlas{extension}'
+        destination = (self.root / 'assets/source/texture-atlases' / atlas_key / f'{width}x{height}' / filename)
+        now = time.time()
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            row = db.execute('''SELECT v.id,v.source_sha256,v.published_id
+                FROM texture_atlas_variants v JOIN texture_atlas_families f ON f.id=v.family_id
+                WHERE f.atlas_key=? AND v.width=? AND v.height=?''',
+                (atlas_key,width,height)).fetchone()
+            if row:
+                if row['source_sha256'] != expected_sha256 or str(row['published_id']) != published_id:
+                    raise ValueError('atlas family has different publication at this resolution')
+                variant_id = int(row['id'])
+            else:
+                if destination.exists() and digest(destination) != expected_sha256:
+                    raise ValueError('indexed atlas destination contains different pixels')
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                if not destination.exists():
+                    shutil.copy2(source,destination)
+                family = db.execute('SELECT id FROM texture_atlas_families WHERE atlas_key=?', (atlas_key,)).fetchone()
+                if family is None:
+                    family_id = db.execute('INSERT INTO texture_atlas_families(atlas_key,created_at) VALUES(?,?)',
+                                            (atlas_key,now)).lastrowid
+                else:
+                    family_id = int(family['id'])
+                cursor = db.execute('''INSERT INTO texture_atlas_variants
+                    (family_id,width,height,filename,original_filename,source_path,source_sha256,
+                    uses_alpha,published_id,published_sha256,moderation_state,published_at,created_at)
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+                    (family_id,width,height,filename,source.name,destination.relative_to(self.root).as_posix(),
+                     expected_sha256,int(uses_alpha),published_id,expected_sha256,'INDEXED_LEGACY',now,now))
+                variant_id = int(cursor.lastrowid)
+        return self.get_variant(variant_id)
+
     def get_variant(self, variant_id: int) -> dict | None:
         with self.connect() as db:
             row = db.execute('''SELECT v.*, f.atlas_key, r.source_sha256 AS replacement_sha256

@@ -23,6 +23,7 @@ def route(parsed, sources, publication_config):
         "/api/characters": ("characters", None),
         "/api/animations": ("animations", "character"),
         "/api/weapons": ("weapons", None),
+        "/api/arrows": ("arrows", None),
         "/api/monsters": ("monsters", None),
         "/api/monster-animations": ("monster_animations", "monster"),
         "/api/npcs": ("npcs", None),

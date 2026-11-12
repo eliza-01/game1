@@ -83,9 +83,13 @@ def check_character_animation(
         if required not in attack_controller_text:
             err(f"robloxlineage attack/aim integration missing {required}")
     aim_pose_text = (ROOT / "src/client/combat/AimPoseController.luau").read_text(encoding="utf-8")
-    for required in ["RunService.PreSimulation", "CharacterUpperBodyRig.ResolveBridge", "AimTorsoYawDegrees", "applyWorldAim", "desiredTransform", "ViewportPointToRay", "Game1AimReticle"]:
+    for required in ["RunService.PreSimulation", "CharacterUpperBodyRig.ResolveBridge", "AimTorsoYawDegrees", "applyWorldAim", "desiredTransform", "CameraController.GetAimRay", "Game1AimReticle"]:
         if required not in aim_pose_text:
             err(f"procedural torso aim controller missing {required}")
+    camera_text = (ROOT / "src/client/character/CameraController.luau").read_text(encoding="utf-8")
+    for required in ('function CameraController.GetAimRay()', 'ViewportPointToRay'):
+        if required not in camera_text:
+            err(f"central camera ray controller missing {required}")
     movement_runtime = (ROOT / "src/client/character/MovementController.luau").read_text(encoding="utf-8")
     for required in ["BeginAimFacingCompensation", "UpdateAimFacingCompensation", "applyAimFacingCompensation"]:
         if required not in movement_runtime:

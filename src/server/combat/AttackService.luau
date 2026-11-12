@@ -11,13 +11,23 @@ local WeaponAttackVolume = require(CombatShared:WaitForChild("WeaponAttackVolume
 local WeaponBounceConfig = require(CombatShared:WaitForChild("WeaponBounceConfig"))
 local CharacterAnimationRegistry = require(CharacterShared:WaitForChild("CharacterAnimationRegistry"))
 local AttackAimGeometry = require(CombatShared:WaitForChild("AttackAimGeometry"))
+local BowAimGeometry = require(CombatShared:WaitForChild("BowAimGeometry"))
+local BowProjectileConfig = require(CombatShared:WaitForChild("BowProjectileConfig"))
+local BowProjectileService = require(script.Parent:WaitForChild("BowProjectileService"))
 local WeaponEnvironmentCollision = require(script.Parent:WaitForChild("WeaponEnvironmentCollision"))
 local AttackDamageResolver = require(script.Parent:WaitForChild("AttackDamageResolver"))
 local AttackSessionStore = require(script.Parent:WaitForChild("AttackSessionStore"))
 local HostilePursuitRegistry = require(script.Parent:WaitForChild("HostilePursuitRegistry"))
 local WeaponBounceService = require(script.Parent:WaitForChild("WeaponBounceService"))
 
+-- A decorative reaction must not prevent the authoritative combat module from starting.
+local swayOk, swayModule = pcall(function()
+    return require(script.Parent.Parent:WaitForChild("world"):WaitForChild("LandscapeSwayService"))
+end)
+local LandscapeSwayService = if swayOk then swayModule else nil
+
 local AttackService = {}
+local pendingBowReleases: { [Player]: any } = {}
 
 local function rowsForEquippedAttack(character: Model): any
     local profileId = tostring(character:GetAttribute("AnimationProfileId") or character:GetAttribute("CharacterArchetype") or "")
@@ -29,9 +39,9 @@ local function rowsForEquippedAttack(character: Model): any
     local weaponSet = tostring(character:GetAttribute("AnimationWeaponSet") or "")
     if weaponSet ~= "" and weaponSet ~= "base" and weaponSet ~= "unarmed" then
         local weapon = profile.weapons and profile.weapons[weaponSet]
-        if weapon and weapon.attack then
-            return weapon.attack
-        end
+        if weapon and weapon.attack then return weapon.attack end
+        -- In particular, a bow may NEVER fire using the fallback hands clip.
+        if weaponSet == "bow" then return nil end
     end
     return profile.base and profile.base.attack or nil
 end
@@ -144,6 +154,7 @@ local function applyAnimatedWeaponSweep(
             -- Keep the authored HitStart -> HitEnd environment query unchanged.
             -- Combat/pursuit suppresses only the bounce RESPONSE to a real contact.
             local environmentContact = WeaponEnvironmentCollision.Query(previousVolume, volume)
+            if LandscapeSwayService then LandscapeSwayService.Melee(volume, root.Position) end
             if environmentContact then
                 local pursuerCount = HostilePursuitRegistry.Count(character)
                 if character:GetAttribute("InCombat") == true or pursuerCount > 0 then
@@ -214,6 +225,7 @@ local function clearAttackState(
         character:SetAttribute("AttackDamageStartsAt", nil)
         character:SetAttribute("AttackDamageEndsAt", nil)
         character:SetAttribute("AttackClipId", nil)
+        character:SetAttribute("AttackReleaseAt", nil)
     end
     return true
 end
@@ -281,6 +293,54 @@ triggerWeaponBounce = function(
     return true
 end
 
+-- Aim packets can only update an already accepted, unreleased bow attack.
+-- The server owns the release clock, not a client marker or attack timestamp.
+local function updateBowAim(player: Player, payload: any)
+    if type(payload) ~= "table" then return end
+    local pending = pendingBowReleases[player]
+    if not pending or pending.clientAttackId ~= math.floor(tonumber(payload.clientAttackId) or 0) then return end
+    local now = os.clock()
+    if now > pending.releaseAt or now - pending.lastUpdate < BowProjectileConfig.AimUpdateInterval * 0.5 then return end
+    if player.Character ~= pending.character then return end
+    local session = AttackSessionStore.Get(player)
+    if not session or session.serial ~= pending.serial or session.character ~= pending.character then return end
+    local root = pending.character:FindFirstChild("RootCollider")
+    if not root or not root:IsA("BasePart") then return end
+    local origin, direction = BowAimGeometry.Validate(root, payload.aimOrigin, payload.aimDirection)
+    if not origin or not direction then return end
+    pending.aimOrigin = origin
+    pending.aimDirection = direction
+    pending.lastUpdate = now
+end
+
+local function beginBowRelease(player: Player, character: Model, root: BasePart,
+    clientAttackId: number, serial: number, timing: any, payload: any): boolean
+    local releaseEvent = timing.events and timing.events[BowProjectileConfig.ReleaseEvent]
+    local releaseTime = releaseEvent and tonumber(releaseEvent.time)
+    if not releaseTime or releaseTime < 0 or releaseTime > timing.duration then return false end
+    local origin, direction = BowAimGeometry.Validate(root, payload.aimOrigin, payload.aimDirection)
+    if not origin or not direction then return false end
+    local pending = {
+        character = character,
+        serial = serial,
+        clientAttackId = clientAttackId,
+        aimOrigin = origin,
+        aimDirection = direction,
+        releaseAt = os.clock() + releaseTime,
+        lastUpdate = 0,
+    }
+    pendingBowReleases[player] = pending
+    task.delay(releaseTime, function()
+        if pendingBowReleases[player] ~= pending then return end
+        pendingBowReleases[player] = nil
+        local session = AttackSessionStore.Get(player)
+        if player.Character ~= character or not session or session.serial ~= serial
+            or session.clientAttackId ~= clientAttackId then return end
+        BowProjectileService.Release(player, character, pending.aimOrigin, pending.aimDirection)
+    end)
+    return true
+end
+
 local function attack(player: Player, payload: any)
     if type(payload) ~= "table" then
         if Config.DebugLogs then
@@ -325,12 +385,21 @@ local function attack(player: Player, payload: any)
         return
     end
 
-    local damageWindow = CharacterAttackWindow.Resolve(timing)
-    if not damageWindow then
+    local isBow = string.lower(tostring(character:GetAttribute("EquippedWeaponType") or "")) == "bow"
+    local releaseEvent = if isBow then timing.events and timing.events[BowProjectileConfig.ReleaseEvent] else nil
+    local damageWindow = if isBow then nil else CharacterAttackWindow.Resolve(timing)
+    if (isBow and not releaseEvent) or (not isBow and not damageWindow) then
         if Config.DebugLogs then
             print(("[game1][attack] reject player=%s reason=missing_character_damage_window clip=%s"):format(player.Name, clipId))
         end
         return
+    end
+
+    -- No bow is allowed to reuse melee attack windows or an unvalidated camera.
+    if isBow then
+        if tostring(character:GetAttribute("AnimationWeaponSet") or "") ~= "bow" then return end
+        local origin, direction = BowAimGeometry.Validate(root, payload.aimOrigin, payload.aimDirection)
+        if not origin or not direction then return end
     end
 
     local now = os.clock()
@@ -345,16 +414,21 @@ local function attack(player: Player, payload: any)
     character:SetAttribute("AttackClipId", clipId)
     character:SetAttribute("AttackStartedAt", now)
     character:SetAttribute("AttackEndsAt", now + attackDuration)
-    character:SetAttribute("AttackDamageStartsAt", now + damageWindow.startTime)
-    character:SetAttribute("AttackDamageEndsAt", now + damageWindow.endTime)
+    character:SetAttribute("AttackDamageStartsAt", if damageWindow then now + damageWindow.startTime else nil)
+    character:SetAttribute("AttackDamageEndsAt", if damageWindow then now + damageWindow.endTime else nil)
+    character:SetAttribute("AttackReleaseAt", if releaseEvent then now + releaseEvent.time else nil)
     character:SetAttribute("LastAttackHitZone", nil)
     character:SetAttribute("LastAttackHeadshot", false)
     character:SetAttribute("LastAttackBounced", false)
 
-    -- Character weapon damage exists only inside the authored HitStart -> HitEnd
-    -- interval. Hit is no longer a character damage event; monsters keep their
-    -- separate single-Hit timing policy in MonsterAIService.
-    clearAttackStateLater(player, character, serial, clientAttackId, attackDuration, true)
+    if isBow then
+        if not beginBowRelease(player, character, root, clientAttackId, serial, timing, payload) then
+            clearAttackState(player, character, serial, clientAttackId, false)
+            return
+        end
+    end
+    -- Bow Release creates one projectile; only melee uses the HitStart/HitEnd volume.
+    clearAttackStateLater(player, character, serial, clientAttackId, attackDuration, not isBow)
 end
 
 local function recordWeaponPose(player: Player, payload: any)
@@ -367,6 +441,9 @@ local function recordWeaponPose(player: Player, payload: any)
     end
 
     local character = player.Character
+    if character and string.lower(tostring(character:GetAttribute("EquippedWeaponType") or "")) == "bow" then
+        return -- a bow cannot submit melee hitbox pose packets
+    end
     local root = character and character:FindFirstChild("RootCollider")
     local weapon = character and character:FindFirstChild("EquippedWeapon")
     if not character
@@ -454,7 +531,15 @@ function AttackService.Start()
     poseEvent.Parent = remotes
     poseEvent.OnServerEvent:Connect(recordWeaponPose)
 
+    local aimEvent = remotes:FindFirstChild("BowAimUpdate") or Instance.new("RemoteEvent")
+    aimEvent.Name = "BowAimUpdate"
+    aimEvent.Parent = remotes
+    aimEvent.OnServerEvent:Connect(updateBowAim)
+
     Players.PlayerRemoving:Connect(AttackSessionStore.Forget)
+    Players.PlayerRemoving:Connect(function(player)
+        pendingBowReleases[player] = nil
+    end)
 end
 
 return table.freeze(AttackService)

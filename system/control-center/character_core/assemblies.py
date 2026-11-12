@@ -18,6 +18,9 @@ from sqlite_connection import connect
 FACE = ('head', 'eye_l', 'eye_r', 'eyebrow_l', 'eyebrow_r', 'hair')
 SOLID_FACE = frozenset(('eye_l', 'eye_r', 'eyebrow_l', 'eyebrow_r'))
 HEX_COLOR = re.compile(r'#[0-9a-fA-F]{6}\Z')
+MATERIAL_SLOTS = frozenset((*ARMOR_SLOTS,*FACE))
+MATERIALS = frozenset(('Glass','Metal','SmoothPlastic','Plaster','Slate','Sandstone','Sand',
+                       'Cardboard','Rubber','Limestone','Granite'))
 
 
 def lua_table(value):
@@ -86,13 +89,19 @@ class CharacterAssemblies:
         result=dict(schema_version=2,rig=dict(id=rig['id'],asset_id=rig['model_asset_id'],
                     revision=rig['published_revision'],bone_names=[b['name'] for b in bones]),parts={})
         missing=[]
+        selected_materials=recipe.get('part_materials') or {}
+        if not isinstance(selected_materials,dict) or set(selected_materials)-MATERIAL_SLOTS or any(
+                material not in MATERIALS for material in selected_materials.values()):
+            return dict(schema_version=2,ready=False,missing=['invalid part material override'],parts={})
         if not str(rig['model_asset_id']).isdigit():missing.append('rig not published')
         armor_parts,armor_missing=self.armor.resolve(recipe.get('armor_set_id'),gender,rig_id)
         missing.extend('armor '+m for m in armor_missing)
         for slot,(mesh,appearance,_atlas) in armor_parts.items():
             record,problem=self._part(slot,mesh['id'],rig_id,gender,appearance_id=appearance['id'])
             if problem:missing.append(slot+': '+problem)
-            else:result['parts'][slot]=record
+            else:
+                if slot in selected_materials:record['material']=selected_materials[slot]
+                result['parts'][slot]=record
         faces=recipe.get('face_parts') or {}
         for slot in FACE:
             selection=faces.get(slot) or {}
@@ -134,6 +143,7 @@ class CharacterAssemblies:
                         missing.append(slot+': color must be #RRGGBB')
                     else:
                         record['color']=color.upper()
+            if slot in selected_materials:record['material']=selected_materials[slot]
             result['parts'][slot]=record
         result['ready']=not missing
         result['missing']=missing
@@ -164,6 +174,10 @@ class CharacterAssemblies:
         expected=payload.get('expected_revision',0)
         if type(expected) is not int or expected!=(old['revision'] if old else 0):
             raise ValueError('character changed; refresh before saving')
+        selected_materials=payload.get('part_materials') or {}
+        if not isinstance(selected_materials,dict) or set(selected_materials)-MATERIAL_SLOTS or any(
+                material not in MATERIALS for material in selected_materials.values()):
+            raise ValueError('part_materials: unsupported body slot or Roblox material')
         faces=payload.get('face_parts') or {}
         if not isinstance(faces,dict) or set(faces)-set(FACE):raise ValueError('unknown face slot')
         face_atlases=payload.get('face_atlases') or {}
@@ -207,7 +221,8 @@ class CharacterAssemblies:
                 raise ValueError('hair colors must be #RRGGBB')
         recipe=dict(schema_version=2,rig_id=rig_id,gender=payload['gender'],armor_set_id=set_id,
                     face_parts=stored_faces,face_colors={k:v.upper() for k,v in face_colors.items()},
-                    hair_colors={k:v.upper() for k,v in hair_colors.items()})
+                    hair_colors={k:v.upper() for k,v in hair_colors.items()},
+                    part_materials=selected_materials)
         pin=payload.get('rig_revision')
         if pin is not None:
             rig=published_rig(self.components,rig_id,pin)

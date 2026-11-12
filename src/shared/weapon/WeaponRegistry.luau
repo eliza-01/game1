@@ -2,7 +2,7 @@
 return table.freeze({
 	schemaVersion = 2,
 	project = "game1",
-	activeWeaponSlug = "newbie_sword_01",
+	activeWeaponSlug = "newbie_bow",
 	attackMovementByType = table.freeze({
 		["dagger"] = table.freeze({
 			animationSet = "1hs",
@@ -26,6 +26,28 @@ return table.freeze({
 		}),
 	}),
 	weapons = table.freeze({
+		["newbie_bow"] = table.freeze({
+			slug = "newbie_bow",
+			nameEn = "Newbie Bow",
+			nameRu = "Лук Новичка",
+			weaponType = "bow",
+			rarity = "common",
+			attackRadiusStuds = 40,
+			status = "PUBLISHED",
+			modelAssetId = "94574936821202",
+			serverStoragePath = "ServerStorage.weapons.bow.newbie_bow.model.newbie_bow",
+			statModifiers = table.freeze({
+				["AttackSpeed"] = 0,
+				["Damage"] = 15,
+			}),
+			atlasVariantId = 0,
+			textures = table.freeze({
+				["newbie_bow_01_32x128_atlas"] = table.freeze({
+					assetId = "130978850204616",
+					sha256 = "ceae65370125fb5862011a67b537a2ee1ce8a751a2e1a7b09cbece259aed8ec1",
+				}),
+			}),
+		}),
 		["newbie_dagger"] = table.freeze({
 			slug = "newbie_dagger",
 			nameEn = "Newbie Dagger",
@@ -40,6 +62,7 @@ return table.freeze({
 				["AttackSpeed"] = 0,
 				["Damage"] = 0,
 			}),
+			atlasVariantId = 0,
 			textures = table.freeze({
 				["newbie_dagger_01"] = table.freeze({
 					assetId = "93664090329756",
@@ -61,6 +84,7 @@ return table.freeze({
 				["AttackSpeed"] = 0,
 				["Damage"] = 0,
 			}),
+			atlasVariantId = 0,
 			textures = table.freeze({
 				["newbie_sword_01"] = table.freeze({
 					assetId = "127316574053686",
@@ -82,6 +106,7 @@ return table.freeze({
 				["AttackSpeed"] = 50,
 				["Damage"] = 10,
 			}),
+			atlasVariantId = 0,
 			textures = table.freeze({
 				["starter_axe_01"] = table.freeze({
 					assetId = "114414624522732",
@@ -103,6 +128,7 @@ return table.freeze({
 				["AttackSpeed"] = 0,
 				["Damage"] = 0,
 			}),
+			atlasVariantId = 0,
 			textures = table.freeze({
 				["newbie_saber_01"] = table.freeze({
 					assetId = "98409980598157",
@@ -124,6 +150,7 @@ return table.freeze({
 				["AttackSpeed"] = 100,
 				["Damage"] = 50,
 			}),
+			atlasVariantId = 0,
 			textures = table.freeze({
 			}),
 		}),
@@ -141,6 +168,7 @@ return table.freeze({
 				["AttackSpeed"] = 0,
 				["Damage"] = 0,
 			}),
+			atlasVariantId = 0,
 			textures = table.freeze({
 				["guards_sword_01"] = table.freeze({
 					assetId = "75862292451032",
@@ -162,6 +190,7 @@ return table.freeze({
 				["AttackSpeed"] = 0,
 				["Damage"] = 0,
 			}),
+			atlasVariantId = 0,
 			textures = table.freeze({
 				["warsmiths_hummer"] = table.freeze({
 					assetId = "73070479826352",

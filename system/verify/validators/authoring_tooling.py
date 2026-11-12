@@ -21,7 +21,7 @@ def check_authoring_tooling(root: Path, report_error: Callable[[str], None]) -> 
             report_error(f"m38 seed-place build isolation missing {required}")
 
 
-    # m40 Asset Manager: Animation Speed is presented as one clear card per animation channel.
+    # Animation Speed keeps compact channel rows; clip overrides use bounded table pages.
     animation_speed_ui_text = (root / "system/control-center/static/animation-speed.js").read_text(encoding="utf-8")
     animation_speed_css_text = (root / "system/control-center/static/asset-manager.css").read_text(encoding="utf-8")
     animation_speed_html_text = (root / "system/control-center/static/index.html").read_text(encoding="utf-8")
@@ -30,7 +30,9 @@ def check_authoring_tooling(root: Path, report_error: Callable[[str], None]) -> 
         "animation-speed-rule-grid",
         "animation-speed-rule",
         "Gameplay stat",
-        "Stat units for +1% playback",
+        "custom-scaling-table-row",
+        "CUSTOM_SCALING_PAGE_SIZE",
+        "custom-scaling-filter",
         "Playback formula",
         "Scales independently from Combat Idle",
     ]:

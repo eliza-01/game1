@@ -10,6 +10,7 @@ local CharacterConfig = require(CharacterShared:WaitForChild("CharacterConfig"))
 local AttackConfig = require(CombatShared:WaitForChild("AttackConfig"))
 local CharacterAttackWindow = require(CombatShared:WaitForChild("CharacterAttackWindow"))
 local WeaponAttackVolume = require(CombatShared:WaitForChild("WeaponAttackVolume"))
+local BowProjectileConfig = require(CombatShared:WaitForChild("BowProjectileConfig"))
 local UiInputGuard = require(script.Parent.Parent:WaitForChild("UiInputGuard"))
 local AttackController = {}
 local started = false
@@ -23,6 +24,10 @@ local activePoseUntil = 0
 local activePoseStartedAt = 0
 local poseAccumulator = 0
 local weaponPoseRemote: RemoteEvent? = nil
+local bowAimRemote: RemoteEvent? = nil
+local bowAimAttackId = 0
+local bowAimUntil = 0
+local bowAimAccumulator = 0
 
 
 local function publishWeaponPose()
@@ -67,6 +72,8 @@ local function finishPresentation(sequence: number)
             movementController.EndAttackMovement()
         end
     end
+    bowAimAttackId = 0
+    bowAimUntil = 0
     if aimPoseController and aimPoseController.EndAttack then
         aimPoseController.EndAttack()
     end
@@ -96,8 +103,34 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
     local remotes = ReplicatedStorage:WaitForChild("Game1Remotes")
     local attack = remotes:WaitForChild("AttackIntent")
     weaponPoseRemote = remotes:WaitForChild("AttackWeaponPose") :: RemoteEvent
+    bowAimRemote = remotes:WaitForChild("BowAimUpdate") :: RemoteEvent
 
     RunService.RenderStepped:Connect(function(deltaTime)
+        if bowAimAttackId > 0 then
+            if os.clock() >= bowAimUntil then
+                bowAimAttackId = 0
+            else
+                -- The same stationary attack facing compensation used by hands
+                -- receives the live camera direction while the bow is drawn.
+                -- This is a local presentation update; server aim packets retain
+                -- their existing bounded rate and authoritative validation.
+                local origin, direction = aimPoseController.GetAimRay()
+                if direction and movementController and movementController.UpdateAimFacingCompensation then
+                    movementController.UpdateAimFacingCompensation(direction)
+                end
+                bowAimAccumulator += deltaTime
+                if bowAimAccumulator >= BowProjectileConfig.AimUpdateInterval then
+                    bowAimAccumulator = 0
+                    if origin and direction then
+                        bowAimRemote:FireServer({
+                            clientAttackId = bowAimAttackId,
+                            aimOrigin = origin,
+                            aimDirection = direction,
+                        })
+                    end
+                end
+            end
+        end
         if activePoseAttackId <= 0 then
             return
         end
@@ -147,17 +180,21 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
             return
         end
 
-        local damageWindow = CharacterAttackWindow.Resolve(action.timeline)
-        if not damageWindow then
-            warn(("[game1][attack] action has invalid HitStart/HitEnd damage window: %s"):format(tostring(action.clipId)))
+        local isBow = string.lower(tostring(character:GetAttribute("EquippedWeaponType") or "")) == "bow"
+        local release = isBow and action.timeline and action.timeline.events
+            and action.timeline.events[BowProjectileConfig.ReleaseEvent] or nil
+        local damageWindow = if isBow then nil else CharacterAttackWindow.Resolve(action.timeline)
+        if (isBow and not release) or (not isBow and not damageWindow) then
+            warn(("[game1][attack] missing %s event(s): %s"):format(
+                if isBow then "Release" else "HitStart/HitEnd", tostring(action.clipId)))
             return
         end
 
         attackSequence += 1
         local sequence = attackSequence
         local attackDuration = math.max(0.05, tonumber(action.durationSeconds) or 0.05)
-        local damagePoseStart = math.clamp(damageWindow.startTime, 0, attackDuration)
-        local damagePoseEnd = math.clamp(damageWindow.endTime, damagePoseStart, attackDuration)
+        local damagePoseStart = math.clamp(if isBow then release.time else damageWindow.startTime, 0, attackDuration)
+        local damagePoseEnd = if damageWindow then math.clamp(damageWindow.endTime, damagePoseStart, attackDuration) else damagePoseStart
         local movingAtAttackStart = movementController and movementController.IsMoving and movementController.IsMoving() or false
         if movementController and movementController.BeginAttackMovement then
             -- Every weapon may attack while moving. The equipped weapon type
@@ -189,17 +226,38 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
                         movementController.LockFacing(direction.Unit, attackDuration)
                     end
                 end
-                if aimPoseController then
-                    -- Same target and same complete attack lifetime as gameplay.
-                    -- TorsoAimResponse controls interpolation, not early release.
-                    aimPoseController.BeginAttack(target, attackDuration)
-                end
             end
         end
+        if aimPoseController then
+            -- World-space yaw AND pitch follow the reticle for the complete
+            -- authored attack, including targets directly above or below.
+            aimPoseController.BeginAttack(target, attackDuration)
+        end
+
 
         task.delay(attackDuration, function()
             finishPresentation(sequence)
         end)
+
+        -- Projectile Release is clocked by the server, but the camera may still
+        -- move while the bow animation draws. Sample the live aim until release.
+        if isBow then
+            local aimOrigin, aimDirection = aimPoseController.GetAimRay()
+            if not aimOrigin or not aimDirection then
+                finishPresentation(sequence)
+                return
+            end
+            bowAimAttackId = sequence
+            bowAimUntil = os.clock() + damagePoseStart
+            bowAimAccumulator = 0
+            attack:FireServer({
+                clipId = action.clipId,
+                clientAttackId = sequence,
+                aimOrigin = aimOrigin,
+                aimDirection = aimDirection,
+            })
+            return
+        end
 
         -- Pose streaming exists only for the authored character melee window:
         -- HitStart through HitEnd. Presentation/cooldown still owns the complete

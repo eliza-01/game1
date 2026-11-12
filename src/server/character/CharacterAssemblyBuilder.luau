@@ -210,6 +210,16 @@ function Builder.Build(recipe: any, loadAsset: (number) -> Model?): Model
                     for _, bone in incoming do bone:Destroy() end
                     SkinConnection.Connect(imported, carrier, mesh, "CharacterSkinWeld")
                 end
+                if part.material then
+                    local selected = Enum.Material[part.material]
+                    assert(selected ~= nil, "unsupported authored material: " .. tostring(part.material))
+                    mesh.Material = selected
+                    if hairGroup then
+                        for _, visual in ipairs(hairGroup:GetDescendants()) do
+                            if visual:IsA("MeshPart") then visual.Material = selected end
+                        end
+                    end
+                end
                 if part.color then
                     assert(slot == "eye_l" or slot == "eye_r" or slot == "eyebrow_l" or slot == "eyebrow_r",
                         "solid tint is only valid for eyes and eyebrows")

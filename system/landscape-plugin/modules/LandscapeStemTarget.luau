@@ -4,8 +4,8 @@
 local StemTarget = {}
 
 local DECOR_ROOT = "Game1LandscapeDecor"
-local MAX_PICK_RADIUS = 0.85
-local MIN_PICK_RADIUS = 0.12
+local MAX_PICK_RADIUS = 1.2
+local MIN_PICK_RADIUS = 0.24
 
 local function branchFolder(workspace)
     local root = workspace:FindFirstChild(DECOR_ROOT)
@@ -108,8 +108,10 @@ function StemTarget.Find(parts, folder, unitRay, surfaceHit, maxDistance: number
             local b = part.Position + tangent * half
             local onStem, t, distance, fraction = StemTarget.Closest(origin, direction, a, b)
             if onStem and t <= maxDistance and t <= stopDistance then
-                -- A modest camera-distance tolerance makes very thin stems usable.
-                local tolerance = math.clamp(t * 0.0075, MIN_PICK_RADIUS, MAX_PICK_RADIUS)
+                -- Clickable radius is larger than the physical 0.05-stud stem.
+                -- Approximate a fixed on-screen targeting cone while retaining
+                -- wall occlusion and only considering authored stem geometry.
+                local tolerance = math.clamp(t * 0.012, MIN_PICK_RADIUS, MAX_PICK_RADIUS)
                     + part.Size.Y * 0.5
                 if distance <= tolerance then
                     local score = distance / tolerance

@@ -39,6 +39,15 @@
       }
     },
     {
+      "clipId": "human_female__weapon__bow__attack__01",
+      "duration": 1.875,
+      "events": {
+        "Release": {
+          "normalizedTime": 0.6039719626168224
+        }
+      }
+    },
+    {
       "clipId": "human_female__weapon__hands__attack__01",
       "duration": 1.875,
       "events": {

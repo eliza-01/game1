@@ -18,14 +18,14 @@
       "race": "human",
       "gender": "female",
       "status": "ASSEMBLY_READY",
-      "revision": 2,
+      "revision": 12,
       "visualMode": "assembly",
       "assembly": {
         "schema_version": 2,
         "rig": {
           "id": "human_female",
-          "asset_id": "134874851448365",
-          "revision": 1,
+          "asset_id": "101730982429113",
+          "revision": 2,
           "bone_names": [
             "back_mount",
             "cape_clasp_l",
@@ -261,7 +261,8 @@
             "socket_bone": "pelvis",
             "extras": [],
             "atlas_image_id": "",
-            "color": "#FFFFFF"
+            "color": "#9EDFFF",
+            "material": "Metal"
           },
           "eye_r": {
             "id": "human_common_m001_eye_r",
@@ -277,7 +278,8 @@
             "socket_bone": "pelvis",
             "extras": [],
             "atlas_image_id": "",
-            "color": "#FFFFFF"
+            "color": "#FFBDF3",
+            "material": "Metal"
           },
           "eyebrow_l": {
             "id": "human_common_m001_eyebrow_l",
@@ -293,7 +295,7 @@
             "socket_bone": "pelvis",
             "extras": [],
             "atlas_image_id": "",
-            "color": "#FFFFFF"
+            "color": "#000000"
           },
           "eyebrow_r": {
             "id": "human_common_m001_eyebrow_r",
@@ -309,7 +311,7 @@
             "socket_bone": "pelvis",
             "extras": [],
             "atlas_image_id": "",
-            "color": "#FFFFFF"
+            "color": "#000000"
           },
           "hair": {
             "id": "human_female_m001_hair",
@@ -324,13 +326,14 @@
             "extras": [],
             "atlas_image_id": "",
             "colors": {
-              "primary": "#70453D"
-            }
+              "primary": "#FFB8D1"
+            },
+            "material": "Plaster"
           }
         },
         "ready": true,
         "missing": [],
-        "fingerprint": "3f91005e20480b2af8453934"
+        "fingerprint": "4f1c7156f6e6a27747d201f7"
       },
       "stats": {
         "Level": 1,

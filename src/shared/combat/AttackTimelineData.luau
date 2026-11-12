@@ -21,6 +21,12 @@ local BY_CLIP = {
             HitEnd = table.freeze({ normalizedTime = 0.5 }),
         }),
     }),
+    ["human_female__weapon__bow__attack__01"] = table.freeze({
+        duration = 1.875,
+        events = table.freeze({
+            Release = table.freeze({ normalizedTime = 0.603971963 }),
+        }),
+    }),
     ["human_female__weapon__hands__attack__01"] = table.freeze({
         duration = 1.875,
         events = table.freeze({

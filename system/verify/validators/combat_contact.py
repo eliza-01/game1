@@ -204,13 +204,15 @@ def check_combat_contact_contracts(
     # the center-screen aim segment is clamped to AttackRadius and may upgrade only
     # the one nearest combat region under the reticle, at most once per attack.
     aim_pose_m33 = (root / "src/client/combat/AimPoseController.luau").read_text(encoding="utf-8")
-    for required in [
-        "function AimPoseController.GetAimRay()",
-        "ViewportPointToRay",
-        "return ray.Origin, direction.Unit",
-    ]:
+    # The one authoritative viewport ray now lives in CameraController so
+    # Studio Camera Debug can move the reticle without desyncing headshots.
+    camera_m306 = (root / "src/client/character/CameraController.luau").read_text(encoding="utf-8")
+    for required in ["function AimPoseController.GetAimRay()", "CameraController.GetAimRay()"]:
         if required not in aim_pose_m33:
-            report_error(f"m33 center-screen aim-ray source missing {required}")
+            report_error(f"m33 central aim-ray source missing {required}")
+    for required in ["function CameraController.GetAimRay()", "ViewportPointToRay", "return ray.Origin, ray.Direction.Unit"]:
+        if required not in camera_m306:
+            report_error(f"m33 central camera ray source missing {required}")
 
     attack_controller_m33 = (root / "src/client/combat/AttackController.luau").read_text(encoding="utf-8")
     for required in [

@@ -1,0 +1,58 @@
+{
+  "boneHash": "e823b7b6a6160955591511f241104bbb3ab3d44f5e8feb180e43dcdaacec6d95",
+  "bones": [
+    {
+      "matrix": [
+        0.9983861,
+        0.0567885,
+        -0.0005601,
+        0.0,
+        -0.0005597,
+        0.0197003,
+        0.9998057,
+        0.0,
+        0.0567885,
+        -0.9981918,
+        0.0197003,
+        -1.0617855,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "light_01_socket",
+      "parent": ""
+    }
+  ],
+  "carrierName": "rig_carrier",
+  "inventoryHash": "70b56a8fde7e083f6187b4a248bdf78462904d668bdb271dda55e2d66e623105",
+  "parts": [
+    {
+      "name": "lantern_02",
+      "role": "visual",
+      "vertices": 93
+    },
+    {
+      "name": "rig_carrier",
+      "role": "rig_carrier",
+      "vertices": 3
+    }
+  ],
+  "rigKind": "skinned",
+  "schemaVersion": 2,
+  "skinPreparation": {
+    "minimumInfluence": 0.05,
+    "minimumVerticesPerBone": 1,
+    "patchedBoneCount": 0,
+    "patchedBones": [],
+    "prunedVertices": 0,
+    "survivingBoneCount": 1,
+    "unweightedVertexPolicy": "nearest-authored-bone-head-v1",
+    "unweightedVerticesAfter": 0,
+    "unweightedVerticesBefore": 93,
+    "verticesOverFourAfter": 0,
+    "verticesOverFourBefore": 0
+  },
+  "sourceSha256": "5a490975f97f35165a1ae448c616c07dcd44b49bbe080fc99b11f9173e85fb67",
+  "structuralHash": "134ff071f948ff64b1202760069635b1c9dc246d2c72e81482aabd30855760a7"
+}

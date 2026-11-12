@@ -9,7 +9,7 @@ local MAX_EFFECTS_PER_RIG = 128
 
 local function isLeafEffect(item: Instance): boolean
     return #item:GetChildren() == 0
-        and (item:IsA("ParticleEmitter") or item:IsA("PointLight")
+        and (item:IsA("Fire") or item:IsA("ParticleEmitter") or item:IsA("PointLight")
             or item:IsA("SpotLight") or item:IsA("SurfaceLight"))
 end
 

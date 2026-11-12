@@ -95,6 +95,12 @@ function WeaponAttackVolume.StampWeaponBox(weapon: Model): (CFrame, Vector3)
     return localCFrame, boxSize
 end
 
+function WeaponAttackVolume.ClearWeaponBox(weapon: Model)
+    weapon:SetAttribute(BOX_LOCAL_ATTRIBUTE, nil)
+    weapon:SetAttribute(BOX_SIZE_ATTRIBUTE, nil)
+    weapon:SetAttribute(BONE_BOX_LOCAL_ATTRIBUTE, nil)
+end
+
 function WeaponAttackVolume.ReadWeaponBox(weapon: Model): (CFrame?, Vector3?)
     local localCFrame = weapon:GetAttribute(BOX_LOCAL_ATTRIBUTE)
     local boxSize = weapon:GetAttribute(BOX_SIZE_ATTRIBUTE)

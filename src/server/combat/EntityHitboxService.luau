@@ -275,7 +275,8 @@ function EntityHitboxService.RaycastAimRegions(
     exclude: Model?,
     rayOrigin: Vector3,
     rayDirection: Vector3,
-    maxDistance: number
+    maxDistance: number,
+    projectilePrecision: boolean?
 ): any?
     if typeof(rayOrigin) ~= "Vector3" or typeof(rayDirection) ~= "Vector3" then
         return nil
@@ -295,7 +296,9 @@ function EntityHitboxService.RaycastAimRegions(
             and binding.visual.Parent ~= nil
             and entity:GetAttribute("Damageable") == true
         then
-            local hit = HitboxSpatialQueries.AimContact(binding, rayOrigin, direction, distanceLimit, frameSerial)
+            local hit = if projectilePrecision
+                then HitboxSpatialQueries.AimContact(binding, rayOrigin, direction, distanceLimit, frameSerial, true)
+                else HitboxSpatialQueries.AimContact(binding, rayOrigin, direction, distanceLimit, frameSerial)
             if hit and hit.distance < bestDistance then
                 bestDistance = hit.distance
                 best = {

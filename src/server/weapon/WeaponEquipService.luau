@@ -199,7 +199,11 @@ function WeaponEquipService.Equip(character: Model, slugValue: any): (boolean, s
     -- can then reconstruct the exact animated weapon box every frame without
     -- changing its dimensions, while the server owns the canonical size used
     -- by combat validation.
-    WeaponAttackVolume.StampWeaponBox(weapon)
+    if string.lower(tostring(row.weaponType or "")) == "bow" then
+        WeaponAttackVolume.ClearWeaponBox(weapon)
+    else
+        WeaponAttackVolume.StampWeaponBox(weapon)
+    end
     weapon.Parent = character
 
     character:SetAttribute("EquippedWeaponSlug", slug)
@@ -245,7 +249,11 @@ function WeaponEquipService.EquipVisual(actor: Model, slugValue: any, hand: stri
     weapon:SetAttribute("Game1WeaponGripRotation", nil)
     weapon:SetAttribute("WeaponAttachmentMode", "runtime-canonical-grip-v2")
     alignWeaponToSocket(weapon, grip, targetSocketCFrame(bone) * WEAPON_EQUIP_ROTATION)
-    WeaponAttackVolume.StampWeaponBox(weapon)
+    if string.lower(tostring(row.weaponType or "")) == "bow" then
+        WeaponAttackVolume.ClearWeaponBox(weapon)
+    else
+        WeaponAttackVolume.StampWeaponBox(weapon)
+    end
     weapon.Parent = actor
     return weapon, row, nil
 end

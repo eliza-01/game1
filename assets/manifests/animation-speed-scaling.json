@@ -82,6 +82,11 @@
   ],
   "customScaling": [
     {
+      "assetId": "105422326147906",
+      "stat": "AttackSpeed",
+      "unitsPerPercent": 1.5
+    },
+    {
       "assetId": "116868377220889",
       "stat": "RunSpeed",
       "unitsPerPercent": 5.0
@@ -92,14 +97,29 @@
       "unitsPerPercent": 2.4
     },
     {
+      "assetId": "130243478044042",
+      "stat": "RunSpeed",
+      "unitsPerPercent": 0.6
+    },
+    {
       "assetId": "132123582014306",
       "stat": "RunSpeed",
       "unitsPerPercent": 1.4
     },
     {
-      "assetId": "77341804648662",
+      "assetId": "134879106022438",
       "stat": "RunSpeed",
       "unitsPerPercent": 0.8
+    },
+    {
+      "assetId": "72958203766772",
+      "stat": "AttackSpeed",
+      "unitsPerPercent": 0.8
+    },
+    {
+      "assetId": "77341804648662",
+      "stat": "RunSpeed",
+      "unitsPerPercent": 0.55
     },
     {
       "assetId": "85145236963317",

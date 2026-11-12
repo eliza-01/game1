@@ -94,6 +94,9 @@
       "StudioPlotsSelectionFilter": {
         "$path": "modules/StudioPlotsSelectionFilter.luau"
       },
+      "StudioCameraDraftBridge": {
+        "$path": "modules/StudioCameraDraftBridge.luau"
+      },
       "StudioDebugPreferenceBridge": {
         "$path": "modules/StudioDebugPreferenceBridge.luau"
       },

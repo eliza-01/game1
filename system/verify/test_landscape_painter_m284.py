@@ -31,8 +31,10 @@ class LandscapeM284Tests(unittest.TestCase):
 
     def test_surface_point_normal_and_pivot_control(self):
         surface = src('modules/LandscapeSurface.luau')
-        self.assertIn('CFrame.lookAt(position, position + facing, up)', surface)
-        self.assertIn('normal.Unit * offset', surface)
+        self.assertIn('DecoTransform.placementPivot(', surface)
+        self.assertIn('point - Vector3.yAxis * settings.length', surface)
+        self.assertIn('point + normal.Unit * supportOffset', surface)
+        self.assertIn('else point', surface)
         self.assertIn('Enum.RaycastFilterType.Exclude', surface)
         self.assertIn('table.insert(ignore, decor)', surface)
         self.assertIn('table.insert(ignore, camera)', surface)
@@ -45,7 +47,7 @@ class LandscapeM284Tests(unittest.TestCase):
         self.assertIn('BranchGeometry.Apply(line, hitPoint, targetPoint', tether)
         self.assertIn('LINE_NAME = "LandscapeAttachmentLine"', tether)
         self.assertIn('self.preview:Show(anchors', tether)
-        self.assertIn('Surface.Pivot(hit.Position, hit.Normal, config)', tether)
+        self.assertIn('Surface.Pivot(hit.Position, hit.Normal, config,', tether)
         self.assertNotIn('Instance.new("WeldConstraint")', tether)
 
     def test_use_and_apply_are_separate_and_persistent(self):

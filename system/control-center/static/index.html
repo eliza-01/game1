@@ -6,11 +6,11 @@
 <link rel="icon" href="data:,">
 <title>game1 · asset manager</title>
 <link rel="stylesheet" href="shared-asset-retirement.css?v=2">
-<link rel="stylesheet" href="asset-manager.css?v=13">
+<link rel="stylesheet" href="asset-manager.css?v=309">
 <link rel="stylesheet" href="database-history.css?v=3">
 <link rel="stylesheet" href="atlas-library.css?v=2">
 <link rel="stylesheet" href="asset-section-order.css?v=1">
-<link rel="stylesheet" href="character-animations.css?v=2">
+<link rel="stylesheet" href="character-animations.css?v=309">
 <link rel="stylesheet" href="location-assets.css?v=1">
 <link rel="stylesheet" href="place-registry.css?v=241">
 <link rel="stylesheet" href="character-components.css?v=6">
@@ -181,7 +181,7 @@
 <span class="eyebrow">03 · startup archetype</span><div class="actions"><button id="activate-character" type="button" disabled>Set as Startup</button><span id="character-startup-badge" class="cp-published" hidden>✓ startup</span><button type="button" class="character-help" aria-label="About Startup" data-character-tip="Выбирает стартового персонажа для новых игровых сессий. Не публикует модель и не меняет характеристики.">?</button></div>
 </div>
 <div class="panel character-card">
-<div class="section-title"><div><span>versioned registry</span><h3>registered characters</h3></div><button id="validate-view" type="button">refresh</button></div>
+<div class="section-title"><div><span>published library</span><h3>registered characters</h3></div><button id="validate-view" type="button">refresh</button></div>
 <div class="table-wrap"><table><thead><tr><th>active</th><th>identity</th><th>model</th><th>skeleton</th><th>status</th><th>revision</th><th>actions</th></tr></thead><tbody id="rows"></tbody></table></div>
 <div id="selected-details" class="details"><span class="muted">select a character.</span></div>
 </div>
@@ -212,8 +212,9 @@
 <div class="metrics"><div><b id="animation-metric-total">0</b><span>registered</span></div><div><b id="animation-metric-published">0</b><span>published</span></div><div><b id="animation-metric-changed">0</b><span>changed</span></div></div>
 </div>
 <div class="panel runtime-card"><div id="animation-profile-state" class="runtime-state registered"><strong>profile</strong><span>select a character.</span></div><div id="animation-publication-state" class="publication-missing">open cloud: checking…</div></div>
+<div id="animation-studio-sync-status" class="game1-asset-publication-state" role="status" aria-live="polite">Published animations are exported to the Rojo registry. Studio must be connected to Rojo before testing new clips.</div>
 <div class="panel character-card animation-profile-panel" id="animation-profile-panel">
-<div class="section-title"><div><span>Animation Profile</span><h3 id="animation-table-title">Зарегистрированные анимации</h3></div><div class="animation-profile-actions"><label class="animation-show-missing"><input id="animation-show-missing" type="checkbox"> Show missing</label><span id="animation-filter-label" class="pill">all</span></div></div>
+<div class="section-title"><div><span>Animation Profile</span><h3 id="animation-table-title">Зарегистрированные анимации</h3></div><div class="animation-profile-actions"><label class="animation-show-missing"><input id="animation-show-missing" type="checkbox"> Show missing</label><span id="animation-filter-label" class="pill">all</span><button id="animation-prepare-sync" type="button">Prepare Studio Sync</button></div></div>
 <div class="animation-legend"><span><b>base</b> базовые движения</span><span><b>weapon</b> оружейные состояния</span><span><b>emotions</b> лицо и эмоции</span><span><b>variant</b> варианты анимации</span></div>
 <div class="table-wrap animation-table-wrap"><table><thead><tr><th data-animation-sort="context" role="button" tabindex="0">context ↕</th><th data-animation-sort="slot" role="button" tabindex="0">slot ↕</th><th data-animation-sort="variant" role="button" tabindex="0">variant ↕</th><th>clip</th><th>asset</th><th data-animation-sort="status" role="button" tabindex="0">status ↕</th><th>weight</th><th>actions</th></tr></thead><tbody id="animation-rows"></tbody></table></div>
 <div id="animation-details" class="details"><span class="muted">select a clip.</span></div>
@@ -242,7 +243,7 @@
 <dialog id="animation-replace-dialog" class="animation-operation-dialog">
   <div class="animation-operation-head"><div><small>Постоянный Roblox ID</small><h3>Замена анимации</h3></div><button data-animation-close type="button" aria-label="Закрыть">✕</button></div>
   <div id="animation-replace-review" class="animation-operation-body"></div>
-  <div class="animation-operation-actions"><button id="animation-replace-choose" type="button">Выбрать новый файл</button><button id="animation-replace-confirm" class="primary" type="button" disabled>Подготовить замену</button><button id="animation-replace-check" type="button">Проверить Roblox</button><button data-animation-close type="button">Закрыть</button></div>
+  <div class="animation-operation-actions"><button id="animation-replace-choose" type="button">Выбрать новый файл</button><button id="animation-replace-confirm" class="primary" type="button" disabled>Подготовить замену</button><button id="animation-replace-check" type="button">Проверить Roblox</button><button id="animation-replace-manual" type="button" disabled>Подтвердить вручную</button><button data-animation-close type="button">Закрыть</button></div>
 </dialog>
 
 </div>
@@ -354,6 +355,26 @@
 </div>
 <div class="actions"><button id="save-character-life-options" class="primary" type="button">save character animation options</button></div>
 </div>
+<div class="panel character-card game1-camera-options">
+  <div class="section-title"><div><span>camera · saved runtime defaults</span><h3>Camera</h3></div><span class="muted">Studio Debug → draft → Save</span></div>
+  <small class="hint">Character position and aim cursor use normalized viewport coordinates (0–1). Studio Play Camera Debug previews immediately; only Save persists options and updates the generated registry for Rojo.</small>
+  <div class="game1-camera-options-grid">
+    <label>Target height · studs<input id="option-camera-targetHeight" type="number" min="0" max="12" step="0.25"></label>
+    <label>Camera distance · studs<input id="option-camera-distance" type="number" min="4" max="18" step="0.25"></label>
+    <label>Initial pitch · degrees<input id="option-camera-pitchDegrees" type="number" min="-65" max="60" step="1"></label>
+    <label>Character X · screen<input id="option-camera-characterX" type="number" min="0.2" max="0.8" step="0.01"></label>
+    <label>Character Y · screen<input id="option-camera-characterY" type="number" min="0.2" max="0.8" step="0.01"></label>
+    <label>Cursor X · screen<input id="option-camera-cursorX" type="number" min="0.1" max="0.9" step="0.01"></label>
+    <label>Cursor Y · screen<input id="option-camera-cursorY" type="number" min="0.1" max="0.9" step="0.01"></label>
+  </div>
+  <div class="actions"><button id="option-camera-draft-import" type="button">Import Studio Debug</button><button id="option-camera-save" type="button" class="primary">Save Camera Options</button></div>
+  <div class="muted" id="option-camera-draft-status" role="status">No Studio Play camera draft yet.</div>
+  <div class="game1-camera-presets">
+    <label>Saved presets<select id="option-camera-presets"><option value="">Choose saved preset…</option></select></label>
+    <label>New / overwrite preset<input id="option-camera-preset-name" maxlength="40" placeholder="e.g. Cinematic close"></label>
+    <div class="actions"><button id="option-camera-preset-save" type="button">Save preset</button><button id="option-camera-preset-apply" type="button">Apply preset</button><button id="option-camera-preset-delete" type="button">Delete</button></div>
+  </div>
+</div>
 </div>
 
 <div id="weapons-view" hidden>
@@ -367,8 +388,14 @@
 <small class="hint">all values are authored data, not controller constants. movement % is a fraction of RunSpeed used for the complete attack. legs select which locomotion clip stays live under the upper-body attack. animation set maps the gameplay type to its animation context.</small>
 <div id="weapon-attack-movement-rules" class="weapon-attack-movement-rules"><span class="muted">loading attack movement rules…</span></div>
 </div>
-<div class="weapon-workflow">
-<div class="panel character-card">
+<details class="panel character-card game1-weapon-atlas-index"><summary>Legacy atlases · import and naming</summary>
+<div class="section-title"><div><span>shared textures</span><h3>Published atlas library</h3></div>
+<button id="weapon-index-published" type="button">Index existing weapon images</button></div>
+<small class="hint">Legacy texture? Имя атласа должно быть <code>&lt;atlas_key&gt;_&lt;width&gt;x&lt;height&gt;_atlas.png</code> (или .jpg). Кнопка явно подключает прежние Image ID к общему Atlas Registry по SHA256 — без повторной публикации и без Studio Sync. Для нескольких текстур выбери активную градацию вручную.</small>
+<div id="weapon-index-status" class="game1-asset-publication-state" role="status" aria-live="polite">Existing registered atlases are available through Connect existing atlas.</div>
+</details>
+<div class="weapon-workflow weapon-workflow-m309">
+<details id="weapon-register-disclosure" class="panel character-card weapon-register-panel"><summary>Register new weapon</summary>
 <span class="eyebrow">01 · identity and stats</span><h3>register weapon</h3>
 <div class="character-grid"><label>name en<input id="weapon-name-en" autocomplete="off"></label><label>name ru<input id="weapon-name-ru" autocomplete="off"></label></div>
 <label>slug<input id="weapon-slug" readonly><small class="hint">generated from english name as lowercase snake_case. existing registered slugs stay stable.</small></label>
@@ -378,20 +405,35 @@
 <hr class="card-separator">
 <span class="eyebrow">02 · source assets</span>
 <div class="picker"><button id="choose-weapon-model" type="button">choose fbx</button><small id="picked-weapon-model">fbx not selected</small></div>
-<div class="picker"><button id="choose-weapon-textures" type="button">choose textures</button><small id="picked-weapon-textures">textures not selected</small></div>
+<details class="game1-legacy-source"><summary>Legacy local textures (compatibility only)</summary><div class="picker"><button id="choose-weapon-textures" type="button">choose legacy textures</button><small id="picked-weapon-textures">textures not selected</small></div><small>New / replacement atlases: use the shared atlas editor below, not this legacy field.</small></details>
+<div id="weapon-atlas-picker" class="game1-asset-atlas-picker"></div>
 <div id="weapon-model-status" class="status-box"><strong>not registered</strong><span>choose a weapon model. textures are optional.</span></div>
 <div class="actions"><button id="register-weapon" class="primary" type="button">register weapon</button><button id="clear-weapon-form" type="button">clear form</button></div>
 <hr class="card-separator">
 <span class="eyebrow">03 · publication and studio</span><h3 class="subheading">roblox assets</h3>
 <label>description<input id="weapon-publication-description" value="Game1 Weapon"></label>
-<div class="actions"><button id="publish-weapon" class="primary" type="button" disabled>publish all changed</button><button id="sync-weapon" type="button" disabled>sync studio</button><button id="activate-weapon" type="button" disabled>set startup</button><button id="clear-active-weapon" type="button">unarmed startup</button></div>
+<div class="actions"><button id="publish-weapon" class="primary" type="button" disabled>Publish Model</button><button id="sync-weapon" type="button" disabled>sync studio</button><button id="activate-weapon" type="button" disabled>set startup</button><button id="clear-active-weapon" type="button">unarmed startup</button></div>
 <small id="weapon-publication-hint" class="hint">select a registered weapon.</small>
-</div>
+<div id="weapon-operation-status" class="game1-asset-publication-state" role="status" aria-live="polite">Select Register, Publish and Sync Studio separately.</div>
+</details>
 <div class="panel character-card">
 <div class="section-title"><div><span>versioned registry</span><h3>registered weapons <small id="weapon-visible-count" class="muted"></small></h3></div><div class="weapon-list-actions"><label>type filter<select id="weapon-table-type"><option value="all">all types</option></select></label><button id="validate-weapons" type="button">refresh</button></div></div>
-<div class="table-wrap weapon-table-wrap"><table><thead><tr><th>active</th><th>weapon</th><th>type</th><th>rarity</th><th>stats</th><th>assets</th><th>published at</th><th>status</th><th>actions</th></tr></thead><tbody id="weapon-rows"></tbody></table></div>
+<div class="table-wrap weapon-table-wrap"><table><thead><tr><th>active</th><th>weapon</th><th>type</th><th>rarity</th><th>stats</th><th>Model / Texture</th><th>Atlas resolutions</th><th>status</th><th>actions</th></tr></thead><tbody id="weapon-rows"></tbody></table></div>
 <div id="weapon-details" class="details"><span class="muted">select a weapon.</span></div>
 </div>
+</div>
+<div class="panel character-card" id="arrow-assets-panel">
+<div class="section-title"><div><span>projectiles · bow</span><h3>Arrow assets</h3></div><button id="arrow-new" type="button">New arrow</button></div>
+<small class="hint">Publish FBX and atlases separately, Sync Studio explicitly, then select the active arrow. Speed is server-authoritative; model pivot is the projectile origin, -Z is the default forward axis.</small>
+<div class="character-grid"><label>Name<input id="arrow-name" autocomplete="off" placeholder="Wooden arrow"></label><label>Slug (stable)<input id="arrow-slug" readonly placeholder="generated on Save"></label></div>
+<div class="game1-arrow-geometry"><label>Flight speed · studs/s<input id="arrow-speed" type="number" min="20" max="500" step="1" value="145"></label><label>Mesh forward axis<select id="arrow-axis"><option>-Z</option><option>+Z</option><option>+X</option><option>-X</option><option>+Y</option><option>-Y</option></select></label><label>Penetration · studs<input id="arrow-penetration" type="number" min="0" max="3" step="0.05" value="0.12" title="How deeply the visible tip enters the hit surface"></label></div>
+<div class="picker"><button id="arrow-pick-model" type="button">Choose arrow FBX</button><small id="arrow-model-file">choose FBX</small></div>
+<details class="game1-legacy-source"><summary>Legacy local arrow texture (compatibility only)</summary><div class="picker"><button id="arrow-pick-texture" type="button">Choose legacy texture</button><small id="arrow-texture-file">optional PNG/JPG</small></div></details>
+<div id="arrow-atlas-picker" class="game1-asset-atlas-picker"></div>
+<div class="actions"><button id="arrow-save" class="primary" type="button">Register / save</button></div>
+<div id="arrow-operation-status" class="game1-asset-publication-state" role="status" aria-live="polite">Register → publish → Sync Studio → activate. Each is explicit.</div>
+<div class="character-grid"><label>Active arrow for bows<select id="arrow-active"><option value="">No published arrow</option></select></label><div class="actions"><button id="arrow-use" type="button">Use active arrow</button></div></div>
+<div class="table-wrap"><table><thead><tr><th>arrow</th><th>speed</th><th>status</th><th>model ID</th><th>Atlas resolutions</th><th>actions</th></tr></thead><tbody id="arrow-rows"></tbody></table></div>
 </div>
 </div>
 
@@ -731,7 +773,7 @@
 <script src="publication-descriptions.js?v=1"></script>
 <script src="character-assets.js?v=24"></script>
 <script src="asset-section-order.js?v=1"></script>
-<script src="character-animation-ui.js?v=3"></script>
+<script src="character-animation-ui.js?v=309"></script>
 <script src="character-workflow.js?v=2"></script>
 <script src="character-publications.js?v=2"></script>
 <script src="character-component-summary.js?v=1"></script>
@@ -748,7 +790,7 @@
 <script src="studio-sync.js?v=237"></script>
 <script src="asset-atlas-actions.js?v=1"></script>
 <script src="asset-workflow-dialog.js?v=1"></script>
-<script src="asset-atlas-editor.js?v=254"></script>
+<script src="asset-atlas-editor.js?v=309"></script>
 <script src="mesh-authoring.js?v=1"></script>
 <script src="location-category-picker.js?v=249"></script>
 <script src="deco-assets.js?v=253"></script>
@@ -758,8 +800,11 @@
 <script src="location-asset-workflow.js?v=262"></script>
 <script src="asset-audit.js?v=2"></script>
 <script src="atlas-library.js?v=2"></script>
-<script src="options.js?v=1"></script>
-<script src="weapon-assets.js?v=3"></script>
+<script src="options.js?v=306"></script>
+<script src="weapon-atlas-picker.js?v=309"></script>
+<script src="weapon-assets.js?v=309"></script>
+<script src="weapon-workflow.js?v=309"></script>
+<script src="arrow-assets.js?v=309"></script>
 <script src="monster-assets.js?v=6"></script>
 <script src="npc-assets.js?v=5"></script>
 <script src="npc-spawns.js?v=4"></script>

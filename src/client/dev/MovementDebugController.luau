@@ -4,6 +4,8 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local StudioDebugDock = require(script.Parent:WaitForChild("StudioDebugDock"))
+local AnimationSpeedScaling = require(ReplicatedStorage:WaitForChild("Game1Shared"):WaitForChild("animation"):WaitForChild("AnimationSpeedScaling"))
+local CharacterAnimationController = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("animation"):WaitForChild("CharacterAnimationController"))
 
 local MovementDebugController = {}
 local started = false
@@ -409,10 +411,21 @@ function MovementDebugController.Start()
         local catalogRemote = remotes:WaitForChild("GetMovementDebugCatalog", 10)
         local applyRemote = remotes:WaitForChild("ApplyMovementDebug", 10)
         local monsterModeRemote = remotes:WaitForChild("SetMovementDebugMonsterMode", 10)
-        if not catalogRemote or not applyRemote or not monsterModeRemote then
+        local ratioChangedRemote = remotes:WaitForChild("MovementDebugAnimationRatioChanged", 10)
+        if not catalogRemote or not applyRemote or not monsterModeRemote or not ratioChangedRemote then
             warn("[game1][movement-debug] remotes are missing")
             return
         end
+
+        ratioChangedRemote.OnClientEvent:Connect(function(model, channel, units)
+            if model ~= player.Character or (channel ~= "run" and channel ~= "walk") then return end
+            local value = tonumber(units)
+            if not value or value <= 0 then return end
+            -- Do not wait for the server's Attribute replication: the confirmed
+            -- debug ratio must affect the locally owned AnimationTrack now.
+            model:SetAttribute(AnimationSpeedScaling.DebugUnitsPerPercentAttribute(channel), value)
+            CharacterAnimationController.Refresh()
+        end)
 
         local _, unitDropdown, runSpeedBox, distanceBox, animationRatioBox, animationRuleModeButton, runTiming, walkTiming, measuredTiming, walkHint, monsterModeButton, live = createGui()
         local unitById = {}
@@ -857,7 +870,7 @@ function MovementDebugController.Start()
                     pendingAnimationByKey[key] = nil
                 end
                 if not ok or type(result) ~= "table" or result.ok ~= true then
-                    live.Text = "Animation ratio update failed"
+                    live.Text = "Animation ratio: " .. tostring(type(result) == "table" and result.error or result)
                     live.TextColor3 = COLORS.error
                     return
                 end

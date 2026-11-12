@@ -184,6 +184,11 @@ if($GeneratedHash -ne $InstalledHash -or $GeneratedHash -ne $BuiltHash){
 }
 Remove-Item $Temp -Force -ErrorAction SilentlyContinue
 
+# Do not install or overwrite third-party/user-authored Fire Tuner scripts.
+# The M303 auto-replacement was unsafe: the archived fire_bone.lua does not
+# contain newer local presets. The original plugin belongs to the user's
+# Roblox/Plugins folder and must be managed separately from Game1Bridge.
+
 Write-Host ("Game1Bridge installed with DecoManager + authoring-marker visibility + Locations + Attack Timeline: {0}" -f $Installed)
 Write-Host ("SHA256: {0}" -f $InstalledHash)
 Write-Host 'DecoManager places published Location Assets; Locations draw from Asset Manager / Locations; Attack Timeline opens from Asset Manager / Timelines.'

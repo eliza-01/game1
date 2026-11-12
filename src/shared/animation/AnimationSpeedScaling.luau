@@ -85,7 +85,7 @@ function AnimationSpeedScaling.ResolveDetailsForModel(model: Model, channel: any
     local overrideAttribute = AnimationSpeedScaling.DebugUnitsPerPercentAttribute(normalizedChannel)
     local debugUnitsPerPercent = DebugOverrides.ModelUnits(model, overrideAttribute)
     local unitsPerPercent = authoredUnitsPerPercent
-    if debugUnitsPerPercent ~= nil and not isCustom then
+    if debugUnitsPerPercent ~= nil and (normalizedChannel == "run" or normalizedChannel == "walk") then
         unitsPerPercent = Formula.DebugUnits(debugUnitsPerPercent, authoredUnitsPerPercent)
     end
     local percent = Formula.DetailsPercent(statValue, unitsPerPercent)

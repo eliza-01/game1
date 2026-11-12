@@ -1,21 +1,28 @@
--- Shared surface facing rule for landscape placement.
--- A published object's local front (-Z) points along the hit outward normal.
--- This is independent of camera direction and handles walls / ceilings.
+-- Canonical Location placement frame. Imported MeshPart/PivotOffset/Bone
+-- coordinates remain owned by DecoAssetLoader; this module only calculates
+-- where to move the intact model. Do not rebuild or move the rig's own pivot.
+local DecoTransform = require(script.Parent.DecoTransform)
+
 local Surface = {}
 
-function Surface.Facing(position: Vector3, normal: Vector3): CFrame
+function Surface.Pivot(point: Vector3, normal: Vector3, settings,
+    authoredRotation: CFrame, supportOffset: number, cameraLook: Vector3,
+    targetKind: string): CFrame
     if normal.Magnitude < 0.0001 then error("surface normal is missing") end
-    local facing = normal.Unit
-    local up = if math.abs(facing:Dot(Vector3.yAxis)) > 0.97
-        then Vector3.zAxis else Vector3.yAxis
-    return CFrame.lookAt(position, position + facing, up)
-end
-
-function Surface.Pivot(point: Vector3, normal: Vector3, settings): CFrame
-    local offset = if settings.tetherEnabled then settings.length else 0
-    local base = Surface.Facing(point + normal.Unit * offset, normal)
-    return base * CFrame.Angles(
-        math.rad(settings.pitch), math.rad(settings.yaw), math.rad(settings.roll))
+    -- A surface contact is geometry-to-surface, not pivot-to-surface. This is
+    -- the same authored-geometry offset used by DecoManager (including Z-up
+    -- FBX axis correction); the original pivot stays inside the rig.
+    -- For an authored stem the selected socket IS the pivot location.
+    -- A tether always ends at the genuine authored pivot below its mount.
+    local position = if settings.tetherEnabled then
+        point - Vector3.yAxis * settings.length
+        elseif targetKind == "surface" then
+        point + normal.Unit * supportOffset
+        else point
+    local frame = DecoTransform.placementPivot(authoredRotation,
+        position, normal, cameraLook)
+    return frame * CFrame.Angles(math.rad(settings.pitch),
+        math.rad(settings.yaw), math.rad(settings.roll))
 end
 
 function Surface.Raycast(workspace, mouse, maxDistance: number)

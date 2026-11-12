@@ -151,6 +151,29 @@ local function rayBoxDistance(
     return tMin
 end
 
+-- Projectile precision uses a smaller ellipsoid inside the precomputed head box.
+-- Melee retains the author's original OBB contact geometry and timing.
+local function rayHeadEllipsoidDistance(origin: Vector3, direction: Vector3, limit: number,
+    frame: CFrame, size: Vector3): number?
+    local localOrigin = frame:PointToObjectSpace(origin)
+    local localDirection = frame:VectorToObjectSpace(direction)
+    local radii = Vector3.new(
+        math.max(size.X * 0.375, 0.01),
+        math.max(size.Y * 0.375, 0.01),
+        math.max(size.Z * 0.375, 0.01)
+    ) -- 75% of each authored head-box axis, with safe nonzero radii
+    local o = Vector3.new(localOrigin.X / radii.X, localOrigin.Y / radii.Y, localOrigin.Z / radii.Z)
+    local d = Vector3.new(localDirection.X / radii.X, localDirection.Y / radii.Y, localDirection.Z / radii.Z)
+    local a = d:Dot(d)
+    local b = o:Dot(d)
+    local c = o:Dot(o) - 1
+    local disc = b * b - a * c
+    if disc < 0 or a < 1e-9 then return nil end
+    local t = (-b - math.sqrt(disc)) / a
+    if t < 0 then t = (-b + math.sqrt(disc)) / a end
+    return if t >= 0 and t <= limit then t else nil
+end
+
 local function raySegmentNearSphere(
     rayOrigin: Vector3,
     rayDirection: Vector3,
@@ -168,7 +191,8 @@ function HitboxSpatialQueries.AimContact(
     rayOrigin: Vector3,
     rayDirection: Vector3,
     maxDistance: number,
-    frameSerial: number
+    frameSerial: number,
+    projectilePrecision: boolean?
 ): any?
     if not raySegmentNearSphere(
         rayOrigin,
@@ -189,12 +213,10 @@ function HitboxSpatialQueries.AimContact(
     -- damage the first reticle target if the contact is inside AttackRadius;
     -- only a head region can upgrade it to a headshot.
     if binding.headBox and binding.worldHeadCFrame then
-        local distance = rayBoxDistance(
-            rayOrigin,
-            rayDirection,
-            maxDistance,
-            binding.worldHeadCFrame,
-            binding.headBox.size
+        local distance = if projectilePrecision then rayHeadEllipsoidDistance(
+            rayOrigin, rayDirection, maxDistance, binding.worldHeadCFrame, binding.headBox.size
+        ) else rayBoxDistance(
+            rayOrigin, rayDirection, maxDistance, binding.worldHeadCFrame, binding.headBox.size
         )
         if distance ~= nil then
             bestDistance = distance
@@ -206,7 +228,8 @@ function HitboxSpatialQueries.AimContact(
     for index, bodyBox in ipairs(binding.bodyBoxes) do
         local worldCFrame = binding.worldBodyCFrames[index]
         if worldCFrame then
-            local distance = rayBoxDistance(rayOrigin, rayDirection, maxDistance, worldCFrame, bodyBox.size)
+            local boxSize = if projectilePrecision then bodyBox.size * 0.90 else bodyBox.size
+            local distance = rayBoxDistance(rayOrigin, rayDirection, maxDistance, worldCFrame, boxSize)
             if distance ~= nil and distance < bestDistance - SAT_EPSILON then
                 bestDistance = distance
                 bestZone = "body"

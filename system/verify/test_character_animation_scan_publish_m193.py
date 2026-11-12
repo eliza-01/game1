@@ -27,7 +27,7 @@ class CharacterAnimationScanPublishM193(unittest.TestCase):
             capture_output=True, text=True, timeout=10,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('character-animation-ui.js?v=2', (STATIC / 'index.html').read_text(encoding='utf-8'))
+        self.assertIn('character-animation-ui.js?v=309', (STATIC / 'index.html').read_text(encoding='utf-8'))
 
 
 if __name__ == '__main__':

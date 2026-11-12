@@ -72,12 +72,13 @@ function AssetsWidget.new(parent, actions)
     self.active = false
     self.targetMode = "auto"
     self.config = {yaw = 0, pitch = 0, roll = 0,
-        tetherEnabled = false, length = 2, thickness = 0.02,
+        tetherEnabled = false, swayEnabled = false, length = 2, thickness = 0.02,
         color = "#343B38"}
 
     section(parent, "02 · Ассеты · прицел / Pivot")
     self.mode = button(parent, "Начать · Размещение ассета", 41)
     self.mode.MouseButton1Click:Connect(actions.toggleAsset)
+    self.modeStatus = label(parent, "Выбери ассет, затем нажми «Начать»", 54, MUTED)
     self.target = button(parent, "Прицел: Авто · стебель / поверхность", 35)
     self.target.MouseButton1Click:Connect(function()
         self.targetMode = if self.targetMode == "auto" then "stem"
@@ -96,7 +97,7 @@ function AssetsWidget.new(parent, actions)
     self.chosen = label(parent, "Ассет не выбран", 27, TEXT)
 
     section(parent, "03 · Поворот ассета")
-    label(parent, "Прицел совмещает Pivot с поверхностью. Настраивай поворот по живому превью.", 42)
+    label(parent, "Без подвеса Pivot стоит в точке крепления. С подвесом он ниже на длину нити.", 42)
     self.axes = {}
     for _, definition in ipairs({
         {key = "yaw", name = "Yaw · по нормали"},
@@ -135,12 +136,20 @@ function AssetsWidget.new(parent, actions)
         end)
     end
 
-    section(parent, "04 · Подвес · видимый отрезок")
+    section(parent, "04 · Подвес · реакция на события")
     self.tether = button(parent, "○ Подвес выключен")
     self.tether.MouseButton1Click:Connect(function()
         self.config.tetherEnabled = not self.config.tetherEnabled
+        if not self.config.tetherEnabled then self.config.swayEnabled = false end
         self:Changed()
     end)
+    self.sway = button(parent, "☐ Покачивание от ударов / ветра", 37)
+    self.sway.MouseButton1Click:Connect(function()
+        self.config.swayEnabled = not self.config.swayEnabled
+        if self.config.swayEnabled then self.config.tetherEnabled = true end
+        self:Changed()
+    end)
+    label(parent, "С галочкой: визуальное качание от удара, стрелы или ветра. Объект Anchored; верёвка декоративная.", 50)
     self.length = Adjustments.Slider(parent, {
         label = "Длина подвеса · studs", min = 0.05, max = 100,
         logarithmic = true, step = 0.05, value = self.config.length,
@@ -200,17 +209,28 @@ function AssetsWidget.new(parent, actions)
 end
 
 function AssetsWidget:Changed()
+    -- A Use profile previously overrode the visible checkbox silently.
+    -- Once the user edits any manual control, the UI becomes authoritative.
+    if self.activeId then
+        self.actions.useProfile(self.activeId, false)
+    end
     self:Refresh()
     self.actions.configChanged(table.clone(self.config))
 end
 
 function AssetsWidget:SetConfig(config)
-    for _, key in ipairs({"yaw", "pitch", "roll", "length", "thickness", "color", "tetherEnabled"}) do
+    for _, key in ipairs({"yaw", "pitch", "roll", "length", "thickness", "color", "tetherEnabled", "swayEnabled"}) do
         -- Equivalent rotations share one readable slider range (-180..180).
         self.config[key] = if key == "yaw" or key == "pitch" or key == "roll"
             then (config[key] + 180) % 360 - 180 else config[key]
     end
-    self:Changed()
+    -- Selecting/restoring a saved profile is not a manual edit.
+    self:Refresh()
+    self.actions.configChanged(table.clone(self.config))
+end
+
+function AssetsWidget:SetStatus(message)
+    self.modeStatus.Text = tostring(message)
 end
 
 function AssetsWidget:SetActive(active)
@@ -224,6 +244,7 @@ function AssetsWidget:Refresh()
     self.thickness:Set(self.config.thickness)
     self.color:Set(Color3.fromHex(self.config.color))
     self.tether.Text = if self.config.tetherEnabled then "● Подвес включён" else "○ Подвес выключен"
+    self.sway.Text = if self.config.swayEnabled then "☑ Покачивание · Play" else "☐ Покачивание от ударов / ветра"
     self.mode.Text = if self.active then "● Прицел активен · Enter завершить" else "Начать · Размещение ассета"
     self.target.Text = if self.targetMode == "auto" then "Прицел: Авто · стебель / поверхность"
         elseif self.targetMode == "stem" then "Прицел: Только стебель"
@@ -231,7 +252,7 @@ function AssetsWidget:Refresh()
     self.use.Text = if self.selectedProfile and self.activeId == self.selectedProfile
         then "● Use · активно (нажми, чтобы снять)" else "○ Use · для новых размещений"
     if self.activeId then
-        self.profileStatus.Text = "Use активен · новые размещения используют сохранённый профиль. Выключи Use для ручных настроек."
+        self.profileStatus.Text = "Use активен · параметры ниже соответствуют профилю. Любая ручная правка автоматически выключит Use."
         self.profileStatus.Size = UDim2.new(1, 0, 0, 52)
     else
         self.profileStatus.Size = UDim2.new(1, 0, 0, 30)
@@ -273,6 +294,9 @@ end
 function AssetsWidget:SelectProfile(id)
     for _, item in ipairs(self.profiles) do
         if item.id == id then
+            if self.activeId and self.activeId ~= id then
+                self.actions.useProfile(self.activeId, false)
+            end
             self.selectedProfile = id
             self.profileStatus.Text = "Профиль: " .. item.name
             self:SetConfig(item)
@@ -300,11 +324,22 @@ function AssetsWidget:SetProfiles(rows, activeId)
         local control = button(self.profileList, title, 31)
         control.LayoutOrder = index
         control.MouseButton1Click:Connect(function()
+            if self.activeId and self.activeId ~= item.id then
+                self.actions.useProfile(self.activeId, false)
+            end
             self.selectedProfile = item.id
             self.profileStatus.Text = "Профиль: " .. item.name
             self:SetConfig(item)
             self:Refresh()
         end)
+    end
+    if activeId then
+        for _, item in ipairs(rows) do
+            if item.id == activeId then
+                self:SetConfig(item)
+                return
+            end
+        end
     end
     self:Refresh()
 end

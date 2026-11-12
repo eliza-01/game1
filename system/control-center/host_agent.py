@@ -32,6 +32,7 @@ from character_core.armor import ArmorCatalog
 from character_core.publication_queue import CharacterPublicationQueue
 from animation_store import AnimationStore
 from weapon_store import WeaponStore
+from arrow_store import ArrowStore
 from monster_store import MonsterStore
 from monster_animation_store import MonsterAnimationStore
 from npc_equipment_store import NpcEquipmentStore
@@ -91,6 +92,7 @@ character_publications = CharacterPublicationQueue(
     ROOT, character_components, on_published=export_character_publication)
 animations = AnimationStore(ROOT)
 weapons = WeaponStore(ROOT)
+arrows = ArrowStore(ROOT)
 monsters = MonsterStore(ROOT)
 monster_animations = MonsterAnimationStore(ROOT)
 monster_spawns = MonsterSpawnStore(ROOT, monsters, monster_animations, run_monster_spawn_bridge)
@@ -106,6 +108,12 @@ options_store = OptionsStore(ROOT)
 timelines = TimelineStore(ROOT, store, animations, monsters, monster_animations)
 locations = LocationStore(ROOT, run_location_authoring_bridge)
 location_assets = LocationAssetStore(ROOT)
+# Weapon and Arrow atlases are consumers of the ONE shared published atlas catalog.
+# Switching a variant updates authoring only; Sync Studio remains an explicit action.
+weapons.atlases = location_assets.atlases
+arrows.atlases = location_assets.atlases
+weapons.export()
+arrows.export()
 location_asset_sync_history = LocationAssetSyncHistory(ROOT, database=asset_audit_repository)
 place_registry = LocationPlaceRegistry(location_assets, PlaceRevisionStore(ROOT), run_place_registry_bridge)
 real_estate = RealEstateStore(ROOT, location_assets=location_assets)
@@ -117,7 +125,7 @@ deco_layouts = DecoLayoutStore(ROOT)
 character_identity = CharacterIdentityService(ROOT, store, animations)
 real_estate_studio_sync = RealEstateStudioSync(real_estate, run_model_load_bridge)
 studio_asset_sync = StudioAssetSyncService(
-    characters=store, weapons=weapons, monsters=monsters, npcs=npcs,
+    characters=store, weapons=weapons, arrows=arrows, monsters=monsters, npcs=npcs,
     load_model=run_model_load_bridge,
 )
 
@@ -167,7 +175,7 @@ def publication_credentials(description: str = ""):
 # Application composition root for read-only HTTP adapters. Built once, not per request.
 READ_SOURCES = MappingProxyType({
     "characters": store, "animations": animations, "character_components": character_components, "armor": armor, "character_assemblies": character_assemblies, "character_publications": character_publications,
-    "weapons": weapons, "monsters": monsters, "monster_animations": monster_animations,
+    "weapons": weapons, "arrows": arrows, "monsters": monsters, "monster_animations": monster_animations,
     "npcs": npcs, "npc_animations": npc_animations, "npc_equipment": npc_equipment,
     "location_assets": location_assets, "location_asset_sync_history": location_asset_sync_history,
     "place_registry": place_registry,
@@ -235,6 +243,8 @@ WRITE_SOURCES = MappingProxyType({
     "sync_weapon_to_studio": studio_asset_sync.sync_weapon_to_studio,
     "timelines": timelines,
     "weapons": weapons,
+    "arrows": arrows,
+    "sync_arrow_to_studio": studio_asset_sync.sync_arrow_to_studio,
     "write_animation_export": write_animation_export,
 })
 

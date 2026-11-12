@@ -18,13 +18,19 @@ function Profiles.Validate(settings)
         assert(finite(settings[axis], -360, 360), axis .. " must be -360..360")
     end
     assert(type(settings.tetherEnabled) == "boolean", "tetherEnabled must be boolean")
+    -- Decode the old persisted checkbox once; new profiles contain sway only.
+    local swayEnabled = if settings.swayEnabled ~= nil then settings.swayEnabled
+        else settings.physicsEnabled == true
+    assert(type(swayEnabled) == "boolean", "swayEnabled must be boolean")
+    assert(not swayEnabled or settings.tetherEnabled, "sway requires tetherEnabled")
     assert(finite(settings.length, 0.05, 100), "tether length must be 0.05..100")
     assert(finite(settings.thickness, 0.02, 4), "tether thickness must be 0.02..4")
     assert(type(settings.color) == "string" and settings.color:match("^#%x%x%x%x%x%x$") ~= nil,
         "tether color must be #RRGGBB")
     return {
         yaw = settings.yaw, pitch = settings.pitch, roll = settings.roll,
-        tetherEnabled = settings.tetherEnabled, length = settings.length,
+        tetherEnabled = settings.tetherEnabled, swayEnabled = swayEnabled,
+        length = settings.length,
         thickness = settings.thickness, color = settings.color:upper(),
     }
 end

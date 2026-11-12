@@ -7,6 +7,7 @@ local ProximityPromptService = game:GetService("ProximityPromptService")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
+local CameraController = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CameraController"))
 
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local Contract = require(Shared:WaitForChild("world"):WaitForChild("HouseSocketContract"))
@@ -245,8 +246,9 @@ end
 local function nearestCustomPrompt(root: BasePart, aimedOnly: boolean): ProximityPrompt?
     local camera = Workspace.CurrentCamera
     if not camera then return nil end
+    local cursor = CameraController.CursorPoint()
     local viewport = camera.ViewportSize
-    local ray = camera:ViewportPointToRay(viewport.X * 0.5, viewport.Y * 0.5)
+    local ray = camera:ViewportPointToRay(viewport.X * cursor.X, viewport.Y * cursor.Y)
     local selectedAim: ProximityPrompt? = nil
     local aimEntry = math.huge
     local selectedOther: ProximityPrompt? = nil

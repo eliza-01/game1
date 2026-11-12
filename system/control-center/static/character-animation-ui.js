@@ -4,6 +4,7 @@
   const safe=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const missingKey='game1.animations.showMissing';
   let api, sortKey='context', sortDir=1, showMissing=false, scan=null, replacing=null, replacementPath='', busy=false;
+  let manualConfirmAsset="",manualConfirmChecked=false;
   let timelineByClip=null; // null means the separate timeline registry has not been checked
   try{showMissing=localStorage.getItem(missingKey)==='1'}catch{}
   function pendingRows(){
@@ -25,7 +26,7 @@
       const timing=attack&&timelineByClip?.get(row.clip_id);
       const timingLabel=timelineByClip===null?'таймлайн: не проверен':timing?.configured?'таймлайн: готов':'таймлайн: нужен HitStart / HitEnd';
       const tr=document.createElement('tr');tr.className=(row.binding_id&&row.binding_id===s.animationSelected?'active ':'')+(row.missing?'animation-empty-row':'');
-      tr.innerHTML=`<td><span class="context-chip ${safe(row.scope)}">${safe(context(row))}</span></td><td><b>${safe(row.slot)}</b></td><td>${row.variant?String(row.variant).padStart(2,'0'):'—'}</td><td>${safe(row.name||'—')}${row.source_path?`<br><small class="animation-source-path" title="${safe(row.source_path)}">${safe(row.source_path)}</small>`:''}</td><td>${safe(row.asset_id||'—')}</td><td><span class="tag ${safe(String(row.status).toLowerCase())}">${safe(row.status)}</span>${attack?`<small class="animation-timeline-status ${timing?.configured?'ready':'required'}">${safe(timingLabel)}</small>`:''}</td><td>${row.missing?'—':`<input data-weight class="weight-input" type="number" min="1" max="10000" value="${safe(row.weight||100)}">`}</td><td>${row.missing?'Требуется файл':`<div class="row-actions"><button data-open>детали</button>${row.document_only?'программное состояние':row.asset_id?`<button data-replace>${row.status==='CHANGED'?'проверить / replace':'replace'}</button>`:`<button data-publish ${row.status==='LOCAL_ONLY'?'':'disabled'}>publish</button>`}${attack?'<button data-timeline type="button">таймлайн удара</button>':''}<button data-delete class="danger">удалить</button></div>`}</td>`;
+      tr.innerHTML=`<td><span class="context-chip ${safe(row.scope)}">${safe(context(row))}</span></td><td><b>${safe(row.slot)}</b></td><td>${row.variant?String(row.variant).padStart(2,'0'):'—'}</td><td>${safe(row.name||'—')}${row.source_path?`<br><small class="animation-source-path" title="${safe(row.source_path)}">${safe(row.source_path)}</small>`:''}</td><td>${safe(row.asset_id||'—')}</td><td><span class="tag ${safe(String(row.status).toLowerCase())}">${safe(row.status)}</span>${row.user_attested?'<small class="animation-timeline-status required">Replaced · user attested, not verified</small>':''}${attack?`<small class="animation-timeline-status ${timing?.configured?'ready':'required'}">${safe(timingLabel)}</small>`:''}</td><td>${row.missing?'—':`<input data-weight class="weight-input" type="number" min="1" max="10000" value="${safe(row.weight||100)}">`}</td><td>${row.missing?'Требуется файл':`<div class="row-actions"><button data-open>детали</button>${row.document_only?'программное состояние':row.asset_id?`<button data-replace>${row.status==='CHANGED'?'проверить / replace':'replace'}</button>`:`<button data-publish ${row.status==='LOCAL_ONLY'?'':'disabled'}>publish</button>`}${attack?'<button data-timeline type="button">таймлайн удара</button>':''}<button data-delete class="danger">удалить</button></div>`}</td>`;
       if(!row.missing){tr.querySelector('[data-open]').onclick=()=>{s.animationSelected=row.binding_id;api.render()};tr.querySelector('[data-weight]').onchange=e=>api.weight(row.binding_id,e.target.value);tr.querySelector('[data-publish]')?.addEventListener('click',()=>api.publish(row.clip_id));tr.querySelector('[data-replace]')?.addEventListener('click',()=>openReplacement(row));tr.querySelector('[data-timeline]')?.addEventListener('click',()=>api.openTimeline(row.clip_id));tr.querySelector('[data-delete]').onclick=()=>api.remove(row.binding_id)}
       tr.dataset.context=context(row);tr.dataset.slot=row.slot;host.append(tr);
     }
@@ -78,17 +79,58 @@
       await api.load();if(published+documents===registered)report.textContent=`Done! Зарегистрировано ${registered} · опубликовано ${published} · документов применено ${documents}.`;
     }catch(e){report.textContent='Не выполнено: '+e.message;api.toast(e.message,true)}finally{busy=false;if(committed)scan=null;syncScanPublishButton();api.render()}
   }
-  function renderReplacement(){const row=replacing;const el=$('animation-replace-review');if(!row)return;
-    el.innerHTML=`<p><b>${safe(row.name)}</b> · ${safe(context(row))} / ${safe(row.slot)}</p><p>Постоянный Roblox Asset ID: <strong>${safe(row.asset_id)}</strong>. Он не меняется.</p><p class="animation-info">1. Выбери .rbxm/.rbxmx. 2. Вручную импортируй эту анимацию в Roblox Studio как новую версию того же Asset ID. 3. Нажми «Проверить Roblox» после одобрения.</p><p>Файл: <b>${safe(replacementPath||'не выбран')}</b></p><div id="animation-replace-result" class="animation-review-result" aria-live="polite">${row.status==='CHANGED'?'Ожидается ручной реимпорт в Studio.':'Исходная версия опубликована.'}</div>`;
-    $('animation-replace-confirm').disabled=!replacementPath||busy;$('animation-replace-check').disabled=busy||row.status!=='CHANGED';
+  function syncManualConfirm(){
+    const el=$('animation-replace-manual');if(!el)return;
+    el.disabled=busy||replacing?.status!=='CHANGED'||
+      !manualConfirmChecked||manualConfirmAsset!==String(replacing?.asset_id||'');
   }
-  function openReplacement(row){replacing=row;replacementPath='';renderReplacement();open('animation-replace-dialog')}
+  function renderReplacement(){const row=replacing,el=$('animation-replace-review');if(!row)return;
+    el.innerHTML=`<p><b>${safe(row.name)}</b> · ${safe(context(row))} / ${safe(row.slot)}</p>`+
+      `<p>Permanent Roblox Asset ID: <strong>${safe(row.asset_id)}</strong>. It does not change.</p>`+
+      `<p class="animation-info">1. Choose the new .rbxm/.rbxmx and stage it. 2. In Studio replace the existing Roblox animation under the SAME ID. 3. Verify through Roblox, or explicitly attest to a completed replacement below.</p>`+
+      `<p>Staged file: <b>${safe(replacementPath||'not selected')}</b></p>`+
+      (row.status==='CHANGED'?`<div class="animation-manual-confirm"><strong>Manual confirmation · no Open Cloud verification</strong>`+
+        `<label>Type the permanent Asset ID<input type="text" data-animation-manual-id inputmode="numeric" autocomplete="off" value="${safe(manualConfirmAsset)}"></label>`+
+        `<label><input type="checkbox" data-animation-manual-checked ${manualConfirmChecked?'checked':''}> I confirm that I replaced this exact animation in Roblox Studio under the ID above.</label>`+
+        `<small>This records USER_ATTESTED, not Roblox Approved. The old ID and full publication history are retained.</small></div>`:'')+
+      `<div id="animation-replace-result" class="animation-review-result" aria-live="polite">${row.status==='CHANGED'?'Waiting for Studio replacement or explicit confirmation.':row.user_attested?'Previously marked as user-attested; not verified by Roblox.':'Current source publication registered.'}</div>`;
+    $('animation-replace-confirm').disabled=!replacementPath||busy;
+    $('animation-replace-check').disabled=busy||row.status!=='CHANGED';
+    const manualId=el.querySelector('[data-animation-manual-id]');if(manualId)manualId.oninput=()=>{manualConfirmAsset=manualId.value.trim();syncManualConfirm();};
+    const confirm=el.querySelector('[data-animation-manual-checked]');if(confirm)confirm.onchange=()=>{manualConfirmChecked=confirm.checked;syncManualConfirm();};
+    syncManualConfirm();
+  }
+  function openReplacement(row){replacing=row;replacementPath='';manualConfirmAsset='';manualConfirmChecked=false;renderReplacement();open('animation-replace-dialog')}
   async function chooseReplacement(){try{const result=await api.request('/api/files/choose-character-animation-file',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({initialPath:api.state().animationFolder})});if(result.path){replacementPath=result.path;renderReplacement()}}catch(e){api.toast(e.message,true)}}
   async function stageReplacement(){if(!replacing||!replacementPath||busy)return;busy=true;const before=replacing.asset_id;try{const result=await api.request('/api/animations/'+encodeURIComponent(replacing.clip_id)+'/stage-replacement',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sourcePath:replacementPath})});if(result.assetId!==before)throw Error('Asset ID changed unexpectedly');await api.load();replacing=(api.state().animations?.items||[]).find(r=>r.clip_id===replacing.clip_id)||replacing;renderReplacement();$('animation-replace-result').textContent=result.status==='CHANGED'?'Файл подготовлен. Выполни ручной реимпорт в Studio и затем проверь Roblox.':'Файл не изменился; реимпорт не требуется.'}catch(e){api.toast(e.message,true)}finally{busy=false;$('animation-replace-confirm').disabled=!replacementPath;$('animation-replace-check').disabled=replacing?.status!=='CHANGED'}}
+  async function confirmReplacementManually(){
+    if(!replacing||busy||replacing.status!=='CHANGED'||!manualConfirmChecked||manualConfirmAsset!==String(replacing.asset_id))return;
+    const row=replacing;
+    if(!confirm(`Confirm that ${row.name} was REPLACED in Roblox Studio under ID ${row.asset_id}? This is your declaration, not Roblox verification.`))return;
+    busy=true;syncManualConfirm();
+    try{
+      const result=await api.request('/api/animations/'+encodeURIComponent(row.clip_id)+'/confirm-studio-replacement',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({assetId:row.asset_id,sha256:row.sha256,attested:true})});
+      await api.load();
+      replacing=(api.state().animations?.items||[]).find(r=>r.clip_id===row.clip_id)||row;
+      renderReplacement();
+      $('animation-replace-result').textContent='Marked USER_ATTESTED (not Cloud verified). Asset ID preserved. Prepare Studio Sync and connect Rojo before Play.';
+      api.toast('User attestation recorded · not Roblox-verified');
+    }catch(e){api.toast(e.message,true)}finally{busy=false;syncManualConfirm();}
+  }
+  async function prepareStudioSync(){
+    const status=$('animation-studio-sync-status');
+    status.textContent='Regenerating canonical Animation Registry for Rojo…';
+    try{const result=await api.request('/api/animations/prepare-studio-sync',{method:'POST'});
+      status.textContent=`Exported ${result.publishedClips}/${result.clips} animations (${result.changedClips} changed). Studio is NOT synced by this button. Connect / Sync Rojo and restart Play.`;
+      api.toast('Animation Registry exported. Sync Rojo to Studio; then restart Play.');
+    }catch(e){status.textContent='Animation export failed: '+e.message;api.toast(e.message,true);}
+  }
   async function checkReplacement(){if(!replacing||busy)return;busy=true;try{const result=await api.request('/api/animations/'+encodeURIComponent(replacing.clip_id)+'/check-replacement',{method:'POST'});await api.load();replacing=(api.state().animations?.items||[]).find(r=>r.clip_id===replacing.clip_id)||replacing;renderReplacement();$('animation-replace-result').textContent=result.confirmed?'Done! Roblox подтвердил новую Approved-версию; Asset ID сохранён.':result.pending?'Ожидание: новой одобренной версии Roblox пока нет.':'Проверка: '+(result.details?.[0]?.message||'нет ожидающей замены.')}catch(e){api.toast(e.message,true)}finally{busy=false;$('animation-replace-confirm').disabled=!replacementPath;$('animation-replace-check').disabled=replacing?.status!=='CHANGED'}}
   function init(callbacks){api=callbacks;$('animation-show-missing').checked=showMissing;$('animation-show-missing').addEventListener('change',e=>{showMissing=e.target.checked;try{localStorage.setItem(missingKey,showMissing?'1':'0')}catch{}api.render()});
     document.querySelectorAll('[data-animation-sort]').forEach(th=>{const action=()=>{const key=th.dataset.animationSort;sortDir=sortKey===key?-sortDir:1;sortKey=key;api.render()};th.addEventListener('click',action);th.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();action()}})});
-    document.querySelectorAll('[data-animation-close]').forEach(b=>b.addEventListener('click',()=>b.closest('dialog').close()));$('animation-register-selected').onclick=registerSelected;$('animation-scan-review').addEventListener('change',syncScanPublishButton);$('animation-replace-choose').onclick=chooseReplacement;$('animation-replace-confirm').onclick=stageReplacement;$('animation-replace-check').onclick=checkReplacement;
+    document.querySelectorAll('[data-animation-close]').forEach(b=>b.addEventListener('click',()=>b.closest('dialog').close()));$('animation-register-selected').onclick=registerSelected;$('animation-scan-review').addEventListener('change',syncScanPublishButton);$('animation-replace-choose').onclick=chooseReplacement;$('animation-replace-confirm').onclick=stageReplacement;$('animation-replace-check').onclick=checkReplacement;$('animation-replace-manual').onclick=confirmReplacementManually;$('animation-prepare-sync').onclick=prepareStudioSync;
   }
   window.game1AnimationUI={init,renderRows,renderRules,scanFolder,refreshAttackTimelines};
 })();

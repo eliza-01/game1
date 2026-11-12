@@ -98,6 +98,30 @@ def route(path, body, deps):
         except Exception as error:
             return out(400, {"error": str(error)})
 
+    if path == "/api/animations/prepare-studio-sync":
+        try:
+            manifest = animations.export()  # Regenerate the Rojo-owned source of truth.
+            clips = manifest.get('clips') or []
+            return out(200, {'schemaVersion':1, 'exported':True,
+                             'registryPath':'src/shared/character/CharacterAnimationRegistry.luau',
+                             'clips':len(clips),
+                             'publishedClips':sum(bool(c.get('assetId')) for c in clips),
+                             'changedClips':sum(c.get('status')=='CHANGED' for c in clips),
+                             'studioSynced':False, 'nextStep':'Connect or Sync Rojo in Roblox Studio, then restart Play'})
+        except Exception as error:
+            return out(400, {'error':str(error)})
+
+    if path.startswith("/api/animations/") and path.endswith("/confirm-studio-replacement"):
+        clip_id = unquote(path[len("/api/animations/"):-len("/confirm-studio-replacement")].strip("/"))
+        try:
+            payload = body()
+            return out(200, animations.confirm_studio_replacement(
+                clip_id,asset_id=str(payload.get('assetId') or ''),
+                sha256=str(payload.get('sha256') or ''),
+                attestation=payload.get('attested') is True))
+        except Exception as error:
+            return out(400, {'error':str(error)})
+
     if path.startswith("/api/animations/") and path.endswith("/stage-replacement"):
         clip_id = unquote(path[len("/api/animations/"):-len("/stage-replacement")].strip("/"))
         try:

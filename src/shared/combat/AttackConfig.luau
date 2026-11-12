@@ -25,6 +25,9 @@ return table.freeze({
     -- body up to this yaw. Only the overflow is assigned to whole-character yaw.
     TorsoYawLimit = math.rad(70),
     TorsoAimResponse = 26,
+    -- Local pitch is applied to the spine bridge after authored source poses.
+    TorsoPitchUpLimit = math.rad(65),
+    TorsoPitchDownLimit = math.rad(55),
     -- Time used to rotate the root overflow toward the attack direction. The
     -- resulting facing is then held until the complete attack animation ends.
     FacingTurnSeconds = 0.28,

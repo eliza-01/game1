@@ -26,4 +26,18 @@ function GameOptions.CharacterLifePlaybackPercent(slot: any): number
 	return 100
 end
 
+-- Saved camera defaults are authoritative; Studio debug uses an ephemeral copy.
+function GameOptions.CameraSettings(): {[string]: number}
+    local source = Registry.camera or {}
+    return {
+        targetHeight = math.clamp(finite(source.targetHeight, 5.5), 0, 12),
+        distance = math.clamp(finite(source.distance, 10), 4, 18),
+        pitchDegrees = math.clamp(finite(source.pitchDegrees, -12), -65, 60),
+        characterX = math.clamp(finite(source.characterX, 0.5), 0.2, 0.8),
+        characterY = math.clamp(finite(source.characterY, 0.5), 0.2, 0.8),
+        cursorX = math.clamp(finite(source.cursorX, 0.5), 0.1, 0.9),
+        cursorY = math.clamp(finite(source.cursorY, 0.5), 0.1, 0.9),
+    }
+end
+
 return table.freeze(GameOptions)

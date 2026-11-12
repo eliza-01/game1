@@ -452,8 +452,8 @@ local function updateMovement()
 	end
 
 	if facingLockDirection and now < facingLockUntil then
-		-- Facing lock is independent from movement lock and can be refreshed every
-		-- frame while an attack tracks the center reticle.
+		-- Common hands / bow / melee facing lock. Camera orbit remains owned
+		-- exclusively by CameraController, irrespective of the equipped weapon.
 		controllerManager.FacingDirection = facingLockDirection
 	else
 		if facingLockDirection then
@@ -462,22 +462,20 @@ local function updateMovement()
 		end
 		if moveDirection.Magnitude > 0.001 then
 			if not backwardActive then
-				-- Forward/side movement continues to own facing as before.
+				-- Moving players face travel, as they do with hands equipped.
 				controllerManager.FacingDirection = moveDirection
 			elseif backwardCameraSteering then
-				-- RMB + S: face with the camera while travelling exactly opposite its forward
-				-- direction. A/D are ignored for the trajectory while backpedalling.
+				-- RMB + S backpedal: steer with camera while travelling backwards.
 				local cameraForward = cameraForwardDirection()
 				if cameraForward.Magnitude > 0.001 then
 					controllerManager.FacingDirection = cameraForward
 				end
 			end
-			-- Backpedal without RMB intentionally preserves the current facing.
+			-- Without RMB, backpedal preserves the current facing.
 		end
 	end
-
-	-- Standing bow compensation is deliberately applied after ordinary facing, so
-	-- only the stationary attack path can override the root yaw.
+	-- Stationary root yaw overflow belongs to the shared attack-facing
+	-- compensation. Do not silently steer the root solely because bow is equipped.
 	applyAimFacingCompensation(now)
 
 	if now >= airLockUntil then

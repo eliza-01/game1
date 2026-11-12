@@ -13,19 +13,21 @@ EVENT_CATALOGS = {
         {"name": "HitStart", "label": "hit start"},
         {"name": "HitEnd", "label": "hit end"},
     ],
+    "bows": [{"name": "Release", "label": "release arrow"}],
     "monsters": [
         {"name": "Hit", "label": "hit"},
     ],
 }
-ALL_EVENT_NAMES = ("HitStart", "HitEnd", "Hit")
+ALL_EVENT_NAMES = ("HitStart", "HitEnd", "Hit", "Release")
 
 
 def event_catalog_for_subject(subject_type: str) -> list[dict]:
     return list(EVENT_CATALOGS.get(str(subject_type or ""), []))
 
 
-def event_names_for_subject(subject_type: str) -> set[str]:
-    return {str(row["name"]) for row in event_catalog_for_subject(subject_type)}
+def event_names_for_subject(subject_type: str, weapon_set: str = "") -> set[str]:
+    return {str(row["name"]) for row in event_catalog_for_subject(
+        "bows" if subject_type == "characters" and weapon_set == "bow" else subject_type)}
 
 
 class TimelineStore:
@@ -161,7 +163,8 @@ class TimelineStore:
                 preview_id, preview_mode = self._character_preview(character)
                 required_events = timeline.get("events") if isinstance(timeline.get("events"), dict) else {}
                 configured = (float(timeline.get("duration") or 0) > 0
-                              and all(name in required_events for name in ("HitStart", "HitEnd"))
+                              and all(name in required_events for name in
+                                      (("Release",) if str(clip.get("weapon_set") or "") == "bow" else ("HitStart", "HitEnd")))
                               and not bool(timeline.get("reviewRequired")))
                 rows.append({
                     "subjectType": "characters",
@@ -173,6 +176,8 @@ class TimelineStore:
                     "clipName": str(clip.get("name") or clip_id),
                     "animationAssetId": str(clip.get("asset_id") or ""),
                     "weaponSet": str(clip.get("weapon_set") or ""),
+                    "eventCatalog": event_catalog_for_subject(
+                        "bows" if str(clip.get("weapon_set") or "") == "bow" else "characters"),
                     "variant": int(clip.get("variant") or 0),
                     "duration": float(timeline.get("duration") or 0),
                     "events": dict(timeline.get("events") or {}),
@@ -195,6 +200,7 @@ class TimelineStore:
                     "clipName": str(clip.get("name") or clip_id),
                     "animationAssetId": str(clip.get("asset_id") or ""),
                     "weaponSet": "",
+                    "eventCatalog": event_catalog_for_subject("monsters"),
                     "variant": int(clip.get("variant") or 0),
                     "duration": float(timeline.get("duration") or 0),
                     "events": dict(timeline.get("events") or {}),
@@ -234,8 +240,8 @@ class TimelineStore:
         return row
 
     @staticmethod
-    def _validate_events(subject_type: str, raw_events: dict) -> dict:
-        allowed = event_names_for_subject(subject_type)
+    def _validate_events(subject_type: str, raw_events: dict, weapon_set: str = "") -> dict:
+        allowed = event_names_for_subject(subject_type, weapon_set)
         events = {}
         for event_name, raw in raw_events.items():
             if event_name not in allowed or not isinstance(raw, dict):
@@ -243,7 +249,10 @@ class TimelineStore:
             events[event_name] = {
                 "normalizedTime": max(0.0, min(1.0, float(raw.get("normalizedTime") or 0)))
             }
-        if subject_type == "characters":
+        if subject_type == "characters" and weapon_set == "bow":
+            if "Release" not in events:
+                raise ValueError("bow attack timeline requires Release")
+        elif subject_type == "characters":
             if "HitStart" not in events or "HitEnd" not in events:
                 raise ValueError("character attack timeline requires HitStart and HitEnd")
             if events["HitStart"]["normalizedTime"] > events["HitEnd"]["normalizedTime"]:
@@ -255,8 +264,9 @@ class TimelineStore:
             raise ValueError(f"unsupported timeline subject type: {subject_type}")
         return events
 
-    def event_catalog_for_subject(self, subject_type: str) -> list[dict]:
-        return event_catalog_for_subject(subject_type)
+    def event_catalog_for_subject(self, subject_type: str, weapon_set: str = "") -> list[dict]:
+        return event_catalog_for_subject(
+            "bows" if subject_type == "characters" and weapon_set == "bow" else subject_type)
 
     def begin_editor_session(self, clip_id: str) -> dict:
         row = self._find_attack(clip_id)
@@ -265,6 +275,7 @@ class TimelineStore:
             "sessionId": session_id,
             "clipId": row["clipId"],
             "subjectType": row["subjectType"],
+            "weaponSet": row.get("weaponSet", ""),
             "subjectId": row["subjectId"],
             "subjectName": row["subjectName"],
             "clipName": row["clipName"],
@@ -297,7 +308,7 @@ class TimelineStore:
             session["studioReady"] = True
         elif action == "set-event":
             event_name = str(payload.get("eventName") or "")
-            if event_name not in event_names_for_subject(str(session.get("subjectType") or "")):
+            if event_name not in event_names_for_subject(str(session.get("subjectType") or ""), str(session.get("weaponSet") or "")):
                 raise ValueError(f"unsupported event for this attack type: {event_name}")
             session.setdefault("events", {})[event_name] = {
                 "normalizedTime": max(0.0, min(1.0, float(payload.get("normalizedTime") or 0)))
@@ -318,7 +329,7 @@ class TimelineStore:
         raw_events = payload.get("events")
         if not isinstance(raw_events, dict):
             raise ValueError("timeline events are required")
-        events = self._validate_events(str(attack.get("subjectType") or ""), raw_events)
+        events = self._validate_events(str(attack.get("subjectType") or ""), raw_events, str(attack.get("weaponSet") or ""))
 
         data = self._load()
         row = {"clipId": clip_id, "duration": duration, "events": events}

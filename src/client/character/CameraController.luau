@@ -8,6 +8,7 @@ local Workspace = game:GetService("Workspace")
 local Game1Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local CharacterShared = Game1Shared:WaitForChild("character")
 local CharacterConfig = require(CharacterShared:WaitForChild("CharacterConfig"))
+local GameOptions = require(Game1Shared:WaitForChild("GameOptions"))
 local UiInputGuard = require(script.Parent.Parent:WaitForChild("UiInputGuard"))
 
 local CameraController = {}
@@ -18,10 +19,11 @@ local character: Model? = nil
 local root: BasePart? = nil
 local rotating = false
 local targetYaw = 0
-local targetPitch = CharacterConfig.CameraPitch
+local cameraSettings = GameOptions.CameraSettings()
+local targetPitch = math.rad(cameraSettings.pitchDegrees)
 local renderedYaw = 0
-local renderedPitch = CharacterConfig.CameraPitch
-local distance = CharacterConfig.CameraDistance
+local renderedPitch = targetPitch
+local distance = cameraSettings.distance
 local discardNextMouseDelta = false
 local touchLookAxis = Vector2.zero
 
@@ -116,9 +118,18 @@ local function updateCamera(deltaTime: number)
 	-- Reading .Position here samples the simulation transform and can make the
 	-- whole world appear to stutter when render FPS is higher than physics FPS.
 	local renderedRootCFrame = currentRoot:GetRenderCFrame()
-	local target = renderedRootCFrame.Position + Vector3.new(0, CharacterConfig.CameraTargetHeight, 0)
+	local target = renderedRootCFrame.Position + Vector3.new(0, cameraSettings.targetHeight, 0)
 	local rotation = CFrame.Angles(0, renderedYaw, 0) * CFrame.Angles(renderedPitch, 0, 0)
-	local desiredPosition = target + rotation:VectorToWorldSpace(Vector3.new(0, 0, distance))
+	-- Translate the camera frame in its local screen plane; the player appears
+    -- at the chosen normalized on-screen position without changing root movement.
+    local viewport = camera.ViewportSize
+    local aspect = if viewport.Y > 1 then viewport.X / viewport.Y else 1
+    local halfHeight = distance * math.tan(math.rad(camera.FieldOfView) * 0.5)
+    local halfWidth = halfHeight * aspect
+    local screenShift = rotation.RightVector * ((0.5 - cameraSettings.characterX) * 2 * halfWidth)
+        + rotation.UpVector * ((cameraSettings.characterY - 0.5) * 2 * halfHeight)
+    target += screenShift
+    local desiredPosition = target + rotation:VectorToWorldSpace(Vector3.new(0, 0, distance))
 	local castDirection = desiredPosition - target
 
 	local cameraPosition = desiredPosition
@@ -128,6 +139,56 @@ local function updateCamera(deltaTime: number)
 	end
 
 	camera.CFrame = CFrame.lookAt(cameraPosition, target, Vector3.yAxis)
+end
+
+local CAMERA_LIMITS = {
+    targetHeight = {0, 12}, distance = {4, 18}, pitchDegrees = {-65, 60},
+    characterX = {0.2, 0.8}, characterY = {0.2, 0.8},
+    cursorX = {0.1, 0.9}, cursorY = {0.1, 0.9},
+}
+
+function CameraController.GetSettings(): {[string]: number}
+    return table.clone(cameraSettings)
+end
+
+function CameraController.ApplyDebug(settings: {[string]: number}): boolean
+    if not RunService:IsStudio() then return false end
+    local replacement = table.clone(cameraSettings)
+    for key, bounds in CAMERA_LIMITS do
+        local value = settings[key]
+        if type(value) ~= "number" or value ~= value or value == math.huge or value == -math.huge
+            or value < bounds[1] or value > bounds[2] then
+            return false
+        end
+        replacement[key] = value
+    end
+    local oldPitch = cameraSettings.pitchDegrees
+    cameraSettings = replacement
+    distance = cameraSettings.distance
+    if math.abs(cameraSettings.pitchDegrees - oldPitch) > 1e-6 then
+        targetPitch = math.rad(cameraSettings.pitchDegrees)
+        renderedPitch = targetPitch
+    end
+    local gui = localPlayer:FindFirstChild("PlayerGui")
+    local reticle = gui and gui:FindFirstChild("Game1AimReticle")
+    local dot = reticle and reticle:FindFirstChild("Dot")
+    if dot and dot:IsA("GuiObject") then
+        dot.Position = UDim2.fromScale(cameraSettings.cursorX, cameraSettings.cursorY)
+    end
+    return true
+end
+
+function CameraController.CursorPoint(): Vector2
+    return Vector2.new(cameraSettings.cursorX, cameraSettings.cursorY)
+end
+
+function CameraController.GetAimRay(): (Vector3?, Vector3?)
+    local camera = Workspace.CurrentCamera
+    if not camera then return nil, nil end
+    local v = camera.ViewportSize
+    local ray = camera:ViewportPointToRay(v.X * cameraSettings.cursorX, v.Y * cameraSettings.cursorY)
+    if ray.Direction.Magnitude <= 1e-6 then return nil, nil end
+    return ray.Origin, ray.Direction.Unit
 end
 
 function CameraController.SetTouchLookAxis(axis: Vector2)

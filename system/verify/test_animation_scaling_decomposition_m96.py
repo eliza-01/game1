@@ -46,9 +46,10 @@ class AnimationScalingM96(unittest.TestCase):
         # Workspace debug rule must override published custom clip, then profile fallback.
         self.assertLess(facade.index("if debugRule then"), facade.index("if authored then"))
         self.assertLess(facade.index("if authored then"), facade.index("return AnimationSpeedScaling.Rule(targetType"))
-        # A custom clip ignores stat overrides AND model-channel debug units (legacy contract).
+        # A published custom clip keeps its own stat, while Studio Run/Walk
+        # ratio overrides its units even for that clip. Attack remains authored.
         self.assertIn("statValueOverride ~= nil and not isCustom", facade)
-        self.assertIn("debugUnitsPerPercent ~= nil and not isCustom", facade)
+        self.assertIn('debugUnitsPerPercent ~= nil and (normalizedChannel == "run" or normalizedChannel == "walk")', facade)
 
     def test_pure_formula_runtime_if_lua_is_available(self):
         # Formula intentionally uses the Lua 5.3 subset of Luau. This optional

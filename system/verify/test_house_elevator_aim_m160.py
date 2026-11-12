@@ -41,7 +41,7 @@ class M160FloorAndAim(unittest.TestCase):
         self.assertIn('sideSq > radiusSq', aim)
         self.assertIn('forward < -radius', aim)
         client = code('src/client/world/HouseSocketPromptController.luau')
-        self.assertIn('camera:ViewportPointToRay(viewport.X * 0.5, viewport.Y * 0.5)', client)
+        self.assertIn('camera:ViewportPointToRay(viewport.X * cursor.X, viewport.Y * cursor.Y)', client)
         self.assertIn('Aim.RaySphereEntry(ray.Origin, ray.Direction, frame.Position, hoverRadius(name))', client)
         self.assertNotIn('Magnitude > 140', client)
         self.assertIn('return selectedOther', client)

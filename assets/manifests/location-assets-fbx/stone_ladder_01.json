@@ -1,10 +1,27 @@
 {
   "schemaVersion": 1,
   "slug": "stone_ladder_01",
-  "sourceSha256": "e2b0f1078cfc120abc3708f0b8fe9a54ad019a36d21baf3e8ac779e67f96816e",
+  "sourceSha256": "942420581dd61b622e6fcaba844b9eb35126ac6a2a07d7e920260f78565dc5d4",
   "analysis": {
     "schemaVersion": 1,
     "meshes": [
+      {
+        "name": "col_mesh",
+        "armature": "",
+        "vertices": 13,
+        "bones": [],
+        "influencedBones": [],
+        "role": "collider",
+        "physics": {
+          "role": "collider",
+          "canCollide": true,
+          "canQuery": true,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": "PreciseConvexDecomposition",
+          "physicsOnly": true
+        }
+      },
       {
         "name": "stone_ladder_01",
         "armature": "",
@@ -14,16 +31,16 @@
         "role": "visual",
         "physics": {
           "role": "visual",
-          "canCollide": null,
-          "canQuery": null,
+          "canCollide": false,
+          "canQuery": false,
           "canTouch": false,
           "doubleSided": false,
-          "collisionFidelity": null,
+          "collisionFidelity": "Box",
           "physicsOnly": false
         }
       }
     ],
-    "hasCollider": false,
+    "hasCollider": true,
     "armatures": [],
     "unassignedArmatures": []
   }

@@ -1,4 +1,4 @@
-const animationSpeedState={data:null,saving:new Set(),search:""};
+const animationSpeedState={data:null,saving:new Set(),search:"",overrideFilter:"",overridePage:0};
 const animationSpeedChannelMeta={
   run:{title:'Run',description:'Running movement animations.'},
   walk:{title:'Walk',description:'Walking movement animations.'},
@@ -18,28 +18,20 @@ function animationSpeedRender(){
       const key=[profile.targetType,profile.targetId,rule.channel].join(':');
       const units=animationSpeedFormat(rule.unitsPerPercent);
       const meta=animationSpeedRuleMeta(rule);
-      return `<article class="animation-speed-rule" data-animation-speed-key="${esc(key)}">
-        <div class="animation-speed-rule-head">
-          <div><span>animation</span><h4>${esc(meta.title)}</h4><small>${esc(meta.description)}</small></div>
-          <span class="animation-speed-channel">${esc(rule.channel)}</span>
-        </div>
-        <div class="animation-speed-fields">
-          <div class="animation-speed-field animation-speed-readonly"><b>Gameplay stat</b><strong>${esc(rule.stat)}</strong><small>Gameplay value that controls playback speed for this animation only.</small></div>
-          <label class="animation-speed-field"><b>Stat units for +1% playback</b><input data-animation-speed-units type="number" min="0.001" max="100000" step="0.01" value="${esc(units)}"><small>Lower value = faster playback for the same ${esc(rule.stat)}.</small></label>
-          <div class="animation-speed-field"><b>Playback formula</b><code>playback % = ${esc(rule.stat)} ÷ ${esc(units)}</code><small>This rule is evaluated at runtime from the current gameplay stat.</small></div>
-          <div class="animation-speed-field"><b>Example</b><strong>${esc(animationSpeedExample(rule,Number(units)))}</strong><small>Example uses a stat value of 100 only to make the scale easy to compare.</small></div>
-        </div>
-        <div class="animation-speed-rule-actions"><span>applies to <b>${esc(meta.title)}</b> only</span><button data-animation-speed-save class="primary" type="button">save ${esc(meta.title)}</button></div>
+      return `<article class="animation-speed-rule animation-speed-compact" data-animation-speed-key="${esc(key)}">
+        <div class="animation-speed-compact-intro"><h4>${esc(meta.title)}</h4><small>${esc(rule.stat)} · ${esc(animationSpeedExample(rule,Number(units)))}</small></div>
+        <label class="animation-speed-compact-input"><span>Единиц / +1%</span><input data-animation-speed-units type="number" min="0.001" max="100000" step="0.01" value="${esc(units)}"></label>
+        <button data-animation-speed-save class="primary" type="button">Сохранить</button>
       </article>`;
     }).join('');
-    const explanation=profile.targetType==='humanoid'?'Shared across all Characters and NPCs; each animation state has an independent rule.':'Separate scaling rules for this monster profile.';
+    const explanation=(profile.targetType==='humanoid'?'Общее правило для персонажей и NPC.':'Правила этого монстра.')+' Playback formula: стат ÷ единиц = скорость %.';
     return `<section class="animation-speed-profile"><div class="animation-speed-profile-head"><div><span>${esc(profile.targetType)}</span><h3>${esc(profile.displayName||profile.targetId)}</h3><small>${esc(explanation)}</small></div><span class="pill">${esc(profile.targetId)}</span></div><div class="animation-speed-rule-grid">${cards}</div></section>`;
   }).join('');
   for(const profile of profiles){for(const rule of profile.rules||[]){
     const key=[profile.targetType,profile.targetId,rule.channel].join(':');
     const row=[...host.querySelectorAll('[data-animation-speed-key]')].find(el=>el.dataset.animationSpeedKey===key);if(!row)continue;
     const input=row.querySelector('[data-animation-speed-units]'),button=row.querySelector('[data-animation-speed-save]');
-    const busy=animationSpeedState.saving.has(key);button.disabled=busy;button.textContent=busy?'saving…':`save ${animationSpeedRuleMeta(rule).title}`;
+    const busy=animationSpeedState.saving.has(key);button.disabled=busy;button.textContent=busy?'Сохранение…':'Сохранить';
     button.onclick=()=>animationSpeedSave(profile,rule,input);
     input.onkeydown=event=>{if(event.key==='Enter'){event.preventDefault();animationSpeedSave(profile,rule,input)}};
   }}
@@ -69,10 +61,11 @@ function customScalingInherited(clip){
   const rule=(profile?.rules||[]).find(r=>r.channel===clip.channel);
   return {stat:rule?.stat||clip.stat||'AttackSpeed',unitsPerPercent:rule?.unitsPerPercent||1};
 }
+const CUSTOM_SCALING_PAGE_SIZE=40;
 function customScalingRender(){
-  const list=$('custom-scaling-rows'), results=$('custom-scaling-results');
+  const list=$('custom-scaling-rows'),results=$('custom-scaling-results');
   if(!list||!results)return;
-  const catalog=customScalingCatalog(), saved=customScalingSaved();
+  const catalog=customScalingCatalog(),saved=customScalingSaved();
   const byId=new Map(catalog.map(c=>[c.assetId,c]));
   const term=animationSpeedState.search.trim().toLowerCase();
   const matches=term?catalog.filter(c=>
@@ -85,23 +78,55 @@ function customScalingRender(){
   for(const button of results.querySelectorAll('[data-custom-pick]'))button.onclick=()=>{
     const aid=button.dataset.customPick;
     if(!saved.some(row=>row.assetId===aid))saved.push({assetId:aid,...customScalingInherited(byId.get(aid)),_draft:true});
-    animationSpeedState.search='';$('custom-scaling-search').value='';customScalingRender();
+    animationSpeedState.search='';$('custom-scaling-search').value='';
+    animationSpeedState.overrideFilter='';animationSpeedState.overridePage=0;
+    const filter=$('custom-scaling-filter');if(filter)filter.value='';
+    customScalingRender();
     list.querySelector(`[data-custom-row="${aid}"]`)?.scrollIntoView({block:'nearest'});
   };
-  list.innerHTML=saved.length?saved.map(row=>{
+  const query=animationSpeedState.overrideFilter.trim().toLowerCase();
+  const filtered=saved.filter(row=>{
     const c=byId.get(row.assetId);
-    return `<article class="animation-speed-rule" data-custom-row="${esc(row.assetId)}">
-       <div class="animation-speed-rule-head"><div><span>${esc(c?.kind||'published')} / ${esc(c?.subject||'registered')}</span><h4>${esc(c?.name||row.assetId)}</h4><small>${esc(c?.channel||'')} · Roblox Animation ID ${esc(row.assetId)}</small></div><span class="animation-speed-channel">${row._draft?'new':'custom'}</span></div>
-       <div class="animation-speed-fields">
-        <label class="animation-speed-field"><b>Gameplay stat</b><select data-custom-stat><option value="AttackSpeed" ${row.stat==='AttackSpeed'?'selected':''}>AttackSpeed</option><option value="RunSpeed" ${row.stat==='RunSpeed'?'selected':''}>RunSpeed</option></select></label>
-        <label class="animation-speed-field"><b>Stat units for +1% playback</b><input data-custom-units type="number" min="0.001" max="1000" step="0.01" value="${esc(animationSpeedFormat(row.unitsPerPercent))}"></label>
-       </div><div class="animation-speed-rule-actions"><span>override only this animation</span><div class="actions"><button data-custom-remove type="button">${row._draft?'cancel':'remove override'}</button><button data-custom-apply class="primary" type="button">apply</button></div></div>
-    </article>`;
-  }).join(''):'<span class="muted">No custom overrides. Search for a published animation above.</span>';
+    return !query||[row.assetId,row.stat,c?.name,c?.subject,c?.kind,c?.channel,c?.clipId]
+      .some(value=>String(value||'').toLowerCase().includes(query));
+  }).sort((a,b)=>{
+    const ca=byId.get(a.assetId),cb=byId.get(b.assetId);
+    return String(ca?.name||a.assetId).localeCompare(String(cb?.name||b.assetId));
+  });
+  const pages=Math.max(1,Math.ceil(filtered.length/CUSTOM_SCALING_PAGE_SIZE));
+  animationSpeedState.overridePage=Math.min(animationSpeedState.overridePage,pages-1);
+  const start=animationSpeedState.overridePage*CUSTOM_SCALING_PAGE_SIZE;
+  const pageRows=filtered.slice(start,start+CUSTOM_SCALING_PAGE_SIZE);
+  const status=$('custom-scaling-count');
+  if(status)status.textContent=`${filtered.length} / ${saved.length} overrides`;
+  list.innerHTML=pageRows.length?`<div class="custom-scaling-table" role="table" aria-label="Clip scaling overrides">
+    <div class="custom-scaling-table-head" role="row"><span>Анимация</span><span>Stat</span><span>Ед./1%</span><span>Действия</span></div>
+    ${pageRows.map(row=>{
+      const c=byId.get(row.assetId);
+      return `<div class="custom-scaling-table-row" role="row" data-custom-row="${esc(row.assetId)}">
+        <div class="custom-scaling-clip" title="${esc(c?.name||row.assetId)}"><strong>${esc(c?.name||row.assetId)}</strong><small>${esc(c?.subject||c?.kind||'registered')} · ${esc(c?.channel||'')} · ${esc(row.assetId)}${row._draft?' · NEW':''}</small></div>
+        <label class="custom-scaling-cell"><span class="sr-only">Gameplay stat</span><select aria-label="Stat for ${esc(c?.name||row.assetId)}" data-custom-stat><option value="AttackSpeed" ${row.stat==='AttackSpeed'?'selected':''}>AttackSpeed</option><option value="RunSpeed" ${row.stat==='RunSpeed'?'selected':''}>RunSpeed</option></select></label>
+        <label class="custom-scaling-cell"><span class="sr-only">Units per 1 percent</span><input aria-label="Units per 1% for ${esc(c?.name||row.assetId)}" data-custom-units type="number" min="0.001" max="1000" step="0.01" value="${esc(animationSpeedFormat(row.unitsPerPercent))}"></label>
+        <div class="custom-scaling-table-actions"><button data-custom-apply class="primary" type="button" title="Сохранить override">Save</button><button data-custom-remove type="button" title="${row._draft?'Отменить':'Удалить override'}">${row._draft?'Cancel':'Remove'}</button></div>
+      </div>`;
+    }).join('')}
+  </div>`:'<span class="muted">'+(saved.length?'No overrides match the filter.':'No custom overrides. Search for a published animation above.')+'</span>';
+  const pagination=$('custom-scaling-pages');
+  if(pagination){
+    pagination.hidden=filtered.length<=CUSTOM_SCALING_PAGE_SIZE;
+    pagination.innerHTML=`<button type="button" data-custom-page="prev" ${animationSpeedState.overridePage===0?'disabled':''}>←</button><span>${animationSpeedState.overridePage+1} / ${pages}</span><button type="button" data-custom-page="next" ${animationSpeedState.overridePage>=pages-1?'disabled':''}>→</button>`;
+    for(const button of pagination.querySelectorAll('[data-custom-page]'))button.onclick=()=>{
+      animationSpeedState.overridePage+=button.dataset.customPage==='next'?1:-1;
+      customScalingRender();
+    };
+  }
   for(const section of list.querySelectorAll('[data-custom-row]')){
     const aid=section.dataset.customRow;
     section.querySelector('[data-custom-apply]').onclick=()=>customScalingSave(aid,section,false);
     section.querySelector('[data-custom-remove]').onclick=()=>customScalingSave(aid,section,true);
+    for(const input of section.querySelectorAll('[data-custom-units],[data-custom-stat]')){
+      input.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();customScalingSave(aid,section,false)}});
+    }
   }
 }
 async function customScalingSave(assetId,section,remove){
@@ -118,3 +143,19 @@ async function customScalingSave(assetId,section,remove){
   }catch(error){toast(error.message,true);action.disabled=false}
 }
 $('custom-scaling-search').oninput=e=>{animationSpeedState.search=e.target.value;customScalingRender()};
+
+// Controls live beside the existing list, so older Control Center markup is
+// still compatible without copying/replacing the entire HTML template.
+const customRowsHost=$('custom-scaling-rows');
+if(customRowsHost&&!$('custom-scaling-filter')){
+  customRowsHost.insertAdjacentHTML('beforebegin',`<div class="custom-scaling-toolbar">
+    <label>Filter overrides <input type="search" id="custom-scaling-filter" autocomplete="off" placeholder="name, subject, channel, ID"></label>
+    <span id="custom-scaling-count" aria-live="polite">0 overrides</span>
+  </div>`);
+  customRowsHost.insertAdjacentHTML('afterend','<div id="custom-scaling-pages" class="custom-scaling-pages" hidden></div>');
+}
+$('custom-scaling-filter').oninput=e=>{
+  animationSpeedState.overrideFilter=e.target.value;
+  animationSpeedState.overridePage=0;
+  customScalingRender();
+};

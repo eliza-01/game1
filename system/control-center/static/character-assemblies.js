@@ -3,6 +3,10 @@
   const base='/api/characters/assemblies';
   const byId=id=>document.getElementById('ca-'+id);
   const slots=['head','eye_l','eye_r','eyebrow_l','eyebrow_r','hair'];
+  const bodySlots=['upper','lower','gloves','boots'];
+  const materialSlots=[...bodySlots,...slots];
+  const materials=['','Glass','Metal','SmoothPlastic','Plaster','Slate','Sandstone','Sand','Cardboard','Rubber','Limestone','Granite'];
+  const bodyLabels={upper:'Верх',lower:'Низ',gloves:'Перчатки',boots:'Обувь'};
   const solidFaceSlots=['eye_l','eye_r','eyebrow_l','eyebrow_r'];
   const atlasSlots=['head','hair'];
   const labels={head:'Голова',eye_l:'Левый глаз',eye_r:'Правый глаз',eyebrow_l:'Левая бровь',eyebrow_r:'Правая бровь',hair:'Волосы'};
@@ -47,6 +51,8 @@
       face_colors:Object.fromEntries(solidFaceSlots.filter(slot=>byId('slot-'+slot).value)
         .map(slot=>[slot,byId('color-'+slot).value.toUpperCase()])),
       hair_colors:hairColors(),
+      part_materials:Object.fromEntries(materialSlots.filter(slot=>byId('material-'+slot)?.value)
+        .map(slot=>[slot,byId('material-'+slot).value])),
       stats:Object.fromEntries((data?.stats.statKeys||[]).map(key=>[key,Number(byId('stat-'+key).value)]))};
   }
   function formDirty(){return !!data&&!!original&&JSON.stringify(payload())!==original;}
@@ -100,6 +106,7 @@
     const faces=Object.fromEntries(slots.map(slot=>[slot,r.face_parts?.[slot]?.meshPartId||'']));
     const textures=Object.fromEntries(slots.map(slot=>[slot,String(data.armor.appearances.find(a=>a.id===r.face_parts?.[slot]?.appearanceId)?.atlas_variant_id||'')]));
     fillFaces(faces,textures,r.face_colors||{});fillHairColors(r.hair_colors||{});
+    fillMaterials(r.part_materials||{});
     for(const key of data.stats.statKeys)byId('stat-'+key).value=row.stats[key];
     original=JSON.stringify(payload());update();
     message(r.schema_version===2?(row.assembly_resolved.ready?'READY':'DRAFT: '+row.assembly_resolved.missing.join(' · ')):
@@ -111,7 +118,7 @@
     byId('id').value=id;byId('name').value='Human Female';
     byId('gender').value='female';
     byId('rig').value=data.catalog.items.find(x=>x.kind==='rig'&&x.id==='human_female')?.id||'';
-    fillSets('');fillFaces();fillHairColors();
+    fillSets('');fillFaces();fillHairColors();fillMaterials();
     for(const key of data.stats.statKeys)byId('stat-'+key).value=data.stats.defaultStats[key];
     original=JSON.stringify(payload());update();
     message('Базовый Human Female: выбери опубликованный rig, Armor set и голову. Глаза, брови и волосы выбираются отдельно.');
@@ -150,7 +157,7 @@
     setSelect(byId('rig'),data.catalog.items.filter(x=>x.kind==='rig').map(x=>({label:x.id,value:x.id})),
       remember?.rig_id||byId('rig').value,'Rig…');
     if(remember){
-      byId('gender').value=remember.gender;fillSets(remember.armor_set_id);fillFaces(remember.face_parts,remember.face_atlases,remember.face_colors);fillHairColors(remember.hair_colors);
+      byId('gender').value=remember.gender;fillSets(remember.armor_set_id);fillFaces(remember.face_parts,remember.face_atlases,remember.face_colors);fillHairColors(remember.hair_colors);fillMaterials(remember.part_materials);
       update();message('Catalog refreshed, unsaved edits retained.');
     }else if(editId&&current(editId))edit(current(editId));
     else if(!editId&&byId('id').value) newDraft();
@@ -159,24 +166,63 @@
   }
   async function run(fn){if(busy)return;busy=true;byId('save').disabled=true;
     try{await fn();}catch(error){message(error.message,true);}finally{busy=false;update();}}
-  const col=document.createElement('section');col.className='ca-part-column';
-  col.append(text('h5','Лицо · геометрия и appearance'));
+  function materialSelect(slot){
+    const control=document.createElement('select');control.id='ca-material-'+slot;
+    control.setAttribute('aria-label','Материал · '+(labels[slot]||bodyLabels[slot]));
+    for(const name of materials)control.append(new Option(name||'Исходный',name));
+    control.onchange=()=>{update();autoSaveMaterial();};
+    return control;
+  }
+  function fillMaterials(saved={}){
+    for(const slot of materialSlots)byId('material-'+slot).value=saved?.[slot]||'';
+  }
+  let materialSaveRevision=0;
+  async function autoSaveMaterial(){
+    const snapshot=payload();
+    if(!selected||busy||!original)return;
+    // Save a material instantly only if other fields have no unsaved edits.
+    const previous=JSON.parse(original);
+    const compare=JSON.stringify({...snapshot,part_materials:previous.part_materials||{}});
+    if(compare!==original){message('Материал изменён · сохрани остальные изменения кнопкой Save.');return;}
+    const revisionId=++materialSaveRevision;
+    await run(async()=>{
+      const id=snapshot.id;
+      data=await post(base,{...snapshot,expected_revision:revision});
+      if(revisionId===materialSaveRevision){edit(current(id));render();message('Материал сохранён · применяется к следующей сборке персонажа.');}
+    });
+  }
+  const face=document.createElement('section');face.className='ca-part-column';
+  face.append(text('h5','Лицо и волосы'));
   for(const slot of slots){
-    const label=text('label',labels[slot]);const part=document.createElement('select');part.id='ca-slot-'+slot;
-    label.append(part);col.append(label);
+    const row=document.createElement('div');row.className='ca-part-row';
+    const heading=text('strong',labels[slot]);heading.className='ca-part-title';row.append(heading);
+    const fields=document.createElement('div');fields.className='ca-part-fields';
+    const part=document.createElement('select');part.id='ca-slot-'+slot;part.setAttribute('aria-label','Меш · '+labels[slot]);
+    fields.append(part);
+    const style=document.createElement('div');style.className='ca-part-style';
     if(atlasSlots.includes(slot)){
-      const atlasLabel=text('label','Атлас · '+labels[slot]);const atlas=document.createElement('select');atlas.id='ca-atlas-'+slot;
-      atlasLabel.append(atlas);col.append(atlasLabel);atlas.onchange=update;
+      const atlas=document.createElement('select');atlas.id='ca-atlas-'+slot;
+      atlas.setAttribute('aria-label','Атлас · '+labels[slot]);atlas.onchange=update;
+      style.append(atlas);
     }else{
-      const colorLabel=text('label','Цвет · '+labels[slot]);const color=document.createElement('input');
-      color.type='color';color.id='ca-color-'+slot;color.value='#ffffff';color.oninput=update;
-      colorLabel.append(color);col.append(colorLabel);
+      const color=document.createElement('input');color.type='color';color.id='ca-color-'+slot;
+      color.value='#ffffff';color.title='Цвет · '+labels[slot];color.setAttribute('aria-label','Цвет · '+labels[slot]);
+      color.oninput=update;style.append(color);
     }
+    style.append(materialSelect(slot));fields.append(style);row.append(fields);face.append(row);
     part.onchange=()=>{if(slot==='hair')fillHairColors();update();};
   }
-  const hairColorsRow=document.createElement('div');hairColorsRow.id='ca-hair-colors';
-  col.append(hairColorsRow);
-  byId('parts').append(col);
+  const hairColorsRow=document.createElement('details');hairColorsRow.id='ca-hair-colors-options';
+  hairColorsRow.append(text('summary','Цвета прядей'));
+  const hairColorsHost=document.createElement('div');hairColorsHost.id='ca-hair-colors';hairColorsRow.append(hairColorsHost);
+  face.append(hairColorsRow);
+  const body=document.createElement('section');body.className='ca-part-column ca-materials-body';
+  body.append(text('h5','Материалы тела и брони'));
+  for(const slot of bodySlots){
+    const row=document.createElement('label');row.className='ca-body-material';
+    row.append(text('span',bodyLabels[slot]),materialSelect(slot));body.append(row);
+  }
+  byId('parts').append(face,body);
   for(const input of ['rig','gender'])byId(input).onchange=()=>{fillFaces();fillHairColors();update();};
   byId('set').onchange=update;
   for(const field of ['id','name'])byId(field).oninput=update;

@@ -726,7 +726,9 @@ function TestLoadoutController.Start()
         radiusToggle.Activated:Connect(function() setRingVisible(not ringVisible) end)
 
         local function setVolumeVisible(value: boolean)
-            volumeVisible = value == true
+            local character = player.Character
+            local isBow = character and string.lower(tostring(character:GetAttribute("EquippedWeaponType") or "")) == "bow"
+            volumeVisible = value == true and not isBow
             volumeToggle.Text = volumeVisible and "WEAPON HIT VOLUME: ON" or "WEAPON HIT VOLUME: OFF"
             volumeToggle.BackgroundColor3 = volumeVisible and COLORS.controlSelected or COLORS.control
             volumeToggle.TextColor3 = volumeVisible and COLORS.accent or COLORS.text
@@ -736,6 +738,11 @@ function TestLoadoutController.Start()
         local function renderWeaponHitVolume()
             if not volumeVisible then return end
             local currentCharacter = player.Character
+            if currentCharacter and string.lower(tostring(currentCharacter:GetAttribute("EquippedWeaponType") or "")) == "bow" then
+                setVolumeVisible(false)
+                volumePart.Transparency = 1
+                return
+            end
             local root = currentCharacter and currentCharacter:FindFirstChild("RootCollider")
             if not root or not root:IsA("BasePart") then
                 volumePart.Transparency = 1

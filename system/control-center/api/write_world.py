@@ -87,6 +87,9 @@ def route(path, body, deps):
             # Report partial exports explicitly for manual recovery instead.
             exports = [('Location Assets', location_assets.export),
                        ('Real Estate', deps['real_estate'].export)]
+            for name, store in (('Weapons', deps.get('weapons')), ('Arrows', deps.get('arrows'))):
+                if store is not None:
+                    exports.append((name, store.export))
             if 'character_components' in deps:
                 exports.append(('Characters', deps['character_components'].export))
             if 'character_assemblies' in deps:
@@ -100,6 +103,33 @@ def route(path, body, deps):
             return out(200, {**result, 'exportWarnings': warnings})
         except (ValueError,OSError,RuntimeError,KeyError) as error:
             return out(400,{'error':str(error)})
+
+    if path == '/api/texture-atlases/index-existing-weapons':
+        # A user-initiated metadata import; never auto-publishes or syncs.
+        try:
+            payload = body()
+            if not isinstance(payload, dict) or payload.get('confirm') is not True:
+                raise ValueError('explicit confirmation required to index published weapon atlases')
+            from services.weapon_atlas_index import index_existing_textures
+            kind = str(payload.get('kind') or '')
+            slug = str(payload.get('slug') or '')
+            if kind and kind not in ('weapon', 'arrow'):
+                raise ValueError('invalid legacy atlas consumer type')
+            if (bool(kind) != bool(slug)) or (slug and not re.fullmatch(r'[a-z0-9][a-z0-9_]{0,63}',slug)):
+                raise ValueError('invalid legacy atlas consumer')
+            report = index_existing_textures(location_assets.root, location_assets.atlases,
+                kind_filter=kind, slug_filter=slug)
+            warnings = []
+            for name, store in (('Weapons', deps.get('weapons')), ('Arrows', deps.get('arrows'))):
+                if store is not None:
+                    try:
+                        store.export()
+                    except Exception as error:
+                        warnings.append(f'{name}: {error}')
+            report['exportWarnings'] = warnings
+            return out(200, report)
+        except (ValueError, OSError, RuntimeError) as error:
+            return out(400, {'error': str(error)})
 
     if path == '/api/texture-atlases/consumer-choice':
         # Shared HTTP transport; domain stores alone validate registration and
@@ -121,6 +151,10 @@ def route(path, body, deps):
                 if not row or part not in row.get('meshParts', []) or is_collision_mesh(part):
                     raise ValueError('choose a visual Real Estate mesh')
                 consumer = f'{slug}:{part}'
+            elif kind in ('weapon', 'arrow'):
+                store = deps['weapons'] if kind == 'weapon' else deps['arrows']
+                row = store.get(slug)
+                consumer = slug
             else:
                 raise ValueError('unsupported atlas consumer type')
             if not row:
@@ -128,11 +162,15 @@ def route(path, body, deps):
             if action == 'attach':
                 variants = location_assets.atlases.attach(kind, consumer, variant_id)
                 return out(200, {'attachedVariants': variants, 'studioSyncRequired': False})
+            if action == 'clear' and kind in ('weapon', 'arrow'):
+                return out(200, {'item': store.clear_atlas(slug), 'studioSyncRequired': True})
             if action != 'select':
                 raise ValueError('unsupported atlas action')
             revision = int(payload.get('expectedRevision') or 0)
             if kind == 'location_asset':
                 updated = location_assets.select_atlas(slug, variant_id, revision)
+            elif kind in ('weapon', 'arrow'):
+                updated = store.select_atlas(slug, variant_id, revision)
             else:
                 updated = deps['real_estate'].select_atlas(slug, part, variant_id, revision, mode='existing')
             return out(200, {'item': updated, 'studioSyncRequired': True})
@@ -416,6 +454,12 @@ def route(path, body, deps):
         except Exception as error:
             return out(400, {"error": str(error)})
 
+    if path == "/api/options/camera-draft":
+        try:
+            return out(200, options_store.preview_camera(body()))
+        except (ValueError, OSError, TypeError) as error:
+            return out(400, {"error": str(error)})
+
     if path == "/api/options":
         try:
             return out(200, options_store.update(body()))
@@ -462,7 +506,7 @@ def route(path, body, deps):
         try:
             payload = body()
             session = timelines.begin_editor_session(str(payload.get("clipId") or ""))
-            studio = run_timeline_editor_bridge(session, timelines.event_catalog_for_subject(session["subjectType"]))
+            studio = run_timeline_editor_bridge(session, timelines.event_catalog_for_subject(session["subjectType"], session.get("weaponSet", "")))
             duration = float(studio.get("duration") or 0)
             if duration > 0:
                 timelines.update_editor_state({"sessionId": session["sessionId"], "action": "ready", "duration": duration})

@@ -7,5 +7,41 @@
   "characterAnimations": {
     "deathPlaybackPercent": 50.0,
     "revivePlaybackPercent": 50.0
-  }
+  },
+  "camera": {
+    "targetHeight": 5.5,
+    "distance": 14.25,
+    "pitchDegrees": -20.0,
+    "characterX": 0.5,
+    "characterY": 0.6,
+    "cursorX": 0.5,
+    "cursorY": 0.5
+  },
+  "cameraPresets": [
+    {
+      "name": "1",
+      "settings": {
+        "targetHeight": 5.5,
+        "distance": 10.0,
+        "pitchDegrees": -12.0,
+        "characterX": 0.42,
+        "characterY": 0.58,
+        "cursorX": 0.5,
+        "cursorY": 0.52
+      }
+    },
+    {
+      "name": "2",
+      "settings": {
+        "targetHeight": 5.5,
+        "distance": 14.25,
+        "pitchDegrees": -20.0,
+        "characterX": 0.5,
+        "characterY": 0.6,
+        "cursorX": 0.5,
+        "cursorY": 0.5
+      }
+    }
+  ],
+  "activeCameraPreset": "2"
 }

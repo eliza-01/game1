@@ -123,10 +123,10 @@ class DomainValidatorM166Tests(unittest.TestCase):
         self.assertIn("m26 combat state default duration must be 6 seconds", errors)
 
     def test_combat_headshot_reticle_contract(self):
-        with self.swap_read("src/client/combat/AimPoseController.luau", lambda text:
+        with self.swap_read("src/client/character/CameraController.luau", lambda text:
                             text.replace("ViewportPointToRay", "ReticleRayRemoved")):
             errors = self.contact()
-        self.assertIn("m33 center-screen aim-ray source missing ViewportPointToRay", errors)
+        self.assertIn("m33 central camera ray source missing ViewportPointToRay", errors)
 
     def test_combat_hitbox_and_contact_independent_inputs(self):
         errors = self.contact(hitbox_implementation_text=self.hitbox_inputs["hitbox_implementation_text"].replace(

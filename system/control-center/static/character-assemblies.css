@@ -52,3 +52,20 @@
 #character-rail .tree-actions{grid-template-columns:1fr}
 @media(max-width:800px){#character-assemblies-panel .ca-parts-grid{grid-template-columns:1fr}}
 @media(max-width:580px){#character-assemblies-panel .ca-identity-grid{grid-template-columns:1fr}#character-assemblies-panel .ca-registry,#character-assemblies-panel .ca-editor{padding:12px}}
+
+/* M300: each component is one compact row; appearance and material sit together. */
+#character-assemblies-panel .ca-parts-grid{grid-template-columns:minmax(0,1.6fr) minmax(220px,1fr);gap:12px}
+#character-assemblies-panel .ca-part-column{gap:9px;padding:13px}
+#character-assemblies-panel .ca-part-row{display:grid;grid-template-columns:106px minmax(0,1fr);align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+#character-assemblies-panel .ca-part-row:last-of-type{border-bottom:0}
+#character-assemblies-panel .ca-part-title{font-size:12px;font-weight:650;color:var(--text)}
+#character-assemblies-panel .ca-part-fields{display:grid;gap:5px;min-width:0}
+#character-assemblies-panel .ca-part-style{display:flex;align-items:center;gap:6px;min-width:0}
+#character-assemblies-panel .ca-part-style select{flex:1;min-width:0}
+#character-assemblies-panel .ca-part-style input[type=color]{width:38px;height:32px;flex:none;padding:2px;cursor:pointer}
+#character-assemblies-panel .ca-body-material{display:grid;grid-template-columns:95px minmax(0,1fr);align-items:center;gap:12px;margin:0}
+#character-assemblies-panel #ca-hair-colors-options{padding:9px 0}
+#character-assemblies-panel #ca-hair-colors{display:flex;gap:8px;flex-wrap:wrap;padding-top:10px}
+#character-assemblies-panel #ca-hair-colors label{flex:1;min-width:105px}
+@media(max-width:900px){#character-assemblies-panel .ca-parts-grid{grid-template-columns:1fr}}
+@media(max-width:520px){#character-assemblies-panel .ca-part-row{grid-template-columns:1fr;gap:5px}}

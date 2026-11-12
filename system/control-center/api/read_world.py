@@ -96,12 +96,17 @@ def route(parsed, sources, info):
         snapshot["publication"] = sources["publication_config"]()
         return 200, snapshot
 
+    if path == "/api/options":
+        try:
+            return 200, sources["options"].snapshot_with_debug()
+        except Exception as error:
+            return 400, {"error": str(error)}
+
     # Historically these GET errors were encoded as 400 JSON, not a transport crash.
     simple = {
         "/api/npc-spawns": "npc_spawns",
         "/api/monster-spawns": "monster_spawns",
         "/api/animation-speed-scaling": "animation_speed_scaling",
-        "/api/options": "options",
         "/api/timelines": "timelines",
         "/api/locations": "locations",
     }

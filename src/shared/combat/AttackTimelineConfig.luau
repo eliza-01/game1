@@ -14,6 +14,7 @@ AttackTimelineConfig.EventNames = table.freeze({
     HitStart = true,
     HitEnd = true,
     Hit = true,
+    Release = true,
 })
 
 local BY_CLIP = require(script.Parent:WaitForChild("AttackTimelineData"))

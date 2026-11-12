@@ -113,3 +113,134 @@
 /* Sidebar owns scrolling while hovered or focused; conceal scrollbar chrome. */
 @media(min-width:1051px){.rail{max-height:calc(100dvh - 112px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none}.rail::-webkit-scrollbar{display:none}}
 main > .content{padding-top:14px}
+
+/* M300: compact animation speed editing, one channel per row. */
+#animation-speed-profiles .animation-speed-rule-grid{grid-template-columns:1fr;gap:6px}
+#animation-speed-profiles .animation-speed-compact{display:grid;grid-template-columns:minmax(125px,1fr) minmax(145px,190px) auto;align-items:center;gap:12px;padding:10px 12px;border-radius:10px}
+#animation-speed-profiles .animation-speed-compact-intro h4{font-size:13px;margin:0}
+#animation-speed-profiles .animation-speed-compact-intro small{color:var(--muted);font-size:10px;line-height:1.35}
+#animation-speed-profiles .animation-speed-compact-input{display:grid;gap:4px;margin:0;min-width:0;font-size:10px;color:var(--muted)}
+#animation-speed-profiles .animation-speed-compact-input input{width:100%;min-width:0;margin:0}
+#animation-speed-profiles .animation-speed-compact button{white-space:nowrap}
+@media(max-width:650px){#animation-speed-profiles .animation-speed-compact{grid-template-columns:minmax(0,1fr) auto}#animation-speed-profiles .animation-speed-compact-intro{grid-column:1/-1}}
+
+/* M301: compact, filterable clip-level overrides. One row per clip, not a card. */
+.custom-scaling-toolbar{display:flex;align-items:end;justify-content:space-between;gap:12px;margin-top:12px;flex-wrap:wrap}
+.custom-scaling-toolbar label{display:grid;gap:5px;color:var(--muted);font-size:11px;min-width:min(300px,100%);flex:1}
+.custom-scaling-toolbar input{margin:0;min-width:0;width:100%}
+#custom-scaling-count{color:var(--muted);font-size:11px;white-space:nowrap}
+.custom-scaling-list{display:block;margin-top:8px;max-height:660px;overflow:auto;border:1px solid var(--line);border-radius:10px}
+.custom-scaling-table{min-width:680px}
+.custom-scaling-table-head,.custom-scaling-table-row{display:grid;grid-template-columns:minmax(190px,1fr) minmax(110px,145px) minmax(95px,125px) 155px;align-items:center;gap:10px;padding:7px 10px}
+.custom-scaling-table-head{position:sticky;top:0;z-index:2;background:var(--panel);font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--line)}
+.custom-scaling-table-row{border-bottom:1px solid var(--line);min-height:47px}
+.custom-scaling-table-row:last-child{border-bottom:0}
+.custom-scaling-table-row:nth-child(odd){background:color-mix(in srgb,var(--panel2),transparent 50%)}
+.custom-scaling-clip{display:grid;gap:2px;min-width:0}
+.custom-scaling-clip strong{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.custom-scaling-clip small{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.custom-scaling-cell{display:block!important;margin:0!important;min-width:0}
+.custom-scaling-cell select,.custom-scaling-cell input{width:100%;min-width:0;margin:0!important;padding:6px 8px!important;font-size:11px}
+.custom-scaling-table-actions{display:flex;gap:5px;justify-content:flex-end}
+.custom-scaling-table-actions button{padding:6px 9px!important;white-space:nowrap;font-size:11px}
+.custom-scaling-pages{display:flex;justify-content:flex-end;align-items:center;gap:10px;padding-top:10px;color:var(--muted);font-size:11px}
+.custom-scaling-pages[hidden]{display:none}
+.custom-scaling-pages button{min-width:35px}
+.custom-scaling-list .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+
+/* M305: scoped spacing and reusable published-atlas picker for weapons/arrows */
+#weapons-view .panel.character-card{padding:16px 18px}
+#weapons-view .weapon-workflow{gap:12px;margin-top:12px}
+#weapons-view .panel.character-card .card-separator{margin:12px 0}
+#weapons-view .character-grid,#weapons-view .weapon-stats-grid{gap:10px}
+#weapons-view .picker{gap:8px}
+#weapons-view .actions{gap:8px;flex-wrap:wrap}
+#weapons-view .hint{line-height:1.45}
+#weapons-view .game1-arrow-geometry{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+#weapons-view .game1-arrow-geometry label{min-width:0}
+#weapons-view .game1-asset-atlas-picker{padding:12px 0;margin:12px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);display:grid;gap:8px;min-width:0}
+#weapons-view .game1-atlas-header{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+#weapons-view .game1-atlas-header small,#weapons-view .game1-atlas-note{color:var(--muted);font-size:11px}
+#weapons-view .game1-atlas-selection{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+#weapons-view .game1-atlas-selection select{flex:1 1 220px;min-width:0}
+#weapons-view .game1-atlas-versions{display:flex;flex-wrap:wrap;gap:6px}
+#weapons-view .game1-atlas-variant{min-width:30px;padding:5px 9px;border:1px solid var(--line);border-radius:30px}
+#weapons-view .game1-atlas-variant.active{border-color:var(--mint);font-weight:700}
+#weapons-view .game1-asset-publication-state{padding:8px 10px;border:1px solid var(--line);border-radius:7px;color:var(--muted);font-size:12px}
+@media(max-width:760px){#weapons-view .game1-arrow-geometry{grid-template-columns:1fr}#weapons-view .panel.character-card{padding:12px}}
+
+/* M306: Weapons/Arrows reuse the compact central atlas variant dots. */
+#weapons-view .game1-asset-atlas-picker {padding:8px 0;margin:8px 0;gap:5px}
+#weapons-view .game1-asset-atlas-picker .shared-atlas-editor {padding:8px 10px;margin:0;gap:6px}
+#weapons-view .game1-asset-atlas-picker .deco-atlas-dots {gap:8px;margin:4px 0}
+#weapons-view .game1-asset-atlas-picker .deco-atlas-dot {width:22px;height:22px}
+#weapons-view .game1-asset-atlas-picker .deco-atlas-dot span {width:11px;height:11px}
+#weapons-view .game1-asset-atlas-picker .shared-atlas-current {font-size:11px}
+#weapons-view .game1-asset-atlas-picker .shared-atlas-choices {max-height:220px;overflow-y:auto}
+#weapons-view .panel.character-card {padding:12px 16px}
+#weapons-view .weapon-workflow {gap:10px;margin-top:8px}
+#weapons-view .panel.character-card .card-separator {margin:10px 0}
+@media(max-width:760px){#weapons-view .panel.character-card{padding:10px}}
+
+/* M306: camera settings and consistent compact weapon atlas spacing */
+.game1-camera-options-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(172px,1fr));gap:12px;align-items:end; }
+.game1-camera-presets { display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-top:16px;padding-top:12px;border-top:1px solid var(--line, #384452); }
+.game1-camera-presets .actions {grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px;}
+.game1-camera-options .actions {display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;}
+.game1-camera-options-grid label,.game1-camera-presets label {min-width:0;}
+.game1-asset-atlas-picker {margin:12px 0 14px;}
+.game1-asset-atlas-picker .shared-atlas-editor {padding:12px;}
+.game1-asset-atlas-picker .deco-atlas-dots {display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 0;}
+.game1-asset-atlas-picker .shared-atlas-picker {margin-top:10px;}
+
+.game1-asset-atlas-picker .game1-atlas-utilities {display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap;}
+#weapons-view .weapon-workflow .panel {padding:clamp(16px,2vw,22px);}
+#weapons-view .weapon-workflow .picker {margin:8px 0 12px;}
+#weapons-view .weapon-workflow .actions {gap:8px;flex-wrap:wrap;}
+#weapons-view .game1-weapon-atlas-index {padding:16px 20px;}
+
+/* M308 · Weapons use the shared Location Assets atlas workflow and spacing. */
+#weapons-view .weapon-workflow {display:grid;gap:14px;align-items:start}
+#weapons-view .weapon-workflow .panel {padding:16px 18px}
+#weapons-view .game1-asset-atlas-picker {margin:10px 0;padding:0;border:0}
+#weapons-view .game1-asset-atlas-picker .shared-atlas-editor {padding:12px 14px;gap:8px}
+#weapons-view .game1-asset-atlas-picker .deco-atlas-dot {width:25px;height:25px}
+#weapons-view .game1-asset-atlas-picker .deco-atlas-dot span {width:12px;height:12px}
+#weapons-view .game1-atlas-legacy {padding:10px 12px;border:1px solid var(--line);border-left:3px solid #d9ac43;border-radius:7px;display:grid;gap:4px;font-size:12px}
+#weapons-view .game1-atlas-legacy strong {color:#d9ac43}
+#weapons-view .game1-atlas-legacy code {overflow-wrap:anywhere}
+#weapons-view .game1-legacy-source {padding:8px 0;margin:8px 0;color:var(--muted)}
+#weapons-view .game1-legacy-source summary {cursor:pointer;font-size:12px}
+#weapons-view .game1-asset-atlas-picker .shared-atlas-choices {max-height:260px;overflow:auto}
+#weapons-view .game1-asset-publication-state {min-height:36px;overflow-wrap:anywhere}
+@media (max-width:760px) {#weapons-view .weapon-workflow .panel{padding:12px}}
+
+/* M309 · Weapons follows the same resource-library/editor split as Location Assets. */
+#weapons-view .weapon-workflow-m309{display:block;max-width:none}
+#weapons-view .weapon-workflow-m309 .weapon-register-panel{padding:12px 18px;margin-bottom:12px}
+#weapons-view .weapon-register-panel:not([open]){padding:0}
+#weapons-view .weapon-register-panel>summary{cursor:pointer;font-weight:700;padding:14px 18px;list-style:revert}
+#weapons-view .weapon-register-panel[open]>summary{margin-bottom:14px}
+#weapons-view .weapon-workflow-m309>.panel:not(.weapon-register-panel){padding:14px 18px}
+#weapons-view .weapon-workflow-m309 .weapon-table-wrap{max-height:680px;overflow:auto}
+#weapons-view .weapon-table-wrap .deco-atlas-dots{margin:2px 0;justify-content:flex-start}
+#weapons-view .weapon-table-wrap td{vertical-align:top}
+#weapons-view .weapon-table-wrap .row-actions{gap:6px}
+#weapons-view .weapon-table-wrap .row-actions button{white-space:nowrap}
+#weapons-view .weapon-register-panel .game1-asset-atlas-picker{display:none}
+#weapon-asset-edit-dialog {width:min(740px,calc(100vw - 24px));max-height:90vh}
+#weapon-asset-edit-dialog .real-estate-mesh-dialog-body{max-height:calc(90vh - 88px);padding:14px 20px 20px}
+#weapon-asset-edit-dialog .weapon-edit-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+#weapon-asset-edit-dialog .weapon-edit-fields label{min-width:0}
+#weapon-asset-edit-dialog .weapon-edit-fields label input{min-width:0}
+#weapon-asset-edit-dialog .weapon-asset-status{padding:10px 12px;border:1px solid var(--line);border-radius:8px;overflow-wrap:anywhere}
+#weapon-asset-edit-dialog .weapon-edit-warning{padding:9px 12px;border:1px solid #a97b39;border-radius:8px;color:#e5bd83}
+@media(max-width:700px){#weapon-asset-edit-dialog .weapon-edit-fields{grid-template-columns:1fr}}
+
+#weapons-view .game1-weapon-atlas-index:not([open]){padding:0}
+#weapons-view .game1-weapon-atlas-index>summary{cursor:pointer;padding:14px 18px;font-weight:700}
+#weapons-view #weapon-details{display:none}
+
+#weapons-view #arrow-assets-panel{padding:16px 20px}
+#weapons-view #arrow-assets-panel .deco-atlas-dots{margin:2px 0}
+#weapons-view #arrow-assets-panel .table-wrap{max-height:460px}

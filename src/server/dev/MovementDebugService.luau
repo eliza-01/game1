@@ -11,6 +11,7 @@ local AnimationSpeedScaling = require(AnimationShared:WaitForChild("AnimationSpe
 
 local MovementDebugService = {}
 local started = false
+local ratioChangedRemote: RemoteEvent? = nil
 
 local MIN_RUN_SPEED = 0
 local MAX_RUN_SPEED = 500
@@ -47,6 +48,16 @@ local function ensureRemoteFolder(): Folder
     folder.Name = "Game1Remotes"
     folder.Parent = ReplicatedStorage
     return folder
+end
+
+local function ensureRemoteEvent(parent: Instance, name: string): RemoteEvent
+    local current = parent:FindFirstChild(name)
+    if current and current:IsA("RemoteEvent") then return current end
+    if current then current:Destroy() end
+    local remote = Instance.new("RemoteEvent")
+    remote.Name = name
+    remote.Parent = parent
+    return remote
 end
 
 local function ensureRemoteFunction(parent: Instance, name: string): RemoteFunction
@@ -314,7 +325,49 @@ local function applyUnit(_player: Player, targetId: any, patch: any)
             AnimationSpeedScaling.MinUnitsPerPercent,
             AnimationSpeedScaling.MaxUnitsPerPercent
         )
+        local owner = playerForCharacter(model)
+        local playing = {}
+        if not owner then
+            -- Snapshot each server-owned track before changing the ratio.
+            -- Combat pursuit may multiply Run playback (and reverse playback
+            -- may be negative); keep those presentation multipliers intact.
+            local currentChannel = string.lower(tostring(model:GetAttribute("AnimationResolvedSlot")
+                or model:GetAttribute("MonsterAnimationState") or ""))
+            local catalog = AnimationSpeedScaling.Catalog()
+            for _, descendant in ipairs(model:GetDescendants()) do
+                if descendant:IsA("Animator") then
+                    for _, track in ipairs(descendant:GetPlayingAnimationTracks()) do
+                        local assetId = AnimationSpeedScaling.AssetId(track.Animation and track.Animation.AnimationId)
+                        local metadata = catalog[assetId]
+                        local playingChannel = metadata and metadata.channel or currentChannel
+                        if playingChannel == channel and track.Speed ~= 0 then
+                            local oldScale = AnimationSpeedScaling.ResolveScaleForAnimation(model, channel, assetId)
+                            table.insert(playing, {
+                                track = track,
+                                assetId = assetId,
+                                sign = if track.Speed < 0 then -1 else 1,
+                                multiplier = math.clamp(math.abs(track.Speed) / math.max(0.01, oldScale), 0.05, 8),
+                            })
+                        end
+                    end
+                end
+            end
+        end
+
         model:SetAttribute(AnimationSpeedScaling.DebugUnitsPerPercentAttribute(channel), unitsPerPercent)
+        if owner and ratioChangedRemote then
+            -- Player Animator is owned by that player's client, not this server.
+            ratioChangedRemote:FireClient(owner, model, channel, unitsPerPercent)
+        else
+            for _, item in ipairs(playing) do
+                if item.track.IsPlaying then
+                    local scale = AnimationSpeedScaling.ResolveScaleForAnimation(model, channel, item.assetId)
+                    local actualSpeed = item.sign * scale * item.multiplier
+                    item.track:AdjustSpeed(actualSpeed)
+                    model:SetAttribute("AnimationPlaybackSpeedPercent", math.abs(actualSpeed) * 100)
+                end
+            end
+        end
     end
 
     return {
@@ -351,6 +404,7 @@ function MovementDebugService.Start()
     end)
 
     local remotes = ensureRemoteFolder()
+    ratioChangedRemote = ensureRemoteEvent(remotes, "MovementDebugAnimationRatioChanged")
     local catalog = ensureRemoteFunction(remotes, "GetMovementDebugCatalog")
     local apply = ensureRemoteFunction(remotes, "ApplyMovementDebug")
     local monsterMode = ensureRemoteFunction(remotes, "SetMovementDebugMonsterMode")

@@ -17,6 +17,9 @@ function ServiceCatalog.Build(root: Instance)
             local EnvironmentAssetService = require(world:WaitForChild("EnvironmentAssetService"))
             EnvironmentAssetService.Start()
         end},
+        {name = "LandscapeSwayService", critical = false, start = function()
+            require(world:WaitForChild("LandscapeSwayService")).Start()
+        end},
         {name = "PlotMarkerVisibilityService", critical = false, start = function()
             require(world:WaitForChild("PlotMarkerVisibilityService")).Start()
         end},
@@ -36,6 +39,9 @@ function ServiceCatalog.Build(root: Instance)
         end},
         {name = "CombatFeedbackService", critical = false, start = function()
             require(combat:WaitForChild("CombatFeedbackService")).Start()
+        end},
+        {name = "BowProjectileService", critical = false, dependsOn = {"EntityHitboxService"}, start = function()
+            require(combat:WaitForChild("BowProjectileService")).Start()
         end},
         {name = "AttackService", critical = true, dependsOn = {"EntityHitboxService"}, start = function()
             require(combat:WaitForChild("AttackService")).Start()
@@ -72,6 +78,9 @@ function ServiceCatalog.Build(root: Instance)
         end},
         {name = "HouseSocketDebugService", critical = false, dependsOn = {"HouseSocketService"}, start = function()
             require(dev:WaitForChild("HouseSocketDebugService")).Start()
+        end},
+        {name = "CameraDebugService", critical = false, start = function()
+            require(dev:WaitForChild("CameraDebugService")).Start()
         end},
         {name = "TrainingDummyService", critical = false, dependsOn = {"EntityHitboxService"}, start = function()
             require(dev:WaitForChild("TrainingDummyService")).Start()

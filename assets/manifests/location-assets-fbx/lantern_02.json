@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "slug": "lantern_02",
+  "sourceSha256": "5a490975f97f35165a1ae448c616c07dcd44b49bbe080fc99b11f9173e85fb67",
+  "analysis": {
+    "schemaVersion": 1,
+    "meshes": [
+      {
+        "name": "lantern_02",
+        "armature": "lantern_02_armature",
+        "vertices": 93,
+        "bones": [
+          {
+            "name": "light_01_socket",
+            "parent": "",
+            "matrixLocal": [
+              0.9983861,
+              0.0567885,
+              -0.0005601,
+              0.0,
+              -0.0005597,
+              0.0197003,
+              0.9998057,
+              0.0,
+              0.0567885,
+              -0.9981918,
+              0.0197003,
+              -1.0617855,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          }
+        ],
+        "influencedBones": [
+          "light_01_socket"
+        ],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": null,
+          "canQuery": null,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": null,
+          "physicsOnly": false
+        }
+      },
+      {
+        "name": "rig_carrier",
+        "armature": "lantern_02_armature",
+        "vertices": 3,
+        "bones": [
+          {
+            "name": "light_01_socket",
+            "parent": "",
+            "matrixLocal": [
+              0.9983861,
+              0.0567885,
+              -0.0005601,
+              0.0,
+              -0.0005597,
+              0.0197003,
+              0.9998057,
+              0.0,
+              0.0567885,
+              -0.9981918,
+              0.0197003,
+              -1.0617855,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          }
+        ],
+        "influencedBones": [
+          "light_01_socket"
+        ],
+        "role": "carrier",
+        "physics": {
+          "role": "carrier",
+          "canCollide": false,
+          "canQuery": false,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": "Box",
+          "physicsOnly": true
+        }
+      }
+    ],
+    "hasCollider": false,
+    "armatures": [
+      "lantern_02_armature"
+    ],
+    "unassignedArmatures": []
+  }
+}

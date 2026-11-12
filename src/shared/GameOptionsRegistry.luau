@@ -5,6 +5,15 @@ return table.freeze({
 	combat = table.freeze({
 		stateDurationSeconds = 6,
 	}),
+	camera = table.freeze({
+		targetHeight = 5.5,
+		distance = 14.25,
+		pitchDegrees = -20,
+		characterX = 0.5,
+		characterY = 0.6,
+		cursorX = 0.5,
+		cursorY = 0.5,
+	}),
 	characterAnimations = table.freeze({
 		deathPlaybackPercent = 50,
 		revivePlaybackPercent = 50,

@@ -79,6 +79,8 @@ class AtlasSourceReview:
 
         result = {
             'sourcePath': str(path), 'filename': filename,
+            'sourceName': path.name, 'legacyName': parse_filename(path.name) is None,
+            'expectedFilename': filename, 'atlasKey': parsed['atlasKey'],
             'width': width, 'height': height, 'sha256': digest(path),
             'oldPreview': '', 'newPreview': preview,
             'existing': None, 'valid': True, 'reason': '',

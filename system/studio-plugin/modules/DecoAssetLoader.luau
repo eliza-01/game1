@@ -128,9 +128,14 @@ function DecoAssetLoader:loadPublished(row: any): Model
     -- LoadAssetAsync can wrap a valid Blender-authored carrier rig in an inert
     -- RootPart + Motor6D assembly. Normalize only this detached fresh clone;
     -- placed Models are replaced transactionally and are never edited in situ.
-    local authoredPivot = PublishedRigNormalize.Apply(model, row.rigManifest)
+    PublishedRigNormalize.Apply(model, row.rigManifest)
     local carrier = Carrier.Validate(model, row.rigManifest, row.legacyStaticPublication)
     if carrier then
+        -- The outer Roblox Model pivot can belong to an importer wrapper or
+        -- a deleted RootPart. It is NOT the authored rig pivot. Capture the
+        -- native MeshPart pivot before adjusting the assembly.
+        local nativeCarrierPivot = carrier:GetPivot()
+        local nativeCarrierOffset = carrier.PivotOffset
         Carrier.Prepare(carrier)
         -- Roblox skinning finds Bones on connected MeshParts within one Model.
         -- Importer Motor6Ds may already form a valid assembly; retain those.
@@ -143,10 +148,14 @@ function DecoAssetLoader:loadPublished(row: any): Model
                 SkinConnection.Connect(model, carrier, part, weldName)
             end
         end
-        carrier.PivotOffset = carrier.CFrame:ToObjectSpace(authoredPivot)
+        -- Promote the actual imported rig_carrier to PrimaryPart without
+        -- rebasing its PivotOffset to the unrelated outer Model pivot. Both
+        -- DecoManager and Landscape Painter must use this unchanged rig origin.
         model.PrimaryPart = carrier
-        if (model:GetPivot().Position-authoredPivot.Position).Magnitude>0.002 then
-            error("rig_carrier PrimaryPart changed the authored Model pivot")
+        if carrier.PivotOffset ~= nativeCarrierOffset
+            or carrier:GetPivot() ~= nativeCarrierPivot
+            or model:GetPivot() ~= nativeCarrierPivot then
+            error("published rig_carrier pivot changed during Location assembly")
         end
     end
     applyTexture(model, tostring(row.texture_asset_id or ""), row.alphaEnabled)

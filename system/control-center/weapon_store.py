@@ -63,6 +63,7 @@ class WeaponStore:
         self.runtime = self.root / ".control-center"
         self.runtime.mkdir(parents=True, exist_ok=True)
         self.db = self.runtime / "game1.db"
+        self.atlases = None  # injected shared AtlasRegistry after LocationAssetStore initializes
         self._init()
         self.export()
 
@@ -314,11 +315,42 @@ class WeaponStore:
                 return folder
         return str(row.get("weapon_type") or "").strip().lower()
 
+    def atlas_binding(self, slug: str):
+        if self.atlases is None:
+            return None
+        binding = self.atlases.binding('weapon', slug)
+        if binding:
+            binding['id'] = binding['variant_id']  # UI variant row identity from shared Registry
+        return binding
+
+    def select_atlas(self, slug: str, variant_id: int, expected_revision: int):
+        if not self.get(slug):
+            raise ValueError('unknown weapon for atlas selection')
+        if self.atlases is None:
+            raise ValueError('shared atlas registry is unavailable')
+        self.atlases.bind('weapon', slug, variant_id, expected_revision=expected_revision)
+        self.export()  # generated Registry reflects chosen published variant; no Cloud or Studio calls
+        return self.get(slug)
+
+    def clear_atlas(self, slug: str):
+        if not self.get(slug):
+            raise ValueError('unknown weapon')
+        self.atlases.unbind('weapon', slug)
+        self.export()
+        return self.get(slug)
+
     def _decorate(self, connection, row) -> dict:
         result = dict(row)
         result["textures"] = self._textures(connection, result["slug"])
+        result["atlas_binding"] = self.atlas_binding(result["slug"])
+        result["atlas_variants"] = self.atlases.attached_variants("weapon", result["slug"]) if self.atlases else []
         result["stat_modifiers"] = self._modifiers(connection, result["slug"])
-        result["status"] = self._status(result, result["textures"])
+        # A published shared atlas is selected independently of local texture revisions.
+        source_textures = [] if result["atlas_binding"] else result["textures"]
+        result["status"] = self._status(result, source_textures)
+        if result["atlas_binding"] and not result["atlas_binding"]["current"]:
+            # Never claim a retired/outdated shared image is ready for Studio Sync.
+            result["status"] = "UPDATE_AVAILABLE" if result.get("model_asset_id") else "LOCAL_ONLY"
         result["storage_type"] = self._storage_type(result)
         result["server_storage_path"] = (
             f"ServerStorage.weapons.{result['storage_type']}.{result['slug']}.model.{result['slug']}"
@@ -469,7 +501,7 @@ class WeaponStore:
         self.export()
         return self.get(slug)
 
-    def publish(self, slug: str, credentials: dict) -> dict:
+    def publish(self, slug: str, credentials: dict, *, include_legacy_textures: bool = True) -> dict:
         row = self.get(slug)
         if not row:
             raise ValueError(f"unknown weapon: {slug}")
@@ -481,36 +513,40 @@ class WeaponStore:
         creator_id = str(credentials.get("creatorId") or "")
         description = str(credentials.get("description") or "game1 weapon").strip()
 
-        current_asset_id = str(row.get("model_asset_id") or "").strip()
-        with staged_model(self.root, model) as publication:
-            if current_asset_id:
-                operation = update_model_asset(
-                    publication, asset_id=current_asset_id, display_name=row["name_en"], description=description,
-                    creator_type=creator_type, creator_id=creator_id, api_key=api_key,
+        # Location Assets contract: do not publish an unchanged model revision.
+        if not row.get('model_asset_id') or row.get('model_sha256') != row.get('model_published_sha256'):
+            current_asset_id = str(row.get("model_asset_id") or "").strip()
+            with staged_model(self.root, model) as publication:
+                if current_asset_id:
+                    operation = update_model_asset(
+                        publication, asset_id=current_asset_id, display_name=row["name_en"], description=description,
+                        creator_type=creator_type, creator_id=creator_id, api_key=api_key,
+                    )
+                else:
+                    operation = create_model_asset(
+                        publication, display_name=row["name_en"], description=description,
+                        creator_type=creator_type, creator_id=creator_id, api_key=api_key,
+                    )
+            result = wait_for_operation(operation, api_key=api_key)
+            now = time.time()
+            with self.connect() as connection:
+                connection.execute(
+                    """UPDATE weapons SET model_asset_id=?,model_published_sha256=?,moderation_state=?,published_at=?,updated_at=?
+                       WHERE slug=?""",
+                    (result.asset_id, row["model_sha256"], result.moderation_state or "", now, now, slug),
                 )
-            else:
-                operation = create_model_asset(
-                    publication, display_name=row["name_en"], description=description,
-                    creator_type=creator_type, creator_id=creator_id, api_key=api_key,
+                connection.execute(
+                    """INSERT INTO weapon_publications(
+                        weapon_slug,kind,slot,weapon_revision,asset_id,operation_path,sha256,moderation_state,published_at
+                    ) VALUES(?,?,?,?,?,?,?,?,?)""",
+                    (slug, "model", "", int(row["revision"]), result.asset_id, result.operation_path,
+                     row["model_sha256"], result.moderation_state or "", now),
                 )
-        result = wait_for_operation(operation, api_key=api_key)
-        now = time.time()
-        with self.connect() as connection:
-            connection.execute(
-                """UPDATE weapons SET model_asset_id=?,model_published_sha256=?,moderation_state=?,published_at=?,updated_at=?
-                   WHERE slug=?""",
-                (result.asset_id, row["model_sha256"], result.moderation_state or "", now, now, slug),
-            )
-            connection.execute(
-                """INSERT INTO weapon_publications(
-                    weapon_slug,kind,slot,weapon_revision,asset_id,operation_path,sha256,moderation_state,published_at
-                ) VALUES(?,?,?,?,?,?,?,?,?)""",
-                (slug, "model", "", int(row["revision"]), result.asset_id, result.operation_path,
-                 row["model_sha256"], result.moderation_state or "", now),
-            )
 
         row = self.get(slug)
-        for texture in row.get("textures") or []:
+        # Shared AtlasRegistry owns publication and variants. Never re-upload
+        # a bound shared atlas from Weapons -> Publish.
+        for texture in ([] if row.get("atlas_binding") or not include_legacy_textures else row.get("textures") or []):
             if str(texture.get("asset_id") or "") and str(texture.get("published_sha256") or "") == str(texture.get("sha256") or ""):
                 continue
             file_path = self.root / str(texture.get("prepared_path") or texture.get("source_path") or "")
@@ -556,6 +592,8 @@ class WeaponStore:
             current = connection.execute("SELECT value FROM project_settings WHERE key=?", (ACTIVE_KEY,)).fetchone()
             if current and str(current["value"]) == slug:
                 connection.execute("DELETE FROM project_settings WHERE key=?", (ACTIVE_KEY,))
+        if self.atlases is not None:
+            self.atlases.unbind('weapon', slug)
         self.export()
 
     def publications(self, slug: str) -> list[dict]:
@@ -634,8 +672,16 @@ class WeaponStore:
             ])
             for key, value in sorted((row.get("stat_modifiers") or {}).items()):
                 lines.append(f"\t\t\t\t[{self._lua_string(key)}] = {self._lua_number(value)},")
-            lines.extend(["\t\t\t}),", "\t\t\ttextures = table.freeze({"])
-            for texture in row.get("textures") or []:
+            atlas = row.get("atlas_binding")
+            lines.extend(["\t\t\t}),", f"\t\t\tatlasVariantId = {int(atlas['id']) if atlas else 0},", "\t\t\ttextures = table.freeze({"])
+            if atlas and atlas.get('current'):
+                lines.extend([
+                    '\t\t\t\t["atlas"] = table.freeze({',
+                    f"\t\t\t\t\tassetId = {self._lua_string(atlas.get('published_id') or '')},",
+                    f"\t\t\t\t\tsha256 = {self._lua_string(atlas.get('source_sha256') or '')},",
+                    '\t\t\t\t}),',
+                ])
+            for texture in ([] if atlas else row.get("textures") or []):
                 lines.extend([
                     f"\t\t\t\t[{self._lua_string(texture['slot'])}] = table.freeze({{",
                     f"\t\t\t\t\tassetId = {self._lua_string(texture.get('asset_id') or '')},",

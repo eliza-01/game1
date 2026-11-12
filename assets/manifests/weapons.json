@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "project": "game1",
-  "activeWeaponSlug": "newbie_sword_01",
+  "activeWeaponSlug": "newbie_bow",
   "options": {
     "weaponTypes": [
       "dagger",
@@ -64,6 +64,53 @@
   ],
   "items": [
     {
+      "slug": "newbie_bow",
+      "name_en": "Newbie Bow",
+      "name_ru": "Лук Новичка",
+      "weapon_type": "bow",
+      "rarity": "common",
+      "model_source_path": "assets/source/weapons/bow/newbie_bow/model/newbie_bow.fbx",
+      "model_prepared_path": "assets/source/weapons/bow/newbie_bow/model/newbie_bow.fbx",
+      "model_sha256": "179bdb5068ed2b03a8f50dcfa06d6ca344aca56edd706e8756bb5971afc01027",
+      "model_asset_id": "94574936821202",
+      "model_published_sha256": "179bdb5068ed2b03a8f50dcfa06d6ca344aca56edd706e8756bb5971afc01027",
+      "moderation_state": "Approved",
+      "revision": 7,
+      "created_at": 1794451456.5872643,
+      "updated_at": 1794507576.8273122,
+      "published_at": 1794503446.86737,
+      "grip_rot_x": 0.0,
+      "grip_rot_y": 0.0,
+      "grip_rot_z": 0.0,
+      "attack_radius_studs": 40.0,
+      "textures": [
+        {
+          "id": "newbie_bow__newbie_bow_01_32x128_atlas",
+          "weapon_slug": "newbie_bow",
+          "slot": "newbie_bow_01_32x128_atlas",
+          "source_path": "assets/source/weapons/dagger/newbie_bow/textures/newbie_bow_01_32x128_atlas.png",
+          "prepared_path": "assets/source/weapons/dagger/newbie_bow/textures/newbie_bow_01_32x128_atlas.png",
+          "sha256": "ceae65370125fb5862011a67b537a2ee1ce8a751a2e1a7b09cbece259aed8ec1",
+          "asset_id": "130978850204616",
+          "published_sha256": "ceae65370125fb5862011a67b537a2ee1ce8a751a2e1a7b09cbece259aed8ec1",
+          "moderation_state": "Reviewing",
+          "revision": 3,
+          "created_at": 1794451456.5872643,
+          "updated_at": 1794503430.610394,
+          "published_at": 1794451478.7065403
+        }
+      ],
+      "atlas_binding": null,
+      "atlas_variants": [],
+      "stat_modifiers": {
+        "AttackSpeed": 0,
+        "Damage": 15
+      },
+      "status": "PUBLISHED",
+      "storage_type": "bow",
+      "server_storage_path": "ServerStorage.weapons.bow.newbie_bow.model.newbie_bow"
+    },
+    {
       "slug": "newbie_dagger",
       "name_en": "Newbie Dagger",
       "name_ru": "Кинжал Новичка",
@@ -100,6 +147,8 @@
           "published_at": 1792049134.3146741
         }
       ],
+      "atlas_binding": null,
+      "atlas_variants": [],
       "stat_modifiers": {
         "AttackSpeed": 0,
         "Damage": 0
@@ -145,6 +194,8 @@
           "published_at": 1792040095.5343783
         }
       ],
+      "atlas_binding": null,
+      "atlas_variants": [],
       "stat_modifiers": {
         "AttackSpeed": 0,
         "Damage": 0
@@ -190,6 +241,8 @@
           "published_at": 1791159756.1325212
         }
       ],
+      "atlas_binding": null,
+      "atlas_variants": [],
       "stat_modifiers": {
         "AttackSpeed": 50,
         "Damage": 10
@@ -235,6 +288,8 @@
           "published_at": 1792142994.2438982
         }
       ],
+      "atlas_binding": null,
+      "atlas_variants": [],
       "stat_modifiers": {
         "AttackSpeed": 0,
         "Damage": 0
@@ -264,6 +319,8 @@
       "grip_rot_z": 0.0,
       "attack_radius_studs": 7.0,
       "textures": [],
+      "atlas_binding": null,
+      "atlas_variants": [],
       "stat_modifiers": {
         "AttackSpeed": 100,
         "Damage": 50
@@ -309,6 +366,8 @@
           "published_at": 1791851081.652693
         }
       ],
+      "atlas_binding": null,
+      "atlas_variants": [],
       "stat_modifiers": {
         "AttackSpeed": 0,
         "Damage": 0
@@ -354,6 +413,8 @@
           "published_at": 1791851467.1071875
         }
       ],
+      "atlas_binding": null,
+      "atlas_variants": [],
       "stat_modifiers": {
         "AttackSpeed": 0,
         "Damage": 0
@@ -364,8 +425,8 @@
     }
   ],
   "summary": {
-    "registered": 7,
-    "published": 7,
+    "registered": 8,
+    "published": 8,
     "active": 1
   }
 }

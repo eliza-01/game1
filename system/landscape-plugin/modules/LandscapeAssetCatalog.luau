@@ -43,6 +43,13 @@ function Catalog:Load(row)
         model:Destroy()
         error("published location model must be detached before authoring")
     end
+    -- Authoring requires two independent copies: a disposable cursor ghost
+    -- and an Undo-recorded placed Model. Asset import may mark individual
+    -- instances as non-archivable; normalize only the detached local template.
+    model.Archivable = true
+    for _, descendant in ipairs(model:GetDescendants()) do
+        descendant.Archivable = true
+    end
     return model
 end
 

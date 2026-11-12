@@ -38,3 +38,10 @@
 .animation-timeline-status{display:block;margin-top:5px;font-size:11px;line-height:1.35;white-space:normal}
 .animation-timeline-status.ready{color:#42cda4}
 .animation-timeline-status.required{color:#e7ae75}
+
+/* M309 · Manual Studio attestation requires visible scope and checksum confirmation. */
+.animation-manual-confirm{display:grid;gap:8px;padding:12px;margin-top:12px;border:1px solid var(--line);border-radius:9px}
+.animation-manual-confirm label{display:grid;gap:5px}
+.animation-manual-confirm label:has([type=checkbox]){display:flex;align-items:flex-start;gap:8px}
+.animation-manual-confirm small{color:var(--muted)}
+#animation-studio-sync-status{margin:8px 0 12px;padding:10px 14px;border:1px solid var(--line);border-radius:9px}

@@ -9,9 +9,10 @@ from .texture_alpha import texture_binding
 
 
 class StudioAssetSyncService:
-    def __init__(self, characters, weapons, monsters, npcs, load_model):
+    def __init__(self, characters, weapons, monsters, npcs, load_model, arrows=None):
         self._characters = characters
         self._weapons = weapons
+        self._arrows = arrows
         self._monsters = monsters
         self._npcs = npcs
         self._load_model = load_model
@@ -42,14 +43,21 @@ class StudioAssetSyncService:
         asset_id = str(row.get("model_asset_id") or "").strip()
         if not asset_id:
             raise ValueError("publish the weapon model before syncing it to Studio")
+        atlas = row.get('atlas_binding')
+        if atlas and not atlas['current']:
+            raise ValueError('selected shared weapon atlas is not currently published')
         texture_assets = [
             texture_binding(item.get("slot") or "", item.get("asset_id") or "",
                             getattr(self._weapons, "root", None), item.get("source_path") or "",
                             registered_sha256=item.get("sha256") or "",
                             published_sha256=item.get("published_sha256") or "")
-            for item in (row.get("textures") or [])
+            for item in ([] if atlas else row.get("textures") or [])
             if str(item.get("asset_id") or "").isdigit()
         ]
+        if atlas:
+            texture_assets = [texture_binding('atlas', atlas['published_id'], self._weapons.root,
+                atlas['source_path'], registered_sha256=atlas['source_sha256'],
+                published_sha256=atlas['published_sha256'])]
         destination = ["weapons", str(row.get("storage_type") or row.get("weapon_type") or ""), str(row.get("slug") or ""), "model"]
         result = self._load_model(
             asset_id,
@@ -63,7 +71,40 @@ class StudioAssetSyncService:
                 "textures": texture_assets,
             },
         )
+        if atlas:
+            applied = int(((result.get('weaponStats') or {}).get('textures') or {}).get('applied') or 0)
+            if applied <= 0:
+                raise ValueError('Studio loaded the weapon but no MeshPart received the selected atlas; binding remains pending')
+            self._weapons.atlases.mark_synced('weapon', slug, int(atlas['revision']))
         return {"weapon": row, "studio": result}
+
+    def sync_arrow_to_studio(self, slug: str):
+        if not self._arrows:
+            raise ValueError("arrow catalog is not connected")
+        row = self._arrows.get(slug)
+        if not row or row['status'] != 'PUBLISHED':
+            raise ValueError("publish the arrow model and texture before Studio Sync")
+        atlas = row.get('atlas_binding')
+        if atlas and not atlas['current']:
+            raise ValueError('selected shared arrow atlas is not currently published')
+        textures = []
+        if atlas:
+            textures.append(texture_binding('arrow_atlas', atlas['published_id'], self._arrows.root,
+                atlas['source_path'], registered_sha256=atlas['source_sha256'],
+                published_sha256=atlas['published_sha256']))
+        elif row['texture_asset_id']:
+            textures.append(texture_binding('arrow_atlas', row['texture_asset_id'],
+                self._arrows.root, row['texture_path'], registered_sha256=row['texture_sha256'],
+                published_sha256=row['texture_published_sha256']))
+        result = self._load_model(row['model_asset_id'], ['arrows', slug, 'model'],
+            wrapper_name=slug, placement_mode='weapon-pivot',
+            metadata={'arrowSlug':slug, 'textures':textures})
+        if atlas:
+            applied = int(((result.get('weaponStats') or {}).get('textures') or {}).get('applied') or 0)
+            if applied <= 0:
+                raise ValueError('Studio loaded the arrow but no MeshPart received the selected atlas; binding remains pending')
+            self._arrows.atlases.mark_synced('arrow', slug, int(atlas['revision']))
+        return {'arrow':row, 'studio':result}
 
     def sync_monster_to_studio(self, slug: str, kind: str = "monster"):
         actor_store = self._npcs if kind == "npc" else self._monsters

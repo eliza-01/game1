@@ -21,6 +21,7 @@ local LocationCommands = require(script.Parent.modules.LocationCommands)
 local StudioMarkerVisibility = require(script.Parent.modules.StudioMarkerVisibility)
 local StudioPlotsVisibility = require(script.Parent.modules.StudioPlotsVisibility)
 local StudioDebugPreferenceBridge = require(script.Parent.modules.StudioDebugPreferenceBridge)
+local StudioCameraDraftBridge = require(script.Parent.modules.StudioCameraDraftBridge)
 local StudioModelLoadCommands = require(script.Parent.modules.StudioModelLoadCommands)
 local StudioActorSpawnCommands = require(script.Parent.modules.StudioActorSpawnCommands)
 local StudioTimelineEditorCommands = require(script.Parent.modules.StudioTimelineEditorCommands)
@@ -91,6 +92,13 @@ StudioDebugPreferenceBridge({
     plugin = plugin,
     ReplicatedStorage = ReplicatedStorage,
     RunService = RunService,
+})
+StudioCameraDraftBridge({
+    ReplicatedStorage = ReplicatedStorage,
+    RunService = RunService,
+    HttpService = HttpService,
+    agentBaseUrl = AGENT_BASE_URL,
+    agentToken = AGENT_TOKEN,
 })
 
 local function checkAgent()
@@ -466,9 +474,14 @@ function DecoAssetLoader:loadPublished(row: any): Model
     -- LoadAssetAsync can wrap a valid Blender-authored carrier rig in an inert
     -- RootPart + Motor6D assembly. Normalize only this detached fresh clone;
     -- placed Models are replaced transactionally and are never edited in situ.
-    local authoredPivot = PublishedRigNormalize.Apply(model, row.rigManifest)
+    PublishedRigNormalize.Apply(model, row.rigManifest)
     local carrier = Carrier.Validate(model, row.rigManifest, row.legacyStaticPublication)
     if carrier then
+        -- The outer Roblox Model pivot can belong to an importer wrapper or
+        -- a deleted RootPart. It is NOT the authored rig pivot. Capture the
+        -- native MeshPart pivot before adjusting the assembly.
+        local nativeCarrierPivot = carrier:GetPivot()
+        local nativeCarrierOffset = carrier.PivotOffset
         Carrier.Prepare(carrier)
         -- Roblox skinning finds Bones on connected MeshParts within one Model.
         -- Importer Motor6Ds may already form a valid assembly; retain those.
@@ -481,10 +494,14 @@ function DecoAssetLoader:loadPublished(row: any): Model
                 SkinConnection.Connect(model, carrier, part, weldName)
             end
         end
-        carrier.PivotOffset = carrier.CFrame:ToObjectSpace(authoredPivot)
+        -- Promote the actual imported rig_carrier to PrimaryPart without
+        -- rebasing its PivotOffset to the unrelated outer Model pivot. Both
+        -- DecoManager and Landscape Painter must use this unchanged rig origin.
         model.PrimaryPart = carrier
-        if (model:GetPivot().Position-authoredPivot.Position).Magnitude>0.002 then
-            error("rig_carrier PrimaryPart changed the authored Model pivot")
+        if carrier.PivotOffset ~= nativeCarrierOffset
+            or carrier:GetPivot() ~= nativeCarrierPivot
+            or model:GetPivot() ~= nativeCarrierPivot then
+            error("published rig_carrier pivot changed during Location assembly")
         end
     end
     applyTexture(model, tostring(row.texture_asset_id or ""), row.alphaEnabled)
@@ -3420,6 +3437,70 @@ return table.freeze(MeshAnchor)
       </Item>
       <Item class="ModuleScript" referent="15">
         <Properties>
+          <string name="Name">StudioCameraDraftBridge</string>
+          <string name="Source"><![CDATA[--!strict
+-- Studio plugin transport: Game1CameraDebug -> authenticated LOCAL agent draft.
+-- It NEVER writes the persisted Options manifest, which needs an explicit Save.
+return function(services)
+    local ReplicatedStorage = services.ReplicatedStorage
+    local RunService = services.RunService
+    local HttpService = services.HttpService
+    local endpoint = services.agentBaseUrl .. "/api/options/camera-draft"
+    local token = services.agentToken
+    local current: Folder? = nil
+    local changed: RBXScriptConnection? = nil
+    local generation = 0
+
+    local function disconnect()
+        if changed then changed:Disconnect(); changed=nil end
+        current=nil
+        generation += 1
+    end
+    local function attach(folder: Folder)
+        if current == folder then return end
+        disconnect()
+        current=folder
+        changed=folder:GetAttributeChangedSignal("Payload"):Connect(function()
+            if not RunService:IsStudio() or not RunService:IsRunning() then return end
+            local payload=folder:GetAttribute("Payload")
+            if type(payload)~="string" or #payload > 2000 then return end
+            local ok,parsed=pcall(HttpService.JSONDecode,HttpService,payload)
+            if not ok or type(parsed)~="table" then return end
+            generation += 1
+            local thisGeneration=generation
+            task.delay(0.3,function()
+                if generation~=thisGeneration or current~=folder then return end
+                local sent,response=pcall(HttpService.RequestAsync,HttpService,{
+                    Url=endpoint,
+                    Method="POST",
+                    Headers={["Content-Type"]="application/json",["X-Control-Token"]=token},
+                    Body=payload,
+                })
+                if not sent or not response.Success then
+                    warn("[game1][camera] Could not send Studio camera draft: " .. tostring(sent and response.Body or response))
+                end
+            end)
+        end)
+    end
+    ReplicatedStorage.ChildAdded:Connect(function(item)
+        if item:IsA("Folder") and item.Name=="Game1CameraDebug" then attach(item) end
+    end)
+    local existing=ReplicatedStorage:FindFirstChild("Game1CameraDebug")
+    if existing and existing:IsA("Folder") then attach(existing) end
+    RunService:GetPropertyChangedSignal("RunState"):Connect(function()
+        if not RunService:IsRunning() then
+            disconnect()
+        else
+            local folder=ReplicatedStorage:FindFirstChild("Game1CameraDebug")
+            if folder and folder:IsA("Folder") then attach(folder) end
+        end
+    end)
+end
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="16">
+        <Properties>
           <string name="Name">StudioCharacterStandBuilder</string>
           <string name="Source"><![CDATA[-- Studio authoring adapter for the SAME published assembly recipe and Builder
 -- used by CharacterService. No second bind/atlas/mesh pipeline is implemented here.
@@ -3560,7 +3641,7 @@ return table.freeze(Builder)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="16">
+      <Item class="ModuleScript" referent="17">
         <Properties>
           <string name="Name">StudioCharacterStandPlacement</string>
           <string name="Source"><![CDATA[-- Edit-mode surface placement. Does not change the imported rig's orientation,
@@ -3648,7 +3729,7 @@ return table.freeze(Placement)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="17">
+      <Item class="ModuleScript" referent="18">
         <Properties>
           <string name="Name">StudioCharacterStandWidget</string>
           <string name="Source"><![CDATA[-- Dock widget contains presentation only. No asset imports or Workspace writes.
@@ -3721,7 +3802,7 @@ return table.freeze(Widget)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="18">
+      <Item class="ModuleScript" referent="19">
         <Properties>
           <string name="Name">StudioCharacterTestStand</string>
           <string name="Source"><![CDATA[-- Game1Bridge composition root for the Studio-only character assembly stand.
@@ -3928,7 +4009,7 @@ return table.freeze(TestStand)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="19">
+      <Item class="ModuleScript" referent="20">
         <Properties>
           <string name="Name">StudioDebugPreferenceBridge</string>
           <string name="Source"><![CDATA[-- Studio-only persistence bridge for Test Loadout preferences.
@@ -4048,7 +4129,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="20">
+      <Item class="ModuleScript" referent="21">
         <Properties>
           <string name="Name">StudioDecoSyncCommands</string>
           <string name="Source"><![CDATA[-- M238: protocol 8 adds read-only per-row Studio selection and COL atlas exclusion.
@@ -4126,7 +4207,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="21">
+      <Item class="ModuleScript" referent="22">
         <Properties>
           <string name="Name">StudioHousePlacementCapture</string>
           <string name="Source"><![CDATA[-- Read-only Studio authoring adapter. Selection and plot markers stay untouched.
@@ -4239,7 +4320,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="22">
+      <Item class="ModuleScript" referent="23">
         <Properties>
           <string name="Name">StudioHousePlacementPreview</string>
           <string name="Source"><![CDATA[-- Explicitly authored house preview in Workspace.Plots/NN/Houses.
@@ -4706,7 +4787,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="23">
+      <Item class="ModuleScript" referent="24">
         <Properties>
           <string name="Name">StudioLocationMeshNames</string>
           <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
@@ -4739,7 +4820,7 @@ return Naming
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="24">
+      <Item class="ModuleScript" referent="25">
         <Properties>
           <string name="Name">StudioLocationPlacedGeometry</string>
           <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
@@ -4925,7 +5006,7 @@ return table.freeze(Geometry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="25">
+      <Item class="ModuleScript" referent="26">
         <Properties>
           <string name="Name">StudioLocationPlacementHistory</string>
           <string name="Source"><![CDATA[-- Per-placement, bounded authoring audit for Location repair and sync.
@@ -4966,7 +5047,7 @@ return table.freeze(History)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="26">
+      <Item class="ModuleScript" referent="27">
         <Properties>
           <string name="Name">StudioLocationPlacementOwner</string>
           <string name="Source"><![CDATA[-- M243: one placement-ownership rule for Location Find and scoped Sync.
@@ -5022,7 +5103,7 @@ return table.freeze(Owner)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="27">
+      <Item class="ModuleScript" referent="28">
         <Properties>
           <string name="Name">StudioLocationPublishedGeometry</string>
           <string name="Source"><![CDATA[-- Published-model provenance and shape policy for Location Assets.
@@ -5101,7 +5182,7 @@ return table.freeze(Published)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="28">
+      <Item class="ModuleScript" referent="29">
         <Properties>
           <string name="Name">StudioLocationPublishedRigNormalize</string>
           <string name="Source"><![CDATA[-- Location-only normalization of Roblox importer scaffolding on a FRESH,
@@ -5223,7 +5304,7 @@ return table.freeze(Normalize)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="29">
+      <Item class="ModuleScript" referent="30">
         <Properties>
           <string name="Name">StudioLocationRigCarrier</string>
           <string name="Source"><![CDATA[-- Canonical Location-only rig carrier policy. Imported FBX mesh; never synthetic.
@@ -5456,7 +5537,7 @@ return table.freeze(Carrier)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="30">
+      <Item class="ModuleScript" referent="31">
         <Properties>
           <string name="Name">StudioManagedRigSwap</string>
           <string name="Source"><![CDATA[-- Shared Studio mechanism for replacing AUTHORING-MANAGED child rigs while
@@ -5652,7 +5733,7 @@ return table.freeze(RigSwap)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="31">
+      <Item class="ModuleScript" referent="32">
         <Properties>
           <string name="Name">StudioMarkerVisibility</string>
           <string name="Source"><![CDATA[-- Studio-only presentation toggle. No movement of markers, no metadata edits.
@@ -5796,7 +5877,7 @@ return table.freeze(Visibility)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="32">
+      <Item class="ModuleScript" referent="33">
         <Properties>
           <string name="Name">StudioMeshPhysicsCore</string>
           <string name="Source"><![CDATA[-- One Studio MeshPart physics writer shared by Real Estate and Location Assets.
@@ -6012,7 +6093,7 @@ return table.freeze(Core)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="33">
+      <Item class="ModuleScript" referent="34">
         <Properties>
           <string name="Name">StudioModelLoadCommands</string>
           <string name="Source"><![CDATA[-- Studio model-sync command: validates and imports Character, Monster/NPC and Weapon models.
@@ -6579,7 +6660,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="34">
+      <Item class="ModuleScript" referent="35">
         <Properties>
           <string name="Name">StudioPlaceRegistryCommands</string>
           <string name="Source"><![CDATA[-- M240: separate Studio Bridge controller, NOT an extension of DecoManager.
@@ -6695,7 +6776,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="35">
+      <Item class="ModuleScript" referent="36">
         <Properties>
           <string name="Name">StudioPlaceRegistryInventory</string>
           <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
@@ -7156,7 +7237,7 @@ return Inventory
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="36">
+      <Item class="ModuleScript" referent="37">
         <Properties>
           <string name="Name">StudioPlaceRegistryRepair</string>
           <string name="Source"><![CDATA[-- Metadata-only Repair for canonical Location FBX placements.
@@ -7277,7 +7358,7 @@ return Repair
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="37">
+      <Item class="ModuleScript" referent="38">
         <Properties>
           <string name="Name">StudioPlaceRegistrySync</string>
           <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
@@ -7475,7 +7556,7 @@ return Sync
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="38">
+      <Item class="ModuleScript" referent="39">
         <Properties>
           <string name="Name">StudioPlacedRigBoneEffects</string>
           <string name="Source"><![CDATA[-- Placement-owned visual decorations attached to authored Bones. Accept either
@@ -7489,7 +7570,7 @@ local MAX_EFFECTS_PER_RIG = 128
 
 local function isLeafEffect(item: Instance): boolean
     return #item:GetChildren() == 0
-        and (item:IsA("ParticleEmitter") or item:IsA("PointLight")
+        and (item:IsA("Fire") or item:IsA("ParticleEmitter") or item:IsA("PointLight")
             or item:IsA("SpotLight") or item:IsA("SurfaceLight"))
 end
 
@@ -7590,7 +7671,7 @@ return table.freeze(BoneEffects)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="39">
+      <Item class="ModuleScript" referent="40">
         <Properties>
           <string name="Name">StudioPlotsCatalog</string>
           <string name="Source"><![CDATA[-- Read-only discovery contract for authored Workspace.Plots/01..50.
@@ -7652,7 +7733,7 @@ return table.freeze(Catalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="40">
+      <Item class="ModuleScript" referent="41">
         <Properties>
           <string name="Name">StudioPlotsPartPolicy</string>
           <string name="Source"><![CDATA[-- Reversible, Studio-only properties for Plots visibility and playtest preview.
@@ -7737,7 +7818,7 @@ return table.freeze(Policy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="41">
+      <Item class="ModuleScript" referent="42">
         <Properties>
           <string name="Name">StudioPlotsSelectionFilter</string>
           <string name="Source"><![CDATA[-- Studio viewport hit-test filter for hidden Plots authoring geometry.
@@ -7827,7 +7908,7 @@ return table.freeze(Filter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="42">
+      <Item class="ModuleScript" referent="43">
         <Properties>
           <string name="Name">StudioPlotsVisibility</string>
           <string name="Source"><![CDATA[-- Studio-only Plots preview: hidden -> volumes -> volumes + numbers -> hidden.
@@ -8121,7 +8202,7 @@ return table.freeze(PlotsVisibility)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="43">
+      <Item class="ModuleScript" referent="44">
         <Properties>
           <string name="Name">StudioPublishedMeshHistory</string>
           <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
@@ -8537,7 +8618,7 @@ return table.freeze(Inventory)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="44">
+      <Item class="ModuleScript" referent="45">
         <Properties>
           <string name="Name">StudioRealEstateCollisionPolicy</string>
           <string name="Source"><![CDATA[-- Real Estate physics profile; shared MeshPhysicsCore writes MeshPart physics.
@@ -8646,7 +8727,7 @@ return table.freeze(Policy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="45">
+      <Item class="ModuleScript" referent="46">
         <Properties>
           <string name="Name">StudioRealEstateHouseFrame</string>
           <string name="Source"><![CDATA[-- Author-space transform for all Real Estate Studio sync paths.
@@ -8673,7 +8754,7 @@ return table.freeze(HouseFrame)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="46">
+      <Item class="ModuleScript" referent="47">
         <Properties>
           <string name="Name">StudioRealEstateModel</string>
           <string name="Source"><![CDATA[-- Studio assembly for any number of independent Real Estate MeshPart rigs.
@@ -8957,7 +9038,7 @@ return table.freeze(StudioRealEstateModel)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="47">
+      <Item class="ModuleScript" referent="48">
         <Properties>
           <string name="Name">StudioRealEstatePartPlacement</string>
           <string name="Source"><![CDATA[-- Restore source-FBX mesh centres after independent Model Asset import.
@@ -9081,7 +9162,7 @@ return table.freeze(Placement)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="48">
+      <Item class="ModuleScript" referent="49">
         <Properties>
           <string name="Name">StudioRealEstatePartSync</string>
           <string name="Source"><![CDATA[-- Atomic, single-rig refresh of a managed Real Estate template.
@@ -9315,7 +9396,7 @@ return table.freeze(PartSync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="49">
+      <Item class="ModuleScript" referent="50">
         <Properties>
           <string name="Name">StudioRealEstatePlacedCollisionSync</string>
           <string name="Source"><![CDATA[-- Repair *only* authoring-managed collision rigs of already placed Estates.
@@ -9390,7 +9471,7 @@ return table.freeze(Sync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="50">
+      <Item class="ModuleScript" referent="51">
         <Properties>
           <string name="Name">StudioRealEstatePlacedPhysicsGuard</string>
           <string name="Source"><![CDATA[-- Studio Edit Mode: normalize a managed Estate pasted or dragged from
@@ -9462,7 +9543,7 @@ return table.freeze(Guard)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="51">
+      <Item class="ModuleScript" referent="52">
         <Properties>
           <string name="Name">StudioRealEstatePlacedTargets</string>
           <string name="Source"><![CDATA[-- One authoritative definition of a placed Real Estate instance.
@@ -9507,7 +9588,7 @@ return table.freeze(Targets)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="52">
+      <Item class="ModuleScript" referent="53">
         <Properties>
           <string name="Name">StudioRealEstatePlacedVisualSync</string>
           <string name="Source"><![CDATA[-- Full Real Estate sync: refresh visual rigs on *all managed placed* houses.
@@ -9626,7 +9707,7 @@ return table.freeze(VisualSync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="53">
+      <Item class="ModuleScript" referent="54">
         <Properties>
           <string name="Name">StudioRealEstateRigValidation</string>
           <string name="Source"><![CDATA[-- Validate an already-published Real Estate Model Asset as actually loaded by Roblox.
@@ -9755,7 +9836,7 @@ return table.freeze(Validation)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="54">
+      <Item class="ModuleScript" referent="55">
         <Properties>
           <string name="Name">StudioSkinnedMeshConnection</string>
           <string name="Source"><![CDATA[--!strict
@@ -9825,7 +9906,7 @@ return table.freeze(Connection)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="55">
+      <Item class="ModuleScript" referent="56">
         <Properties>
           <string name="Name">StudioTextureAppearance</string>
           <string name="Source"><![CDATA[-- Shared Studio-side material binding for all authored MeshParts.
@@ -9982,7 +10063,7 @@ return table.freeze(StudioTextureAppearance)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="56">
+      <Item class="ModuleScript" referent="57">
         <Properties>
           <string name="Name">StudioTimelineEditorCommands</string>
           <string name="Source"><![CDATA[-- Timeline authoring session: validates requests, binds UI events and reports results.
@@ -10295,7 +10376,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="57">
+      <Item class="ModuleScript" referent="58">
         <Properties>
           <string name="Name">StudioTimelinePoseSampler</string>
           <string name="Source"><![CDATA[-- Offline pose extraction and interpolation for a preview rig. No UI or HTTP dependencies.
@@ -10474,7 +10555,7 @@ return table.freeze(StudioTimelinePoseSampler)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="58">
+      <Item class="ModuleScript" referent="59">
         <Properties>
           <string name="Name">StudioTimelinePreview</string>
           <string name="Source"><![CDATA[-- Owns the isolated ViewportFrame rig, camera interaction and animation-asset retrieval.
@@ -10771,7 +10852,7 @@ return table.freeze(StudioTimelinePreview)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="59">
+      <Item class="ModuleScript" referent="60">
         <Properties>
           <string name="Name">StudioTimelineTransport</string>
           <string name="Source"><![CDATA[-- HTTP boundary for the Timeline editor. No UI, animation or Studio model access.
@@ -10829,7 +10910,7 @@ return table.freeze(StudioTimelineTransport)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="60">
+      <Item class="ModuleScript" referent="61">
         <Properties>
           <string name="Name">StudioTimelineWidget</string>
           <string name="Source"><![CDATA[-- Timeline editor view. Builds the dock widget and exposes only its controls.

@@ -6,6 +6,7 @@ local Workspace = game:GetService("Workspace")
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local CombatShared = Shared:WaitForChild("combat")
 local AttackConfig = require(CombatShared:WaitForChild("AttackConfig"))
+local CameraController = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CameraController"))
 local CharacterUpperBodyRig = require(script.Parent.Parent:WaitForChild("character")
     :WaitForChild("animation"):WaitForChild("CharacterUpperBodyRig"))
 
@@ -20,6 +21,7 @@ local previousProcedural: { [Bone]: CFrame } = {}
 local targetPosition: Vector3? = nil
 local activeUntil = 0
 local renderedYaw = 0
+local renderedPitch = 0
 local poseDrivenExternally = false
 local skipOwnStepOnce = false
 
@@ -42,7 +44,8 @@ local function ensureReticle()
     local dot = Instance.new("Frame")
     dot.Name = "Dot"
     dot.AnchorPoint = Vector2.new(0.5, 0.5)
-    dot.Position = UDim2.fromScale(0.5, 0.5)
+    local cursor = CameraController.CursorPoint()
+    dot.Position = UDim2.fromScale(cursor.X, cursor.Y)
     dot.Size = UDim2.fromOffset(5, 5)
     dot.BackgroundColor3 = Color3.fromRGB(245, 245, 245)
     dot.BorderSizePixel = 0
@@ -107,6 +110,7 @@ local function clearCharacter()
     targetPosition = nil
     activeUntil = 0
     renderedYaw = 0
+    renderedPitch = 0
     poseDrivenExternally = false
     skipOwnStepOnce = false
     table.clear(previousProcedural)
@@ -142,29 +146,35 @@ local function restorePreviousProcedural()
     table.clear(previousProcedural)
 end
 
-local function desiredTorsoYaw(now: number): number
+local function desiredTorsoAngles(now: number): (number, number, boolean)
     local currentRoot = root
-    local target = targetPosition
-    if not currentRoot or not currentRoot.Parent or not target or now > activeUntil then
-        return 0
+    if not currentRoot or not currentRoot.Parent then return 0, 0, false end
+    local activeAttack = targetPosition ~= nil and now <= activeUntil
+    local target = if activeAttack then targetPosition else nil
+    -- The same upper-body aim layer serves hands and bow ONLY during an
+    -- authored attack. Bow keeps following the live camera throughout its draw;
+    -- hands use the target captured when the melee attack began.
+    local bowAttack = activeAttack and character ~= nil
+        and string.lower(tostring(character:GetAttribute("EquippedWeaponType") or "")) == "bow"
+    if bowAttack then
+        local _, aimDirection = CameraController.GetAimRay()
+        if aimDirection then target = currentRoot.Position + aimDirection * 100 end
     end
+    if not target then return 0, 0, false end
 
-    local aim = flatUnit(target - currentRoot.Position)
+    local direction = target - currentRoot.Position
+    if direction.Magnitude < 0.01 then return 0, 0, false end
     local forward = flatUnit(currentRoot.CFrame.LookVector)
-    if not aim or not forward then
-        return 0
-    end
-
-    return math.clamp(
-        signedYaw(forward, aim),
-        -AttackConfig.TorsoYawLimit,
-        AttackConfig.TorsoYawLimit
-    )
+    local horizontal = flatUnit(direction)
+    local yaw = if forward and horizontal then signedYaw(forward, horizontal) else 0
+    local pitch = math.atan2(direction.Y, math.max(0.001, Vector3.new(direction.X, 0, direction.Z).Magnitude))
+    return math.clamp(yaw, -AttackConfig.TorsoYawLimit, AttackConfig.TorsoYawLimit),
+        math.clamp(pitch, -AttackConfig.TorsoPitchDownLimit, AttackConfig.TorsoPitchUpLimit), true
 end
 
-local function applyWorldAim(bone: Bone, yaw: number)
+local function applyWorldAim(bone: Bone, yaw: number, pitch: number)
     local currentRoot = root
-    if not currentRoot or math.abs(yaw) <= 0.00001 then
+    if not currentRoot or (math.abs(yaw) <= 0.00001 and math.abs(pitch) <= 0.00001) then
         return
     end
 
@@ -184,7 +194,13 @@ local function applyWorldAim(bone: Bone, yaw: number)
     -- produces negative yaw, which is also the world-Y rotation that turns -Z
     -- toward +X. Apply it directly; imported bone-local axes never enter the math.
     local yawRotation = CFrame.fromAxisAngle(Vector3.yAxis, yaw)
-    local desiredWorld = CFrame.new(position) * (yawRotation * animatedRotation)
+    -- Positive pitch raises the reticle; rotate about the character's current
+    -- horizontal right axis *after* applying yaw. Never tilt the root or legs.
+    local yawedForward = yawRotation:VectorToWorldSpace(currentRoot.CFrame.LookVector)
+    local flatForward = flatUnit(yawedForward)
+    local pitchAxis = if flatForward then flatForward:Cross(Vector3.yAxis) else Vector3.xAxis
+    local pitchRotation = CFrame.fromAxisAngle(pitchAxis.Unit, pitch)
+    local desiredWorld = CFrame.new(position) * (pitchRotation * yawRotation * animatedRotation)
 
     local currentLocal = parentWorld:ToObjectSpace(animatedWorld)
     local effectiveBase = currentLocal * animatedTransform:Inverse()
@@ -197,22 +213,23 @@ end
 
 local function stepPose(deltaTime: number)
     local now = os.clock()
-    local desired = desiredTorsoYaw(now)
+    local desiredYaw, desiredPitch, active = desiredTorsoAngles(now)
     local response = math.max(1, AttackConfig.TorsoAimResponse)
     local blend = 1 - math.exp(-response * math.max(0, deltaTime))
-    renderedYaw += (desired - renderedYaw) * blend
-    if math.abs(renderedYaw) < 0.0001 and desired == 0 then
-        renderedYaw = 0
-    end
+    renderedYaw += (desiredYaw - renderedYaw) * blend
+    renderedPitch += (desiredPitch - renderedPitch) * blend
+    if math.abs(renderedYaw) < 0.0001 and desiredYaw == 0 then renderedYaw = 0 end
+    if math.abs(renderedPitch) < 0.0001 and desiredPitch == 0 then renderedPitch = 0 end
 
     local bone = aimBone
     if bone and bone.Parent then
-        applyWorldAim(bone, renderedYaw)
+        applyWorldAim(bone, renderedYaw, renderedPitch)
     end
 
     if character then
         character:SetAttribute("AimTorsoYawDegrees", math.deg(renderedYaw))
-        character:SetAttribute("AimPoseActive", targetPosition ~= nil and now <= activeUntil)
+        character:SetAttribute("AimTorsoPitchDegrees", math.deg(renderedPitch))
+        character:SetAttribute("AimPoseActive", active)
     end
 end
 
@@ -241,21 +258,8 @@ local function applyPose(deltaTime: number)
 end
 
 function AimPoseController.GetAimRay(): (Vector3?, Vector3?)
-    local camera = Workspace.CurrentCamera
-    if not camera then
-        return nil, nil
-    end
-
-    -- The center-screen reticle owns gameplay aim. Headshot classification uses
-    -- this exact camera line, while the server rebases it beside the character
-    -- and clamps the usable segment to AttackRadius.
-    local viewport = camera.ViewportSize
-    local ray = camera:ViewportPointToRay(viewport.X * 0.5, viewport.Y * 0.5)
-    local direction = ray.Direction
-    if direction.Magnitude <= 1e-6 then
-        return nil, nil
-    end
-    return ray.Origin, direction.Unit
+    -- The camera and all targeting share one authoring offset.
+    return CameraController.GetAimRay()
 end
 
 function AimPoseController.GetAimPosition(): Vector3?

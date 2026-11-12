@@ -8,7 +8,7 @@ from services.character_registration_flow import run as run_character_registrati
 
 
 def route(path, body, deps):
-    if not path.startswith(('/api/armor', '/api/characters', '/api/weapons', '/api/npcs', '/api/monsters', '/api/npc-equipment',)):
+    if not path.startswith(('/api/arrows', '/api/armor', '/api/characters', '/api/weapons', '/api/npcs', '/api/monsters', '/api/npc-equipment',)):
         return None
 
     if path.startswith('/api/armor/'):
@@ -57,6 +57,30 @@ def route(path, body, deps):
     sync_monster_to_studio = deps["sync_monster_to_studio"]
     sync_weapon_to_studio = deps["sync_weapon_to_studio"]
     weapons = deps["weapons"]
+    arrows = deps.get("arrows")
+
+    if path == '/api/arrows':
+        try:
+            return out(200, arrows.register(body()))
+        except Exception as error:
+            return out(400, {'error':str(error)})
+
+    if path.startswith('/api/arrows/'):
+        tail = unquote(path[len('/api/arrows/'):].strip('/'))
+        slug, _, action = tail.rpartition('/')
+        try:
+            if action == 'publish':
+                payload = body()
+                return out(200, arrows.publish(slug, publication_credentials(
+                    str(payload.get('description') or 'Game1 arrow')),
+                    include_legacy_textures=payload.get('includeLegacyTextures', True) is True))
+            if action == 'sync':
+                return out(200, deps['sync_arrow_to_studio'](slug))
+            if action == 'activate':
+                return out(200, arrows.activate(slug))
+        except Exception as error:
+            return out(400, {'error':str(error)})
+        return out(404, {'error':'unknown arrow operation'})
 
     if path in ('/api/characters/workflow', '/api/characters'):
         return out(410, {'error': 'whole-model Character registration is retired; use Character Components and Assemblies v2'})
@@ -272,7 +296,8 @@ def route(path, body, deps):
         try:
             payload = body()
             credentials = publication_credentials(str(payload.get("description") or "game1 weapon"))
-            return out(200, weapons.publish(slug, credentials))
+            return out(200, weapons.publish(slug, credentials,
+                include_legacy_textures=payload.get('includeLegacyTextures', True) is True))
         except Exception as error:
             return out(400, {"error": str(error)})
 

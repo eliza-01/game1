@@ -17,6 +17,12 @@
   },
   "weapons": [
     {
+      "slug": "newbie_bow",
+      "nameEn": "Newbie Bow",
+      "weaponType": "bow",
+      "status": "PUBLISHED"
+    },
+    {
       "slug": "newbie_dagger",
       "nameEn": "Newbie Dagger",
       "weaponType": "dagger",

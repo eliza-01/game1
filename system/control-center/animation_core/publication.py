@@ -70,6 +70,48 @@ class AnimationPublicationMixin:
                 break
         return {"requested": len(queue), "published": published, "failed": failed, "snapshot": self.snapshot(character_id)}
 
+    def confirm_studio_replacement(self, clip_id: str, *, asset_id: str, sha256: str, attestation: bool) -> dict:
+        """Record the user's explicit Studio replacement attestation, NOT Cloud verification.
+
+        Only a staged, changed, previously published clip is eligible. The
+        immutable Roblox Animation ID and append-only publication history stay
+        intact. This never uploads an animation nor asserts Roblox approval.
+        """
+        if attestation is not True:
+            raise ValueError('explicit Studio replacement attestation is required')
+        now = _now()
+        with self.connect() as connection:
+            row = connection.execute('SELECT * FROM animation_clips WHERE id=?', (clip_id,)).fetchone()
+            if row is None:
+                raise ValueError('unknown animation clip')
+            row = dict(row)
+            if (not str(row.get('asset_id') or '').isdigit()
+                    or str(row['asset_id']) != str(asset_id)
+                    or str(row.get('sha256') or '') != str(sha256)
+                    or str(row.get('published_sha256') or '') == str(row['sha256'])):
+                raise ValueError('asset ID, staged checksum or status changed; reopen Replace')
+            path = (self.root / str(row.get('prepared_path') or row.get('source_path') or '')).resolve()
+            if not path.is_file() or self._sha256(path) != row['sha256']:
+                raise ValueError('staged animation source is missing or changed')
+            # Keep moderation_state from the last verified publication, rather
+            # than falsely asserting that this newly attested revision is approved.
+            updated = connection.execute("""UPDATE animation_clips
+                SET published_sha256=sha256,published_at=?,updated_at=?
+                WHERE id=? AND asset_id=? AND sha256=? AND published_sha256<>sha256""",
+                (now, now, clip_id, asset_id, sha256))
+            if updated.rowcount != 1:
+                raise ValueError('animation was changed concurrently; reopen Replace')
+            connection.execute("""INSERT INTO animation_publications(
+                clip_id,clip_revision,asset_id,operation_path,sha256,moderation_state,
+                published_at,asset_version_id,version_create_time,manual_verified)
+                VALUES(?,?,?,?,?,?,?,?,?,?)""",
+                (clip_id, int(row.get('revision') or 1), asset_id,
+                 f'studio/user-attested/{asset_id}/{sha256[:12]}', sha256,
+                 'UserAttestedUnverified', now, '', '', 0))
+        self.export()
+        return {'clipId':clip_id,'assetId':asset_id,'sha256':sha256,
+                'confirmation':'USER_ATTESTED_NOT_CLOUD_VERIFIED','studioSynced':False}
+
     def check_manual_reimports(self, credentials: dict, clip_id: str | None = None) -> dict:
         with self.connect() as connection:
             changed = [dict(row) for row in connection.execute(

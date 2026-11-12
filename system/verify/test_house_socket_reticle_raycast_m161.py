@@ -39,9 +39,10 @@ class M161ReticleRaycast(unittest.TestCase):
     def test_aim_uses_headshot_center_ray_not_free_mouse(self):
         aim = source('src/client/combat/AimPoseController.luau')
         prompt = source('src/client/world/HouseSocketPromptController.luau')
-        expected = 'camera:ViewportPointToRay(viewport.X * 0.5, viewport.Y * 0.5)'
-        self.assertIn(expected, aim)
-        self.assertIn(expected, prompt)
+        camera = source('src/client/character/CameraController.luau')
+        self.assertIn('CameraController.GetAimRay()', aim)
+        self.assertIn('ViewportPointToRay(v.X * cameraSettings.cursorX, v.Y * cameraSettings.cursorY)',camera)
+        self.assertIn('camera:ViewportPointToRay(viewport.X * cursor.X, viewport.Y * cursor.Y)',prompt)
         self.assertNotIn('UserInputService:GetMouseLocation()', prompt)
         self.assertIn('Aim.RaySphereEntry(ray.Origin, ray.Direction, frame.Position, hoverRadius(name))', prompt)
         self.assertIn('Occlusion.IsClear(ray.Origin, ray.Direction, aimEntry, player.Character)', prompt)

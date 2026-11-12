@@ -460,6 +460,13 @@ class AnimationStorageMixin:
             with self.connect() as documents:
                 row['document']=get_document(documents,row['clip_id'],'procedural' if row['document_only'] else row['sha256'])
             row["status"] = self._status(row)
+            with self.connect() as history:
+                latest = history.execute("""SELECT operation_path,sha256
+                    FROM animation_publications WHERE clip_id=? ORDER BY id DESC LIMIT 1""",
+                    (row['clip_id'],)).fetchone()
+                row['user_attested'] = bool(latest and
+                    str(latest['operation_path']).startswith('studio/user-attested/') and
+                    str(latest['sha256']) == str(row['sha256']))
             row["looped"] = bool(row.get("looped"))
             row["animationId"] = f"rbxassetid://{row['asset_id']}" if str(row.get("asset_id") or "").isdigit() else ""
             result.append(row)

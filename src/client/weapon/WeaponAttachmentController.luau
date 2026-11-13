@@ -97,6 +97,23 @@ local function update()
     end
 end
 
+-- Read-only launch socket for the local bow snapshot. Prefer an explicitly
+-- authored nock attachment; otherwise use the same equipped-hand Bone already
+-- resolved for weapon placement. No new rig naming requirement or fake socket.
+function WeaponAttachmentController.GetBowReleaseOrigin(character: Model): Vector3?
+    local weapon = character:FindFirstChild("EquippedWeapon")
+    if not weapon or not weapon:IsA("Model") or weapon:GetAttribute("WeaponType") ~= "bow" then
+        return nil
+    end
+    for _, name in ipairs({"ArrowNock", "ArrowRelease", "ArrowSocket"}) do
+        local node = weapon:FindFirstChild(name, true)
+        if node and node:IsA("Attachment") then return node.WorldPosition end
+        if node and node:IsA("Bone") then return node.TransformedWorldCFrame.Position end
+    end
+    local state = cache[weapon] or buildState(character, weapon)
+    return if state and state.targetBone.Parent then state.targetBone.TransformedWorldCFrame.Position else nil
+end
+
 function WeaponAttachmentController.Start()
     if started then
         return

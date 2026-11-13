@@ -40,14 +40,17 @@ function ServiceCatalog.Build(root: Instance)
         {name = "CombatFeedbackService", critical = false, start = function()
             require(combat:WaitForChild("CombatFeedbackService")).Start()
         end},
-        {name = "BowProjectileService", critical = false, dependsOn = {"EntityHitboxService"}, start = function()
-            require(combat:WaitForChild("BowProjectileService")).Start()
+        {name = "BowHitscanService", critical = false, dependsOn = {"EntityHitboxService"}, start = function()
+            require(combat:WaitForChild("BowHitscanService")).Start()
         end},
         {name = "AttackService", critical = true, dependsOn = {"EntityHitboxService"}, start = function()
             require(combat:WaitForChild("AttackService")).Start()
         end},
         {name = "CharacterService", critical = true, dependsOn = {"EntityHitboxService", "AttackService"}, start = function()
             require(character:WaitForChild("CharacterService")).Start()
+        end},
+        {name = "CharacterRegenerationService", critical = false, dependsOn = {"CharacterService"}, start = function()
+            require(character:WaitForChild("CharacterRegenerationService")).Start()
         end},
         {name = "MonsterSpawnerService", critical = false, dependsOn = {"EntityHitboxService", "CharacterService"}, start = function()
             local MonsterSpawnerService = require(monster:WaitForChild("MonsterSpawnerService"))

@@ -17,19 +17,15 @@ function BowAimGeometry.Validate(root: BasePart, origin: any, direction: any): (
     return cameraOrigin, unitDirection
 end
 
--- Find the low-arc direction that intersects the chosen reticle point. When the
--- physical solution is impossible, use a straight aim rather than invent speed.
-function BowAimGeometry.BallisticDirection(origin: Vector3, target: Vector3, speed: number, gravity: number): Vector3?
-    local displacement = target - origin
-    if displacement.Magnitude < 0.01 then return nil end
-    local flat = Vector3.new(displacement.X, 0, displacement.Z)
-    local distance = flat.Magnitude
-    if distance < 0.01 or gravity <= 0 then return displacement.Unit end
-    local speedSq = speed * speed
-    local disc = speedSq * speedSq - gravity * (gravity * distance * distance + 2 * displacement.Y * speedSq)
-    if disc < 0 then return displacement.Unit end
-    local tangent = (speedSq - math.sqrt(disc)) / (gravity * distance)
-    return (flat.Unit + Vector3.yAxis * tangent).Unit
+function BowAimGeometry.ValidateLaunch(root: BasePart, candidate: any): Vector3?
+    if typeof(candidate) ~= "Vector3" then return nil end
+    local delta = candidate - root.Position
+    if delta.X ~= delta.X or delta.Y ~= delta.Y or delta.Z ~= delta.Z
+        or math.abs(delta.X) == math.huge or math.abs(delta.Y) == math.huge
+        or math.abs(delta.Z) == math.huge or delta.Magnitude > Policy.MaxLaunchOffset then
+        return nil
+    end
+    return candidate
 end
 
 return table.freeze(BowAimGeometry)

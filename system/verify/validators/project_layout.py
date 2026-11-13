@@ -30,7 +30,7 @@ REQUIRED_RUNTIME_MODULES = (
     "src/server/monster/MonsterSpawnRegistry.luau",
     "src/client/character/MovementController.luau",
     "src/client/character/CameraController.luau",
-    "src/client/character/PlayerStatusController.luau",
+    "src/client/combat/OverheadHealthController.luau",
     "src/client/character/animation/AnimationResolver.luau",
     "src/client/character/animation/AnimationTrackCache.luau",
     "src/client/character/animation/AttackUpperBodyComposer.luau",

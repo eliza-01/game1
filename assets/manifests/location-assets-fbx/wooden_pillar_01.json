@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "slug": "wooden_pillar_01",
+  "sourceSha256": "15b2fd0021093bb9f4ef1dbad7d60e717c4d0af03c42ad066c6617420cc1a2b6",
+  "analysis": {
+    "schemaVersion": 1,
+    "meshes": [
+      {
+        "name": "col_mesh",
+        "armature": "",
+        "vertices": 8,
+        "bones": [],
+        "influencedBones": [],
+        "role": "collider",
+        "physics": {
+          "role": "collider",
+          "canCollide": true,
+          "canQuery": true,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": "PreciseConvexDecomposition",
+          "physicsOnly": true
+        }
+      },
+      {
+        "name": "wooden_pillar_01",
+        "armature": "",
+        "vertices": 393,
+        "bones": [],
+        "influencedBones": [],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": false,
+          "canQuery": false,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": "Box",
+          "physicsOnly": false
+        }
+      }
+    ],
+    "hasCollider": true,
+    "armatures": [],
+    "unassignedArmatures": []
+  }
+}

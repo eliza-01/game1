@@ -1,7 +1,7 @@
-"""Arrow model publication and ballistic speed authoring (not a second weapon store).
+"""Arrow model publication and visual-flight speed authoring (not a second weapon store).
 
-A versioned arrow is a cosmetic template + speed policy. Damage and collision
-remain owned by the existing AttackService/BowProjectileService.
+A versioned arrow is a cosmetic template + speed policy. Server-side hit
+confirmation belongs to AttackService/BowHitscanService, never this store.
 """
 from __future__ import annotations
 

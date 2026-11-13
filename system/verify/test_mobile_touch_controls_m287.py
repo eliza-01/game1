@@ -47,8 +47,10 @@ class MobileTouchControlsM287(unittest.TestCase):
 
     def test_touch_backwards_is_camera_relative_not_keyboard_backpedal(self):
         self.assertIn('if touchMovementActive then\n\t\treturn touchAxis', MOVEMENT)
-        self.assertIn('not touchMovementActive and isBackwardAxis(axis)', MOVEMENT)
+        self.assertIn('not touchMovementActive or (aimFacingActive and aimFacingLive)', MOVEMENT)
         self.assertIn('backwardActive and backwardRelativeDirection(axis, backwardCameraSteering) or cameraRelativeDirection(axis)', MOVEMENT)
+        self.assertIn('if liveBowAim then', MOVEMENT)
+        self.assertIn('moveDirection = cameraRelativeDirection(axis)', MOVEMENT)
 
     def test_jump_and_attack_share_desktop_rules(self):
         self.assertIn('MovementController.RequestJump()', MOVEMENT)
@@ -56,7 +58,8 @@ class MobileTouchControlsM287(unittest.TestCase):
         self.assertIn('AttackController.RequestAttack = attemptAttack', ATTACK)
         self.assertIn('attackController.RequestAttack()', TOUCH)
         self.assertEqual(ATTACK.count('animationController.PlayAction("attack")'), 1)
-        self.assertEqual(ATTACK.count('attack:FireServer({'), 1)
+        # Separate bow and melee attack intents have existed since M313.
+        self.assertEqual(ATTACK.count('attack:FireServer({'), 2)
         self.assertIn('and not UiInputGuard.BlocksWorldInput(input, processed)', ATTACK)
         self.assertIn('MobileInputController.Start(MovementController, CameraController, AttackController)', INIT)
 

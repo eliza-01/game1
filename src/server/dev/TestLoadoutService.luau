@@ -120,11 +120,12 @@ local function buildCatalog(player: Player)
     if selectedArchetype == "" then
         selectedArchetype = tostring((if RunService:IsStudio() then CharacterRegistry.studioAdminArchetypeId or CharacterRegistry.defaultArchetypeId else CharacterRegistry.defaultArchetypeId) or "")
     end
-    local selectedWeaponSlug = tostring(player:GetAttribute("SelectedWeaponSlug") or "")
     local character = player.Character
-    if selectedWeaponSlug == "" and character then
-        selectedWeaponSlug = tostring(character:GetAttribute("EquippedWeaponSlug") or "")
-    end
+    -- The equipped runtime model is authoritative, even for Hands. Saved
+    -- selections are merely pending preferences for the next Accept Loadout.
+    local selectedWeaponSlug = if character then
+        tostring(character:GetAttribute("EquippedWeaponSlug") or "")
+        else tostring(player:GetAttribute("SelectedWeaponSlug") or "")
 
     return {
         characters = availableCharacters(),
@@ -137,8 +138,10 @@ local function buildCatalog(player: Player)
             bow = "Bow",
         },
         weapons = weapons,
-        selectedArchetype = selectedArchetype,
+        selectedArchetype = if character then tostring(character:GetAttribute("CharacterArchetype") or selectedArchetype) else selectedArchetype,
         selectedWeaponSlug = selectedWeaponSlug,
+        actualAttackRadiusStuds = character and tonumber(character:GetAttribute("AttackRadius")) or nil,
+        radiusOverridden = tonumber(player:GetAttribute("Game1TestAttackRadiusOverride")) ~= nil,
     }
 end
 

@@ -24,12 +24,16 @@ return table.freeze({
     -- RobloxLineage attack-facing contract. A planted attack can twist the upper
     -- body up to this yaw. Only the overflow is assigned to whole-character yaw.
     TorsoYawLimit = math.rad(70),
+    -- Bow strafing keeps the lower body aligned with travel while the upper
+    -- bridge turns toward the camera (up to ~90 degrees for a sideways strafe).
+    -- Planted shots continue to use the normal 70-degree limit + root overflow.
+    MovingBowTorsoYawLimit = math.rad(100),
     TorsoAimResponse = 26,
     -- Local pitch is applied to the spine bridge after authored source poses.
     TorsoPitchUpLimit = math.rad(65),
     TorsoPitchDownLimit = math.rad(55),
-    -- Time used to rotate the root overflow toward the attack direction. The
-    -- resulting facing is then held until the complete attack animation ends.
+    -- Stationary melee ramps root overflow over this time. The bow uses the
+    -- same interval as its exponential live yaw response to a changing reticle.
     FacingTurnSeconds = 0.28,
 
     -- RobloxLineage-style upper-body composition: legs stay on combat locomotion

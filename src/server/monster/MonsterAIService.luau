@@ -9,6 +9,8 @@ local Presentation = require(script.Parent:WaitForChild("MonsterCombatPresentati
 local AttackExecutor = require(script.Parent:WaitForChild("MonsterAttackExecutor"))
 local Navigation = require(script.Parent:WaitForChild("MonsterChaseNavigation"))
 local Lifecycle = require(script.Parent:WaitForChild("MonsterAgentLifecycle"))
+local DamageSignals = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("ActorDamageSignals"))
+local Players = game:GetService("Players")
 
 local MonsterAIService = {}
 local started = false
@@ -37,6 +39,7 @@ local AttackMovement = table.freeze({
 local function leaveCombat(agent: any)
     Facing.Stop(agent.model)
     CombatState.ClearTarget(agent)
+    agent.retaliating = false
     agent.attacking = false
     agent.attackSerial += 1
     AttackExecutor.ClearPursuit(agent)
@@ -54,6 +57,33 @@ local function updateTarget(agent: any, now: number)
     if target then CombatState.Enter(agent, target) end
 end
 
+-- Server-authoritative retaliation edge, independent of the periodic proximity
+-- scan. This is an aggro transition; the authored Hit event still owns damage.
+local function onDamaged(attacker: Model?, monster: Model, attempted: number, _applied: number, killed: boolean)
+    if attempted <= 0 or killed or not attacker or not Players:GetPlayerFromCharacter(attacker) then return end
+    if not TargetPolicy.IsValid(attacker) or monster:GetAttribute("LifeState") ~= "Alive" then return end
+    local agent = Lifecycle.Find(monster)
+    if not agent or not agent.active then return end
+    if agent.target ~= attacker then
+        CombatState.Enter(agent, attacker)
+    end
+    agent.retaliating = true
+    if agent.model:GetAttribute("MonsterSpawning") == true or agent.attacking then return end
+    local targetRoot = rootOf(attacker)
+    if not targetRoot then return end
+    if horizontalDistance(agent.root.Position, targetRoot.Position) <= attackRadius(agent) then
+        stopNavigation(agent)
+        AttackExecutor.FaceDirection(agent, targetRoot.Position - agent.root.Position)
+        Presentation.PlayCombatIdle(agent)
+        AttackExecutor.Begin(agent, attacker, AttackMovement, random)
+    else
+        setState(agent, "Chase")
+        AttackExecutor.ClearPursuit(agent)
+        Presentation.PlayRun(agent)
+        navigateTo(agent, targetRoot.Position, runSpeedStuds(agent))
+    end
+end
+
 local function runAgent(agent: any)
     task.wait(random:NextNumber(0, THINK_INTERVAL))
     while agent.active and agent.model.Parent do
@@ -67,7 +97,7 @@ local function runAgent(agent: any)
         if agent.model:GetAttribute("MonsterSpawning") == true then
             continue
         end
-        if not aggressive(agent) then
+        if not aggressive(agent) and not agent.retaliating then
             if agent.target or agent.model:GetAttribute("MonsterCombatActive") == true then leaveCombat(agent) end
             continue
         end
@@ -101,6 +131,7 @@ end
 function MonsterAIService.Start()
     if started then return end
     started = true
+    DamageSignals.Event:Connect(onDamaged)
     Lifecycle.Start(runAgent, random)
     print("[game1][monster-ai] RobloxLineage aggro/chase/attack-pursuit runtime ready")
 end

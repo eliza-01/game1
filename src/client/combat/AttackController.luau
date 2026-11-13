@@ -12,6 +12,7 @@ local CharacterAttackWindow = require(CombatShared:WaitForChild("CharacterAttack
 local WeaponAttackVolume = require(CombatShared:WaitForChild("WeaponAttackVolume"))
 local BowProjectileConfig = require(CombatShared:WaitForChild("BowProjectileConfig"))
 local UiInputGuard = require(script.Parent.Parent:WaitForChild("UiInputGuard"))
+local WeaponAttachmentController = require(script.Parent.Parent:WaitForChild("weapon"):WaitForChild("WeaponAttachmentController"))
 local AttackController = {}
 local started = false
 local movementController: any = nil
@@ -23,11 +24,11 @@ local activePoseFrom = 0
 local activePoseUntil = 0
 local activePoseStartedAt = 0
 local poseAccumulator = 0
+local bowCaptureSequence = 0
+local bowPresentationUntil = 0
+local bowPresentationCharacter: Model? = nil
 local weaponPoseRemote: RemoteEvent? = nil
 local bowAimRemote: RemoteEvent? = nil
-local bowAimAttackId = 0
-local bowAimUntil = 0
-local bowAimAccumulator = 0
 
 
 local function publishWeaponPose()
@@ -72,8 +73,9 @@ local function finishPresentation(sequence: number)
             movementController.EndAttackMovement()
         end
     end
-    bowAimAttackId = 0
-    bowAimUntil = 0
+    bowCaptureSequence = 0
+    bowPresentationUntil = 0
+    bowPresentationCharacter = nil
     if aimPoseController and aimPoseController.EndAttack then
         aimPoseController.EndAttack()
     end
@@ -106,27 +108,24 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
     bowAimRemote = remotes:WaitForChild("BowAimUpdate") :: RemoteEvent
 
     RunService.RenderStepped:Connect(function(deltaTime)
-        if bowAimAttackId > 0 then
-            if os.clock() >= bowAimUntil then
-                bowAimAttackId = 0
-            else
-                -- The same stationary attack facing compensation used by hands
-                -- receives the live camera direction while the bow is drawn.
-                -- This is a local presentation update; server aim packets retain
-                -- their existing bounded rate and authoritative validation.
+        -- Bow is VISUALLY aimed continuously through the complete authored clip,
+        -- including after Release. This never does an extra hit raycast, changes
+        -- the frozen server snapshot or sends additional network packets.
+        if bowCaptureSequence > 0 then
+            local playerCharacter = Players.LocalPlayer.Character
+            if playerCharacter ~= bowPresentationCharacter
+                or not playerCharacter or playerCharacter:GetAttribute("LifeState") ~= "Alive"
+                or os.clock() > bowPresentationUntil then
+                finishPresentation(bowCaptureSequence)
+            elseif aimPoseController and movementController then
                 local origin, direction = aimPoseController.GetAimRay()
-                if direction and movementController and movementController.UpdateAimFacingCompensation then
-                    movementController.UpdateAimFacingCompensation(direction)
-                end
-                bowAimAccumulator += deltaTime
-                if bowAimAccumulator >= BowProjectileConfig.AimUpdateInterval then
-                    bowAimAccumulator = 0
-                    if origin and direction then
-                        bowAimRemote:FireServer({
-                            clientAttackId = bowAimAttackId,
-                            aimOrigin = origin,
-                            aimDirection = direction,
-                        })
+                if typeof(origin) == "Vector3" and typeof(direction) == "Vector3"
+                    and direction.Magnitude > 1e-6 then
+                    local target = origin + direction.Unit * AttackConfig.MaxAimDistance
+                    aimPoseController.UpdateTarget(target)
+                    local root = playerCharacter:FindFirstChild("RootCollider")
+                    if root and root:IsA("BasePart") then
+                        movementController.UpdateAimFacingCompensation(target - root.Position)
                     end
                 end
             end
@@ -167,10 +166,21 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
             return
         end
 
-        local target = aimPoseController and aimPoseController.GetAimPosition and aimPoseController.GetAimPosition() or nil
-        if typeof(target) ~= "Vector3" or not animationController then
-            return
+        if not animationController then return end
+        local isBow = string.lower(tostring(character:GetAttribute("EquippedWeaponType") or "")) == "bow"
+        -- Bow facing starts with Draw, not with the late target snapshot.
+        -- This ray is already used by AttackIntent: no additional world raycast
+        -- or per-frame target tracking is needed before Release.
+        local bowAimOrigin, bowAimDirection = nil, nil
+        if isBow then
+            if not aimPoseController or not aimPoseController.GetAimRay then return end
+            bowAimOrigin, bowAimDirection = aimPoseController.GetAimRay()
+            if typeof(bowAimOrigin) ~= "Vector3" or typeof(bowAimDirection) ~= "Vector3"
+                or bowAimDirection.Magnitude <= 1e-6 then return end
         end
+        local target = if isBow then nil else
+            (aimPoseController and aimPoseController.GetAimPosition and aimPoseController.GetAimPosition() or nil)
+        if not isBow and typeof(target) ~= "Vector3" then return end
 
         -- PlayAction owns the complete attack interval. It returns nil while the
         -- previous attack animation is still inside its configured timeline, so
@@ -180,7 +190,6 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
             return
         end
 
-        local isBow = string.lower(tostring(character:GetAttribute("EquippedWeaponType") or "")) == "bow"
         local release = isBow and action.timeline and action.timeline.events
             and action.timeline.events[BowProjectileConfig.ReleaseEvent] or nil
         local damageWindow = if isBow then nil else CharacterAttackWindow.Resolve(action.timeline)
@@ -204,19 +213,29 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
         end
 
         local root = character:FindFirstChild("RootCollider")
+        -- Face the reticle immediately for Bow and Melee alike. Bow uses its
+        -- initial camera direction only to drive presentation; the authoritative
+        -- target is still captured just once close to Release.
+        local presentationTarget = if isBow then
+            bowAimOrigin + bowAimDirection.Unit * AttackConfig.MaxAimDistance else target
         if root and root:IsA("BasePart") then
-            local direction = Vector3.new(target.X - root.Position.X, 0, target.Z - root.Position.Z)
+            local direction = Vector3.new(presentationTarget.X - root.Position.X, 0,
+                presentationTarget.Z - root.Position.Z)
             if direction.Magnitude > 0.001 then
                 -- Facing is a gameplay interval, not a function of the FBX clip's
                 -- individual playback multiplier.
-                local facingTurnDuration = math.min(attackDuration, AttackConfig.FacingTurnSeconds)
-
-                if movementController and not movingAtAttackStart then
+                if isBow and movementController and movementController.BeginAimFacingCompensation then
+                    -- Bow tracks the reticle while idle, moving and backpedalling.
+                    -- The root follows full camera yaw; the spine absorbs the turn.
+                    movementController.BeginAimFacingCompensation(
+                        attackDuration, AttackConfig.TorsoYawLimit, true
+                    )
+                    movementController.UpdateAimFacingCompensation(direction.Unit)
+                elseif movementController and not movingAtAttackStart then
+                    local facingTurnDuration = math.min(attackDuration, AttackConfig.FacingTurnSeconds)
                     if movementController.BeginAimFacingCompensation then
-                        -- Stationary attacks may turn root overflow toward the
-                        -- aim target and hold it for the complete attack. The
-                        -- moment movement starts, MovementController releases
-                        -- this root compensation and live locomotion owns facing.
+                        -- Stationary melee retains its original one-shot
+                        -- facing, released if locomotion takes over.
                         movementController.BeginAimFacingCompensation(
                             facingTurnDuration,
                             AttackConfig.TorsoYawLimit
@@ -229,9 +248,9 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
             end
         end
         if aimPoseController then
-            -- World-space yaw AND pitch follow the reticle for the complete
-            -- authored attack, including targets directly above or below.
-            aimPoseController.BeginAttack(target, attackDuration)
+            -- The same torso controller applies both weapon types. The bow's
+            -- cosmetic target follows the camera; Capture never changes it.
+            aimPoseController.BeginAttack(presentationTarget, attackDuration)
         end
 
 
@@ -239,23 +258,36 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
             finishPresentation(sequence)
         end)
 
-        -- Projectile Release is clocked by the server, but the camera may still
-        -- move while the bow animation draws. Sample the live aim until release.
+        -- The server schedules Release. The initial camera direction is only
+        -- validated as an attack request; it is NOT a captured hit or target.
         if isBow then
-            local aimOrigin, aimDirection = aimPoseController.GetAimRay()
-            if not aimOrigin or not aimDirection then
-                finishPresentation(sequence)
-                return
-            end
-            bowAimAttackId = sequence
-            bowAimUntil = os.clock() + damagePoseStart
-            bowAimAccumulator = 0
             attack:FireServer({
                 clipId = action.clipId,
                 clientAttackId = sequence,
-                aimOrigin = aimOrigin,
-                aimDirection = aimDirection,
+                aimOrigin = bowAimOrigin,
+                aimDirection = bowAimDirection,
             })
+            -- Exactly one late capture for SERVER damage. Presentation tracks
+            -- the CAMERA ray each render frame without raycasts or remotes.
+            bowCaptureSequence = sequence
+            bowPresentationUntil = os.clock() + attackDuration
+            bowPresentationCharacter = character
+            local lead = math.min(BowProjectileConfig.CaptureLeadSeconds, damagePoseStart * 0.5)
+            task.delay(math.max(0.025, damagePoseStart - lead), function()
+                if sequence ~= bowCaptureSequence or sequence ~= attackSequence or player.Character ~= character
+                    or character:GetAttribute("LifeState") ~= "Alive" then return end
+                local origin, direction = aimPoseController.GetAimRay()
+                if not origin or not direction then return end
+                local launchOrigin = WeaponAttachmentController.GetBowReleaseOrigin(character)
+                bowAimRemote:FireServer({
+                    clientAttackId = sequence,
+                    aimOrigin = origin,
+                    aimDirection = direction,
+                    launchOrigin = launchOrigin,
+                })
+                -- Capture is gameplay-only. Never snap the torso to a close
+                -- surface at Release: the live camera ray still owns the pose.
+            end)
             return
         end
 

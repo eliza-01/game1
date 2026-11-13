@@ -28,7 +28,8 @@ class Bow3DAimContracts(unittest.TestCase):
         movement = read('src/client/character/MovementController.luau')
         self.assertNotIn('if bowEquipped then', movement)
         self.assertIn('controllerManager.FacingDirection = moveDirection', movement)
-        self.assertIn('moveDirection = backwardActive and', movement)
+        self.assertIn('moveDirection = backwardActive and backwardRelativeDirection(', movement)
+        self.assertIn('if liveBowAim then', movement)
         self.assertIn('BeginAimFacingCompensation', movement)
         self.assertIn('BeginAttackMovement', movement)
         self.assertIn('WeaponAttackMovement.Resolve(weaponType)', movement)
@@ -49,44 +50,40 @@ class Bow3DAimContracts(unittest.TestCase):
         self.assertIn('return -- a bow cannot submit melee hitbox pose packets', server)
 
     def test_release_clock_and_damage_authority_stay_on_server(self):
-        server = read('src/server/combat/AttackService.luau')
-        projectile = read('src/server/combat/BowProjectileService.luau')
-        self.assertIn('BowProjectileConfig.ReleaseEvent', server)
-        self.assertIn('task.delay(releaseTime', server)
-        self.assertIn('BowProjectileService.Release(player, character', server)
-        self.assertIn('BowAimGeometry.Validate(root, payload.aimOrigin, payload.aimDirection)', server)
-        self.assertIn('AttackSessionStore.IsCoolingDown(player, now)', server)
-        self.assertIn('DamageService.Apply(state.character, target', projectile)
-        self.assertIn('EntityHitboxService.RaycastAimRegions', projectile)
-        self.assertIn('worldContact(state.character, startPosition, displacement)', projectile)
-        self.assertIn('Workspace:Raycast(origin, displacement, params)', projectile)
-        self.assertIn('BowProjectileConfig', projectile)
+        server=read('src/server/combat/AttackService.luau')
+        hit=read('src/server/combat/BowHitscanService.luau')
+        self.assertIn('BowProjectileConfig.ReleaseEvent',server)
+        self.assertIn('task.delay(releaseTime',server)
+        self.assertIn('BowHitscanService.Release(player, character',server)
+        self.assertIn('AttackSessionStore.IsCoolingDown(player, now)',server)
+        self.assertIn('DamageService.Apply(character, target',hit)
+        self.assertIn('EntityHitboxService.RaycastAimRegions(character',hit)
+        self.assertIn('Workspace:Raycast(origin, displacement, params)',hit)
+        self.assertNotIn('RunService.Heartbeat:Connect',hit)
 
     def test_arrow_state_is_bounded_and_has_cancellation(self):
-        policy = read('src/shared/combat/BowProjectileConfig.luau')
-        projectile = read('src/server/combat/BowProjectileService.luau')
-        self.assertIn('MaxActivePerPlayer = 3', policy)
-        self.assertIn('MaxLifetime = 3.6', policy)
-        self.assertIn('count >= Policy.MaxActivePerPlayer', projectile)
-        self.assertIn('os.clock() - state.born >= Policy.MaxLifetime', projectile)
-        self.assertIn('Players.PlayerRemoving:Connect', projectile)
-        self.assertIn('state.player.Character ~= state.character', projectile)
-        factory = read('src/server/combat/ArrowVisualFactory.luau')
-        self.assertIn('child.CanCollide = false', factory)
-        self.assertIn('child.CanQuery = false', factory)
+        policy=read('src/shared/combat/BowProjectileConfig.luau')
+        client=read('src/client/combat/BowShotVisualController.luau')
+        factory=read('src/shared/combat/ArrowVisualFactory.luau')
+        self.assertIn('MaxClientVisuals = 64',policy)
+        self.assertIn('StuckLifetime = 2.5',policy)
+        self.assertIn('renderConnection:Disconnect()',client)
+        self.assertIn('while #flights + #attachedBones > Policy.MaxClientVisuals',client)
+        self.assertIn('node.CanCollide = false',factory)
+        self.assertIn('child.CanQuery = false',factory)
 
     def test_aim_validation_and_parallax_safety(self):
-        geometry = read('src/shared/combat/BowAimGeometry.luau')
-        self.assertIn('AttackAimGeometry.Normalize', geometry)
-        self.assertIn('root.CFrame:VectorToObjectSpace(unitDirection)', geometry)
-        self.assertIn('Policy.MaxAimYaw', geometry)
-        self.assertIn('Policy.MinAimPitch', geometry)
-        self.assertIn('Policy.MaxAimPitch', geometry)
-        projectile = read('src/server/combat/BowProjectileService.luau')
-        self.assertIn('muzzlePosition(root)', projectile)
-        self.assertIn('spawnPosition - root.Position', projectile)
-        self.assertIn('blockedAt', projectile)
-        self.assertNotIn('clientHitTarget', projectile)
+        geo=read('src/shared/combat/BowAimGeometry.luau')
+        server=read('src/server/combat/BowHitscanService.luau')
+        self.assertIn('AttackAimGeometry.Normalize',geo)
+        self.assertIn('root.CFrame:VectorToObjectSpace(unitDirection)',geo)
+        self.assertIn('Policy.MaxAimYaw',geo)
+        self.assertIn('Policy.MinAimPitch',geo)
+        self.assertIn('Policy.MaxAimPitch',geo)
+        self.assertIn('Geometry.ValidateLaunch(root,',server)
+        self.assertIn('worldContact(character, safeStart, candidate - safeStart)',server)
+        self.assertIn('OcclusionTolerance',server)
+        self.assertNotIn('clientHitTarget',server)
 
     def test_camera_can_look_up_and_down_for_bow_and_melee(self):
         camera = read('src/shared/character/CharacterConfig.luau')
@@ -96,22 +93,22 @@ class Bow3DAimContracts(unittest.TestCase):
         self.assertIn('CharacterConfig.CameraMinPitch', controller)
         self.assertIn('CharacterConfig.CameraMaxPitch', controller)
 
-    def test_ballistic_discriminant_basics(self):
-        # Cross-check the published policy's low-arc formula independently.
-        speed, gravity, distance, height = 145.0, 38.0, 80.0, 10.0
-        discriminant = speed**4 - gravity * (gravity * distance**2 + 2 * height * speed**2)
-        self.assertGreater(discriminant, 0)
-        angle = math.atan((speed**2 - math.sqrt(discriminant)) / (gravity * distance))
-        t = distance / (speed * math.cos(angle))
-        self.assertAlmostEqual(speed * math.sin(angle) * t - 0.5 * gravity * t**2, height, places=7)
-        self.assertLess(angle, math.pi / 2)
+    def test_straight_snapshot_flight_basics(self):
+        # M313 intentionally replaces ballistic arc with one frozen, straight ray.
+        start, target = (0, 3, 0), (2, 8, -5)
+        vector = tuple(target[i] - start[i] for i in range(3))
+        distance = math.sqrt(sum(value * value for value in vector))
+        velocity = tuple(value * 145.0 / distance for value in vector)
+        time_to_target = distance / 145.0
+        predicted = tuple(start[i] + velocity[i] * time_to_target for i in range(3))
+        for actual, expected in zip(predicted, target):
+            self.assertAlmostEqual(actual, expected, places=7)
 
     def test_no_generated_manifest_or_asset_id_touched(self):
-        policy = read('src/shared/combat/BowProjectileConfig.luau')
-        self.assertNotIn('assetId', policy)
-        self.assertNotIn('ModelAssetId', policy)
-        self.assertNotIn('attack-timelines.json', read('src/server/combat/BowProjectileService.luau'))
-
+        policy=read('src/shared/combat/BowProjectileConfig.luau')
+        self.assertNotIn('assetId',policy)
+        self.assertNotIn('ModelAssetId',policy)
+        self.assertNotIn('attack-timelines.json',read('src/server/combat/BowHitscanService.luau'))
 
 if __name__ == '__main__':
     unittest.main()

@@ -80,6 +80,7 @@ local function registerModel(model: Model, random: Random, runAgent: (any) -> ()
                 combatIdleTrack = combatIdleRow and Presentation.LoadTrack(animator, combatIdleRow, true) or nil,
                 attackTrack = nil,
                 target = nil,
+                retaliating = false,
                 active = true,
                 attacking = false,
                 attackSerial = 0,
@@ -151,6 +152,10 @@ local function watchFolder(folder: Folder, random: Random, runAgent: (any) -> ()
     for _, child in ipairs(folder:GetChildren()) do
         if child:IsA("Model") then registerModel(child, random, runAgent) end
     end
+end
+
+function MonsterAgentLifecycle.Find(model: Model): any?
+    return agents[model]
 end
 
 function MonsterAgentLifecycle.Release(agent: any)

@@ -36,7 +36,7 @@ class EventSwayM300(unittest.TestCase):
         self.assertNotIn('physicsEnabled = physicsEnabled',source)
     def test_impact_authority_remains_on_server(self):
         server=load('src/server/world/LandscapeSwayService.luau')
-        arrow=load('src/server/combat/BowProjectileService.luau')
+        arrow=load('src/server/combat/BowHitscanService.luau')
         attack=load('src/server/combat/AttackService.luau')
         self.assertIn('function Service.Impact(',server)
         self.assertIn('function Service.Melee(',server)

@@ -119,15 +119,16 @@ class StudioSourceContracts(unittest.TestCase):
         self.assertIn('CFrame.Angles(math.pi, 0, 0)',lua)
 
     def test_impact_uses_native_weld_on_props_bone_local_on_animated_rigs(self):
-        source=self.text('src/server/combat/ArrowImpactAttachment.luau')
-        self.assertIn('Instance.new("WeldConstraint")',source)
-        self.assertIn('weld.Part0 = hitPart',source)
-        self.assertIn('bone.TransformedWorldCFrame',source)
-        self.assertIn('RunService.Heartbeat:Connect(update)',source)
-        self.assertIn('connection:Disconnect()',source)
-        bow=self.text('src/server/combat/BowProjectileService.luau')
-        self.assertIn('ArrowImpactAttachment.Attach(visual, hitInstance, entity, boneName)',bow)
-        self.assertIn('ArrowVisualFactory.ContactFrame',bow)
+        visual=self.text('src/client/combat/BowShotVisualController.luau')
+        self.assertIn('Instance.new("WeldConstraint")',visual)
+        self.assertIn('join.Part0 = hitPart',visual)
+        self.assertIn('bone.TransformedWorldCFrame',visual)
+        self.assertIn('RenderStepped:Connect(step)',visual)
+        self.assertIn('renderConnection:Disconnect()',visual)
+        self.assertIn('Factory.ContactFrame(',visual)
+        server=self.text('src/server/combat/BowHitscanService.luau')
+        self.assertIn('publish(payload)',server)
+        self.assertIn('DamageService.Apply(',server)
 
     def test_camera_one_authoritative_controller_and_manual_persistence(self):
         cam=self.text('src/client/character/CameraController.luau')

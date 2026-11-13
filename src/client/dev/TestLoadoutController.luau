@@ -15,7 +15,7 @@ local started = false
 local player = Players.LocalPlayer
 
 local PANEL_WIDTH = 320
-local PANEL_EXPANDED_HEIGHT = 540
+local PANEL_EXPANDED_HEIGHT = 574
 local PANEL_COLLAPSED_SIZE = 44
 local CONTENT_WIDTH = PANEL_WIDTH - 32
 local DEBUG_PANEL_OPEN_ATTRIBUTE = "Game1DebugPanelOpen"
@@ -589,6 +589,13 @@ local function createGui()
     apply.Active = false
 
     HouseSocketDebugController.AttachLauncher(body, 428)
+    local runtimeStats = textLabel(body, "", 10, false)
+    runtimeStats.Name = "ActualRuntimeStats"
+    runtimeStats.Position = UDim2.fromOffset(1, 470)
+    runtimeStats.Size = UDim2.new(1, -2, 0, 28)
+    runtimeStats.TextWrapped = true
+    runtimeStats.TextYAlignment = Enum.TextYAlignment.Top
+    runtimeStats.TextColor3 = COLORS.mutedStrong
 
     local collapsed = true
     local function setCollapsed(value: boolean)
@@ -617,7 +624,7 @@ local function createGui()
     end)
     setCollapsed(playerGui:GetAttribute(DEBUG_PANEL_OPEN_ATTRIBUTE) ~= DEBUG_PANEL_ID)
 
-    return gui, character, category, weapon, meta, radiusBox, radiusMinus, radiusPlus, radiusReset, radiusToggle, volumeToggle, targetHitboxToggle, apply, status, statusDot
+    return gui, character, category, weapon, meta, runtimeStats, radiusBox, radiusMinus, radiusPlus, radiusReset, radiusToggle, volumeToggle, targetHitboxToggle, apply, status, statusDot
 end
 
 function TestLoadoutController.Start()
@@ -638,7 +645,8 @@ function TestLoadoutController.Start()
             return
         end
 
-        local gui, characterDropdown, categorySelector, weaponDropdown, meta, radiusBox, radiusMinus, radiusPlus, radiusReset, radiusToggle, volumeToggle, targetHitboxToggle, applyButton, status, statusDot = createGui()
+        local gui, characterDropdown, categorySelector, weaponDropdown, meta, runtimeStats, radiusBox, radiusMinus, radiusPlus, radiusReset, radiusToggle, volumeToggle, targetHitboxToggle, applyButton, status, statusDot = createGui()
+        local playerGui = player:WaitForChild("PlayerGui")
         local catalog = catalogRemote:InvokeServer()
         local weaponRows = catalog.weapons or {}
         local weaponBySlug = {}
@@ -879,7 +887,7 @@ function TestLoadoutController.Start()
             applyRadiusValue("default")
         end)
         local initialCharacter = player.Character
-        syncRadiusBox(initialCharacter and initialCharacter:GetAttribute("AttackRadius") or 7)
+        syncRadiusBox(initialCharacter and initialCharacter:GetAttribute("AttackRadius") or catalog.actualAttackRadiusStuds or 7)
 
         local function renderApply()
             local changed = characterDropdown.getValue() ~= appliedArchetype or weaponDropdown.getValue() ~= appliedWeaponSlug
@@ -910,6 +918,56 @@ function TestLoadoutController.Start()
         end
 
         local preferences = nil
+        local function syncActualCharacter()
+            local actual = player.Character
+            if not actual then return end
+            local radius = actual:GetAttribute("AttackRadius")
+            if radius ~= nil and not radiusBox:IsFocused() then syncRadiusBox(radius) end
+            runtimeStats.Text = string.format("ACTUAL  HP %.0f/%.0f  ·  DMG %.0f  ·  DEF %.0f\nASPD %.0f  ·  RUN %.0f  ·  RANGE %s",
+                tonumber(actual:GetAttribute("HP")) or 0, tonumber(actual:GetAttribute("MaxHP")) or 0,
+                tonumber(actual:GetAttribute("Damage")) or 0, tonumber(actual:GetAttribute("Defense")) or 0,
+                tonumber(actual:GetAttribute("AttackSpeed")) or 0, tonumber(actual:GetAttribute("RunSpeed")) or 0,
+                formatStuds(radius or 0))
+        end
+        local function syncActualLoadout(force: boolean?)
+            local actual = player.Character
+            if not actual then return end
+            -- Do not silently replace a pending selection while the editor is open.
+            if not applying and (force == true or playerGui:GetAttribute(DEBUG_PANEL_OPEN_ATTRIBUTE) ~= DEBUG_PANEL_ID) then
+                local slug = tostring(actual:GetAttribute("EquippedWeaponSlug") or "")
+                local archetype = tostring(actual:GetAttribute("CharacterArchetype") or "")
+                if archetype ~= "" then
+                    appliedArchetype = archetype
+                    characterDropdown.setValue(archetype, false)
+                end
+                appliedWeaponSlug = slug
+                local category = categoryForSlug(slug)
+                categorySelector.setValue(category, false)
+                rebuildWeapons(category, slug)
+                updateMeta()
+            end
+        end
+        local characterConnections = {}
+        local function watchActualCharacter(character: Model?)
+            for _, connection in ipairs(characterConnections) do connection:Disconnect() end
+            table.clear(characterConnections)
+            if character then
+                for _, attr in ipairs({"HP", "MaxHP", "Damage", "Defense", "AttackSpeed", "RunSpeed", "AttackRadius"}) do
+                    table.insert(characterConnections, character:GetAttributeChangedSignal(attr):Connect(syncActualCharacter))
+                end
+                table.insert(characterConnections, character:GetAttributeChangedSignal("EquippedWeaponSlug"):Connect(syncActualLoadout))
+            end
+            syncActualCharacter()
+            syncActualLoadout()
+        end
+        local characterAddedConnection = player.CharacterAdded:Connect(watchActualCharacter)
+        watchActualCharacter(player.Character)
+        local panelOpenedConnection = playerGui:GetAttributeChangedSignal(DEBUG_PANEL_OPEN_ATTRIBUTE):Connect(function()
+            if playerGui:GetAttribute(DEBUG_PANEL_OPEN_ATTRIBUTE) == DEBUG_PANEL_ID then
+                syncActualLoadout(true)
+                syncActualCharacter()
+            end
+        end)
         local function persistSelection()
             if not preferences then return end
             preferences:SetAttribute("LastLoadoutArchetype", characterDropdown.getValue())
@@ -983,6 +1041,9 @@ function TestLoadoutController.Start()
 
         gui.Destroying:Connect(function()
             preferences = nil
+            characterAddedConnection:Disconnect()
+            panelOpenedConnection:Disconnect()
+            for _, connection in ipairs(characterConnections) do connection:Disconnect() end
             if ringConnection then ringConnection:Disconnect() end
             if volumeConnection then volumeConnection:Disconnect() end
             ringFolder:Destroy()

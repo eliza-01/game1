@@ -151,15 +151,9 @@ local function desiredTorsoAngles(now: number): (number, number, boolean)
     if not currentRoot or not currentRoot.Parent then return 0, 0, false end
     local activeAttack = targetPosition ~= nil and now <= activeUntil
     local target = if activeAttack then targetPosition else nil
-    -- The same upper-body aim layer serves hands and bow ONLY during an
-    -- authored attack. Bow keeps following the live camera throughout its draw;
-    -- hands use the target captured when the melee attack began.
-    local bowAttack = activeAttack and character ~= nil
-        and string.lower(tostring(character:GetAttribute("EquippedWeaponType") or "")) == "bow"
-    if bowAttack then
-        local _, aimDirection = CameraController.GetAimRay()
-        if aimDirection then target = currentRoot.Position + aimDirection * 100 end
-    end
+    -- Melee retains its attack-start target. During a bow clip the presentation
+    -- target follows the camera ray until the final frame; this is independent
+    -- of the ONE server-side pre-Release hit snapshot.
     if not target then return 0, 0, false end
 
     local direction = target - currentRoot.Position
@@ -168,7 +162,14 @@ local function desiredTorsoAngles(now: number): (number, number, boolean)
     local horizontal = flatUnit(direction)
     local yaw = if forward and horizontal then signedYaw(forward, horizontal) else 0
     local pitch = math.atan2(direction.Y, math.max(0.001, Vector3.new(direction.X, 0, direction.Z).Magnitude))
-    return math.clamp(yaw, -AttackConfig.TorsoYawLimit, AttackConfig.TorsoYawLimit),
+    -- NavigationRoot/pelvis face the walking direction during Bow. The same
+    -- world-space spine bridge compensates up to a full lateral strafe; the
+    -- stationary character retains the authored 70-degree limit.
+    local movingBow = activeAttack and character ~= nil
+        and string.lower(tostring(character:GetAttribute("EquippedWeaponType") or "")) == "bow"
+        and tostring(character:GetAttribute("MovementState") or "Idle") ~= "Idle"
+    local yawLimit = if movingBow then AttackConfig.MovingBowTorsoYawLimit else AttackConfig.TorsoYawLimit
+    return math.clamp(yaw, -yawLimit, yawLimit),
         math.clamp(pitch, -AttackConfig.TorsoPitchDownLimit, AttackConfig.TorsoPitchUpLimit), true
 end
 
@@ -216,7 +217,9 @@ local function stepPose(deltaTime: number)
     local desiredYaw, desiredPitch, active = desiredTorsoAngles(now)
     local response = math.max(1, AttackConfig.TorsoAimResponse)
     local blend = 1 - math.exp(-response * math.max(0, deltaTime))
-    renderedYaw += (desiredYaw - renderedYaw) * blend
+    -- Use the shortest arc when the camera crosses the -180/180 boundary.
+    local yawDelta = math.atan2(math.sin(desiredYaw - renderedYaw), math.cos(desiredYaw - renderedYaw))
+    renderedYaw += yawDelta * blend
     renderedPitch += (desiredPitch - renderedPitch) * blend
     if math.abs(renderedYaw) < 0.0001 and desiredYaw == 0 then renderedYaw = 0 end
     if math.abs(renderedPitch) < 0.0001 and desiredPitch == 0 then renderedPitch = 0 end

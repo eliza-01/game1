@@ -59,7 +59,7 @@ function DamageService.Apply(attacker: Model?, target: Model, rawDamage: number,
     CombatFeedbackService.PublishDamage(attacker, target, finalDamage, critical, headshot == true)
 
     if AttackConfig.DebugLogs then
-        print(("[game1][DAMAGE] target=%s raw=%d crit=%s chance=%.1f defense=%d final=%d hp=%d->%d killed=%s"):format(
+        print(("[game1][DAMAGE] target=%s raw=%d crit=%s chance=%.1f defense=%d final=%d hp=%.1f->%.1f killed=%s"):format(
             target.Name,
             normalizedRawDamage,
             tostring(critical),

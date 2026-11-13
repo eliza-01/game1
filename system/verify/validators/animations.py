@@ -138,7 +138,10 @@ def check_character_animation(
     ]:
         if forbidden in attack_controller_text:
             err(f"attack presentation still releases aim/movement early: {forbidden}")
-    if "aimPoseController.BeginAttack(target, attackDuration)" not in attack_controller_text:
+    if not any(call in attack_controller_text for call in (
+        "aimPoseController.BeginAttack(target, attackDuration)",
+        "aimPoseController.BeginAttack(presentationTarget, attackDuration)",
+    )):
         err("attack aim pose must stay active for the complete attack duration")
     if "movementController.EndAimFacingCompensation()" not in attack_controller_text.split("local function finishPresentation", 1)[1].split("function AttackController.Start", 1)[0]:
         err("root aim compensation must release only from full-attack presentation cleanup")

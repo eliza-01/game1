@@ -1,4 +1,5 @@
 local CharacterStatsConfig = {}
+CharacterStatsConfig.RegenerationHPPerSecond = 5
 CharacterStatsConfig.Default = table.freeze({
     Level = 1,
     MaxHP = 100,

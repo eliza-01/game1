@@ -12,6 +12,7 @@ local WeaponShared = Game1Shared:WaitForChild("weapon")
 local CharacterConfig = require(CharacterShared:WaitForChild("CharacterConfig"))
 local CharacterMovementConfig = require(CharacterShared:WaitForChild("CharacterMovementConfig"))
 local WeaponAttackMovement = require(WeaponShared:WaitForChild("WeaponAttackMovement"))
+local AttackConfig = require(Game1Shared:WaitForChild("combat"):WaitForChild("AttackConfig"))
 
 local MovementController = {}
 
@@ -25,6 +26,7 @@ local airLockUntil = 0
 local facingLockDirection: Vector3? = nil
 local facingLockUntil = 0
 local aimFacingActive = false
+local aimFacingLive = false
 local aimFacingStartedAt = 0
 local aimFacingEndsAt = 0
 local aimFacingStartDirection: Vector3? = nil
@@ -60,6 +62,7 @@ local function clearCharacter()
 	facingLockDirection = nil
 	facingLockUntil = 0
 	aimFacingActive = false
+	aimFacingLive = false
 	aimFacingStartedAt = 0
 	aimFacingEndsAt = 0
 	aimFacingStartDirection = nil
@@ -236,10 +239,14 @@ local function walkModifierDown(): boolean
 end
 
 local function isBackwardAxis(axis: Vector2): boolean
-	-- S / Down owns a dedicated backpedal mode. W+S cancel to zero and therefore
-	-- do not count as backward movement. While backpedalling, A/D are ignored:
-	-- S, S+A and S+D all travel exactly backwards.
+	-- S / Down selects backpedal, but only while no touch locomotion is
+	-- active or a bow attack explicitly holds the facing direction.
 	return axis.Y < -0.001
+end
+
+local function backwardLocomotion(axis: Vector2): boolean
+	return isBackwardAxis(axis) and
+		(not touchMovementActive or (aimFacingActive and aimFacingLive))
 end
 
 local function rightMouseDown(): boolean
@@ -312,6 +319,7 @@ end
 
 local function clearAimFacingCompensation()
 	aimFacingActive = false
+	aimFacingLive = false
 	aimFacingStartedAt = 0
 	aimFacingEndsAt = 0
 	aimFacingStartDirection = nil
@@ -319,7 +327,7 @@ local function clearAimFacingCompensation()
 	aimFacingMaxResidualYaw = 0
 end
 
-local function applyAimFacingCompensation(now: number)
+local function applyAimFacingCompensation(now: number, deltaTime: number, moving: boolean)
 	if not aimFacingActive or not navigationRoot or not controllerManager then
 		return
 	end
@@ -329,13 +337,34 @@ local function applyAimFacingCompensation(now: number)
 		return
 	end
 
-	local duration = math.max(0.001, aimFacingEndsAt - aimFacingStartedAt)
-	local alpha = smoothStep01((now - aimFacingStartedAt) / duration)
-	local delta = signedYaw(startDirection, targetDirection)
-	local facing = flatUnit(rotateYaw(startDirection, delta * alpha))
-	if not facing then
-		return
+	local facing: Vector3?
+	if aimFacingLive then
+		if now >= aimFacingEndsAt then
+			clearAimFacingCompensation()
+			return
+		end
+		-- While moving, ControllerManager owns physical yaw to match the gait.
+		-- Bow's upper-body bridge independently follows the camera. Writing the
+		-- NavigationRoot CFrame here made pelvis and legs spin with the reticle.
+		if moving then return end
+		local current = flatUnit(navigationRoot.CFrame.LookVector)
+		if not current then return end
+		-- Only turn the planted root by yaw that the spine cannot cover.
+		-- Unlike the old one-shot target, this residual is updated until the
+		-- complete bow animation ends, including after Release.
+		local yaw = signedYaw(current, targetDirection)
+		local overflow = yaw - math.clamp(yaw, -aimFacingMaxResidualYaw, aimFacingMaxResidualYaw)
+		if math.abs(overflow) <= 0.0001 then return end
+		local response = 4 / math.max(0.05, AttackConfig.FacingTurnSeconds)
+		local blend = 1 - math.exp(-response * math.max(0, deltaTime))
+		facing = flatUnit(rotateYaw(current, overflow * blend))
+	else
+		local duration = math.max(0.001, aimFacingEndsAt - aimFacingStartedAt)
+		local alpha = smoothStep01((now - aimFacingStartedAt) / duration)
+		local delta = signedYaw(startDirection, targetDirection)
+		facing = flatUnit(rotateYaw(startDirection, delta * alpha))
 	end
+	if not facing then return end
 
 	-- ControllerManager does not reliably rotate a completely stationary custom
 	-- character just from FacingDirection. Rotate the physical NavigationRoot; the
@@ -405,7 +434,7 @@ local function performJump()
 	end
 end
 
-local function updateMovement()
+local function updateMovement(deltaTime: number)
 	if not character or not character.Parent then
 		clearCharacter()
 		return
@@ -429,19 +458,30 @@ local function updateMovement()
 
 	local now = os.clock()
 	local axis = inputAxis()
-	-- Touch stick uses camera-relative motion in every direction; S backpedal is PC-only.
-	local backwardActive = not touchMovementActive and isBackwardAxis(axis)
-	local backwardCameraSteering = backwardActive and rightMouseDown()
+	-- Movement remains camera-relative while the bow is firing. Lower-body
+	-- facing follows travel, except on S / downward stick where it backpedals.
+	local liveBowAim = aimFacingActive and aimFacingLive
+	local backwardActive = backwardLocomotion(axis)
+	local backwardCameraSteering = backwardActive and (rightMouseDown() or liveBowAim)
 	applyMovementMode(forcedWalk or walkModifierDown(), backwardActive)
 	local movementLocked = now < movementLockUntil
 	local moveDirection = Vector3.zero
 	if not movementLocked then
-		moveDirection = backwardActive and backwardRelativeDirection(axis, backwardCameraSteering) or cameraRelativeDirection(axis)
+		-- Keep both keyboard and analog bow movement camera-relative, with
+		-- diagonals intact. The existing one-axis S rule applies outside Bow.
+		if liveBowAim then
+			moveDirection = cameraRelativeDirection(axis)
+		else
+			moveDirection = backwardActive and backwardRelativeDirection(axis, backwardCameraSteering) or cameraRelativeDirection(axis)
+		end
 	end
 	controllerManager.MovingDirection = moveDirection
 	if aimFacingActive and not movementLocked and moveDirection.Magnitude > 0.001 then
-		-- Live movement/camera steering owns whole-character facing immediately.
-		clearAimFacingCompensation()
+		-- Only planted melee hands facing back to locomotion. Bow retains the
+		-- reticle-facing authority even while its lower body runs or retreats.
+		if not aimFacingLive then
+			clearAimFacingCompensation()
+		end
 	end
 	if movementLocked then
 		jumpRequested = false
@@ -451,8 +491,17 @@ local function updateMovement()
 		navigationRoot.AssemblyLinearVelocity = Vector3.new(0, velocity.Y, 0)
 	end
 
-	if facingLockDirection and now < facingLockUntil then
-		-- Common hands / bow / melee facing lock. Camera orbit remains owned
+	if liveBowAim and moveDirection.Magnitude > 0.001 then
+		-- The navigation root drives pelvis + feet: never aim it at the
+		-- reticle while travelling. Strafing uses the actual travel direction.
+		-- Backpedal keeps the feet forward and plays the authored gait in
+		-- reverse while travelling backwards (including touch diagonals).
+		local lowerBodyFacing = if backwardActive then cameraForwardDirection() else moveDirection
+		if lowerBodyFacing.Magnitude > 0.001 then
+			controllerManager.FacingDirection = lowerBodyFacing
+		end
+	elseif facingLockDirection and now < facingLockUntil then
+		-- Original melee facing lock. Camera orbit remains owned
 		-- exclusively by CameraController, irrespective of the equipped weapon.
 		controllerManager.FacingDirection = facingLockDirection
 	else
@@ -474,9 +523,9 @@ local function updateMovement()
 			-- Without RMB, backpedal preserves the current facing.
 		end
 	end
-	-- Stationary root yaw overflow belongs to the shared attack-facing
-	-- compensation. Do not silently steer the root solely because bow is equipped.
-	applyAimFacingCompensation(now)
+	-- Only a planted bow may rotate the physical root for spine overflow.
+	-- Locomotion must never be overwritten by the aim compensation layer.
+	applyAimFacingCompensation(now, deltaTime, moveDirection.Magnitude > 0.001)
 
 	if now >= airLockUntil then
 		if isGrounded() then
@@ -532,7 +581,7 @@ function MovementController.BeginAttackMovement(weaponType: any, duration: numbe
 	end
 	if controllerManager and character then
 		local axis = inputAxis()
-		applyMovementMode(walkModifierDown(), not touchMovementActive and isBackwardAxis(axis))
+		applyMovementMode(walkModifierDown(), backwardLocomotion(axis))
 	end
 	return resolved
 end
@@ -545,7 +594,7 @@ function MovementController.EndAttackMovement()
 	end
 	if controllerManager and character then
 		local axis = inputAxis()
-		applyMovementMode(forcedWalk or walkModifierDown(), not touchMovementActive and isBackwardAxis(axis))
+		applyMovementMode(forcedWalk or walkModifierDown(), backwardLocomotion(axis))
 	end
 end
 
@@ -560,7 +609,7 @@ function MovementController.EndForcedWalk()
 	forcedWalk = false
 	if controllerManager and character then
 		local axis = inputAxis()
-		applyMovementMode(walkModifierDown(), not touchMovementActive and isBackwardAxis(axis))
+		applyMovementMode(walkModifierDown(), backwardLocomotion(axis))
 	end
 end
 
@@ -597,7 +646,7 @@ function MovementController.UnlockFacing()
 	facingLockUntil = 0
 end
 
-function MovementController.BeginAimFacingCompensation(duration: number, maxResidualYaw: number)
+function MovementController.BeginAimFacingCompensation(duration: number, maxResidualYaw: number, live: boolean?)
 	if not root then
 		return false
 	end
@@ -607,6 +656,7 @@ function MovementController.BeginAimFacingCompensation(duration: number, maxResi
 	end
 	local now = os.clock()
 	aimFacingActive = true
+	aimFacingLive = live == true
 	aimFacingStartedAt = now
 	aimFacingEndsAt = now + math.max(0.05, tonumber(duration) or 0.05)
 	aimFacingStartDirection = startDirection
@@ -619,15 +669,19 @@ function MovementController.UpdateAimFacingCompensation(aimDirection: Vector3)
 	if not aimFacingActive then
 		return false
 	end
-	local startDirection = aimFacingStartDirection
 	local aim = flatUnit(aimDirection)
-	if not startDirection or not aim then
-		return false
+	if not aim then return false end
+	if aimFacingLive then
+		-- Keep the live camera target for the torso. Physical root compensation
+		-- happens only if planted and only beyond the allowable torso yaw.
+		aimFacingTargetDirection = aim
+		return true
 	end
+	local startDirection = aimFacingStartDirection
+	if not startDirection then return false end
 
-	-- Split the desired yaw exactly once: the torso is allowed to keep up to the
-	-- configured limit; RootCollider receives only the overflow. Example: 150° aim
-	-- with 70° torso limit => root turns 80° and torso retains the final 70°.
+	-- Planted melee retains M314's initial root overflow split. Example:
+	-- 150° aim with 70° torso limit => root turns 80° and torso holds 70°.
 	local fullYaw = signedYaw(startDirection, aim)
 	local torsoYaw = math.clamp(fullYaw, -aimFacingMaxResidualYaw, aimFacingMaxResidualYaw)
 	local rootYaw = fullYaw - torsoYaw

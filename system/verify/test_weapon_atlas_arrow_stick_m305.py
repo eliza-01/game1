@@ -61,12 +61,14 @@ class SharedWeaponAtlasTests(unittest.TestCase):
         self.assertIn('"penetrationStuds":0.05', (self.root/'src/shared/weapon/ArrowRegistry.luau').read_text())
 
     def test_gameplay_arrow_follows_landscape_and_no_fixed_depth(self):
-        projectile=(ROOT/'src/server/combat/BowProjectileService.luau').read_text()
-        factory=(ROOT/'src/server/combat/ArrowVisualFactory.luau').read_text()
-        self.assertIn('ArrowImpactAttachment.Attach(visual, hitInstance, entity, boneName)',projectile)
-        self.assertIn('Instance.new("WeldConstraint")',(ROOT/'src/server/combat/ArrowImpactAttachment.luau').read_text())
-        self.assertIn('ArrowVisualFactory.ContactFrame(',projectile)
-        self.assertNotIn('direction.Unit * 0.55',projectile)
+        server=(ROOT/'src/server/combat/BowHitscanService.luau').read_text()
+        client=(ROOT/'src/client/combat/BowShotVisualController.luau').read_text()
+        factory=(ROOT/'src/shared/combat/ArrowVisualFactory.luau').read_text()
+        self.assertIn('localContact = if part',server)
+        self.assertIn('Instance.new("WeldConstraint")',client)
+        self.assertIn('Factory.ContactFrame(',client)
+        self.assertIn('visual.Parent = sway',client)
+        self.assertNotIn('direction.Unit * 0.55',client)
         self.assertIn('item.Transparency',factory)
 
     def test_shared_atlas_studio_sync_is_explicit_and_checked(self):

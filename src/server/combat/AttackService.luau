@@ -1,5 +1,6 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local CharacterShared = Shared:WaitForChild("character")
@@ -13,7 +14,7 @@ local CharacterAnimationRegistry = require(CharacterShared:WaitForChild("Charact
 local AttackAimGeometry = require(CombatShared:WaitForChild("AttackAimGeometry"))
 local BowAimGeometry = require(CombatShared:WaitForChild("BowAimGeometry"))
 local BowProjectileConfig = require(CombatShared:WaitForChild("BowProjectileConfig"))
-local BowProjectileService = require(script.Parent:WaitForChild("BowProjectileService"))
+local BowHitscanService = require(script.Parent:WaitForChild("BowHitscanService"))
 local WeaponEnvironmentCollision = require(script.Parent:WaitForChild("WeaponEnvironmentCollision"))
 local AttackDamageResolver = require(script.Parent:WaitForChild("AttackDamageResolver"))
 local AttackSessionStore = require(script.Parent:WaitForChild("AttackSessionStore"))
@@ -293,24 +294,56 @@ triggerWeaponBounce = function(
     return true
 end
 
--- Aim packets can only update an already accepted, unreleased bow attack.
--- The server owns the release clock, not a client marker or attack timestamp.
+-- The client emits ONE capture ~100ms before Release. Separate reliable
+-- remotes and network jitter can deliver it after the server's Release clock.
+-- Never replace a missed late capture with an unrelated attack-start camera ray:
+-- that produced visually identical shots with different flight directions.
+local function finishBowRelease(player: Player, pending: any): boolean
+    if pendingBowReleases[player] ~= pending then return false end
+    pendingBowReleases[player] = nil -- consume once, including rejected shots
+    local character = pending.character
+    if not pending.snapshot or not character.Parent
+        or player.Character ~= character
+        or character:GetAttribute("LifeState") ~= "Alive"
+        or character:GetAttribute("AttackSerial") ~= pending.serial
+        or string.lower(tostring(character:GetAttribute("EquippedWeaponType") or "")) ~= "bow" then
+        return false
+    end
+    if RunService:IsStudio() and Config.DebugLogs then
+        print(("[game1][bow] release player=%s id=%d capture=%s delay_ms=%.0f")
+            :format(player.Name, pending.clientAttackId,
+                if pending.captureReceivedAt > pending.releaseAt then "late" else "on_time",
+                math.max(0, (pending.captureReceivedAt - pending.releaseAt) * 1000)))
+    end
+    return BowHitscanService.Release(player, character, pending.snapshot)
+end
+
 local function updateBowAim(player: Player, payload: any)
     if type(payload) ~= "table" then return end
     local pending = pendingBowReleases[player]
     if not pending or pending.clientAttackId ~= math.floor(tonumber(payload.clientAttackId) or 0) then return end
     local now = os.clock()
-    if now > pending.releaseAt or now - pending.lastUpdate < BowProjectileConfig.AimUpdateInterval * 0.5 then return end
-    if player.Character ~= pending.character then return end
-    local session = AttackSessionStore.Get(player)
-    if not session or session.serial ~= pending.serial or session.character ~= pending.character then return end
+    if pending.snapshot or now > pending.releaseAt + BowProjectileConfig.CaptureGraceSeconds then return end
+    -- Accept one late packet inside a bounded grace window. Earlier packets
+    -- must still come from the final portion of the authored attack timeline.
+    if now < pending.releaseAt - BowProjectileConfig.CaptureWindowSeconds then return end
+    if player.Character ~= pending.character
+        or pending.character:GetAttribute("LifeState") ~= "Alive"
+        or pending.character:GetAttribute("AttackSerial") ~= pending.serial then return end
+    if not pending.releaseReached then
+        local session = AttackSessionStore.Get(player)
+        if not session or session.serial ~= pending.serial or session.character ~= pending.character then return end
+    end
     local root = pending.character:FindFirstChild("RootCollider")
     if not root or not root:IsA("BasePart") then return end
     local origin, direction = BowAimGeometry.Validate(root, payload.aimOrigin, payload.aimDirection)
     if not origin or not direction then return end
-    pending.aimOrigin = origin
-    pending.aimDirection = direction
-    pending.lastUpdate = now
+    pending.snapshot = BowHitscanService.Capture(pending.character, origin, direction, payload.launchOrigin)
+    if not pending.snapshot then return end
+    pending.captureReceivedAt = now
+    if pending.releaseReached then
+        finishBowRelease(player, pending)
+    end
 end
 
 local function beginBowRelease(player: Player, character: Model, root: BasePart,
@@ -324,19 +357,29 @@ local function beginBowRelease(player: Player, character: Model, root: BasePart,
         character = character,
         serial = serial,
         clientAttackId = clientAttackId,
-        aimOrigin = origin,
-        aimDirection = direction,
         releaseAt = os.clock() + releaseTime,
-        lastUpdate = 0,
+        releaseReached = false,
+        snapshot = nil,
+        captureReceivedAt = nil,
     }
     pendingBowReleases[player] = pending
     task.delay(releaseTime, function()
         if pendingBowReleases[player] ~= pending then return end
-        pendingBowReleases[player] = nil
-        local session = AttackSessionStore.Get(player)
-        if player.Character ~= character or not session or session.serial ~= serial
-            or session.clientAttackId ~= clientAttackId then return end
-        BowProjectileService.Release(player, character, pending.aimOrigin, pending.aimDirection)
+        pending.releaseReached = true
+        if pending.snapshot then
+            finishBowRelease(player, pending)
+            return
+        end
+        -- Do not turn network timing variance into an inaccurate projectile.
+        -- A missing snapshot is an explicit failed shot, not a stale fallback.
+        task.delay(BowProjectileConfig.CaptureGraceSeconds, function()
+            if pendingBowReleases[player] ~= pending then return end
+            pendingBowReleases[player] = nil
+            if RunService:IsStudio() and Config.DebugLogs then
+                warn(("[game1][bow] capture_timeout player=%s id=%d grace_ms=%.0f; no projectile (no stale aim)")
+                    :format(player.Name, clientAttackId, BowProjectileConfig.CaptureGraceSeconds * 1000))
+            end
+        end)
     end)
     return true
 end
@@ -427,7 +470,7 @@ local function attack(player: Player, payload: any)
             return
         end
     end
-    -- Bow Release creates one projectile; only melee uses the HitStart/HitEnd volume.
+    -- Bow Release confirms one hitscan shot; only melee uses HitStart/HitEnd volumes.
     clearAttackStateLater(player, character, serial, clientAttackId, attackDuration, not isBow)
 end
 

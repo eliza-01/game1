@@ -1,6 +1,7 @@
--- Cosmetic presentation for an authoritative arrow. Collision and damage are
--- calculated by BowProjectileService's swept ray, NEVER by model parts.
-local ServerStorage = game:GetService("ServerStorage")
+-- Shared cosmetic arrow factory: server publishes the active template once.
+-- Client clones and animates locally; meshes never decide damage.
+local RunService = game:GetService("RunService")
+local ServerStorage = if RunService:IsServer() then game:GetService("ServerStorage") else nil
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local Registry = require(Shared:WaitForChild("weapon"):WaitForChild("ArrowRegistry"))
@@ -29,6 +30,7 @@ local function templateFor(row: any): Model?
     if type(row) ~= "table" then return nil end
     local path = tostring(row.serverStoragePath or "")
     if path:sub(1, 14) ~= "ServerStorage." then return nil end
+    if not ServerStorage then return nil end
     local cursor: Instance = ServerStorage
     for segment in path:sub(15):gmatch("[^%.]+") do
         local child = cursor:FindFirstChild(segment)
@@ -36,6 +38,36 @@ local function templateFor(row: any): Model?
         cursor = child
     end
     return if cursor:IsA("Model") and cursor:FindFirstChildWhichIsA("BasePart", true) then cursor else nil
+end
+
+-- Only one active published arrow needs replication. Do not publish any user
+-- asset or Model ID: this is an in-memory visual clone for current clients.
+function Factory.PublishActiveTemplate()
+    if not RunService:IsServer() then return end
+    local slug, row = Factory.ActiveDefinition()
+    local root = ReplicatedStorage:FindFirstChild("Game1ArrowTemplates")
+    if not root then
+        root = Instance.new("Folder")
+        root.Name = "Game1ArrowTemplates"
+        root.Parent = ReplicatedStorage
+    end
+    root:ClearAllChildren()
+    local template = templateFor(row)
+    if not template then return end
+    local clone = template:Clone()
+    clone.Name = slug
+    for _, node in ipairs(clone:GetDescendants()) do
+        if node:IsA("LuaSourceContainer") or node:IsA("Humanoid") or node:IsA("AnimationController") then
+            node:Destroy()
+        elseif node:IsA("BasePart") then
+            node.Anchored = true
+            node.CanCollide = false
+            node.CanQuery = false
+            node.CanTouch = false
+            node.Massless = true
+        end
+    end
+    clone.Parent = root
 end
 
 local function procedural(): Model
@@ -62,8 +94,9 @@ local function procedural(): Model
 end
 
 function Factory.Create(row: any, slug: string, frame: CFrame, parent: Instance): (Model, CFrame)
-    local template = templateFor(row)
-    local visual = if template then template:Clone() else procedural()
+    local repository = ReplicatedStorage:FindFirstChild("Game1ArrowTemplates")
+    local template = if repository then repository:FindFirstChild(slug) else nil
+    local visual = if template and template:IsA("Model") then template:Clone() else procedural()
     visual.Name = "Game1BowArrow"
     for _, child in ipairs(visual:GetDescendants()) do
         if child:IsA("LuaSourceContainer") or child:IsA("Humanoid") or child:IsA("AnimationController") then
@@ -88,7 +121,7 @@ end
 -- Projection of the visible arrow's actual frontmost geometry along flight.
 -- Handles an FBX-authored pivot, arbitrary mesh axes and the procedural arrow.
 function Factory.ContactFrame(visual: Model, contact: Vector3, travelDirection: Vector3,
-    penetrationStuds: number): CFrame
+    penetrationStuds: number, hitPart: Instance?): CFrame
     local direction = travelDirection.Unit
     local pivot = visual:GetPivot().Position
     local tip = -math.huge
@@ -104,6 +137,14 @@ function Factory.ContactFrame(visual: Model, contact: Vector3, travelDirection: 
     end
     if tip == -math.huge then tip = 0 end
     local depth = math.clamp(tonumber(penetrationStuds) or 0.12, 0, 3)
+    if hitPart and hitPart:IsA("BasePart") then
+        -- An authored deep penetration must not bury the arrow THROUGH a thin
+        -- lantern casing; base the safe cap on its oriented projected width.
+        local width = math.abs(hitPart.CFrame.RightVector:Dot(direction)) * hitPart.Size.X
+            + math.abs(hitPart.CFrame.UpVector:Dot(direction)) * hitPart.Size.Y
+            + math.abs(hitPart.CFrame.LookVector:Dot(direction)) * hitPart.Size.Z
+        depth = math.min(depth, math.max(0.025, width * 0.35))
+    end
     local target = contact - direction * (tip - depth)
     local up = if math.abs(direction:Dot(Vector3.yAxis)) > 0.98 then Vector3.zAxis else Vector3.yAxis
     return CFrame.lookAt(target, target + direction, up)

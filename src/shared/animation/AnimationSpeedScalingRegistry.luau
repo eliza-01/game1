@@ -75,6 +75,14 @@ return table.freeze({
 		}),
 	}),
 	catalog = table.freeze({
+		["107614308022042"] = table.freeze({
+			label = "character / human_female / base_death",
+			channel = "death",
+		}),
+		["71151100957955"] = table.freeze({
+			label = "character / human_female / base_revive",
+			channel = "revive",
+		}),
 		["127579361053055"] = table.freeze({
 			label = "character / human_female / bow_attack_01",
 			channel = "attack",

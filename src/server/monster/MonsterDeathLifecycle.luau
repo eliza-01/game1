@@ -4,7 +4,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local AnimationSpeedScaling = require(Shared:WaitForChild("animation"):WaitForChild("AnimationSpeedScaling"))
 local DeathAnimationPolicy = require(Shared:WaitForChild("combat"):WaitForChild("DeathAnimationPolicy"))
-local DeathLifecycleService = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("DeathLifecycleService"))
+local CombatRoot = script.Parent.Parent:WaitForChild("combat")
+local DeathLifecycleService = require(CombatRoot:WaitForChild("DeathLifecycleService"))
+local EntityHitboxService = require(CombatRoot:WaitForChild("EntityHitboxService"))
+local ActorCollisionPolicy = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorCollisionPolicy"))
 
 local MonsterDeathLifecycle = {}
 
@@ -60,6 +63,11 @@ function MonsterDeathLifecycle.new(callbacks: any): any
         entry.dying = true
         entry.deathPoseHeld = false
         model:SetAttribute("Damageable", false)
+        -- LifeState=Dying is terminal for collision as well as combat. Remove
+        -- the virtual Head/Body query binding and the physical navigation shell
+        -- at the BEGINNING of death, not after the Death animation or sink.
+        EntityHitboxService.Detach(model)
+        ActorCollisionPolicy.MakePhantom(model)
         model:SetAttribute("MonsterAnimationState", "death")
         model:SetAttribute("MonsterIdleVariant", nil)
         model:SetAttribute("DeathAnimationStartedAt", os.clock())

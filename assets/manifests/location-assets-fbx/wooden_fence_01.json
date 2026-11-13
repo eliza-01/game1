@@ -1,10 +1,27 @@
 {
   "schemaVersion": 1,
   "slug": "wooden_fence_01",
-  "sourceSha256": "b2090a38d58468a84351dfb7b4dfaee5a5e58ae54a7bb906306725a418f5f3e4",
+  "sourceSha256": "33cdd2fe3e75dd2a13c15bec9b01590db98f92a8ca442357fa9658b7428dedf9",
   "analysis": {
     "schemaVersion": 1,
     "meshes": [
+      {
+        "name": "col_mesh",
+        "armature": "",
+        "vertices": 24,
+        "bones": [],
+        "influencedBones": [],
+        "role": "collider",
+        "physics": {
+          "role": "collider",
+          "canCollide": true,
+          "canQuery": true,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": "PreciseConvexDecomposition",
+          "physicsOnly": true
+        }
+      },
       {
         "name": "wooden_fence_01",
         "armature": "",
@@ -14,16 +31,16 @@
         "role": "visual",
         "physics": {
           "role": "visual",
-          "canCollide": null,
-          "canQuery": null,
+          "canCollide": false,
+          "canQuery": false,
           "canTouch": false,
           "doubleSided": false,
-          "collisionFidelity": null,
+          "collisionFidelity": "Box",
           "physicsOnly": false
         }
       }
     ],
-    "hasCollider": false,
+    "hasCollider": true,
     "armatures": [],
     "unassignedArmatures": []
   }

@@ -4,8 +4,32 @@ return table.freeze({
 	project = "game1",
 	profiles = table.freeze({
 		["human_female"] = table.freeze({
-			skeletonSignature = "92410319cb196440d41d90136359034cf23a0d830fb7a11d70a3b68e6a93bbe3",
+			skeletonSignature = "1f420b74eeeb7d27fdf2f0b48207a9a4363a17ad622b339d0c7abee30dfc6265",
 			base = table.freeze({
+				["death"] = table.freeze({
+					table.freeze({
+						clipId = "human_female__base__death__00",
+						assetId = "107614308022042",
+						animationId = "rbxassetid://107614308022042",
+						variant = 0,
+						weight = 100,
+						looped = false,
+						priority = "Action",
+						document = nil,
+					}),
+				}),
+				["revive"] = table.freeze({
+					table.freeze({
+						clipId = "human_female__base__revive__00",
+						assetId = "71151100957955",
+						animationId = "rbxassetid://71151100957955",
+						variant = 0,
+						weight = 100,
+						looped = false,
+						priority = "Action",
+						document = nil,
+					}),
+				}),
 			}),
 			emotions = table.freeze({
 			}),

@@ -12,7 +12,7 @@ local CharacterAttackWindow = require(CombatShared:WaitForChild("CharacterAttack
 local WeaponAttackVolume = require(CombatShared:WaitForChild("WeaponAttackVolume"))
 local BowProjectileConfig = require(CombatShared:WaitForChild("BowProjectileConfig"))
 local UiInputGuard = require(script.Parent.Parent:WaitForChild("UiInputGuard"))
-local WeaponAttachmentController = require(script.Parent.Parent:WaitForChild("weapon"):WaitForChild("WeaponAttachmentController"))
+local BoneMountedAttachmentController = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("BoneMountedAttachmentController"))
 local AttackController = {}
 local started = false
 local movementController: any = nil
@@ -278,7 +278,7 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
                     or character:GetAttribute("LifeState") ~= "Alive" then return end
                 local origin, direction = aimPoseController.GetAimRay()
                 if not origin or not direction then return end
-                local launchOrigin = WeaponAttachmentController.GetBowReleaseOrigin(character)
+                local launchOrigin = BoneMountedAttachmentController.GetBowReleaseOrigin(character)
                 bowAimRemote:FireServer({
                     clientAttackId = sequence,
                     aimOrigin = origin,

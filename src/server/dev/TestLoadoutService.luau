@@ -1,6 +1,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local PublishedDebugAccess = require(game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared"):WaitForChild("dev"):WaitForChild("PublishedDebugAccess"))
 
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local CharacterShared = Shared:WaitForChild("character")
@@ -97,6 +98,7 @@ local function availableWeapons()
 end
 
 local function buildCatalog(player: Player)
+    if not PublishedDebugAccess.ServerAllowed(player) then return {ok=false, error="Developer debug access denied"} end
     local weapons = availableWeapons()
     local categoriesSeen = { hands = true }
     for _, row in ipairs(weapons) do
@@ -152,6 +154,7 @@ local function weaponRadiusForCharacter(character: Model): number
 end
 
 local function setTestAttackRadius(player: Player, value: any)
+    if not PublishedDebugAccess.ServerAllowed(player) then return {ok=false, error="Developer debug access denied"} end
     local character = player.Character
     if not character then
         return { ok = false, error = "character is not spawned" }
@@ -173,6 +176,7 @@ local function setTestAttackRadius(player: Player, value: any)
 end
 
 local function applyLoadout(player: Player, archetypeValue: any, weaponSlugValue: any)
+    if not PublishedDebugAccess.ServerAllowed(player) then return {ok=false, error="Developer debug access denied"} end
     local archetype = string.lower(tostring(archetypeValue or ""))
     local weaponSlug = string.lower(tostring(weaponSlugValue or ""))
     if archetype == "" or not CharacterService.IsAvailable(archetype) then
@@ -218,7 +222,7 @@ end
 local function bindPlayer(player: Player)
     player.CharacterAdded:Connect(function(character)
         task.defer(function()
-            if not RunService:IsStudio() or player.Parent ~= Players or player.Character ~= character then
+            if not PublishedDebugAccess.ServerAllowed(player) or player.Parent ~= Players or player.Character ~= character then
                 return
             end
             if player:GetAttribute("Game1TestLoadoutActive") ~= true then
@@ -249,7 +253,7 @@ local function bindPlayer(player: Player)
 end
 
 function TestLoadoutService.Start()
-    if started or not RunService:IsStudio() then
+    if started or not PublishedDebugAccess.ServerEnabled() then
         return
     end
     started = true

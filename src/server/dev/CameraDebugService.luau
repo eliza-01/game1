@@ -3,6 +3,7 @@
 -- All authoring persistence is handled by the local Control Center, not the game.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local PublishedDebugAccess = require(game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared"):WaitForChild("dev"):WaitForChild("PublishedDebugAccess"))
 local HttpService = game:GetService("HttpService")
 
 local Service = {}
@@ -12,6 +13,7 @@ local limits = {
     targetHeight = {0, 12}, distance = {4, 18}, pitchDegrees = {-65, 60},
     characterX = {0.2, 0.8}, characterY = {0.2, 0.8},
     cursorX = {0.1, 0.9}, cursorY = {0.1, 0.9},
+    mobileLookSpeed = {0.25, 4},
 }
 
 local function validate(values: any): {[string]: number}?
@@ -27,7 +29,7 @@ local function validate(values: any): {[string]: number}?
 end
 
 function Service.Start()
-    if started or not RunService:IsStudio() then return end
+    if started or not PublishedDebugAccess.ServerEnabled() then return end
     started = true
     local remotes = ReplicatedStorage:FindFirstChild("Game1Remotes")
     if not remotes then
@@ -52,6 +54,7 @@ function Service.Start()
         folder.Parent = ReplicatedStorage
     end
     event.OnServerEvent:Connect(function(player: Player, values: any)
+    if not PublishedDebugAccess.ServerAllowed(player) then return end
         local now = os.clock()
         if now - (lastDraft[player] or -100) < 0.12 then return end
         local draft = validate(values)

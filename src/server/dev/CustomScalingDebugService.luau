@@ -1,5 +1,6 @@
 -- Studio-only transient clip scaling. Persistent authoring belongs to Asset Manager.
 local RunService = game:GetService("RunService")
+local PublishedDebugAccess = require(game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared"):WaitForChild("dev"):WaitForChild("PublishedDebugAccess"))
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
@@ -25,7 +26,7 @@ local function actors(): {Model}
 end
 
 function Service.Start()
-    if started or not RunService:IsStudio() then return end
+    if started or not PublishedDebugAccess.ServerEnabled() then return end
     started = true
     local folder = ReplicatedStorage:FindFirstChild("Game1CustomScalingDebug")
     if not folder then
@@ -40,6 +41,7 @@ function Service.Start()
     refresh.Name = "Refresh"
     refresh.Parent = folder
     apply.OnServerInvoke = function(_player: Player, assetId: any, stat: any, units: any, clear: any)
+    if not PublishedDebugAccess.ServerAllowed(_player) then return {ok=false, error="Developer debug access denied"} end
         local id = Scaling.AssetId(assetId)
         if id == "" or not Scaling.Catalog()[id] then
             return {ok = false, error = "Animation ID is not in the published registry"}

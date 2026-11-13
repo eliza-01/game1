@@ -1,0 +1,13 @@
+/* M337: compact Options accordion; native <details> preserves keyboard support. */
+#options-view .game1-option-section { border: 1px solid var(--line, #33404b); border-radius: 14px; margin: 10px 0; overflow: hidden; background: rgba(20,26,33,.72); }
+#options-view .game1-option-section > summary { display:flex; align-items:center; gap:12px; cursor:pointer; padding:12px 16px; list-style:none; }
+#options-view .game1-option-section > summary::-webkit-details-marker {display:none}
+#options-view .game1-option-section > summary::after {content:'⌄'; margin-left:auto; font-size:20px; opacity:.65; transition:transform .18s ease}
+#options-view .game1-option-section[open] > summary::after {transform:rotate(180deg)}
+#options-view .game1-option-section > summary strong {display:block; font-size:15px}
+#options-view .game1-option-section > summary small {display:block; font-size:11px; opacity:.65; margin-top:2px}
+#options-view .game1-option-icon {display:grid;place-items:center;width:36px;height:36px;border-radius:10px;background:rgba(130,150,175,.12);font-size:21px}
+#options-view .game1-option-section > .panel {margin:0;border:0;border-top:1px solid var(--line,#33404b);border-radius:0;background:transparent;box-shadow:none}
+#options-view .game1-option-section label {font-size:12px}
+#options-view .game1-option-section .hint {font-size:11px;line-height:1.35;max-width:78ch}
+@media (max-width:750px){#options-view .game1-option-section > summary {padding:11px 12px}#options-view .game1-option-icon{width:32px;height:32px}}

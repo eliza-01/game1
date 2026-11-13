@@ -1,6 +1,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local PublishedDebugAccess = require(game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared"):WaitForChild("dev"):WaitForChild("PublishedDebugAccess"))
 local Workspace = game:GetService("Workspace")
 
 local StudioDebugDock = require(script.Parent:WaitForChild("StudioDebugDock"))
@@ -201,7 +202,7 @@ local function createGui()
 end
 
 function MonsterDebugController.Start()
-    if started or not RunService:IsStudio() then return end
+    if started or not PublishedDebugAccess.ClientAllowed() then return end
     started=true
     task.spawn(createGui)
 end

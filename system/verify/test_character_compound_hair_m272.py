@@ -201,15 +201,15 @@ class CompoundHairTests(unittest.TestCase):
     def test_runtime_uses_one_model_pivot_and_whitelisted_meshes(self):
         builder = (self.root / 'src/server/character/CharacterAssemblyBuilder.luau') if hasattr(self, 'root') else Path(__file__).resolve().parents[2] / 'src/server/character/CharacterAssemblyBuilder.luau'
         code = builder.read_text()
-        client = (Path(__file__).resolve().parents[2] / 'src/client/character/HairAttachmentController.luau').read_text()
+        client = (Path(__file__).resolve().parents[2] / 'src/client/character/BoneMountedAttachmentController.luau').read_text()
         self.assertIn('rigidHairFromAsset(raw, part.id, part.extras or {})', code)
         self.assertIn('"unregistered hair MeshPart "', code)
-        self.assertIn('group:PivotTo(delta * group:GetPivot())', code)
-        self.assertIn('CharacterHairExtraWeld', code)
+        self.assertIn('BoneModelMount.Place(group, anchor, BoneModelMount.SocketFrame(target, "hair"))', code)
+        self.assertNotIn('CharacterHairExtraWeld', code)
         self.assertIn('HairColorBinder.Apply(hairGroup, part.colors or {})', code)
         self.assertLess(code.index('CharacterAtlasBinder.Apply(mesh, part.atlas_image_id)'),
                         code.index('HairColorBinder.Apply(hairGroup, part.colors or {})'))
-        self.assertIn('state.group:PivotTo(delta * state.group:GetPivot())', client)
+        self.assertIn('BoneModelMount.Place(model, state.grip, BoneModelMount.SocketFrame(state.bone, kind))', client)
 
 
 if __name__ == '__main__':

@@ -11,6 +11,8 @@ local Navigation = require(script.Parent:WaitForChild("MonsterChaseNavigation"))
 local Lifecycle = require(script.Parent:WaitForChild("MonsterAgentLifecycle"))
 local DamageSignals = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("ActorDamageSignals"))
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local GameOptions = require(ReplicatedStorage:WaitForChild("Game1Shared"):WaitForChild("GameOptions"))
 
 local MonsterAIService = {}
 local started = false
@@ -40,6 +42,8 @@ local function leaveCombat(agent: any)
     Facing.Stop(agent.model)
     CombatState.ClearTarget(agent)
     agent.retaliating = false
+    agent.returning = false
+    agent.lastDealtDamageAt = 0
     agent.attacking = false
     agent.attackSerial += 1
     AttackExecutor.ClearPursuit(agent)
@@ -48,9 +52,42 @@ local function leaveCombat(agent: any)
     CombatState.FinishExit(agent)
 end
 
+local function beginReturn(agent: any)
+    if agent.returning then return end
+    -- Invalidate pending attack hit events BEFORE clearing the target.
+    agent.attacking = false
+    agent.attackSerial += 1
+    AttackExecutor.ClearPursuit(agent)
+    stopNavigation(agent)
+    Facing.Stop(agent.model)
+    CombatState.ClearTarget(agent)
+    agent.model:SetAttribute("MonsterTargetName", "")
+    agent.model:SetAttribute("MonsterTargetUserId", 0)
+    agent.retaliating = false
+    agent.returning = true
+    -- Stay combat-active until home so wandering cannot fight navigation.
+    agent.model:SetAttribute("MonsterCombatActive", true)
+    setState(agent, "Return")
+    Presentation.PlayRun(agent)
+end
+
+local function updateReturn(agent: any)
+    local home = agent.home
+    if horizontalDistance(agent.root.Position, home) <= 2 then
+        leaveCombat(agent)
+        return
+    end
+    setState(agent, "Return")
+    navigateTo(agent, home, runSpeedStuds(agent))
+end
+
+local function withinPursuitRadius(agent: any, position: Vector3): boolean
+    return horizontalDistance(agent.spawnCenter, position) <= agent.pursuitRadius
+end
+
 local function updateTarget(agent: any, now: number)
     if agent.target and targetIsValid(agent.target) then return end
-    if agent.target then leaveCombat(agent) end
+    if agent.target then beginReturn(agent); return end
     if not aggressive(agent) or now < agent.nextTargetScanAt then return end
     agent.nextTargetScanAt = now + TARGET_SCAN_INTERVAL
     local target = TargetPolicy.AcquireNearestTarget(agent)
@@ -64,9 +101,11 @@ local function onDamaged(attacker: Model?, monster: Model, attempted: number, _a
     if not TargetPolicy.IsValid(attacker) or monster:GetAttribute("LifeState") ~= "Alive" then return end
     local agent = Lifecycle.Find(monster)
     if not agent or not agent.active then return end
-    if agent.target ~= attacker then
+    if agent.target ~= attacker or agent.returning then
         CombatState.Enter(agent, attacker)
+        agent.lastDealtDamageAt = os.clock()
     end
+    agent.returning = false
     agent.retaliating = true
     if agent.model:GetAttribute("MonsterSpawning") == true or agent.attacking then return end
     local targetRoot = rootOf(attacker)
@@ -97,13 +136,28 @@ local function runAgent(agent: any)
         if agent.model:GetAttribute("MonsterSpawning") == true then
             continue
         end
-        if not aggressive(agent) and not agent.retaliating then
+        if not aggressive(agent) and not agent.retaliating and not agent.returning then
             if agent.target or agent.model:GetAttribute("MonsterCombatActive") == true then leaveCombat(agent) end
             continue
         end
         local now = os.clock()
+        if agent.returning then
+            updateReturn(agent)
+            continue
+        end
         updateTarget(agent, now)
         local target = agent.target
+        if target then
+            if agent.lastDealtDamageAt <= 0 then agent.lastDealtDamageAt = now end
+            local targetRoot = rootOf(target)
+            if not withinPursuitRadius(agent, agent.root.Position)
+                or (targetRoot and not withinPursuitRadius(agent, targetRoot.Position))
+                or now - agent.lastDealtDamageAt >= GameOptions.MonsterNoDamageReturnSeconds() then
+                beginReturn(agent)
+                updateReturn(agent)
+                continue
+            end
+        end
         local targetRoot = rootOf(target)
         local distance = if targetRoot then horizontalDistance(agent.root.Position, targetRoot.Position) else 0
         local action = CombatState.Decide(agent.attacking, targetRoot ~= nil, distance, attackRadius(agent))
@@ -128,10 +182,21 @@ local function runAgent(agent: any)
     Lifecycle.Release(agent)
 end
 
+-- Only server-confirmed applied damage by this monster refreshes the timer.
+-- Taking damage during Return immediately re-engages via onDamaged above.
+local function onDamageDealt(attacker: Model?, target: Model, _attempted: number, applied: number)
+    if not attacker or applied <= 0 or not Players:GetPlayerFromCharacter(target) then return end
+    local agent = Lifecycle.Find(attacker)
+    if agent and agent.active and agent.target == target then
+        agent.lastDealtDamageAt = os.clock()
+    end
+end
+
 function MonsterAIService.Start()
     if started then return end
     started = true
     DamageSignals.Event:Connect(onDamaged)
+    DamageSignals.Event:Connect(onDamageDealt)
     Lifecycle.Start(runAgent, random)
     print("[game1][monster-ai] RobloxLineage aggro/chase/attack-pursuit runtime ready")
 end

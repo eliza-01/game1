@@ -13,6 +13,8 @@ local CharacterConfig = require(CharacterShared:WaitForChild("CharacterConfig"))
 local CharacterMovementConfig = require(CharacterShared:WaitForChild("CharacterMovementConfig"))
 local WeaponAttackMovement = require(WeaponShared:WaitForChild("WeaponAttackMovement"))
 local AttackConfig = require(Game1Shared:WaitForChild("combat"):WaitForChild("AttackConfig"))
+local GameOptions = require(Game1Shared:WaitForChild("GameOptions"))
+local JumpSettings = GameOptions.PlayerJumpSettings()
 
 local MovementController = {}
 
@@ -22,6 +24,9 @@ local keysDown: { [Enum.KeyCode]: boolean } = {}
 local touchAxis = Vector2.zero
 local touchMovementActive = false
 local jumpRequested = false
+local jumpInFlight = false
+local fallForce: VectorForce? = nil
+local fallAttachment: Attachment? = nil
 local airLockUntil = 0
 local facingLockDirection: Vector3? = nil
 local facingLockUntil = 0
@@ -50,6 +55,9 @@ local airController: AirController? = nil
 local groundSensor: ControllerPartSensor? = nil
 
 local function clearCharacter()
+    if fallForce then fallForce:Destroy(); fallForce = nil end
+    if fallAttachment then fallAttachment:Destroy(); fallAttachment = nil end
+    jumpInFlight = false
 	character = nil
 	root = nil
 	navigationRoot = nil
@@ -425,13 +433,39 @@ local function performJump()
 	end
 
 	controllerManager.ActiveController = airController
+	jumpInFlight = true
 	airLockUntil = os.clock() + CharacterConfig.JumpGroundIgnoreTime
 
 	local upwardSpeed = navigationRoot.AssemblyLinearVelocity:Dot(Vector3.yAxis)
-	local deltaVelocity = math.max(CharacterConfig.JumpVelocity - upwardSpeed, 0)
+	local deltaVelocity = math.max(CharacterConfig.JumpVelocity * math.sqrt(JumpSettings.heightMultiplier) - upwardSpeed, 0)
 	if deltaVelocity > 0 then
 		navigationRoot:ApplyImpulse(Vector3.yAxis * navigationRoot.AssemblyMass * deltaVelocity)
 	end
+end
+
+local function updateJumpDescent()
+    local force = fallForce
+    local actorRoot = navigationRoot
+    if not force or not actorRoot or not character then return end
+    if character:GetAttribute("LifeState") ~= "Alive" then
+        force.Enabled = false
+        jumpInFlight = false
+        return
+    end
+    if isGrounded() and os.clock() >= airLockUntil then
+        jumpInFlight = false
+        force.Enabled = false
+        return
+    end
+    local downward = actorRoot.AssemblyLinearVelocity.Y <= 0
+    local slow = JumpSettings.descentTimeMultiplier
+    local enabled = jumpInFlight and downward and math.abs(slow - 1) > 0.0001
+    if enabled then
+        -- Net acceleration downward is g / slow², after the jump apex.
+        -- This force is positive for slow > 1, negative for slow < 1.
+        force.Force = Vector3.yAxis * actorRoot.AssemblyMass * Workspace.Gravity * (1 - 1 / (slow * slow))
+    end
+    force.Enabled = enabled
 end
 
 local function updateMovement(deltaTime: number)
@@ -444,6 +478,8 @@ local function updateMovement(deltaTime: number)
 	end
 
 	if character and tostring(character:GetAttribute("LifeState") or "Alive") ~= "Alive" then
+        if fallForce then fallForce.Enabled = false end
+        jumpInFlight = false
 		controllerManager.MovingDirection = Vector3.zero
 		if character:GetAttribute("MovementState") ~= "Idle" then
 			character:SetAttribute("MovementState", "Idle")
@@ -541,6 +577,7 @@ local function updateMovement(deltaTime: number)
 			performJump()
 		end
 	end
+	updateJumpDescent()
 end
 
 function MovementController.SetTouchMovement(axis: Vector2, active: boolean)

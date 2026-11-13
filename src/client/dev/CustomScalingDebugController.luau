@@ -1,5 +1,6 @@
 -- Studio Play-only debug window. Changes affect the running simulation only.
 local RunService = game:GetService("RunService")
+local PublishedDebugAccess = require(game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared"):WaitForChild("dev"):WaitForChild("PublishedDebugAccess"))
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
@@ -63,7 +64,7 @@ local function refreshLocally(assetId: string)
 end
 
 function Controller.Start()
-    if not RunService:IsStudio() then return end
+    if not PublishedDebugAccess.ClientAllowed() then return end
     local player = Players.LocalPlayer
     if not player then return end
     local playerGui = player:WaitForChild("PlayerGui")

@@ -1,5 +1,5 @@
 -- Event-driven local rendering of NPC equipment presentation state.
--- WeaponAttachmentController owns socket following independently of this module.
+-- BoneMountedAttachmentController owns all rigid bone mounts independently of this module.
 -- No animation track, death state or render-frame code can equip/unequip a weapon here.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Contract = require(ReplicatedStorage:WaitForChild("Game1Shared")

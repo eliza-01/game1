@@ -1,5 +1,6 @@
 -- Studio-only transport. Validation and ownership live in HouseSocketService.
 local RunService = game:GetService("RunService")
+local PublishedDebugAccess = require(game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared"):WaitForChild("dev"):WaitForChild("PublishedDebugAccess"))
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Service = require(script.Parent.Parent:WaitForChild("world"):WaitForChild("HouseSocketService"))
 local Debug = {}
@@ -16,7 +17,7 @@ local function remote(folder: Instance, name: string): RemoteFunction
 end
 
 function Debug.Start()
-    if started or not RunService:IsStudio() then return end
+    if started or not PublishedDebugAccess.ServerEnabled() then return end
     started = true
     local folder = ReplicatedStorage:FindFirstChild("Game1Remotes")
     if not folder then
@@ -25,20 +26,25 @@ function Debug.Start()
         folder.Parent = ReplicatedStorage
     end
     remote(folder, "GetTestHouseSockets").OnServerInvoke = function(player)
+        if not PublishedDebugAccess.ServerAllowed(player) then return {ok=false, error="Developer debug access denied"} end
         local metrics = Service.Reconcile()
         return {ok = true, sockets = Service.GetDebugStatus(player), metrics = metrics,
             keyOwned = Service.GetDebugKey(player)}
     end
     remote(folder, "SetTestHouseKeyOwned").OnServerInvoke = function(player, owned)
+        if not PublishedDebugAccess.ServerAllowed(player) then return {ok=false, error="Developer debug access denied"} end
         return Service.SetDebugKey(player, owned)
     end
     remote(folder, "SetTestHouseSocketRadius").OnServerInvoke = function(player, name, radius)
+        if not PublishedDebugAccess.ServerAllowed(player) then return {ok=false, error="Developer debug access denied"} end
         return Service.SetDebugRadius(player, name, radius)
     end
     remote(folder, "SetTestHouseSocketHoverRadius").OnServerInvoke = function(player, name, radius)
+        if not PublishedDebugAccess.ServerAllowed(player) then return {ok=false, error="Developer debug access denied"} end
         return Service.SetDebugHoverRadius(player, name, radius)
     end
     remote(folder, "TeleportTestHouseSpawn").OnServerInvoke = function(player, name)
+        if not PublishedDebugAccess.ServerAllowed(player) then return {ok=false, error="Developer debug access denied"} end
         return Service.TeleportDebug(player, name)
     end
 end

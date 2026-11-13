@@ -1,6 +1,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local PublishedDebugAccess = require(game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared"):WaitForChild("dev"):WaitForChild("PublishedDebugAccess"))
 local UserInputService = game:GetService("UserInputService")
 
 local StudioDebugDock = require(script.Parent:WaitForChild("StudioDebugDock"))
@@ -397,7 +398,7 @@ local function createGui()
 end
 
 function MovementDebugController.Start()
-    if started or not RunService:IsStudio() then
+    if started or not PublishedDebugAccess.ClientAllowed() then
         return
     end
     started = true

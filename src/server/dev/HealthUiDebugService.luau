@@ -2,6 +2,7 @@
 -- Studio-only transport of client HP appearance drafts; gameplay state is untouched.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local PublishedDebugAccess = require(game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared"):WaitForChild("dev"):WaitForChild("PublishedDebugAccess"))
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
@@ -47,7 +48,7 @@ local function validated(device: any, data: any): {[string]: any}?
 end
 
 function Service.Start()
-    if started or not RunService:IsStudio() then return end
+    if started or not PublishedDebugAccess.ServerEnabled() then return end
     started = true
     local remotes = ReplicatedStorage:FindFirstChild("Game1Remotes")
     if not remotes then
@@ -66,6 +67,7 @@ function Service.Start()
     folder.Name = "Game1HealthUiDebug"
     folder.Parent = ReplicatedStorage
     remote.OnServerEvent:Connect(function(player: Player, request: any)
+    if not PublishedDebugAccess.ServerAllowed(player) then return end
         if type(request) ~= "table" then return end
         local now = os.clock()
         if now - (cooldown[player] or -100) < 0.12 then return end

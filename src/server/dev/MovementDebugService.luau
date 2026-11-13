@@ -1,6 +1,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local PublishedDebugAccess = require(game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared"):WaitForChild("dev"):WaitForChild("PublishedDebugAccess"))
 local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
@@ -274,6 +275,7 @@ local function applyMonsterModeToAll(mode: string)
 end
 
 local function buildCatalog(player: Player)
+    if not PublishedDebugAccess.ServerAllowed(player) then return {ok=false, error="Developer debug access denied"} end
     local units = {}
     local selectedId = ""
     local playerCharacter = player.Character
@@ -299,6 +301,7 @@ local function buildCatalog(player: Player)
 end
 
 local function applyUnit(_player: Player, targetId: any, patch: any)
+    if not PublishedDebugAccess.ServerAllowed(_player) then return {ok=false, error="Developer debug access denied"} end
     local model = findModelById(targetId)
     if not model then
         return { ok = false, error = "selected movement unit no longer exists" }
@@ -377,6 +380,7 @@ local function applyUnit(_player: Player, targetId: any, patch: any)
 end
 
 local function setMonsterMode(_player: Player, requestedMode: any)
+    if not PublishedDebugAccess.ServerAllowed(_player) then return {ok=false, error="Developer debug access denied"} end
     local mode = normalizeMonsterMode(requestedMode)
     applyMonsterModeToAll(mode)
     return {
@@ -386,7 +390,7 @@ local function setMonsterMode(_player: Player, requestedMode: any)
 end
 
 function MovementDebugService.Start()
-    if started or not RunService:IsStudio() then
+    if started or not PublishedDebugAccess.ServerEnabled() then
         return
     end
     started = true

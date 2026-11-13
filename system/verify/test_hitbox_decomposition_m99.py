@@ -129,10 +129,10 @@ class HitboxDecompositionM99Tests(unittest.TestCase):
             'entity:GetAttribute("Damageable") == true',
             'excludedTargets[entity] ~= true',
             'table.insert(results, {',
-            'mode = "precomputed_bone_boxes"',
+            'mode = binding.mode',
             'local previous = binding.entity:FindFirstChild(DEBUG_FOLDER_NAME)',
             'entity:SetAttribute("CombatHitboxCount", count)',
-            'entity:SetAttribute("CombatTargetGeometry", "precomputed_mesh_bounds")',
+            'entity:SetAttribute("CombatTargetGeometry", if geometryUnavailable then "root_bounds_fallback" else "precomputed_mesh_bounds")',
             'binding.worldFrameSerial = -1',
         ):
             self.assertIn(token, self.facade)

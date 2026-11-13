@@ -1,0 +1,4 @@
+-- generated. do not edit by hand.
+local HttpService = game:GetService("HttpService")
+local data = HttpService:JSONDecode([==[{"project":"game1","records":[{"enabled":true,"mapKey":"main","monsterSlug":"guard_01","placeId":0,"position":{"x":429.41,"y":-54.0,"z":-304.086},"respawnSeconds":10.0,"spawnId":"spawn-17106a938a634015b0f320e7bd64328e","yawDegrees":311.25},{"enabled":true,"mapKey":"main","monsterSlug":"warsmith","placeId":0,"position":{"x":454.716,"y":-54.0,"z":-228.246},"respawnSeconds":10.0,"spawnId":"spawn-6de4624d878b4e7b9e7a4d77406b071b","yawDegrees":50.050000000000004},{"enabled":true,"mapKey":"main","monsterSlug":"guard_01","placeId":0,"position":{"x":270.423,"y":-142.103,"z":-172.457},"respawnSeconds":10.0,"spawnId":"spawn-b126db75e53949cea848dc7bf8b9300c","yawDegrees":316.45}],"schemaVersion":1,"sourceDigest":"5b1a28f1bf9235161323344562ea197523b79b7456ed82a2090ed4fe17729a2c"}]==])
+return table.freeze(data)

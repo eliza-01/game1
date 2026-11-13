@@ -277,6 +277,34 @@ local function buildDefinition(binding: any): (any?, string?)
     }, nil
 end
 
+-- Permission-safe coarse definition. Only used when AssetService cannot read
+-- the mesh; root is already sized from the visual bounds during actor assembly.
+-- Keep this inside the existing hitbox service/OBB query pipeline.
+function HitboxDefinitionBuilder.Fallback(binding: any): any
+    local root = binding.root
+    local size = root.Size
+    -- The permission fallback is a *coarse* root envelope. Do not cut its
+    -- upper half away: the bow ray may otherwise pass through the visible
+    -- monster while only melee's larger sweep touches the lower box.
+    local headBox = nil
+    local head = binding.headBone
+    local neck = binding.headParentBone
+    if head and neck and head.Parent and neck.Parent then
+        local headSide = math.clamp(math.min(size.X, size.Z) * 0.6, 0.4, 2.6)
+        headBox = {
+            kind = "head",
+            localCFrame = CFrame.identity,
+            size = Vector3.new(headSide, math.clamp(size.Y * 0.22, 0.4, 2.3), headSide),
+        }
+    end
+    return {
+        broadRadius = size.Magnitude * 0.5 + BROAD_RADIUS_PADDING,
+        bodyBoxes = {{kind = "root", localCFrame = CFrame.identity, size = size}},
+        headBox = headBox,
+        sourceVertexCount = 0,
+    }
+end
+
 function HitboxDefinitionBuilder.MeshScale(meshPart: MeshPart): Vector3
     return meshScale(meshPart)
 end

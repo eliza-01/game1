@@ -4,6 +4,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local PublishedDebugAccess = require(game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared"):WaitForChild("dev"):WaitForChild("PublishedDebugAccess"))
 local Workspace = game:GetService("Workspace")
 local StudioDebugDock = require(script.Parent:WaitForChild("StudioDebugDock"))
 local Contract = require(ReplicatedStorage:WaitForChild("Game1Shared"):WaitForChild("world"):WaitForChild("HouseSocketContract"))
@@ -372,7 +373,7 @@ local function mountPanel(gui: ScreenGui)
 end
 
 function Debug.Start()
-    if started or not RunService:IsStudio() then return end
+    if started or not PublishedDebugAccess.ClientAllowed() then return end
     started = true
     local gui = Instance.new("ScreenGui")
     gui.Name = "Game1HouseSocketDebugGui"
@@ -386,7 +387,7 @@ end
 
 -- A second entry point in the existing Test Loadout; only ONE panel owns state.
 function Debug.AttachLauncher(body: Frame, y: number)
-    if not RunService:IsStudio() then return end
+    if not PublishedDebugAccess.ClientAllowed() then return end
     local opener = control(body, "HOUSE SOCKETS  ·  DEBUG", 288, 32)
     opener.Position = UDim2.fromOffset(0, y)
     opener.Activated:Connect(function()

@@ -4,6 +4,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local PublishedDebugAccess = require(game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared"):WaitForChild("dev"):WaitForChild("PublishedDebugAccess"))
 local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
@@ -332,7 +333,7 @@ function Service.GetDebugKey(player: Player): boolean
 end
 
 function Service.SetDebugKey(player: Player, owned: any): any
-    if not RunService:IsStudio() or typeof(owned) ~= "boolean" then
+    if not PublishedDebugAccess.ServerAllowed(player) or typeof(owned) ~= "boolean" then
         return {ok = false, error = "Studio only; key state must be boolean"}
     end
     Padlock.SetTestKey(player, owned)
@@ -340,7 +341,7 @@ function Service.SetDebugKey(player: Player, owned: any): any
 end
 
 function Service.SetDebugRadius(player: Player, name: any, value: any): any
-    if not RunService:IsStudio() or typeof(name) ~= "string" or not Contract.Get(name) then
+    if not PublishedDebugAccess.ServerAllowed(player) or typeof(name) ~= "string" or not Contract.Get(name) then
         return {ok = false, error = "Unknown socket or not Studio"}
     end
     local radius = tonumber(value)
@@ -352,7 +353,7 @@ end
 
 function Service.SetDebugHoverRadius(player: Player, name: any, value: any): any
     local definition = if typeof(name) == "string" then Contract.Get(name) else nil
-    if not RunService:IsStudio() or not definition or not definition.hoverRadius then
+    if not PublishedDebugAccess.ServerAllowed(player) or not definition or not definition.hoverRadius then
         return {ok = false, error = "Aim range is Studio-only and requires an AIM socket"}
     end
     local hoverRadius = tonumber(value)
@@ -365,7 +366,7 @@ function Service.SetDebugHoverRadius(player: Player, name: any, value: any): any
 end
 
 function Service.TeleportDebug(player: Player, name: any): any
-    if not RunService:IsStudio() or typeof(name) ~= "string" then
+    if not PublishedDebugAccess.ServerAllowed(player) or typeof(name) ~= "string" then
         return {ok = false, error = "Studio only"}
     end
     local definition = Contract.Get(name)

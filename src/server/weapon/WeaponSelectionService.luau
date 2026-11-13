@@ -5,6 +5,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local Config = require(Shared:WaitForChild("weapon"):WaitForChild("WeaponSelectionConfig"))
+local Access = require(Shared:WaitForChild("dev"):WaitForChild("PublishedDebugAccess"))
 local WeaponEquipService = require(script.Parent:WaitForChild("WeaponEquipService"))
 
 local Service = {}
@@ -24,6 +25,7 @@ local function remote(parent: Instance, name: string): RemoteFunction
 end
 
 local function catalogFor(player: Player)
+    if not Access.ServerAllowed(player) then return {enabled = false, weapons = {}} end
     if not Config.Enabled then return { enabled = false, weapons = {} } end
     local character = player.Character
     local rows = {
@@ -46,6 +48,7 @@ local function catalogFor(player: Player)
 end
 
 local function selectWeapon(player: Player, request: any)
+    if not Access.ServerAllowed(player) then return {ok = false, error = "Developer debug access denied"} end
     if not Config.Enabled then return { ok = false, error = "Выбор оружия отключён" } end
     if typeof(request) ~= "string" or #request > 80 then
         return { ok = false, error = "Некорректный ID оружия" }

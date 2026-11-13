@@ -7,6 +7,7 @@
 <title>game1 · asset manager</title>
 <link rel="stylesheet" href="shared-asset-retirement.css?v=2">
 <link rel="stylesheet" href="asset-manager.css?v=322">
+<link rel="stylesheet" href="m337-options.css?v=337">
 <link rel="stylesheet" href="database-history.css?v=3">
 <link rel="stylesheet" href="atlas-library.css?v=2">
 <link rel="stylesheet" href="asset-section-order.css?v=1">
@@ -339,25 +340,40 @@
 <div class="panel hero">
 <div><span class="eyebrow">common runtime settings · shared gameplay</span><h2>options</h2><p>project-wide settings that are not owned by one character, monster, weapon or animation clip.</p></div>
 </div>
+<details class="game1-option-section" open><summary><span class="game1-option-icon" aria-hidden="true">⚔️</span><span><strong>Combat & AI</strong><small>Состояния, атаки, возврат</small></span></summary>
 <div class="panel character-card">
 <div class="section-title"><div><span>combat</span><h3>combat state</h3></div><button id="refresh-options" type="button">refresh</button></div>
-<small class="hint">when an entity deals or receives actual damage it enters combat. while idle in combat, characters, monsters and NPC-compatible rigs use <code>combat_idle</code>. every new hit restarts this timer.</small>
+<small class="hint">Shared combat timeout; return timer uses monster damage dealt.</small>
 <div class="details-grid">
-<div><b>combat state duration</b><span><input id="option-combat-state-duration" type="number" min="0" max="3600" step="0.1" value="6"> seconds</span></div>
+<div><b>⚔ combat state duration</b><span><input id="option-combat-state-duration" type="number" min="0" max="3600" step="0.1" value="6"> seconds</span></div>
+<div><b>🏠 Return if no hit · sec</b><span><input id="option-monster-return-time" type="number" min="1" max="3600" step="1" value="30"> seconds</span></div>
 </div>
 <div class="actions"><button id="save-combat-options" class="primary" type="button">save combat options</button></div>
 <hr class="card-separator">
 <div class="section-title"><div><span>character life animations</span><h3>global playback speed</h3></div></div>
-<small class="hint">absolute playback percentages shared by every character archetype. these values are independent from RunSpeed / AttackSpeed scaling.</small>
+<small class="hint">Death and revive playback speed.</small>
 <div class="character-grid">
 <label>death playback %<input id="option-character-death-playback" type="number" min="1" max="400" step="1" value="100"></label>
 <label>revive playback %<input id="option-character-revive-playback" type="number" min="1" max="400" step="1" value="100"></label>
 </div>
 <div class="actions"><button id="save-character-life-options" class="primary" type="button">save character animation options</button></div>
 </div>
+</details>
+<details class="game1-option-section" ><summary><span class="game1-option-icon" aria-hidden="true">🦘</span><span><strong>Movement</strong><small>Прыжок и приземление</small></span></summary>
+<div class="panel character-card">
+  <div class="section-title"><div><span>character movement · shared gameplay</span><h3>Jump &amp; landing</h3></div></div>
+  <small class="hint">Shared PC / Mobile; world gravity unchanged.</small>
+  <div class="character-grid">
+    <label>↗ Jump height · ×<input id="option-jump-height" type="number" min="0.5" max="4" step="0.1" value="2"></label>
+    <label>↘ Descent time · ×<input id="option-jump-descent" type="number" min="0.5" max="4" step="0.1" value="2"></label>
+  </div>
+  <div class="actions"><button id="save-player-jump-options" type="button" class="primary">Save jump options</button></div>
+</div>
+</details>
+<details class="game1-option-section" ><summary><span class="game1-option-icon" aria-hidden="true">🎥</span><span><strong>Camera</strong><small>Угол, скорость, пресеты</small></span></summary>
 <div class="panel character-card game1-camera-options">
   <div class="section-title"><div><span>camera · saved runtime defaults</span><h3>Camera</h3></div><span class="muted">Studio Debug → draft → Save</span></div>
-  <small class="hint">Character position and aim cursor use normalized viewport coordinates (0–1). Studio Play Camera Debug previews immediately; only Save persists options and updates the generated registry for Rojo.</small>
+  <small class="hint">Studio preview → Save to publish.</small>
   <div class="game1-camera-options-grid">
     <label>Target height · studs<input id="option-camera-targetHeight" type="number" min="0" max="12" step="0.25"></label>
     <label>Camera distance · studs<input id="option-camera-distance" type="number" min="4" max="18" step="0.25"></label>
@@ -366,6 +382,7 @@
     <label>Character Y · screen<input id="option-camera-characterY" type="number" min="0.2" max="0.8" step="0.01"></label>
     <label>Cursor X · screen<input id="option-camera-cursorX" type="number" min="0.1" max="0.9" step="0.01"></label>
     <label>Cursor Y · screen<input id="option-camera-cursorY" type="number" min="0.1" max="0.9" step="0.01"></label>
+    <label>Mobile camera look speed · ×<input id="option-camera-mobileLookSpeed" type="number" min="0.25" max="4" step="0.05"></label>
   </div>
   <div class="actions"><button id="option-camera-draft-import" type="button">Import Studio Debug</button><button id="option-camera-save" type="button" class="primary">Save Camera Options</button></div>
   <div class="muted" id="option-camera-draft-status" role="status">No Studio Play camera draft yet.</div>
@@ -375,9 +392,11 @@
     <div class="actions"><button id="option-camera-preset-save" type="button">Save preset</button><button id="option-camera-preset-apply" type="button">Apply preset</button><button id="option-camera-preset-delete" type="button">Delete</button></div>
   </div>
 </div>
+</details>
+<details class="game1-option-section"><summary><span class="game1-option-icon" aria-hidden="true">❤️</span><span><strong>Health UI</strong><small>Игрок, монстры, NPC · PC/Mobile</small></span></summary>
 <div class="panel character-card game1-health-ui-options">
   <div class="section-title"><div><span>combat appearance · separate PC / Mobile profiles</span><h3>Health bars</h3></div><span class="muted">Studio HP Debug → Import → Save</span></div>
-  <small class="hint">Pixel dimensions, outline, text sizes, and position are independent for desktop and mobile. HP colors switch at 30% and 65%. Overhead distance is measured in studs above the visible top of the rig, not the hidden collider. Settings apply on the next Rojo sync and game start.</small>
+  <small class="hint">PC / Mobile profiles. Colors: 30% red · 65% yellow · green.</small>
   <div class="actions game1-hp-device-tabs">
     <button type="button" id="health-ui-desktop" class="primary">PC · Desktop</button>
     <button type="button" id="health-ui-mobile">Mobile · Touch</button>
@@ -389,16 +408,29 @@
   </div>
   <div class="muted" id="health-ui-draft-status" role="status">No Studio HP Debug draft yet.</div>
   <hr class="card-separator">
+  <div class="section-title"><div><span>NPC · names &amp; HP</span><h3>NPC overhead</h3></div></div>
+  <div class="game1-camera-options-grid">
+    <label>Device<select id="option-npc-device"><option value="desktop">PC</option><option value="mobile">Mobile</option></select></label>
+    <label>🏷 Name · studs<input id="option-npc-name-radius" type="number" min="10" max="800" value="70"></label>
+    <label>❤️ HP · studs<input id="option-npc-health-radius" type="number" min="10" max="800" value="70"></label>
+  </div>
+  <div class="actions"><button class="primary" id="option-npc-overhead-save" type="button">Save NPC display</button></div>
+</div>
+</details>
+<details class="game1-option-section"><summary><span class="game1-option-icon" aria-hidden="true">🌍</span><span><strong>World</strong><small>Terrain / MeshPart streaming</small></span></summary>
+<div class="panel character-card">
   <div class="section-title"><div><span>Workspace · both devices</span><h3>World streaming target</h3></div></div>
-  <small class="hint">The Roblox engine streams MeshParts and Terrain using a single Workspace target for the entire Place. It cannot have separate PC/mobile targets. 150 studs is a streaming goal, NOT a hard draw cutoff: the engine can retain already loaded regions. Save the value here, then copy and run the Studio Edit command below and publish the Place. This does not affect monster UI distances.</small>
+  <small class="hint">One shared Workspace setting. Apply in Studio Edit, then Publish; not a hard draw cutoff.</small>
   <div class="game1-hp-grid"><label>Shared target radius · studs <input type="number" id="option-world-streaming-radius" min="96" max="4096" step="1" value="150"></label></div>
   <div class="actions"><button type="button" id="option-world-streaming-save" class="primary">Save world streaming target</button><button type="button" id="option-world-streaming-copy">Copy Studio Command Bar code</button></div>
-  <hr class="card-separator">
+</div></details>
+<details class="game1-option-section"><summary><span class="game1-option-icon" aria-hidden="true">🛠️</span><span><strong>Debug / TestPlace</strong><small>Права и видимость кнопок</small></span></summary>
+<div class="panel character-card">
   <div class="section-title"><div><span>published TestPlace</span><h3>Debug and test controls</h3></div></div>
-  <small class="hint">Hide development-only in-game buttons for the selected device in a published Roblox TestPlace. Studio Play debug panels remain available. Currently this also controls the published test weapon selector; it does not disable game combat or mobile input.</small>
+  <small class="hint">Published TestPlace only; authorized developer accounts.</small>
   <label class="game1-published-debug-toggle"><input type="checkbox" id="option-published-debug-buttons">Show debug / test buttons in published TestPlace</label>
   <div class="actions"><button id="option-published-debug-save" class="primary" type="button">Save debug visibility</button></div>
-</div>
+</div></details>
 </div>
 
 <div id="weapons-view" hidden>
@@ -597,7 +629,7 @@
 <label>slug<input id="monster-slug" readonly><small class="hint">generated from english name as lowercase snake_case. existing registered slugs stay stable.</small></label>
 <div class="monster-stats-grid"><label>HP<input id="monster-stat-hp" type="number" min="0" step="1" value="100"></label><label>attack<input id="monster-stat-damage" type="number" min="0" step="1" value="10"></label><label>attack speed<input id="monster-stat-attack-speed" type="number" min="0" step="1" value="100"></label><label>run speed<input id="monster-stat-run-speed" type="number" min="0" step="1" value="50"></label><label>critical chance %<input id="monster-stat-crit-chance" type="number" min="0" max="100" step="0.1" value="0"></label></div>
 <small class="hint">monster stats are absolute runtime values. critical chance is 0..100 percent.</small>
-<div class="monster-stats-grid"><label class="spawn-enabled"><input id="monster-behavior-aggressive" type="checkbox"><span>aggressive · unchecked = passive</span></label><label>aggro radius · studs<input id="monster-behavior-aggro-radius" type="number" min="0" step="0.1" value="16"></label><label>attack radius · studs<input id="monster-behavior-attack-radius" type="number" min="0" step="0.1" value="3"></label></div>
+<div class="monster-stats-grid"><label class="spawn-enabled"><input id="monster-behavior-aggressive" type="checkbox"><span>aggressive · unchecked = passive</span></label><label>aggro radius · studs<input id="monster-behavior-aggro-radius" type="number" min="0" step="0.1" value="16"></label><label>pursuit radius from spawn · studs<input id="monster-behavior-pursuit-radius" type="number" min="1" max="10000" step="1" value="150" title="Monster chase boundary measured from the authored spawn point, not the spawn distribution radius"></label><label>attack radius · studs<input id="monster-behavior-attack-radius" type="number" min="0" step="0.1" value="3"></label></div>
 <label class="spawn-enabled"><input id="monster-behavior-rise-from-ground" type="checkbox"><span>rise from ground when spawning</span></label>
 <small class="hint">Every spawn fades in. With this option checked, the monster also rises from below the surface. The setting belongs to the monster asset and does not require FBX republishing.</small>
 <small class="hint">behavior is authored here; Monster Debug can override these values only for the current Play session.</small>
@@ -778,7 +810,7 @@
 </div>
 <div class="panel character-card">
 <span class="eyebrow">08 · fixed npc</span><h3>spawn settings</h3>
-<div class="npc-spawn-settings-grid monster-spawn-settings-grid"><label>respawn sec<input id="npc-spawn-respawn" type="number" min="0" max="86400" step="0.1" value="10"></label></div>
+<div class="npc-spawn-settings-grid monster-spawn-settings-grid"><label>home leash · studs<input id="npc-spawn-home-radius" type="number" min="1" max="10000" step="1" value="16" title="Maximum pursuit distance from authored NPC spawn"></label><label>respawn sec<input id="npc-spawn-respawn" type="number" min="0" max="86400" step="0.1" value="10"></label></div>
 <label class="spawn-enabled"><input id="npc-spawn-enabled" type="checkbox" checked><span>enabled · one NPC at the exact registered point</span></label>
 <small class="hint">One NPC per spawn marker. When it dies, a replacement appears at the same coordinates after the respawn delay.</small>
 <div class="actions"><button id="npc-spawn-register" class="primary" type="button" disabled>register spawn</button><button id="npc-spawn-new" type="button">new spawn</button><button id="npc-spawn-delete" class="danger" type="button" disabled>delete</button></div>
@@ -824,17 +856,17 @@
 <script src="location-asset-workflow.js?v=262"></script>
 <script src="asset-audit.js?v=2"></script>
 <script src="atlas-library.js?v=2"></script>
-<script src="options.js?v=322"></script>
+<script src="options.js?v=337"></script>
 <script src="weapon-atlas-picker.js?v=309"></script>
 <script src="weapon-assets.js?v=309"></script>
 <script src="weapon-workflow.js?v=309"></script>
 <script src="arrow-assets.js?v=309"></script>
-<script src="monster-assets.js?v=6"></script>
+<script src="monster-assets.js?v=338"></script>
 <script src="npc-assets.js?v=5"></script>
-<script src="npc-spawns.js?v=4"></script>
+<script src="npc-spawns.js?v=337"></script>
 <script src="real-estate.js?v=247&rig=186&atlas=202&physics=232"></script>
 <script src="real-estate-mesh-workflow.js?v=234"></script>
 <script src="real-estate-placement.js?v=2"></script>
-<script src="monster-spawns.js?v=1"></script>
+<script src="monster-spawns.js?v=338"></script>
 </body>
 </html>

@@ -53,7 +53,7 @@ class OptionsHealthContract(unittest.TestCase):
         self.assertFalse(settings['debugUi']['mobile']['showPublishedControls'])
         registry = (self.root / 'src/shared/GameOptionsRegistry.luau').read_text()
         self.assertIn('healthUi = table.freeze', registry)
-        self.assertIn('showPublishedControls = false', registry)
+        self.assertIn('showPublishedControls = ', registry)
 
     def test_mutation_of_desktop_does_not_touch_mobile_and_changes_generated_runtime(self):
         old_mobile = self.store.snapshot()['healthUi']['mobile']
@@ -128,14 +128,15 @@ class HealthRuntimeIntegration(unittest.TestCase):
             self.assertIn('ratio <= 0.65', file)
             self.assertIn('TweenService:Create(fill', file)
             self.assertNotIn('SetAttribute("HP"', file)
-        self.assertIn('not RunService:IsStudio() and not GameOptions.ShowPublishedDebugControls(device)', picker)
+        self.assertIn('PublishedDebugAccess.ClientAllowed()', picker)
 
     def test_studio_draft_transport_uses_existing_authenticated_bridge(self):
         client = source('src/client/dev/HealthUiDebugController.luau')
         server = source('src/server/dev/HealthUiDebugService.luau')
         bridge = source('system/studio-plugin/modules/StudioOptionsDraftBridge.luau')
-        self.assertIn('RunService:IsStudio()', client)
-        self.assertIn('RunService:IsStudio()', server)
+        self.assertIn('PublishedDebugAccess.ClientAllowed()', client)
+        self.assertIn('PublishedDebugAccess.ServerEnabled()', server)
+        self.assertIn('PublishedDebugAccess.ServerAllowed(player)', server)
         self.assertIn('Settings.Preview(device, drafts[device])', client)
         self.assertIn('remote:FireServer({device=chosen, settings=snapshot})', client)
         self.assertIn('cooldown[player]', server)

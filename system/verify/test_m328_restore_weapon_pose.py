@@ -14,14 +14,14 @@ class PreviousWeaponPoseContract(unittest.TestCase):
         attack = source("src/client/combat/AttackController.luau")
         self.assertIn("WeaponAttackVolume.ReadEquippedWeaponBox(character)", attack)
         self.assertNotIn("WeaponAttachmentController.ReadEquippedWeaponBox(character)", attack)
-        weapon = source("src/client/weapon/WeaponAttachmentController.luau")
-        self.assertIn("weapon:PivotTo(", weapon)
+        weapon = source("src/client/character/BoneMountedAttachmentController.luau")
+        self.assertIn("BoneModelMount.Place(model, state.grip", weapon)
         self.assertNotIn("RuntimeBoneVisual", weapon)
 
     def test_hair_uses_original_mount(self):
-        hair = source("src/client/character/HairAttachmentController.luau")
-        self.assertIn("state.group:PivotTo(", hair)
-        self.assertNotIn("RuntimeBoneVisual", hair)
+        mount = source("src/client/character/BoneMountedAttachmentController.luau")
+        self.assertIn('updateMount(character, hair, "hair")', mount)
+        self.assertNotIn("RuntimeBoneVisual", mount)
 
     def test_volume_debug_is_not_gameplay_and_only_updates_when_visible(self):
         debug = source("src/client/dev/TestLoadoutController.luau")

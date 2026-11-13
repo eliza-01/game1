@@ -10762,13 +10762,13 @@ function StudioTimelinePreview.new(services)
 
     local hairFollower = nil
     local function refreshTimelineAccessories(preview: Model)
-        -- The same HairAttachmentController that positions pivot hair in Play,
+        -- The same BoneMountedAttachmentController that positions rigid models in Play,
         -- called once per scrubbed pose instead of starting a render loop.
         if hairFollower == nil then
             local scripts = game:GetService("StarterPlayer"):FindFirstChild("StarterPlayerScripts")
             local client = scripts and scripts:FindFirstChild("Game1Client")
             local character = client and client:FindFirstChild("character")
-            local source = character and character:FindFirstChild("HairAttachmentController")
+            local source = character and character:FindFirstChild("BoneMountedAttachmentController")
             if source and source:IsA("ModuleScript") then
                 hairFollower = require(source)
             else

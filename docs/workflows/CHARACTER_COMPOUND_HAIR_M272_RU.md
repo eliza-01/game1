@@ -20,7 +20,7 @@ human_female_m004_hair_extra_02       # ещё одна часть, канал e
 
 ## Roblox
 
-Builder проверяет фактический список MeshPart против metadata из опубликованной FBX. Root получает `CharacterMount` и крепится к `hair_mount`. Все extras входят во внутреннюю модель `CharacterHairComponent`, связываются с root `CharacterHairExtraWeld`. Клиентский `HairAttachmentController` перемещает **всю** `Model:PivotTo`, а не только один MeshPart. Каждый extra сохраняет свой локальный transform и PivotOffset.
+Builder проверяет фактический список MeshPart против metadata из опубликованной FBX. Root получает `CharacterMount` и крепится к `hair_mount`. Все extras входят во внутреннюю модель `CharacterHairComponent` и закреплены `Anchored`, без физических weld. Единый `BoneMountedAttachmentController` перемещает **всю** модель через `BoneModelMount.Place`, как и оружие. Каждый extra сохраняет свой локальный transform и PivotOffset.
 
 Настройка цвета независима от геометрии и не создаёт копии MeshPart. `hair_colors` в Character recipe:
 

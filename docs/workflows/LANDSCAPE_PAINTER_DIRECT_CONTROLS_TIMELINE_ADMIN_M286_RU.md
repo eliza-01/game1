@@ -18,7 +18,7 @@ It neither changes Workspace nor owns a second asset catalogue.
 - For monsters, keep loading their published Model asset, with no change in protocol.
 - The model lives only inside the plugin's WorldModel. No new mannequin in Workspace; no save/Undo operation, no gameplay spawning.
 - Pose samples still come from the published KeyframeSequence and never from attack timeline metadata. Existing HitStart/HitEnd confirmation and server validation remain unchanged.
-- For rigid pivot hair, the timeline invokes the **same** `HairAttachmentController.UpdateCharacter` method per sampled frame, without starting a RenderStepped loop.
+- For rigid pivot hair, the timeline invokes the **same** `BoneMountedAttachmentController.UpdateCharacter` method per sampled frame, without starting a RenderStepped loop.
 - Missing admin, mismatched subject, empty visual geometry or inaccessible source build are explicit errors; do not silently fall back to an invisible rig.
 
 ## Studio acceptance checklist (not performed offline)

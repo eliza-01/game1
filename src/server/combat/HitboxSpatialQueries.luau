@@ -213,7 +213,8 @@ function HitboxSpatialQueries.AimContact(
     -- damage the first reticle target if the contact is inside AttackRadius;
     -- only a head region can upgrade it to a headshot.
     if binding.headBox and binding.worldHeadCFrame then
-        local distance = if projectilePrecision then rayHeadEllipsoidDistance(
+        local distance = if projectilePrecision and binding.mode ~= "root_bounds_fallback"
+            then rayHeadEllipsoidDistance(
             rayOrigin, rayDirection, maxDistance, binding.worldHeadCFrame, binding.headBox.size
         ) else rayBoxDistance(
             rayOrigin, rayDirection, maxDistance, binding.worldHeadCFrame, binding.headBox.size
@@ -228,9 +229,16 @@ function HitboxSpatialQueries.AimContact(
     for index, bodyBox in ipairs(binding.bodyBoxes) do
         local worldCFrame = binding.worldBodyCFrames[index]
         if worldCFrame then
-            local boxSize = if projectilePrecision then bodyBox.size * 0.90 else bodyBox.size
+            local boxSize = if projectilePrecision and binding.mode ~= "root_bounds_fallback"
+                then bodyBox.size * 0.90 else bodyBox.size
             local distance = rayBoxDistance(rayOrigin, rayDirection, maxDistance, worldCFrame, boxSize)
-            if distance ~= nil and distance < bestDistance - SAT_EPSILON then
+            -- Permission fallback deliberately uses the entire RootCollider as
+            -- Body. Its entry is often in front of the nested Head box, even
+            -- for a ray through the face. Keep an actual head intersection as
+            -- a headshot in that mode; exact bone boxes still use nearest hit.
+            local fallbackHeadContact = binding.mode == "root_bounds_fallback" and bestZone == "head"
+            if distance ~= nil and not fallbackHeadContact
+                and distance < bestDistance - SAT_EPSILON then
                 bestDistance = distance
                 bestZone = "body"
                 bestBoneName = if bodyBox.anchor:IsA("Bone") then bodyBox.anchor.Name else ""

@@ -16,7 +16,7 @@ local EQUIPPED_NAME = "EquippedWeapon"
 local RIGHT_SOCKET_NAMES = { "weapon_grip_r", "Weapon_R_Bone", "weapon_r", "Weapon_R", "WeaponR" }
 local LEFT_SOCKET_NAMES = { "weapon_grip_l", "Weapon_L_Bone", "weapon_l", "Weapon_L", "WeaponL" }
 local WEAPON_GRIP_NAME = "Game1WeaponGrip"
-local WEAPON_EQUIP_ROTATION = CFrame.Angles(math.rad(-90), 0, 0)
+local BoneModelMount = require(Shared:WaitForChild("rig"):WaitForChild("BoneModelMount"))
 
 local function findByStudioPath(studioPath: string): Instance?
     if string.sub(studioPath, 1, 14) ~= "ServerStorage." then
@@ -94,28 +94,9 @@ local function ensureCanonicalRuntimeGrip(model: Model): Attachment?
     -- World XYZ is the one canonical authored basis for every weapon. The local
     -- Attachment CFrame stores the inverse of whatever hidden part/model basis
     -- Roblox imported, so all weapons enter the equip solver identically.
-    local grip = Instance.new("Attachment")
-    grip.Name = WEAPON_GRIP_NAME
-    grip.CFrame = referencePart.CFrame:ToObjectSpace(CFrame.new(gripPoint))
+    local grip = BoneModelMount.CreateGrip(referencePart, WEAPON_GRIP_NAME, gripPoint)
     grip:SetAttribute("Game1WeaponGrip", true)
-    grip.Parent = referencePart
     return grip
-end
-
-local function targetSocketCFrame(targetBone: Bone): CFrame
-    local parent = targetBone.Parent
-    if parent and parent:IsA("Bone") then
-        return parent.TransformedWorldCFrame * targetBone.CFrame
-    end
-    return targetBone.WorldCFrame
-end
-
-local function alignWeaponToSocket(weapon: Model, grip: Attachment, socketFrame: CFrame)
-    -- One solver for every weapon. No Model-pivot fallback is allowed: mixing
-    -- PivotTo(socketFrame) with grip alignment is what made otherwise identical
-    -- weapons acquire different orientations.
-    local delta = socketFrame * grip.WorldCFrame:Inverse()
-    weapon:PivotTo(delta * weapon:GetPivot())
 end
 
 local function prepareWeapon(model: Model)
@@ -194,7 +175,7 @@ function WeaponEquipService.Equip(character: Model, slugValue: any): (boolean, s
     weapon:SetAttribute("AttackRadius", attackRadiusFor(row))
     weapon:SetAttribute("Game1WeaponGripRotation", nil)
     weapon:SetAttribute("WeaponAttachmentMode", "runtime-canonical-grip-v2")
-    alignWeaponToSocket(weapon, grip, targetSocketCFrame(targetBone) * WEAPON_EQUIP_ROTATION)
+    BoneModelMount.Place(weapon, grip, BoneModelMount.SocketFrame(targetBone, "weapon"))
     -- Persist the authored EquippedWeapon OBB in model-local space. The client
     -- can then reconstruct the exact animated weapon box every frame without
     -- changing its dimensions, while the server owns the canonical size used
@@ -248,7 +229,7 @@ function WeaponEquipService.EquipVisual(actor: Model, slugValue: any, hand: stri
     weapon:SetAttribute("AttackRadius", attackRadiusFor(row))
     weapon:SetAttribute("Game1WeaponGripRotation", nil)
     weapon:SetAttribute("WeaponAttachmentMode", "runtime-canonical-grip-v2")
-    alignWeaponToSocket(weapon, grip, targetSocketCFrame(bone) * WEAPON_EQUIP_ROTATION)
+    BoneModelMount.Place(weapon, grip, BoneModelMount.SocketFrame(bone, "weapon"))
     if string.lower(tostring(row.weaponType or "")) == "bow" then
         WeaponAttackVolume.ClearWeaponBox(weapon)
     else

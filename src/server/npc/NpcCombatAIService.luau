@@ -387,7 +387,7 @@ function NpcCombatAIService.Bind(model: Model, root: BasePart, presentation: any
     local definition = (NpcRegistry.npcs or {})[tostring(model:GetAttribute("NpcSlug") or "")]
     local behavior = definition and definition.behavior or {}
     local retaliate = behavior.retaliateWhenAttacked == true
-    local pursuitRadius = math.max(0, finite(behavior.pursuitRadiusStuds, 16))
+    local pursuitRadius = math.clamp(finite(model:GetAttribute("NpcHomeRadiusStuds"), finite(behavior.pursuitRadiusStuds, 16)), 1, 10000)
     local attackRadius = math.max(0, finite(behavior.attackRadiusStuds, 3))
     local profile = (NpcAnimationRegistry.profiles or {})[tostring(model:GetAttribute("NpcSlug") or "")]
     local weaponSet = tostring(model:GetAttribute("NpcWeaponSet") or "unarmed")

@@ -3,6 +3,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local PublishedDebugAccess = require(game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared"):WaitForChild("dev"):WaitForChild("PublishedDebugAccess"))
 local StudioDebugDock = require(script.Parent:WaitForChild("StudioDebugDock"))
 local Settings = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("HealthUiSettings"))
 
@@ -66,7 +67,7 @@ local function format(value: number): string
 end
 
 function Debug.Start()
-    if started or not RunService:IsStudio() then return end
+    if started or not PublishedDebugAccess.ClientAllowed() then return end
     started = true
     local player = Players.LocalPlayer
     local gui = make(player:WaitForChild("PlayerGui"), "ScreenGui", {
@@ -90,10 +91,12 @@ function Debug.Start()
     local status = label(panel,"Preview only · Save via Asset Manager Options",12,482,332)
     status.TextColor3 = MUTED
     status.TextSize = 10
-    local reset = control(panel,"Reset selected profile",157,30)
+    local reset = control(panel,"Reset profile",103,30)
     reset.Position = UDim2.fromOffset(12,448)
-    local restore = control(panel,"Stop preview",153,30)
-    restore.Position = UDim2.fromOffset(185,448)
+    local showAll = control(panel,"All HP: OFF",106,30)
+    showAll.Position = UDim2.fromOffset(125,448)
+    local restore = control(panel,"Stop preview",108,30)
+    restore.Position = UDim2.fromOffset(241,448)
 
     local remote: RemoteEvent? = nil
     task.spawn(function()
@@ -187,15 +190,31 @@ function Debug.Start()
         drafts[device]=Settings.Saved(device)
         forward(); render()
     end)
-    restore.Activated:Connect(function()
+    local function stopPreview()
+        -- Cancel pending delayed draft transport and restore combat visibility.
+        forwardRevision += 1
         Settings.ClearPreview()
+        showAll.Text = "All HP: OFF"
+    end
+    showAll.Activated:Connect(function()
+        if not Settings.IsPreviewing() then forward() end
+        local enabled = not Settings.ShowAllMonsters()
+        Settings.SetShowAllMonsters(enabled)
+        showAll.Text = if enabled then "All HP: ON" else "All HP: OFF"
+    end)
+    restore.Activated:Connect(function()
+        stopPreview()
         status.Text="Saved profile restored (no changes persisted)"
     end)
     launcher.Activated:Connect(function()
         panel.Visible=not panel.Visible
-        if panel.Visible then render(); forward() end
+        if panel.Visible then render(); forward()
+        else stopPreview() end
     end)
-    close.Activated:Connect(function() panel.Visible=false end)
+    close.Activated:Connect(function()
+        panel.Visible=false
+        stopPreview()
+    end)
     render()
 end
 

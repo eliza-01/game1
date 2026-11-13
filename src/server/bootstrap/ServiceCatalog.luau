@@ -65,7 +65,10 @@ function ServiceCatalog.Build(root: Instance)
         {name = "NpcSpawnerService", critical = false, dependsOn = {"EntityHitboxService", "CharacterService"}, start = function()
             require(npc:WaitForChild("NpcSpawnerService")).Start()
         end},
-        {name = "MovementDebugService", critical = false, start = function()
+        {name = "PublishedDebugAccessService", critical = false, start = function()
+            require(dev:WaitForChild("PublishedDebugAccessService")).Start()
+        end},
+        {name = "MovementDebugService", critical = false, dependsOn = {"PublishedDebugAccessService"}, start = function()
             local MovementDebugService = require(dev:WaitForChild("MovementDebugService"))
             MovementDebugService.Start()
         end},

@@ -83,6 +83,53 @@ def normalize_world_streaming(change, base=None):
     return result
 
 
+# Player movement physics (shared on PC and mobile; does not modify Workspace.Gravity).
+def normalize_player_jump(change, base=None):
+    import math
+    if not isinstance(change, dict) or set(change) - {'heightMultiplier', 'descentTimeMultiplier'}:
+        raise ValueError('playerJump accepts heightMultiplier/descentTimeMultiplier only')
+    result = deepcopy(base or {'heightMultiplier': 2.0, 'descentTimeMultiplier': 2.0})
+    for key in ('heightMultiplier', 'descentTimeMultiplier'):
+        value = change.get(key, result[key])
+        if type(value) not in (int, float) or not math.isfinite(value) or not 0.5 <= value <= 4:
+            raise ValueError(f'playerJump.{key} must be finite 0.5..4')
+        result[key] = float(value)
+    return result
+
+
+NPC_OVERHEAD_DEFAULTS = {
+    "desktop": {"nameRadiusStuds": 70, "healthRadiusStuds": 70},
+    "mobile": {"nameRadiusStuds": 70, "healthRadiusStuds": 70},
+}
+
+
+def normalize_npc_overhead(change, base=None):
+    import math
+    if not isinstance(change, dict) or set(change) - {'desktop', 'mobile'}:
+        raise ValueError('npcOverhead requires desktop/mobile profiles')
+    result = deepcopy(base or NPC_OVERHEAD_DEFAULTS)
+    for device, fields in change.items():
+        if not isinstance(fields, dict) or set(fields) - {'nameRadiusStuds', 'healthRadiusStuds'}:
+            raise ValueError('invalid NPC overhead fields')
+        for key, value in fields.items():
+            if type(value) not in (int, float) or not math.isfinite(value) or not 10 <= value <= 800:
+                raise ValueError(f'npcOverhead.{device}.{key} must be 10..800')
+            result[device][key] = float(value)
+    return result
+
+
+def normalize_monster_ai(change, base=None):
+    import math
+    if not isinstance(change, dict) or set(change) - {'noDamageReturnSeconds'}:
+        raise ValueError('monsterAi only accepts noDamageReturnSeconds')
+    result = deepcopy(base or {'noDamageReturnSeconds': 30})
+    value = change.get('noDamageReturnSeconds', result['noDamageReturnSeconds'])
+    if type(value) not in (int, float) or not math.isfinite(value) or not 1 <= value <= 3600:
+        raise ValueError('monster return delay must be 1..3600 seconds')
+    result['noDamageReturnSeconds'] = float(value)
+    return result
+
+
 def normalize_debug_ui(change, base=None):
     if not isinstance(change, dict) or set(change) - {'desktop', 'mobile'}:
         raise ValueError('debugUi expects desktop/mobile profiles')
@@ -116,7 +163,10 @@ DEFAULT_PAYLOAD = {
     },
     "camera": DEFAULT_CAMERA.copy(),
     "healthUi": deepcopy(HEALTH_UI_DEFAULTS),
+    "npcOverhead": deepcopy(NPC_OVERHEAD_DEFAULTS),
+    "monsterAi": {"noDamageReturnSeconds": 30},
     "worldStreaming": {"targetRadiusStuds": 150},
+    "playerJump": {"heightMultiplier": 2.0, "descentTimeMultiplier": 2.0},
     "debugUi": {"desktop": {"showPublishedControls": False}, "mobile": {"showPublishedControls": False}},
     "cameraPresets": [],
     "activeCameraPreset": "",
@@ -162,7 +212,10 @@ class OptionsStore:
             names.add(row['name'])
             normalize_camera(row.get('settings') or {})
         normalize_health_ui(payload.get('healthUi', HEALTH_UI_DEFAULTS))
+        normalize_npc_overhead(payload.get('npcOverhead', NPC_OVERHEAD_DEFAULTS))
+        normalize_monster_ai(payload.get('monsterAi', DEFAULT_PAYLOAD['monsterAi']))
         normalize_world_streaming(payload.get('worldStreaming', DEFAULT_PAYLOAD['worldStreaming']))
+        normalize_player_jump(payload.get('playerJump', DEFAULT_PAYLOAD['playerJump']))
         normalize_debug_ui(payload.get('debugUi', DEFAULT_PAYLOAD['debugUi']))
         animations = payload.get("characterAnimations") or {}
         for key in ("deathPlaybackPercent", "revivePlaybackPercent"):
@@ -186,6 +239,9 @@ class OptionsStore:
             *(f"\t\t{key} = {value:.12g}," for key,value in camera.items()),
             "\t}),",
             "\thealthUi = " + lua_literal(normalize_health_ui(payload.get('healthUi', HEALTH_UI_DEFAULTS))) + ",",
+            "\tnpcOverhead = " + lua_literal(normalize_npc_overhead(payload.get('npcOverhead', NPC_OVERHEAD_DEFAULTS))) + ",",
+            "\tmonsterAi = " + lua_literal(normalize_monster_ai(payload.get('monsterAi', DEFAULT_PAYLOAD['monsterAi']))) + ",",
+            "\tplayerJump = " + lua_literal(normalize_player_jump(payload.get('playerJump', DEFAULT_PAYLOAD['playerJump']))) + ",",
             "\tdebugUi = " + lua_literal(normalize_debug_ui(payload.get('debugUi', DEFAULT_PAYLOAD['debugUi']))) + ",",
             "\tcharacterAnimations = table.freeze({",
             f"\t\tdeathPlaybackPercent = {float(animations['deathPlaybackPercent']):.12g},",
@@ -217,7 +273,7 @@ class OptionsStore:
                 if key not in payload[group]:
                     payload[group][key] = value
                     changed = True
-        for field in ('healthUi', 'debugUi', 'worldStreaming'):
+        for field in ('healthUi', 'npcOverhead', 'monsterAi', 'debugUi', 'worldStreaming', 'playerJump'):
             if field not in payload:
                 payload[field] = deepcopy(DEFAULT_PAYLOAD[field])
                 changed = True
@@ -284,9 +340,15 @@ class OptionsStore:
             for key in ("deathPlaybackPercent", "revivePlaybackPercent"):
                 if key in animations:
                     payload.setdefault("characterAnimations", {})[key] = float(animations[key])
+        if 'npcOverhead' in request:
+            payload['npcOverhead'] = normalize_npc_overhead(request['npcOverhead'], payload.get('npcOverhead', NPC_OVERHEAD_DEFAULTS))
+        if 'monsterAi' in request:
+            payload['monsterAi'] = normalize_monster_ai(request['monsterAi'], payload.get('monsterAi', DEFAULT_PAYLOAD['monsterAi']))
         if 'healthUi' in request:
             payload['healthUi'] = normalize_health_ui(request['healthUi'],
                                                        payload.get('healthUi', HEALTH_UI_DEFAULTS))
+        if 'playerJump' in request:
+            payload['playerJump'] = normalize_player_jump(request['playerJump'], payload.get('playerJump', DEFAULT_PAYLOAD['playerJump']))
         if 'worldStreaming' in request:
             payload['worldStreaming'] = normalize_world_streaming(
                 request['worldStreaming'], payload.get('worldStreaming', DEFAULT_PAYLOAD['worldStreaming']))

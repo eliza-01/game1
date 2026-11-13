@@ -10,6 +10,7 @@ local Settings = {}
 local changed = Instance.new("BindableEvent")
 local previewDevice: string? = nil
 local preview: {[string]: any}? = nil
+local previewAllMonsters = false
 
 local function clone(value: any): any
     if type(value) ~= "table" then return value end
@@ -45,9 +46,21 @@ function Settings.IsPreviewing(): boolean
     return preview ~= nil
 end
 
+-- Editing HP style must NOT automatically reveal every neutral monster.
+-- The debug operator may explicitly enable this while tuning overhead bars.
+function Settings.ShowAllMonsters(): boolean
+    return preview ~= nil and previewAllMonsters
+end
+
+function Settings.SetShowAllMonsters(enabled: boolean)
+    previewAllMonsters = enabled == true
+    changed:Fire()
+end
+
 function Settings.ClearPreview()
     previewDevice = nil
     preview = nil
+    previewAllMonsters = false
     changed:Fire()
 end
 

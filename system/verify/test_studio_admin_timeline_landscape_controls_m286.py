@@ -84,12 +84,12 @@ class TimelineAdminPreview(unittest.TestCase):
         self.assertIn('action = "ready"', command)
 
     def test_hair_uses_existing_runtime_follower_per_scrub(self):
-        client = read(ROOT / 'src/client/character/HairAttachmentController.luau')
-        self.assertIn('HairAttachmentController.UpdateCharacter = updateCharacter', client)
+        client = read(ROOT / 'src/client/character/BoneMountedAttachmentController.luau')
+        self.assertIn('BoneMountedAttachmentController.UpdateCharacter = updateCharacter', client)
         command = read(STUDIO / 'StudioTimelineEditorCommands.luau')
         self.assertIn('previewService.RefreshAccessories(timelineEditor.preview)', command)
         preview = read(STUDIO / 'StudioTimelinePreview.luau')
-        self.assertIn('HairAttachmentController', preview)
+        self.assertIn('BoneMountedAttachmentController', preview)
         self.assertIn('hairFollower.UpdateCharacter(preview)', preview)
         self.assertNotIn('RenderStepped:Connect', preview)
 

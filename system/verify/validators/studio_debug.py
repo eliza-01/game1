@@ -16,7 +16,7 @@ def check_studio_debug(root: Path, report_error: Callable[[str], None], *,
     for required in ["GetTestLoadoutCatalog", "ApplyTestLoadout", "CharacterService.Respawn", "WeaponEquipService.Equip", "Game1TestLoadoutActive"]:
         if required not in test_loadout_server:
             report_error(f"Studio Test Loadout server missing {required}")
-    for required in ["TEST LOADOUT", "createDropdown", "createCategorySelector", "LastLoadoutArchetype", "LastLoadoutWeaponSlug", "ACCEPT LOADOUT", "RunService:IsStudio()"]:
+    for required in ["TEST LOADOUT", "createDropdown", "createCategorySelector", "LastLoadoutArchetype", "LastLoadoutWeaponSlug", "ACCEPT LOADOUT", "PublishedDebugAccess.ClientAllowed()"]:
         if required not in test_loadout_client:
             report_error(f"Studio Test Loadout client missing {required}")
     for required in ["ATTACK RADIUS: OFF", "Game1AttackRadiusPreview", "createAttackRadiusRing", 'currentCharacter:GetAttribute("AttackRadius")', "RunService.RenderStepped"]:
@@ -56,7 +56,7 @@ def check_studio_debug(root: Path, report_error: Callable[[str], None], *,
         "model = model",
         "Game1MonsterDebugLocomotionMode",
         "MonsterLocomotionMode",
-        "RunService:IsStudio()",
+        "PublishedDebugAccess.ServerEnabled()",
     ]:
         if required not in movement_debug_server:
             report_error(f"Studio movement debugger server missing {required}")
@@ -81,7 +81,7 @@ def check_studio_debug(root: Path, report_error: Callable[[str], None], *,
         "GetMovementDebugCatalog",
         "SetMovementDebugMonsterMode",
         "CATALOG_POLL_SECONDS",
-        "RunService:IsStudio()",
+        "PublishedDebugAccess.ClientAllowed()",
     ]:
         if required not in movement_debug_client:
             report_error(f"Studio movement debugger client missing {required}")

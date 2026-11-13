@@ -54,7 +54,9 @@ end
 
 local function resolveRuntimeBox(binding: any, definitionBox: any): (any?, string?)
     local anchor = nil
-    if definitionBox.kind == "head" then
+    if definitionBox.kind == "root" then
+        anchor = binding.root
+    elseif definitionBox.kind == "head" then
         anchor = binding.headBone
     elseif definitionBox.kind == "bone" then
         local record = binding.records[definitionBox.recordIndex]
@@ -141,6 +143,7 @@ local function clearAttributes(entity: Model)
     entity:SetAttribute("CombatHitboxCount", nil)
     entity:SetAttribute("CombatHeadBoneName", nil)
     entity:SetAttribute("CombatTargetGeometry", nil)
+    entity:SetAttribute("CombatHitboxFallback", nil)
 end
 
 function EntityHitboxService.Detach(entity: Model)
@@ -166,14 +169,12 @@ function EntityHitboxService.Attach(entity: Model, visual: Model): any
 
     local resolved = SkeletonHeadResolver.Resolve(visual)
     local records = {}
+    local geometryUnavailable = false
     for _, meshPart in ipairs(meshPartsForVisual(visual)) do
         local geometry = HitboxMeshGeometryCache.Read(meshPart)
         if geometry.state ~= "ready" then
-            entity:SetAttribute("CombatHitboxMode", "unavailable")
-            entity:SetAttribute("CombatHitboxCount", 0)
-            warn(("[game1][combat-hitbox] %s could not build hitboxes because %s is unreadable")
-                :format(entity:GetFullName(), meshPart:GetFullName()))
-            return { count = 0, headBoneName = "", hasHead = false }
+            geometryUnavailable = true
+            break
         end
         table.insert(records, {
             meshPart = meshPart,
@@ -185,7 +186,7 @@ function EntityHitboxService.Attach(entity: Model, visual: Model): any
         })
     end
 
-    if #records == 0 then
+    if #records == 0 and not geometryUnavailable then
         entity:SetAttribute("CombatHitboxMode", "unavailable")
         entity:SetAttribute("CombatHitboxCount", 0)
         warn(("[game1][combat-hitbox] %s has no visual MeshPart; combat hitboxes were not built")
@@ -203,7 +204,12 @@ function EntityHitboxService.Attach(entity: Model, visual: Model): any
         headParentBone = resolved.headParentBone,
     }
 
-    local definition, buildError = HitboxDefinitionBuilder.Resolve(binding)
+    local definition, buildError
+    if geometryUnavailable then
+        definition = HitboxDefinitionBuilder.Fallback(binding)
+    else
+        definition, buildError = HitboxDefinitionBuilder.Resolve(binding)
+    end
     if not definition then
         entity:SetAttribute("CombatHitboxMode", "unavailable")
         entity:SetAttribute("CombatHitboxCount", 0)
@@ -221,12 +227,20 @@ function EntityHitboxService.Attach(entity: Model, visual: Model): any
         return { count = 0, headBoneName = "", hasHead = false }
     end
 
+    binding.mode = if geometryUnavailable then "root_bounds_fallback" else "precomputed_bone_boxes"
     bindings[entity] = binding
     local count = #binding.bodyBoxes + (if binding.headBox then 1 else 0)
-    entity:SetAttribute("CombatHitboxMode", "precomputed_bone_boxes")
+    if geometryUnavailable then
+        -- Geometry cache reports permission failures once per MeshId. Mode/Count
+        -- attributes are enough to inspect the fallback without per-NPC spam.
+        entity:SetAttribute("CombatHitboxFallback", true)
+    else
+        entity:SetAttribute("CombatHitboxFallback", nil)
+    end
+    entity:SetAttribute("CombatHitboxMode", binding.mode)
     entity:SetAttribute("CombatHitboxCount", count)
     entity:SetAttribute("CombatHeadBoneName", binding.headBone and binding.headBone.Name or "")
-    entity:SetAttribute("CombatTargetGeometry", "precomputed_mesh_bounds")
+    entity:SetAttribute("CombatTargetGeometry", if geometryUnavailable then "root_bounds_fallback" else "precomputed_mesh_bounds")
 
     return {
         count = count,
@@ -262,7 +276,7 @@ function EntityHitboxService.QueryDamageablesInBox(
                 table.insert(results, {
                     model = entity,
                     hit = hit,
-                    mode = "precomputed_bone_boxes",
+                    mode = binding.mode,
                 })
             end
         end
@@ -307,7 +321,7 @@ function EntityHitboxService.RaycastAimRegions(
                     boneName = hit.boneName,
                     hitPosition = hit.hitPosition,
                     distance = hit.distance,
-                    mode = "precomputed_bone_boxes",
+                    mode = binding.mode,
                 }
             end
         end

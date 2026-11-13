@@ -37,7 +37,13 @@ function GameOptions.CameraSettings(): {[string]: number}
         characterY = math.clamp(finite(source.characterY, 0.5), 0.2, 0.8),
         cursorX = math.clamp(finite(source.cursorX, 0.5), 0.1, 0.9),
         cursorY = math.clamp(finite(source.cursorY, 0.5), 0.1, 0.9),
+        mobileLookSpeed = math.clamp(finite(source.mobileLookSpeed, 1.5), 0.25, 4),
     }
+end
+
+-- A separate mobile look multiplier changes input response, not interpolation.
+function GameOptions.MobileCameraSpeed(): number
+    return math.clamp(finite((Registry.camera or {}).mobileLookSpeed, 1.5), 0.25, 4)
 end
 
 -- Configured visual profiles are generated from Asset Manager Options.
@@ -46,9 +52,30 @@ function GameOptions.HealthUiSettings(device: string): {[string]: any}
     return profiles[device] or profiles.desktop or {}
 end
 
+function GameOptions.PlayerJumpSettings(): {[string]: number}
+    local jump = Registry.playerJump or {}
+    return {
+        heightMultiplier = math.clamp(finite(jump.heightMultiplier, 2), 0.5, 4),
+        descentTimeMultiplier = math.clamp(finite(jump.descentTimeMultiplier, 2), 0.5, 4),
+    }
+end
+
 function GameOptions.ShowPublishedDebugControls(device: string): boolean
     local settings = (Registry.debugUi or {})[device] or {}
     return settings.showPublishedControls == true
+end
+
+function GameOptions.NpcOverheadSettings(device: string): {[string]: number}
+    local profiles = Registry.npcOverhead or {}
+    local source = profiles[device] or profiles.desktop or {}
+    return {
+        nameRadiusStuds = math.clamp(finite(source.nameRadiusStuds, 70), 10, 800),
+        healthRadiusStuds = math.clamp(finite(source.healthRadiusStuds, 70), 10, 800),
+    }
+end
+
+function GameOptions.MonsterNoDamageReturnSeconds(): number
+    return math.clamp(finite((Registry.monsterAi or {}).noDamageReturnSeconds, 30), 1, 3600)
 end
 
 return table.freeze(GameOptions)

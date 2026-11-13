@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "project": "game1",
+  "combat": {
+    "stateDurationSeconds": 6.0
+  },
+  "characterAnimations": {
+    "deathPlaybackPercent": 50.0,
+    "revivePlaybackPercent": 50.0
+  },
+  "camera": {
+    "targetHeight": 5.5,
+    "distance": 14.25,
+    "pitchDegrees": -20.0,
+    "characterX": 0.5,
+    "characterY": 0.6,
+    "cursorX": 0.5,
+    "cursorY": 0.5
+  },
+  "cameraPresets": [
+    {
+      "name": "1",
+      "settings": {
+        "targetHeight": 5.5,
+        "distance": 10.0,
+        "pitchDegrees": -12.0,
+        "characterX": 0.42,
+        "characterY": 0.58,
+        "cursorX": 0.5,
+        "cursorY": 0.52
+      }
+    },
+    {
+      "name": "2",
+      "settings": {
+        "targetHeight": 5.5,
+        "distance": 14.25,
+        "pitchDegrees": -20.0,
+        "characterX": 0.5,
+        "characterY": 0.6,
+        "cursorX": 0.5,
+        "cursorY": 0.5
+      }
+    }
+  ],
+  "activeCameraPreset": "2",
+  "healthUi": {
+    "desktop": {
+      "screen": {
+        "enabled": true,
+        "width": 280,
+        "height": 20,
+        "border": 0,
+        "textSize": 12,
+        "top": 18
+      },
+      "self": {
+        "enabled": false,
+        "width": 148,
+        "height": 12,
+        "border": 2,
+        "nameSize": 13,
+        "levelSize": 15,
+        "offsetStuds": 1.7
+      },
+      "monster": {
+        "enabled": true,
+        "width": 60,
+        "height": 8,
+        "border": 0,
+        "nameSize": 15,
+        "levelSize": 11,
+        "offsetStuds": 2.35,
+        "maxDistanceStuds": 100
+      },
+      "colors": {
+        "green": "#16D423",
+        "yellow": "#E79F04",
+        "red": "#E2181B"
+      }
+    },
+    "mobile": {
+      "screen": {
+        "enabled": true,
+        "width": 214,
+        "height": 17,
+        "border": 2,
+        "textSize": 13,
+        "top": 11
+      },
+      "self": {
+        "enabled": false,
+        "width": 126,
+        "height": 11,
+        "border": 1.7,
+        "nameSize": 14,
+        "levelSize": 8,
+        "offsetStuds": 1.8
+      },
+      "monster": {
+        "enabled": true,
+        "width": 60,
+        "height": 6,
+        "border": 0,
+        "nameSize": 13,
+        "levelSize": 19,
+        "offsetStuds": 2.05,
+        "maxDistanceStuds": 100
+      },
+      "colors": {
+        "green": "#16D423",
+        "yellow": "#E79F04",
+        "red": "#E2181B"
+      }
+    }
+  },
+  "debugUi": {
+    "desktop": {
+      "showPublishedControls": true
+    },
+    "mobile": {
+      "showPublishedControls": false
+    }
+  },
+  "worldStreaming": {
+    "targetRadiusStuds": 150
+  }
+}

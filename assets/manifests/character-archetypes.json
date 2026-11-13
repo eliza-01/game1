@@ -18,7 +18,7 @@
       "race": "human",
       "gender": "female",
       "status": "ASSEMBLY_READY",
-      "revision": 14,
+      "revision": 15,
       "visualMode": "assembly",
       "assembly": {
         "schema_version": 2,
@@ -341,7 +341,7 @@
         "Damage": 10,
         "Defense": 0,
         "AttackSpeed": 177,
-        "RunSpeed": 155,
+        "RunSpeed": 255,
         "CritChance": 0
       },
       "model": {

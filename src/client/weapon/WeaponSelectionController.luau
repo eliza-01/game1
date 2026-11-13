@@ -8,6 +8,7 @@ local UserInputService = game:GetService("UserInputService")
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local Config = require(Shared:WaitForChild("weapon"):WaitForChild("WeaponSelectionConfig"))
 local GameOptions = require(Shared:WaitForChild("GameOptions"))
+local PublishedDebugAccess = require(Shared:WaitForChild("dev"):WaitForChild("PublishedDebugAccess"))
 
 local Controller = {}
 local started = false
@@ -41,9 +42,7 @@ end
 function Controller.Start()
     -- The playtest weapon picker is a debug control, not the eventual game inventory.
     if started or not Config.Enabled then return end
-    local device = if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-        then "mobile" else "desktop"
-    if not RunService:IsStudio() and not GameOptions.ShowPublishedDebugControls(device) then return end
+    if not PublishedDebugAccess.ClientAllowed() then return end
     started = true
     task.spawn(function()
         local remotes = ReplicatedStorage:WaitForChild("Game1Remotes", 15)

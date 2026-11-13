@@ -15,6 +15,7 @@ DEFAULT_CAMERA = {
     'characterY': 0.5,
     'cursorX': 0.5,
     'cursorY': 0.5,
+    'mobileLookSpeed': 1.5,
 }
 CAMERA_LIMITS = {
     'targetHeight': (0, 12),
@@ -24,6 +25,7 @@ CAMERA_LIMITS = {
     'characterY': (0.2, 0.8),
     'cursorX': (0.1, 0.9),
     'cursorY': (0.1, 0.9),
+    'mobileLookSpeed': (0.25, 4),
 }
 
 

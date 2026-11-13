@@ -70,10 +70,12 @@ class CharacterColorSocketTests(unittest.TestCase):
         shared=(ROOT/'src/shared/world/SocketFacing.luau').read_text()
         self.assertIn('if fromBone then -frame.UpVector else frame.LookVector',shared)
         self.assertIn('CFrame.lookAlong(frame.Position, SocketFacing.Forward(frame, true), frame.LookVector)',shared)
+        source=(ROOT/'src/shared/rig/BoneModelMount.luau').read_text()
+        self.assertIn('SocketFacing.FullFrame(frame, true)',source)
         for name in ('src/server/character/CharacterAssemblyBuilder.luau',
-                     'src/client/character/HairAttachmentController.luau'):
+                     'src/client/character/BoneMountedAttachmentController.luau'):
             source=(ROOT/name).read_text()
-            self.assertIn('SocketFacing.FullFrame(targetSocketCFrame(',source)
+            self.assertIn('BoneModelMount.SocketFrame(',source)
         spawn=(ROOT/'src/shared/world/HouseSpawnOrientation.luau').read_text()
         self.assertIn('SocketFacing.Forward(socketFrame, fromBone)',spawn)
         effects=(ROOT/'src/server/world/HouseSocketEffects.luau').read_text()

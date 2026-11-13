@@ -41,20 +41,23 @@ local function stroke(frame: GuiObject, color: Color3, transparency: number, thi
 end
 
 local function makeStick(gui: ScreenGui, name: string)
-    local pad = circle(gui, 120, PALETTE.background, 0.57)
+    local pad = circle(gui, 68, PALETTE.background, 0.34)
     pad.Name = name
-    pad.Active = true
-    pad.AnchorPoint = Vector2.new(0, 1)
-    stroke(pad, PALETTE.rim, 0.72, 1.5)
+    -- Dynamic thumb zone: no permanent left joystick or touch-capturing GUI.
+    pad.Active = false
+    pad.Visible = false
+    pad.AnchorPoint = Vector2.new(0.5, 0.5)
+    pad:SetAttribute("WorldInputPassthrough", true)
+    stroke(pad, PALETTE.rim, 0.80, 1)
 
-    local inner = circle(pad, 56, PALETTE.thumb, 0.42)
+    local inner = circle(pad, 28, PALETTE.thumb, 0.42)
     inner.Name = "Thumb"
     inner.AnchorPoint = Vector2.new(0.5, 0.5)
     inner.Position = UDim2.fromScale(0.5, 0.5)
     inner.Visible = false -- only show the white thumb while a finger owns this pad
     inner.Active = false
 
-    return { pad = pad, thumb = inner, input = nil :: InputObject?, axis = Vector2.zero }
+    return { pad = pad, thumb = inner, input = nil :: InputObject?, center = nil :: Vector2?, axis = Vector2.zero }
 end
 
 -- Icons are vector-like Roblox UI primitives, not asset IDs or text glyphs.
@@ -98,7 +101,24 @@ local function makeAction(gui: ScreenGui, name: string): TextButton
     glyph.Size = UDim2.fromScale(0.6, 0.6)
     glyph.BackgroundTransparency = 1
     glyph.Parent = button
-    if name == "Attack" then
+    if name == "Aim" then
+        -- Reticle glyph, distinct from attack and jump.
+        local ring = Instance.new("Frame")
+        ring.Name = "ReticleRing"
+        ring.AnchorPoint = Vector2.new(0.5, 0.5)
+        ring.Position = UDim2.fromScale(0.5, 0.5)
+        ring.Size = UDim2.fromScale(0.65, 0.65)
+        ring.BackgroundTransparency = 1
+        ring.Parent = glyph
+        local round = Instance.new("UICorner")
+        round.CornerRadius = UDim.new(1, 0)
+        round.Parent = ring
+        stroke(ring, PALETTE.text, 0.06, 2)
+        iconLine(glyph, "ReticleTop", 0.07, 0.21, 0.5, 0.04, 0)
+        iconLine(glyph, "ReticleBottom", 0.07, 0.21, 0.5, 0.96, 0)
+        iconLine(glyph, "ReticleLeft", 0.21, 0.07, 0.04, 0.5, 0)
+        iconLine(glyph, "ReticleRight", 0.21, 0.07, 0.96, 0.5, 0)
+    elseif name == "Attack" then
         -- Tilted sword silhouette: pointed blade, cross guard and grip.
         iconLine(glyph, "Blade", 0.16, 0.66, 0.53, 0.34, 45)
         iconLine(glyph, "Crossguard", 0.43, 0.09, 0.37, 0.58, 45)
@@ -125,23 +145,22 @@ local function getTouchPosition(input: InputObject): Vector2
 end
 
 local function stickCenter(stick): Vector2
-    return stick.pad.AbsolutePosition + stick.pad.AbsoluteSize * 0.5
-end
-
-local function touchStartsOn(stick, input: InputObject): boolean
-    local center = stickCenter(stick)
-    local radius = stick.pad.AbsoluteSize.X * 0.5
-    return (getTouchPosition(input) - center).Magnitude <= radius
+    return stick.center or (stick.pad.AbsolutePosition + stick.pad.AbsoluteSize * 0.5)
 end
 
 local function moveStick(stick, input: InputObject)
     local center = stickCenter(stick)
-    local radius = math.max(1, stick.pad.AbsoluteSize.X * 0.35)
+    -- Movement radius is larger than the small visual circle: analog precision
+    -- is preserved without putting a large control on screen.
+    local radius = math.max(38, stick.pad.AbsoluteSize.X * 0.72)
     local delta = getTouchPosition(input) - center
     local magnitude = delta.Magnitude
     local limited = if magnitude > radius then delta.Unit * radius else delta
+    local thumbLimit = stick.pad.AbsoluteSize.X * 0.28
+    local visualDelta = if limited.Magnitude > thumbLimit
+        then limited.Unit * thumbLimit else limited
     stick.thumb.Visible = true
-    stick.thumb.Position = UDim2.new(0.5, limited.X, 0.5, limited.Y)
+    stick.thumb.Position = UDim2.new(0.5, visualDelta.X, 0.5, visualDelta.Y)
 
     local normalized = limited / radius
     local strength = math.clamp((normalized.Magnitude - DEADZONE) / (1 - DEADZONE), 0, 1)
@@ -151,6 +170,8 @@ end
 
 local function releaseStick(stick)
     stick.input = nil
+    stick.center = nil
+    stick.pad.Visible = false
     stick.axis = Vector2.zero
     stick.thumb.Position = UDim2.fromScale(0.5, 0.5)
     stick.thumb.Visible = false
@@ -170,6 +191,8 @@ function MobileInputController.Start(movementController: any, cameraController: 
     local gui = Instance.new("ScreenGui")
     gui.Name = "Game1MobileControls"
     gui.ResetOnSpawn = false
+    -- Raw InputObject.Position and UDim2.fromOffset share one viewport origin.
+    gui.IgnoreGuiInset = true
     gui.DisplayOrder = 15
     gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     gui.Parent = playerGui
@@ -178,6 +201,7 @@ function MobileInputController.Start(movementController: any, cameraController: 
 
     local jump = makeAction(gui, "Jump")
     local attack = makeAction(gui, "Attack")
+    local aim = makeAction(gui, "Aim")
 
     local function layout()
         local camera = Workspace.CurrentCamera
@@ -187,18 +211,28 @@ function MobileInputController.Start(movementController: any, cameraController: 
         local viewport = camera.ViewportSize
         local short = math.min(viewport.X, viewport.Y)
         local oldStickSize = math.floor(math.clamp(short * 0.31, 105, 148))
-        local stickSize = math.floor(oldStickSize * 0.5)
+        local stickSize = math.floor(math.clamp(short * 0.17, 58, 74))
         local inset = math.floor(math.clamp(short * 0.07, 19, 34))
         local sideInset = math.floor(math.clamp(viewport.X * 0.035, 20, 44))
         local actionSize = math.floor(math.clamp(oldStickSize * 0.5, 49, 70))
-        local thumbSize = math.floor(stickSize * 0.47)
         left.pad.Size = UDim2.fromOffset(stickSize, stickSize)
-        left.pad.Position = UDim2.new(0, sideInset, 1, -inset)
-        left.thumb.Size = UDim2.fromOffset(thumbSize, thumbSize)
+        left.thumb.Size = UDim2.fromOffset(math.floor(stickSize * 0.40), math.floor(stickSize * 0.40))
         jump.Size = UDim2.fromOffset(actionSize, actionSize)
         attack.Size = UDim2.fromOffset(actionSize, actionSize)
-        jump.Position = UDim2.new(1, -sideInset, 1, -inset)
-        attack.Position = UDim2.new(1, -sideInset - actionSize - 14, 1, -inset)
+        aim.Size = UDim2.fromOffset(actionSize, actionSize)
+        -- Reserve the full former right joystick footprint as EMPTY, active
+        -- camera-look space. Place action buttons outside that invisible circle.
+        local virtualRadius = oldStickSize * 0.55
+        local buttonDistance = virtualRadius + actionSize * 0.5 + 12
+        local centerX = viewport.X - sideInset - (virtualRadius + actionSize + 18)
+        local centerY = viewport.Y - inset - (virtualRadius + actionSize * 0.45)
+        local function put(button: TextButton, x: number, y: number)
+            button.Position = UDim2.fromOffset(math.floor(x + actionSize * 0.5),
+                math.floor(y + actionSize * 0.5))
+        end
+        put(attack, centerX - buttonDistance, centerY - 18)
+        put(aim, centerX + buttonDistance, centerY - 18)
+        put(jump, centerX, centerY - buttonDistance)
     end
 
     local cameraConnection: RBXScriptConnection? = nil
@@ -221,6 +255,19 @@ function MobileInputController.Start(movementController: any, cameraController: 
     local lookFingers: {InputObject} = {}
     local lookPositions: {[InputObject]: Vector2} = {}
     local pinchGap: number? = nil
+    local pinchLocked = false -- never interpret a surviving pinch finger as fresh one-finger input
+
+    local function moveTouchZone(position: Vector2): boolean
+        local camera = Workspace.CurrentCamera
+        if not camera then return false end
+        local size = camera.ViewportSize
+        return position.X <= size.X / 3 and position.Y >= size.Y * 0.5
+    end
+
+    local function cameraTouchZone(position: Vector2): boolean
+        local camera = Workspace.CurrentCamera
+        return camera ~= nil and position.X >= camera.ViewportSize.X / 3
+    end
 
     local function gapBetweenLookFingers(): number?
         if #lookFingers ~= 2 then
@@ -235,21 +282,31 @@ function MobileInputController.Start(movementController: any, cameraController: 
         table.clear(lookFingers)
         table.clear(lookPositions)
         pinchGap = nil
+        pinchLocked = false
     end
 
     UserInputService.TouchStarted:Connect(function(input: InputObject, gameProcessed: boolean)
         if UserInputService:GetFocusedTextBox() ~= nil then
             return
         end
-        if not left.input and touchStartsOn(left, input) then
+        if not left.input and moveTouchZone(getTouchPosition(input))
+            and not UiInputGuard.BlocksWorldInput(input, gameProcessed) then
+            left.center = getTouchPosition(input)
+            left.pad.Position = UDim2.fromOffset(left.center.X, left.center.Y)
+            left.pad.Visible = true
             left.input = input
             moveStick(left, input)
             movementController.SetTouchMovement(left.axis, true)
-        elseif #lookFingers < 2 and not UiInputGuard.BlocksWorldInput(input, gameProcessed) then
-            -- Free-screen look replaces the old right-hand joystick entirely.
+        elseif not pinchLocked and #lookFingers < 2
+            and cameraTouchZone(getTouchPosition(input))
+            and not UiInputGuard.BlocksWorldInput(input, gameProcessed) then
+            -- The former right-stick area remains invisible and fully usable.
             table.insert(lookFingers, input)
             lookPositions[input] = getTouchPosition(input)
-            pinchGap = gapBetweenLookFingers()
+            if #lookFingers == 2 then
+                pinchLocked = true
+                pinchGap = gapBetweenLookFingers()
+            end
         end
     end)
 
@@ -265,7 +322,7 @@ function MobileInputController.Start(movementController: any, cameraController: 
         end
         local current = getTouchPosition(input)
         lookPositions[input] = current
-        if #lookFingers == 1 then
+        if #lookFingers == 1 and not pinchLocked then
             cameraController.RotateTouch(current - previous)
         elseif #lookFingers == 2 then
             local currentGap = gapBetweenLookFingers()
@@ -290,14 +347,27 @@ function MobileInputController.Start(movementController: any, cameraController: 
         if index then
             table.remove(lookFingers, index)
         end
-        -- Continuing a drag after a pinch uses the surviving finger's last
-        -- observed position; no accumulated jump or delayed camera motion.
-        pinchGap = gapBetweenLookFingers()
+        -- End the gesture only when ALL camera fingers are released. A remaining
+        -- finger cannot keep zooming or rotating after a two-finger pinch.
+        if #lookFingers == 0 then
+            pinchLocked = false
+            pinchGap = nil
+        elseif #lookFingers < 2 then
+            pinchGap = nil
+        end
     end)
 
     UserInputService.WindowFocusReleased:Connect(resetTouch)
     jump.Activated:Connect(function()
         movementController.RequestJump()
+    end)
+    local function showAimState(selected: Model?)
+        aim.BackgroundColor3 = if selected then Color3.fromRGB(27, 94, 101) else PALETTE.background
+        aim.BackgroundTransparency = if selected then 0.10 else 0.48
+    end
+    cameraController.AutoAimChanged(showAimState)
+    aim.Activated:Connect(function()
+        cameraController.ToggleAutoAim()
     end)
     attack.Activated:Connect(function()
         if attackController.RequestAttack then

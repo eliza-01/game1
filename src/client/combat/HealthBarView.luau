@@ -40,7 +40,9 @@ local function visualTopOffset(model: Model, anchor: BasePart): number
 end
 
 local function displayName(model: Model, monster: boolean): string
-    local text = if monster then tostring(model:GetAttribute("MonsterDisplayName")
+    local text = if monster then tostring(model:GetAttribute("NpcDisplayName")
+        or model:GetAttribute("MonsterDisplayName")
+        or model:GetAttribute("NpcSlug")
         or model:GetAttribute("MonsterSlug") or model.Name):gsub("_", " ")
         else tostring(model:GetAttribute("CharacterDisplayName") or model.Name)
     -- English monster slugs/names are always title-cased, including multiword names.
@@ -53,7 +55,9 @@ local function displayName(model: Model, monster: boolean): string
 end
 
 function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart, style: {[string]: any}): any
-    local monster = model:GetAttribute("Game1MonsterRuntime") == true
+    local monster = model:GetAttribute("Game1NpcRuntime") == true
+        or model:GetAttribute("NpcSlug") ~= nil
+        or model:GetAttribute("Game1MonsterRuntime") == true
         or model:GetAttribute("MonsterSlug") ~= nil
     local layout = if monster then "monster" else "self"
     local nameText = displayName(model, monster)
@@ -185,8 +189,19 @@ function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart,
         track.Size = UDim2.new(1, -pad * 2, 1, -pad * 2)
         update()
     end
+    -- For NPCs the name can remain visible while the HP bar stays hidden.
+    -- Existing player/monster callers retain SetVisible, which toggles both.
+    function view.SetMaxDistance(distance: number)
+        gui.MaxDistance = math.max(260, distance)
+    end
+    function view.SetSegments(showName: boolean, showHP: boolean)
+        gui.Enabled = showName or (showHP and currentStyle[layout].enabled == true)
+        titleLine.Visible = showName
+        plate.Visible = showHP and currentStyle[layout].enabled == true
+    end
     function view.SetVisible(value: boolean)
-        gui.Enabled = value and currentStyle[layout].enabled == true
+        view.SetSegments(value and currentStyle[layout].enabled == true,
+            value and currentStyle[layout].enabled == true)
     end
     function view.Destroy()
         for _, connection in ipairs(connections) do connection:Disconnect() end

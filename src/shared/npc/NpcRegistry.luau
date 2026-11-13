@@ -47,9 +47,9 @@ return table.freeze({
 			}),
 			stats = table.freeze({
 				["MaxHP"] = 3000,
-				["Damage"] = 2,
+				["Damage"] = 10,
 				["AttackSpeed"] = 300,
-				["RunSpeed"] = 150,
+				["RunSpeed"] = 80,
 				["CritChance"] = 20,
 			}),
 			textures = table.freeze({

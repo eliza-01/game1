@@ -9,6 +9,8 @@ local SkinConnection = require(game:GetService("ReplicatedStorage"):WaitForChild
 local Builder = {}
 local slots = { "upper", "lower", "gloves", "boots", "head", "eye_l", "eye_r", "eyebrow_l", "eyebrow_r", "hair" }
 local HAIR_GRIP_NAME = "CharacterMount"
+local BoneModelMount = require(game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared")
+    :WaitForChild("rig"):WaitForChild("BoneModelMount"))
 
 local function meshFromAsset(asset: Model, expectedName: string): MeshPart
     local meshes = {}
@@ -71,26 +73,9 @@ local function rigidHairFromAsset(asset: Model, rootName: string, extras: {strin
     return group, root
 end
 
-local SocketFacing = require(game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared")
-    :WaitForChild("world"):WaitForChild("SocketFacing"))
-
-local function targetSocketCFrame(targetBone: Bone): CFrame
-    local parent = targetBone.Parent
-    if parent and parent:IsA("Bone") then
-        return parent.TransformedWorldCFrame * targetBone.CFrame
-    end
-    return targetBone.WorldCFrame
-end
-
 local function createCanonicalHairGrip(mesh: MeshPart): Attachment
-    -- Match the weapon attachment contract: preserve the authored grip point,
-    -- while the grip basis stays in world XYZ instead of inheriting PivotOffset.
-    local gripPoint = mesh:GetPivot().Position
-    local grip = Instance.new("Attachment")
-    grip.Name = HAIR_GRIP_NAME
-    grip.CFrame = mesh.CFrame:ToObjectSpace(CFrame.new(gripPoint))
+    local grip = BoneModelMount.CreateGrip(mesh, "CharacterMount", mesh:GetPivot().Position)
     grip:SetAttribute("Game1HairGrip", true)
-    grip.Parent = mesh
     return grip
 end
 
@@ -155,22 +140,15 @@ function Builder.Build(recipe: any, loadAsset: (number) -> Model?): Model
                         assert(#part.used_bones == 0 and next(incoming) == nil, "rigid hair must not contain skin bones")
                         anchor = createCanonicalHairGrip(mesh)
                         local group = assert(hairGroup, "rigid hair must have a component Model")
-                        local socketFrame = SocketFacing.FullFrame(targetSocketCFrame(target), true)
-                        local delta = socketFrame * anchor.WorldCFrame:Inverse()
-                        group:PivotTo(delta * group:GetPivot())
+                        -- Identical anchored Model mount as equipped weapons. No
+                        -- physics welds between the rigid hair pieces.
+                        BoneModelMount.Place(group, anchor, BoneModelMount.SocketFrame(target, "hair"))
                         for _, piece in group:GetChildren() do
-                            if piece:IsA("MeshPart") and piece ~= mesh then
-                                local weld = Instance.new("WeldConstraint")
-                                weld.Name = "CharacterHairExtraWeld"
-                                weld.Part0 = mesh
-                                weld.Part1 = piece
-                                weld.Parent = mesh
-                            end
+                            if piece:IsA("BasePart") then piece.Anchored = true end
                         end
-                        mesh.Anchored = true
                         mesh:SetAttribute("Game1HairAttachment", true)
                         mesh:SetAttribute("HairTargetBoneName", target.Name)
-                        mesh:SetAttribute("HairAttachmentMode", "runtime-canonical-grip-v1")
+                        mesh:SetAttribute("HairAttachmentMode", "bone-model-mount")
                         runtimeHairGrip = true
                     else
                         -- Skinned accessory rig uses its authored socket Bone.

@@ -2,6 +2,7 @@
 -- Live Studio-only camera preview; saved defaults always belong to GameOptions.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local PublishedDebugAccess = require(game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared"):WaitForChild("dev"):WaitForChild("PublishedDebugAccess"))
 local Players = game:GetService("Players")
 local StudioDebugDock = require(script.Parent:WaitForChild("StudioDebugDock"))
 local CameraController = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CameraController"))
@@ -16,6 +17,7 @@ local FIELDS: {{key: string, label: string, step: number}} = {
     {key="characterY", label="Character Y · 0–1", step=0.02},
     {key="cursorX", label="Cursor / aim X · 0–1", step=0.02},
     {key="cursorY", label="Cursor / aim Y · 0–1", step=0.02},
+    {key="mobileLookSpeed", label="Mobile look speed · ×", step=0.05},
 }
 local COLORS = {bg=Color3.fromRGB(15,20,27), panel=Color3.fromRGB(25,34,44),
     text=Color3.fromRGB(238,243,246), muted=Color3.fromRGB(150,167,180),
@@ -37,7 +39,7 @@ local function button(parent: Instance, caption: string, width: number, height: 
 end
 
 function Debug.Start()
-    if started or not RunService:IsStudio() then return end
+    if started or not PublishedDebugAccess.ClientAllowed() then return end
     started=true
     local player=Players.LocalPlayer
     if not player then return end
@@ -52,7 +54,7 @@ function Debug.Start()
     opener:SetAttribute("DebugTooltip", "Camera debug")
     local panel=Instance.new("Frame")
     panel.Name="CameraDebugPanel"
-    panel.Size=UDim2.fromOffset(362,404)
+    panel.Size=UDim2.fromOffset(362,450)
     panel.Position=StudioDebugDock.WindowPosition("CD",362)
     panel.BackgroundColor3=COLORS.bg
     panel.Visible=false
@@ -72,7 +74,7 @@ function Debug.Start()
     heading.Font=Enum.Font.GothamSemibold
     heading.TextSize=13
     heading.TextXAlignment=Enum.TextXAlignment.Left
-    heading.Text="CAMERA DEBUG · STUDIO"
+    heading.Text="CAMERA DEBUG · LIVE TEST"
     heading.ZIndex=86
     heading.Parent=panel
     local close=button(panel,"×",30,28)
@@ -80,7 +82,7 @@ function Debug.Start()
     close.ZIndex=86
     local status=Instance.new("TextLabel")
     status.Size=UDim2.fromOffset(340,36)
-    status.Position=UDim2.fromOffset(12,357)
+    status.Position=UDim2.fromOffset(12,404)
     status.BackgroundTransparency=1
     status.TextColor3=COLORS.muted
     status.Font=Enum.Font.Gotham

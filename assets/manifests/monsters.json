@@ -19,6 +19,7 @@
     "defaultBehavior": {
       "aggressive": false,
       "aggroRadiusStuds": 16.0,
+      "pursuitRadiusStuds": 150.0,
       "attackRadiusStuds": 3.0,
       "riseFromGround": false
     }
@@ -72,6 +73,7 @@
       "behavior": {
         "aggressive": true,
         "aggroRadiusStuds": 32.0,
+        "pursuitRadiusStuds": 150.0,
         "attackRadiusStuds": 5.0,
         "riseFromGround": true
       },

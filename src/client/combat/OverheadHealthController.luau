@@ -14,7 +14,8 @@ local own: any = nil
 local ownCharacter: Model? = nil
 local ownDestroyConnection: RBXScriptConnection? = nil
 local monsterViews: {[Model]: any} = {}
-local pendingMonsters: {[Model]: boolean} = {}
+local pendingMonsters: {[Model]: {RBXScriptConnection}} = {}
+local anchorRemovedConnections: {[Model]: RBXScriptConnection} = {}
 local folderConnections: {RBXScriptConnection} = {}
 local watchedFolder: Folder? = nil
 local aimedMonster: Model? = nil
@@ -49,26 +50,65 @@ local function bindOwn(character: Model?)
     end)
 end
 
+local function clearPendingMonster(model: Model)
+    local connections = pendingMonsters[model]
+    if not connections then return end
+    pendingMonsters[model] = nil
+    for _, connection in ipairs(connections) do connection:Disconnect() end
+end
+
 local function unbindMonster(model: Model)
+    local removed = anchorRemovedConnections[model]
+    if removed then removed:Disconnect(); anchorRemovedConnections[model] = nil end
+    clearPendingMonster(model)
     local view = monsterViews[model]
     if view then view.Destroy(); monsterViews[model] = nil end
-    pendingMonsters[model] = nil
     if aimedMonster == model then aimedMonster = nil end
 end
 
 local function bindMonster(model: Instance)
     if not model:IsA("Model") or monsterViews[model] or pendingMonsters[model] then return end
     local monster = model :: Model
-    pendingMonsters[monster] = true
-    task.spawn(function()
-        -- The spawner publishes the Model before it constructs RootCollider.
-        local anchor = anchorFor(monster) or monster:WaitForChild("RootCollider", 5)
-        if pendingMonsters[monster] and anchor and anchor:IsA("BasePart")
-            and monster.Parent == watchedFolder and not monsterViews[monster] then
-            monsterViews[monster] = HealthBarView.Create(player:WaitForChild("PlayerGui"), monster, anchor, HealthUiSettings.Current())
+    -- The server parents the model BEFORE publishing its attributes and its
+    -- navigation/collision root. Attribute and part replication can arrive in
+    -- either order, especially when StreamingEnabled is on. Do not time out.
+    local connections: {RBXScriptConnection} = {}
+    pendingMonsters[monster] = connections
+    local function attachWhenReady()
+        if monster.Parent ~= watchedFolder or monsterViews[monster] then return end
+        if monster:GetAttribute("Game1MonsterRuntime") ~= true
+            or monster:GetAttribute("LifeState") == nil
+            or type(monster:GetAttribute("MonsterSlug")) ~= "string" then return end
+        -- Wait for the actual combat/visual collider, not the early
+        -- navigation root, which can arrive before the full monster rig.
+        local anchor = monster:FindFirstChild("RootCollider")
+        if not anchor or not anchor:IsA("BasePart") then return end
+        local playerGui = player:FindFirstChildOfClass("PlayerGui")
+        if not playerGui then return end
+        clearPendingMonster(monster)
+        -- This is an overhead MONSTER view, never a self-health view. Its
+        -- identity is ready before construction; visibility starts disabled.
+        monsterViews[monster] = HealthBarView.Create(
+            playerGui, monster, anchor, HealthUiSettings.Current())
+        -- Streaming can remove a PART while leaving the Model alive. Reattach
+        -- the existing UI policy when its adornee is streamed back in.
+        anchorRemovedConnections[monster] = monster.ChildRemoved:Connect(function(child)
+            if child == anchor then
+                unbindMonster(monster)
+                if monster.Parent == watchedFolder then bindMonster(monster) end
+            end
+        end)
+    end
+    table.insert(connections, monster.ChildAdded:Connect(function(child)
+        if child.Name == "RootCollider" or child.Name == "HumanoidRootPart"
+            or child.Name == "NavigationRoot" then
+            attachWhenReady()
         end
-        pendingMonsters[monster] = nil
-    end)
+    end))
+    for _, attribute in ipairs({"Game1MonsterRuntime", "MonsterSlug", "LifeState"}) do
+        table.insert(connections, monster:GetAttributeChangedSignal(attribute):Connect(attachWhenReady))
+    end
+    attachWhenReady()
 end
 
 local function watchFolder(folder: Folder)
@@ -76,6 +116,7 @@ local function watchFolder(folder: Folder)
     for _, connection in ipairs(folderConnections) do connection:Disconnect() end
     table.clear(folderConnections)
     for model in pairs(monsterViews) do unbindMonster(model) end
+    for model in pairs(pendingMonsters) do clearPendingMonster(model) end
     watchedFolder = folder
     table.insert(folderConnections, folder.ChildAdded:Connect(bindMonster))
     table.insert(folderConnections, folder.ChildRemoved:Connect(function(child)
@@ -85,16 +126,15 @@ local function watchFolder(folder: Folder)
 end
 
 local function reticleTarget(): Model?
-    local camera = Workspace.CurrentCamera
-    if not camera then return nil end
-    local size = camera.ViewportSize
-    local cursor = CameraController.CursorPoint()
-    local ray = camera:ViewportPointToRay(cursor.X * size.X, cursor.Y * size.Y)
+    -- Same aim ray as camera, Bow and AttackController: no mismatched
+    -- viewport calculation or camera-to-character offset.
+    local origin, direction = CameraController.GetAimRay()
+    if not origin or not direction then return nil end
     local params = RaycastParams.new()
     params.FilterType = Enum.RaycastFilterType.Exclude
     params.FilterDescendantsInstances = if player.Character then {player.Character} else {}
     params.RespectCanCollide = false
-    local hit = Workspace:Raycast(ray.Origin, ray.Direction * AIM_MAX_DISTANCE, params)
+    local hit = Workspace:Raycast(origin, direction * AIM_MAX_DISTANCE, params)
     if not hit then return nil end
     local model = hit.Instance:FindFirstAncestorOfClass("Model")
     while model do
@@ -121,16 +161,21 @@ local function updateVisibility()
     local radius = math.clamp(tonumber(style.monster and style.monster.maxDistanceStuds) or 100, 20, 800)
     local radiusSquared = radius * radius
     aimedMonster = if playerRoot then reticleTarget() else nil
+    -- A locked mobile camera deliberately tracks this same live monster; do
+    -- not lose its HP just because the collider briefly misses a ray sample.
+    local lockedMonster = CameraController.AutoAimTarget()
     for model, view in pairs(monsterViews) do
         local alive = model.Parent ~= nil and model:GetAttribute("LifeState") == "Alive"
-        local focused = model == aimedMonster
+        local focused = model == aimedMonster or model == lockedMonster
+        -- The server's current target is the authority. Aggro/Chase/Attack
+        -- all keep this attribute until the monster actually leaves combat.
         local attackingUs = model:GetAttribute("MonsterCombatActive") == true
             and model:GetAttribute("MonsterTargetUserId") == player.UserId
         local root = anchorFor(model)
         local delta = if playerRoot and root then root.Position - playerRoot.Position else nil
         local inRange = delta ~= nil and delta:Dot(delta) <= radiusSquared
         view.SetVisible(alive and inRange
-            and (HealthUiSettings.IsPreviewing() or focused or attackingUs))
+            and (HealthUiSettings.ShowAllMonsters() or focused or attackingUs))
     end
 end
 
@@ -158,6 +203,7 @@ function Controller.Start()
             for _, connection in ipairs(folderConnections) do connection:Disconnect() end
             table.clear(folderConnections)
             for model in pairs(monsterViews) do unbindMonster(model) end
+            for model in pairs(pendingMonsters) do clearPendingMonster(model) end
             watchedFolder = nil
         end
     end)

@@ -73,6 +73,11 @@ local function registerModel(model: Model, random: Random, runAgent: (any) -> ()
             local agent = {
                 model = model,
                 root = root,
+                home = model:GetAttribute("MonsterHomePosition") or root.Position,
+                spawnCenter = model:GetAttribute("MonsterSpawnCenter") or root.Position,
+                pursuitRadius = math.clamp(tonumber(model:GetAttribute("MonsterPursuitRadiusStuds")) or 150, 1, 10000),
+                lastDealtDamageAt = 0,
+                returning = false,
                 humanoid = humanoid,
                 animator = animator,
                 attackRows = attackRows,

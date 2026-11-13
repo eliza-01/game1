@@ -112,6 +112,7 @@ local function spawnOne(state: any): boolean
     entity:SetAttribute("NpcSlug", slug)
     NpcEquipmentService.Equip(entity, slug)
     entity:SetAttribute("SpawnId", tostring(record.spawnId or ""))
+    entity:SetAttribute("NpcHomeRadiusStuds", math.clamp(finite(record.homeRadiusStuds, finite((definition.behavior or {}).pursuitRadiusStuds, 16)), 1, 10000))
     entity:SetAttribute("Damageable", true)
     entity:SetAttribute("LifeState", "Alive")
     entity:SetAttribute("InCombat", false)

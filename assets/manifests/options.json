@@ -15,7 +15,8 @@
     "characterX": 0.5,
     "characterY": 0.6,
     "cursorX": 0.5,
-    "cursorY": 0.5
+    "cursorY": 0.5,
+    "mobileLookSpeed": 1.5
   },
   "cameraPresets": [
     {
@@ -70,7 +71,7 @@
         "border": 0,
         "nameSize": 15,
         "levelSize": 11,
-        "offsetStuds": 2.35,
+        "offsetStuds": 0.10000000000000009,
         "maxDistanceStuds": 100
       },
       "colors": {
@@ -119,10 +120,27 @@
       "showPublishedControls": true
     },
     "mobile": {
-      "showPublishedControls": false
+      "showPublishedControls": true
     }
   },
   "worldStreaming": {
     "targetRadiusStuds": 150
+  },
+  "playerJump": {
+    "heightMultiplier": 2.0,
+    "descentTimeMultiplier": 2.0
+  },
+  "npcOverhead": {
+    "desktop": {
+      "nameRadiusStuds": 70,
+      "healthRadiusStuds": 70
+    },
+    "mobile": {
+      "nameRadiusStuds": 70,
+      "healthRadiusStuds": 70
+    }
+  },
+  "monsterAi": {
+    "noDamageReturnSeconds": 30
   }
 }

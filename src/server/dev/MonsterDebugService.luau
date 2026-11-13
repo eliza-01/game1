@@ -1,5 +1,6 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local PublishedDebugAccess = require(game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared"):WaitForChild("dev"):WaitForChild("PublishedDebugAccess"))
 local Workspace = game:GetService("Workspace")
 
 local MonsterDebugService = {}
@@ -76,12 +77,14 @@ local function row(model: Model): any
 end
 
 local function catalog(_player: Player)
+    if not PublishedDebugAccess.ServerAllowed(_player) then return {monsters={}} end
     local rows = {}
     for _, model in ipairs(collect()) do table.insert(rows, row(model)) end
     return { monsters = rows, selectedId = rows[1] and rows[1].id or "" }
 end
 
 local function apply(_player: Player, id: any, patch: any)
+    if not PublishedDebugAccess.ServerAllowed(_player) then return {ok=false, error="Developer debug access denied"} end
     local model = find(id)
     if not model then return {ok = false, error = "selected monster no longer exists"} end
     if type(patch) ~= "table" then return {ok = false, error = "monster debug patch must be a table"} end
@@ -98,7 +101,7 @@ local function apply(_player: Player, id: any, patch: any)
 end
 
 function MonsterDebugService.Start()
-    if started or not RunService:IsStudio() then return end
+    if started or not PublishedDebugAccess.ServerEnabled() then return end
     started = true
     local remotes = ensureRemoteFolder()
     ensureRemoteFunction(remotes, "GetMonsterDebugCatalog").OnServerInvoke = catalog

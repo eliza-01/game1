@@ -158,6 +158,8 @@ local function spawnOne(state: any): Model?
         warn("[game1][monster-spawn] monster navigation rig could not be created: " .. slug)
         return nil
     end
+    -- Preserve the ground-level home before the underground reveal moves the rig.
+    model:SetAttribute("MonsterHomePosition", navigationRoot.Position)
     local riseFromGround = definition.behavior and definition.behavior.riseFromGround == true
     local spawnPresentation = MonsterSpawnPresentation.Prepare(model, visual, navigationRoot, humanoid, riseFromGround)
     local hitbox = EntityHitboxService.Attach(model, visual)

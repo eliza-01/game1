@@ -40,7 +40,7 @@ class TestAssetManagerStaticFreshness(unittest.TestCase):
 
     def test_client_urls_and_favicon_are_explicit(self):
         html = (SERVER_DIR / "static" / "index.html").read_text(encoding="utf-8")
-        self.assertIn("monster-assets.js?v=6", html)
+        self.assertIn("monster-assets.js?v=338", html)
         self.assertIn("npc-assets.js?v=5", html)
         self.assertIn('<link rel="icon" href="data:,">', html)
 

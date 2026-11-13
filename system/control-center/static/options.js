@@ -7,6 +7,7 @@ const GAME1_CAMERA_FIELDS=[
   ['characterY','Character Y','screen',0.2,0.8,0.01],
   ['cursorX','Aim cursor X','screen',0.1,0.9,0.01],
   ['cursorY','Aim cursor Y','screen',0.1,0.9,0.01],
+  ['mobileLookSpeed','Mobile camera look speed','×',0.25,4,0.05],
 ];
 function game1OptionNumber(id,fallback){const value=Number($(id).value);return Number.isFinite(value)?value:fallback}
 function game1CameraRead(){
@@ -39,8 +40,12 @@ function game1OptionsRender(){
   const combat=data.combat||{};
   const life=data.characterAnimations||{};
   $('option-combat-state-duration').value=String(combat.stateDurationSeconds??6);
+  $('option-monster-return-time').value=String(data.monsterAi?.noDamageReturnSeconds??30);
+  game1NpcOverheadRender();
   $('option-character-death-playback').value=String(life.deathPlaybackPercent??100);
   $('option-character-revive-playback').value=String(life.revivePlaybackPercent??100);
+  $('option-jump-height').value=String(data.playerJump?.heightMultiplier??2);
+  $('option-jump-descent').value=String(data.playerJump?.descentTimeMultiplier??2);
   game1CameraFill(data.camera||{});
   const select=$('option-camera-presets');
   const current=select.value;
@@ -52,7 +57,9 @@ function game1OptionsRender(){
   game1HealthDraftStatus(data);
   $('option-world-streaming-radius').value=String(data.worldStreaming?.targetRadiusStuds??150);
   $('save-combat-options').disabled=game1OptionsState.saving;
+  $('option-npc-overhead-save').disabled=game1OptionsState.saving;
   $('save-character-life-options').disabled=game1OptionsState.saving;
+  $('save-player-jump-options').disabled=game1OptionsState.saving;
   for(const id of ['option-camera-save','option-camera-preset-save','option-camera-preset-apply','option-camera-preset-delete','health-ui-save','option-published-debug-save','option-world-streaming-save']){
     $(id).disabled=game1OptionsState.saving;
   }
@@ -100,8 +107,32 @@ $('option-world-streaming-copy').onclick=async()=>{
   }catch(error){toast(error.message||'Cannot copy Command Bar code',true)}
 };
 $('refresh-options').onclick=game1OptionsLoad;
-$('save-combat-options').onclick=()=>game1OptionsSave({combat:{stateDurationSeconds:game1OptionNumber('option-combat-state-duration',6)}},'combat options saved');
+$('save-combat-options').onclick=()=>game1OptionsSave({combat:{stateDurationSeconds:game1OptionNumber('option-combat-state-duration',6)},monsterAi:{noDamageReturnSeconds:game1OptionNumber('option-monster-return-time',30)}},'combat and monster return saved');
+function game1NpcOverheadRender(){
+  const device=$('option-npc-device').value;
+  const opts=game1OptionsState.data?.npcOverhead?.[device]||{};
+  $('option-npc-name-radius').value=String(opts.nameRadiusStuds??70);
+  $('option-npc-health-radius').value=String(opts.healthRadiusStuds??70);
+}
+$('option-npc-device').onchange=game1NpcOverheadRender;
+$('option-npc-overhead-save').onclick=()=>{
+  const nameRadiusStuds=game1OptionNumber('option-npc-name-radius',70);
+  const healthRadiusStuds=game1OptionNumber('option-npc-health-radius',70);
+  if(![nameRadiusStuds,healthRadiusStuds].every(value=>value>=10&&value<=800)){
+    toast('NPC distance must be 10–800 studs',true);return;
+  }
+  const device=$('option-npc-device').value;
+  game1OptionsSave({npcOverhead:{[device]:{nameRadiusStuds,healthRadiusStuds}}},'NPC overhead saved');
+};
 $('save-character-life-options').onclick=()=>game1OptionsSave({characterAnimations:{deathPlaybackPercent:game1OptionNumber('option-character-death-playback',100),revivePlaybackPercent:game1OptionNumber('option-character-revive-playback',100)}},'character life animation options saved');
+$('save-player-jump-options').onclick=()=>{
+  try {
+    const heightMultiplier=game1OptionNumber('option-jump-height',2);
+    const descentTimeMultiplier=game1OptionNumber('option-jump-descent',2);
+    if(![heightMultiplier,descentTimeMultiplier].every(x=>Number.isFinite(x)&&x>=0.5&&x<=4)) throw Error('Jump multipliers must be 0.5–4');
+    game1OptionsSave({playerJump:{heightMultiplier,descentTimeMultiplier}},'Jump settings saved · sync Rojo and restart Play');
+  }catch(error){toast(error.message,true)}
+};
 $('option-camera-save').onclick=()=>{
   try{const camera=game1CameraRead();game1OptionsSave({camera},'Camera options saved · sync Rojo and restart Play to apply')}
   catch(error){toast(error.message,true)}

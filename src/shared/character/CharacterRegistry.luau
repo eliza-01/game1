@@ -13,14 +13,14 @@ return table.freeze({
 			gender = "female",
 			status = "ASSEMBLY_READY",
 			visualMode = "assembly",
-			revision = 14,
+			revision = 15,
 			stats = table.freeze({
 				Level = 2,
 				MaxHP = 100,
 				Damage = 10,
 				Defense = 0,
 				AttackSpeed = 177,
-				RunSpeed = 155,
+				RunSpeed = 255,
 				CritChance = 0,
 			}),
 			model = table.freeze({

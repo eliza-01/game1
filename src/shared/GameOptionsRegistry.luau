@@ -13,6 +13,7 @@ return table.freeze({
 		characterY = 0.6,
 		cursorX = 0.5,
 		cursorY = 0.5,
+		mobileLookSpeed = 1.5,
 	}),
 	healthUi = table.freeze({
 		desktop = table.freeze({
@@ -40,7 +41,7 @@ return table.freeze({
 				border = 0,
 				nameSize = 15,
 				levelSize = 11,
-				offsetStuds = 2.35,
+				offsetStuds = 0.1,
 				maxDistanceStuds = 100,
 			}),
 			colors = table.freeze({
@@ -84,12 +85,29 @@ return table.freeze({
 			}),
 		}),
 	}),
+	npcOverhead = table.freeze({
+		desktop = table.freeze({
+			nameRadiusStuds = 70,
+			healthRadiusStuds = 70,
+		}),
+		mobile = table.freeze({
+			nameRadiusStuds = 70,
+			healthRadiusStuds = 70,
+		}),
+	}),
+	monsterAi = table.freeze({
+		noDamageReturnSeconds = 30,
+	}),
+	playerJump = table.freeze({
+		heightMultiplier = 2,
+		descentTimeMultiplier = 2,
+	}),
 	debugUi = table.freeze({
 		desktop = table.freeze({
 			showPublishedControls = true,
 		}),
 		mobile = table.freeze({
-			showPublishedControls = false,
+			showPublishedControls = true,
 		}),
 	}),
 	characterAnimations = table.freeze({

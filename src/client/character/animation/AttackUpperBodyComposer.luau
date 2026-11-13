@@ -209,7 +209,13 @@ function AttackUpperBodyComposer.BeginExitBlend()
 	exitBlendStartedAt = os.clock()
 end
 
-function AttackUpperBodyComposer.Begin(character: Model, descriptor: any, playbackSpeed: number, stillValid: (() -> boolean)?): (AnimationTrack?, string?)
+function AttackUpperBodyComposer.Begin(
+    character: Model,
+    descriptor: any,
+    playbackSpeed: number,
+    stillValid: (() -> boolean)?,
+    playbackDuration: number?
+): (AnimationTrack?, string?, number?)
 	local visual = character:FindFirstChild("Visual")
 	if not visual or not visual:IsA("Model") then
 		return nil, "visible character rig is missing"
@@ -294,7 +300,15 @@ function AttackUpperBodyComposer.Begin(character: Model, descriptor: any, playba
 	sourceAnimation = animation
 	sourceTrack = track
 	upperPairs = pairs
-	sourcePlaybackSpeed = math.max(0.01, tonumber(playbackSpeed) or 1)
+	-- Authored metadata describes combat-event fractions; it is not necessarily
+	-- the same length reported by Roblox for the published AnimationTrack.
+	-- Match the *loaded* source clip to the fixed authoritative attack interval.
+	-- Otherwise the terminal-pose guard can hold a finished clip for ~1s.
+	local actualPlaybackSpeed = math.max(0.01, tonumber(playbackSpeed) or 1)
+	if typeof(playbackDuration) == "number" and playbackDuration > 0.001 then
+		actualPlaybackSpeed = math.max(0.01, track.Length / playbackDuration)
+	end
+	sourcePlaybackSpeed = actualPlaybackSpeed
 	sourcePoseFrozen = false
 	blendStartedAt = os.clock()
 	exitBlendStartedAt = 0
@@ -304,7 +318,7 @@ function AttackUpperBodyComposer.Begin(character: Model, descriptor: any, playba
 	pcall(function()
 		track.TimePosition = 0
 	end)
-	return track, nil
+	return track, nil, sourcePlaybackSpeed
 end
 
 function AttackUpperBodyComposer.End()

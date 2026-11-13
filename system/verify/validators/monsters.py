@@ -211,9 +211,18 @@ def check_monster_contracts(
             report_error(f"monster animated-navigation bridge missing {required}")
     if "Game1MonsterVisualWeld" in monster_runtime_text:
         report_error("monster navigation must never rigid-weld every visual BasePart; weld only the rig root")
-    for required in ['Workspace:FindFirstChild("Game1Authoring")', 'authoring:FindFirstChild("MonsterSpawns")', "monsterSpawns:Destroy()", "removeAuthoringVisualsFromSimulation"]:
-        if required not in monster_runtime_text:
-            report_error(f"Play/Run monster-spawn authoring-visual cleanup missing {required}")
+    # M321: one runtime-only owner removes ALL editor marker categories, including
+    # Locations. Monster/NPC spawners must not each implement partial cleanup.
+    cleanup_path = root / "src/server/world/Game1AuthoringCleanupService.luau"
+    cleanup_text = cleanup_path.read_text(encoding="utf-8") if cleanup_path.exists() else ""
+    catalog_text = (root / "src/server/bootstrap/ServiceCatalog.luau").read_text(encoding="utf-8")
+    for required in ['Workspace:FindFirstChild("Game1Authoring")', 'Workspace.ChildAdded:Connect(removeAuthoringRoot)', 'instance:Destroy()']:
+        if required not in cleanup_text:
+            report_error(f"Play/Run authoring root cleanup missing {required}")
+    if 'Game1AuthoringCleanupService' not in catalog_text:
+        report_error("Play/Run authoring root cleanup service not registered")
+    if 'removeAuthoringVisualsFromSimulation' in monster_runtime_text:
+        report_error("monster spawner must defer authoring cleanup to shared runtime owner")
     if "RunService.Heartbeat" in monster_runtime_text:
         report_error("monster spawn/wander runtime must not use a permanent Heartbeat loop")
     if "MonsterSpawnerService.Start()" not in server_init_text:

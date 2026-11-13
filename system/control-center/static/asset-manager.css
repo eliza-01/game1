@@ -244,3 +244,21 @@ main > .content{padding-top:14px}
 #weapons-view #arrow-assets-panel{padding:16px 20px}
 #weapons-view #arrow-assets-panel .deco-atlas-dots{margin:2px 0}
 #weapons-view #arrow-assets-panel .table-wrap{max-height:460px}
+
+/* M322: Health UI editor; independent responsive device profiles. */
+.game1-health-ui-options{margin-top:14px}
+.game1-hp-device-tabs{margin:14px 0}
+.game1-hp-fields{display:grid;grid-template-columns:repeat(2,minmax(230px,1fr));gap:12px;margin-bottom:16px}
+.game1-hp-section{padding:14px;background:var(--panel2);border:1px solid var(--line);border-radius:13px;min-width:0}
+.game1-hp-section h4{font-size:14px;margin-bottom:8px;color:var(--text)}
+.game1-hp-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.game1-hp-grid label{margin:0!important;padding:3px 0;color:var(--muted);font-size:11px}
+.game1-hp-grid label input[type=number]{margin-top:5px;font-variant-numeric:tabular-nums}
+.game1-hp-grid label.game1-hp-enabled{display:flex;align-items:center;gap:8px;grid-column:1/-1}
+.game1-hp-grid label.game1-hp-enabled input{width:auto;margin:0}
+.game1-hp-color{display:flex;align-items:center;gap:8px}
+.game1-hp-color input[type=color]{padding:2px;width:48px;min-width:48px;height:36px;cursor:pointer}
+.game1-hp-color input[type=text]{width:100%;min-width:0;font:12px ui-monospace,monospace}
+.game1-published-debug-toggle{display:flex!important;align-items:center;gap:10px!important}
+.game1-published-debug-toggle input{width:18px!important;margin:0!important;accent-color:var(--mint)}
+@media(max-width:750px){.game1-hp-fields{grid-template-columns:1fr}}

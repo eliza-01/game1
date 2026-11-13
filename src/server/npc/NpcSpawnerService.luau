@@ -171,11 +171,6 @@ function NpcSpawnerService.Start()
     started = true
     NpcCombatAIService.Start()
     folder()
-    local authoring = Workspace:FindFirstChild("Game1Authoring")
-    local markers = authoring and authoring:FindFirstChild("NpcSpawns")
-    if markers then
-        markers:Destroy()
-    end
     RunService.PreAnimation:Connect(function(delta)
         for _, state in pairs(states) do
             for entity, entry in pairs(state.instances) do

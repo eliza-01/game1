@@ -211,7 +211,7 @@ end
 
 -- Server applies damage immediately at the authored Release; the visual arrow
 -- subsequently flies toward the FROZEN point with no collision polling.
-function Service.Release(player: Player, character: Model, snapshot: any): boolean
+function Service.Release(player: Player, character: Model, snapshot: any): (boolean, number)
     local root = character:FindFirstChild("RootCollider")
     if not root or not root:IsA("BasePart") or player.Character ~= character
         or character:GetAttribute("LifeState") ~= "Alive"
@@ -278,10 +278,11 @@ function Service.Release(player: Player, character: Model, snapshot: any): boole
     }
     -- Send visual coordinates BEFORE damage can initiate Death/rig cleanup.
     publish(payload)
+    local damageDealt = 0
     if target then
         local headshot = snapshot.zone == "head"
         local damage = math.max(0, tonumber(character:GetAttribute("Damage")) or 0)
-        DamageService.Apply(character, target,
+        damageDealt = DamageService.Apply(character, target,
             damage * (if headshot then AttackConfig.HeadshotDamageMultiplier else 1), headshot)
         target:SetAttribute("LastHitZone", if headshot then "head" else "body")
         target:SetAttribute("LastHeadshot", headshot)
@@ -298,7 +299,7 @@ function Service.Release(player: Player, character: Model, snapshot: any): boole
             :format(shotSerial, if target then target.Name else "world", tostring(payload.zone),
                 if hitPart then hitPart.Name else "no-embedded-arrow"))
     end
-    return true
+    return true, damageDealt
 end
 
 function Service.Start()

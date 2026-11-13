@@ -17,9 +17,18 @@ function CombatFeedbackController.Start()
     end
 
     remote.OnClientEvent:Connect(function(payload: any)
-        if type(payload) ~= "table" or tostring(payload.kind or "") ~= "damage" then
+        if type(payload) ~= "table" then return end
+        if payload.kind == "miss" or payload.kind == "far" then
+            if typeof(payload.position) == "Vector3" then
+                if payload.kind == "far" then
+                    CombatFloatingText.ShowFar(payload.target, payload.position)
+                else
+                    CombatFloatingText.ShowMiss(payload.target, payload.position)
+                end
+            end
             return
         end
+        if payload.kind ~= "damage" then return end
         local position = payload.position
         local damage = tonumber(payload.damage) or 0
         if typeof(position) ~= "Vector3" or damage <= 0 then

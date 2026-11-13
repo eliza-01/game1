@@ -14,6 +14,82 @@ return table.freeze({
 		cursorX = 0.5,
 		cursorY = 0.5,
 	}),
+	healthUi = table.freeze({
+		desktop = table.freeze({
+			screen = table.freeze({
+				enabled = true,
+				width = 280,
+				height = 20,
+				border = 0,
+				textSize = 12,
+				top = 18,
+			}),
+			self = table.freeze({
+				enabled = false,
+				width = 148,
+				height = 12,
+				border = 2,
+				nameSize = 13,
+				levelSize = 15,
+				offsetStuds = 1.7,
+			}),
+			monster = table.freeze({
+				enabled = true,
+				width = 60,
+				height = 8,
+				border = 0,
+				nameSize = 15,
+				levelSize = 11,
+				offsetStuds = 2.35,
+			}),
+			colors = table.freeze({
+				green = "#16D423",
+				yellow = "#E79F04",
+				red = "#E2181B",
+			}),
+		}),
+		mobile = table.freeze({
+			screen = table.freeze({
+				enabled = true,
+				width = 214,
+				height = 17,
+				border = 2,
+				textSize = 13,
+				top = 11,
+			}),
+			self = table.freeze({
+				enabled = false,
+				width = 126,
+				height = 11,
+				border = 1.7,
+				nameSize = 14,
+				levelSize = 8,
+				offsetStuds = 1.8,
+			}),
+			monster = table.freeze({
+				enabled = true,
+				width = 60,
+				height = 6,
+				border = 0,
+				nameSize = 13,
+				levelSize = 19,
+				offsetStuds = 2.05,
+			}),
+			colors = table.freeze({
+				green = "#16D423",
+				yellow = "#E79F04",
+				red = "#E2181B",
+			}),
+		}),
+	}),
+	debugUi = table.freeze({
+		desktop = table.freeze({
+			showPublishedControls = false,
+		}),
+		mobile = table.freeze({
+			showPublishedControls = false,
+		}),
+	}),
 	characterAnimations = table.freeze({
 		deathPlaybackPercent = 50,
 		revivePlaybackPercent = 50,

@@ -67,7 +67,7 @@ class CoreContractsM170Tests(unittest.TestCase):
 
     def test_combat_contracts_keep_diagnostic_order(self):
         with self.intercept("src/server/combat/AttackService.luau", lambda s: s.replace(
-                "[game1][attack] miss", "[game1][attack] removed").replace(
+                "[game1][attack] zero_damage", "[game1][attack] removed").replace(
                 "AttackSessionStore.IsCoolingDown", "AttackSessionStore.Disabled")):
             problems, _ = self.combat()
         self.assertEqual(problems, [

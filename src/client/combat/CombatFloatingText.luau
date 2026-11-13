@@ -215,4 +215,51 @@ function CombatFloatingText.ShowHeadshot(target: any, fallbackPosition: Vector3)
     cleanupBillboard(gui, parent, root, CRITICAL_LIFETIME + 0.05)
 end
 
+-- Both authoritative outcome labels use the same transient over-head styling.
+-- A blank swing never reaches this layer, and Far is server-throttled for melee.
+local function showOutcome(target: any, fallbackPosition: Vector3, labelText: string)
+    local parent, root, offset = targetAnchor(target, fallbackPosition, DAMAGE_ABOVE_TARGET_STUDS + 0.35)
+    local gui = Instance.new("BillboardGui")
+    gui.Name = "Combat" .. labelText
+    gui.Adornee = root or (parent:IsA("BasePart") and parent or nil)
+    gui.AlwaysOnTop = true
+    gui.LightInfluence = 0
+    gui.MaxDistance = MAX_DISTANCE
+    gui.Size = UDim2.fromOffset(122, 40)
+    gui.StudsOffsetWorldSpace = offset
+    gui.Parent = parent
+
+    local label = Instance.new("TextLabel")
+    label.BackgroundTransparency = 1
+    label.Size = UDim2.fromScale(1, 1)
+    label.Text = labelText
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 23
+    label.TextColor3 = if labelText == "Far" then Color3.fromRGB(255, 185, 83)
+        else Color3.fromRGB(235, 237, 240)
+    label.TextStrokeColor3 = Color3.fromRGB(23, 27, 36)
+    label.TextStrokeTransparency = 0.08
+    label.Parent = gui
+
+    local scale = Instance.new("UIScale")
+    scale.Scale = 0.85
+    scale.Parent = label
+    TweenService:Create(scale, TweenInfo.new(0.14, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+    TweenService:Create(gui, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        StudsOffsetWorldSpace = offset + Vector3.new(0, 1.2, 0),
+    }):Play()
+    TweenService:Create(label, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.In, 0, false, 0.20), {
+        TextTransparency = 1, TextStrokeTransparency = 1,
+    }):Play()
+    cleanupBillboard(gui, parent, root, 0.88)
+end
+
+function CombatFloatingText.ShowMiss(target: any, fallbackPosition: Vector3)
+    showOutcome(target, fallbackPosition, "Miss")
+end
+
+function CombatFloatingText.ShowFar(target: any, fallbackPosition: Vector3)
+    showOutcome(target, fallbackPosition, "Far")
+end
+
 return table.freeze(CombatFloatingText)

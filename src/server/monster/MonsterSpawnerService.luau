@@ -262,28 +262,11 @@ end
 -- The callback is injected to keep instance construction and presentation in Spawner.
 population = MonsterPopulationController.new(spawnOne)
 
-local function removeAuthoringVisualsFromSimulation()
-    local authoring = Workspace:FindFirstChild("Game1Authoring")
-    if not authoring then
-        return
-    end
-    local monsterSpawns = authoring:FindFirstChild("MonsterSpawns")
-    if monsterSpawns then
-        -- Spawn circles, marker arrows and BillboardGui IDs are editor authoring aids.
-        -- The Play/Run DataModel uses the generated registry and must not render them.
-        monsterSpawns:Destroy()
-    end
-    if #authoring:GetChildren() == 0 then
-        authoring:Destroy()
-    end
-end
-
 function MonsterSpawnerService.Start()
     if started then
         return
     end
     started = true
-    removeAuthoringVisualsFromSimulation()
     ensureMonstersFolder()
 
     -- Death runs as a normal one-shot. PreAnimation only catches the step that

@@ -25,7 +25,7 @@ export type DamageQuery = {
     headshotTarget: Model?,
 }
 
-function AttackDamageResolver.Apply(query: DamageQuery): (number, Model?)
+function AttackDamageResolver.Apply(query: DamageQuery): (number, Model?, number)
     local player = query.player
     local character = query.character
     local root = query.root
@@ -39,6 +39,7 @@ function AttackDamageResolver.Apply(query: DamageQuery): (number, Model?)
     local attackRange = query.attackRange
     local headshotTarget = query.headshotTarget
     local hitCount = 0
+    local damagedTargets = 0
     local contacts = EntityHitboxService.QueryDamageablesInBox(character, boxCFrame, boxSize, hitTargets)
 
     -- The reticle ray contributes ONE nearest aimed target independently of blade
@@ -92,6 +93,7 @@ function AttackDamageResolver.Apply(query: DamageQuery): (number, Model?)
                 character:SetAttribute("LastAttackHitZone", "body")
             end
             hitTargets[model] = true
+            if finalDamage > 0 then damagedTargets += 1 end
             HitEffectService.Publish(character, model, model:GetAttribute("LastCritical") == true, hitPosition)
             hitCount += 1
             if Config.DebugLogs then
@@ -113,7 +115,7 @@ function AttackDamageResolver.Apply(query: DamageQuery): (number, Model?)
         end
     end
 
-    return hitCount, headshotTarget
+    return hitCount, headshotTarget, damagedTargets
 end
 
 return table.freeze(AttackDamageResolver)

@@ -6,7 +6,7 @@
 <link rel="icon" href="data:,">
 <title>game1 · asset manager</title>
 <link rel="stylesheet" href="shared-asset-retirement.css?v=2">
-<link rel="stylesheet" href="asset-manager.css?v=309">
+<link rel="stylesheet" href="asset-manager.css?v=322">
 <link rel="stylesheet" href="database-history.css?v=3">
 <link rel="stylesheet" href="atlas-library.css?v=2">
 <link rel="stylesheet" href="asset-section-order.css?v=1">
@@ -374,6 +374,25 @@
     <label>New / overwrite preset<input id="option-camera-preset-name" maxlength="40" placeholder="e.g. Cinematic close"></label>
     <div class="actions"><button id="option-camera-preset-save" type="button">Save preset</button><button id="option-camera-preset-apply" type="button">Apply preset</button><button id="option-camera-preset-delete" type="button">Delete</button></div>
   </div>
+</div>
+<div class="panel character-card game1-health-ui-options">
+  <div class="section-title"><div><span>combat appearance · separate PC / Mobile profiles</span><h3>Health bars</h3></div><span class="muted">Studio HP Debug → Import → Save</span></div>
+  <small class="hint">Pixel dimensions, outline, text sizes, and position are independent for desktop and mobile. HP colors switch at 30% and 65%. Overhead distance is measured in studs above the visible top of the rig, not the hidden collider. Settings apply on the next Rojo sync and game start.</small>
+  <div class="actions game1-hp-device-tabs">
+    <button type="button" id="health-ui-desktop" class="primary">PC · Desktop</button>
+    <button type="button" id="health-ui-mobile">Mobile · Touch</button>
+  </div>
+  <div id="health-ui-fields" class="game1-hp-fields" aria-label="Health bar settings"></div>
+  <div class="actions">
+    <button id="health-ui-import" type="button">Import Studio HP Debug</button>
+    <button id="health-ui-save" type="button" class="primary">Save selected device profile</button>
+  </div>
+  <div class="muted" id="health-ui-draft-status" role="status">No Studio HP Debug draft yet.</div>
+  <hr class="card-separator">
+  <div class="section-title"><div><span>published TestPlace</span><h3>Debug and test controls</h3></div></div>
+  <small class="hint">Hide development-only in-game buttons for the selected device in a published Roblox TestPlace. Studio Play debug panels remain available. Currently this also controls the published test weapon selector; it does not disable game combat or mobile input.</small>
+  <label class="game1-published-debug-toggle"><input type="checkbox" id="option-published-debug-buttons">Show debug / test buttons in published TestPlace</label>
+  <div class="actions"><button id="option-published-debug-save" class="primary" type="button">Save debug visibility</button></div>
 </div>
 </div>
 
@@ -800,7 +819,7 @@
 <script src="location-asset-workflow.js?v=262"></script>
 <script src="asset-audit.js?v=2"></script>
 <script src="atlas-library.js?v=2"></script>
-<script src="options.js?v=306"></script>
+<script src="options.js?v=322"></script>
 <script src="weapon-atlas-picker.js?v=309"></script>
 <script src="weapon-assets.js?v=309"></script>
 <script src="weapon-workflow.js?v=309"></script>

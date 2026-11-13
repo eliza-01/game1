@@ -4,6 +4,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local HealthBarView = require(script.Parent:WaitForChild("HealthBarView"))
+local HealthUiSettings = require(script.Parent:WaitForChild("HealthUiSettings"))
 local CameraController = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CameraController"))
 
 local Controller = {}
@@ -37,7 +38,7 @@ local function bindOwn(character: Model?)
         local anchor = anchorFor(character)
         if anchor then
             if own then own.Destroy() end
-            own = HealthBarView.Create(player:WaitForChild("PlayerGui"), character, anchor)
+            own = HealthBarView.Create(player:WaitForChild("PlayerGui"), character, anchor, HealthUiSettings.Current())
         end
     end
     attach()
@@ -64,7 +65,7 @@ local function bindMonster(model: Instance)
         local anchor = anchorFor(monster) or monster:WaitForChild("RootCollider", 5)
         if pendingMonsters[monster] and anchor and anchor:IsA("BasePart")
             and monster.Parent == watchedFolder and not monsterViews[monster] then
-            monsterViews[monster] = HealthBarView.Create(player:WaitForChild("PlayerGui"), monster, anchor)
+            monsterViews[monster] = HealthBarView.Create(player:WaitForChild("PlayerGui"), monster, anchor, HealthUiSettings.Current())
         end
         pendingMonsters[monster] = nil
     end)
@@ -111,7 +112,7 @@ local function updateVisibility()
         local hp = tonumber(character:GetAttribute("HP")) or 0
         local maxHP = tonumber(character:GetAttribute("MaxHP")) or 0
         own.SetVisible(character:GetAttribute("LifeState") == "Alive"
-            and (character:GetAttribute("InCombat") == true or hp < maxHP - 0.001))
+            and (HealthUiSettings.IsPreviewing() or character:GetAttribute("InCombat") == true or hp < maxHP - 0.001))
     end
     aimedMonster = reticleTarget()
     for model, view in pairs(monsterViews) do
@@ -119,13 +120,19 @@ local function updateVisibility()
         local focused = model == aimedMonster
         local attackingUs = model:GetAttribute("MonsterCombatActive") == true
             and model:GetAttribute("MonsterTargetUserId") == player.UserId
-        view.SetVisible(alive and (focused or attackingUs))
+        view.SetVisible(alive and (HealthUiSettings.IsPreviewing() or focused or attackingUs))
     end
 end
 
 function Controller.Start()
     if started then return end
     started = true
+    HealthUiSettings.Changed(function()
+        local style = HealthUiSettings.Current()
+        if own then own.ApplyStyle(style) end
+        for _, view in pairs(monsterViews) do view.ApplyStyle(style) end
+        updateVisibility()
+    end)
     player.CharacterAdded:Connect(bindOwn)
     player.CharacterRemoving:Connect(function(character)
         if character == ownCharacter then bindOwn(nil) end

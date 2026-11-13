@@ -1,9 +1,14 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Policy = require(ReplicatedStorage:WaitForChild("Game1Shared")
+    :WaitForChild("combat"):WaitForChild("AttackFeedbackPolicy"))
+local HostilePursuitRegistry = require(script.Parent:WaitForChild("HostilePursuitRegistry"))
+
 local CombatFeedbackService = {}
 local started = false
 local remote: RemoteEvent? = nil
+local lastMeleeFar: {[Player]: number} = setmetatable({}, {__mode = "k"})
 
 local function ensureRemote(): RemoteEvent
     local folder = ReplicatedStorage:FindFirstChild("Game1Remotes")
@@ -60,10 +65,53 @@ function CombatFeedbackService.PublishDamage(attacker: Model?, target: Model, da
     end
 end
 
+-- All outcome labels share the existing reliable per-player feedback channel.
+local function publishLabel(character: Model?, kind: string)
+    if not started or not remote or not character then return end
+    local player = Players:GetPlayerFromCharacter(character)
+    if not player or player.Character ~= character
+        or character:GetAttribute("LifeState") ~= "Alive" then return end
+    local root = rootOf(character)
+    if not root then return end
+    remote:FireClient(player, {
+        kind = kind,
+        target = character,
+        position = root.Position,
+    })
+end
+
+-- The recipient must still be pursued; attacks from NPCs/monsters do not
+-- manufacture an out-of-combat Miss after a target was lost.
+function CombatFeedbackService.PublishMissOverPlayer(character: Model?)
+    if character and HostilePursuitRegistry.IsPursued(character)
+        and Policy.AllowIncomingMiss(character:GetAttribute("AttackEndsAt"),
+            character:GetAttribute("EquippedWeaponType"), os.clock()) then
+        publishLabel(character, "miss")
+    end
+end
+
+-- Called only after a completed player attack that dealt no damage.
+-- No target + no pursuer is silent. Far has priority over Miss, with a
+-- per-player throttle for melee; bow shots report Far at every Release.
+function CombatFeedbackService.PublishAttackOutcome(character: Model, aimedState: string?, isBow: boolean)
+    local player = Players:GetPlayerFromCharacter(character)
+    if not player then return end
+    local kind = Policy.Resolve(HostilePursuitRegistry.IsPursued(character), aimedState, isBow)
+    if kind == "far" and not isBow then
+        local now = os.clock()
+        if not Policy.CanShowMeleeFar(lastMeleeFar[player], now) then return end
+        lastMeleeFar[player] = now
+    end
+    if kind then publishLabel(character, kind) end
+end
+
 function CombatFeedbackService.Start()
     if started then return end
     started = true
     remote = ensureRemote()
+    Players.PlayerRemoving:Connect(function(player)
+        lastMeleeFar[player] = nil
+    end)
     print("[game1][COMBAT_FEEDBACK] reliable damage numbers ready")
 end
 

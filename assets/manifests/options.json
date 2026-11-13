@@ -43,5 +43,81 @@
       }
     }
   ],
-  "activeCameraPreset": "2"
+  "activeCameraPreset": "2",
+  "healthUi": {
+    "desktop": {
+      "screen": {
+        "enabled": true,
+        "width": 280,
+        "height": 20,
+        "border": 0,
+        "textSize": 12,
+        "top": 18
+      },
+      "self": {
+        "enabled": false,
+        "width": 148,
+        "height": 12,
+        "border": 2,
+        "nameSize": 13,
+        "levelSize": 15,
+        "offsetStuds": 1.7
+      },
+      "monster": {
+        "enabled": true,
+        "width": 60,
+        "height": 8,
+        "border": 0,
+        "nameSize": 15,
+        "levelSize": 11,
+        "offsetStuds": 2.35
+      },
+      "colors": {
+        "green": "#16D423",
+        "yellow": "#E79F04",
+        "red": "#E2181B"
+      }
+    },
+    "mobile": {
+      "screen": {
+        "enabled": true,
+        "width": 214,
+        "height": 17,
+        "border": 2,
+        "textSize": 13,
+        "top": 11
+      },
+      "self": {
+        "enabled": false,
+        "width": 126,
+        "height": 11,
+        "border": 1.7,
+        "nameSize": 14,
+        "levelSize": 8,
+        "offsetStuds": 1.8
+      },
+      "monster": {
+        "enabled": true,
+        "width": 60,
+        "height": 6,
+        "border": 0,
+        "nameSize": 13,
+        "levelSize": 19,
+        "offsetStuds": 2.05
+      },
+      "colors": {
+        "green": "#16D423",
+        "yellow": "#E79F04",
+        "red": "#E2181B"
+      }
+    }
+  },
+  "debugUi": {
+    "desktop": {
+      "showPublishedControls": false
+    },
+    "mobile": {
+      "showPublishedControls": false
+    }
+  }
 }

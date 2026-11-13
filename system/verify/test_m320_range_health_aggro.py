@@ -83,7 +83,7 @@ class TestHealth(unittest.TestCase):
         for token in ('TweenService:Create(fill, TWEEN, goal)', 'ratio <= 0.30', 'ratio <= 0.65',
                       'Instance.new("UICorner")', 'BillboardGui', 'Gui.Enabled'):
             if token == 'Gui.Enabled':
-                self.assertIn('gui.Enabled = value', view)
+                self.assertIn('gui.Enabled = value and currentStyle[layout].enabled == true', view)
             else:
                 self.assertIn(token, view)
         self.assertNotIn('SetAttribute("HP"', controller)

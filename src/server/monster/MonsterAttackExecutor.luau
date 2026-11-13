@@ -7,6 +7,7 @@ local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local AttackTimelineConfig = require(Shared:WaitForChild("combat"):WaitForChild("AttackTimelineConfig"))
 local AnimationSpeedScaling = require(Shared:WaitForChild("animation"):WaitForChild("AnimationSpeedScaling"))
 local DamageService = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("DamageService"))
+local CombatFeedbackService = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("CombatFeedbackService"))
 local HitEffectService = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("HitEffectService"))
 local Facing = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorFacingTracker"))
 local AttackPursuit = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorAttackPursuit"))
@@ -122,10 +123,12 @@ function MonsterAttackExecutor.Begin(agent: any, target: Model, movement: any, r
             HitEffectService.Publish(agent.model, target, target:GetAttribute("LastCritical") == true, rootOf(target) and rootOf(target).Position or nil)
             agent.model:SetAttribute("LastMonsterAttackDamage", damage)
             agent.model:SetAttribute("MonsterAttackPhase", if damage > 0 then "Hit" else "Miss")
+            if damage <= 0 then CombatFeedbackService.PublishMissOverPlayer(target) end
             if killed then clearAttackPursuit(agent) end
         else
             agent.model:SetAttribute("LastMonsterAttackDamage", 0)
             agent.model:SetAttribute("MonsterAttackPhase", "Miss")
+            CombatFeedbackService.PublishMissOverPlayer(target)
         end
     end)
 

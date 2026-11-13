@@ -17,6 +17,8 @@ local BowProjectileConfig = require(CombatShared:WaitForChild("BowProjectileConf
 local BowHitscanService = require(script.Parent:WaitForChild("BowHitscanService"))
 local WeaponEnvironmentCollision = require(script.Parent:WaitForChild("WeaponEnvironmentCollision"))
 local AttackDamageResolver = require(script.Parent:WaitForChild("AttackDamageResolver"))
+local CombatFeedbackService = require(script.Parent:WaitForChild("CombatFeedbackService"))
+local AttackFeedbackTargeting = require(script.Parent:WaitForChild("AttackFeedbackTargeting"))
 local AttackSessionStore = require(script.Parent:WaitForChild("AttackSessionStore"))
 local HostilePursuitRegistry = require(script.Parent:WaitForChild("HostilePursuitRegistry"))
 local WeaponBounceService = require(script.Parent:WaitForChild("WeaponBounceService"))
@@ -72,7 +74,7 @@ local function applyDamageInVolume(
     aimDirection: Vector3?,
     attackRange: number
 ): number
-    local hitCount, headshotTarget = AttackDamageResolver.Apply({
+    local hitCount, headshotTarget, damagedTargets = AttackDamageResolver.Apply({
         player = player,
         character = character,
         root = root,
@@ -87,6 +89,9 @@ local function applyDamageInVolume(
         headshotTarget = AttackSessionStore.HeadshotTarget(player),
     })
     AttackSessionStore.SetHeadshotTarget(player, headshotTarget)
+    if damagedTargets > 0 then
+        AttackSessionStore.MarkDamage(player, character, serial)
+    end
     return hitCount
 end
 
@@ -211,14 +216,23 @@ local function clearAttackState(
         return false
     end
 
-    if reportMiss
-        and Config.DebugLogs
-        and finished.environmentBlocked ~= true
-        and next(finished.hitTargets) == nil
-    then
-        local attackRange = math.clamp(tonumber(character:GetAttribute("AttackRadius")) or Config.Range, 1, Config.MaxAimDistance)
-        print(("[game1][attack] miss player=%s range=%.1f serial=%d source=animated_weapon_sweep")
-            :format(player.Name, attackRange, serial))
+    -- Aggregate the whole multi-target sweep: any positive damage wins.
+    -- Never publish one Miss per monster that the blade did not touch.
+    if reportMiss and not finished.damageDealt
+        and player.Character == character and character.Parent
+        and character:GetAttribute("LifeState") == "Alive" then
+        local root = character:FindFirstChild("RootCollider")
+        if root and root:IsA("BasePart") then
+            local range = math.clamp(tonumber(character:GetAttribute("AttackRadius")) or Config.Range,
+                1, Config.MaxAimDistance)
+            local aimedState = AttackFeedbackTargeting.Evaluate(character, root,
+                finished.lastAimOrigin, finished.lastAimDirection, range, false)
+            CombatFeedbackService.PublishAttackOutcome(character, aimedState, false)
+        end
+        if Config.DebugLogs then
+            print(("[game1][attack] zero_damage player=%s serial=%d source=animated_weapon_sweep")
+                :format(player.Name, serial))
+        end
     end
 
     if character.Parent and tonumber(character:GetAttribute("AttackSerial")) == serial then
@@ -315,7 +329,18 @@ local function finishBowRelease(player: Player, pending: any): boolean
                 if pending.captureReceivedAt > pending.releaseAt then "late" else "on_time",
                 math.max(0, (pending.captureReceivedAt - pending.releaseAt) * 1000)))
     end
-    return BowHitscanService.Release(player, character, pending.snapshot)
+    local released, damageDealt = BowHitscanService.Release(player, character, pending.snapshot)
+    if released and damageDealt <= 0 then
+        local root = character:FindFirstChild("RootCollider")
+        if root and root:IsA("BasePart") then
+            local range = math.clamp(tonumber(character:GetAttribute("AttackRadius")) or Config.Range,
+                1, Config.MaxAimDistance)
+            local aimedState = AttackFeedbackTargeting.Evaluate(character, root,
+                pending.aimOrigin, pending.aimDirection, range, true)
+            CombatFeedbackService.PublishAttackOutcome(character, aimedState, true)
+        end
+    end
+    return released
 end
 
 local function updateBowAim(player: Player, payload: any)
@@ -341,6 +366,8 @@ local function updateBowAim(player: Player, payload: any)
     pending.snapshot = BowHitscanService.Capture(pending.character, origin, direction, payload.launchOrigin)
     if not pending.snapshot then return end
     pending.captureReceivedAt = now
+    pending.aimOrigin = origin
+    pending.aimDirection = direction
     if pending.releaseReached then
         finishBowRelease(player, pending)
     end
@@ -361,6 +388,8 @@ local function beginBowRelease(player: Player, character: Model, root: BasePart,
         releaseReached = false,
         snapshot = nil,
         captureReceivedAt = nil,
+        aimOrigin = nil,
+        aimDirection = nil,
     }
     pendingBowReleases[player] = pending
     task.delay(releaseTime, function()
@@ -453,6 +482,10 @@ local function attack(player: Player, payload: any)
     local attackDuration = timing.duration
     local serial = (tonumber(character:GetAttribute("AttackSerial")) or 0) + 1
     AttackSessionStore.Begin(player, character, serial, clientAttackId, now + attackDuration, damageWindow)
+    if not isBow then
+        local origin, direction = AttackAimGeometry.Normalize(root.Position, payload.aimOrigin, payload.aimDirection)
+        AttackSessionStore.SetAim(player, character, serial, clientAttackId, origin, direction)
+    end
     character:SetAttribute("AttackSerial", serial)
     character:SetAttribute("AttackClipId", clipId)
     character:SetAttribute("AttackStartedAt", now)
@@ -523,6 +556,7 @@ local function recordWeaponPose(player: Player, payload: any)
     end
 
     local aimOrigin, aimDirection = AttackAimGeometry.Normalize(root.Position, payload.aimOrigin, payload.aimDirection)
+    AttackSessionStore.SetAim(player, character, session.serial, clientAttackId, aimOrigin, aimDirection)
 
     local sweepState = AttackSessionStore.EnsureSweep(session)
 

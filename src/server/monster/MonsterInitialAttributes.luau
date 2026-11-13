@@ -18,6 +18,10 @@ local function applyMonsterAttributes(model: Model, definition: any, record: any
     local maxHP = math.max(1, finite(stats.MaxHP, 100))
     model:SetAttribute("Game1MonsterRuntime", true)
     model:SetAttribute("MonsterSlug", tostring(definition.slug or record.monsterSlug or ""))
+    local level = tonumber(stats.Level)
+    if level and level > 0 and level < 100000 and level == math.floor(level) then
+        model:SetAttribute("Level", level)
+    end
     model:SetAttribute("SpawnId", tostring(record.spawnId or ""))
     model:SetAttribute("MonsterInstanceId", instanceId)
     model:SetAttribute("Damageable", true)

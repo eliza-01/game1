@@ -120,7 +120,7 @@ function Visibility:SetVisible(value: boolean)
     if count == 0 then
         warn("[game1][studio-markers] no authored marker models in Workspace; "
             .. "check Workspace.Game1Authoring or use Restore markers in Asset Manager "
-            .. "(Monster/NPC Population and Locations). In Play, the spawn marker folders are removed by runtime.")
+            .. "(Monster/NPC Population and Locations). In Play, the complete Game1Authoring folder is removed by runtime.")
     end
 end
 

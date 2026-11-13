@@ -460,6 +460,12 @@ def route(path, body, deps):
         except (ValueError, OSError, TypeError) as error:
             return out(400, {"error": str(error)})
 
+    if path == "/api/options/health-ui-draft":
+        try:
+            return out(200, options_store.preview_health_ui(body()))
+        except (ValueError, OSError, TypeError) as error:
+            return out(400, {"error": str(error)})
+
     if path == "/api/options":
         try:
             return out(200, options_store.update(body()))

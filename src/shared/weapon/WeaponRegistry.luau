@@ -2,7 +2,7 @@
 return table.freeze({
 	schemaVersion = 2,
 	project = "game1",
-	activeWeaponSlug = "newbie_bow",
+	activeWeaponSlug = "newbie_sword_01",
 	attackMovementByType = table.freeze({
 		["dagger"] = table.freeze({
 			animationSet = "1hs",
@@ -70,28 +70,6 @@ return table.freeze({
 				}),
 			}),
 		}),
-		["newbie_sword_01"] = table.freeze({
-			slug = "newbie_sword_01",
-			nameEn = "Newbie Sword 01",
-			nameRu = "Меч Новичка 01",
-			weaponType = "dagger",
-			rarity = "common",
-			attackRadiusStuds = 4,
-			status = "PUBLISHED",
-			modelAssetId = "89658066107896",
-			serverStoragePath = "ServerStorage.weapons.dagger.newbie_sword_01.model.newbie_sword_01",
-			statModifiers = table.freeze({
-				["AttackSpeed"] = 0,
-				["Damage"] = 0,
-			}),
-			atlasVariantId = 0,
-			textures = table.freeze({
-				["newbie_sword_01"] = table.freeze({
-					assetId = "127316574053686",
-					sha256 = "2ad6323ed05598ff5d88a1ffadb904e867f99eeaf7e2751557e8b349657626f1",
-				}),
-			}),
-		}),
 		["newbie_axe"] = table.freeze({
 			slug = "newbie_axe",
 			nameEn = "Newbie Axe",
@@ -133,6 +111,28 @@ return table.freeze({
 				["newbie_saber_01"] = table.freeze({
 					assetId = "98409980598157",
 					sha256 = "7418213fbe4c769f72e3bcbeb35ee0e8909ae28b09ae959324ad210b108d9d68",
+				}),
+			}),
+		}),
+		["newbie_sword_01"] = table.freeze({
+			slug = "newbie_sword_01",
+			nameEn = "Newbie Sword 01",
+			nameRu = "Меч Новичка 01",
+			weaponType = "sword",
+			rarity = "common",
+			attackRadiusStuds = 8,
+			status = "PUBLISHED",
+			modelAssetId = "89658066107896",
+			serverStoragePath = "ServerStorage.weapons.sword.newbie_sword_01.model.newbie_sword_01",
+			statModifiers = table.freeze({
+				["AttackSpeed"] = 0,
+				["Damage"] = 11,
+			}),
+			atlasVariantId = 0,
+			textures = table.freeze({
+				["newbie_sword_01"] = table.freeze({
+					assetId = "127316574053686",
+					sha256 = "2ad6323ed05598ff5d88a1ffadb904e867f99eeaf7e2751557e8b349657626f1",
 				}),
 			}),
 		}),

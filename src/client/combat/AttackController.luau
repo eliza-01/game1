@@ -299,9 +299,15 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
         activePoseFrom = activePoseStartedAt + damagePoseStart
         activePoseUntil = activePoseStartedAt + damagePoseEnd
         poseAccumulator = 0
+        local meleeAimOrigin, meleeAimDirection = nil, nil
+        if aimPoseController and aimPoseController.GetAimRay then
+            meleeAimOrigin, meleeAimDirection = aimPoseController.GetAimRay()
+        end
         attack:FireServer({
             clipId = action.clipId,
             clientAttackId = sequence,
+            aimOrigin = meleeAimOrigin,
+            aimDirection = meleeAimDirection,
         })
     end
 

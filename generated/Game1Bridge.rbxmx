@@ -21,7 +21,7 @@ local LocationCommands = require(script.Parent.modules.LocationCommands)
 local StudioMarkerVisibility = require(script.Parent.modules.StudioMarkerVisibility)
 local StudioPlotsVisibility = require(script.Parent.modules.StudioPlotsVisibility)
 local StudioDebugPreferenceBridge = require(script.Parent.modules.StudioDebugPreferenceBridge)
-local StudioCameraDraftBridge = require(script.Parent.modules.StudioCameraDraftBridge)
+local StudioOptionsDraftBridge = require(script.Parent.modules.StudioOptionsDraftBridge)
 local StudioModelLoadCommands = require(script.Parent.modules.StudioModelLoadCommands)
 local StudioActorSpawnCommands = require(script.Parent.modules.StudioActorSpawnCommands)
 local StudioTimelineEditorCommands = require(script.Parent.modules.StudioTimelineEditorCommands)
@@ -93,7 +93,7 @@ StudioDebugPreferenceBridge({
     ReplicatedStorage = ReplicatedStorage,
     RunService = RunService,
 })
-StudioCameraDraftBridge({
+StudioOptionsDraftBridge({
     ReplicatedStorage = ReplicatedStorage,
     RunService = RunService,
     HttpService = HttpService,
@@ -3437,70 +3437,6 @@ return table.freeze(MeshAnchor)
       </Item>
       <Item class="ModuleScript" referent="15">
         <Properties>
-          <string name="Name">StudioCameraDraftBridge</string>
-          <string name="Source"><![CDATA[--!strict
--- Studio plugin transport: Game1CameraDebug -> authenticated LOCAL agent draft.
--- It NEVER writes the persisted Options manifest, which needs an explicit Save.
-return function(services)
-    local ReplicatedStorage = services.ReplicatedStorage
-    local RunService = services.RunService
-    local HttpService = services.HttpService
-    local endpoint = services.agentBaseUrl .. "/api/options/camera-draft"
-    local token = services.agentToken
-    local current: Folder? = nil
-    local changed: RBXScriptConnection? = nil
-    local generation = 0
-
-    local function disconnect()
-        if changed then changed:Disconnect(); changed=nil end
-        current=nil
-        generation += 1
-    end
-    local function attach(folder: Folder)
-        if current == folder then return end
-        disconnect()
-        current=folder
-        changed=folder:GetAttributeChangedSignal("Payload"):Connect(function()
-            if not RunService:IsStudio() or not RunService:IsRunning() then return end
-            local payload=folder:GetAttribute("Payload")
-            if type(payload)~="string" or #payload > 2000 then return end
-            local ok,parsed=pcall(HttpService.JSONDecode,HttpService,payload)
-            if not ok or type(parsed)~="table" then return end
-            generation += 1
-            local thisGeneration=generation
-            task.delay(0.3,function()
-                if generation~=thisGeneration or current~=folder then return end
-                local sent,response=pcall(HttpService.RequestAsync,HttpService,{
-                    Url=endpoint,
-                    Method="POST",
-                    Headers={["Content-Type"]="application/json",["X-Control-Token"]=token},
-                    Body=payload,
-                })
-                if not sent or not response.Success then
-                    warn("[game1][camera] Could not send Studio camera draft: " .. tostring(sent and response.Body or response))
-                end
-            end)
-        end)
-    end
-    ReplicatedStorage.ChildAdded:Connect(function(item)
-        if item:IsA("Folder") and item.Name=="Game1CameraDebug" then attach(item) end
-    end)
-    local existing=ReplicatedStorage:FindFirstChild("Game1CameraDebug")
-    if existing and existing:IsA("Folder") then attach(existing) end
-    RunService:GetPropertyChangedSignal("RunState"):Connect(function()
-        if not RunService:IsRunning() then
-            disconnect()
-        else
-            local folder=ReplicatedStorage:FindFirstChild("Game1CameraDebug")
-            if folder and folder:IsA("Folder") then attach(folder) end
-        end
-    end)
-end
-]]></string>
-        </Properties>
-      </Item>
-      <Item class="ModuleScript" referent="16">
-        <Properties>
           <string name="Name">StudioCharacterStandBuilder</string>
           <string name="Source"><![CDATA[-- Studio authoring adapter for the SAME published assembly recipe and Builder
 -- used by CharacterService. No second bind/atlas/mesh pipeline is implemented here.
@@ -3641,7 +3577,7 @@ return table.freeze(Builder)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="17">
+      <Item class="ModuleScript" referent="16">
         <Properties>
           <string name="Name">StudioCharacterStandPlacement</string>
           <string name="Source"><![CDATA[-- Edit-mode surface placement. Does not change the imported rig's orientation,
@@ -3729,7 +3665,7 @@ return table.freeze(Placement)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="18">
+      <Item class="ModuleScript" referent="17">
         <Properties>
           <string name="Name">StudioCharacterStandWidget</string>
           <string name="Source"><![CDATA[-- Dock widget contains presentation only. No asset imports or Workspace writes.
@@ -3802,7 +3738,7 @@ return table.freeze(Widget)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="19">
+      <Item class="ModuleScript" referent="18">
         <Properties>
           <string name="Name">StudioCharacterTestStand</string>
           <string name="Source"><![CDATA[-- Game1Bridge composition root for the Studio-only character assembly stand.
@@ -4009,7 +3945,7 @@ return table.freeze(TestStand)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="20">
+      <Item class="ModuleScript" referent="19">
         <Properties>
           <string name="Name">StudioDebugPreferenceBridge</string>
           <string name="Source"><![CDATA[-- Studio-only persistence bridge for Test Loadout preferences.
@@ -4129,7 +4065,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="21">
+      <Item class="ModuleScript" referent="20">
         <Properties>
           <string name="Name">StudioDecoSyncCommands</string>
           <string name="Source"><![CDATA[-- M238: protocol 8 adds read-only per-row Studio selection and COL atlas exclusion.
@@ -4207,7 +4143,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="22">
+      <Item class="ModuleScript" referent="21">
         <Properties>
           <string name="Name">StudioHousePlacementCapture</string>
           <string name="Source"><![CDATA[-- Read-only Studio authoring adapter. Selection and plot markers stay untouched.
@@ -4320,7 +4256,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="23">
+      <Item class="ModuleScript" referent="22">
         <Properties>
           <string name="Name">StudioHousePlacementPreview</string>
           <string name="Source"><![CDATA[-- Explicitly authored house preview in Workspace.Plots/NN/Houses.
@@ -4787,7 +4723,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="24">
+      <Item class="ModuleScript" referent="23">
         <Properties>
           <string name="Name">StudioLocationMeshNames</string>
           <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
@@ -4820,7 +4756,7 @@ return Naming
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="25">
+      <Item class="ModuleScript" referent="24">
         <Properties>
           <string name="Name">StudioLocationPlacedGeometry</string>
           <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
@@ -5006,7 +4942,7 @@ return table.freeze(Geometry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="26">
+      <Item class="ModuleScript" referent="25">
         <Properties>
           <string name="Name">StudioLocationPlacementHistory</string>
           <string name="Source"><![CDATA[-- Per-placement, bounded authoring audit for Location repair and sync.
@@ -5047,7 +4983,7 @@ return table.freeze(History)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="27">
+      <Item class="ModuleScript" referent="26">
         <Properties>
           <string name="Name">StudioLocationPlacementOwner</string>
           <string name="Source"><![CDATA[-- M243: one placement-ownership rule for Location Find and scoped Sync.
@@ -5103,7 +5039,7 @@ return table.freeze(Owner)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="28">
+      <Item class="ModuleScript" referent="27">
         <Properties>
           <string name="Name">StudioLocationPublishedGeometry</string>
           <string name="Source"><![CDATA[-- Published-model provenance and shape policy for Location Assets.
@@ -5182,7 +5118,7 @@ return table.freeze(Published)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="29">
+      <Item class="ModuleScript" referent="28">
         <Properties>
           <string name="Name">StudioLocationPublishedRigNormalize</string>
           <string name="Source"><![CDATA[-- Location-only normalization of Roblox importer scaffolding on a FRESH,
@@ -5304,7 +5240,7 @@ return table.freeze(Normalize)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="30">
+      <Item class="ModuleScript" referent="29">
         <Properties>
           <string name="Name">StudioLocationRigCarrier</string>
           <string name="Source"><![CDATA[-- Canonical Location-only rig carrier policy. Imported FBX mesh; never synthetic.
@@ -5537,7 +5473,7 @@ return table.freeze(Carrier)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="31">
+      <Item class="ModuleScript" referent="30">
         <Properties>
           <string name="Name">StudioManagedRigSwap</string>
           <string name="Source"><![CDATA[-- Shared Studio mechanism for replacing AUTHORING-MANAGED child rigs while
@@ -5733,7 +5669,7 @@ return table.freeze(RigSwap)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="32">
+      <Item class="ModuleScript" referent="31">
         <Properties>
           <string name="Name">StudioMarkerVisibility</string>
           <string name="Source"><![CDATA[-- Studio-only presentation toggle. No movement of markers, no metadata edits.
@@ -5858,7 +5794,7 @@ function Visibility:SetVisible(value: boolean)
     if count == 0 then
         warn("[game1][studio-markers] no authored marker models in Workspace; "
             .. "check Workspace.Game1Authoring or use Restore markers in Asset Manager "
-            .. "(Monster/NPC Population and Locations). In Play, the spawn marker folders are removed by runtime.")
+            .. "(Monster/NPC Population and Locations). In Play, the complete Game1Authoring folder is removed by runtime.")
     end
 end
 
@@ -5877,7 +5813,7 @@ return table.freeze(Visibility)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="33">
+      <Item class="ModuleScript" referent="32">
         <Properties>
           <string name="Name">StudioMeshPhysicsCore</string>
           <string name="Source"><![CDATA[-- One Studio MeshPart physics writer shared by Real Estate and Location Assets.
@@ -6093,7 +6029,7 @@ return table.freeze(Core)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="34">
+      <Item class="ModuleScript" referent="33">
         <Properties>
           <string name="Name">StudioModelLoadCommands</string>
           <string name="Source"><![CDATA[-- Studio model-sync command: validates and imports Character, Monster/NPC and Weapon models.
@@ -6656,6 +6592,73 @@ return function(services)
 
 
     return handleModelLoad
+end
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="34">
+        <Properties>
+          <string name="Name">StudioOptionsDraftBridge</string>
+          <string name="Source"><![CDATA[--!strict
+-- Studio Play folder -> authenticated local Control Center. Drafts only, never Save.
+-- Both camera and HP use this one transport; changes are debounced per folder.
+return function(services)
+    local ReplicatedStorage = services.ReplicatedStorage
+    local RunService = services.RunService
+    local HttpService = services.HttpService
+    local token = services.agentToken
+    local specs = {
+        Game1CameraDebug = {route="/api/options/camera-draft", maxBytes=2000},
+        Game1HealthUiDebug = {route="/api/options/health-ui-draft", maxBytes=8000},
+    }
+    for name, spec in pairs(specs) do
+        local current: Folder? = nil
+        local changed: RBXScriptConnection? = nil
+        local generation = 0
+        local function disconnect()
+            if changed then changed:Disconnect(); changed=nil end
+            current=nil
+            generation += 1
+        end
+        local function attach(folder: Folder)
+            if current == folder then return end
+            disconnect()
+            current=folder
+            changed=folder:GetAttributeChangedSignal("Payload"):Connect(function()
+                if not RunService:IsStudio() or not RunService:IsRunning() then return end
+                local payload=folder:GetAttribute("Payload")
+                if type(payload)~="string" or #payload > spec.maxBytes then return end
+                local ok, parsed=pcall(HttpService.JSONDecode,HttpService,payload)
+                if not ok or type(parsed)~="table" then return end
+                generation += 1
+                local thisGeneration=generation
+                task.delay(0.3,function()
+                    if generation~=thisGeneration or current~=folder then return end
+                    local sent,response=pcall(HttpService.RequestAsync,HttpService,{
+                        Url=services.agentBaseUrl .. spec.route, Method="POST",
+                        Headers={["Content-Type"]="application/json",["X-Control-Token"]=token},
+                        Body=payload,
+                    })
+                    if not sent or not response.Success then
+                        warn("[game1][options] Could not send Studio "..name.." draft: " .. tostring(sent and response.Body or response))
+                    end
+                end)
+            end)
+        end
+        ReplicatedStorage.ChildAdded:Connect(function(item)
+            if item:IsA("Folder") and item.Name==name then attach(item) end
+        end)
+        local initial=ReplicatedStorage:FindFirstChild(name)
+        if initial and initial:IsA("Folder") then attach(initial) end
+        RunService:GetPropertyChangedSignal("RunState"):Connect(function()
+            if not RunService:IsRunning() then
+                disconnect()
+            else
+                local folder=ReplicatedStorage:FindFirstChild(name)
+                if folder and folder:IsA("Folder") then attach(folder) end
+            end
+        end)
+    end
 end
 ]]></string>
         </Properties>

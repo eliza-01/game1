@@ -12,7 +12,7 @@ local LocationCommands = require(script.Parent.modules.LocationCommands)
 local StudioMarkerVisibility = require(script.Parent.modules.StudioMarkerVisibility)
 local StudioPlotsVisibility = require(script.Parent.modules.StudioPlotsVisibility)
 local StudioDebugPreferenceBridge = require(script.Parent.modules.StudioDebugPreferenceBridge)
-local StudioCameraDraftBridge = require(script.Parent.modules.StudioCameraDraftBridge)
+local StudioOptionsDraftBridge = require(script.Parent.modules.StudioOptionsDraftBridge)
 local StudioModelLoadCommands = require(script.Parent.modules.StudioModelLoadCommands)
 local StudioActorSpawnCommands = require(script.Parent.modules.StudioActorSpawnCommands)
 local StudioTimelineEditorCommands = require(script.Parent.modules.StudioTimelineEditorCommands)
@@ -84,7 +84,7 @@ StudioDebugPreferenceBridge({
     ReplicatedStorage = ReplicatedStorage,
     RunService = RunService,
 })
-StudioCameraDraftBridge({
+StudioOptionsDraftBridge({
     ReplicatedStorage = ReplicatedStorage,
     RunService = RunService,
     HttpService = HttpService,

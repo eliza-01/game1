@@ -526,10 +526,10 @@ function CharacterAnimationController.PlayAction(slot: string)
 		attackComposePending = true
 		attackLowerBodyActive = true
 		refreshLoop()
-		local composedTrack, composeError = AttackUpperBodyComposer.Begin(boundCharacter, descriptor, playbackSpeed, function()
+		local composedTrack, composeError, loadedPlaybackSpeed = AttackUpperBodyComposer.Begin(boundCharacter, descriptor, playbackSpeed, function()
 			return character == boundCharacter and cache == boundCache
 				and currentActionToken == pendingToken and not lifeTransition
-		end)
+		end, timeline.playbackDuration)
 		if currentActionToken == pendingToken then
 			attackComposePending = false
 		end
@@ -557,6 +557,13 @@ function CharacterAnimationController.PlayAction(slot: string)
 		end
 		track = composedTrack
 		composed = true
+		-- The published track can be shorter than the FBX/authoring duration.
+		-- Keep gameplay and HitStart/HitEnd times fixed, but use the actual
+		-- source playback rate for visual output and bounce rewind.
+		playbackSpeed = loadedPlaybackSpeed or playbackSpeed
+		animationSpeedPercent = playbackSpeed * 100
+		timeline.playbackSpeed = playbackSpeed
+		timeline.animationSpeedPercent = animationSpeedPercent
 		character:SetAttribute("AnimationAttackCompositionError", nil)
 	end
 

@@ -139,7 +139,7 @@ class StudioSourceContracts(unittest.TestCase):
         debug=self.text('src/client/dev/CameraDebugController.luau')
         self.assertIn('StudioDebugDock.ButtonPosition("CD")',debug)
         self.assertIn('remote:FireServer(values)',debug)
-        bridge=self.text('system/studio-plugin/modules/StudioCameraDraftBridge.luau')
+        bridge=self.text('system/studio-plugin/modules/StudioOptionsDraftBridge.luau')
         self.assertIn('/api/options/camera-draft',bridge)
         self.assertNotIn('/api/options"',bridge)
         options=self.text('system/control-center/static/options.js')

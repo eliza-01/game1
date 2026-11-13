@@ -29,12 +29,6 @@
       "status": "PUBLISHED"
     },
     {
-      "slug": "newbie_sword_01",
-      "nameEn": "Newbie Sword 01",
-      "weaponType": "dagger",
-      "status": "PUBLISHED"
-    },
-    {
       "slug": "newbie_axe",
       "nameEn": "Newbie Axe",
       "weaponType": "sword",
@@ -43,6 +37,12 @@
     {
       "slug": "newbie_saber_01",
       "nameEn": "Newbie Saber 01",
+      "weaponType": "sword",
+      "status": "PUBLISHED"
+    },
+    {
+      "slug": "newbie_sword_01",
+      "nameEn": "Newbie Sword 01",
       "weaponType": "sword",
       "status": "PUBLISHED"
     },

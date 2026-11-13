@@ -8,7 +8,10 @@ export type Session = {
     clientAttackId: number,
     untilTime: number,
     hitTargets: { [Model]: boolean },
+    damageDealt: boolean,
     damageWindow: any?,
+    lastAimOrigin: Vector3?,
+    lastAimDirection: Vector3?,
     headshotTarget: Model?,
     environmentBlocked: boolean,
     suppressedBounceLogged: boolean,
@@ -40,7 +43,10 @@ function AttackSessionStore.Begin(
         clientAttackId = clientAttackId,
         untilTime = untilTime,
         hitTargets = {},
+        damageDealt = false,
         damageWindow = damageWindow,
+        lastAimOrigin = nil,
+        lastAimDirection = nil,
         headshotTarget = nil,
         environmentBlocked = false,
         suppressedBounceLogged = false,
@@ -68,6 +74,25 @@ function AttackSessionStore.HitTargets(
         return session.hitTargets
     end
     return nil
+end
+
+function AttackSessionStore.SetAim(
+    player: Player, character: Model, serial: number, clientAttackId: number,
+    origin: Vector3?, direction: Vector3?
+)
+    local session = byPlayer[player]
+    if matches(session, character, serial, clientAttackId)
+        and typeof(origin) == "Vector3" and typeof(direction) == "Vector3" then
+        session.lastAimOrigin = origin
+        session.lastAimDirection = direction
+    end
+end
+
+function AttackSessionStore.MarkDamage(player: Player, character: Model, serial: number)
+    local session = byPlayer[player]
+    if session and session.character == character and session.serial == serial then
+        session.damageDealt = true
+    end
 end
 
 function AttackSessionStore.HeadshotTarget(player: Player): Model?

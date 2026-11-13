@@ -15,6 +15,7 @@ local WeightedAnimationChoice = require(Shared:WaitForChild("animation"):WaitFor
 local DamageService = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("DamageService"))
 local DamageSignals = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("ActorDamageSignals"))
 local HitEffectService = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("HitEffectService"))
+local CombatFeedbackService = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("CombatFeedbackService"))
 local CombatStateService = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("CombatStateService"))
 local HostilePursuitRegistry = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("HostilePursuitRegistry"))
 local Navigator = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorChaseNavigator"))
@@ -261,6 +262,7 @@ local function beginAttack(agent: any, target: Model, continuing: boolean?)
                 local amount, killed = DamageService.Apply(agent.model, target, finite(agent.model:GetAttribute("Damage"), 0))
                 agent.model:SetAttribute("NpcLastAttackDamage", amount)
                 agent.model:SetAttribute("NpcAttackPhase", if amount > 0 then "Hit" else "Miss")
+                if amount <= 0 then CombatFeedbackService.PublishMissOverPlayer(target) end
                 if amount > 0 then
                     local targetRoot = Queries.Root(target)
                     HitEffectService.Publish(agent.model, target, target:GetAttribute("LastCritical") == true,
@@ -273,6 +275,7 @@ local function beginAttack(agent: any, target: Model, continuing: boolean?)
             else
                 agent.model:SetAttribute("NpcLastAttackDamage", 0)
                 agent.model:SetAttribute("NpcAttackPhase", "Miss")
+                CombatFeedbackService.PublishMissOverPlayer(target)
             end
         end)
         task.delay(math.max(0, duration - elapsed), function()

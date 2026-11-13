@@ -40,4 +40,15 @@ function GameOptions.CameraSettings(): {[string]: number}
     }
 end
 
+-- Configured visual profiles are generated from Asset Manager Options.
+function GameOptions.HealthUiSettings(device: string): {[string]: any}
+    local profiles = Registry.healthUi or {}
+    return profiles[device] or profiles.desktop or {}
+end
+
+function GameOptions.ShowPublishedDebugControls(device: string): boolean
+    local settings = (Registry.debugUi or {})[device] or {}
+    return settings.showPublishedControls == true
+end
+
 return table.freeze(GameOptions)

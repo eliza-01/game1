@@ -122,7 +122,7 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
                 if typeof(origin) == "Vector3" and typeof(direction) == "Vector3"
                     and direction.Magnitude > 1e-6 then
                     local target = origin + direction.Unit * AttackConfig.MaxAimDistance
-                    aimPoseController.UpdateTarget(target)
+                    aimPoseController.UpdateTarget(target, direction)
                     local root = playerCharacter:FindFirstChild("RootCollider")
                     if root and root:IsA("BasePart") then
                         movementController.UpdateAimFacingCompensation(target - root.Position)

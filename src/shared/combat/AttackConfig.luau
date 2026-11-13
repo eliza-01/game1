@@ -32,6 +32,11 @@ return table.freeze({
     -- Local pitch is applied to the spine bridge after authored source poses.
     TorsoPitchUpLimit = math.rad(65),
     TorsoPitchDownLimit = math.rad(55),
+    -- Downward camera pitch is softened only within point-blank melee reach.
+    -- This avoids the head dipping into a nearby target, while allowing full
+    -- vertical tracking again by 9 studs. Does not change weapon hit range.
+    CloseAimPitchNeutralStuds = 3,
+    CloseAimPitchFullStuds = 9,
     -- Stationary melee ramps root overflow over this time. The bow uses the
     -- same interval as its exponential live yaw response to a changing reticle.
     FacingTurnSeconds = 0.28,

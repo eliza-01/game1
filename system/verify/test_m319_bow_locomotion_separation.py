@@ -90,7 +90,7 @@ class BowMovementM319(unittest.TestCase):
         self.assertEqual(attack.count('bowAimRemote:FireServer({'), 1)
         self.assertIn('bowPresentationUntil = os.clock() + attackDuration', attack)
         self.assertIn('finishPresentation(bowCaptureSequence)', attack)
-        self.assertIn('aimPoseController.UpdateTarget(target)', attack)
+        self.assertIn('aimPoseController.UpdateTarget(target, direction)', attack)
         self.assertNotIn('CameraController.SetTouchLookAxis(', movement)
 
 

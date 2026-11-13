@@ -71,7 +71,7 @@ class LiveBowAim(unittest.TestCase):
         attack = read('src/client/combat/AttackController.luau')
         movement = read('src/client/character/MovementController.luau')
         self.assertIn('bowPresentationUntil = os.clock() + attackDuration', attack)
-        self.assertIn('aimPoseController.UpdateTarget(target)', attack)
+        self.assertIn('aimPoseController.UpdateTarget(target, direction)', attack)
         self.assertIn('movementController.UpdateAimFacingCompensation(target - root.Position)', attack)
         self.assertIn('attackDuration, AttackConfig.TorsoYawLimit, true', attack)
         self.assertIn('aimFacingLive = live == true', movement)

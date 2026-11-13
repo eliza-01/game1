@@ -4,19 +4,19 @@
   "timelines": [
     {
       "clipId": "human_female__weapon__1hs__attack__01",
-      "duration": 1.8666666746139526,
+      "duration": 1.5,
       "events": {
         "HitStart": {
           "normalizedTime": 0.4
         },
         "HitEnd": {
-          "normalizedTime": 0.6856649395509499
+          "normalizedTime": 0.5
         }
       }
     },
     {
       "clipId": "human_female__weapon__1hs__attack__02",
-      "duration": 1.866666674,
+      "duration": 1.5,
       "events": {
         "HitStart": {
           "normalizedTime": 0.4
@@ -28,7 +28,7 @@
     },
     {
       "clipId": "human_female__weapon__1hs__attack__03",
-      "duration": 1.866666674,
+      "duration": 1.4666666984558105,
       "events": {
         "HitStart": {
           "normalizedTime": 0.4

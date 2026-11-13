@@ -6,6 +6,7 @@ local Workspace = game:GetService("Workspace")
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local CombatShared = Shared:WaitForChild("combat")
 local AttackConfig = require(CombatShared:WaitForChild("AttackConfig"))
+local AimPitchGeometry = require(CombatShared:WaitForChild("AimPitchGeometry"))
 local CameraController = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CameraController"))
 local CharacterUpperBodyRig = require(script.Parent.Parent:WaitForChild("character")
     :WaitForChild("animation"):WaitForChild("CharacterUpperBodyRig"))
@@ -19,6 +20,7 @@ local root: BasePart? = nil
 local aimBone: Bone? = nil
 local previousProcedural: { [Bone]: CFrame } = {}
 local targetPosition: Vector3? = nil
+local presentationAimDirection: Vector3? = nil
 local activeUntil = 0
 local renderedYaw = 0
 local renderedPitch = 0
@@ -108,6 +110,7 @@ local function clearCharacter()
     root = nil
     aimBone = nil
     targetPosition = nil
+    presentationAimDirection = nil
     activeUntil = 0
     renderedYaw = 0
     renderedPitch = 0
@@ -161,7 +164,15 @@ local function desiredTorsoAngles(now: number): (number, number, boolean)
     local forward = flatUnit(currentRoot.CFrame.LookVector)
     local horizontal = flatUnit(direction)
     local yaw = if forward and horizontal then signedYaw(forward, horizontal) else 0
-    local pitch = math.atan2(direction.Y, math.max(0.001, Vector3.new(direction.X, 0, direction.Z).Magnitude))
+    -- The hit point may be above RootCollider even when the camera is looking
+    -- DOWN (especially against a monster at point-blank range). Root-to-hit
+    -- pitch would jerk the head upward; presentation pitch follows the actual
+    -- reticle ray instead. Nearby downward aim fades toward level, while true
+    -- upward aim and long-range vertical shots stay available.
+    local pitch = AimPitchGeometry.Resolve(
+        presentationAimDirection, direction,
+        AttackConfig.CloseAimPitchNeutralStuds, AttackConfig.CloseAimPitchFullStuds
+    )
     -- NavigationRoot/pelvis face the walking direction during Bow. The same
     -- world-space spine bridge compensates up to a full lateral strafe; the
     -- stationary character retains the authored 70-degree limit.
@@ -282,20 +293,29 @@ function AimPoseController.BeginAttack(target: Vector3, duration: number)
     if typeof(target) ~= "Vector3" then
         return
     end
+    -- Melee holds the attack-start reticle direction, just like its fixed yaw
+    -- target. Bow refreshes this direction each frame via UpdateTarget.
+    local _, direction = CameraController.GetAimRay()
+    presentationAimDirection = if typeof(direction) == "Vector3" and direction.Magnitude > 1e-6
+        then direction.Unit else nil
     targetPosition = target
     -- duration is the COMPLETE attack interval. The aim response controls how
     -- quickly we reach the angle; it is not a timer that releases the pose early.
     activeUntil = os.clock() + math.max(0.05, tonumber(duration) or 0.05)
 end
 
-function AimPoseController.UpdateTarget(target: Vector3)
+function AimPoseController.UpdateTarget(target: Vector3, direction: Vector3?)
     if typeof(target) == "Vector3" and os.clock() <= activeUntil then
         targetPosition = target
+        if typeof(direction) == "Vector3" and direction.Magnitude > 1e-6 then
+            presentationAimDirection = direction.Unit
+        end
     end
 end
 
 function AimPoseController.EndAttack()
     targetPosition = nil
+    presentationAimDirection = nil
     activeUntil = 0
 end
 

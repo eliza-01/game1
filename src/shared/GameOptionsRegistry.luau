@@ -41,6 +41,7 @@ return table.freeze({
 				nameSize = 15,
 				levelSize = 11,
 				offsetStuds = 2.35,
+				maxDistanceStuds = 100,
 			}),
 			colors = table.freeze({
 				green = "#16D423",
@@ -74,6 +75,7 @@ return table.freeze({
 				nameSize = 13,
 				levelSize = 19,
 				offsetStuds = 2.05,
+				maxDistanceStuds = 100,
 			}),
 			colors = table.freeze({
 				green = "#16D423",
@@ -84,7 +86,7 @@ return table.freeze({
 	}),
 	debugUi = table.freeze({
 		desktop = table.freeze({
-			showPublishedControls = false,
+			showPublishedControls = true,
 		}),
 		mobile = table.freeze({
 			showPublishedControls = false,

@@ -50,9 +50,10 @@ function game1OptionsRender(){
   game1CameraDraftStatus(data);
   game1HealthRender();
   game1HealthDraftStatus(data);
+  $('option-world-streaming-radius').value=String(data.worldStreaming?.targetRadiusStuds??150);
   $('save-combat-options').disabled=game1OptionsState.saving;
   $('save-character-life-options').disabled=game1OptionsState.saving;
-  for(const id of ['option-camera-save','option-camera-preset-save','option-camera-preset-apply','option-camera-preset-delete','health-ui-save','option-published-debug-save']){
+  for(const id of ['option-camera-save','option-camera-preset-save','option-camera-preset-apply','option-camera-preset-delete','health-ui-save','option-published-debug-save','option-world-streaming-save']){
     $(id).disabled=game1OptionsState.saving;
   }
 }
@@ -66,6 +67,38 @@ async function game1OptionsSave(payload,message){
   catch(error){toast(error.message,true)}
   finally{game1OptionsState.saving=false;game1OptionsRender()}
 }
+// Workspace streaming has one shared target per Place. Command Bar application
+// is deliberately explicit: these properties cannot be changed by a client.
+function game1WorldStreamingRadius(){
+  const input=$('option-world-streaming-radius');
+  const radius=Number(input.value);
+  if(!Number.isInteger(radius)||radius<96||radius>4096)throw Error('Streaming target must be an integer 96–4096 studs');
+  return radius;
+}
+$('option-world-streaming-save').onclick=()=>{
+  try{game1OptionsSave({worldStreaming:{targetRadiusStuds:game1WorldStreamingRadius()}},
+    'Streaming target saved · apply in Studio Edit, then Publish to Roblox')}
+  catch(error){toast(error.message,true)}
+};
+$('option-world-streaming-copy').onclick=async()=>{
+  try{
+    const radius=game1WorldStreamingRadius();
+    const command=`-- Eyesland: Roblox Studio Command Bar, EDIT mode. Publish afterward.\n`+
+      `local ws = game:GetService("Workspace")\n`+
+      `local function set(name, value)\n`+
+      `  local ok, err = pcall(function() ws[name] = value end)\n`+
+      `  if not ok then warn(name .. ": " .. tostring(err) .. "; set it in Workspace Properties") end\n`+
+      `end\n`+
+      `set("StreamingEnabled", true)\n`+
+      `set("StreamingMinRadius", 64)\n`+
+      `set("StreamingTargetRadius", ${radius})\n`+
+      `set("ModelStreamingBehavior", Enum.ModelStreamingBehavior.Improved)\n`+
+      `set("StreamOutBehavior", Enum.StreamOutBehavior.Opportunistic)\n`+
+      `print("Current Workspace target:", ws.StreamingTargetRadius)\n`;
+    await navigator.clipboard.writeText(command);
+    toast('Studio Command Bar code copied · apply in Edit mode and publish');
+  }catch(error){toast(error.message||'Cannot copy Command Bar code',true)}
+};
 $('refresh-options').onclick=game1OptionsLoad;
 $('save-combat-options').onclick=()=>game1OptionsSave({combat:{stateDurationSeconds:game1OptionNumber('option-combat-state-duration',6)}},'combat options saved');
 $('save-character-life-options').onclick=()=>game1OptionsSave({characterAnimations:{deathPlaybackPercent:game1OptionNumber('option-character-death-playback',100),revivePlaybackPercent:game1OptionNumber('option-character-revive-playback',100)}},'character life animation options saved');
@@ -114,7 +147,7 @@ window.game1OptionsLoad=game1OptionsLoad;
 const GAME1_HP_FIELDS={
   screen:[['enabled','Enabled'],['width','Width · px',60,560,1],['height','Height · px',6,60,1],['border','Outline · px',0,8,0.5],['textSize','HP digits · px',8,36,1],['top','Top offset · px',0,160,1]],
   self:[['enabled','Show above player'],['width','Width · px',60,560,1],['height','Height · px',6,60,1],['border','Outline · px',0,8,0.5],['nameSize','Name font · px',8,40,1],['levelSize','Level font · px',8,40,1],['offsetStuds','Above head · studs',0,12,0.25]],
-  monster:[['enabled','Show above monsters'],['width','Width · px',60,560,1],['height','Height · px',6,60,1],['border','Outline · px',0,8,0.5],['nameSize','Name font · px',8,40,1],['levelSize','Level font · px',8,40,1],['offsetStuds','Above head · studs',0,12,0.25]],
+  monster:[['enabled','Show above monsters'],['maxDistanceStuds','Name + HP visibility radius · studs',20,800,1],['width','Width · px',60,560,1],['height','Height · px',6,60,1],['border','Outline · px',0,8,0.5],['nameSize','Name font · px',8,40,1],['levelSize','Level font · px',8,40,1],['offsetStuds','Above head · studs',0,12,0.25]],
   colors:[['green','Green (above 65%)'],['yellow','Yellow (31–65%)'],['red','Red (0–30%)']],
 };
 function game1HealthEnsureDrafts(){

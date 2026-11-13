@@ -1,9 +1,10 @@
--- Touch-only input adapter for Game1's custom ControllerManager and Scriptable camera.
+-- Touch-only movement stick + free-screen camera drag/pinch adapter.
 -- The stock Roblox PlayerModule is intentionally disabled in default.project.json.
 -- No physics, camera ownership or combat validation lives in this module.
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
+local UiInputGuard = require(script.Parent.Parent:WaitForChild("UiInputGuard"))
 
 local MobileInputController = {}
 local started = false
@@ -174,8 +175,6 @@ function MobileInputController.Start(movementController: any, cameraController: 
     gui.Parent = playerGui
 
     local left = makeStick(gui, "MoveStick")
-    local right = makeStick(gui, "LookStick")
-    right.pad.AnchorPoint = Vector2.new(1, 1)
 
     local jump = makeAction(gui, "Jump")
     local attack = makeAction(gui, "Attack")
@@ -187,21 +186,19 @@ function MobileInputController.Start(movementController: any, cameraController: 
         end
         local viewport = camera.ViewportSize
         local short = math.min(viewport.X, viewport.Y)
-        local stickSize = math.floor(math.clamp(short * 0.31, 105, 148))
+        local oldStickSize = math.floor(math.clamp(short * 0.31, 105, 148))
+        local stickSize = math.floor(oldStickSize * 0.5)
         local inset = math.floor(math.clamp(short * 0.07, 19, 34))
         local sideInset = math.floor(math.clamp(viewport.X * 0.035, 20, 44))
-        local actionSize = math.floor(math.clamp(stickSize * 0.5, 49, 70))
+        local actionSize = math.floor(math.clamp(oldStickSize * 0.5, 49, 70))
         local thumbSize = math.floor(stickSize * 0.47)
         left.pad.Size = UDim2.fromOffset(stickSize, stickSize)
-        right.pad.Size = UDim2.fromOffset(stickSize, stickSize)
         left.pad.Position = UDim2.new(0, sideInset, 1, -inset)
-        right.pad.Position = UDim2.new(1, -sideInset, 1, -inset)
         left.thumb.Size = UDim2.fromOffset(thumbSize, thumbSize)
-        right.thumb.Size = UDim2.fromOffset(thumbSize, thumbSize)
         jump.Size = UDim2.fromOffset(actionSize, actionSize)
         attack.Size = UDim2.fromOffset(actionSize, actionSize)
-        jump.Position = UDim2.new(1, -sideInset, 1, -inset - stickSize - 22)
-        attack.Position = UDim2.new(1, -sideInset - actionSize - 14, 1, -inset - stickSize - 22)
+        jump.Position = UDim2.new(1, -sideInset, 1, -inset)
+        attack.Position = UDim2.new(1, -sideInset - actionSize - 14, 1, -inset)
     end
 
     local cameraConnection: RBXScriptConnection? = nil
@@ -219,15 +216,28 @@ function MobileInputController.Start(movementController: any, cameraController: 
     Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(bindViewport)
     bindViewport()
 
-    local function resetTouch()
-        releaseStick(left)
-        releaseStick(right)
-        movementController.SetTouchMovement(Vector2.zero, false)
-        cameraController.SetTouchLookAxis(Vector2.zero)
+    -- Up to two fingers on the world viewport control the camera. The movement
+    -- finger and touch UI are never counted as look/pinch fingers.
+    local lookFingers: {InputObject} = {}
+    local lookPositions: {[InputObject]: Vector2} = {}
+    local pinchGap: number? = nil
+
+    local function gapBetweenLookFingers(): number?
+        if #lookFingers ~= 2 then
+            return nil
+        end
+        return (lookPositions[lookFingers[1]] - lookPositions[lookFingers[2]]).Magnitude
     end
 
-    -- Track each InputObject separately. One finger cannot steal the other stick.
-    UserInputService.TouchStarted:Connect(function(input: InputObject)
+    local function resetTouch()
+        releaseStick(left)
+        movementController.SetTouchMovement(Vector2.zero, false)
+        table.clear(lookFingers)
+        table.clear(lookPositions)
+        pinchGap = nil
+    end
+
+    UserInputService.TouchStarted:Connect(function(input: InputObject, gameProcessed: boolean)
         if UserInputService:GetFocusedTextBox() ~= nil then
             return
         end
@@ -235,10 +245,11 @@ function MobileInputController.Start(movementController: any, cameraController: 
             left.input = input
             moveStick(left, input)
             movementController.SetTouchMovement(left.axis, true)
-        elseif not right.input and touchStartsOn(right, input) then
-            right.input = input
-            moveStick(right, input)
-            cameraController.SetTouchLookAxis(right.axis)
+        elseif #lookFingers < 2 and not UiInputGuard.BlocksWorldInput(input, gameProcessed) then
+            -- Free-screen look replaces the old right-hand joystick entirely.
+            table.insert(lookFingers, input)
+            lookPositions[input] = getTouchPosition(input)
+            pinchGap = gapBetweenLookFingers()
         end
     end)
 
@@ -246,9 +257,22 @@ function MobileInputController.Start(movementController: any, cameraController: 
         if input == left.input then
             moveStick(left, input)
             movementController.SetTouchMovement(left.axis, true)
-        elseif input == right.input then
-            moveStick(right, input)
-            cameraController.SetTouchLookAxis(right.axis)
+            return
+        end
+        local previous = lookPositions[input]
+        if not previous then
+            return
+        end
+        local current = getTouchPosition(input)
+        lookPositions[input] = current
+        if #lookFingers == 1 then
+            cameraController.RotateTouch(current - previous)
+        elseif #lookFingers == 2 then
+            local currentGap = gapBetweenLookFingers()
+            if pinchGap and currentGap then
+                cameraController.PinchZoom(pinchGap, currentGap)
+            end
+            pinchGap = currentGap
         end
     end)
 
@@ -256,10 +280,19 @@ function MobileInputController.Start(movementController: any, cameraController: 
         if input == left.input then
             releaseStick(left)
             movementController.SetTouchMovement(Vector2.zero, false)
-        elseif input == right.input then
-            releaseStick(right)
-            cameraController.SetTouchLookAxis(Vector2.zero)
+            return
         end
+        if not lookPositions[input] then
+            return
+        end
+        lookPositions[input] = nil
+        local index = table.find(lookFingers, input)
+        if index then
+            table.remove(lookFingers, index)
+        end
+        -- Continuing a drag after a pinch uses the surviving finger's last
+        -- observed position; no accumulated jump or delayed camera motion.
+        pinchGap = gapBetweenLookFingers()
     end)
 
     UserInputService.WindowFocusReleased:Connect(resetTouch)

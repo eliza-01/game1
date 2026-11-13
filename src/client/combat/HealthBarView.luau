@@ -165,6 +165,11 @@ function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart,
         local lineWidth = math.max(width + 28, math.min(580,
             #nameText * titleSize * 0.68 + (number.Visible and levelSize * 2.5 or 0) + 20))
         gui.Size = UDim2.fromOffset(lineWidth, lineHeight + height + 13)
+        -- A generous camera-distance cap avoids clipping a monster whose root
+        -- is within the actual player-centered radius in third-person view.
+        if monster then
+            gui.MaxDistance = math.max(260, (tonumber(spec.maxDistanceStuds) or 100) + 80)
+        end
         gui.StudsOffsetWorldSpace = Vector3.new(0, baseOffset + spec.offsetStuds, 0)
         titleLine.Position = UDim2.fromOffset(0, 0)
         titleLine.Size = UDim2.fromOffset(lineWidth, lineHeight)

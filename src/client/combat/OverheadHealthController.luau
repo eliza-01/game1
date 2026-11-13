@@ -114,13 +114,23 @@ local function updateVisibility()
         own.SetVisible(character:GetAttribute("LifeState") == "Alive"
             and (HealthUiSettings.IsPreviewing() or character:GetAttribute("InCombat") == true or hp < maxHP - 0.001))
     end
-    aimedMonster = reticleTarget()
+    local playerRoot = if character then anchorFor(character) else nil
+    -- The radius is player-centered, not camera-centered (BillboardGui.MaxDistance
+    -- uses the camera and would incorrectly shorten the range in third person).
+    local style = HealthUiSettings.Current()
+    local radius = math.clamp(tonumber(style.monster and style.monster.maxDistanceStuds) or 100, 20, 800)
+    local radiusSquared = radius * radius
+    aimedMonster = if playerRoot then reticleTarget() else nil
     for model, view in pairs(monsterViews) do
         local alive = model.Parent ~= nil and model:GetAttribute("LifeState") == "Alive"
         local focused = model == aimedMonster
         local attackingUs = model:GetAttribute("MonsterCombatActive") == true
             and model:GetAttribute("MonsterTargetUserId") == player.UserId
-        view.SetVisible(alive and (HealthUiSettings.IsPreviewing() or focused or attackingUs))
+        local root = anchorFor(model)
+        local delta = if playerRoot and root then root.Position - playerRoot.Position else nil
+        local inRange = delta ~= nil and delta:Dot(delta) <= radiusSquared
+        view.SetVisible(alive and inRange
+            and (HealthUiSettings.IsPreviewing() or focused or attackingUs))
     end
 end
 

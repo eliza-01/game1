@@ -13,7 +13,7 @@ local cooldown: {[Player]: number} = {}
 local limits = {
     width={60,560}, height={6,60}, border={0,8},
     textSize={8,36}, nameSize={8,40}, levelSize={8,40},
-    offsetStuds={0,12}, top={0,160},
+    offsetStuds={0,12}, top={0,160}, maxDistanceStuds={20,800},
 }
 
 local function validated(device: any, data: any): {[string]: any}?

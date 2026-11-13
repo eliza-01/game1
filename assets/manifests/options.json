@@ -70,7 +70,8 @@
         "border": 0,
         "nameSize": 15,
         "levelSize": 11,
-        "offsetStuds": 2.35
+        "offsetStuds": 2.35,
+        "maxDistanceStuds": 100
       },
       "colors": {
         "green": "#16D423",
@@ -103,7 +104,8 @@
         "border": 0,
         "nameSize": 13,
         "levelSize": 19,
-        "offsetStuds": 2.05
+        "offsetStuds": 2.05,
+        "maxDistanceStuds": 100
       },
       "colors": {
         "green": "#16D423",
@@ -114,10 +116,13 @@
   },
   "debugUi": {
     "desktop": {
-      "showPublishedControls": false
+      "showPublishedControls": true
     },
     "mobile": {
       "showPublishedControls": false
     }
+  },
+  "worldStreaming": {
+    "targetRadiusStuds": 150
   }
 }

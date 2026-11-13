@@ -15,20 +15,20 @@ HEALTH_UI_DEFAULTS = {
     "desktop": {
         "screen": {"enabled": True, "width": 320, "height": 20, "border": 2, "textSize": 15, "top": 22},
         "self": {"enabled": True, "width": 148, "height": 12, "border": 2, "nameSize": 13, "levelSize": 15, "offsetStuds": 1.7},
-        "monster": {"enabled": True, "width": 182, "height": 18, "border": 2.5, "nameSize": 20, "levelSize": 22, "offsetStuds": 2.6},
+        "monster": {"enabled": True, "width": 182, "height": 18, "border": 2.5, "nameSize": 20, "levelSize": 22, "offsetStuds": 2.6, "maxDistanceStuds": 100},
         "colors": {"green": "#45DB8B", "yellow": "#FFC64B", "red": "#FF5B5D"},
     },
     "mobile": {
         "screen": {"enabled": True, "width": 214, "height": 17, "border": 2, "textSize": 13, "top": 35},
         "self": {"enabled": True, "width": 126, "height": 11, "border": 1.7, "nameSize": 12, "levelSize": 13, "offsetStuds": 1.8},
-        "monster": {"enabled": True, "width": 150, "height": 15, "border": 2, "nameSize": 17, "levelSize": 19, "offsetStuds": 2.8},
+        "monster": {"enabled": True, "width": 150, "height": 15, "border": 2, "nameSize": 17, "levelSize": 19, "offsetStuds": 2.8, "maxDistanceStuds": 100},
         "colors": {"green": "#45DB8B", "yellow": "#FFC64B", "red": "#FF5B5D"},
     },
 }
 HEALTH_BOUNDS = {
     "width": (60, 560), "height": (6, 60), "border": (0, 8),
     "textSize": (8, 36), "nameSize": (8, 40), "levelSize": (8, 40),
-    "offsetStuds": (0, 12), "top": (0, 160),
+    "offsetStuds": (0, 12), "top": (0, 160), "maxDistanceStuds": (20, 800),
 }
 
 
@@ -70,6 +70,19 @@ def normalize_health_ui(change, base=None):
             for device in ('desktop', 'mobile')}
 
 
+# Streaming radii belong to Workspace / the published Place, not to a player.
+# The command-bar helper in Asset Manager applies this value in Studio Edit.
+def normalize_world_streaming(change, base=None):
+    if not isinstance(change, dict) or set(change) - {'targetRadiusStuds'}:
+        raise ValueError('worldStreaming accepts targetRadiusStuds only')
+    result = deepcopy(base or {'targetRadiusStuds': 150})
+    value = change.get('targetRadiusStuds', result['targetRadiusStuds'])
+    if type(value) is not int or not (96 <= value <= 4096):
+        raise ValueError('worldStreaming.targetRadiusStuds must be an integer 96..4096')
+    result['targetRadiusStuds'] = value
+    return result
+
+
 def normalize_debug_ui(change, base=None):
     if not isinstance(change, dict) or set(change) - {'desktop', 'mobile'}:
         raise ValueError('debugUi expects desktop/mobile profiles')
@@ -103,6 +116,7 @@ DEFAULT_PAYLOAD = {
     },
     "camera": DEFAULT_CAMERA.copy(),
     "healthUi": deepcopy(HEALTH_UI_DEFAULTS),
+    "worldStreaming": {"targetRadiusStuds": 150},
     "debugUi": {"desktop": {"showPublishedControls": False}, "mobile": {"showPublishedControls": False}},
     "cameraPresets": [],
     "activeCameraPreset": "",
@@ -148,6 +162,7 @@ class OptionsStore:
             names.add(row['name'])
             normalize_camera(row.get('settings') or {})
         normalize_health_ui(payload.get('healthUi', HEALTH_UI_DEFAULTS))
+        normalize_world_streaming(payload.get('worldStreaming', DEFAULT_PAYLOAD['worldStreaming']))
         normalize_debug_ui(payload.get('debugUi', DEFAULT_PAYLOAD['debugUi']))
         animations = payload.get("characterAnimations") or {}
         for key in ("deathPlaybackPercent", "revivePlaybackPercent"):
@@ -202,7 +217,7 @@ class OptionsStore:
                 if key not in payload[group]:
                     payload[group][key] = value
                     changed = True
-        for field in ('healthUi', 'debugUi'):
+        for field in ('healthUi', 'debugUi', 'worldStreaming'):
             if field not in payload:
                 payload[field] = deepcopy(DEFAULT_PAYLOAD[field])
                 changed = True
@@ -210,6 +225,11 @@ class OptionsStore:
             if field not in payload:
                 payload[field] = deepcopy(DEFAULT_PAYLOAD[field])
                 changed = True
+        # Upgrade older saved per-device HP profiles without changing authored values.
+        normalized_health = normalize_health_ui(payload['healthUi'])
+        if normalized_health != payload['healthUi']:
+            payload['healthUi'] = normalized_health
+            changed = True
         if changed:
             payload["schemaVersion"] = 1
             payload["project"] = "game1"
@@ -267,6 +287,9 @@ class OptionsStore:
         if 'healthUi' in request:
             payload['healthUi'] = normalize_health_ui(request['healthUi'],
                                                        payload.get('healthUi', HEALTH_UI_DEFAULTS))
+        if 'worldStreaming' in request:
+            payload['worldStreaming'] = normalize_world_streaming(
+                request['worldStreaming'], payload.get('worldStreaming', DEFAULT_PAYLOAD['worldStreaming']))
         if 'debugUi' in request:
             payload['debugUi'] = normalize_debug_ui(request['debugUi'],
                                                     payload.get('debugUi', DEFAULT_PAYLOAD['debugUi']))

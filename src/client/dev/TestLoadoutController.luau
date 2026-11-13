@@ -733,6 +733,7 @@ function TestLoadoutController.Start()
         setRingVisible(false)
         radiusToggle.Activated:Connect(function() setRingVisible(not ringVisible) end)
 
+        local renderWeaponHitVolume: () -> ()
         local function setVolumeVisible(value: boolean)
             local character = player.Character
             local isBow = character and string.lower(tostring(character:GetAttribute("EquippedWeaponType") or "")) == "bow"
@@ -741,9 +742,19 @@ function TestLoadoutController.Start()
             volumeToggle.BackgroundColor3 = volumeVisible and COLORS.controlSelected or COLORS.control
             volumeToggle.TextColor3 = volumeVisible and COLORS.accent or COLORS.text
             volumeFolder.Parent = volumeVisible and Workspace or nil
+            -- The preview is one reusable Part, never a per-frame clone.
+            -- Do not even schedule visual updates while the debug toggle is off.
+            if volumeConnection then
+                volumeConnection:Disconnect()
+                volumeConnection = nil
+            end
+            if volumeVisible then
+                renderWeaponHitVolume()
+                volumeConnection = RunService.RenderStepped:Connect(renderWeaponHitVolume)
+            end
         end
 
-        local function renderWeaponHitVolume()
+        renderWeaponHitVolume = function()
             if not volumeVisible then return end
             local currentCharacter = player.Character
             if currentCharacter and string.lower(tostring(currentCharacter:GetAttribute("EquippedWeaponType") or "")) == "bow" then
@@ -773,7 +784,6 @@ function TestLoadoutController.Start()
             volumePart.Transparency = 0.78
         end
 
-        volumeConnection = RunService.RenderStepped:Connect(renderWeaponHitVolume)
         setVolumeVisible(false)
         volumeToggle.Activated:Connect(function() setVolumeVisible(not volumeVisible) end)
 

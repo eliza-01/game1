@@ -16,14 +16,14 @@ local GREEN = Color3.fromRGB(72, 214, 180)
 local LIMITS = {
     width={60,560,4}, height={6,60,1}, border={0,8,0.5},
     textSize={8,36,1}, nameSize={8,40,1}, levelSize={8,40,1},
-    offsetStuds={0,12,0.25}, top={0,160,2},
+    offsetStuds={0,12,0.25}, top={0,160,2}, maxDistanceStuds={20,800,10},
 }
 local GROUPS = {"screen", "self", "monster", "colors"}
 local GROUP_NAMES = {screen="SCREEN", self="SELF", monster="MONSTER", colors="COLORS"}
 local KEYS = {
     screen={"enabled", "width", "height", "border", "textSize", "top"},
     self={"enabled", "width", "height", "border", "nameSize", "levelSize", "offsetStuds"},
-    monster={"enabled", "width", "height", "border", "nameSize", "levelSize", "offsetStuds"},
+    monster={"enabled", "maxDistanceStuds", "width", "height", "border", "nameSize", "levelSize", "offsetStuds"},
     colors={"green", "yellow", "red"},
 }
 
@@ -74,7 +74,7 @@ function Debug.Start()
     local launcher = control(gui,"HP",44,44)
     launcher.Position = StudioDebugDock.ButtonPosition("HP")
     local panel = make(gui,"Frame", {Name="HealthUiDebugPanel", Visible=false,
-        Size=UDim2.fromOffset(356,476), Position=StudioDebugDock.WindowPosition("HP",356),
+        Size=UDim2.fromOffset(356,520), Position=StudioDebugDock.WindowPosition("HP",356),
         BackgroundColor3=BACKGROUND, BorderSizePixel=0})
     rounded(panel, 11)
     make(panel,"UIStroke", {Color=Color3.fromRGB(55,69,83),Thickness=1})
@@ -86,14 +86,14 @@ function Debug.Start()
     local group = "monster"
     local drafts = {desktop=Settings.Saved("desktop"), mobile=Settings.Saved("mobile")}
     local rows = make(panel,"Frame", {Name="Rows", Position=UDim2.fromOffset(12,116),
-        Size=UDim2.fromOffset(333,284), BackgroundTransparency=1})
-    local status = label(panel,"Preview only · Save via Asset Manager Options",12,438,332)
+        Size=UDim2.fromOffset(333,324), BackgroundTransparency=1})
+    local status = label(panel,"Preview only · Save via Asset Manager Options",12,482,332)
     status.TextColor3 = MUTED
     status.TextSize = 10
     local reset = control(panel,"Reset selected profile",157,30)
-    reset.Position = UDim2.fromOffset(12,405)
+    reset.Position = UDim2.fromOffset(12,448)
     local restore = control(panel,"Stop preview",153,30)
-    restore.Position = UDim2.fromOffset(185,405)
+    restore.Position = UDim2.fromOffset(185,448)
 
     local remote: RemoteEvent? = nil
     task.spawn(function()

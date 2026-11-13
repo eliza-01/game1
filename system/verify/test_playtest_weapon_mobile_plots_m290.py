@@ -49,7 +49,7 @@ class PlaytestWeaponMobilePlotsM290(unittest.TestCase):
         self.assertNotIn('"ПРЫЖОК"', ui)
         self.assertNotIn('"УДАР"', ui)
         self.assertIn('movementController.SetTouchMovement', ui)
-        self.assertIn('cameraController.SetTouchLookAxis', ui)
+        self.assertIn('cameraController.RotateTouch', ui)
         self.assertIn('attackController.RequestAttack()', ui)
 
     def test_touch_prompt_uses_existing_server_validation(self):

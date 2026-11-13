@@ -389,6 +389,11 @@
   </div>
   <div class="muted" id="health-ui-draft-status" role="status">No Studio HP Debug draft yet.</div>
   <hr class="card-separator">
+  <div class="section-title"><div><span>Workspace · both devices</span><h3>World streaming target</h3></div></div>
+  <small class="hint">The Roblox engine streams MeshParts and Terrain using a single Workspace target for the entire Place. It cannot have separate PC/mobile targets. 150 studs is a streaming goal, NOT a hard draw cutoff: the engine can retain already loaded regions. Save the value here, then copy and run the Studio Edit command below and publish the Place. This does not affect monster UI distances.</small>
+  <div class="game1-hp-grid"><label>Shared target radius · studs <input type="number" id="option-world-streaming-radius" min="96" max="4096" step="1" value="150"></label></div>
+  <div class="actions"><button type="button" id="option-world-streaming-save" class="primary">Save world streaming target</button><button type="button" id="option-world-streaming-copy">Copy Studio Command Bar code</button></div>
+  <hr class="card-separator">
   <div class="section-title"><div><span>published TestPlace</span><h3>Debug and test controls</h3></div></div>
   <small class="hint">Hide development-only in-game buttons for the selected device in a published Roblox TestPlace. Studio Play debug panels remain available. Currently this also controls the published test weapon selector; it does not disable game combat or mobile input.</small>
   <label class="game1-published-debug-toggle"><input type="checkbox" id="option-published-debug-buttons">Show debug / test buttons in published TestPlace</label>

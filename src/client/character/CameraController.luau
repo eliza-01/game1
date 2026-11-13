@@ -21,11 +21,8 @@ local rotating = false
 local targetYaw = 0
 local cameraSettings = GameOptions.CameraSettings()
 local targetPitch = math.rad(cameraSettings.pitchDegrees)
-local renderedYaw = 0
-local renderedPitch = targetPitch
 local distance = cameraSettings.distance
 local discardNextMouseDelta = false
-local touchLookAxis = Vector2.zero
 
 local raycastParameters = RaycastParams.new()
 raycastParameters.FilterType = Enum.RaycastFilterType.Exclude
@@ -40,8 +37,6 @@ local function setCharacter(newCharacter: Model)
 		root = newRoot
 		local look = newRoot.CFrame.LookVector
 		targetYaw = math.atan2(-look.X, -look.Z)
-		renderedYaw = targetYaw
-		renderedPitch = targetPitch
 		raycastParameters.FilterDescendantsInstances = { newCharacter }
 	end
 end
@@ -54,16 +49,7 @@ local function releaseMouse()
 	end
 end
 
-local function updateCameraInput(deltaTime: number)
-	-- Continuous touch thumbstick (radians/sec) shares the desktop camera's target.
-	if touchLookAxis.Magnitude > 0.001 then
-		targetYaw -= touchLookAxis.X * CharacterConfig.CameraTouchRotationSpeed * deltaTime
-		targetPitch = math.clamp(
-			targetPitch + touchLookAxis.Y * CharacterConfig.CameraTouchRotationSpeed * deltaTime,
-			CharacterConfig.CameraMinPitch,
-			CharacterConfig.CameraMaxPitch
-		)
-	end
+local function updateCameraInput(_deltaTime: number)
 	if not rotating then
 		return
 	end
@@ -91,7 +77,7 @@ local function updateCameraInput(deltaTime: number)
 	)
 end
 
-local function updateCamera(deltaTime: number)
+local function updateCamera(_deltaTime: number)
 	local currentRoot = root
 	if not currentRoot or not currentRoot.Parent then
 		return
@@ -105,21 +91,14 @@ local function updateCamera(deltaTime: number)
 	camera.CameraType = Enum.CameraType.Scriptable
 	camera.FieldOfView = CharacterConfig.CameraFieldOfView
 
-	-- Mouse deltas are quantized input samples. Keep the authoritative target angles
-	-- exact, but render toward them with a frame-rate-independent exponential response.
-	-- This removes the visible one-pixel/one-packet stepping without smoothing the
-	-- character follow position itself.
-	local response = CharacterConfig.CameraRotationResponse
-	local blend = 1 - math.exp(-response * math.max(0, deltaTime))
-	renderedYaw += (targetYaw - renderedYaw) * blend
-	renderedPitch += (targetPitch - renderedPitch) * blend
+	-- Direct orbit: no angular lerp or delayed camera follow.
 
 	-- Follow the transform Roblox actually renders for the physics root.
 	-- Reading .Position here samples the simulation transform and can make the
 	-- whole world appear to stutter when render FPS is higher than physics FPS.
 	local renderedRootCFrame = currentRoot:GetRenderCFrame()
 	local target = renderedRootCFrame.Position + Vector3.new(0, cameraSettings.targetHeight, 0)
-	local rotation = CFrame.Angles(0, renderedYaw, 0) * CFrame.Angles(renderedPitch, 0, 0)
+	local rotation = CFrame.Angles(0, targetYaw, 0) * CFrame.Angles(targetPitch, 0, 0)
 	-- Translate the camera frame in its local screen plane; the player appears
     -- at the chosen normalized on-screen position without changing root movement.
     local viewport = camera.ViewportSize
@@ -167,7 +146,6 @@ function CameraController.ApplyDebug(settings: {[string]: number}): boolean
     distance = cameraSettings.distance
     if math.abs(cameraSettings.pitchDegrees - oldPitch) > 1e-6 then
         targetPitch = math.rad(cameraSettings.pitchDegrees)
-        renderedPitch = targetPitch
     end
     local gui = localPlayer:FindFirstChild("PlayerGui")
     local reticle = gui and gui:FindFirstChild("Game1AimReticle")
@@ -191,9 +169,27 @@ function CameraController.GetAimRay(): (Vector3?, Vector3?)
     return ray.Origin, ray.Direction.Unit
 end
 
-function CameraController.SetTouchLookAxis(axis: Vector2)
-	local magnitude = axis.Magnitude
-	touchLookAxis = if magnitude > 1 then axis.Unit else axis
+-- The touch adapter owns gesture recognition; this controller only consumes deltas.
+function CameraController.RotateTouch(delta: Vector2)
+	targetYaw -= delta.X * CharacterConfig.CameraTouchSensitivity
+	targetPitch = math.clamp(
+		targetPitch - delta.Y * CharacterConfig.CameraTouchSensitivity,
+		CharacterConfig.CameraMinPitch,
+		CharacterConfig.CameraMaxPitch
+	)
+end
+
+function CameraController.PinchZoom(previousGap: number, currentGap: number)
+	if previousGap <= 5 or currentGap <= 5 then
+		return
+	end
+	-- A widening pinch zooms in. Bound malformed input spikes without smoothing.
+	local ratio = math.clamp(previousGap / currentGap, 0.7, 1.4)
+	distance = math.clamp(
+		distance * ratio,
+		CharacterConfig.CameraMinDistance,
+		CharacterConfig.CameraMaxDistance
+	)
 end
 
 function CameraController.Start()

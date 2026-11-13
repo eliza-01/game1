@@ -90,12 +90,12 @@
       "name": "1hs_run",
       "sourcePath": "assets/source/characters/human/female/human_female/animations/weapons/1hs/1hs_run.rbxm",
       "preparedPath": "assets/source/characters/human/female/human_female/animations/weapons/1hs/1hs_run.rbxm",
-      "sha256": "7b4eb03f0d635cb53e04ca215b4769f57f498de445dcd9e3621c082426d422b5",
-      "sourceSha256": "7b4eb03f0d635cb53e04ca215b4769f57f498de445dcd9e3621c082426d422b5",
+      "sha256": "b162c571a6fe7f8bac79a1192a1fea4dc65462feeddc6180aa7d8824f0c34cbb",
+      "sourceSha256": "b162c571a6fe7f8bac79a1192a1fea4dc65462feeddc6180aa7d8824f0c34cbb",
       "assetId": "89877200678956",
-      "publishedSha256": "7b4eb03f0d635cb53e04ca215b4769f57f498de445dcd9e3621c082426d422b5",
+      "publishedSha256": "b162c571a6fe7f8bac79a1192a1fea4dc65462feeddc6180aa7d8824f0c34cbb",
       "moderationState": "Approved",
-      "revision": 2,
+      "revision": 3,
       "status": "PUBLISHED"
     },
     {

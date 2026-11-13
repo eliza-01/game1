@@ -5,12 +5,13 @@
 local CollisionPolicy = require(script.Parent.StudioRealEstateCollisionPolicy)
 local Targets = require(script.Parent.StudioRealEstatePlacedTargets)
 local HouseFrame = require(script.Parent.StudioRealEstateHouseFrame)
+local Roles = require(script.Parent.StudioRealEstateRigRoles)
 local Sync = {}
 
 local function authoredRigs(template: Model): {[string]: Model}
     local result = {}
     for _, rig in template:GetChildren() do
-        if rig:IsA("Model") and rig:GetAttribute("Game1RealEstatePhysicsRig") == true then
+        if Roles.IsLegacyCollisionRig(rig) then
             local part = rig:GetAttribute("Game1RealEstatePhysicsMeshName")
             if typeof(part) == "string" and CollisionPolicy.IsCollider(part) then
                 result[part] = rig
@@ -40,7 +41,7 @@ function Sync.Update(template: Model, slug: string, placedTargets: {Model}?): (n
         local relative = HouseFrame.Relative(referenceHouse, placedHouse)
         for part, source in physicsRigs do
             local old = root:FindFirstChild(source.Name)
-            if old and (not old:IsA("Model") or old:GetAttribute("Game1RealEstatePhysicsRig") ~= true
+            if old and (not Roles.IsLegacyCollisionRig(old)
                 or old:GetAttribute("Game1RealEstatePhysicsMeshName") ~= part) then
                 table.insert(warnings, "collision rig " .. source.Name
                     .. " already exists but is not managed in " .. root:GetFullName())

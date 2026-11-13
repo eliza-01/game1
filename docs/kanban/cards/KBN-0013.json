@@ -3,7 +3,7 @@
   "id": "KBN-0013",
   "title": "Real Estate · Collision Blueprint (Parts) + миграция с col_mesh",
   "domain": "Real Estate",
-  "status": "READY",
+  "status": "IN_PROGRESS",
   "priority": "P0",
   "owner": "Owner + Codex",
   "specPath": "docs/kanban/specs/KBN-0013.md",
@@ -12,7 +12,7 @@
     {
       "id": "KBN-0013-T01",
       "title": "Read-only аудит Col_meshRig, PrimaryPart, HouseRig, дверей, сокетов, старых Studio-политик и зависимостей",
-      "done": false
+      "done": true
     },
     {
       "id": "KBN-0013-T02",
@@ -78,6 +78,11 @@
       "id": "KBN-0013-T14",
       "title": "Обновить старые CollisionPolicy/PlacedPhysicsGuard, документацию и выполнить rollback smoke-test",
       "done": false
+    },
+    {
+      "id": "KBN-0013-T15",
+      "title": "Сверить M341 read-only preflight с актуальной моделью и достроить привязки выбранного дома до 50 Plot",
+      "done": false
     }
   ],
   "acceptance": [
@@ -130,7 +135,7 @@
       "evidence": ""
     }
   ],
-  "revision": 1,
-  "updatedAt": "2026-11-13T00:00:00+00:00",
-  "specSha256": "dedcc51382a01a993758c25630184de6c39434845cb37e1085ed4e0bc5cb9946"
+  "revision": 2,
+  "updatedAt": "2026-11-14T01:15:00+00:00",
+  "specSha256": "fd5544da13828f99c554e5a4cfdb29fbd52c206b24dafba4900f40dc07d97611"
 }

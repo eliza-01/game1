@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 1,
+  "kind": "m341_real_estate_read_only_preflight",
+  "registeredHouses": 5,
+  "placementBindings": 196,
+  "distinctPlotsWithBindings": 40,
+  "totalPlots": 50,
+  "placementsWithoutHouseAnchor": 23,
+  "houses": [
+    {
+      "slug": "house_level1_01",
+      "placementBindings": 40,
+      "meshCount": 2,
+      "totalSourceVertices": 1299,
+      "legacyColliders": [
+        {
+          "name": "col_mesh",
+          "vertices": 205,
+          "publishedRig": true,
+          "noCollide": false,
+          "collisionFidelity": "PreciseConvexDecomposition"
+        }
+      ],
+      "otherCollidableMeshes": []
+    },
+    {
+      "slug": "house_level2_01",
+      "placementBindings": 39,
+      "meshCount": 4,
+      "totalSourceVertices": 3759,
+      "legacyColliders": [
+        {
+          "name": "col_mesh",
+          "vertices": 415,
+          "publishedRig": true,
+          "noCollide": false,
+          "collisionFidelity": "PreciseConvexDecomposition"
+        }
+      ],
+      "otherCollidableMeshes": [
+        {
+          "name": "door",
+          "vertices": 500,
+          "publishedRig": true,
+          "noCollide": false,
+          "collisionFidelity": "PreciseConvexDecomposition"
+        },
+        {
+          "name": "window_frames_glass",
+          "vertices": 8,
+          "publishedRig": true,
+          "noCollide": false,
+          "collisionFidelity": "PreciseConvexDecomposition"
+        }
+      ]
+    },
+    {
+      "slug": "house_level3_01",
+      "placementBindings": 39,
+      "meshCount": 5,
+      "totalSourceVertices": 23214,
+      "legacyColliders": [
+        {
+          "name": "col_mesh",
+          "vertices": 1454,
+          "publishedRig": true,
+          "noCollide": false,
+          "collisionFidelity": null
+        }
+      ],
+      "otherCollidableMeshes": [
+        {
+          "name": "door",
+          "vertices": 5550,
+          "publishedRig": true,
+          "noCollide": false,
+          "collisionFidelity": null
+        },
+        {
+          "name": "window_frames_glass",
+          "vertices": 32,
+          "publishedRig": true,
+          "noCollide": false,
+          "collisionFidelity": null
+        }
+      ]
+    },
+    {
+      "slug": "house_level4_01",
+      "placementBindings": 39,
+      "meshCount": 5,
+      "totalSourceVertices": 14276,
+      "legacyColliders": [
+        {
+          "name": "col_mesh",
+          "vertices": 602,
+          "publishedRig": true,
+          "noCollide": false,
+          "collisionFidelity": null
+        }
+      ],
+      "otherCollidableMeshes": [
+        {
+          "name": "door",
+          "vertices": 2124,
+          "publishedRig": true,
+          "noCollide": false,
+          "collisionFidelity": null
+        },
+        {
+          "name": "window_frames_glass",
+          "vertices": 32,
+          "publishedRig": true,
+          "noCollide": false,
+          "collisionFidelity": null
+        }
+      ]
+    },
+    {
+      "slug": "house_level5_01",
+      "placementBindings": 39,
+      "meshCount": 6,
+      "totalSourceVertices": 30410,
+      "legacyColliders": [
+        {
+          "name": "col_mesh",
+          "vertices": 4725,
+          "publishedRig": true,
+          "noCollide": false,
+          "collisionFidelity": "PreciseConvexDecomposition"
+        }
+      ],
+      "otherCollidableMeshes": [
+        {
+          "name": "door",
+          "vertices": 2076,
+          "publishedRig": true,
+          "noCollide": false,
+          "collisionFidelity": "PreciseConvexDecomposition"
+        },
+        {
+          "name": "window_frames_glass",
+          "vertices": 24,
+          "publishedRig": true,
+          "noCollide": false,
+          "collisionFidelity": "PreciseConvexDecomposition"
+        }
+      ]
+    }
+  ],
+  "warnings": [],
+  "collisionMigrationEnabled": false,
+  "note": "Read-only authoring snapshot; it does not inspect live Workspace, Studio physics or device FPS."
+}

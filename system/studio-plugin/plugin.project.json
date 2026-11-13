@@ -121,6 +121,9 @@
       "StudioRealEstatePlacedPhysicsGuard": {
         "$path": "modules/StudioRealEstatePlacedPhysicsGuard.luau"
       },
+      "StudioRealEstateRigRoles": {
+        "$path": "modules/StudioRealEstateRigRoles.luau"
+      },
       "StudioRealEstatePlacedCollisionSync": {
         "$path": "modules/StudioRealEstatePlacedCollisionSync.luau"
       },

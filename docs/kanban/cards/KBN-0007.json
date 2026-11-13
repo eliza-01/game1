@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0007",
+  "title": "Клиентский World Streaming",
+  "domain": "World Streaming",
+  "status": "PROPOSED",
+  "priority": "P1",
+  "owner": "Codex",
+  "specPath": "docs/kanban/specs/KBN-0007.md",
+  "dependsOn": [
+    "KBN-0005",
+    "KBN-0006"
+  ],
+  "tasks": [
+    {
+      "id": "KBN-0007-T01",
+      "title": "Разработать состояния FULL / LOD1 / UNLOADED",
+      "done": false
+    },
+    {
+      "id": "KBN-0007-T02",
+      "title": "Внедрить профили дистанции и hysteresis",
+      "done": false
+    },
+    {
+      "id": "KBN-0007-T03",
+      "title": "Ограничить создание/удаление экземпляров бюджетом кадра",
+      "done": false
+    },
+    {
+      "id": "KBN-0007-T04",
+      "title": "Сделать предзагрузку соседних секторов и отмену устаревших задач",
+      "done": false
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0007-A01",
+      "title": "Два клиента на разных расстояниях показывают разные LOD",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0007-A02",
+      "title": "10 циклов удаления и повторной загрузки без роста активных Instances",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ],
+  "revision": 1,
+  "updatedAt": "2026-11-13T00:00:00+00:00",
+  "specSha256": "2ed6dbab961f94880f07e5fa6121df57bad88e63c5684e43a561909308f2d0ee"
+}

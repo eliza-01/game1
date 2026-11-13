@@ -1,0 +1,136 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0013",
+  "title": "Real Estate · Collision Blueprint (Parts) + миграция с col_mesh",
+  "domain": "Real Estate",
+  "status": "READY",
+  "priority": "P0",
+  "owner": "Owner + Codex",
+  "specPath": "docs/kanban/specs/KBN-0013.md",
+  "dependsOn": [],
+  "tasks": [
+    {
+      "id": "KBN-0013-T01",
+      "title": "Read-only аудит Col_meshRig, PrimaryPart, HouseRig, дверей, сокетов, старых Studio-политик и зависимостей",
+      "done": false
+    },
+    {
+      "id": "KBN-0013-T02",
+      "title": "Сохранить backup Place/Studio, SQLite через backup API, манифестов и актуального commit",
+      "done": false
+    },
+    {
+      "id": "KBN-0013-T03",
+      "title": "Утвердить формат и versioning Collision Blueprint с pivot авторского MeshPart house",
+      "done": false
+    },
+    {
+      "id": "KBN-0013-T04",
+      "title": "Сделать Studio Preview/Capture Collision с проверкой slug, принадлежности Parts и ревизий",
+      "done": false
+    },
+    {
+      "id": "KBN-0013-T05",
+      "title": "Реализовать backend валидацию, хранение, историю, безопасное восстановление версии",
+      "done": false
+    },
+    {
+      "id": "KBN-0013-T06",
+      "title": "Реализовать server-side генерацию Parts и stage-before-destroy при Place/Place all/Sync",
+      "done": false
+    },
+    {
+      "id": "KBN-0013-T07",
+      "title": "Создать Collision Blueprint вручную для house_level1_01 и проверить round-trip CFrame",
+      "done": false
+    },
+    {
+      "id": "KBN-0013-T08",
+      "title": "Проверить два Plot, разные повороты, legacy binding, масштаб, Undo и Clear",
+      "done": false
+    },
+    {
+      "id": "KBN-0013-T09",
+      "title": "Проверить двери, лестницы, триггеры, сокеты, лифт, raycasts и collision groups",
+      "done": false
+    },
+    {
+      "id": "KBN-0013-T10",
+      "title": "Проверить два клиента FULL/LOD/NONE и Roblox Streaming на мобильном устройстве",
+      "done": false
+    },
+    {
+      "id": "KBN-0013-T11",
+      "title": "Снять baseline/after метрики CPU physics, память и число активных colliders",
+      "done": false
+    },
+    {
+      "id": "KBN-0013-T12",
+      "title": "Мигрировать первый дом с отключением legacy col_mesh только после PASS новой физики",
+      "done": false
+    },
+    {
+      "id": "KBN-0013-T13",
+      "title": "После утверждения мигрировать остальные дома Real Estate без влияния на Location Assets",
+      "done": false
+    },
+    {
+      "id": "KBN-0013-T14",
+      "title": "Обновить старые CollisionPolicy/PlacedPhysicsGuard, документацию и выполнить rollback smoke-test",
+      "done": false
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0013-A01",
+      "title": "Capture/Restore сохраняет точный локальный pivot/CFrame/Size и контролирует версию Blueprint",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0013-A02",
+      "title": "Два Plot с разным поворотом имеют совпадающие относительно house коллизии",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0013-A03",
+      "title": "В Real Estate нет дублирования legacy col_mesh и новой primitive коллизии",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0013-A04",
+      "title": "Двери, лестницы, сокеты и другие интерактивные механики функционируют",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0013-A05",
+      "title": "При FULL/LOD1/NONE и двух клиентах коллизии остаются серверными и корректными",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0013-A06",
+      "title": "Legacy дом без Blueprint и чужие Location Assets col_mesh не изменены",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0013-A07",
+      "title": "Удаление legacy выполнено только для проверенных объектов, выполнен rollback smoke-test",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0013-A08",
+      "title": "Статические/профильные тесты и мобильные замеры зафиксированы с версиями",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ],
+  "revision": 1,
+  "updatedAt": "2026-11-13T00:00:00+00:00",
+  "specSha256": "dedcc51382a01a993758c25630184de6c39434845cb37e1085ed4e0bc5cb9946"
+}

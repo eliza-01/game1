@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0001",
+  "title": "Аудит текущего Workspace",
+  "domain": "Environment",
+  "status": "PROPOSED",
+  "priority": "P0",
+  "owner": "Owner + Codex",
+  "specPath": "docs/kanban/specs/KBN-0001.md",
+  "dependsOn": [],
+  "tasks": [
+    {
+      "id": "KBN-0001-T01",
+      "title": "Снять дерево Workspace и распределение классов без изменения объектов",
+      "done": false
+    },
+    {
+      "id": "KBN-0001-T02",
+      "title": "Классифицировать Plots, Places, Game1CharacterTestStands: authoring/runtime/physics/visual/debug",
+      "done": false
+    },
+    {
+      "id": "KBN-0001-T03",
+      "title": "Отметить постоянные серверные объекты и границы Streaming",
+      "done": false
+    },
+    {
+      "id": "KBN-0001-T04",
+      "title": "Сверить данные Workspace со сканером Asset Manager и каталогом",
+      "done": false
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0001-A01",
+      "title": "Опубликован read-only отчёт с классами, владельцами и точными путями",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0001-A02",
+      "title": "Установлено, какие экземпляры разрешено переносить, а какие защищены",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ],
+  "revision": 3,
+  "updatedAt": "2026-11-13T21:05:21+00:00",
+  "specSha256": "36762d8eb1a9ae8e86863fb13ceea606407ff6bcc0272f766242889aa369e03c"
+}

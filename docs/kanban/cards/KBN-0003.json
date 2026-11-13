@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0003",
+  "title": "Базовые замеры на Android",
+  "domain": "Performance",
+  "status": "PROPOSED",
+  "priority": "P0",
+  "owner": "Owner",
+  "specPath": "docs/kanban/specs/KBN-0003.md",
+  "dependsOn": [],
+  "tasks": [
+    {
+      "id": "KBN-0003-T01",
+      "title": "Зафиксировать модель телефона, OS и настройки качества Roblox",
+      "done": false
+    },
+    {
+      "id": "KBN-0003-T02",
+      "title": "Записать FPS, стабильность кадра, RAM и время первой загрузки",
+      "done": false
+    },
+    {
+      "id": "KBN-0003-T03",
+      "title": "Повторить 15-минутный обход одной сцены и сохранить журнал",
+      "done": false
+    },
+    {
+      "id": "KBN-0003-T04",
+      "title": "Отметить версию опубликованной Eyesland DEV и место замера",
+      "done": false
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0003-A01",
+      "title": "Есть baseline на устройстве и воспроизводимый маршрут",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0003-A02",
+      "title": "Измерения содержат время/версию и описание графических настроек",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ],
+  "revision": 1,
+  "updatedAt": "2026-11-13T00:00:00+00:00",
+  "specSha256": "2bac9e638f545c5305a8e6c795845531c8e2e7b832fc3d3f454fa62b34509ee8"
+}

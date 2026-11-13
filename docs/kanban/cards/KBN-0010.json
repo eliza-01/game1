@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0010",
+  "title": "Проверки производительности на устройствах",
+  "domain": "Performance",
+  "status": "PROPOSED",
+  "priority": "P1",
+  "owner": "Owner + Codex",
+  "specPath": "docs/kanban/specs/KBN-0010.md",
+  "dependsOn": [
+    "KBN-0007",
+    "KBN-0008"
+  ],
+  "tasks": [
+    {
+      "id": "KBN-0010-T01",
+      "title": "Сравнить baseline и custom streamer на той же карте",
+      "done": false
+    },
+    {
+      "id": "KBN-0010-T02",
+      "title": "Проверить мобильную память/текстуры/mesh/physics counters",
+      "done": false
+    },
+    {
+      "id": "KBN-0010-T03",
+      "title": "Проверить hot/cold loading и 15 минут прохода",
+      "done": false
+    },
+    {
+      "id": "KBN-0010-T04",
+      "title": "Отработать сценарии нескольких игроков и телепорта",
+      "done": false
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0010-A01",
+      "title": "Есть протокол сравнения до/после на слабом Android",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0010-A02",
+      "title": "Нет регресса геймплея, критических задержек или неконтролируемого роста памяти",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ],
+  "revision": 1,
+  "updatedAt": "2026-11-13T00:00:00+00:00",
+  "specSha256": "13e61fceecdf2539a005b986863bbf466c1557dd10bbdd57eb0679ec250d5415"
+}

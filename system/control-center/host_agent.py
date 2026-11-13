@@ -66,6 +66,7 @@ from services.native_pickers import (
 )
 from api.read_dispatch import dispatch as dispatch_read_request
 from api.write_dispatch import dispatch_post as dispatch_write_request, dispatch_delete as dispatch_delete_request
+from kanban_store import KanbanStore
 from source_only_assets import migrate_source_only_assets
 from real_estate.jobs import RealEstatePublicationJobs
 
@@ -76,6 +77,7 @@ port = int(os.environ.get("CONTROL_AGENT_PORT", "43821"))
 token = os.environ.get("CONTROL_TOKEN", "Game1LocalControlV1")
 asset_audit_repository = MySqlAssetReplacementAudit(MySqlAuditConfig.from_environment())
 asset_replacement_audit = SqliteAssetAuditImporter(ROOT, asset_audit_repository)
+kanban_store = KanbanStore(ROOT)
 store = CharacterStore(ROOT)
 character_components = CharacterComponents(ROOT)
 armor = ArmorCatalog(character_components)
@@ -185,6 +187,7 @@ READ_SOURCES = MappingProxyType({
     "monster_spawns": monster_spawns, "animation_speed_scaling": animation_speed_scaling,
     "options": options_store, "timelines": timelines, "locations": locations,
     "publication_config": publication_config,
+    "kanban": kanban_store,
 })
 
 
@@ -193,6 +196,7 @@ READ_SOURCES = MappingProxyType({
 # these with in-memory fakes without touching SQLite, Roblox, or the filesystem.
 WRITE_SOURCES = MappingProxyType({
     "animation_speed_scaling": animation_speed_scaling,
+    "kanban": kanban_store,
     "animations": animations,
     "character_identity": character_identity,
     "character_components": character_components,

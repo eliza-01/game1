@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0008",
+  "title": "Физика и коллизии независимо от LOD",
+  "domain": "Physics",
+  "status": "PROPOSED",
+  "priority": "P1",
+  "owner": "Codex",
+  "specPath": "docs/kanban/specs/KBN-0008.md",
+  "dependsOn": [
+    "KBN-0007"
+  ],
+  "tasks": [
+    {
+      "id": "KBN-0008-T01",
+      "title": "Сверить все текущие house collision mesh и socket triggers",
+      "done": false
+    },
+    {
+      "id": "KBN-0008-T02",
+      "title": "Определить серверную ответственность CanCollide/CanTouch/CanQuery",
+      "done": false
+    },
+    {
+      "id": "KBN-0008-T03",
+      "title": "Проверить StreamingIntegrityMode при входе и телепортах",
+      "done": false
+    },
+    {
+      "id": "KBN-0008-T04",
+      "title": "Проверить двери, проходы и взаимодействия на двух клиентах",
+      "done": false
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0008-A01",
+      "title": "Коллизии работают при FULL, LOD1 и UNLOADED",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0008-A02",
+      "title": "Игрок не проходит через препятствия при переключении сектора",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ],
+  "revision": 1,
+  "updatedAt": "2026-11-13T00:00:00+00:00",
+  "specSha256": "4a278d96277fc980bb16414af15484e30189b87d0dea4e832aae9e5828f37f94"
+}

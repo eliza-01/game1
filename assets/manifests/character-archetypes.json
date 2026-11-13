@@ -18,7 +18,7 @@
       "race": "human",
       "gender": "female",
       "status": "ASSEMBLY_READY",
-      "revision": 15,
+      "revision": 16,
       "visualMode": "assembly",
       "assembly": {
         "schema_version": 2,
@@ -326,14 +326,14 @@
             "extras": [],
             "atlas_image_id": "",
             "colors": {
-              "primary": "#FFB8D1"
+              "primary": "#E7A2B0"
             },
-            "material": "Plaster"
+            "material": "SmoothPlastic"
           }
         },
         "ready": true,
         "missing": [],
-        "fingerprint": "6a34c19d3f539fd32d886a89"
+        "fingerprint": "a0f0428cfa07c8e6776e29ab"
       },
       "stats": {
         "Level": 2,

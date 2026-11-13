@@ -1,0 +1,48 @@
+#kanban-view{display:grid;gap:14px}
+#kanban-view[hidden]{display:none}
+.kb-toolbar{display:grid;gap:12px}
+.kb-metrics{display:flex;gap:18px;flex-wrap:wrap}
+.kb-metrics span{font-size:12px;color:var(--muted)}
+.kb-metrics strong{font-size:19px;color:var(--text);margin-right:5px}
+.kb-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.kb-controls input{flex:1;min-width:190px}
+.kb-controls select{min-width:150px}
+#kb-notice{font-size:12px;color:var(--muted);margin:0}
+#kb-notice.kb-error{color:var(--danger,#f66)}
+.kb-list{display:grid;gap:12px}
+.kb-card{border:1px solid var(--line);border-radius:14px;background:var(--panel);overflow:hidden}
+.kb-card>summary{display:flex;cursor:pointer;align-items:center;justify-content:space-between;gap:16px;padding:17px;list-style:none}
+.kb-card>summary::-webkit-details-marker{display:none}
+.kb-card[open]>summary{border-bottom:1px solid var(--line)}
+.kb-head{min-width:0;display:grid;gap:6px}
+.kb-title{font-size:16px;font-weight:750;color:var(--text)}
+.kb-sub{font-size:11px;color:var(--muted)}
+.kb-progress{font-size:12px;color:var(--mint);white-space:nowrap}
+.kb-body{padding:16px;display:grid;gap:16px}
+.kb-actions{display:flex;gap:10px;align-items:end;flex-wrap:wrap}
+.kb-actions label{min-width:200px;flex:0 1 270px}
+.kb-actions select{margin-top:5px;width:100%}
+.kb-group{border:1px solid var(--line);border-radius:10px;padding:13px;display:grid;gap:10px}
+.kb-group h4{margin:0;font-size:14px}
+.kb-item{display:flex;align-items:flex-start;gap:9px;font-size:13px}
+.kb-item input{width:auto!important;margin:2px 0 0;flex:none}
+.kb-test{display:grid;grid-template-columns:minmax(155px,2fr) minmax(110px,.8fr) minmax(150px,2fr);gap:9px;align-items:center}
+.kb-test select,.kb-test input{width:100%}
+.kb-test small{color:var(--muted)}
+.kb-doc{display:grid;gap:10px}
+.kb-doc pre{border:1px solid var(--line);background:var(--panel2);padding:15px;border-radius:10px;max-height:460px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.55;font-size:12px}
+.kb-doc textarea{width:100%;min-height:340px;resize:vertical;line-height:1.5;font:12px ui-monospace,Consolas,monospace}
+.kb-doc input[type=text]{width:100%}
+.kb-doc .kb-doc-controls{display:flex;flex-wrap:wrap;gap:8px}
+.kb-history{display:grid;gap:6px;font-size:12px;color:var(--muted)}
+.kb-history>div{border-bottom:1px solid var(--line);padding-bottom:6px}
+.kb-notice{color:var(--muted);font-size:12px}
+@media(max-width:750px){.kb-test{grid-template-columns:1fr}.kb-card>summary{align-items:flex-start}.kb-actions label{flex:1}}
+#kanban-view [hidden]{display:none!important}
+
+.kb-create{display:flex;flex-wrap:wrap;gap:10px;align-items:end;padding:10px;border:1px solid var(--line);border-radius:10px}
+.kb-create label{flex:1 1 160px;font-size:12px}
+.kb-create input,.kb-create select{width:100%;margin-top:5px}
+.kb-add-row{display:flex;gap:8px;flex-wrap:wrap}
+.kb-add-row input{flex:1;min-width:200px}
+.kb-edit-title{border:0;background:transparent;color:var(--muted);padding:0 5px;font-size:11px}

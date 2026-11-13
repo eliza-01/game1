@@ -1,8 +1,11 @@
 """HTTP GET dispatch. Does not know HTTP transports or persistence implementations."""
-from . import read_catalog, read_world, real_estate
+from . import read_catalog, read_world, real_estate, kanban
 
 
 def dispatch(parsed, sources, info):
+    response = kanban.read(parsed.path, sources)
+    if response is not None:
+        return response
     response = real_estate.read(parsed, sources)
     if response is not None:
         return response

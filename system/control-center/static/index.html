@@ -21,6 +21,7 @@
 <link rel="stylesheet" href="location-alpha.css?v=250">
 <link rel="stylesheet" href="deco-assets.css?v=254">
 <link rel="stylesheet" href="real-estate.css?v=247&physics=205">
+<link rel="stylesheet" href="kanban.css?v=339">
 </head>
 <body>
 <header>
@@ -46,6 +47,7 @@
 <button id="nav-real-estate" class="asset-section" type="button"><b>real estate</b><small>houses · any mesh rigs · textures</small></button>
 <button id="nav-timelines" class="asset-section" type="button"><b>timelines</b><small>attack animation events</small></button>
 <button id="nav-options" class="asset-section" type="button"><b>options</b><small>common runtime settings</small></button>
+<button id="nav-kanban" class="asset-section" type="button"><b>development kanban</b><small>tasks · contracts · evidence</small></button>
 </div>
 <div id="character-rail">
 <hr class="rail-separator">
@@ -823,6 +825,18 @@
 </div>
 </div>
 
+<div id="kanban-view" hidden>
+<div class="panel hero"><div><span class="eyebrow">git-backed · verified work</span><h2>Development Kanban</h2><p>Единый план разработки, документация и проверяемые задачи. Roblox runtime не изменяется.</p></div></div>
+<div class="panel kb-toolbar"><div id="kb-metrics" class="kb-metrics"></div><div class="kb-controls"><input id="kb-search" type="search" placeholder="Найти механику или ID" aria-label="Поиск задач"><select id="kb-status" aria-label="Фильтр по статусу"><option value="">Все статусы</option></select><button id="kb-refresh" type="button">Обновить</button><button id="kb-create-toggle" class="primary" type="button">+ Новая механика</button><button id="kb-export" type="button">Экспорт для Codex</button></div><form id="kb-create-form" class="kb-create" hidden>
+<label>Название<input name="title" maxlength="160" minlength="4" required placeholder="Название новой работы"></label>
+<label>Домен<select name="domain"><option>Tooling</option><option>Assets</option><option>Environment</option><option>Physics</option><option>World Streaming</option><option>Performance</option><option>Gameplay</option></select></label>
+<label>Приоритет<select name="priority"><option>P0</option><option selected>P1</option><option>P2</option><option>P3</option></select></label>
+<label>Исполнитель<input name="owner" maxlength="80" value="Owner + Codex" required></label>
+<button type="submit" class="primary">Создать карточку</button><button type="button" id="kb-create-cancel">Отмена</button>
+</form>
+<p id="kb-notice" role="status" aria-live="polite"></p></div>
+<div id="kb-cards" class="kb-list" aria-label="Карточки работ"></div>
+</div>
 </section>
 </main>
 <div id="toast" class="toast"></div>
@@ -868,5 +882,6 @@
 <script src="real-estate-mesh-workflow.js?v=234"></script>
 <script src="real-estate-placement.js?v=2"></script>
 <script src="monster-spawns.js?v=338"></script>
+<script src="kanban.js?v=339"></script>
 </body>
 </html>

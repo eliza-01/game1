@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0004",
+  "title": "Стандарт MASTER / FULL / LOD1 / COLLISION",
+  "domain": "Assets",
+  "status": "PROPOSED",
+  "priority": "P0",
+  "owner": "Owner + Codex",
+  "specPath": "docs/kanban/specs/KBN-0004.md",
+  "dependsOn": [
+    "KBN-0002"
+  ],
+  "tasks": [
+    {
+      "id": "KBN-0004-T01",
+      "title": "Определить единый ID ассета и версии вариаций",
+      "done": false
+    },
+    {
+      "id": "KBN-0004-T02",
+      "title": "Утвердить pivot, ориентацию, масштаб, UV и материалы",
+      "done": false
+    },
+    {
+      "id": "KBN-0004-T03",
+      "title": "Определить структуру Blender source, FULL, LOD1 и collision",
+      "done": false
+    },
+    {
+      "id": "KBN-0004-T04",
+      "title": "Установить допустимые исключения для Rig и интерактивных деталей",
+      "done": false
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0004-A01",
+      "title": "Описана проверяемая схема ассета с версиями и идентификаторами",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0004-A02",
+      "title": "Валидатор обнаруживает отсутствующие LOD и расхождения pivot",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ],
+  "revision": 1,
+  "updatedAt": "2026-11-13T00:00:00+00:00",
+  "specSha256": "a536c693c548164075961f6a56a00cb4646dd0e75b1c874993b4aacc06d416b0"
+}

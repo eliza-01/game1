@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0002",
+  "title": "Аудит Asset Manager и Studio Bridge",
+  "domain": "Tooling",
+  "status": "PROPOSED",
+  "priority": "P0",
+  "owner": "Codex",
+  "specPath": "docs/kanban/specs/KBN-0002.md",
+  "dependsOn": [
+    "KBN-0001"
+  ],
+  "tasks": [
+    {
+      "id": "KBN-0002-T01",
+      "title": "Найти фактических владельцев SQLite/JSON/manifest/Workspace data",
+      "done": false
+    },
+    {
+      "id": "KBN-0002-T02",
+      "title": "Проверить Studio Bridge, EnvironmentAssetService и Place Registry",
+      "done": false
+    },
+    {
+      "id": "KBN-0002-T03",
+      "title": "Зафиксировать сканирование, идентичность, ревизии и историю",
+      "done": false
+    },
+    {
+      "id": "KBN-0002-T04",
+      "title": "Составить карту API и существующих тестов для будущего интеграционного слоя",
+      "done": false
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0002-A01",
+      "title": "Есть карта компонентов с ответственностью и входами/выходами",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0002-A02",
+      "title": "Проведён независимый тест сканирования без изменений placement",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ],
+  "revision": 1,
+  "updatedAt": "2026-11-13T00:00:00+00:00",
+  "specSha256": "3aa5a695fa62d000f5b7fd00cc53bdc9cc047d1cb37d0f30e0fbaaff39a6afe6"
+}

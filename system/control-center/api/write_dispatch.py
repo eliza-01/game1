@@ -1,5 +1,5 @@
 """Transport-neutral POST and DELETE routing. Handlers return (status, JSON data)."""
-from . import write_files, write_actors, write_world, write_animations, delete_entities, real_estate
+from . import write_files, write_actors, write_world, write_animations, delete_entities, real_estate, kanban
 from services.shared_asset_retirement import SharedAssetRetirement
 
 
@@ -34,7 +34,7 @@ def dispatch_post(path, body, deps):
             return response
         except (ValueError, OSError, KeyError) as error:
             return 400, {'error': str(error)}
-    for handler in (real_estate.write, write_files.route, write_actors.route, write_world.route, write_animations.route):
+    for handler in (kanban.write, real_estate.write, write_files.route, write_actors.route, write_world.route, write_animations.route):
         response = handler(path, body, deps)
         if response is not None:
             if requires_audit and response[0] < 300:

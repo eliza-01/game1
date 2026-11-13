@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0005",
+  "title": "Вертикальный тест house_level1_01",
+  "domain": "Assets",
+  "status": "PROPOSED",
+  "priority": "P0",
+  "owner": "Owner + Codex",
+  "specPath": "docs/kanban/specs/KBN-0005.md",
+  "dependsOn": [
+    "KBN-0004"
+  ],
+  "tasks": [
+    {
+      "id": "KBN-0005-T01",
+      "title": "Снять текущее дерево HouseRig и Col_meshRig",
+      "done": false
+    },
+    {
+      "id": "KBN-0005-T02",
+      "title": "Создать отдельную облегчённую версию дома с сохранённым pivot",
+      "done": false
+    },
+    {
+      "id": "KBN-0005-T03",
+      "title": "Проверить прозрачность, ColorMap и внешний вид FULL/LOD",
+      "done": false
+    },
+    {
+      "id": "KBN-0005-T04",
+      "title": "Проверить published IDs и серверные коллизии на устройстве",
+      "done": false
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0005-A01",
+      "title": "FULL и LOD1 можно независимо создать и удалить на клиенте",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0005-A02",
+      "title": "Дом визуально корректен на Android, коллизии остаются стабильными",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ],
+  "revision": 1,
+  "updatedAt": "2026-11-13T00:00:00+00:00",
+  "specSha256": "d356d99a206afcf60173b128703783f1cb669a882d0af2bf247f62b3c593104a"
+}

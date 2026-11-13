@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0009",
+  "title": "Автоматизация подготовки ассетов",
+  "domain": "Assets",
+  "status": "PROPOSED",
+  "priority": "P1",
+  "owner": "Codex",
+  "specPath": "docs/kanban/specs/KBN-0009.md",
+  "dependsOn": [
+    "KBN-0004",
+    "KBN-0005"
+  ],
+  "tasks": [
+    {
+      "id": "KBN-0009-T01",
+      "title": "Реализовать read-only scan и отчёт несоответствий по asset IDs",
+      "done": false
+    },
+    {
+      "id": "KBN-0009-T02",
+      "title": "Проверять FULL/LOD1/collision contract и pivots",
+      "done": false
+    },
+    {
+      "id": "KBN-0009-T03",
+      "title": "Встроить batch export с dry-run и явным подтверждением",
+      "done": false
+    },
+    {
+      "id": "KBN-0009-T04",
+      "title": "Обеспечить idempotent повторный прогон без перепубликации",
+      "done": false
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0009-A01",
+      "title": "Dry-run не мутирует источники и даёт список ошибок",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0009-A02",
+      "title": "Повторный прогон не создаёт новые Asset ID без изменения исходника",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ],
+  "revision": 1,
+  "updatedAt": "2026-11-13T00:00:00+00:00",
+  "specSha256": "b7f2e038f8514717f8138396b9519170fc26c077df36ec77cb9226cf652148ff"
+}

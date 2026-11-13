@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0006",
+  "title": "Реестр мира и placement records",
+  "domain": "World Streaming",
+  "status": "PROPOSED",
+  "priority": "P1",
+  "owner": "Codex",
+  "specPath": "docs/kanban/specs/KBN-0006.md",
+  "dependsOn": [
+    "KBN-0001",
+    "KBN-0002"
+  ],
+  "tasks": [
+    {
+      "id": "KBN-0006-T01",
+      "title": "Определить objectId, assetTypeId, CFrame, bounds, sector IDs",
+      "done": false
+    },
+    {
+      "id": "KBN-0006-T02",
+      "title": "Экспортировать одну область из существующего генератора",
+      "done": false
+    },
+    {
+      "id": "KBN-0006-T03",
+      "title": "Добавить версионирование worldRevision и assetCatalogVersion",
+      "done": false
+    },
+    {
+      "id": "KBN-0006-T04",
+      "title": "Обработать объекты, пересекающие несколько секторов",
+      "done": false
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0006-A01",
+      "title": "Одинаковая генерация даёт одинаковые stable IDs и placement",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0006-A02",
+      "title": "Два соседних сектора не создают дубликатов одной модели",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ],
+  "revision": 1,
+  "updatedAt": "2026-11-13T00:00:00+00:00",
+  "specSha256": "70c8835b64d318408c424424f581b399cadd6176e9e721a08274c272c09fee9c"
+}

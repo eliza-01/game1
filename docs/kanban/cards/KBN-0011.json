@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0011",
+  "title": "Графические пресеты Low / Medium / High",
+  "domain": "Performance",
+  "status": "PROPOSED",
+  "priority": "P2",
+  "owner": "Codex",
+  "specPath": "docs/kanban/specs/KBN-0011.md",
+  "dependsOn": [
+    "KBN-0010"
+  ],
+  "tasks": [
+    {
+      "id": "KBN-0011-T01",
+      "title": "Разделить client settings и server gameplay",
+      "done": false
+    },
+    {
+      "id": "KBN-0011-T02",
+      "title": "Настроить конфигурационные расстояния LOD по профилям",
+      "done": false
+    },
+    {
+      "id": "KBN-0011-T03",
+      "title": "Добавить плотность декоративных объектов и локальные эффекты",
+      "done": false
+    },
+    {
+      "id": "KBN-0011-T04",
+      "title": "Проверить смену профиля без телепорта/перезагрузки",
+      "done": false
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0011-A01",
+      "title": "У каждого игрока независимый графический профиль",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0011-A02",
+      "title": "Low снижает измеряемую графическую нагрузку без изменения коллизий",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ],
+  "revision": 1,
+  "updatedAt": "2026-11-13T00:00:00+00:00",
+  "specSha256": "d9102a36a6ee13228ef559facad879226c586874a5953af1bfc3dcb077384b2a"
+}

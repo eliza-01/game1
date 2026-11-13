@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0012",
+  "title": "Безопасная публикация Eyesland DEV",
+  "domain": "Tooling",
+  "status": "PROPOSED",
+  "priority": "P1",
+  "owner": "Owner + Codex",
+  "specPath": "docs/kanban/specs/KBN-0012.md",
+  "dependsOn": [
+    "KBN-0002"
+  ],
+  "tasks": [
+    {
+      "id": "KBN-0012-T01",
+      "title": "Определить единственный исходный project/build target для DEV",
+      "done": false
+    },
+    {
+      "id": "KBN-0012-T02",
+      "title": "Документировать Publish / Publish As и rollback",
+      "done": false
+    },
+    {
+      "id": "KBN-0012-T03",
+      "title": "Проверить Playtest доступ на телефонах и нескольких ПК",
+      "done": false
+    },
+    {
+      "id": "KBN-0012-T04",
+      "title": "Сохранить smoke test после каждого деплоя",
+      "done": false
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0012-A01",
+      "title": "Новый билд доступен на телефоне, публичный релиз не выполнялся",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0012-A02",
+      "title": "Описан проверенный способ возврата к предыдущей рабочей сборке",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ],
+  "revision": 1,
+  "updatedAt": "2026-11-13T00:00:00+00:00",
+  "specSha256": "fb263cb6f2b77dd538ca1a07969d591142350775beb030c3b9a1e2a250e3f5f0"
+}

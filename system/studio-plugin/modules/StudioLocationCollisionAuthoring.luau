@@ -52,23 +52,38 @@ local function sameInventory(root: Model, version: any): boolean
     return true
 end
 
-local function selectedModel(selection: any, workspaceRef: Workspace, command: any, needParts: boolean): (Model, {BasePart})
+-- Only members returned by Studio Selection:Get() count as authoring inputs.
+-- Generated Parts may appear in a mixed Studio selection, but must NEVER
+-- become Blueprint recipes. Ignore them; don't mutate Studio's selection.
+local function selectedModel(selection: any, workspaceRef: Workspace, command: any, needParts: boolean): (Model, {BasePart}, number)
     local picked = selection:Get()
     local root: Model? = nil
     local parts: {BasePart} = {}
+    local ignoredGenerated = 0
+    local observed = {}
     for _, item in ipairs(picked) do
+        if #observed < 8 then
+            table.insert(observed, item.ClassName .. " " .. item:GetFullName())
+        end
         if item:IsA("Model") then
             if root then error("Select exactly ONE Location Asset Model plus Parts") end
             root = item
+        elseif item:IsA("BasePart") and (
+            item:GetAttribute("Game1LocationCollisionOwned") == true
+            or item.Name:sub(1, 17) == "__Game1Collision_") then
+            ignoredGenerated += 1
         else
-            -- Calling shapeOf also refuses MeshPart, Folder, Attachments, etc.
+            -- Reject all unsupported classes, including visual MeshParts.
             shapeOf(item)
             if not item:IsA("BasePart") then error("Selected collision must be a BasePart") end
             table.insert(parts, item)
         end
     end
+    local selectionReport = string.format(
+        "Studio Selection:Get() returned %d objects; generated ignored: %d; actual: %s",
+        #picked, ignoredGenerated, table.concat(observed, " | "))
     if root == nil or not root:IsDescendantOf(workspaceRef) then
-        error("Select a published Location Asset Model in Workspace and its Parts")
+        error("Select one published Location Asset Model in Workspace. " .. selectionReport)
     end
     local camera = workspaceRef.CurrentCamera
     if camera and root:IsDescendantOf(camera) then error("Camera Model cannot be a Location Asset") end
@@ -83,7 +98,8 @@ local function selectedModel(selection: any, workspaceRef: Workspace, command: a
         end
     end
     if needParts and (#parts < 1 or #parts > MAX_PARTS) then
-        error("Select the Location Model together with 1..256 collision Parts")
+        error("Select the Location Model together with 1..256 ORIGINAL collision Parts. "
+            .. selectionReport)
     end
     -- A placed Model is accepted. No exception for Workspace.Places or Plots.
     -- Editable names and stamps are never sufficient identity by themselves.
@@ -113,7 +129,7 @@ local function selectedModel(selection: any, workspaceRef: Workspace, command: a
         error("Selected Model does not match published visual Mesh IDs of " .. command.slug ..
             ". Select the registered asset instance, not an unrelated Model")
     end
-    return root, parts
+    return root, parts, ignoredGenerated
 end
 
 local function acceptableId(value: any): boolean
@@ -121,7 +137,45 @@ local function acceptableId(value: any): boolean
         and value:match("^[A-Za-z0-9][A-Za-z0-9_%-]*$") ~= nil
 end
 
-local function capture(root: Model, parts: {BasePart}): any
+
+-- A published visual MeshPart is a stable geometric anchor. Historic Models may
+-- have PrimaryPart/PivotOffset while newly imported Models use WorldPivot.
+-- Selecting an anchor by the CURRENT published Mesh ID (not by an editable name)
+-- makes the Blueprint portable across both representations without changing pivots.
+local function selectVisualAnchor(root: Model, command: any): (MeshPart, string)
+    local versions = command.expectedVersions
+    local current = if type(versions) == "table" then versions[1] else nil
+    if type(current) ~= "table" or type(current.meshes) ~= "table" then
+        error("Current published Mesh ID inventory unavailable for Collision Capture")
+    end
+    local allowed = {}
+    for _, entry in ipairs(current.meshes) do
+        if entry.count == 1 then allowed[entry.meshId] = true end
+    end
+    local candidates = {}
+    for _, child in ipairs(root:GetDescendants()) do
+        if child:IsA("MeshPart") and not Carrier.IsCarrier(child)
+            and not MeshPhysics.IsCollider(child.Name)
+            and child:GetAttribute("Game1DecoPhysicsOnly") ~= true then
+            local mid = History.Id(child.MeshId)
+            if allowed[mid] then
+                candidates[mid] = candidates[mid] or {}
+                table.insert(candidates[mid], child)
+            end
+        end
+    end
+    local ids = {}
+    for mid, matches in pairs(candidates) do
+        if #matches == 1 then table.insert(ids, mid) end
+    end
+    table.sort(ids)
+    if #ids == 0 then
+        error("No unique visual Mesh ID shared with the CURRENT publication. Place a fresh published instance before Capture")
+    end
+    return candidates[ids[1]][1], ids[1]
+end
+
+local function capture(root: Model, parts: {BasePart}, command: any): any
     -- IDs are optional: a unique simple name is used where available; repeated,
     -- Unicode or otherwise arbitrary names receive deterministic generated IDs.
     table.sort(parts, function(a, b)
@@ -152,7 +206,10 @@ local function capture(root: Model, parts: {BasePart}): any
     local used = {}
     local nextAuto = 0
     local recipes = {}
-    local pivot = root:GetPivot() -- Blender/Roblox-authored Pivot; read-only.
+    local pivot = root:GetPivot() -- Read only; never edit the placed Model.
+    local anchorPart, meshId = selectVisualAnchor(root, command)
+    local anchorFrame = pivot:ToObjectSpace(anchorPart.CFrame)
+    local anchorSize = anchorPart.Size
     for index, part in ipairs(parts) do
         local id = proposed[index]
         if id == nil or frequencies[id] ~= 1 then
@@ -176,7 +233,11 @@ local function capture(root: Model, parts: {BasePart}): any
             canTouch = part.CanTouch,
         })
     end
-    return {schemaVersion = 1, pivot = "Model:GetPivot()", parts = recipes}
+    return {schemaVersion = 2, pivot = "Model:GetPivot()",
+        anchor = {meshId = meshId,
+            localCFrame = {anchorFrame:GetComponents()},
+            size = {anchorSize.X, anchorSize.Y, anchorSize.Z}},
+        parts = recipes}
 end
 
 local function clearPreview(workspaceRef: Workspace): number
@@ -191,12 +252,14 @@ local function clearPreview(workspaceRef: Workspace): number
 end
 
 local function preview(root: Model, blueprint: any, workspaceRef: Workspace, slug: string): number
-    if type(blueprint) ~= "table" or blueprint.schemaVersion ~= 1
-        or blueprint.pivot ~= "Model:GetPivot()" or type(blueprint.parts) ~= "table"
+    if type(blueprint) ~= "table" or blueprint.schemaVersion ~= 2
+        or blueprint.pivot ~= "Model:GetPivot()" or type(blueprint.anchor) ~= "table"
+        or type(blueprint.parts) ~= "table"
         or #blueprint.parts < 1 or #blueprint.parts > MAX_PARTS then
         error("Invalid saved Collision Blueprint; Preview refused")
     end
-    local pivot = root:GetPivot()
+    local Collision = require(script.Parent.StudioLocationCollisionParts)
+    local pivot, visualScale = Collision.ReferencePivot(root, blueprint)
     -- Build the whole temporary preview first; do not remove a working preview
     -- until every new recipe has passed validation and instantiated correctly.
     local draft = Instance.new("Folder")
@@ -230,8 +293,8 @@ local function preview(root: Model, blueprint: any, workspaceRef: Workspace, slu
             ghost.CanQuery = false
             ghost.CastShadow = false
             ghost.Transparency = 1
-            ghost.Size = Vector3.new(recipe.size[1], recipe.size[2], recipe.size[3])
-            ghost.CFrame = pivot * CFrame.new(table.unpack(recipe.localCFrame))
+            ghost.Size = Collision.SizeFor(visualScale, recipe)
+            ghost.CFrame = Collision.FrameFromPivot(pivot, visualScale, recipe)
             ghost.Parent = draft
             local outline = Instance.new("SelectionBox")
             outline.Name = "Game1CollisionOutline"
@@ -273,9 +336,10 @@ return function(config: any)
                 return {partCount = clearPreview(workspaceRef)}
             end
             local requiresParts = command.phase == "validate" or command.phase == "capture"
-            local model, parts = selectedModel(config.Selection, workspaceRef, command, requiresParts)
+            local model, parts, ignoredGenerated = selectedModel(config.Selection, workspaceRef, command, requiresParts)
             if requiresParts then
-                return {blueprint = capture(model, parts)}
+                return {blueprint = capture(model, parts, command),
+                    ignoredGenerated = ignoredGenerated}
             elseif command.phase == "preview" then
                 return {partCount = preview(model, command.blueprint, workspaceRef, command.slug)}
             end

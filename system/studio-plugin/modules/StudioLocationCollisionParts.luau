@@ -1,6 +1,7 @@
 -- M343C: collision geometry from the saved Location Asset Blueprint.
 -- Authored Parts can be selected anywhere. Only GENERATED Parts are owned here;
 -- never delete hand-made Parts or mutate the original Blender/Roblox pivot.
+local Transform = require(script.Parent.StudioLocationCollisionTransform)
 local Collision = {}
 
 local OWNED = "Game1LocationCollisionOwned"
@@ -9,8 +10,9 @@ local REVISION = "Game1LocationCollisionRevision"
 local SHA = "Game1LocationCollisionSha256"
 
 local function recipes(blueprint: any): {any}
-    if type(blueprint) ~= "table" or blueprint.schemaVersion ~= 1
-        or blueprint.pivot ~= "Model:GetPivot()" or type(blueprint.parts) ~= "table"
+    if type(blueprint) ~= "table" or blueprint.schemaVersion ~= 2
+        or blueprint.pivot ~= "Model:GetPivot()" or type(blueprint.anchor) ~= "table"
+        or type(blueprint.parts) ~= "table"
         or #blueprint.parts < 1 or #blueprint.parts > 256 then
         error("Invalid Location Collision Blueprint; no Parts changed")
     end
@@ -43,17 +45,8 @@ local function recipes(blueprint: any): {any}
     return blueprint.parts
 end
 
--- Model:ScaleTo() preserves an authored pivot but scales offsets/sizes.
--- Capture is unscaled; each placed instance may have its own uniform Model scale.
-local function frameFor(root: Model, recipe: any): CFrame
-    local localFrame = CFrame.new(table.unpack(recipe.localCFrame))
-    return root:GetPivot() * CFrame.new(localFrame.Position * root:GetScale()) * localFrame.Rotation
-end
-
-local function sizeFor(root: Model, recipe: any): Vector3
-    return Vector3.new(table.unpack(recipe.size)) * root:GetScale()
-end
-
+-- Coordinate conversion is owned by StudioLocationCollisionTransform. Never
+-- infer per-axis visual scale from Model:GetScale() or adjust the old Pivot.
 local function ownedParts(root: Model): {BasePart}
     local result = {}
     for _, child in ipairs(root:GetChildren()) do
@@ -73,8 +66,12 @@ end
 
 function Collision.Current(root: Model, blueprint: any, revision: any, sha: any): boolean
     if type(revision) ~= "number" or revision < 1 then return true end
+    if type(blueprint) ~= "table" or blueprint.schemaVersion ~= 2 then return false end
     if root:GetAttribute(REVISION) ~= revision or root:GetAttribute(SHA) ~= sha then return false end
-    local actual = ownedParts(root)
+    local resolved, anchor = pcall(Transform.Resolve, root, blueprint)
+    if not resolved then return false end
+    local validParts, actual = pcall(ownedParts, root)
+    if not validParts then return false end
     if type(blueprint) ~= "table" or type(blueprint.parts) ~= "table"
         or #actual ~= #blueprint.parts then return false end
     local byId = {}
@@ -95,8 +92,9 @@ function Collision.Current(root: Model, blueprint: any, revision: any, sha: any)
                 elseif part.Shape == Enum.PartType.Cylinder then "Cylinder" else "Block"
             if shape ~= expectedShape then return false end
         end
-        local expected = frameFor(root, recipe)
-        if (part.Size - sizeFor(root, recipe)).Magnitude > 0.002
+        local okGeometry, expected, expectedSize = pcall(Transform.Part, anchor, recipe)
+        if not okGeometry then return false end
+        if (part.Size - expectedSize).Magnitude > 0.002
             or (part.Position - expected.Position).Magnitude > 0.003
             or part.CFrame.LookVector:Dot(expected.LookVector) < 0.99999
             or part.CFrame.UpVector:Dot(expected.UpVector) < 0.99999
@@ -107,12 +105,14 @@ function Collision.Current(root: Model, blueprint: any, revision: any, sha: any)
     return true
 end
 
-function Collision.Prepare(root: Model, blueprint: any, revision: any, sha: any): any
+function Collision.Prepare(root: Model, blueprint: any, revision: any, sha: any, incoming: Model?): any
     if not root:IsA("Model") or type(revision) ~= "number" or revision < 1
         or type(sha) ~= "string" or #sha ~= 64 then
         error("Invalid Location Collision publication")
     end
     local pivot = root:GetPivot()
+    local geometry = incoming or root
+    local anchor = Transform.Resolve(geometry, blueprint)
     local stage = {}
     local good, failure = pcall(function()
         for _, recipe in ipairs(recipes(blueprint)) do
@@ -130,8 +130,9 @@ function Collision.Prepare(root: Model, blueprint: any, revision: any, sha: any)
             part.Name = "__Game1Collision_" .. recipe.id
             part:SetAttribute(OWNED, true)
             part:SetAttribute(PART_ID, recipe.id)
-            part.Size = sizeFor(root, recipe)
-            part.CFrame = frameFor(root, recipe)
+            local frame, size = Transform.Part(anchor, recipe)
+            part.Size = size
+            part.CFrame = frame
             part.Anchored = true
             part.CanCollide = true
             -- CanQuery=false has no effect when CanCollide=true in Roblox.
@@ -173,8 +174,9 @@ function Collision.Rollback(transaction: any)
     end
 end
 
-function Collision.Finalize(transaction: any)
-    for _, part in ipairs(transaction.prior) do part:Destroy() end
+function Collision.Finalize(_transaction: any)
+    -- Intentionally no Destroy(): Commit already detached old Parts and the
+    -- Studio Undo transaction may need to re-parent them on Ctrl+Z.
 end
 
 return table.freeze(Collision)

@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT / 'system/control-center'))
 from location_asset_store import LocationAssetStore
 from services.place_registry.catalog import build_catalog, validate_report
 
-BLUEPRINT = {'schemaVersion': 1, 'pivot': 'Model:GetPivot()', 'parts': [
+BLUEPRINT = {'schemaVersion': 2, 'pivot': 'Model:GetPivot()', 'anchor': {'meshId':'139744616815788', 'size':[10,5,0.5], 'localCFrame':[0,0,0,1,0,0,0,1,0,0,0,1]}, 'parts': [
     {'id': 'wall', 'name': 'wall', 'shape': 'Block', 'size': [4, 3, 1],
      'localCFrame': [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
      'collisionGroup': 'Default', 'canQuery': False, 'canTouch': False},
@@ -84,7 +84,9 @@ class CollisionSyncM343C(unittest.TestCase):
         self.assertIn('part.Transparency = 1', module)
         self.assertIn('Collision.Finalize', module)
         self.assertIn('Collision.Rollback', module)
-        self.assertIn('root:GetScale()', module)
+        transform = source('system/studio-plugin/modules/StudioLocationCollisionTransform.luau')
+        self.assertIn('matched.Size.X / original.X', transform)
+        self.assertIn('Transform.Part(anchor, recipe)', module)
         self.assertIn('part.CanQuery = true', module)
         self.assertIn('for _, part in ipairs(transaction.prior)', module)
         plugin = source('system/studio-plugin/plugin.project.json')

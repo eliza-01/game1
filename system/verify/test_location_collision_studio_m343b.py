@@ -22,7 +22,7 @@ from api.read_world import route as read_route
 from api.write_world import route as write_route
 
 
-BLUEPRINT = {'schemaVersion': 1, 'pivot': 'Model:GetPivot()', 'parts': [
+BLUEPRINT = {'schemaVersion': 2, 'pivot': 'Model:GetPivot()', 'anchor': {'meshId':'139744616815788', 'size':[10,5,0.5], 'localCFrame':[0,0,0,1,0,0,0,1,0,0,0,1]}, 'parts': [
     {'id':'wall_01','name':'wall_01','shape':'Block','size':[4,5,0.3],
      'localCFrame':[0,1,0,1,0,0,0,1,0,0,0,1],
      'collisionGroup':'Default','canQuery':True,'canTouch':False}
@@ -80,7 +80,7 @@ class LocationCollisionStudioM343B(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             store=registered_store(Path(tmp))
             def malformed(**_kwargs):
-                return {'blueprint':{'schemaVersion':1,'pivot':'Model:GetPivot()','parts':[
+                return {'blueprint':{'schemaVersion':2,'pivot':'Model:GetPivot()','anchor':{'meshId':'139744616815788', 'size':[10,5,0.5], 'localCFrame':[0,0,0,1,0,0,0,1,0,0,0,1]},'parts':[
                     {**BLUEPRINT['parts'][0], 'shape':'MeshPart'}]}}
             service=LocationCollisionAuthoring(store,malformed)
             with self.assertRaisesRegex(ValueError,'shape'):

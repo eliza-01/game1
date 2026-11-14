@@ -56,7 +56,9 @@ def expected_versions(store, slug: str) -> list[dict]:
         asset_slug = str(row['asset_slug'])
         owners.setdefault(signature, set()).add(asset_slug)
         if asset_slug == slug:
-            own[signature] = str(row['model_asset_id'])
+            model_id = str(row['model_asset_id'])
+            if signature not in own or model_id == str(current['model_asset_id']):
+                own[signature] = model_id
 
     if not own:
         raise ValueError('No published visual Mesh ID inventory for this Location Asset; '
@@ -66,6 +68,9 @@ def expected_versions(store, slug: str) -> list[dict]:
         raise ValueError('Published visual Mesh IDs also identify another Location Asset; '
                          'Collision Capture requires unambiguous model provenance')
 
+    current_id = str(current['model_asset_id'])
+    if current_id not in own.values():
+        raise ValueError('Current published visual Mesh ID inventory is missing; refresh publication inventory')
     return [{'modelAssetId': own[signature],
              'meshes': [{'meshId': mesh_id, 'count': count} for mesh_id, count in signature]}
-            for signature in sorted(own)]
+            for signature in sorted(own, key=lambda key: (own[key] != current_id, key))]

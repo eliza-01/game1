@@ -78,6 +78,21 @@
       "id": "KBN-0014-T14",
       "title": "Проверить функциональные тесты на устройстве и снять baseline производительности",
       "done": false
+    },
+    {
+      "id": "KBN-0014-T15",
+      "title": "Проверить Anchor v2 и Capture без повторного использования сгенерированных Parts в Studio",
+      "done": false
+    },
+    {
+      "id": "KBN-0014-T16",
+      "title": "Проверить Scan/Sync отсутствующих коллизий, масштаб и Ctrl+Z на размещениях",
+      "done": false
+    },
+    {
+      "id": "KBN-0014-T17",
+      "title": "Проверить non-uniform Size Collision Blueprint на старых заборах, Scan/Sync и Undo в Studio (M350)",
+      "done": false
     }
   ],
   "acceptance": [
@@ -110,9 +125,21 @@
       "title": "Старые Atlas-ассеты и Studio Bridge/Plots без регрессий",
       "status": "NOT_RUN",
       "evidence": ""
+    },
+    {
+      "id": "KBN-0014-A06",
+      "title": "M348: визуальный anchor v2, отсутствующая коллизия, размещение и Undo подтверждены в Studio",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0014-A07",
+      "title": "M350: неравномерные старые MeshPart Size, ограничение shear и Undo проверены в Studio",
+      "status": "NOT_RUN",
+      "evidence": ""
     }
   ],
-  "revision": 3,
-  "updatedAt": "2026-11-14T02:30:00+00:00",
-  "specSha256": "a87adbfa1648727b85068c0a067d23dff32cef827e5ba719466348b925b15c23"
+  "revision": 5,
+  "updatedAt": "2026-11-14T19:37:00+00:00",
+  "specSha256": "f0f70313a4102b4f6d7212c2da82fa93d43a4b127b0b74db6fd6ad6ad4b513c1"
 }

@@ -94,6 +94,10 @@ function decoAssetSetForm() {
 }
 function decoAssetBeginNew() {
   decoAssetSetForm();
+  const body = $('location-new-registration-body');
+  body.hidden = false;
+  $('new-location-asset-main').setAttribute('aria-expanded', 'true');
+  $('new-location-asset-main').textContent = 'Close';
   $('location-asset-name').focus();
 }
 function decoAssetMatchingVariant(path) {
@@ -261,6 +265,7 @@ function decoAssetRender() {
     rows.appendChild(tr);
   }
   window.game1LocationCollisionRefresh?.(decoAssetState.data.items || []);
+  window.game1LocationInstanceRefresh?.(decoAssetState.data.items || []);
   if (!visible.length) {
     const tr = document.createElement('tr');
     tr.innerHTML = '<td colspan="6"><span class="muted">No registered assets match this category.</span></td>';
@@ -339,6 +344,9 @@ async function decoAssetRegister() {
     });
     await decoAssetLoad();
     decoAssetSetForm();
+    $('location-new-registration-body').hidden = true;
+    $('new-location-asset-main').setAttribute('aria-expanded', 'false');
+    $('new-location-asset-main').textContent = '+ New asset';
     toast(`Registered ${row.slug} · ready to publish`);
     window.game1LocationAssetWorkflow.open(row.slug, 'publish');
   } catch (error) { toast(`Register: ${error.message}`, true); }
@@ -426,7 +434,18 @@ decoAssetRestorePreferences();
 window.game1LocationAssetsLoad = decoAssetLoad;
 $('location-asset-name').oninput = decoAssetSyncSlug;
 $('location-asset-appearance-mode').onchange = decoAssetToggleAppearance;
-$('new-location-asset-main').onclick = decoAssetBeginNew;
+$('new-location-asset-main').onclick = () => {
+  if (!$('location-new-registration-body').hidden) {
+    $('location-new-registration-body').hidden = true;
+    $('new-location-asset-main').setAttribute('aria-expanded','false');
+    $('new-location-asset-main').textContent = '+ New asset';
+  } else {
+    $('location-new-registration-body').hidden = false;
+    $('new-location-asset-main').setAttribute('aria-expanded','true');
+    $('new-location-asset-main').textContent = 'Close';
+    $('location-asset-name').focus();
+  }
+};
 $('refresh-location-assets-table').onclick = decoAssetLoad;
 $('choose-location-asset-model').onclick = decoAssetChooseModel;
 $('choose-location-asset-texture').onclick = decoAssetChooseTexture;

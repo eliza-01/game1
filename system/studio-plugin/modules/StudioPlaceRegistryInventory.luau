@@ -98,22 +98,32 @@ end
 -- Only a Model whose WHOLE MeshPart multiset matches one historical published
 -- version is an asset instance. Arbitrary hand-made grouping Models are not.
 local function closestPublishedRoot(part: MeshPart, entry: any): Model?
-    local candidate=part.Parent
-    while candidate and candidate~=workspace do
+    local candidate = part.Parent
+    local closest: Model? = nil
+    local stamped: Model? = nil
+    while candidate and candidate ~= workspace do
         if candidate:IsA("Model") then
-            local meshCount=0
+            local meshCount = 0
             for _, child in ipairs(candidate:GetDescendants()) do
-                if child:IsA("MeshPart") then meshCount+=1 end
+                if child:IsA("MeshPart") then meshCount += 1 end
             end
-            if meshCount<=32 then
+            if meshCount <= 512 then
                 for _, version in ipairs(entry.models) do
-                    if History.MatchesInventory(candidate,version) then return candidate end
+                    if History.MatchesInventory(candidate, version)
+                        or History.MatchesRetiredStaticInventory(candidate, version, entry) then
+                        if not closest then closest = candidate end
+                        if candidate:GetAttribute("Game1DecoAssetSlug") == entry.slug
+                            and candidate:GetAttribute("Game1DecoInstanceId") ~= nil then
+                            stamped = candidate
+                        end
+                        break
+                    end
                 end
             end
         end
-        candidate=candidate.Parent
+        candidate = candidate.Parent
     end
-    return nil
+    return stamped or closest
 end
 
 local function positionOf(part: MeshPart): {number}
@@ -236,8 +246,9 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
         local issues={}
         local function warn(code: string) table.insert(issues,code) end
         local needsMesh=eligible and not Published.VisualCurrent(entry,id(part.MeshId))
-        -- The visible MeshId may be unchanged across publications. Check the
-        -- entire published shape (including COL), not only that one MeshId.
+        -- A historical static publication may still list retired COL meshes.
+        -- The verified remaining visual set is sufficient only under M349's
+        -- explicit static/root ownership check; no generic subset matching.
         local needsRig=eligible and root~=nil and not Published.CurrentShape(entry,root)
         local needsTexture=false
         if eligible then
@@ -285,8 +296,12 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
         local needsInspection = eligible and entry.needsFbxInspection==true
         local requiresRepublish = eligible and not needsInspection
             and not CarrierRig.IsCanonicalPublication(entry.rigManifest,entry.legacyStaticPublication)
-        local needsCollision = eligible and root ~= nil and entry.collisionRevision > 0
-            and not Collision.Current(root,entry.collisionBlueprint,entry.collisionRevision,entry.collisionSha)
+        local needsRecapture = eligible and entry.collisionRevision > 0
+            and (type(entry.collisionBlueprint) ~= "table"
+                or entry.collisionBlueprint.schemaVersion ~= 2)
+        local needsCollision = eligible and entry.collisionRevision > 0
+            and (root == nil or needsRecapture
+                or not Collision.Current(root,entry.collisionBlueprint,entry.collisionRevision,entry.collisionSha))
         local needsReplacement = eligible and structuralState ~= "current"
             and not requiresRepublish and not needsInspection
         if eligible and structuralState == "legacy_import_root" then
@@ -311,7 +326,11 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
         if not root then warn("Нет отдельной Model для этого экземпляра") end
         if needsRig and not needsMesh then warn("Новая версия модели отличается по составу MeshPart, хотя визуальный Mesh ID совпадает") end
         if needsMaterial then warn("Звуковой материал требует Sync: "..entry.material) end
-        if needsCollision then warn("Collision Blueprint требует Sync: ревизия "..tostring(entry.collisionRevision)) end
+        if needsRecapture then
+            warn("Collision Blueprint старого формата: повторите Validate / Capture авторских Parts перед Sync")
+        elseif needsCollision then
+            warn("Collision Blueprint требует Sync: отсутствует или изменён; ревизия "..tostring(entry.collisionRevision))
+        end
         if needsTexture and entry.appearanceMode=="material" then
             warn("Roblox Material / Color требует Sync")
         end
@@ -392,26 +411,36 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
             textureId=original.textureId,expectedMeshId=if eligible then entry.model else "",
             expectedTextureId=if eligible then entry.atlas else "",
             needsMesh=needsMesh,needsRig=needsRig,needsTexture=needsTexture,needsMaterial=needsMaterial,needsAlpha=needsAlpha,
-            needsCollision=needsCollision,collisionRevision=entry.collisionRevision,needsStructure=structuralState ~= "current" or not root or badName or meshNameMismatch or assigned==""
+            needsCollision=needsCollision,needsRecapture=needsRecapture,
+            collisionRevision=entry.collisionRevision,needsStructure=structuralState ~= "current" or not root or badName or meshNameMismatch or assigned==""
                 or (root and root:GetAttribute("Game1DecoAssetSlug")~=entry.slug),
 
             duplicateId=false,ambiguous=not eligible or provenForeignClaim,
             -- Repair remains metadata-only. A verified old publication is
             -- migrated by Sync through the shared whole-child-rig swap.
             canRepair=eligible and structuralState == "current" and root~=nil
-                and not needsMesh and not needsRig,
+                and not needsMesh and not needsRig and not oldAmbiguous,
             requiresRepublish=requiresRepublish == true,
             needsFbxInspection=needsInspection == true,
             needsCanonicalReplacement=needsReplacement == true,
             hasModel=root~=nil,structuralState=structuralState,canSync=eligible and not foreignClaim
                 and root~=nil and assigned~="" and (claimed==entry.slug or oldClaim)
-                and not requiresRepublish and not needsInspection
+                and not requiresRepublish and not needsInspection and not needsRecapture
                 and (structuralState=="current" or (needsReplacement and oldId~=""))
                 and (not needsMesh and not needsRig or oldId~=""),
             status=if not eligible then "ambiguous" elseif needsMesh or needsRig or needsTexture or needsMaterial or needsAlpha or needsCollision
                 or structuralState ~= "current" or not root or badName or meshNameMismatch or assigned==""
                 or oldClaim or foreignClaim
                 then "pending" else "current",
+            -- Read-only evidence for a later authoring-vs-placed pivot audit.
+            pivotEvidence={modelPivot=if root then {root:GetPivot():GetComponents()} else nil,
+                worldPivot=if root then {root.WorldPivot:GetComponents()} else nil,
+                modelScale=if root then root:GetScale() else nil,
+                primaryPart=if root and root.PrimaryPart then root.PrimaryPart:GetFullName() else "",
+                meshPivot={part:GetPivot():GetComponents()},
+                meshPivotOffset={part.PivotOffset:GetComponents()},
+                meshCFrame={part.CFrame:GetComponents()},
+                meshSize={part.Size.X,part.Size.Y,part.Size.Z}},
             issues=issues,hierarchy=fullHierarchy,transform={cframe={part.CFrame:GetComponents()},
                 size={part.Size.X,part.Size.Y,part.Size.Z},position=positionOf(part),
                 anchored=part.Anchored,canCollide=part.CanCollide},
@@ -424,7 +453,7 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
             rootPrimary=if root then root.PrimaryPart else nil,
             row=row,entry=if eligible then entry else nil,structuralState=structuralState,
             oldVersion=oldId,hasImporterRoot=hasImporterRoot,
-            collisionCurrent=if root then Collision.Current(root,entry.collisionBlueprint,entry.collisionRevision,entry.collisionSha) else true,
+            collisionCurrent=if root and eligible then Collision.Current(root,entry.collisionBlueprint,entry.collisionRevision,entry.collisionSha) else false,
             currentVisual=eligible and Published.VisualCurrent(entry,id(part.MeshId))}
     end
     for _,indexes in pairs(duplicateGroups) do

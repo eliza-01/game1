@@ -99,7 +99,8 @@ function Sync.Apply(refs: {any}, ctx: any): any
         local ref = item.ref
         if ref.row.needsCollision then
             local ok, transaction = pcall(Collision.Prepare, ref.root,
-                ref.entry.collisionBlueprint,ref.entry.collisionRevision,ref.entry.collisionSha)
+                ref.entry.collisionBlueprint,ref.entry.collisionRevision,ref.entry.collisionSha,
+                item.stage)
             if not ok then
                 for _, previous in ipairs(plan) do
                     if previous.collision then Collision.Rollback(previous.collision) end

@@ -29,7 +29,9 @@ end
 
 function Published.CurrentShape(entry: any, root: Model?): boolean
     local version = current(entry)
-    return root ~= nil and version ~= nil and History.MatchesInventory(root, version)
+    return root ~= nil and version ~= nil
+        and (History.MatchesInventory(root, version)
+            or History.MatchesRetiredStaticInventory(root, version, entry))
 end
 
 -- A stamped old Model ID is corroborating evidence only when its COMPLETE
@@ -40,6 +42,7 @@ function Published.ResolveOldVersion(entry: any, root: Model?, visualMeshId: str
         local found = false
         if root then
             found = History.MatchesInventory(root, version)
+                or History.MatchesRetiredStaticInventory(root, version, entry)
         else
             for _, mesh in ipairs(version.meshes) do
                 if mesh.meshId == visualMeshId and type(mesh.visualNames) == "table"

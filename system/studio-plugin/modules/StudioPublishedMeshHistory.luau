@@ -62,6 +62,54 @@ function Inventory.MatchesInventory(placed: Model, inventory: any): boolean
     return true
 end
 
+-- M349: retired COL publications predate the no-COL policy. An old
+-- *static* publication can contain exactly one retired physics MeshPart in
+-- the historical SQLite inventory, while its already-cleaned placed Model
+-- contains only the original visual meshes. This is NOT a general partial
+-- MeshId match: verify the complete remaining visual multiset, a placement
+-- ownership boundary, and an explicit previously managed root name/stamp.
+function Inventory.MatchesRetiredStaticInventory(placed: Model, version: any, entry: any): boolean
+    if not placed:IsA("Model") or type(version) ~= "table"
+        or type(version.meshes) ~= "table" or type(entry) ~= "table" then return false end
+    local staticManifest=type(entry.rigManifest)=="table"
+        and entry.rigManifest.rigKind=="static"
+    if not (entry.legacyStaticPublication==true or staticManifest) then return false end
+    local slug=tostring(entry.slug or "")
+    if slug=="" then return false end
+    local claim=placed:GetAttribute("Game1DecoAssetSlug")
+    if claim~=nil and claim~=slug then return false end
+    -- Naming alone is never provenance; full visual MeshId multiset below is
+    -- required too. But an arbitrary developer-created parent Model must not
+    -- suddenly acquire a managed Placement ID merely because it contains one
+    -- published MeshPart.
+    local suffix=placed.Name:match("^"..slug.."__(%x%x%x%x%x%x%x%x)$")
+    if not suffix and claim~=slug then return false end
+    if Ownership.HasNestedPlacements(placed) then return false end
+    local expected, retired= {},0
+    for _, record in ipairs(version.meshes) do
+        if type(record.meshId)~="string" or type(record.count)~="number"
+            or type(record.visualNames)~="table" or record.count<1 then return false end
+        if #record.visualNames==0 then
+            retired+=record.count
+        else
+            if expected[record.meshId] then return false end
+            expected[record.meshId]=record.count
+        end
+    end
+    if retired<1 then return false end
+    for _, part in ipairs(Inventory.Parts(placed)) do
+        if Inventory.Id(part.MeshId)=="" then return false end
+    end
+    local actual=Inventory.Describe("",placed).meshes
+    local actualCount,expectedCount=0,0
+    for _, record in ipairs(actual) do
+        if expected[record.meshId]~=record.count then return false end
+        actualCount+=1
+    end
+    for _ in pairs(expected) do expectedCount+=1 end
+    return actualCount>0 and actualCount==expectedCount
+end
+
 function Inventory.Ids(model: Model): {[string]: boolean}
     local ids = {}
     for _, part in ipairs(Inventory.Parts(model)) do

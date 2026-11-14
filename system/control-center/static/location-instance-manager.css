@@ -1,0 +1,40 @@
+/* M344 · condensed new registration, with unchanged IDs and authoring logic. */
+#location-assets-view .deco-asset-workflow {display:block;}
+#location-asset-editor-panel.compact-location-registration {padding:12px 14px;}
+#location-asset-editor-panel.compact-location-registration .section-title {margin:0;}
+#location-asset-editor-panel.compact-location-registration .section-title h3 {font-size:14px;}
+#location-new-registration-body[hidden] {display:none!important;}
+#location-new-registration-body {margin-top:12px;}
+#location-new-registration-body .location-register-fields {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;align-items:end;}
+#location-new-registration-body .location-register-fields>label,
+#location-new-registration-body .location-register-fields>.deco-appearance-editor {margin:0;min-width:0;}
+#location-new-registration-body .deco-appearance-editor {display:contents;}
+#location-new-registration-body .deco-appearance-editor>label {margin:0;min-width:0;}
+#location-new-registration-body #location-asset-material-fields:not([hidden]) {grid-column:span 2;display:flex;gap:8px;align-items:end;}
+#location-new-registration-body #location-asset-material-fields>label {flex:1;min-width:0;margin:0;}
+#location-new-registration-body #location-asset-material-fields small {display:none;}
+#location-new-registration-body .location-register-fields>label small {display:none;}
+#location-new-registration-body .deco-gameplay-policy {margin:8px 0;padding:8px 10px;}
+#location-new-registration-body .deco-policy-toggle small {display:none;}
+#location-new-registration-body .card-separator {margin:8px 0;}
+#location-new-registration-body .deco-source-pickers {grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+#location-new-registration-body .deco-texture-source {padding:8px 10px;margin:8px 0;}
+#location-new-registration-body .deco-texture-source small {display:none;}
+#location-new-registration-body #location-asset-fbx-preview {margin:5px 0;}
+#location-new-registration-body .actions {margin-top:8px;}
+#location-instance-manager {margin-top:16px;}
+#location-instance-manager .location-instance-grid {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
+#location-instance-manager .location-instance-grid label {min-width:0;margin:0;}
+#location-instance-manager .location-instance-actions {margin:12px 0;}
+#location-instance-manager .location-instance-placements {display:grid;gap:5px;padding:8px 0;max-height:240px;overflow:auto;}
+#location-instance-manager .location-instance-placement {padding:7px 10px;border:1px solid var(--line);border-radius:7px;font-size:12px;overflow-wrap:anywhere;}
+#location-instance-manager .location-instance-placement small {display:block;color:var(--muted);margin-top:3px;}
+@media(max-width:900px) {
+ #location-new-registration-body .location-register-fields,
+ #location-instance-manager .location-instance-grid {grid-template-columns:repeat(2,minmax(0,1fr));}
+}
+@media(max-width:620px) {
+ #location-new-registration-body .location-register-fields,
+ #location-instance-manager .location-instance-grid {grid-template-columns:1fr;}
+ #location-new-registration-body #location-asset-material-fields:not([hidden]) {grid-column:auto;}
+}

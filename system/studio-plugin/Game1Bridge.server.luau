@@ -202,6 +202,22 @@ else
     warn("[Game1] Collision Authoring unavailable: " .. tostring(collisionModule))
 end
 
+-- Optional: a failure in whole-Model replacement must never hide Plots or Place Registry.
+local handleLocationInstanceReplace = nil
+do
+    local loaded, module = pcall(require, script.Parent.modules.StudioLocationInstanceReplace)
+    if loaded then
+        local ok, controller = pcall(module, {
+            HttpService=HttpService, Workspace=Workspace, Selection=Selection,
+            ChangeHistoryService=ChangeHistoryService, RunService=RunService,
+            decoManager=decoManager, bridgeUrl=BRIDGE_URL, bridgeToken=BRIDGE_TOKEN,
+        })
+        if ok and type(controller)=="function" then
+            handleLocationInstanceReplace = controller
+        else warn("[Game1] Instance Manager disabled: "..tostring(controller)) end
+    else warn("[Game1] Instance Manager unavailable: "..tostring(module)) end
+end
+
 local handleHousePlacementCapture = StudioHousePlacementCapture({
     HttpService = HttpService,
     Selection = Selection,
@@ -248,6 +264,11 @@ local function pollBridge()
         else
             warn("[Game1] Collision Authoring unavailable; other Bridge tools continue")
         end
+    elseif data.command == "location-instance-replace-v3" then
+        if handleLocationInstanceReplace then
+            local ok, problem = pcall(handleLocationInstanceReplace,data)
+            if not ok then warn("[Game1] Instance Manager error: "..tostring(problem)) end
+        else warn("[Game1] Instance Manager unavailable; other Bridge tools continue") end
     elseif data.command == "location-place-registry" then
         handlePlaceRegistry(data)
     elseif data.command == "house-placement-capture-v2" then

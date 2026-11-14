@@ -24,6 +24,12 @@ def route(path, body, deps):
         except (ValueError, OSError, RuntimeError, KeyError) as error:
             return 400, {'error': str(error)}
 
+    if path == '/api/location-instance-manager':
+        try:
+            return 200, {'studio': deps['location_instance_manager'].operate(body())}
+        except (ValueError, OSError, RuntimeError, KeyError) as error:
+            return 400, {'error': str(error)}
+
     if path == '/api/location-place-registry':
         try:
             payload = body()

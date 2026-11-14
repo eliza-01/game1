@@ -105,6 +105,8 @@ def validate_report(report: dict, catalog: dict) -> list[dict]:
         # Validate strictly when present, while allowing read-only historical scans.
         if 'needsCollision' in row and type(row['needsCollision']) is not bool:
             raise ValueError('invalid scan flag: needsCollision')
+        if 'needsRecapture' in row and type(row['needsRecapture']) is not bool:
+            raise ValueError('invalid scan flag: needsRecapture')
         if 'needsMaterial' in row and type(row['needsMaterial']) is not bool:
             raise ValueError('invalid scan flag: needsMaterial')
         if 'needsAlpha' in row and type(row['needsAlpha']) is not bool:

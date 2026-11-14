@@ -1,6 +1,7 @@
 """Location Assets Collision Blueprint v1: validated Roblox Part recipes.
 
-Authoring stores transforms RELATIVE to the registered Model:GetPivot().
+Authoring stores transforms relative to the placed Model:GetPivot(), plus a
+unique published visual-Mesh anchor for rebasing onto new Model pivots.
 This module never mutates Roblox Studio, places Parts, or accepts MeshParts.
 """
 from __future__ import annotations
@@ -32,12 +33,41 @@ def validate(value: dict, *, slug: str) -> dict:
     """
     if not SLUG.fullmatch(slug):
         raise ValueError("invalid Location Asset slug")
-    if not isinstance(value, dict) or set(value) != {"schemaVersion", "pivot", "parts"}:
-        raise ValueError("blueprint must contain schemaVersion, pivot, parts only")
-    if type(value["schemaVersion"]) is not int or value["schemaVersion"] != 1:
-        raise ValueError("unsupported collision blueprint schemaVersion")
+    if not isinstance(value, dict) or set(value) != {"schemaVersion", "pivot", "anchor", "parts"}:
+        raise ValueError("blueprint must contain schemaVersion, pivot, anchor, parts only")
+    if type(value["schemaVersion"]) is not int or value["schemaVersion"] != 2:
+        raise ValueError("outdated Collision Blueprint: re-Capture with visual Mesh anchor (schema 2)")
     if value["pivot"] != "Model:GetPivot()":
         raise ValueError("collision blueprint pivot must use Model:GetPivot()")
+    anchor = value["anchor"]
+    if not isinstance(anchor, dict) or set(anchor) != {"meshId", "localCFrame", "size"}:
+        raise ValueError("visual Mesh anchor must contain meshId, localCFrame, size")
+    if not isinstance(anchor["meshId"], str) or not re.fullmatch(r"[1-9][0-9]{0,19}", anchor["meshId"]):
+        raise ValueError("visual Mesh anchor needs a published Mesh ID")
+    anchor_size = anchor["size"]
+    if not isinstance(anchor_size, list) or len(anchor_size) != 3:
+        raise ValueError("visual Mesh anchor requires three size numbers")
+    anchor_size = [_finite(x, "anchor.size", absolute=4096.0) for x in anchor_size]
+    if any(x <= 0.001 for x in anchor_size):
+        raise ValueError("visual Mesh anchor size must be positive")
+
+    def validate_frame(frame, label):
+        if not isinstance(frame, list) or len(frame) != 12:
+            raise ValueError(f"{label} requires 12 CFrame numbers")
+        frame = [_finite(v, label) for v in frame]
+        x, y, z = (frame[3:6], frame[6:9], frame[9:12])
+        dot = lambda a, b: sum(p*q for p, q in zip(a, b))
+        if any(abs(dot(v,v)-1.0) > 0.002 for v in (x,y,z)) or any(
+                abs(dot(a,b)) > 0.002 for a,b in ((x,y),(x,z),(y,z))):
+            raise ValueError(f"{label}: rotation must be orthonormal")
+        determinant = (x[0]*(y[1]*z[2]-y[2]*z[1])
+                       - x[1]*(y[0]*z[2]-y[2]*z[0])
+                       + x[2]*(y[0]*z[1]-y[1]*z[0]))
+        if abs(determinant - 1.0) > 0.004:
+            raise ValueError(f"{label}: mirrored CFrame is not allowed")
+        return frame
+    anchor_frame = validate_frame(anchor["localCFrame"], "anchor.localCFrame")
+
     raw = value["parts"]
     if not isinstance(raw, list) or not 1 <= len(raw) <= MAX_PARTS:
         raise ValueError("collision blueprint requires 1..256 Parts")
@@ -63,20 +93,7 @@ def validate(value: dict, *, slug: str) -> dict:
         size = [_finite(x, f"{label}.size", absolute=4096.0) for x in size]
         if any(x <= 0.001 for x in size):
             raise ValueError(f"{label}: size must be positive")
-        frame = part["localCFrame"]
-        if not isinstance(frame, list) or len(frame) != 12:
-            raise ValueError(f"{label}: localCFrame requires 12 numbers")
-        frame = [_finite(v, f"{label}.localCFrame") for v in frame]
-        x, y, z = (frame[3:6], frame[6:9], frame[9:12])
-        dot = lambda a,b: sum(p*q for p,q in zip(a,b))
-        if any(abs(dot(v,v)-1.0) > 0.002 for v in (x,y,z)) or any(
-            abs(dot(a,b)) > 0.002 for a,b in ((x,y),(x,z),(y,z))):
-            raise ValueError(f"{label}: CFrame rotation must be orthonormal")
-        determinant = (x[0]*(y[1]*z[2]-y[2]*z[1])
-                       - x[1]*(y[0]*z[2]-y[2]*z[0])
-                       + x[2]*(y[0]*z[1]-y[1]*z[0]))
-        if abs(determinant - 1.0) > 0.004:
-            raise ValueError(f"{label}: mirrored CFrame is not allowed")
+        frame = validate_frame(part["localCFrame"], f"{label}.localCFrame")
         group = part["collisionGroup"]
         if not isinstance(group, str) or not GROUP.fullmatch(group):
             raise ValueError(f"{label}: invalid collision group")
@@ -87,7 +104,9 @@ def validate(value: dict, *, slug: str) -> dict:
                       "localCFrame": frame, "collisionGroup": group,
                       "canQuery": part["canQuery"], "canTouch": part["canTouch"]})
     parts.sort(key=lambda p: p["id"])
-    return {"schemaVersion": 1, "pivot": "Model:GetPivot()", "parts": parts}
+    return {"schemaVersion": 2, "pivot": "Model:GetPivot()",
+            "anchor": {"meshId": anchor["meshId"], "size": anchor_size,
+                       "localCFrame": anchor_frame}, "parts": parts}
 
 
 def latest(store, slug: str) -> dict | None:

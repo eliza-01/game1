@@ -3959,10 +3959,64 @@
           "noCollide": true
         }
       },
-      "collisionBlueprintRevision": 0,
-      "collisionBlueprintPartCount": 0,
-      "collisionBlueprint": null,
-      "collisionBlueprintSha256": "",
+      "collisionBlueprintRevision": 3,
+      "collisionBlueprintPartCount": 1,
+      "collisionBlueprint": {
+        "anchor": {
+          "localCFrame": [
+            -0.0047607421875,
+            2.74237060546875,
+            -0.011474609375,
+            1.0000007152557373,
+            -2.8421709430404007e-13,
+            -2.9802322387695312e-08,
+            6.252776074688882e-13,
+            1.0000004768371582,
+            1.0942358130705543e-12,
+            -2.9802322387695312e-08,
+            -5.400124791776761e-13,
+            1.0000005960464478
+          ],
+          "meshId": "139744616815788",
+          "size": [
+            3.407264232635498,
+            5.484735488891602,
+            17.768489837646484
+          ]
+        },
+        "parts": [
+          {
+            "canQuery": true,
+            "canTouch": true,
+            "collisionGroup": "Default",
+            "id": "Part",
+            "localCFrame": [
+              0.031494140625,
+              2.6250038146972656,
+              -0.07122802734375,
+              0.9999041557312012,
+              0.013888359069824219,
+              -5.223545485932846e-06,
+              -5.042219527240377e-06,
+              -1.3090854736219626e-05,
+              -1.0000004768371582,
+              -0.013888388872146606,
+              0.9999041557312012,
+              -1.3019567631999962e-05
+            ],
+            "name": "Part",
+            "shape": "Block",
+            "size": [
+              2.753999948501587,
+              17.320999145507812,
+              5.250999927520752
+            ]
+          }
+        ],
+        "pivot": "Model:GetPivot()",
+        "schemaVersion": 2
+      },
+      "collisionBlueprintSha256": "372a6eb5f370375d2bf368a926e70f30b581967682d228c2a22ca057d0184c85",
       "surfaceMaterial": "default",
       "appearanceMode": "atlas",
       "visualMaterial": "SmoothPlastic",
@@ -4297,15 +4351,15 @@
       "name_en": "stone fence 02",
       "category": "fence",
       "model_path": "assets/source/location-assets/fence/stone_fence_02/model/stone_fence_02.fbx",
-      "model_sha256": "d15eb171ce08c43433d3c0bf0eed11e72a2557573f09ff3f5771828bfed279d0",
-      "model_asset_id": "84002732967561",
-      "model_published_sha256": "d15eb171ce08c43433d3c0bf0eed11e72a2557573f09ff3f5771828bfed279d0",
+      "model_sha256": "74321a047326a60c806c67dfe931c80c26789f8b463cb9680b50aa544d3c2d86",
+      "model_asset_id": "110878872381451",
+      "model_published_sha256": "74321a047326a60c806c67dfe931c80c26789f8b463cb9680b50aa544d3c2d86",
       "model_moderation_state": "Approved",
       "destructible": false,
-      "revision": 2,
+      "revision": 5,
       "created_at": 1794629527.8825006,
-      "updated_at": 1794629560.9541798,
-      "published_at": 1794629542.5570967,
+      "updated_at": 1794636699.2149656,
+      "published_at": 1794636699.2149656,
       "surface_material": "stone",
       "alpha_enabled": 0,
       "appearance_mode": "material",
@@ -4363,42 +4417,64 @@
           "noCollide": true
         }
       },
-      "collisionBlueprintRevision": 3,
+      "collisionBlueprintRevision": 6,
       "collisionBlueprintPartCount": 1,
       "collisionBlueprint": {
+        "anchor": {
+          "localCFrame": [
+            -9.1552734375e-05,
+            2.7077102661132812,
+            -0.00433349609375,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "meshId": "89499570578827",
+          "size": [
+            3.424428939819336,
+            5.563468933105469,
+            17.87802505493164
+          ]
+        },
         "parts": [
           {
             "canQuery": true,
             "canTouch": true,
             "collisionGroup": "Default",
-            "id": "part_0001",
+            "id": "Part",
             "localCFrame": [
-              0.899169921875,
-              2.418720245361328,
-              0.035400390625,
-              0.0005879700183868408,
-              -2.201676341240244e-13,
+              0.040924072265625,
+              2.625,
+              -0.06494140625,
+              0.9998790621757507,
+              0.015549987554550171,
+              -6.797113982770497e-10,
+              0.0,
+              -4.371138828673793e-08,
               -1.0,
-              -1.132774429812855e-13,
-              1.0000001192092896,
-              1.0408340855860843e-17,
-              0.9999998807907104,
-              5.6769693113079e-14,
-              0.0005879402160644531
+              -0.015549987554550171,
+              0.9998790621757507,
+              -4.3706101848783874e-08
             ],
-            "name": "__Game1Collision_part_0001",
+            "name": "Part",
             "shape": "Block",
             "size": [
-              17.318510055541992,
-              5.147065162658691,
-              2.6098732948303223
+              2.753999948501587,
+              17.320999145507812,
+              5.250999927520752
             ]
           }
         ],
         "pivot": "Model:GetPivot()",
-        "schemaVersion": 1
+        "schemaVersion": 2
       },
-      "collisionBlueprintSha256": "550f59cfaf612ac516b030015f92f42bca48305c8780468ef44053f06adba864",
+      "collisionBlueprintSha256": "cea38b612d8faf173c022b00cb767aeb5ad3fdac40b100afef0bb4ac8f83713c",
       "surfaceMaterial": "stone",
       "appearanceMode": "material",
       "visualMaterial": "Slate",
@@ -4420,13 +4496,13 @@
       "atlasVariants": [],
       "textureUsesAlpha": null,
       "atlasVariantId": 0,
-      "bindingRevision": 2,
+      "bindingRevision": 5,
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
       "category_label": "Fence",
       "publishedVisualMeshes": [
         {
-          "meshId": "133474237457316",
+          "meshId": "89499570578827",
           "name": "stone_fence_02"
         }
       ],

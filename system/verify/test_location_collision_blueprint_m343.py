@@ -18,7 +18,7 @@ from api.read_world import route as read_route
 
 
 def sample():
-    return {'schemaVersion':1, 'pivot':'Model:GetPivot()', 'parts':[
+    return {'schemaVersion':2, 'pivot':'Model:GetPivot()', 'anchor':{'meshId':'139744616815788', 'size':[10,5,0.5], 'localCFrame':[0,0,0,1,0,0,0,1,0,0,0,1]}, 'parts':[
         {'id':'wall_01', 'name':'Wall 01', 'shape':'Block', 'size':[10,5,0.5],
          'localCFrame':[2.0,0.0,0.0,1,0,0,0,1,0,0,0,1],
          'collisionGroup':'Default','canQuery':True,'canTouch':False},

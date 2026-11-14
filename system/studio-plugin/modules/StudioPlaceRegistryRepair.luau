@@ -15,8 +15,14 @@ end
 local function originalState(model: Model): any
     local attrs = {}
     for _, name in ipairs(ATTRIBUTES) do attrs[name] = model:GetAttribute(name) end
+    local meshes={}
+    for _,obj in ipairs(model:GetDescendants()) do
+        if obj:IsA("MeshPart") then
+            meshes[obj]={cframe=obj.CFrame,size=obj.Size,pivotOffset=obj.PivotOffset}
+        end
+    end
     return {name = model.Name, attributes = attrs, pivot = model:GetPivot(),
-        primary = model.PrimaryPart, parent = model.Parent}
+        primary = model.PrimaryPart, parent = model.Parent, meshes=meshes, scale=model:GetScale()}
 end
 
 local function restore(model: Model, state: any)
@@ -94,8 +100,14 @@ function Repair.Apply(refs: {any}, ctx: any): any
                 changed += 1
             end
             if model:GetPivot() ~= before.pivot or model.PrimaryPart ~= before.primary
-                or model.Parent ~= before.parent then
-                error("Repair changed Model pivot/PrimaryPart/parent; rolling back")
+                or model.Parent ~= before.parent or model:GetScale() ~= before.scale then
+                error("Repair changed Model pivot/PrimaryPart/parent or scale; rolling back")
+            end
+            for obj,state in pairs(before.meshes) do
+                if obj.CFrame~=state.cframe or obj.Size~=state.size
+                    or obj.PivotOffset~=state.pivotOffset then
+                    error("Repair changed existing MeshPart geometry or PivotOffset; rolling back")
+                end
             end
         end
     end)

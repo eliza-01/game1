@@ -43,6 +43,12 @@
       "StudioLocationCollisionParts": {
         "$path": "modules/StudioLocationCollisionParts.luau"
       },
+      "StudioLocationCollisionTransform": {
+        "$path": "modules/StudioLocationCollisionTransform.luau"
+      },
+      "StudioLocationInstanceReplace": {
+        "$path": "modules/StudioLocationInstanceReplace.luau"
+      },
       "StudioLocationCollisionAuthoring": {
         "$path": "modules/StudioLocationCollisionAuthoring.luau"
       },

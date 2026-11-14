@@ -58,7 +58,7 @@
         ${row.needsRig?'<span class="pr-old">Rig ✕ отличается состав MeshPart</span>':''}
         ${row.needsMaterial?'<span class="pr-old">Материал ✕ требует Sync</span>':''}
         ${row.needsAlpha?'<span class="pr-old">Alpha ✕ требует Sync</span>':''}
-        ${row.needsCollision?`<span class="pr-old">Collision ✕ требует Sync (r${html(row.collisionRevision||0)})</span>`:row.collisionRevision>0?'<span class="pr-ok">Collision ✓ актуальна</span>':''}
+        ${row.needsRecapture?'<span class="pr-old">Collision ✕ повторить Capture (старый формат)</span>':row.needsCollision?`<span class="pr-old">Collision ✕ требует Sync: отсутствует / повреждена (r${html(row.collisionRevision||0)})</span>`:row.collisionRevision>0?'<span class="pr-ok">Collision ✓ актуальна</span>':''}
         <small>Mesh ID ${html(row.meshId)} · Texture ID ${html(row.textureId||'—')}</small></div>
       ${issues?`<div class="pr-issues">${issues}</div>`:''}
       <div class="actions"><button type="button" data-pr-action="select" data-key="${html(row.key)}">Select in Studio</button>

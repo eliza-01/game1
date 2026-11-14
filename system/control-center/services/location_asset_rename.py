@@ -67,7 +67,7 @@ def rename(store, old_slug: str, payload: dict) -> dict:
                    'revision=revision+1,updated_at=? WHERE slug=?',
                    (new_slug,name,category,1 if payload['destructible'] else 0,material,now,old_slug))
         if old_slug != new_slug:
-            for table in ('location_asset_publications', 'location_asset_mesh_id_inventory', 'location_asset_rig_manifests'):
+            for table in ('location_asset_publications', 'location_asset_mesh_id_inventory', 'location_asset_rig_manifests', 'location_asset_collision_blueprints'):
                 db.execute(f'UPDATE {table} SET asset_slug=? WHERE asset_slug=?', (new_slug, old_slug))
             for table in _CONSUMER_TABLES:
                 if db.execute('SELECT 1 FROM sqlite_master WHERE type=\'table\' AND name=?',

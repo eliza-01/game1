@@ -91,6 +91,14 @@ def route(parsed, sources, info):
         except (ValueError, OSError, RuntimeError) as error:
             return 400, {'error': str(error)}
 
+    if path.startswith('/api/location-assets/') and path.endswith('/collision-blueprint'):
+        try:
+            slug = path[len('/api/location-assets/'):-len('/collision-blueprint')].strip('/')
+            saved = sources['location_assets'].collision_blueprint(slug)
+            return 200, saved if saved else {'revision': 0, 'blueprint': None}
+        except (ValueError, OSError) as error:
+            return 400, {'error': str(error)}
+
     if path == "/api/location-assets":
         snapshot = sources["location_assets"].snapshot()
         snapshot["publication"] = sources["publication_config"]()

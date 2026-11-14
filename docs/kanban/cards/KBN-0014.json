@@ -1,0 +1,118 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0014",
+  "title": "Location Assets · Collision Blueprint + Roblox Material / Atlas",
+  "domain": "Location Assets",
+  "status": "IN_PROGRESS",
+  "priority": "P0",
+  "owner": "Owner + Codex",
+  "specPath": "docs/kanban/specs/KBN-0014.md",
+  "dependsOn": [],
+  "tasks": [
+    {
+      "id": "KBN-0014-T01",
+      "title": "Аудит существующих Location Asset публикаций, Surface/Atlas/Sync и Place Registry",
+      "done": true
+    },
+    {
+      "id": "KBN-0014-T02",
+      "title": "Утвердить единый Collision Blueprint JSON v1: строго Parts, локальный CFrame и Pivot",
+      "done": true
+    },
+    {
+      "id": "KBN-0014-T03",
+      "title": "Создать версионируемое SQLite-хранилище Blueprint и валидацию",
+      "done": true
+    },
+    {
+      "id": "KBN-0014-T04",
+      "title": "Протестировать ревизии, повторный Capture, конфликты, чтение через API",
+      "done": true
+    },
+    {
+      "id": "KBN-0014-T05",
+      "title": "Проверить rename и retire с сохранением истории Blueprint",
+      "done": false
+    },
+    {
+      "id": "KBN-0014-T06",
+      "title": "Реализовать Studio Capture и Preview для выбранного зарегистрированного Location Asset",
+      "done": false
+    },
+    {
+      "id": "KBN-0014-T07",
+      "title": "Добавить серверное размещение/удаление Part Blueprint через отдельную операцию Sync",
+      "done": false
+    },
+    {
+      "id": "KBN-0014-T08",
+      "title": "Проверить масштаб, повороты, Bounds, Undo и CollisionGroup в Studio",
+      "done": false
+    },
+    {
+      "id": "KBN-0014-T09",
+      "title": "Создать отдельный Appearance contract: Atlas / Roblox Material + Color",
+      "done": false
+    },
+    {
+      "id": "KBN-0014-T10",
+      "title": "Разрешить публикацию FBX без атласа с Material по умолчанию",
+      "done": false
+    },
+    {
+      "id": "KBN-0014-T11",
+      "title": "Добавить UI выбора режима, материала и цвета при регистрации/публикации",
+      "done": false
+    },
+    {
+      "id": "KBN-0014-T12",
+      "title": "Интегрировать Material/Color/TextureID/ColorMap в scoped Studio Sync",
+      "done": false
+    },
+    {
+      "id": "KBN-0014-T13",
+      "title": "Проверить отсутствие регрессий Plots, Bridge, Place Registry и старых Atlas-ассетов",
+      "done": false
+    },
+    {
+      "id": "KBN-0014-T14",
+      "title": "Проверить функциональные тесты на устройстве и снять baseline производительности",
+      "done": false
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0014-A01",
+      "title": "M343A: хранение и revision/conflict/idempotent tests",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0014-A02",
+      "title": "M343B: Capture/Preview в Studio без MeshPart и без изменения Place",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0014-A03",
+      "title": "M343C: размещение, повторный Sync, поворот и Undo подтверждены",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0014-A04",
+      "title": "M343D: публикация модели без атласа и Material Sync реально работают",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0014-A05",
+      "title": "Старые Atlas-ассеты и Studio Bridge/Plots без регрессий",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ],
+  "revision": 1,
+  "updatedAt": "2026-11-14T00:00:00+00:00",
+  "specSha256": "66496d91ff7c0d2aed035fea9107cec06e3594efdde4e0b0936f0bece5ebfe07"
+}

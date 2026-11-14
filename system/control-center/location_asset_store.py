@@ -18,6 +18,7 @@ from services.mesh_authoring_policy import normalize_location_options
 from services.retired_col_mesh import strip_options
 from services import location_asset_taxonomy as taxonomy
 from services import location_asset_alpha
+from services import location_collision_blueprint
 from services.texture_atlas_registry import AtlasRegistry, parse_filename
 
 from opencloud_assets import (
@@ -131,12 +132,11 @@ class LocationAssetStore:
             )""")
             if not connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='location_asset_rig_manifests'").fetchone():
                 # Additive M256 storage. Back up current identity and publications.
-                import sqlite3
                 target_dir = self.runtime / 'backups'
                 target_dir.mkdir(parents=True, exist_ok=True)
                 target = target_dir / ('location_rig_manifest_m256_' +
                     datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ') + '.sqlite')
-                with sqlite3.connect(str(target)) as saved:
+                with connect_sqlite(target) as saved:
                     connection.backup(saved)
             connection.execute("""CREATE TABLE IF NOT EXISTS location_asset_rig_manifests(
                 asset_slug TEXT NOT NULL,
@@ -149,14 +149,24 @@ class LocationAssetStore:
             if 'mesh_options_json' not in columns:
                 # Capture a consistent SQLite snapshot before the additive migration.
                 # Do not mix the backup with the authoring source/assets.
-                import sqlite3
                 backup_dir = self.runtime / 'backups'
                 backup_dir.mkdir(parents=True, exist_ok=True)
                 backup = backup_dir / ('location_mesh_options_m232_' +
                     datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ') + '.sqlite')
-                with sqlite3.connect(str(backup)) as saved:
+                with connect_sqlite(backup) as saved:
                     connection.backup(saved)
                 connection.execute("ALTER TABLE location_assets ADD COLUMN mesh_options_json TEXT NOT NULL DEFAULT '{}'")
+            # M343: versioned Part recipes, independent of existing Places.
+            connection.execute("""CREATE TABLE IF NOT EXISTS location_asset_collision_blueprints(
+                asset_slug TEXT NOT NULL,
+                revision INTEGER NOT NULL,
+                blueprint_json TEXT NOT NULL,
+                sha256 TEXT NOT NULL,
+                captured_at REAL NOT NULL,
+                PRIMARY KEY(asset_slug,revision)
+            )""")
+            connection.execute("""CREATE INDEX IF NOT EXISTS idx_location_collision_latest
+                ON location_asset_collision_blueprints(asset_slug,revision DESC)""")
             connection.execute("""CREATE TABLE IF NOT EXISTS location_asset_slug_aliases(
                 old_slug TEXT PRIMARY KEY,
                 current_slug TEXT NOT NULL,
@@ -164,23 +174,21 @@ class LocationAssetStore:
             )""")
             if 'surface_material' not in columns:
                 # Additive, idempotent: old rows keep their existing physical appearance.
-                import sqlite3
                 backup_dir = self.runtime / 'backups'
                 backup_dir.mkdir(parents=True, exist_ok=True)
                 path = backup_dir / ('location_surface_material_m249_' +
                     datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ') + '.sqlite')
-                with sqlite3.connect(str(path)) as saved:
+                with connect_sqlite(path) as saved:
                     connection.backup(saved)
                 connection.execute("ALTER TABLE location_assets ADD COLUMN surface_material TEXT NOT NULL DEFAULT 'default'")
             if 'alpha_enabled' not in columns:
                 # M250 additive migration: no change to current Place; the
                 # next explicit Sync applies opaque mode. Back up SQLite first.
-                import sqlite3
                 backup_dir = self.runtime / 'backups'
                 backup_dir.mkdir(parents=True, exist_ok=True)
                 path = backup_dir / ('location_alpha_m250_' +
                     datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ') + '.sqlite')
-                with sqlite3.connect(str(path)) as saved:
+                with connect_sqlite(path) as saved:
                     connection.backup(saved)
                 connection.execute('ALTER TABLE location_assets ADD COLUMN alpha_enabled INTEGER NOT NULL DEFAULT 0')
             # Owner-era texture columns remain readable only until the M203
@@ -336,6 +344,9 @@ class LocationAssetStore:
         atlas_catalog = self.atlases.catalog() if atlas_catalog is None else atlas_catalog
         binding = self.atlases.binding('location_asset', str(result.get('slug') or ''))
         result['destructible'] = bool(result.get('destructible'))
+        collision = location_collision_blueprint.latest(self, result['slug'])
+        result['collisionBlueprintRevision'] = collision['revision'] if collision else 0
+        result['collisionBlueprintPartCount'] = len(collision['blueprint']['parts']) if collision else 0
         result['surfaceMaterial'] = result.get('surface_material') or 'default'
         result['alphaEnabled'] = bool(result.get('alpha_enabled', 0))
         result['materialDefinition'] = taxonomy.MATERIAL_BY_ID.get(result['surfaceMaterial'], taxonomy.MATERIAL_BY_ID['default']).copy()
@@ -393,6 +404,15 @@ class LocationAssetStore:
     def get(self, slug: str) -> dict | None:
         row = self._raw_get(slug)
         return self._decorate(row) if row else None
+
+    def collision_blueprint(self, slug: str) -> dict | None:
+        return location_collision_blueprint.latest(self, slug)
+
+    def save_collision_blueprint(self, slug: str, payload: dict) -> dict:
+        """Persist a complete validated capture; never mutate Roblox Place."""
+        saved = location_collision_blueprint.save(self, slug, payload)
+        self.export()
+        return saved
 
     def update_alpha(self, slug: str, payload: dict) -> dict:
         """Update per-consumer alpha only; NEVER publish or bind Atlas/Model."""
@@ -625,16 +645,19 @@ class LocationAssetStore:
         with self.connect() as connection:
             manifests = [dict(item) for item in connection.execute(
                 'SELECT * FROM location_asset_rig_manifests WHERE asset_slug=?', (normalized,))]
+            collision_history = [dict(item) for item in connection.execute(
+                'SELECT * FROM location_asset_collision_blueprints WHERE asset_slug=? ORDER BY revision', (normalized,))]
         archive = self.root / '.control-center' / 'location-assets-retired'
         archive.mkdir(parents=True, exist_ok=True)
         target = archive / (normalized + '_' + datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ') + '.json')
         with target.open('x', encoding='utf-8') as file:
-            json.dump({'asset': raw, 'publications': history, 'rigManifests': manifests, 'sourceFilesPreserved': True},
+            json.dump({'asset': raw, 'publications': history, 'rigManifests': manifests, 'collisionBlueprints': collision_history, 'sourceFilesPreserved': True},
                       file, ensure_ascii=False, indent=2)
         with self.connect() as connection:
             connection.execute("DELETE FROM location_asset_publications WHERE asset_slug=?", (normalized,))
             connection.execute("DELETE FROM location_asset_mesh_id_inventory WHERE asset_slug=?", (normalized,))
             connection.execute("DELETE FROM location_asset_rig_manifests WHERE asset_slug=?", (normalized,))
+            connection.execute("DELETE FROM location_asset_collision_blueprints WHERE asset_slug=?", (normalized,))
             connection.execute("DELETE FROM location_assets WHERE slug=?", (normalized,))
         self.atlases.unbind('location_asset', normalized)
         self.export()

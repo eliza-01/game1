@@ -199,7 +199,7 @@ function DecoManager:_rows(): { any }
     if self.registry and type(self.registry.items) == "table" then
         for _, row in ipairs(self.registry.items) do
             if tostring(row.category or "") == self.category and tostring(row.status or "") == "PUBLISHED" then
-                if tonumber(row.model_asset_id) and tonumber(row.texture_asset_id) then
+                if tonumber(row.model_asset_id) and (row.appearanceMode=="material" or tonumber(row.texture_asset_id)) then
                     table.insert(rows, row)
                 end
             end
@@ -293,7 +293,7 @@ function DecoManager:_showCurrent()
     self:_framePreview(self.preview)
     self.empty.Visible = false
     self.assetName.Text = tostring(row.name_en or row.slug)
-    self.assetMeta.Text = CATEGORY_LABELS[self.category] .. " · model " .. tostring(row.model_asset_id) .. " · texture " .. tostring(row.texture_asset_id)
+    self.assetMeta.Text = CATEGORY_LABELS[self.category] .. " · model " .. tostring(row.model_asset_id) .. " · appearance " .. (if row.appearanceMode=="material" then tostring(row.visualMaterial).." "..tostring(row.visualColor) else "atlas "..tostring(row.texture_asset_id or ""))
     self.place.Active = true
     self.place.AutoButtonColor = true
     self.place.BackgroundColor3 = Color3.fromRGB(66, 214, 177)
@@ -349,7 +349,7 @@ function DecoManager:previewMeshSync(slug: string, modelId: string, atlasId: str
         if tostring(entry.slug)==slug then row=entry;break end
     end
     if not row or row.status~="PUBLISHED" or tostring(row.model_asset_id)~=modelId
-        or tostring(row.texture_asset_id)~=atlasId or tonumber(row.bindingRevision)~=expectedRevision then
+        or tostring(row.texture_asset_id or "")~=atlasId or tonumber(row.bindingRevision)~=expectedRevision then
         error("published asset changed; refresh and search again")
     end
     local report=History.Scan(self.Workspace,slug,row,historyIds,self.loader,cached)
@@ -370,7 +370,9 @@ function DecoManager:previewMeshSync(slug: string, modelId: string, atlasId: str
             snap[part]={meshId=History.Id(part.MeshId),texture=part.TextureID,
                 colorMap=if surface then surface.ColorMap else nil,
                 parent=part.Parent,frame=part:GetPivot(),size=part.Size,
-                surface=surface,alphaMode=if surface then surface.AlphaMode else nil}
+                surface=surface,alphaMode=if surface then surface.AlphaMode else nil,
+                material=part.Material,color=part.Color,
+                appearanceMode=part:GetAttribute("Game1DecoAppearanceMode")}
         end
     end
     report.partStates=snap
@@ -584,16 +586,16 @@ function DecoManager:refreshRegistry(targetSlug: string?, applyIds: boolean?, ex
             end
         end
         -- A waypoint BEFORE the update makes Undo possible even for an error.
-        self.ChangeHistoryService:SetWaypoint("Before Location Asset Model + Atlas Sync: " .. targetSlug)
+        self.ChangeHistoryService:SetWaypoint("Before Location Asset Model + Appearance Sync: " .. targetSlug)
         syncResult = DecoPlacedAssetSync.RefreshIds(
             self.Workspace, result, targetSlug, self.HttpService, expectedModelId, expectedAtlasId, self.loader, scanned, selected)
         syncResult.fullySynced=allPending
-        self.ChangeHistoryService:SetWaypoint("Location Asset Model + Atlas Sync: " .. targetSlug)
+        self.ChangeHistoryService:SetWaypoint("Location Asset Model + Appearance Sync: " .. targetSlug)
     end
     if selectedSlug == "" or not self:_showSlug(selectedSlug) then
         self:_setCategory(self.category)
     end
-    self:_setStatus(("Registry refreshed · %d placed, %d atlas IDs, %d updated meshes, %d model references, %d stale FBX"):format(
+    self:_setStatus(("Registry refreshed · %d placed, %d appearance changes, %d updated meshes, %d model references, %d stale FBX"):format(
         syncResult.matchedModels, syncResult.parts, syncResult.meshPartsUpdated,
         syncResult.modelReferences, syncResult.pendingGeometry))
     return { models = syncResult.models, parts = syncResult.parts,
@@ -609,7 +611,24 @@ function DecoManager:_placeCurrent()
     if self.template == nil or self.currentRow == nil then
         return
     end
-    self.placement:start(self.template, self.currentRow, function(message)
+    -- Capture may have happened after the DecoManager panel was opened.
+    -- Reload current blueprint and revision on EVERY new Place operation.
+    local ok, latest = pcall(self.loader.fetchRegistry, self.loader)
+    if not ok then
+        self:_setStatus("Cannot refresh Collision Blueprint: " .. tostring(latest))
+        return
+    end
+    local chosen = nil
+    for _, row in ipairs(latest.items) do
+        if row.slug == self.currentRow.slug then chosen = row break end
+    end
+    if not chosen or chosen.status ~= "PUBLISHED"
+        or tostring(chosen.model_asset_id) ~= tostring(self.currentRow.model_asset_id) then
+        self:_setStatus("Asset publication changed. Refresh registry before Place")
+        return
+    end
+    self.currentRow = chosen
+    self.placement:start(self.template, chosen, function(message)
         self:_setStatus(message)
     end)
 end

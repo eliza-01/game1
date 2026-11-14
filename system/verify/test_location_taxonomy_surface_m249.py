@@ -45,7 +45,7 @@ class LocationTaxonomySurfaceM249(TestCase):
             self.assertEqual(changed['materialDefinition']['soundFamily'],'wood')
             generated=(root/'src/shared/world/LocationAssetRegistry.luau').read_text('utf-8')
             self.assertIn('surfaceMaterial = "wood"',generated)
-            self.assertIn('robloxMaterial = "Wood"',generated)
+            self.assertIn('robloxMaterial = ""',generated) # surfaceKey changes audio, not visual material
             self.assertIn('soundFamily = "wood"',generated)
             # Older clients do not reset a material when omitting the new field.
             renamed=store.rename_identity('wooden_post',{
@@ -98,7 +98,7 @@ class LocationTaxonomySurfaceM249(TestCase):
         metal=build_catalog(Fake('metal'))
         self.assertNotEqual(wood['digest'],metal['digest'])
         self.assertEqual(wood['items'][0]['surfaceMaterial'],'wood')
-        self.assertEqual(wood['items'][0]['robloxMaterial'],'Wood')
+        self.assertEqual(wood['items'][0]['robloxMaterial'],'')
 
     def test_studio_application_is_scoped_and_reversible(self):
         core=(ROOT/'src/shared/world/MeshPhysicsCore.luau').read_text('utf-8')

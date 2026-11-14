@@ -71,7 +71,7 @@ class StudioSelectM238(TestCase):
         status, response = route('/api/location-assets/studio-sync',lambda:payload,deps)
         self.assertEqual((status, response['studio']), (200, answer))
         bridge_fn.assert_called_once_with(slug='old_tree',binding_revision=2,
-            model_asset_id='12345',atlas_asset_id='999',phase='select',
+            model_asset_id='12345',atlas_asset_id='999',appearance_mode='atlas',phase='select',
             scan_token='1'*32, part_keys=['p2'])
         history.append.assert_not_called()
         self.assertEqual(assets.atlases.marked, [])
@@ -107,7 +107,7 @@ class StudioSelectM238(TestCase):
         history.append.assert_called_once_with(slug='old_tree',binding_revision=2,studio=legacy)
         self.assertEqual(assets.atlases.marked,[])
         bridge_fn.assert_called_once_with(slug='old_tree',binding_revision=2,
-            model_asset_id='12345',atlas_asset_id='999',phase='attach',
+            model_asset_id='12345',atlas_asset_id='999',appearance_mode='atlas',phase='attach',
             scan_token='1'*32,part_key='p2')
 
     def test_link_history_accepts_immutable_old_model_id_without_texture_publish(self):

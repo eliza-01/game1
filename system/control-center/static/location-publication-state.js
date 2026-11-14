@@ -13,7 +13,7 @@ window.game1LocationPublication = (() => {
     item.fbxAnalysis.meshes.some(m=>Array.isArray(m.bones) && m.bones.length>0) &&
     !item.fbxAnalysis.meshes.some(m=>String(m.name).toLowerCase()==='rig_carrier'));
   function plan(item, catalog = [], hasNewFbx = false) {
-    const selected = variantFor(item, catalog);
+    const selected = item?.appearanceMode === 'material' ? null : variantFor(item, catalog);
     const modelNeeded = Boolean(hasNewFbx || needsCanonicalFbx(item) || (item?.model_path &&
       (!item.model_asset_id || item.model_sha256 !== item.model_published_sha256)));
     const atlasNeeded = Boolean(selected && !selected.retired && !selected.published_id);

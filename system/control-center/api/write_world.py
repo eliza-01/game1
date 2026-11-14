@@ -208,12 +208,13 @@ def route(path, body, deps):
                 raise ValueError('publish the Location Asset Model before Studio Sync')
             # The M203 independent binding is a direct slug->variant relation.
             # Legacy inherited bindings cannot be acknowledged by a scoped Sync.
-            if row.get('atlasBindingSourceSlug') not in (None, '', slug):
+            if row.get('appearanceMode', 'atlas') == 'atlas' and row.get('atlasBindingSourceSlug') not in (None, '', slug):
                 raise ValueError('independent atlas binding required for scoped Studio Sync')
-            if not location_assets.atlases.binding('location_asset', slug):
-                raise ValueError('direct atlas binding not found')
-            if not str(row.get('texture_asset_id') or ''):
-                raise ValueError('publish the selected Location Asset Atlas before Studio Sync')
+            if row.get('appearanceMode', 'atlas') == 'atlas':
+                if not location_assets.atlases.binding('location_asset', slug):
+                    raise ValueError('direct atlas binding not found')
+                if not str(row.get('texture_asset_id') or ''):
+                    raise ValueError('publish the selected Location Asset Atlas before Studio Sync')
             revision = row.get('bindingRevision')
             if type(revision) is not int or revision < 1:
                 raise ValueError('invalid Location Asset atlas binding revision')
@@ -222,7 +223,8 @@ def route(path, body, deps):
                 raise ValueError('unknown Studio ID sync phase')
             kwargs = dict(slug=slug, binding_revision=revision,
                           model_asset_id=str(row.get('model_asset_id') or ''),
-                          atlas_asset_id=str(row.get('texture_asset_id') or ''),phase=phase)
+                          atlas_asset_id=str(row.get('texture_asset_id') or ''),
+                          appearance_mode=str(row.get('appearanceMode') or 'atlas'),phase=phase)
             if phase == 'scan':
                 kwargs['model_history'] = location_assets.model_publication_ids(slug)
                 kwargs['model_mesh_inventory'] = location_assets.mesh_id_inventory(slug)
@@ -249,10 +251,11 @@ def route(path, body, deps):
                     latest = location_assets.get(slug)
                     identity = ('model_asset_id', 'model_published_sha256',
                                 'texture_asset_id', 'bindingRevision', 'revision',
-                                'alphaEnabled')
+                                'alphaEnabled','appearanceMode','visualMaterial','visualColor','surfaceMaterial')
                     if latest and all(latest.get(key) == row.get(key) for key in identity):
-                        if location_assets.atlases.mark_synced('location_asset', slug, revision):
-                            location_assets.export()
+                        if row.get('appearanceMode', 'atlas') == 'atlas':
+                            if location_assets.atlases.mark_synced('location_asset', slug, revision):
+                                location_assets.export()
                     else:
                         studio['verification'] = 'review_required'
                 return out(200, {'studio': studio})
@@ -261,7 +264,7 @@ def route(path, body, deps):
             # Only a successful explicit Replace acknowledges Studio ID changes.
             deps['location_asset_sync_history'].append(
                 slug=slug, binding_revision=revision, studio=studio)
-            if phase == 'replace' and studio['fullySynced']:
+            if phase == 'replace' and studio['fullySynced'] and row.get('appearanceMode', 'atlas') == 'atlas':
                 location_assets.atlases.mark_synced('location_asset', slug, revision)
             location_assets.export()
             return out(200, {'studio': studio})

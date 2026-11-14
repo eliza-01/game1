@@ -6,7 +6,7 @@ return function(config: any)
             or type(command.targetSlug)~="string" or command.targetSlug==""
             or type(command.bindingRevision)~="number" or command.bindingRevision<1
             or type(command.modelAssetId)~="string" or command.modelAssetId==""
-            or type(command.atlasAssetId)~="string" or command.atlasAssetId==""
+            or type(command.atlasAssetId)~="string"
             or (command.phase~="scan" and command.phase~="select" and command.phase~="attach" and command.phase~="replace") then
             warn("[game1] rejected stale/unscoped Studio Mesh ID command")
             return

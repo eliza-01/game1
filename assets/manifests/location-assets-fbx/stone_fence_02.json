@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "slug": "stone_fence_02",
+  "sourceSha256": "d15eb171ce08c43433d3c0bf0eed11e72a2557573f09ff3f5771828bfed279d0",
+  "analysis": {
+    "schemaVersion": 1,
+    "meshes": [
+      {
+        "name": "stone_fence_02",
+        "armature": "",
+        "vertices": 1107,
+        "bones": [],
+        "influencedBones": [],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": null,
+          "canQuery": null,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": null,
+          "physicsOnly": false
+        }
+      }
+    ],
+    "hasCollider": false,
+    "armatures": [],
+    "unassignedArmatures": []
+  }
+}

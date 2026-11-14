@@ -42,13 +42,27 @@ function decoAssetStudioSyncNote(row){
     && proof.atlasId === String(row.texture_asset_id || '')
     && proof.bindingRevision === Number(row.bindingRevision || 0)
     && proof.authoringRevision === Number(row.revision || 0)
-    && proof.alphaEnabled === Boolean(row.alphaEnabled);
+    && proof.alphaEnabled === Boolean(row.alphaEnabled)
+    && proof.appearanceMode === (row.appearanceMode || 'atlas')
+    && proof.visualMaterial === (row.visualMaterial || 'SmoothPlastic')
+    && proof.visualColor === (row.visualColor || '#FFFFFF')
+    && proof.surfaceMaterial === (row.surfaceMaterial || 'default');
   if(!proofCurrent)return '';
   if(proof.verification === 'pending')
     return '<small class="deco-sync-pending">Studio Sync pending · verified by Find</small>';
   if(proof.verification === 'review_required')
     return '<small class="muted">Studio · review required</small>';
   return '';
+}
+function decoAssetAppearanceMode() {
+  return $('location-asset-appearance-mode').value;
+}
+function decoAssetToggleAppearance() {
+  const material = decoAssetAppearanceMode() === 'material';
+  $('location-asset-material-fields').hidden = !material;
+  document.querySelectorAll('#location-asset-editor-panel .location-atlas-only')
+    .forEach(node => { node.hidden = material; });
+  // The atlas selection remains in memory but is NEVER submitted in material mode.
 }
 function decoAssetSyncSlug() {
   $('location-asset-slug').value = decoAssetSlugify($('location-asset-name').value);
@@ -67,6 +81,10 @@ function decoAssetSetForm() {
     ? decoAssetState.libraryCategory : (categories[0]?.id || 'tree');
   $('location-asset-destructible').checked = false;
   $('location-asset-surface-material').value = 'default';
+  $('location-asset-appearance-mode').value = 'material';
+  $('location-asset-visual-material').value = 'SmoothPlastic';
+  $('location-asset-visual-color').value = '#ffffff';
+  decoAssetToggleAppearance();
   window.game1LocationCategoryPicker?.refresh($('location-asset-category'));
   $('picked-location-asset-model').textContent = 'Choose the FBX for this new asset';
   decoAssetRenderInspection();
@@ -194,6 +212,16 @@ function decoAssetRender() {
     materials.value='default';
   }
   decoAssetRenderTextureReferences();
+  const visualMaterials = $('location-asset-visual-material');
+  if (!visualMaterials.options.length) {
+    for (const item of decoAssetState.data.options?.visualMaterials || []) {
+      const option = document.createElement('option');
+      option.value = item.id; option.textContent = item.label + (item.requiresTexture ? ' · requires texture' : '');
+      option.disabled = Boolean(item.requiresTexture);
+      visualMaterials.appendChild(option);
+    }
+    visualMaterials.value = 'SmoothPlastic';
+  }
   decoAssetRenderLibraryFilter();
   const publication = decoAssetState.data.publication || {};
   const publicationState = $('location-asset-publication-state');
@@ -213,10 +241,12 @@ function decoAssetRender() {
       `<small>Model ${i+1} · ${esc(mesh.name)} · Mesh ID ${esc(mesh.meshId)}</small>`).join(''):
       `<small class="muted">Mesh ID: нет данных · Find Mesh IDs в Studio</small>`;
     tr.innerHTML = `<td><b>${esc(row.name_en)}</b><small>${esc(row.slug)}</small>` +
-      `<small class="deco-texture-filename">${esc(window.game1AtlasIdentity.describe({filename:decoAssetTextureFilename(row),atlasKey:row.atlasFamily||''}).key)} ${decoAtlasWarning(row)}</small>` +
+      `<small class="deco-texture-filename">${row.appearanceMode==='material'
+        ? `Material: ${esc(row.visualMaterial)} · ${esc(row.visualColor)}`
+        : `${esc(window.game1AtlasIdentity.describe({filename:decoAssetTextureFilename(row),atlasKey:row.atlasFamily||''}).key)} ${decoAtlasWarning(row)}`}</small>` +
       `${decoAtlasDots(row)}${studioSyncNote}</td>` +
-      `<td>${esc(decoAssetCategoryLabel(row.category))}<small>${esc(row.materialDefinition?.label||'Default')}</small></td><td>${contactPolicy}</td>` +
-      `<td><small>Model ID ${esc(row.model_asset_id || '—')}</small>${row.model_asset_id?meshLabels:''}<small>Image ID ${esc(row.texture_asset_id || '—')}</small></td>` +
+      `<td>${esc(decoAssetCategoryLabel(row.category))}<small>Sound: ${esc(row.materialDefinition?.label||'Default')}</small></td><td>${contactPolicy}</td>` +
+      `<td><small>Model ID ${esc(row.model_asset_id || '—')}</small>${row.model_asset_id?meshLabels:''}<small>${row.appearanceMode==='material'?'No atlas · Roblox material':'Image ID '+esc(row.texture_asset_id || '—')}</small></td>` +
       `<td>${decoAssetStatusTag(row.status)}</td><td><div class="deco-asset-row-actions">` +
       `<button data-select type="button" ${decoAssetState.syncingSlug?'disabled':''}>Edit</button>` +
       `<button data-collision type="button" title="Select this asset for Collision Blueprint">Collision</button>` +
@@ -293,12 +323,17 @@ async function decoAssetRegister() {
       nameEn: $('location-asset-name').value.trim(), slug:$('location-asset-slug').value.trim(),
       category:$('location-asset-category').value, destructible: $('location-asset-destructible').checked,
       surfaceMaterial:$('location-asset-surface-material').value,
-      modelSourcePath:decoAssetState.modelPath, textureSourcePath:decoAssetState.texturePath,
-      atlasVariantId:decoAssetState.atlasVariantId, createOnly:true, inspectFbx:true,
+      appearanceMode:decoAssetAppearanceMode(), visualMaterial:$('location-asset-visual-material').value,
+      visualColor:$('location-asset-visual-color').value,
+      modelSourcePath:decoAssetState.modelPath,
+      textureSourcePath:decoAssetAppearanceMode()==='atlas'?decoAssetState.texturePath:'',
+      atlasVariantId:decoAssetAppearanceMode()==='atlas'?decoAssetState.atlasVariantId:0,
+      createOnly:true, inspectFbx:true,
       meshOptions:decoAssetState.meshOptions,
     };
     if (!payload.modelSourcePath || !decoAssetState.inspection) throw Error('Choose and analyze the FBX first');
-    if (!payload.textureSourcePath && !payload.atlasVariantId) throw Error('Choose PNG/JPG or an existing atlas');
+    if (payload.appearanceMode==='atlas' && !payload.textureSourcePath && !payload.atlasVariantId)
+      throw Error('Choose PNG/JPG or an existing atlas');
     const row = await request('/api/location-assets', {
       method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload),
     });
@@ -317,8 +352,12 @@ async function decoAssetSaveEdits(slug, payload, expectedRevision) {
       slug, nameEn:payload.nameEn ?? row.name_en, category:payload.category ?? row.category,
       destructible:payload.destructible ?? Boolean(row.destructible),
       surfaceMaterial:payload.surfaceMaterial ?? row.surfaceMaterial ?? 'default',
+      appearanceMode:payload.appearanceMode ?? row.appearanceMode ?? 'atlas',
+      visualMaterial:payload.visualMaterial ?? row.visualMaterial ?? 'SmoothPlastic',
+      visualColor:payload.visualColor ?? row.visualColor ?? '#FFFFFF',
       modelSourcePath:payload.modelSourcePath || '', textureSourcePath:payload.textureSourcePath || '',
-      atlasVariantId:payload.textureSourcePath ? 0 : (payload.atlasVariantId ?? row.atlasVariantId),
+      atlasVariantId:(payload.appearanceMode ?? row.appearanceMode)==='material'?0:
+        (payload.textureSourcePath ? 0 : (payload.atlasVariantId ?? (row.appearanceMode==='atlas'?row.atlasVariantId:0))),
       expectedRevision, editOnly:true, inspectFbx:Boolean(payload.modelSourcePath),
       ...(payload.meshOptions ? {meshOptions:payload.meshOptions} : {}),
     }),
@@ -386,6 +425,7 @@ async function decoAssetDelete(slug) {
 decoAssetRestorePreferences();
 window.game1LocationAssetsLoad = decoAssetLoad;
 $('location-asset-name').oninput = decoAssetSyncSlug;
+$('location-asset-appearance-mode').onchange = decoAssetToggleAppearance;
 $('new-location-asset-main').onclick = decoAssetBeginNew;
 $('refresh-location-assets-table').onclick = decoAssetLoad;
 $('choose-location-asset-model').onclick = decoAssetChooseModel;

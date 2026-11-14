@@ -1,6 +1,7 @@
 local DecoTransform = require(script.Parent.DecoTransform)
 local DecoAssetPreparation = require(script.Parent.DecoAssetPreparation)
 local DecoPlacedAssetSync = require(script.Parent.DecoPlacedAssetSync)
+local collisionModuleOk, Collision = pcall(require, script.Parent.StudioLocationCollisionParts)
 
 local DecoPlacement = {}
 DecoPlacement.__index = DecoPlacement
@@ -186,6 +187,28 @@ function DecoPlacement:_commit()
     placed:SetAttribute("Game1DecoAssetSlug", tostring(row.slug or ""))
     placed.Parent = self:_categoryFolder(tostring(row.category or ""))
     placed:PivotTo(pivot)
+    if tonumber(row.collisionBlueprintRevision or 0) > 0 then
+        if not collisionModuleOk then
+            placed:Destroy()
+            self.committing = false
+            error("Collision generator unavailable: " .. tostring(Collision))
+        end
+        local prepared, transaction = pcall(Collision.Prepare, placed, row.collisionBlueprint,
+            row.collisionBlueprintRevision, row.collisionBlueprintSha256)
+        if not prepared then
+            placed:Destroy()
+            self.committing = false
+            error("Place cancelled: " .. tostring(transaction))
+        end
+        local committed, failure = pcall(Collision.Commit, transaction)
+        if not committed then
+            Collision.Rollback(transaction)
+            placed:Destroy()
+            self.committing = false
+            error("Place cancelled: " .. tostring(failure))
+        end
+        Collision.Finalize(transaction)
+    end
 
     -- Detach the session before deactivating the plugin. Deactivation is re-entrant
     -- and must never be able to destroy an instance that the active call still uses.

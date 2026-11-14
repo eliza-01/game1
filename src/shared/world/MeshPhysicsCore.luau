@@ -102,23 +102,16 @@ end
 
 -- Semantic surface for future impact/footstep audio and interaction.
 -- This does not own collision flags, sizes, meshes or appearance textures.
--- Only a selected explicit physical material changes Roblox Material; "default"
--- leaves historical authored Materials intact (including collision geometry).
+-- This semantic key is for sound classification only, and never changes
+-- Roblox Material / physical simulation properties.
 function Core.ApplyLocationSurfaceMaterial(model: Model, surfaceKey: string?, physicalName: string?): number
     local key = if type(surfaceKey) == "string" and surfaceKey ~= "" then surfaceKey else "default"
-    local material: Enum.Material? = nil
-    if physicalName ~= nil and physicalName ~= "" then
-        material = Enum.Material[physicalName]
-        if material == nil then error("unsupported Location physical material " .. tostring(physicalName)) end
-    end
     local changed = 0
     for _, mesh in ipairs(parts(model)) do
         if Core.IsLocationCarrier(mesh) then continue end
         local differs = mesh:GetAttribute("Game1LocationSurfaceMaterial") ~= key
-        if material ~= nil and mesh.Material ~= material then differs = true end
         if differs then
             mesh:SetAttribute("Game1LocationSurfaceMaterial", key)
-            if material ~= nil then mesh.Material = material end
             changed += 1
         end
     end
@@ -128,8 +121,7 @@ end
 function Core.CaptureLocationSurfaceMaterial(model: Model): {any}
     local old = {}
     for _, mesh in ipairs(parts(model)) do
-        table.insert(old,{part=mesh,material=mesh.Material,
-            key=mesh:GetAttribute("Game1LocationSurfaceMaterial")})
+        table.insert(old,{part=mesh,key=mesh:GetAttribute("Game1LocationSurfaceMaterial")})
     end
     return old
 end
@@ -137,7 +129,6 @@ end
 function Core.RestoreLocationSurfaceMaterial(saved: {any})
     for _,entry in ipairs(saved) do
         if entry.part.Parent then
-            entry.part.Material=entry.material
             entry.part:SetAttribute("Game1LocationSurfaceMaterial",entry.key)
         end
     end

@@ -33,7 +33,10 @@ window.game1LocationAssetWorkflow = (() => {
     decoAssetState.studioVerifications[item.slug]={
       modelId:String(item.model_asset_id||''),atlasId:String(item.texture_asset_id||''),
       bindingRevision:Number(item.bindingRevision||0),authoringRevision:Number(item.revision||0),
-      alphaEnabled:Boolean(item.alphaEnabled),verification:studio.verification||'review_required',
+      alphaEnabled:Boolean(item.alphaEnabled),appearanceMode:item.appearanceMode||'atlas',
+      visualMaterial:item.visualMaterial||'SmoothPlastic',visualColor:item.visualColor||'#FFFFFF',
+      surfaceMaterial:item.surfaceMaterial||'default',
+      verification:studio.verification||'review_required',
     };
   }
   async function run(label,task){
@@ -85,14 +88,20 @@ window.game1LocationAssetWorkflow = (() => {
       ...(showPublish?[{id:'publish',label:`Publish${publication.count?' · '+publication.count:''}`}]:[])];
     const card=(name,description,content,status='',css='ready')=>shell.step(name,description,content,status,css);
     const identityData=state.identityDraft||{nameEn:item.name_en,slug:item.slug,
-      category:item.category,surfaceMaterial:item.surfaceMaterial||'default',destructible:Boolean(item.destructible)};
+      category:item.category,surfaceMaterial:item.surfaceMaterial||'default',destructible:Boolean(item.destructible),
+      appearanceMode:item.appearanceMode||'atlas',visualMaterial:item.visualMaterial||'SmoothPlastic',
+      visualColor:item.visualColor||'#FFFFFF'};
     const identity=card('Registration details','Metadata changes never publish assets or modify Studio.',
       `<div class="deco-manage-fields"><label>Name<input data-la-name maxlength="120" value="${e(identityData.nameEn)}"></label>`+
       `<label>Slug<input data-la-slug maxlength="64" pattern="[a-z0-9_]+" value="${e(identityData.slug)}"></label>`+
       `<small class="muted">Изменение slug сохраняет опубликованные ID и историю. После переименования Place Registry покажет старые экземпляры для Repair.</small>`+
       `<label>Category<select data-la-category>${(decoAssetState.data?.options?.categories||[]).map(c=>
         `<option value="${e(c.id)}" ${c.id===identityData.category?'selected':''}>${e(c.label)}</option>`).join('')}</select></label>`+
-      `<label>Surface material<select data-la-material>${(decoAssetState.data?.options?.surfaceMaterials||[]).map(m=>`<option value="${e(m.id)}" ${m.id===identityData.surfaceMaterial?'selected':''}>${e(m.label)}</option>`).join('')}</select><small class="muted">Physical surface and future impact/footstep sound family.</small></label>`+
+      `<label>Object material · interaction sounds<select data-la-material>${(decoAssetState.data?.options?.surfaceMaterials||[]).map(m=>`<option value="${e(m.id)}" ${m.id===identityData.surfaceMaterial?'selected':''}>${e(m.label)}</option>`).join('')}</select><small class="muted">Sound family only; never changes the visible material.</small></label>`+
+      `<label>Appearance source<select data-la-appearance-mode><option value="atlas" ${identityData.appearanceMode==='atlas'?'selected':''}>Texture Atlas</option><option value="material" ${identityData.appearanceMode==='material'?'selected':''}>Roblox Material + Color</option></select></label>`+
+      `<div data-la-visual-fields ${identityData.appearanceMode==='material'?'':'hidden'}>`+
+      `<label>Visual material<select data-la-visual-material>${(decoAssetState.data?.options?.visualMaterials||[]).map(m=>`<option value="${e(m.id)}" ${m.id===identityData.visualMaterial?'selected':''} ${m.requiresTexture?'disabled':''}>${e(m.label)}${m.requiresTexture?' · requires texture':''}</option>`).join('')}</select></label>`+
+      `<label>Color<input type="color" data-la-visual-color value="${e(identityData.visualColor)}"></label></div>`+
       `<label class="deco-policy-toggle"><input type="checkbox" data-la-destructible ${identityData.destructible?'checked':''}> Destructible</label></div>`+
       `<div class="actions">${button('save-identity','Apply Changes',busy)}${button('delete','Retire asset',busy)}</div>`,
       `Revision ${Number(item.revision||0)}`);
@@ -118,10 +127,17 @@ window.game1LocationAssetWorkflow = (() => {
       `<input type="checkbox" data-la-alpha ${selectedAlpha?'checked':''} ${busy?'disabled':''}> Alpha transparency</label>`+
       `<small>${selectedAlpha?'Вкл. · Transparency':'Выкл. · Opaque'} · независимо от альфа-канала общего атласа; Физические Parts настраиваются отдельно.</small>`+
       `<div class="actions">${button('apply-alpha','Apply Changes',busy||!alphaDirty,alphaDirty?'asset-apply-ready':'')}</div></section>`;
-    const atlas=alphaEditor+window.game1ConsumerAtlasEditor.render(state.atlas,{
+    const atlas=(item.appearanceMode==='material'
+      ? '<small class="hint">Material + Color active: no Image ID is required. To switch to Atlas, choose a registered variant below. This changes the appearance mode but does not modify Studio until Sync.</small>'+
+        `<label>Existing atlas variant<select data-la-switch-atlas>`+
+        `<option value="">Choose a variant…</option>`+
+        (decoAssetState.data?.atlases||[]).flatMap(f=>f.variants||[]).filter(v=>!v.retired)
+          .map(v=>`<option value="${Number(v.id)}">${e(v.filename)}${v.published_id?' · published':' · publish required'}</option>`).join('')+
+        `</select></label><div class="actions">${button('activate-atlas','Use selected atlas',busy)}</div>`
+      : alphaEditor+window.game1ConsumerAtlasEditor.render(state.atlas,{
       currentId:item.atlasVariantId||0,linked:item.atlasVariants||[],
       catalog:decoAssetState.data?.atlases||[],busy,openPublish:publication.atlasNeeded,
-      offerPublication:true});
+      offerPublication:true}));
     // Publication is a separate operation from source registration and Studio Sync.
     // Busy stages show the actual awaited network operation, not a fabricated %.
     const publicationStatus=(key,label,pending)=>{
@@ -134,7 +150,7 @@ window.game1LocationAssetWorkflow = (() => {
     const publishPanel=card('Publish resources',
       'Регистрация сохраняет исходники. Публикация создаёт Roblox ID. Studio Sync выполняется отдельно.',
       `<div class="la-publication-stack">`+
-      publicationStatus('atlas',`Atlas · ${e(publication.variant?.filename||'не выбран')}`,publication.atlasNeeded)+
+      (item.appearanceMode==='material'?'':publicationStatus('atlas',`Atlas · ${e(publication.variant?.filename||'не выбран')}`,publication.atlasNeeded))+
       publicationStatus('model','Model · FBX',publication.modelNeeded)+`</div>`+
       (state.physicsDirty&&!publication.modelNeeded?'<p class="la-publication-warning">Есть изменения физических настроек MeshPart. Сохрани их через Model · FBX → Apply Changes.</p>':'')+
       (publication.reviewRequired?'<p class="la-publication-warning">Атлас уже имеет Image ID, но изменён. Для замены общего атласа открой Texture · atlas и подтверди замену после просмотра.</p>':'')+
@@ -175,13 +191,14 @@ window.game1LocationAssetWorkflow = (() => {
     const meshLine=p=>{
       const meshStatus=p.meshCurrent?'✓ актуальный':'✕ устаревший';
       const textureStatus=p.textureCurrent?'✓ актуальный':'✕ устаревший';
+      const appearanceLabel=item.appearanceMode==='material'?'Appearance':'Texture';
       return `<div class="la-sync-visual"><strong>${e(p.name)}</strong>`+
         `<div class="la-sync-part-status"><span class="${p.meshCurrent?'is-current':'is-stale'}">Mesh ${meshStatus}</span>`+
         (p.textureApplicable?`<span class="${p.textureCurrent?'is-current':'is-stale'}">Texture ${textureStatus}</span>`:'')+`</div>`+
         `<small class="la-sync-ids">Mesh ID ${e(p.meshId||'—')}`+
-        (p.textureApplicable?` · Texture ${e(p.textureId||'—')}`+
+        (p.textureApplicable?(item.appearanceMode==='material'?` · Material ${e(item.visualMaterial)} · Color ${e(item.visualColor)}`:` · Texture ${e(p.textureId||'—')}`)+
           (p.hasSurface?` · ColorMap ${e(p.colorMapId||'—')}`:'')+
-          ` · Alpha ${p.alphaCurrent?'✓':'✕'} ${p.alphaEnabled?'Transparency':'Opaque'}`:'')+`</small></div>`;
+          (item.appearanceMode==='material'?'':` · Alpha ${p.alphaCurrent?'✓':'✕'} ${p.alphaEnabled?'Transparency':'Opaque'}`):'')+`</small></div>`;
     };
     const modelLine=(model,i)=>{
       const visuals=model.parts.filter(p=>!p.isCollider);
@@ -207,20 +224,20 @@ window.game1LocationAssetWorkflow = (() => {
           (needsInspection?button('inspect-fbx','Analyze saved FBX',busy):'')+
           (model.managed?button('sync-one','Sync',!pending||busy||reportStale):'')+'</div></div>';
     };
-    const footer=card('Studio · Mesh & Texture Sync',
+    const footer=card('Studio · Mesh & Appearance Sync',
       'Поиск проверяет размещённые модели. Select выделяет в Studio; Sync обновляет только привязанные модели.',
       `<div class="actions">${button('scan','Find Mesh IDs · Studio',busy)}</div>`+
       (selected?`<div class="la-sync-current"><div><small>Актуальный Model ID</small><strong>${e(item.model_asset_id||'—')}</strong></div>`+
         `<div><small>Актуальные Mesh ID (визуальные)</small>`+
         `<strong>${visualIds.map(e).join(' · ')||'—'}</strong></div>`+
-        `<div><small>Актуальный Texture ID · Atlas</small><strong>${e(item.texture_asset_id||'—')}</strong></div></div>`+
+        `<div><small>${item.appearanceMode==='material'?'Визуальный материал / цвет':'Актуальный Texture ID · Atlas'}</small><strong>${item.appearanceMode==='material'?e(item.visualMaterial+' · '+item.visualColor):e(item.texture_asset_id||'—')}</strong></div></div>`+
         `<div class="la-sync-counts"><strong>Найдено ${Number(selected.foundMeshParts||0)} MeshPart · `+
         `${grouped.length} моделей</strong>`+
         (reportStale?'<small class="la-sync-warning">Отчёт сохранён для просмотра. Требуется новый Find перед Sync.</small>':'')+
         `<small>Привязано: ${Number(selected.managedModels||0)} · `+
         `Исторических без привязки: ${grouped.filter(g=>!g.managed).length}</small>`+
         `<small>Геометрию обновить: ${Number(selected.geometryPending||0)} моделей · `+
-        `Текстуру обновить: ${Number(selected.texturePending||0)} MeshPart · `+
+        `${item.appearanceMode==='material'?'Внешний вид обновить':'Текстуру обновить'}: ${Number(selected.texturePending||0)} MeshPart · `+
         `Alpha обновить: ${Number(selected.alphaPending||0)} MeshPart</small></div>`+
         `<div class="la-sync-list">${grouped.map(modelLine).join('')||'<small>MeshPart не найдены.</small>'}</div>`:'')+
         `<div class="la-sync-controls"><div class="actions">`+
@@ -254,6 +271,9 @@ window.game1LocationAssetWorkflow = (() => {
       const updateDraft=()=>{state.identityDraft={nameEn:nameInput.value,
         slug:slugInput.value,category:d.querySelector('[data-la-category]').value,
         surfaceMaterial:d.querySelector('[data-la-material]').value,
+        appearanceMode:d.querySelector('[data-la-appearance-mode]').value,
+        visualMaterial:d.querySelector('[data-la-visual-material]').value,
+        visualColor:d.querySelector('[data-la-visual-color]').value,
         destructible:d.querySelector('[data-la-destructible]').checked};};
       slugInput.oninput=()=>{state.manualSlug=true;updateDraft();};
       nameInput.oninput=()=>{
@@ -262,6 +282,12 @@ window.game1LocationAssetWorkflow = (() => {
       };
       d.querySelector('[data-la-category]').onchange=updateDraft;
       d.querySelector('[data-la-material]').onchange=updateDraft;
+      d.querySelector('[data-la-appearance-mode]').onchange=()=>{
+        d.querySelector('[data-la-visual-fields]').hidden=d.querySelector('[data-la-appearance-mode]').value!=='material';
+        updateDraft();
+      };
+      d.querySelector('[data-la-visual-material]').onchange=updateDraft;
+      d.querySelector('[data-la-visual-color]').onchange=updateDraft;
       d.querySelector('[data-la-destructible]').onchange=updateDraft;
     }
     d.querySelectorAll('[data-la-action="select-studio"]').forEach(b=>{
@@ -283,7 +309,7 @@ window.game1LocationAssetWorkflow = (() => {
     });
     const alphaInput=d.querySelector('[data-la-alpha]');
     if(alphaInput)alphaInput.onchange=()=>{state.alphaDraft=alphaInput.checked;render();};
-    if(state.tab==='atlas')window.game1ConsumerAtlasEditor.wire(d,state.atlas,{
+    if(state.tab==='atlas'&&item.appearanceMode!=='material')window.game1ConsumerAtlasEditor.wire(d,state.atlas,{
       consumerType:'location_asset',slug:state.slug,
       revision:item.bindingRevision||0,busy:state.busy,
       getRevision:()=>row()?.bindingRevision||0,getCurrentId:()=>row()?.atlasVariantId||0,
@@ -318,6 +344,16 @@ window.game1LocationAssetWorkflow = (() => {
   }
   async function execute(action){
     const item=row();if(!item)return;
+    if(action==='activate-atlas')return run('Подключение атласа',async()=>{
+      const chosen=Number(dialog()?.querySelector('[data-la-switch-atlas]')?.value||0);
+      if(!Number.isInteger(chosen)||chosen<1)throw Error('Выбери вариант атласа');
+      await request(`/api/location-assets/${encodeURIComponent(state.slug)}/atlas-binding`,{
+        method:'PUT',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({variantId:chosen,expectedRevision:Number(item.revision)}),
+      });
+      await decoAssetLoad();state.scanStale=true;state.identityDraft=null;
+      message('Режим Atlas включён. При необходимости опубликуй Image ID и выполни Studio Sync.');
+    });
     if(action==='apply-alpha')return run('Сохранение Alpha',async()=>{
       const current=row();if(!current)throw Error('Location Asset не найден');
       const value=state.alphaDraft===null?Boolean(current.alphaEnabled):state.alphaDraft;
@@ -395,6 +431,9 @@ window.game1LocationAssetWorkflow = (() => {
       const data={nameEn:d.querySelector('[data-la-name]').value.trim(),
         category:d.querySelector('[data-la-category]').value,
         surfaceMaterial:d.querySelector('[data-la-material]').value,
+        appearanceMode:d.querySelector('[data-la-appearance-mode]').value,
+        visualMaterial:d.querySelector('[data-la-visual-material]').value,
+        visualColor:d.querySelector('[data-la-visual-color]').value,
         destructible:d.querySelector('[data-la-destructible]').checked};
       return run('Applying metadata',async()=>{
       if(!/^[a-z0-9][a-z0-9_]{0,63}$/.test(nextSlug))throw Error('Slug: только a-z, 0-9 и _, не больше 64 символов');

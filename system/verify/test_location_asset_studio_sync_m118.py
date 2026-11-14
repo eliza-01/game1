@@ -35,6 +35,6 @@ class LocationAssetsSyncM118(TestCase):
         self.assertIn('schemaVersion~=9', command)
         self.assertIn('command.targetSlug', command)
         self.assertIn('DecoPlacedAssetSync.RefreshIds(', manager)
-        self.assertIn('StudioTextureAppearance.Apply(change.part, uri, nil, true)', sync)
+        self.assertIn('Visual.Apply(change.part,row)', sync)
         for forbidden in ('LoadAssetAsync', 'previous:Destroy()', 'newModel.Parent ='):
             self.assertNotIn(forbidden, sync)

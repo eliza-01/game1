@@ -19,6 +19,8 @@ from services.mysql_asset_replacement_audit import (
 SLUG = re.compile(r'^[a-z0-9][a-z0-9_]{0,63}$')
 ID = re.compile(r'^[0-9]{0,20}$')
 ALPHA_MODE = re.compile(r'^(?:missing|Overlay|Transparency|TintMask|Opaque)$')
+# Fits the existing MySQL VARCHAR(20) audit columns: max material 13 chars + #RRGGBB.
+APPEARANCE = re.compile(r'^(?:[0-9]{0,20}|[A-Za-z][A-Za-z0-9]{0,12}#[0-9A-F]{6})$')
 INSTANCE_ID = re.compile(r'^[A-Za-z0-9_-]{1,128}$')
 OPERATION_ID = re.compile(r'^[0-9a-f]{32}$')
 
@@ -37,7 +39,7 @@ class LocationAssetSyncHistory:
         validated = []
         for item in changes:
             if not isinstance(item, dict) or item.get('kind') not in (
-                    'atlas', 'model_reference', 'model', 'alpha'):
+                    'atlas', 'model_reference', 'model', 'alpha', 'appearance'):
                 raise ValueError('invalid Studio ID change history type')
             kind = item['kind']
             old = str(item.get('oldId', ''))
@@ -52,10 +54,15 @@ class LocationAssetSyncHistory:
                 if new.startswith(prefix):
                     new = new[len(prefix):]
             count = item.get('count')
-            values_valid = (ALPHA_MODE.fullmatch(old) is not None
-                            and ALPHA_MODE.fullmatch(new) is not None
-                            and new != 'missing') if kind == 'alpha' else (
-                                ID.fullmatch(old) is not None
+            if kind == 'alpha':
+                values_valid = (ALPHA_MODE.fullmatch(old) is not None
+                                and ALPHA_MODE.fullmatch(new) is not None and new != 'missing')
+            elif kind == 'appearance':
+                values_valid = (APPEARANCE.fullmatch(old) is not None
+                                and APPEARANCE.fullmatch(new) is not None
+                                and '#' in new)
+            else:
+                values_valid = (ID.fullmatch(old) is not None
                                 and ID.fullmatch(new) is not None and bool(new))
             if (not values_valid or type(count) is not int or not 0 < count <= 100000):
                 raise ValueError('invalid Studio ID change history entry')

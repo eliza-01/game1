@@ -12,7 +12,9 @@ function Resolver.ForSlug(slug: string?): any?
     return table.freeze({
         slug = canonical,
         material = entry.surfaceMaterial or "default",
-        robloxMaterial = entry.robloxMaterial or "",
+        robloxMaterial = entry.robloxMaterial or "", -- visual only, not an audio category
+        visualMaterial = entry.visualMaterial or "SmoothPlastic",
+        visualColor = entry.visualColor or "#FFFFFF",
         soundFamily = entry.soundFamily or "generic",
     })
 end

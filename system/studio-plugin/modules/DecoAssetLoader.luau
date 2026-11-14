@@ -1,4 +1,4 @@
-local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
+local Visual = require(script.Parent.StudioLocationVisualAppearance)
 local MeshPhysics = require(script.Parent.StudioMeshPhysicsCore)
 local RetiredCleanup = require(script.Parent.StudioRetiredColMeshCleanup)
 local MeshNames = require(script.Parent.StudioLocationMeshNames)
@@ -40,27 +40,6 @@ local function sanitize(model: Model)
             descendant.CanTouch = false
         end
     end
-end
-
-local function applyTexture(model: Model, textureAssetId: string, alphaEnabled: boolean)
-    local numericId = tonumber(textureAssetId)
-    if numericId == nil or numericId <= 0 then
-        return 0
-    end
-    local uri = "rbxassetid://" .. tostring(math.floor(numericId))
-    local applied = 0
-    for _, descendant in ipairs(model:GetDescendants()) do
-        if descendant:IsA("MeshPart") then
-            if Carrier.IsCarrier(descendant) then
-                -- Carrier is a real published mesh, never an Atlas consumer.
-                Carrier.Prepare(descendant)
-            else
-                StudioTextureAppearance.ApplyLocation(descendant, uri, alphaEnabled)
-                applied += 1
-            end
-        end
-    end
-    return applied
 end
 
 function DecoAssetLoader.new(config: any)
@@ -152,9 +131,9 @@ function DecoAssetLoader:loadPublished(row: any): Model
             error("published rig_carrier pivot changed during Location assembly")
         end
     end
-    applyTexture(model, tostring(row.texture_asset_id or ""), row.alphaEnabled)
+    Visual.ApplyModel(model,row)
     MeshPhysics.ApplyLocationModel(model, nil, row.meshOptions)
-    MeshPhysics.ApplyLocationSurfaceMaterial(model,row.surfaceMaterial,row.robloxMaterial or (row.materialDefinition and row.materialDefinition.robloxMaterial))
+    MeshPhysics.ApplyLocationSurfaceMaterial(model,row.surfaceMaterial,nil)
     -- Version-2 authored names belong to the immutable publication manifest.
     -- Renaming a visual to the current slug would silently invalidate it.
     return model

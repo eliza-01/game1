@@ -114,7 +114,7 @@ class SafetyM216(TestCase):
         self.assertEqual(status, 200, reply)
         self.scoped.assert_called_once_with(slug='oak_tree', binding_revision=3,
                                             model_asset_id='12345', atlas_asset_id='98765',
-                                            phase='replace',scan_token='1'*32,selected_keys=['p1'])
+                                            appearance_mode='atlas',phase='replace',scan_token='1'*32,selected_keys=['p1'])
         self.assertEqual(self.loc.atlases.marked, ('location_asset', 'oak_tree', 3))
         self.assertEqual(self.loc.exports, 1)
         event = self.history.list('oak_tree')[0]
@@ -173,7 +173,7 @@ class SafetyM216(TestCase):
         self.assertIn('RigSwap.Commit(', sync)
         self.assertIn('RigSwap.Rollback(', sync)
         self.assertNotIn('model:Destroy()', sync)
-        self.assertIn('StudioTextureAppearance.Apply(change.part, uri, nil, true)', sync)
+        self.assertIn('Visual.Apply(change.part,row)', sync)
         appearance = self.source('system/studio-plugin/modules/StudioTextureAppearance.luau')
         self.assertIn('if idsOnly == true then', appearance)
         self.assertIn('mesh.TextureID = uri', appearance)
@@ -190,7 +190,7 @@ class SafetyM216(TestCase):
         discovery = sync.split('local function targets(', 1)[1].split(
             'local function meshParts(', 1)[0]
         self.assertIn('workspace:GetDescendants()', discovery)
-        self.assertIn('descendant:GetAttribute(SLUG) == slug', discovery)
+        self.assertIn('belongsToSlug(descendant:GetAttribute(SLUG), slug, aliases)', discovery)
         self.assertIn('descendant:GetAttribute(INSTANCE)', discovery)
         self.assertNotRegex(discovery, r'\.Parent\s*=(?!=)')
 
@@ -222,7 +222,7 @@ class SafetyM216(TestCase):
             try:
                 result['value'] = bridge.run_deco_refresh_bridge(
                     timeout_seconds=5, slug='oak_tree', binding_revision=3,
-                    model_asset_id='12345', atlas_asset_id='98765',phase='replace',scan_token='1'*32,selected_keys=['p1'])
+                    model_asset_id='12345', atlas_asset_id='98765',appearance_mode='atlas',phase='replace',scan_token='1'*32,selected_keys=['p1'])
             except Exception as error:
                 result['error'] = str(error)
         with mock.patch.object(bridge, 'PORT', port):

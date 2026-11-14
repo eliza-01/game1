@@ -65,7 +65,7 @@ class M239(TestCase):
         self.assertEqual(status,200,result)
         self.assertEqual(result['studio']['selectedCount'],3)
         transport.assert_called_once_with(slug='oak',binding_revision=2,model_asset_id='12345',
-            atlas_asset_id='999',phase='select',scan_token='a'*32,part_keys=['p1','p3','p5'])
+            atlas_asset_id='999',appearance_mode='atlas',phase='select',scan_token='a'*32,part_keys=['p1','p3','p5'])
         history.append.assert_not_called()
         assets.atlases.mark_synced.assert_not_called()
 
@@ -84,7 +84,7 @@ class M239(TestCase):
             try:
                 outcome['result']=bridge.run_deco_refresh_bridge(
                     timeout_seconds=4,slug='oak',binding_revision=2,model_asset_id='12345',
-                    atlas_asset_id='999',phase='select',scan_token='a'*32,part_keys=['p1','p3','p5'])
+                    atlas_asset_id='999',appearance_mode='atlas',phase='select',scan_token='a'*32,part_keys=['p1','p3','p5'])
             except Exception as exc:outcome['error']=exc
         with mock.patch.object(bridge,'PORT',port):
             thread=threading.Thread(target=worker,daemon=True);thread.start()

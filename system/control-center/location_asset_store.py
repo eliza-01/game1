@@ -18,6 +18,7 @@ from services.mesh_authoring_policy import normalize_location_options
 from services.retired_col_mesh import strip_options
 from services import location_asset_taxonomy as taxonomy
 from services import location_asset_alpha
+from services import location_visual_appearance as appearance
 from services import location_collision_blueprint
 from services.texture_atlas_registry import AtlasRegistry, parse_filename
 
@@ -191,6 +192,25 @@ class LocationAssetStore:
                 with connect_sqlite(path) as saved:
                     connection.backup(saved)
                 connection.execute('ALTER TABLE location_assets ADD COLUMN alpha_enabled INTEGER NOT NULL DEFAULT 0')
+            # Separate appearance from the sound-surface classification.
+            # Old rows remain atlas based. Never invent Image IDs for material mode.
+            appearance_columns = {
+                'appearance_mode': "TEXT NOT NULL DEFAULT 'atlas'",
+                'visual_material': "TEXT NOT NULL DEFAULT 'SmoothPlastic'",
+                'visual_color': "TEXT NOT NULL DEFAULT '#FFFFFF'",
+            }
+            if any(key not in columns for key in appearance_columns):
+                # Keep a durable pre-migration snapshot. ClosingConnection
+                # releases Windows file handles when a test tempdir is removed.
+                backup_dir = self.runtime / 'backups'
+                backup_dir.mkdir(parents=True, exist_ok=True)
+                backup = backup_dir / ('location_visual_appearance_m343d_' +
+                    datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ') + '.sqlite')
+                with connect_sqlite(backup) as saved:
+                    connection.backup(saved)
+            for key, declaration in appearance_columns.items():
+                if key not in columns:
+                    connection.execute(f'ALTER TABLE location_assets ADD COLUMN {key} {declaration}')
             # Owner-era texture columns remain readable only until the M203
             # atlas migration drops them; never mutate old Image Asset IDs.
 
@@ -227,7 +247,7 @@ class LocationAssetStore:
         return location_asset_rename.rename(self, old_slug, payload)
 
     def options(self) -> dict:
-        return taxonomy.options()
+        return dict(taxonomy.options(), visualMaterials=appearance.options())
 
     @staticmethod
     def _texture_current(row: dict) -> bool:
@@ -239,9 +259,14 @@ class LocationAssetStore:
     def _status(self, row: dict) -> str:
         model_current = bool(row.get('model_asset_id') and
             row.get('model_published_sha256') == row.get('model_sha256'))
-        if not row.get('model_path') or not row.get('atlasVariantId'):
+        if not row.get('model_path'):
             return 'INCOMPLETE'
-        if model_current and self._texture_current(row):
+        if row.get('appearanceMode') == 'material':
+            if model_current:
+                return 'PUBLISHED'
+        elif not row.get('atlasVariantId'):
+            return 'INCOMPLETE'
+        elif model_current and self._texture_current(row):
             return 'PUBLISHED'
         return 'UPDATE_AVAILABLE' if row.get('model_asset_id') else 'LOCAL_ONLY'
 
@@ -347,7 +372,12 @@ class LocationAssetStore:
         collision = location_collision_blueprint.latest(self, result['slug'])
         result['collisionBlueprintRevision'] = collision['revision'] if collision else 0
         result['collisionBlueprintPartCount'] = len(collision['blueprint']['parts']) if collision else 0
+        result['collisionBlueprint'] = collision['blueprint'] if collision else None
+        result['collisionBlueprintSha256'] = collision['sha256'] if collision else ''
         result['surfaceMaterial'] = result.get('surface_material') or 'default'
+        result['appearanceMode'] = result.get('appearance_mode') or 'atlas'
+        result['visualMaterial'] = result.get('visual_material') or 'SmoothPlastic'
+        result['visualColor'] = result.get('visual_color') or '#FFFFFF'
         result['alphaEnabled'] = bool(result.get('alpha_enabled', 0))
         result['materialDefinition'] = taxonomy.MATERIAL_BY_ID.get(result['surfaceMaterial'], taxonomy.MATERIAL_BY_ID['default']).copy()
         for field, default in (('texture_path',''),('texture_filename',''),('texture_sha256',''),
@@ -373,6 +403,13 @@ class LocationAssetStore:
         result.setdefault('atlasVariants', self.atlases.attached_variants('location_asset', result['slug']))
         result['textureUsesAlpha'] = (texture_uses_alpha(self.root, str(result.get('texture_path') or ''))
                                        if binding and binding['current'] else None)
+        if result['appearanceMode'] == 'material':
+            # No active texture identity, even when a historical atlas remains
+            # attached for an explicit future switch back to atlas mode.
+            result.update(texture_asset_id=None, texture_path='', texture_filename='',
+                          texture_sha256='', texture_published_sha256='',
+                          atlasVariantId=0, atlasVariants=[], bindingRevision=int(result.get('revision') or 1),
+                          textureUsesAlpha=None)
         result['atlasLegacyWarning'] = bool(binding and not parse_filename(result['texture_filename']))
         result['status'] = self._status(result)
         result['category_label'] = CATEGORY_LABELS.get(result.get('category'), str(result.get('category') or ''))
@@ -464,6 +501,10 @@ class LocationAssetStore:
         destructible = parse_bool(payload.get("destructible"), bool(old.get("destructible")) if old else False)
         surface_material = taxonomy.surface_material(payload.get('surfaceMaterial',
             old.get('surface_material', 'default') if old else 'default'))
+        appearance_mode, visual_material, visual_color = appearance.validated(
+            payload.get('appearanceMode', old.get('appearance_mode') if old else 'atlas'),
+            payload.get('visualMaterial', old.get('visual_material') if old else 'SmoothPlastic'),
+            payload.get('visualColor', old.get('visual_color') if old else '#FFFFFF'))
         alpha_enabled = (location_asset_alpha.validate_alpha(payload['alphaEnabled'])
                          if 'alphaEnabled' in payload else bool(old.get('alpha_enabled')) if old else False)
         if category not in CATEGORIES:
@@ -498,13 +539,17 @@ class LocationAssetStore:
             raise ValueError('select an independent Atlas Registry variant, not a model owner')
         if selected_texture and atlas_variant_id:
             raise ValueError('choose either an atlas file or registered variant')
-        if selected_texture:
-            atlas_variant_id = self.atlases.adopt_file(selected_texture)['id']
-        if not atlas_variant_id and old:
-            binding = self.atlases.binding('location_asset', slug)
-            atlas_variant_id = int(binding['variant_id']) if binding else 0
-        if not atlas_variant_id or not self.atlases.get_variant(atlas_variant_id):
-            raise ValueError('select an independent atlas variant or PNG/JPG source')
+        if appearance_mode == 'material':
+            if selected_texture or atlas_variant_id:
+                raise ValueError('material appearance must not publish or select an atlas')
+        else:
+            if selected_texture:
+                atlas_variant_id = self.atlases.adopt_file(selected_texture)['id']
+            if not atlas_variant_id and old:
+                binding = self.atlases.binding('location_asset', slug)
+                atlas_variant_id = int(binding['variant_id']) if binding else 0
+            if not atlas_variant_id or not self.atlases.get_variant(atlas_variant_id):
+                raise ValueError('select an independent atlas variant or PNG/JPG source')
         if old is None and not selected_model:
             raise ValueError('choose a location asset FBX before registration')
 
@@ -537,25 +582,37 @@ class LocationAssetStore:
             connection.execute("""INSERT OR REPLACE INTO location_assets (
                 slug,name_en,category,model_path,model_sha256,model_asset_id,
                 model_published_sha256,model_moderation_state,destructible,
-                revision,created_at,updated_at,published_at,mesh_options_json,surface_material,alpha_enabled
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                revision,created_at,updated_at,published_at,mesh_options_json,surface_material,alpha_enabled,
+                appearance_mode,visual_material,visual_color
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (slug,name_en,category,values['model_path'],values['model_sha256'],
              old.get('model_asset_id') if old else None,
              str(old.get('model_published_sha256') or '') if old else '',
              str(old.get('model_moderation_state') or '') if old else '',
              1 if destructible else 0,revision,old.get('created_at') if old else now,
              now,old.get('published_at') if old else None,
-             json.dumps(effective_options, ensure_ascii=False, sort_keys=True),surface_material,int(alpha_enabled)))
-        self.atlases.bind('location_asset', slug, atlas_variant_id, allow_unpublished=True)
+             json.dumps(effective_options, ensure_ascii=False, sort_keys=True),surface_material,int(alpha_enabled),
+             appearance_mode,visual_material,visual_color))
+        if appearance_mode == 'atlas':
+            self.atlases.bind('location_asset', slug, atlas_variant_id, allow_unpublished=True)
         if inspected is not None:
             self._save_fbx_analysis(slug, values['model_sha256'], inspected)
         self.export()
         return self.get(slug)
 
     def select_atlas(self, slug: str, variant_id: int, expected_revision: int | None) -> dict:
-        if not self._raw_get(slug):
+        row = self._raw_get(slug)
+        if not row:
             raise ValueError('unknown location asset')
-        self.atlases.bind("location_asset", slug, variant_id, expected_revision=expected_revision)
+        if row.get('appearance_mode') == 'material':
+            if expected_revision is not None and expected_revision != int(row['revision']):
+                raise ValueError('appearance revision changed; refresh before binding atlas')
+            self.atlases.bind("location_asset", slug, variant_id, allow_unpublished=True)
+            with self.connect() as db:
+                db.execute("UPDATE location_assets SET appearance_mode='atlas', "
+                           "revision=revision+1,updated_at=? WHERE slug=?",(time.time(),slug))
+        else:
+            self.atlases.bind("location_asset", slug, variant_id, expected_revision=expected_revision)
         self.export()
         return self.get(slug)
 
@@ -579,7 +636,9 @@ class LocationAssetStore:
         atlas_binding = self.atlases.binding('location_asset', slug)
         if scope in ('changed', 'model') and not model.is_file():
             raise ValueError('canonical Location Asset FBX is missing')
-        if scope in ('changed', 'atlas'):
+        if scope == 'atlas' and row['appearanceMode'] == 'material':
+            raise ValueError('no atlas to publish for material appearance')
+        if scope in ('changed', 'atlas') and row['appearanceMode'] == 'atlas':
             if atlas_binding is None:
                 raise ValueError('independent atlas binding missing')
             texture = self.root / str(row.get('texture_path') or '')
@@ -624,7 +683,7 @@ class LocationAssetStore:
                     (slug, 'model', int(row['revision']), result.asset_id, result.operation_path,
                      row['model_sha256'], result.moderation_state or '', now))
 
-        if scope in ('changed', 'atlas') and atlas_binding is not None and not atlas_binding['current']:
+        if scope in ('changed', 'atlas') and row['appearanceMode']=='atlas' and atlas_binding is not None and not atlas_binding['current']:
             self.atlases.ensure_published(atlas_binding['variant_id'], credentials, description)
 
         self.export()
@@ -807,8 +866,11 @@ class LocationAssetStore:
                 f"\t\t\tname = {self._lua_string(row['name_en'])},",
                 f"\t\t\tcategory = {self._lua_string(row['category'])},",
                 f"\t\t\tsurfaceMaterial = {self._lua_string(row.get('surfaceMaterial') or 'default')},",
+                f"\t\t\tappearanceMode = {self._lua_string(row.get('appearanceMode') or 'atlas')},",
+                f"\t\t\tvisualMaterial = {self._lua_string(row.get('visualMaterial') or 'SmoothPlastic')},",
+                f"\t\t\tvisualColor = {self._lua_string(row.get('visualColor') or '#FFFFFF')},",
                 f"\t\t\talphaEnabled = {str(bool(row.get('alphaEnabled'))).lower()},",
-                f"\t\t\trobloxMaterial = {self._lua_string(row['materialDefinition']['robloxMaterial'])},",
+                f"\t\t\trobloxMaterial = {self._lua_string(row.get('visualMaterial') if row.get('appearanceMode') == 'material' else '')},",
                 f"\t\t\tsoundFamily = {self._lua_string(row['materialDefinition']['soundFamily'])},",
                 f"\t\t\tstatus = {self._lua_string(row['status'])},",
                 f"\t\t\tmodelAssetId = {self._lua_string(row.get('model_asset_id') or '')},",

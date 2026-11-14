@@ -3,6 +3,7 @@ local Carrier = require(script.Parent.StudioLocationRigCarrier)
 -- both keep StudioManagedRigSwap as the sole child-rig transaction.
 local MeshPhysics = require(script.Parent.StudioMeshPhysicsCore)
 local Ownership = require(script.Parent.StudioLocationPlacementOwner)
+local Visual = require(script.Parent.StudioLocationVisualAppearance)
 local BoneEffects = require(script.Parent.StudioPlacedRigBoneEffects)
 local Inventory = {}
 
@@ -317,10 +318,9 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
                     and part:GetAttribute("Game1DecoPhysicsOnly") ~= true
                 local textureId=if textureApplicable then Inventory.Id(part.TextureID) else ""
                 local colorMapId=if textureApplicable and surface then Inventory.Id(surface.ColorMap) else ""
-                local textureCurrent=not textureApplicable or (textureId==atlasId
-                    and (not surface or colorMapId==atlasId))
+                local textureCurrent=not textureApplicable or Visual.IsCurrent(part,row)
                 local alphaEnabled=row.alphaEnabled==true
-                local alphaCurrent=not textureApplicable or (surface~=nil and
+                local alphaCurrent=not textureApplicable or row.appearanceMode=="material" or (surface~=nil and
                     surface.AlphaMode==(if alphaEnabled then Enum.AlphaMode.Transparency else Enum.AlphaMode.Opaque))
                 local meshCurrent=currentIds[meshId]==true
                 -- Authored skeleton layout is validated independently of MeshId:

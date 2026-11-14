@@ -15,7 +15,7 @@ function DecoAssetPreparation.PreparePlaced(model: Model, meshOptions: any?, mat
     -- The policy is reapplied after ghost/preview handling and before Workspace
     -- parenting, without writing any transforms, scale or anchors.
     MeshPhysics.ApplyLocationModel(model, nil, meshOptions)
-    MeshPhysics.ApplyLocationSurfaceMaterial(model,materialKey,physicalMaterial)
+    MeshPhysics.ApplyLocationSurfaceMaterial(model,materialKey,nil)
 end
 
 -- Geometry Sync stages a replacement for an existing placement. Apply the
@@ -23,7 +23,7 @@ end
 -- state; StudioLocationPlacedGeometry owns Anchored/Scale/CFrame preservation.
 function DecoAssetPreparation.PrepareSynced(model: Model, meshOptions: any?, materialKey: string?, physicalMaterial: string?)
     MeshPhysics.ApplyLocationModel(model, nil, meshOptions)
-    MeshPhysics.ApplyLocationSurfaceMaterial(model,materialKey,physicalMaterial)
+    MeshPhysics.ApplyLocationSurfaceMaterial(model,materialKey,nil)
 end
 
 return table.freeze(DecoAssetPreparation)

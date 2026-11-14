@@ -17,6 +17,7 @@ from studio_bridge import PORT, PROJECT, TOKEN, StudioBridgeError
 def run_deco_refresh_bridge(*, timeout_seconds: float = 75.0,
                             slug: str, binding_revision: int,
                             model_asset_id: str, atlas_asset_id: str,
+                            appearance_mode: str = 'atlas',
                             phase: str = 'scan', scan_token: str = '',
                             selected_keys: list[str] | None = None, part_key: str = '',
                             part_keys: list[str] | None = None,
@@ -27,9 +28,14 @@ def run_deco_refresh_bridge(*, timeout_seconds: float = 75.0,
         raise ValueError('Location Asset Studio Sync requires one valid slug')
     if type(binding_revision) is not int or binding_revision < 1:
         raise ValueError('invalid Location Asset binding revision')
-    for identifier in (model_asset_id, atlas_asset_id):
-        if not re.fullmatch(r'[1-9][0-9]{0,19}', str(identifier)):
-            raise ValueError('a published Model and Atlas Asset ID are required')
+    if appearance_mode not in ('atlas','material'):
+        raise ValueError('invalid Location Asset appearance mode')
+    if not re.fullmatch(r'[1-9][0-9]{0,19}', str(model_asset_id)):
+        raise ValueError('a published Model Asset ID is required')
+    if appearance_mode=='atlas' and not re.fullmatch(r'[1-9][0-9]{0,19}', str(atlas_asset_id)):
+        raise ValueError('atlas mode requires a published Image Asset ID')
+    if appearance_mode=='material' and atlas_asset_id!='':
+        raise ValueError('material mode must not have an Image Asset ID')
     if phase not in ('scan','select','attach','replace'):
         raise ValueError('Studio Sync phase must be scan, select, attach or replace')
     if phase == 'scan':
@@ -63,6 +69,7 @@ def run_deco_refresh_bridge(*, timeout_seconds: float = 75.0,
         'bindingRevision': binding_revision,
         'modelAssetId': model_asset_id,
         'atlasAssetId': atlas_asset_id,
+        'appearanceMode': appearance_mode,
         'phase': phase,
         **({'modelHistory':model_history, 'modelMeshInventory':model_mesh_inventory or []}
            if phase=='scan' else {'scanToken':scan_token,'partKeys':part_keys}

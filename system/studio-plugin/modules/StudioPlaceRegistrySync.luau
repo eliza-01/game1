@@ -6,9 +6,11 @@ local RigSwap=require(script.Parent.StudioManagedRigSwap)
 local History=require(script.Parent.StudioPublishedMeshHistory)
 local BoneEffects = require(script.Parent.StudioPlacedRigBoneEffects)
 local Texture=require(script.Parent.StudioTextureAppearance)
+local Visual=require(script.Parent.StudioLocationVisualAppearance)
 local Physics=require(script.Parent.StudioMeshPhysicsCore)
 local Geometry=require(script.Parent.StudioLocationPlacedGeometry)
 local PlacementHistory=require(script.Parent.StudioLocationPlacementHistory)
+local collisionModuleOk, Collision = pcall(require, script.Parent.StudioLocationCollisionParts)
 local Sync={}
 
 local function visuals(root: Instance): {MeshPart}
@@ -23,6 +25,7 @@ end
 local function rigChildren(root: Model): {Instance}
     local result={}
     for _,child in ipairs(root:GetChildren()) do
+        if Collision.IsOwned(child) then continue end
         if child:IsA("BasePart") or ((child:IsA("Model") or child:IsA("Folder"))
             and child:FindFirstChildWhichIsA("BasePart",true)) then
             table.insert(result,child)
@@ -37,7 +40,9 @@ local function stageRig(ref: any, ctx: any): any
     if ref.oldVersion=="" then error("historical publication not unique") end
     local publishedRow={slug=ref.entry.slug,status="PUBLISHED",
         model_asset_id=ref.entry.model,texture_asset_id=ref.entry.atlas,
-        surfaceMaterial=ref.entry.material,robloxMaterial=ref.entry.physicalMaterial,alphaEnabled=ref.entry.alphaEnabled,rigManifest=ref.entry.rigManifest}
+        surfaceMaterial=ref.entry.material, appearanceMode=ref.entry.appearanceMode,
+        visualMaterial=ref.entry.visualMaterial, visualColor=ref.entry.visualColor,
+        alphaEnabled=ref.entry.alphaEnabled,rigManifest=ref.entry.rigManifest}
     local stage=ctx.loader:loadPublished(publishedRow)
     local previous=ctx.loader:loadForMeshInventory(ref.oldVersion,ref.entry.slug)
     local good,result=pcall(function()
@@ -60,6 +65,9 @@ local function stageRig(ref: any, ctx: any): any
 end
 
 function Sync.Apply(refs: {any}, ctx: any): any
+    if not collisionModuleOk then
+        error("Collision generator unavailable; Place unchanged: " .. tostring(Collision))
+    end
     local plan,blocked,stages={},{},{}
     -- Prepare EVERY geometry transaction before touching any placed object.
     for _,ref in ipairs(refs) do
@@ -75,14 +83,31 @@ function Sync.Apply(refs: {any}, ctx: any): any
             else
                 table.insert(blocked,ref.row.key..": "..tostring(stage):sub(1,180))
             end
-        elseif ref.row.needsTexture or ref.row.needsMaterial or ref.row.needsAlpha then
+        elseif ref.row.needsTexture or ref.row.needsMaterial or ref.row.needsAlpha or ref.row.needsCollision then
             local changes={}
             for _,part in ipairs(ref.visuals) do
-                table.insert(changes,Texture.Capture(part))
+                table.insert(changes,Visual.Capture(part))
             end
             table.insert(plan,{ref=ref,appearance=changes,
                 priorSurface=Physics.CaptureLocationSurfaceMaterial(ref.root),
                 priorHistory=ref.root:GetAttribute("Game1DecoSyncHistory")})
+        end
+    end
+    -- Stage ALL collision changes before the first Place mutation. Geometry
+    -- replacements and collision recipes share one explicit Undo transaction.
+    for _, item in ipairs(plan) do
+        local ref = item.ref
+        if ref.row.needsCollision then
+            local ok, transaction = pcall(Collision.Prepare, ref.root,
+                ref.entry.collisionBlueprint,ref.entry.collisionRevision,ref.entry.collisionSha)
+            if not ok then
+                for _, previous in ipairs(plan) do
+                    if previous.collision then Collision.Rollback(previous.collision) end
+                end
+                for _, stage in ipairs(stages) do stage.stage:Destroy() end
+                error("Collision Sync staging failed; Place unchanged: " .. tostring(transaction))
+            end
+            item.collision = transaction
         end
     end
     if #plan==0 then return {changed=0,skipped=blocked,
@@ -91,6 +116,9 @@ function Sync.Apply(refs: {any}, ctx: any): any
     local recording=ctx.history:TryBeginRecording(ctx.recordingName,"Sync Location Place Registry")
     if not recording then
         for _,item in ipairs(stages) do item.stage:Destroy() end
+        for _,item in ipairs(plan) do
+            if item.collision then Collision.Rollback(item.collision) end
+        end
         error("Studio Undo unavailable; no Place geometry modified")
     end
     local committed={}
@@ -111,26 +139,32 @@ function Sync.Apply(refs: {any}, ctx: any): any
                 root:SetAttribute("Game1DecoPublishedModelSha256",ref.entry.sha)
             else
                 if ref.row.needsTexture or ref.row.needsAlpha then
-                    local uri="rbxassetid://"..ref.entry.atlas
+                    local row={appearanceMode=ref.entry.appearanceMode,
+                        visualMaterial=ref.entry.visualMaterial,visualColor=ref.entry.visualColor,
+                        texture_asset_id=ref.entry.atlas,alphaEnabled=ref.entry.alphaEnabled}
                     for _,change in ipairs(item.appearance) do
                         if ref.row.needsTexture then
-                            Texture.ApplyLocation(change.mesh,uri,ref.entry.alphaEnabled)
-                        else
-                            Texture.ApplyAlpha(change.mesh,ref.entry.alphaEnabled,uri)
+                            Visual.Apply(change.mesh,row)
+                        elseif ref.entry.appearanceMode~="material" then
+                            Texture.ApplyAlpha(change.mesh,ref.entry.alphaEnabled,
+                                "rbxassetid://"..ref.entry.atlas)
                         end
                     end
                 end
             end
+            if item.collision then Collision.Commit(item.collision) end
             if ref.row.needsMaterial then
-                Physics.ApplyLocationSurfaceMaterial(root,ref.entry.material,ref.entry.physicalMaterial)
+                Physics.ApplyLocationSurfaceMaterial(root,ref.entry.material,nil)
             end
             local events={}
             if item.swap then
                 table.insert(events,{kind="model",oldId=ref.oldVersion,newId=ref.entry.model,count=1})
             end
             if ref.row.needsTexture then
-                table.insert(events,{kind="atlas",oldId=ref.row.textureId,
-                    newId=ref.entry.atlas,count=#ref.visuals})
+                table.insert(events,{kind=if ref.entry.appearanceMode=="material" then "appearance" else "atlas",
+                    oldId=ref.row.textureId,
+                    newId=if ref.entry.appearanceMode=="material" then ref.entry.visualMaterial..ref.entry.visualColor
+                        else ref.entry.atlas,count=#ref.visuals})
             end
             if ref.row.needsMaterial then
                 local previousMaterial="published geometry"
@@ -144,6 +178,10 @@ function Sync.Apply(refs: {any}, ctx: any): any
                 end
                 table.insert(events,{kind="material",oldId=previousMaterial,
                     newId=ref.entry.material,count=#ref.visuals})
+            end
+            if ref.row.needsCollision then
+                table.insert(events,{kind="collision",oldId=tostring(item.collision.oldRevision or 0),
+                    newId=tostring(ref.entry.collisionRevision),count=#item.collision.stage})
             end
             if ref.row.needsAlpha then
                 table.insert(events,{kind="alpha",oldId="previous",newId=if ref.entry.alphaEnabled then "Transparency" else "Opaque",count=#ref.visuals})
@@ -165,16 +203,20 @@ function Sync.Apply(refs: {any}, ctx: any): any
                     item.ref.root.Name=item.priorName
                 else
                     for _,change in ipairs(item.appearance) do
-                        Texture.Restore(change)
+                        Visual.Restore(change)
                     end
                     if item.priorSurface then
                         Physics.RestoreLocationSurfaceMaterial(item.priorSurface)
                     end
                 end
+                if item.collision then Collision.Rollback(item.collision) end
                 item.ref.root:SetAttribute("Game1DecoSyncHistory",item.priorHistory)
             end)
         end
         for _,item in ipairs(stages) do item.stage:Destroy() end
+        for _,item in ipairs(plan) do
+            if item.collision and not item.collision.committed then Collision.Rollback(item.collision) end
+        end
         ctx.history:FinishRecording(recording,Enum.FinishRecordingOperation.Cancel)
         error("Place Sync rolled back: "..tostring(problem))
     end
@@ -182,6 +224,7 @@ function Sync.Apply(refs: {any}, ctx: any): any
     -- attributes have committed successfully. This is the point of no return.
     for _,item in ipairs(committed) do
         if item.swap then RigSwap.Finalize(item.swap) end
+        if item.collision then Collision.Finalize(item.collision) end
     end
     for _,item in ipairs(stages) do item.stage:Destroy() end
     ctx.history:FinishRecording(recording,Enum.FinishRecordingOperation.Commit)

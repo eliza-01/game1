@@ -16,8 +16,21 @@ function EnvironmentAssetVisuals.ApplyPart(part: BasePart, definition: any): boo
     if not part:IsA("MeshPart") or MeshPhysics.IsCollider(part.Name)
         or MeshPhysics.IsLocationCarrier(part) then return false end
     local uri = textureUri(definition)
-    if uri == nil then return false end
     local mesh = part :: MeshPart
+    if definition and definition.appearanceMode == "material" then
+        local material = Enum.Material[tostring(definition.visualMaterial or "SmoothPlastic")]
+        if not material then return false end
+        local raw = tostring(definition.visualColor or "#FFFFFF")
+        if not raw:match("^#[%x][%x][%x][%x][%x][%x]$") then return false end
+        local color = Color3.fromRGB(tonumber(raw:sub(2,3),16),
+            tonumber(raw:sub(4,5),16),tonumber(raw:sub(6,7),16))
+        local changed = mesh.Material ~= material or mesh.Color ~= color or mesh.TextureID ~= ""
+        mesh.Material = material
+        mesh.Color = color
+        mesh.TextureID = ""
+        return changed
+    end
+    if uri == nil then return false end
     -- Existing authored SurfaceAppearance (and textureUsesAlpha) must be
     -- handled at Studio Sync, not mutated from a server gameplay thread.
     if mesh:FindFirstChildOfClass("SurfaceAppearance") then return false end

@@ -40,8 +40,14 @@
       "StudioDecoSyncCommands": {
         "$path": "modules/StudioDecoSyncCommands.luau"
       },
+      "StudioLocationCollisionParts": {
+        "$path": "modules/StudioLocationCollisionParts.luau"
+      },
       "StudioLocationCollisionAuthoring": {
         "$path": "modules/StudioLocationCollisionAuthoring.luau"
+      },
+      "StudioLocationVisualAppearance": {
+        "$path": "modules/StudioLocationVisualAppearance.luau"
       },
       "StudioPlaceRegistryCommands": {
         "$path": "modules/StudioPlaceRegistryCommands.luau"

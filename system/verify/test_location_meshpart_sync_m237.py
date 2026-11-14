@@ -30,8 +30,8 @@ class MeshpartM237(TestCase):
         self.assertIn('not MeshPhysics.IsCollider(part.Name)', scan)
         self.assertIn('textureCurrent=not textureApplicable', scan)
         self.assertIn('not Carrier.IsCarrier(part) and not Physics.IsCollider(part.Name)', sync)
-        self.assertIn('descendant.TextureID = ""', loader)
-        self.assertIn('StudioTextureAppearance.ApplyLocation(descendant, uri, alphaEnabled)', loader)
+        self.assertIn('RetiredCleanup.CleanLocation(model)', loader)
+        self.assertIn('Visual.ApplyModel(model,row)', loader)
 
     def test_selective_rig_scope_and_one_use_preview(self):
         manager = self.source('system/studio-plugin/modules/DecoManager.luau')
@@ -135,7 +135,7 @@ class MeshpartM237(TestCase):
         self.assertEqual(status,200,reply)
         self.assertEqual(assets.atlases.marked,[])
         write.assert_called_once_with(slug='oak_tree',binding_revision=2,
-            model_asset_id='12345',atlas_asset_id='999',phase='replace',
+            model_asset_id='12345',atlas_asset_id='999',appearance_mode='atlas',phase='replace',
             scan_token='1'*32,selected_keys=['p1'])
         write.return_value=dict(result,fullySynced=True)
         status,reply=route('/api/location-assets/studio-sync',lambda:payload,deps)

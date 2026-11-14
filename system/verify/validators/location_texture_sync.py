@@ -40,10 +40,10 @@ def check_location_texture_sync(root: Path, report_error: Callable[[str], None],
     if not ('game1ConsumerAtlasEditor' in workflow and 'Image ID' in shared_atlas and
             'decoAssetPublish' in workflow and 'texture_asset_id' in deco_assets_js_text):
         report_error('m51 published texture feedback missing')
-    for required in ["Game1DecoAssetSlug", "StudioTextureAppearance.Apply(change.part, uri, nil, true)", "RefreshIds"]:
+    for required in ["Game1DecoAssetSlug", "Visual.Apply(change.part,row)", "RefreshIds"]:
         if required not in deco_placed_sync_text:
             report_error(f"m51 DecoManager placed-texture sync missing {required}")
-    for required in ["DecoPlacedAssetSync.RefreshIds", "Before Location Asset Model + Atlas Sync", "Location Asset Model + Atlas Sync"]:
+    for required in ["DecoPlacedAssetSync.RefreshIds", "Before Location Asset Model + Appearance Sync", "Location Asset Model + Appearance Sync"]:
         if required not in deco_manager_text:
             report_error(f"m51 DecoManager registry refresh integration missing {required}")
     if '"DecoPlacedAssetSync"' not in plugin_project_text:

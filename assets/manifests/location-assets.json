@@ -245,6 +245,223 @@
         "robloxMaterial": "Ice",
         "soundFamily": "ice"
       }
+    ],
+    "visualMaterials": [
+      {
+        "id": "Plastic",
+        "label": "Plastic",
+        "requiresTexture": false
+      },
+      {
+        "id": "SmoothPlastic",
+        "label": "SmoothPlastic",
+        "requiresTexture": false
+      },
+      {
+        "id": "Neon",
+        "label": "Neon",
+        "requiresTexture": false
+      },
+      {
+        "id": "Wood",
+        "label": "Wood",
+        "requiresTexture": false
+      },
+      {
+        "id": "WoodPlanks",
+        "label": "WoodPlanks",
+        "requiresTexture": false
+      },
+      {
+        "id": "Marble",
+        "label": "Marble",
+        "requiresTexture": false
+      },
+      {
+        "id": "Basalt",
+        "label": "Basalt",
+        "requiresTexture": false
+      },
+      {
+        "id": "Slate",
+        "label": "Slate",
+        "requiresTexture": false
+      },
+      {
+        "id": "CrackedLava",
+        "label": "CrackedLava",
+        "requiresTexture": false
+      },
+      {
+        "id": "Concrete",
+        "label": "Concrete",
+        "requiresTexture": false
+      },
+      {
+        "id": "Limestone",
+        "label": "Limestone",
+        "requiresTexture": false
+      },
+      {
+        "id": "Granite",
+        "label": "Granite",
+        "requiresTexture": false
+      },
+      {
+        "id": "Pavement",
+        "label": "Pavement",
+        "requiresTexture": false
+      },
+      {
+        "id": "Brick",
+        "label": "Brick",
+        "requiresTexture": false
+      },
+      {
+        "id": "Pebble",
+        "label": "Pebble",
+        "requiresTexture": false
+      },
+      {
+        "id": "Cobblestone",
+        "label": "Cobblestone",
+        "requiresTexture": false
+      },
+      {
+        "id": "Rock",
+        "label": "Rock",
+        "requiresTexture": false
+      },
+      {
+        "id": "Sandstone",
+        "label": "Sandstone",
+        "requiresTexture": false
+      },
+      {
+        "id": "CorrodedMetal",
+        "label": "CorrodedMetal",
+        "requiresTexture": false
+      },
+      {
+        "id": "DiamondPlate",
+        "label": "DiamondPlate",
+        "requiresTexture": false
+      },
+      {
+        "id": "Foil",
+        "label": "Foil",
+        "requiresTexture": false
+      },
+      {
+        "id": "Metal",
+        "label": "Metal",
+        "requiresTexture": false
+      },
+      {
+        "id": "Grass",
+        "label": "Grass",
+        "requiresTexture": false
+      },
+      {
+        "id": "LeafyGrass",
+        "label": "LeafyGrass",
+        "requiresTexture": false
+      },
+      {
+        "id": "Sand",
+        "label": "Sand",
+        "requiresTexture": false
+      },
+      {
+        "id": "Fabric",
+        "label": "Fabric",
+        "requiresTexture": false
+      },
+      {
+        "id": "Snow",
+        "label": "Snow",
+        "requiresTexture": false
+      },
+      {
+        "id": "Mud",
+        "label": "Mud",
+        "requiresTexture": false
+      },
+      {
+        "id": "Ground",
+        "label": "Ground",
+        "requiresTexture": false
+      },
+      {
+        "id": "Asphalt",
+        "label": "Asphalt",
+        "requiresTexture": false
+      },
+      {
+        "id": "Salt",
+        "label": "Salt",
+        "requiresTexture": false
+      },
+      {
+        "id": "Ice",
+        "label": "Ice",
+        "requiresTexture": false
+      },
+      {
+        "id": "Glacier",
+        "label": "Glacier",
+        "requiresTexture": false
+      },
+      {
+        "id": "Glass",
+        "label": "Glass",
+        "requiresTexture": false
+      },
+      {
+        "id": "ForceField",
+        "label": "ForceField",
+        "requiresTexture": true
+      },
+      {
+        "id": "Cardboard",
+        "label": "Cardboard",
+        "requiresTexture": false
+      },
+      {
+        "id": "Carpet",
+        "label": "Carpet",
+        "requiresTexture": false
+      },
+      {
+        "id": "CeramicTiles",
+        "label": "CeramicTiles",
+        "requiresTexture": false
+      },
+      {
+        "id": "ClayRoofTiles",
+        "label": "ClayRoofTiles",
+        "requiresTexture": false
+      },
+      {
+        "id": "RoofShingles",
+        "label": "RoofShingles",
+        "requiresTexture": false
+      },
+      {
+        "id": "Leather",
+        "label": "Leather",
+        "requiresTexture": false
+      },
+      {
+        "id": "Plaster",
+        "label": "Plaster",
+        "requiresTexture": false
+      },
+      {
+        "id": "Rubber",
+        "label": "Rubber",
+        "requiresTexture": false
+      }
     ]
   },
   "aliases": {
@@ -2580,6 +2797,9 @@
       "published_at": 1791473606.3923557,
       "surface_material": "default",
       "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
       "fbxAnalysis": null,
       "rigManifest": null,
       "needsFbxInspection": true,
@@ -2587,7 +2807,12 @@
       "meshOptions": {},
       "collisionBlueprintRevision": 0,
       "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
       "surfaceMaterial": "default",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
@@ -2662,6 +2887,9 @@
       "published_at": 1791473269.232121,
       "surface_material": "default",
       "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
       "fbxAnalysis": null,
       "rigManifest": null,
       "needsFbxInspection": true,
@@ -2669,7 +2897,12 @@
       "meshOptions": {},
       "collisionBlueprintRevision": 0,
       "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
       "surfaceMaterial": "default",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
@@ -2744,6 +2977,9 @@
       "published_at": 1794276073.532448,
       "surface_material": "grass",
       "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -2798,7 +3034,12 @@
       },
       "collisionBlueprintRevision": 0,
       "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
       "surfaceMaterial": "grass",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
         "id": "grass",
@@ -2898,6 +3139,9 @@
       "published_at": 1794271502.612349,
       "surface_material": "grass",
       "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -2952,7 +3196,12 @@
       },
       "collisionBlueprintRevision": 0,
       "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
       "surfaceMaterial": "grass",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
         "id": "grass",
@@ -3052,6 +3301,9 @@
       "published_at": 1794276130.6505659,
       "surface_material": "default",
       "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -3106,7 +3358,12 @@
       },
       "collisionBlueprintRevision": 0,
       "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
       "surfaceMaterial": "default",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
@@ -3206,6 +3463,9 @@
       "published_at": 1794029773.0531905,
       "surface_material": "default",
       "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -3244,7 +3504,12 @@
       },
       "collisionBlueprintRevision": 0,
       "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
       "surfaceMaterial": "default",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
@@ -3369,6 +3634,9 @@
       "published_at": 1793930533.7606688,
       "surface_material": "default",
       "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -3407,7 +3675,12 @@
       },
       "collisionBlueprintRevision": 0,
       "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
       "surfaceMaterial": "default",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
@@ -3532,6 +3805,9 @@
       "published_at": 1791443607.9077108,
       "surface_material": "default",
       "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
       "fbxAnalysis": null,
       "rigManifest": null,
       "needsFbxInspection": true,
@@ -3539,7 +3815,12 @@
       "meshOptions": {},
       "collisionBlueprintRevision": 0,
       "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
       "surfaceMaterial": "default",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
@@ -3639,6 +3920,9 @@
       "published_at": 1794019331.9400635,
       "surface_material": "default",
       "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -3677,7 +3961,12 @@
       },
       "collisionBlueprintRevision": 0,
       "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
       "surfaceMaterial": "default",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
@@ -3852,6 +4141,9 @@
       "published_at": 1794524881.7574415,
       "surface_material": "default",
       "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -3911,7 +4203,12 @@
       },
       "collisionBlueprintRevision": 0,
       "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
       "surfaceMaterial": "default",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
@@ -3996,6 +4293,146 @@
       "aliases": []
     },
     {
+      "slug": "stone_fence_02",
+      "name_en": "stone fence 02",
+      "category": "fence",
+      "model_path": "assets/source/location-assets/fence/stone_fence_02/model/stone_fence_02.fbx",
+      "model_sha256": "d15eb171ce08c43433d3c0bf0eed11e72a2557573f09ff3f5771828bfed279d0",
+      "model_asset_id": "84002732967561",
+      "model_published_sha256": "d15eb171ce08c43433d3c0bf0eed11e72a2557573f09ff3f5771828bfed279d0",
+      "model_moderation_state": "Approved",
+      "destructible": false,
+      "revision": 2,
+      "created_at": 1794629527.8825006,
+      "updated_at": 1794629560.9541798,
+      "published_at": 1794629542.5570967,
+      "surface_material": "stone",
+      "alpha_enabled": 0,
+      "appearance_mode": "material",
+      "visual_material": "Slate",
+      "visual_color": "#7C7C7C",
+      "fbxAnalysis": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "stone_fence_02",
+            "armature": "",
+            "vertices": 1107,
+            "bones": [],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          }
+        ],
+        "hasCollider": false,
+        "armatures": [],
+        "unassignedArmatures": []
+      },
+      "rigManifest": {
+        "boneHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "bones": [],
+        "carrierName": null,
+        "inventoryHash": "c86ec5c7711dd3f422f23ec0eb8af4f082b0a4e2a72b36e3919b6c7a4458567e",
+        "parts": [
+          {
+            "name": "stone_fence_02",
+            "role": "visual",
+            "vertices": 1107
+          }
+        ],
+        "rigKind": "static",
+        "schemaVersion": 2,
+        "sourceSha256": "",
+        "structuralHash": "f01942eca03a9a0c17b6c88914caf42ceb55a10328e02b4cf40b46288799b790"
+      },
+      "needsFbxInspection": false,
+      "legacyStaticPublication": false,
+      "meshOptions": {
+        "stone_fence_02": {
+          "collisionFidelity": "Box",
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true
+        }
+      },
+      "collisionBlueprintRevision": 3,
+      "collisionBlueprintPartCount": 1,
+      "collisionBlueprint": {
+        "parts": [
+          {
+            "canQuery": true,
+            "canTouch": true,
+            "collisionGroup": "Default",
+            "id": "part_0001",
+            "localCFrame": [
+              0.899169921875,
+              2.418720245361328,
+              0.035400390625,
+              0.0005879700183868408,
+              -2.201676341240244e-13,
+              -1.0,
+              -1.132774429812855e-13,
+              1.0000001192092896,
+              1.0408340855860843e-17,
+              0.9999998807907104,
+              5.6769693113079e-14,
+              0.0005879402160644531
+            ],
+            "name": "__Game1Collision_part_0001",
+            "shape": "Block",
+            "size": [
+              17.318510055541992,
+              5.147065162658691,
+              2.6098732948303223
+            ]
+          }
+        ],
+        "pivot": "Model:GetPivot()",
+        "schemaVersion": 1
+      },
+      "collisionBlueprintSha256": "550f59cfaf612ac516b030015f92f42bca48305c8780468ef44053f06adba864",
+      "surfaceMaterial": "stone",
+      "appearanceMode": "material",
+      "visualMaterial": "Slate",
+      "visualColor": "#7C7C7C",
+      "alphaEnabled": false,
+      "materialDefinition": {
+        "id": "stone",
+        "label": "Stone",
+        "robloxMaterial": "Slate",
+        "soundFamily": "stone"
+      },
+      "texture_path": "",
+      "texture_filename": "",
+      "texture_sha256": "",
+      "texture_asset_id": null,
+      "texture_published_sha256": "",
+      "texture_moderation_state": "",
+      "texture_reference_slug": "",
+      "atlasVariants": [],
+      "textureUsesAlpha": null,
+      "atlasVariantId": 0,
+      "bindingRevision": 2,
+      "atlasLegacyWarning": false,
+      "status": "PUBLISHED",
+      "category_label": "Fence",
+      "publishedVisualMeshes": [
+        {
+          "meshId": "133474237457316",
+          "name": "stone_fence_02"
+        }
+      ],
+      "aliases": []
+    },
+    {
       "slug": "stone_ladder_01",
       "name_en": "Stone Ladder 01",
       "category": "ladder",
@@ -4011,6 +4448,9 @@
       "published_at": 1794446370.8587775,
       "surface_material": "stone",
       "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -4070,7 +4510,12 @@
       },
       "collisionBlueprintRevision": 0,
       "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
       "surfaceMaterial": "stone",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
         "id": "stone",
@@ -4170,6 +4615,9 @@
       "published_at": 1793925350.9916499,
       "surface_material": "default",
       "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -4208,7 +4656,12 @@
       },
       "collisionBlueprintRevision": 0,
       "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
       "surfaceMaterial": "default",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
@@ -4335,6 +4788,9 @@
       "published_at": 1794278320.9412763,
       "surface_material": "wood",
       "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -4491,7 +4947,12 @@
       },
       "collisionBlueprintRevision": 0,
       "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
       "surfaceMaterial": "wood",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
         "id": "wood",
@@ -4593,6 +5054,9 @@
       "published_at": 1794105974.1723387,
       "surface_material": "metal",
       "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -4749,7 +5213,12 @@
       },
       "collisionBlueprintRevision": 0,
       "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
       "surfaceMaterial": "metal",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
         "id": "metal",
@@ -4874,6 +5343,9 @@
       "published_at": 1794356552.7842677,
       "surface_material": "metal",
       "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -5030,7 +5502,12 @@
       },
       "collisionBlueprintRevision": 0,
       "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
       "surfaceMaterial": "metal",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
         "id": "metal",
@@ -5130,6 +5607,9 @@
       "published_at": 1794356777.513668,
       "surface_material": "metal",
       "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -5286,7 +5766,12 @@
       },
       "collisionBlueprintRevision": 0,
       "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
       "surfaceMaterial": "metal",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
         "id": "metal",
@@ -5386,6 +5871,9 @@
       "published_at": 1794415183.4159954,
       "surface_material": "default",
       "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -5609,7 +6097,12 @@
       },
       "collisionBlueprintRevision": 0,
       "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
       "surfaceMaterial": "default",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
@@ -5734,6 +6227,9 @@
       "published_at": 1794451034.3347821,
       "surface_material": "metal",
       "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -5885,7 +6381,12 @@
       },
       "collisionBlueprintRevision": 0,
       "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
       "surfaceMaterial": "metal",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
         "id": "metal",
@@ -5985,6 +6486,9 @@
       "published_at": 1794450681.0514858,
       "surface_material": "metal",
       "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -6136,7 +6640,12 @@
       },
       "collisionBlueprintRevision": 0,
       "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
       "surfaceMaterial": "metal",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
         "id": "metal",
@@ -6286,6 +6795,9 @@
       "published_at": 1792108399.6092346,
       "surface_material": "default",
       "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
       "fbxAnalysis": null,
       "rigManifest": null,
       "needsFbxInspection": true,
@@ -6293,7 +6805,12 @@
       "meshOptions": {},
       "collisionBlueprintRevision": 0,
       "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
       "surfaceMaterial": "default",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
@@ -6368,6 +6885,9 @@
       "published_at": 1792108424.1820817,
       "surface_material": "default",
       "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
       "fbxAnalysis": null,
       "rigManifest": null,
       "needsFbxInspection": true,
@@ -6375,7 +6895,12 @@
       "meshOptions": {},
       "collisionBlueprintRevision": 0,
       "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
       "surfaceMaterial": "default",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
@@ -6450,6 +6975,9 @@
       "published_at": 1792108537.2191844,
       "surface_material": "default",
       "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
       "fbxAnalysis": null,
       "rigManifest": null,
       "needsFbxInspection": true,
@@ -6457,7 +6985,12 @@
       "meshOptions": {},
       "collisionBlueprintRevision": 0,
       "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
       "surfaceMaterial": "default",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
@@ -6532,6 +7065,9 @@
       "published_at": 1793988677.8449352,
       "surface_material": "stone",
       "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -6570,7 +7106,12 @@
       },
       "collisionBlueprintRevision": 0,
       "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
       "surfaceMaterial": "stone",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
         "id": "stone",
@@ -6697,6 +7238,9 @@
       "published_at": 1794524635.848632,
       "surface_material": "wood",
       "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -6756,7 +7300,12 @@
       },
       "collisionBlueprintRevision": 0,
       "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
       "surfaceMaterial": "wood",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
         "id": "wood",
@@ -6858,6 +7407,9 @@
       "published_at": 1794028107.9032092,
       "surface_material": "stone",
       "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -6896,7 +7448,12 @@
       },
       "collisionBlueprintRevision": 0,
       "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
       "surfaceMaterial": "stone",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
         "id": "stone",
@@ -6996,6 +7553,9 @@
       "published_at": 1794281772.9289348,
       "surface_material": "wood",
       "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -7152,7 +7712,12 @@
       },
       "collisionBlueprintRevision": 0,
       "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
       "surfaceMaterial": "wood",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
         "id": "wood",
@@ -7277,6 +7842,9 @@
       "published_at": 1792931169.0824056,
       "surface_material": "default",
       "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
       "fbxAnalysis": null,
       "rigManifest": null,
       "needsFbxInspection": true,
@@ -7284,7 +7852,12 @@
       "meshOptions": {},
       "collisionBlueprintRevision": 0,
       "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
       "surfaceMaterial": "default",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
@@ -7388,6 +7961,9 @@
       "published_at": 1794526287.771344,
       "surface_material": "default",
       "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -10678,7 +11254,12 @@
       },
       "collisionBlueprintRevision": 0,
       "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
       "surfaceMaterial": "default",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
@@ -10786,6 +11367,9 @@
       "published_at": 1793901136.4099162,
       "surface_material": "default",
       "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -10824,7 +11408,12 @@
       },
       "collisionBlueprintRevision": 0,
       "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
       "surfaceMaterial": "default",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
@@ -10974,6 +11563,9 @@
       "published_at": 1794280897.511054,
       "surface_material": "default",
       "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -11402,7 +11994,12 @@
       },
       "collisionBlueprintRevision": 0,
       "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
       "surfaceMaterial": "default",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
@@ -11502,6 +12099,9 @@
       "published_at": 1792462028.8508034,
       "surface_material": "default",
       "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
       "fbxAnalysis": null,
       "rigManifest": null,
       "needsFbxInspection": true,
@@ -11509,7 +12109,12 @@
       "meshOptions": {},
       "collisionBlueprintRevision": 0,
       "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
       "surfaceMaterial": "default",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
@@ -11584,6 +12189,9 @@
       "published_at": 1793887582.637806,
       "surface_material": "default",
       "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -11622,7 +12230,12 @@
       },
       "collisionBlueprintRevision": 0,
       "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
       "surfaceMaterial": "default",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
         "id": "default",
@@ -11722,6 +12335,9 @@
       "published_at": 1794093776.9550889,
       "surface_material": "wood",
       "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
@@ -12014,7 +12630,12 @@
       },
       "collisionBlueprintRevision": 0,
       "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
       "surfaceMaterial": "wood",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
         "id": "wood",
@@ -12102,8 +12723,8 @@
     }
   ],
   "summary": {
-    "registered": 33,
-    "published": 33,
+    "registered": 34,
+    "published": 34,
     "changed": 0
   }
 }

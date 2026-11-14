@@ -19,8 +19,11 @@ def build_catalog(location_assets) -> dict:
         slug = str(row.get('slug') or '')
         model = str(row.get('model_asset_id') or '')
         atlas = str(row.get('texture_asset_id') or '')
-        if not _ASSET_ID.fullmatch(model) or not _ASSET_ID.fullmatch(atlas):
+        mode = str(row.get('appearanceMode') or 'atlas')
+        if not _ASSET_ID.fullmatch(model) or (mode != 'material' and not _ASSET_ID.fullmatch(atlas)):
             continue
+        if mode == 'material':
+            atlas = ''
         history = location_assets.model_publication_ids(slug)
         inventory = {str(v['modelAssetId']): v for v in location_assets.mesh_id_inventory(slug)}
         if model not in history:
@@ -31,8 +34,14 @@ def build_catalog(location_assets) -> dict:
             'modelAssetId': model, 'atlasAssetId': atlas,
             'publishedSha': str(row.get('model_published_sha256') or ''),
             'surfaceMaterial': str(row.get('surfaceMaterial') or 'default'),
+            'appearanceMode': mode,
+            'visualMaterial': str(row.get('visualMaterial') or 'SmoothPlastic'),
+            'visualColor': str(row.get('visualColor') or '#FFFFFF'),
             'alphaEnabled': bool(row.get('alphaEnabled', False)),
-            'robloxMaterial': str((row.get('materialDefinition') or {}).get('robloxMaterial') or ''),
+            'collisionBlueprintRevision': int(row.get('collisionBlueprintRevision') or 0),
+            'collisionBlueprintSha256': str(row.get('collisionBlueprintSha256') or ''),
+            'collisionBlueprint': row.get('collisionBlueprint'),
+            'robloxMaterial': str(row.get('visualMaterial') or 'SmoothPlastic') if mode == 'material' else '',
             'rigManifest': (location_assets.rig_manifest(slug, model)
                             if hasattr(location_assets, 'rig_manifest') else None),
             'legacyStaticPublication': bool(row.get('legacyStaticPublication')),
@@ -46,7 +55,7 @@ def build_catalog(location_assets) -> dict:
     # Mesh inventory is an observed cache; filling it during Scan must not
     # invalidate the immediately following repair token. Publication identity
     # and atlas bindings, not cache population, define the stable digest.
-    identities = [{k: item[k] for k in ('slug', 'modelAssetId', 'atlasAssetId', 'publishedSha', 'surfaceMaterial', 'robloxMaterial', 'alphaEnabled')}
+    identities = [{k: item[k] for k in ('slug', 'modelAssetId', 'atlasAssetId', 'publishedSha', 'surfaceMaterial', 'appearanceMode', 'visualMaterial', 'visualColor', 'robloxMaterial', 'alphaEnabled', 'collisionBlueprintRevision', 'collisionBlueprintSha256')}
                   | {'versions': [model['modelAssetId'] for model in item['models']],
                      'aliases': item['aliases'],
                      'rigHash': (item.get('rigManifest') or {}).get('structuralHash', ''),
@@ -94,6 +103,8 @@ def validate_report(report: dict, catalog: dict) -> list[dict]:
             raise ValueError('invalid scan flag: needsRig')
         # Schema 1 older Studio plugins omit the new material-only flag.
         # Validate strictly when present, while allowing read-only historical scans.
+        if 'needsCollision' in row and type(row['needsCollision']) is not bool:
+            raise ValueError('invalid scan flag: needsCollision')
         if 'needsMaterial' in row and type(row['needsMaterial']) is not bool:
             raise ValueError('invalid scan flag: needsMaterial')
         if 'needsAlpha' in row and type(row['needsAlpha']) is not bool:

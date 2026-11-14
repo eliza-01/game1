@@ -135,7 +135,7 @@ def check_location_assets_core(root: Path, report_error: Callable[[str], None], 
     for required in [
         'self.AssetService:LoadAssetAsync(assetId)',
         'row.status or ""',
-        'StudioTextureAppearance.ApplyLocation(descendant, uri, alphaEnabled)',
+        'Visual.ApplyModel(model,row)',
         'Url = self.agentBaseUrl .. "/api/location-assets"',
     ]:
         if required not in deco_loader_text:

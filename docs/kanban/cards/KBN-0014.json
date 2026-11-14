@@ -41,7 +41,7 @@
     },
     {
       "id": "KBN-0014-T07",
-      "title": "Добавить серверное размещение/удаление Part Blueprint через отдельную операцию Sync",
+      "title": "Collision Blueprint → DecoManager Place + Place Registry Sync (код M343C; Studio приёмка ожидается)",
       "done": false
     },
     {

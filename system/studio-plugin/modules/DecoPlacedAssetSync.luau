@@ -3,6 +3,7 @@ local Carrier = require(script.Parent.StudioLocationRigCarrier)
 -- by Real Estate. Only this adapter knows the Location slug, publication and
 -- audit attributes; the replacement mechanism has no domain-specific rules.
 local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
+local Visual = require(script.Parent.StudioLocationVisualAppearance)
 local RigSwap = require(script.Parent.StudioManagedRigSwap)
 local History = require(script.Parent.StudioPublishedMeshHistory)
 local BoneEffects = require(script.Parent.StudioPlacedRigBoneEffects)
@@ -11,6 +12,7 @@ local Physics = require(script.Parent.StudioMeshPhysicsCore)
 local RetiredCleanup = require(script.Parent.StudioRetiredColMeshCleanup)
 local Ownership = require(script.Parent.StudioLocationPlacementOwner)
 local Geometry = require(script.Parent.StudioLocationPlacedGeometry)
+local collisionModuleOk, Collision = pcall(require, script.Parent.StudioLocationCollisionParts)
 local DecoPlacedAssetSync = {}
 
 local SLUG = "Game1DecoAssetSlug"
@@ -72,8 +74,10 @@ local function meshParts(model: Model): {MeshPart}
 end
 
 local function rigChildren(model: Model): {Instance}
+    if not collisionModuleOk then error("Collision generator unavailable; rig Sync blocked") end
     local result = {}
     for _, child in ipairs(model:GetChildren()) do
+        if Collision.IsOwned(child) then continue end
         if child:IsA("BasePart") then
             table.insert(result, child)
         elseif child:IsA("Model") or child:IsA("Folder") then
@@ -125,7 +129,8 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
         error("one explicitly selected Location Asset slug is required")
     end
     local row = rowFor(registry, slug)
-    local modelId, atlasId = id(row.model_asset_id), id(row.texture_asset_id)
+    local modelId = id(row.model_asset_id)
+    local atlasId = if row.appearanceMode=="material" then "" else id(row.texture_asset_id)
     if modelId ~= expectedModelId or atlasId ~= expectedAtlasId then
         error("Location Asset publication changed during Studio Sync; retry")
     end
@@ -173,7 +178,8 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
     end
     for part, snap in pairs(preview.partStates or {}) do
         if part.Parent~=snap.parent or part:GetPivot()~=snap.frame or part.Size~=snap.size
-            or History.Id(part.MeshId)~=snap.meshId or part.TextureID~=snap.texture then
+            or History.Id(part.MeshId)~=snap.meshId or part.TextureID~=snap.texture or part.Material~=snap.material
+            or part.Color~=snap.color or part:GetAttribute("Game1DecoAppearanceMode")~=snap.appearanceMode then
             error("Mesh identity, transform or texture changed since Find; rescan")
         end
         local surface=part:FindFirstChildOfClass("SurfaceAppearance")
@@ -248,7 +254,7 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                     local previousChildren=rigChildren(model)
                     History.VerifyChildren(previousPublished,previousChildren)
                     local anchor=Geometry.Align(stage,previousPublished,model)
-                    Placement.PrepareSynced(stage,row.meshOptions,row.surfaceMaterial,row.materialDefinition and row.materialDefinition.robloxMaterial)
+                    Placement.PrepareSynced(stage,row.meshOptions,row.surfaceMaterial,nil)
                     BoneEffects.CopyToIncoming(previousChildren, rigChildren(stage))
                     transaction = RigSwap.Prepare(model, previousChildren, rigChildren(stage),
                         {preferredPrimary=anchor})
@@ -264,16 +270,13 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                 if Carrier.IsCarrier(part) or Physics.IsCollider(part.Name)
                     or part:GetAttribute("Game1DecoPhysicsOnly") == true then continue end
                 if not geometry and not chosenParts[part] then continue end
-                local surface = part:FindFirstChildOfClass("SurfaceAppearance")
-                if part.TextureID ~= uri or (surface and surface.ColorMap ~= uri) then
-                    local previousUri = if part.TextureID == uri and surface then surface.ColorMap else part.TextureID
-                    table.insert(atlasChanges, {part = part, oldId = textureId(previousUri),
-                        texture = part.TextureID, surface = surface,
-                        colorMap = if surface then surface.ColorMap else nil})
+                if not Visual.IsCurrent(part,row) then
+                    table.insert(atlasChanges, {part=part,oldId=textureId(part.TextureID),
+                        before=Visual.Capture(part)})
                 end
             end
             local alphaChanges={}
-            if not geometry then
+            if not geometry and row.appearanceMode~="material" then
                 for _, part in ipairs(oldParts) do
                     if chosenParts[part] and not Carrier.IsCarrier(part) and not Physics.IsCollider(part.Name)
                         and part:GetAttribute("Game1DecoPhysicsOnly")~=true
@@ -293,7 +296,16 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
             end
             if geometry then add("model", previousModelId, modelId, 1) end
             if changeRef then add("model_reference", oldRef, modelId, 1) end
-            for _, change in ipairs(atlasChanges) do add("atlas", change.oldId, atlasId, 1) end
+            for _, change in ipairs(atlasChanges) do
+                if row.appearanceMode=="material" then
+                    local oldAppearance=change.oldId
+                    if change.before.mode=="material" then
+                        oldAppearance=tostring(change.before.visualMaterial or "")
+                            ..tostring(change.before.visualColor or "")
+                    end
+                    add("appearance",oldAppearance,tostring(row.visualMaterial)..tostring(row.visualColor),1)
+                else add("atlas", change.oldId, atlasId, 1) end
+            end
             for _, change in ipairs(alphaChanges) do
                 -- Persist the stable enum name. tostring(EnumItem) includes the
                 -- "Enum.AlphaMode." prefix and does not fit the audit value
@@ -371,7 +383,7 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                 if item.geometry then
                     -- Source rig is already textured by the central DecoAssetLoader.
                     changedParts += 1
-                elseif StudioTextureAppearance.Apply(change.part, uri, nil, true) then
+                elseif Visual.Apply(change.part,row) then
                     changedParts += 1
                 end
             end
@@ -400,14 +412,13 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                 model:SetAttribute("Game1DecoAuthoringAnchorPath", item.oldAnchorPath)
                 model:SetAttribute(HISTORY, item.oldHistory)
                 if item.physicsBefore then Physics.RestoreLocationModel(item.physicsBefore) end
-                for _, change in ipairs(item.atlasChanges) do
-                    if not item.geometry then
-                        change.part.TextureID = change.texture
-                        if change.surface then change.surface.ColorMap = change.colorMap end
-                    end
-                end
                 for _, change in ipairs(item.alphaChanges) do
                     StudioTextureAppearance.Restore(change)
+                end
+                for _, change in ipairs(item.atlasChanges) do
+                    if not item.geometry then
+                        Visual.Restore(change.before)
+                    end
                 end
             end)
             if item.swap then RigSwap.Rollback(item.swap) end

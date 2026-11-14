@@ -34,7 +34,7 @@ def run_location_instance_bridge(*, catalog: dict, phase: str, source_slug: str,
     if source_slug not in slugs or target_slug not in slugs:
         raise ValueError('Source and target must be published Location Assets')
     operation_id = uuid.uuid4().hex
-    command = dict(project=PROJECT, command='location-instance-replace-v3', schemaVersion=3,
+    command = dict(project=PROJECT, command='location-instance-replace-v4', schemaVersion=4,
                    operationId=operation_id, catalog=catalog, phase=phase,
                    sourceSlug=source_slug, targetSlug=target_slug, scope=scope,
                    scanToken=scan_token, anchorId=anchor_id)
@@ -111,6 +111,12 @@ def run_location_instance_bridge(*, catalog: dict, phase: str, source_slug: str,
         if (not _GUID.fullmatch(str(value.get('scanToken', '')))
             or not isinstance(value.get('placements'), list)
             or len(value['placements']) != value['count']
+            or type(value.get('normalizedPivots')) is not int
+            or not 0 <= value['normalizedPivots'] <= value['count']
+            or type(value.get('preservedManualSizes')) is not int
+            or not 0 <= value['preservedManualSizes'] <= value['count']
+            or any(type(place.get(field)) is not bool for place in value['placements']
+                   for field in ('legacyPivot','manualSize'))
             or type(value.get('reassignedIds')) is not int
             or not 0 <= value['reassignedIds'] <= value['count']
             or any(not isinstance(place,dict) or not isinstance(place.get('name'),str)

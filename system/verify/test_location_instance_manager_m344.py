@@ -44,8 +44,8 @@ class LocationInstanceManagerM344(unittest.TestCase):
     def fake_bridge(self, **data):
         self.calls.append(data)
         return {'count':1,'scanToken':'f'*8+'-'+'f'*4+'-'+'f'*4+'-'+'f'*4+'-'+'f'*12,
-                'placements':[{'name':'test','path':'Workspace.test','placementId':'f'*36, 'newPlacementId':'f'*36}],
-                'reassignedIds':0, 'anchorOptions':[{'id':'model','label':'Model Pivot'}]}
+                'placements':[{'name':'test','path':'Workspace.test','placementId':'f'*36, 'newPlacementId':'f'*36, 'legacyPivot':False, 'manualSize':False}],
+                'reassignedIds':0, 'normalizedPivots':0, 'preservedManualSizes':0, 'anchorOptions':[{'id':'model','label':'Model Pivot'}]}
 
     def test_only_explicit_published_slugs_and_scopes(self):
         base={'phase':'preview','sourceSlug':'stone_fence_01',
@@ -114,13 +114,14 @@ class LocationInstanceManagerM344(unittest.TestCase):
                 except Exception:
                     time.sleep(0.05)
             self.assertIsNotNone(command)
-            self.assertEqual(command['command'],'location-instance-replace-v3')
+            self.assertEqual(command['command'],'location-instance-replace-v4')
             self.assertEqual(command['anchorId'],'model')
             self.assertEqual(command['catalog']['digest'],catalog['digest'])
             result={k:command[k] for k in ('project','command','schemaVersion','operationId','phase','sourceSlug','targetSlug','scope','anchorId')}
             result['catalogDigest']=catalog['digest']
             result['result']={'count':1,'scanToken':token,'reassignedIds':0,'placements':[
-                {'name':'fence','path':'Workspace.fence','placementId':token, 'newPlacementId':token}],
+                {'name':'fence','path':'Workspace.fence','placementId':token, 'newPlacementId':token, 'legacyPivot':False, 'manualSize':False}],
+                'normalizedPivots':0,'preservedManualSizes':0,
                 'anchorOptions':[{'id':'model','label':'Model Pivot'},
                                  {'id':'mesh:1','label':'MeshPart 1 · fence'}]}
             request=Request(f'http://127.0.0.1:{isolated_port}/location-instance-result',method='POST',
@@ -140,7 +141,7 @@ class LocationInstanceManagerM344(unittest.TestCase):
         self.assertIn('id="li-scope"', section)
         self.assertGreater(section.index('id="location-instance-manager"'),
                            section.index('id="location-collision-panel"'))
-        self.assertIn('location-instance-manager.js?v=347', markup)
+        self.assertIn('location-instance-manager.js?v=351', markup)
         self.assertIn('id="li-anchor"', section)
 
     def test_luau_replaces_whole_model_without_touching_authoring(self):
@@ -148,7 +149,7 @@ class LocationInstanceManagerM344(unittest.TestCase):
         script=path.read_text(encoding='utf-8')
         for method in ('TryBeginRecording','FinishRecording','loadPublished',
                        'StampPublishedModel','Collision.Prepare','Collision.Commit',
-                       'positionAtSource(clone,old.frame,anchorId,approved)','"selected"','"all"','anchorOptions'):
+                       'positionAtSource(clone,old.geometry.frame,anchorId,approved)','"selected"','"all"','anchorOptions'):
             self.assertIn(method,script)
         self.assertNotIn('sameBounds',script)
         self.assertNotIn('Visual bounds differ',script)

@@ -264,7 +264,7 @@ local function pollBridge()
         else
             warn("[Game1] Collision Authoring unavailable; other Bridge tools continue")
         end
-    elseif data.command == "location-instance-replace-v3" then
+    elseif data.command == "location-instance-replace-v4" then
         if handleLocationInstanceReplace then
             local ok, problem = pcall(handleLocationInstanceReplace,data)
             if not ok then warn("[Game1] Instance Manager error: "..tostring(problem)) end

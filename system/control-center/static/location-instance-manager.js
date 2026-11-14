@@ -1,4 +1,4 @@
-/* M347 · Location Assets Instance Manager.
+/* M351 · Location Assets Instance Manager.
  * All operations are explicit, preview-token guarded Studio Edit actions.
  * Local UI never manufactures placement paths, transforms or published IDs.
  */
@@ -60,8 +60,9 @@
     const choice = id('li-anchor');
     status(`Готово к замене: ${p.count} Model. Изменений пока нет.\n`+
       `${p.source} → ${p.target}. Pivot исходной Model ← ${choice.selectedOptions[0]?.textContent || 'Pivot новой Model'}.\n`+
-      `Масштаб исходной Model и родительский каталог сохраняются. Переиздание конфликтующих Placement ID: ${p.reassignedIds}.\n`+
-      'Ни одна модель пока не изменена. Ручные размеры отдельных MeshParts не копируются.');
+      `Из исходной публикации восстановлены Pivot: ${p.normalizedPivots}, ручной MeshPart.Size: ${p.preservedManualSizes}.\n`+
+      `Model scale и родительский каталог сохраняются. Переиздание конфликтующих Placement ID: ${p.reassignedIds}.\n`+
+      'Исходные размещения не изменены. Неподдерживаемые размеры и оси блокируются до Replace.');
   }
   async function preview() {
     if(state.busy) return;
@@ -80,13 +81,16 @@
         throw Error('Studio вернула неполный Preview');
       loadAnchors(data.anchorOptions);
       state.preview = {token:data.scanToken,source,target,scope:id('li-scope').value,
-        count:data.count,reassignedIds:data.reassignedIds || 0};
+        count:data.count,reassignedIds:data.reassignedIds || 0,
+        normalizedPivots:data.normalizedPivots || 0,
+        preservedManualSizes:data.preservedManualSizes || 0};
       showChoiceStatus();
       id('li-placements').innerHTML = data.placements.map(row =>
         `<div class="location-instance-placement"><b>${escape(row.name)}</b> · ${escape(row.placementId)}`+
         `${row.newPlacementId && row.newPlacementId !== row.placementId ?
           ` <strong>→ новый Placement ID ${escape(row.newPlacementId)}</strong>` : ''}`+
-        `<small>${escape(row.path)}</small></div>`).join('');
+        `<small>${escape(row.path)}${row.legacyPivot ? ' · исторический Pivot' : ''}`+
+        `${row.manualSize ? ' · изменённый Size' : ''}</small></div>`).join('');
       id('li-replace').disabled = data.count < 1;
     } catch(error) {clearAnchors();status('Preview: '+error.message);id('li-placements').textContent='Ничего не выбрано.';}
     finally {state.busy=false;id('li-preview').disabled=false;}
@@ -98,7 +102,8 @@
     const warning = `Заменить ${p.count} Model целиком?\n${p.source} → ${p.target}\n`+
       `Совместить: Pivot исходной Model ← ${id('li-anchor').selectedOptions[0]?.textContent}.\n`+
       `${p.reassignedIds ? `Исправить ${p.reassignedIds} конфликтующих Placement ID у заменяемых экземпляров.\n` : ''}`+
-      `Старые модели и пользовательские дополнения внутри них будут удалены.\n`+
+      `Исторический Pivot: ${p.normalizedPivots}; растянутые MeshParts: ${p.preservedManualSizes}.\n`+
+      `Исходные модели будут заменены целиком (Undo возвращает их).\n`+
       `Сохрани .rbxl перед массовой заменой. Отмена — Ctrl+Z в Roblox Studio.`;
     if(!confirm(warning)) return;
     state.busy=true;id('li-preview').disabled=true;id('li-replace').disabled=true;

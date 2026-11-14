@@ -49,7 +49,7 @@ class PivotChoiceM345(unittest.TestCase):
             manager.operate({**base,'phase':'preview','scanToken':'','anchorId':'mesh:1'})
         self.assertEqual(calls, [])
 
-    def test_authenticated_v3_transport_passes_mesh_anchor(self):
+    def test_authenticated_v4_transport_passes_mesh_anchor(self):
         catalog = build_catalog(FakeAssets())
         import services.studio_location_instance_bridge as bridge
         with socket.socket() as reserved:
@@ -79,7 +79,7 @@ class PivotChoiceM345(unittest.TestCase):
                     time.sleep(0.05)
             self.assertIsNotNone(command)
             self.assertEqual(command['anchorId'],'mesh:2')
-            self.assertEqual(command['schemaVersion'],3)
+            self.assertEqual(command['schemaVersion'],4)
             wrong = {k:command[k] for k in ('project','command','schemaVersion','operationId',
                                           'phase','sourceSlug','targetSlug','scope','anchorId')}
             wrong['catalogDigest']=catalog['digest']
@@ -106,7 +106,7 @@ class PivotChoiceM345(unittest.TestCase):
                          'local function selectedTargetAnchor(target:',
                          'local function positionAtSource(target:',
                          'sourceFrame * originalAnchorFrame:Inverse() * originalModelFrame',
-                         'positionAtSource(clone,old.frame,anchorId,approved)',
+                         'positionAtSource(clone,old.geometry.frame,anchorId,approved)',
                          'clone:ScaleTo(old.scale)',
                          'selectedTargetAnchor(clone,anchorId,approved)',
                          'Collision.Prepare(', 'TryBeginRecording',
@@ -127,11 +127,11 @@ class PivotChoiceM345(unittest.TestCase):
         install=(ROOT/'system/studio-plugin/install.ps1').read_text(encoding='utf8')
         bridge=(CONTROL/'services/studio_location_instance_bridge.py').read_text(encoding='utf8')
         self.assertIn('id="li-anchor"',html)
-        self.assertIn('location-instance-manager.js?v=347',html)
+        self.assertIn('location-instance-manager.js?v=351',html)
         self.assertIn('loadAnchors(data.anchorOptions)',js)
         self.assertIn("id('li-anchor').addEventListener('change', showChoiceStatus)",js)
         for code in (lua,install,bridge):
-            self.assertIn('location-instance-replace-v3',code)
+            self.assertIn('location-instance-replace-v4',code)
         self.assertNotIn('location-instance-replace-v1',lua)
 
 

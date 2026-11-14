@@ -49,6 +49,9 @@
       "StudioLocationInstanceReplace": {
         "$path": "modules/StudioLocationInstanceReplace.luau"
       },
+      "StudioLocationInstanceLegacyGeometry": {
+        "$path": "modules/StudioLocationInstanceLegacyGeometry.luau"
+      },
       "StudioLocationCollisionAuthoring": {
         "$path": "modules/StudioLocationCollisionAuthoring.luau"
       },

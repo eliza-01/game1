@@ -61,9 +61,9 @@ class LocationInstanceReplaceM347(unittest.TestCase):
         code=LUA.read_text(encoding='utf8')
         self.assertIn('local options = {{id="model", label="Pivot новой Model"}}',code)
         self.assertIn('ipairs(meshAnchors(target))',code)
-        self.assertIn('pcall(anchorOptions,template)',code)
+        self.assertIn('return anchorOptions(template)',code)
         self.assertIn('sourceFrame * originalAnchorFrame:Inverse() * originalModelFrame',code)
-        self.assertIn('positionAtSource(clone,old.frame,anchorId,approved)',code)
+        self.assertIn('positionAtSource(clone,old.geometry.frame,anchorId,approved)',code)
         self.assertNotIn('anchorOptions(states)',code)
         self.assertNotIn('local function sourceAnchor(',code)
 
@@ -78,6 +78,7 @@ class LocationInstanceReplaceM347(unittest.TestCase):
         self.assertIn('Enum.FinishRecordingOperation.Commit',commit)
         self.assertIn('Enum.FinishRecordingOperation.Cancel',commit)
         self.assertIn('clone:ScaleTo(old.scale)',code)
+        self.assertIn('Legacy.ResizeTarget(clone,old.geometry)',code)
         self.assertIn('math.abs(clone:GetScale()-old.scale)',code)
 
     def test_duplicate_ids_are_detected_and_reassigned_only_in_approved_scope(self):
@@ -94,14 +95,14 @@ class LocationInstanceReplaceM347(unittest.TestCase):
         self.assertIn('newPlacementId',JS.read_text(encoding='utf8'))
         self.assertIn("type(value.get('reassignedIds')) is not int",BRIDGE.read_text(encoding='utf8'))
 
-    def test_protocol_v3_prevents_stale_game1bridge_from_using_old_semantics(self):
+    def test_protocol_v4_prevents_stale_game1bridge_from_using_old_semantics(self):
         for path in (LUA, BRIDGE, ROOT/'system/studio-plugin/Game1Bridge.server.luau',
                      ROOT/'system/studio-plugin/install.ps1'):
             contents=path.read_text(encoding='utf8')
-            self.assertIn('location-instance-replace-v3',contents,str(path))
+            self.assertIn('location-instance-replace-v4',contents,str(path))
             self.assertNotIn('location-instance-replace-v2',contents,str(path))
-        self.assertIn('schemaVersion ~= 3',LUA.read_text(encoding='utf8'))
-        self.assertIn('schemaVersion=3',BRIDGE.read_text(encoding='utf8'))
+        self.assertIn('schemaVersion ~= 4',LUA.read_text(encoding='utf8'))
+        self.assertIn('schemaVersion=4',BRIDGE.read_text(encoding='utf8'))
 
 
 if __name__ == '__main__': unittest.main()

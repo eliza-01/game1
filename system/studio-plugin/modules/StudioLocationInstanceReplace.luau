@@ -7,6 +7,7 @@ local Carrier = require(script.Parent.StudioLocationRigCarrier)
 local Preparation = require(script.Parent.DecoAssetPreparation)
 local Placed = require(script.Parent.DecoPlacedAssetSync)
 local Collision = require(script.Parent.StudioLocationCollisionParts)
+local Legacy = require(script.Parent.StudioLocationInstanceLegacyGeometry)
 
 local GUID_PATTERN = "^[0-9a-fA-F]+%-[0-9a-fA-F]+%-[0-9a-fA-F]+%-[0-9a-fA-F]+%-[0-9a-fA-F]+$"
 -- CFrame round-off from ScaleTo/PivotTo should not fail a valid replacement.
@@ -49,7 +50,7 @@ local function meshAnchors(root: Model): {any}
             local meshId = History.Id(part.MeshId)
             if meshId == "" then error("Visual MeshPart is missing Mesh ID") end
             table.insert(anchors,{meshId=meshId,path=describeMesh(root,part),
-                frame=part:GetPivot(),size=part.Size})
+                frame=part:GetPivot(),geometry=part.CFrame,pivotOffset=part.PivotOffset,size=part.Size})
         end
     end
     if #anchors == 0 then error("Model has no visual MeshParts") end
@@ -181,6 +182,7 @@ end
 
 local function snapshot(root: Model): any
     return {root=root, parent=root.Parent, frame=root:GetPivot(), scale=root:GetScale(),
+        primary=root.PrimaryPart,
         name=root.Name, identity=root:GetAttribute("Game1DecoInstanceId"),
         publication=root:GetAttribute("Game1DecoPublishedModelAssetId"),
         visual=meshCounts(root), anchors=meshAnchors(root)}
@@ -189,7 +191,8 @@ end
 local function unchanged(state: any): boolean
     local root = state.root
     if not root.Parent or root.Parent ~= state.parent or not sameFrame(root:GetPivot(), state.frame)
-        or root:GetScale() ~= state.scale or root.Name ~= state.name
+        or root:GetScale() ~= state.scale or root.PrimaryPart ~= state.primary
+        or root.Name ~= state.name
         or root:GetAttribute("Game1DecoInstanceId") ~= state.identity
         or root:GetAttribute("Game1DecoPublishedModelAssetId") ~= state.publication then return false end
     local current = meshCounts(root)
@@ -203,6 +206,8 @@ local function unchanged(state: any): boolean
         local previous = state.anchors[i]
         if anchor.meshId ~= previous.meshId or anchor.path ~= previous.path
             or not sameFrame(anchor.frame,previous.frame)
+            or not sameFrame(anchor.geometry,previous.geometry)
+            or not sameFrame(anchor.pivotOffset,previous.pivotOffset)
             or (anchor.size-previous.size).Magnitude > 0.002 then return false end
     end
     return true
@@ -272,7 +277,8 @@ local function freshModel(template: Model, target: any, old: any,
         -- Transfer the authored uniform Model scale, not bounds-derived guesses.
         -- This intentionally does not reinterpret manual child MeshPart Size edits.
         clone:ScaleTo(old.scale)
-        positionAtSource(clone,old.frame,anchorId,approved)
+        Legacy.ResizeTarget(clone,old.geometry)
+        positionAtSource(clone,old.geometry.frame,anchorId,approved)
         Preparation.PreparePlaced(clone,target.meshOptions,target.surfaceMaterial,
             target.materialDefinition and target.materialDefinition.robloxMaterial)
         Placed.StampPublishedModel(clone,target)
@@ -286,13 +292,36 @@ local function freshModel(template: Model, target: any, old: any,
             if not applied then Collision.Rollback(tx); error(problem) end
             Collision.Finalize(tx)
         end
-        if not sameFrame(selectedTargetAnchor(clone,anchorId,approved),old.frame)
+        if not sameFrame(selectedTargetAnchor(clone,anchorId,approved),old.geometry.frame)
             or math.abs(clone:GetScale()-old.scale) > 0.00001 then
             error("Replacement transform or uniform Model scale changed during staging")
         end
     end)
     if not ok then clone:Destroy(); error(tostring(failure)) end
     return clone
+end
+
+-- Reference immutable historical source publications. Cache by Model Asset ID
+-- across hundreds of old instances, and never mutate the placed source Model.
+local function sourceGeometry(states: {any}, loader: any): (number,number)
+    local referenceById={}
+    local rebased,resized=0,0
+    local ok, failure=pcall(function()
+        for _,state in ipairs(states) do
+            local assetId=tostring(state.publication or "")
+            local reference=referenceById[assetId]
+            if not reference then
+                reference=loader:loadForMeshInventory(assetId, "historical_source")
+                referenceById[assetId]=reference
+            end
+            state.geometry=Legacy.Inspect(state.root,reference)
+            if state.geometry.rebased then rebased+=1 end
+            if state.geometry.resized then resized+=1 end
+        end
+    end)
+    for _,model in pairs(referenceById) do model:Destroy() end
+    if not ok then error("Cannot verify historical source transforms: "..tostring(failure)) end
+    return rebased,resized
 end
 
 local function placementIdCounts(world: Workspace): {[string]: number}
@@ -371,26 +400,35 @@ return function(config: any)
                 end
                 table.insert(states,snapshot(root))
             end
+            local rebased,resized=sourceGeometry(states,config.decoManager.loader)
             local counts = placementIdCounts(config.Workspace)
             local rekeyed = assignPlacementIds(states,counts,config.HttpService)
             local targetRow = getLiveRow(config.decoManager.loader,target)
             -- Inspect the NEW published target, not the old placed instances.
             local template = config.decoManager.loader:loadPublished(targetRow)
-            local inspected, choices, approved = pcall(anchorOptions,template)
+            local inspected, choices, approved = pcall(function()
+                for _, state in ipairs(states) do
+                    Legacy.ResizeTarget(template,state.geometry,true)
+                end
+                return anchorOptions(template)
+            end)
             template:Destroy()
-            if not inspected then error("Cannot inspect target pivots: "..tostring(choices)) end
+            if not inspected then error("Target is incompatible with historical transforms: "..tostring(choices)) end
             local token = config.HttpService:GenerateGUID(false)
             session = {token=token,digest=command.catalog.digest,
                 source=source.slug,target=target.slug,scope=command.scope,states=states,
                 targetRevision=targetRow.revision,anchorOptions=choices,approved=approved,
-                rekeyed=rekeyed}
+                rekeyed=rekeyed,rebased=rebased,resized=resized}
             local placements = {}
             for _, state in ipairs(states) do
                 table.insert(placements,{name=state.name,path=state.root:GetFullName(),
-                    placementId=state.identity,newPlacementId=state.newIdentity})
+                    placementId=state.identity,newPlacementId=state.newIdentity,
+                    legacyPivot=state.geometry.rebased,manualSize=state.geometry.resized,
+                    pivotDifferenceStuds=state.geometry.pivotShift or 0})
             end
             return {count=#states,scanToken=token,placements=placements,
-                anchorOptions=choices,reassignedIds=rekeyed}
+                anchorOptions=choices,reassignedIds=rekeyed,
+                normalizedPivots=rebased,preservedManualSizes=resized}
         end
         if command.phase ~= "replace" then error("Unknown Instance Manager phase") end
         local current = session
@@ -450,7 +488,7 @@ return function(config: any)
                 pair.before.root.Parent = nil
                 pair.after.Parent = pair.before.parent
                 if not sameFrame(selectedTargetAnchor(pair.after,command.anchorId,current.approved),
-                    pair.before.frame) or math.abs(pair.after:GetScale()-pair.before.scale) > 0.00001 then
+                    pair.before.geometry.frame) or math.abs(pair.after:GetScale()-pair.before.scale) > 0.00001 then
                     error("Replacement target anchor/scale changed during commit")
                 end
             end
@@ -482,20 +520,20 @@ return function(config: any)
         for _, pair in ipairs(stage) do table.insert(selected,pair.after) end
         config.Selection:Set(selected)
         return {count=#stage,changed=#stage,reassignedIds=current.rekeyed,
-            note="Selected NEW pivots aligned to old Model pivots. Ctrl+Z restores originals."}
+            note="New target pivot aligned using verified source geometry. Manual MeshPart Size edits preserved where safe. Ctrl+Z restores originals."}
     end
 
     return function(command: any)
-        if command.project ~= "game1" or command.command ~= "location-instance-replace-v3"
-            or command.schemaVersion ~= 3 or type(command.operationId) ~= "string"
+        if command.project ~= "game1" or command.command ~= "location-instance-replace-v4"
+            or command.schemaVersion ~= 4 or type(command.operationId) ~= "string"
             or type(command.catalog) ~= "table" or command.catalog.domain ~= "location_assets"
             or type(command.catalog.digest) ~= "string" then
             warn("[Game1] Invalid Instance Manager command")
             return
         end
         local ok, value = pcall(execute,command)
-        local result = {project="game1",command="location-instance-replace-v3",
-            schemaVersion=3,operationId=command.operationId,phase=command.phase,
+        local result = {project="game1",command="location-instance-replace-v4",
+            schemaVersion=4,operationId=command.operationId,phase=command.phase,
             sourceSlug=command.sourceSlug,targetSlug=command.targetSlug,
             scope=command.scope,anchorId=command.anchorId,
             catalogDigest=command.catalog.digest}

@@ -273,7 +273,7 @@ local function pollBridge()
         else
             warn("[Game1] Collision Authoring unavailable; other Bridge tools continue")
         end
-    elseif data.command == "location-instance-replace-v3" then
+    elseif data.command == "location-instance-replace-v4" then
         if handleLocationInstanceReplace then
             local ok, problem = pcall(handleLocationInstanceReplace,data)
             if not ok then warn("[Game1] Instance Manager error: "..tostring(problem)) end
@@ -5495,6 +5495,162 @@ return table.freeze(Transform)
       </Item>
       <Item class="ModuleScript" referent="26">
         <Properties>
+          <string name="Name">StudioLocationInstanceLegacyGeometry</string>
+          <string name="Source"><![CDATA[-- M351: provenance-based placement frame and manual MeshPart.Size transfer.
+-- The old instance is READ ONLY. Never copy the old PivotOffset to the new
+-- publication, and never interpret Model:GetScale() as a child's manual Size.
+-- Handles verified single-visual static placements. Refuses unprovable edits.
+local History = require(script.Parent.StudioPublishedMeshHistory)
+local Carrier = require(script.Parent.StudioLocationRigCarrier)
+local Physics = require(script.Parent.StudioMeshPhysicsCore)
+local Legacy = {}
+
+local AXES = {Vector3.xAxis, Vector3.yAxis, Vector3.zAxis}
+local function visualParts(model: Model): {MeshPart}
+    local found = {}
+    for _, part in ipairs(model:GetDescendants()) do
+        if part:IsA("MeshPart") and not Carrier.IsCarrier(part)
+            and not Physics.IsCollider(part.Name)
+            and part:GetAttribute("Game1DecoPhysicsOnly") ~= true then
+            table.insert(found,part)
+        end
+    end
+    return found
+end
+local function sameFrame(a: CFrame,b: CFrame): boolean
+    return (a.Position-b.Position).Magnitude <= 0.025
+        and a.LookVector:Dot(b.LookVector) >= 0.9999
+        and a.UpVector:Dot(b.UpVector) >= 0.9999
+end
+local function finiteRatio(r: number): boolean
+    return r == r and r >= 0.001 and r <= 1000
+end
+local function ratios(actual: Vector3, authored: Vector3): Vector3
+    if authored.X <= 0.001 or authored.Y <= 0.001 or authored.Z <= 0.001 then
+        error("Invalid published source MeshPart Size")
+    end
+    local r = Vector3.new(actual.X/authored.X, actual.Y/authored.Y, actual.Z/authored.Z)
+    if not finiteRatio(r.X) or not finiteRatio(r.Y) or not finiteRatio(r.Z) then
+        error("Invalid legacy MeshPart.Size ratios; Place unchanged")
+    end
+    return r
+end
+local function changed(r: Vector3): boolean
+    return math.abs(r.X-1)>0.002 or math.abs(r.Y-1)>0.002
+        or math.abs(r.Z-1)>0.002
+end
+
+-- The geometry CFrame, unlike MeshPart:GetPivot(), is unaffected by
+-- historical managed-rig operations that rewrite PivotOffset. The published
+-- Model pivot is therefore transported using the unique proven visual mesh.
+function Legacy.Inspect(placed: Model,published: Model): any
+    local authored = visualParts(published)
+    local existing = visualParts(placed)
+    if #authored == 0 or #existing == 0 or #authored ~= #existing then
+        error("Historical visual inventory is not sufficient for safe Replace")
+    end
+    local scale = placed:GetScale()/published:GetScale()
+    if not finiteRatio(scale) then error("Invalid historical Model scale") end
+    if #authored ~= 1 then
+        -- Multipart/skinned models can be replaced using their current Model
+        -- pivot, but untracked manually resized meshes may NOT be discarded.
+        local counts = {}
+        for _, part in ipairs(authored) do
+            local id = History.Id(part.MeshId)
+            counts[id] = counts[id] or {}
+            table.insert(counts[id],part.Size*scale)
+        end
+        for _, part in ipairs(existing) do
+            local id=History.Id(part.MeshId)
+            local list=counts[id]
+            if not list or #list==0 then error("Historical mesh inventory changed") end
+            local foundIndex=nil
+            for index,size in ipairs(list) do
+                if (part.Size-size).Magnitude <= 0.025 then foundIndex=index; break end
+            end
+            if not foundIndex then
+                error("Manually resized multipart Location rig; cannot safely replace without a dedicated mapping")
+            end
+            table.remove(list,foundIndex)
+        end
+        return {frame=placed:GetPivot(), resized=false, rebased=false}
+    end
+    local reference,old = authored[1],existing[1]
+    if History.Id(reference.MeshId) ~= History.Id(old.MeshId) then
+        error("Historical visual Mesh ID differs from placed source; Place unchanged")
+    end
+    local manual = ratios(old.Size,reference.Size*scale)
+    -- ScaleTo can legitimately scale a published PivotOffset.Position. Do not
+    -- mistake ordinary uniform Model scaling for the historic Sync rebasing.
+    local authoredOffset = CFrame.new(reference.PivotOffset.Position * scale)
+        * reference.PivotOffset.Rotation
+    local pivotRebased = not sameFrame(authoredOffset,old.PivotOffset)
+    local recovered = old.CFrame * reference.CFrame:Inverse() * published:GetPivot()
+    -- Repair and historical Sync can change only PivotOffset and PrimaryPart,
+    -- leaving the visible CFrame unchanged. Reconstruct from source provenance
+    -- only when the old part's PivotOffset has actually diverged.
+    local placementFrame = if pivotRebased then recovered else placed:GetPivot()
+    return {frame=placementFrame, resized=changed(manual), rebased=pivotRebased,
+        ratios=manual,
+        sourceLocalAxes=published:GetPivot().Rotation:ToObjectSpace(reference.CFrame.Rotation),
+        sourceMeshId=History.Id(reference.MeshId),
+        pivotShift=(recovered.Position-placed:GetPivot().Position).Magnitude}
+end
+
+local function isSimple(target: Model, mesh: MeshPart): boolean
+    for _, obj in ipairs(target:GetDescendants()) do
+        if obj:IsA("BasePart") and obj ~= mesh then return false end
+        if obj:IsA("Bone") or obj:IsA("Attachment") or obj:IsA("JointInstance")
+            or obj:IsA("Constraint") or obj:IsA("WeldConstraint")
+            or obj:IsA("WrapLayer") or obj:IsA("WrapTarget") then return false end
+    end
+    return true
+end
+
+-- Preserve *stretch factors*, not absolute dimensions of two different meshes.
+-- A target can have its own authored dimensions. Re-map axes only where the
+-- visual basis of the two published Models proves a 90-degree permutation.
+-- Arbitrary basis changes imply shear under non-uniform scaling and are refused.
+function Legacy.ResizeTarget(target: Model, geometry: any, dryRun: boolean?)
+    if not geometry.resized then return end
+    local meshes=visualParts(target)
+    if #meshes ~= 1 or not isSimple(target,meshes[1]) then
+        error("Manually resized source requires a single, unrigged target MeshPart; Place unchanged")
+    end
+    local targetPart=meshes[1]
+    local targetLocalAxes=target:GetPivot().Rotation:ToObjectSpace(targetPart.CFrame.Rotation)
+    local map=geometry.sourceLocalAxes:ToObjectSpace(targetLocalAxes)
+    local old={geometry.ratios.X,geometry.ratios.Y,geometry.ratios.Z}
+    local mapped={}
+    local used={}
+    for index,axis in ipairs(AXES) do
+        local mappedAxis=map:VectorToWorldSpace(axis)
+        local winner,largest=nil,0
+        for sourceIndex,sourceAxis in ipairs(AXES) do
+            local similarity=math.abs(mappedAxis:Dot(sourceAxis))
+            if similarity>largest then winner=sourceIndex; largest=similarity end
+        end
+        if not winner or largest<0.999 or used[winner] then
+            error("Non-uniform legacy Size cannot map between source/target mesh axes without shear")
+        end
+        used[winner]=true
+        mapped[index]=old[winner]
+    end
+    local newSize=Vector3.new(targetPart.Size.X*mapped[1],
+        targetPart.Size.Y*mapped[2],targetPart.Size.Z*mapped[3])
+    if newSize.X<=0.001 or newSize.Y<=0.001 or newSize.Z<=0.001
+        or newSize.X>4096 or newSize.Y>4096 or newSize.Z>4096 then
+        error("Transformed replacement MeshPart.Size exceeds safe bounds")
+    end
+    if not dryRun then targetPart.Size=newSize end
+end
+
+return table.freeze(Legacy)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="27">
+        <Properties>
           <string name="Name">StudioLocationInstanceReplace</string>
           <string name="Source"><![CDATA[-- Studio-only, explicit Location Asset whole-Model replacement.
 -- No mesh-to-mesh migration: the target published model is a complete new tree.
@@ -5505,6 +5661,7 @@ local Carrier = require(script.Parent.StudioLocationRigCarrier)
 local Preparation = require(script.Parent.DecoAssetPreparation)
 local Placed = require(script.Parent.DecoPlacedAssetSync)
 local Collision = require(script.Parent.StudioLocationCollisionParts)
+local Legacy = require(script.Parent.StudioLocationInstanceLegacyGeometry)
 
 local GUID_PATTERN = "^[0-9a-fA-F]+%-[0-9a-fA-F]+%-[0-9a-fA-F]+%-[0-9a-fA-F]+%-[0-9a-fA-F]+$"
 -- CFrame round-off from ScaleTo/PivotTo should not fail a valid replacement.
@@ -5547,7 +5704,7 @@ local function meshAnchors(root: Model): {any}
             local meshId = History.Id(part.MeshId)
             if meshId == "" then error("Visual MeshPart is missing Mesh ID") end
             table.insert(anchors,{meshId=meshId,path=describeMesh(root,part),
-                frame=part:GetPivot(),size=part.Size})
+                frame=part:GetPivot(),geometry=part.CFrame,pivotOffset=part.PivotOffset,size=part.Size})
         end
     end
     if #anchors == 0 then error("Model has no visual MeshParts") end
@@ -5679,6 +5836,7 @@ end
 
 local function snapshot(root: Model): any
     return {root=root, parent=root.Parent, frame=root:GetPivot(), scale=root:GetScale(),
+        primary=root.PrimaryPart,
         name=root.Name, identity=root:GetAttribute("Game1DecoInstanceId"),
         publication=root:GetAttribute("Game1DecoPublishedModelAssetId"),
         visual=meshCounts(root), anchors=meshAnchors(root)}
@@ -5687,7 +5845,8 @@ end
 local function unchanged(state: any): boolean
     local root = state.root
     if not root.Parent or root.Parent ~= state.parent or not sameFrame(root:GetPivot(), state.frame)
-        or root:GetScale() ~= state.scale or root.Name ~= state.name
+        or root:GetScale() ~= state.scale or root.PrimaryPart ~= state.primary
+        or root.Name ~= state.name
         or root:GetAttribute("Game1DecoInstanceId") ~= state.identity
         or root:GetAttribute("Game1DecoPublishedModelAssetId") ~= state.publication then return false end
     local current = meshCounts(root)
@@ -5701,6 +5860,8 @@ local function unchanged(state: any): boolean
         local previous = state.anchors[i]
         if anchor.meshId ~= previous.meshId or anchor.path ~= previous.path
             or not sameFrame(anchor.frame,previous.frame)
+            or not sameFrame(anchor.geometry,previous.geometry)
+            or not sameFrame(anchor.pivotOffset,previous.pivotOffset)
             or (anchor.size-previous.size).Magnitude > 0.002 then return false end
     end
     return true
@@ -5770,7 +5931,8 @@ local function freshModel(template: Model, target: any, old: any,
         -- Transfer the authored uniform Model scale, not bounds-derived guesses.
         -- This intentionally does not reinterpret manual child MeshPart Size edits.
         clone:ScaleTo(old.scale)
-        positionAtSource(clone,old.frame,anchorId,approved)
+        Legacy.ResizeTarget(clone,old.geometry)
+        positionAtSource(clone,old.geometry.frame,anchorId,approved)
         Preparation.PreparePlaced(clone,target.meshOptions,target.surfaceMaterial,
             target.materialDefinition and target.materialDefinition.robloxMaterial)
         Placed.StampPublishedModel(clone,target)
@@ -5784,13 +5946,36 @@ local function freshModel(template: Model, target: any, old: any,
             if not applied then Collision.Rollback(tx); error(problem) end
             Collision.Finalize(tx)
         end
-        if not sameFrame(selectedTargetAnchor(clone,anchorId,approved),old.frame)
+        if not sameFrame(selectedTargetAnchor(clone,anchorId,approved),old.geometry.frame)
             or math.abs(clone:GetScale()-old.scale) > 0.00001 then
             error("Replacement transform or uniform Model scale changed during staging")
         end
     end)
     if not ok then clone:Destroy(); error(tostring(failure)) end
     return clone
+end
+
+-- Reference immutable historical source publications. Cache by Model Asset ID
+-- across hundreds of old instances, and never mutate the placed source Model.
+local function sourceGeometry(states: {any}, loader: any): (number,number)
+    local referenceById={}
+    local rebased,resized=0,0
+    local ok, failure=pcall(function()
+        for _,state in ipairs(states) do
+            local assetId=tostring(state.publication or "")
+            local reference=referenceById[assetId]
+            if not reference then
+                reference=loader:loadForMeshInventory(assetId, "historical_source")
+                referenceById[assetId]=reference
+            end
+            state.geometry=Legacy.Inspect(state.root,reference)
+            if state.geometry.rebased then rebased+=1 end
+            if state.geometry.resized then resized+=1 end
+        end
+    end)
+    for _,model in pairs(referenceById) do model:Destroy() end
+    if not ok then error("Cannot verify historical source transforms: "..tostring(failure)) end
+    return rebased,resized
 end
 
 local function placementIdCounts(world: Workspace): {[string]: number}
@@ -5869,26 +6054,35 @@ return function(config: any)
                 end
                 table.insert(states,snapshot(root))
             end
+            local rebased,resized=sourceGeometry(states,config.decoManager.loader)
             local counts = placementIdCounts(config.Workspace)
             local rekeyed = assignPlacementIds(states,counts,config.HttpService)
             local targetRow = getLiveRow(config.decoManager.loader,target)
             -- Inspect the NEW published target, not the old placed instances.
             local template = config.decoManager.loader:loadPublished(targetRow)
-            local inspected, choices, approved = pcall(anchorOptions,template)
+            local inspected, choices, approved = pcall(function()
+                for _, state in ipairs(states) do
+                    Legacy.ResizeTarget(template,state.geometry,true)
+                end
+                return anchorOptions(template)
+            end)
             template:Destroy()
-            if not inspected then error("Cannot inspect target pivots: "..tostring(choices)) end
+            if not inspected then error("Target is incompatible with historical transforms: "..tostring(choices)) end
             local token = config.HttpService:GenerateGUID(false)
             session = {token=token,digest=command.catalog.digest,
                 source=source.slug,target=target.slug,scope=command.scope,states=states,
                 targetRevision=targetRow.revision,anchorOptions=choices,approved=approved,
-                rekeyed=rekeyed}
+                rekeyed=rekeyed,rebased=rebased,resized=resized}
             local placements = {}
             for _, state in ipairs(states) do
                 table.insert(placements,{name=state.name,path=state.root:GetFullName(),
-                    placementId=state.identity,newPlacementId=state.newIdentity})
+                    placementId=state.identity,newPlacementId=state.newIdentity,
+                    legacyPivot=state.geometry.rebased,manualSize=state.geometry.resized,
+                    pivotDifferenceStuds=state.geometry.pivotShift or 0})
             end
             return {count=#states,scanToken=token,placements=placements,
-                anchorOptions=choices,reassignedIds=rekeyed}
+                anchorOptions=choices,reassignedIds=rekeyed,
+                normalizedPivots=rebased,preservedManualSizes=resized}
         end
         if command.phase ~= "replace" then error("Unknown Instance Manager phase") end
         local current = session
@@ -5948,7 +6142,7 @@ return function(config: any)
                 pair.before.root.Parent = nil
                 pair.after.Parent = pair.before.parent
                 if not sameFrame(selectedTargetAnchor(pair.after,command.anchorId,current.approved),
-                    pair.before.frame) or math.abs(pair.after:GetScale()-pair.before.scale) > 0.00001 then
+                    pair.before.geometry.frame) or math.abs(pair.after:GetScale()-pair.before.scale) > 0.00001 then
                     error("Replacement target anchor/scale changed during commit")
                 end
             end
@@ -5980,20 +6174,20 @@ return function(config: any)
         for _, pair in ipairs(stage) do table.insert(selected,pair.after) end
         config.Selection:Set(selected)
         return {count=#stage,changed=#stage,reassignedIds=current.rekeyed,
-            note="Selected NEW pivots aligned to old Model pivots. Ctrl+Z restores originals."}
+            note="New target pivot aligned using verified source geometry. Manual MeshPart Size edits preserved where safe. Ctrl+Z restores originals."}
     end
 
     return function(command: any)
-        if command.project ~= "game1" or command.command ~= "location-instance-replace-v3"
-            or command.schemaVersion ~= 3 or type(command.operationId) ~= "string"
+        if command.project ~= "game1" or command.command ~= "location-instance-replace-v4"
+            or command.schemaVersion ~= 4 or type(command.operationId) ~= "string"
             or type(command.catalog) ~= "table" or command.catalog.domain ~= "location_assets"
             or type(command.catalog.digest) ~= "string" then
             warn("[Game1] Invalid Instance Manager command")
             return
         end
         local ok, value = pcall(execute,command)
-        local result = {project="game1",command="location-instance-replace-v3",
-            schemaVersion=3,operationId=command.operationId,phase=command.phase,
+        local result = {project="game1",command="location-instance-replace-v4",
+            schemaVersion=4,operationId=command.operationId,phase=command.phase,
             sourceSlug=command.sourceSlug,targetSlug=command.targetSlug,
             scope=command.scope,anchorId=command.anchorId,
             catalogDigest=command.catalog.digest}
@@ -6011,7 +6205,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="27">
+      <Item class="ModuleScript" referent="28">
         <Properties>
           <string name="Name">StudioLocationMeshNames</string>
           <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
@@ -6044,7 +6238,7 @@ return Naming
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="28">
+      <Item class="ModuleScript" referent="29">
         <Properties>
           <string name="Name">StudioLocationPlacedGeometry</string>
           <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
@@ -6230,7 +6424,7 @@ return table.freeze(Geometry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="29">
+      <Item class="ModuleScript" referent="30">
         <Properties>
           <string name="Name">StudioLocationPlacementHistory</string>
           <string name="Source"><![CDATA[-- Per-placement, bounded authoring audit for Location repair and sync.
@@ -6271,7 +6465,7 @@ return table.freeze(History)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="30">
+      <Item class="ModuleScript" referent="31">
         <Properties>
           <string name="Name">StudioLocationPlacementOwner</string>
           <string name="Source"><![CDATA[-- M243: one placement-ownership rule for Location Find and scoped Sync.
@@ -6327,7 +6521,7 @@ return table.freeze(Owner)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="31">
+      <Item class="ModuleScript" referent="32">
         <Properties>
           <string name="Name">StudioLocationPublishedGeometry</string>
           <string name="Source"><![CDATA[-- Published-model provenance and shape policy for Location Assets.
@@ -6400,7 +6594,7 @@ return table.freeze(Published)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="32">
+      <Item class="ModuleScript" referent="33">
         <Properties>
           <string name="Name">StudioLocationPublishedRigNormalize</string>
           <string name="Source"><![CDATA[-- Location-only normalization of Roblox importer scaffolding on a FRESH,
@@ -6510,7 +6704,7 @@ return table.freeze(Normalize)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="33">
+      <Item class="ModuleScript" referent="34">
         <Properties>
           <string name="Name">StudioLocationRigCarrier</string>
           <string name="Source"><![CDATA[-- Canonical Location-only rig carrier policy. Imported FBX mesh; never synthetic.
@@ -6748,7 +6942,7 @@ return table.freeze(Carrier)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="34">
+      <Item class="ModuleScript" referent="35">
         <Properties>
           <string name="Name">StudioLocationVisualAppearance</string>
           <string name="Source"><![CDATA[-- Visual-only Location Asset appearance. Surface sound classification is separate.
@@ -6872,7 +7066,7 @@ return table.freeze(Visual)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="35">
+      <Item class="ModuleScript" referent="36">
         <Properties>
           <string name="Name">StudioManagedRigSwap</string>
           <string name="Source"><![CDATA[-- Shared Studio mechanism for replacing AUTHORING-MANAGED child rigs while
@@ -7068,7 +7262,7 @@ return table.freeze(RigSwap)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="36">
+      <Item class="ModuleScript" referent="37">
         <Properties>
           <string name="Name">StudioMarkerVisibility</string>
           <string name="Source"><![CDATA[-- Studio-only presentation toggle. No movement of markers, no metadata edits.
@@ -7212,7 +7406,7 @@ return table.freeze(Visibility)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="37">
+      <Item class="ModuleScript" referent="38">
         <Properties>
           <string name="Name">StudioMeshPhysicsCore</string>
           <string name="Source"><![CDATA[-- Shared visual MeshPart physics writer; special COL meshes are retired.
@@ -7394,7 +7588,7 @@ return table.freeze(Core)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="38">
+      <Item class="ModuleScript" referent="39">
         <Properties>
           <string name="Name">StudioModelLoadCommands</string>
           <string name="Source"><![CDATA[-- Studio model-sync command: validates and imports Character, Monster/NPC and Weapon models.
@@ -7961,7 +8155,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="39">
+      <Item class="ModuleScript" referent="40">
         <Properties>
           <string name="Name">StudioOptionsDraftBridge</string>
           <string name="Source"><![CDATA[--!strict
@@ -8028,7 +8222,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="40">
+      <Item class="ModuleScript" referent="41">
         <Properties>
           <string name="Name">StudioPlaceRegistryCommands</string>
           <string name="Source"><![CDATA[-- M240: separate Studio Bridge controller, NOT an extension of DecoManager.
@@ -8144,7 +8338,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="41">
+      <Item class="ModuleScript" referent="42">
         <Properties>
           <string name="Name">StudioPlaceRegistryInventory</string>
           <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
@@ -8658,7 +8852,7 @@ return Inventory
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="42">
+      <Item class="ModuleScript" referent="43">
         <Properties>
           <string name="Name">StudioPlaceRegistryRepair</string>
           <string name="Source"><![CDATA[-- Metadata-only Repair for canonical Location FBX placements.
@@ -8791,7 +8985,7 @@ return Repair
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="43">
+      <Item class="ModuleScript" referent="44">
         <Properties>
           <string name="Name">StudioPlaceRegistrySync</string>
           <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
@@ -9033,7 +9227,7 @@ return Sync
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="44">
+      <Item class="ModuleScript" referent="45">
         <Properties>
           <string name="Name">StudioPlacedRigBoneEffects</string>
           <string name="Source"><![CDATA[-- Placement-owned visual decorations attached to authored Bones. Accept either
@@ -9148,7 +9342,7 @@ return table.freeze(BoneEffects)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="45">
+      <Item class="ModuleScript" referent="46">
         <Properties>
           <string name="Name">StudioPlotsCatalog</string>
           <string name="Source"><![CDATA[-- Read-only discovery contract for authored Workspace.Plots/01..50.
@@ -9210,7 +9404,7 @@ return table.freeze(Catalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="46">
+      <Item class="ModuleScript" referent="47">
         <Properties>
           <string name="Name">StudioPlotsPartPolicy</string>
           <string name="Source"><![CDATA[-- Reversible, Studio-only properties for Plots visibility and playtest preview.
@@ -9295,7 +9489,7 @@ return table.freeze(Policy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="47">
+      <Item class="ModuleScript" referent="48">
         <Properties>
           <string name="Name">StudioPlotsSelectionFilter</string>
           <string name="Source"><![CDATA[-- Studio viewport hit-test filter for hidden Plots authoring geometry.
@@ -9385,7 +9579,7 @@ return table.freeze(Filter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="48">
+      <Item class="ModuleScript" referent="49">
         <Properties>
           <string name="Name">StudioPlotsVisibility</string>
           <string name="Source"><![CDATA[-- Studio-only Plots preview: hidden -> volumes -> volumes + numbers -> hidden.
@@ -9679,7 +9873,7 @@ return table.freeze(PlotsVisibility)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="49">
+      <Item class="ModuleScript" referent="50">
         <Properties>
           <string name="Name">StudioPublishedMeshHistory</string>
           <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
@@ -10143,7 +10337,7 @@ return table.freeze(Inventory)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="50">
+      <Item class="ModuleScript" referent="51">
         <Properties>
           <string name="Name">StudioRealEstateCollisionPolicy</string>
           <string name="Source"><![CDATA[-- M342: Real Estate visual-mesh authoring. Collision Blueprint Parts are separate.
@@ -10175,7 +10369,7 @@ return table.freeze(Policy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="51">
+      <Item class="ModuleScript" referent="52">
         <Properties>
           <string name="Name">StudioRealEstateHouseFrame</string>
           <string name="Source"><![CDATA[-- Author-space transform for all Real Estate Studio sync paths.
@@ -10202,7 +10396,7 @@ return table.freeze(HouseFrame)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="52">
+      <Item class="ModuleScript" referent="53">
         <Properties>
           <string name="Name">StudioRealEstateModel</string>
           <string name="Source"><![CDATA[-- Studio assembly for any number of independent Real Estate MeshPart rigs.
@@ -10478,7 +10672,7 @@ return table.freeze(StudioRealEstateModel)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="53">
+      <Item class="ModuleScript" referent="54">
         <Properties>
           <string name="Name">StudioRealEstatePartPlacement</string>
           <string name="Source"><![CDATA[-- Restore source-FBX mesh centres after independent Model Asset import.
@@ -10602,7 +10796,7 @@ return table.freeze(Placement)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="54">
+      <Item class="ModuleScript" referent="55">
         <Properties>
           <string name="Name">StudioRealEstatePartSync</string>
           <string name="Source"><![CDATA[-- Atomic, single-rig refresh of a managed Real Estate template.
@@ -10837,7 +11031,7 @@ return table.freeze(PartSync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="55">
+      <Item class="ModuleScript" referent="56">
         <Properties>
           <string name="Name">StudioRealEstatePlacedPhysicsGuard</string>
           <string name="Source"><![CDATA[-- M342: remove retired COL geometry from pasted/placed managed Real Estates.
@@ -10899,7 +11093,7 @@ return table.freeze(Guard)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="56">
+      <Item class="ModuleScript" referent="57">
         <Properties>
           <string name="Name">StudioRealEstatePlacedTargets</string>
           <string name="Source"><![CDATA[-- One authoritative definition of a placed Real Estate instance.
@@ -10944,7 +11138,7 @@ return table.freeze(Targets)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="57">
+      <Item class="ModuleScript" referent="58">
         <Properties>
           <string name="Name">StudioRealEstatePlacedVisualSync</string>
           <string name="Source"><![CDATA[-- Full Real Estate sync: refresh visual rigs on *all managed placed* houses.
@@ -11063,7 +11257,7 @@ return table.freeze(VisualSync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="58">
+      <Item class="ModuleScript" referent="59">
         <Properties>
           <string name="Name">StudioRealEstateRigValidation</string>
           <string name="Source"><![CDATA[-- Validate an already-published Real Estate Model Asset as actually loaded by Roblox.
@@ -11192,7 +11386,7 @@ return table.freeze(Validation)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="59">
+      <Item class="ModuleScript" referent="60">
         <Properties>
           <string name="Name">StudioRetiredColMeshCleanup</string>
           <string name="Source"><![CDATA[-- M342: remove retired dedicated COL meshes from managed templates and placements.
@@ -11329,7 +11523,7 @@ return table.freeze(Cleanup)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="60">
+      <Item class="ModuleScript" referent="61">
         <Properties>
           <string name="Name">StudioSkinnedMeshConnection</string>
           <string name="Source"><![CDATA[--!strict
@@ -11399,7 +11593,7 @@ return table.freeze(Connection)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="61">
+      <Item class="ModuleScript" referent="62">
         <Properties>
           <string name="Name">StudioTextureAppearance</string>
           <string name="Source"><![CDATA[-- Shared Studio-side material binding for all authored MeshParts.
@@ -11556,7 +11750,7 @@ return table.freeze(StudioTextureAppearance)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="62">
+      <Item class="ModuleScript" referent="63">
         <Properties>
           <string name="Name">StudioTimelineEditorCommands</string>
           <string name="Source"><![CDATA[-- Timeline authoring session: validates requests, binds UI events and reports results.
@@ -11869,7 +12063,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="63">
+      <Item class="ModuleScript" referent="64">
         <Properties>
           <string name="Name">StudioTimelinePoseSampler</string>
           <string name="Source"><![CDATA[-- Offline pose extraction and interpolation for a preview rig. No UI or HTTP dependencies.
@@ -12048,7 +12242,7 @@ return table.freeze(StudioTimelinePoseSampler)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="64">
+      <Item class="ModuleScript" referent="65">
         <Properties>
           <string name="Name">StudioTimelinePreview</string>
           <string name="Source"><![CDATA[-- Owns the isolated ViewportFrame rig, camera interaction and animation-asset retrieval.
@@ -12345,7 +12539,7 @@ return table.freeze(StudioTimelinePreview)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="65">
+      <Item class="ModuleScript" referent="66">
         <Properties>
           <string name="Name">StudioTimelineTransport</string>
           <string name="Source"><![CDATA[-- HTTP boundary for the Timeline editor. No UI, animation or Studio model access.
@@ -12403,7 +12597,7 @@ return table.freeze(StudioTimelineTransport)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="66">
+      <Item class="ModuleScript" referent="67">
         <Properties>
           <string name="Name">StudioTimelineWidget</string>
           <string name="Source"><![CDATA[-- Timeline editor view. Builds the dock widget and exposes only its controls.

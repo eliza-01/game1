@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0015",
+  "title": "Instance Manager · исторические Pivot и ручной MeshPart Size",
+  "domain": "Location Assets",
+  "status": "IN_PROGRESS",
+  "priority": "P0",
+  "owner": "Owner + Codex",
+  "specPath": "docs/kanban/specs/KBN-0015.md",
+  "dependsOn": [],
+  "tasks": [
+    {
+      "id": "KBN-0015-T01",
+      "title": "Аудит M347/M350 и снимка старых заборов, выявление расхождений",
+      "done": true
+    },
+    {
+      "id": "KBN-0015-T02",
+      "title": "Реализовать восстановление исторического Pivot по геометрии публикации",
+      "done": true
+    },
+    {
+      "id": "KBN-0015-T03",
+      "title": "Перенести ручной Size по трём осям с проверкой базисов source/target",
+      "done": true
+    },
+    {
+      "id": "KBN-0015-T04",
+      "title": "Сохранить опоры новой Model / MeshPart и атомарный Undo при Replace",
+      "done": true
+    },
+    {
+      "id": "KBN-0015-T05",
+      "title": "Проверить Preview/Replace Selected на одном старом fence в Studio",
+      "done": false
+    },
+    {
+      "id": "KBN-0015-T06",
+      "title": "Проверить Ctrl+Z/Ctrl+Y, Collision, Rotation, масштаб и новое размещение",
+      "done": false
+    },
+    {
+      "id": "KBN-0015-T07",
+      "title": "После ручной приёмки проверить Replace All на небольшом наборе",
+      "done": false
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0015-A01",
+      "title": "24+ профильных тестов и основной verify.py, Lua/JS статические проверки",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0015-A02",
+      "title": "M351: старые размещения и Collision проверены в Studio",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0015-A03",
+      "title": "M351: Undo/Redo и отсутствие регрессии новых размещений подтверждены",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ],
+  "revision": 1,
+  "updatedAt": "2026-11-14T19:37:00+00:00",
+  "specSha256": "5baef9460a6e3a129005859db29836a8c08424056de7a5f90638007d0ee0b5c4"
+}

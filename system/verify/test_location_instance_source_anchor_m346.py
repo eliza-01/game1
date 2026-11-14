@@ -8,9 +8,9 @@ class TargetAnchorM347Compatibility(unittest.TestCase):
     def test_new_published_asset_supplies_the_pivot_choices(self):
         code = (ROOT/'system/studio-plugin/modules/StudioLocationInstanceReplace.luau').read_text(encoding='utf-8')
         self.assertIn('local function anchorOptions(target:',code)
-        self.assertIn('pcall(anchorOptions,template)',code)
+        self.assertIn('return anchorOptions(template)',code)
         self.assertIn('local function selectedTargetAnchor(target:',code)
-        self.assertIn('positionAtSource(clone,old.frame,anchorId,approved)',code)
+        self.assertIn('positionAtSource(clone,old.geometry.frame,anchorId,approved)',code)
         self.assertNotIn('local function sourceAnchor(',code)
         self.assertNotIn('anchorOptions(states)',code)
 
@@ -29,7 +29,7 @@ class TargetAnchorM347Compatibility(unittest.TestCase):
         self.assertIn('Pivot исходной Model',html)
         self.assertIn('Pivot новой Model',js)
         self.assertIn('Pivot исходной Model ←',js)
-        self.assertIn('location-instance-manager.js?v=347',html)
+        self.assertIn('location-instance-manager.js?v=351',html)
         self.assertNotIn('Опорный Pivot старого экземпляра',html)
 
 if __name__ == '__main__': unittest.main()

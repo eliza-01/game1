@@ -52,6 +52,8 @@ from character_core.identity import CharacterIdentityService
 from studio_bridge import run_model_load_bridge, run_monster_spawn_bridge, run_timeline_editor_bridge, run_location_authoring_bridge
 from services.studio_deco_bridge import run_deco_refresh_bridge
 from services.studio_place_registry_bridge import run_place_registry_bridge
+from services.studio_location_collision_bridge import run_location_collision_bridge
+from services.location_collision_authoring import LocationCollisionAuthoring
 from services.place_registry.coordinator import LocationPlaceRegistry
 from services.place_registry.revisions import PlaceRevisionStore
 from services.location_asset_sync_history import LocationAssetSyncHistory
@@ -110,6 +112,7 @@ options_store = OptionsStore(ROOT)
 timelines = TimelineStore(ROOT, store, animations, monsters, monster_animations)
 locations = LocationStore(ROOT, run_location_authoring_bridge)
 location_assets = LocationAssetStore(ROOT)
+location_collision_authoring = LocationCollisionAuthoring(location_assets, run_location_collision_bridge)
 # Weapon and Arrow atlases are consumers of the ONE shared published atlas catalog.
 # Switching a variant updates authoring only; Sync Studio remains an explicit action.
 weapons.atlases = location_assets.atlases
@@ -222,7 +225,7 @@ WRITE_SOURCES = MappingProxyType({
     "choose_weapon_fbx": choose_weapon_fbx,
     "choose_weapon_textures": choose_weapon_textures,
     "deco_layouts": deco_layouts,
-    "location_assets": location_assets,
+    "location_assets": location_assets, "location_collision_authoring": location_collision_authoring,
     "location_asset_sync_history": location_asset_sync_history,
     "asset_replacement_audit": asset_replacement_audit,
     "sync_location_assets_to_studio": run_deco_refresh_bridge,

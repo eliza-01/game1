@@ -405,6 +405,9 @@ class LocationAssetStore:
         row = self._raw_get(slug)
         return self._decorate(row) if row else None
 
+    def collision_blueprint_history(self, slug: str, limit: int = 25) -> list[dict]:
+        return location_collision_blueprint.history(self, slug, limit)
+
     def collision_blueprint(self, slug: str) -> dict | None:
         return location_collision_blueprint.latest(self, slug)
 

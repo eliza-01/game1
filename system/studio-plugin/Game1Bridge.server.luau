@@ -179,6 +179,29 @@ local handlePlaceRegistry = StudioPlaceRegistryCommands({
     bridgeToken = BRIDGE_TOKEN,
 })
 
+-- Collision Authoring is optional at plugin startup. A syntax/runtime error in
+-- its module must never hide Plots, Place Registry or the rest of Game1Bridge.
+local collisionController = nil
+local collisionModuleOk, collisionModule = pcall(require, script.Parent.modules.StudioLocationCollisionAuthoring)
+if collisionModuleOk then
+    local controllerOk, controller = pcall(collisionModule, {
+        HttpService = HttpService, Selection = Selection, Workspace = Workspace,
+        RunService = RunService, bridgeUrl = BRIDGE_URL, bridgeToken = BRIDGE_TOKEN,
+    })
+    if controllerOk and type(controller) == "table"
+        and type(controller.handle) == "function" and type(controller.dispose) == "function" then
+        collisionController = controller
+        plugin.Unloading:Connect(function()
+            local unloadOk, unloadError = pcall(controller.dispose)
+            if not unloadOk then warn("[Game1] Collision preview cleanup: " .. tostring(unloadError)) end
+        end)
+    else
+        warn("[Game1] Collision Authoring disabled: " .. tostring(controller))
+    end
+else
+    warn("[Game1] Collision Authoring unavailable: " .. tostring(collisionModule))
+end
+
 local handleHousePlacementCapture = StudioHousePlacementCapture({
     HttpService = HttpService,
     Selection = Selection,
@@ -216,6 +239,15 @@ local function pollBridge()
         locationCommands.handle(data)
     elseif data.command == "deco-refresh" then
         handleDecoRefresh(data)
+    elseif data.command == "location-collision-authoring-v1" then
+        if collisionController then
+            local collisionOk, collisionError = pcall(collisionController.handle, data)
+            if not collisionOk then
+                warn("[Game1] Collision Authoring command failed: " .. tostring(collisionError))
+            end
+        else
+            warn("[Game1] Collision Authoring unavailable; other Bridge tools continue")
+        end
     elseif data.command == "location-place-registry" then
         handlePlaceRegistry(data)
     elseif data.command == "house-placement-capture-v2" then

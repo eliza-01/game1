@@ -2585,6 +2585,8 @@
       "needsFbxInspection": true,
       "legacyStaticPublication": false,
       "meshOptions": {},
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
       "surfaceMaterial": "default",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -2665,6 +2667,8 @@
       "needsFbxInspection": true,
       "legacyStaticPublication": false,
       "meshOptions": {},
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
       "surfaceMaterial": "default",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -2792,6 +2796,8 @@
           "noCollide": true
         }
       },
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
       "surfaceMaterial": "grass",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -2944,6 +2950,8 @@
           "noCollide": true
         }
       },
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
       "surfaceMaterial": "grass",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -3096,6 +3104,8 @@
           "noCollide": true
         }
       },
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
       "surfaceMaterial": "default",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -3232,6 +3242,8 @@
           "noCollide": true
         }
       },
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
       "surfaceMaterial": "default",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -3393,6 +3405,8 @@
           "noCollide": true
         }
       },
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
       "surfaceMaterial": "default",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -3523,6 +3537,8 @@
       "needsFbxInspection": true,
       "legacyStaticPublication": false,
       "meshOptions": {},
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
       "surfaceMaterial": "default",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -3659,6 +3675,8 @@
           "noCollide": true
         }
       },
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
       "surfaceMaterial": "default",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -3891,6 +3909,8 @@
           "noCollide": true
         }
       },
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
       "surfaceMaterial": "default",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -4048,6 +4068,8 @@
           "noCollide": true
         }
       },
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
       "surfaceMaterial": "stone",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -4184,6 +4206,8 @@
           "noCollide": false
         }
       },
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
       "surfaceMaterial": "default",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -4465,6 +4489,8 @@
           "noCollide": true
         }
       },
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
       "surfaceMaterial": "wood",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -4721,6 +4747,8 @@
           "noCollide": true
         }
       },
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
       "surfaceMaterial": "metal",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -5000,6 +5028,8 @@
           "noCollide": true
         }
       },
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
       "surfaceMaterial": "metal",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -5254,6 +5284,8 @@
           "noCollide": true
         }
       },
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
       "surfaceMaterial": "metal",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -5330,7 +5362,12 @@
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
       "category_label": "Light",
-      "publishedVisualMeshes": [],
+      "publishedVisualMeshes": [
+        {
+          "meshId": "131655136653139",
+          "name": "ground_torch_03"
+        }
+      ],
       "aliases": []
     },
     {
@@ -5570,6 +5607,8 @@
           "noCollide": true
         }
       },
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
       "surfaceMaterial": "default",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -5844,6 +5883,8 @@
           "noCollide": false
         }
       },
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
       "surfaceMaterial": "metal",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -6093,6 +6134,8 @@
           "noCollide": false
         }
       },
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
       "surfaceMaterial": "metal",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -6248,6 +6291,8 @@
       "needsFbxInspection": true,
       "legacyStaticPublication": false,
       "meshOptions": {},
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
       "surfaceMaterial": "default",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -6328,6 +6373,8 @@
       "needsFbxInspection": true,
       "legacyStaticPublication": false,
       "meshOptions": {},
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
       "surfaceMaterial": "default",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -6408,6 +6455,8 @@
       "needsFbxInspection": true,
       "legacyStaticPublication": false,
       "meshOptions": {},
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
       "surfaceMaterial": "default",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -6519,6 +6568,8 @@
           "noCollide": true
         }
       },
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
       "surfaceMaterial": "stone",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -6703,6 +6754,8 @@
           "noCollide": true
         }
       },
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
       "surfaceMaterial": "wood",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -6841,6 +6894,8 @@
           "noCollide": true
         }
       },
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
       "surfaceMaterial": "stone",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -7095,6 +7150,8 @@
           "noCollide": true
         }
       },
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
       "surfaceMaterial": "wood",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -7225,6 +7282,8 @@
       "needsFbxInspection": true,
       "legacyStaticPublication": false,
       "meshOptions": {},
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
       "surfaceMaterial": "default",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -10617,6 +10676,8 @@
           "noCollide": false
         }
       },
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
       "surfaceMaterial": "default",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -10761,6 +10822,8 @@
           "noCollide": true
         }
       },
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
       "surfaceMaterial": "default",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -11337,6 +11400,8 @@
           "noCollide": true
         }
       },
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
       "surfaceMaterial": "default",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -11442,6 +11507,8 @@
       "needsFbxInspection": true,
       "legacyStaticPublication": false,
       "meshOptions": {},
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
       "surfaceMaterial": "default",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -11553,6 +11620,8 @@
           "noCollide": true
         }
       },
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
       "surfaceMaterial": "default",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -11943,6 +12012,8 @@
           "noCollide": true
         }
       },
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
       "surfaceMaterial": "wood",
       "alphaEnabled": false,
       "materialDefinition": {

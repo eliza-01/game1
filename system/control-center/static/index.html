@@ -525,6 +525,21 @@
 <div class="deco-assets-note"><strong>Studio placement</strong><span>Open <b>DecoManager</b> in Roblox Studio, choose a category, browse variants with arrows, then Place. <b>Save Assets Data</b> snapshots all placed instances and saves the place.</span></div>
 <div class="table-wrap weapon-table-wrap"><table><thead><tr><th>asset</th><th>category</th><th>weapon contact</th><th>Roblox assets</th><th>status</th><th></th></tr></thead><tbody id="location-asset-rows"></tbody></table></div><details class="deco-sync-history"><summary>Studio ID replacement history · selected in Edit</summary><pre id="location-asset-studio-history">Open Edit to load an asset's Studio history.</pre></details>
 </div>
+<div class="panel character-card location-collision-panel" id="location-collision-panel">
+<div class="section-title"><div><span>03 · Location Asset authoring</span><h3>Collision Blueprint</h3></div></div>
+<p class="hint">В Studio выдели <b>одну уже размещённую Model</b> этого Location Asset <b>вместе с любыми Part / WedgePart / CornerWedgePart</b> (1–256). Parts могут находиться в разных папках и моделях Workspace; папку создавать, переименовывать Parts или менять Pivot не нужно. Asset Manager проверит визуальные Mesh ID по истории публикаций. Нажми <b>Validate → Capture</b>. Для Preview достаточно выделить модель.</p>
+<label>Registered Location Asset<select id="location-collision-asset"><option value="">Выбери ассет</option></select></label>
+<div class="actions location-collision-actions">
+  <button id="location-collision-validate" type="button">Validate</button>
+  <button id="location-collision-capture" class="primary" type="button">Capture</button>
+  <button id="location-collision-preview" type="button">Preview saved</button>
+  <button id="location-collision-clear" type="button">Clear Preview</button>
+</div>
+<div class="location-collision-meta" id="location-collision-meta">Blueprint: не выбран</div>
+<pre id="location-collision-status" class="location-collision-status" role="status" aria-live="polite">Публикацию геометрии и уже размещённые объекты эти операции не меняют.</pre>
+<details><summary>Revision history</summary><div id="location-collision-history" class="location-collision-history">Выбери ассет.</div></details>
+<p class="hint">Preview создаёт временные прозрачные детали с контурами, без физики. После просмотра нажми Clear Preview. Генерация реальных коллизий при размещении — отдельный этап M343C.</p>
+</div>
 </div>
 </div>
 
@@ -864,6 +879,7 @@
 <script src="mesh-authoring.js?v=1"></script>
 <script src="location-category-picker.js?v=249"></script>
 <script src="deco-assets.js?v=253"></script>
+<script src="location-collision.js?v=3431"></script>
 <script src="place-registry.js?v=250"></script>
 <script src="location-publication-state.js?v=253"></script>
 <script src="location-sync-grouping.js?v=262"></script>

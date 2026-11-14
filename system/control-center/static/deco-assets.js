@@ -219,15 +219,18 @@ function decoAssetRender() {
       `<td><small>Model ID ${esc(row.model_asset_id || '—')}</small>${row.model_asset_id?meshLabels:''}<small>Image ID ${esc(row.texture_asset_id || '—')}</small></td>` +
       `<td>${decoAssetStatusTag(row.status)}</td><td><div class="deco-asset-row-actions">` +
       `<button data-select type="button" ${decoAssetState.syncingSlug?'disabled':''}>Edit</button>` +
+      `<button data-collision type="button" title="Select this asset for Collision Blueprint">Collision</button>` +
       `<button data-deco-sync type="button" ${decoAssetState.syncingSlug || decoAssetState.atlasBusy ? 'disabled' : ''} title="Find placed models and sync the latest published Model and Atlas IDs for this slug. Unpublished resources are reported after opening instead of disabling the action.">Sync Studio</button>` +
       `</div></td>`;
     tr.querySelector('[data-select]').onclick = () => decoAssetEditOpen(row.slug);
+    tr.querySelector('[data-collision]').onclick = () => window.game1LocationCollisionSelect?.(row.slug);
     tr.querySelector('[data-deco-sync]').onclick = () => window.game1LocationAssetWorkflow.startScan(row.slug);
     tr.querySelectorAll('[data-atlas-variant]').forEach(button => {
       button.onclick = () => decoAssetChooseAtlasVariant(row, Number(button.dataset.atlasVariant));
     });
     rows.appendChild(tr);
   }
+  window.game1LocationCollisionRefresh?.(decoAssetState.data.items || []);
   if (!visible.length) {
     const tr = document.createElement('tr');
     tr.innerHTML = '<td colspan="6"><span class="muted">No registered assets match this category.</span></td>';

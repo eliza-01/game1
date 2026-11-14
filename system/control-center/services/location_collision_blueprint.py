@@ -127,3 +127,16 @@ def save(store, slug: str, payload: dict) -> dict:
                                "(asset_slug, revision, blueprint_json, sha256, captured_at) VALUES (?,?,?,?,?)",
                                (slug, revision + 1, raw, digest, time.time()))
     return latest(store, slug)
+
+
+def history(store, slug: str, limit: int = 25) -> list[dict]:
+    """Immutable revision summary for the Location Asset editor."""
+    if not SLUG.fullmatch(slug) or type(limit) is not int or not 1 <= limit <= 100:
+        raise ValueError("invalid Collision Blueprint history request")
+    with store.connect() as connection:
+        rows = connection.execute(
+            "SELECT revision, blueprint_json, sha256, captured_at "
+            "FROM location_asset_collision_blueprints WHERE asset_slug=? "
+            "ORDER BY revision DESC LIMIT ?", (slug, limit)).fetchall()
+    return [{"revision": row["revision"], "partCount": len(json.loads(row["blueprint_json"])["parts"]),
+             "sha256": row["sha256"], "capturedAt": row["captured_at"]} for row in rows]

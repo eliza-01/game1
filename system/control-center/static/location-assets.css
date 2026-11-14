@@ -58,3 +58,12 @@
 @media(max-width:1180px){#locations-view .location-workflow{grid-template-columns:minmax(300px,350px) minmax(0,1fr)}#locations-view .location-editor-grid{grid-template-columns:1fr 1fr}#locations-view .location-field-name{grid-column:1/-1}}
 @media(max-width:980px){#locations-view .location-workflow{grid-template-columns:1fr}#locations-view .location-sidebar{position:static}#locations-view .location-action-zone{grid-template-columns:1fr}#locations-view .location-secondary-actions{justify-content:flex-start}}
 @media(max-width:620px){#locations-view .location-card{padding:14px}#locations-view .location-editor-grid{grid-template-columns:1fr}#locations-view .location-field-name{grid-column:auto}#locations-view .location-section-heading{align-items:flex-start;flex-direction:column;gap:5px}#locations-view .location-section-heading small{text-align:left}#locations-view .location-toolbar{grid-template-columns:1fr}#locations-view .location-primary-actions,#locations-view .location-secondary-actions{display:grid;grid-template-columns:1fr}#locations-view .location-primary-actions button{min-width:0;width:100%}}
+
+/* M343B: explicit authoring workflow, separate from publication and Place Registry. */
+.location-collision-panel {margin-top:16px;}
+.location-collision-actions {flex-wrap:wrap; margin:12px 0;}
+.location-collision-meta {color:var(--muted); font-size:13px; margin:8px 0;}
+.location-collision-status {white-space:pre-wrap; overflow-wrap:anywhere; padding:12px;
+  border:1px solid var(--line); border-radius:10px; background:var(--panel2);
+  font-size:12px; line-height:1.5; min-height:55px;}
+.location-collision-history {display:grid;gap:5px;padding:8px 0;font-size:12px;color:var(--muted);}

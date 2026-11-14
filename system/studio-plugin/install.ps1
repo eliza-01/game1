@@ -118,6 +118,8 @@ foreach($Marker in @(
     'StudioLocationPublishedGeometry',
     'StudioLocationPlacementHistory',
     'StudioRealEstatePlacedTargets',
+    'StudioLocationCollisionAuthoring',
+    'location-collision-authoring-v1',
     'StudioDecoSyncCommands',
     'StudioTextureAppearance',
     'StudioActorSpawnCommands'

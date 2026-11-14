@@ -91,6 +91,14 @@ def route(parsed, sources, info):
         except (ValueError, OSError, RuntimeError) as error:
             return 400, {'error': str(error)}
 
+    if path.startswith('/api/location-assets/') and path.endswith('/collision-history'):
+        try:
+            slug = path[len('/api/location-assets/'):-len('/collision-history')].strip('/')
+            limit = int((parse_qs(parsed.query).get('limit') or ['25'])[0])
+            return 200, {'history': sources['location_assets'].collision_blueprint_history(slug, limit)}
+        except (ValueError, OSError) as error:
+            return 400, {'error': str(error)}
+
     if path.startswith('/api/location-assets/') and path.endswith('/collision-blueprint'):
         try:
             slug = path[len('/api/location-assets/'):-len('/collision-blueprint')].strip('/')

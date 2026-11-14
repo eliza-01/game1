@@ -32,12 +32,12 @@
     {
       "id": "KBN-0014-T05",
       "title": "Проверить rename и retire с сохранением истории Blueprint",
-      "done": false
+      "done": true
     },
     {
       "id": "KBN-0014-T06",
       "title": "Реализовать Studio Capture и Preview для выбранного зарегистрированного Location Asset",
-      "done": false
+      "done": true
     },
     {
       "id": "KBN-0014-T07",
@@ -112,7 +112,7 @@
       "evidence": ""
     }
   ],
-  "revision": 1,
-  "updatedAt": "2026-11-14T00:00:00+00:00",
-  "specSha256": "66496d91ff7c0d2aed035fea9107cec06e3594efdde4e0b0936f0bece5ebfe07"
+  "revision": 3,
+  "updatedAt": "2026-11-14T02:30:00+00:00",
+  "specSha256": "a87adbfa1648727b85068c0a067d23dff32cef827e5ba719466348b925b15c23"
 }

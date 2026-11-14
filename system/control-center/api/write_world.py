@@ -14,6 +14,16 @@ from services.mesh_authoring_policy import is_collision_mesh
 
 
 def route(path, body, deps):
+    if path.startswith('/api/location-assets/') and path.endswith('/collision-studio'):
+        try:
+            slug = path[len('/api/location-assets/'):-len('/collision-studio')].strip('/')
+            payload = body()
+            if not isinstance(payload, dict) or set(payload) != {'phase'}:
+                raise ValueError('Collision Studio operation requires phase only')
+            return 200, {'studio': deps['location_collision_authoring'].operate(slug, payload['phase'])}
+        except (ValueError, OSError, RuntimeError, KeyError) as error:
+            return 400, {'error': str(error)}
+
     if path == '/api/location-place-registry':
         try:
             payload = body()

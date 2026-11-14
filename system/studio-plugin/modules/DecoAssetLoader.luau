@@ -1,5 +1,6 @@
 local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
 local MeshPhysics = require(script.Parent.StudioMeshPhysicsCore)
+local RetiredCleanup = require(script.Parent.StudioRetiredColMeshCleanup)
 local MeshNames = require(script.Parent.StudioLocationMeshNames)
 local Carrier = require(script.Parent.StudioLocationRigCarrier)
 local SkinConnection = require(script.Parent.StudioSkinnedMeshConnection)
@@ -53,12 +54,6 @@ local function applyTexture(model: Model, textureAssetId: string, alphaEnabled: 
             if Carrier.IsCarrier(descendant) then
                 -- Carrier is a real published mesh, never an Atlas consumer.
                 Carrier.Prepare(descendant)
-            elseif MeshPhysics.IsCollider(descendant.Name) or descendant:GetAttribute("Game1DecoPhysicsOnly")==true then
-                -- COL is physics-only. Strip old importer texture remnants from
-                -- the fresh clone; never assign Atlas IDs to collision geometry.
-                descendant.TextureID = ""
-                local surface = descendant:FindFirstChildOfClass("SurfaceAppearance")
-                if surface then surface:Destroy() end
             else
                 StudioTextureAppearance.ApplyLocation(descendant, uri, alphaEnabled)
                 applied += 1
@@ -129,6 +124,7 @@ function DecoAssetLoader:loadPublished(row: any): Model
     -- RootPart + Motor6D assembly. Normalize only this detached fresh clone;
     -- placed Models are replaced transactionally and are never edited in situ.
     PublishedRigNormalize.Apply(model, row.rigManifest)
+    RetiredCleanup.CleanLocation(model)
     local carrier = Carrier.Validate(model, row.rigManifest, row.legacyStaticPublication)
     if carrier then
         -- The outer Roblox Model pivot can belong to an importer wrapper or
@@ -143,9 +139,7 @@ function DecoAssetLoader:loadPublished(row: any): Model
         -- Complete only missing paths on this detached clone, never on Place.
         for _, part in ipairs(model:GetDescendants()) do
             if part:IsA("MeshPart") and part ~= carrier then
-                local weldName = if MeshPhysics.IsCollider(part.Name) then "LocationRigWeld"
-                    else "LocationSkinWeld"
-                SkinConnection.Connect(model, carrier, part, weldName)
+                SkinConnection.Connect(model, carrier, part, "LocationSkinWeld")
             end
         end
         -- Promote the actual imported rig_carrier to PrimaryPart without

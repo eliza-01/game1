@@ -23,8 +23,9 @@ from .fbx import inspect, prepare_publication
 from .mesh_revisions import inspect_revision, save_immutable
 from .publication_textures import prepare_texture, published_format
 from .collision_policy import (
-    is_collision_mesh, requires_texture, default_no_collide, normalize_collision_fidelity,
+    requires_texture, default_no_collide, normalize_collision_fidelity,
 )
+from services.retired_col_mesh import retired, strip_options
 from services.texture_atlas_registry import AtlasRegistry, parse_filename, atlas_version, same_atlas_series
 from services.atlas_identity import display_identity
 
@@ -52,10 +53,7 @@ def mesh_options(parts, raw: dict | None) -> dict:
                 part, entry.get('collisionFidelity'), no_collide=effective_no_collide,
             ),
             'doubleSided': entry['doubleSided'] if type(entry.get('doubleSided')) is bool else False,
-            'collisionMesh': is_collision_mesh(part),
-            # Same authoring policy as Location Assets: solid weapon bounce by default.
-            # Actual break/damage simulation is a separate future gameplay feature.
-            'destructible': destructible if type(destructible) is bool and is_collision_mesh(part) else False,
+            'destructible': destructible if type(destructible) is bool else False,
         }
     return result
 
@@ -210,8 +208,6 @@ class RealEstateStore:
         row = self.get(slug)
         if not row or part not in row['meshParts']:
             raise ValueError('unknown Real Estate mesh')
-        if is_collision_mesh(part):
-            raise ValueError('collision-only mesh does not use a texture atlas')
         # A mesh with a shared/local-house reference must first be given its
         # own variant choice. Only the selected mesh changes; other bindings live.
         selected = self.atlases.get_variant(variant_id)
@@ -246,9 +242,9 @@ class RealEstateStore:
             row['rigWarnings'] = warnings_for_analysis(row['skeleton'])
             active = present_parts(row['skeleton'])
             row['meshParts'] = list(active)
-            row['meshSources'] = json.loads(row.pop('mesh_sources_json') or '{}')
+            row['meshSources'] = strip_options(json.loads(row.pop('mesh_sources_json') or '{}'))
             row['rigSourceHashes'] = {part: row['meshSources'].get(part, {}).get('sha256') or row['model_sha256'] for part in active}
-            row['meshOptions'] = mesh_options(active, json.loads(row.pop('mesh_options_json') or '{}'))
+            row['meshOptions'] = mesh_options(active, strip_options(json.loads(row.pop('mesh_options_json') or '{}')))
             # Legacy records may still store door assets after the FBX is
             # replaced with a doorless house; they are publication history,
             # not active resources for the current template.
@@ -261,13 +257,6 @@ class RealEstateStore:
                 row['rigAssets'][part].get('publishedSha256') == row['rigSourceHashes'][part]
                 for part in active)}
             for part in active:
-                # Physics geometry has a Model Asset but never needs an Image
-                # Asset. Historical texture records are preserved for audit.
-                if is_collision_mesh(part):
-                    row['textures'].setdefault(part, {'path':'', 'filename':'', 'sha256':'',
-                        'assetId':'', 'publishedSha256':'', 'reuseReference':''})
-                    current[part] = True
-                    continue
                 row['textures'][part] = self._atlas_metadata(row['slug'], part, row['textures'][part], atlas_catalog)
                 texture = row['textures'][part]
                 if texture.get('reuseReference'):
@@ -321,10 +310,6 @@ class RealEstateStore:
         active = present_parts(analysis)
         chosen_refs = {part: str(references.get(part) or '').strip() for part in active}
         for part, reference in chosen_refs.items():
-            if is_collision_mesh(part):
-                if reference:
-                    raise ValueError(f'{part}: collision mesh cannot select an atlas')
-                continue
             if reference and reference != 'same:house' and not reference.startswith('atlas:'):
                 raise ValueError(f'{part}: choose an independent atlas variant')
             if reference == 'same:house' and part == 'house':
@@ -368,8 +353,6 @@ class RealEstateStore:
         # Registry BEFORE it can be attached to a house part. No owner PNGs.
         atlas_selections = {}
         for part in active:
-            if is_collision_mesh(part):
-                continue
             ref = chosen_refs[part]
             if ref.startswith('atlas:'):
                 atlas_selections[part] = self.atlases.get_variant(int(ref[6:]))
@@ -407,13 +390,6 @@ class RealEstateStore:
                 shutil.copy2(source, destination_model)
         texture_rows = {}
         for part in active:
-            if is_collision_mesh(part):
-                # Store no new image binding or source for geometry-only mesh.
-                # Existing Roblox image publication history is never deleted.
-                texture_rows[part] = {'path':'', 'filename':'', 'sha256':'',
-                    'reuseReference':'', 'assetId':'', 'publishedSha256':'',
-                    'publicationFormat':''}
-                continue
             # Only the Atlas Registry owns the path and Image Asset ID. These
             # columns are transitional, non-authoritative placeholders.
             texture_rows[part] = {'path':'','filename':'','sha256':'',
@@ -569,14 +545,12 @@ class RealEstateStore:
                 raise ValueError(f'Invalid publication scope: {force_model_part} mesh is absent from this house')
         elif scope not in ('all', 'model') and image_part not in active:
             raise ValueError(f'Invalid publication scope: {image_part} mesh is absent from this house')
-        if image_part is not None and is_collision_mesh(image_part):
-            raise ValueError(f'{image_part}: collision geometry has no Image Asset to publish')
         description = str(credentials.get('description') or f'Game1 Real Estate {slug}')
         common = dict(display_name=slug, description=description,
                       creator_type=credentials['creatorType'], creator_id=credentials['creatorId'],
                       api_key=credentials['apiKey'])
         for part in active:
-            if not is_collision_mesh(part) and not row['textures'][part].get('atlasVariantId'):
+            if not row['textures'][part].get('atlasVariantId'):
                 raise ValueError(f'{part}: independent atlas binding is required before publication')
         # Once an Estate has mesh-specific sources, stage every requested
         # changed rig independently. A full-FBX edit may be published one part
@@ -682,10 +656,6 @@ class RealEstateStore:
                     self.export()
         for part in active:
             if scope != 'all' and image_part != part:
-                continue
-            if is_collision_mesh(part):
-                if image_part == part:
-                    raise ValueError(f'{part}: collision geometry has no Image Asset to publish')
                 continue
             # Refresh after each successful upload to preserve earlier progress.
             row = self.get(slug)

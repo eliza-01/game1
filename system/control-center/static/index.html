@@ -274,7 +274,7 @@
 
 <div id="real-estate-view" hidden>
 <div class="panel hero"><div><span class="eyebrow">property authoring · Real Estate</span><h2>real estate</h2>
-<p>Register an FBX containing the <code>house</code> mesh and any number of additional meshes (e.g. <code>door</code>, <code>restoration</code>, <code>glass</code>, <code>stone_fence_01_kit</code>). Visual meshes use atlases, while <code>COL_</code> meshes use a physics-only Model Asset with no texture. The <code>house_armature</code> is required for the house. Door and interaction bones are optional.</p></div></div>
+<p>Register an FBX containing the <code>house</code> mesh and any number of additional meshes (e.g. <code>door</code>, <code>restoration</code>, <code>glass</code>, <code>stone_fence_01_kit</code>). Visual meshes use atlases. Static house collision will be authored independently as Roblox Parts. The <code>house_armature</code> is required for the house. Door and interaction bones are optional.</p></div></div>
 <div class="real-estate-workflow">
 <div class="panel character-card">
 <span class="eyebrow">01 · house identity</span><h3>register house</h3>
@@ -284,7 +284,7 @@
 <div class="details">asset slug: <strong id="real-estate-slug">house_level1_01</strong></div>
 <div class="real-estate-identity-fields"><label>purchase price<input id="real-estate-purchase" type="number" min="1" value="1" step="1"></label><label>minimum purchase level<input id="real-estate-min-level" type="number" min="1" value="1" step="1"></label><label>sale price<input id="real-estate-sale" type="number" min="1" value="1" step="1"></label></div>
 <hr class="card-separator"><span class="eyebrow">02 · mesh textures</span><h3>per-mesh textures</h3>
-<p class="hint">Choose an atlas for each visual mesh, or enable <strong>Reuse atlas</strong>. <code>COL_</code> / <code>_col</code> meshes are physics-only: they have no texture and default to collision enabled. <code>door</code> and <code>window_frames_glass</code> also default to collisions enabled (<strong>No Collide</strong> unchecked). Other visual meshes default to <strong>No Collide</strong>. Every mesh with <strong>CanCollide enabled</strong> uses <strong>PreciseConvexDecomposition</strong>, even if it previously stored Default, Hull or Box. Non-collidable visual meshes default to <strong>Box</strong>. DoubleSided is <strong>off by default</strong> for new mesh settings; saved overrides are retained. The editor shows CanCollide, CanTouch and CanQuery, plus per-mesh Fidelity and DoubleSided controls.</p>
+<p class="hint">Use an Atlas for each visible mesh. Dedicated <code>COL_*</code> / <code>col_mesh</code> meshes are retired and excluded during FBX inspection and publication. All Real Estate visual meshes default to <strong>No Collide</strong> until Part-based Collision Blueprints are authored. An explicitly collidable visual mesh may use Box, Hull, Default or Precise; Precise is not forced. CanTouch stays off. DoubleSided and per-mesh physics options remain configurable.</p>
 <div id="real-estate-mesh-textures" class="real-estate-texture-list"></div>
 <div id="real-estate-rig-warnings" class="real-estate-rig-warnings" hidden></div>
 <details id="real-estate-rig-details" class="real-estate-bone-details"><summary id="real-estate-rig">choose an FBX to inspect its mesh bones</summary><div id="real-estate-bone-list" class="real-estate-bone-list"></div></details>

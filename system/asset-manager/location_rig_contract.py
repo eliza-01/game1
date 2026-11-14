@@ -18,8 +18,6 @@ def role(name: str) -> str:
     lower = name.casefold()
     if lower == CARRIER:
         return 'rig_carrier'
-    if lower == 'col_mesh' or lower.startswith('col_'):
-        return 'collider'
     return 'visual'
 
 
@@ -41,6 +39,8 @@ def validate(parts: list[dict], bones: list[dict], *, source_sha256: str = '') -
         raise ValueError('RootPart and empty part names are forbidden in Location authoring')
     if len(names) != len(set(n.casefold() for n in names)):
         raise ValueError('duplicate MeshPart names in Location rig')
+    if any(name.casefold() == 'col_mesh' or name.casefold().startswith('col_') or '_col_' in name.casefold() or name.casefold().endswith('_col') for name in names):
+        raise ValueError('COL mesh is retired; author collision with Roblox Parts')
     if any(name.casefold() == CARRIER and name != CARRIER for name in names):
         raise ValueError('rig_carrier MeshPart name must use canonical lowercase spelling')
     carriers = [p for p in parts if role(p['name']) == 'rig_carrier']

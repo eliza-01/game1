@@ -32,6 +32,7 @@ local StudioCharacterTestStand = require(script.Parent.modules.StudioCharacterTe
 local StudioHousePlacementCapture = require(script.Parent.modules.StudioHousePlacementCapture)
 local StudioHousePlacementPreview = require(script.Parent.modules.StudioHousePlacementPreview)
 local StudioRealEstatePlacedPhysicsGuard = require(script.Parent.modules.StudioRealEstatePlacedPhysicsGuard)
+local RetiredCleanup = require(script.Parent.modules.StudioRetiredColMeshCleanup)
 
 local toolbar = plugin:CreateToolbar("game1")
 local markerVisibility = StudioMarkerVisibility.new(plugin, toolbar, Workspace)
@@ -51,7 +52,19 @@ local AGENT_TOKEN = "Game1LocalControlV1"
 local BRIDGE_URL = "http://127.0.0.1:43137"
 local BRIDGE_TOKEN = "Game1StudioBridgeV1"
 
--- Only Studio authoring copies are corrected; gameplay actors are untouched.
+-- One-time destructive M342 cleanup of owned source templates and placed world models.
+-- Unmanaged characters/objects are never scanned as migration targets.
+if not RunService:IsRunning() then
+    local workspaceRemoved = RetiredCleanup.CleanManagedTree(Workspace)
+    local templatesRemoved = RetiredCleanup.CleanManagedTree(ServerStorage)
+    local legacyPlaces = RetiredCleanup.CleanLegacyAssetTree(Workspace:FindFirstChild("Places"))
+    local legacyPlots = RetiredCleanup.CleanLegacyAssetTree(Workspace:FindFirstChild("Plots"))
+    local legacyTemplates = RetiredCleanup.CleanLegacyAssetTree(ServerStorage)
+    print(('[game1 plugin] M342R COL cleanup · managed %d/%d · templates %d/%d · old Places %d · old Plots %d · old templates %d')
+        :format(workspaceRemoved.estate, workspaceRemoved.location,
+            templatesRemoved.estate, templatesRemoved.location,
+            legacyPlaces, legacyPlots, legacyTemplates))
+end
 local stopEstateCopyGuard = StudioRealEstatePlacedPhysicsGuard.Start(Workspace, RunService)
 plugin.Unloading:Connect(stopEstateCopyGuard)
 
@@ -346,6 +359,7 @@ return CharacterTemplate
           <string name="Name">DecoAssetLoader</string>
           <string name="Source"><![CDATA[local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
 local MeshPhysics = require(script.Parent.StudioMeshPhysicsCore)
+local RetiredCleanup = require(script.Parent.StudioRetiredColMeshCleanup)
 local MeshNames = require(script.Parent.StudioLocationMeshNames)
 local Carrier = require(script.Parent.StudioLocationRigCarrier)
 local SkinConnection = require(script.Parent.StudioSkinnedMeshConnection)
@@ -399,12 +413,6 @@ local function applyTexture(model: Model, textureAssetId: string, alphaEnabled: 
             if Carrier.IsCarrier(descendant) then
                 -- Carrier is a real published mesh, never an Atlas consumer.
                 Carrier.Prepare(descendant)
-            elseif MeshPhysics.IsCollider(descendant.Name) or descendant:GetAttribute("Game1DecoPhysicsOnly")==true then
-                -- COL is physics-only. Strip old importer texture remnants from
-                -- the fresh clone; never assign Atlas IDs to collision geometry.
-                descendant.TextureID = ""
-                local surface = descendant:FindFirstChildOfClass("SurfaceAppearance")
-                if surface then surface:Destroy() end
             else
                 StudioTextureAppearance.ApplyLocation(descendant, uri, alphaEnabled)
                 applied += 1
@@ -475,6 +483,7 @@ function DecoAssetLoader:loadPublished(row: any): Model
     -- RootPart + Motor6D assembly. Normalize only this detached fresh clone;
     -- placed Models are replaced transactionally and are never edited in situ.
     PublishedRigNormalize.Apply(model, row.rigManifest)
+    RetiredCleanup.CleanLocation(model)
     local carrier = Carrier.Validate(model, row.rigManifest, row.legacyStaticPublication)
     if carrier then
         -- The outer Roblox Model pivot can belong to an importer wrapper or
@@ -489,9 +498,7 @@ function DecoAssetLoader:loadPublished(row: any): Model
         -- Complete only missing paths on this detached clone, never on Place.
         for _, part in ipairs(model:GetDescendants()) do
             if part:IsA("MeshPart") and part ~= carrier then
-                local weldName = if MeshPhysics.IsCollider(part.Name) then "LocationRigWeld"
-                    else "LocationSkinWeld"
-                SkinConnection.Connect(model, carrier, part, weldName)
+                SkinConnection.Connect(model, carrier, part, "LocationSkinWeld")
             end
         end
         -- Promote the actual imported rig_carrier to PrimaryPart without
@@ -1334,6 +1341,7 @@ local History = require(script.Parent.StudioPublishedMeshHistory)
 local BoneEffects = require(script.Parent.StudioPlacedRigBoneEffects)
 local Placement = require(script.Parent.DecoAssetPreparation)
 local Physics = require(script.Parent.StudioMeshPhysicsCore)
+local RetiredCleanup = require(script.Parent.StudioRetiredColMeshCleanup)
 local Ownership = require(script.Parent.StudioLocationPlacementOwner)
 local Geometry = require(script.Parent.StudioLocationPlacedGeometry)
 local DecoPlacedAssetSync = {}
@@ -1742,6 +1750,7 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
     end
     for _, item in ipairs(plans) do
         if item.swap then RigSwap.Finalize(item.swap) end
+        RetiredCleanup.CleanLocation(item.model)
     end
     disposeStages()
     local summary, grouped = {}, {}
@@ -5071,15 +5080,6 @@ function Published.VisualCurrent(entry: any, meshId: string): boolean
     return false
 end
 
-function Published.RequiresCollider(entry: any): boolean
-    local version = current(entry)
-    if not version then return false end
-    for _, mesh in ipairs(version.meshes) do
-        if type(mesh.visualNames) == "table" and #mesh.visualNames == 0 then return true end
-    end
-    return false
-end
-
 function Published.CurrentShape(entry: any, root: Model?): boolean
     local version = current(entry)
     return root ~= nil and version ~= nil and History.MatchesInventory(root, version)
@@ -5159,20 +5159,8 @@ function Normalize.Apply(model: Model, manifest: any): CFrame
         end
         expected[row.name] = row.role
     end
-    -- A COLLIDER is optional for Location Assets, including skinned ones.
-    -- The transparent Roblox importer RootPart is never authored collision:
-    -- its default CanCollide/CanQuery flags must not force a fake COL mesh.
-    -- If the immutable FBX manifest *does* declare COL geometry, require it
-    -- before removing the importer scaffolding. StudioMeshPhysicsCore applies
-    -- the existing visual/COL physics policy after Carrier.Validate.
-    for name, role in pairs(expected) do
-        if role == "collider" then
-            local collider = model:FindFirstChild(name, true)
-            if not collider or not collider:IsA("MeshPart") then
-                error("published Location is missing declared collider: " .. name)
-            end
-        end
-    end
+    -- Retired COL parts from immutable publications are not required.
+    -- The actual rig/carrier validation runs after COL removal.
     local carrier = model:FindFirstChild("rig_carrier")
     if not carrier or not carrier:IsA("MeshPart") or expected[carrier.Name] ~= "rig_carrier" then
         error("importer RootPart has no authored rig_carrier target")
@@ -5247,6 +5235,12 @@ return table.freeze(Normalize)
 -- Character and Real Estate have their own domain assembly rules.
 local Carrier = {}
 
+local function retired(name: string): boolean
+    local lower = string.lower(name)
+    return lower:sub(1, 4) == "col_" or lower:sub(-4) == "_col"
+        or lower:find("_col_", 1, true) ~= nil
+end
+
 function Carrier.IsCarrier(part: Instance): boolean
     return part:IsA("MeshPart") and part.Name == "rig_carrier"
 end
@@ -5310,8 +5304,7 @@ local function validateStatic(model: Model)
             error("static Location publication unexpectedly contains Bones")
         elseif child.Name == "rig_carrier" then
             error("static Location publication must not contain rig_carrier")
-        elseif child:IsA("MeshPart") and child.Name ~= "col_mesh"
-            and child.Name:sub(1, 4) ~= "col_" then
+        elseif child:IsA("MeshPart") and not retired(child.Name) then
             visuals += 1
         end
     end
@@ -5378,11 +5371,11 @@ function Carrier.Validate(model: Model, manifest: any, legacyStatic: boolean?): 
             or expected[part.name] ~= nil then
             error("invalid/duplicate Location publication manifest role")
         end
-        expected[part.name] = part.role
+        if not retired(part.name) then expected[part.name] = part.role end
     end
     validateImporterMotors(model, manifest, expected)
     for _, child in ipairs(model:GetDescendants()) do
-        if child:IsA("MeshPart") then
+        if child:IsA("MeshPart") and not retired(child.Name) then
             if seen[child.Name] then error("duplicate published Location MeshPart name") end
             seen[child.Name] = true
             local role = if Carrier.IsCarrier(child) then "rig_carrier"
@@ -5816,8 +5809,7 @@ return table.freeze(Visibility)
       <Item class="ModuleScript" referent="32">
         <Properties>
           <string name="Name">StudioMeshPhysicsCore</string>
-          <string name="Source"><![CDATA[-- One Studio MeshPart physics writer shared by Real Estate and Location Assets.
--- Every collidable MeshPart uses Precise. Box is the default for no-collision.
+          <string name="Source"><![CDATA[-- Shared visual MeshPart physics writer; special COL meshes are retired.
 local Core = {}
 local FIDELITY = {
     Box = Enum.CollisionFidelity.Box,
@@ -5837,7 +5829,7 @@ function Core.IsLocationCarrier(part: Instance): boolean
 end
 
 function Core.IsGlass(name: string): boolean
-    return not Core.IsCollider(name) and string.find(string.lower(name), "glass", 1, true) ~= nil
+    return string.find(string.lower(name), "glass", 1, true) ~= nil
 end
 
 function Core.Fidelity(name: string): Enum.CollisionFidelity
@@ -5868,7 +5860,7 @@ end
 
 function Core.Apply(mesh: MeshPart, canCollide: boolean, fidelity: string, doubleSided: boolean)
     applyRuntimeProperties(mesh, canCollide, doubleSided)
-    mesh.CollisionFidelity = Core.Fidelity(if canCollide then "PreciseConvexDecomposition" else fidelity)
+    mesh.CollisionFidelity = Core.Fidelity(fidelity)
 end
 
 local function parts(model: Model): {MeshPart}
@@ -5879,53 +5871,31 @@ local function parts(model: Model): {MeshPart}
     return found
 end
 
--- Both domains use Core.Apply as the only MeshPart property writer.
--- Location uses name classification plus saved per-mesh overrides. A missing
--- meshOptions entry means legacy behavior: never silently migrate a Place.
+-- M342: COL_* has no runtime role. Any retired geometry is deleted during
+-- Studio preparation and Location loading. A visual mesh can still opt into
+-- ordinary collisions via noCollide=false and a chosen CollisionFidelity.
 local function applyLocationModel(model: Model, allowedNames: {[string]: boolean}?, meshOptions: any?, runtimeSafe: boolean): number
-    local allParts = parts(model)
-    local hasCollider = false
-    for _, mesh in ipairs(allParts) do
-        if Core.IsCollider(mesh.Name) then hasCollider = true break end
-    end
     local affected = 0
-    for _, mesh in ipairs(allParts) do
+    for _, mesh in ipairs(parts(model)) do
         if not Core.IsLocationCarrier(mesh) and (allowedNames == nil or allowedNames[mesh.Name] == true) then
-            local collider, namedGlass = Core.IsCollider(mesh.Name), Core.IsGlass(mesh.Name)
             local raw = if typeof(meshOptions) == "table" then meshOptions[mesh.Name] else nil
-            local explicit = typeof(raw) == "table"
-            local glass = if explicit and typeof(raw.glass) == "boolean" then raw.glass else namedGlass
-            local doublesided = if explicit and typeof(raw.doubleSided) == "boolean"
+            local noCollide = if typeof(raw) == "table" and typeof(raw.noCollide) == "boolean"
+                then raw.noCollide else false
+            local doubleSided = if typeof(raw) == "table" and typeof(raw.doubleSided) == "boolean"
                 then raw.doubleSided else false
-            local defaultNoCollide = if hasCollider then not collider else not (collider or namedGlass)
-            local noCollide = if explicit and typeof(raw.noCollide) == "boolean"
-                then raw.noCollide else defaultNoCollide
-            if explicit or hasCollider or collider or namedGlass then
-                local fidelity = if noCollide and explicit and typeof(raw.collisionFidelity) == "string"
-                    then raw.collisionFidelity elseif noCollide then "Box" else "PreciseConvexDecomposition"
-                -- All collidable MeshParts are Precise, including COL_*.
-                if runtimeSafe then
-                    Core.ApplyRuntime(mesh, not noCollide, doublesided)
-                else
-                    Core.Apply(mesh, not noCollide, fidelity, doublesided)
-                end
+            local fidelity = if typeof(raw) == "table" and typeof(raw.collisionFidelity) == "string"
+                then raw.collisionFidelity else "Box"
+            if runtimeSafe then
+                Core.ApplyRuntime(mesh, not noCollide, doubleSided)
             else
-                -- Legacy Location without COL: do not override pre-M232 published physics.
-                mesh.CanTouch = false
-                mesh.DoubleSided = false
+                Core.Apply(mesh, not noCollide, fidelity, doubleSided)
             end
-            if collider then
-                mesh.Transparency = 1
-                mesh.CastShadow = false
-                mesh:SetAttribute("Game1DecoPhysicsOnly", true)
-            else
-                mesh:SetAttribute("Game1DecoPhysicsOnly", nil)
-            end
-            if glass then
-                if mesh:GetAttribute("Game1DecoGlassApplied") ~= true then
-                    mesh.Transparency = math.max(mesh.Transparency, 0.02)
-                    mesh:SetAttribute("Game1DecoGlassApplied", true)
-                end
+            mesh:SetAttribute("Game1DecoPhysicsOnly", nil)
+            local glass = if typeof(raw) == "table" and typeof(raw.glass) == "boolean"
+                then raw.glass else Core.IsGlass(mesh.Name)
+            if glass and mesh:GetAttribute("Game1DecoGlassApplied") ~= true then
+                mesh.Transparency = math.max(mesh.Transparency, 0.02)
+                mesh:SetAttribute("Game1DecoGlassApplied", true)
             end
             affected += 1
         end
@@ -5955,8 +5925,6 @@ function Core.ApplyLocationSurfaceMaterial(model: Model, surfaceKey: string?, ph
     local changed = 0
     for _, mesh in ipairs(parts(model)) do
         if Core.IsLocationCarrier(mesh) then continue end
-        -- COL receives exactly the same semantic/physical material as visual parts,
-        -- but continues to be invisible with its own Precise collision policy.
         local differs = mesh:GetAttribute("Game1LocationSurfaceMaterial") ~= key
         if material ~= nil and mesh.Material ~= material then differs = true end
         if differs then
@@ -7044,13 +7012,6 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
                 end
             end
         end
-        local colliders=0
-        if root then
-            for _,child in ipairs(root:GetDescendants()) do
-                if child:IsA("MeshPart") and (Physics.IsCollider(child.Name)
-                    or child:GetAttribute("Game1DecoPhysicsOnly")==true) then colliders+=1 end
-            end
-        end
         local structuralState = if root then CarrierRig.Diagnose(root,if eligible then entry.rigManifest else nil,
             eligible and entry.legacyStaticPublication)
             else "repair_required"
@@ -7082,7 +7043,6 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
         end
         if not eligible then warn("Один Mesh ID встречается у нескольких Location Assets") end
         if not root then warn("Нет отдельной Model для этого экземпляра") end
-        if eligible and Published.RequiresCollider(entry) and colliders==0 then warn("Нет обязательного COL-меша") end
         if needsRig and not needsMesh then warn("Новая версия модели отличается по составу MeshPart, хотя визуальный Mesh ID совпадает") end
         if needsMaterial then warn("Материал поверхности требует Sync: "..entry.material) end
         if needsAlpha then warn("AlphaMode требует Sync") end
@@ -7160,10 +7120,10 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
             name=placement.Name,path=placement:GetFullName(),placementId=assigned,
             modelAssetId=if eligible then oldId else "",meshId=original.meshId,
             textureId=original.textureId,expectedMeshId=if eligible then entry.model else "",
-            expectedTextureId=if eligible then entry.atlas else "",colCount=colliders,
+            expectedTextureId=if eligible then entry.atlas else "",
             needsMesh=needsMesh,needsRig=needsRig,needsTexture=needsTexture,needsMaterial=needsMaterial,needsAlpha=needsAlpha,needsStructure=structuralState ~= "current" or not root or badName or meshNameMismatch or assigned==""
-                or (root and root:GetAttribute("Game1DecoAssetSlug")~=entry.slug)
-                or (eligible and Published.RequiresCollider(entry) and colliders==0),
+                or (root and root:GetAttribute("Game1DecoAssetSlug")~=entry.slug),
+
             duplicateId=false,ambiguous=not eligible or provenForeignClaim,
             -- Repair remains metadata-only. A verified old publication is
             -- migrated by Sync through the shared whole-child-rig swap.
@@ -7179,7 +7139,7 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
                 and (not needsMesh and not needsRig or oldId~=""),
             status=if not eligible then "ambiguous" elseif needsMesh or needsRig or needsTexture or needsMaterial or needsAlpha
                 or structuralState ~= "current" or not root or badName or meshNameMismatch or assigned==""
-                or oldClaim or foreignClaim or (Published.RequiresCollider(entry) and colliders==0)
+                or oldClaim or foreignClaim
                 then "pending" else "current",
             issues=issues,hierarchy=fullHierarchy,transform={cframe={part.CFrame:GetComponents()},
                 size={part.Size.X,part.Size.Y,part.Size.Z},position=positionOf(part),
@@ -7192,7 +7152,7 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
             rootPivot=if root then root:GetPivot() else nil,
             rootPrimary=if root then root.PrimaryPart else nil,
             row=row,entry=if eligible then entry else nil,structuralState=structuralState,
-            oldVersion=oldId,hasImporterRoot=hasImporterRoot,needsCol=eligible and Published.RequiresCollider(entry) and colliders==0,
+            oldVersion=oldId,hasImporterRoot=hasImporterRoot,
             currentVisual=eligible and Published.VisualCurrent(entry,id(part.MeshId))}
     end
     for _,indexes in pairs(duplicateGroups) do
@@ -7292,7 +7252,7 @@ function Repair.Apply(refs: {any}, ctx: any): any
                 .. "; требуется перепубликация FBX, не Repair")
         elseif not ref.root or ref.root.Parent == nil then
             table.insert(blocked, ref.row.key .. ": нет подтверждённой Model, требуется публикация FBX")
-        elseif ref.needsCol or ref.row.needsRig or ref.row.needsMesh then
+        elseif ref.row.needsRig or ref.row.needsMesh then
             table.insert(blocked, ref.row.key .. ": изменение геометрии выполняется из опубликованной Model, не через Repair")
         elseif not ref.row.needsStructure and not ref.row.duplicateId then
             table.insert(blocked, ref.row.key .. ": метаданные уже актуальны")
@@ -8624,13 +8584,9 @@ return table.freeze(Inventory)
       <Item class="ModuleScript" referent="45">
         <Properties>
           <string name="Name">StudioRealEstateCollisionPolicy</string>
-          <string name="Source"><![CDATA[-- Real Estate physics profile; shared MeshPhysicsCore writes MeshPart physics.
--- New authored MeshParts default to single-sided; existing explicit overrides remain.
-local CollectionService = game:GetService("CollectionService")
+          <string name="Source"><![CDATA[-- M342: Real Estate visual-mesh authoring. Collision Blueprint Parts are separate.
 local Core = require(script.Parent.StudioMeshPhysicsCore)
 local Policy = {}
-local COLLIDER_TAG = "Game1RealEstateCollider"
-
 local FIDELITY = {
     Box = Core.Fidelity("Box"),
     Hull = Core.Fidelity("Hull"),
@@ -8638,92 +8594,19 @@ local FIDELITY = {
     PreciseConvexDecomposition = Core.Fidelity("PreciseConvexDecomposition"),
 }
 
-function Policy.IsCollider(name: string): boolean
-    return Core.IsCollider(name)
-end
-
-local function preciseByDefault(name: string): boolean
-    local lower = string.lower(name)
-    return Policy.IsCollider(name) or lower == "door" or lower:sub(1, 5) == "door_"
-        or Core.IsGlass(name)
-end
-
 function Policy.Apply(mesh: MeshPart, name: string, raw: any)
-    local collider = Policy.IsCollider(name)
     local settings = if typeof(raw) == "table" then raw else {}
-    local preciseDefault = preciseByDefault(name)
-    local noCollide = if typeof(settings.noCollide) == "boolean" then settings.noCollide
-        else not preciseDefault
-    -- The physical shape must be Precise for EVERY collidable part, regardless
-    -- of its name or an old saved Default/Box/Hull value.
-    local fidelity = if not noCollide then "PreciseConvexDecomposition" else settings.collisionFidelity
-    if typeof(fidelity) ~= "string" or FIDELITY[fidelity] == nil then
-        fidelity = if preciseDefault then "PreciseConvexDecomposition" else "Box"
-    end
-
-    -- Roblox requires CanQuery=true for collidable parts. Touch remains off
-    -- (collision physics does not require a Touched event listener).
+    local noCollide = if typeof(settings.noCollide) == "boolean" then settings.noCollide else true
+    local fidelity = if typeof(settings.collisionFidelity) == "string"
+        and FIDELITY[settings.collisionFidelity] then settings.collisionFidelity else "Box"
     Core.Apply(mesh, not noCollide, fidelity,
         if typeof(settings.doubleSided) == "boolean" then settings.doubleSided else false)
-    -- Capture the *authoring policy* on the MeshPart itself. Studio copies can
-    -- be revalidated without a Host Agent request or a full model reimport.
-    -- This metadata is not a second registry: it is the applied snapshot.
     mesh:SetAttribute("Game1RealEstateNoCollide", noCollide)
     mesh:SetAttribute("Game1RealEstateCollisionFidelity", fidelity)
     mesh:SetAttribute("Game1RealEstateDoubleSided", mesh.DoubleSided)
-
-    if collider then
-        mesh.Transparency = 1
-        mesh.CastShadow = false
-        mesh.Anchored = true
-        mesh:SetAttribute("Game1RealEstatePhysicsOnly", true)
-        mesh:SetAttribute("Game1RealEstateDestructible", settings.destructible == true)
-        CollectionService:AddTag(mesh, COLLIDER_TAG)
-    else
-        -- Houses are static buildings. Published MeshParts may be unanchored.
-        if string.lower(name) == "house" then
-            mesh.Anchored = true
-        end
-        mesh:SetAttribute("Game1RealEstatePhysicsOnly", nil)
-        mesh:SetAttribute("Game1RealEstateDestructible", nil)
-        if CollectionService:HasTag(mesh, COLLIDER_TAG) then
-            CollectionService:RemoveTag(mesh, COLLIDER_TAG)
-        end
-    end
-end
-
--- Studio copy/paste does not pass through Model.Place/PartSync. Reassert the
--- imported physical shape after a managed house enters Workspace, preserving
--- the explicit mesh settings recorded by Apply. Older templates (before this
--- snapshot existed) fall back to their copied collision toggles.
-function Policy.RestoreCopiedMesh(mesh: MeshPart): boolean
-    local noCollide = mesh:GetAttribute("Game1RealEstateNoCollide")
-    if typeof(noCollide) ~= "boolean" then
-        noCollide = not mesh.CanCollide
-    end
-    local fidelity = mesh:GetAttribute("Game1RealEstateCollisionFidelity")
-    if typeof(fidelity) ~= "string" or FIDELITY[fidelity] == nil then
-        fidelity = mesh.CollisionFidelity.Name
-    end
-    local doubleSided = mesh:GetAttribute("Game1RealEstateDoubleSided")
-    if typeof(doubleSided) ~= "boolean" then
-        doubleSided = mesh.DoubleSided
-    end
-    local expected = if noCollide then (FIDELITY[fidelity] or FIDELITY.Box)
-        else FIDELITY.PreciseConvexDecomposition
-    local needsRestore = mesh.CollisionFidelity ~= expected
-        or mesh.CanCollide ~= not noCollide
-        or mesh.CanQuery ~= not noCollide
-        or mesh.CanTouch ~= false
-        or mesh.DoubleSided ~= doubleSided
-    if not needsRestore then return false end
-    Policy.Apply(mesh, mesh.Name, {
-        noCollide = noCollide,
-        collisionFidelity = fidelity,
-        doubleSided = doubleSided,
-        destructible = mesh:GetAttribute("Game1RealEstateDestructible") == true,
-    })
-    return true
+    mesh:SetAttribute("Game1RealEstatePhysicsOnly", nil)
+    mesh:SetAttribute("Game1RealEstateDestructible", nil)
+    if string.lower(name) == "house" then mesh.Anchored = true end
 end
 
 return table.freeze(Policy)
@@ -8766,7 +8649,7 @@ local HttpService = game:GetService("HttpService")
 local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
 local StudioRealEstateRigValidation = require(script.Parent.StudioRealEstateRigValidation)
 local StudioRealEstateCollisionPolicy = require(script.Parent.StudioRealEstateCollisionPolicy)
-local StudioRealEstatePlacedCollisionSync = require(script.Parent.StudioRealEstatePlacedCollisionSync)
+local RetiredCleanup = require(script.Parent.StudioRetiredColMeshCleanup)
 local StudioRealEstatePlacedVisualSync = require(script.Parent.StudioRealEstatePlacedVisualSync)
 local PlacedTargets = require(script.Parent.StudioRealEstatePlacedTargets)
 local HouseFrame = require(script.Parent.StudioRealEstateHouseFrame)
@@ -8844,7 +8727,7 @@ local function refreshPlaced(slug: string, imageAssets: {[string]: string}, imag
                     StudioTextureAppearance.Apply(child, "rbxassetid://" .. imageAssets[part], imageAlpha[part])
                     setGlassAppearance(child, typeof(settings) == 'table' and settings.glass == true)
                 end
-                if imageAssets[part] or StudioRealEstateCollisionPolicy.IsCollider(part) then
+                if imageAssets[part] then
                     StudioRealEstateCollisionPolicy.Apply(child, part, settings)
                     applied = true
                 end
@@ -8885,9 +8768,8 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
     for _, part in parts do
         local id = tonumber(rigIds[part])
         if not id or id <= 0 or seenModels[id]
-            or (not StudioRealEstateCollisionPolicy.IsCollider(part) and not imageAssets[part]) then
-            error("Real Estate " .. part .. " requires a published Model Asset"
-                .. (StudioRealEstateCollisionPolicy.IsCollider(part) and "" or " and Image Asset"))
+            or not imageAssets[part] then
+            error("Real Estate " .. part .. " requires a published Model Asset and Image Asset")
         end
         seenModels[id] = true
     end
@@ -8950,10 +8832,6 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
         local part = entry.part
         local rigName = part:sub(1, 1):upper() .. part:sub(2) .. "Rig"
         entry.rig.Name = rigName
-        if StudioRealEstateCollisionPolicy.IsCollider(part) then
-            entry.rig:SetAttribute("Game1RealEstatePhysicsRig", true)
-            entry.rig:SetAttribute("Game1RealEstatePhysicsMeshName", part)
-        end
         -- DoorAssembly is the only moving unit. Do not edit Bone.Transform:
         -- the hinge Bone identifies the world-space pivot for Model:PivotTo().
         if part == "door" and meshes[part]:FindFirstChild(DOOR_HINGE, true) then
@@ -8974,11 +8852,9 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
             entry.rig.Parent = wrapper
         end
         local settings = meshOptions[part]
-        if not StudioRealEstateCollisionPolicy.IsCollider(part) then
-            StudioTextureAppearance.Apply(meshes[part], "rbxassetid://" .. imageAssets[part], imageAlpha[part])
-            setGlassAppearance(meshes[part], typeof(settings) == 'table' and settings.glass == true)
-            textureCount += 1
-        end
+        StudioTextureAppearance.Apply(meshes[part], "rbxassetid://" .. imageAssets[part], imageAlpha[part])
+        setGlassAppearance(meshes[part], typeof(settings) == 'table' and settings.glass == true)
+        textureCount += 1
         StudioRealEstateCollisionPolicy.Apply(meshes[part], part, settings)
     end
     -- Align the new complete assembly to the previously registered house
@@ -9011,12 +8887,11 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
     if previous then
         previous:Destroy()
     end
-    -- Retrofit managed physics rigs into existing placed houses, preserving
-    -- their CFrame and all user-owned models / furnishings.
+    -- Remove obsolete COL geometry from all placed managed houses at Sync.
     local placedTargets = PlacedTargets.List(slug)
-    local collisionUpdated, collisionWarnings = StudioRealEstatePlacedCollisionSync.Update(wrapper, slug, placedTargets)
-    for _, warning in collisionWarnings do
-        table.insert(rigWarnings, warning)
+    local collisionUpdated = RetiredCleanup.CleanEstate(wrapper)
+    for _, root in placedTargets do
+        collisionUpdated += RetiredCleanup.CleanEstate(root)
     end
     local visualUpdated, visualFound, visualWarnings = StudioRealEstatePlacedVisualSync.Update(wrapper, slug, placedTargets)
     for _, warning in visualWarnings do
@@ -9173,6 +9048,7 @@ return table.freeze(Placement)
 local HttpService = game:GetService("HttpService")
 local Validation = require(script.Parent.StudioRealEstateRigValidation)
 local Collision = require(script.Parent.StudioRealEstateCollisionPolicy)
+local RetiredCleanup = require(script.Parent.StudioRetiredColMeshCleanup)
 local Texture = require(script.Parent.StudioTextureAppearance)
 local PlacedTargets = require(script.Parent.StudioRealEstatePlacedTargets)
 local HouseFrame = require(script.Parent.StudioRealEstateHouseFrame)
@@ -9234,7 +9110,7 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
             usesAlpha = entry.usesAlpha
         end
     end
-    if not Collision.IsCollider(part) and (not imageId or imageId <= 0) then
+    if not imageId or imageId <= 0 then
         error("Targeted Real Estate rig " .. part .. " has no published Image Asset")
     end
     local settings = (typeof(metadata.meshOptions) == "table" and metadata.meshOptions[part]) or {}
@@ -9264,10 +9140,6 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
     end
     local replacement: Model = imported
     imported.Name = rigName(part)
-    if Collision.IsCollider(part) then
-        imported:SetAttribute("Game1RealEstatePhysicsRig", true)
-        imported:SetAttribute("Game1RealEstatePhysicsMeshName", part)
-    end
     imported:SetAttribute("Game1RealEstateManagedPart", part)
     if part == "door" then
         local hinge = mesh:FindFirstChild("door_01_hinge_socket", true)
@@ -9303,6 +9175,7 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
         error("Real Estate targeted rig swap failed: " .. tostring(problem))
     end
     old:Destroy()
+    RetiredCleanup.CleanEstate(wrapper)
     local savedIds = decodeMap(wrapper:GetAttribute("Game1RigAssetIds"))
     savedIds[part] = tostring(assetId)
     wrapper:SetAttribute("Game1RigAssetIds", HttpService:JSONEncode(savedIds))
@@ -9385,6 +9258,9 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
             table.insert(warnings, root:GetFullName() .. ": " .. tostring(cause))
         end
     end
+    for _, root in PlacedTargets.List(slug) do
+        RetiredCleanup.CleanEstate(root)
+    end
     return wrapper, {bonesValidated = true, rigsValidated = 1,
         texturesApplied = if imageId then 1 else 0,
         partialSync = true, part = part, placedSyncVersion = 2, workspaceModelsUpdated = placedCount,
@@ -9401,87 +9277,11 @@ return table.freeze(PartSync)
       </Item>
       <Item class="ModuleScript" referent="50">
         <Properties>
-          <string name="Name">StudioRealEstatePlacedCollisionSync</string>
-          <string name="Source"><![CDATA[-- Repair *only* authoring-managed collision rigs of already placed Estates.
--- A Studio sync of a new COL_* Model Asset must not leave older placed
--- buildings walking on the obsolete visual-mesh collision approximation.
--- No repositioning / replacement of visual house, door, or edited props.
-local CollisionPolicy = require(script.Parent.StudioRealEstateCollisionPolicy)
-local Targets = require(script.Parent.StudioRealEstatePlacedTargets)
-local HouseFrame = require(script.Parent.StudioRealEstateHouseFrame)
-local Sync = {}
-
-local function authoredRigs(template: Model): {[string]: Model}
-    local result = {}
-    for _, rig in template:GetChildren() do
-        if rig:IsA("Model") and rig:GetAttribute("Game1RealEstatePhysicsRig") == true then
-            local part = rig:GetAttribute("Game1RealEstatePhysicsMeshName")
-            if typeof(part) == "string" and CollisionPolicy.IsCollider(part) then
-                result[part] = rig
-            end
-        end
-    end
-    return result
-end
-
-function Sync.Update(template: Model, slug: string, placedTargets: {Model}?): (number, {string})
-    local physicsRigs = authoredRigs(template)
-    if next(physicsRigs) == nil then return 0, {} end
-    local referenceHouse = HouseFrame.Find(template)
-    if not referenceHouse then
-        return 0, {"collision sync skipped: template house anchor missing or ambiguous"}
-    end
-    local changed = 0
-    local warnings = {}
-    local targets = placedTargets or Targets.List(slug)
-    for _, root in targets do
-        local placedHouse = HouseFrame.Find(root)
-        if not placedHouse then
-            table.insert(warnings, "collision sync skipped for " .. root:GetFullName()
-                .. ": placed house anchor missing or ambiguous")
-            continue
-        end
-        local relative = HouseFrame.Relative(referenceHouse, placedHouse)
-        for part, source in physicsRigs do
-            local old = root:FindFirstChild(source.Name)
-            if old and (not old:IsA("Model") or old:GetAttribute("Game1RealEstatePhysicsRig") ~= true
-                or old:GetAttribute("Game1RealEstatePhysicsMeshName") ~= part) then
-                table.insert(warnings, "collision rig " .. source.Name
-                    .. " already exists but is not managed in " .. root:GetFullName())
-                continue
-            end
-            local clone: Model? = nil
-            local ok, problem = pcall(function()
-                local staged = source:Clone()
-                clone = staged
-                staged:PivotTo(relative * source:GetPivot())
-                staged.Parent = root
-            end)
-            if not ok then
-                if clone then clone:Destroy() end
-                table.insert(warnings, "collision rig " .. part .. " could not be staged in "
-                    .. root:GetFullName() .. ": " .. tostring(problem))
-                continue
-            end
-            if old then old:Destroy() end
-            changed += 1
-        end
-    end
-    return changed, warnings
-end
-
-return table.freeze(Sync)
-]]></string>
-        </Properties>
-      </Item>
-      <Item class="ModuleScript" referent="51">
-        <Properties>
           <string name="Name">StudioRealEstatePlacedPhysicsGuard</string>
-          <string name="Source"><![CDATA[-- Studio Edit Mode: normalize a managed Estate pasted or dragged from
--- ServerStorage into Workspace. The normal Sync path already normalizes its
--- staged MeshParts; manual copy/paste does not call that path.
+          <string name="Source"><![CDATA[-- M342: remove retired COL geometry from pasted/placed managed Real Estates.
+-- No physics restoration or legacy collision mode remains.
 -- One event-driven pass per newly inserted managed root; no Workspace polling.
-local CollisionPolicy = require(script.Parent.StudioRealEstateCollisionPolicy)
+local Cleanup = require(script.Parent.StudioRetiredColMeshCleanup)
 local PlacedTargets = require(script.Parent.StudioRealEstatePlacedTargets)
 local Guard = {}
 
@@ -9512,20 +9312,11 @@ function Guard.Start(Workspace: any, RunService: any): () -> ()
             if not enabled or RunService:IsRunning() or not instance:IsDescendantOf(Workspace) then
                 return
             end
-            local restored = 0
-            for _, descendant in instance:GetDescendants() do
-                if descendant:IsA("MeshPart") then
-                    if CollisionPolicy.RestoreCopiedMesh(descendant) then
-                        restored += 1
-                    end
-                end
-            end
-            -- Cloned ServerStorage templates must not masquerade as templates
-            -- once they are placed in Workspace.
+            local removed = Cleanup.CleanEstate(instance)
             PlacedTargets.MarkPlaced(instance)
-            if restored > 0 then
-                print(("[game1 plugin] repaired %d copied Estate MeshPart physics settings: %s")
-                    :format(restored, instance:GetFullName()))
+            if removed > 0 then
+                print(("[game1 plugin] removed %d retired COL mesh(es) from %s")
+                    :format(removed, instance:GetFullName()))
             end
         end)
     end
@@ -9546,7 +9337,7 @@ return table.freeze(Guard)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="52">
+      <Item class="ModuleScript" referent="51">
         <Properties>
           <string name="Name">StudioRealEstatePlacedTargets</string>
           <string name="Source"><![CDATA[-- One authoritative definition of a placed Real Estate instance.
@@ -9591,7 +9382,7 @@ return table.freeze(Targets)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="53">
+      <Item class="ModuleScript" referent="52">
         <Properties>
           <string name="Name">StudioRealEstatePlacedVisualSync</string>
           <string name="Source"><![CDATA[-- Full Real Estate sync: refresh visual rigs on *all managed placed* houses.
@@ -9605,7 +9396,7 @@ local VisualSync = {}
 local function visuals(template: Model): {Model}
     local result = {}
     for _, child in template:GetChildren() do
-        if child:IsA("Model") and child:GetAttribute("Game1RealEstatePhysicsRig") ~= true then
+        if child:IsA("Model") then
             table.insert(result, child)
         end
     end
@@ -9710,7 +9501,7 @@ return table.freeze(VisualSync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="54">
+      <Item class="ModuleScript" referent="53">
         <Properties>
           <string name="Name">StudioRealEstateRigValidation</string>
           <string name="Source"><![CDATA[-- Validate an already-published Real Estate Model Asset as actually loaded by Roblox.
@@ -9836,6 +9627,143 @@ function Validation.Verify(root: Model, part: string, expected: any): (MeshPart,
 end
 
 return table.freeze(Validation)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="54">
+        <Properties>
+          <string name="Name">StudioRetiredColMeshCleanup</string>
+          <string name="Source"><![CDATA[-- M342: remove retired dedicated COL meshes from managed templates and placements.
+-- This is a destructive migration: no legacy COL physics survives a Studio Sync.
+local HttpService = game:GetService("HttpService")
+local Cleanup = {}
+
+function Cleanup.IsRetiredName(name: string): boolean
+    local lower = string.lower(name)
+    return lower:sub(1, 4) == "col_" or lower:sub(-4) == "_col"
+        or lower:find("_col_", 1, true) ~= nil
+end
+
+local function removeIds(model: Model): ()
+    for _, attr in {"Game1RigAssetIds", "Game1TextureAssetIds"} do
+        local raw = model:GetAttribute(attr)
+        if typeof(raw) == "string" then
+            local ok, values = pcall(function() return HttpService:JSONDecode(raw) end)
+            if ok and typeof(values) == "table" then
+                local changed = false
+                for name in pairs(values) do
+                    if Cleanup.IsRetiredName(tostring(name)) then
+                        values[name] = nil
+                        changed = true
+                    end
+                end
+                if changed then model:SetAttribute(attr, HttpService:JSONEncode(values)) end
+            end
+        end
+    end
+end
+
+function Cleanup.CleanEstate(root: Model): number
+    local removed = 0
+    -- Limit to Real Estate managed models, not user furniture or unrelated Models.
+    if typeof(root:GetAttribute("Game1RealEstateSlug")) ~= "string" then return 0 end
+    for _, child in ipairs(root:GetChildren()) do
+        if child:IsA("Model") and (child:GetAttribute("Game1RealEstatePhysicsRig") == true
+            or (child.Name ~= "HouseRig" and Cleanup.IsRetiredName(child.Name))) then
+            child:Destroy()
+            removed += 1
+        elseif child:IsA("Model") and (child.Name == "HouseRig" or child.Name == "DoorAssembly") then
+            for _, sub in ipairs(child:GetDescendants()) do
+                if sub:IsA("MeshPart") and Cleanup.IsRetiredName(sub.Name) then
+                    sub:Destroy()
+                    removed += 1
+                end
+            end
+        end
+    end
+    removeIds(root)
+    return removed
+end
+
+function Cleanup.CleanLocation(root: Model): number
+    local removed = 0
+    local obsolete = {}
+    for _, child in ipairs(root:GetDescendants()) do
+        if child:IsA("MeshPart") and Cleanup.IsRetiredName(child.Name) then
+            obsolete[child] = true
+        end
+    end
+    -- Remove importer joints referencing a discarded mesh, not just the mesh.
+    for _, child in ipairs(root:GetDescendants()) do
+        if child:IsA("JointInstance") and (obsolete[child.Part0] or obsolete[child.Part1]) then
+            child:Destroy()
+        end
+    end
+    for child in pairs(obsolete) do
+        child:Destroy()
+        removed += 1
+    end
+    return removed
+end
+
+-- One-time COL removal from old authoring roots that predate managed IDs.
+-- Only dedicated COL_* names and the deprecated physics rig flag are eligible.
+function Cleanup.CleanLegacyAssetTree(root: Instance?): number
+    if not root then return 0 end
+    local obsolete = {}
+    for _, obj in ipairs(root:GetDescendants()) do
+        if obj:IsA("MeshPart") and Cleanup.IsRetiredName(obj.Name) then
+            obsolete[obj] = true
+        elseif obj:IsA("Model") and (Cleanup.IsRetiredName(obj.Name)
+            or obj:GetAttribute("Game1RealEstatePhysicsRig") == true) then
+            obsolete[obj] = true
+        end
+    end
+    -- Joint instances referencing deleted meshes are not useful.
+    for _, obj in ipairs(root:GetDescendants()) do
+        if obj:IsA("JointInstance") or obj:IsA("WeldConstraint") then
+            if (obj.Part0 and obsolete[obj.Part0]) or (obj.Part1 and obsolete[obj.Part1]) then
+                obj:Destroy()
+            end
+        end
+    end
+    local removed = 0
+    for obj in pairs(obsolete) do
+        if obj.Parent ~= nil then
+            local parent = obj.Parent
+            local covered = false
+            while parent and parent ~= root do
+                if obsolete[parent] then covered = true break end
+                parent = parent.Parent
+            end
+            if not covered then
+                if obj:IsA("BasePart") and obj.Parent:IsA("Model")
+                    and obj.Parent.PrimaryPart == obj then
+                    obj.Parent.PrimaryPart = nil
+                end
+                obj:Destroy()
+                removed += 1
+            end
+        end
+    end
+    return removed
+end
+
+function Cleanup.CleanManagedTree(root: Instance): {estate: number, location: number}
+    local count = {estate = 0, location = 0}
+    for _, instance in ipairs(root:GetDescendants()) do
+        if instance:IsA("Model") then
+            if typeof(instance:GetAttribute("Game1RealEstateSlug")) == "string" then
+                count.estate += Cleanup.CleanEstate(instance)
+            elseif typeof(instance:GetAttribute("Game1DecoAssetSlug")) == "string" then
+                count.location += Cleanup.CleanLocation(instance)
+            end
+        end
+    end
+    return count
+end
+
+return table.freeze(Cleanup)
 ]]></string>
         </Properties>
       </Item>

@@ -27,15 +27,6 @@ function Published.VisualCurrent(entry: any, meshId: string): boolean
     return false
 end
 
-function Published.RequiresCollider(entry: any): boolean
-    local version = current(entry)
-    if not version then return false end
-    for _, mesh in ipairs(version.meshes) do
-        if type(mesh.visualNames) == "table" and #mesh.visualNames == 0 then return true end
-    end
-    return false
-end
-
 function Published.CurrentShape(entry: any, root: Model?): boolean
     local version = current(entry)
     return root ~= nil and version ~= nil and History.MatchesInventory(root, version)

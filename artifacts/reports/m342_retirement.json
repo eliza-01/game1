@@ -1,0 +1,291 @@
+{
+  "mode": "apply",
+  "houses": [
+    {
+      "slug": "house_level5_01",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "slug": "house_level4_01",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "slug": "house_level3_01",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "slug": "house_level2_01",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "slug": "house_level1_01",
+      "removed": [
+        "col_mesh"
+      ]
+    }
+  ],
+  "locations": [
+    {
+      "slug": "big_tree_01",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "slug": "wooden_bar_01",
+      "removed": []
+    },
+    {
+      "slug": "bush_01",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "slug": "stone_fence_01",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "slug": "stone_pillar_02",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "slug": "bush_02",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "slug": "stone_pillar_01",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "slug": "christmas_tree_01",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "slug": "ground_torch_01",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "slug": "ivy_03",
+      "removed": []
+    },
+    {
+      "slug": "ivy_02",
+      "removed": []
+    },
+    {
+      "slug": "ivy_05",
+      "removed": []
+    },
+    {
+      "slug": "campfire_01",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "slug": "birch_01",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "slug": "wooden_post_01",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "slug": "ground_torch_02",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "slug": "ground_torch_03",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "slug": "lantern_01",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "slug": "stone_ladder_01",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "slug": "lantern_03",
+      "removed": []
+    },
+    {
+      "slug": "lantern_02",
+      "removed": []
+    },
+    {
+      "slug": "wooden_pillar_01",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "slug": "wooden_fence_01",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "slug": "blossom_tree_01",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "slug": "main_statue",
+      "removed": []
+    }
+  ],
+  "fbxReports": [
+    {
+      "file": "big_tree_01.json",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "file": "birch_01.json",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "file": "blossom_tree_01.json",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "file": "bush_01.json",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "file": "bush_02.json",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "file": "campfire_01.json",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "file": "christmas_tree.json",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "file": "christmas_tree_01.json",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "file": "ground_torch_01.json",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "file": "ground_torch_02.json",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "file": "ground_torch_03.json",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "file": "lantern_01.json",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "file": "stone_fence_01.json",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "file": "stone_ladder_01.json",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "file": "stone_pillar_01.json",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "file": "stone_pillar_02.json",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "file": "wooden_fence_01.json",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "file": "wooden_pillar_01.json",
+      "removed": [
+        "col_mesh"
+      ]
+    },
+    {
+      "file": "wooden_post_01.json",
+      "removed": [
+        "col_mesh"
+      ]
+    }
+  ],
+  "retiredPublications": 6,
+  "backup": "E:\\RobloxProjects\\game1\\.control-center\\backups\\m342_col_retirement_20261113T232058233103Z"
+}

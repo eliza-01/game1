@@ -9,6 +9,7 @@ is never silently dropped.
 from __future__ import annotations
 
 from .rig_features import DOOR_HINGE
+from services.retired_col_mesh import strip_mesh_rows
 
 
 def _with_ancestors(names: set[str], bones: dict) -> set[str]:
@@ -38,7 +39,7 @@ def publication_analysis(analysis: dict) -> dict:
     """Expose the current policy to UI without persisting derived bone lists."""
     return {**analysis, 'meshes': [
         {**mesh, 'publicationBones': publish_bones_for_mesh(mesh)}
-        for mesh in analysis.get('meshes', [])
+        for mesh in strip_mesh_rows(analysis).get('meshes', [])
     ]}
 
 

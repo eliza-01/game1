@@ -4,13 +4,12 @@
 local Targets = require(script.Parent.StudioRealEstatePlacedTargets)
 local HouseFrame = require(script.Parent.StudioRealEstateHouseFrame)
 local RigSwap = require(script.Parent.StudioManagedRigSwap)
-local Roles = require(script.Parent.StudioRealEstateRigRoles)
 local VisualSync = {}
 
 local function visuals(template: Model): {Model}
     local result = {}
     for _, child in template:GetChildren() do
-        if Roles.IsVisualRig(child) then
+        if child:IsA("Model") then
             table.insert(result, child)
         end
     end

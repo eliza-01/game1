@@ -16,7 +16,7 @@ function realEstateMeshWorkflowOpen(slug,part,tab='model'){
   const row=realEstateRows().find(item=>item.slug===slug);
   if(!row||!(row.meshParts||[]).includes(part))return;
   realEstateMeshWorkflow.slug=slug;realEstateMeshWorkflow.part=part;
-  realEstateMeshWorkflow.tab=realEstateIsCollider(part)?'model':tab;
+  realEstateMeshWorkflow.tab=tab;
   realEstateMeshWorkflow.result='';realEstateMeshWorkflow.error=false;
   realEstateMeshWorkflow.atlas=window.game1ConsumerAtlasEditor.newState();
   realEstateForm(row);
@@ -38,14 +38,13 @@ function realEstateMeshWorkflowRender(){
   if(!dialog||!realEstateMeshWorkflow.slug)return;
   const {row,part}=realEstateMeshWorkflowCurrent();
   if(!row){dialog.close();return;}
-  const collider=realEstateIsCollider(part);
   const rig=row.rigAssets?.[part]||{};
   const texture=row.textures?.[part]||{};
   const published=Boolean(rig.assetId);
   const current=published && rig.publishedSha256===row.rigSourceHashes?.[part];
   const busy=realEstateMeshWorkflow.busy||realEstateMeshWorkflow.atlas.busy||
     realEstatePublicationBusy(row.slug)||realEstateState.atlasBusy;
-  const tabs=[{id:'model',label:'Model · FBX'},...(!collider?[{id:'texture',label:'Texture · atlas'}]:[])];
+  const tabs=[{id:'model',label:'Model · FBX'},{id:'texture',label:'Texture · atlas'}];
   const model=window.game1AssetWorkflowDialog.step('Model · FBX',
     'Replace the FBX of this mesh only. Other models and images stay unchanged.',
     `<small class="deco-manage-value">${esc(row.meshSources?.[part]?'Independent FBX revision':'Original house FBX')}</small>`+
@@ -62,7 +61,7 @@ function realEstateMeshWorkflowRender(){
     `<div class="actions"><button type="button" data-mw-sync ${busy||!current?'disabled':''}>Sync Model + Atlas · Studio</button></div>`,
     current?'Ready':'Publish Model first',current?'ready':'pending');
   dialog.innerHTML=`<div class="real-estate-mesh-dialog-head"><div><small class="eyebrow">${esc(row.slug)} · mesh</small>`+
-    `<h3>${esc(part)}${collider?' · collision':''}</h3></div><button type="button" data-mw-close aria-label="Close">✕</button></div>`+
+    `<h3>${esc(part)}</h3></div><button type="button" data-mw-close aria-label="Close">✕</button></div>`+
     `<div class="real-estate-mesh-dialog-body" aria-busy="${busy}">`+
     window.game1AssetWorkflowDialog.tabs(tabs,realEstateMeshWorkflow.tab)+
     `${realEstateMeshWorkflow.tab==='model'?model:atlas}${footer}`+
@@ -89,7 +88,7 @@ function realEstateMeshWorkflowRender(){
     realEstateMeshWorkflowMessage(`Studio Sync complete · placed houses ${Number(stats.workspaceModelsUpdated||0)}/${Number(stats.workspaceModelsFound||0)}`+
       ((stats.rigWarnings||[]).length?` · ${stats.rigWarnings.join(' | ')}`:''),Boolean((stats.rigWarnings||[]).length));
   }));
-  if(!collider&&realEstateMeshWorkflow.tab==='texture'){
+  if(realEstateMeshWorkflow.tab==='texture'){
     window.game1ConsumerAtlasEditor.wire(dialog,realEstateMeshWorkflow.atlas,{
       consumerType:'real_estate',slug:row.slug,part,
       revision:texture.atlasBindingRevision||0,busy:realEstateMeshWorkflow.busy,

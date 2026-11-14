@@ -2787,7 +2787,6 @@
       "meshOptions": {
         "ivy_02": {
           "collisionFidelity": "Box",
-          "collisionMesh": false,
           "doubleSided": true,
           "glass": false,
           "noCollide": true
@@ -2940,7 +2939,6 @@
       "meshOptions": {
         "ivy_03": {
           "collisionFidelity": "Box",
-          "collisionMesh": false,
           "doubleSided": true,
           "glass": false,
           "noCollide": true
@@ -3093,7 +3091,6 @@
       "meshOptions": {
         "ivy_05": {
           "collisionFidelity": "Box",
-          "collisionMesh": false,
           "doubleSided": true,
           "glass": false,
           "noCollide": true
@@ -3211,33 +3208,16 @@
             "role": "visual",
             "physics": {
               "role": "visual",
-              "canCollide": false,
-              "canQuery": false,
+              "canCollide": null,
+              "canQuery": null,
               "canTouch": false,
               "doubleSided": false,
-              "collisionFidelity": "Box",
+              "collisionFidelity": null,
               "physicsOnly": false
-            }
-          },
-          {
-            "name": "col_mesh",
-            "armature": "",
-            "vertices": 8,
-            "bones": [],
-            "influencedBones": [],
-            "role": "collider",
-            "physics": {
-              "role": "collider",
-              "canCollide": true,
-              "canQuery": true,
-              "canTouch": false,
-              "doubleSided": false,
-              "collisionFidelity": "PreciseConvexDecomposition",
-              "physicsOnly": true
             }
           }
         ],
-        "hasCollider": true,
+        "hasCollider": false,
         "armatures": [],
         "unassignedArmatures": []
       },
@@ -3247,17 +3227,9 @@
       "meshOptions": {
         "bush_02": {
           "collisionFidelity": "Box",
-          "collisionMesh": false,
           "doubleSided": false,
           "glass": false,
           "noCollide": true
-        },
-        "col_mesh": {
-          "collisionFidelity": "PreciseConvexDecomposition",
-          "collisionMesh": true,
-          "doubleSided": false,
-          "glass": false,
-          "noCollide": false
         }
       },
       "surfaceMaterial": "default",
@@ -3397,33 +3369,16 @@
             "role": "visual",
             "physics": {
               "role": "visual",
-              "canCollide": false,
-              "canQuery": false,
+              "canCollide": null,
+              "canQuery": null,
               "canTouch": false,
               "doubleSided": false,
-              "collisionFidelity": "Box",
+              "collisionFidelity": null,
               "physicsOnly": false
-            }
-          },
-          {
-            "name": "col_mesh",
-            "armature": "",
-            "vertices": 8,
-            "bones": [],
-            "influencedBones": [],
-            "role": "collider",
-            "physics": {
-              "role": "collider",
-              "canCollide": true,
-              "canQuery": true,
-              "canTouch": false,
-              "doubleSided": false,
-              "collisionFidelity": "PreciseConvexDecomposition",
-              "physicsOnly": true
             }
           }
         ],
-        "hasCollider": true,
+        "hasCollider": false,
         "armatures": [],
         "unassignedArmatures": []
       },
@@ -3433,17 +3388,9 @@
       "meshOptions": {
         "bush_01": {
           "collisionFidelity": "Box",
-          "collisionMesh": false,
           "doubleSided": false,
           "glass": false,
           "noCollide": true
-        },
-        "col_mesh": {
-          "collisionFidelity": "PreciseConvexDecomposition",
-          "collisionMesh": true,
-          "doubleSided": false,
-          "glass": false,
-          "noCollide": false
         }
       },
       "surfaceMaterial": "default",
@@ -3680,23 +3627,6 @@
         "schemaVersion": 1,
         "meshes": [
           {
-            "name": "col_mesh",
-            "armature": "",
-            "vertices": 8,
-            "bones": [],
-            "influencedBones": [],
-            "role": "collider",
-            "physics": {
-              "role": "collider",
-              "canCollide": true,
-              "canQuery": true,
-              "canTouch": false,
-              "doubleSided": false,
-              "collisionFidelity": "PreciseConvexDecomposition",
-              "physicsOnly": true
-            }
-          },
-          {
             "name": "stone_fence_01",
             "armature": "",
             "vertices": 3275,
@@ -3705,16 +3635,16 @@
             "role": "visual",
             "physics": {
               "role": "visual",
-              "canCollide": false,
-              "canQuery": false,
+              "canCollide": null,
+              "canQuery": null,
               "canTouch": false,
               "doubleSided": false,
-              "collisionFidelity": "Box",
+              "collisionFidelity": null,
               "physicsOnly": false
             }
           }
         ],
-        "hasCollider": true,
+        "hasCollider": false,
         "armatures": [],
         "unassignedArmatures": []
       },
@@ -3722,16 +3652,8 @@
       "needsFbxInspection": false,
       "legacyStaticPublication": true,
       "meshOptions": {
-        "col_mesh": {
-          "collisionFidelity": "PreciseConvexDecomposition",
-          "collisionMesh": true,
-          "doubleSided": false,
-          "glass": false,
-          "noCollide": false
-        },
         "stone_fence_01": {
           "collisionFidelity": "Box",
-          "collisionMesh": false,
           "doubleSided": false,
           "glass": false,
           "noCollide": true
@@ -3916,23 +3838,6 @@
         "schemaVersion": 1,
         "meshes": [
           {
-            "name": "col_mesh",
-            "armature": "",
-            "vertices": 24,
-            "bones": [],
-            "influencedBones": [],
-            "role": "collider",
-            "physics": {
-              "role": "collider",
-              "canCollide": true,
-              "canQuery": true,
-              "canTouch": false,
-              "doubleSided": false,
-              "collisionFidelity": "PreciseConvexDecomposition",
-              "physicsOnly": true
-            }
-          },
-          {
             "name": "wooden_fence_01",
             "armature": "",
             "vertices": 783,
@@ -3941,16 +3846,16 @@
             "role": "visual",
             "physics": {
               "role": "visual",
-              "canCollide": false,
-              "canQuery": false,
+              "canCollide": null,
+              "canQuery": null,
               "canTouch": false,
               "doubleSided": false,
-              "collisionFidelity": "Box",
+              "collisionFidelity": null,
               "physicsOnly": false
             }
           }
         ],
-        "hasCollider": true,
+        "hasCollider": false,
         "armatures": [],
         "unassignedArmatures": []
       },
@@ -3979,16 +3884,8 @@
       "needsFbxInspection": false,
       "legacyStaticPublication": false,
       "meshOptions": {
-        "col_mesh": {
-          "collisionFidelity": "PreciseConvexDecomposition",
-          "collisionMesh": true,
-          "doubleSided": false,
-          "glass": false,
-          "noCollide": false
-        },
         "wooden_fence_01": {
           "collisionFidelity": "Box",
-          "collisionMesh": false,
           "doubleSided": false,
           "glass": false,
           "noCollide": true
@@ -4098,23 +3995,6 @@
         "schemaVersion": 1,
         "meshes": [
           {
-            "name": "col_mesh",
-            "armature": "",
-            "vertices": 13,
-            "bones": [],
-            "influencedBones": [],
-            "role": "collider",
-            "physics": {
-              "role": "collider",
-              "canCollide": true,
-              "canQuery": true,
-              "canTouch": false,
-              "doubleSided": false,
-              "collisionFidelity": "PreciseConvexDecomposition",
-              "physicsOnly": true
-            }
-          },
-          {
             "name": "stone_ladder_01",
             "armature": "",
             "vertices": 3001,
@@ -4123,16 +4003,16 @@
             "role": "visual",
             "physics": {
               "role": "visual",
-              "canCollide": false,
-              "canQuery": false,
+              "canCollide": null,
+              "canQuery": null,
               "canTouch": false,
               "doubleSided": false,
-              "collisionFidelity": "Box",
+              "collisionFidelity": null,
               "physicsOnly": false
             }
           }
         ],
-        "hasCollider": true,
+        "hasCollider": false,
         "armatures": [],
         "unassignedArmatures": []
       },
@@ -4161,16 +4041,8 @@
       "needsFbxInspection": false,
       "legacyStaticPublication": false,
       "meshOptions": {
-        "col_mesh": {
-          "collisionFidelity": "PreciseConvexDecomposition",
-          "collisionMesh": true,
-          "doubleSided": false,
-          "glass": false,
-          "noCollide": false
-        },
         "stone_ladder_01": {
           "collisionFidelity": "Box",
-          "collisionMesh": false,
           "doubleSided": false,
           "glass": false,
           "noCollide": true
@@ -4307,7 +4179,6 @@
       "meshOptions": {
         "wooden_bar_01": {
           "collisionFidelity": "PreciseConvexDecomposition",
-          "collisionMesh": false,
           "doubleSided": false,
           "glass": false,
           "noCollide": false
@@ -4477,29 +4348,12 @@
             "role": "visual",
             "physics": {
               "role": "visual",
-              "canCollide": false,
-              "canQuery": false,
+              "canCollide": null,
+              "canQuery": null,
               "canTouch": false,
               "doubleSided": false,
-              "collisionFidelity": "Box",
+              "collisionFidelity": null,
               "physicsOnly": false
-            }
-          },
-          {
-            "name": "col_mesh",
-            "armature": "",
-            "vertices": 60,
-            "bones": [],
-            "influencedBones": [],
-            "role": "collider",
-            "physics": {
-              "role": "collider",
-              "canCollide": true,
-              "canQuery": true,
-              "canTouch": false,
-              "doubleSided": false,
-              "collisionFidelity": "PreciseConvexDecomposition",
-              "physicsOnly": true
             }
           },
           {
@@ -4545,7 +4399,7 @@
             }
           }
         ],
-        "hasCollider": true,
+        "hasCollider": false,
         "armatures": [
           "campfire_01_armature"
         ],
@@ -4606,17 +4460,9 @@
       "meshOptions": {
         "campfire_01": {
           "collisionFidelity": "Box",
-          "collisionMesh": false,
           "doubleSided": false,
           "glass": false,
           "noCollide": true
-        },
-        "col_mesh": {
-          "collisionFidelity": "PreciseConvexDecomposition",
-          "collisionMesh": true,
-          "doubleSided": false,
-          "glass": false,
-          "noCollide": false
         }
       },
       "surfaceMaterial": "wood",
@@ -4725,23 +4571,6 @@
         "schemaVersion": 1,
         "meshes": [
           {
-            "name": "col_mesh",
-            "armature": "",
-            "vertices": 224,
-            "bones": [],
-            "influencedBones": [],
-            "role": "collider",
-            "physics": {
-              "role": "collider",
-              "canCollide": true,
-              "canQuery": true,
-              "canTouch": false,
-              "doubleSided": false,
-              "collisionFidelity": "PreciseConvexDecomposition",
-              "physicsOnly": true
-            }
-          },
-          {
             "name": "ground_torch_01",
             "armature": "ground_torch_01_armature",
             "vertices": 2007,
@@ -4775,11 +4604,11 @@
             "role": "visual",
             "physics": {
               "role": "visual",
-              "canCollide": false,
-              "canQuery": false,
+              "canCollide": null,
+              "canQuery": null,
               "canTouch": false,
               "doubleSided": false,
-              "collisionFidelity": "Box",
+              "collisionFidelity": null,
               "physicsOnly": false
             }
           },
@@ -4826,7 +4655,7 @@
             }
           }
         ],
-        "hasCollider": true,
+        "hasCollider": false,
         "armatures": [
           "ground_torch_01_armature"
         ],
@@ -4885,16 +4714,8 @@
       "needsFbxInspection": false,
       "legacyStaticPublication": false,
       "meshOptions": {
-        "col_mesh": {
-          "collisionFidelity": "PreciseConvexDecomposition",
-          "collisionMesh": true,
-          "doubleSided": false,
-          "glass": false,
-          "noCollide": false
-        },
         "ground_torch_01": {
           "collisionFidelity": "Box",
-          "collisionMesh": false,
           "doubleSided": false,
           "glass": false,
           "noCollide": true
@@ -5029,23 +4850,6 @@
         "schemaVersion": 1,
         "meshes": [
           {
-            "name": "col_mesh",
-            "armature": "",
-            "vertices": 345,
-            "bones": [],
-            "influencedBones": [],
-            "role": "collider",
-            "physics": {
-              "role": "collider",
-              "canCollide": true,
-              "canQuery": true,
-              "canTouch": false,
-              "doubleSided": false,
-              "collisionFidelity": "PreciseConvexDecomposition",
-              "physicsOnly": true
-            }
-          },
-          {
             "name": "ground_torch_02",
             "armature": "ground_torch_02_armature",
             "vertices": 2083,
@@ -5079,11 +4883,11 @@
             "role": "visual",
             "physics": {
               "role": "visual",
-              "canCollide": false,
-              "canQuery": false,
+              "canCollide": null,
+              "canQuery": null,
               "canTouch": false,
               "doubleSided": false,
-              "collisionFidelity": "Box",
+              "collisionFidelity": null,
               "physicsOnly": false
             }
           },
@@ -5130,7 +4934,7 @@
             }
           }
         ],
-        "hasCollider": true,
+        "hasCollider": false,
         "armatures": [
           "ground_torch_02_armature"
         ],
@@ -5189,16 +4993,8 @@
       "needsFbxInspection": false,
       "legacyStaticPublication": false,
       "meshOptions": {
-        "col_mesh": {
-          "collisionFidelity": "PreciseConvexDecomposition",
-          "collisionMesh": true,
-          "doubleSided": false,
-          "glass": false,
-          "noCollide": false
-        },
         "ground_torch_02": {
           "collisionFidelity": "Box",
-          "collisionMesh": false,
           "doubleSided": false,
           "glass": false,
           "noCollide": true
@@ -5308,23 +5104,6 @@
         "schemaVersion": 1,
         "meshes": [
           {
-            "name": "col_mesh",
-            "armature": "",
-            "vertices": 400,
-            "bones": [],
-            "influencedBones": [],
-            "role": "collider",
-            "physics": {
-              "role": "collider",
-              "canCollide": true,
-              "canQuery": true,
-              "canTouch": false,
-              "doubleSided": false,
-              "collisionFidelity": "PreciseConvexDecomposition",
-              "physicsOnly": true
-            }
-          },
-          {
             "name": "ground_torch_03",
             "armature": "ground_torch_03_armature",
             "vertices": 1856,
@@ -5358,11 +5137,11 @@
             "role": "visual",
             "physics": {
               "role": "visual",
-              "canCollide": false,
-              "canQuery": false,
+              "canCollide": null,
+              "canQuery": null,
               "canTouch": false,
               "doubleSided": false,
-              "collisionFidelity": "Box",
+              "collisionFidelity": null,
               "physicsOnly": false
             }
           },
@@ -5409,7 +5188,7 @@
             }
           }
         ],
-        "hasCollider": true,
+        "hasCollider": false,
         "armatures": [
           "ground_torch_03_armature"
         ],
@@ -5468,16 +5247,8 @@
       "needsFbxInspection": false,
       "legacyStaticPublication": false,
       "meshOptions": {
-        "col_mesh": {
-          "collisionFidelity": "PreciseConvexDecomposition",
-          "collisionMesh": true,
-          "doubleSided": false,
-          "glass": false,
-          "noCollide": false
-        },
         "ground_torch_03": {
           "collisionFidelity": "Box",
-          "collisionMesh": false,
           "doubleSided": false,
           "glass": false,
           "noCollide": true
@@ -5582,23 +5353,6 @@
         "schemaVersion": 1,
         "meshes": [
           {
-            "name": "col_mesh",
-            "armature": "",
-            "vertices": 109,
-            "bones": [],
-            "influencedBones": [],
-            "role": "collider",
-            "physics": {
-              "role": "collider",
-              "canCollide": true,
-              "canQuery": true,
-              "canTouch": false,
-              "doubleSided": false,
-              "collisionFidelity": "PreciseConvexDecomposition",
-              "physicsOnly": true
-            }
-          },
-          {
             "name": "lantern_01",
             "armature": "lantern_01_armature",
             "vertices": 847,
@@ -5654,11 +5408,11 @@
             "role": "visual",
             "physics": {
               "role": "visual",
-              "canCollide": false,
-              "canQuery": false,
+              "canCollide": null,
+              "canQuery": null,
               "canTouch": false,
               "doubleSided": false,
-              "collisionFidelity": "Box",
+              "collisionFidelity": null,
               "physicsOnly": false
             }
           },
@@ -5728,7 +5482,7 @@
             }
           }
         ],
-        "hasCollider": true,
+        "hasCollider": false,
         "armatures": [
           "lantern_01_armature"
         ],
@@ -5809,16 +5563,8 @@
       "needsFbxInspection": false,
       "legacyStaticPublication": false,
       "meshOptions": {
-        "col_mesh": {
-          "collisionFidelity": "PreciseConvexDecomposition",
-          "collisionMesh": true,
-          "doubleSided": false,
-          "glass": false,
-          "noCollide": false
-        },
         "lantern_01": {
           "collisionFidelity": "Box",
-          "collisionMesh": false,
           "doubleSided": false,
           "glass": false,
           "noCollide": true
@@ -6093,7 +5839,6 @@
       "meshOptions": {
         "lantern_02": {
           "collisionFidelity": "PreciseConvexDecomposition",
-          "collisionMesh": false,
           "doubleSided": true,
           "glass": false,
           "noCollide": false
@@ -6343,7 +6088,6 @@
       "meshOptions": {
         "lantern_03": {
           "collisionFidelity": "PreciseConvexDecomposition",
-          "collisionMesh": false,
           "doubleSided": false,
           "glass": false,
           "noCollide": false
@@ -6743,23 +6487,6 @@
         "schemaVersion": 1,
         "meshes": [
           {
-            "name": "col_mesh",
-            "armature": "",
-            "vertices": 28,
-            "bones": [],
-            "influencedBones": [],
-            "role": "collider",
-            "physics": {
-              "role": "collider",
-              "canCollide": true,
-              "canQuery": true,
-              "canTouch": false,
-              "doubleSided": false,
-              "collisionFidelity": "PreciseConvexDecomposition",
-              "physicsOnly": true
-            }
-          },
-          {
             "name": "stone_pillar_01",
             "armature": "",
             "vertices": 1154,
@@ -6768,16 +6495,16 @@
             "role": "visual",
             "physics": {
               "role": "visual",
-              "canCollide": false,
-              "canQuery": false,
+              "canCollide": null,
+              "canQuery": null,
               "canTouch": false,
               "doubleSided": false,
-              "collisionFidelity": "Box",
+              "collisionFidelity": null,
               "physicsOnly": false
             }
           }
         ],
-        "hasCollider": true,
+        "hasCollider": false,
         "armatures": [],
         "unassignedArmatures": []
       },
@@ -6785,16 +6512,8 @@
       "needsFbxInspection": false,
       "legacyStaticPublication": true,
       "meshOptions": {
-        "col_mesh": {
-          "collisionFidelity": "PreciseConvexDecomposition",
-          "collisionMesh": true,
-          "doubleSided": false,
-          "glass": false,
-          "noCollide": false
-        },
         "stone_pillar_01": {
           "collisionFidelity": "Box",
-          "collisionMesh": false,
           "doubleSided": false,
           "glass": false,
           "noCollide": true
@@ -6931,23 +6650,6 @@
         "schemaVersion": 1,
         "meshes": [
           {
-            "name": "col_mesh",
-            "armature": "",
-            "vertices": 8,
-            "bones": [],
-            "influencedBones": [],
-            "role": "collider",
-            "physics": {
-              "role": "collider",
-              "canCollide": true,
-              "canQuery": true,
-              "canTouch": false,
-              "doubleSided": false,
-              "collisionFidelity": "PreciseConvexDecomposition",
-              "physicsOnly": true
-            }
-          },
-          {
             "name": "wooden_pillar_01",
             "armature": "",
             "vertices": 393,
@@ -6956,16 +6658,16 @@
             "role": "visual",
             "physics": {
               "role": "visual",
-              "canCollide": false,
-              "canQuery": false,
+              "canCollide": null,
+              "canQuery": null,
               "canTouch": false,
               "doubleSided": false,
-              "collisionFidelity": "Box",
+              "collisionFidelity": null,
               "physicsOnly": false
             }
           }
         ],
-        "hasCollider": true,
+        "hasCollider": false,
         "armatures": [],
         "unassignedArmatures": []
       },
@@ -6994,16 +6696,8 @@
       "needsFbxInspection": false,
       "legacyStaticPublication": false,
       "meshOptions": {
-        "col_mesh": {
-          "collisionFidelity": "PreciseConvexDecomposition",
-          "collisionMesh": true,
-          "doubleSided": false,
-          "glass": false,
-          "noCollide": false
-        },
         "wooden_pillar_01": {
           "collisionFidelity": "Box",
-          "collisionMesh": false,
           "doubleSided": false,
           "glass": false,
           "noCollide": true
@@ -7115,23 +6809,6 @@
         "schemaVersion": 1,
         "meshes": [
           {
-            "name": "col_mesh",
-            "armature": "",
-            "vertices": 40,
-            "bones": [],
-            "influencedBones": [],
-            "role": "collider",
-            "physics": {
-              "role": "collider",
-              "canCollide": true,
-              "canQuery": true,
-              "canTouch": false,
-              "doubleSided": false,
-              "collisionFidelity": "PreciseConvexDecomposition",
-              "physicsOnly": true
-            }
-          },
-          {
             "name": "stone_pillar_02",
             "armature": "",
             "vertices": 1176,
@@ -7140,16 +6817,16 @@
             "role": "visual",
             "physics": {
               "role": "visual",
-              "canCollide": false,
-              "canQuery": false,
+              "canCollide": null,
+              "canQuery": null,
               "canTouch": false,
               "doubleSided": false,
-              "collisionFidelity": "Box",
+              "collisionFidelity": null,
               "physicsOnly": false
             }
           }
         ],
-        "hasCollider": true,
+        "hasCollider": false,
         "armatures": [],
         "unassignedArmatures": []
       },
@@ -7157,16 +6834,8 @@
       "needsFbxInspection": false,
       "legacyStaticPublication": true,
       "meshOptions": {
-        "col_mesh": {
-          "collisionFidelity": "PreciseConvexDecomposition",
-          "collisionMesh": true,
-          "doubleSided": false,
-          "glass": false,
-          "noCollide": false
-        },
         "stone_pillar_02": {
           "collisionFidelity": "Box",
-          "collisionMesh": false,
           "doubleSided": false,
           "glass": false,
           "noCollide": true
@@ -7276,23 +6945,6 @@
         "schemaVersion": 1,
         "meshes": [
           {
-            "name": "col_mesh",
-            "armature": "",
-            "vertices": 32,
-            "bones": [],
-            "influencedBones": [],
-            "role": "collider",
-            "physics": {
-              "role": "collider",
-              "canCollide": true,
-              "canQuery": true,
-              "canTouch": false,
-              "doubleSided": false,
-              "collisionFidelity": "PreciseConvexDecomposition",
-              "physicsOnly": true
-            }
-          },
-          {
             "name": "rig_carrier",
             "armature": "wooden_post_01_armature",
             "vertices": 3,
@@ -7368,16 +7020,16 @@
             "role": "visual",
             "physics": {
               "role": "visual",
-              "canCollide": false,
-              "canQuery": false,
+              "canCollide": null,
+              "canQuery": null,
               "canTouch": false,
               "doubleSided": false,
-              "collisionFidelity": "Box",
+              "collisionFidelity": null,
               "physicsOnly": false
             }
           }
         ],
-        "hasCollider": true,
+        "hasCollider": false,
         "armatures": [
           "wooden_post_01_armature"
         ],
@@ -7436,16 +7088,8 @@
       "needsFbxInspection": false,
       "legacyStaticPublication": false,
       "meshOptions": {
-        "col_mesh": {
-          "collisionFidelity": "PreciseConvexDecomposition",
-          "collisionMesh": true,
-          "doubleSided": false,
-          "glass": false,
-          "noCollide": false
-        },
         "wooden_post_01": {
           "collisionFidelity": "Box",
-          "collisionMesh": false,
           "doubleSided": false,
           "glass": false,
           "noCollide": true
@@ -10956,21 +10600,18 @@
       "meshOptions": {
         "main_statue_01": {
           "collisionFidelity": "PreciseConvexDecomposition",
-          "collisionMesh": false,
           "doubleSided": false,
           "glass": false,
           "noCollide": false
         },
         "main_statue_pedestal": {
           "collisionFidelity": "PreciseConvexDecomposition",
-          "collisionMesh": false,
           "doubleSided": false,
           "glass": false,
           "noCollide": false
         },
         "main_statue_sword": {
           "collisionFidelity": "PreciseConvexDecomposition",
-          "collisionMesh": false,
           "doubleSided": false,
           "glass": false,
           "noCollide": false
@@ -11096,33 +10737,16 @@
             "role": "visual",
             "physics": {
               "role": "visual",
-              "canCollide": false,
-              "canQuery": false,
+              "canCollide": null,
+              "canQuery": null,
               "canTouch": false,
-              "doubleSided": true,
-              "collisionFidelity": "Box",
+              "doubleSided": false,
+              "collisionFidelity": null,
               "physicsOnly": false
-            }
-          },
-          {
-            "name": "col_mesh",
-            "armature": "",
-            "vertices": 786,
-            "bones": [],
-            "influencedBones": [],
-            "role": "collider",
-            "physics": {
-              "role": "collider",
-              "canCollide": true,
-              "canQuery": true,
-              "canTouch": false,
-              "doubleSided": true,
-              "collisionFidelity": "PreciseConvexDecomposition",
-              "physicsOnly": true
             }
           }
         ],
-        "hasCollider": true,
+        "hasCollider": false,
         "armatures": [],
         "unassignedArmatures": []
       },
@@ -11132,17 +10756,9 @@
       "meshOptions": {
         "big_tree_01": {
           "collisionFidelity": "Box",
-          "collisionMesh": false,
           "doubleSided": false,
           "glass": false,
           "noCollide": true
-        },
-        "col_mesh": {
-          "collisionFidelity": "PreciseConvexDecomposition",
-          "collisionMesh": true,
-          "doubleSided": false,
-          "glass": false,
-          "noCollide": false
         }
       },
       "surfaceMaterial": "default",
@@ -11424,29 +11040,12 @@
             "role": "visual",
             "physics": {
               "role": "visual",
-              "canCollide": false,
-              "canQuery": false,
+              "canCollide": null,
+              "canQuery": null,
               "canTouch": false,
               "doubleSided": false,
-              "collisionFidelity": "Box",
+              "collisionFidelity": null,
               "physicsOnly": false
-            }
-          },
-          {
-            "name": "col_mesh",
-            "armature": "",
-            "vertices": 226,
-            "bones": [],
-            "influencedBones": [],
-            "role": "collider",
-            "physics": {
-              "role": "collider",
-              "canCollide": true,
-              "canQuery": true,
-              "canTouch": false,
-              "doubleSided": false,
-              "collisionFidelity": "PreciseConvexDecomposition",
-              "physicsOnly": true
             }
           },
           {
@@ -11584,7 +11183,7 @@
             }
           }
         ],
-        "hasCollider": true,
+        "hasCollider": false,
         "armatures": [
           "birch_01_armature"
         ],
@@ -11733,17 +11332,9 @@
       "meshOptions": {
         "birch_01": {
           "collisionFidelity": "Box",
-          "collisionMesh": false,
           "doubleSided": false,
           "glass": false,
           "noCollide": true
-        },
-        "col_mesh": {
-          "collisionFidelity": "PreciseConvexDecomposition",
-          "collisionMesh": true,
-          "doubleSided": false,
-          "glass": false,
-          "noCollide": false
         }
       },
       "surfaceMaterial": "default",
@@ -11938,33 +11529,16 @@
             "role": "visual",
             "physics": {
               "role": "visual",
-              "canCollide": false,
-              "canQuery": false,
+              "canCollide": null,
+              "canQuery": null,
               "canTouch": false,
-              "doubleSided": true,
-              "collisionFidelity": "Box",
+              "doubleSided": false,
+              "collisionFidelity": null,
               "physicsOnly": false
-            }
-          },
-          {
-            "name": "col_mesh",
-            "armature": "",
-            "vertices": 344,
-            "bones": [],
-            "influencedBones": [],
-            "role": "collider",
-            "physics": {
-              "role": "collider",
-              "canCollide": true,
-              "canQuery": true,
-              "canTouch": false,
-              "doubleSided": true,
-              "collisionFidelity": "PreciseConvexDecomposition",
-              "physicsOnly": true
             }
           }
         ],
-        "hasCollider": true,
+        "hasCollider": false,
         "armatures": [],
         "unassignedArmatures": []
       },
@@ -11974,17 +11548,9 @@
       "meshOptions": {
         "blossom_tree_01": {
           "collisionFidelity": "Box",
-          "collisionMesh": false,
           "doubleSided": false,
           "glass": false,
           "noCollide": true
-        },
-        "col_mesh": {
-          "collisionFidelity": "PreciseConvexDecomposition",
-          "collisionMesh": true,
-          "doubleSided": false,
-          "glass": false,
-          "noCollide": false
         }
       },
       "surfaceMaterial": "default",
@@ -12170,29 +11736,12 @@
             "role": "visual",
             "physics": {
               "role": "visual",
-              "canCollide": false,
-              "canQuery": false,
+              "canCollide": null,
+              "canQuery": null,
               "canTouch": false,
               "doubleSided": false,
-              "collisionFidelity": "Box",
+              "collisionFidelity": null,
               "physicsOnly": false
-            }
-          },
-          {
-            "name": "col_mesh",
-            "armature": "",
-            "vertices": 75,
-            "bones": [],
-            "influencedBones": [],
-            "role": "collider",
-            "physics": {
-              "role": "collider",
-              "canCollide": true,
-              "canQuery": true,
-              "canTouch": false,
-              "doubleSided": false,
-              "collisionFidelity": "PreciseConvexDecomposition",
-              "physicsOnly": true
             }
           },
           {
@@ -12284,7 +11833,7 @@
             }
           }
         ],
-        "hasCollider": true,
+        "hasCollider": false,
         "armatures": [
           "christmas_tree_01_armature"
         ],
@@ -12389,17 +11938,9 @@
       "meshOptions": {
         "christmas_tree_01": {
           "collisionFidelity": "Box",
-          "collisionMesh": false,
           "doubleSided": false,
           "glass": false,
           "noCollide": true
-        },
-        "col_mesh": {
-          "collisionFidelity": "PreciseConvexDecomposition",
-          "collisionMesh": true,
-          "doubleSided": false,
-          "glass": false,
-          "noCollide": false
         }
       },
       "surfaceMaterial": "wood",

@@ -26,20 +26,14 @@ function realEstateRows(){return (Array.isArray(realEstateState.data?.items)?rea
 function realEstateSelected(){return realEstateRows().find(item=>item.slug===realEstateState.selected)||null;}
 function realEstateStatus(){const row=realEstateSelected();return row?.status||'LOCAL_ONLY';}
 function realEstateMeshLabel(part){return part==='repair'?'restoration (legacy: repair)':part;}
-// Shared naming contract: COL_Floor / house_col / wall_COL_01 are physics-only.
-function realEstateIsCollider(part){return /(?:^|_)col(?:_|$)/i.test(part);}
-function realEstatePreciseDefault(part){
-  const name=String(part||'').toLowerCase();
-  return realEstateIsCollider(part)||name==='door'||name.startsWith('door_')||name.includes('glass');
-}
 function realEstateMeshDefaults(part){
-  return {...window.game1MeshAuthoring.defaults(part),destructible:false};
+  return window.game1MeshAuthoring.defaults(part);
 }
 function realEstateEffectiveFidelity(part,flags){
   return window.game1MeshAuthoring.effectiveFidelity(flags);
 }
 function realEstateNormalizePhysics(part,raw){
-  return {...window.game1MeshAuthoring.normalize(part,raw),destructible:Boolean(raw?.destructible)};
+  return window.game1MeshAuthoring.normalize(part,raw);
 }
 function realEstatePhysicsStatus(flags){return window.game1MeshAuthoring.status(flags);}
 function realEstatePhysicsControls(part,flags){
@@ -57,8 +51,7 @@ function realEstateForm(row){
     glass:row?.meshOptions?.[part]?.glass ?? realEstateMeshDefaults(part).glass,
     noCollide:row?.meshOptions?.[part]?.noCollide ?? realEstateMeshDefaults(part).noCollide,
     collisionFidelity:row?.meshOptions?.[part]?.collisionFidelity ?? realEstateMeshDefaults(part).collisionFidelity,
-    doubleSided:row?.meshOptions?.[part]?.doubleSided ?? realEstateMeshDefaults(part).doubleSided,
-    destructible:realEstateIsCollider(part) && (row?.meshOptions?.[part]?.destructible === true)
+    doubleSided:row?.meshOptions?.[part]?.doubleSided ?? realEstateMeshDefaults(part).doubleSided
   }]));
   for(const part of meshNames){
     realEstateState.meshOptions[part]=realEstateNormalizePhysics(part,realEstateState.meshOptions[part]);
@@ -252,8 +245,7 @@ function realEstateRenderTextures(){
     realEstateState.meshOptions[part]=realEstateNormalizePhysics(part,realEstateState.meshOptions[part]);
   }
   const options=realEstateOptions();
-  host.innerHTML=(parts.length&&!parts.some(realEstateIsCollider)
-    ? '<small class="real-estate-physics-caution">No COL_ collision mesh in this FBX. If all visual meshes have No Collide enabled, characters will fall through the house until a collision model is published.</small>' : '')+parts.map(part=>{
+  host.innerHTML='<small class="real-estate-physics-caution">Static house collision will use a separately authored Roblox Parts blueprint. Visual meshes default to No Collide.</small>'+parts.map(part=>{
     let selected=realEstateState.textures[part]||'';
     const reuse=realEstateState.reuseEnabled[part]===true;
     if(!selected && !reuse){
@@ -268,19 +260,7 @@ function realEstateRenderTextures(){
     for(const item of options)choices.push(`<option value="${esc(item.path)}">${esc(item.name)}</option>`);
     const filters=realEstateState.reuseFilters[part]||{query:''};
     realEstateState.reuseFilters[part]=filters;
-    const collider=realEstateIsCollider(part);
     const flags=realEstateState.meshOptions[part];
-    if(collider){
-      return `<div class="real-estate-texture-row real-estate-collider-row" data-texture-part="${esc(part)}">
-        <div class="real-estate-texture-heading"><strong class="real-estate-mesh-name">${esc(realEstateMeshLabel(part))}</strong><span class="real-estate-physics-badge">Collision · no texture</span></div>
-        <div class="real-estate-mesh-switches" role="group" aria-label="${esc(part)} physics settings">
-          <label class="real-estate-physics-toggle" title="Disable collisions and spatial queries for this mesh"><input type="checkbox" id="real-estate-nocollide-${esc(part)}" ${flags.noCollide?'checked':''}> No Collide</label>
-          <label class="real-estate-physics-toggle" title="When enabled weapon attacks pass through this collider. Actual destruction is not implemented yet."><input type="checkbox" id="real-estate-destructible-${esc(part)}" ${flags.destructible?'checked':''}> Destructible</label>
-          <span class="real-estate-contact-policy" id="real-estate-contact-${esc(part)}" aria-live="polite">${flags.destructible?'Destructible · no bounce':'Solid · bounce'}</span>
-        </div>
-        ${realEstatePhysicsControls(part,flags)}
-        <small class="real-estate-collider-note">Invisible · physical for characters · weapon bounce when not destructible. Destruction gameplay is not implemented yet.</small></div>`;
-    }
     return `<div class="real-estate-texture-row" data-texture-part="${esc(part)}">
       <div class="real-estate-texture-heading"><strong class="real-estate-mesh-name">${esc(realEstateMeshLabel(part))}</strong><span class="real-estate-mesh-kind">Visual mesh</span></div>
       <div class="real-estate-mesh-switches" role="group" aria-label="${esc(part)} mesh settings">
@@ -309,25 +289,17 @@ function realEstateRenderTextures(){
       flags.collisionFidelity=realEstateEffectiveFidelity(part,flags);
       const select=$(`real-estate-fidelity-${part}`);
       select.value=flags.collisionFidelity;
-      select.disabled=!flags.noCollide;
+      select.disabled=flags.noCollide;
       $(`real-estate-physics-state-${part}`).textContent=realEstatePhysicsStatus(flags);
     };
     $(`real-estate-fidelity-${part}`).onchange=event=>{
       const flags=realEstateState.meshOptions[part];
-      flags.collisionFidelity=flags.noCollide===true?event.target.value:'PreciseConvexDecomposition';
+      flags.collisionFidelity=event.target.value;
       event.target.value=flags.collisionFidelity;
     };
     $(`real-estate-doublesided-${part}`).onchange=event=>{
       realEstateState.meshOptions[part].doubleSided=event.target.checked;
     };
-    if(realEstateIsCollider(part)){
-      $(`real-estate-destructible-${part}`).onchange=event=>{
-        const enabled=event.target.checked;
-        realEstateState.meshOptions[part].destructible=enabled;
-        $(`real-estate-contact-${part}`).textContent=enabled?'Destructible · no bounce':'Solid · bounce';
-      };
-      continue;
-    }
     $(`real-estate-glass-${part}`).onchange=event=>{
       realEstateState.meshOptions[part].glass=event.target.checked;
     };
@@ -407,21 +379,20 @@ async function realEstateChooseFbx(){
       // this Estate has any Image Asset ID. Respect explicitly named textures.
       for(const mesh of inspection.analysis?.meshes||[]){
         const part=mesh.name;
-        if(part==='house'||realEstateIsCollider(part))continue;
+        if(part==='house')continue;
         const hasOwnTexture=(inspection.textures||[]).some(t=>t.name.toLowerCase().startsWith(part.toLowerCase()+'.')||t.name.toLowerCase().startsWith(part.toLowerCase()+'_'));
         if(!hasOwnTexture){realEstateState.textureRefs[part]='same:house';realEstateState.reuseEnabled[part]=true;}
       }
     }
     realEstateRenderTextures();
     realEstateIdentity();
-    toast('FBX analyzed · visual meshes need textures; COL_ meshes are geometry-only');
+    toast('FBX analyzed · visual meshes need textures');
     return true;
   } catch(error) {toast(error.message,true);return false;}
 }
 function realEstatePayload(){
   const parts=realEstateParts();
   for(const part of parts){
-    if(realEstateIsCollider(part))continue;
     if(realEstateState.reuseEnabled[part] && !realEstateState.textureRefs[part]){
       throw Error(`choose a reusable texture source for ${part}`);
     }
@@ -431,16 +402,15 @@ function realEstatePayload(){
     houseType:$('real-estate-type').value,level:$('real-estate-level').value,
     variant:$('real-estate-variant').value,purchasePrice:$('real-estate-purchase').value,
     minLevel:$('real-estate-min-level').value,salePrice:$('real-estate-sale').value,
-    textures:Object.fromEntries(parts.filter(part=>!realEstateIsCollider(part)).map(part=>[part,realEstateState.textureRefs[part]?'':(realEstateState.textures[part]||'')])),
-    textureReferences:Object.fromEntries(parts.filter(part=>!realEstateIsCollider(part)).map(part=>[part,realEstateState.textureRefs[part]||''])),
+    textures:Object.fromEntries(parts.map(part=>[part,realEstateState.textureRefs[part]?'':(realEstateState.textures[part]||'')])),
+    textureReferences:Object.fromEntries(parts.map(part=>[part,realEstateState.textureRefs[part]||''])),
     meshOptions:Object.fromEntries(parts.map(part=>{
       const flags=realEstateNormalizePhysics(part,realEstateState.meshOptions[part]);
       return [part,{
         glass:Boolean(flags.glass),
         noCollide:flags.noCollide===true,
         collisionFidelity:flags.collisionFidelity,
-        doubleSided:flags.doubleSided,
-        destructible:realEstateIsCollider(part) && flags.destructible === true
+        doubleSided:flags.doubleSided
       }];
     })),
     acceptWarnings:realEstateState.acceptWarnings};
@@ -623,15 +593,14 @@ function realEstateRender(){
     const textureLines=parts.map(part=>{
       const tex=textures[part]||{};
       const filename=tex.filename||tex.path?.split('/').pop()||tex.reuseReference||'—';
-      if(realEstateIsCollider(part))return `<div class="real-estate-texture-line"><strong>${esc(part)}</strong>: <span class="real-estate-physics-badge">physics only · no image</span> <span class="real-estate-contact-policy" title="Weapon interaction policy; does not affect character physics">${item.meshOptions?.[part]?.destructible===true?'Destructible · no bounce':'Solid · bounce'}</span></div>`;
       return `<div class="real-estate-texture-line"><strong>${esc(realEstateMeshLabel(part))}</strong>: <span class="real-estate-texture-filename">${esc(filename)}</span>${tex.atlasLegacyWarning?'<span class="deco-atlas-warning" title="Expected &lt;atlas_key&gt;_&lt;width&gt;x&lt;height&gt;_atlas.png"> ⚠️</span>':''}${realEstateAtlasDots(tex,part)}${realEstateAtlasVersionSelector(tex,part)}<button type="button" class="real-estate-texture-manage" data-re-texture="${esc(part)}">Manage atlas</button>${tex.atlasSyncStatus==='pending_studio_sync'?'<button type="button" data-re-atlas-retry="'+esc(part)+'" class="deco-atlas-retry">Sync pending · retry</button>':''}</div>`;
     }).join('');
     const assetLines=parts.map(part=>`<div class="real-estate-asset-part">
       <div class="real-estate-mesh-card-header"><strong class="real-estate-asset-part-name">${esc(realEstateMeshLabel(part))}</strong>
-        <button type="button" class="real-estate-manage" data-re-manage="${esc(part)}">Manage ${realEstateIsCollider(part)?'collision':'mesh'}</button></div>
+        <button type="button" class="real-estate-manage" data-re-manage="${esc(part)}">Manage mesh</button></div>
       <div class="real-estate-asset-identities">
         <span class="real-estate-asset-id real-estate-asset-model"><span>model</span><code>${asset(rigs[part]?.assetId,rigs[part]?.publishedSha256===item.rigSourceHashes?.[part])}</code></span>
-        ${realEstateIsCollider(part)?'<span class="real-estate-physics-badge">collision geometry</span>':`<span class="real-estate-asset-id real-estate-asset-image"><span>image</span><code>${asset(textures[part]?.assetId,live[part])}</code></span>`}
+        <span class="real-estate-asset-id real-estate-asset-image"><span>image</span><code>${asset(textures[part]?.assetId,live[part])}</code></span>
       </div>
       <small class="real-estate-mesh-source-label">${item.meshSources?.[part]?'Independent FBX revision':'Original house FBX'}</small>
       </div>`).join('');
@@ -672,7 +641,7 @@ function realEstateRender(){
     ? `Publishing ${job.scope} · ${job.step} (continues in Host Agent if this tab closes)`
     : row && job && job.slug===row.slug && job.status==='failed'
       ? `Last publication failed · ${job.step}: ${job.error}`
-      : row?`${row.status} · ${(row.meshParts||[]).map(p=>p.slice(0,1).toUpperCase()+p.slice(1)+'Rig').join(' + ')} ${row.publicationCurrent?.model?'ready':'changed'} · ${row.meshParts?.map(part=>realEstateIsCollider(part)?`${part} physics only`:`${part} image ${row.publicationCurrent?.[part]?'ready':'changed'}`).join(' · ')} · Sync Studio requires all present assets ready`:'register a house first';
+      : row?`${row.status} · ${(row.meshParts||[]).map(p=>p.slice(0,1).toUpperCase()+p.slice(1)+'Rig').join(' + ')} ${row.publicationCurrent?.model?'ready':'changed'} · ${row.meshParts?.map(part=>`${part} image ${row.publicationCurrent?.[part]?'ready':'changed'}`).join(' · ')} · Sync Studio requires all present assets ready`:'register a house first';
   realEstateIdentity();
   if(typeof game1RealEstatePlacementRender==='function')game1RealEstatePlacementRender();
   if(typeof realEstateMeshWorkflowRender==='function')realEstateMeshWorkflowRender();

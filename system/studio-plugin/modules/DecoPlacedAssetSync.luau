@@ -8,6 +8,7 @@ local History = require(script.Parent.StudioPublishedMeshHistory)
 local BoneEffects = require(script.Parent.StudioPlacedRigBoneEffects)
 local Placement = require(script.Parent.DecoAssetPreparation)
 local Physics = require(script.Parent.StudioMeshPhysicsCore)
+local RetiredCleanup = require(script.Parent.StudioRetiredColMeshCleanup)
 local Ownership = require(script.Parent.StudioLocationPlacementOwner)
 local Geometry = require(script.Parent.StudioLocationPlacedGeometry)
 local DecoPlacedAssetSync = {}
@@ -416,6 +417,7 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
     end
     for _, item in ipairs(plans) do
         if item.swap then RigSwap.Finalize(item.swap) end
+        RetiredCleanup.CleanLocation(item.model)
     end
     disposeStages()
     local summary, grouped = {}, {}

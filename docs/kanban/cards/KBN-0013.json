@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "KBN-0013",
-  "title": "Real Estate · Collision Blueprint (Parts) + миграция с col_mesh",
+  "title": "Real Estate · Collision Blueprint Parts / COL Mesh retired",
   "domain": "Real Estate",
   "status": "IN_PROGRESS",
   "priority": "P0",
@@ -66,22 +66,47 @@
     },
     {
       "id": "KBN-0013-T12",
-      "title": "Мигрировать первый дом с отключением legacy col_mesh только после PASS новой физики",
+      "title": "M342: применить миграцию реестров, удалить COL meshes из шаблонов и всех managed Place через Studio Sync (без legacy)",
       "done": false
     },
     {
       "id": "KBN-0013-T13",
-      "title": "После утверждения мигрировать остальные дома Real Estate без влияния на Location Assets",
+      "title": "M342: проверить Real Estate и Location Assets после удаления COL policy, сохранить опубликованные визуальные Asset ID",
       "done": false
     },
     {
       "id": "KBN-0013-T14",
-      "title": "Обновить старые CollisionPolicy/PlacedPhysicsGuard, документацию и выполнить rollback smoke-test",
+      "title": "M342: проверить Place/Clear, двери, сокеты и отсутствие возврата COL при повторном Sync",
       "done": false
     },
     {
       "id": "KBN-0013-T15",
       "title": "Сверить M341 read-only preflight с актуальной моделью и достроить привязки выбранного дома до 50 Plot",
+      "done": false
+    },
+    {
+      "id": "KBN-0013-T16",
+      "title": "M342: убрать COL-политику из инспектора FBX, регистрации и временной публикации",
+      "done": true
+    },
+    {
+      "id": "KBN-0013-T17",
+      "title": "M342: внедрить команду миграции с backup двух SQLite и манифестов",
+      "done": true
+    },
+    {
+      "id": "KBN-0013-T18",
+      "title": "M342: удалить COL из Studio Sync Real Estate и Location Assets, сохранить визуалы и пивоты",
+      "done": true
+    },
+    {
+      "id": "KBN-0013-T19",
+      "title": "M342: применить патч/миграцию к основному проекту и подтвердить удаление в Roblox Studio",
+      "done": false
+    },
+    {
+      "id": "KBN-0013-T20",
+      "title": "После M342: спецификация, версия, Capture/Preview/Restore Collision Blueprint",
       "done": false
     }
   ],
@@ -118,13 +143,13 @@
     },
     {
       "id": "KBN-0013-A06",
-      "title": "Legacy дом без Blueprint и чужие Location Assets col_mesh не изменены",
+      "title": "Ни один COL_* не активен в Real Estate / Location; мастер-FBX и опубликованные ID сохранены",
       "status": "NOT_RUN",
       "evidence": ""
     },
     {
       "id": "KBN-0013-A07",
-      "title": "Удаление legacy выполнено только для проверенных объектов, выполнен rollback smoke-test",
+      "title": "M342 удаляет COL из managed Studio, без legacy режима; резервные копии SQLite и Place доступны",
       "status": "NOT_RUN",
       "evidence": ""
     },
@@ -135,7 +160,7 @@
       "evidence": ""
     }
   ],
-  "revision": 2,
-  "updatedAt": "2026-11-14T01:15:00+00:00",
-  "specSha256": "fd5544da13828f99c554e5a4cfdb29fbd52c206b24dafba4900f40dc07d97611"
+  "revision": 4,
+  "updatedAt": "2026-11-14T02:37:00+03:00",
+  "specSha256": "f819d19487f2f9712d790033263fd238848d5b3eb66b7c1d966393935d2ed45e"
 }

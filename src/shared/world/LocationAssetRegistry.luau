@@ -52,7 +52,7 @@ return table.freeze({
 			atlasVariantId = 71,
 			bindingRevision = 2,
 			destructible = false,
-			meshOptions = table.freeze({["ivy_02"]=table.freeze({["collisionFidelity"]="Box",["collisionMesh"]=false,["doubleSided"]=true,["glass"]=false,["noCollide"]=true})}),
+			meshOptions = table.freeze({["ivy_02"]=table.freeze({["collisionFidelity"]="Box",["doubleSided"]=true,["glass"]=false,["noCollide"]=true})}),
 		}),
 		["ivy_03"] = table.freeze({
 			slug = "ivy_03",
@@ -69,7 +69,7 @@ return table.freeze({
 			atlasVariantId = 71,
 			bindingRevision = 3,
 			destructible = false,
-			meshOptions = table.freeze({["ivy_03"]=table.freeze({["collisionFidelity"]="Box",["collisionMesh"]=false,["doubleSided"]=true,["glass"]=false,["noCollide"]=true})}),
+			meshOptions = table.freeze({["ivy_03"]=table.freeze({["collisionFidelity"]="Box",["doubleSided"]=true,["glass"]=false,["noCollide"]=true})}),
 		}),
 		["ivy_05"] = table.freeze({
 			slug = "ivy_05",
@@ -86,7 +86,7 @@ return table.freeze({
 			atlasVariantId = 71,
 			bindingRevision = 2,
 			destructible = false,
-			meshOptions = table.freeze({["ivy_05"]=table.freeze({["collisionFidelity"]="Box",["collisionMesh"]=false,["doubleSided"]=true,["glass"]=false,["noCollide"]=true})}),
+			meshOptions = table.freeze({["ivy_05"]=table.freeze({["collisionFidelity"]="Box",["doubleSided"]=true,["glass"]=false,["noCollide"]=true})}),
 		}),
 		["bush_02"] = table.freeze({
 			slug = "bush_02",
@@ -103,7 +103,7 @@ return table.freeze({
 			atlasVariantId = 73,
 			bindingRevision = 3,
 			destructible = false,
-			meshOptions = table.freeze({["bush_02"]=table.freeze({["collisionFidelity"]="Box",["collisionMesh"]=false,["doubleSided"]=false,["glass"]=false,["noCollide"]=true}),["col_mesh"]=table.freeze({["collisionFidelity"]="PreciseConvexDecomposition",["collisionMesh"]=true,["doubleSided"]=false,["glass"]=false,["noCollide"]=false})}),
+			meshOptions = table.freeze({["bush_02"]=table.freeze({["collisionFidelity"]="Box",["doubleSided"]=false,["glass"]=false,["noCollide"]=true})}),
 		}),
 		["bush_01"] = table.freeze({
 			slug = "bush_01",
@@ -120,7 +120,7 @@ return table.freeze({
 			atlasVariantId = 72,
 			bindingRevision = 3,
 			destructible = false,
-			meshOptions = table.freeze({["bush_01"]=table.freeze({["collisionFidelity"]="Box",["collisionMesh"]=false,["doubleSided"]=false,["glass"]=false,["noCollide"]=true}),["col_mesh"]=table.freeze({["collisionFidelity"]="PreciseConvexDecomposition",["collisionMesh"]=true,["doubleSided"]=false,["glass"]=false,["noCollide"]=false})}),
+			meshOptions = table.freeze({["bush_01"]=table.freeze({["collisionFidelity"]="Box",["doubleSided"]=false,["glass"]=false,["noCollide"]=true})}),
 		}),
 		["pillar_with_lantern"] = table.freeze({
 			slug = "pillar_with_lantern",
@@ -154,7 +154,7 @@ return table.freeze({
 			atlasVariantId = 59,
 			bindingRevision = 6,
 			destructible = false,
-			meshOptions = table.freeze({["col_mesh"]=table.freeze({["collisionFidelity"]="PreciseConvexDecomposition",["collisionMesh"]=true,["doubleSided"]=false,["glass"]=false,["noCollide"]=false}),["stone_fence_01"]=table.freeze({["collisionFidelity"]="Box",["collisionMesh"]=false,["doubleSided"]=false,["glass"]=false,["noCollide"]=true})}),
+			meshOptions = table.freeze({["stone_fence_01"]=table.freeze({["collisionFidelity"]="Box",["doubleSided"]=false,["glass"]=false,["noCollide"]=true})}),
 		}),
 		["wooden_fence_01"] = table.freeze({
 			slug = "wooden_fence_01",
@@ -171,7 +171,7 @@ return table.freeze({
 			atlasVariantId = 62,
 			bindingRevision = 2,
 			destructible = false,
-			meshOptions = table.freeze({["col_mesh"]=table.freeze({["collisionFidelity"]="PreciseConvexDecomposition",["collisionMesh"]=true,["doubleSided"]=false,["glass"]=false,["noCollide"]=false}),["wooden_fence_01"]=table.freeze({["collisionFidelity"]="Box",["collisionMesh"]=false,["doubleSided"]=false,["glass"]=false,["noCollide"]=true})}),
+			meshOptions = table.freeze({["wooden_fence_01"]=table.freeze({["collisionFidelity"]="Box",["doubleSided"]=false,["glass"]=false,["noCollide"]=true})}),
 		}),
 		["stone_ladder_01"] = table.freeze({
 			slug = "stone_ladder_01",
@@ -188,7 +188,7 @@ return table.freeze({
 			atlasVariantId = 50,
 			bindingRevision = 2,
 			destructible = false,
-			meshOptions = table.freeze({["col_mesh"]=table.freeze({["collisionFidelity"]="PreciseConvexDecomposition",["collisionMesh"]=true,["doubleSided"]=false,["glass"]=false,["noCollide"]=false}),["stone_ladder_01"]=table.freeze({["collisionFidelity"]="Box",["collisionMesh"]=false,["doubleSided"]=false,["glass"]=false,["noCollide"]=true})}),
+			meshOptions = table.freeze({["stone_ladder_01"]=table.freeze({["collisionFidelity"]="Box",["doubleSided"]=false,["glass"]=false,["noCollide"]=true})}),
 		}),
 		["wooden_bar_01"] = table.freeze({
 			slug = "wooden_bar_01",
@@ -205,7 +205,7 @@ return table.freeze({
 			atlasVariantId = 74,
 			bindingRevision = 3,
 			destructible = false,
-			meshOptions = table.freeze({["wooden_bar_01"]=table.freeze({["collisionFidelity"]="PreciseConvexDecomposition",["collisionMesh"]=false,["doubleSided"]=false,["glass"]=false,["noCollide"]=false})}),
+			meshOptions = table.freeze({["wooden_bar_01"]=table.freeze({["collisionFidelity"]="PreciseConvexDecomposition",["doubleSided"]=false,["glass"]=false,["noCollide"]=false})}),
 		}),
 		["campfire_01"] = table.freeze({
 			slug = "campfire_01",
@@ -222,7 +222,7 @@ return table.freeze({
 			atlasVariantId = 75,
 			bindingRevision = 10,
 			destructible = false,
-			meshOptions = table.freeze({["campfire_01"]=table.freeze({["collisionFidelity"]="Box",["collisionMesh"]=false,["doubleSided"]=false,["glass"]=false,["noCollide"]=true}),["col_mesh"]=table.freeze({["collisionFidelity"]="PreciseConvexDecomposition",["collisionMesh"]=true,["doubleSided"]=false,["glass"]=false,["noCollide"]=false})}),
+			meshOptions = table.freeze({["campfire_01"]=table.freeze({["collisionFidelity"]="Box",["doubleSided"]=false,["glass"]=false,["noCollide"]=true})}),
 		}),
 		["ground_torch_01"] = table.freeze({
 			slug = "ground_torch_01",
@@ -239,7 +239,7 @@ return table.freeze({
 			atlasVariantId = 40,
 			bindingRevision = 6,
 			destructible = false,
-			meshOptions = table.freeze({["col_mesh"]=table.freeze({["collisionFidelity"]="PreciseConvexDecomposition",["collisionMesh"]=true,["doubleSided"]=false,["glass"]=false,["noCollide"]=false}),["ground_torch_01"]=table.freeze({["collisionFidelity"]="Box",["collisionMesh"]=false,["doubleSided"]=false,["glass"]=false,["noCollide"]=true})}),
+			meshOptions = table.freeze({["ground_torch_01"]=table.freeze({["collisionFidelity"]="Box",["doubleSided"]=false,["glass"]=false,["noCollide"]=true})}),
 		}),
 		["ground_torch_02"] = table.freeze({
 			slug = "ground_torch_02",
@@ -256,7 +256,7 @@ return table.freeze({
 			atlasVariantId = 47,
 			bindingRevision = 2,
 			destructible = true,
-			meshOptions = table.freeze({["col_mesh"]=table.freeze({["collisionFidelity"]="PreciseConvexDecomposition",["collisionMesh"]=true,["doubleSided"]=false,["glass"]=false,["noCollide"]=false}),["ground_torch_02"]=table.freeze({["collisionFidelity"]="Box",["collisionMesh"]=false,["doubleSided"]=false,["glass"]=false,["noCollide"]=true})}),
+			meshOptions = table.freeze({["ground_torch_02"]=table.freeze({["collisionFidelity"]="Box",["doubleSided"]=false,["glass"]=false,["noCollide"]=true})}),
 		}),
 		["ground_torch_03"] = table.freeze({
 			slug = "ground_torch_03",
@@ -273,7 +273,7 @@ return table.freeze({
 			atlasVariantId = 48,
 			bindingRevision = 2,
 			destructible = true,
-			meshOptions = table.freeze({["col_mesh"]=table.freeze({["collisionFidelity"]="PreciseConvexDecomposition",["collisionMesh"]=true,["doubleSided"]=false,["glass"]=false,["noCollide"]=false}),["ground_torch_03"]=table.freeze({["collisionFidelity"]="Box",["collisionMesh"]=false,["doubleSided"]=false,["glass"]=false,["noCollide"]=true})}),
+			meshOptions = table.freeze({["ground_torch_03"]=table.freeze({["collisionFidelity"]="Box",["doubleSided"]=false,["glass"]=false,["noCollide"]=true})}),
 		}),
 		["lantern_01"] = table.freeze({
 			slug = "lantern_01",
@@ -290,7 +290,7 @@ return table.freeze({
 			atlasVariantId = 3,
 			bindingRevision = 3,
 			destructible = false,
-			meshOptions = table.freeze({["col_mesh"]=table.freeze({["collisionFidelity"]="PreciseConvexDecomposition",["collisionMesh"]=true,["doubleSided"]=false,["glass"]=false,["noCollide"]=false}),["lantern_01"]=table.freeze({["collisionFidelity"]="Box",["collisionMesh"]=false,["doubleSided"]=false,["glass"]=false,["noCollide"]=true})}),
+			meshOptions = table.freeze({["lantern_01"]=table.freeze({["collisionFidelity"]="Box",["doubleSided"]=false,["glass"]=false,["noCollide"]=true})}),
 		}),
 		["lantern_02"] = table.freeze({
 			slug = "lantern_02",
@@ -307,7 +307,7 @@ return table.freeze({
 			atlasVariantId = 51,
 			bindingRevision = 2,
 			destructible = false,
-			meshOptions = table.freeze({["lantern_02"]=table.freeze({["collisionFidelity"]="PreciseConvexDecomposition",["collisionMesh"]=false,["doubleSided"]=true,["glass"]=false,["noCollide"]=false})}),
+			meshOptions = table.freeze({["lantern_02"]=table.freeze({["collisionFidelity"]="PreciseConvexDecomposition",["doubleSided"]=true,["glass"]=false,["noCollide"]=false})}),
 		}),
 		["lantern_03"] = table.freeze({
 			slug = "lantern_03",
@@ -324,7 +324,7 @@ return table.freeze({
 			atlasVariantId = 3,
 			bindingRevision = 7,
 			destructible = false,
-			meshOptions = table.freeze({["lantern_03"]=table.freeze({["collisionFidelity"]="PreciseConvexDecomposition",["collisionMesh"]=false,["doubleSided"]=false,["glass"]=false,["noCollide"]=false})}),
+			meshOptions = table.freeze({["lantern_03"]=table.freeze({["collisionFidelity"]="PreciseConvexDecomposition",["doubleSided"]=false,["glass"]=false,["noCollide"]=false})}),
 		}),
 		["wall_torch_01"] = table.freeze({
 			slug = "wall_torch_01",
@@ -392,7 +392,7 @@ return table.freeze({
 			atlasVariantId = 60,
 			bindingRevision = 3,
 			destructible = false,
-			meshOptions = table.freeze({["col_mesh"]=table.freeze({["collisionFidelity"]="PreciseConvexDecomposition",["collisionMesh"]=true,["doubleSided"]=false,["glass"]=false,["noCollide"]=false}),["stone_pillar_01"]=table.freeze({["collisionFidelity"]="Box",["collisionMesh"]=false,["doubleSided"]=false,["glass"]=false,["noCollide"]=true})}),
+			meshOptions = table.freeze({["stone_pillar_01"]=table.freeze({["collisionFidelity"]="Box",["doubleSided"]=false,["glass"]=false,["noCollide"]=true})}),
 		}),
 		["wooden_pillar_01"] = table.freeze({
 			slug = "wooden_pillar_01",
@@ -409,7 +409,7 @@ return table.freeze({
 			atlasVariantId = 61,
 			bindingRevision = 2,
 			destructible = false,
-			meshOptions = table.freeze({["col_mesh"]=table.freeze({["collisionFidelity"]="PreciseConvexDecomposition",["collisionMesh"]=true,["doubleSided"]=false,["glass"]=false,["noCollide"]=false}),["wooden_pillar_01"]=table.freeze({["collisionFidelity"]="Box",["collisionMesh"]=false,["doubleSided"]=false,["glass"]=false,["noCollide"]=true})}),
+			meshOptions = table.freeze({["wooden_pillar_01"]=table.freeze({["collisionFidelity"]="Box",["doubleSided"]=false,["glass"]=false,["noCollide"]=true})}),
 		}),
 		["stone_pillar_02"] = table.freeze({
 			slug = "stone_pillar_02",
@@ -426,7 +426,7 @@ return table.freeze({
 			atlasVariantId = 66,
 			bindingRevision = 2,
 			destructible = false,
-			meshOptions = table.freeze({["col_mesh"]=table.freeze({["collisionFidelity"]="PreciseConvexDecomposition",["collisionMesh"]=true,["doubleSided"]=false,["glass"]=false,["noCollide"]=false}),["stone_pillar_02"]=table.freeze({["collisionFidelity"]="Box",["collisionMesh"]=false,["doubleSided"]=false,["glass"]=false,["noCollide"]=true})}),
+			meshOptions = table.freeze({["stone_pillar_02"]=table.freeze({["collisionFidelity"]="Box",["doubleSided"]=false,["glass"]=false,["noCollide"]=true})}),
 		}),
 		["wooden_post_01"] = table.freeze({
 			slug = "wooden_post_01",
@@ -443,7 +443,7 @@ return table.freeze({
 			atlasVariantId = 69,
 			bindingRevision = 3,
 			destructible = true,
-			meshOptions = table.freeze({["col_mesh"]=table.freeze({["collisionFidelity"]="PreciseConvexDecomposition",["collisionMesh"]=true,["doubleSided"]=false,["glass"]=false,["noCollide"]=false}),["wooden_post_01"]=table.freeze({["collisionFidelity"]="Box",["collisionMesh"]=false,["doubleSided"]=false,["glass"]=false,["noCollide"]=true})}),
+			meshOptions = table.freeze({["wooden_post_01"]=table.freeze({["collisionFidelity"]="Box",["doubleSided"]=false,["glass"]=false,["noCollide"]=true})}),
 		}),
 		["test_window_01"] = table.freeze({
 			slug = "test_window_01",
@@ -477,7 +477,7 @@ return table.freeze({
 			atlasVariantId = 70,
 			bindingRevision = 2,
 			destructible = false,
-			meshOptions = table.freeze({["main_statue_01"]=table.freeze({["collisionFidelity"]="PreciseConvexDecomposition",["collisionMesh"]=false,["doubleSided"]=false,["glass"]=false,["noCollide"]=false}),["main_statue_pedestal"]=table.freeze({["collisionFidelity"]="PreciseConvexDecomposition",["collisionMesh"]=false,["doubleSided"]=false,["glass"]=false,["noCollide"]=false}),["main_statue_sword"]=table.freeze({["collisionFidelity"]="PreciseConvexDecomposition",["collisionMesh"]=false,["doubleSided"]=false,["glass"]=false,["noCollide"]=false})}),
+			meshOptions = table.freeze({["main_statue_01"]=table.freeze({["collisionFidelity"]="PreciseConvexDecomposition",["doubleSided"]=false,["glass"]=false,["noCollide"]=false}),["main_statue_pedestal"]=table.freeze({["collisionFidelity"]="PreciseConvexDecomposition",["doubleSided"]=false,["glass"]=false,["noCollide"]=false}),["main_statue_sword"]=table.freeze({["collisionFidelity"]="PreciseConvexDecomposition",["doubleSided"]=false,["glass"]=false,["noCollide"]=false})}),
 		}),
 		["big_tree_01"] = table.freeze({
 			slug = "big_tree_01",
@@ -494,7 +494,7 @@ return table.freeze({
 			atlasVariantId = 2,
 			bindingRevision = 11,
 			destructible = true,
-			meshOptions = table.freeze({["big_tree_01"]=table.freeze({["collisionFidelity"]="Box",["collisionMesh"]=false,["doubleSided"]=false,["glass"]=false,["noCollide"]=true}),["col_mesh"]=table.freeze({["collisionFidelity"]="PreciseConvexDecomposition",["collisionMesh"]=true,["doubleSided"]=false,["glass"]=false,["noCollide"]=false})}),
+			meshOptions = table.freeze({["big_tree_01"]=table.freeze({["collisionFidelity"]="Box",["doubleSided"]=false,["glass"]=false,["noCollide"]=true})}),
 		}),
 		["birch_01"] = table.freeze({
 			slug = "birch_01",
@@ -511,7 +511,7 @@ return table.freeze({
 			atlasVariantId = 32,
 			bindingRevision = 6,
 			destructible = true,
-			meshOptions = table.freeze({["birch_01"]=table.freeze({["collisionFidelity"]="Box",["collisionMesh"]=false,["doubleSided"]=false,["glass"]=false,["noCollide"]=true}),["col_mesh"]=table.freeze({["collisionFidelity"]="PreciseConvexDecomposition",["collisionMesh"]=true,["doubleSided"]=false,["glass"]=false,["noCollide"]=false})}),
+			meshOptions = table.freeze({["birch_01"]=table.freeze({["collisionFidelity"]="Box",["doubleSided"]=false,["glass"]=false,["noCollide"]=true})}),
 		}),
 		["birch_02"] = table.freeze({
 			slug = "birch_02",
@@ -545,7 +545,7 @@ return table.freeze({
 			atlasVariantId = 63,
 			bindingRevision = 2,
 			destructible = false,
-			meshOptions = table.freeze({["blossom_tree_01"]=table.freeze({["collisionFidelity"]="Box",["collisionMesh"]=false,["doubleSided"]=false,["glass"]=false,["noCollide"]=true}),["col_mesh"]=table.freeze({["collisionFidelity"]="PreciseConvexDecomposition",["collisionMesh"]=true,["doubleSided"]=false,["glass"]=false,["noCollide"]=false})}),
+			meshOptions = table.freeze({["blossom_tree_01"]=table.freeze({["collisionFidelity"]="Box",["doubleSided"]=false,["glass"]=false,["noCollide"]=true})}),
 		}),
 		["christmas_tree_01"] = table.freeze({
 			slug = "christmas_tree_01",
@@ -562,7 +562,7 @@ return table.freeze({
 			atlasVariantId = 64,
 			bindingRevision = 3,
 			destructible = false,
-			meshOptions = table.freeze({["christmas_tree_01"]=table.freeze({["collisionFidelity"]="Box",["collisionMesh"]=false,["doubleSided"]=false,["glass"]=false,["noCollide"]=true}),["col_mesh"]=table.freeze({["collisionFidelity"]="PreciseConvexDecomposition",["collisionMesh"]=true,["doubleSided"]=false,["glass"]=false,["noCollide"]=false})}),
+			meshOptions = table.freeze({["christmas_tree_01"]=table.freeze({["collisionFidelity"]="Box",["doubleSided"]=false,["glass"]=false,["noCollide"]=true})}),
 		}),
 	}),
 	aliases = table.freeze({

@@ -6,7 +6,9 @@ import bpy
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from model_publication import clean_scene, linked_meshes, prepare_rig, export_model, rest_snapshot
 from model_publication import assert_skin_complete
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'control-center'))
 from location_rig_contract import CARRIER, ROOT, role, validate as validate_location_rig
+from services.retired_col_mesh import retired
 
 
 def snapshot():
@@ -58,6 +60,10 @@ def main(source, output, report_path, texture_mode="embedded"):
         raise ValueError('publication output must differ from source')
     clean_scene()
     bpy.ops.import_scene.fbx(filepath=str(source), use_anim=False)
+    if texture_mode == 'geometry_only':
+        for obj in list(bpy.context.scene.objects):
+            if obj.type == 'MESH' and retired(obj.name):
+                bpy.data.objects.remove(obj, do_unlink=True)
     objects = sorted((o for o in bpy.context.scene.objects if o.type in {'MESH', 'ARMATURE'}),
                      key=lambda o: o.name)
     if not any(o.type == 'MESH' for o in objects):

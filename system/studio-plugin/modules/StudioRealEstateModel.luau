@@ -4,7 +4,7 @@ local HttpService = game:GetService("HttpService")
 local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
 local StudioRealEstateRigValidation = require(script.Parent.StudioRealEstateRigValidation)
 local StudioRealEstateCollisionPolicy = require(script.Parent.StudioRealEstateCollisionPolicy)
-local StudioRealEstatePlacedCollisionSync = require(script.Parent.StudioRealEstatePlacedCollisionSync)
+local RetiredCleanup = require(script.Parent.StudioRetiredColMeshCleanup)
 local StudioRealEstatePlacedVisualSync = require(script.Parent.StudioRealEstatePlacedVisualSync)
 local PlacedTargets = require(script.Parent.StudioRealEstatePlacedTargets)
 local HouseFrame = require(script.Parent.StudioRealEstateHouseFrame)
@@ -82,7 +82,7 @@ local function refreshPlaced(slug: string, imageAssets: {[string]: string}, imag
                     StudioTextureAppearance.Apply(child, "rbxassetid://" .. imageAssets[part], imageAlpha[part])
                     setGlassAppearance(child, typeof(settings) == 'table' and settings.glass == true)
                 end
-                if imageAssets[part] or StudioRealEstateCollisionPolicy.IsCollider(part) then
+                if imageAssets[part] then
                     StudioRealEstateCollisionPolicy.Apply(child, part, settings)
                     applied = true
                 end
@@ -123,9 +123,8 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
     for _, part in parts do
         local id = tonumber(rigIds[part])
         if not id or id <= 0 or seenModels[id]
-            or (not StudioRealEstateCollisionPolicy.IsCollider(part) and not imageAssets[part]) then
-            error("Real Estate " .. part .. " requires a published Model Asset"
-                .. (StudioRealEstateCollisionPolicy.IsCollider(part) and "" or " and Image Asset"))
+            or not imageAssets[part] then
+            error("Real Estate " .. part .. " requires a published Model Asset and Image Asset")
         end
         seenModels[id] = true
     end
@@ -188,10 +187,6 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
         local part = entry.part
         local rigName = part:sub(1, 1):upper() .. part:sub(2) .. "Rig"
         entry.rig.Name = rigName
-        if StudioRealEstateCollisionPolicy.IsCollider(part) then
-            entry.rig:SetAttribute("Game1RealEstatePhysicsRig", true)
-            entry.rig:SetAttribute("Game1RealEstatePhysicsMeshName", part)
-        end
         -- DoorAssembly is the only moving unit. Do not edit Bone.Transform:
         -- the hinge Bone identifies the world-space pivot for Model:PivotTo().
         if part == "door" and meshes[part]:FindFirstChild(DOOR_HINGE, true) then
@@ -212,11 +207,9 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
             entry.rig.Parent = wrapper
         end
         local settings = meshOptions[part]
-        if not StudioRealEstateCollisionPolicy.IsCollider(part) then
-            StudioTextureAppearance.Apply(meshes[part], "rbxassetid://" .. imageAssets[part], imageAlpha[part])
-            setGlassAppearance(meshes[part], typeof(settings) == 'table' and settings.glass == true)
-            textureCount += 1
-        end
+        StudioTextureAppearance.Apply(meshes[part], "rbxassetid://" .. imageAssets[part], imageAlpha[part])
+        setGlassAppearance(meshes[part], typeof(settings) == 'table' and settings.glass == true)
+        textureCount += 1
         StudioRealEstateCollisionPolicy.Apply(meshes[part], part, settings)
     end
     -- Align the new complete assembly to the previously registered house
@@ -249,12 +242,11 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
     if previous then
         previous:Destroy()
     end
-    -- Retrofit managed physics rigs into existing placed houses, preserving
-    -- their CFrame and all user-owned models / furnishings.
+    -- Remove obsolete COL geometry from all placed managed houses at Sync.
     local placedTargets = PlacedTargets.List(slug)
-    local collisionUpdated, collisionWarnings = StudioRealEstatePlacedCollisionSync.Update(wrapper, slug, placedTargets)
-    for _, warning in collisionWarnings do
-        table.insert(rigWarnings, warning)
+    local collisionUpdated = RetiredCleanup.CleanEstate(wrapper)
+    for _, root in placedTargets do
+        collisionUpdated += RetiredCleanup.CleanEstate(root)
     end
     local visualUpdated, visualFound, visualWarnings = StudioRealEstatePlacedVisualSync.Update(wrapper, slug, placedTargets)
     for _, warning in visualWarnings do

@@ -11,7 +11,9 @@ from real_estate_rig_discovery import find_mesh, find_rig
 from real_estate_import_rigs import restore_authored_rigs
 from model_publication import assert_skin_complete
 from real_estate_part_placement import inspect_placements
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'control-center'))
 from fbx_mesh_inspection import describe_mesh
+from services.retired_col_mesh import retired
 
 
 def analyze(source, only_part=None, extract=False):
@@ -20,11 +22,13 @@ def analyze(source, only_part=None, extract=False):
     bpy.ops.import_scene.fbx(filepath=str(source), use_anim=False)
     restore_authored_rigs(bpy, source)
     meshes = []
-    present = [obj.name for obj in bpy.context.scene.objects if obj.type == 'MESH']
+    present = [obj.name for obj in bpy.context.scene.objects if obj.type == 'MESH' and not retired(obj.name)]
     expected = [only_part] if only_part is not None else sorted(
         present, key=lambda name: (name != 'house', name.casefold(), name))
     if not present or (only_part is None and 'house' not in present):
         raise RuntimeError(f"Required mesh house is missing. Found: {', '.join(present) or 'none'}.")
+    if only_part is not None and retired(only_part):
+        raise RuntimeError('COL_ mesh is retired; author collision with Roblox Parts')
     if only_part is not None and only_part not in present:
         raise RuntimeError(f"Expected mesh {only_part} is absent; found: {', '.join(present)}")
     if only_part is not None and not extract and (present != [only_part]):

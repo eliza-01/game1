@@ -14,33 +14,16 @@
         "role": "visual",
         "physics": {
           "role": "visual",
-          "canCollide": false,
-          "canQuery": false,
+          "canCollide": null,
+          "canQuery": null,
           "canTouch": false,
-          "doubleSided": true,
-          "collisionFidelity": "Box",
+          "doubleSided": false,
+          "collisionFidelity": null,
           "physicsOnly": false
-        }
-      },
-      {
-        "name": "col_mesh",
-        "armature": "",
-        "vertices": 786,
-        "bones": [],
-        "influencedBones": [],
-        "role": "collider",
-        "physics": {
-          "role": "collider",
-          "canCollide": true,
-          "canQuery": true,
-          "canTouch": false,
-          "doubleSided": true,
-          "collisionFidelity": "PreciseConvexDecomposition",
-          "physicsOnly": true
         }
       }
     ],
-    "hasCollider": true,
+    "hasCollider": false,
     "armatures": [],
     "unassignedArmatures": []
   }

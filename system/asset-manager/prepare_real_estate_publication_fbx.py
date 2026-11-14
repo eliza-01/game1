@@ -10,7 +10,7 @@ from real_estate_rig_discovery import find_mesh, find_rig
 from real_estate_import_rigs import restore_authored_rigs
 from real_estate_staging_rig import isolated_rig
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "control-center"))
-from real_estate.collision_policy import is_collision_mesh
+from services.retired_col_mesh import retired
 from real_estate.rig_publication_policy import publish_bones_for_mesh
 
 
@@ -21,9 +21,11 @@ def main(source, output, texture_config, selected_part=None):
     restore_authored_rigs(bpy, source)
     reports = {}
     output.mkdir(parents=True, exist_ok=True)
-    authored = [obj.name for obj in bpy.context.scene.objects if obj.type == 'MESH']
+    authored = [obj.name for obj in bpy.context.scene.objects if obj.type == 'MESH' and not retired(obj.name)]
     if selected_part is None and 'house' not in authored:
         raise RuntimeError('The FBX must contain a mesh named house')
+    if selected_part is not None and retired(selected_part):
+        raise RuntimeError('retired COL mesh is not publishable')
     if selected_part is not None and selected_part not in authored:
         raise RuntimeError('Selected mesh ' + selected_part + ' not present in the FBX')
     parts = (selected_part,) if selected_part else tuple(sorted(authored, key=lambda name: (name != 'house', name.casefold(), name)))
@@ -76,11 +78,6 @@ def main(source, output, texture_config, selected_part=None):
 
 
 def _material(mesh, part, texture_config):
-    # Collision geometry is published as a Model Asset only. Never attach
-    # a fake image / atlas merely to get a physics mesh through Open Cloud.
-    if is_collision_mesh(part):
-        mesh.data.materials.clear()
-        return
     image = bpy.data.images.load(str(texture_config[part]), check_existing=True)
     material = bpy.data.materials.new(name=f'Game1_{part}')
     material.use_nodes = True

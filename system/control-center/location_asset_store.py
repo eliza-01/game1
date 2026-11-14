@@ -15,6 +15,7 @@ from services.texture_alpha import texture_uses_alpha
 from services import location_asset_rename
 from services.location_fbx_inspection import inspect as inspect_location_fbx
 from services.mesh_authoring_policy import normalize_location_options
+from services.retired_col_mesh import strip_options
 from services import location_asset_taxonomy as taxonomy
 from services import location_asset_alpha
 from services.texture_atlas_registry import AtlasRegistry, parse_filename
@@ -328,7 +329,7 @@ class LocationAssetStore:
                         for mesh in analysis['meshes']))
         try:
             stored_options = json.loads(result.pop('mesh_options_json', '{}') or '{}')
-            result['meshOptions'] = stored_options if isinstance(stored_options, dict) else {}
+            result['meshOptions'] = strip_options(stored_options) if isinstance(stored_options, dict) else {}
         except (ValueError, TypeError):
             result['meshOptions'] = {}
 

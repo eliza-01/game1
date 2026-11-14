@@ -1,8 +1,7 @@
--- Studio Edit Mode: normalize a managed Estate pasted or dragged from
--- ServerStorage into Workspace. The normal Sync path already normalizes its
--- staged MeshParts; manual copy/paste does not call that path.
+-- M342: remove retired COL geometry from pasted/placed managed Real Estates.
+-- No physics restoration or legacy collision mode remains.
 -- One event-driven pass per newly inserted managed root; no Workspace polling.
-local CollisionPolicy = require(script.Parent.StudioRealEstateCollisionPolicy)
+local Cleanup = require(script.Parent.StudioRetiredColMeshCleanup)
 local PlacedTargets = require(script.Parent.StudioRealEstatePlacedTargets)
 local Guard = {}
 
@@ -33,20 +32,11 @@ function Guard.Start(Workspace: any, RunService: any): () -> ()
             if not enabled or RunService:IsRunning() or not instance:IsDescendantOf(Workspace) then
                 return
             end
-            local restored = 0
-            for _, descendant in instance:GetDescendants() do
-                if descendant:IsA("MeshPart") then
-                    if CollisionPolicy.RestoreCopiedMesh(descendant) then
-                        restored += 1
-                    end
-                end
-            end
-            -- Cloned ServerStorage templates must not masquerade as templates
-            -- once they are placed in Workspace.
+            local removed = Cleanup.CleanEstate(instance)
             PlacedTargets.MarkPlaced(instance)
-            if restored > 0 then
-                print(("[game1 plugin] repaired %d copied Estate MeshPart physics settings: %s")
-                    :format(restored, instance:GetFullName()))
+            if removed > 0 then
+                print(("[game1 plugin] removed %d retired COL mesh(es) from %s")
+                    :format(removed, instance:GetFullName()))
             end
         end)
     end

@@ -23,6 +23,7 @@ local StudioCharacterTestStand = require(script.Parent.modules.StudioCharacterTe
 local StudioHousePlacementCapture = require(script.Parent.modules.StudioHousePlacementCapture)
 local StudioHousePlacementPreview = require(script.Parent.modules.StudioHousePlacementPreview)
 local StudioRealEstatePlacedPhysicsGuard = require(script.Parent.modules.StudioRealEstatePlacedPhysicsGuard)
+local RetiredCleanup = require(script.Parent.modules.StudioRetiredColMeshCleanup)
 
 local toolbar = plugin:CreateToolbar("game1")
 local markerVisibility = StudioMarkerVisibility.new(plugin, toolbar, Workspace)
@@ -42,7 +43,19 @@ local AGENT_TOKEN = "Game1LocalControlV1"
 local BRIDGE_URL = "http://127.0.0.1:43137"
 local BRIDGE_TOKEN = "Game1StudioBridgeV1"
 
--- Only Studio authoring copies are corrected; gameplay actors are untouched.
+-- One-time destructive M342 cleanup of owned source templates and placed world models.
+-- Unmanaged characters/objects are never scanned as migration targets.
+if not RunService:IsRunning() then
+    local workspaceRemoved = RetiredCleanup.CleanManagedTree(Workspace)
+    local templatesRemoved = RetiredCleanup.CleanManagedTree(ServerStorage)
+    local legacyPlaces = RetiredCleanup.CleanLegacyAssetTree(Workspace:FindFirstChild("Places"))
+    local legacyPlots = RetiredCleanup.CleanLegacyAssetTree(Workspace:FindFirstChild("Plots"))
+    local legacyTemplates = RetiredCleanup.CleanLegacyAssetTree(ServerStorage)
+    print(('[game1 plugin] M342R COL cleanup · managed %d/%d · templates %d/%d · old Places %d · old Plots %d · old templates %d')
+        :format(workspaceRemoved.estate, workspaceRemoved.location,
+            templatesRemoved.estate, templatesRemoved.location,
+            legacyPlaces, legacyPlots, legacyTemplates))
+end
 local stopEstateCopyGuard = StudioRealEstatePlacedPhysicsGuard.Start(Workspace, RunService)
 plugin.Unloading:Connect(stopEstateCopyGuard)
 

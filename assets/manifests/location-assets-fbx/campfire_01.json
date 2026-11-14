@@ -39,29 +39,12 @@
         "role": "visual",
         "physics": {
           "role": "visual",
-          "canCollide": false,
-          "canQuery": false,
+          "canCollide": null,
+          "canQuery": null,
           "canTouch": false,
           "doubleSided": false,
-          "collisionFidelity": "Box",
+          "collisionFidelity": null,
           "physicsOnly": false
-        }
-      },
-      {
-        "name": "col_mesh",
-        "armature": "",
-        "vertices": 60,
-        "bones": [],
-        "influencedBones": [],
-        "role": "collider",
-        "physics": {
-          "role": "collider",
-          "canCollide": true,
-          "canQuery": true,
-          "canTouch": false,
-          "doubleSided": false,
-          "collisionFidelity": "PreciseConvexDecomposition",
-          "physicsOnly": true
         }
       },
       {
@@ -107,7 +90,7 @@
         }
       }
     ],
-    "hasCollider": true,
+    "hasCollider": false,
     "armatures": [
       "campfire_01_armature"
     ],

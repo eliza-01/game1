@@ -3,6 +3,7 @@
 local HttpService = game:GetService("HttpService")
 local Validation = require(script.Parent.StudioRealEstateRigValidation)
 local Collision = require(script.Parent.StudioRealEstateCollisionPolicy)
+local RetiredCleanup = require(script.Parent.StudioRetiredColMeshCleanup)
 local Texture = require(script.Parent.StudioTextureAppearance)
 local PlacedTargets = require(script.Parent.StudioRealEstatePlacedTargets)
 local HouseFrame = require(script.Parent.StudioRealEstateHouseFrame)
@@ -64,7 +65,7 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
             usesAlpha = entry.usesAlpha
         end
     end
-    if not Collision.IsCollider(part) and (not imageId or imageId <= 0) then
+    if not imageId or imageId <= 0 then
         error("Targeted Real Estate rig " .. part .. " has no published Image Asset")
     end
     local settings = (typeof(metadata.meshOptions) == "table" and metadata.meshOptions[part]) or {}
@@ -94,10 +95,6 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
     end
     local replacement: Model = imported
     imported.Name = rigName(part)
-    if Collision.IsCollider(part) then
-        imported:SetAttribute("Game1RealEstatePhysicsRig", true)
-        imported:SetAttribute("Game1RealEstatePhysicsMeshName", part)
-    end
     imported:SetAttribute("Game1RealEstateManagedPart", part)
     if part == "door" then
         local hinge = mesh:FindFirstChild("door_01_hinge_socket", true)
@@ -133,6 +130,7 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
         error("Real Estate targeted rig swap failed: " .. tostring(problem))
     end
     old:Destroy()
+    RetiredCleanup.CleanEstate(wrapper)
     local savedIds = decodeMap(wrapper:GetAttribute("Game1RigAssetIds"))
     savedIds[part] = tostring(assetId)
     wrapper:SetAttribute("Game1RigAssetIds", HttpService:JSONEncode(savedIds))
@@ -214,6 +212,9 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
             if cloned then cloned:Destroy() end
             table.insert(warnings, root:GetFullName() .. ": " .. tostring(cause))
         end
+    end
+    for _, root in PlacedTargets.List(slug) do
+        RetiredCleanup.CleanEstate(root)
     end
     return wrapper, {bonesValidated = true, rigsValidated = 1,
         texturesApplied = if imageId then 1 else 0,

@@ -1,5 +1,4 @@
--- One Studio MeshPart physics writer shared by Real Estate and Location Assets.
--- Every collidable MeshPart uses Precise. Box is the default for no-collision.
+-- Shared visual MeshPart physics writer; special COL meshes are retired.
 local Core = {}
 local FIDELITY = {
     Box = Enum.CollisionFidelity.Box,
@@ -19,7 +18,7 @@ function Core.IsLocationCarrier(part: Instance): boolean
 end
 
 function Core.IsGlass(name: string): boolean
-    return not Core.IsCollider(name) and string.find(string.lower(name), "glass", 1, true) ~= nil
+    return string.find(string.lower(name), "glass", 1, true) ~= nil
 end
 
 function Core.Fidelity(name: string): Enum.CollisionFidelity
@@ -50,7 +49,7 @@ end
 
 function Core.Apply(mesh: MeshPart, canCollide: boolean, fidelity: string, doubleSided: boolean)
     applyRuntimeProperties(mesh, canCollide, doubleSided)
-    mesh.CollisionFidelity = Core.Fidelity(if canCollide then "PreciseConvexDecomposition" else fidelity)
+    mesh.CollisionFidelity = Core.Fidelity(fidelity)
 end
 
 local function parts(model: Model): {MeshPart}
@@ -61,53 +60,31 @@ local function parts(model: Model): {MeshPart}
     return found
 end
 
--- Both domains use Core.Apply as the only MeshPart property writer.
--- Location uses name classification plus saved per-mesh overrides. A missing
--- meshOptions entry means legacy behavior: never silently migrate a Place.
+-- M342: COL_* has no runtime role. Any retired geometry is deleted during
+-- Studio preparation and Location loading. A visual mesh can still opt into
+-- ordinary collisions via noCollide=false and a chosen CollisionFidelity.
 local function applyLocationModel(model: Model, allowedNames: {[string]: boolean}?, meshOptions: any?, runtimeSafe: boolean): number
-    local allParts = parts(model)
-    local hasCollider = false
-    for _, mesh in ipairs(allParts) do
-        if Core.IsCollider(mesh.Name) then hasCollider = true break end
-    end
     local affected = 0
-    for _, mesh in ipairs(allParts) do
+    for _, mesh in ipairs(parts(model)) do
         if not Core.IsLocationCarrier(mesh) and (allowedNames == nil or allowedNames[mesh.Name] == true) then
-            local collider, namedGlass = Core.IsCollider(mesh.Name), Core.IsGlass(mesh.Name)
             local raw = if typeof(meshOptions) == "table" then meshOptions[mesh.Name] else nil
-            local explicit = typeof(raw) == "table"
-            local glass = if explicit and typeof(raw.glass) == "boolean" then raw.glass else namedGlass
-            local doublesided = if explicit and typeof(raw.doubleSided) == "boolean"
+            local noCollide = if typeof(raw) == "table" and typeof(raw.noCollide) == "boolean"
+                then raw.noCollide else false
+            local doubleSided = if typeof(raw) == "table" and typeof(raw.doubleSided) == "boolean"
                 then raw.doubleSided else false
-            local defaultNoCollide = if hasCollider then not collider else not (collider or namedGlass)
-            local noCollide = if explicit and typeof(raw.noCollide) == "boolean"
-                then raw.noCollide else defaultNoCollide
-            if explicit or hasCollider or collider or namedGlass then
-                local fidelity = if noCollide and explicit and typeof(raw.collisionFidelity) == "string"
-                    then raw.collisionFidelity elseif noCollide then "Box" else "PreciseConvexDecomposition"
-                -- All collidable MeshParts are Precise, including COL_*.
-                if runtimeSafe then
-                    Core.ApplyRuntime(mesh, not noCollide, doublesided)
-                else
-                    Core.Apply(mesh, not noCollide, fidelity, doublesided)
-                end
+            local fidelity = if typeof(raw) == "table" and typeof(raw.collisionFidelity) == "string"
+                then raw.collisionFidelity else "Box"
+            if runtimeSafe then
+                Core.ApplyRuntime(mesh, not noCollide, doubleSided)
             else
-                -- Legacy Location without COL: do not override pre-M232 published physics.
-                mesh.CanTouch = false
-                mesh.DoubleSided = false
+                Core.Apply(mesh, not noCollide, fidelity, doubleSided)
             end
-            if collider then
-                mesh.Transparency = 1
-                mesh.CastShadow = false
-                mesh:SetAttribute("Game1DecoPhysicsOnly", true)
-            else
-                mesh:SetAttribute("Game1DecoPhysicsOnly", nil)
-            end
-            if glass then
-                if mesh:GetAttribute("Game1DecoGlassApplied") ~= true then
-                    mesh.Transparency = math.max(mesh.Transparency, 0.02)
-                    mesh:SetAttribute("Game1DecoGlassApplied", true)
-                end
+            mesh:SetAttribute("Game1DecoPhysicsOnly", nil)
+            local glass = if typeof(raw) == "table" and typeof(raw.glass) == "boolean"
+                then raw.glass else Core.IsGlass(mesh.Name)
+            if glass and mesh:GetAttribute("Game1DecoGlassApplied") ~= true then
+                mesh.Transparency = math.max(mesh.Transparency, 0.02)
+                mesh:SetAttribute("Game1DecoGlassApplied", true)
             end
             affected += 1
         end
@@ -137,8 +114,6 @@ function Core.ApplyLocationSurfaceMaterial(model: Model, surfaceKey: string?, ph
     local changed = 0
     for _, mesh in ipairs(parts(model)) do
         if Core.IsLocationCarrier(mesh) then continue end
-        -- COL receives exactly the same semantic/physical material as visual parts,
-        -- but continues to be invisible with its own Precise collision policy.
         local differs = mesh:GetAttribute("Game1LocationSurfaceMaterial") ~= key
         if material ~= nil and mesh.Material ~= material then differs = true end
         if differs then

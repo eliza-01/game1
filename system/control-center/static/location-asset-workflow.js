@@ -92,7 +92,7 @@ window.game1LocationAssetWorkflow = (() => {
       `<small class="muted">Изменение slug сохраняет опубликованные ID и историю. После переименования Place Registry покажет старые экземпляры для Repair.</small>`+
       `<label>Category<select data-la-category>${(decoAssetState.data?.options?.categories||[]).map(c=>
         `<option value="${e(c.id)}" ${c.id===identityData.category?'selected':''}>${e(c.label)}</option>`).join('')}</select></label>`+
-      `<label>Surface material<select data-la-material>${(decoAssetState.data?.options?.surfaceMaterials||[]).map(m=>`<option value="${e(m.id)}" ${m.id===identityData.surfaceMaterial?'selected':''}>${e(m.label)}</option>`).join('')}</select><small class="muted">Physical surface and future impact/footstep sound family; COL receives the same.</small></label>`+
+      `<label>Surface material<select data-la-material>${(decoAssetState.data?.options?.surfaceMaterials||[]).map(m=>`<option value="${e(m.id)}" ${m.id===identityData.surfaceMaterial?'selected':''}>${e(m.label)}</option>`).join('')}</select><small class="muted">Physical surface and future impact/footstep sound family.</small></label>`+
       `<label class="deco-policy-toggle"><input type="checkbox" data-la-destructible ${identityData.destructible?'checked':''}> Destructible</label></div>`+
       `<div class="actions">${button('save-identity','Apply Changes',busy)}${button('delete','Retire asset',busy)}</div>`,
       `Revision ${Number(item.revision||0)}`);
@@ -116,7 +116,7 @@ window.game1LocationAssetWorkflow = (() => {
     const alphaDirty=selectedAlpha!==activeAlpha;
     const alphaEditor=`<section class="la-alpha-settings"><label class="deco-policy-toggle">`+
       `<input type="checkbox" data-la-alpha ${selectedAlpha?'checked':''} ${busy?'disabled':''}> Alpha transparency</label>`+
-      `<small>${selectedAlpha?'Вкл. · Transparency':'Выкл. · Opaque'} · независимо от альфа-канала общего атласа; COL не изменяется.</small>`+
+      `<small>${selectedAlpha?'Вкл. · Transparency':'Выкл. · Opaque'} · независимо от альфа-канала общего атласа; Физические Parts настраиваются отдельно.</small>`+
       `<div class="actions">${button('apply-alpha','Apply Changes',busy||!alphaDirty,alphaDirty?'asset-apply-ready':'')}</div></section>`;
     const atlas=alphaEditor+window.game1ConsumerAtlasEditor.render(state.atlas,{
       currentId:item.atlasVariantId||0,linked:item.atlasVariants||[],
@@ -156,7 +156,7 @@ window.game1LocationAssetWorkflow = (() => {
       preview.alphaEnabled===Boolean(item.alphaEnabled);
     const selected=scanValid?preview.studio:null;
     const reportStale=Boolean(state.scanStale);
-    // One card per placed Model; COLLIDER geometry is only a compact existence hint.
+    // One card per placed Model; dedicated COL meshes are retired.
     // Selection and Sync operate on different contracts: Select is Explorer-only.
     const parts=selected?.parts||[];
     const grouped=window.game1LocationSyncGrouping.models(parts);
@@ -169,7 +169,7 @@ window.game1LocationAssetWorkflow = (() => {
     const historyLine=(v,title)=>`<div><small><strong>${e(title)} · Model ID ${e(v.modelAssetId)}</strong></small>`+
       `<small>Mesh ID частей: ${(v.meshes||[]).map(m=>e(m.meshId)+(Number(m.count||0)>1?` ×${Number(m.count)}`:'')).join(', ')||'—'}</small></div>`;
     const inventoryDisplay=`<small>Model ID — версия публикации Roblox; Mesh ID — части внутри неё, `+
-      `включая COL для поиска старых моделей.</small>`+
+      `включая части исторических публикаций.</small>`+
       (currentVersion?historyLine(currentVersion,'Сейчас'):'')+
       oldVersions.map((v,i)=>historyLine(v,`Ранее ${i+1}`)).join('');
     const meshLine=p=>{
@@ -185,7 +185,6 @@ window.game1LocationAssetWorkflow = (() => {
     };
     const modelLine=(model,i)=>{
       const visuals=model.parts.filter(p=>!p.isCollider);
-      const colliders=model.parts.filter(p=>p.isCollider);
       const pending=pendingKeys(model).length>0;
       const republish=model.parts.some(p=>p.republishRequired);
       const needsNewPlacement=model.parts.some(p=>p.needsCanonicalReplacement);
@@ -197,8 +196,6 @@ window.game1LocationAssetWorkflow = (() => {
         `<div class="la-sync-part-title"><strong>${i+1}. ${e(label)}</strong>`+
         `<small title="${e(model.modelPath)}">${e(model.modelPath)}</small></div>`+
         visuals.map(meshLine).join('')+
-        `<small class="la-sync-col ${colliders.length?'':'is-missing'}">`+
-        (colliders.length?`COL ✓ · ${colliders.length}`:'⚠ COL-меш не найден')+`</small>`+
         (republish?'<small class="la-sync-external-note">Импортный RootPart или некорректная структура — требуется исправить исходный FBX и перепубликовать Model. rig_carrier нужен только при наличии Bone. Атлас остаётся прежним. Repair не изменит скелет.</small>':'')+
         (needsNewPlacement?'<small class="la-sync-external-note">Новый Model ID имеет каноническую структуру. Явный Sync загрузит эту опубликованную Model и целиком заменит подтверждённый старый дочерний rig. Корневая Model, parent, pivot, CFrame и масштаб размещения сохраняются; Repair не используется.</small>':'')+
         (needsInspection?'<small class="la-sync-external-note">Неизвестно, есть ли кости в опубликованном FBX. Сначала Analyze saved FBX; перепубликация пока не требуется.</small>':'')+
@@ -230,7 +227,7 @@ window.game1LocationAssetWorkflow = (() => {
         `${button('select-all','Select All · Studio',busy||!grouped.length||reportStale)}`+
         `${button('replace-all','Sync All',busy||reportStale, selected&&parts.some(p=>p.managed&&!p.republishRequired&&!p.needsFbxInspection&&(p.needsMesh||p.needsTexture||p.needsAlpha))?'asset-apply-ready':'')}</div>`+
         `<small>Sync обновляет только устаревшие ресурсы. При замене Mesh обновляется весь rig модели. `+
-        `COL не получает текстуры. Перед изменением Place потребуется подтверждение.</small>`+
+        `Перед изменением Place потребуется подтверждение.</small>`+
         (selected?`<details><summary>История Model / Mesh ID</summary>${inventoryDisplay}</details>`:'')+
         `</div>`,
       selected?'Проверка завершена':'Сначала Find',selected?'ready':'pending');

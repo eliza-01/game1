@@ -4,30 +4,23 @@
 window.game1MeshAuthoring = (() => {
   const e = value => esc(String(value ?? ''));
   const fidelityChoices = ['Box','Hull','Default','PreciseConvexDecomposition'];
-  const isCollider = name => /(?:^|_)col(?:_|$)/i.test(name);
+  const isRetired = name => /(?:^|_)col(?:_|$)/i.test(name);
   const isCarrier = name => String(name||'').toLowerCase()==='rig_carrier';
-  const isGlass = name => String(name||'').toLowerCase().includes('glass') && !isCollider(name);
+  const isGlass = name => String(name||'').toLowerCase().includes('glass');
   function defaults(name,hasCollider=false,domain='estate') {
-    const lower=String(name||'').toLowerCase();
-    const solidDefault=isCollider(name)||lower==='door'||lower.startsWith('door_')||isGlass(name);
-    const noCollide=hasCollider ? !isCollider(name) : domain==='location'?false:!solidDefault;
-    return {glass:isGlass(name),noCollide,collisionFidelity:noCollide?'Box':'PreciseConvexDecomposition',
-      doubleSided:false,collisionMesh:isCollider(name)};
+    return {glass:isGlass(name),noCollide:domain!=='location',collisionFidelity:'Box',doubleSided:false};
   }
   function effectiveFidelity(flags) {
-    if (flags.noCollide !== true) return 'PreciseConvexDecomposition';
     return fidelityChoices.includes(flags.collisionFidelity)?flags.collisionFidelity:'Box';
   }
   function normalize(name,raw,hasCollider=false,domain='estate') {
-    const flags={...defaults(name,hasCollider,domain),...(raw||{})};
-    if (isCollider(name)) flags.glass=false;
-    flags.collisionFidelity=effectiveFidelity(flags);
-    return flags;
+    const {collisionMesh, ...clean}={...defaults(name,hasCollider,domain),...(raw||{})};
+    return {...clean,collisionFidelity:effectiveFidelity(clean)};
   }
   const status=flags=>`CanCollide: ${flags.noCollide!==true} · CanTouch: false · CanQuery: ${flags.noCollide!==true}`;
   function controls(part,flags,prefix='real-estate') {
     return `<div class="real-estate-physics-controls">
-      <label>Collision Fidelity <select id="${e(prefix)}-fidelity-${e(part)}" aria-label="Collision Fidelity for ${e(part)}" ${flags.noCollide!==true?'disabled title="Precise is required when collision is enabled"':''}>`+
+      <label>Collision Fidelity <select id="${e(prefix)}-fidelity-${e(part)}" aria-label="Collision Fidelity for ${e(part)}">`+
       fidelityChoices.map(v=>`<option value="${v}" ${flags.collisionFidelity===v?'selected':''}>${v==='PreciseConvexDecomposition'?'Precise (convex decomposition)':v}</option>`).join('')+`</select></label>
       <label class="real-estate-physics-toggle"><input type="checkbox" id="${e(prefix)}-doublesided-${e(part)}" ${flags.doubleSided?'checked':''}> DoubleSided</label>
       <small class="real-estate-physics-state" id="${e(prefix)}-physics-state-${e(part)}">${status(flags)}</small>
@@ -36,7 +29,7 @@ window.game1MeshAuthoring = (() => {
   function seeded(analysis, stored={}) {
     const next={};
     for(const part of analysis?.meshes||[]) {
-      if(isCarrier(part.name))continue;
+      if(isCarrier(part.name)||isRetired(part.name))continue;
       next[part.name]=normalize(part.name,stored?.[part.name],!!analysis.hasCollider,'location');
     }
     return next;
@@ -53,19 +46,19 @@ window.game1MeshAuthoring = (() => {
     const meshes=analysis.meshes||[];
     const armatures=analysis.armatures||[];
     return `<div class="deco-fbx-report" aria-label="FBX mesh inspection">
-      <div class="deco-fbx-report-header"><strong>FBX · ${meshes.length} MeshPart(s)</strong><small>${armatures.length} armature(s) · ${analysis.hasCollider?'COL collision mesh detected':'No COL collider'}</small></div>
-      ${!analysis.hasCollider?'<small class="real-estate-physics-caution">No dedicated COL mesh: review visual collisions before publishing.</small>':''}
-      ${meshes.map(mesh=>{
-        const name=mesh.name,flags=normalize(name,options[name],!!analysis.hasCollider,'location'),role=isCarrier(name)?'rig_carrier · shared Bone owner':isCollider(name)?'COL · collision geometry':isGlass(name)?'Glass':'Visual';
+      <div class="deco-fbx-report-header"><strong>FBX · ${meshes.length} MeshPart(s)</strong><small>${armatures.length} armature(s) · dedicated COL meshes retired</small></div>
+
+      ${meshes.filter(mesh=>!isRetired(mesh.name)).map(mesh=>{
+        const name=mesh.name,flags=normalize(name,options[name],!!analysis.hasCollider,'location'),role=isCarrier(name)?'rig_carrier · shared Bone owner':isGlass(name)?'Glass':'Visual';
         const bones=mesh.bones||[];
         return `<section class="deco-fbx-mesh" data-fbx-mesh="${e(name)}">
           <div class="deco-fbx-mesh-title"><strong>${e(name)}</strong><small>${role} · ${Number(mesh.vertices)||0} vertices</small></div>
           ${isCarrier(name)?'<small>Authored carrier · no visual, atlas, collision or editable physics</small>':`<div class="real-estate-mesh-switches" role="group" aria-label="${e(name)} physics settings">
             <label class="real-estate-physics-toggle"><input type="checkbox" data-mesh-field="noCollide" ${flags.noCollide?'checked':''}> No Collide</label>
-            ${!isCollider(name)?`<label class="real-estate-glass-toggle"><input type="checkbox" data-mesh-field="glass" ${flags.glass?'checked':''}> Glass · 0.02</label>`:''}
+            <label class="real-estate-glass-toggle"><input type="checkbox" data-mesh-field="glass" ${flags.glass?'checked':''}> Glass · 0.02</label>
           </div>
           <div class="real-estate-physics-controls">
-            <label>Collision Fidelity<select data-mesh-field="collisionFidelity" ${flags.noCollide?'':'disabled'}>
+            <label>Collision Fidelity<select data-mesh-field="collisionFidelity" >
               ${fidelityChoices.map(v=>`<option value="${v}" ${v===flags.collisionFidelity?'selected':''}>${v==='PreciseConvexDecomposition'?'Precise (convex decomposition)':v}</option>`).join('')}
             </select></label>
             <label><input type="checkbox" data-mesh-field="doubleSided" ${flags.doubleSided?'checked':''}> DoubleSided</label>
@@ -90,7 +83,7 @@ window.game1MeshAuthoring = (() => {
         options[name]=normalize(name,row,hasCollider,'location');
         const fidelity=meshRow.querySelector('[data-mesh-field="collisionFidelity"]');
         fidelity.value=options[name].collisionFidelity;
-        fidelity.disabled=!options[name].noCollide;
+        fidelity.disabled=false;
         meshRow.querySelector('[data-mesh-status]').textContent=status(options[name]);
         onChange?.(options);
       });

@@ -47,7 +47,7 @@ function Repair.Apply(refs: {any}, ctx: any): any
                 .. "; требуется перепубликация FBX, не Repair")
         elseif not ref.root or ref.root.Parent == nil then
             table.insert(blocked, ref.row.key .. ": нет подтверждённой Model, требуется публикация FBX")
-        elseif ref.needsCol or ref.row.needsRig or ref.row.needsMesh then
+        elseif ref.row.needsRig or ref.row.needsMesh then
             table.insert(blocked, ref.row.key .. ": изменение геометрии выполняется из опубликованной Model, не через Repair")
         elseif not ref.row.needsStructure and not ref.row.duplicateId then
             table.insert(blocked, ref.row.key .. ": метаданные уже актуальны")

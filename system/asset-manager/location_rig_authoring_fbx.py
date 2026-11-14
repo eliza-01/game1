@@ -14,7 +14,9 @@ from blender_rig_carrier import create_rig_carrier
 from model_publication import (
     assert_skin_complete, clean_scene, export_model, linked_meshes, prepare_rig,
 )
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'control-center'))
 from location_rig_contract import CARRIER, ROOT, role, validate, assert_bone_rest_roundtrip
+from services.retired_col_mesh import retired
 
 
 def bone_rows(armature):
@@ -47,6 +49,9 @@ def main(source, output, report_path):
         raise ValueError('authoring output must be a new, nonexisting .fbx')
     clean_scene()
     bpy.ops.import_scene.fbx(filepath=str(source), use_anim=False)
+    for obj in list(bpy.context.scene.objects):
+        if obj.type == 'MESH' and retired(obj.name):
+            bpy.data.objects.remove(obj, do_unlink=True)
     objects = [o for o in bpy.context.scene.objects if o.type in {'MESH', 'ARMATURE'}]
     if not any(o.type == 'MESH' and role(o.name) == 'visual' for o in objects):
         raise ValueError('no visual geometry')

@@ -8,6 +8,7 @@ import tempfile
 
 from blender_runtime import blender_executable
 from .contracts import validate_analysis, present_parts
+from services.retired_col_mesh import strip_mesh_rows, retired
 from services.fbx_blender_report import _blender_failure  # legacy import, shared implementation
 
 
@@ -27,12 +28,14 @@ def inspect(root: Path, source: Path) -> dict:
         raise ValueError('choose a valid Real Estate FBX')
     with tempfile.TemporaryDirectory(prefix='game1-real-estate-inspect-') as temp:
         report = Path(temp) / 'analysis.json'
-        return validate_analysis(_run(root, 'analyze_real_estate_fbx.py',
-                             (source, report), report_path=report))
+        return validate_analysis(strip_mesh_rows(_run(root, 'analyze_real_estate_fbx.py',
+                             (source, report), report_path=report)))
 
 
 def inspect_selected(root: Path, source: Path, part: str) -> dict:
     """Inspect a named mesh from either a single-mesh or a complete house FBX."""
+    if retired(part):
+        raise ValueError('COL_* authoring mesh has been retired')
     with tempfile.TemporaryDirectory(prefix='game1-estate-mesh-inspect-') as temp:
         report = Path(temp) / 'analysis.json'
         return _run(root, 'analyze_real_estate_fbx.py',

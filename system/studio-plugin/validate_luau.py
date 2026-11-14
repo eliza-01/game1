@@ -24,6 +24,27 @@ def ambiguous_leading_parentheses(source: str) -> list[int]:
             if line.lstrip().startswith('(')]
 
 
+def missing_place_registry_row_separator(source: str) -> list[int]:
+    """Catch the M342R regression: deleting a table branch removed its comma.
+
+    Only checks the known multi-line row transition, not the full Luau grammar.
+    A complete Luau parser is still needed for general syntax validation.
+    """
+    lines = source.splitlines()
+    errors = []
+    for index, line in enumerate(lines):
+        if 'or (root and root:GetAttribute("Game1DecoAssetSlug")~=entry.slug)' not in line:
+            continue
+        next_index = index + 1
+        while next_index < len(lines) and not lines[next_index].strip():
+            next_index += 1
+        if (next_index < len(lines)
+                and lines[next_index].strip().startswith('duplicateId=')
+                and not line.rstrip().endswith(',')):
+            errors.append(index + 1)
+    return errors
+
+
 def check_plugin(plugin_dir: Path) -> list[str]:
     errors: list[str] = []
     files = sorted(plugin_dir.rglob('*.luau'))
@@ -51,6 +72,9 @@ def check_plugin(plugin_dir: Path) -> list[str]:
         for number in ambiguous_leading_parentheses(source):
             errors.append(f'{path}:{number}: statement starts with "("; '
                           'introduce a named local to avoid ambiguous Luau syntax')
+        for number in missing_place_registry_row_separator(source):
+            errors.append(f'{path}:{number}: missing comma before duplicateId '
+                          'in Place Registry row table (M342R regression)')
     return errors
 
 

@@ -48,7 +48,9 @@ def validate(analysis: dict) -> dict:
             raise ValueError('FBX weights reference an unknown bone')
         if any(bone['parent'] and bone['parent'] not in bone_names for bone in mesh['bones']):
             raise ValueError('FBX bone parent missing from armature')
-    has_collider = any(is_collision_mesh(m['name']) for m in meshes)
+    if any(is_collision_mesh(m['name']) for m in meshes):
+        raise ValueError('retired COL mesh found in Location FBX inspection')
+    has_collider = False
     if analysis.get('hasCollider') != has_collider:
         raise ValueError('FBX collision role mismatch')
     for mesh in meshes:

@@ -16,13 +16,13 @@ def analyze(source):
     bpy.ops.object.select_all(action='SELECT')
     bpy.ops.object.delete(use_global=False)
     bpy.ops.import_scene.fbx(filepath=str(source), use_anim=False)
-    meshes = sorted((o for o in bpy.context.scene.objects if o.type == 'MESH'),
+    meshes = sorted((o for o in bpy.context.scene.objects if o.type == 'MESH' and not is_collision_mesh(o.name)),
                     key=lambda o: (o.name.casefold(), o.name))
     if not meshes:
         raise ValueError('Location FBX contains no MESH objects')
     if len({o.name.casefold() for o in meshes}) != len(meshes):
         raise ValueError('Location FBX contains ambiguous mesh names differing only by case')
-    has_collider = any(is_collision_mesh(o.name) for o in meshes)
+    has_collider = False
     records = []
     for mesh in meshes:
         rig = find_rig(bpy, mesh, mesh.name)

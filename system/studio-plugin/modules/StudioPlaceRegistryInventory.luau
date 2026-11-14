@@ -260,13 +260,6 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
                 end
             end
         end
-        local colliders=0
-        if root then
-            for _,child in ipairs(root:GetDescendants()) do
-                if child:IsA("MeshPart") and (Physics.IsCollider(child.Name)
-                    or child:GetAttribute("Game1DecoPhysicsOnly")==true) then colliders+=1 end
-            end
-        end
         local structuralState = if root then CarrierRig.Diagnose(root,if eligible then entry.rigManifest else nil,
             eligible and entry.legacyStaticPublication)
             else "repair_required"
@@ -298,7 +291,6 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
         end
         if not eligible then warn("Один Mesh ID встречается у нескольких Location Assets") end
         if not root then warn("Нет отдельной Model для этого экземпляра") end
-        if eligible and Published.RequiresCollider(entry) and colliders==0 then warn("Нет обязательного COL-меша") end
         if needsRig and not needsMesh then warn("Новая версия модели отличается по составу MeshPart, хотя визуальный Mesh ID совпадает") end
         if needsMaterial then warn("Материал поверхности требует Sync: "..entry.material) end
         if needsAlpha then warn("AlphaMode требует Sync") end
@@ -376,10 +368,10 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
             name=placement.Name,path=placement:GetFullName(),placementId=assigned,
             modelAssetId=if eligible then oldId else "",meshId=original.meshId,
             textureId=original.textureId,expectedMeshId=if eligible then entry.model else "",
-            expectedTextureId=if eligible then entry.atlas else "",colCount=colliders,
+            expectedTextureId=if eligible then entry.atlas else "",
             needsMesh=needsMesh,needsRig=needsRig,needsTexture=needsTexture,needsMaterial=needsMaterial,needsAlpha=needsAlpha,needsStructure=structuralState ~= "current" or not root or badName or meshNameMismatch or assigned==""
-                or (root and root:GetAttribute("Game1DecoAssetSlug")~=entry.slug)
-                or (eligible and Published.RequiresCollider(entry) and colliders==0),
+                or (root and root:GetAttribute("Game1DecoAssetSlug")~=entry.slug),
+
             duplicateId=false,ambiguous=not eligible or provenForeignClaim,
             -- Repair remains metadata-only. A verified old publication is
             -- migrated by Sync through the shared whole-child-rig swap.
@@ -395,7 +387,7 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
                 and (not needsMesh and not needsRig or oldId~=""),
             status=if not eligible then "ambiguous" elseif needsMesh or needsRig or needsTexture or needsMaterial or needsAlpha
                 or structuralState ~= "current" or not root or badName or meshNameMismatch or assigned==""
-                or oldClaim or foreignClaim or (Published.RequiresCollider(entry) and colliders==0)
+                or oldClaim or foreignClaim
                 then "pending" else "current",
             issues=issues,hierarchy=fullHierarchy,transform={cframe={part.CFrame:GetComponents()},
                 size={part.Size.X,part.Size.Y,part.Size.Z},position=positionOf(part),
@@ -408,7 +400,7 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
             rootPivot=if root then root:GetPivot() else nil,
             rootPrimary=if root then root.PrimaryPart else nil,
             row=row,entry=if eligible then entry else nil,structuralState=structuralState,
-            oldVersion=oldId,hasImporterRoot=hasImporterRoot,needsCol=eligible and Published.RequiresCollider(entry) and colliders==0,
+            oldVersion=oldId,hasImporterRoot=hasImporterRoot,
             currentVisual=eligible and Published.VisualCurrent(entry,id(part.MeshId))}
     end
     for _,indexes in pairs(duplicateGroups) do

@@ -6,23 +6,6 @@
     "schemaVersion": 1,
     "meshes": [
       {
-        "name": "col_mesh",
-        "armature": "",
-        "vertices": 109,
-        "bones": [],
-        "influencedBones": [],
-        "role": "collider",
-        "physics": {
-          "role": "collider",
-          "canCollide": true,
-          "canQuery": true,
-          "canTouch": false,
-          "doubleSided": false,
-          "collisionFidelity": "PreciseConvexDecomposition",
-          "physicsOnly": true
-        }
-      },
-      {
         "name": "lantern_01",
         "armature": "lantern_01_armature",
         "vertices": 847,
@@ -78,11 +61,11 @@
         "role": "visual",
         "physics": {
           "role": "visual",
-          "canCollide": false,
-          "canQuery": false,
+          "canCollide": null,
+          "canQuery": null,
           "canTouch": false,
           "doubleSided": false,
-          "collisionFidelity": "Box",
+          "collisionFidelity": null,
           "physicsOnly": false
         }
       },
@@ -152,7 +135,7 @@
         }
       }
     ],
-    "hasCollider": true,
+    "hasCollider": false,
     "armatures": [
       "lantern_01_armature"
     ],

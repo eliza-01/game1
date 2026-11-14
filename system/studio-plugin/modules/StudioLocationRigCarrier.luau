@@ -2,6 +2,12 @@
 -- Character and Real Estate have their own domain assembly rules.
 local Carrier = {}
 
+local function retired(name: string): boolean
+    local lower = string.lower(name)
+    return lower:sub(1, 4) == "col_" or lower:sub(-4) == "_col"
+        or lower:find("_col_", 1, true) ~= nil
+end
+
 function Carrier.IsCarrier(part: Instance): boolean
     return part:IsA("MeshPart") and part.Name == "rig_carrier"
 end
@@ -65,8 +71,7 @@ local function validateStatic(model: Model)
             error("static Location publication unexpectedly contains Bones")
         elseif child.Name == "rig_carrier" then
             error("static Location publication must not contain rig_carrier")
-        elseif child:IsA("MeshPart") and child.Name ~= "col_mesh"
-            and child.Name:sub(1, 4) ~= "col_" then
+        elseif child:IsA("MeshPart") and not retired(child.Name) then
             visuals += 1
         end
     end
@@ -133,11 +138,11 @@ function Carrier.Validate(model: Model, manifest: any, legacyStatic: boolean?): 
             or expected[part.name] ~= nil then
             error("invalid/duplicate Location publication manifest role")
         end
-        expected[part.name] = part.role
+        if not retired(part.name) then expected[part.name] = part.role end
     end
     validateImporterMotors(model, manifest, expected)
     for _, child in ipairs(model:GetDescendants()) do
-        if child:IsA("MeshPart") then
+        if child:IsA("MeshPart") and not retired(child.Name) then
             if seen[child.Name] then error("duplicate published Location MeshPart name") end
             seen[child.Name] = true
             local role = if Carrier.IsCarrier(child) then "rig_carrier"

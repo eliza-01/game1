@@ -115,17 +115,14 @@
       "StudioRealEstateRigValidation": {
         "$path": "modules/StudioRealEstateRigValidation.luau"
       },
+      "StudioRetiredColMeshCleanup": {
+        "$path": "modules/StudioRetiredColMeshCleanup.luau"
+      },
       "StudioRealEstateCollisionPolicy": {
         "$path": "modules/StudioRealEstateCollisionPolicy.luau"
       },
       "StudioRealEstatePlacedPhysicsGuard": {
         "$path": "modules/StudioRealEstatePlacedPhysicsGuard.luau"
-      },
-      "StudioRealEstateRigRoles": {
-        "$path": "modules/StudioRealEstateRigRoles.luau"
-      },
-      "StudioRealEstatePlacedCollisionSync": {
-        "$path": "modules/StudioRealEstatePlacedCollisionSync.luau"
       },
       "StudioActorSpawnCommands": {
         "$path": "modules/StudioActorSpawnCommands.luau"

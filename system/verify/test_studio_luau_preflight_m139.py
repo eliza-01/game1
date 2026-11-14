@@ -26,21 +26,35 @@ class StudioLuauPreflightM139(unittest.TestCase):
             path.write_text(bad, encoding='utf8')
             self.assertIn('Fail.luau:3:', '\n'.join(preflight.check_plugin(Path(tmp))))
 
-    def test_collision_sync_uses_named_clone_and_preserves_transaction(self):
-        source = (PLUGIN / 'modules/StudioRealEstatePlacedCollisionSync.luau').read_text(encoding='utf8')
-        self.assertIn('local staged = source:Clone()', source)
-        self.assertIn('clone = staged', source)
-        self.assertIn('staged:PivotTo(relative * source:GetPivot())', source)
-        self.assertIn('staged.Parent = root', source)
-        self.assertIn('if clone then clone:Destroy() end', source)
-        self.assertIn('if old then old:Destroy() end', source)
-        self.assertNotIn('(clone :: Model):PivotTo', source)
+    def test_place_registry_row_separator_is_validated_before_install(self):
+        inventory = (PLUGIN / 'modules/StudioPlaceRegistryInventory.luau').read_text(encoding='utf8')
+        self.assertEqual(preflight.missing_place_registry_row_separator(inventory), [])
+        missing = inventory.replace(
+            'or (root and root:GetAttribute("Game1DecoAssetSlug")~=entry.slug),',
+            'or (root and root:GetAttribute("Game1DecoAssetSlug")~=entry.slug)',
+        )
+        self.assertNotEqual(missing, inventory)
+        self.assertEqual(len(preflight.missing_place_registry_row_separator(missing)), 1)
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'modules' / 'StudioPlaceRegistryInventory.luau'
+            path.parent.mkdir()
+            path.write_text(missing, encoding='utf8')
+            self.assertIn('missing comma before duplicateId',
+                          '\n'.join(preflight.check_plugin(Path(tmp))))
+
+    def test_retired_collision_sync_is_not_in_plugin(self):
+        # M342 intentionally removed the legacy col_mesh placement mechanism.
+        manifest = (PLUGIN / 'plugin.project.json').read_text(encoding='utf8')
+        self.assertNotIn('StudioRealEstatePlacedCollisionSync', manifest)
+        cleanup = (PLUGIN / 'modules/StudioRetiredColMeshCleanup.luau').read_text(encoding='utf8')
+        self.assertIn('function Cleanup.CleanEstate', cleanup)
+        self.assertIn('function Cleanup.CleanLocation', cleanup)
 
     def test_install_runs_preflight_before_build_or_install(self):
         installer = (PLUGIN / 'install.ps1').read_text(encoding='utf8')
         self.assertIn("'validate_luau.py'", installer)
         self.assertLess(installer.index("'validate_luau.py'"),
-                        installer.index('rojo build plugin.project.json'))
+                        installer.index('& $RojoExe build plugin.project.json'))
         self.assertLess(installer.index('Studio Luau preflight failed'),
                         installer.index('Install-VerifiedBundle -Source $Temp -Destination $Installed'))
 

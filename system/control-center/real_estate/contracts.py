@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 
 from .rig_features import feature_warnings
+from services.retired_col_mesh import retired
 from .rig_publication_policy import publish_bones_for_mesh
 
 HOUSE_NAME = re.compile(r"^(?P<kind>[a-z][a-z0-9_]*)_level(?P<level>[1-9][0-9]*)_(?P<variant>[0-9]+)$")
@@ -19,7 +20,7 @@ def present_parts(analysis: dict) -> tuple[str, ...]:
     """
     meshes = analysis.get("meshes", []) if isinstance(analysis, dict) else []
     names = [item.get("name") for item in meshes if isinstance(item, dict)
-             and isinstance(item.get("name"), str)]
+             and isinstance(item.get("name"), str) and not retired(item.get("name"))]
     return tuple(sorted(names, key=lambda name: (name != REQUIRED_MESH, name.casefold(), name)))
 
 

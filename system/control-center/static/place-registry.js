@@ -118,7 +118,6 @@
         const slugs=[...new Set(selected.map(x=>x.slug))];
         const scope=selected.length?`${selected.length} размещений · ${slugs.join(', ')}`:'Запись старого формата';
         const skipped=Array.isArray(r.report?.skipped)?r.report.skipped:[];
-        const colCount=Number(r.report?.collidersCreated)||0;
         const status=r.status==='undone'?'Отменено':
           r.status==='no_changes'?(skipped.length?'Пропущено':'Без изменений'):
           r.status==='legacy'?'До M241':'Применено';
@@ -128,7 +127,6 @@
           <strong>#${html(r.id)} · ${title} · ${new Date(r.recordedUtc*1000).toLocaleString('ru-RU')}</strong>
           <small>${html(scope)} · изменено ${r.affected} · перед ревизией #${r.beforeRevision}</small>
           <span class="pr-state${r.status==='undone'?' pr-state-undone':''}">${status}</span>
-          ${colCount?`<small>Восстановлено COL: ${colCount}</small>`:''}
           ${skippedDetails}</div>
           ${r.status==='applied'?`<button type="button" data-pr-undo="${r.id}" ${r.canUndo?'':'disabled title="Сначала отмените более новые операции"'}>Undo</button>`:''}
         </div>`;

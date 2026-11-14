@@ -6,23 +6,6 @@
     "schemaVersion": 1,
     "meshes": [
       {
-        "name": "col_mesh",
-        "armature": "",
-        "vertices": 224,
-        "bones": [],
-        "influencedBones": [],
-        "role": "collider",
-        "physics": {
-          "role": "collider",
-          "canCollide": true,
-          "canQuery": true,
-          "canTouch": false,
-          "doubleSided": false,
-          "collisionFidelity": "PreciseConvexDecomposition",
-          "physicsOnly": true
-        }
-      },
-      {
         "name": "ground_torch_01",
         "armature": "ground_torch_01_armature",
         "vertices": 2007,
@@ -56,11 +39,11 @@
         "role": "visual",
         "physics": {
           "role": "visual",
-          "canCollide": false,
-          "canQuery": false,
+          "canCollide": null,
+          "canQuery": null,
           "canTouch": false,
           "doubleSided": false,
-          "collisionFidelity": "Box",
+          "collisionFidelity": null,
           "physicsOnly": false
         }
       },
@@ -107,7 +90,7 @@
         }
       }
     ],
-    "hasCollider": true,
+    "hasCollider": false,
     "armatures": [
       "ground_torch_01_armature"
     ],

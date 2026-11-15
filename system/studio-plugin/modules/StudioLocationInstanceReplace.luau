@@ -60,6 +60,15 @@ end
 local function anchorOptions(target: Model): ({any}, {[string]: any})
     local options = {{id="model", label="Pivot новой Model"}}
     local approved = {model={}}
+    local targetVisuals = meshAnchors(target)
+    -- Geometry CFrame is the physical visual orientation, independent of an
+    -- old MeshPart.PivotOffset or a Model's authored pivot orientation.
+    if #targetVisuals == 1 then
+        local part = targetVisuals[1]
+        table.insert(options,{id="geometry",label="Геометрия нового MeshPart · CFrame (рекомендуется)",
+            meshId=part.meshId})
+        approved.geometry = {meshId=part.meshId,path=part.path}
+    end
     for index, part in ipairs(meshAnchors(target)) do
         local id = "mesh:"..tostring(index)
         table.insert(options,{id=id,label="Pivot нового MeshPart "..index.." · "..part.path,
@@ -74,12 +83,13 @@ local function selectedTargetAnchor(target: Model, anchorId: string,
     if anchorId == "model" and approved.model then return target:GetPivot() end
     local expected = approved[anchorId]
     local ordinal = tonumber(anchorId:match("^mesh:(%d+)$"))
-    local part = if ordinal then meshAnchors(target)[ordinal] else nil
+    local part = if anchorId == "geometry" then meshAnchors(target)[1]
+        elseif ordinal then meshAnchors(target)[ordinal] else nil
     if not expected or not part or part.meshId ~= expected.meshId
         or part.path ~= expected.path then
         error("Target MeshPart changed since Preview; preview again")
     end
-    return part.frame
+    return if anchorId == "geometry" then part.geometry else part.frame
 end
 
 -- Pure rigid transform: align the selected NEW anchor with the OLD Model pivot.
@@ -168,13 +178,34 @@ local function proven(model: Model, source: any, sourceVersions: {any}, otherVer
     return true
 end
 
+-- Legacy grouped fences sometimes carry copied Location identity attributes.
+-- A grouping Model without its own published visual and without direct Parts
+-- is NOT a placed asset. Its separately published children are replaceable.
+-- Real published ancestors remain protected, as do Real Estate/house previews.
+local function groupingContainer(root: Model): boolean
+    if root:GetAttribute("Game1DecoPublishedModelAssetId") ~= nil then return false end
+    for _, child in ipairs(root:GetChildren()) do
+        if child:IsA("BasePart") then return false end
+    end
+    for _, descendant in ipairs(root:GetDescendants()) do
+        if descendant:IsA("Model") and descendant:GetAttribute("Game1DecoAssetSlug") ~= nil
+            and descendant:GetAttribute("Game1DecoPublishedModelAssetId") ~= nil then
+            return true
+        end
+    end
+    return false
+end
+
 local function allowedParent(root: Model, world: Workspace): boolean
     if not root:IsDescendantOf(world) then return false end
     if world.CurrentCamera and root:IsDescendantOf(world.CurrentCamera) then return false end
     local ancestor = root.Parent
     while ancestor and ancestor ~= world do
-        if ancestor:GetAttribute("Game1RealEstateSlug") ~= nil or ancestor:GetAttribute("Game1PlotHousePreview") == true
-            or ancestor:GetAttribute("Game1DecoAssetSlug") ~= nil then return false end
+        if ancestor:GetAttribute("Game1RealEstateSlug") ~= nil or ancestor:GetAttribute("Game1PlotHousePreview") == true then
+            return false
+        end
+        if ancestor:IsA("Model") and ancestor:GetAttribute("Game1DecoAssetSlug") ~= nil
+            and not groupingContainer(ancestor) then return false end
         ancestor = ancestor.Parent
     end
     return true
@@ -217,7 +248,14 @@ local function sourceRoots(config: any, slug: string, scope: string): {Model}
     local results, seen = {}, {}
     local function add(root: Model)
         if not owned(root,slug) or seen[root] then return end
-        if not allowedParent(root,config.Workspace) then error("Nested/foreign Location model cannot be replaced") end
+        -- Do not mistake a manually stamped group for a published placement.
+        if groupingContainer(root) then return end
+        if not allowedParent(root,config.Workspace) then
+            error("Location placement is nested inside a published/foreign asset: "..root:GetFullName())
+        end
+        if root:GetAttribute("Game1DecoPublishedModelAssetId") == nil then
+            error("Location placement is missing its published Model ID: "..root:GetFullName())
+        end
         seen[root] = true
         table.insert(results,root)
     end
@@ -228,7 +266,15 @@ local function sourceRoots(config: any, slug: string, scope: string): {Model}
             local cursor = item
             while cursor and cursor ~= config.Workspace do
                 if owned(cursor,slug) then
-                    add(cursor)
+                    if groupingContainer(cursor) then
+                        -- Selecting a group explicitly selects its real child
+                        -- placements, not a nonexistent aggregate Model asset.
+                        for _, descendant in ipairs(cursor:GetDescendants()) do
+                            if owned(descendant,slug) then add(descendant) end
+                        end
+                    else
+                        add(cursor)
+                    end
                     break
                 end
                 cursor = cursor.Parent
@@ -278,7 +324,12 @@ local function freshModel(template: Model, target: any, old: any,
         -- This intentionally does not reinterpret manual child MeshPart Size edits.
         clone:ScaleTo(old.scale)
         Legacy.ResizeTarget(clone,old.geometry)
-        positionAtSource(clone,old.geometry.frame,anchorId,approved)
+        if anchorId == "geometry" then
+            if not old.geometry.visualFrame then error("Source has no unique visual MeshPart CFrame") end
+            positionAtSource(clone,old.geometry.visualFrame,anchorId,approved)
+        else
+            positionAtSource(clone,old.geometry.frame,anchorId,approved)
+        end
         Preparation.PreparePlaced(clone,target.meshOptions,target.surfaceMaterial,
             target.materialDefinition and target.materialDefinition.robloxMaterial)
         Placed.StampPublishedModel(clone,target)
@@ -292,7 +343,8 @@ local function freshModel(template: Model, target: any, old: any,
             if not applied then Collision.Rollback(tx); error(problem) end
             Collision.Finalize(tx)
         end
-        if not sameFrame(selectedTargetAnchor(clone,anchorId,approved),old.geometry.frame)
+        local expectedFrame = if anchorId == "geometry" then old.geometry.visualFrame else old.geometry.frame
+        if not sameFrame(selectedTargetAnchor(clone,anchorId,approved),expectedFrame)
             or math.abs(clone:GetScale()-old.scale) > 0.00001 then
             error("Replacement transform or uniform Model scale changed during staging")
         end
@@ -414,11 +466,30 @@ return function(config: any)
             end)
             template:Destroy()
             if not inspected then error("Target is incompatible with historical transforms: "..tostring(choices)) end
+            -- The geometry option is only valid when EVERY source has one
+            -- provable source MeshPart, not merely a single target mesh.
+            for _, state in ipairs(states) do
+                if not state.geometry.visualFrame and approved.geometry then
+                    approved.geometry = nil
+                    for i=#choices,1,-1 do
+                        if choices[i].id == "geometry" then table.remove(choices,i) end
+                    end
+                    break
+                end
+            end
+            local differingAxes = 0
+            for _, state in ipairs(states) do
+                local frame = state.geometry.visualFrame
+                if frame and (state.frame.Rotation.LookVector:Dot(frame.LookVector) < 0.9999
+                    or state.frame.Rotation.UpVector:Dot(frame.UpVector) < 0.9999) then
+                    differingAxes += 1
+                end
+            end
             local token = config.HttpService:GenerateGUID(false)
             session = {token=token,digest=command.catalog.digest,
                 source=source.slug,target=target.slug,scope=command.scope,states=states,
                 targetRevision=targetRow.revision,anchorOptions=choices,approved=approved,
-                rekeyed=rekeyed,rebased=rebased,resized=resized}
+                rekeyed=rekeyed,rebased=rebased,resized=resized,differingAxes=differingAxes}
             local placements = {}
             for _, state in ipairs(states) do
                 table.insert(placements,{name=state.name,path=state.root:GetFullName(),
@@ -428,7 +499,8 @@ return function(config: any)
             end
             return {count=#states,scanToken=token,placements=placements,
                 anchorOptions=choices,reassignedIds=rekeyed,
-                normalizedPivots=rebased,preservedManualSizes=resized}
+                normalizedPivots=rebased,preservedManualSizes=resized,
+                differingVisualAxes=differingAxes}
         end
         if command.phase ~= "replace" then error("Unknown Instance Manager phase") end
         local current = session
@@ -487,8 +559,10 @@ return function(config: any)
             for _, pair in ipairs(stage) do
                 pair.before.root.Parent = nil
                 pair.after.Parent = pair.before.parent
+                local expectedFrame = if command.anchorId == "geometry"
+                    then pair.before.geometry.visualFrame else pair.before.geometry.frame
                 if not sameFrame(selectedTargetAnchor(pair.after,command.anchorId,current.approved),
-                    pair.before.geometry.frame) or math.abs(pair.after:GetScale()-pair.before.scale) > 0.00001 then
+                    expectedFrame) or math.abs(pair.after:GetScale()-pair.before.scale) > 0.00001 then
                     error("Replacement target anchor/scale changed during commit")
                 end
             end

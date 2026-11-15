@@ -92,7 +92,8 @@ function Legacy.Inspect(placed: Model,published: Model): any
     -- leaving the visible CFrame unchanged. Reconstruct from source provenance
     -- only when the old part's PivotOffset has actually diverged.
     local placementFrame = if pivotRebased then recovered else placed:GetPivot()
-    return {frame=placementFrame, resized=changed(manual), rebased=pivotRebased,
+    return {frame=placementFrame, visualFrame=old.CFrame,
+        resized=changed(manual), rebased=pivotRebased,
         ratios=manual,
         sourceLocalAxes=published:GetPivot().Rotation:ToObjectSpace(reference.CFrame.Rotation),
         sourceMeshId=History.Id(reference.MeshId),

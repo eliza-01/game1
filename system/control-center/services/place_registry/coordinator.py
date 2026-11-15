@@ -16,6 +16,7 @@ class LocationPlaceRegistry:
         self.revisions = revisions
         self.studio = studio_bridge
         self._last_scan = None
+        self.studio_mutation_counter = 0  # Increment on explicit Studio writes; read-only Scan does not.
         self.journal = PlaceOperationJournal(self.revisions.path)
         self._lock = RLock()
 
@@ -47,6 +48,7 @@ class LocationPlaceRegistry:
             if not isinstance(result, dict) or result.get('undone') is not True:
                 raise ValueError('Studio did not confirm Undo; journal unchanged')
             self._last_scan = None
+            self.studio_mutation_counter += 1
             self.journal.mark_undone(action_id, candidate['operation_id'])
             return {'undone': True, 'actionId': action_id,
                     'note': 'Studio Undo выполнен; ревизия будет обновлена после Scan'}
@@ -93,6 +95,7 @@ class LocationPlaceRegistry:
         if phase != 'select':
             scan = self._last_scan
             self._last_scan = None  # Even if audit persistence fails: Place may have changed.
+            self.studio_mutation_counter += 1
             if not isinstance(bridge.get('operationId'), str):
                 raise RuntimeError('Studio operation committed, but audit identity is missing; Scan Place before continuing')
             record_keys = set(keys or [])

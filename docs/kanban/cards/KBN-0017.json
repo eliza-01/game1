@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0017",
+  "title": "LOD Manager · Inventory → Runtime Build",
+  "domain": "World Streaming",
+  "status": "IN_PROGRESS",
+  "priority": "P1",
+  "owner": "Codex",
+  "specPath": "docs/kanban/specs/KBN-0017.md",
+  "dependsOn": [
+    "KBN-0004",
+    "KBN-0006"
+  ],
+  "tasks": [
+    {
+      "id": "KBN-0017-T01",
+      "title": "Отдельный LOD Manager в Asset Manager, подключён к Place Registry",
+      "done": true
+    },
+    {
+      "id": "KBN-0017-T02",
+      "title": "Scan / Snapshot / LOD readiness, статус актуальности и история",
+      "done": true
+    },
+    {
+      "id": "KBN-0017-T03",
+      "title": "Полная проверка покрытия и подготовка Runtime Placement Registry",
+      "done": false
+    },
+    {
+      "id": "KBN-0017-T04",
+      "title": "Проверяемый backup живого авторского Place",
+      "done": false
+    },
+    {
+      "id": "KBN-0017-T05",
+      "title": "Безопасная отдельная Runtime-копия Place с Preview Diff и rollback",
+      "done": false
+    },
+    {
+      "id": "KBN-0017-T06",
+      "title": "Подтверждение удаления только визуальных ассетов в Runtime-копии",
+      "done": false
+    },
+    {
+      "id": "KBN-0017-T07",
+      "title": "Runtime Validate и publish gate, тест на телефоне",
+      "done": false
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0017-A01",
+      "title": "Studio Edit Mode Scan и снимок на реальном Place, без изменений исходных Instances",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0017-A02",
+      "title": "Runtime backup и очищение тестовой Runtime-копии с откатом",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0017-A03",
+      "title": "Два клиента / Eyesland DEV · мобильный тест",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ],
+  "revision": 1,
+  "updatedAt": "2026-11-15T01:01:43+00:00",
+  "specSha256": "da0acf6a9bf7926f5b31d6e568e9fff8131ca9d047de88dc7a6bff5ec4c2bed5"
+}

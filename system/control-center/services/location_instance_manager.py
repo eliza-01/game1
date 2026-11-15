@@ -22,7 +22,7 @@ class LocationInstanceManager:
         phase, source, target, scope, token = (payload[key] for key in
             ('phase', 'sourceSlug', 'targetSlug', 'scope', 'scanToken'))
         anchor_id = payload['anchorId']
-        if not isinstance(anchor_id, str) or not (anchor_id == 'model' or
+        if not isinstance(anchor_id, str) or not (anchor_id in ('model', 'geometry') or
                 re.fullmatch(r'mesh:[1-9][0-9]{0,6}', anchor_id)):
             raise ValueError('Choose a valid target Pivot')
         if phase == 'preview' and anchor_id != 'model':

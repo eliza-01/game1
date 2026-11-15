@@ -15,6 +15,7 @@
 <link rel="stylesheet" href="location-assets.css?v=1">
 <link rel="stylesheet" href="location-instance-manager.css?v=344">
 <link rel="stylesheet" href="place-registry.css?v=241">
+<link rel="stylesheet" href="lod-manager.css?v=1">
 <link rel="stylesheet" href="character-components.css?v=6">
 <link rel="stylesheet" href="character-assemblies.css?v=5">
 <link rel="stylesheet" href="character-armor.css?v=1">
@@ -43,6 +44,7 @@
 <button id="nav-locations" class="asset-section" type="button"><b>locations</b><small>polygon registry · studio authoring</small></button>
 <button id="nav-location-assets" class="asset-section" type="button"><b>location assets</b><small>flora · structure · prop</small></button>
 <button id="nav-place-registry" class="asset-section" type="button"><b>place registry</b><small>location assets · audit · repair · revisions</small></button>
+<button id="nav-lod-manager" class="asset-section" type="button"><b>LOD Manager</b><small>scan · snapshots · readiness</small></button>
 <button id="nav-database" class="asset-section" type="button"><b>database</b><small>asset audit · ID history</small></button>
 <div id="database-nav" class="database-subnav" hidden><button id="nav-asset-audit" type="button" class="database-subnav-item">Asset History</button></div>
 <button id="nav-atlas" class="asset-section" type="button"><b>atlas</b><small>variants · consumers · retirement</small></button>
@@ -612,6 +614,36 @@
   </div>
 </div>
 
+<div id="lod-manager-view" hidden>
+  <div class="panel hero"><div><span class="eyebrow">Location Assets · World Streaming</span>
+    <h2>LOD Manager</h2><p>Снимки размещений и готовность FULL / LOD. Используется существующий Place Registry — без повторного сканера и без изменения Studio.</p></div></div>
+  <section class="panel lm-panel">
+    <div class="lm-toolbar"><div><span class="eyebrow">01 · Inventory</span><h3>Snapshot · Studio</h3></div>
+      <div class="actions"><button id="lod-refresh" type="button">Refresh</button><button id="lod-scan" class="primary" type="button">Scan Place</button></div></div>
+    <div id="lod-snapshot" class="lm-snapshot" aria-live="polite">Нет данных — Refresh или Scan.</div>
+    <div id="lod-status" class="lm-note" role="status" aria-live="polite"></div>
+    <div id="lod-metrics" class="lm-metrics"></div>
+    <p id="lod-warnings" class="lm-flag" role="status"></p>
+  </section>
+  <section class="panel lm-panel">
+    <div class="lm-list-head"><div><span class="eyebrow">02 · LOD readiness</span><h3>Location Assets <small id="lod-count" class="lm-note"></small></h3></div>
+      <div class="lm-filters"><input id="lod-search" type="search" placeholder="Search asset slug" aria-label="Search Location Asset">
+        <select id="lod-filter" aria-label="LOD readiness filter"><option value="all">All statuses</option>
+          <option value="red">Missing LOD1</option><option value="yellow">LOD1 · no LOD2</option><option value="green">LOD1 + LOD2</option></select></div></div>
+    <div class="lm-table"><table><thead><tr><th>Location Asset</th><th>Placed</th><th>LOD models</th><th>Placement diagnostics</th></tr></thead>
+      <tbody id="lod-rows"><tr><td colspan="4">Loading…</td></tr></tbody></table></div>
+    <p class="lm-note">Точки: красная — нет опубликованного LOD1; жёлтая — LOD1 опубликован, LOD2 отсутствует; зелёная — оба опубликованы. Регистрация LOD2 пока не реализована. Сканирование распознаёт только опубликованные Mesh ID из Place Registry.</p>
+  </section>
+  <section class="panel lm-panel"><div><span class="eyebrow">03 · History</span><h3>Snapshot revisions</h3></div>
+    <div id="lod-revisions" class="lm-revisions"></div>
+    <p class="lm-note">JSON включает полные трансформации и иерархию размещений. Он не заменяет резервную копию Place (.rbxl).</p>
+  </section>
+  <section class="panel lm-panel lm-build"><div><span class="eyebrow">04 · Runtime preparation</span><h3>Prepare to publish</h3></div>
+    <div class="actions" style="margin-top:12px"><button id="lod-prepare" type="button" disabled title="Backup / Runtime Place builder ещё не реализованы">Prepare Runtime Place · not available</button></div>
+    <p id="lod-build-status" class="lm-note">Runtime Build будет подключён отдельно после проверки снимков и бэкапа. Исходный Place не меняется.</p>
+  </section>
+</div>
+
 <div id="database-view" hidden>
 <div class="panel hero">
 <div><span class="eyebrow">game1 · read-only audit database</span><h2>Database</h2><p>История публикаций и замен Roblox Asset ID из MySQL. Просмотр не изменяет зарегистрированные ассеты, атласы и Roblox Studio.</p></div>
@@ -904,8 +936,9 @@
 <script src="location-category-picker.js?v=249"></script>
 <script src="deco-assets.js?v=253"></script>
 <script src="location-collision.js?v=3431"></script>
-<script src="location-instance-manager.js?v=351"></script>
+<script src="location-instance-manager.js?v=351&geometry=1"></script>
 <script src="place-registry.js?v=348"></script>
+<script src="lod-manager.js?v=1"></script>
 <script src="location-publication-state.js?v=253"></script>
 <script src="location-sync-grouping.js?v=262"></script>
 <script src="location-asset-workflow.js?v=262"></script>

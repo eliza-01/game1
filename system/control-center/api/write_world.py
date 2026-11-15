@@ -14,6 +14,12 @@ from services.mesh_authoring_policy import is_collision_mesh
 
 
 def route(path, body, deps):
+    if path == "/api/lod-manager/scan":
+        try:
+            return 200, deps["lod_manager"].scan(body())
+        except (ValueError, OSError, RuntimeError, KeyError) as error:
+            return 400, {"error": str(error)}
+
     if path.startswith('/api/location-assets/') and path.endswith('/collision-studio'):
         try:
             slug = path[len('/api/location-assets/'):-len('/collision-studio')].strip('/')
@@ -376,6 +382,31 @@ def route(path, body, deps):
             return out(200, result)
         except Exception as error:
             return out(400, {"error": str(error)})
+
+    # LOD1 is an optional, independently versioned Location Asset resource.
+    # Neither staging nor publication mutates FULL, Atlas, placements or Studio.
+    if path.startswith('/api/location-assets/') and path.endswith('/lod1-stage'):
+        slug = unquote(path[len('/api/location-assets/'):-len('/lod1-stage')].strip('/'))
+        try:
+            payload = body()
+            if not isinstance(payload, dict) or set(payload) != {'sourcePath', 'expectedRevision'}:
+                raise ValueError('LOD1 stage requires sourcePath and expectedRevision')
+            return out(200, location_assets.stage_lod1(
+                slug, payload['sourcePath'], payload['expectedRevision']))
+        except (ValueError, OSError, RuntimeError, KeyError) as error:
+            return out(400, {'error': str(error)})
+
+    if path.startswith('/api/location-assets/') and path.endswith('/lod1-publish'):
+        slug = unquote(path[len('/api/location-assets/'):-len('/lod1-publish')].strip('/'))
+        try:
+            payload = body()
+            if not isinstance(payload, dict) or set(payload) != {'expectedRevision'}:
+                raise ValueError('LOD1 publish requires expectedRevision only')
+            return out(200, location_assets.publish_lod1(
+                slug, payload['expectedRevision'],
+                publication_credentials('game1 location LOD1')))
+        except (ValueError, OSError, RuntimeError, KeyError) as error:
+            return out(400, {'error': str(error)})
 
     if path.startswith('/api/location-assets/') and path.endswith('/collision-blueprint'):
         try:

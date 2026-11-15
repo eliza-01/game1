@@ -1,52 +1,50 @@
 {
   "schemaVersion": 1,
   "id": "KBN-0004",
-  "title": "Стандарт MASTER / FULL / LOD1 / COLLISION",
+  "title": "Контракт Location Assets: FULL / LOD1 / Collision",
   "domain": "Assets",
-  "status": "PROPOSED",
+  "status": "IN_PROGRESS",
   "priority": "P0",
   "owner": "Owner + Codex",
   "specPath": "docs/kanban/specs/KBN-0004.md",
-  "dependsOn": [
-    "KBN-0002"
-  ],
+  "dependsOn": [],
   "tasks": [
     {
       "id": "KBN-0004-T01",
-      "title": "Определить единый ID ассета и версии вариаций",
-      "done": false
+      "title": "Сохранить один slug для FULL, LOD1 и независимого Collision Blueprint",
+      "done": true
     },
     {
       "id": "KBN-0004-T02",
-      "title": "Утвердить pivot, ориентацию, масштаб, UV и материалы",
+      "title": "Зафиксировать независимость Pivot MeshPart, Model и авторских координат коллизии",
       "done": false
     },
     {
       "id": "KBN-0004-T03",
-      "title": "Определить структуру Blender source, FULL, LOD1 и collision",
+      "title": "Зарегистрировать LOD1 FBX и отдельный Roblox Model ID без изменения FULL",
       "done": false
     },
     {
       "id": "KBN-0004-T04",
-      "title": "Установить допустимые исключения для Rig и интерактивных деталей",
+      "title": "Определить правила проверки LOD перед внедрением переключения",
       "done": false
     }
   ],
   "acceptance": [
     {
       "id": "KBN-0004-A01",
-      "title": "Описана проверяемая схема ассета с версиями и идентификаторами",
+      "title": "LOD1 хранится и публикуется независимо, без потери FULL/Atlas/Collision/истории",
       "status": "NOT_RUN",
       "evidence": ""
     },
     {
       "id": "KBN-0004-A02",
-      "title": "Валидатор обнаруживает отсутствующие LOD и расхождения pivot",
+      "title": "Отсутствующий LOD1 допустим; некорректные Pivot/геометрия проверяются перед runtime",
       "status": "NOT_RUN",
       "evidence": ""
     }
   ],
-  "revision": 1,
-  "updatedAt": "2026-11-13T00:00:00+00:00",
-  "specSha256": "a536c693c548164075961f6a56a00cb4646dd0e75b1c874993b4aacc06d416b0"
+  "revision": 3,
+  "updatedAt": "2026-11-15T01:30:00+00:00",
+  "specSha256": "b05ac44d2d5e23554605091ea995b049329501dada034caffdbb1d974aedf092"
 }

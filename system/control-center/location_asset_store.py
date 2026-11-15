@@ -20,6 +20,7 @@ from services import location_asset_taxonomy as taxonomy
 from services import location_asset_alpha
 from services import location_visual_appearance as appearance
 from services import location_collision_blueprint
+from services import location_lod_resource
 from services.texture_atlas_registry import AtlasRegistry, parse_filename
 
 from opencloud_assets import (
@@ -70,6 +71,7 @@ class LocationAssetStore:
         self.runtime.mkdir(parents=True, exist_ok=True)
         self.db = self.runtime / "game1.db"
         self._init()
+        location_lod_resource.ensure_schema(self)
         self.atlases = AtlasRegistry(self.root)
         self._index_legacy_texture_publications()
         with self.connect() as db:
@@ -338,6 +340,7 @@ class LocationAssetStore:
     def _decorate(self, row, rows_by_slug=None, atlas_catalog=None) -> dict:
         """Only a direct binding determines the effective image publication."""
         result = dict(row)
+        result['lod1'] = location_lod_resource.describe(self, result['slug'])
         result['fbxAnalysis'] = self._fbx_analysis(result)
         result['rigManifest'] = (self.rig_manifest(str(result.get('slug') or ''),
                                  str(result.get('model_asset_id') or ''))
@@ -707,25 +710,37 @@ class LocationAssetStore:
         with self.connect() as connection:
             manifests = [dict(item) for item in connection.execute(
                 'SELECT * FROM location_asset_rig_manifests WHERE asset_slug=?', (normalized,))]
+            lod_resources = [dict(item) for item in connection.execute(
+                'SELECT * FROM location_asset_lod_resources WHERE asset_slug=?', (normalized,))]
             collision_history = [dict(item) for item in connection.execute(
                 'SELECT * FROM location_asset_collision_blueprints WHERE asset_slug=? ORDER BY revision', (normalized,))]
         archive = self.root / '.control-center' / 'location-assets-retired'
         archive.mkdir(parents=True, exist_ok=True)
         target = archive / (normalized + '_' + datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ') + '.json')
         with target.open('x', encoding='utf-8') as file:
-            json.dump({'asset': raw, 'publications': history, 'rigManifests': manifests, 'collisionBlueprints': collision_history, 'sourceFilesPreserved': True},
+            json.dump({'asset': raw, 'publications': history, 'rigManifests': manifests, 'collisionBlueprints': collision_history, 'lodResources': lod_resources, 'sourceFilesPreserved': True},
                       file, ensure_ascii=False, indent=2)
         with self.connect() as connection:
             connection.execute("DELETE FROM location_asset_publications WHERE asset_slug=?", (normalized,))
             connection.execute("DELETE FROM location_asset_mesh_id_inventory WHERE asset_slug=?", (normalized,))
             connection.execute("DELETE FROM location_asset_rig_manifests WHERE asset_slug=?", (normalized,))
             connection.execute("DELETE FROM location_asset_collision_blueprints WHERE asset_slug=?", (normalized,))
+            connection.execute("DELETE FROM location_asset_lod_resources WHERE asset_slug=?", (normalized,))
             connection.execute("DELETE FROM location_assets WHERE slug=?", (normalized,))
         self.atlases.unbind('location_asset', normalized)
         self.export()
         return {'ok': True, 'sharedTextureRetained': True,
                 'archived': target.relative_to(self.root).as_posix(),
                 'sourceFilesPreserved': True}
+
+    def stage_lod1(self, slug: str, source_path: str, expected_revision: int) -> dict:
+        return location_lod_resource.stage(self, slug, source_path, expected_revision)
+
+    def publish_lod1(self, slug: str, expected_revision: int, credentials: dict) -> dict:
+        return location_lod_resource.publish(self, slug, expected_revision, credentials)
+
+    def lod1_history(self, slug: str) -> list[dict]:
+        return location_lod_resource.history(self, slug)
 
     def publications(self, slug: str) -> list[dict]:
         with self.connect() as connection:
@@ -874,6 +889,8 @@ class LocationAssetStore:
                 f"\t\t\tsoundFamily = {self._lua_string(row['materialDefinition']['soundFamily'])},",
                 f"\t\t\tstatus = {self._lua_string(row['status'])},",
                 f"\t\t\tmodelAssetId = {self._lua_string(row.get('model_asset_id') or '')},",
+                f"\t\t\tlod1ModelAssetId = {self._lua_string(row['lod1'].get('modelAssetId') or '') if row['lod1']['status'] == 'PUBLISHED' else self._lua_string('')},",
+                f"\t\t\tlod1Status = {self._lua_string(row['lod1']['status'])},",
                 f"\t\t\ttextureAssetId = {self._lua_string(row.get('texture_asset_id') or '')},",
                 ("\t\t\ttextureUsesAlpha = " + (
                     "nil" if row.get('textureUsesAlpha') is None else

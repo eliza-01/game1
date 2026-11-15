@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0016",
+  "title": "Location Assets · LOD1: регистрация и публикация",
+  "domain": "Location Assets",
+  "status": "CODE_COMPLETE",
+  "priority": "P0",
+  "owner": "Owner + Codex",
+  "specPath": "docs/kanban/specs/KBN-0016.md",
+  "dependsOn": [
+    "KBN-0004"
+  ],
+  "tasks": [
+    {
+      "id": "KBN-0016-T01",
+      "title": "Определить самостоятельную модель данных LOD1",
+      "done": true
+    },
+    {
+      "id": "KBN-0016-T02",
+      "title": "Добавить сохранение FBX и историю ревизий",
+      "done": true
+    },
+    {
+      "id": "KBN-0016-T03",
+      "title": "Добавить публикацию Open Cloud и экспорт Model ID",
+      "done": true
+    },
+    {
+      "id": "KBN-0016-T04",
+      "title": "Добавить интерфейс Location Assets → LOD1",
+      "done": true
+    },
+    {
+      "id": "KBN-0016-T05",
+      "title": "Проверить первый реальный LOD1 в Roblox Studio",
+      "done": false
+    },
+    {
+      "id": "KBN-0016-T06",
+      "title": "Проверить визуальный Pivot, материалы и сетевую загрузку",
+      "done": false
+    },
+    {
+      "id": "KBN-0016-T07",
+      "title": "Зафиксировать и валидировать имя <slug>_lod1.fbx и опубликованного Model",
+      "done": true
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0016-A01",
+      "title": "API/SQLite/rename/retire/экспорт проверены на локальной тестовой базе",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0016-A02",
+      "title": "Open Cloud публикация реального LOD1 подтверждена",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0016-A03",
+      "title": "FULL/Atlas/Collision/Studio Sync неизменны",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0016-A04",
+      "title": "Переключение FULL ↔ LOD1 независимо от серверной физики (будущая задача)",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ],
+  "revision": 3,
+  "updatedAt": "2026-11-15T01:01:43+00:00",
+  "specSha256": "3e655b342ddcf9c8d75b9d3241e61b79931c6df6dae411c3e37d4229445128eb"
+}

@@ -40,6 +40,9 @@
         "$className": "StarterPlayerScripts",
         "Game1Client": {
           "$path": "src/client"
+        },
+        "Game1LodProbeClient": {
+          "$path": "src/lod-probe"
         }
       }
     }

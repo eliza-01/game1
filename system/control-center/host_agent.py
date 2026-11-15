@@ -58,6 +58,7 @@ from services.studio_location_collision_bridge import run_location_collision_bri
 from services.location_collision_authoring import LocationCollisionAuthoring
 from services.place_registry.coordinator import LocationPlaceRegistry
 from services.place_registry.revisions import PlaceRevisionStore
+from services.location_lod_manager import LocationLodManager
 from services.location_asset_sync_history import LocationAssetSyncHistory
 from services.mysql_asset_replacement_audit import MySqlAssetReplacementAudit, MySqlAuditConfig
 from services.sqlite_asset_audit_importer import SqliteAssetAuditImporter
@@ -124,6 +125,7 @@ arrows.export()
 location_asset_sync_history = LocationAssetSyncHistory(ROOT, database=asset_audit_repository)
 place_registry = LocationPlaceRegistry(location_assets, PlaceRevisionStore(ROOT), run_place_registry_bridge)
 location_instance_manager = LocationInstanceManager(location_assets, run_location_instance_bridge)
+lod_manager = LocationLodManager(location_assets, place_registry)
 real_estate = RealEstateStore(ROOT, location_assets=location_assets)
 real_estate_placements = RealEstatePlacementStore(ROOT, real_estate)
 real_estate.placement_store = real_estate_placements
@@ -186,7 +188,7 @@ READ_SOURCES = MappingProxyType({
     "weapons": weapons, "arrows": arrows, "monsters": monsters, "monster_animations": monster_animations,
     "npcs": npcs, "npc_animations": npc_animations, "npc_equipment": npc_equipment,
     "location_assets": location_assets, "location_asset_sync_history": location_asset_sync_history,
-    "place_registry": place_registry, "location_instance_manager": location_instance_manager,
+    "place_registry": place_registry, "location_instance_manager": location_instance_manager, "lod_manager": lod_manager,
     "asset_replacement_audit": asset_replacement_audit, "real_estate": real_estate,
     "real_estate_placements": real_estate_placements,
     "real_estate_publications": real_estate_publications, "npc_spawns": npc_spawns,
@@ -232,7 +234,7 @@ WRITE_SOURCES = MappingProxyType({
     "location_asset_sync_history": location_asset_sync_history,
     "asset_replacement_audit": asset_replacement_audit,
     "sync_location_assets_to_studio": run_deco_refresh_bridge,
-    "place_registry": place_registry, "location_instance_manager": location_instance_manager,
+    "place_registry": place_registry, "location_instance_manager": location_instance_manager, "lod_manager": lod_manager,
     "locations": locations,
     "monster_animations": monster_animations,
     "monster_spawns": monster_spawns,

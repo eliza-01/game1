@@ -51,9 +51,9 @@ class PlaceRevisionStore:
         place_id = int(report.get('placeId') or 0)
         issue_count = sum(bool(p.get('issues')) for p in report['placements'])
         with closing(self._connect()) as db, db:
-            previous = db.execute('SELECT id, fingerprint FROM location_place_revisions '
+            previous = db.execute('SELECT id, fingerprint, registry_digest FROM location_place_revisions '
                                   'WHERE place_id=? ORDER BY id DESC LIMIT 1', (place_id,)).fetchone()
-            if previous and previous['fingerprint'] == fingerprint:
+            if previous and previous['fingerprint'] == fingerprint and previous['registry_digest'] == digest:
                 return {'revisionId': previous['id'], 'unchanged': True,
                         'recorded': False, 'fingerprint': fingerprint}
             cursor = db.execute('INSERT INTO location_place_revisions '
@@ -68,7 +68,7 @@ class PlaceRevisionStore:
         if type(limit) is not int or limit < 1 or limit > 100:
             raise ValueError('limit must be 1..100')
         with closing(self._connect()) as db, db:
-            rows = db.execute('SELECT id, recorded_utc, place_id, fingerprint, total, issues '
+            rows = db.execute('SELECT id, recorded_utc, place_id, fingerprint, registry_digest, total, issues '
                               'FROM location_place_revisions ORDER BY id DESC LIMIT ?', (limit,)).fetchall()
         return [dict(v) for v in rows]
 

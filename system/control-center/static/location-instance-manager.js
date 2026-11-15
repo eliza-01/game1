@@ -19,7 +19,7 @@
     for (const option of options) {
       anchor.add(new Option(option.label, option.id));
     }
-    anchor.value='model';
+    anchor.value = options.some(option => option.id === 'geometry') ? 'geometry' : 'model';
   }
   function reset() {
     state.preview = null;
@@ -58,8 +58,11 @@
     const p = state.preview;
     if(!p) return;
     const choice = id('li-anchor');
+    const sourceAnchor = choice.value === 'geometry' ? 'Геометрия исходного MeshPart (CFrame) ← '
+      : 'Pivot исходной Model ← ';
     status(`Готово к замене: ${p.count} Model. Изменений пока нет.\n`+
-      `${p.source} → ${p.target}. Pivot исходной Model ← ${choice.selectedOptions[0]?.textContent || 'Pivot новой Model'}.\n`+
+      `${p.source} → ${p.target}. ${sourceAnchor}${choice.selectedOptions[0]?.textContent || 'Pivot новой Model'}.\n`+
+      `${p.differingVisualAxes ? `Несовпадение осей Model/MeshPart у ${p.differingVisualAxes} источников: выбирай геометрию для сохранения поворота.\n` : ''}`+
       `Из исходной публикации восстановлены Pivot: ${p.normalizedPivots}, ручной MeshPart.Size: ${p.preservedManualSizes}.\n`+
       `Model scale и родительский каталог сохраняются. Переиздание конфликтующих Placement ID: ${p.reassignedIds}.\n`+
       'Исходные размещения не изменены. Неподдерживаемые размеры и оси блокируются до Replace.');
@@ -83,7 +86,8 @@
       state.preview = {token:data.scanToken,source,target,scope:id('li-scope').value,
         count:data.count,reassignedIds:data.reassignedIds || 0,
         normalizedPivots:data.normalizedPivots || 0,
-        preservedManualSizes:data.preservedManualSizes || 0};
+        preservedManualSizes:data.preservedManualSizes || 0,
+        differingVisualAxes:data.differingVisualAxes || 0};
       showChoiceStatus();
       id('li-placements').innerHTML = data.placements.map(row =>
         `<div class="location-instance-placement"><b>${escape(row.name)}</b> · ${escape(row.placementId)}`+
@@ -100,7 +104,7 @@
     if(state.busy || !p || p.source !== id('li-source').value ||
       p.target !== id('li-target').value || p.scope !== id('li-scope').value) return;
     const warning = `Заменить ${p.count} Model целиком?\n${p.source} → ${p.target}\n`+
-      `Совместить: Pivot исходной Model ← ${id('li-anchor').selectedOptions[0]?.textContent}.\n`+
+      `Совместить: ${id('li-anchor').value === 'geometry' ? 'геометрию исходного MeshPart (CFrame)' : 'Pivot исходной Model'} ← ${id('li-anchor').selectedOptions[0]?.textContent}.\n`+
       `${p.reassignedIds ? `Исправить ${p.reassignedIds} конфликтующих Placement ID у заменяемых экземпляров.\n` : ''}`+
       `Исторический Pivot: ${p.normalizedPivots}; растянутые MeshParts: ${p.preservedManualSizes}.\n`+
       `Исходные модели будут заменены целиком (Undo возвращает их).\n`+

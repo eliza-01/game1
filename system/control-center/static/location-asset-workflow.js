@@ -3,7 +3,7 @@
  */
 window.game1LocationAssetWorkflow = (() => {
   const state={slug:'',tab:'model',busy:false,result:'',error:false,manualSlug:false,identityDraft:null,
-    pendingModel:'',inspection:null,meshOptions:{},physicsDirty:false,scan:null,scanStale:false,alphaDraft:null,publication:null,
+    pendingModel:'',pendingLod1:'',inspection:null,meshOptions:{},physicsDirty:false,scan:null,scanStale:false,alphaDraft:null,publication:null,
     atlas:window.game1ConsumerAtlasEditor.newState()};
   const shell=window.game1AssetWorkflowDialog;
   const e=value=>esc(String(value??''));
@@ -11,7 +11,7 @@ window.game1LocationAssetWorkflow = (() => {
   const button=(action,label,disabled=false,css='')=>
     `<button type="button" class="${css}" data-la-action="${action}" ${disabled?'disabled':''}>${label}</button>`;
   const dialog=()=>shell.ensure('location-asset-edit-dialog','Manage Location Asset',()=>{
-    state.slug='';state.pendingModel='';state.scan=null;state.scanStale=false;state.identityDraft=null;state.alphaDraft=null;state.publication=null;state.atlas=window.game1ConsumerAtlasEditor.newState();
+    state.slug='';state.pendingModel='';state.pendingLod1='';state.scan=null;state.scanStale=false;state.identityDraft=null;state.alphaDraft=null;state.publication=null;state.atlas=window.game1ConsumerAtlasEditor.newState();
   });
   const close=()=>{const d=document.getElementById('location-asset-edit-dialog');if(d?.open)d.close();};
   function open(slug,initialTab='identity'){
@@ -19,7 +19,7 @@ window.game1LocationAssetWorkflow = (() => {
     if(!item)return toast('Location Asset no longer exists; refresh.',true);
     if(state.busy)return toast('Finish the current operation first.',true);
     const d=dialog();if(d.open && state.slug!==slug)d.close();
-    state.slug=slug;state.tab=initialTab;state.busy=false;state.scan=null;state.scanStale=false;state.pendingModel='';state.manualSlug=false;state.identityDraft=null;
+    state.slug=slug;state.tab=initialTab;state.busy=false;state.scan=null;state.scanStale=false;state.pendingModel='';state.pendingLod1='';state.manualSlug=false;state.identityDraft=null;
     state.alphaDraft=null;state.publication=null;state.inspection=item.fbxAnalysis||null;
     state.meshOptions=window.game1MeshAuthoring.seeded(state.inspection,item.meshOptions||{});
     state.physicsDirty=false;state.atlas=window.game1ConsumerAtlasEditor.newState();
@@ -84,6 +84,7 @@ window.game1LocationAssetWorkflow = (() => {
     const publicationReady=Boolean(configured&&(state.pendingModel||item.model_path));
     const showPublish=publication.count>0||state.tab==='publish'||Boolean(state.publication);
     const tabs=[{id:'identity',label:'Identity'},{id:'model',label:'Model · FBX'},
+      {id:'lod1',label:'LOD1'},
       {id:'atlas',label:'Texture · atlas'},
       ...(showPublish?[{id:'publish',label:`Publish${publication.count?' · '+publication.count:''}`}]:[])];
     const card=(name,description,content,status='',css='ready')=>shell.step(name,description,content,status,css);
@@ -163,6 +164,22 @@ window.game1LocationAssetWorkflow = (() => {
       `<small>Публикация атласа не перепубликует Model. Публикация Model не публикует атлас. `+
       `Если один этап завершится ошибкой, успешный ID сохранится, повторятся только незавершённые этапы.</small>`,
       publication.count?`${publication.count} ожидает публикации`:'Готово',publication.count?'pending':'ready');
+    const lod=item.lod1||{revision:0,status:'NOT_REGISTERED',modelAssetId:'',sourcePath:''};
+    const lodStatus={NOT_REGISTERED:'Не зарегистрирован',STAGED:'FBX сохранён · ожидает публикации',
+      UPDATE_AVAILABLE:'Новая ревизия · ожидает публикации',PUBLISHED:'Опубликован',
+      SOURCE_MISSING:'Исходный FBX не найден'}[lod.status]||lod.status;
+    const lodPanel=card('LOD1 · облегчённая Model',
+      'Необязательный ресурс. Не меняет FULL, Atlas, Collision или размещённые объекты.',
+      `<div class="deco-manage-fields"><small>Статус: <strong>${e(lodStatus)}</strong> · ревизия ${Number(lod.revision||0)}</small>`+
+      `<small>LOD1 Model ID: <strong>${e(lod.modelAssetId||'—')}</strong></small>`+
+      `<small>Имя FBX и Roblox Model: <strong>${e(state.slug+'_lod1')}</strong> · файл ${e(state.slug+'_lod1.fbx')}</small>`+
+      `<small>FBX: ${e(lod.sourcePath||'—')}</small>`+
+      (state.pendingLod1?`<small>Выбрано: ${e(state.pendingLod1)}</small>`:'')+
+      `<div class="actions">${button('choose-lod1','Choose LOD1 FBX',busy)}`+
+      `${button('stage-lod1','Register LOD1',busy||!state.pendingLod1,'asset-apply-ready')}`+
+      `${button('publish-lod1','Publish LOD1',busy||!configured||!['STAGED','UPDATE_AVAILABLE'].includes(lod.status),'la-publish-primary')}</div>`+
+      `<small>Каждая публикация создаёт новый Model ID. Размещение и LOD-переключение в Studio пока не включены.</small></div>`,
+      lodStatus,lod.status==='PUBLISHED'?'ready':'pending');
     const errorStatus=state.error&&state.result?`<div class="real-estate-workflow-result issue la-operation-error" role="alert">${e(state.result)}</div>`:'';
     const busyStatus=busy&&state.tab!=='publish'?`<div class="la-operation-status" role="status" aria-live="polite"><span class="la-publish-spinner" aria-hidden="true"></span>${e(state.operationLabel||state.result||'Подготовка ресурса…')}</div>`:'';
     const preview=state.scan;
@@ -251,7 +268,7 @@ window.game1LocationAssetWorkflow = (() => {
     d.innerHTML=`<div class="real-estate-mesh-dialog-head"><div><small class="eyebrow">Location Asset · ${e(item.slug)}</small>`+
       `<h3>Manage ${e(item.name_en)}</h3></div><button type="button" data-la-close aria-label="Close">✕</button></div>`+
       `<div class="real-estate-mesh-dialog-body" aria-busy="${busy}">${shell.tabs(tabs,state.tab,'data-la-tab')}${errorStatus}${busyStatus}`+
-      `${state.tab==='identity'?identity:state.tab==='model'?model:state.tab==='atlas'?atlas:publishPanel}${state.tab==='publish'?'':footer}`+
+      `${state.tab==='identity'?identity:state.tab==='model'?model:state.tab==='lod1'?lodPanel:state.tab==='atlas'?atlas:publishPanel}${['publish','lod1'].includes(state.tab)?'':footer}`+
       `${state.error?'':`<div class="real-estate-workflow-result" role="status" ${state.result?'':'hidden'}>${e(state.result)}</div>`}</div>`;
     d.querySelector('.real-estate-mesh-dialog-body').scrollTop=state.error?0:scrollBody;
     const newList=d.querySelector('.la-sync-list');if(newList)newList.scrollTop=scrollList;
@@ -459,6 +476,38 @@ window.game1LocationAssetWorkflow = (() => {
       }
       });
     }
+    if(action==='choose-lod1')return run('Выбор LOD1 FBX',async()=>{
+      const chosen=await request('/api/files/choose-location-asset-model',{method:'POST'});
+      if(!chosen?.path){message('Выбор LOD1 отменён.');return;}
+      state.pendingLod1=chosen.path;
+      message('LOD1 FBX выбран. Нажми Register LOD1; FULL и Studio не изменятся.');
+    });
+    if(action==='stage-lod1')return run('Регистрация LOD1',async()=>{
+      if(!state.pendingLod1)throw Error('Выбери FBX для LOD1');
+      const saved=await request(`/api/location-assets/${encodeURIComponent(state.slug)}/lod1-stage`,{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({sourcePath:state.pendingLod1,
+          expectedRevision:Number(row()?.lod1?.revision||0)}),
+      });
+      state.pendingLod1='';await decoAssetLoad();
+      message(`LOD1 FBX зарегистрирован · ревизия ${saved.revision}. Публикация отдельно.`);
+    });
+    if(action==='publish-lod1')return run('Публикация LOD1',async()=>{
+      const before=row();
+      if(!before||!['STAGED','UPDATE_AVAILABLE'].includes(before.lod1?.status))
+        throw Error('Нет новой ревизии LOD1 для публикации');
+      try{
+        const result=await request(`/api/location-assets/${encodeURIComponent(state.slug)}/lod1-publish`,{
+          method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({expectedRevision:Number(before.lod1.revision)}),
+        });
+        await decoAssetLoad();
+        message(`LOD1 опубликован · Roblox Model ID ${result.modelAssetId}. FULL / Studio не изменены.`);
+      }catch(error){
+        try{await decoAssetLoad();}catch(_ignored){}
+        throw Error((error?.message||String(error))+' Проверь LOD1 Model ID перед повторной публикацией.');
+      }
+    });
     if(action==='choose-fbx')return run('Inspecting FBX',async()=>{
       const chosen=await request('/api/files/choose-location-asset-model',{method:'POST'});
       if(!chosen?.path){message('FBX selection cancelled.');return;}

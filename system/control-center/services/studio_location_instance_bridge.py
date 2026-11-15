@@ -22,7 +22,7 @@ def run_location_instance_bridge(*, catalog: dict, phase: str, source_slug: str,
         or not _SLUG.fullmatch(source_slug) or not _SLUG.fullmatch(target_slug)
         or source_slug == target_slug or scope not in ('selected', 'all')
         or phase not in ('preview', 'replace') or not isinstance(anchor_id, str)
-        or not (anchor_id == 'model' or (re.fullmatch(r'mesh:[1-9][0-9]{0,6}',anchor_id) is not None))):
+        or not (anchor_id in ('model', 'geometry') or (re.fullmatch(r'mesh:[1-9][0-9]{0,6}',anchor_id) is not None))):
         raise ValueError('Invalid Location Instance Manager scope/catalog')
     if phase == 'replace' and not _GUID.fullmatch(scan_token):
         raise ValueError('Preview token required')
@@ -117,6 +117,8 @@ def run_location_instance_bridge(*, catalog: dict, phase: str, source_slug: str,
             or not 0 <= value['preservedManualSizes'] <= value['count']
             or any(type(place.get(field)) is not bool for place in value['placements']
                    for field in ('legacyPivot','manualSize'))
+            or type(value.get('differingVisualAxes', 0)) is not int
+            or not 0 <= value.get('differingVisualAxes', 0) <= value['count']
             or type(value.get('reassignedIds')) is not int
             or not 0 <= value['reassignedIds'] <= value['count']
             or any(not isinstance(place,dict) or not isinstance(place.get('name'),str)
@@ -130,12 +132,29 @@ def run_location_instance_bridge(*, catalog: dict, phase: str, source_slug: str,
             or not value['anchorOptions']
             or any(not isinstance(choice, dict) or not isinstance(choice.get('id'), str)
                    or not isinstance(choice.get('label'), str)
-                   or not (choice['id'] == 'model' or
+                   or not (choice['id'] in ('model', 'geometry') or
                            re.fullmatch(r'mesh:[1-9][0-9]{0,6}', choice['id']))
                    for choice in value['anchorOptions'])
             or value['anchorOptions'][0]['id'] != 'model'
             or len({choice['id'] for choice in value['anchorOptions']}) != len(value['anchorOptions'])):
-            raise StudioBridgeError('Invalid Instance Manager Preview')
+            # Preview is read-only. Report the response contract mismatch without
+            # changing the existing strict authorization guard for Replace.
+            placements = value.get('placements')
+            options = value.get('anchorOptions')
+            details = {
+                'count': value.get('count'),
+                'placementsCount': len(placements) if isinstance(placements, list) else None,
+                'normalizedPivots': value.get('normalizedPivots'),
+                'preservedManualSizes': value.get('preservedManualSizes'),
+                'differingVisualAxes': value.get('differingVisualAxes'),
+                'reassignedIds': value.get('reassignedIds'),
+                'anchorIds': [option.get('id') if isinstance(option, dict) else None for option in options]
+                    if isinstance(options, list) else None,
+                'firstPlacement': placements[0] if isinstance(placements, list) and placements else None,
+                'scanTokenFormat': bool(_GUID.fullmatch(str(value.get('scanToken', '')))),
+            }
+            raise StudioBridgeError('Invalid Instance Manager Preview: ' +
+                                    json.dumps(details, ensure_ascii=False, default=str)[:1800])
     elif value.get('changed') != value['count']:
         raise StudioBridgeError('Incomplete Instance Manager transaction; inspect Studio and Undo')
     return value

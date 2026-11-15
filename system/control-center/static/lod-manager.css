@@ -1,0 +1,39 @@
+/* Independent World Streaming readiness UI; no shared editor styles changed. */
+#lod-manager-view .lm-panel{padding:18px;margin-top:14px}
+#lod-manager-view .lm-toolbar{display:flex;gap:10px;justify-content:space-between;align-items:center;flex-wrap:wrap}
+#lod-manager-view .lm-toolbar .actions{margin-left:auto}
+#lod-manager-view .lm-snapshot{border:1px solid var(--line);border-radius:12px;padding:13px;background:var(--panel2);margin-top:13px}
+#lod-manager-view .lm-snapshot-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+#lod-manager-view .lm-chip{border-radius:99px;border:1px solid var(--line);font-size:11px;padding:5px 9px}
+#lod-manager-view .lm-ready{color:var(--mint);border-color:var(--mint)}
+#lod-manager-view .lm-warning{color:var(--orange);border-color:var(--orange)}
+#lod-manager-view .lm-danger{color:var(--danger);border-color:var(--danger)}
+#lod-manager-view .lm-meta{margin-top:9px;color:var(--muted);font-size:11px;overflow-wrap:anywhere}
+#lod-manager-view .lm-note{color:var(--muted);font-size:12px;line-height:1.5;margin-top:8px}
+#lod-manager-view .lm-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:14px}
+#lod-manager-view .lm-metric{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;min-width:0}
+#lod-manager-view .lm-metric b{display:block;font-size:20px;font-variant-numeric:tabular-nums}
+#lod-manager-view .lm-metric span{display:block;margin-top:4px;color:var(--muted);font-size:11px}
+#lod-manager-view .lm-list-head{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:14px}
+#lod-manager-view .lm-filters{display:flex;flex-wrap:wrap;gap:8px}
+#lod-manager-view .lm-filters input{min-width:190px}
+#lod-manager-view .lm-table{overflow:auto;max-height:600px}
+#lod-manager-view .lm-table table{min-width:660px}
+#lod-manager-view .lm-table tbody tr{cursor:default}
+#lod-manager-view .lm-table td small{display:block;color:var(--muted);font-size:11px;margin-top:4px}
+#lod-manager-view .lm-count{font-size:16px;font-weight:700;white-space:nowrap}
+#lod-manager-view .lm-count small{display:inline!important;font-weight:400}
+#lod-manager-view .lm-dot{width:10px;height:10px;border-radius:50%;display:inline-block;vertical-align:middle;margin-right:6px}
+#lod-manager-view .lm-dot.lm-red{background:var(--danger)}
+#lod-manager-view .lm-dot.lm-yellow{background:#e2ad49}
+#lod-manager-view .lm-dot.lm-green{background:var(--mint)}
+#lod-manager-view .lm-quality{font-size:12px}
+#lod-manager-view .lm-flag{font-size:11px;color:var(--orange);line-height:1.45}
+#lod-manager-view .lm-ok{color:var(--muted)}
+#lod-manager-view .lm-revisions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+#lod-manager-view .lm-revision{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:9px;font-size:11px;color:var(--muted)}
+#lod-manager-view .lm-revision a{color:var(--mint);margin-left:7px}
+#lod-manager-view .lm-build{opacity:.8}
+#lod-manager-view .lm-build button{opacity:.6}
+@media(max-width:940px){#lod-manager-view .lm-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:550px){#lod-manager-view .lm-metrics{grid-template-columns:1fr 1fr}#lod-manager-view .lm-filters input{min-width:0;width:100%}}

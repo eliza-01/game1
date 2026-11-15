@@ -5,6 +5,12 @@ from services.shared_asset_retirement import SharedAssetRetirement
 
 def route(parsed, sources, info):
     path = parsed.path
+    if path == "/api/lod-manager":
+        try:
+            return 200, sources["lod_manager"].overview()
+        except (ValueError, OSError, RuntimeError) as error:
+            return 400, {"error": str(error)}
+
     if path == "/api/agent/info":
         return 200, info()
 
@@ -89,6 +95,13 @@ def route(parsed, sources, info):
                 slug, limit=limit, before=int(raw_before) if raw_before else None)
             return 200, {'slug': slug, **page}
         except (ValueError, OSError, RuntimeError) as error:
+            return 400, {'error': str(error)}
+
+    if path.startswith('/api/location-assets/') and path.endswith('/lod1-history'):
+        try:
+            slug = path[len('/api/location-assets/'):-len('/lod1-history')].strip('/')
+            return 200, {'items': sources['location_assets'].lod1_history(slug)}
+        except (ValueError, OSError) as error:
             return 400, {'error': str(error)}
 
     if path.startswith('/api/location-assets/') and path.endswith('/collision-history'):

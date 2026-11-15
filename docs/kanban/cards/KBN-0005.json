@@ -3,8 +3,8 @@
   "id": "KBN-0005",
   "title": "Вертикальный тест house_level1_01",
   "domain": "Assets",
-  "status": "PROPOSED",
-  "priority": "P0",
+  "status": "ON_HOLD",
+  "priority": "P2",
   "owner": "Owner + Codex",
   "specPath": "docs/kanban/specs/KBN-0005.md",
   "dependsOn": [
@@ -46,7 +46,7 @@
       "evidence": ""
     }
   ],
-  "revision": 1,
-  "updatedAt": "2026-11-13T00:00:00+00:00",
-  "specSha256": "d356d99a206afcf60173b128703783f1cb669a882d0af2bf247f62b3c593104a"
+  "revision": 2,
+  "updatedAt": "2026-11-15T00:00:00+00:00",
+  "specSha256": "61530e3c09226e9abf1ebd85597d8da21de1fff4f5c1e55abb3f7a782091e619"
 }

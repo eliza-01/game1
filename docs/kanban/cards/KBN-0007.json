@@ -3,24 +3,23 @@
   "id": "KBN-0007",
   "title": "Клиентский World Streaming",
   "domain": "World Streaming",
-  "status": "PROPOSED",
+  "status": "IN_PROGRESS",
   "priority": "P1",
   "owner": "Codex",
   "specPath": "docs/kanban/specs/KBN-0007.md",
   "dependsOn": [
-    "KBN-0005",
     "KBN-0006"
   ],
   "tasks": [
     {
       "id": "KBN-0007-T01",
       "title": "Разработать состояния FULL / LOD1 / UNLOADED",
-      "done": false
+      "done": true
     },
     {
       "id": "KBN-0007-T02",
       "title": "Внедрить профили дистанции и hysteresis",
-      "done": false
+      "done": true
     },
     {
       "id": "KBN-0007-T03",
@@ -31,6 +30,11 @@
       "id": "KBN-0007-T04",
       "title": "Сделать предзагрузку соседних секторов и отмену устаревших задач",
       "done": false
+    },
+    {
+      "id": "KBN-0007-T05",
+      "title": "Добавить Studio-only read-only диагностику дистанций для помеченных Location Assets",
+      "done": true
     }
   ],
   "acceptance": [
@@ -47,7 +51,7 @@
       "evidence": ""
     }
   ],
-  "revision": 1,
-  "updatedAt": "2026-11-13T00:00:00+00:00",
-  "specSha256": "2ed6dbab961f94880f07e5fa6121df57bad88e63c5684e43a561909308f2d0ee"
+  "revision": 3,
+  "updatedAt": "2026-11-15T01:01:43+00:00",
+  "specSha256": "ac6a972ac802c7547a9a11335293d876e4ddcc9b8e3e549d8fb5f375620a015c"
 }

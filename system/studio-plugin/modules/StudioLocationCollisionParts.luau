@@ -8,6 +8,7 @@ local OWNED = "Game1LocationCollisionOwned"
 local PART_ID = "Game1LocationCollisionPartId"
 local REVISION = "Game1LocationCollisionRevision"
 local SHA = "Game1LocationCollisionSha256"
+local APPROVED = "Game1LocationCollisionApprovedSha256"
 
 local function recipes(blueprint: any): {any}
     if type(blueprint) ~= "table" or blueprint.schemaVersion ~= 2
@@ -92,7 +93,11 @@ function Collision.Current(root: Model, blueprint: any, revision: any, sha: any)
                 elseif part.Shape == Enum.PartType.Cylinder then "Cylinder" else "Block"
             if shape ~= expectedShape then return false end
         end
-        local okGeometry, expected, expectedSize = pcall(Transform.Part, anchor, recipe)
+        -- Explicit Studio inspection may authorize a larger, visible enclosure
+        -- for this exact Blueprint SHA. It does not change the default for
+        -- unapproved placements or later Blueprint revisions.
+        local allowed = root:GetAttribute(APPROVED) == sha
+        local okGeometry, expected, expectedSize = pcall(Transform.Part, anchor, recipe, allowed)
         if not okGeometry then return false end
         if (part.Size - expectedSize).Magnitude > 0.002
             or (part.Position - expected.Position).Magnitude > 0.003
@@ -105,7 +110,7 @@ function Collision.Current(root: Model, blueprint: any, revision: any, sha: any)
     return true
 end
 
-function Collision.Prepare(root: Model, blueprint: any, revision: any, sha: any, incoming: Model?): any
+function Collision.Prepare(root: Model, blueprint: any, revision: any, sha: any, incoming: Model?, allowExcessive: boolean?): any
     if not root:IsA("Model") or type(revision) ~= "number" or revision < 1
         or type(sha) ~= "string" or #sha ~= 64 then
         error("Invalid Location Collision publication")
@@ -114,6 +119,7 @@ function Collision.Prepare(root: Model, blueprint: any, revision: any, sha: any,
     local geometry = incoming or root
     local anchor = Transform.Resolve(geometry, blueprint)
     local stage = {}
+    local warnings = {}
     local good, failure = pcall(function()
         for _, recipe in ipairs(recipes(blueprint)) do
             local part: BasePart
@@ -130,7 +136,13 @@ function Collision.Prepare(root: Model, blueprint: any, revision: any, sha: any,
             part.Name = "__Game1Collision_" .. recipe.id
             part:SetAttribute(OWNED, true)
             part:SetAttribute(PART_ID, recipe.id)
-            local frame, size = Transform.Part(anchor, recipe)
+            local frame, size, warning
+            if allowExcessive == true then
+                frame, size, warning = Transform.Part(anchor, recipe, true)
+            else
+                frame, size = Transform.Part(anchor, recipe)
+            end
+            if warning then table.insert(warnings, warning) end
             part.Size = size
             part.CFrame = frame
             part.Anchored = true
@@ -148,9 +160,10 @@ function Collision.Prepare(root: Model, blueprint: any, revision: any, sha: any,
         for _, part in ipairs(stage) do part:Destroy() end
         error("Collision Parts staging failed: " .. tostring(failure))
     end
-    return {root = root, pivot = pivot, stage = stage,
+    return {root = root, pivot = pivot, stage = stage, warnings = warnings,
         prior = ownedParts(root), revision = revision, sha = sha,
-        oldRevision = root:GetAttribute(REVISION), oldSha = root:GetAttribute(SHA), committed = false}
+        oldRevision = root:GetAttribute(REVISION), oldSha = root:GetAttribute(SHA),
+        oldApproval = root:GetAttribute(APPROVED), committed = false}
 end
 
 function Collision.Commit(transaction: any)
@@ -162,6 +175,7 @@ function Collision.Commit(transaction: any)
     for _, part in ipairs(transaction.stage) do part.Parent = root end
     root:SetAttribute(REVISION, transaction.revision)
     root:SetAttribute(SHA, transaction.sha)
+    root:SetAttribute(APPROVED, if #transaction.warnings > 0 then transaction.sha else nil)
     if root:GetPivot() ~= transaction.pivot then error("Collision Parts changed the authored Pivot") end
 end
 
@@ -171,6 +185,7 @@ function Collision.Rollback(transaction: any)
         for _, part in ipairs(transaction.prior) do part.Parent = transaction.root end
         transaction.root:SetAttribute(REVISION, transaction.oldRevision)
         transaction.root:SetAttribute(SHA, transaction.oldSha)
+        transaction.root:SetAttribute(APPROVED, transaction.oldApproval)
     end
 end
 

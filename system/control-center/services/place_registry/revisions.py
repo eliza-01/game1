@@ -93,9 +93,20 @@ class PlaceRevisionStore:
                 counter[data] = counter.get(data, 0) + 1
             return counter
         x, y = entries(previous), entries(current)
+        # Protected external owners live in the SAME immutable snapshot, but
+        # are intentionally excluded from mutable Deco placement counts.
+        def externals(report):
+            counter = {}
+            for item in report.get('protected', []):
+                data = json.dumps(item, sort_keys=True, ensure_ascii=False)
+                counter[data] = counter.get(data, 0) + 1
+            return counter
+        ex, ey = externals(previous), externals(current)
         return {'from': a, 'to': b,
                 'added': sum(max(0, y[k] - x.get(k, 0)) for k in y),
                 'removed': sum(max(0, x[k] - y.get(k, 0)) for k in x),
+                'protectedAdded': sum(max(0, ey[k] - ex.get(k, 0)) for k in ey),
+                'protectedRemoved': sum(max(0, ex[k] - ey.get(k, 0)) for k in ex),
                 'placeId': current.get('placeId')}
 
     def log_action(self, before_revision: int, action: str, report: dict):

@@ -2,6 +2,8 @@ local Carrier = require(script.Parent.StudioLocationRigCarrier)
 -- M240: Registry-backed Location Assets ONLY. Scan is strictly read-only.
 -- No Workspace classification by name/category; only immutable published Mesh IDs.
 local History = require(script.Parent.StudioPublishedMeshHistory)
+local Ownership = require(script.Parent.StudioLocationPlacementOwner)
+local ExternalOwners = require(script.Parent.StudioPlaceRegistryExternalOwners)
 local Physics = require(script.Parent.StudioMeshPhysicsCore)
 local Published = require(script.Parent.StudioLocationPublishedGeometry)
 local Visual = require(script.Parent.StudioLocationVisualAppearance)
@@ -110,7 +112,8 @@ local function closestPublishedRoot(part: MeshPart, entry: any): Model?
             if meshCount <= 512 then
                 for _, version in ipairs(entry.models) do
                     if History.MatchesInventory(candidate, version)
-                        or History.MatchesRetiredStaticInventory(candidate, version, entry) then
+                        or History.MatchesRetiredStaticInventory(candidate, version, entry)
+                        or History.MatchesRetiredSkinnedPhysics(candidate, version, entry) then
                         if not closest then closest = candidate end
                         if candidate:GetAttribute("Game1DecoAssetSlug") == entry.slug
                             and candidate:GetAttribute("Game1DecoInstanceId") ~= nil then
@@ -124,6 +127,25 @@ local function closestPublishedRoot(part: MeshPart, entry: any): Model?
         candidate = candidate.Parent
     end
     return stamped or closest
+end
+
+-- If the published multiset does NOT match, preserve an explicitly owned
+-- Model's identity for diagnostics only. It must remain unsafe for Repair,
+-- Sync, and future Runtime Build until a human verifies the extra geometry.
+local function unverifiedOwnedRoot(part: MeshPart, entry: any): Model?
+    local candidate: Instance? = part.Parent
+    while candidate and candidate ~= workspace do
+        if candidate:IsA("Model") and candidate:GetAttribute("Game1DecoAssetSlug") ~= nil then
+            local placedId = tostring(candidate:GetAttribute("Game1DecoInstanceId") or "")
+            if candidate:GetAttribute("Game1DecoAssetSlug") ~= entry.slug
+                or #placedId < 8
+                or candidate.Name ~= entry.slug .. "__" .. placedId:sub(1,8)
+                or Ownership.HasNestedPlacements(candidate) then return nil end
+            return candidate
+        end
+        candidate = candidate.Parent
+    end
+    return nil
 end
 
 local function positionOf(part: MeshPart): {number}
@@ -222,13 +244,49 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
     end)
     if #candidates>4096 then error("Place contains >4096 identifiable Location MeshParts; run a scoped audit") end
     local rows,refs,duplicateGroups={},{},{}
+    local protected,externalSeen={},{}
     local consumed={}
     for _,candidate in ipairs(candidates) do
         local part=candidate.part
         if consumed[part] then continue end
+        local external = ExternalOwners.ForPart(part,workspaceService)
+        if external then
+            -- One protected owner Model, not one record per visible MeshPart.
+            -- Report published-mesh evidence without declaring Deco ownership.
+            if not externalSeen[external.model] then
+                externalSeen[external.model]=true
+                local visualSlug=if #candidate.owners==1 then candidate.owners[1].slug else ""
+                if external.kind=="landscape_attachment" and external.authorSlug~="" then
+                    for _, candidateOwner in ipairs(candidate.owners) do
+                        if candidateOwner.slug==external.authorSlug then
+                            visualSlug=external.authorSlug
+                            break
+                        end
+                    end
+                end
+                table.insert(protected,{
+                    kind=external.kind,slug=visualSlug,
+                    path=external.model:GetFullName(),name=external.model.Name,
+                    ownerPath=external.model:GetFullName(),
+                    authorSlug=external.authorSlug,
+                    branchStrokeId=external.branchStrokeId,
+                    anchorKind=external.anchorKind,
+                    -- A path/branch stroke is a locator, not a guaranteed stable placement ID.
+                    reason=if external.kind=="unmanaged_package" then "PackageLink · not a DecoManager placement"
+                        elseif external.kind=="landscape_structure" then "LandscapePainter branch geometry"
+                        elseif external.authorSlug~=visualSlug then "LandscapePainter asset slug differs from published Mesh ID"
+                        else "LandscapePainter authored attachment",
+                    review=external.kind=="unmanaged_package" or external.kind=="landscape_structure"
+                        or external.authorSlug=="" or external.authorSlug~=visualSlug,
+                    protectedFromRuntime=true,
+                })
+            end
+            continue
+        end
         local eligible=#candidate.owners==1
         local entry=candidate.owners[1]
         local root=if eligible then closestPublishedRoot(part,entry) else nil
+        local unverified=if eligible and not root then unverifiedOwnedRoot(part,entry) else nil
         local visualParts={part}
         if root then
             visualParts={}
@@ -239,7 +297,7 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
             end
         end
         for _,visualPart in ipairs(visualParts) do consumed[visualPart]=true end
-        local placement: Instance = root or part
+        local placement: Instance = root or unverified or part
         local original = state(part)
         local oldId,oldAmbiguous="",true
         if eligible then oldId,oldAmbiguous=Published.ResolveOldVersion(entry,root,id(part.MeshId)) end
@@ -323,7 +381,11 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
             end
         end
         if not eligible then warn("Один Mesh ID встречается у нескольких Location Assets") end
-        if not root then warn("Нет отдельной Model для этого экземпляра") end
+        if unverified then
+            warn("Model и Placement ID существуют, но состав MeshParts не совпадает с историей публикации — ручная проверка")
+        elseif not root then
+            warn("Нет отдельной Model для этого экземпляра")
+        end
         if needsRig and not needsMesh then warn("Новая версия модели отличается по составу MeshPart, хотя визуальный Mesh ID совпадает") end
         if needsMaterial then warn("Звуковой материал требует Sync: "..entry.material) end
         if needsRecapture then
@@ -415,7 +477,7 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
             collisionRevision=entry.collisionRevision,needsStructure=structuralState ~= "current" or not root or badName or meshNameMismatch or assigned==""
                 or (root and root:GetAttribute("Game1DecoAssetSlug")~=entry.slug),
 
-            duplicateId=false,ambiguous=not eligible or provenForeignClaim,
+            duplicateId=false,ambiguous=not eligible or provenForeignClaim or unverified~=nil,
             -- Repair remains metadata-only. A verified old publication is
             -- migrated by Sync through the shared whole-child-rig swap.
             canRepair=eligible and structuralState == "current" and root~=nil
@@ -423,7 +485,7 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
             requiresRepublish=requiresRepublish == true,
             needsFbxInspection=needsInspection == true,
             needsCanonicalReplacement=needsReplacement == true,
-            hasModel=root~=nil,structuralState=structuralState,canSync=eligible and not foreignClaim
+            hasModel=root~=nil or unverified~=nil,structuralState=structuralState,canSync=eligible and not foreignClaim
                 and root~=nil and assigned~="" and (claimed==entry.slug or oldClaim)
                 and not requiresRepublish and not needsInspection and not needsRecapture
                 and (structuralState=="current" or (needsReplacement and oldId~=""))
@@ -466,7 +528,8 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
             end
         end
     end
-    return {placements=rows,refs=refs,inventory=allInventory,
+    table.sort(protected,function(a,b) return a.path<b.path end)
+    return {placements=rows,protected=protected,refs=refs,inventory=allInventory,
         placeId=workspaceService.Parent.PlaceId,warnings=warnings}
 end
 

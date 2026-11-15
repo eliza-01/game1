@@ -13,10 +13,15 @@ end
 
 local function shapeOf(part: Instance): string
     if part:IsA("Part") then
-        if part.Shape == Enum.PartType.Block then return "Block" end
-        if part.Shape == Enum.PartType.Ball then return "Ball" end
-        if part.Shape == Enum.PartType.Cylinder then return "Cylinder" end
-        error("unsupported Part.Shape")
+        -- Studio now creates wedges as Part.Shape, not only as WedgePart.
+        -- Normalize both representations to the existing Blueprint shape IDs.
+        local shape = part.Shape
+        if shape == Enum.PartType.Block then return "Block" end
+        if shape == Enum.PartType.Ball then return "Ball" end
+        if shape == Enum.PartType.Cylinder then return "Cylinder" end
+        if shape == Enum.PartType.Wedge then return "Wedge" end
+        if shape == Enum.PartType.CornerWedge then return "CornerWedge" end
+        error("Unsupported collision Part.Shape: " .. tostring(shape) .. " (" .. part:GetFullName() .. ")")
     end
     if part:IsA("WedgePart") then return "Wedge" end
     if part:IsA("CornerWedgePart") then return "CornerWedge" end

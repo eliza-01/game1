@@ -20,6 +20,14 @@ def route(path, body, deps):
         except (ValueError, OSError, RuntimeError, KeyError) as error:
             return 400, {"error": str(error)}
 
+    if path in ('/api/lod-manager/preflight', '/api/lod-manager/prepare'):
+        try:
+            manager = deps['lod_manager']
+            action = manager.preflight if path.endswith('/preflight') else manager.prepare
+            return 200, action(body())
+        except (ValueError, OSError, RuntimeError, KeyError) as error:
+            return 400, {'error': str(error)}
+
     if path.startswith('/api/location-assets/') and path.endswith('/collision-studio'):
         try:
             slug = path[len('/api/location-assets/'):-len('/collision-studio')].strip('/')

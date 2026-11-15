@@ -74,7 +74,7 @@ class NonuniformCollisionM350(unittest.TestCase):
         self.assertIn('matched.Size.X / original.X', transform)
         self.assertIn('scaleVector(relative.Position, ratios)', transform)
         self.assertIn('math.abs(right:Dot(scaledRight))', transform)
-        self.assertIn('Non-uniform visual MeshPart Size requires Block collision Parts', transform)
+        self.assertIn('Non-uniform collision shape needs excessive shear enclosure', transform)
         self.assertNotIn('PivotTo(', transform)
         self.assertNotIn('PivotOffset =', transform)
 

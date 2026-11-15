@@ -4270,6 +4270,178 @@
       "aliases": []
     },
     {
+      "slug": "stone_fence_02",
+      "name_en": "Stone Fence 02",
+      "category": "fence",
+      "model_path": "assets/source/location-assets/fence/stone_fence_02/model/stone_fence_02.fbx",
+      "model_sha256": "74321a047326a60c806c67dfe931c80c26789f8b463cb9680b50aa544d3c2d86",
+      "model_asset_id": "110878872381451",
+      "model_published_sha256": "74321a047326a60c806c67dfe931c80c26789f8b463cb9680b50aa544d3c2d86",
+      "model_moderation_state": "Approved",
+      "destructible": false,
+      "revision": 6,
+      "created_at": 1794629527.8825006,
+      "updated_at": 1794709998.3296227,
+      "published_at": 1794636699.2149656,
+      "surface_material": "stone",
+      "alpha_enabled": 0,
+      "appearance_mode": "material",
+      "visual_material": "Slate",
+      "visual_color": "#7C7C7C",
+      "lod1": {
+        "kind": "lod1",
+        "revision": 1,
+        "status": "PUBLISHED",
+        "sourcePath": "assets/source/location-assets/fence/stone_fence_02/lod/lod1.fbx",
+        "sourceSha256": "d57033740769db1dfa04613144d776215f9cefa65adcb55c4cff896f3ab0cbe1",
+        "publishedSha256": "d57033740769db1dfa04613144d776215f9cefa65adcb55c4cff896f3ab0cbe1",
+        "modelAssetId": "91896785734146",
+        "moderationState": "Approved"
+      },
+      "fbxAnalysis": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "stone_fence_02",
+            "armature": "",
+            "vertices": 1107,
+            "bones": [],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          }
+        ],
+        "hasCollider": false,
+        "armatures": [],
+        "unassignedArmatures": []
+      },
+      "rigManifest": {
+        "boneHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "bones": [],
+        "carrierName": null,
+        "inventoryHash": "c86ec5c7711dd3f422f23ec0eb8af4f082b0a4e2a72b36e3919b6c7a4458567e",
+        "parts": [
+          {
+            "name": "stone_fence_02",
+            "role": "visual",
+            "vertices": 1107
+          }
+        ],
+        "rigKind": "static",
+        "schemaVersion": 2,
+        "sourceSha256": "",
+        "structuralHash": "f01942eca03a9a0c17b6c88914caf42ceb55a10328e02b4cf40b46288799b790"
+      },
+      "needsFbxInspection": false,
+      "legacyStaticPublication": false,
+      "meshOptions": {
+        "stone_fence_02": {
+          "collisionFidelity": "Box",
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true
+        }
+      },
+      "collisionBlueprintRevision": 6,
+      "collisionBlueprintPartCount": 1,
+      "collisionBlueprint": {
+        "anchor": {
+          "localCFrame": [
+            -9.1552734375e-05,
+            2.7077102661132812,
+            -0.00433349609375,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "meshId": "89499570578827",
+          "size": [
+            3.424428939819336,
+            5.563468933105469,
+            17.87802505493164
+          ]
+        },
+        "parts": [
+          {
+            "canQuery": true,
+            "canTouch": true,
+            "collisionGroup": "Default",
+            "id": "Part",
+            "localCFrame": [
+              0.040924072265625,
+              2.625,
+              -0.06494140625,
+              0.9998790621757507,
+              0.015549987554550171,
+              -6.797113982770497e-10,
+              0.0,
+              -4.371138828673793e-08,
+              -1.0,
+              -0.015549987554550171,
+              0.9998790621757507,
+              -4.3706101848783874e-08
+            ],
+            "name": "Part",
+            "shape": "Block",
+            "size": [
+              2.753999948501587,
+              17.320999145507812,
+              5.250999927520752
+            ]
+          }
+        ],
+        "pivot": "Model:GetPivot()",
+        "schemaVersion": 2
+      },
+      "collisionBlueprintSha256": "cea38b612d8faf173c022b00cb767aeb5ad3fdac40b100afef0bb4ac8f83713c",
+      "surfaceMaterial": "stone",
+      "appearanceMode": "material",
+      "visualMaterial": "Slate",
+      "visualColor": "#7C7C7C",
+      "alphaEnabled": false,
+      "materialDefinition": {
+        "id": "stone",
+        "label": "Stone",
+        "robloxMaterial": "Slate",
+        "soundFamily": "stone"
+      },
+      "texture_path": "",
+      "texture_filename": "",
+      "texture_sha256": "",
+      "texture_asset_id": null,
+      "texture_published_sha256": "",
+      "texture_moderation_state": "",
+      "texture_reference_slug": "",
+      "atlasVariants": [],
+      "textureUsesAlpha": null,
+      "atlasVariantId": 0,
+      "bindingRevision": 6,
+      "atlasLegacyWarning": false,
+      "status": "PUBLISHED",
+      "category_label": "Fence",
+      "publishedVisualMeshes": [
+        {
+          "meshId": "89499570578827",
+          "name": "stone_fence_02"
+        }
+      ],
+      "aliases": []
+    },
+    {
       "slug": "wooden_fence_01",
       "name_en": "Wooden Fence 01",
       "category": "fence",
@@ -4447,41 +4619,41 @@
       "aliases": []
     },
     {
-      "slug": "stone_fence_02",
-      "name_en": "stone fence 02",
+      "slug": "wooden_fence_03",
+      "name_en": "Wooden Fence 03",
       "category": "fence",
-      "model_path": "assets/source/location-assets/fence/stone_fence_02/model/stone_fence_02.fbx",
-      "model_sha256": "74321a047326a60c806c67dfe931c80c26789f8b463cb9680b50aa544d3c2d86",
-      "model_asset_id": "110878872381451",
-      "model_published_sha256": "74321a047326a60c806c67dfe931c80c26789f8b463cb9680b50aa544d3c2d86",
+      "model_path": "assets/source/location-assets/fence/wooden_fence_03/model/wooden_fence_03.fbx",
+      "model_sha256": "5062b00c06de4de6d13225aa9cb28d76a3fb625bcc846eb1150af9546faabe90",
+      "model_asset_id": "108095777802918",
+      "model_published_sha256": "5062b00c06de4de6d13225aa9cb28d76a3fb625bcc846eb1150af9546faabe90",
       "model_moderation_state": "Approved",
       "destructible": false,
-      "revision": 5,
-      "created_at": 1794629527.8825006,
-      "updated_at": 1794636699.2149656,
-      "published_at": 1794636699.2149656,
-      "surface_material": "stone",
+      "revision": 1,
+      "created_at": 1794720539.764395,
+      "updated_at": 1794720556.2570817,
+      "published_at": 1794720556.2570817,
+      "surface_material": "wood",
       "alpha_enabled": 0,
       "appearance_mode": "material",
-      "visual_material": "Slate",
-      "visual_color": "#7C7C7C",
+      "visual_material": "Wood",
+      "visual_color": "#A16745",
       "lod1": {
         "kind": "lod1",
-        "revision": 1,
-        "status": "PUBLISHED",
-        "sourcePath": "assets/source/location-assets/fence/stone_fence_02/lod/lod1.fbx",
-        "sourceSha256": "d57033740769db1dfa04613144d776215f9cefa65adcb55c4cff896f3ab0cbe1",
-        "publishedSha256": "d57033740769db1dfa04613144d776215f9cefa65adcb55c4cff896f3ab0cbe1",
-        "modelAssetId": "91896785734146",
-        "moderationState": "Approved"
+        "revision": 0,
+        "status": "NOT_REGISTERED",
+        "sourcePath": "",
+        "sourceSha256": "",
+        "publishedSha256": "",
+        "modelAssetId": "",
+        "moderationState": ""
       },
       "fbxAnalysis": {
         "schemaVersion": 1,
         "meshes": [
           {
-            "name": "stone_fence_02",
+            "name": "wooden_fence_03",
             "armature": "",
-            "vertices": 1107,
+            "vertices": 52,
             "bones": [],
             "influencedBones": [],
             "role": "visual",
@@ -4504,52 +4676,52 @@
         "boneHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "bones": [],
         "carrierName": null,
-        "inventoryHash": "c86ec5c7711dd3f422f23ec0eb8af4f082b0a4e2a72b36e3919b6c7a4458567e",
+        "inventoryHash": "9697e7fd2929e9583d314bdcf16f9101739e049445d2913c21d8ddc17a87cd3a",
         "parts": [
           {
-            "name": "stone_fence_02",
+            "name": "wooden_fence_03",
             "role": "visual",
-            "vertices": 1107
+            "vertices": 52
           }
         ],
         "rigKind": "static",
         "schemaVersion": 2,
         "sourceSha256": "",
-        "structuralHash": "f01942eca03a9a0c17b6c88914caf42ceb55a10328e02b4cf40b46288799b790"
+        "structuralHash": "5de000b36e679c5c56e38e017e6d91e482d9175e291e1fd132e8788a64e17d2c"
       },
       "needsFbxInspection": false,
       "legacyStaticPublication": false,
       "meshOptions": {
-        "stone_fence_02": {
+        "wooden_fence_03": {
           "collisionFidelity": "Box",
           "doubleSided": false,
           "glass": false,
           "noCollide": true
         }
       },
-      "collisionBlueprintRevision": 6,
+      "collisionBlueprintRevision": 1,
       "collisionBlueprintPartCount": 1,
       "collisionBlueprint": {
         "anchor": {
           "localCFrame": [
-            -9.1552734375e-05,
-            2.7077102661132812,
-            -0.00433349609375,
-            1.0,
+            0.04852294921875,
+            1.6844024658203125,
+            0.669647216796875,
+            1.0000001192092896,
+            2.6921043172478676e-10,
             0.0,
-            0.0,
-            0.0,
-            1.0,
+            2.6921043172478676e-10,
+            1.0000001192092896,
             0.0,
             0.0,
             0.0,
             1.0
           ],
-          "meshId": "89499570578827",
+          "meshId": "100119295242562",
           "size": [
-            3.424428939819336,
-            5.563468933105469,
-            17.87802505493164
+            0.9817004203796387,
+            3.3688430786132812,
+            6.848592758178711
           ]
         },
         "parts": [
@@ -4559,42 +4731,42 @@
             "collisionGroup": "Default",
             "id": "Part",
             "localCFrame": [
-              0.040924072265625,
-              2.625,
-              -0.06494140625,
-              0.9998790621757507,
-              0.015549987554550171,
-              -6.797113982770497e-10,
-              0.0,
-              -4.371138828673793e-08,
-              -1.0,
-              -0.015549987554550171,
-              0.9998790621757507,
-              -4.3706101848783874e-08
+              0.0386962890625,
+              1.289215087890625,
+              0.657073974609375,
+              0.999525785446167,
+              0.005942322313785553,
+              -0.030216820538043976,
+              -0.005940467584878206,
+              0.9999824166297913,
+              0.00015115115093067288,
+              0.03021717071533203,
+              2.842255162249785e-05,
+              0.9995433688163757
             ],
             "name": "Part",
             "shape": "Block",
             "size": [
-              2.753999948501587,
-              17.320999145507812,
-              5.250999927520752
+              0.5151746273040771,
+              2.576117515563965,
+              6.729648590087891
             ]
           }
         ],
         "pivot": "Model:GetPivot()",
         "schemaVersion": 2
       },
-      "collisionBlueprintSha256": "cea38b612d8faf173c022b00cb767aeb5ad3fdac40b100afef0bb4ac8f83713c",
-      "surfaceMaterial": "stone",
+      "collisionBlueprintSha256": "f9af4c3a723f30243c4bd6a38e1aad42dada8f78e30154ece69db2a0e88c4dbf",
+      "surfaceMaterial": "wood",
       "appearanceMode": "material",
-      "visualMaterial": "Slate",
-      "visualColor": "#7C7C7C",
+      "visualMaterial": "Wood",
+      "visualColor": "#A16745",
       "alphaEnabled": false,
       "materialDefinition": {
-        "id": "stone",
-        "label": "Stone",
-        "robloxMaterial": "Slate",
-        "soundFamily": "stone"
+        "id": "wood",
+        "label": "Wood",
+        "robloxMaterial": "Wood",
+        "soundFamily": "wood"
       },
       "texture_path": "",
       "texture_filename": "",
@@ -4606,14 +4778,14 @@
       "atlasVariants": [],
       "textureUsesAlpha": null,
       "atlasVariantId": 0,
-      "bindingRevision": 5,
+      "bindingRevision": 1,
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
       "category_label": "Fence",
       "publishedVisualMeshes": [
         {
-          "meshId": "89499570578827",
-          "name": "stone_fence_02"
+          "meshId": "100119295242562",
+          "name": "wooden_fence_03"
         }
       ],
       "aliases": []
@@ -4791,6 +4963,178 @@
         {
           "meshId": "83073073404149",
           "name": "stone_ladder_01"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "slug": "stone_ladder_02",
+      "name_en": "Stone Ladder 02",
+      "category": "ladder",
+      "model_path": "assets/source/location-assets/ladder/stone_ladder_02/model/stone_ladder_02.fbx",
+      "model_sha256": "78fbab3c2e5b332ff7e991193f6781f7042ddcbf4567ededc36489e5d23ee2e9",
+      "model_asset_id": "87622636607329",
+      "model_published_sha256": "78fbab3c2e5b332ff7e991193f6781f7042ddcbf4567ededc36489e5d23ee2e9",
+      "model_moderation_state": "Approved",
+      "destructible": false,
+      "revision": 1,
+      "created_at": 1794718421.0699673,
+      "updated_at": 1794718439.2671177,
+      "published_at": 1794718439.2671177,
+      "surface_material": "stone",
+      "alpha_enabled": 0,
+      "appearance_mode": "material",
+      "visual_material": "Slate",
+      "visual_color": "#7C7C7C",
+      "lod1": {
+        "kind": "lod1",
+        "revision": 1,
+        "status": "PUBLISHED",
+        "sourcePath": "assets/source/location-assets/ladder/stone_ladder_02/lod/lod1.fbx",
+        "sourceSha256": "5746b884c7c3a7373220fd8f50678903b163c91c8f404abe64ea5187974a846f",
+        "publishedSha256": "5746b884c7c3a7373220fd8f50678903b163c91c8f404abe64ea5187974a846f",
+        "modelAssetId": "138953598549622",
+        "moderationState": "Approved"
+      },
+      "fbxAnalysis": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "stone_ladder_02",
+            "armature": "",
+            "vertices": 195,
+            "bones": [],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          }
+        ],
+        "hasCollider": false,
+        "armatures": [],
+        "unassignedArmatures": []
+      },
+      "rigManifest": {
+        "boneHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "bones": [],
+        "carrierName": null,
+        "inventoryHash": "9a0aa616c279ffa8ca13a7de7e17a61a5d475f014426ba8319870537c1a0492b",
+        "parts": [
+          {
+            "name": "stone_ladder_02",
+            "role": "visual",
+            "vertices": 195
+          }
+        ],
+        "rigKind": "static",
+        "schemaVersion": 2,
+        "sourceSha256": "",
+        "structuralHash": "b04077b7f96189b0d58a90aa2b2c0d1bba28b9986179e4cc86017b91b324b948"
+      },
+      "needsFbxInspection": false,
+      "legacyStaticPublication": false,
+      "meshOptions": {
+        "stone_ladder_02": {
+          "collisionFidelity": "Box",
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true
+        }
+      },
+      "collisionBlueprintRevision": 2,
+      "collisionBlueprintPartCount": 1,
+      "collisionBlueprint": {
+        "anchor": {
+          "localCFrame": [
+            0.05572509765625,
+            6.393333435058594,
+            -0.002716064453125,
+            1.000000238418579,
+            1.975997143688346e-11,
+            5.960464477539063e-08,
+            -1.9511949347905677e-11,
+            1.000000238418579,
+            5.874483566259414e-09,
+            -4.470348358154297e-08,
+            -5.874492003954401e-09,
+            1.0000001192092896
+          ],
+          "meshId": "108596637737945",
+          "size": [
+            4.662718772888184,
+            2.7866568565368652,
+            6.828357696533203
+          ]
+        },
+        "parts": [
+          {
+            "canQuery": true,
+            "canTouch": true,
+            "collisionGroup": "Default",
+            "id": "Part",
+            "localCFrame": [
+              -0.2137451171875,
+              6.433612823486328,
+              -0.001007080078125,
+              0.0008593052625656128,
+              -1.0580548632788123e-06,
+              0.9999997019767761,
+              6.06258538482507e-07,
+              1.0000001192092896,
+              1.0575344049357227e-06,
+              -0.9999996423721313,
+              6.053495553715038e-07,
+              0.0008593052625656128
+            ],
+            "name": "Part",
+            "shape": "Wedge",
+            "size": [
+              6.668088436126709,
+              2.756840229034424,
+              4.552102088928223
+            ]
+          }
+        ],
+        "pivot": "Model:GetPivot()",
+        "schemaVersion": 2
+      },
+      "collisionBlueprintSha256": "d60e6d0e769234e58a33f959901f204cbb7677f83869b706d206e02ed182ec67",
+      "surfaceMaterial": "stone",
+      "appearanceMode": "material",
+      "visualMaterial": "Slate",
+      "visualColor": "#7C7C7C",
+      "alphaEnabled": false,
+      "materialDefinition": {
+        "id": "stone",
+        "label": "Stone",
+        "robloxMaterial": "Slate",
+        "soundFamily": "stone"
+      },
+      "texture_path": "",
+      "texture_filename": "",
+      "texture_sha256": "",
+      "texture_asset_id": null,
+      "texture_published_sha256": "",
+      "texture_moderation_state": "",
+      "texture_reference_slug": "",
+      "atlasVariants": [],
+      "textureUsesAlpha": null,
+      "atlasVariantId": 0,
+      "bindingRevision": 1,
+      "atlasLegacyWarning": false,
+      "status": "PUBLISHED",
+      "category_label": "Ladder",
+      "publishedVisualMeshes": [
+        {
+          "meshId": "108596637737945",
+          "name": "stone_ladder_02"
         }
       ],
       "aliases": []
@@ -7539,6 +7883,334 @@
       ]
     },
     {
+      "slug": "stone_pillar_02",
+      "name_en": "Stone Pillar 02",
+      "category": "pillar",
+      "model_path": "assets/source/location-assets/pillar/stone_pillar_02/model/stone_pillar_02.fbx",
+      "model_sha256": "75584d75d1950ee004568566aebb4dbc210ebe73771b40a1027df7f33777c63e",
+      "model_asset_id": "124151728112602",
+      "model_published_sha256": "75584d75d1950ee004568566aebb4dbc210ebe73771b40a1027df7f33777c63e",
+      "model_moderation_state": "Approved",
+      "destructible": false,
+      "revision": 4,
+      "created_at": 1794028066.028978,
+      "updated_at": 1794709971.2773063,
+      "published_at": 1794028107.9032092,
+      "surface_material": "stone",
+      "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
+      "lod1": {
+        "kind": "lod1",
+        "revision": 0,
+        "status": "NOT_REGISTERED",
+        "sourcePath": "",
+        "sourceSha256": "",
+        "publishedSha256": "",
+        "modelAssetId": "",
+        "moderationState": ""
+      },
+      "fbxAnalysis": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "stone_pillar_02",
+            "armature": "",
+            "vertices": 1176,
+            "bones": [],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          }
+        ],
+        "hasCollider": false,
+        "armatures": [],
+        "unassignedArmatures": []
+      },
+      "rigManifest": null,
+      "needsFbxInspection": false,
+      "legacyStaticPublication": true,
+      "meshOptions": {
+        "stone_pillar_02": {
+          "collisionFidelity": "Box",
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true
+        }
+      },
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
+      "surfaceMaterial": "stone",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
+      "alphaEnabled": false,
+      "materialDefinition": {
+        "id": "stone",
+        "label": "Stone",
+        "robloxMaterial": "Slate",
+        "soundFamily": "stone"
+      },
+      "texture_path": "assets/source/texture-atlases/stone_pillar_02/32x64/stone_pillar_02_32x64_atlas.png",
+      "texture_filename": "stone_pillar_02_32x64_atlas.png",
+      "texture_sha256": "143b0c3bad1852b973ad6c63a7180a4edb50b65e29e9824fbdf06af35aa31f22",
+      "texture_asset_id": "96258371276574",
+      "texture_published_sha256": "143b0c3bad1852b973ad6c63a7180a4edb50b65e29e9824fbdf06af35aa31f22",
+      "texture_moderation_state": "Reviewing",
+      "texture_reference_slug": "",
+      "atlasVariantId": 66,
+      "atlasFamily": "stone_pillar_02",
+      "atlasResolution": "32x64",
+      "bindingRevision": 2,
+      "studioSyncStatus": "synced",
+      "atlasVariants": [
+        {
+          "id": 37,
+          "family_id": 30,
+          "width": 128,
+          "height": 256,
+          "filename": "stone_pillar_02_128x256_atlas.png",
+          "original_filename": "stone_pillar_02_128x256_atlas.png",
+          "source_path": "assets/source/texture-atlases/stone_pillar_02/128x256/stone_pillar_02_128x256_atlas.png",
+          "source_sha256": "b770c0aa9d7ff5eea5d7a48d0b5c20d1d0365601287457f646f51de2ddd010ad",
+          "uses_alpha": true,
+          "published_id": "101117475420735",
+          "published_sha256": "b770c0aa9d7ff5eea5d7a48d0b5c20d1d0365601287457f646f51de2ddd010ad",
+          "moderation_state": "Reviewing",
+          "published_at": 1794066393.8433344,
+          "created_at": 1794028065.6058714,
+          "retired_at": null,
+          "atlas_key": "stone_pillar_02",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "128x256",
+          "baseKey": "stone_pillar",
+          "version": "02"
+        },
+        {
+          "id": 66,
+          "family_id": 30,
+          "width": 32,
+          "height": 64,
+          "filename": "stone_pillar_02_32x64_atlas.png",
+          "original_filename": "stone_pillar_02_32x64_atlas.png",
+          "source_path": "assets/source/texture-atlases/stone_pillar_02/32x64/stone_pillar_02_32x64_atlas.png",
+          "source_sha256": "143b0c3bad1852b973ad6c63a7180a4edb50b65e29e9824fbdf06af35aa31f22",
+          "uses_alpha": true,
+          "published_id": "96258371276574",
+          "published_sha256": "143b0c3bad1852b973ad6c63a7180a4edb50b65e29e9824fbdf06af35aa31f22",
+          "moderation_state": "Reviewing",
+          "published_at": 1794525568.7617693,
+          "created_at": 1794525565.1448848,
+          "retired_at": null,
+          "atlas_key": "stone_pillar_02",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "32x64",
+          "baseKey": "stone_pillar",
+          "version": "02"
+        }
+      ],
+      "textureUsesAlpha": true,
+      "atlasLegacyWarning": false,
+      "status": "PUBLISHED",
+      "category_label": "Pillar",
+      "publishedVisualMeshes": [
+        {
+          "meshId": "79569085063588",
+          "name": "stone_pillar_02"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "slug": "stone_pillar_03",
+      "name_en": "Stone Pillar 03",
+      "category": "pillar",
+      "model_path": "assets/source/location-assets/pillar/stone_pillar_03/model/stone_pillar_03.fbx",
+      "model_sha256": "7b68cfb2b17dae5cf88845aeb989f01a8c520b4cda9330816df0fe26564793d5",
+      "model_asset_id": "134793393702800",
+      "model_published_sha256": "7b68cfb2b17dae5cf88845aeb989f01a8c520b4cda9330816df0fe26564793d5",
+      "model_moderation_state": "Approved",
+      "destructible": false,
+      "revision": 1,
+      "created_at": 1794709873.3937948,
+      "updated_at": 1794709888.3006494,
+      "published_at": 1794709888.3006494,
+      "surface_material": "stone",
+      "alpha_enabled": 0,
+      "appearance_mode": "material",
+      "visual_material": "Slate",
+      "visual_color": "#7C7C7C",
+      "lod1": {
+        "kind": "lod1",
+        "revision": 1,
+        "status": "PUBLISHED",
+        "sourcePath": "assets/source/location-assets/pillar/stone_pillar_03/lod/lod1.fbx",
+        "sourceSha256": "6e2f189aac6c5eda992e1c180be7757caf748d4ca0219d87e6255cedfbaac036",
+        "publishedSha256": "6e2f189aac6c5eda992e1c180be7757caf748d4ca0219d87e6255cedfbaac036",
+        "modelAssetId": "99666277072546",
+        "moderationState": "Approved"
+      },
+      "fbxAnalysis": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "stone_pillar_03",
+            "armature": "",
+            "vertices": 481,
+            "bones": [],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          }
+        ],
+        "hasCollider": false,
+        "armatures": [],
+        "unassignedArmatures": []
+      },
+      "rigManifest": {
+        "boneHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "bones": [],
+        "carrierName": null,
+        "inventoryHash": "fc34559a6513176acf30c1ea382802bc5f2d7b91dca00f458d3c2daf7a9522aa",
+        "parts": [
+          {
+            "name": "stone_pillar_03",
+            "role": "visual",
+            "vertices": 481
+          }
+        ],
+        "rigKind": "static",
+        "schemaVersion": 2,
+        "sourceSha256": "",
+        "structuralHash": "7a51a248c3326e8eef27364487b06dc5813ec8eb737d9c3e0a3171a7edcd6564"
+      },
+      "needsFbxInspection": false,
+      "legacyStaticPublication": false,
+      "meshOptions": {
+        "stone_pillar_03": {
+          "collisionFidelity": "Box",
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true
+        }
+      },
+      "collisionBlueprintRevision": 1,
+      "collisionBlueprintPartCount": 1,
+      "collisionBlueprint": {
+        "anchor": {
+          "localCFrame": [
+            0.11962890625,
+            3.90118408203125,
+            0.041412353515625,
+            1.000000238418579,
+            -3.7834979593753815e-10,
+            0.0,
+            -3.7834979593753815e-10,
+            1.0000001192092896,
+            1.862645149230957e-09,
+            0.0,
+            1.862645149230957e-09,
+            1.000000238418579
+          ],
+          "meshId": "81042781594152",
+          "size": [
+            3.531332015991211,
+            6.837714195251465,
+            3.3906090259552
+          ]
+        },
+        "parts": [
+          {
+            "canQuery": true,
+            "canTouch": true,
+            "collisionGroup": "Default",
+            "id": "Part",
+            "localCFrame": [
+              0.072235107421875,
+              3.837688446044922,
+              0.143402099609375,
+              -0.999869704246521,
+              0.01267057191580534,
+              -0.0100136399269104,
+              0.012891105376183987,
+              0.9996688365936279,
+              -0.022274475544691086,
+              0.009728092700242996,
+              -0.022400658577680588,
+              -0.9997018575668335
+            ],
+            "name": "Part",
+            "shape": "Block",
+            "size": [
+              2.451174736022949,
+              6.647870063781738,
+              2.0
+            ]
+          }
+        ],
+        "pivot": "Model:GetPivot()",
+        "schemaVersion": 2
+      },
+      "collisionBlueprintSha256": "8800fc7a7ee30e23c3c77f7b33b7b00476c8b5ab15736d1ca9ad55912743a1c4",
+      "surfaceMaterial": "stone",
+      "appearanceMode": "material",
+      "visualMaterial": "Slate",
+      "visualColor": "#7C7C7C",
+      "alphaEnabled": false,
+      "materialDefinition": {
+        "id": "stone",
+        "label": "Stone",
+        "robloxMaterial": "Slate",
+        "soundFamily": "stone"
+      },
+      "texture_path": "",
+      "texture_filename": "",
+      "texture_sha256": "",
+      "texture_asset_id": null,
+      "texture_published_sha256": "",
+      "texture_moderation_state": "",
+      "texture_reference_slug": "",
+      "atlasVariants": [],
+      "textureUsesAlpha": null,
+      "atlasVariantId": 0,
+      "bindingRevision": 1,
+      "atlasLegacyWarning": false,
+      "status": "PUBLISHED",
+      "category_label": "Pillar",
+      "publishedVisualMeshes": [
+        {
+          "meshId": "81042781594152",
+          "name": "stone_pillar_03"
+        }
+      ],
+      "aliases": []
+    },
+    {
       "slug": "wooden_pillar_01",
       "name_en": "Wooden Pillar 01",
       "category": "pillar",
@@ -7716,162 +8388,6 @@
       "aliases": [
         "wooden_fence_pillar_01"
       ]
-    },
-    {
-      "slug": "stone_pillar_02",
-      "name_en": "stone pillar 02",
-      "category": "pillar",
-      "model_path": "assets/source/location-assets/pillar/stone_pillar_02/model/stone_pillar_02.fbx",
-      "model_sha256": "75584d75d1950ee004568566aebb4dbc210ebe73771b40a1027df7f33777c63e",
-      "model_asset_id": "124151728112602",
-      "model_published_sha256": "75584d75d1950ee004568566aebb4dbc210ebe73771b40a1027df7f33777c63e",
-      "model_moderation_state": "Approved",
-      "destructible": false,
-      "revision": 3,
-      "created_at": 1794028066.028978,
-      "updated_at": 1794028648.3691769,
-      "published_at": 1794028107.9032092,
-      "surface_material": "stone",
-      "alpha_enabled": 0,
-      "appearance_mode": "atlas",
-      "visual_material": "SmoothPlastic",
-      "visual_color": "#FFFFFF",
-      "lod1": {
-        "kind": "lod1",
-        "revision": 0,
-        "status": "NOT_REGISTERED",
-        "sourcePath": "",
-        "sourceSha256": "",
-        "publishedSha256": "",
-        "modelAssetId": "",
-        "moderationState": ""
-      },
-      "fbxAnalysis": {
-        "schemaVersion": 1,
-        "meshes": [
-          {
-            "name": "stone_pillar_02",
-            "armature": "",
-            "vertices": 1176,
-            "bones": [],
-            "influencedBones": [],
-            "role": "visual",
-            "physics": {
-              "role": "visual",
-              "canCollide": null,
-              "canQuery": null,
-              "canTouch": false,
-              "doubleSided": false,
-              "collisionFidelity": null,
-              "physicsOnly": false
-            }
-          }
-        ],
-        "hasCollider": false,
-        "armatures": [],
-        "unassignedArmatures": []
-      },
-      "rigManifest": null,
-      "needsFbxInspection": false,
-      "legacyStaticPublication": true,
-      "meshOptions": {
-        "stone_pillar_02": {
-          "collisionFidelity": "Box",
-          "doubleSided": false,
-          "glass": false,
-          "noCollide": true
-        }
-      },
-      "collisionBlueprintRevision": 0,
-      "collisionBlueprintPartCount": 0,
-      "collisionBlueprint": null,
-      "collisionBlueprintSha256": "",
-      "surfaceMaterial": "stone",
-      "appearanceMode": "atlas",
-      "visualMaterial": "SmoothPlastic",
-      "visualColor": "#FFFFFF",
-      "alphaEnabled": false,
-      "materialDefinition": {
-        "id": "stone",
-        "label": "Stone",
-        "robloxMaterial": "Slate",
-        "soundFamily": "stone"
-      },
-      "texture_path": "assets/source/texture-atlases/stone_pillar_02/32x64/stone_pillar_02_32x64_atlas.png",
-      "texture_filename": "stone_pillar_02_32x64_atlas.png",
-      "texture_sha256": "143b0c3bad1852b973ad6c63a7180a4edb50b65e29e9824fbdf06af35aa31f22",
-      "texture_asset_id": "96258371276574",
-      "texture_published_sha256": "143b0c3bad1852b973ad6c63a7180a4edb50b65e29e9824fbdf06af35aa31f22",
-      "texture_moderation_state": "Reviewing",
-      "texture_reference_slug": "",
-      "atlasVariantId": 66,
-      "atlasFamily": "stone_pillar_02",
-      "atlasResolution": "32x64",
-      "bindingRevision": 2,
-      "studioSyncStatus": "synced",
-      "atlasVariants": [
-        {
-          "id": 37,
-          "family_id": 30,
-          "width": 128,
-          "height": 256,
-          "filename": "stone_pillar_02_128x256_atlas.png",
-          "original_filename": "stone_pillar_02_128x256_atlas.png",
-          "source_path": "assets/source/texture-atlases/stone_pillar_02/128x256/stone_pillar_02_128x256_atlas.png",
-          "source_sha256": "b770c0aa9d7ff5eea5d7a48d0b5c20d1d0365601287457f646f51de2ddd010ad",
-          "uses_alpha": true,
-          "published_id": "101117475420735",
-          "published_sha256": "b770c0aa9d7ff5eea5d7a48d0b5c20d1d0365601287457f646f51de2ddd010ad",
-          "moderation_state": "Reviewing",
-          "published_at": 1794066393.8433344,
-          "created_at": 1794028065.6058714,
-          "retired_at": null,
-          "atlas_key": "stone_pillar_02",
-          "replacement_sha256": null,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "128x256",
-          "baseKey": "stone_pillar",
-          "version": "02"
-        },
-        {
-          "id": 66,
-          "family_id": 30,
-          "width": 32,
-          "height": 64,
-          "filename": "stone_pillar_02_32x64_atlas.png",
-          "original_filename": "stone_pillar_02_32x64_atlas.png",
-          "source_path": "assets/source/texture-atlases/stone_pillar_02/32x64/stone_pillar_02_32x64_atlas.png",
-          "source_sha256": "143b0c3bad1852b973ad6c63a7180a4edb50b65e29e9824fbdf06af35aa31f22",
-          "uses_alpha": true,
-          "published_id": "96258371276574",
-          "published_sha256": "143b0c3bad1852b973ad6c63a7180a4edb50b65e29e9824fbdf06af35aa31f22",
-          "moderation_state": "Reviewing",
-          "published_at": 1794525568.7617693,
-          "created_at": 1794525565.1448848,
-          "retired_at": null,
-          "atlas_key": "stone_pillar_02",
-          "replacement_sha256": null,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "32x64",
-          "baseKey": "stone_pillar",
-          "version": "02"
-        }
-      ],
-      "textureUsesAlpha": true,
-      "atlasLegacyWarning": false,
-      "status": "PUBLISHED",
-      "category_label": "Pillar",
-      "publishedVisualMeshes": [
-        {
-          "meshId": "79569085063588",
-          "name": "stone_pillar_02"
-        }
-      ],
-      "aliases": []
     },
     {
       "slug": "wooden_post_01",
@@ -13139,8 +13655,8 @@
     }
   ],
   "summary": {
-    "registered": 34,
-    "published": 34,
+    "registered": 37,
+    "published": 37,
     "changed": 0
   }
 }

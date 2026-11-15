@@ -20,6 +20,9 @@ function ServiceCatalog.Build(root: Instance)
             local EnvironmentAssetService = require(world:WaitForChild("EnvironmentAssetService"))
             EnvironmentAssetService.Start()
         end},
+        {name = "LocationLodTemplateService", critical = false, dependsOn = {"EnvironmentAssetService"}, start = function()
+            require(world:WaitForChild("LocationLodTemplateService")).Start()
+        end},
         {name = "LandscapeSwayService", critical = false, start = function()
             require(world:WaitForChild("LandscapeSwayService")).Start()
         end},

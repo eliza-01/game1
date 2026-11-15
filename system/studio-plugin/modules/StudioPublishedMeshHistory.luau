@@ -110,6 +110,63 @@ function Inventory.MatchesRetiredStaticInventory(placed: Model, version: any, en
     return actualCount>0 and actualCount==expectedCount
 end
 
+-- Older skinned publications can retain one authored COL MeshPart which has
+-- already been removed from the placed Model. The strict full-mesh check is
+-- still authoritative everywhere else. This exception requires a real owned
+-- instance, its exact published revision, a complete visual multiset, and the
+-- matching authored rig_carrier. Never accept an extra/foreign MeshPart.
+function Inventory.MatchesRetiredSkinnedPhysics(placed: Model, version: any, entry: any): boolean
+    if not placed:IsA("Model") or type(version) ~= "table"
+        or type(version.meshes) ~= "table" or type(entry) ~= "table" then return false end
+    local manifest = entry.rigManifest
+    if type(manifest) ~= "table" or manifest.rigKind ~= "skinned"
+        or manifest.carrierName ~= "rig_carrier" then return false end
+    local slug = tostring(entry.slug or "")
+    local instanceId = tostring(placed:GetAttribute("Game1DecoInstanceId") or "")
+    if slug == "" or #instanceId < 8
+        or placed:GetAttribute("Game1DecoAssetSlug") ~= slug
+        or placed.Name ~= slug .. "__" .. instanceId:sub(1, 8)
+        or tostring(placed:GetAttribute("Game1DecoPublishedModelAssetId") or "")
+            ~= tostring(version.modelAssetId or "")
+        or Ownership.HasNestedPlacements(placed) then return false end
+    local expected = {}
+    local hasVisual = false
+    for _, record in ipairs(version.meshes) do
+        if type(record.meshId) ~= "string" or type(record.count) ~= "number"
+            or record.count < 1 or type(record.visualNames) ~= "table"
+            or expected[record.meshId] then return false end
+        expected[record.meshId] = record
+        if #record.visualNames > 0 then hasVisual = true end
+    end
+    if not hasVisual then return false end
+    local actual = {}
+    local carriers = 0
+    for _, part in ipairs(Inventory.Parts(placed)) do
+        local mid = Inventory.Id(part.MeshId)
+        local record = expected[mid]
+        if not record then return false end
+        actual[mid] = (actual[mid] or 0) + 1
+        if actual[mid] > record.count then return false end
+        if Carrier.IsCarrier(part) then
+            if #record.visualNames > 0 then return false end
+            carriers += 1
+        elseif not MeshPhysics.IsCollider(part.Name)
+            and part:GetAttribute("Game1DecoPhysicsOnly") ~= true
+            and #record.visualNames == 0 then return false end
+    end
+    if carriers ~= 1 then return false end
+    local missingNonvisual = 0
+    for mid, record in pairs(expected) do
+        local count = actual[mid] or 0
+        if #record.visualNames > 0 then
+            if count ~= record.count then return false end
+        else
+            missingNonvisual += record.count - count
+        end
+    end
+    return missingNonvisual == 1
+end
+
 function Inventory.Ids(model: Model): {[string]: boolean}
     local ids = {}
     for _, part in ipairs(Inventory.Parts(model)) do

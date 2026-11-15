@@ -49,6 +49,9 @@
       "StudioLocationInstanceReplace": {
         "$path": "modules/StudioLocationInstanceReplace.luau"
       },
+      "StudioLocationInstanceCollisionPreview": {
+        "$path": "modules/StudioLocationInstanceCollisionPreview.luau"
+      },
       "StudioLocationInstanceLegacyGeometry": {
         "$path": "modules/StudioLocationInstanceLegacyGeometry.luau"
       },
@@ -63,6 +66,9 @@
       },
       "StudioPlaceRegistryInventory": {
         "$path": "modules/StudioPlaceRegistryInventory.luau"
+      },
+      "StudioPlaceRegistryExternalOwners": {
+        "$path": "modules/StudioPlaceRegistryExternalOwners.luau"
       },
       "StudioLocationPublishedGeometry": {
         "$path": "modules/StudioLocationPublishedGeometry.luau"

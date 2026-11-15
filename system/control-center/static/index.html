@@ -13,9 +13,9 @@
 <link rel="stylesheet" href="asset-section-order.css?v=1">
 <link rel="stylesheet" href="character-animations.css?v=309">
 <link rel="stylesheet" href="location-assets.css?v=1">
-<link rel="stylesheet" href="location-instance-manager.css?v=344">
+<link rel="stylesheet" href="location-instance-manager.css?v=353">
 <link rel="stylesheet" href="place-registry.css?v=241">
-<link rel="stylesheet" href="lod-manager.css?v=1">
+<link rel="stylesheet" href="lod-manager.css?v=2">
 <link rel="stylesheet" href="character-components.css?v=6">
 <link rel="stylesheet" href="character-assemblies.css?v=5">
 <link rel="stylesheet" href="character-armor.css?v=1">
@@ -536,7 +536,7 @@
 </div>
 <div class="panel character-card location-collision-panel" id="location-collision-panel">
 <div class="section-title"><div><span>03 · Location Asset authoring</span><h3>Collision Blueprint</h3></div></div>
-<p class="hint">В Studio выдели <b>одну уже размещённую Model</b> этого Location Asset <b>вместе с любыми Part / WedgePart / CornerWedgePart</b> (1–256). Parts могут находиться в разных папках и моделях Workspace; папку создавать, переименовывать Parts или менять Pivot не нужно. Asset Manager проверит визуальные Mesh ID по истории публикаций. Нажми <b>Validate → Capture</b>. Для Preview достаточно выделить модель.</p>
+<p class="hint">В Studio выдели <b>одну уже размещённую Model</b> этого Location Asset <b>вместе с любыми Part (Block, Ball, Cylinder, Wedge, CornerWedge) / WedgePart / CornerWedgePart</b> (1–256). Parts могут находиться в разных папках и моделях Workspace; папку создавать, переименовывать Parts или менять Pivot не нужно. Asset Manager проверит визуальные Mesh ID по истории публикаций. Нажми <b>Validate → Capture</b>. Для Preview достаточно выделить модель.</p>
 <label>Registered Location Asset<select id="location-collision-asset"><option value="">Выбери ассет</option></select></label>
 <div class="actions location-collision-actions">
   <button id="location-collision-validate" type="button">Validate</button>
@@ -560,7 +560,18 @@
 </div>
 <div class="actions location-instance-actions">
 <button id="li-preview" type="button">Preview replacements</button>
+<button id="li-inspect" type="button" disabled>Show collision preview · Studio</button>
+<button id="li-clear-preview" type="button" disabled>Clear collision preview</button>
 <button id="li-replace" class="primary" type="button" disabled>Replace Models</button>
+</div>
+<div class="location-instance-override">
+<label><input type="checkbox" id="li-approve-shear"> Разрешить увеличенные / приближённые коллизии после осмотра</label>
+<small>Только после 3D Preview: оранжевые Block могут быть увеличены; Wedge/CornerWedge/Ball/Cylinder при неравномерном масштабе могут менять наклон или кривизну. Это приближение, не гарантированное совпадение. Проверка изменений и Undo обязательны.</small>
+</div>
+<div id="li-collision-approval" class="location-instance-approval" hidden>
+<strong id="li-collision-warning-count">Были бы заблокированы: 0</strong>
+<div id="li-collision-warnings" class="location-instance-placements"></div>
+<small>«Показать в Studio» переносит камеру к коллизии, не изменяя выделение.</small>
 </div>
 <pre id="li-status" class="location-collision-status" role="status" aria-live="polite">Выбери два ассета и нажми Preview. Никаких изменений до Replace.</pre>
 <details><summary>Выбранные размещения</summary><div id="li-placements" class="location-instance-placements">Сначала Preview.</div></details>
@@ -632,15 +643,20 @@
           <option value="red">Missing LOD1</option><option value="yellow">LOD1 · no LOD2</option><option value="green">LOD1 + LOD2</option></select></div></div>
     <div class="lm-table"><table><thead><tr><th>Location Asset</th><th>Placed</th><th>LOD models</th><th>Placement diagnostics</th></tr></thead>
       <tbody id="lod-rows"><tr><td colspan="4">Loading…</td></tr></tbody></table></div>
-    <p class="lm-note">Точки: красная — нет опубликованного LOD1; жёлтая — LOD1 опубликован, LOD2 отсутствует; зелёная — оба опубликованы. Регистрация LOD2 пока не реализована. Сканирование распознаёт только опубликованные Mesh ID из Place Registry.</p>
+    <p class="lm-note">Точки: красная — нет опубликованного LOD1; жёлтая — LOD1 опубликован, LOD2 отсутствует; зелёная — оба опубликованы. Регистрация LOD2 пока не реализована. Совпадение Mesh ID не означает Deco-размещение: владельцы LandscapePainter и PackageLink отображаются отдельно и защищены от Runtime-очистки.</p>
   </section>
   <section class="panel lm-panel"><div><span class="eyebrow">03 · History</span><h3>Snapshot revisions</h3></div>
     <div id="lod-revisions" class="lm-revisions"></div>
     <p class="lm-note">JSON включает полные трансформации и иерархию размещений. Он не заменяет резервную копию Place (.rbxl).</p>
   </section>
-  <section class="panel lm-panel lm-build"><div><span class="eyebrow">04 · Runtime preparation</span><h3>Prepare to publish</h3></div>
-    <div class="actions" style="margin-top:12px"><button id="lod-prepare" type="button" disabled title="Backup / Runtime Place builder ещё не реализованы">Prepare Runtime Place · not available</button></div>
-    <p id="lod-build-status" class="lm-note">Runtime Build будет подключён отдельно после проверки снимков и бэкапа. Исходный Place не меняется.</p>
+  <section class="panel lm-panel lm-build"><div><span class="eyebrow">04 · Runtime preparation</span><h3>Preflight → Verified backup → Runtime draft</h3></div>
+    <p class="lm-note">Сохрани текущий Studio Place через File → Save to File в <b>Roblox XML Place (.rbxlx)</b> по указанному пути. Snapshot не является .rbxlx; несохранённые изменения Studio в файл не попадут.</p>
+    <code id="lod-source-path" class="lm-source-path">place/game1_runtime_source.rbxlx</code>
+    <div class="actions" style="margin-top:12px"><button id="lod-prepare" type="button" disabled>Preflight saved Place</button></div>
+    <div id="lod-build-preview" class="lm-build-preview" hidden></div>
+    <label id="lod-build-confirm-label" class="lm-confirm" hidden>Подтверждение: <input id="lod-build-confirm" type="text" spellcheck="false" autocomplete="off" placeholder="PREPARE RUNTIME" aria-label="Введите PREPARE RUNTIME"></label>
+    <div class="actions" style="margin-top:8px"><button id="lod-build-execute" class="primary" type="button" disabled hidden>Backup + Build Runtime draft</button></div>
+    <p id="lod-build-status" class="lm-note">Runtime-копия создаётся отдельно, исходный Place не изменяется. Публикация пока запрещена: клиентский FULL/LOD1 загрузчик ещё не подключён.</p>
   </section>
 </div>
 
@@ -936,9 +952,9 @@
 <script src="location-category-picker.js?v=249"></script>
 <script src="deco-assets.js?v=253"></script>
 <script src="location-collision.js?v=3431"></script>
-<script src="location-instance-manager.js?v=351&geometry=1"></script>
+<script src="location-instance-manager.js?v=351&geometry=2&collision=1&review=354"></script>
 <script src="place-registry.js?v=348"></script>
-<script src="lod-manager.js?v=1"></script>
+<script src="lod-manager.js?v=2"></script>
 <script src="location-publication-state.js?v=253"></script>
 <script src="location-sync-grouping.js?v=262"></script>
 <script src="location-asset-workflow.js?v=262"></script>

@@ -15,21 +15,35 @@ _GUID = re.compile(r'[0-9a-fA-F-]{36}\Z')
 
 def run_location_instance_bridge(*, catalog: dict, phase: str, source_slug: str,
                                  target_slug: str, scope: str, scan_token: str = '',
-                                 anchor_id: str = 'model',
+                                 anchor_id: str = 'model', inspection_token: str = '',
+                                 approve_shear: bool = False, focus_index: int = 0,
+                                 focus_part_id: str = '',
                                  timeout_seconds: float = 300.0) -> dict:
     if (not isinstance(catalog, dict) or catalog.get('domain') != 'location_assets'
         or catalog.get('schemaVersion') != 1 or not isinstance(catalog.get('digest'), str)
         or not _SLUG.fullmatch(source_slug) or not _SLUG.fullmatch(target_slug)
         or source_slug == target_slug or scope not in ('selected', 'all')
-        or phase not in ('preview', 'replace') or not isinstance(anchor_id, str)
+        or phase not in ('preview', 'inspect', 'clear', 'focus', 'replace') or not isinstance(anchor_id, str)
         or not (anchor_id in ('model', 'geometry') or (re.fullmatch(r'mesh:[1-9][0-9]{0,6}',anchor_id) is not None))):
         raise ValueError('Invalid Location Instance Manager scope/catalog')
-    if phase == 'replace' and not _GUID.fullmatch(scan_token):
+    if phase in ('inspect', 'clear', 'focus', 'replace') and not _GUID.fullmatch(scan_token):
         raise ValueError('Preview token required')
     if phase == 'preview' and anchor_id != 'model':
         raise ValueError('Preview must start with the target Model pivot option')
     if phase == 'preview' and scan_token:
         raise ValueError('Unexpected Preview token')
+    if (not isinstance(inspection_token,str) or type(approve_shear) is not bool
+        or (approve_shear and phase != 'replace')
+        or (inspection_token and (phase not in ('clear', 'focus', 'replace')
+                                  or not _GUID.fullmatch(inspection_token)))):
+        raise ValueError('Invalid collision approval')
+    if phase == 'focus':
+        if (not _GUID.fullmatch(inspection_token) or type(focus_index) is not int
+            or not 1 <= focus_index <= 1000 or not isinstance(focus_part_id,str)
+            or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_\-]{0,63}',focus_part_id)):
+            raise ValueError('Focus needs a current inspected collision warning')
+    elif focus_index != 0 or focus_part_id:
+        raise ValueError('Unexpected collision focus fields')
     slugs = {row['slug'] for row in catalog['items']}
     if source_slug not in slugs or target_slug not in slugs:
         raise ValueError('Source and target must be published Location Assets')
@@ -37,7 +51,9 @@ def run_location_instance_bridge(*, catalog: dict, phase: str, source_slug: str,
     command = dict(project=PROJECT, command='location-instance-replace-v4', schemaVersion=4,
                    operationId=operation_id, catalog=catalog, phase=phase,
                    sourceSlug=source_slug, targetSlug=target_slug, scope=scope,
-                   scanToken=scan_token, anchorId=anchor_id)
+                   scanToken=scan_token, anchorId=anchor_id,
+                   inspectionToken=inspection_token, approveShear=approve_shear,
+                   focusIndex=focus_index, focusPartId=focus_part_id)
     state = {'claimed': False, 'result': None}
 
     class Handler(BaseHTTPRequestHandler):
@@ -155,6 +171,33 @@ def run_location_instance_bridge(*, catalog: dict, phase: str, source_slug: str,
             }
             raise StudioBridgeError('Invalid Instance Manager Preview: ' +
                                     json.dumps(details, ensure_ascii=False, default=str)[:1800])
+    elif phase == 'inspect':
+        details = value.get('warningDetails')
+        if (not _GUID.fullmatch(str(value.get('inspectionToken', '')))
+            or type(value.get('collisionParts')) is not int or not 0 <= value['collisionParts'] <= 512
+            or type(value.get('warnings')) is not int
+            or not isinstance(details,list) or len(details) != value['warnings']
+            or any(not isinstance(item,dict) or not isinstance(item.get('path'),str)
+                   or not isinstance(item.get('partId'),str)
+                   or (item.get('index') is not None and
+                       (type(item['index']) is not int or not 1 <= item['index'] <= value['count']))
+                   or not isinstance(item.get('excessStuds'),list) or len(item['excessStuds']) != 3
+                   or not isinstance(item.get('addedPercent'),list) or len(item['addedPercent']) != 3
+                   or (item.get('shape') is not None and item['shape'] not in
+                       ('Block','Wedge','CornerWedge','Ball','Cylinder'))
+                   or (item.get('approximate') is not None and type(item['approximate']) is not bool)
+                   or (item.get('reason') is not None and
+                       (not isinstance(item['reason'],str) or len(item['reason']) > 256))
+                   or any(type(n) not in (float,int) or n < 0 or n > 1000000
+                          for n in item['excessStuds']+item['addedPercent']) for item in details)):
+            raise StudioBridgeError('Invalid collision inspection response')
+    elif phase == 'clear':
+        if value.get('cleared') is not True:
+            raise StudioBridgeError('Invalid collision preview cleanup response')
+    elif phase == 'focus':
+        if (value.get('focused') is not True or value.get('index') != focus_index
+            or value.get('partId') != focus_part_id):
+            raise StudioBridgeError('Invalid collision warning focus response')
     elif value.get('changed') != value['count']:
         raise StudioBridgeError('Incomplete Instance Manager transaction; inspect Studio and Undo')
     return value

@@ -120,6 +120,7 @@ foreach($Marker in @(
     'StudioRealEstatePlacedTargets',
     'StudioLocationCollisionAuthoring',
     'StudioLocationInstanceReplace',
+    'StudioLocationInstanceCollisionPreview',
     'StudioLocationInstanceLegacyGeometry',
     'location-instance-replace-v4',
     'location-collision-authoring-v1',

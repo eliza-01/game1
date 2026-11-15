@@ -23,7 +23,7 @@ return function(config: any)
                 local token=config.HttpService:GenerateGUID(false)
                 session={token=token,digest=command.catalog.digest,refs=scan.refs}
                 local report={schemaVersion=1,placeId=scan.placeId,
-                    placements=scan.placements,warnings=scan.warnings}
+                    placements=scan.placements,protected=scan.protected,warnings=scan.warnings}
                 return {scanToken=token,scan=report,inventory=scan.inventory}
             end
             if phase=="undo" then

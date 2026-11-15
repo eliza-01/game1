@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "slug": "stone_pillar_03",
+  "sourceSha256": "7b68cfb2b17dae5cf88845aeb989f01a8c520b4cda9330816df0fe26564793d5",
+  "analysis": {
+    "schemaVersion": 1,
+    "meshes": [
+      {
+        "name": "stone_pillar_03",
+        "armature": "",
+        "vertices": 481,
+        "bones": [],
+        "influencedBones": [],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": null,
+          "canQuery": null,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": null,
+          "physicsOnly": false
+        }
+      }
+    ],
+    "hasCollider": false,
+    "armatures": [],
+    "unassignedArmatures": []
+  }
+}

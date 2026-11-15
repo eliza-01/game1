@@ -74,6 +74,35 @@ class CollisionMultiSelectM343B1(unittest.TestCase):
             run_location_collision_bridge(slug='stone_fence_01', phase='capture',
                                           expected_revision=0)
 
+    def test_studio_part_shape_wedge_capture_matches_blueprint_runtime(self):
+        """Modern Studio wedges are Part.Shape enums; older class wedges still work."""
+        plugin = ROOT / 'system/studio-plugin/modules'
+        authoring = (plugin / 'StudioLocationCollisionAuthoring.luau').read_text(encoding='utf-8')
+        producer = authoring.split('local function shapeOf(', 1)[1].split('\nend', 1)[0]
+        for shape in ('Block', 'Ball', 'Cylinder', 'Wedge', 'CornerWedge'):
+            self.assertIn(f'if shape == Enum.PartType.{shape} then return "{shape}" end', producer)
+        for class_name, recipe_shape in (('WedgePart', 'Wedge'), ('CornerWedgePart', 'CornerWedge')):
+            self.assertIn(f'if part:IsA("{class_name}") then return "{recipe_shape}" end', producer)
+        parts = (plugin / 'StudioLocationCollisionParts.luau').read_text(encoding='utf-8')
+        for class_name, recipe_shape in (('WedgePart', 'Wedge'), ('CornerWedgePart', 'CornerWedge')):
+            self.assertIn(f'recipe.shape == "{recipe_shape}"', parts)
+            self.assertIn(f'Instance.new("{class_name}")', parts)
+
+    def test_new_part_wedge_shapes_are_valid_blueprint_recipes(self):
+        from services.location_collision_blueprint import validate
+        identity = [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1]
+        blueprint = {
+            'schemaVersion': 2, 'pivot': 'Model:GetPivot()',
+            'anchor': {'meshId': '139744616815788', 'localCFrame': identity, 'size': [2, 2, 2]},
+            'parts': [{
+                'id': f'collision_{i}', 'name': f'Wedge {i}', 'shape': shape,
+                'size': [3, 2, 1], 'localCFrame': identity,
+                'collisionGroup': 'Default', 'canQuery': True, 'canTouch': False,
+            } for i, shape in enumerate(('Wedge', 'CornerWedge'), 1)],
+        }
+        result = validate(blueprint, slug='stone_fence_01')
+        self.assertEqual([part['shape'] for part in result['parts']], ['Wedge', 'CornerWedge'])
+
     def test_studio_contract_no_authoring_folder_or_pivot_mutation(self):
         source = (ROOT / 'system/studio-plugin/modules/StudioLocationCollisionAuthoring.luau').read_text(encoding='utf-8')
         page = (ROOT / 'system/control-center/static/index.html').read_text(encoding='utf-8')

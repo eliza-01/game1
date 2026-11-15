@@ -8,6 +8,7 @@ local Preparation = require(script.Parent.DecoAssetPreparation)
 local Placed = require(script.Parent.DecoPlacedAssetSync)
 local Collision = require(script.Parent.StudioLocationCollisionParts)
 local Legacy = require(script.Parent.StudioLocationInstanceLegacyGeometry)
+local CollisionPreview = require(script.Parent.StudioLocationInstanceCollisionPreview)
 
 local GUID_PATTERN = "^[0-9a-fA-F]+%-[0-9a-fA-F]+%-[0-9a-fA-F]+%-[0-9a-fA-F]+%-[0-9a-fA-F]+$"
 -- CFrame round-off from ScaleTo/PivotTo should not fail a valid replacement.
@@ -317,8 +318,10 @@ local function getLiveRow(loader: any, expected: any): any
 end
 
 local function freshModel(template: Model, target: any, old: any,
-    placementId: string, anchorId: string, approved: {[string]: any}): Model
+    placementId: string, anchorId: string, approved: {[string]: any},
+    allowExcessive: boolean?): (Model, {any})
     local clone = template:Clone()
+    local warnings = {}
     local ok, failure = pcall(function()
         -- Transfer the authored uniform Model scale, not bounds-derived guesses.
         -- This intentionally does not reinterpret manual child MeshPart Size edits.
@@ -338,7 +341,9 @@ local function freshModel(template: Model, target: any, old: any,
         clone:SetAttribute("Game1DecoInstanceId",placementId)
         if tonumber(target.collisionBlueprintRevision or 0) > 0 then
             local tx = Collision.Prepare(clone,target.collisionBlueprint,
-                target.collisionBlueprintRevision,target.collisionBlueprintSha256)
+                target.collisionBlueprintRevision,target.collisionBlueprintSha256,
+                nil, allowExcessive)
+            warnings = tx.warnings
             local applied, problem = pcall(Collision.Commit,tx)
             if not applied then Collision.Rollback(tx); error(problem) end
             Collision.Finalize(tx)
@@ -350,7 +355,7 @@ local function freshModel(template: Model, target: any, old: any,
         end
     end)
     if not ok then clone:Destroy(); error(tostring(failure)) end
-    return clone
+    return clone, warnings
 end
 
 -- Reference immutable historical source publications. Cache by Model Asset ID
@@ -412,8 +417,45 @@ local function assignPlacementIds(states: {any}, counts: {[string]: number}, htt
     return changed
 end
 
+-- All collision geometry used for approval is re-created before commit and
+-- compared to the inspected geometry. The UI cannot authorize unseen changes.
+local function collisionFingerprint(staged: {any}): string
+    local values = {}
+    for _, pair in ipairs(staged) do
+        local parts = {}
+        for _, part in ipairs(pair.after:GetChildren()) do
+            if Collision.IsOwned(part) then table.insert(parts,part) end
+        end
+        table.sort(parts,function(a,b)
+            return tostring(a:GetAttribute("Game1LocationCollisionPartId"))
+                < tostring(b:GetAttribute("Game1LocationCollisionPartId"))
+        end)
+        for _, part in ipairs(parts) do
+            local numbers = {part.CFrame:GetComponents()}
+            table.insert(numbers,part.Size.X)
+            table.insert(numbers,part.Size.Y)
+            table.insert(numbers,part.Size.Z)
+            local record = {tostring(part:GetAttribute("Game1LocationCollisionPartId")),
+                part.ClassName, if part:IsA("Part") then part.Shape.Name else ""}
+            for _, n in ipairs(numbers) do table.insert(record,string.format("%.5f",n)) end
+            table.insert(values,table.concat(record,","))
+        end
+        table.insert(values,"#" .. tostring(#parts))
+        table.insert(values,"!warnings:" .. tostring(#pair.warnings))
+        for _, warning in ipairs(pair.warnings) do
+            table.insert(values,"!" .. warning.partId)
+        end
+    end
+    return table.concat(values,"|")
+end
+
 return function(config: any)
     local session: any = nil
+    local overlay: Model? = nil
+    local function clearOverlay()
+        CollisionPreview.Clear(overlay)
+        overlay = nil
+    end
     local function execute(command: any): any
         if config.RunService:IsRunning() then error("Studio Edit mode required") end
         local source = getRow(command.catalog,command.sourceSlug)
@@ -422,6 +464,8 @@ return function(config: any)
             error("Invalid asset replacement scope")
         end
         if command.phase == "preview" then
+            clearOverlay()
+            session = nil
             local sourceVersions = versions(source,config.decoManager.loader)
             local otherVersions = {}
             -- Cross-asset ambiguity is checked against known publication inventories.
@@ -502,14 +546,49 @@ return function(config: any)
                 normalizedPivots=rebased,preservedManualSizes=resized,
                 differingVisualAxes=differingAxes}
         end
-        if command.phase ~= "replace" then error("Unknown Instance Manager phase") end
+        if command.phase ~= "replace" and command.phase ~= "inspect"
+            and command.phase ~= "clear" and command.phase ~= "focus" then
+            error("Unknown Instance Manager phase")
+        end
         local current = session
-        session = nil -- A Replace attempt always invalidates this Preview.
+        if command.phase == "clear" then
+            if not current or command.scanToken ~= current.token then
+                error("Collision preview expired")
+            end
+            -- A delayed Clear from an older inspection must not erase the
+            -- newly inspected overlay, even within the same placement Preview.
+            if current.inspectedToken ~= nil
+                and command.inspectionToken ~= current.inspectedToken then
+                error("Stale collision cleanup ignored; newer inspection remains active")
+            end
+            clearOverlay()
+            current.inspectedToken = nil
+            current.inspectedFingerprint = nil
+            current.inspectedWarnings = nil
+            current.inspectedProblems = nil
+            return {count=#current.states, cleared=true}
+        end
         if not current or command.scanToken ~= current.token
             or command.catalog.digest ~= current.digest
             or command.sourceSlug ~= current.source or command.targetSlug ~= current.target
             or command.scope ~= current.scope or not current.approved[command.anchorId] then
             error("Preview expired; run Preview again")
+        end
+        if command.phase == "focus" then
+            if type(command.inspectionToken) ~= "string"
+                or command.inspectionToken ~= current.inspectedToken
+                or type(command.focusIndex) ~= "number"
+                or type(command.focusPartId) ~= "string"
+                or not current.inspectedProblems
+                or not current.inspectedProblems[tostring(command.focusIndex) .. ":" .. command.focusPartId] then
+                error("Selected collision warning is stale; show preview again")
+            end
+            if not CollisionPreview.Focus(config.Workspace,overlay,
+                command.focusIndex,command.focusPartId) then
+                error("Collision overlay is no longer visible; show preview again")
+            end
+            return {count=#current.states,focused=true,
+                index=command.focusIndex,partId=command.focusPartId}
         end
         -- Selected scope must still contain exactly the same roots; All scope
         -- must still cover all instances, not a stale subset.
@@ -530,19 +609,79 @@ return function(config: any)
         if targetRow.revision ~= current.targetRevision then
             error("Target asset changed after Preview; preview again")
         end
+        if command.phase == "replace" then
+            if type(command.inspectionToken) ~= "string" or command.inspectionToken == ""
+                or command.inspectionToken ~= current.inspectedToken then
+                -- Do not destroy a newer inspection from a delayed Replace.
+                error("Collision inspection token is stale; click Show collision preview again")
+            end
+            if not CollisionPreview.IsVisible(config.Workspace,overlay) then
+                clearOverlay()
+                current.inspectedToken = nil
+                current.inspectedFingerprint = nil
+                error("Collision preview not active in Studio; click Show collision preview again")
+            end
+            if current.inspectedWarnings > 0 and command.approveShear ~= true then
+                error("Check the explicit oversized-collision approval before Replace")
+            end
+            -- Keep the session until staging and Undo have both succeeded.
+            -- A failed transaction must not silently consume the Preview.
+        end
         local template = config.decoManager.loader:loadPublished(targetRow)
         local stage = {}
         local staged, failure = pcall(function()
             for _, state in ipairs(current.states) do
-                local candidate = freshModel(template,targetRow,state,state.newIdentity,command.anchorId,current.approved)
-                table.insert(stage,{before=state,after=candidate})
+                local candidate, warnings = freshModel(template,targetRow,state,state.newIdentity,
+                    command.anchorId,current.approved,true)
+                table.insert(stage,{before=state,after=candidate,warnings=warnings})
             end
         end)
         template:Destroy()
         if not staged then
             for _, pair in ipairs(stage) do pair.after:Destroy() end
+            clearOverlay()
             error("Replacement staging failed, Place unchanged: "..tostring(failure))
         end
+        if command.phase == "inspect" then
+            local details = {}
+            local problems = {}
+            for index, pair in ipairs(stage) do
+                for _, warning in ipairs(pair.warnings) do
+                    table.insert(details,{
+                        index=index,path=pair.before.root:GetFullName(),partId=warning.partId,
+                        excessStuds=warning.excessStuds,addedPercent=warning.addedPercent,
+                        shape=warning.shape,approximate=warning.approximate,reason=warning.reason,
+                    })
+                    problems[tostring(index) .. ":" .. warning.partId] = true
+                end
+            end
+            local fingerprint = collisionFingerprint(stage)
+            local visible, ghost, parts = pcall(CollisionPreview.Show,config.Workspace,stage)
+            for _, pair in ipairs(stage) do pair.after:Destroy() end
+            if not visible then
+                error("Collision inspection failed, Place unchanged: "..tostring(ghost))
+            end
+            -- Only a successful, fully validated new inspection replaces the
+            -- old camera overlay and its token.
+            clearOverlay()
+            overlay = ghost
+            local approvalToken = config.HttpService:GenerateGUID(false)
+            current.inspectedToken = approvalToken
+            current.inspectedFingerprint = fingerprint
+            current.inspectedWarnings = #details
+            current.inspectedProblems = problems
+            current.inspectedAnchorId = command.anchorId
+            return {count=#current.states, inspectionToken=approvalToken,
+                collisionParts=parts,warnings=#details,warningDetails=details,
+                note="Orange = enlarged Block or approximate non-Block collision (requires approval); green = within exact/safe limits. Place unchanged."}
+        end
+        if collisionFingerprint(stage) ~= current.inspectedFingerprint
+            or command.anchorId ~= current.inspectedAnchorId then
+            for _, pair in ipairs(stage) do pair.after:Destroy() end
+            clearOverlay()
+            error("Collision geometry changed after inspection; Place unchanged, inspect again")
+        end
+        clearOverlay()
         for _, pair in ipairs(stage) do
             if not unchanged(pair.before) then
                 for _, cleanup in ipairs(stage) do cleanup.after:Destroy() end
@@ -592,6 +731,7 @@ return function(config: any)
         end
         local selected = {}
         for _, pair in ipairs(stage) do table.insert(selected,pair.after) end
+        session = nil
         config.Selection:Set(selected)
         return {count=#stage,changed=#stage,reassignedIds=current.rekeyed,
             note="New target pivot aligned using verified source geometry. Manual MeshPart Size edits preserved where safe. Ctrl+Z restores originals."}

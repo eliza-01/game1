@@ -38,3 +38,15 @@
  #location-instance-manager .location-instance-grid {grid-template-columns:1fr;}
  #location-new-registration-body #location-asset-material-fields:not([hidden]) {grid-column:auto;}
 }
+
+#location-instance-manager .location-instance-override {border:1px solid var(--line);border-radius:9px;padding:9px 12px;margin:9px 0;}
+#location-instance-manager .location-instance-override label {display:flex;gap:9px;align-items:center;font-size:12px;font-weight:600;}
+#location-instance-manager .location-instance-override input {flex:none;}
+#location-instance-manager .location-instance-override small {display:block;color:var(--muted);margin:5px 0 0 24px;}
+#location-instance-manager .location-instance-warning-actions {display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:6px;}
+#location-instance-manager .location-instance-warning-actions button {font-size:12px;padding:4px 9px;}
+#location-instance-manager .location-instance-approval {border:1px solid var(--line);border-radius:9px;padding:10px;margin:9px 0;}
+#location-instance-manager .location-instance-approval[hidden] {display:none!important;}
+#location-instance-manager .location-instance-approval label {display:flex;gap:9px;align-items:center;font-size:12px;}
+#location-instance-manager .location-instance-approval input {flex:none;}
+#location-instance-manager .location-instance-approval .location-instance-placements {max-height:160px;}

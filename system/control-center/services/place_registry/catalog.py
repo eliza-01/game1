@@ -116,4 +116,30 @@ def validate_report(report: dict, catalog: dict) -> list[dict]:
             raise ValueError('invalid diagnostic issues')
         if not isinstance(row.get('transform'), dict):
             raise ValueError('missing placement transform')
+    # External ownership is evidence, not permission to mutate. None of these
+    # entries gets a Place Registry selection key or a DecoManager Placement ID.
+    protected = report.get('protected', [])
+    if not isinstance(protected, list) or len(protected) > 4096:
+        raise ValueError('invalid protected external inventory')
+    valid_kinds = {'landscape_attachment', 'landscape_structure', 'unmanaged_package'}
+    seen_paths = set()
+    for item in protected:
+        if not isinstance(item, dict) or item.get('kind') not in valid_kinds:
+            raise ValueError('invalid protected external owner')
+        if item.get('slug') not in known and item.get('slug') != '':
+            raise ValueError('unknown protected asset slug')
+        for field in ('name', 'path', 'ownerPath', 'slug', 'authorSlug',
+                      'branchStrokeId', 'anchorKind', 'reason'):
+            value = item.get(field)
+            if not isinstance(value, str) or len(value) > 1200:
+                raise ValueError('invalid protected owner field: ' + field)
+        if (item['path'], item['slug']) in seen_paths or not item['path'] or not item['ownerPath']:
+            raise ValueError('invalid or duplicate protected owner path')
+        seen_paths.add((item['path'], item['slug']))
+        if type(item.get('review')) is not bool or item.get('protectedFromRuntime') is not True:
+            raise ValueError('unsafe protected owner record')
+        if (item['kind'] == 'landscape_attachment'
+                and (not item['authorSlug'] or item['authorSlug'] != item['slug'])
+                and item['review'] is not True):
+            raise ValueError('unreviewed LandscapePainter owner conflict')
     return rows

@@ -4835,10 +4835,15 @@ end
 
 local function shapeOf(part: Instance): string
     if part:IsA("Part") then
-        if part.Shape == Enum.PartType.Block then return "Block" end
-        if part.Shape == Enum.PartType.Ball then return "Ball" end
-        if part.Shape == Enum.PartType.Cylinder then return "Cylinder" end
-        error("unsupported Part.Shape")
+        -- Studio now creates wedges as Part.Shape, not only as WedgePart.
+        -- Normalize both representations to the existing Blueprint shape IDs.
+        local shape = part.Shape
+        if shape == Enum.PartType.Block then return "Block" end
+        if shape == Enum.PartType.Ball then return "Ball" end
+        if shape == Enum.PartType.Cylinder then return "Cylinder" end
+        if shape == Enum.PartType.Wedge then return "Wedge" end
+        if shape == Enum.PartType.CornerWedge then return "CornerWedge" end
+        error("Unsupported collision Part.Shape: " .. tostring(shape) .. " (" .. part:GetFullName() .. ")")
     end
     if part:IsA("WedgePart") then return "Wedge" end
     if part:IsA("CornerWedgePart") then return "CornerWedge" end
@@ -5205,6 +5210,7 @@ local OWNED = "Game1LocationCollisionOwned"
 local PART_ID = "Game1LocationCollisionPartId"
 local REVISION = "Game1LocationCollisionRevision"
 local SHA = "Game1LocationCollisionSha256"
+local APPROVED = "Game1LocationCollisionApprovedSha256"
 
 local function recipes(blueprint: any): {any}
     if type(blueprint) ~= "table" or blueprint.schemaVersion ~= 2
@@ -5289,7 +5295,11 @@ function Collision.Current(root: Model, blueprint: any, revision: any, sha: any)
                 elseif part.Shape == Enum.PartType.Cylinder then "Cylinder" else "Block"
             if shape ~= expectedShape then return false end
         end
-        local okGeometry, expected, expectedSize = pcall(Transform.Part, anchor, recipe)
+        -- Explicit Studio inspection may authorize a larger, visible enclosure
+        -- for this exact Blueprint SHA. It does not change the default for
+        -- unapproved placements or later Blueprint revisions.
+        local allowed = root:GetAttribute(APPROVED) == sha
+        local okGeometry, expected, expectedSize = pcall(Transform.Part, anchor, recipe, allowed)
         if not okGeometry then return false end
         if (part.Size - expectedSize).Magnitude > 0.002
             or (part.Position - expected.Position).Magnitude > 0.003
@@ -5302,7 +5312,7 @@ function Collision.Current(root: Model, blueprint: any, revision: any, sha: any)
     return true
 end
 
-function Collision.Prepare(root: Model, blueprint: any, revision: any, sha: any, incoming: Model?): any
+function Collision.Prepare(root: Model, blueprint: any, revision: any, sha: any, incoming: Model?, allowExcessive: boolean?): any
     if not root:IsA("Model") or type(revision) ~= "number" or revision < 1
         or type(sha) ~= "string" or #sha ~= 64 then
         error("Invalid Location Collision publication")
@@ -5311,6 +5321,7 @@ function Collision.Prepare(root: Model, blueprint: any, revision: any, sha: any,
     local geometry = incoming or root
     local anchor = Transform.Resolve(geometry, blueprint)
     local stage = {}
+    local warnings = {}
     local good, failure = pcall(function()
         for _, recipe in ipairs(recipes(blueprint)) do
             local part: BasePart
@@ -5327,7 +5338,13 @@ function Collision.Prepare(root: Model, blueprint: any, revision: any, sha: any,
             part.Name = "__Game1Collision_" .. recipe.id
             part:SetAttribute(OWNED, true)
             part:SetAttribute(PART_ID, recipe.id)
-            local frame, size = Transform.Part(anchor, recipe)
+            local frame, size, warning
+            if allowExcessive == true then
+                frame, size, warning = Transform.Part(anchor, recipe, true)
+            else
+                frame, size = Transform.Part(anchor, recipe)
+            end
+            if warning then table.insert(warnings, warning) end
             part.Size = size
             part.CFrame = frame
             part.Anchored = true
@@ -5345,9 +5362,10 @@ function Collision.Prepare(root: Model, blueprint: any, revision: any, sha: any,
         for _, part in ipairs(stage) do part:Destroy() end
         error("Collision Parts staging failed: " .. tostring(failure))
     end
-    return {root = root, pivot = pivot, stage = stage,
+    return {root = root, pivot = pivot, stage = stage, warnings = warnings,
         prior = ownedParts(root), revision = revision, sha = sha,
-        oldRevision = root:GetAttribute(REVISION), oldSha = root:GetAttribute(SHA), committed = false}
+        oldRevision = root:GetAttribute(REVISION), oldSha = root:GetAttribute(SHA),
+        oldApproval = root:GetAttribute(APPROVED), committed = false}
 end
 
 function Collision.Commit(transaction: any)
@@ -5359,6 +5377,7 @@ function Collision.Commit(transaction: any)
     for _, part in ipairs(transaction.stage) do part.Parent = root end
     root:SetAttribute(REVISION, transaction.revision)
     root:SetAttribute(SHA, transaction.sha)
+    root:SetAttribute(APPROVED, if #transaction.warnings > 0 then transaction.sha else nil)
     if root:GetPivot() ~= transaction.pivot then error("Collision Parts changed the authored Pivot") end
 end
 
@@ -5368,6 +5387,7 @@ function Collision.Rollback(transaction: any)
         for _, part in ipairs(transaction.prior) do part.Parent = transaction.root end
         transaction.root:SetAttribute(REVISION, transaction.oldRevision)
         transaction.root:SetAttribute(SHA, transaction.oldSha)
+        transaction.root:SetAttribute(APPROVED, transaction.oldApproval)
     end
 end
 
@@ -5432,13 +5452,22 @@ function Transform.Resolve(root: Model, blueprint: any): any
         ratios = ratios, uniform = uniform, uniformScale = average}
 end
 
--- The visual MeshPart is an affine X/Y/Z-scaled reference. A rigid Roblox Part
--- cannot express shear. For Blocks we use the exact transformed centre and a
--- tight enclosing oriented box (the captured local axes), measuring any added
--- thickness. Reject geometries that need an excessively inflated enclosure.
--- This prevents a plausible-looking but badly oversized collision on meshes
--- whose colliders were not authored approximately aligned to their Mesh axes.
-function Transform.Part(anchor: any, recipe: any): (CFrame, Vector3)
+-- A captured primitive is transformed by the visual MeshPart's *per-axis*
+-- Size changes, independently of the Model's uniform ScaleTo. This affine
+-- transform may shear a primitive whose local axes do not align with the mesh.
+-- In Instance Manager, an explicit 3-D inspection may approve a visibly
+-- approximate collision. Ordinary Place/Sync remain strict and never silently
+-- replace wedges with Blocks or accept approximate primitive geometry.
+local function inBounds(size: Vector3): boolean
+    return size.X > 0.001 and size.Y > 0.001 and size.Z > 0.001
+        and size.X <= 4096 and size.Y <= 4096 and size.Z <= 4096
+end
+
+local function perpendicular(a: Vector3, b: Vector3): boolean
+    return math.abs(a:Dot(b)) <= a.Magnitude * b.Magnitude * 0.0001
+end
+
+function Transform.Part(anchor: any, recipe: any, allowExcessive: boolean?): (CFrame, Vector3, any?)
     local source = CFrame.new(table.unpack(recipe.localCFrame))
     local relative = anchor.anchorFrame:ToObjectSpace(source)
     local baseSize = Vector3.new(table.unpack(recipe.size))
@@ -5447,9 +5476,6 @@ function Transform.Part(anchor: any, recipe: any): (CFrame, Vector3)
         return anchor.mesh.CFrame * CFrame.new(relative.Position * scale) * relative.Rotation,
             baseSize * scale
     end
-    if recipe.shape ~= "Block" then
-        error("Non-uniform visual MeshPart Size requires Block collision Parts; Place unchanged")
-    end
 
     local ratios = anchor.ratios
     local offset = scaleVector(relative.Position, ratios)
@@ -5457,9 +5483,35 @@ function Transform.Part(anchor: any, recipe: any): (CFrame, Vector3)
     local scaledRight = scaleVector(right, ratios)
     local scaledUp = scaleVector(up, ratios)
     local scaledBack = scaleVector(back, ratios)
+    local axisLengths = Vector3.new(scaledRight.Magnitude * baseSize.X,
+        scaledUp.Magnitude * baseSize.Y, scaledBack.Magnitude * baseSize.Z)
 
-    -- Project the affine-transformed box onto its ORIGINAL orthonormal axes.
-    -- The resulting rigid Part completely contains the source volume.
+    -- A non-uniform scale is EXACT for a Wedge/CornerWedge if its three
+    -- transformed basis vectors remain orthogonal (including 90-degree
+    -- rotations). A Cylinder is also exact if its Y/Z radial scales match.
+    local orthogonal = perpendicular(scaledRight, scaledUp)
+        and perpendicular(scaledRight, scaledBack)
+        and perpendicular(scaledUp, scaledBack)
+    local wedge = recipe.shape == "Wedge" or recipe.shape == "CornerWedge"
+    local cylinder = recipe.shape == "Cylinder"
+    local matchingRadii = math.abs(scaledUp.Magnitude - scaledBack.Magnitude)
+        <= math.max(0.0001, scaledUp.Magnitude * 0.0001)
+    if orthogonal and (wedge or (cylinder and matchingRadii)) then
+        if not inBounds(axisLengths) then
+            error("Non-uniform collision Part Size outside Roblox authoring bounds")
+        end
+        local centre = anchor.mesh.CFrame:PointToWorldSpace(offset)
+        local frame = CFrame.fromMatrix(centre, scaledRight.Unit, scaledUp.Unit, scaledBack.Unit)
+        return frame, axisLengths
+    end
+
+    -- The transformed primitive may be sheared. Project its full bounding
+    -- box onto the original orthonormal axes to produce a deterministic
+    -- candidate. For Blocks this is a conservative enclosing OBB. For Wedge,
+    -- CornerWedge, Ball and Cylinder, keeping the SAME primitive type with
+    -- these dimensions is an APPROXIMATION, not an assured enclosure: the
+    -- sloped/curved surface can differ. Never allow it without an explicit
+    -- Instance Manager visual inspection and approval.
     local size = Vector3.new(
         math.abs(right:Dot(scaledRight)) * baseSize.X
             + math.abs(right:Dot(scaledUp)) * baseSize.Y
@@ -5471,22 +5523,39 @@ function Transform.Part(anchor: any, recipe: any): (CFrame, Vector3)
             + math.abs(back:Dot(scaledUp)) * baseSize.Y
             + math.abs(back:Dot(scaledBack)) * baseSize.Z
     )
-    local axisLengths = Vector3.new(scaledRight.Magnitude * baseSize.X,
-        scaledUp.Magnitude * baseSize.Y, scaledBack.Magnitude * baseSize.Z)
-    local excess = size - axisLengths
-    -- At most 0.20 studs added to any full dimension, or at most 10% of that
-    -- dimension. Reject only when BOTH limits are exceeded. Any larger shear
-    -- needs a more suitable authoring primitive, not an implicit approximation.
-    if (excess.X > 0.20 and excess.X > axisLengths.X * 0.10)
-        or (excess.Y > 0.20 and excess.Y > axisLengths.Y * 0.10)
-        or (excess.Z > 0.20 and excess.Z > axisLengths.Z * 0.10) then
-        error("Non-uniform collision shape needs excessive shear enclosure; author aligned Block Parts")
-    end
-    if size.X <= 0.001 or size.Y <= 0.001 or size.Z <= 0.001
-        or size.X > 4096 or size.Y > 4096 or size.Z > 4096 then
+    if not inBounds(size) then
         error("Non-uniform collision Part Size outside Roblox authoring bounds")
     end
-    return anchor.mesh.CFrame * CFrame.new(offset) * relative.Rotation, size
+    local excess = size - axisLengths
+    -- A Block enclosure exceeding BOTH .20 studs AND 10% on an axis is
+    -- not silently permitted. Other primitives always require approval if
+    -- their affine transform cannot be represented exactly.
+    local excessive = (excess.X > 0.20 and excess.X > axisLengths.X * 0.10)
+        or (excess.Y > 0.20 and excess.Y > axisLengths.Y * 0.10)
+        or (excess.Z > 0.20 and excess.Z > axisLengths.Z * 0.10)
+    local approximate = recipe.shape ~= "Block"
+    if approximate and allowExcessive ~= true then
+        error("Non-uniform " .. tostring(recipe.shape)
+            .. " collision requires visual approximation review in Instance Manager")
+    end
+    if excessive and allowExcessive ~= true then
+        error("Non-uniform collision shape needs excessive shear enclosure; preview and approve in Instance Manager")
+    end
+    local warning = if excessive or approximate then {
+        partId = recipe.id,
+        shape = recipe.shape,
+        approximate = approximate,
+        reason = if approximate then "Approximate " .. tostring(recipe.shape)
+            .. ": slope/curvature may differ from the affinely transformed original"
+            else "Block enclosure enlarged by non-uniform shear",
+        excessStuds = {math.max(0, excess.X), math.max(0, excess.Y), math.max(0, excess.Z)},
+        addedPercent = {
+            math.max(0, excess.X) / math.max(axisLengths.X, 0.001) * 100,
+            math.max(0, excess.Y) / math.max(axisLengths.Y, 0.001) * 100,
+            math.max(0, excess.Z) / math.max(axisLengths.Z, 0.001) * 100,
+        },
+    } else nil
+    return anchor.mesh.CFrame * CFrame.new(offset) * relative.Rotation, size, warning
 end
 
 return table.freeze(Transform)
@@ -5494,6 +5563,158 @@ return table.freeze(Transform)
         </Properties>
       </Item>
       <Item class="ModuleScript" referent="26">
+        <Properties>
+          <string name="Name">StudioLocationInstanceCollisionPreview</string>
+          <string name="Source"><![CDATA[-- Instance Manager: disposable collision inspection overlay, never a placed asset.
+-- Only clones generated collision primitives from detached, validated staged Models.
+local Collision = require(script.Parent.StudioLocationCollisionParts)
+local Carrier = require(script.Parent.StudioLocationRigCarrier)
+local MeshPhysics = require(script.Parent.StudioMeshPhysicsCore)
+local Preview = {}
+local MAX_PARTS = 512
+-- Keep the temporary overlay attached to the currently active Studio camera.
+-- A camera switch must not invalidate an otherwise approved inspection.
+local cameraConnections = {}
+
+function Preview.Show(workspaceRef: Workspace, staged: {any}): (Model, number)
+    local camera = workspaceRef.CurrentCamera
+    if not camera then error("Studio camera unavailable for collision preview") end
+    local ghost = Instance.new("Model")
+    ghost.Name = "__Game1InstanceCollisionPreview"
+    ghost:SetAttribute("Game1AuthoringPreview", true)
+    local count = 0
+    local visualCount = 0
+    local ok, failure = pcall(function()
+        for index, pair in ipairs(staged) do
+            local warnings = {}
+            for _, warning in ipairs(pair.warnings) do warnings[warning.partId] = warning end
+            if #pair.warnings > 0 then
+                -- Show the proposed target's *visual MeshParts* only for enlarged
+                -- colliders, so the author can compare the orange enclosure to
+                -- the new mesh. Never clone scripts or authored model behavior.
+                for _, object in ipairs(pair.after:GetDescendants()) do
+                    if object:IsA("MeshPart") and not Carrier.IsCarrier(object)
+                        and not MeshPhysics.IsCollider(object.Name)
+                        and object:GetAttribute("Game1DecoPhysicsOnly") ~= true then
+                        visualCount += 1
+                        if visualCount > MAX_PARTS then
+                            error("Too many target visual previews; use Selected scope")
+                        end
+                        local visual = object:Clone()
+                        for _, descendant in ipairs(visual:GetDescendants()) do
+                            if descendant:IsA("LuaSourceContainer") then descendant:Destroy() end
+                        end
+                        visual.Name = "TARGET VISUAL · " .. object.Name
+                        visual.CFrame = object.CFrame
+                        visual.Anchored = true
+                        visual.CanCollide = false
+                        visual.CanQuery = false
+                        visual.CanTouch = false
+                        visual.Transparency = 0.72
+                        visual.CastShadow = false
+                        visual.Parent = ghost
+                    end
+                end
+            end
+            for _, child in ipairs(pair.after:GetChildren()) do
+                if Collision.IsOwned(child) then
+                    count += 1
+                    if count > MAX_PARTS then
+                        error("Collision preview exceeds 512 Parts; use Selected scope in smaller batches")
+                    end
+                    local copy = child:Clone()
+                    local issue = warnings[child:GetAttribute("Game1LocationCollisionPartId")]
+                    local enlarged = issue ~= nil
+                    copy.Name = if issue and issue.approximate then "APPROX · " .. child.Name
+                        elseif enlarged then "SHEAR · " .. child.Name else "Collision · " .. child.Name
+                    copy:SetAttribute("Game1InspectionPlacementIndex", index)
+                    copy:SetAttribute("Game1InspectionExcessive", enlarged)
+                    copy.Anchored = true
+                    copy.CanCollide = false
+                    copy.CanQuery = false
+                    copy.CanTouch = false
+                    copy.CastShadow = false
+                    copy.Material = Enum.Material.Neon
+                    copy.Color = if warnings[child:GetAttribute("Game1LocationCollisionPartId")]
+                        then Color3.fromRGB(235, 84, 54) else Color3.fromRGB(72, 183, 131)
+                    copy.Transparency = if warnings[child:GetAttribute("Game1LocationCollisionPartId")]
+                        then 0.45 else 0.72
+                    copy.Parent = ghost
+                end
+            end
+        end
+        ghost.Parent = camera
+    end)
+    if not ok then ghost:Destroy(); error(tostring(failure)) end
+    cameraConnections[ghost] = workspaceRef:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+        local active = workspaceRef.CurrentCamera
+        if ghost.Parent and active then ghost.Parent = active end
+    end)
+    -- Keep the five-minute leak guard. Disconnect even when Studio destroys
+    -- the overlay externally, so no abandoned camera listener remains.
+    task.delay(300, function() Preview.Clear(ghost) end)
+    return ghost, count
+end
+
+function Preview.IsVisible(workspaceRef: Workspace, ghost: Instance?): boolean
+    local camera = workspaceRef.CurrentCamera
+    if not ghost or not camera or not ghost.Parent then return false end
+    if ghost.Parent ~= camera then
+        if not ghost.Parent:IsA("Camera") then return false end
+        ghost.Parent = camera
+    end
+    return ghost.Parent == camera
+end
+
+-- Locate an already inspected orange collision without changing Studio Selection.
+-- This is intentionally camera-only: Selected-scope Replace validates the
+-- original selection and a focus command must not invalidate that evidence.
+function Preview.Focus(workspaceRef: Workspace, ghost: Instance?, index: number, partId: string): boolean
+    if not Preview.IsVisible(workspaceRef,ghost) then return false end
+    local match: BasePart? = nil
+    for _, child in ipairs(ghost:GetChildren()) do
+        if child:IsA("BasePart") and child:GetAttribute("Game1InspectionPlacementIndex") == index
+            and child:GetAttribute("Game1LocationCollisionPartId") == partId
+            and child:GetAttribute("Game1InspectionExcessive") == true then
+            match = child
+            break
+        end
+    end
+    if not match then return false end
+    local old = ghost:FindFirstChild("__Game1CollisionFocus")
+    if old then old:Destroy() end
+    local selectionBox = Instance.new("SelectionBox")
+    selectionBox.Name = "__Game1CollisionFocus"
+    selectionBox.Adornee = match
+    selectionBox.LineThickness = 0.08
+    selectionBox.Color3 = Color3.fromRGB(255, 180, 60)
+    selectionBox.SurfaceTransparency = 1
+    selectionBox.Parent = ghost
+    local camera = workspaceRef.CurrentCamera
+    if not camera then return false end
+    local direction = camera.CFrame.LookVector
+    local largest = math.max(match.Size.X, match.Size.Y, match.Size.Z)
+    local distance = math.clamp(largest * 2.5, 14, 180)
+    camera.CFrame = CFrame.lookAt(match.Position - direction * distance,match.Position)
+    camera.Focus = CFrame.new(match.Position)
+    return true
+end
+
+function Preview.Clear(ghost: Instance?)
+    if not ghost then return end
+    local connection = cameraConnections[ghost]
+    if connection then
+        connection:Disconnect()
+        cameraConnections[ghost] = nil
+    end
+    ghost:Destroy()
+end
+
+return table.freeze(Preview)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="27">
         <Properties>
           <string name="Name">StudioLocationInstanceLegacyGeometry</string>
           <string name="Source"><![CDATA[-- M351: provenance-based placement frame and manual MeshPart.Size transfer.
@@ -5650,7 +5871,7 @@ return table.freeze(Legacy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="27">
+      <Item class="ModuleScript" referent="28">
         <Properties>
           <string name="Name">StudioLocationInstanceReplace</string>
           <string name="Source"><![CDATA[-- Studio-only, explicit Location Asset whole-Model replacement.
@@ -5663,6 +5884,7 @@ local Preparation = require(script.Parent.DecoAssetPreparation)
 local Placed = require(script.Parent.DecoPlacedAssetSync)
 local Collision = require(script.Parent.StudioLocationCollisionParts)
 local Legacy = require(script.Parent.StudioLocationInstanceLegacyGeometry)
+local CollisionPreview = require(script.Parent.StudioLocationInstanceCollisionPreview)
 
 local GUID_PATTERN = "^[0-9a-fA-F]+%-[0-9a-fA-F]+%-[0-9a-fA-F]+%-[0-9a-fA-F]+%-[0-9a-fA-F]+$"
 -- CFrame round-off from ScaleTo/PivotTo should not fail a valid replacement.
@@ -5972,8 +6194,10 @@ local function getLiveRow(loader: any, expected: any): any
 end
 
 local function freshModel(template: Model, target: any, old: any,
-    placementId: string, anchorId: string, approved: {[string]: any}): Model
+    placementId: string, anchorId: string, approved: {[string]: any},
+    allowExcessive: boolean?): (Model, {any})
     local clone = template:Clone()
+    local warnings = {}
     local ok, failure = pcall(function()
         -- Transfer the authored uniform Model scale, not bounds-derived guesses.
         -- This intentionally does not reinterpret manual child MeshPart Size edits.
@@ -5993,7 +6217,9 @@ local function freshModel(template: Model, target: any, old: any,
         clone:SetAttribute("Game1DecoInstanceId",placementId)
         if tonumber(target.collisionBlueprintRevision or 0) > 0 then
             local tx = Collision.Prepare(clone,target.collisionBlueprint,
-                target.collisionBlueprintRevision,target.collisionBlueprintSha256)
+                target.collisionBlueprintRevision,target.collisionBlueprintSha256,
+                nil, allowExcessive)
+            warnings = tx.warnings
             local applied, problem = pcall(Collision.Commit,tx)
             if not applied then Collision.Rollback(tx); error(problem) end
             Collision.Finalize(tx)
@@ -6005,7 +6231,7 @@ local function freshModel(template: Model, target: any, old: any,
         end
     end)
     if not ok then clone:Destroy(); error(tostring(failure)) end
-    return clone
+    return clone, warnings
 end
 
 -- Reference immutable historical source publications. Cache by Model Asset ID
@@ -6067,8 +6293,45 @@ local function assignPlacementIds(states: {any}, counts: {[string]: number}, htt
     return changed
 end
 
+-- All collision geometry used for approval is re-created before commit and
+-- compared to the inspected geometry. The UI cannot authorize unseen changes.
+local function collisionFingerprint(staged: {any}): string
+    local values = {}
+    for _, pair in ipairs(staged) do
+        local parts = {}
+        for _, part in ipairs(pair.after:GetChildren()) do
+            if Collision.IsOwned(part) then table.insert(parts,part) end
+        end
+        table.sort(parts,function(a,b)
+            return tostring(a:GetAttribute("Game1LocationCollisionPartId"))
+                < tostring(b:GetAttribute("Game1LocationCollisionPartId"))
+        end)
+        for _, part in ipairs(parts) do
+            local numbers = {part.CFrame:GetComponents()}
+            table.insert(numbers,part.Size.X)
+            table.insert(numbers,part.Size.Y)
+            table.insert(numbers,part.Size.Z)
+            local record = {tostring(part:GetAttribute("Game1LocationCollisionPartId")),
+                part.ClassName, if part:IsA("Part") then part.Shape.Name else ""}
+            for _, n in ipairs(numbers) do table.insert(record,string.format("%.5f",n)) end
+            table.insert(values,table.concat(record,","))
+        end
+        table.insert(values,"#" .. tostring(#parts))
+        table.insert(values,"!warnings:" .. tostring(#pair.warnings))
+        for _, warning in ipairs(pair.warnings) do
+            table.insert(values,"!" .. warning.partId)
+        end
+    end
+    return table.concat(values,"|")
+end
+
 return function(config: any)
     local session: any = nil
+    local overlay: Model? = nil
+    local function clearOverlay()
+        CollisionPreview.Clear(overlay)
+        overlay = nil
+    end
     local function execute(command: any): any
         if config.RunService:IsRunning() then error("Studio Edit mode required") end
         local source = getRow(command.catalog,command.sourceSlug)
@@ -6077,6 +6340,8 @@ return function(config: any)
             error("Invalid asset replacement scope")
         end
         if command.phase == "preview" then
+            clearOverlay()
+            session = nil
             local sourceVersions = versions(source,config.decoManager.loader)
             local otherVersions = {}
             -- Cross-asset ambiguity is checked against known publication inventories.
@@ -6157,14 +6422,49 @@ return function(config: any)
                 normalizedPivots=rebased,preservedManualSizes=resized,
                 differingVisualAxes=differingAxes}
         end
-        if command.phase ~= "replace" then error("Unknown Instance Manager phase") end
+        if command.phase ~= "replace" and command.phase ~= "inspect"
+            and command.phase ~= "clear" and command.phase ~= "focus" then
+            error("Unknown Instance Manager phase")
+        end
         local current = session
-        session = nil -- A Replace attempt always invalidates this Preview.
+        if command.phase == "clear" then
+            if not current or command.scanToken ~= current.token then
+                error("Collision preview expired")
+            end
+            -- A delayed Clear from an older inspection must not erase the
+            -- newly inspected overlay, even within the same placement Preview.
+            if current.inspectedToken ~= nil
+                and command.inspectionToken ~= current.inspectedToken then
+                error("Stale collision cleanup ignored; newer inspection remains active")
+            end
+            clearOverlay()
+            current.inspectedToken = nil
+            current.inspectedFingerprint = nil
+            current.inspectedWarnings = nil
+            current.inspectedProblems = nil
+            return {count=#current.states, cleared=true}
+        end
         if not current or command.scanToken ~= current.token
             or command.catalog.digest ~= current.digest
             or command.sourceSlug ~= current.source or command.targetSlug ~= current.target
             or command.scope ~= current.scope or not current.approved[command.anchorId] then
             error("Preview expired; run Preview again")
+        end
+        if command.phase == "focus" then
+            if type(command.inspectionToken) ~= "string"
+                or command.inspectionToken ~= current.inspectedToken
+                or type(command.focusIndex) ~= "number"
+                or type(command.focusPartId) ~= "string"
+                or not current.inspectedProblems
+                or not current.inspectedProblems[tostring(command.focusIndex) .. ":" .. command.focusPartId] then
+                error("Selected collision warning is stale; show preview again")
+            end
+            if not CollisionPreview.Focus(config.Workspace,overlay,
+                command.focusIndex,command.focusPartId) then
+                error("Collision overlay is no longer visible; show preview again")
+            end
+            return {count=#current.states,focused=true,
+                index=command.focusIndex,partId=command.focusPartId}
         end
         -- Selected scope must still contain exactly the same roots; All scope
         -- must still cover all instances, not a stale subset.
@@ -6185,19 +6485,79 @@ return function(config: any)
         if targetRow.revision ~= current.targetRevision then
             error("Target asset changed after Preview; preview again")
         end
+        if command.phase == "replace" then
+            if type(command.inspectionToken) ~= "string" or command.inspectionToken == ""
+                or command.inspectionToken ~= current.inspectedToken then
+                -- Do not destroy a newer inspection from a delayed Replace.
+                error("Collision inspection token is stale; click Show collision preview again")
+            end
+            if not CollisionPreview.IsVisible(config.Workspace,overlay) then
+                clearOverlay()
+                current.inspectedToken = nil
+                current.inspectedFingerprint = nil
+                error("Collision preview not active in Studio; click Show collision preview again")
+            end
+            if current.inspectedWarnings > 0 and command.approveShear ~= true then
+                error("Check the explicit oversized-collision approval before Replace")
+            end
+            -- Keep the session until staging and Undo have both succeeded.
+            -- A failed transaction must not silently consume the Preview.
+        end
         local template = config.decoManager.loader:loadPublished(targetRow)
         local stage = {}
         local staged, failure = pcall(function()
             for _, state in ipairs(current.states) do
-                local candidate = freshModel(template,targetRow,state,state.newIdentity,command.anchorId,current.approved)
-                table.insert(stage,{before=state,after=candidate})
+                local candidate, warnings = freshModel(template,targetRow,state,state.newIdentity,
+                    command.anchorId,current.approved,true)
+                table.insert(stage,{before=state,after=candidate,warnings=warnings})
             end
         end)
         template:Destroy()
         if not staged then
             for _, pair in ipairs(stage) do pair.after:Destroy() end
+            clearOverlay()
             error("Replacement staging failed, Place unchanged: "..tostring(failure))
         end
+        if command.phase == "inspect" then
+            local details = {}
+            local problems = {}
+            for index, pair in ipairs(stage) do
+                for _, warning in ipairs(pair.warnings) do
+                    table.insert(details,{
+                        index=index,path=pair.before.root:GetFullName(),partId=warning.partId,
+                        excessStuds=warning.excessStuds,addedPercent=warning.addedPercent,
+                        shape=warning.shape,approximate=warning.approximate,reason=warning.reason,
+                    })
+                    problems[tostring(index) .. ":" .. warning.partId] = true
+                end
+            end
+            local fingerprint = collisionFingerprint(stage)
+            local visible, ghost, parts = pcall(CollisionPreview.Show,config.Workspace,stage)
+            for _, pair in ipairs(stage) do pair.after:Destroy() end
+            if not visible then
+                error("Collision inspection failed, Place unchanged: "..tostring(ghost))
+            end
+            -- Only a successful, fully validated new inspection replaces the
+            -- old camera overlay and its token.
+            clearOverlay()
+            overlay = ghost
+            local approvalToken = config.HttpService:GenerateGUID(false)
+            current.inspectedToken = approvalToken
+            current.inspectedFingerprint = fingerprint
+            current.inspectedWarnings = #details
+            current.inspectedProblems = problems
+            current.inspectedAnchorId = command.anchorId
+            return {count=#current.states, inspectionToken=approvalToken,
+                collisionParts=parts,warnings=#details,warningDetails=details,
+                note="Orange = enlarged Block or approximate non-Block collision (requires approval); green = within exact/safe limits. Place unchanged."}
+        end
+        if collisionFingerprint(stage) ~= current.inspectedFingerprint
+            or command.anchorId ~= current.inspectedAnchorId then
+            for _, pair in ipairs(stage) do pair.after:Destroy() end
+            clearOverlay()
+            error("Collision geometry changed after inspection; Place unchanged, inspect again")
+        end
+        clearOverlay()
         for _, pair in ipairs(stage) do
             if not unchanged(pair.before) then
                 for _, cleanup in ipairs(stage) do cleanup.after:Destroy() end
@@ -6247,6 +6607,7 @@ return function(config: any)
         end
         local selected = {}
         for _, pair in ipairs(stage) do table.insert(selected,pair.after) end
+        session = nil
         config.Selection:Set(selected)
         return {count=#stage,changed=#stage,reassignedIds=current.rekeyed,
             note="New target pivot aligned using verified source geometry. Manual MeshPart Size edits preserved where safe. Ctrl+Z restores originals."}
@@ -6280,7 +6641,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="28">
+      <Item class="ModuleScript" referent="29">
         <Properties>
           <string name="Name">StudioLocationMeshNames</string>
           <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
@@ -6313,7 +6674,7 @@ return Naming
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="29">
+      <Item class="ModuleScript" referent="30">
         <Properties>
           <string name="Name">StudioLocationPlacedGeometry</string>
           <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
@@ -6499,7 +6860,7 @@ return table.freeze(Geometry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="30">
+      <Item class="ModuleScript" referent="31">
         <Properties>
           <string name="Name">StudioLocationPlacementHistory</string>
           <string name="Source"><![CDATA[-- Per-placement, bounded authoring audit for Location repair and sync.
@@ -6540,7 +6901,7 @@ return table.freeze(History)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="31">
+      <Item class="ModuleScript" referent="32">
         <Properties>
           <string name="Name">StudioLocationPlacementOwner</string>
           <string name="Source"><![CDATA[-- M243: one placement-ownership rule for Location Find and scoped Sync.
@@ -6596,7 +6957,7 @@ return table.freeze(Owner)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="32">
+      <Item class="ModuleScript" referent="33">
         <Properties>
           <string name="Name">StudioLocationPublishedGeometry</string>
           <string name="Source"><![CDATA[-- Published-model provenance and shape policy for Location Assets.
@@ -6669,7 +7030,7 @@ return table.freeze(Published)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="33">
+      <Item class="ModuleScript" referent="34">
         <Properties>
           <string name="Name">StudioLocationPublishedRigNormalize</string>
           <string name="Source"><![CDATA[-- Location-only normalization of Roblox importer scaffolding on a FRESH,
@@ -6779,7 +7140,7 @@ return table.freeze(Normalize)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="34">
+      <Item class="ModuleScript" referent="35">
         <Properties>
           <string name="Name">StudioLocationRigCarrier</string>
           <string name="Source"><![CDATA[-- Canonical Location-only rig carrier policy. Imported FBX mesh; never synthetic.
@@ -7017,7 +7378,7 @@ return table.freeze(Carrier)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="35">
+      <Item class="ModuleScript" referent="36">
         <Properties>
           <string name="Name">StudioLocationVisualAppearance</string>
           <string name="Source"><![CDATA[-- Visual-only Location Asset appearance. Surface sound classification is separate.
@@ -7141,7 +7502,7 @@ return table.freeze(Visual)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="36">
+      <Item class="ModuleScript" referent="37">
         <Properties>
           <string name="Name">StudioManagedRigSwap</string>
           <string name="Source"><![CDATA[-- Shared Studio mechanism for replacing AUTHORING-MANAGED child rigs while
@@ -7337,7 +7698,7 @@ return table.freeze(RigSwap)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="37">
+      <Item class="ModuleScript" referent="38">
         <Properties>
           <string name="Name">StudioMarkerVisibility</string>
           <string name="Source"><![CDATA[-- Studio-only presentation toggle. No movement of markers, no metadata edits.
@@ -7481,7 +7842,7 @@ return table.freeze(Visibility)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="38">
+      <Item class="ModuleScript" referent="39">
         <Properties>
           <string name="Name">StudioMeshPhysicsCore</string>
           <string name="Source"><![CDATA[-- Shared visual MeshPart physics writer; special COL meshes are retired.
@@ -7663,7 +8024,7 @@ return table.freeze(Core)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="39">
+      <Item class="ModuleScript" referent="40">
         <Properties>
           <string name="Name">StudioModelLoadCommands</string>
           <string name="Source"><![CDATA[-- Studio model-sync command: validates and imports Character, Monster/NPC and Weapon models.
@@ -8230,7 +8591,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="40">
+      <Item class="ModuleScript" referent="41">
         <Properties>
           <string name="Name">StudioOptionsDraftBridge</string>
           <string name="Source"><![CDATA[--!strict
@@ -8297,7 +8658,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="41">
+      <Item class="ModuleScript" referent="42">
         <Properties>
           <string name="Name">StudioPlaceRegistryCommands</string>
           <string name="Source"><![CDATA[-- M240: separate Studio Bridge controller, NOT an extension of DecoManager.
@@ -8325,7 +8686,7 @@ return function(config: any)
                 local token=config.HttpService:GenerateGUID(false)
                 session={token=token,digest=command.catalog.digest,refs=scan.refs}
                 local report={schemaVersion=1,placeId=scan.placeId,
-                    placements=scan.placements,warnings=scan.warnings}
+                    placements=scan.placements,protected=scan.protected,warnings=scan.warnings}
                 return {scanToken=token,scan=report,inventory=scan.inventory}
             end
             if phase=="undo" then
@@ -8413,13 +8774,62 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="42">
+      <Item class="ModuleScript" referent="43">
+        <Properties>
+          <string name="Name">StudioPlaceRegistryExternalOwners</string>
+          <string name="Source"><![CDATA[-- Explicit ownership for published-mesh matches that do NOT belong to DecoManager.
+-- Read-only. This module never changes an Instance, tag, ID or attachment.
+-- A historical shared Mesh ID is not proof that an asset is a Deco placement.
+local ExternalOwners = {}
+
+function ExternalOwners.ForPart(part: MeshPart, workspaceService: Workspace): any?
+    local cursor: Instance? = part.Parent
+    while cursor and cursor ~= workspaceService do
+        if cursor:IsA("Model") then
+            if cursor:GetAttribute("LandscapeAuthoringTool") == "Game1LandscapePainter" then
+                return {kind="landscape_attachment", model=cursor,
+                    authorSlug=tostring(cursor:GetAttribute("LandscapeAssetSlug") or ""),
+                    branchStrokeId=tostring(cursor:GetAttribute("LandscapeBranchStrokeId") or ""),
+                    anchorKind=tostring(cursor:GetAttribute("LandscapeAnchorKind") or "")}
+            end
+            -- A branch's own geometry is painter-owned too, not an independent
+            -- Decoration. Its attachment children are classified above first.
+            if cursor:GetAttribute("AuthoringTool") == "Game1LandscapePainter" then
+                return {kind="landscape_structure", model=cursor, authorSlug="",
+                    branchStrokeId=tostring(cursor:GetAttribute("StrokeId") or ""),
+                    anchorKind=""}
+            end
+            -- Roblox package models carry no Deco placement identity. Protect
+            -- them, even if one of their meshes matches a Location publication.
+            if cursor:FindFirstChildOfClass("PackageLink") ~= nil then
+                return {kind="unmanaged_package", model=cursor, authorSlug="",
+                    branchStrokeId="", anchorKind=""}
+            end
+            -- An explicitly stamped Location placement is a stronger boundary
+            -- than a distant Package or Landscape ancestor.
+            if cursor:GetAttribute("Game1DecoInstanceId") ~= nil
+                or cursor:GetAttribute("Game1DecoAssetSlug") ~= nil then
+                return nil
+            end
+        end
+        cursor = cursor.Parent
+    end
+    return nil
+end
+
+return table.freeze(ExternalOwners)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="44">
         <Properties>
           <string name="Name">StudioPlaceRegistryInventory</string>
           <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
 -- M240: Registry-backed Location Assets ONLY. Scan is strictly read-only.
 -- No Workspace classification by name/category; only immutable published Mesh IDs.
 local History = require(script.Parent.StudioPublishedMeshHistory)
+local Ownership = require(script.Parent.StudioLocationPlacementOwner)
+local ExternalOwners = require(script.Parent.StudioPlaceRegistryExternalOwners)
 local Physics = require(script.Parent.StudioMeshPhysicsCore)
 local Published = require(script.Parent.StudioLocationPublishedGeometry)
 local Visual = require(script.Parent.StudioLocationVisualAppearance)
@@ -8528,7 +8938,8 @@ local function closestPublishedRoot(part: MeshPart, entry: any): Model?
             if meshCount <= 512 then
                 for _, version in ipairs(entry.models) do
                     if History.MatchesInventory(candidate, version)
-                        or History.MatchesRetiredStaticInventory(candidate, version, entry) then
+                        or History.MatchesRetiredStaticInventory(candidate, version, entry)
+                        or History.MatchesRetiredSkinnedPhysics(candidate, version, entry) then
                         if not closest then closest = candidate end
                         if candidate:GetAttribute("Game1DecoAssetSlug") == entry.slug
                             and candidate:GetAttribute("Game1DecoInstanceId") ~= nil then
@@ -8542,6 +8953,25 @@ local function closestPublishedRoot(part: MeshPart, entry: any): Model?
         candidate = candidate.Parent
     end
     return stamped or closest
+end
+
+-- If the published multiset does NOT match, preserve an explicitly owned
+-- Model's identity for diagnostics only. It must remain unsafe for Repair,
+-- Sync, and future Runtime Build until a human verifies the extra geometry.
+local function unverifiedOwnedRoot(part: MeshPart, entry: any): Model?
+    local candidate: Instance? = part.Parent
+    while candidate and candidate ~= workspace do
+        if candidate:IsA("Model") and candidate:GetAttribute("Game1DecoAssetSlug") ~= nil then
+            local placedId = tostring(candidate:GetAttribute("Game1DecoInstanceId") or "")
+            if candidate:GetAttribute("Game1DecoAssetSlug") ~= entry.slug
+                or #placedId < 8
+                or candidate.Name ~= entry.slug .. "__" .. placedId:sub(1,8)
+                or Ownership.HasNestedPlacements(candidate) then return nil end
+            return candidate
+        end
+        candidate = candidate.Parent
+    end
+    return nil
 end
 
 local function positionOf(part: MeshPart): {number}
@@ -8640,13 +9070,49 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
     end)
     if #candidates>4096 then error("Place contains >4096 identifiable Location MeshParts; run a scoped audit") end
     local rows,refs,duplicateGroups={},{},{}
+    local protected,externalSeen={},{}
     local consumed={}
     for _,candidate in ipairs(candidates) do
         local part=candidate.part
         if consumed[part] then continue end
+        local external = ExternalOwners.ForPart(part,workspaceService)
+        if external then
+            -- One protected owner Model, not one record per visible MeshPart.
+            -- Report published-mesh evidence without declaring Deco ownership.
+            if not externalSeen[external.model] then
+                externalSeen[external.model]=true
+                local visualSlug=if #candidate.owners==1 then candidate.owners[1].slug else ""
+                if external.kind=="landscape_attachment" and external.authorSlug~="" then
+                    for _, candidateOwner in ipairs(candidate.owners) do
+                        if candidateOwner.slug==external.authorSlug then
+                            visualSlug=external.authorSlug
+                            break
+                        end
+                    end
+                end
+                table.insert(protected,{
+                    kind=external.kind,slug=visualSlug,
+                    path=external.model:GetFullName(),name=external.model.Name,
+                    ownerPath=external.model:GetFullName(),
+                    authorSlug=external.authorSlug,
+                    branchStrokeId=external.branchStrokeId,
+                    anchorKind=external.anchorKind,
+                    -- A path/branch stroke is a locator, not a guaranteed stable placement ID.
+                    reason=if external.kind=="unmanaged_package" then "PackageLink · not a DecoManager placement"
+                        elseif external.kind=="landscape_structure" then "LandscapePainter branch geometry"
+                        elseif external.authorSlug~=visualSlug then "LandscapePainter asset slug differs from published Mesh ID"
+                        else "LandscapePainter authored attachment",
+                    review=external.kind=="unmanaged_package" or external.kind=="landscape_structure"
+                        or external.authorSlug=="" or external.authorSlug~=visualSlug,
+                    protectedFromRuntime=true,
+                })
+            end
+            continue
+        end
         local eligible=#candidate.owners==1
         local entry=candidate.owners[1]
         local root=if eligible then closestPublishedRoot(part,entry) else nil
+        local unverified=if eligible and not root then unverifiedOwnedRoot(part,entry) else nil
         local visualParts={part}
         if root then
             visualParts={}
@@ -8657,7 +9123,7 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
             end
         end
         for _,visualPart in ipairs(visualParts) do consumed[visualPart]=true end
-        local placement: Instance = root or part
+        local placement: Instance = root or unverified or part
         local original = state(part)
         local oldId,oldAmbiguous="",true
         if eligible then oldId,oldAmbiguous=Published.ResolveOldVersion(entry,root,id(part.MeshId)) end
@@ -8741,7 +9207,11 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
             end
         end
         if not eligible then warn("Один Mesh ID встречается у нескольких Location Assets") end
-        if not root then warn("Нет отдельной Model для этого экземпляра") end
+        if unverified then
+            warn("Model и Placement ID существуют, но состав MeshParts не совпадает с историей публикации — ручная проверка")
+        elseif not root then
+            warn("Нет отдельной Model для этого экземпляра")
+        end
         if needsRig and not needsMesh then warn("Новая версия модели отличается по составу MeshPart, хотя визуальный Mesh ID совпадает") end
         if needsMaterial then warn("Звуковой материал требует Sync: "..entry.material) end
         if needsRecapture then
@@ -8833,7 +9303,7 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
             collisionRevision=entry.collisionRevision,needsStructure=structuralState ~= "current" or not root or badName or meshNameMismatch or assigned==""
                 or (root and root:GetAttribute("Game1DecoAssetSlug")~=entry.slug),
 
-            duplicateId=false,ambiguous=not eligible or provenForeignClaim,
+            duplicateId=false,ambiguous=not eligible or provenForeignClaim or unverified~=nil,
             -- Repair remains metadata-only. A verified old publication is
             -- migrated by Sync through the shared whole-child-rig swap.
             canRepair=eligible and structuralState == "current" and root~=nil
@@ -8841,7 +9311,7 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
             requiresRepublish=requiresRepublish == true,
             needsFbxInspection=needsInspection == true,
             needsCanonicalReplacement=needsReplacement == true,
-            hasModel=root~=nil,structuralState=structuralState,canSync=eligible and not foreignClaim
+            hasModel=root~=nil or unverified~=nil,structuralState=structuralState,canSync=eligible and not foreignClaim
                 and root~=nil and assigned~="" and (claimed==entry.slug or oldClaim)
                 and not requiresRepublish and not needsInspection and not needsRecapture
                 and (structuralState=="current" or (needsReplacement and oldId~=""))
@@ -8884,7 +9354,8 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
             end
         end
     end
-    return {placements=rows,refs=refs,inventory=allInventory,
+    table.sort(protected,function(a,b) return a.path<b.path end)
+    return {placements=rows,protected=protected,refs=refs,inventory=allInventory,
         placeId=workspaceService.Parent.PlaceId,warnings=warnings}
 end
 
@@ -8927,7 +9398,7 @@ return Inventory
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="43">
+      <Item class="ModuleScript" referent="45">
         <Properties>
           <string name="Name">StudioPlaceRegistryRepair</string>
           <string name="Source"><![CDATA[-- Metadata-only Repair for canonical Location FBX placements.
@@ -9060,7 +9531,7 @@ return Repair
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="44">
+      <Item class="ModuleScript" referent="46">
         <Properties>
           <string name="Name">StudioPlaceRegistrySync</string>
           <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
@@ -9302,7 +9773,7 @@ return Sync
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="45">
+      <Item class="ModuleScript" referent="47">
         <Properties>
           <string name="Name">StudioPlacedRigBoneEffects</string>
           <string name="Source"><![CDATA[-- Placement-owned visual decorations attached to authored Bones. Accept either
@@ -9417,7 +9888,7 @@ return table.freeze(BoneEffects)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="46">
+      <Item class="ModuleScript" referent="48">
         <Properties>
           <string name="Name">StudioPlotsCatalog</string>
           <string name="Source"><![CDATA[-- Read-only discovery contract for authored Workspace.Plots/01..50.
@@ -9479,7 +9950,7 @@ return table.freeze(Catalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="47">
+      <Item class="ModuleScript" referent="49">
         <Properties>
           <string name="Name">StudioPlotsPartPolicy</string>
           <string name="Source"><![CDATA[-- Reversible, Studio-only properties for Plots visibility and playtest preview.
@@ -9564,7 +10035,7 @@ return table.freeze(Policy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="48">
+      <Item class="ModuleScript" referent="50">
         <Properties>
           <string name="Name">StudioPlotsSelectionFilter</string>
           <string name="Source"><![CDATA[-- Studio viewport hit-test filter for hidden Plots authoring geometry.
@@ -9654,7 +10125,7 @@ return table.freeze(Filter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="49">
+      <Item class="ModuleScript" referent="51">
         <Properties>
           <string name="Name">StudioPlotsVisibility</string>
           <string name="Source"><![CDATA[-- Studio-only Plots preview: hidden -> volumes -> volumes + numbers -> hidden.
@@ -9948,7 +10419,7 @@ return table.freeze(PlotsVisibility)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="50">
+      <Item class="ModuleScript" referent="52">
         <Properties>
           <string name="Name">StudioPublishedMeshHistory</string>
           <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
@@ -10061,6 +10532,63 @@ function Inventory.MatchesRetiredStaticInventory(placed: Model, version: any, en
     end
     for _ in pairs(expected) do expectedCount+=1 end
     return actualCount>0 and actualCount==expectedCount
+end
+
+-- Older skinned publications can retain one authored COL MeshPart which has
+-- already been removed from the placed Model. The strict full-mesh check is
+-- still authoritative everywhere else. This exception requires a real owned
+-- instance, its exact published revision, a complete visual multiset, and the
+-- matching authored rig_carrier. Never accept an extra/foreign MeshPart.
+function Inventory.MatchesRetiredSkinnedPhysics(placed: Model, version: any, entry: any): boolean
+    if not placed:IsA("Model") or type(version) ~= "table"
+        or type(version.meshes) ~= "table" or type(entry) ~= "table" then return false end
+    local manifest = entry.rigManifest
+    if type(manifest) ~= "table" or manifest.rigKind ~= "skinned"
+        or manifest.carrierName ~= "rig_carrier" then return false end
+    local slug = tostring(entry.slug or "")
+    local instanceId = tostring(placed:GetAttribute("Game1DecoInstanceId") or "")
+    if slug == "" or #instanceId < 8
+        or placed:GetAttribute("Game1DecoAssetSlug") ~= slug
+        or placed.Name ~= slug .. "__" .. instanceId:sub(1, 8)
+        or tostring(placed:GetAttribute("Game1DecoPublishedModelAssetId") or "")
+            ~= tostring(version.modelAssetId or "")
+        or Ownership.HasNestedPlacements(placed) then return false end
+    local expected = {}
+    local hasVisual = false
+    for _, record in ipairs(version.meshes) do
+        if type(record.meshId) ~= "string" or type(record.count) ~= "number"
+            or record.count < 1 or type(record.visualNames) ~= "table"
+            or expected[record.meshId] then return false end
+        expected[record.meshId] = record
+        if #record.visualNames > 0 then hasVisual = true end
+    end
+    if not hasVisual then return false end
+    local actual = {}
+    local carriers = 0
+    for _, part in ipairs(Inventory.Parts(placed)) do
+        local mid = Inventory.Id(part.MeshId)
+        local record = expected[mid]
+        if not record then return false end
+        actual[mid] = (actual[mid] or 0) + 1
+        if actual[mid] > record.count then return false end
+        if Carrier.IsCarrier(part) then
+            if #record.visualNames > 0 then return false end
+            carriers += 1
+        elseif not MeshPhysics.IsCollider(part.Name)
+            and part:GetAttribute("Game1DecoPhysicsOnly") ~= true
+            and #record.visualNames == 0 then return false end
+    end
+    if carriers ~= 1 then return false end
+    local missingNonvisual = 0
+    for mid, record in pairs(expected) do
+        local count = actual[mid] or 0
+        if #record.visualNames > 0 then
+            if count ~= record.count then return false end
+        else
+            missingNonvisual += record.count - count
+        end
+    end
+    return missingNonvisual == 1
 end
 
 function Inventory.Ids(model: Model): {[string]: boolean}
@@ -10412,7 +10940,7 @@ return table.freeze(Inventory)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="51">
+      <Item class="ModuleScript" referent="53">
         <Properties>
           <string name="Name">StudioRealEstateCollisionPolicy</string>
           <string name="Source"><![CDATA[-- M342: Real Estate visual-mesh authoring. Collision Blueprint Parts are separate.
@@ -10444,7 +10972,7 @@ return table.freeze(Policy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="52">
+      <Item class="ModuleScript" referent="54">
         <Properties>
           <string name="Name">StudioRealEstateHouseFrame</string>
           <string name="Source"><![CDATA[-- Author-space transform for all Real Estate Studio sync paths.
@@ -10471,7 +10999,7 @@ return table.freeze(HouseFrame)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="53">
+      <Item class="ModuleScript" referent="55">
         <Properties>
           <string name="Name">StudioRealEstateModel</string>
           <string name="Source"><![CDATA[-- Studio assembly for any number of independent Real Estate MeshPart rigs.
@@ -10747,7 +11275,7 @@ return table.freeze(StudioRealEstateModel)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="54">
+      <Item class="ModuleScript" referent="56">
         <Properties>
           <string name="Name">StudioRealEstatePartPlacement</string>
           <string name="Source"><![CDATA[-- Restore source-FBX mesh centres after independent Model Asset import.
@@ -10871,7 +11399,7 @@ return table.freeze(Placement)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="55">
+      <Item class="ModuleScript" referent="57">
         <Properties>
           <string name="Name">StudioRealEstatePartSync</string>
           <string name="Source"><![CDATA[-- Atomic, single-rig refresh of a managed Real Estate template.
@@ -11106,7 +11634,7 @@ return table.freeze(PartSync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="56">
+      <Item class="ModuleScript" referent="58">
         <Properties>
           <string name="Name">StudioRealEstatePlacedPhysicsGuard</string>
           <string name="Source"><![CDATA[-- M342: remove retired COL geometry from pasted/placed managed Real Estates.
@@ -11168,7 +11696,7 @@ return table.freeze(Guard)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="57">
+      <Item class="ModuleScript" referent="59">
         <Properties>
           <string name="Name">StudioRealEstatePlacedTargets</string>
           <string name="Source"><![CDATA[-- One authoritative definition of a placed Real Estate instance.
@@ -11213,7 +11741,7 @@ return table.freeze(Targets)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="58">
+      <Item class="ModuleScript" referent="60">
         <Properties>
           <string name="Name">StudioRealEstatePlacedVisualSync</string>
           <string name="Source"><![CDATA[-- Full Real Estate sync: refresh visual rigs on *all managed placed* houses.
@@ -11332,7 +11860,7 @@ return table.freeze(VisualSync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="59">
+      <Item class="ModuleScript" referent="61">
         <Properties>
           <string name="Name">StudioRealEstateRigValidation</string>
           <string name="Source"><![CDATA[-- Validate an already-published Real Estate Model Asset as actually loaded by Roblox.
@@ -11461,7 +11989,7 @@ return table.freeze(Validation)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="60">
+      <Item class="ModuleScript" referent="62">
         <Properties>
           <string name="Name">StudioRetiredColMeshCleanup</string>
           <string name="Source"><![CDATA[-- M342: remove retired dedicated COL meshes from managed templates and placements.
@@ -11598,7 +12126,7 @@ return table.freeze(Cleanup)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="61">
+      <Item class="ModuleScript" referent="63">
         <Properties>
           <string name="Name">StudioSkinnedMeshConnection</string>
           <string name="Source"><![CDATA[--!strict
@@ -11668,7 +12196,7 @@ return table.freeze(Connection)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="62">
+      <Item class="ModuleScript" referent="64">
         <Properties>
           <string name="Name">StudioTextureAppearance</string>
           <string name="Source"><![CDATA[-- Shared Studio-side material binding for all authored MeshParts.
@@ -11825,7 +12353,7 @@ return table.freeze(StudioTextureAppearance)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="63">
+      <Item class="ModuleScript" referent="65">
         <Properties>
           <string name="Name">StudioTimelineEditorCommands</string>
           <string name="Source"><![CDATA[-- Timeline authoring session: validates requests, binds UI events and reports results.
@@ -12138,7 +12666,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="64">
+      <Item class="ModuleScript" referent="66">
         <Properties>
           <string name="Name">StudioTimelinePoseSampler</string>
           <string name="Source"><![CDATA[-- Offline pose extraction and interpolation for a preview rig. No UI or HTTP dependencies.
@@ -12317,7 +12845,7 @@ return table.freeze(StudioTimelinePoseSampler)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="65">
+      <Item class="ModuleScript" referent="67">
         <Properties>
           <string name="Name">StudioTimelinePreview</string>
           <string name="Source"><![CDATA[-- Owns the isolated ViewportFrame rig, camera interaction and animation-asset retrieval.
@@ -12614,7 +13142,7 @@ return table.freeze(StudioTimelinePreview)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="66">
+      <Item class="ModuleScript" referent="68">
         <Properties>
           <string name="Name">StudioTimelineTransport</string>
           <string name="Source"><![CDATA[-- HTTP boundary for the Timeline editor. No UI, animation or Studio model access.
@@ -12672,7 +13200,7 @@ return table.freeze(StudioTimelineTransport)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="67">
+      <Item class="ModuleScript" referent="69">
         <Properties>
           <string name="Name">StudioTimelineWidget</string>
           <string name="Source"><![CDATA[-- Timeline editor view. Builds the dock widget and exposes only its controls.

@@ -47,13 +47,22 @@ function Transform.Resolve(root: Model, blueprint: any): any
         ratios = ratios, uniform = uniform, uniformScale = average}
 end
 
--- The visual MeshPart is an affine X/Y/Z-scaled reference. A rigid Roblox Part
--- cannot express shear. For Blocks we use the exact transformed centre and a
--- tight enclosing oriented box (the captured local axes), measuring any added
--- thickness. Reject geometries that need an excessively inflated enclosure.
--- This prevents a plausible-looking but badly oversized collision on meshes
--- whose colliders were not authored approximately aligned to their Mesh axes.
-function Transform.Part(anchor: any, recipe: any): (CFrame, Vector3)
+-- A captured primitive is transformed by the visual MeshPart's *per-axis*
+-- Size changes, independently of the Model's uniform ScaleTo. This affine
+-- transform may shear a primitive whose local axes do not align with the mesh.
+-- In Instance Manager, an explicit 3-D inspection may approve a visibly
+-- approximate collision. Ordinary Place/Sync remain strict and never silently
+-- replace wedges with Blocks or accept approximate primitive geometry.
+local function inBounds(size: Vector3): boolean
+    return size.X > 0.001 and size.Y > 0.001 and size.Z > 0.001
+        and size.X <= 4096 and size.Y <= 4096 and size.Z <= 4096
+end
+
+local function perpendicular(a: Vector3, b: Vector3): boolean
+    return math.abs(a:Dot(b)) <= a.Magnitude * b.Magnitude * 0.0001
+end
+
+function Transform.Part(anchor: any, recipe: any, allowExcessive: boolean?): (CFrame, Vector3, any?)
     local source = CFrame.new(table.unpack(recipe.localCFrame))
     local relative = anchor.anchorFrame:ToObjectSpace(source)
     local baseSize = Vector3.new(table.unpack(recipe.size))
@@ -62,9 +71,6 @@ function Transform.Part(anchor: any, recipe: any): (CFrame, Vector3)
         return anchor.mesh.CFrame * CFrame.new(relative.Position * scale) * relative.Rotation,
             baseSize * scale
     end
-    if recipe.shape ~= "Block" then
-        error("Non-uniform visual MeshPart Size requires Block collision Parts; Place unchanged")
-    end
 
     local ratios = anchor.ratios
     local offset = scaleVector(relative.Position, ratios)
@@ -72,9 +78,35 @@ function Transform.Part(anchor: any, recipe: any): (CFrame, Vector3)
     local scaledRight = scaleVector(right, ratios)
     local scaledUp = scaleVector(up, ratios)
     local scaledBack = scaleVector(back, ratios)
+    local axisLengths = Vector3.new(scaledRight.Magnitude * baseSize.X,
+        scaledUp.Magnitude * baseSize.Y, scaledBack.Magnitude * baseSize.Z)
 
-    -- Project the affine-transformed box onto its ORIGINAL orthonormal axes.
-    -- The resulting rigid Part completely contains the source volume.
+    -- A non-uniform scale is EXACT for a Wedge/CornerWedge if its three
+    -- transformed basis vectors remain orthogonal (including 90-degree
+    -- rotations). A Cylinder is also exact if its Y/Z radial scales match.
+    local orthogonal = perpendicular(scaledRight, scaledUp)
+        and perpendicular(scaledRight, scaledBack)
+        and perpendicular(scaledUp, scaledBack)
+    local wedge = recipe.shape == "Wedge" or recipe.shape == "CornerWedge"
+    local cylinder = recipe.shape == "Cylinder"
+    local matchingRadii = math.abs(scaledUp.Magnitude - scaledBack.Magnitude)
+        <= math.max(0.0001, scaledUp.Magnitude * 0.0001)
+    if orthogonal and (wedge or (cylinder and matchingRadii)) then
+        if not inBounds(axisLengths) then
+            error("Non-uniform collision Part Size outside Roblox authoring bounds")
+        end
+        local centre = anchor.mesh.CFrame:PointToWorldSpace(offset)
+        local frame = CFrame.fromMatrix(centre, scaledRight.Unit, scaledUp.Unit, scaledBack.Unit)
+        return frame, axisLengths
+    end
+
+    -- The transformed primitive may be sheared. Project its full bounding
+    -- box onto the original orthonormal axes to produce a deterministic
+    -- candidate. For Blocks this is a conservative enclosing OBB. For Wedge,
+    -- CornerWedge, Ball and Cylinder, keeping the SAME primitive type with
+    -- these dimensions is an APPROXIMATION, not an assured enclosure: the
+    -- sloped/curved surface can differ. Never allow it without an explicit
+    -- Instance Manager visual inspection and approval.
     local size = Vector3.new(
         math.abs(right:Dot(scaledRight)) * baseSize.X
             + math.abs(right:Dot(scaledUp)) * baseSize.Y
@@ -86,22 +118,39 @@ function Transform.Part(anchor: any, recipe: any): (CFrame, Vector3)
             + math.abs(back:Dot(scaledUp)) * baseSize.Y
             + math.abs(back:Dot(scaledBack)) * baseSize.Z
     )
-    local axisLengths = Vector3.new(scaledRight.Magnitude * baseSize.X,
-        scaledUp.Magnitude * baseSize.Y, scaledBack.Magnitude * baseSize.Z)
-    local excess = size - axisLengths
-    -- At most 0.20 studs added to any full dimension, or at most 10% of that
-    -- dimension. Reject only when BOTH limits are exceeded. Any larger shear
-    -- needs a more suitable authoring primitive, not an implicit approximation.
-    if (excess.X > 0.20 and excess.X > axisLengths.X * 0.10)
-        or (excess.Y > 0.20 and excess.Y > axisLengths.Y * 0.10)
-        or (excess.Z > 0.20 and excess.Z > axisLengths.Z * 0.10) then
-        error("Non-uniform collision shape needs excessive shear enclosure; author aligned Block Parts")
-    end
-    if size.X <= 0.001 or size.Y <= 0.001 or size.Z <= 0.001
-        or size.X > 4096 or size.Y > 4096 or size.Z > 4096 then
+    if not inBounds(size) then
         error("Non-uniform collision Part Size outside Roblox authoring bounds")
     end
-    return anchor.mesh.CFrame * CFrame.new(offset) * relative.Rotation, size
+    local excess = size - axisLengths
+    -- A Block enclosure exceeding BOTH .20 studs AND 10% on an axis is
+    -- not silently permitted. Other primitives always require approval if
+    -- their affine transform cannot be represented exactly.
+    local excessive = (excess.X > 0.20 and excess.X > axisLengths.X * 0.10)
+        or (excess.Y > 0.20 and excess.Y > axisLengths.Y * 0.10)
+        or (excess.Z > 0.20 and excess.Z > axisLengths.Z * 0.10)
+    local approximate = recipe.shape ~= "Block"
+    if approximate and allowExcessive ~= true then
+        error("Non-uniform " .. tostring(recipe.shape)
+            .. " collision requires visual approximation review in Instance Manager")
+    end
+    if excessive and allowExcessive ~= true then
+        error("Non-uniform collision shape needs excessive shear enclosure; preview and approve in Instance Manager")
+    end
+    local warning = if excessive or approximate then {
+        partId = recipe.id,
+        shape = recipe.shape,
+        approximate = approximate,
+        reason = if approximate then "Approximate " .. tostring(recipe.shape)
+            .. ": slope/curvature may differ from the affinely transformed original"
+            else "Block enclosure enlarged by non-uniform shear",
+        excessStuds = {math.max(0, excess.X), math.max(0, excess.Y), math.max(0, excess.Z)},
+        addedPercent = {
+            math.max(0, excess.X) / math.max(axisLengths.X, 0.001) * 100,
+            math.max(0, excess.Y) / math.max(axisLengths.Y, 0.001) * 100,
+            math.max(0, excess.Z) / math.max(axisLengths.Z, 0.001) * 100,
+        },
+    } else nil
+    return anchor.mesh.CFrame * CFrame.new(offset) * relative.Rotation, size, warning
 end
 
 return table.freeze(Transform)

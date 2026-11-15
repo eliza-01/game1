@@ -33,7 +33,20 @@
 #lod-manager-view .lm-revisions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
 #lod-manager-view .lm-revision{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:9px;font-size:11px;color:var(--muted)}
 #lod-manager-view .lm-revision a{color:var(--mint);margin-left:7px}
-#lod-manager-view .lm-build{opacity:.8}
-#lod-manager-view .lm-build button{opacity:.6}
+#lod-manager-view .lm-build{opacity:1}
+#lod-manager-view .lm-source-path{display:block;margin-top:9px;padding:10px;border:1px solid var(--line);border-radius:8px;overflow-wrap:anywhere;font-size:11px;user-select:text}
+#lod-manager-view .lm-build-preview{margin-top:12px;padding:12px;background:var(--panel2);border-radius:8px;white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.5 monospace}
+#lod-manager-view .lm-confirm{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px}
+#lod-manager-view .lm-confirm input{max-width:260px}
 @media(max-width:940px){#lod-manager-view .lm-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:550px){#lod-manager-view .lm-metrics{grid-template-columns:1fr 1fr}#lod-manager-view .lm-filters input{min-width:0;width:100%}}
+
+#lod-manager-view .lm-problems{margin-top:6px;max-width:480px;font-size:11px}
+#lod-manager-view .lm-problems summary{cursor:pointer;color:var(--mint)}
+#lod-manager-view .lm-problem{padding:6px 0;border-top:1px solid var(--line);overflow-wrap:anywhere}
+#lod-manager-view .lm-problem code{font-size:11px;user-select:text;white-space:normal}
+#lod-manager-view .lm-problem small{color:var(--orange)}
+
+#lod-manager-view .lm-protected-count{color:var(--mint)!important;white-space:nowrap}
+#lod-manager-view .lm-external summary{color:var(--mint)}
+#lod-manager-view .lm-external .lm-problem small{color:var(--muted)}

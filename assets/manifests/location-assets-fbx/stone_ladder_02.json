@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "slug": "stone_ladder_02",
+  "sourceSha256": "78fbab3c2e5b332ff7e991193f6781f7042ddcbf4567ededc36489e5d23ee2e9",
+  "analysis": {
+    "schemaVersion": 1,
+    "meshes": [
+      {
+        "name": "stone_ladder_02",
+        "armature": "",
+        "vertices": 195,
+        "bones": [],
+        "influencedBones": [],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": null,
+          "canQuery": null,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": null,
+          "physicsOnly": false
+        }
+      }
+    ],
+    "hasCollider": false,
+    "armatures": [],
+    "unassignedArmatures": []
+  }
+}

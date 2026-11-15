@@ -24,7 +24,7 @@
     {
       "id": "KBN-0007-T03",
       "title": "Ограничить создание/удаление экземпляров бюджетом кадра",
-      "done": false
+      "done": true
     },
     {
       "id": "KBN-0007-T04",
@@ -51,7 +51,7 @@
       "evidence": ""
     }
   ],
-  "revision": 3,
-  "updatedAt": "2026-11-15T01:01:43+00:00",
-  "specSha256": "ac6a972ac802c7547a9a11335293d876e4ddcc9b8e3e549d8fb5f375620a015c"
+  "revision": 4,
+  "updatedAt": "2026-11-15T03:40:00+00:00",
+  "specSha256": "43700ebe185acab7b862333587df14146c0ba18f8cc6bcd21a594ce102066a95"
 }

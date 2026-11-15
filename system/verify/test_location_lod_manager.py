@@ -123,6 +123,51 @@ class TestLocationLodManager(unittest.TestCase):
         self.assertEqual(status,400)
         self.assertIn('empty',detail['error'])
 
+    def test_problem_paths_are_available_to_find_errors_in_studio(self):
+        self.manager.scan({})
+        rows = {item['slug']:item for item in self.manager.overview()['items']}
+        problems = rows['stone_fence_02']['problemPlacements']
+        self.assertEqual(len(problems), 1)
+        self.assertEqual(problems[0]['path'], 'Workspace/second')
+        self.assertEqual(problems[0]['placementId'], '')
+        self.assertEqual(rows['no_placement']['problemPlacements'], [])
+
+    def test_managed_landscape_and_unmanaged_package_are_protected_not_placements(self):
+        source = report()
+        source['protected'] = [
+            {'kind':'landscape_attachment','slug':'stone_fence_02',
+             'path':'Workspace.Game1LandscapeDecor.Branches.Branch_a.Attachments.lantern_a',
+             'ownerPath':'Workspace.Game1LandscapeDecor.Branches.Branch_a.Attachments.lantern_a',
+             'name':'lantern_a','authorSlug':'stone_fence_02','branchStrokeId':'stroke-123',
+             'anchorKind':'stem','reason':'LandscapePainter authored attachment',
+             'review':False,'protectedFromRuntime':True},
+            {'kind':'unmanaged_package','slug':'wooden_fence_01',
+             'path':'Workspace.Lantern 03','ownerPath':'Workspace.Lantern 03',
+             'name':'Lantern 03','authorSlug':'','branchStrokeId':'','anchorKind':'',
+             'reason':'PackageLink · not a DecoManager placement',
+             'review':True,'protectedFromRuntime':True},
+        ]
+        self.revisions.add(source, 'digest-v1')
+        view = self.manager.overview()
+        self.assertEqual(view['summary']['placements'], 3)
+        self.assertEqual(view['summary']['protectedExternal'], 2)
+        self.assertEqual(view['summary']['protectedLandscape'], 1)
+        self.assertEqual(view['summary']['protectedPackages'], 1)
+        self.assertEqual(view['summary']['missingId'], 1)
+        a = next(i for i in view['items'] if i['slug']=='stone_fence_02')
+        self.assertEqual(a['count'], 2)
+        self.assertEqual(a['protectedCount'], 1)
+        self.assertEqual(a['protectedOwners'][0]['kind'], 'landscape_attachment')
+        b = next(i for i in view['items'] if i['slug']=='wooden_fence_01')
+        self.assertEqual(b['protectedOwners'][0]['review'], True)
+        self.assertEqual(self.revisions.get(1)['protected'], source['protected'])
+        revised = report()
+        revised['protected'] = source['protected'][:1]
+        self.revisions.add(revised, 'digest-v1')
+        diff = self.revisions.diff(1, 2)
+        self.assertEqual((diff['added'],diff['removed']), (0,0))
+        self.assertEqual((diff['protectedAdded'],diff['protectedRemoved']), (0,1))
+
     def test_catalog_digest_change_creates_revision_even_if_placement_rows_are_identical(self):
         first = self.revisions.add(report(), 'digest-v1')
         second = self.revisions.add(report(), 'digest-v2')

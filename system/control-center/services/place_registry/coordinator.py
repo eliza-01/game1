@@ -77,7 +77,8 @@ class LocationPlaceRegistry:
                     self.assets.record_mesh_id_inventory(slug, completed)
             revision = self.revisions.add(report, catalog['digest'])
             result = {'scanToken': bridge.get('scanToken'), 'revision': revision,
-                      'summary': self._summary(records), 'placements': records,
+                      'summary': {**self._summary(records), 'protectedExternal': len(report.get('protected', []))},
+                      'placements': records,
                       'warnings': report.get('warnings', []), 'incomplete': incomplete,
                       'placeId': report.get('placeId', 0)}
             self._last_scan = (result['scanToken'], catalog['digest'], revision['revisionId'], incomplete, result['placeId'], records)

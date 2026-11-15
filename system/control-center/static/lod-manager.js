@@ -1,9 +1,65 @@
-/* Location Assets LOD Manager: read-only inventory over Place Registry snapshots. */
+/* LOD Manager: authoritative Place Registry inventory + project-owned streaming policy. */
 (() => {
   const $ = id => document.getElementById(id);
   const escape = value => String(value ?? '').replace(/[&<>"']/g,
     c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const state = {overview:null, busy:false, filter:'all', term:'', preflight:null};
+  const defaultSettings = {
+    distances:{lod1:120,lod2:260,hide:400,hysteresis:12},
+    workspace:{streamingEnabled:true,minRadius:64,targetRadius:1024,
+      modelStreamingBehavior:'Improved',streamingIntegrityMode:'PauseOutsideLoadedArea',streamOutBehavior:'Opportunistic'}
+  };
+  const helpIds = ['lod-distance-1','lod-distance-2','lod-distance-hide','lod-distance-hysteresis',
+    'lod-workspace-enabled','lod-workspace-min-radius','lod-workspace-target-radius',
+    'lod-workspace-model','lod-workspace-integrity','lod-workspace-streamout'];
+  function fillSettings(settings) {
+    const d=settings.distances,w=settings.workspace;
+    $('lod-distance-1').value=String(d.lod1); $('lod-distance-2').value=String(d.lod2);
+    $('lod-distance-hide').value=String(d.hide); $('lod-distance-hysteresis').value=String(d.hysteresis);
+    $('lod-workspace-enabled').checked=w.streamingEnabled;
+    $('lod-workspace-min-radius').value=String(w.minRadius); $('lod-workspace-target-radius').value=String(w.targetRadius);
+    $('lod-workspace-model').value=w.modelStreamingBehavior;
+    $('lod-workspace-integrity').value=w.streamingIntegrityMode;
+    $('lod-workspace-streamout').value=w.streamOutBehavior;
+  }
+  function readSettings() {
+    const integer = id => {
+      const el=$(id), n=Number(el.value);
+      if (!el.value.trim() || !Number.isSafeInteger(n)) throw Error(`${id}: введите целое число studs`);
+      return n;
+    };
+    const d={lod1:integer('lod-distance-1'),lod2:integer('lod-distance-2'),
+      hide:integer('lod-distance-hide'),hysteresis:integer('lod-distance-hysteresis')};
+    if(!(d.lod1>=16 && d.lod1<d.lod2 && d.lod2<d.hide && d.hide<=10000 &&
+         d.hysteresis>=0 && d.hysteresis<=100 && d.lod1>d.hysteresis &&
+         d.lod2-d.lod1>2*d.hysteresis && d.hide-d.lod2>2*d.hysteresis))
+      throw Error('LOD1 < LOD2 < Hide и между порогами нужен запас для гистерезиса');
+    const w={streamingEnabled:$('lod-workspace-enabled').checked,
+      minRadius:integer('lod-workspace-min-radius'),targetRadius:integer('lod-workspace-target-radius'),
+      modelStreamingBehavior:$('lod-workspace-model').value,
+      streamingIntegrityMode:$('lod-workspace-integrity').value,streamOutBehavior:$('lod-workspace-streamout').value};
+    if(w.minRadius<32 || w.minRadius>512 || w.targetRadius<96 || w.targetRadius>4096 || w.targetRadius<=w.minRadius)
+      throw Error('Workspace: Min 32–512, Target 96–4096 и Target > Min');
+    return {distances:d,workspace:w};
+  }
+  async function saveSettings(payload) {
+    if (state.busy) return;
+    state.busy=true;
+    $('lod-settings-status').textContent='Сохраняем настройки проекта…';
+    try {
+      const view=await request('/api/lod-manager/settings', {method:'POST',
+        headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      state.overview=view; state.preflight=null;
+      $('lod-build-confirm-label').hidden=true; $('lod-build-execute').hidden=true;
+      $('lod-build-preview').hidden=true;
+      $('lod-build-status').textContent='Настройки изменены. Запусти Preflight по новому профилю.';
+      $('lod-settings-status').textContent='Сохранено. Preflight нужно выполнить заново; Studio не изменена.';
+      fillSettings(view.settings);
+    } catch(error) {
+      $('lod-settings-status').textContent=`Не сохранено: ${error.message}`;
+    } finally {state.busy=false;render();}
+  }
+
   const compact = value => Number(value || 0).toLocaleString('ru-RU');
   const date = value => value ? new Date(value*1000).toLocaleString('ru-RU') : '—';
   const indicators = {red:'Нет опубликованного LOD1',yellow:'LOD1 ✓ · LOD2 —',green:'LOD1 ✓ · LOD2 ✓'};
@@ -13,6 +69,9 @@
   function render() {
     const data = state.overview;
     $('lod-scan').disabled = state.busy;
+    $('lod-save-settings').disabled = state.busy;
+    $('lod-enable-ready').disabled = state.busy;
+    $('lod-disable-all').disabled = state.busy;
     if (!data) return;
     const snap = data.snapshot;
     const [style,label] = statuses[snap?.freshness || 'NO_SNAPSHOT'];
@@ -50,8 +109,14 @@
           ${item.problemPlacements?.length ? `<details class="lm-problems"><summary>Показать объекты (${item.problemPlacements.length})</summary>
             ${item.problemPlacements.map(p => `<div class="lm-problem"><code>${escape(p.path)}</code>
               <small>${escape(p.issues?.join(' · ') || (p.placementId ? 'Placement ID: ' + p.placementId : 'Нет Placement ID'))}</small></div>`).join('')}
-            </details>` : ''}</td></tr>`;
-    }).join('') : '<tr><td colspan="4" class="lm-empty">Нет записей с такими условиями.</td></tr>';
+            </details>` : ''}</td>
+        <td><select class="lm-stream-mode" data-stream-slug="${escape(item.slug)}"
+          aria-label="Streaming mode ${escape(item.slug)}" ${state.busy || !item.streamingEligible && item.streamingMode==='off' ? 'disabled' : ''}>
+          ${[['off','Off · Workspace'],['full','FULL → Hide'],['lod1','FULL / LOD1'],['lod2','FULL / LOD1 / LOD2']]
+            .map(([mode,label])=>`<option value="${mode}" ${item.streamingMode===mode?'selected':''}
+              ${(mode!=='off' && !item.streamingEligible) || (mode==='lod1' && item.lod1Status!=='PUBLISHED') || (mode==='lod2' && item.lod2Status!=='PUBLISHED')?'disabled':''}>${label}</option>`).join('')}
+          </select><div class="lm-stream-status">${escape(item.streamingReason || 'Выбор сохранён')}</div></td></tr>`;
+    }).join('') : '<tr><td colspan="5" class="lm-empty">Нет записей с такими условиями.</td></tr>';
     $('lod-count').textContent = `${rows.length} / ${data.items.length} видов`;
     $('lod-revisions').innerHTML = data.revisions.length ? data.revisions.map(r =>
       `<span class="lm-revision">#${r.id} · ${date(r.recordedUtc)} · ${compact(r.total)} pcs
@@ -73,6 +138,7 @@
   async function load() {
     try {
       state.overview = await request('/api/lod-manager');
+      fillSettings(state.overview.settings);
       render();
       $('lod-status').textContent = 'Показан последний сохранённый снимок. Для проверки изменений в Studio нажми Scan.';
     } catch(error) { $('lod-status').textContent = `LOD Manager: ${error.message}`; }
@@ -108,7 +174,9 @@
       state.preflight = plan;
       $('lod-build-preview').textContent = `Snapshot #${plan.snapshotRevision} · ${plan.eligible} визуальных MeshParts к удалению из копии · ` +
         Object.entries(plan.counts || {}).map(([slug,count])=>`${slug}: ${count}`).join(' · ') +
-        ` · защищённых объектов не трогаем: ${plan.protectedNotModified} · SHA256 исходника: ${plan.sourceSha256}`;
+        ` · защищённых объектов не трогаем: ${plan.protectedNotModified}` +
+        ` · LOD1 ${plan.distances.lod1} / LOD2 ${plan.distances.lod2} / Hide ${plan.distances.hide} studs` +
+        ` · Workspace Target ${plan.workspace.targetRadius} studs · SHA256 исходника: ${plan.sourceSha256}`;
       $('lod-build-preview').hidden = false;
       $('lod-build-confirm').value = '';
       $('lod-build-confirm-label').hidden = false;
@@ -130,7 +198,7 @@
     try {
       const result = await request('/api/lod-manager/prepare', {method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({token,confirmation:'PREPARE RUNTIME'})});
-      $('lod-build-status').textContent = `Runtime draft создан: ${result.removedVisualMeshParts} визуальных MeshParts. Встроен клиентский FULL/LOD1 пилот. Публикация ЗАБЛОКИРОВАНА до Studio / мобильной проверки.`;
+      $('lod-build-status').textContent = `Runtime draft создан: ${result.removedVisualMeshParts} визуальных MeshParts. Streaming-профиль встроен. Публикация ЗАБЛОКИРОВАНА до Studio / мобильной проверки.`;
       $('lod-build-preview').textContent = `Backup: ${result.backupPath}
 Runtime: ${result.runtimePath}
 Placement manifest: ${result.manifestPath}
@@ -144,6 +212,60 @@ Build report: ${result.reportPath}`;
       render();
     }
   }
+  $('lod-rows').addEventListener('change', event => {
+    const el=event.target, slug=el?.dataset?.streamSlug;
+    if(!slug || !state.overview)return;
+    saveSettings({modes:{[slug]:el.value}});
+  });
+  $('lod-enable-ready').addEventListener('click', () => {
+    if(!state.overview || state.busy)return;
+    const modes={};
+    for(const item of state.overview.items)if(item.streamingEligible)
+      modes[item.slug]=item.lod2Status==='PUBLISHED'?'lod2':item.lod1Status==='PUBLISHED'?'lod1':'full';
+    if(Object.keys(modes).length)saveSettings({modes});
+    else $('lod-settings-status').textContent='Нет готовых ассетов; сначала проверь Collision Blueprint и Scan.';
+  });
+  $('lod-disable-all').addEventListener('click', () => {
+    if(!state.overview || state.busy)return;
+    const modes={};
+    for(const item of state.overview.items)modes[item.slug]='off';
+    saveSettings({modes});
+  });
+  $('lod-preset-default').addEventListener('click', () => {
+    fillSettings(defaultSettings);
+    $('lod-settings-status').textContent='Пресет заполнен. Нажми Save settings для сохранения.';
+  });
+  $('lod-save-settings').addEventListener('click', () => {
+    try{saveSettings(readSettings())}catch(error){$('lod-settings-status').textContent=error.message}
+  });
+  $('lod-copy-workspace').addEventListener('click', async () => {
+    try {
+      const w=readSettings().workspace;
+      const command=`-- Eyesland LOD Manager · Roblox Studio Command Bar · EDIT mode.\n`+
+        `local ws = game:GetService("Workspace")\n`+
+        `local settings = {StreamingEnabled=${w.streamingEnabled}, StreamingMinRadius=${w.minRadius}, `+
+        `StreamingTargetRadius=${w.targetRadius}, `+
+        `ModelStreamingBehavior=Enum.ModelStreamingBehavior.${w.modelStreamingBehavior}, `+
+        `StreamingIntegrityMode=Enum.StreamingIntegrityMode.${w.streamingIntegrityMode}, `+
+        `StreamOutBehavior=Enum.StreamOutBehavior.${w.streamOutBehavior}}\n`+
+        `for key, value in pairs(settings) do\n`+
+        `  local ok, err = pcall(function() ws[key] = value end)\n`+
+        `  if not ok then warn(key .. ": " .. tostring(err) .. " · set manually in Workspace Properties") end\n`+
+        `end\nprint("Workspace streaming profile applied; save Place to persist")`;
+      await navigator.clipboard.writeText(command);
+      $('lod-settings-status').textContent='Команда скопирована. Запусти в Studio Edit Mode; если свойство защищено, установи его в Workspace Properties.';
+    }catch(error){$('lod-settings-status').textContent=`Copy failed: ${error.message}`}
+  });
+  $('lod-settings-section').addEventListener('click',event=>{
+    const target=event.target;
+    if(target?.classList?.contains('lm-help'))$('lod-settings-status').textContent=target.title;
+  });
+  $('lod-settings-section').addEventListener('keydown',event=>{
+    if((event.key==='Enter'||event.key===' ') && event.target?.classList?.contains('lm-help')){
+      $('lod-settings-status').textContent=event.target.title;
+    }
+  });
+  for(const id of helpIds){$(id).addEventListener('input',()=>{$('lod-settings-status').textContent='Настройки изменены. Нажми Save settings.';});}
   $('lod-prepare').addEventListener('click', preflight);
   $('lod-build-execute').addEventListener('click', prepare);
   $('lod-build-confirm').addEventListener('input', event => {

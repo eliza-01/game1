@@ -42,20 +42,27 @@ function Service.Impact(part: Instance?, contact: Vector3, direction: Vector3)
     end
 end
 
--- Bounded melee target query. Queryable proxy is authored exactly once per sway model.
-function Service.Melee(volume: any, attackerPosition: Vector3)
-    if not remote or typeof(attackerPosition) ~= "Vector3" then return end
+-- M358: server sector contact without weapon volume or client box transforms.
+-- Sway proxies are immutable authoring output and queried with a bounded radius.
+function Service.MeleeArc(root: BasePart, reach: number, arcAngle: number)
+    if not remote or not root or not root.Parent then return end
     local decor = Workspace:FindFirstChild(ROOT)
-    if not decor or typeof(volume) ~= "table" or typeof(volume.cframe) ~= "CFrame"
-        or typeof(volume.size) ~= "Vector3" then return end
+    if not decor then return end
     local params = OverlapParams.new()
     params.FilterType = Enum.RaycastFilterType.Include
     params.FilterDescendantsInstances = {decor}
     params.MaxParts = 24
-    for _, part in ipairs(Workspace:GetPartBoundsInBox(volume.cframe, volume.size, params)) do
+    local forward = Vector3.new(root.CFrame.LookVector.X, 0, root.CFrame.LookVector.Z)
+    if forward.Magnitude <= 1e-6 then return end
+    local threshold = math.cos(math.rad(math.clamp(arcAngle, 1, 360)) * 0.5)
+    for _, part in ipairs(Workspace:GetPartBoundsInRadius(root.Position, reach, params)) do
         if part.Name == "LandscapeSwayTarget" and part:GetAttribute("Game1LandscapeSwayTarget") == true then
-            local direction = part.Position - attackerPosition
-            Service.Impact(part, part.Position, if direction.Magnitude > 0.01 then direction else volume.cframe.LookVector)
+            local delta = part.Position - root.Position
+            local horizontal = Vector3.new(delta.X, 0, delta.Z)
+            if horizontal.Magnitude < 0.01 or arcAngle >= 360
+                or horizontal.Unit:Dot(forward.Unit) >= threshold then
+                Service.Impact(part, part.Position, if delta.Magnitude > 0.01 then delta else forward)
+            end
         end
     end
 end

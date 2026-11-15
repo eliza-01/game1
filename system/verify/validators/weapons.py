@@ -20,8 +20,8 @@ def check_weapon_registration(
         weapon_manifest = {}
     else:
         weapon_manifest = json.loads(weapon_manifest_path.read_text(encoding="utf-8"))
-    if weapon_manifest.get("schemaVersion") != 2 or weapon_manifest.get("project") != "game1":
-        err("weapon manifest must be game1 schema 2")
+    if weapon_manifest.get("schemaVersion") != 3 or weapon_manifest.get("project") != "game1":
+        err("weapon manifest must be game1 schema 3")
     weapon_options = weapon_manifest.get("options") or {}
     if weapon_options.get("weaponTypes") != ["dagger", "sword", "bigsword", "bow"]:
         err("weapon type pool must be dagger, sword, bigsword, bow")
@@ -152,10 +152,20 @@ def check_weapon_registration(
     for required in ['character:SetAttribute("AttackRadius"', "attackRadiusStuds", "AttackConfig.MaxAimDistance"]:
         if required not in weapon_equip_text:
             err(f"weapon equip attack-radius runtime missing {required}")
-    for required in ['character:GetAttribute("AttackRadius")', "attackRange", "WeaponAttackVolume.Build"]:
+    for required in ['character:GetAttribute("AttackRadius")', 'character:GetAttribute("MeleeArcAngle")', 'scheduleMeleeArc', 'MeleeEnvironmentContact.Query']:
         if required not in attack_text:
             err(f"server-authoritative weapon attack radius missing {required}")
 
+    arc = (weapon_options.get("meleeArcAngle") or {})
+    if arc.get("default") != 108 or arc.get("min") != 1 or arc.get("max") != 360:
+        err("M358 weapon arc angle options invalid")
+    for row in weapon_manifest.get("items") or []:
+        if row.get("weapon_type") != "bow" and not 1 <= float(row.get("melee_arc_angle_degrees") or 0) <= 360:
+            err(f"M358 weapon arc angle invalid: {row.get('slug')}")
+    if 'id="weapon-melee-arc-angle"' not in ui or 'data-ww-arc' not in (ROOT / "system/control-center/static/weapon-workflow.js").read_text(encoding="utf-8"):
+        err("M358 per-weapon arc editor missing")
+    if "MELEE_ARC_DEFAULT = 108.0" not in weapon_store_text or "melee_arc_angle_degrees" not in weapon_store_text:
+        err("M358 per-weapon arc migration missing")
     return stats_config_text, stats_service_text, movement_config_text
 
 

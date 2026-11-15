@@ -8,14 +8,18 @@ local CombatShared = Shared:WaitForChild("combat")
 local Config = require(CombatShared:WaitForChild("AttackConfig"))
 local AttackTimelineConfig = require(CombatShared:WaitForChild("AttackTimelineConfig"))
 local CharacterAttackWindow = require(CombatShared:WaitForChild("CharacterAttackWindow"))
-local WeaponAttackVolume = require(CombatShared:WaitForChild("WeaponAttackVolume"))
 local WeaponBounceConfig = require(CombatShared:WaitForChild("WeaponBounceConfig"))
 local CharacterAnimationRegistry = require(CharacterShared:WaitForChild("CharacterAnimationRegistry"))
 local AttackAimGeometry = require(CombatShared:WaitForChild("AttackAimGeometry"))
 local BowAimGeometry = require(CombatShared:WaitForChild("BowAimGeometry"))
 local BowProjectileConfig = require(CombatShared:WaitForChild("BowProjectileConfig"))
 local BowHitscanService = require(script.Parent:WaitForChild("BowHitscanService"))
-local WeaponEnvironmentCollision = require(script.Parent:WaitForChild("WeaponEnvironmentCollision"))
+local MeleeEnvironmentContact = require(script.Parent:WaitForChild("MeleeEnvironmentContact"))
+-- Sway is an optional presentation reaction; it cannot block authoritative hits.
+local swayOk, swayModule = pcall(function()
+    return require(script.Parent.Parent:WaitForChild("world"):WaitForChild("LandscapeSwayService"))
+end)
+local LandscapeSwayService = if swayOk then swayModule else nil
 local AttackDamageResolver = require(script.Parent:WaitForChild("AttackDamageResolver"))
 local CombatFeedbackService = require(script.Parent:WaitForChild("CombatFeedbackService"))
 local AttackFeedbackTargeting = require(script.Parent:WaitForChild("AttackFeedbackTargeting"))
@@ -23,11 +27,6 @@ local AttackSessionStore = require(script.Parent:WaitForChild("AttackSessionStor
 local HostilePursuitRegistry = require(script.Parent:WaitForChild("HostilePursuitRegistry"))
 local WeaponBounceService = require(script.Parent:WaitForChild("WeaponBounceService"))
 
--- A decorative reaction must not prevent the authoritative combat module from starting.
-local swayOk, swayModule = pcall(function()
-    return require(script.Parent.Parent:WaitForChild("world"):WaitForChild("LandscapeSwayService"))
-end)
-local LandscapeSwayService = if swayOk then swayModule else nil
 
 local AttackService = {}
 local pendingBowReleases: { [Player]: any } = {}
@@ -61,147 +60,68 @@ local function allowedAttackDescriptor(character: Model, clipId: string): any?
     return nil
 end
 
-local function applyDamageInVolume(
-    player: Player,
-    character: Model,
-    root: BasePart,
-    serial: number,
-    boxCFrame: CFrame,
-    boxSize: Vector3,
-    sourceLabel: string,
-    hitTargets: { [Model]: boolean }?,
-    aimOrigin: Vector3?,
-    aimDirection: Vector3?,
-    attackRange: number
-): number
-    local hitCount, headshotTarget, damagedTargets = AttackDamageResolver.Apply({
-        player = player,
-        character = character,
-        root = root,
-        serial = serial,
-        boxCFrame = boxCFrame,
-        boxSize = boxSize,
-        sourceLabel = sourceLabel,
-        hitTargets = hitTargets,
-        aimOrigin = aimOrigin,
-        aimDirection = aimDirection,
-        attackRange = attackRange,
-        headshotTarget = AttackSessionStore.HeadshotTarget(player),
-    })
-    AttackSessionStore.SetHeadshotTarget(player, headshotTarget)
-    if damagedTargets > 0 then
-        AttackSessionStore.MarkDamage(player, character, serial)
-    end
-    return hitCount
-end
-
+-- Server clock drives the complete HitStart -> HitEnd sampling window.
+-- Client-authored CFrame/Size of a weapon is never accepted or consulted.
 local triggerWeaponBounce
 
-local function applyAnimatedWeaponSweep(
-    player: Player,
-    character: Model,
-    root: BasePart,
-    serial: number,
-    clientAttackId: number,
-    clipId: string,
-    weapon: Model,
-    boxSize: Vector3,
-    previousBoxCFrame: CFrame?,
-    currentBoxCFrame: CFrame,
-    previousElapsed: number?,
-    currentElapsed: number,
-    previousAimOrigin: Vector3?,
-    previousAimDirection: Vector3?,
-    currentAimOrigin: Vector3?,
-    currentAimDirection: Vector3?
-): (number, boolean)
-    local attackRange = math.clamp(tonumber(character:GetAttribute("AttackRadius")) or Config.Range, 1, Config.MaxAimDistance)
-    local weaponBoneBoxLocalPosition = WeaponAttackVolume.ReadWeaponBoneBoxLocalPosition(weapon)
-    local hitTargets = AttackSessionStore.HitTargets(player, character, serial, clientAttackId)
-    if not hitTargets then
-        return 0, false
-    end
+local function applyMeleeArc(player: Player, character: Model, root: BasePart,
+    serial: number, clientAttackId: number, clipId: string, elapsed: number): boolean
+    local session = AttackSessionStore.Get(player)
+    if not session or session.serial ~= serial or session.character ~= character
+        or session.clientAttackId ~= clientAttackId or session.environmentBlocked
+        or player.Character ~= character or character:GetAttribute("LifeState") ~= "Alive" then return false end
+    if string.lower(tostring(character:GetAttribute("EquippedWeaponType") or "")) == "bow" then return false end
+    local reach = math.clamp(tonumber(character:GetAttribute("AttackRadius")) or Config.Range, 1, Config.MaxAimDistance)
+    local arcAngle = math.clamp(tonumber(character:GetAttribute("MeleeArcAngle")) or Config.MeleeDefaultArcAngle, 1, 360)
+    local padding = Config.MeleeVerticalPadding
 
-    local steps = 1
-    if typeof(previousBoxCFrame) == "CFrame" then
-        local linearDelta = (currentBoxCFrame.Position - previousBoxCFrame.Position).Magnitude
-        local _, angularDelta = previousBoxCFrame:ToObjectSpace(currentBoxCFrame):ToAxisAngle()
-        local linearSteps = math.ceil(linearDelta / math.max(0.05, Config.WeaponPoseSweepLinearStep))
-        local angularSteps = math.ceil(math.abs(angularDelta) / math.max(math.rad(1), Config.WeaponPoseSweepAngularStep))
-        steps = math.clamp(math.max(1, linearSteps, angularSteps), 1, Config.WeaponPoseSweepMaxSubsteps)
-    end
-
-    local previousVolume = nil
-    if typeof(previousBoxCFrame) == "CFrame" then
-        previousVolume = WeaponAttackVolume.Build(
-            root.Position,
-            previousBoxCFrame,
-            boxSize,
-            attackRange,
-            weaponBoneBoxLocalPosition
-        )
-    end
-
-    local hitCount = 0
-    for step = 1, steps do
-        local alpha = step / steps
-        local sampledBoxCFrame = if typeof(previousBoxCFrame) == "CFrame"
-            then previousBoxCFrame:Lerp(currentBoxCFrame, alpha)
-            else currentBoxCFrame
-        local sampledAimOrigin = if typeof(previousAimOrigin) == "Vector3" and typeof(currentAimOrigin) == "Vector3"
-            then previousAimOrigin:Lerp(currentAimOrigin, alpha)
-            else currentAimOrigin
-        local sampledAimDirection = AttackAimGeometry.InterpolateDirection(previousAimDirection, currentAimDirection, alpha)
-        local sampledElapsed = if previousElapsed ~= nil
-            then previousElapsed + (currentElapsed - previousElapsed) * alpha
-            else currentElapsed
-        local volume = WeaponAttackVolume.Build(root.Position, sampledBoxCFrame, boxSize, attackRange, weaponBoneBoxLocalPosition)
-        if volume then
-            -- Keep the authored HitStart -> HitEnd environment query unchanged.
-            -- Combat/pursuit suppresses only the bounce RESPONSE to a real contact.
-            local environmentContact = WeaponEnvironmentCollision.Query(previousVolume, volume)
-            if LandscapeSwayService then LandscapeSwayService.Melee(volume, root.Position) end
-            if environmentContact then
-                local pursuerCount = HostilePursuitRegistry.Count(character)
-                if character:GetAttribute("InCombat") == true or pursuerCount > 0 then
-                    -- One informative line per affected attack, no Command Bar script.
-                    if Config.DebugLogs and AttackSessionStore.FirstBounceSuppression(player) then
-                        print(("[game1][weapon-bounce] suppressed player=%s combat=%s pursuers=%d")
-                            :format(player.Name, tostring(character:GetAttribute("InCombat")), pursuerCount))
-                    end
-                else
-                    local bounced = triggerWeaponBounce(
-                        player,
-                        character,
-                        serial,
-                        clientAttackId,
-                        clipId,
-                        sampledElapsed,
-                        environmentContact
-                    )
-                    if bounced then
-                        return hitCount, true
-                    end
-                end
+    if LandscapeSwayService then LandscapeSwayService.MeleeArc(root, reach, arcAngle) end
+    -- Preserve environmental bounce presentation, using directional rays rather
+    -- than the retired animated weapon OBB. Suppression during combat remains.
+    local contact = MeleeEnvironmentContact.Query(root, reach, arcAngle)
+    if contact then
+        local pursuers = HostilePursuitRegistry.Count(character)
+        if character:GetAttribute("InCombat") ~= true and pursuers == 0 then
+            if triggerWeaponBounce(player, character, serial, clientAttackId, clipId, elapsed, contact) then
+                return true
             end
-
-            hitCount += applyDamageInVolume(
-                player,
-                character,
-                root,
-                serial,
-                volume.cframe,
-                volume.size,
-                "animated_weapon_sweep",
-                hitTargets,
-                sampledAimOrigin,
-                sampledAimDirection,
-                attackRange
-            )
-            previousVolume = volume
+        elseif Config.DebugLogs and AttackSessionStore.FirstBounceSuppression(player) then
+            print(("[game1][weapon-bounce] suppressed player=%s combat=%s pursuers=%d")
+                :format(player.Name, tostring(character:GetAttribute("InCombat")), pursuers))
         end
     end
-    return hitCount, false
+
+    local count, headshot, damaged = AttackDamageResolver.Apply({
+        player=player, character=character, root=root, serial=serial,
+        hitTargets=session.hitTargets, aimOrigin=session.lastAimOrigin,
+        aimDirection=session.lastAimDirection, attackRange=reach,
+        arcAngleDegrees=arcAngle, verticalPadding=padding,
+        headshotTarget=session.headshotTarget,
+    })
+    AttackSessionStore.SetHeadshotTarget(player, headshot)
+    if damaged > 0 then AttackSessionStore.MarkDamage(player, character, serial) end
+    return false
+end
+
+local function scheduleMeleeArc(player: Player, character: Model, root: BasePart,
+    serial: number, clientAttackId: number, clipId: string, window: any)
+    local started = os.clock()
+    task.delay(window.startTime, function()
+        local endAt = started + window.endTime
+        repeat
+            local session = AttackSessionStore.Get(player)
+            if not session or session.serial ~= serial or session.clientAttackId ~= clientAttackId
+                or session.character ~= character or player.Character ~= character
+                or not character.Parent or session.environmentBlocked
+                or os.clock() > endAt + Config.MeleeWindowGraceSeconds then return end
+            local currentRoot = character:FindFirstChild("RootCollider")
+            if not currentRoot or not currentRoot:IsA("BasePart") then return end
+            if applyMeleeArc(player, character, currentRoot, serial, clientAttackId, clipId,
+                math.max(0, os.clock() - started)) then return end
+            if os.clock() >= endAt then return end
+            task.wait(Config.MeleeSampleInterval)
+        until false
+    end)
 end
 
 local function clearAttackState(
@@ -216,8 +136,8 @@ local function clearAttackState(
         return false
     end
 
-    -- Aggregate the whole multi-target sweep: any positive damage wins.
-    -- Never publish one Miss per monster that the blade did not touch.
+    -- Aggregate the whole multi-target arc: any positive damage wins.
+    -- Never publish one Miss per monster that the sector did not reach.
     if reportMiss and not finished.damageDealt
         and player.Character == character and character.Parent
         and character:GetAttribute("LifeState") == "Alive" then
@@ -230,7 +150,7 @@ local function clearAttackState(
             CombatFeedbackService.PublishAttackOutcome(character, aimedState, false)
         end
         if Config.DebugLogs then
-            print(("[game1][attack] zero_damage player=%s serial=%d source=animated_weapon_sweep")
+            print(("[game1][attack] zero_damage player=%s serial=%d source=melee_arc")
                 :format(player.Name, serial))
         end
     end
@@ -503,93 +423,30 @@ local function attack(player: Player, payload: any)
             return
         end
     end
-    -- Bow Release confirms one hitscan shot; only melee uses HitStart/HitEnd volumes.
+    -- Bow's hitscan path is unchanged; melee is server-sampled from its timeline.
+    if not isBow then
+        scheduleMeleeArc(player, character, root, serial, clientAttackId, clipId, damageWindow)
+    end
     clearAttackStateLater(player, character, serial, clientAttackId, attackDuration, not isBow)
 end
 
-local function recordWeaponPose(player: Player, payload: any)
-    if type(payload) ~= "table" or typeof(payload.boxCFrame) ~= "CFrame" then
-        return
-    end
+-- This event carries AIM ONLY for a headshot upgrade. Geometry and
+-- damage timing are never sourced from client packets (M358).
+local function updateMeleeAim(player: Player, payload: any)
+    if type(payload) ~= "table" then return end
     local clientAttackId = math.floor(tonumber(payload.clientAttackId) or 0)
-    if clientAttackId <= 0 then
-        return
-    end
-
     local character = player.Character
-    if character and string.lower(tostring(character:GetAttribute("EquippedWeaponType") or "")) == "bow" then
-        return -- a bow cannot submit melee hitbox pose packets
-    end
-    local root = character and character:FindFirstChild("RootCollider")
-    local weapon = character and character:FindFirstChild("EquippedWeapon")
-    if not character
-        or not root
-        or not root:IsA("BasePart")
-        or not weapon
-        or not weapon:IsA("Model")
-        or tostring(character:GetAttribute("LifeState") or "") ~= "Alive"
-    then
-        return
-    end
-
-    local elapsed = math.max(0, tonumber(payload.elapsed) or 0)
+    if not character or tostring(character:GetAttribute("EquippedWeaponType") or "") == "bow" then return end
+    local root = character:FindFirstChild("RootCollider")
     local session = AttackSessionStore.Get(player)
-    local damageWindow = session and session.damageWindow
-    if not session
-        or session.character ~= character
-        or session.clientAttackId ~= clientAttackId
-        or damageWindow == nil
-        or elapsed + 1e-4 < damageWindow.startTime
-        or elapsed > damageWindow.endTime + 1e-4
-    then
-        return
-    end
-
-    local _, boxSize = WeaponAttackVolume.ReadWeaponBox(weapon)
-    if not boxSize then
-        return
-    end
-    local attackRange = math.clamp(tonumber(character:GetAttribute("AttackRadius")) or Config.Range, 1, Config.MaxAimDistance)
-    local maxCenterDistance = attackRange + boxSize.Magnitude + Config.WeaponPoseValidationSlack
-    if (payload.boxCFrame.Position - root.Position).Magnitude > maxCenterDistance then
-        return
-    end
-
-    local aimOrigin, aimDirection = AttackAimGeometry.Normalize(root.Position, payload.aimOrigin, payload.aimDirection)
-    AttackSessionStore.SetAim(player, character, session.serial, clientAttackId, aimOrigin, aimDirection)
-
-    local sweepState = AttackSessionStore.EnsureSweep(session)
-
-    -- Accepted poses sweep continuously only inside HitStart -> HitEnd. There is
-    -- no buffered terminal Hit checkpoint anymore; each accepted pose belongs to
-    -- the active authored window and is resolved immediately.
-    local serial = session.serial
-    local lastElapsed = tonumber(sweepState.lastElapsed)
-    if serial and (lastElapsed == nil or elapsed + 1e-4 >= lastElapsed) then
-        local previousBoxCFrame = if typeof(sweepState.lastBoxCFrame) == "CFrame" then sweepState.lastBoxCFrame else nil
-        local previousAimOrigin = if typeof(sweepState.lastAimOrigin) == "Vector3" then sweepState.lastAimOrigin else nil
-        local previousAimDirection = if typeof(sweepState.lastAimDirection) == "Vector3" then sweepState.lastAimDirection else nil
-        local _, bounced = applyAnimatedWeaponSweep(
-            player,
-            character,
-            root,
-            serial,
-            clientAttackId,
-            tostring(character:GetAttribute("AttackClipId") or ""),
-            weapon,
-            boxSize,
-            previousBoxCFrame,
-            payload.boxCFrame,
-            lastElapsed,
-            elapsed,
-            previousAimOrigin,
-            previousAimDirection,
-            aimOrigin,
-            aimDirection
-        )
-        if not bounced then
-            AttackSessionStore.CommitSweep(session, sweepState, elapsed, payload.boxCFrame, aimOrigin, aimDirection)
-        end
+    if not root or not root:IsA("BasePart") or not session
+        or session.character ~= character or session.clientAttackId ~= clientAttackId
+        or session.environmentBlocked or character:GetAttribute("LifeState") ~= "Alive" then return end
+    local now = os.clock()
+    if now > session.untilTime or now < session.untilTime - Config.MaxMeleeAimWindowSeconds then return end
+    local origin, direction = AttackAimGeometry.Normalize(root.Position, payload.aimOrigin, payload.aimDirection)
+    if origin and direction then
+        AttackSessionStore.SetAim(player, character, session.serial, clientAttackId, origin, direction)
     end
 end
 
@@ -603,10 +460,10 @@ function AttackService.Start()
     event.Parent = remotes
     event.OnServerEvent:Connect(attack)
 
-    local poseEvent = remotes:FindFirstChild("AttackWeaponPose") or Instance.new("RemoteEvent")
-    poseEvent.Name = "AttackWeaponPose"
-    poseEvent.Parent = remotes
-    poseEvent.OnServerEvent:Connect(recordWeaponPose)
+    local aimMeleeEvent = remotes:FindFirstChild("MeleeAimUpdate") or Instance.new("RemoteEvent")
+    aimMeleeEvent.Name = "MeleeAimUpdate"
+    aimMeleeEvent.Parent = remotes
+    aimMeleeEvent.OnServerEvent:Connect(updateMeleeAim)
 
     local aimEvent = remotes:FindFirstChild("BowAimUpdate") or Instance.new("RemoteEvent")
     aimEvent.Name = "BowAimUpdate"

@@ -15,7 +15,6 @@ export type Session = {
     headshotTarget: Model?,
     environmentBlocked: boolean,
     suppressedBounceLogged: boolean,
-    sweepState: any?,
 }
 
 local byPlayer: { [Player]: Session } = {}
@@ -50,7 +49,6 @@ function AttackSessionStore.Begin(
         headshotTarget = nil,
         environmentBlocked = false,
         suppressedBounceLogged = false,
-        sweepState = nil,
     }
     byPlayer[player] = session
     return session
@@ -61,19 +59,6 @@ local function matches(session: Session?, character: Model, serial: number, clie
         and session.character == character
         and session.serial == serial
         and session.clientAttackId == clientAttackId
-end
-
-function AttackSessionStore.HitTargets(
-    player: Player,
-    character: Model,
-    serial: number,
-    clientAttackId: number
-): { [Model]: boolean }?
-    local session = byPlayer[player]
-    if session and matches(session, character, serial, clientAttackId) then
-        return session.hitTargets
-    end
-    return nil
 end
 
 function AttackSessionStore.SetAim(
@@ -95,11 +80,6 @@ function AttackSessionStore.MarkDamage(player: Player, character: Model, serial:
     end
 end
 
-function AttackSessionStore.HeadshotTarget(player: Player): Model?
-    local session = byPlayer[player]
-    return if session then session.headshotTarget else nil
-end
-
 function AttackSessionStore.SetHeadshotTarget(player: Player, target: Model?)
     local session = byPlayer[player]
     if session then
@@ -107,7 +87,7 @@ function AttackSessionStore.SetHeadshotTarget(player: Player, target: Model?)
     end
 end
 
--- Returns true exactly once per attack, to avoid logging every sweep substep.
+-- Returns true exactly once per attack, to avoid logging every server arc sample.
 function AttackSessionStore.FirstBounceSuppression(player: Player): boolean
     local session = byPlayer[player]
     if not session or session.suppressedBounceLogged then
@@ -135,7 +115,6 @@ function AttackSessionStore.BlockForBounce(
     local session = byPlayer[player]
     session.environmentBlocked = true
     session.damageWindow = nil
-    session.sweepState = nil
     session.untilTime = untilTime
     return true
 end
@@ -149,35 +128,6 @@ function AttackSessionStore.Finish(player: Player, character: Model, serial: num
     end
     byPlayer[player] = nil
     return session
-end
-
-function AttackSessionStore.EnsureSweep(session: Session): any
-    local sweep = session.sweepState
-    if not sweep then
-        sweep = {
-            character = session.character,
-            clientAttackId = session.clientAttackId,
-        }
-        session.sweepState = sweep
-    end
-    return sweep
-end
-
-function AttackSessionStore.CommitSweep(
-    session: Session,
-    sweep: any,
-    elapsed: number,
-    boxCFrame: CFrame,
-    aimOrigin: Vector3?,
-    aimDirection: Vector3?
-)
-    if session.sweepState ~= sweep then
-        return
-    end
-    sweep.lastElapsed = elapsed
-    sweep.lastBoxCFrame = boxCFrame
-    sweep.lastAimOrigin = aimOrigin
-    sweep.lastAimDirection = aimDirection
 end
 
 function AttackSessionStore.Forget(player: Player)

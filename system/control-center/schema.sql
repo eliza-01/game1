@@ -117,6 +117,7 @@ create table if not exists weapons (
     weapon_type text not null,
     rarity text not null,
     attack_radius_studs real not null default 7,
+    melee_arc_angle_degrees real not null default 108,
     model_source_path text not null default '',
     model_prepared_path text not null default '',
     model_sha256 text not null default '',

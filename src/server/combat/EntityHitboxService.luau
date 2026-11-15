@@ -7,6 +7,7 @@ local SkeletonHeadResolver = require(CombatShared:WaitForChild("SkeletonHeadReso
 local HitboxMeshGeometryCache = require(script.Parent:WaitForChild("HitboxMeshGeometryCache"))
 local HitboxDefinitionBuilder = require(script.Parent:WaitForChild("HitboxDefinitionBuilder"))
 local HitboxSpatialQueries = require(script.Parent:WaitForChild("HitboxSpatialQueries"))
+local HitboxRuntimeFrames = require(script.Parent:WaitForChild("HitboxRuntimeFrames"))
 
 local EntityHitboxService = {}
 local started = false
@@ -278,6 +279,41 @@ function EntityHitboxService.QueryDamageablesInBox(
                     hit = hit,
                     mode = binding.mode,
                 })
+            end
+        end
+    end
+    return results
+end
+
+
+-- M358: queries exactly the existing authored monster/NPC/training-dummy hitboxes.
+-- Broad sphere keeps far entities cheap; the pure geometry module handles actual
+-- sector vs OBB overlap (including large targets whose center is outside reach).
+function EntityHitboxService.QueryDamageablesInArc(
+    exclude: Model?, origin: Vector3, facing: Vector3,
+    reach: number, angle: number, minY: number, maxY: number, geometry: any
+): {any}
+    local results = {}
+    for entity, binding in pairs(bindings) do
+        if entity ~= exclude and entity.Parent and binding.visual.Parent
+            and entity:GetAttribute("Damageable") == true
+            and (binding.root.Position - origin).Magnitude <= reach + binding.definition.broadRadius
+        then
+            HitboxRuntimeFrames.Refresh(binding, frameSerial)
+            local point = nil
+            for index, box in ipairs(binding.bodyBoxes) do
+                local frame = binding.worldBodyCFrames[index]
+                if frame then
+                    point = geometry.Contact(frame, box.size, origin, facing, reach, angle, minY, maxY)
+                    if point then break end
+                end
+            end
+            if not point and binding.headBox and binding.worldHeadCFrame then
+                point = geometry.Contact(binding.worldHeadCFrame, binding.headBox.size,
+                    origin, facing, reach, angle, minY, maxY)
+            end
+            if point then
+                table.insert(results, {model=entity, hit={hitPosition=point, geometryRole="body"}, mode="melee_arc"})
             end
         end
     end

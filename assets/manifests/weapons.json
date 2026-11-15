@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "project": "game1",
   "activeWeaponSlug": "newbie_sword_01",
   "options": {
@@ -26,6 +26,12 @@
       "min": 1.0,
       "max": 420.0,
       "step": 0.5
+    },
+    "meleeArcAngle": {
+      "default": 108.0,
+      "min": 1.0,
+      "max": 360.0,
+      "step": 1
     },
     "attackLocomotionModes": [
       "Run",
@@ -83,6 +89,7 @@
       "grip_rot_y": 0.0,
       "grip_rot_z": 0.0,
       "attack_radius_studs": 40.0,
+      "melee_arc_angle_degrees": 108.0,
       "textures": [
         {
           "id": "newbie_bow__newbie_bow_01_32x128_atlas",
@@ -130,6 +137,7 @@
       "grip_rot_y": 0.0,
       "grip_rot_z": 0.0,
       "attack_radius_studs": 3.0,
+      "melee_arc_angle_degrees": 108.0,
       "textures": [
         {
           "id": "newbie_dagger__newbie_dagger_01",
@@ -177,6 +185,7 @@
       "grip_rot_y": 0.0,
       "grip_rot_z": 0.0,
       "attack_radius_studs": 7.0,
+      "melee_arc_angle_degrees": 108.0,
       "textures": [
         {
           "id": "newbie_axe__starter_axe_01",
@@ -224,6 +233,7 @@
       "grip_rot_y": 0.0,
       "grip_rot_z": 0.0,
       "attack_radius_studs": 7.0,
+      "melee_arc_angle_degrees": 108.0,
       "textures": [
         {
           "id": "newbie_saber_01__newbie_saber_01",
@@ -271,6 +281,7 @@
       "grip_rot_y": 0.0,
       "grip_rot_z": 0.0,
       "attack_radius_studs": 8.0,
+      "melee_arc_angle_degrees": 108.0,
       "textures": [
         {
           "id": "newbie_sword_01__newbie_sword_01",
@@ -318,6 +329,7 @@
       "grip_rot_y": 0.0,
       "grip_rot_z": 0.0,
       "attack_radius_studs": 7.0,
+      "melee_arc_angle_degrees": 108.0,
       "textures": [],
       "atlas_binding": null,
       "atlas_variants": [],
@@ -349,6 +361,7 @@
       "grip_rot_y": 0.0,
       "grip_rot_z": 0.0,
       "attack_radius_studs": 7.0,
+      "melee_arc_angle_degrees": 108.0,
       "textures": [
         {
           "id": "guards_sword_01__guards_sword_01",
@@ -396,6 +409,7 @@
       "grip_rot_y": 0.0,
       "grip_rot_z": 0.0,
       "attack_radius_studs": 7.0,
+      "melee_arc_angle_degrees": 108.0,
       "textures": [
         {
           "id": "warsmiths_hummer_01__warsmiths_hummer",

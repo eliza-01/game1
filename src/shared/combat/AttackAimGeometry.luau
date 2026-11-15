@@ -1,4 +1,4 @@
--- Pure aim validation and finite center-screen ray geometry for server-authoritative melee.
+-- Pure aim validation and headshot-ray geometry for server-authoritative melee.
 -- No player, workspace, attack lifecycle, or mutable session state.
 local Config = require(script.Parent:WaitForChild("AttackConfig"))
 local AttackAimGeometry = {}
@@ -46,29 +46,14 @@ function AttackAimGeometry.HeadshotSegment(
     return origin + direction * closestAlongRay, direction
 end
 
--- Only a center-screen ray contact inside the attack radius may add a target
--- independently of weapon-volume intersection. Volume contacts intentionally keep
--- their authored physical blade length even when it extends beyond this radius.
+-- Ray headshots only upgrade targets already inside the server arc; a ray
+-- never inserts a new damage target. Range remains anchored to the attacker.
 function AttackAimGeometry.HitWithinAttackRadius(rootPosition: Vector3, hitPosition: any, attackRange: number): boolean
     return typeof(hitPosition) == "Vector3"
         and finiteVector(hitPosition)
         and finiteNumber(attackRange)
         and attackRange > 0
         and (hitPosition - rootPosition).Magnitude <= attackRange + Config.AttackRadiusEpsilon
-end
-
-function AttackAimGeometry.InterpolateDirection(previous: Vector3?, current: Vector3?, alpha: number): Vector3?
-    if typeof(current) ~= "Vector3" then
-        return nil
-    end
-    if typeof(previous) ~= "Vector3" then
-        return current
-    end
-    local blended = previous:Lerp(current, alpha)
-    if blended.Magnitude <= 1e-6 then
-        return current
-    end
-    return blended.Unit
 end
 
 return table.freeze(AttackAimGeometry)

@@ -50,21 +50,21 @@ def check_attack_timelines(root: Path, report_error: Callable[[str], None], *,
         "CharacterAttackWindow.Resolve(action.timeline)",
         "damageWindow.startTime",
         "damageWindow.endTime",
-        "activePoseFrom = activePoseStartedAt + damagePoseStart",
-        "activePoseUntil = activePoseStartedAt + damagePoseEnd",
+        "activeMeleeAimFrom = activeMeleeAimStartedAt + damagePoseStart",
+        "activeMeleeAimUntil = activeMeleeAimStartedAt + damagePoseEnd",
     ]:
         if required not in attack_controller_m38:
             report_error(f"m38 client HitStart/HitEnd pose window missing {required}")
 
     attack_service_m38 = (root / "src/server/combat/AttackService.luau").read_text(encoding="utf-8")
     for required in [
-        "session.damageWindow",
+        "scheduleMeleeArc",
         "CharacterAttackWindow.Resolve(timing)",
         'SetAttribute("AttackDamageStartsAt"',
         'SetAttribute("AttackDamageEndsAt"',
-        "elapsed + 1e-4 < damageWindow.startTime",
-        "elapsed > damageWindow.endTime + 1e-4",
-        "AttackSessionStore.EnsureSweep",
+        "task.delay(window.startTime",
+        "Config.MeleeSampleInterval",
+        "os.clock() >= endAt",
     ]:
         if required not in attack_service_m38:
             report_error(f"m38 server HitStart/HitEnd damage gate missing {required}")

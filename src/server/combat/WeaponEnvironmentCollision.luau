@@ -1,3 +1,5 @@
+-- LEGACY · DEPRECATED · DO NOT USE (M358).
+-- Volume-based environment contact; active melee uses MeleeEnvironmentContact.
 local Workspace = game:GetService("Workspace")
 
 local EnvironmentAssetService = require(script.Parent.Parent:WaitForChild("world"):WaitForChild("EnvironmentAssetService"))

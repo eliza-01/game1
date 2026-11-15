@@ -11,7 +11,8 @@ from pathlib import Path
 from secrets import token_urlsafe
 from threading import RLock
 
-from .location_runtime_build import RuntimePlaceBuilder, build_rows
+from .location_runtime_build import RuntimePlaceBuilder, build_rows, placement_shape_problem
+from .location_streaming_config import LocationStreamingConfig, settings_digest
 
 from .place_registry.catalog import build_catalog
 
@@ -23,8 +24,17 @@ class LocationLodManager:
         self._verified = None  # Last scan by THIS process, not a claim about Studio edits.
         root = Path(self.registry.revisions.path).resolve().parents[1]
         self.builder = RuntimePlaceBuilder(root)
+        self.streaming_config = LocationStreamingConfig(root)
         self._preflight = None
         self._build_lock = RLock()
+
+    def save_settings(self, payload: dict) -> dict:
+        # Persistent selection only. Do not mutate Studio or the saved Place.
+        with self._build_lock:
+            known = [row['slug'] for row in self.assets.snapshot()['items']]
+            self.streaming_config.save(payload, known)
+            self._preflight = None  # saved Preflight cannot authorize a different selection/profile
+            return self.overview()
 
     def scan(self, payload: dict) -> dict:
         if not isinstance(payload, dict) or payload:
@@ -45,12 +55,15 @@ class LocationLodManager:
             raise ValueError('Runtime preflight accepts an empty request only')
         with self._build_lock:
             overview = self.overview()
-            rows = build_rows(overview, self.registry)
-            inspected = self.builder.inspect(rows)
+            settings = self.streaming_config.read()
+            rows = build_rows(overview, self.registry, settings)
+            inspected = self.builder.inspect(rows, settings)
             token = token_urlsafe(32)
-            self._preflight = (token, inspected['sourceSha256'], overview['snapshot']['revisionId'])
+            self._preflight = (token, inspected['sourceSha256'], overview['snapshot']['revisionId'], settings_digest(settings))
             return {'schemaVersion': 1, 'token': token, 'snapshotRevision': overview['snapshot']['revisionId'],
                     'catalogDigest': overview['snapshot']['catalogDigest'],
+                    'streamingModes': {slug: settings['modes'][slug] for slug in inspected['counts']},
+                    'distances': settings['distances'], 'workspace': settings['workspace'],
                     **inspected, 'backupRequired': True, 'publishAllowed': False,
                     'protectedNotModified': overview['summary']['protectedExternal'],
                     'message': 'Only the explicitly selected Location visual MeshParts will be stripped from a separate saved Place copy.'}
@@ -64,16 +77,20 @@ class LocationLodManager:
             if not self._preflight or payload['token'] != self._preflight[0]:
                 raise ValueError('Preflight expired; run Preflight again')
             overview = self.overview()
-            rows = build_rows(overview, self.registry)
+            settings = self.streaming_config.read()
+            if settings_digest(settings) != self._preflight[3]:
+                raise ValueError('Streaming settings changed since Preflight; run it again')
+            rows = build_rows(overview, self.registry, settings)
             if overview['snapshot']['revisionId'] != self._preflight[2]:
                 raise ValueError('Snapshot changed; run Preflight again')
             digest = self._preflight[1]
             self._preflight = None  # One-shot, including failed builds.
             return self.builder.prepare(rows, expected_sha=digest,
                 snapshot_id=overview['snapshot']['revisionId'],
-                catalog_digest=overview['snapshot']['catalogDigest'])
+                catalog_digest=overview['snapshot']['catalogDigest'], settings=settings)
 
     def overview(self) -> dict:
+        settings = self.streaming_config.read()
         catalog = build_catalog(self.assets)
         published = {row['slug'] for row in catalog['items']}
         assets = self.assets.snapshot()['items']
@@ -129,7 +146,17 @@ class LocationLodManager:
                 or r.get('issues'))]
             for name, count in issues.items():
                 counts[name] += count
+            mode = settings['modes'].get(slug, 'off')
+            structural_issues = [placement_shape_problem(r) for r in placements if placement_shape_problem(r)]
+            eligible = bool(asset and placements and asset.get('status') == 'PUBLISHED' and
+                asset.get('model_asset_id') and not external and not problem_rows and not structural_issues)
+            reason = ('Нет размещений' if not placements else
+                'Не опубликован FULL' if not asset or asset.get('status') != 'PUBLISHED' or not asset.get('model_asset_id') else
+                'Есть защищённые чужой системой объекты' if external else
+                'Ошибки Place Registry' if problem_rows else
+                structural_issues[0] if structural_issues else '')
             items.append({
+                'streamingMode': mode, 'streamingEligible': eligible, 'streamingReason': reason,
                 'slug': slug, 'category': (asset or {}).get('category') or '',
                 'count': len(placements), 'fullStatus': (asset or {}).get('status') or 'NOT_REGISTERED',
                 'fullModelId': str((asset or {}).get('model_asset_id') or ''),
@@ -158,7 +185,8 @@ class LocationLodManager:
             })
         warnings = report.get('warnings', []) if report else []
         return {
-            'schemaVersion': 1, 'domain': 'location_assets',
+            'schemaVersion': 2, 'domain': 'location_assets',
+            'settings': settings, 'settingsDigest': settings_digest(settings),
             'snapshot': None if not latest else {
                 'revisionId': latest['id'], 'recordedUtc': latest['recorded_utc'],
                 'placeId': latest['place_id'], 'fingerprint': latest['fingerprint'],

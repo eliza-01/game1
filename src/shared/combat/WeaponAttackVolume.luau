@@ -1,3 +1,6 @@
+-- LEGACY · DEPRECATED · DO NOT USE (M358).
+-- Historic animated OBB implementation retained solely as source reference.
+-- It is not required by runtime combat, weapon equip, Test Loadout or any fallback.
 local WeaponAttackVolume = {}
 
 local BOX_LOCAL_ATTRIBUTE = "WeaponAttackBoxLocalCFrame"

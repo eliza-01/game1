@@ -2,24 +2,19 @@ return table.freeze({
     Range = 7,
     MaxAimDistance = 420,
     AttackRadiusEpsilon = 0.15,
-    -- Head/body boxes are precomputed once from visual-mesh bounds. Weapon
-    -- contact always deals normal melee damage; headshot is a separate live
+    -- Head/body boxes are precomputed once from visual-mesh bounds. Arc
+    -- contact deals normal melee damage; headshot is a separate live
     -- reticle-ray classification and can upgrade at most one target per attack.
     HeadshotDamageMultiplier = 2,
     HeadshotAimOriginMaxDistance = 24,
 
-    -- Animated EquippedWeapon pose samples are client-observed because the
-    -- visible weapon follows client-side Bone transforms. The server owns the
-    -- canonical box dimensions and accepts only nearby poses inside the authored
-    -- HitStart -> HitEnd character damage window.
-    WeaponPoseSampleInterval = 1 / 30,
-    WeaponPoseValidationSlack = 2.0,
-    -- Continuous contact sweep subdivision. Pose packets arrive at ~30 Hz; these
-    -- limits add intermediate OBB samples so a fast animated weapon cannot pass
-    -- completely through a target between two packets.
-    WeaponPoseSweepLinearStep = 0.75,
-    WeaponPoseSweepAngularStep = math.rad(8),
-    WeaponPoseSweepMaxSubsteps = 8,
+    -- M358: server samples the authored HitStart/HitEnd window independently
+    -- of any client pose. Arc width is a per-weapon persisted setting.
+    MeleeDefaultArcAngle = 108,
+    MeleeVerticalPadding = 1.5,
+    MeleeSampleInterval = 1 / 20,
+    MeleeWindowGraceSeconds = 0.04,
+    MaxMeleeAimWindowSeconds = 8,
 
     -- RobloxLineage attack-facing contract. A planted attack can twist the upper
     -- body up to this yaw. Only the overflow is assigned to whole-character yaw.

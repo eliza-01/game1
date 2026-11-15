@@ -82,7 +82,7 @@ function Streamer.Start()
         table.insert(records, {
             id = row.id, slug = row.slug, pivot = Vector3.new(row.pivot[1], row.pivot[2], row.pivot[3]),
             cframe = transform(row.cframe), size = Vector3.new(table.unpack(row.size)),
-            desired = nil, actual = "UNLOADED", part = nil, distance = math.huge,
+            mode = manifest.modes[row.slug], desired = nil, actual = "UNLOADED", part = nil, distance = math.huge,
         })
     end
     local cache = ReplicatedStorage:WaitForChild(Contract.TemplateFolder, 30)
@@ -104,7 +104,7 @@ function Streamer.Start()
         for _, record in ipairs(records) do
             local distance = (cameraPosition - record.pivot).Magnitude
             record.distance = distance
-            record.desired = Policy.Resolve(distance, record.desired)
+            record.desired = Policy.Resolve(distance, record.desired, manifest.distances, record.mode)
         end
         -- Release stale distant visuals first, then prioritize nearest loads.
         -- Both phases share the same MAX_CHANGES_PER_TICK budget.
@@ -120,9 +120,13 @@ function Streamer.Start()
                 then cache:FindFirstChild(record.slug .. "__" .. variant) else nil
             -- During partial template loading we never create a bad fallback geometry.
             if variant ~= "UNLOADED" and not prototype then
-                -- A missing LOD1 may use FULL temporarily; do not mutate target's desired state.
-                prototype = cache:FindFirstChild(record.slug .. "__FULL")
-                variant = if prototype then "FULL" else "UNLOADED"
+                -- During partial staging prefer a lower-detail available template,
+                -- never invent a Mesh ID or modify desired distance state.
+                for _, fallback in ipairs({"LOD1", "FULL"}) do
+                    prototype = cache:FindFirstChild(record.slug .. "__" .. fallback)
+                    if prototype then variant = fallback break end
+                end
+                if not prototype then variant = "UNLOADED" end
             end
             if variant ~= "UNLOADED" and prototype and not prototype:IsA("MeshPart") then
                 variant = "UNLOADED" -- invalid cache entry is never instantiated
@@ -148,10 +152,11 @@ function Streamer.Start()
             end
         end
         if status then
-            local counts = {FULL = 0, LOD1 = 0, UNLOADED = 0}
+            local counts = {FULL = 0, LOD1 = 0, LOD2 = 0, UNLOADED = 0}
             for _, record in ipairs(records) do counts[record.actual] += 1 end
-            status.Text = ("Runtime LOD | FULL %d · LOD1 %d · UNLOADED %d\nTemplates %d/4 · operations this tick %d")
-                :format(counts.FULL, counts.LOD1, counts.UNLOADED, cache:GetAttribute("Loaded") or 0, changes)
+            status.Text = ("Runtime LOD | FULL %d · LOD1 %d · LOD2 %d · UNLOADED %d\nTemplates %d/%d · operations/tick %d")
+                :format(counts.FULL, counts.LOD1, counts.LOD2, counts.UNLOADED,
+                    cache:GetAttribute("Loaded") or 0, cache:GetAttribute("Expected") or 0, changes)
         end
         if cache:GetAttribute("Ready") ~= true and os.clock() - lastWarning > 15 then
             lastWarning = os.clock()

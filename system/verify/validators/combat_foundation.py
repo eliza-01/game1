@@ -22,9 +22,9 @@ def check_combat_foundation(ROOT: Path, err: Callable[[str], None]):
     attack_text = (ROOT / "src/server/combat/AttackService.luau").read_text(encoding="utf-8")
     dummy_text = (ROOT / "src/server/dev/TrainingDummyService.luau").read_text(encoding="utf-8")
     damage_resolver_text = (ROOT / "src/server/combat/AttackDamageResolver.luau").read_text(encoding="utf-8")
-    if "[game1][attack] hit" not in damage_resolver_text or "[game1][attack] zero_damage" not in attack_text:
+    if "[game1][melee-arc] hit" not in damage_resolver_text or "[game1][attack] zero_damage" not in attack_text:
         err("attack smoke-test logging contract missing")
-    if "EntityHitboxService.QueryDamageablesInBox" not in damage_resolver_text:
+    if "MeleeTargetQuery.Find" not in damage_resolver_text:
         err("attack service must resolve melee damage through authoritative target hitboxes")
     attack_timeline_path = ROOT / "src/shared/combat/AttackTimelineConfig.luau"
     attack_timeline_text = attack_timeline_path.read_text(encoding="utf-8") if attack_timeline_path.is_file() else ""

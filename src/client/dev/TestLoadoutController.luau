@@ -6,7 +6,7 @@ local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local CombatShared = Shared:WaitForChild("combat")
-local WeaponAttackVolume = require(CombatShared:WaitForChild("WeaponAttackVolume"))
+local MeleeArcGeometry = require(CombatShared:WaitForChild("MeleeArcGeometry"))
 
 local StudioDebugDock = require(script.Parent:WaitForChild("StudioDebugDock"))
 local HouseSocketDebugController = require(script.Parent:WaitForChild("HouseSocketDebugController"))
@@ -376,35 +376,36 @@ local function createAttackRadiusRing()
         part.Parent = folder
         parts[index] = part
     end
+    -- Extra lines show the two radial sides and the vertical extent of the arc.
+    for index = 1, 4 do
+        local part = Instance.new("Part")
+        part.Name = ("Boundary%02d"):format(index)
+        part.Anchored = true
+        part.CanCollide = false
+        part.CanQuery = false
+        part.CanTouch = false
+        part.CastShadow = false
+        part.Material = Enum.Material.Neon
+        part.Color = COLORS.accent
+        part.Transparency = 0.27
+        part.Parent = folder
+        parts[64 + index] = part
+    end
+    -- A server hitbox Headshot is confirmed only inside the sector; this
+    -- thin camera ray shows the independent precision input.
+    local ray = Instance.new("Part")
+    ray.Name = "HeadshotAimRay"
+    ray.Anchored = true
+    ray.CanCollide = false
+    ray.CanQuery = false
+    ray.CanTouch = false
+    ray.CastShadow = false
+    ray.Material = Enum.Material.Neon
+    ray.Color = Color3.fromRGB(255, 205, 108)
+    ray.Transparency = 0.25
+    ray.Parent = folder
+    parts[69] = ray
     return folder, parts
-end
-
-local function createWeaponHitVolumePreview()
-    local folder = Instance.new("Folder")
-    folder.Name = "Game1WeaponHitVolumePreview"
-
-    local part = Instance.new("Part")
-    part.Name = "AnimatedWeaponHitVolume"
-    part.Anchored = true
-    part.CanCollide = false
-    part.CanQuery = false
-    part.CanTouch = false
-    part.CastShadow = false
-    part.Material = Enum.Material.Neon
-    part.Color = COLORS.error
-    part.Transparency = 0.78
-    part.Parent = folder
-
-    local outline = Instance.new("SelectionBox")
-    outline.Name = "VolumeOutline"
-    outline.Adornee = part
-    outline.Color3 = COLORS.error
-    outline.LineThickness = 0.035
-    outline.SurfaceColor3 = COLORS.error
-    outline.SurfaceTransparency = 0.93
-    outline.Parent = part
-
-    return folder, part
 end
 
 local function createTargetHitboxPreview()
@@ -555,11 +556,15 @@ local function createGui()
     radiusToggle.TextSize = 10
     radiusToggle.Font = Enum.Font.GothamSemibold
 
-    local volumeToggle = button(body, "WEAPON HIT VOLUME: OFF")
+    local volumeToggle = button(body, "LEGACY VOLUME · DO NOT USE")
     volumeToggle.Position = UDim2.fromOffset(0, 286)
     volumeToggle.Size = UDim2.new(1, 0, 0, 28)
     volumeToggle.TextSize = 10
     volumeToggle.Font = Enum.Font.GothamSemibold
+    volumeToggle.Active = false
+    volumeToggle.AutoButtonColor = false
+    volumeToggle.TextColor3 = COLORS.muted
+    volumeToggle.BackgroundColor3 = COLORS.disabled
 
     local targetHitboxToggle = button(body, "TARGET HITBOXES: OFF")
     targetHitboxToggle.Position = UDim2.fromOffset(0, 320)
@@ -693,9 +698,6 @@ function TestLoadoutController.Start()
         local ringFolder, ringParts = createAttackRadiusRing()
         local ringVisible = false
         local ringConnection: RBXScriptConnection? = nil
-        local volumeFolder, volumePart = createWeaponHitVolumePreview()
-        local volumeVisible = false
-        local volumeConnection: RBXScriptConnection? = nil
         local rayParams = RaycastParams.new()
         rayParams.FilterType = Enum.RaycastFilterType.Exclude
         rayParams.IgnoreWater = false
@@ -703,7 +705,7 @@ function TestLoadoutController.Start()
 
         local function setRingVisible(value: boolean)
             ringVisible = value == true
-            radiusToggle.Text = ringVisible and "ATTACK RADIUS: ON" or "ATTACK RADIUS: OFF"
+            radiusToggle.Text = ringVisible and "MELEE ARC: ON" or "MELEE ARC: OFF"
             radiusToggle.BackgroundColor3 = ringVisible and COLORS.controlSelected or COLORS.control
             radiusToggle.TextColor3 = ringVisible and COLORS.accent or COLORS.text
             ringFolder.Parent = ringVisible and Workspace or nil
@@ -711,82 +713,68 @@ function TestLoadoutController.Start()
 
         local function renderAttackRadiusRing()
             if not ringVisible then return end
-            local currentCharacter = player.Character
-            local root = currentCharacter and currentCharacter:FindFirstChild("RootCollider")
-            if not root or not root:IsA("BasePart") then
+            local character = player.Character
+            local root = character and character:FindFirstChild("RootCollider")
+            if not root or not root:IsA("BasePart")
+                or string.lower(tostring(character:GetAttribute("EquippedWeaponType") or "")) == "bow" then
                 for _, part in ipairs(ringParts) do part.Transparency = 1 end
                 return
             end
-            local radius = math.max(1, tonumber(currentCharacter:GetAttribute("AttackRadius")) or 7)
-            rayParams.FilterDescendantsInstances = { currentCharacter }
+            local radius = math.max(1, tonumber(character:GetAttribute("AttackRadius")) or 7)
+            local arc = math.clamp(tonumber(character:GetAttribute("MeleeArcAngle")) or 108, 1, 360)
+            local halfAngle = math.rad(arc) * 0.5
+            local forward = Vector3.new(root.CFrame.LookVector.X, 0, root.CFrame.LookVector.Z)
+            if forward.Magnitude < 1e-5 then return end
+            forward = forward.Unit
+            rayParams.FilterDescendantsInstances = {character}
             local ground = Workspace:Raycast(root.Position, Vector3.new(0, -64, 0), rayParams)
-            local center = Vector3.new(root.Position.X, ground and (ground.Position.Y + 0.06) or (root.Position.Y - root.Size.Y * 0.5), root.Position.Z)
-            local chord = 2 * radius * math.sin(math.pi / #ringParts) + 0.04
-            for index, part in ipairs(ringParts) do
-                local angle = ((index - 0.5) / #ringParts) * math.pi * 2
-                local position = center + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
+            local center = Vector3.new(root.Position.X,
+                ground and (ground.Position.Y + 0.06) or (root.Position.Y - root.Size.Y * 0.5), root.Position.Z)
+            local count = 64
+            local sweep = math.rad(arc) / count
+            local chord = 2 * radius * math.sin(sweep * 0.5) + 0.03
+            for index = 1, count do
+                local angle = -halfAngle + (index - 0.5) * sweep
+                local direction = CFrame.fromAxisAngle(Vector3.yAxis, angle):VectorToWorldSpace(forward)
+                local position = center + direction * radius
+                local part = ringParts[index]
                 part.Size = Vector3.new(chord, 0.055, 0.10)
-                part.CFrame = CFrame.new(position) * CFrame.Angles(0, -angle - math.pi * 0.5, 0)
+                part.CFrame = CFrame.lookAt(position, position + direction) * CFrame.Angles(0, math.pi / 2, 0)
                 part.Transparency = 0.18
             end
+            for index, sign in ipairs({-1, 1}) do
+                local direction = CFrame.fromAxisAngle(Vector3.yAxis, halfAngle * sign):VectorToWorldSpace(forward)
+                local line = ringParts[64 + index]
+                line.Size = Vector3.new(0.065, 0.055, radius)
+                line.CFrame = CFrame.lookAt(center + direction * radius * 0.5, center + direction * radius)
+                line.Transparency = 0.24
+                local vertical = ringParts[66 + index]
+                local pad = 1.5
+                local height = math.max(3, root.Size.Y) + pad * 2
+                vertical.Size = Vector3.new(0.08, height, 0.08)
+                vertical.CFrame = CFrame.new(root.Position.X + direction.X * radius,
+                    root.Position.Y, root.Position.Z + direction.Z * radius)
+                vertical.Transparency = 0.35
+            end
+            local camera = Workspace.CurrentCamera
+            local ray = ringParts[69]
+            if camera then
+                local origin = camera.CFrame.Position
+                local direction = camera.CFrame.LookVector
+                local relative = root.Position - origin
+                local start = origin + direction * math.max(0, relative:Dot(direction))
+                local length = math.max(0.01, radius)
+                ray.Size = Vector3.new(0.045, 0.045, length)
+                ray.CFrame = CFrame.lookAt(start + direction * length * 0.5, start + direction * length)
+                ray.Transparency = 0.45
+            else ray.Transparency = 1 end
         end
         ringConnection = RunService.RenderStepped:Connect(renderAttackRadiusRing)
         setRingVisible(false)
         radiusToggle.Activated:Connect(function() setRingVisible(not ringVisible) end)
 
-        local renderWeaponHitVolume: () -> ()
-        local function setVolumeVisible(value: boolean)
-            local character = player.Character
-            local isBow = character and string.lower(tostring(character:GetAttribute("EquippedWeaponType") or "")) == "bow"
-            volumeVisible = value == true and not isBow
-            volumeToggle.Text = volumeVisible and "WEAPON HIT VOLUME: ON" or "WEAPON HIT VOLUME: OFF"
-            volumeToggle.BackgroundColor3 = volumeVisible and COLORS.controlSelected or COLORS.control
-            volumeToggle.TextColor3 = volumeVisible and COLORS.accent or COLORS.text
-            volumeFolder.Parent = volumeVisible and Workspace or nil
-            -- The preview is one reusable Part, never a per-frame clone.
-            -- Do not even schedule visual updates while the debug toggle is off.
-            if volumeConnection then
-                volumeConnection:Disconnect()
-                volumeConnection = nil
-            end
-            if volumeVisible then
-                renderWeaponHitVolume()
-                volumeConnection = RunService.RenderStepped:Connect(renderWeaponHitVolume)
-            end
-        end
-
-        renderWeaponHitVolume = function()
-            if not volumeVisible then return end
-            local currentCharacter = player.Character
-            if currentCharacter and string.lower(tostring(currentCharacter:GetAttribute("EquippedWeaponType") or "")) == "bow" then
-                setVolumeVisible(false)
-                volumePart.Transparency = 1
-                return
-            end
-            local root = currentCharacter and currentCharacter:FindFirstChild("RootCollider")
-            if not root or not root:IsA("BasePart") then
-                volumePart.Transparency = 1
-                return
-            end
-            local weaponBoxCFrame, weaponBoxSize, equippedWeapon = WeaponAttackVolume.ReadEquippedWeaponBox(currentCharacter)
-            if typeof(weaponBoxCFrame) ~= "CFrame" or typeof(weaponBoxSize) ~= "Vector3" or not equippedWeapon then
-                volumePart.Transparency = 1
-                return
-            end
-            local radius = math.max(1, tonumber(currentCharacter:GetAttribute("AttackRadius")) or 7)
-            local weaponBoneBoxLocalPosition = WeaponAttackVolume.ReadWeaponBoneBoxLocalPosition(equippedWeapon)
-            local volume = WeaponAttackVolume.Build(root.Position, weaponBoxCFrame, weaponBoxSize, radius, weaponBoneBoxLocalPosition)
-            if not volume then
-                volumePart.Transparency = 1
-                return
-            end
-            volumePart.CFrame = volume.cframe
-            volumePart.Size = volume.size
-            volumePart.Transparency = 0.78
-        end
-
-        setVolumeVisible(false)
-        volumeToggle.Activated:Connect(function() setVolumeVisible(not volumeVisible) end)
+        -- M358: no weapon-volume toggle, renderer or gameplay fallback exists.
+        -- The legacy label is deliberately inert for discoverability.
 
         local targetPreview = createTargetHitboxPreview()
         local targetHitboxesVisible = false
@@ -838,10 +826,36 @@ function TestLoadoutController.Start()
                             local anchorFrame = anchor and debugAnchorFrame(anchor) or nil
                             if anchorFrame and typeof(localCFrame) == "CFrame" and typeof(size) == "Vector3" then
                                 previewIndex += 1
-                                local color = if zone == "head" then COLORS.error else COLORS.accent
-                                local transparency = if zone == "head" then 0.72 else 0.82
+                                local frame = anchorFrame * localCFrame
+                                local own = player.Character
+                                local root = own and own:FindFirstChild("RootCollider")
+                                local inside = false
+                                if root and root:IsA("BasePart") then
+                                    local reach = tonumber(own:GetAttribute("AttackRadius")) or 7
+                                    local angle = tonumber(own:GetAttribute("MeleeArcAngle")) or 108
+                                    local pad = 1.5
+                                    local halfHeight = math.max(1.5, root.Size.Y * 0.5)
+                                    inside = MeleeArcGeometry.Contact(frame, size, root.Position,
+                                        root.CFrame.LookVector, reach, angle,
+                                        root.Position.Y - halfHeight - pad, root.Position.Y + halfHeight + pad) ~= nil
+                                end
+                                -- Debug colours: green = sector contact, red = outside,
+                                -- amber = in sector but physically blocked by a solid wall.
+                                local blocked = false
+                                if inside and root and root:IsA("BasePart") then
+                                    local origin = root.Position + Vector3.new(0, math.min(1, root.Size.Y * 0.25), 0)
+                                    local displacement = frame.Position - origin
+                                    if displacement.Magnitude > 1e-4 then
+                                        rayParams.FilterDescendantsInstances = {own}
+                                        local obstruction = Workspace:Raycast(origin, displacement, rayParams)
+                                        blocked = obstruction ~= nil and not obstruction.Instance:IsDescendantOf(model)
+                                    end
+                                end
+                                local color = if not inside then COLORS.error
+                                    else if blocked then Color3.fromRGB(255, 187, 86) else COLORS.accent
+                                local transparency = if inside then 0.63 else 0.87
                                 local hitbox = targetPreview.acquire(previewIndex, Enum.PartType.Block, color, transparency)
-                                hitbox.CFrame = anchorFrame * localCFrame
+                                hitbox.CFrame = frame
                                 hitbox.Size = size
                             end
                         end
@@ -1057,9 +1071,7 @@ function TestLoadoutController.Start()
             panelOpenedConnection:Disconnect()
             for _, connection in ipairs(characterConnections) do connection:Disconnect() end
             if ringConnection then ringConnection:Disconnect() end
-            if volumeConnection then volumeConnection:Disconnect() end
             ringFolder:Destroy()
-            volumeFolder:Destroy()
         end)
     end)
 end

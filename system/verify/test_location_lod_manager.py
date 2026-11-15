@@ -187,3 +187,26 @@ class TestLocationLodManager(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+class TestLodManagerSettingsRoutes(unittest.TestCase):
+    def test_saving_settings_uses_project_root_and_revokes_preflight(self):
+        from unittest.mock import Mock
+        import tempfile
+        from services.location_streaming_config import DEFAULT_SETTINGS
+        with tempfile.TemporaryDirectory() as folder:
+            revisions=PlaceRevisionStore(folder)
+            manager=LocationLodManager(Assets(), Registry(revisions))
+            with patch('services.location_lod_manager.build_catalog',
+                       return_value={'digest':'digest-v1','items':[{'slug':'stone_fence_02'}]}):
+                manager._preflight=('old_token','a'*64,10,'digest')
+                status, view=write_world('/api/lod-manager/settings',lambda:{'modes':{'stone_fence_02':'full'}},
+                                         {'lod_manager':manager})
+                self.assertEqual(status,200)
+                self.assertIsNone(manager._preflight)
+                self.assertEqual(view['settings']['modes']['stone_fence_02'],'full')
+                self.assertTrue(manager.streaming_config.path.exists())
+                error_status, error=write_world('/api/lod-manager/settings',
+                    lambda:{'modes':{'imaginary_slug':'full'}},{'lod_manager':manager})
+                self.assertEqual(error_status,400)
+                self.assertIn('Unknown',error['error'])
+                self.assertEqual(manager.streaming_config.read()['modes']['stone_fence_02'],'full')

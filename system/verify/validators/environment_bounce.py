@@ -153,18 +153,18 @@ def check_environment_bounce(root: Path, report_error: Callable[[str], None], *,
     attack_service_text = (root / "src/server/combat/AttackService.luau").read_text(encoding="utf-8")
     attack_session_text = (root / "src/server/combat/AttackSessionStore.luau").read_text(encoding="utf-8")
     for required in [
-        'WeaponEnvironmentCollision.Query(previousVolume, volume)',
+        'MeleeEnvironmentContact.Query(root, reach, arcAngle)',
         'AttackSessionStore.BlockForBounce(',
         'WeaponBounceService.Publish(player, {',
         'LastAttackBounced',
     ]:
         if required not in attack_service_text:
             report_error(f"m50 AttackService environment-bounce integration missing {required}")
-    for required in ['session.environmentBlocked = true', 'session.damageWindow = nil', 'session.sweepState = nil']:
+    for required in ['session.environmentBlocked = true', 'session.damageWindow = nil']:
         if required not in attack_session_text:
             report_error(f"m50 AttackSessionStore bounce invalidation missing {required}")
-    if attack_service_text.find('WeaponEnvironmentCollision.Query(previousVolume, volume)') > attack_service_text.find('hitCount += applyDamageInVolume', attack_service_text.find('local function applyAnimatedWeaponSweep')):
-        report_error("m50 environment collision must resolve before damage in each weapon sweep substep")
+    if attack_service_text.find('MeleeEnvironmentContact.Query(root, reach, arcAngle)') > attack_service_text.find('AttackDamageResolver.Apply({'):
+        report_error("M358 environment bounce must resolve before arc damage")
 
     upper_composer_text = (root / "src/client/character/animation/AttackUpperBodyComposer.luau").read_text(encoding="utf-8")
     character_animation_text = (root / "src/client/character/animation/CharacterAnimationController.luau").read_text(encoding="utf-8")
@@ -182,7 +182,7 @@ def check_environment_bounce(root: Path, report_error: Callable[[str], None], *,
     ]:
         if required not in character_animation_text:
             report_error(f"m50 character attack reverse presentation missing {required}")
-    for required in ['function AttackController.CancelForBounce', 'activePoseAttackId = 0']:
+    for required in ['function AttackController.CancelForBounce', 'activeMeleeAimId = 0']:
         if required not in attack_controller_text:
             report_error(f"m50 attack controller bounce cancellation missing {required}")
     for required in ['WeaponBounceController.Start(CharacterAnimationController, AttackController)']:

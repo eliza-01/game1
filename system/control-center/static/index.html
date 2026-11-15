@@ -15,7 +15,7 @@
 <link rel="stylesheet" href="location-assets.css?v=1">
 <link rel="stylesheet" href="location-instance-manager.css?v=353">
 <link rel="stylesheet" href="place-registry.css?v=241">
-<link rel="stylesheet" href="lod-manager.css?v=2">
+<link rel="stylesheet" href="lod-manager.css?v=3">
 <link rel="stylesheet" href="character-components.css?v=6">
 <link rel="stylesheet" href="character-assemblies.css?v=5">
 <link rel="stylesheet" href="character-armor.css?v=1">
@@ -426,7 +426,7 @@
 <details class="game1-option-section"><summary><span class="game1-option-icon" aria-hidden="true">🌍</span><span><strong>World</strong><small>Terrain / MeshPart streaming</small></span></summary>
 <div class="panel character-card">
   <div class="section-title"><div><span>Workspace · both devices</span><h3>World streaming target</h3></div></div>
-  <small class="hint">One shared Workspace setting. Apply in Studio Edit, then Publish; not a hard draw cutoff.</small>
+  <small class="hint">Только для авторского Studio Place. Runtime Build использует настройки из LOD Manager; радиус не является жёсткой границей видимости.</small>
   <div class="game1-hp-grid"><label>Shared target radius · studs <input type="number" id="option-world-streaming-radius" min="96" max="4096" step="1" value="150"></label></div>
   <div class="actions"><button type="button" id="option-world-streaming-save" class="primary">Save world streaming target</button><button type="button" id="option-world-streaming-copy">Copy Studio Command Bar code</button></div>
 </div></details>
@@ -462,7 +462,7 @@
 <div class="character-grid"><label>name en<input id="weapon-name-en" autocomplete="off"></label><label>name ru<input id="weapon-name-ru" autocomplete="off"></label></div>
 <label>slug<input id="weapon-slug" readonly><small class="hint">generated from english name as lowercase snake_case. existing registered slugs stay stable.</small></label>
 <div class="character-grid"><label>type<select id="weapon-type"></select></label><label>rarity<select id="weapon-rarity"></select></label></div>
-<div class="weapon-stats-grid"><label>attack delta<input id="weapon-stat-damage" type="number" step="1" value="0"></label><label>attack speed delta<input id="weapon-stat-attack-speed" type="number" step="1" value="0"></label><label>attack radius · studs<input id="weapon-attack-radius" type="number" min="1" max="420" step="0.5" value="7"></label></div>
+<div class="weapon-stats-grid"><label>attack delta<input id="weapon-stat-damage" type="number" step="1" value="0"></label><label>attack speed delta<input id="weapon-stat-attack-speed" type="number" step="1" value="0"></label><label>attack radius · studs<input id="weapon-attack-radius" type="number" min="1" max="420" step="0.5" value="7"></label><label id="weapon-melee-arc-field">Melee Arc Angle · degrees <abbr title="Total horizontal melee sector, 108° = 54° to each side of the character's look direction. Set per weapon; bow is unchanged.">(?)</abbr><input id="weapon-melee-arc-angle" type="number" min="1" max="360" step="1" value="108"></label></div>
 <small class="hint">damage and attack speed are additive modifiers. attack radius is an absolute server-authoritative reach in Roblox studs and is visualized from Studio Test Loadout.</small>
 <hr class="card-separator">
 <span class="eyebrow">02 · source assets</span>
@@ -641,15 +641,43 @@
       <div class="lm-filters"><input id="lod-search" type="search" placeholder="Search asset slug" aria-label="Search Location Asset">
         <select id="lod-filter" aria-label="LOD readiness filter"><option value="all">All statuses</option>
           <option value="red">Missing LOD1</option><option value="yellow">LOD1 · no LOD2</option><option value="green">LOD1 + LOD2</option></select></div></div>
-    <div class="lm-table"><table><thead><tr><th>Location Asset</th><th>Placed</th><th>LOD models</th><th>Placement diagnostics</th></tr></thead>
-      <tbody id="lod-rows"><tr><td colspan="4">Loading…</td></tr></tbody></table></div>
+    <div class="actions lm-bulk"><button id="lod-enable-ready" type="button">Включить все готовые</button>
+      <button id="lod-disable-all" type="button">Выключить все</button></div>
+    <div class="lm-table"><table><thead><tr><th>Location Asset</th><th>Placed</th><th>LOD models</th><th>Placement diagnostics</th><th>Streaming</th></tr></thead>
+      <tbody id="lod-rows"><tr><td colspan="5">Loading…</td></tr></tbody></table></div>
+    <p class="lm-note">Streaming Off оставляет ассет в Workspace. Full only = FULL → UNLOADED без LOD1; режимы LOD1/LOD2 доступны только при опубликованных моделях. Preflight проверяет отдельную коллизию и точный состав Model.</p>
     <p class="lm-note">Точки: красная — нет опубликованного LOD1; жёлтая — LOD1 опубликован, LOD2 отсутствует; зелёная — оба опубликованы. Регистрация LOD2 пока не реализована. Совпадение Mesh ID не означает Deco-размещение: владельцы LandscapePainter и PackageLink отображаются отдельно и защищены от Runtime-очистки.</p>
   </section>
-  <section class="panel lm-panel"><div><span class="eyebrow">03 · History</span><h3>Snapshot revisions</h3></div>
+  <section class="panel lm-panel" id="lod-settings-section">
+    <div class="lm-toolbar"><div><span class="eyebrow">03 · Streaming settings</span><h3>Visual LOD · Workspace</h3></div>
+      <div class="actions"><button id="lod-preset-default" type="button">Default · Roblox recommended</button>
+        <button id="lod-save-settings" class="primary" type="button">Save settings</button></div></div>
+    <p class="lm-note">Visual LOD создаётся локально по расстоянию от камеры; Roblox Workspace Streaming доставляет серверную геометрию относительно персонажа. Это независимые механизмы.</p>
+    <h4 class="lm-settings-title">Client visual distance · studs</h4>
+    <div class="lm-setting-grid">
+      <label>LOD1 от <span class="lm-help" tabindex="0" role="button" title="Переход с FULL на LOD1 при удалении камеры. Если LOD1 нет, режим FULL-only использует FULL до Hide.">?</span><input id="lod-distance-1" type="number" min="16" max="10000" step="1"></label>
+      <label>LOD2 от <span class="lm-help" tabindex="0" role="button" title="Порог для LOD2, только если LOD2 опубликован и выбран режим LOD2. Иначе LOD1 остаётся до Hide.">?</span><input id="lod-distance-2" type="number" min="16" max="10000" step="1"></label>
+      <label>Hide / UNLOADED от <span class="lm-help" tabindex="0" role="button" title="После этой дистанции клиент удаляет визуальный MeshPart. Серверная коллизия не зависит от LOD.">?</span><input id="lod-distance-hide" type="number" min="16" max="10000" step="1"></label>
+      <label>Гистерезис ± <span class="lm-help" tabindex="0" role="button" title="Запас в studs вокруг перехода. Предотвращает мигание при колебании камеры около границы.">?</span><input id="lod-distance-hysteresis" type="number" min="0" max="100" step="1"></label>
+    </div>
+    <h4 class="lm-settings-title">Roblox Workspace · Instance Streaming</h4>
+    <div class="lm-setting-grid">
+      <label class="lm-checkbox">StreamingEnabled <span class="lm-help" tabindex="0" role="button" title="Доставка Terrain и серверных Instance по расстоянию. Это не наш клиентский визуальный LOD.">?</span><input id="lod-workspace-enabled" type="checkbox"></label>
+      <label>StreamingMinRadius · studs <span class="lm-help" tabindex="0" role="button" title="Ближайшая область приоритетной загрузки вокруг ReplicationFocus. Roblox рекомендует 64 для экономии памяти.">?</span><input id="lod-workspace-min-radius" type="number" min="32" max="512" step="1"></label>
+      <label>StreamingTargetRadius · studs <span class="lm-help" tabindex="0" role="button" title="Целевой радиус доставки серверной геометрии вокруг персонажа. НЕ жёсткая граница видимости. Roblox рекомендует 1024.">?</span><input id="lod-workspace-target-radius" type="number" min="96" max="4096" step="1"></label>
+      <label>ModelStreamingBehavior <span class="lm-help" tabindex="0" role="button" title="Improved позволяет моделям с BasePart появляться и выгружаться более эффективно.">?</span><select id="lod-workspace-model"><option>Improved</option><option>Default</option><option>Legacy</option></select></label>
+      <label>StreamingIntegrityMode <span class="lm-help" tabindex="0" role="button" title="PauseOutsideLoadedArea защищает персонажа от движения в ещё не прогруженную область.">?</span><select id="lod-workspace-integrity"><option>PauseOutsideLoadedArea</option><option>Default</option><option>Disabled</option><option>MinimumRadiusPause</option></select></label>
+      <label>StreamOutBehavior <span class="lm-help" tabindex="0" role="button" title="Opportunistic удаляет далёкую геометрию без ожидания нехватки памяти.">?</span><select id="lod-workspace-streamout"><option>Opportunistic</option><option>Default</option><option>LowMemory</option></select></label>
+    </div>
+    <div class="actions"><button id="lod-copy-workspace" type="button">Copy Studio Command Bar · Workspace</button></div>
+    <p id="lod-settings-status" class="lm-note" role="status">Сохрани настройки до Preflight. Runtime Builder применяет Workspace-профиль только в копии Place.</p>
+  </section>
+  <section class="panel lm-panel"><div><span class="eyebrow">04 · History</span><h3>Snapshot revisions</h3></div>
     <div id="lod-revisions" class="lm-revisions"></div>
     <p class="lm-note">JSON включает полные трансформации и иерархию размещений. Он не заменяет резервную копию Place (.rbxl).</p>
   </section>
-  <section class="panel lm-panel lm-build"><div><span class="eyebrow">04 · Runtime preparation</span><h3>Preflight → Verified backup → Runtime draft</h3></div>
+  <section class="panel lm-panel lm-build"><div><span class="eyebrow">05 · Runtime preparation</span><h3>Preflight → Verified backup → Runtime draft</h3></div>
+    <p class="lm-note">Отмеченные выше ассеты обрабатываются только если проходят проверку структуры и принадлежности. Отключённые остаются обычными объектами Workspace.</p>
     <p class="lm-note">Сохрани текущий Studio Place через File → Save to File в <b>Roblox XML Place (.rbxlx)</b> по указанному пути. Snapshot не является .rbxlx; несохранённые изменения Studio в файл не попадут.</p>
     <code id="lod-source-path" class="lm-source-path">place/game1_runtime_source.rbxlx</code>
     <div class="actions" style="margin-top:12px"><button id="lod-prepare" type="button" disabled>Preflight saved Place</button></div>
@@ -954,7 +982,7 @@
 <script src="location-collision.js?v=3431"></script>
 <script src="location-instance-manager.js?v=351&geometry=2&collision=1&review=354"></script>
 <script src="place-registry.js?v=348"></script>
-<script src="lod-manager.js?v=2"></script>
+<script src="lod-manager.js?v=3"></script>
 <script src="location-publication-state.js?v=253"></script>
 <script src="location-sync-grouping.js?v=262"></script>
 <script src="location-asset-workflow.js?v=262"></script>

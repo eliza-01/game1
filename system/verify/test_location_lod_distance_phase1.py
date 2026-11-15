@@ -12,9 +12,9 @@ class LodDistancePhase1(unittest.TestCase):
 
     def test_policy_has_separate_hysteresis_states(self):
         text = (ROOT/'src/shared/world/LocationLodDistancePolicy.luau').read_text()
-        for marker in ('function Policy.Resolve', 'previousState == "FULL"',
-                       'previousState == "LOD1"', 'previousState == "UNLOADED"',
-                       'full + h', 'full - h', 'unload + h', 'unload - h'):
+        for marker in ('function Policy.Resolve', 'config.hysteresis',
+                       'LOD2', 'states[index]', 'cutoffs[index] + h',
+                       'cutoffs[index - 1] - h'):
             self.assertIn(marker, text)
 
     def test_studio_probe_is_non_destructive_and_opt_in(self):

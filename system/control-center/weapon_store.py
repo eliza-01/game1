@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from model_publication_service import staged_model
 
+from contextlib import contextmanager
 from pathlib import Path
 import hashlib
 import json
+import math
 import re
 import shutil
 import sqlite3
@@ -18,7 +20,7 @@ from opencloud_assets import (
     wait_for_operation,
 )
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 PROJECT = "game1"
 ACTIVE_KEY = "active_weapon_slug"
 WEAPON_TYPES = ("dagger", "sword", "bigsword", "bow")
@@ -32,6 +34,9 @@ ATTACK_MOVEMENT_DEFAULTS = {
 RARITIES = ("common", "uncommon", "rare", "mythical", "legendary", "immortal")
 TEXTURE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 STAT_KEYS = ("Damage", "AttackSpeed")
+MELEE_ARC_DEFAULT = 108.0
+MELEE_ARC_MIN = 1.0
+MELEE_ARC_MAX = 360.0
 ATTACK_RADIUS_DEFAULT = 7.0
 ATTACK_RADIUS_MIN = 1.0
 ATTACK_RADIUS_MAX = 420.0
@@ -67,10 +72,20 @@ class WeaponStore:
         self._init()
         self.export()
 
+    @contextmanager
     def connect(self):
+        """Keep the transaction contract while releasing the SQLite file handle.
+
+        sqlite3.Connection.__exit__ commits/rolls back but does not close the
+        connection.  On Windows that leaks a lock on temporary/authoring DBs.
+        """
         connection = sqlite3.connect(self.db)
-        connection.row_factory = sqlite3.Row
-        return connection
+        try:
+            connection.row_factory = sqlite3.Row
+            with connection:
+                yield connection
+        finally:
+            connection.close()
 
     def _init(self):
         with self.connect() as connection:
@@ -82,6 +97,7 @@ class WeaponStore:
                     weapon_type TEXT NOT NULL,
                     rarity TEXT NOT NULL,
                     attack_radius_studs REAL NOT NULL DEFAULT 7,
+                    melee_arc_angle_degrees REAL NOT NULL DEFAULT 108,
                     model_source_path TEXT NOT NULL DEFAULT '',
                     model_prepared_path TEXT NOT NULL DEFAULT '',
                     model_sha256 TEXT NOT NULL DEFAULT '',
@@ -170,6 +186,8 @@ class WeaponStore:
                 connection.execute(
                     "ALTER TABLE weapons ADD COLUMN attack_radius_studs REAL NOT NULL DEFAULT 7"
                 )
+            if "melee_arc_angle_degrees" not in columns:
+                connection.execute("ALTER TABLE weapons ADD COLUMN melee_arc_angle_degrees REAL NOT NULL DEFAULT 108")
             connection.execute("DELETE FROM project_settings WHERE key='test_loadout_weapon'")
 
     @staticmethod
@@ -191,6 +209,7 @@ class WeaponStore:
                 "max": ATTACK_RADIUS_MAX,
                 "step": ATTACK_RADIUS_STEP,
             },
+            "meleeArcAngle": {"default": MELEE_ARC_DEFAULT, "min": MELEE_ARC_MIN, "max": MELEE_ARC_MAX, "step": 1},
             "attackLocomotionModes": list(ATTACK_LOCOMOTION_MODES),
         }
 
@@ -409,6 +428,14 @@ class WeaponStore:
                 f"attack radius must be between {ATTACK_RADIUS_MIN:g} and {ATTACK_RADIUS_MAX:g} studs"
             )
         attack_radius_studs = round(attack_radius_studs, 2)
+        arc_raw = payload.get("meleeArcAngleDegrees", old.get("melee_arc_angle_degrees") if old else MELEE_ARC_DEFAULT)
+        try:
+            melee_arc_angle = float(arc_raw)
+        except (TypeError, ValueError):
+            raise ValueError("melee arc angle must be a number in degrees")
+        if not math.isfinite(melee_arc_angle) or not (MELEE_ARC_MIN <= melee_arc_angle <= MELEE_ARC_MAX):
+            raise ValueError("melee arc angle must be between 1 and 360 degrees")
+        melee_arc_angle = round(melee_arc_angle, 2)
         if not old:
             old = self.get(slug)
         model_source = str(payload.get("modelSourcePath") or "").strip()
@@ -439,11 +466,11 @@ class WeaponStore:
         with self.connect() as connection:
             connection.execute(
                 """INSERT OR REPLACE INTO weapons(
-                    slug,name_en,name_ru,weapon_type,rarity,attack_radius_studs,model_source_path,model_prepared_path,model_sha256,
+                    slug,name_en,name_ru,weapon_type,rarity,attack_radius_studs,melee_arc_angle_degrees,model_source_path,model_prepared_path,model_sha256,
                     model_asset_id,model_published_sha256,moderation_state,revision,created_at,updated_at,published_at
-                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
-                    slug, name_en, name_ru, weapon_type, rarity, attack_radius_studs, model_source_path, model_prepared_path, model_sha256,
+                    slug, name_en, name_ru, weapon_type, rarity, attack_radius_studs, melee_arc_angle, model_source_path, model_prepared_path, model_sha256,
                     old.get("model_asset_id") if old else None,
                     str(old.get("model_published_sha256") or "") if old else "",
                     str(old.get("moderation_state") or "") if old else "",
@@ -665,6 +692,7 @@ class WeaponStore:
                 f"\t\t\tweaponType = {self._lua_string(row['weapon_type'])},",
                 f"\t\t\trarity = {self._lua_string(row['rarity'])},",
                 f"\t\t\tattackRadiusStuds = {self._lua_number(row.get('attack_radius_studs') or ATTACK_RADIUS_DEFAULT)},",
+                f"\t\t\tmeleeArcAngleDegrees = {self._lua_number(row.get('melee_arc_angle_degrees') or MELEE_ARC_DEFAULT)},",
                 f"\t\t\tstatus = {self._lua_string(row['status'])},",
                 f"\t\t\tmodelAssetId = {self._lua_string(row.get('model_asset_id') or '')},",
                 f"\t\t\tserverStoragePath = {self._lua_string(row['server_storage_path'])},",

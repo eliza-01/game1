@@ -10,32 +10,35 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'system/control-center'))
-from services.location_runtime_build import _runtime_payload, TARGET_SLUGS, RuntimePlaceBuilder
+from services.location_runtime_build import _runtime_payload, RuntimePlaceBuilder
+from services.location_streaming_config import DEFAULT_SETTINGS
 
 
 class RuntimeStreamingPilot(unittest.TestCase):
     def test_shared_state_policy_and_local_only_visual_owner(self):
         client = (ROOT / 'src/client/world/LocationWorldStreamer.luau').read_text(encoding='utf-8')
         policy = (ROOT / 'src/shared/world/LocationLodDistancePolicy.luau').read_text(encoding='utf-8')
-        for expected in ('Policy.Resolve(distance, record.desired)',
+        for expected in ('Policy.Resolve(distance, record.desired, manifest.distances, record.mode)',
                          'MAX_CHANGES_PER_TICK = 8', 'CanCollide = false',
                          'CanQuery = false', 'CanTouch = false',
                          'record.cframe', 'record.size', 'cameraPosition - record.pivot',
                          'record.part:Destroy()', 'RunService.Heartbeat'):
             self.assertIn(expected, client)
         self.assertIn('hysteresis = 12', policy)
-        self.assertIn('fullDistance = 120', policy)
-        self.assertIn('unloadDistance = 280', policy)
+        self.assertIn('lod1 = 120', policy)
+        self.assertIn('hide = 400', policy)
+        self.assertIn('lod2 = 260', policy)
         for forbidden in ('remote:FireServer', 'RemoteEvent', 'SetNetworkOwner',
                           'model:Destroy()', 'CollisionGroup ='):
             self.assertNotIn(forbidden, client)
 
-    def test_owned_template_cache_is_limited_to_two_published_assets(self):
+    def test_owned_template_cache_supports_selected_capabilities(self):
         service = (ROOT / 'src/server/world/LocationLodTemplateService.luau').read_text(encoding='utf-8')
         contract = (ROOT / 'src/shared/world/LocationRuntimeManifestContract.luau').read_text(encoding='utf-8')
-        self.assertIn('Contract.MaxTargets = 2', contract)
+        self.assertIn('Contract.MaxTargets = 64', contract)
+        self.assertIn('Contract.Variants(mode)', contract)
         self.assertIn('for _, slug in ipairs(manifest.targets)', service)
-        self.assertIn('for _, variant in ipairs({"FULL", "LOD1"})', service)
+        self.assertIn('for _, variant in ipairs(Contract.Variants(manifest.modes[slug]))', service)
         self.assertIn('InsertService.LoadAsset', service)
         self.assertIn('AssetService.LoadAssetAsync', service)
         self.assertIn('template.CanCollide = false', service)
@@ -43,6 +46,22 @@ class RuntimeStreamingPilot(unittest.TestCase):
         self.assertIn('LocationLodTemplateService', (ROOT / 'src/server/bootstrap/ServiceCatalog.luau').read_text())
         self.assertIn('LocationWorldStreamer', (ROOT / 'src/client/init.client.luau').read_text())
         self.assertIn('if not marker then return end', service)
+
+    def test_server_template_ignores_retired_collision_mesh_in_published_model(self):
+        # M342 deleted COL meshes from managed Place and FBX publication, but
+        # older immutable Roblox Model Asset IDs may still contain col_mesh.
+        service = (ROOT / 'src/server/world/LocationLodTemplateService.luau').read_text(encoding='utf-8')
+        physics = (ROOT / 'src/shared/world/MeshPhysicsCore.luau').read_text(encoding='utf-8')
+        self.assertIn('not MeshPhysics.IsLocationCarrier(part)', service)
+        self.assertIn('and not MeshPhysics.IsCollider(part.Name)', service)
+        self.assertIn('numberVisuals += 1', service)
+        self.assertIn('if numberVisuals ~= 1 then', service)
+        self.assertIn('function Core.IsCollider(name: string)', physics)
+        self.assertIn('lower:sub(1, 4) == "col_"', physics)
+        self.assertIn('lower:find("_col_", 1, true)', physics)
+        self.assertIn('lower:sub(-4) == "_col"', physics)
+        self.assertNotIn('template.CanCollide = true', service)
+        self.assertIn('template.CanQuery = false', service)
 
     def test_full_snapshot_133_compact_manifest_when_available(self):
         # Optional user dataset: this test checks their latest captured source
@@ -55,7 +74,7 @@ class RuntimeStreamingPilot(unittest.TestCase):
         if found is None:
             self.skipTest('Snapshot #133 not included in local project')
         revision = json.loads(zlib.decompress(found[0]))
-        selected = [row for row in revision['placements'] if row['slug'] in TARGET_SLUGS]
+        selected = [row for row in revision['placements'] if row['slug'] in DEFAULT_SETTINGS['modes']]
         self.assertEqual(len(selected), 201)
         payload = _runtime_payload(selected, snapshot_id=133, catalog_digest='test')
         self.assertEqual(len(payload['placements']), 201)
@@ -73,7 +92,7 @@ class RuntimeStreamingPilot(unittest.TestCase):
         if not found:
             self.skipTest('Snapshot #133 missing')
         source_rows = json.loads(zlib.decompress(found[0]))['placements']
-        rows = [row for row in source_rows if row['slug'] in TARGET_SLUGS]
+        rows = [row for row in source_rows if row['slug'] in DEFAULT_SETTINGS['modes']]
         self.assertEqual(len(rows), 201)
         with tempfile.TemporaryDirectory() as base:
             root = Path(base)

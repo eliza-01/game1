@@ -9,7 +9,6 @@ local CombatShared = Shared:WaitForChild("combat")
 local CharacterConfig = require(CharacterShared:WaitForChild("CharacterConfig"))
 local AttackConfig = require(CombatShared:WaitForChild("AttackConfig"))
 local CharacterAttackWindow = require(CombatShared:WaitForChild("CharacterAttackWindow"))
-local WeaponAttackVolume = require(CombatShared:WaitForChild("WeaponAttackVolume"))
 local BowProjectileConfig = require(CombatShared:WaitForChild("BowProjectileConfig"))
 local UiInputGuard = require(script.Parent.Parent:WaitForChild("UiInputGuard"))
 local BoneMountedAttachmentController = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("BoneMountedAttachmentController"))
@@ -19,42 +18,31 @@ local movementController: any = nil
 local animationController: any = nil
 local aimPoseController: any = nil
 local attackSequence = 0
-local activePoseAttackId = 0
-local activePoseFrom = 0
-local activePoseUntil = 0
-local activePoseStartedAt = 0
-local poseAccumulator = 0
+local activeMeleeAimId = 0
+local activeMeleeAimFrom = 0
+local activeMeleeAimUntil = 0
+local activeMeleeAimStartedAt = 0
+local aimAccumulator = 0
 local bowCaptureSequence = 0
 local bowPresentationUntil = 0
 local bowPresentationCharacter: Model? = nil
-local weaponPoseRemote: RemoteEvent? = nil
+local meleeAimRemote: RemoteEvent? = nil
 local bowAimRemote: RemoteEvent? = nil
 
 
-local function publishWeaponPose()
-    if not weaponPoseRemote or activePoseAttackId <= 0 then
-        return
-    end
+-- Only client camera AIM is shared for an optional headshot classification.
+-- Never send a weapon mesh transform, collision box, reach or target list.
+local function publishMeleeAim()
+    if not meleeAimRemote or activeMeleeAimId <= 0 then return end
     local character = Players.LocalPlayer.Character
-    if not character or tostring(character:GetAttribute("LifeState") or "Alive") ~= "Alive" then
-        return
-    end
-    local boxCFrame = WeaponAttackVolume.ReadEquippedWeaponBox(character)
-    if typeof(boxCFrame) ~= "CFrame" then
-        return
-    end
-
-    local aimOrigin = nil
-    local aimDirection = nil
-    if aimPoseController and aimPoseController.GetAimRay then
-        aimOrigin, aimDirection = aimPoseController.GetAimRay()
-    end
-    weaponPoseRemote:FireServer({
-        clientAttackId = activePoseAttackId,
-        elapsed = math.max(0, os.clock() - activePoseStartedAt),
-        boxCFrame = boxCFrame,
-        aimOrigin = aimOrigin,
-        aimDirection = aimDirection,
+    if not character or character:GetAttribute("LifeState") ~= "Alive" then return end
+    if not aimPoseController or not aimPoseController.GetAimRay then return end
+    local origin, direction = aimPoseController.GetAimRay()
+    if typeof(origin) ~= "Vector3" or typeof(direction) ~= "Vector3" then return end
+    meleeAimRemote:FireServer({
+        clientAttackId = activeMeleeAimId,
+        aimOrigin = origin,
+        aimDirection = direction,
     })
 end
 
@@ -86,11 +74,11 @@ function AttackController.CancelForBounce(clientAttackId: number)
     if id <= 0 or id ~= attackSequence then
         return false
     end
-    if activePoseAttackId == id then
-        activePoseAttackId = 0
-        activePoseFrom = 0
-        activePoseUntil = 0
-        poseAccumulator = 0
+    if activeMeleeAimId == id then
+        activeMeleeAimId = 0
+        activeMeleeAimFrom = 0
+        activeMeleeAimUntil = 0
+        aimAccumulator = 0
     end
     finishPresentation(id)
     return true
@@ -104,7 +92,7 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
     started = true
     local remotes = ReplicatedStorage:WaitForChild("Game1Remotes")
     local attack = remotes:WaitForChild("AttackIntent")
-    weaponPoseRemote = remotes:WaitForChild("AttackWeaponPose") :: RemoteEvent
+    meleeAimRemote = remotes:WaitForChild("MeleeAimUpdate") :: RemoteEvent
     bowAimRemote = remotes:WaitForChild("BowAimUpdate") :: RemoteEvent
 
     RunService.RenderStepped:Connect(function(deltaTime)
@@ -130,32 +118,31 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
                 end
             end
         end
-        if activePoseAttackId <= 0 then
+        if activeMeleeAimId <= 0 then
             return
         end
         local now = os.clock()
-        if now > activePoseUntil then
-            activePoseAttackId = 0
-            activePoseFrom = 0
-            poseAccumulator = 0
+        if now > activeMeleeAimUntil then
+            activeMeleeAimId = 0
+            activeMeleeAimFrom = 0
+            aimAccumulator = 0
             return
         end
-        if activePoseFrom > 0 then
-            if now < activePoseFrom then
+        if activeMeleeAimFrom > 0 then
+            if now < activeMeleeAimFrom then
                 return
             end
-            -- Open the authored damage window with an immediate sample on the
-            -- first rendered frame at/after HitStart. No pre-HitStart pose
-            -- packets are sent because they can never deal damage.
-            activePoseFrom = 0
-            poseAccumulator = 0
-            publishWeaponPose()
+            -- An aim snapshot can upgrade one arc contact to a headshot; it is
+            -- never needed for ordinary melee damage.
+            activeMeleeAimFrom = 0
+            aimAccumulator = 0
+            publishMeleeAim()
             return
         end
-        poseAccumulator += deltaTime
-        if poseAccumulator >= AttackConfig.WeaponPoseSampleInterval then
-            poseAccumulator = poseAccumulator % AttackConfig.WeaponPoseSampleInterval
-            publishWeaponPose()
+        aimAccumulator += deltaTime
+        if aimAccumulator >= AttackConfig.MeleeSampleInterval then
+            aimAccumulator = aimAccumulator % AttackConfig.MeleeSampleInterval
+            publishMeleeAim()
         end
     end)
     local function attemptAttack()
@@ -291,14 +278,13 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
             return
         end
 
-        -- Pose streaming exists only for the authored character melee window:
-        -- HitStart through HitEnd. Presentation/cooldown still owns the complete
-        -- animation, but no pose packet is sent before or after the damage window.
-        activePoseAttackId = sequence
-        activePoseStartedAt = os.clock()
-        activePoseFrom = activePoseStartedAt + damagePoseStart
-        activePoseUntil = activePoseStartedAt + damagePoseEnd
-        poseAccumulator = 0
+        -- Send only headshot aim during HitStart -> HitEnd; the server samples
+        -- the sector on its own timer even if the client sends NO aim packets.
+        activeMeleeAimId = sequence
+        activeMeleeAimStartedAt = os.clock()
+        activeMeleeAimFrom = activeMeleeAimStartedAt + damagePoseStart
+        activeMeleeAimUntil = activeMeleeAimStartedAt + damagePoseEnd
+        aimAccumulator = 0
         local meleeAimOrigin, meleeAimDirection = nil, nil
         if aimPoseController and aimPoseController.GetAimRay then
             meleeAimOrigin, meleeAimDirection = aimPoseController.GetAimRay()

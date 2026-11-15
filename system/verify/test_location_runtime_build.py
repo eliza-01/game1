@@ -190,6 +190,61 @@ class RuntimeBuildTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.builder.inspect(changed)
 
+    def test_owned_primary_part_to_visual_is_cleared_only_in_runtime(self):
+        tree = ET.parse(self.source)
+        models = [node for node in tree.iter('Item') if node.get('class') == 'Model'
+                  and any(child.get('class') == 'MeshPart' for child in node if child.tag == 'Item')]
+        self.assertEqual(len(models), 2)
+        ET.SubElement(models[0].find('Properties'), 'Ref', name='PrimaryPart').text = 'RBX_MESH_0'
+        # A valid PrimaryPart pointing at a RETAINED collision stays untouched.
+        ET.SubElement(models[1].find('Properties'), 'Ref', name='PrimaryPart').text = 'RBX_COLL_1'
+        tree.write(self.source, encoding='utf-8', xml_declaration=True)
+        before = self.source.read_bytes()
+        inspected = self.builder.inspect(self.rows)
+        self.assertEqual(inspected['eligible'], 2)
+        # Preflight is read-only, and the builder never modifies its input.
+        self.assertEqual(self.source.read_bytes(), before)
+        result = self.builder.prepare(self.rows, expected_sha=inspected['sourceSha256'],
+                                      snapshot_id=133, catalog_digest='digest')
+        self.assertEqual(self.source.read_bytes(), before)
+        self.assertEqual(Path(result['backupPath']).read_bytes(), before)
+        runtime = ET.parse(result['runtimePath'])
+        runtime_models = [node for node in runtime.iter('Item') if node.get('class') == 'Model'
+                          and node.get('referent') in ('RBX_MODEL_0', 'RBX_MODEL_1')]
+        self.assertEqual(len(runtime_models), 2)
+        actual = {node.get('referent'): node.find('./Properties/Ref[@name="PrimaryPart"]').text
+                  for node in runtime_models}
+        self.assertEqual(actual, {'RBX_MODEL_0': 'null', 'RBX_MODEL_1': 'RBX_COLL_1'})
+        self.assertEqual(len([n for n in runtime.iter('Item') if n.get('class') == 'Part']), 2)
+        self.assertEqual(len([n for n in runtime.iter('Item') if n.get('class') == 'MeshPart']), 0)
+        manifest = json.loads(Path(result['manifestPath']).read_text(encoding='utf-8'))
+        self.assertEqual(manifest['placements'][0]['pivotEvidence']['modelPivot'], sample_cframe(1))
+
+    def test_other_model_primary_part_cannot_reference_removed_visual(self):
+        tree = ET.parse(self.source)
+        foreign = next(x for x in tree.iter('Item')
+                       if any(e.text == 'UnmanagedPackage' for e in x.findall('./Properties/string')))
+        ET.SubElement(foreign.find('Properties'), 'Ref', name='PrimaryPart').text = 'RBX_MESH_0'
+        tree.write(self.source, encoding='utf-8', xml_declaration=True)
+        with self.assertRaisesRegex(ValueError, r'external reference from Model UnmanagedPackage.PrimaryPart'):
+            self.builder.inspect(self.rows)
+
+    def test_cross_placement_primary_part_is_not_silently_cleared(self):
+        tree = ET.parse(self.source)
+        first = next(n for n in tree.iter('Item') if n.get('referent') == 'RBX_MODEL_0')
+        ET.SubElement(first.find('Properties'), 'Ref', name='PrimaryPart').text = 'RBX_MESH_1'
+        tree.write(self.source, encoding='utf-8', xml_declaration=True)
+        with self.assertRaisesRegex(ValueError, 'external reference from Model'):
+            self.builder.inspect(self.rows)
+
+    def test_unrelated_ref_on_selected_model_must_still_block(self):
+        tree = ET.parse(self.source)
+        first = next(n for n in tree.iter('Item') if n.get('referent') == 'RBX_MODEL_0')
+        ET.SubElement(first.find('Properties'), 'Ref', name='SomeGameplayLink').text = 'RBX_MESH_0'
+        tree.write(self.source, encoding='utf-8', xml_declaration=True)
+        with self.assertRaisesRegex(ValueError, 'external reference from Model'):
+            self.builder.inspect(self.rows)
+
     def test_external_reference_to_visual_blocks_removal(self):
         tree=ET.parse(self.source)
         foreign=next(x for x in tree.iter('Item') if any(e.text=='UnmanagedPackage' for e in x.findall('./Properties/string')))

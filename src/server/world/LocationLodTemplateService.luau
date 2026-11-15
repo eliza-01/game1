@@ -1,6 +1,5 @@
--- Server-owned bounded prototype cache. Never creates world visuals on the server.
--- Only active when a Runtime Place contains the compiler-owned manifest marker.
--- Four MeshParts maximum in ReplicatedStorage for the initial two-asset pilot.
+-- Server-owned published prototype cache; client owns all world visuals.
+-- Only active in compiled Runtime Places. Bounded by Contract.MaxTargets.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local InsertService = game:GetService("InsertService")
 local AssetService = game:GetService("AssetService")
@@ -27,7 +26,11 @@ local function loadPrototype(assetId, name)
     local visual = nil
     local numberVisuals = 0
     for _, part in ipairs(wrapper:GetDescendants()) do
-        if part:IsA("MeshPart") and not MeshPhysics.IsLocationCarrier(part) then
+        -- Historical published Model Assets may still contain the retired
+        -- col_mesh. M342 removed it from authoring/Studio, not from immutable
+        -- Roblox publications. Never include it in a client visual template.
+        if part:IsA("MeshPart") and not MeshPhysics.IsLocationCarrier(part)
+            and not MeshPhysics.IsCollider(part.Name) then
             numberVisuals += 1
             visual = part
         end
@@ -75,11 +78,13 @@ function Service.Start()
     cache:SetAttribute("Loaded", 0)
     cache.Parent = ReplicatedStorage
     task.spawn(function()
-        local count = 0
+        local count, expected = 0, 0
         for _, slug in ipairs(manifest.targets) do
             local asset = Registry.assets[slug]
-            for _, variant in ipairs({"FULL", "LOD1"}) do
-                local id = tonumber(variant == "FULL" and asset.modelAssetId or asset.lod1ModelAssetId)
+            for _, variant in ipairs(Contract.Variants(manifest.modes[slug])) do
+                expected += 1
+                local id = tonumber(if variant == "FULL" then asset.modelAssetId
+                    elseif variant == "LOD1" then asset.lod1ModelAssetId else asset.lod2ModelAssetId)
                 local name = slug .. "__" .. variant
                 local prototype = loadPrototype(id, name)
                 if prototype then
@@ -89,14 +94,15 @@ function Service.Start()
                 end
             end
         end
-        local ready = count == #manifest.targets * 2
+        cache:SetAttribute("Expected", expected)
+        local ready = count == expected
         cache:SetAttribute("Ready", ready)
         if ready then
             print(("[game1][LOD] %d shared templates ready; %d runtime placements")
                 :format(count, #manifest.placements))
         else
             warn(("[game1][LOD] only %d/%d templates loaded; Runtime Place is NOT publish-ready")
-                :format(count, #manifest.targets * 2))
+                :format(count, expected))
         end
     end)
 end

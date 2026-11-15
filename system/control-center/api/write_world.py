@@ -14,6 +14,12 @@ from services.mesh_authoring_policy import is_collision_mesh
 
 
 def route(path, body, deps):
+    if path == "/api/lod-manager/settings":
+        try:
+            return 200, deps["lod_manager"].save_settings(body())
+        except (ValueError, OSError, RuntimeError, KeyError) as error:
+            return 400, {"error": str(error)}
+
     if path == "/api/lod-manager/scan":
         try:
             return 200, deps["lod_manager"].scan(body())

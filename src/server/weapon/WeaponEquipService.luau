@@ -5,7 +5,6 @@ local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local WeaponShared = Shared:WaitForChild("weapon")
 local CombatShared = Shared:WaitForChild("combat")
 local AttackConfig = require(CombatShared:WaitForChild("AttackConfig"))
-local WeaponAttackVolume = require(CombatShared:WaitForChild("WeaponAttackVolume"))
 local WeaponRegistry = require(WeaponShared:WaitForChild("WeaponRegistry"))
 local WeaponAttackMovement = require(WeaponShared:WaitForChild("WeaponAttackMovement"))
 local CharacterStatsService = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CharacterStatsService"))
@@ -125,12 +124,24 @@ local function attackRadiusFor(row: any?): number
     return math.clamp(value, 1, AttackConfig.MaxAimDistance)
 end
 
+local function meleeArcFor(row: any?): number
+    return math.clamp(tonumber(row and row.meleeArcAngleDegrees) or AttackConfig.MeleeDefaultArcAngle, 1, 360)
+end
+
+local function purgeLegacyWeaponBox(weapon: Model)
+    -- Retired M27–M357 attributes are never used by combat or the client.
+    for _, name in ipairs({"WeaponAttackBoxLocalCFrame", "WeaponAttackBoxSize", "WeaponAttackBoneBoxLocalPosition"}) do
+        weapon:SetAttribute(name, nil)
+    end
+end
+
 function WeaponEquipService.Unequip(character: Model)
     clearWeapon(character)
     character:SetAttribute("EquippedWeaponSlug", "")
     character:SetAttribute("EquippedWeaponType", "")
     character:SetAttribute("EquippedWeaponRarity", "")
     character:SetAttribute("AttackRadius", attackRadiusFor(nil))
+    character:SetAttribute("MeleeArcAngle", meleeArcFor(nil))
     character:SetAttribute("AnimationWeaponSet", "hands")
     character:SetAttribute("AttackMovementLocomotionMode", "Run")
     character:SetAttribute("AttackMovementRunSpeedMultiplier", 1)
@@ -173,18 +184,11 @@ function WeaponEquipService.Equip(character: Model, slugValue: any): (boolean, s
     weapon:SetAttribute("WeaponType", tostring(row.weaponType or ""))
     weapon:SetAttribute("WeaponRarity", tostring(row.rarity or ""))
     weapon:SetAttribute("AttackRadius", attackRadiusFor(row))
+    weapon:SetAttribute("MeleeArcAngle", meleeArcFor(row))
     weapon:SetAttribute("Game1WeaponGripRotation", nil)
     weapon:SetAttribute("WeaponAttachmentMode", "runtime-canonical-grip-v2")
     BoneModelMount.Place(weapon, grip, BoneModelMount.SocketFrame(targetBone, "weapon"))
-    -- Persist the authored EquippedWeapon OBB in model-local space. The client
-    -- can then reconstruct the exact animated weapon box every frame without
-    -- changing its dimensions, while the server owns the canonical size used
-    -- by combat validation.
-    if string.lower(tostring(row.weaponType or "")) == "bow" then
-        WeaponAttackVolume.ClearWeaponBox(weapon)
-    else
-        WeaponAttackVolume.StampWeaponBox(weapon)
-    end
+    purgeLegacyWeaponBox(weapon)
     weapon.Parent = character
 
     character:SetAttribute("EquippedWeaponSlug", slug)
@@ -192,6 +196,7 @@ function WeaponEquipService.Equip(character: Model, slugValue: any): (boolean, s
     character:SetAttribute("EquippedWeaponRarity", tostring(row.rarity or ""))
     local attackMovement = WeaponAttackMovement.Resolve(row.weaponType)
     character:SetAttribute("AttackRadius", attackRadiusFor(row))
+    character:SetAttribute("MeleeArcAngle", meleeArcFor(row))
     character:SetAttribute("AnimationWeaponSet", attackMovement.animationSet)
     character:SetAttribute("AttackMovementLocomotionMode", attackMovement.locomotionMode)
     character:SetAttribute("AttackMovementRunSpeedMultiplier", attackMovement.runSpeedMultiplier)
@@ -200,7 +205,7 @@ function WeaponEquipService.Equip(character: Model, slugValue: any): (boolean, s
 end
 
 -- Common actor equipment entry point: NPCs call this without player-only stats.
--- Reuses exactly the same runtime grip, authored OBB and bone solver as Equip().
+-- Reuses the runtime grip and bone solver of Equip(); weapon OBBs are legacy.
 function WeaponEquipService.EquipVisual(actor: Model, slugValue: any, hand: string, modelName: string): (Model?, any?, string?)
     local slug = string.lower(tostring(slugValue or ""))
     local row = WeaponRegistry.weapons and WeaponRegistry.weapons[slug]
@@ -227,14 +232,11 @@ function WeaponEquipService.EquipVisual(actor: Model, slugValue: any, hand: stri
     weapon:SetAttribute("WeaponType", tostring(row.weaponType or ""))
     weapon:SetAttribute("WeaponRarity", tostring(row.rarity or ""))
     weapon:SetAttribute("AttackRadius", attackRadiusFor(row))
+    weapon:SetAttribute("MeleeArcAngle", meleeArcFor(row))
     weapon:SetAttribute("Game1WeaponGripRotation", nil)
     weapon:SetAttribute("WeaponAttachmentMode", "runtime-canonical-grip-v2")
     BoneModelMount.Place(weapon, grip, BoneModelMount.SocketFrame(bone, "weapon"))
-    if string.lower(tostring(row.weaponType or "")) == "bow" then
-        WeaponAttackVolume.ClearWeaponBox(weapon)
-    else
-        WeaponAttackVolume.StampWeaponBox(weapon)
-    end
+    purgeLegacyWeaponBox(weapon)
     weapon.Parent = actor
     return weapon, row, nil
 end
@@ -259,6 +261,7 @@ function WeaponEquipService.ListAvailable(): { any }
                 animationSet = WeaponAttackMovement.AnimationSetForType(row.weaponType),
                 rarity = tostring(row.rarity or ""),
                 attackRadiusStuds = attackRadiusFor(row),
+                meleeArcAngleDegrees = meleeArcFor(row),
                 modelAssetId = tostring(row.modelAssetId or ""),
             })
         end

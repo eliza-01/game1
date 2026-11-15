@@ -50,3 +50,16 @@
 #lod-manager-view .lm-protected-count{color:var(--mint)!important;white-space:nowrap}
 #lod-manager-view .lm-external summary{color:var(--mint)}
 #lod-manager-view .lm-external .lm-problem small{color:var(--muted)}
+
+/* M355 · compact authoring policy editor */
+#lod-manager-view .lm-settings-title{margin:16px 0 8px;font-size:12px;color:var(--mint)}
+#lod-manager-view .lm-setting-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(195px,1fr));gap:10px}
+#lod-manager-view .lm-setting-grid label{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--muted);min-width:0}
+#lod-manager-view .lm-setting-grid input,#lod-manager-view .lm-setting-grid select{max-width:100%;min-width:0}
+#lod-manager-view .lm-setting-grid .lm-checkbox{flex-direction:row;align-items:center;justify-content:flex-start;flex-wrap:wrap}
+#lod-manager-view .lm-setting-grid .lm-checkbox input{width:17px;height:17px;accent-color:var(--mint);margin-left:auto}
+#lod-manager-view .lm-help{display:inline-flex;align-items:center;justify-content:center;cursor:help;border:1px solid var(--line);border-radius:50%;width:16px;height:16px;font-size:10px;color:var(--mint);margin-left:4px}
+#lod-manager-view .lm-bulk{margin-bottom:9px;gap:8px}
+#lod-manager-view .lm-stream-mode{min-width:118px;width:100%;font-size:12px}
+#lod-manager-view .lm-stream-status{margin-top:4px;color:var(--muted);font-size:11px}
+#lod-manager-view .lm-table table{min-width:900px}

@@ -7,7 +7,7 @@ local CharacterShared = Shared:WaitForChild("character")
 local CombatShared = Shared:WaitForChild("combat")
 local Config = require(CombatShared:WaitForChild("AttackConfig"))
 local AttackTimelineConfig = require(CombatShared:WaitForChild("AttackTimelineConfig"))
-local CharacterAttackWindow = require(CombatShared:WaitForChild("CharacterAttackWindow"))
+local CharacterAttackHitEnd = require(CombatShared:WaitForChild("CharacterAttackHitEnd"))
 local WeaponBounceConfig = require(CombatShared:WaitForChild("WeaponBounceConfig"))
 local CharacterAnimationRegistry = require(CharacterShared:WaitForChild("CharacterAnimationRegistry"))
 local AttackAimGeometry = require(CombatShared:WaitForChild("AttackAimGeometry"))
@@ -60,7 +60,7 @@ local function allowedAttackDescriptor(character: Model, clipId: string): any?
     return nil
 end
 
--- Server clock drives the complete HitStart -> HitEnd sampling window.
+-- Exactly one server-clock HitEnd checkpoint. No active hit window.
 -- Client-authored CFrame/Size of a weapon is never accepted or consulted.
 local triggerWeaponBounce
 
@@ -76,51 +76,54 @@ local function applyMeleeArc(player: Player, character: Model, root: BasePart,
     local padding = Config.MeleeVerticalPadding
 
     if LandscapeSwayService then LandscapeSwayService.MeleeArc(root, reach, arcAngle) end
-    -- Preserve environmental bounce presentation, using directional rays rather
-    -- than the retired animated weapon OBB. Suppression during combat remains.
-    local contact = MeleeEnvironmentContact.Query(root, reach, arcAngle)
-    if contact then
-        local pursuers = HostilePursuitRegistry.Count(character)
-        if character:GetAttribute("InCombat") ~= true and pursuers == 0 then
-            if triggerWeaponBounce(player, character, serial, clientAttackId, clipId, elapsed, contact) then
-                return true
-            end
-        elseif Config.DebugLogs and AttackSessionStore.FirstBounceSuppression(player) then
-            print(("[game1][weapon-bounce] suppressed player=%s combat=%s pursuers=%d")
-                :format(player.Name, tostring(character:GetAttribute("InCombat")), pursuers))
+    -- Environment queries are meaningful only when Bounce is eligible.
+    -- In combat, never spend up to five rays looking for contact to suppress.
+    if character:GetAttribute("InCombat") ~= true and HostilePursuitRegistry.Count(character) == 0 then
+        local contact = MeleeEnvironmentContact.Query(root, reach, arcAngle)
+        if contact and triggerWeaponBounce(player, character, serial, clientAttackId, clipId, elapsed, contact) then
+            return true
         end
     end
 
-    local count, headshot, damaged = AttackDamageResolver.Apply({
+    local _, _, damaged = AttackDamageResolver.Apply({
         player=player, character=character, root=root, serial=serial,
-        hitTargets=session.hitTargets, aimOrigin=session.lastAimOrigin,
+        aimOrigin=session.lastAimOrigin,
         aimDirection=session.lastAimDirection, attackRange=reach,
         arcAngleDegrees=arcAngle, verticalPadding=padding,
-        headshotTarget=session.headshotTarget,
     })
-    AttackSessionStore.SetHeadshotTarget(player, headshot)
     if damaged > 0 then AttackSessionStore.MarkDamage(player, character, serial) end
     return false
 end
 
 local function scheduleMeleeArc(player: Player, character: Model, root: BasePart,
-    serial: number, clientAttackId: number, clipId: string, window: any)
+    serial: number, clientAttackId: number, clipId: string, hitEndEvent: any)
     local started = os.clock()
-    task.delay(window.startTime, function()
-        local endAt = started + window.endTime
-        repeat
-            local session = AttackSessionStore.Get(player)
-            if not session or session.serial ~= serial or session.clientAttackId ~= clientAttackId
-                or session.character ~= character or player.Character ~= character
-                or not character.Parent or session.environmentBlocked
-                or os.clock() > endAt + Config.MeleeWindowGraceSeconds then return end
-            local currentRoot = character:FindFirstChild("RootCollider")
-            if not currentRoot or not currentRoot:IsA("BasePart") then return end
-            if applyMeleeArc(player, character, currentRoot, serial, clientAttackId, clipId,
-                math.max(0, os.clock() - started)) then return end
-            if os.clock() >= endAt then return end
-            task.wait(Config.MeleeSampleInterval)
-        until false
+    task.delay(hitEndEvent.time, function()
+        local session = AttackSessionStore.Get(player)
+        if not session or session.serial ~= serial or session.clientAttackId ~= clientAttackId
+            or session.character ~= character or player.Character ~= character
+            or not character.Parent or session.environmentBlocked
+            or character:GetAttribute("LifeState") ~= "Alive" then return end
+        local currentRoot = character:FindFirstChild("RootCollider")
+        if not currentRoot or not currentRoot:IsA("BasePart") then return end
+        if not AttackSessionStore.MarkMeleeResolved(player, character, serial, clientAttackId) then return end
+        -- Exactly one snapshot at HitEnd, even with no loaded animation track.
+        local bounced = applyMeleeArc(player, character, currentRoot, serial, clientAttackId, clipId,
+            math.max(0, os.clock() - started))
+        if not bounced then
+            local completed = AttackSessionStore.Get(player)
+            if completed and completed.serial == serial and not completed.damageDealt then
+                local range = math.clamp(tonumber(character:GetAttribute("AttackRadius")) or Config.Range,
+                    1, Config.MaxAimDistance)
+                local aimedState = AttackFeedbackTargeting.Evaluate(character, currentRoot,
+                    completed.lastAimOrigin, completed.lastAimDirection, range, false)
+                CombatFeedbackService.PublishAttackOutcome(character, aimedState, false)
+                if Config.DebugLogs then
+                    print(("[game1][attack] zero_damage player=%s serial=%d source=melee_arc HitEnd")
+                        :format(player.Name, serial))
+                end
+            end
+        end
     end)
 end
 
@@ -128,37 +131,26 @@ local function clearAttackState(
     player: Player,
     character: Model,
     serial: number,
-    clientAttackId: number,
-    reportMiss: boolean
+    clientAttackId: number
 ): boolean
+    local active = AttackSessionStore.Get(player)
+    -- Bounce can extend recovery beyond the original animation duration.
+    -- An older completion timer must never shorten that server cooldown.
+    if active and active.character == character and active.serial == serial
+        and active.clientAttackId == clientAttackId and os.clock() + 0.002 < active.untilTime then
+        task.delay(active.untilTime - os.clock(), function()
+            clearAttackState(player, character, serial, clientAttackId)
+        end)
+        return false
+    end
     local finished = AttackSessionStore.Finish(player, character, serial, clientAttackId)
     if not finished then
         return false
     end
 
-    -- Aggregate the whole multi-target arc: any positive damage wins.
-    -- Never publish one Miss per monster that the sector did not reach.
-    if reportMiss and not finished.damageDealt
-        and player.Character == character and character.Parent
-        and character:GetAttribute("LifeState") == "Alive" then
-        local root = character:FindFirstChild("RootCollider")
-        if root and root:IsA("BasePart") then
-            local range = math.clamp(tonumber(character:GetAttribute("AttackRadius")) or Config.Range,
-                1, Config.MaxAimDistance)
-            local aimedState = AttackFeedbackTargeting.Evaluate(character, root,
-                finished.lastAimOrigin, finished.lastAimDirection, range, false)
-            CombatFeedbackService.PublishAttackOutcome(character, aimedState, false)
-        end
-        if Config.DebugLogs then
-            print(("[game1][attack] zero_damage player=%s serial=%d source=melee_arc")
-                :format(player.Name, serial))
-        end
-    end
-
     if character.Parent and tonumber(character:GetAttribute("AttackSerial")) == serial then
         character:SetAttribute("AttackEndsAt", nil)
-        character:SetAttribute("AttackDamageStartsAt", nil)
-        character:SetAttribute("AttackDamageEndsAt", nil)
+        character:SetAttribute("AttackHitEndAt", nil)
         character:SetAttribute("AttackClipId", nil)
         character:SetAttribute("AttackReleaseAt", nil)
     end
@@ -170,11 +162,10 @@ local function clearAttackStateLater(
     character: Model,
     serial: number,
     clientAttackId: number,
-    durationSeconds: number,
-    reportMiss: boolean
+    durationSeconds: number
 )
     task.delay(durationSeconds, function()
-        clearAttackState(player, character, serial, clientAttackId, reportMiss)
+        clearAttackState(player, character, serial, clientAttackId)
     end)
 end
 
@@ -201,7 +192,7 @@ triggerWeaponBounce = function(
         return false
     end
     character:SetAttribute("AttackEndsAt", now + recoverySeconds)
-    character:SetAttribute("AttackDamageEndsAt", now)
+    character:SetAttribute("AttackHitEndAt", nil)
     character:SetAttribute("LastAttackBounced", true)
 
     WeaponBounceService.Publish(player, {
@@ -224,7 +215,7 @@ triggerWeaponBounce = function(
             ))
     end
 
-    clearAttackStateLater(player, character, serial, clientAttackId, recoverySeconds, false)
+    clearAttackStateLater(player, character, serial, clientAttackId, recoverySeconds)
     return true
 end
 
@@ -379,8 +370,8 @@ local function attack(player: Player, payload: any)
 
     local isBow = string.lower(tostring(character:GetAttribute("EquippedWeaponType") or "")) == "bow"
     local releaseEvent = if isBow then timing.events and timing.events[BowProjectileConfig.ReleaseEvent] else nil
-    local damageWindow = if isBow then nil else CharacterAttackWindow.Resolve(timing)
-    if (isBow and not releaseEvent) or (not isBow and not damageWindow) then
+    local hitEndEvent = if isBow then nil else CharacterAttackHitEnd.Resolve(timing)
+    if (isBow and not releaseEvent) or (not isBow and not hitEndEvent) then
         if Config.DebugLogs then
             print(("[game1][attack] reject player=%s reason=missing_character_damage_window clip=%s"):format(player.Name, clipId))
         end
@@ -401,7 +392,7 @@ local function attack(player: Player, payload: any)
 
     local attackDuration = timing.duration
     local serial = (tonumber(character:GetAttribute("AttackSerial")) or 0) + 1
-    AttackSessionStore.Begin(player, character, serial, clientAttackId, now + attackDuration, damageWindow)
+    AttackSessionStore.Begin(player, character, serial, clientAttackId, now + attackDuration)
     if not isBow then
         local origin, direction = AttackAimGeometry.Normalize(root.Position, payload.aimOrigin, payload.aimDirection)
         AttackSessionStore.SetAim(player, character, serial, clientAttackId, origin, direction)
@@ -410,8 +401,7 @@ local function attack(player: Player, payload: any)
     character:SetAttribute("AttackClipId", clipId)
     character:SetAttribute("AttackStartedAt", now)
     character:SetAttribute("AttackEndsAt", now + attackDuration)
-    character:SetAttribute("AttackDamageStartsAt", if damageWindow then now + damageWindow.startTime else nil)
-    character:SetAttribute("AttackDamageEndsAt", if damageWindow then now + damageWindow.endTime else nil)
+    character:SetAttribute("AttackHitEndAt", if hitEndEvent then now + hitEndEvent.time else nil)
     character:SetAttribute("AttackReleaseAt", if releaseEvent then now + releaseEvent.time else nil)
     character:SetAttribute("LastAttackHitZone", nil)
     character:SetAttribute("LastAttackHeadshot", false)
@@ -419,15 +409,15 @@ local function attack(player: Player, payload: any)
 
     if isBow then
         if not beginBowRelease(player, character, root, clientAttackId, serial, timing, payload) then
-            clearAttackState(player, character, serial, clientAttackId, false)
+            clearAttackState(player, character, serial, clientAttackId)
             return
         end
     end
-    -- Bow's hitscan path is unchanged; melee is server-sampled from its timeline.
+    -- Bow's release path is separate; melee resolves once at server-timed HitEnd.
     if not isBow then
-        scheduleMeleeArc(player, character, root, serial, clientAttackId, clipId, damageWindow)
+        scheduleMeleeArc(player, character, root, serial, clientAttackId, clipId, hitEndEvent)
     end
-    clearAttackStateLater(player, character, serial, clientAttackId, attackDuration, not isBow)
+    clearAttackStateLater(player, character, serial, clientAttackId, attackDuration)
 end
 
 -- This event carries AIM ONLY for a headshot upgrade. Geometry and
@@ -441,7 +431,8 @@ local function updateMeleeAim(player: Player, payload: any)
     local session = AttackSessionStore.Get(player)
     if not root or not root:IsA("BasePart") or not session
         or session.character ~= character or session.clientAttackId ~= clientAttackId
-        or session.environmentBlocked or character:GetAttribute("LifeState") ~= "Alive" then return end
+        or session.environmentBlocked or session.hitResolved
+        or character:GetAttribute("LifeState") ~= "Alive" then return end
     local now = os.clock()
     if now > session.untilTime or now < session.untilTime - Config.MaxMeleeAimWindowSeconds then return end
     local origin, direction = AttackAimGeometry.Normalize(root.Position, payload.aimOrigin, payload.aimDirection)

@@ -1,8 +1,8 @@
 -- Runtime resolver for Asset Manager-authored attack timelines.
 --
 -- Asset Manager owns normalized event positions. Runtime converts them to the
--- exact playback speed used by the animation system. Character melee windows
--- are interpreted separately by CharacterAttackWindow; monster attacks keep
+-- exact playback speed used by the animation system. Character melee hit events
+-- are interpreted separately by CharacterAttackHitEnd; monster attacks keep
 -- their current single Hit event semantics.
 local CharacterAttackCadence = require(script.Parent:WaitForChild("CharacterAttackCadence"))
 
@@ -11,7 +11,6 @@ local AttackTimelineConfig = {}
 AttackTimelineConfig.SchemaVersion = 2
 AttackTimelineConfig.EndGuardSeconds = 0.03
 AttackTimelineConfig.EventNames = table.freeze({
-    HitStart = true,
     HitEnd = true,
     Hit = true,
     Release = true,

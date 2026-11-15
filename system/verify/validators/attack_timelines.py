@@ -1,4 +1,4 @@
-"""Attack Timeline data, damage windows and authoring contract (M168)."""
+"""Attack Timeline metadata and authoritative HitEnd contract (M360)."""
 
 import json
 import re
@@ -10,9 +10,8 @@ def check_attack_timelines(root: Path, report_error: Callable[[str], None], *,
                            attack_timeline_text: str, attack_timeline_data_text: str,
                            studio_plugin_text: str, host_agent_text: str):
     """Return shared Asset Manager UI and Studio Bridge source text."""
-    # m38 character attack damage policy. Character attacks use an authored
-    # HitStart -> HitEnd interval. The old terminal Hit/result dispatch and pose
-    # buffer are removed; monsters intentionally keep their single Hit checkpoint.
+    # M360 player melee has one authored gameplay checkpoint: HitEnd.
+    # Bow Release and monster Hit remain separate authoring policies.
     attack_timeline_manifest_path = root / "assets/manifests/attack-timelines.json"
     attack_timeline_manifest = json.loads(attack_timeline_manifest_path.read_text(encoding="utf-8")) if attack_timeline_manifest_path.is_file() else {}
     if int(attack_timeline_manifest.get("schemaVersion") or 0) != 2:
@@ -28,46 +27,42 @@ def check_attack_timelines(root: Path, report_error: Callable[[str], None], *,
             report_error(f"m38 character timeline clip missing {clip_id}")
             continue
         events = row.get("events") or {}
-        if "HitStart" not in events or "HitEnd" not in events:
-            report_error(f"m38 {clip_id} requires HitStart and HitEnd")
-        if "Hit" in events:
-            report_error(f"m38 {clip_id} must not keep obsolete character Hit damage event")
-        if float((events.get("HitStart") or {}).get("normalizedTime") or 0) > float((events.get("HitEnd") or {}).get("normalizedTime") or 0):
-            report_error(f"m38 {clip_id} HitStart cannot be after HitEnd")
+        if set(events) != {"HitEnd"}:
+            report_error(f"M360 {clip_id} must author only HitEnd")
     monster_timeline = attack_timeline_rows.get("monster__gremlin__attack__01") or {}
     monster_events = monster_timeline.get("events") or {}
     if "Hit" not in monster_events or "HitStart" in monster_events or "HitEnd" in monster_events:
         report_error("m38 monster timeline must retain only its single Hit policy")
 
-    character_window_path = root / "src/shared/combat/CharacterAttackWindow.luau"
-    character_window_text = character_window_path.read_text(encoding="utf-8") if character_window_path.is_file() else ""
-    for required in ["CharacterAttackWindow.Resolve", "events and events.HitStart", "events and events.HitEnd", "startTime", "endTime"]:
-        if required not in character_window_text:
-            report_error(f"m38 character damage-window policy missing {required}")
+    hit_end_path = root / "src/shared/combat/CharacterAttackHitEnd.luau"
+    hit_end_text = hit_end_path.read_text(encoding="utf-8") if hit_end_path.is_file() else ""
+    for required in ["CharacterAttackHitEnd.Resolve", "timing.events.HitEnd", "return table.freeze({ time = time })"]:
+        if required not in hit_end_text:
+            report_error(f"M360 character HitEnd checkpoint missing {required}")
+    for forbidden in ["HitStart.time", "events.HitStart.time", "MeleeHitFraction"]:
+        if forbidden in hit_end_text:
+            report_error(f"M360 damage checkpoint incorrectly depends on {forbidden}")
 
     attack_controller_m38 = (root / "src/client/combat/AttackController.luau").read_text(encoding="utf-8")
     for required in [
-        "CharacterAttackWindow.Resolve(action.timeline)",
-        "damageWindow.startTime",
-        "damageWindow.endTime",
-        "activeMeleeAimFrom = activeMeleeAimStartedAt + damagePoseStart",
-        "activeMeleeAimUntil = activeMeleeAimStartedAt + damagePoseEnd",
+        "CharacterAttackHitEnd.Resolve(action.timeline)",
+        "hitEndEvent.time",
+        "AttackConfig.MeleeAimCaptureLeadSeconds",
+        "task.delay(math.max(0, hitEndEvent.time - lead)",
     ]:
         if required not in attack_controller_m38:
-            report_error(f"m38 client HitStart/HitEnd pose window missing {required}")
+            report_error(f"M360 client HitEnd presentation missing {required}")
 
     attack_service_m38 = (root / "src/server/combat/AttackService.luau").read_text(encoding="utf-8")
     for required in [
         "scheduleMeleeArc",
-        "CharacterAttackWindow.Resolve(timing)",
-        'SetAttribute("AttackDamageStartsAt"',
-        'SetAttribute("AttackDamageEndsAt"',
-        "task.delay(window.startTime",
-        "Config.MeleeSampleInterval",
-        "os.clock() >= endAt",
+        "CharacterAttackHitEnd.Resolve(timing)",
+        'SetAttribute("AttackHitEndAt"',
+        "task.delay(hitEndEvent.time",
+        "applyMeleeArc(",
     ]:
         if required not in attack_service_m38:
-            report_error(f"m38 server HitStart/HitEnd damage gate missing {required}")
+            report_error(f"M360 server authoritative HitEnd missing {required}")
     for forbidden in [
         "activeDamageUntil",
         "activeDamageCutoffElapsed",
@@ -78,6 +73,10 @@ def check_attack_timelines(root: Path, report_error: Callable[[str], None], *,
         "validatedAnimatedWeaponVolume",
         "weaponPoseBuffers",
         "lastDamageElapsed",
+        "MeleeSampleInterval",
+        "MeleeWindowGraceSeconds",
+        "AttackDamageStartsAt",
+        "AttackDamageEndsAt",
     ]:
         if forbidden in attack_service_m38:
             report_error(f"m38 obsolete terminal-Hit/pose-buffer path remains: {forbidden}")
@@ -111,10 +110,10 @@ def check_attack_timelines(root: Path, report_error: Callable[[str], None], *,
     ]:
         if required not in timeline_store_text:
             report_error(f"m35 timeline store missing {required}")
-    for required in ["EVENT_CATALOGS", '"characters"', '"HitStart"', '"HitEnd"', '"monsters"', '"Hit"', "event_catalog_for_subject"]:
+    for required in ["EVENT_CATALOGS", '"characters"', '"HitEnd"', '"monsters"', '"Hit"', "event_catalog_for_subject"]:
         if required not in timeline_store_text:
             report_error(f"m38 subject-specific timeline catalog missing {required}")
-    for forbidden in ["Hit2", "projectile_release", '"result"']:
+    for forbidden in ["Hit2", "projectile_release", '"result"', '"HitStart"']:
         if forbidden in timeline_store_text:
             report_error(f"m38 obsolete generic timeline event plumbing remains: {forbidden}")
     if "eventCatalogs" not in timeline_js_text:

@@ -1,4 +1,5 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CollectionService = game:GetService("CollectionService")
 local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
@@ -149,6 +150,7 @@ end
 
 function EntityHitboxService.Detach(entity: Model)
     bindings[entity] = nil
+    CollectionService:RemoveTag(entity, "Game1CombatHitbox")
     local debugFolder = entity:FindFirstChild(DEBUG_FOLDER_NAME)
     if debugFolder then
         debugFolder:Destroy()
@@ -230,6 +232,7 @@ function EntityHitboxService.Attach(entity: Model, visual: Model): any
 
     binding.mode = if geometryUnavailable then "root_bounds_fallback" else "precomputed_bone_boxes"
     bindings[entity] = binding
+    CollectionService:AddTag(entity, "Game1CombatHitbox")
     local count = #binding.bodyBoxes + (if binding.headBox then 1 else 0)
     if geometryUnavailable then
         -- Geometry cache reports permission failures once per MeshId. Mode/Count
@@ -296,24 +299,28 @@ function EntityHitboxService.QueryDamageablesInArc(
     local results = {}
     for entity, binding in pairs(bindings) do
         if entity ~= exclude and entity.Parent and binding.visual.Parent
-            and entity:GetAttribute("Damageable") == true
-            and (binding.root.Position - origin).Magnitude <= reach + binding.definition.broadRadius
-        then
-            HitboxRuntimeFrames.Refresh(binding, frameSerial)
-            local point = nil
-            for index, box in ipairs(binding.bodyBoxes) do
-                local frame = binding.worldBodyCFrames[index]
-                if frame then
-                    point = geometry.Contact(frame, box.size, origin, facing, reach, angle, minY, maxY)
-                    if point then break end
+            and entity:GetAttribute("Damageable") == true then
+            -- Squared distance is a conservative broadphase: no sqrt, no
+            -- bone transform work for entities beyond this attack's reach.
+            local delta = binding.root.Position - origin
+            local broadReach = reach + binding.definition.broadRadius
+            if delta:Dot(delta) <= broadReach * broadReach then
+                HitboxRuntimeFrames.Refresh(binding, frameSerial)
+                local point = nil
+                for index, box in ipairs(binding.bodyBoxes) do
+                    local frame = binding.worldBodyCFrames[index]
+                    if frame then
+                        point = geometry.Contact(frame, box.size, origin, facing, reach, angle, minY, maxY)
+                        if point then break end
+                    end
                 end
-            end
-            if not point and binding.headBox and binding.worldHeadCFrame then
-                point = geometry.Contact(binding.worldHeadCFrame, binding.headBox.size,
-                    origin, facing, reach, angle, minY, maxY)
-            end
-            if point then
-                table.insert(results, {model=entity, hit={hitPosition=point, geometryRole="body"}, mode="melee_arc"})
+                if not point and binding.headBox and binding.worldHeadCFrame then
+                    point = geometry.Contact(binding.worldHeadCFrame, binding.headBox.size,
+                        origin, facing, reach, angle, minY, maxY)
+                end
+                if point then
+                    table.insert(results, {model=entity, hit={hitPosition=point, geometryRole="body"}, mode="melee_arc"})
+                end
             end
         end
     end

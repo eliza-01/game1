@@ -9,16 +9,13 @@ PROJECT = "game1"
 SCHEMA_VERSION = 2
 
 EVENT_CATALOGS = {
-    "characters": [
-        {"name": "HitStart", "label": "hit start"},
-        {"name": "HitEnd", "label": "hit end"},
-    ],
+    "characters": [{"name": "HitEnd", "label": "hit end"}],
     "bows": [{"name": "Release", "label": "release arrow"}],
     "monsters": [
         {"name": "Hit", "label": "hit"},
     ],
 }
-ALL_EVENT_NAMES = ("HitStart", "HitEnd", "Hit", "Release")
+ALL_EVENT_NAMES = ("HitEnd", "Hit", "Release")
 
 
 def event_catalog_for_subject(subject_type: str) -> list[dict]:
@@ -54,7 +51,6 @@ class TimelineStore:
                     "clipId": "human_female__weapon__1hs__attack__01",
                     "duration": 1.866666674,
                     "events": {
-                        "HitStart": {"normalizedTime": 0.40},
                         "HitEnd": {"normalizedTime": 0.50},
                     },
                 },
@@ -62,7 +58,6 @@ class TimelineStore:
                     "clipId": "human_female__weapon__1hs__attack__02",
                     "duration": 1.866666674,
                     "events": {
-                        "HitStart": {"normalizedTime": 0.40},
                         "HitEnd": {"normalizedTime": 0.50},
                     },
                 },
@@ -70,7 +65,6 @@ class TimelineStore:
                     "clipId": "human_female__weapon__1hs__attack__03",
                     "duration": 1.866666674,
                     "events": {
-                        "HitStart": {"normalizedTime": 0.40},
                         "HitEnd": {"normalizedTime": 0.50},
                     },
                 },
@@ -161,10 +155,14 @@ class TimelineStore:
                 clip_id = str(clip.get("clip_id") or "")
                 timeline = timeline_map.get(clip_id) or {}
                 preview_id, preview_mode = self._character_preview(character)
-                required_events = timeline.get("events") if isinstance(timeline.get("events"), dict) else {}
+                allowed_events = event_names_for_subject("characters", str(clip.get("weapon_set") or ""))
+                saved_events = timeline.get("events") if isinstance(timeline.get("events"), dict) else {}
+                required_events = {
+                    name: event for name, event in saved_events.items() if name in allowed_events
+                }
                 configured = (float(timeline.get("duration") or 0) > 0
                               and all(name in required_events for name in
-                                      (("Release",) if str(clip.get("weapon_set") or "") == "bow" else ("HitStart", "HitEnd")))
+                                      (("Release",) if str(clip.get("weapon_set") or "") == "bow" else ("HitEnd",)))
                               and not bool(timeline.get("reviewRequired")))
                 rows.append({
                     "subjectType": "characters",
@@ -180,7 +178,7 @@ class TimelineStore:
                         "bows" if str(clip.get("weapon_set") or "") == "bow" else "characters"),
                     "variant": int(clip.get("variant") or 0),
                     "duration": float(timeline.get("duration") or 0),
-                    "events": dict(timeline.get("events") or {}),
+                    "events": required_events,
                     "configured": configured,
                     "needsReview": bool(timeline.get("reviewRequired")),
                 })
@@ -253,10 +251,8 @@ class TimelineStore:
             if "Release" not in events:
                 raise ValueError("bow attack timeline requires Release")
         elif subject_type == "characters":
-            if "HitStart" not in events or "HitEnd" not in events:
-                raise ValueError("character attack timeline requires HitStart and HitEnd")
-            if events["HitStart"]["normalizedTime"] > events["HitEnd"]["normalizedTime"]:
-                raise ValueError("HitStart cannot be after HitEnd")
+            if "HitEnd" not in events:
+                raise ValueError("character attack timeline requires HitEnd")
         elif subject_type == "monsters":
             if "Hit" not in events:
                 raise ValueError("monster attack timeline requires Hit")

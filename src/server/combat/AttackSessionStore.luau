@@ -7,14 +7,11 @@ export type Session = {
     serial: number,
     clientAttackId: number,
     untilTime: number,
-    hitTargets: { [Model]: boolean },
     damageDealt: boolean,
-    damageWindow: any?,
+    hitResolved: boolean,
     lastAimOrigin: Vector3?,
     lastAimDirection: Vector3?,
-    headshotTarget: Model?,
     environmentBlocked: boolean,
-    suppressedBounceLogged: boolean,
 }
 
 local byPlayer: { [Player]: Session } = {}
@@ -33,22 +30,18 @@ function AttackSessionStore.Begin(
     character: Model,
     serial: number,
     clientAttackId: number,
-    untilTime: number,
-    damageWindow: any
+    untilTime: number
 ): Session
     local session: Session = {
         character = character,
         serial = serial,
         clientAttackId = clientAttackId,
         untilTime = untilTime,
-        hitTargets = {},
         damageDealt = false,
-        damageWindow = damageWindow,
+        hitResolved = false,
         lastAimOrigin = nil,
         lastAimDirection = nil,
-        headshotTarget = nil,
         environmentBlocked = false,
-        suppressedBounceLogged = false,
     }
     byPlayer[player] = session
     return session
@@ -73,28 +66,24 @@ function AttackSessionStore.SetAim(
     end
 end
 
+-- Consume exactly one authoritative damage event per attack session.
+-- A delayed callback from another attack or respawn cannot resolve this one.
+function AttackSessionStore.MarkMeleeResolved(
+    player: Player, character: Model, serial: number, clientAttackId: number
+): boolean
+    local session = byPlayer[player]
+    if not matches(session, character, serial, clientAttackId) or session.hitResolved then
+        return false
+    end
+    session.hitResolved = true
+    return true
+end
+
 function AttackSessionStore.MarkDamage(player: Player, character: Model, serial: number)
     local session = byPlayer[player]
     if session and session.character == character and session.serial == serial then
         session.damageDealt = true
     end
-end
-
-function AttackSessionStore.SetHeadshotTarget(player: Player, target: Model?)
-    local session = byPlayer[player]
-    if session then
-        session.headshotTarget = target
-    end
-end
-
--- Returns true exactly once per attack, to avoid logging every server arc sample.
-function AttackSessionStore.FirstBounceSuppression(player: Player): boolean
-    local session = byPlayer[player]
-    if not session or session.suppressedBounceLogged then
-        return false
-    end
-    session.suppressedBounceLogged = true
-    return true
 end
 
 function AttackSessionStore.CanBounce(player: Player, character: Model, serial: number, clientAttackId: number): boolean
@@ -114,7 +103,6 @@ function AttackSessionStore.BlockForBounce(
     end
     local session = byPlayer[player]
     session.environmentBlocked = true
-    session.damageWindow = nil
     session.untilTime = untilTime
     return true
 end

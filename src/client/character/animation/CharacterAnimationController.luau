@@ -8,6 +8,7 @@ local AnimationShared = Shared:WaitForChild("animation")
 local CharacterShared = Shared:WaitForChild("character")
 local DeathAnimationPolicy = require(CombatShared:WaitForChild("DeathAnimationPolicy"))
 local AttackTimelineConfig = require(CombatShared:WaitForChild("AttackTimelineConfig"))
+local WeaponBounceConfig = require(CombatShared:WaitForChild("WeaponBounceConfig"))
 local AnimationSpeedScaling = require(AnimationShared:WaitForChild("AnimationSpeedScaling"))
 local CharacterMovementConfig = require(CharacterShared:WaitForChild("CharacterMovementConfig"))
 local GameOptions = require(Shared:WaitForChild("GameOptions"))
@@ -33,7 +34,6 @@ local currentActionComposed = false
 local currentActionTimeline = nil
 local currentActionClipId = ""
 local currentActionToken = 0
-local attackComposePending = false
 local attackLowerBodyActive = false
 local connections = {}
 local lifeTransition = false
@@ -67,7 +67,6 @@ local function clearCharacter()
 	currentActionTimeline = nil
 	currentActionClipId = ""
 	currentActionToken += 1
-	attackComposePending = false
 	attackLowerBodyActive = false
 	AttackUpperBodyComposer.End()
 	lifeTransition = false
@@ -177,16 +176,16 @@ local function stopCurrentAction(fadeTime: number?)
 	attackLowerBodyActive = false
 end
 
-local function finishAttackPresentation(boundCharacter: Model, boundTrack: AnimationTrack, token: number)
-	if character ~= boundCharacter or currentAction ~= boundTrack or currentActionToken ~= token then
+local function finishAttackPresentation(boundCharacter: Model, token: number)
+	if character ~= boundCharacter or currentActionToken ~= token or currentActionSlot ~= "attack" then
 		return
 	end
 	currentActionLockedUntil = 0
 	currentActionSlot = ""
 	if currentActionComposed then
 		AttackUpperBodyComposer.End()
-	elseif boundTrack.IsPlaying then
-		boundTrack:Stop(0.04)
+	elseif currentAction and currentAction.IsPlaying then
+		currentAction:Stop(0.04)
 	end
 	currentActionComposed = false
 	currentActionTimeline = nil
@@ -438,21 +437,22 @@ local function bindCharacter(newCharacter: Model)
 	clearCharacter()
 	character = newCharacter
 	animator = findAnimator(newCharacter)
-	if not animator then
-		warn("[game1][animation] Animator is missing from Visual")
-		return
-	end
-	cache = AnimationTrackCache.new(animator)
-	lastLifeState = tostring(newCharacter:GetAttribute("LifeState") or "Alive")
-	local boundCache = cache
-	local descriptors = AnimationResolver.ListForCharacter(newCharacter)
-	task.spawn(function()
-		local result = boundCache:Prewarm(descriptors, 4)
-		if character ~= newCharacter or cache ~= boundCache then
-			return
-		end
-		print(("[game1][animation] prewarm %d/%d ready in %.3fs"):format(result.ready, result.total, result.elapsed))
-	end)
+    -- A missing Animator disables only presentation. Combat metadata remains
+    -- available so local input can still initiate server-authoritative actions.
+    if animator then
+        cache = AnimationTrackCache.new(animator)
+        local boundCache = cache
+        local descriptors = AnimationResolver.ListForCharacter(newCharacter)
+        task.spawn(function()
+            local result = boundCache:Prewarm(descriptors, 4)
+            if character ~= newCharacter or cache ~= boundCache then return end
+            print(("[game1][animation] prewarm %d/%d ready in %.3fs")
+                :format(result.ready, result.total, result.elapsed))
+        end)
+    else
+        warn("[game1][animation] Animator missing; visual unavailable, gameplay continues")
+    end
+    lastLifeState = tostring(newCharacter:GetAttribute("LifeState") or "Alive")
 	local refreshAttributes = { "MovementState", "InCombat", "AnimationMovementDirection", "AnimationWeaponSet", "RunSpeed", "AttackSpeed", "AttackMovementLocomotionMode", "AttackMovementRunSpeedMultiplier" }
 	for _, channel in ipairs({ "run", "walk" }) do
 		table.insert(refreshAttributes, AnimationSpeedScaling.DebugUnitsPerPercentAttribute(channel))
@@ -472,179 +472,144 @@ local function bindCharacter(newCharacter: Model)
 	print("[game1][animation] character animation profile bound")
 end
 
+-- This function ACCEPTS an attack immediately from authored metadata.  Loading
+-- the animation can take many frames or fail; it has no veto over gameplay.
 function CharacterAnimationController.PlayAction(slot: string)
-	if not character or not cache or lifeTransition or attackComposePending then
-		return nil
-	end
+    if not character or lifeTransition then return nil end
+    local now = os.clock()
+    if currentActionSlot == "attack" and now < currentActionLockedUntil then return nil end
+    local descriptor = AnimationResolver.ResolveAction(character, slot)
+    if not descriptor then return nil end
+    local clipId = tostring(descriptor.clipId or "")
 
-	local now = os.clock()
-	if currentActionSlot == "attack" and now < currentActionLockedUntil then
-		-- An attack owns its complete animation interval. Input/cooldown code may not
-		-- interrupt it before the configured clip timeline reaches its end.
-		return nil
-	end
+    if slot ~= "attack" then
+        if not cache then return nil end
+        local track = cache:Get(descriptor)
+        if not track then return nil end
+        stopCurrentAction(0.06)
+        local speed = animationPlaybackScale(slot, descriptor.animationId)
+        track.Looped = false
+        track:Play(0.06, 1, speed)
+        currentAction = track
+        currentActionSlot = slot
+        currentActionLockedUntil = 0
+        currentActionClipId = clipId
+        character:SetAttribute("AnimationActionSlot", slot)
+        character:SetAttribute("AnimationActionClip", clipId)
+        publishPlaybackPercent(slot)
+        return { track = track, clipId = clipId, playbackSpeed = speed }
+    end
 
-	local descriptor = AnimationResolver.ResolveAction(character, slot)
-	if not descriptor then
-		return nil
-	end
-	-- An attack is never played on the visible full-body Animator: its leg
-	-- keys would override the live run/walk track. The proxy owns its source.
-	local fallbackTrack = if slot == "attack" then nil else cache:Get(descriptor)
-	if slot ~= "attack" and not fallbackTrack then
-		return nil
-	end
+    local timeline = AttackTimelineConfig.ResolveCharacterRuntime(clipId, character:GetAttribute("AttackSpeed"))
+    if not timeline then
+        warn(("[game1][animation] attack clip has no timeline: %s"):format(clipId))
+        return nil
+    end
+    local actionStartedAt = os.clock()
+    local runtimeDuration = timeline.duration
+    stopCurrentAction(0.06)
+    currentActionToken += 1
+    local token = currentActionToken
+    local boundCharacter = character
+    local boundCache = cache
+    local playbackSpeed = timeline.playbackSpeed
 
-	local clipId = tostring(descriptor.clipId or "")
-	-- Non-attack channels retain animation scaling. Character attacks instead
-	-- derive the actual track playback from the fixed gameplay cadence.
-	local animationSpeedPercent = if slot == "attack" then 100
-		else animationPlaybackPercent(slot, descriptor.animationId)
-	local playbackSpeed = animationSpeedPercent / 100
-	local timeline = nil
-	local runtimeDuration = 0
-	if slot == "attack" then
-		timeline = AttackTimelineConfig.ResolveCharacterRuntime(clipId, character:GetAttribute("AttackSpeed"))
-		if not timeline then
-			warn(("[game1][animation] attack clip has no timeline: %s"):format(clipId))
-			return nil
-		end
-		playbackSpeed = timeline.playbackSpeed
-		animationSpeedPercent = timeline.animationSpeedPercent
-		runtimeDuration = timeline.duration
-	end
+    currentAction = nil  -- the track is purely optional presentation
+    currentActionComposed = false
+    currentActionSlot = "attack"
+    currentActionClipId = clipId
+    currentActionTimeline = timeline
+    currentActionLockedUntil = actionStartedAt + runtimeDuration
+    attackLowerBodyActive = true
+    boundCharacter:SetAttribute("AnimationActionSlot", "attack")
+    boundCharacter:SetAttribute("AnimationActionClip", clipId)
+    boundCharacter:SetAttribute("AnimationActionEndsAt", currentActionLockedUntil)
+    boundCharacter:SetAttribute("AnimationAttackBounced", false)
+    boundCharacter:SetAttribute("AnimationAttackUpperBodyComposed", false)
+    boundCharacter:SetAttribute("AnimationAttackLowerBodySlot", movementSlot())
+    boundCharacter:SetAttribute("AnimationPlaybackSpeedPercent", timeline.animationSpeedPercent)
+    boundCharacter:SetAttribute("AnimationAttackCompositionError", nil)
+    refreshLoop()
 
-	stopCurrentAction(0.06)
-	local pendingToken = currentActionToken
-	local boundCharacter = character
-	local boundCache = cache
-	local track = fallbackTrack
-	local composed = false
-	if slot == "attack" then
-		-- A source track may need to load before it can be sampled. Guard both
-		-- repeated input and lifecycle transitions while Begin yields.
-		attackComposePending = true
-		attackLowerBodyActive = true
-		refreshLoop()
-		local composedTrack, composeError, loadedPlaybackSpeed = AttackUpperBodyComposer.Begin(boundCharacter, descriptor, playbackSpeed, function()
-			return character == boundCharacter and cache == boundCache
-				and currentActionToken == pendingToken and not lifeTransition
-		end, timeline.playbackDuration)
-		if currentActionToken == pendingToken then
-			attackComposePending = false
-		end
-		if character ~= boundCharacter or cache ~= boundCache
-			or currentActionToken ~= pendingToken or lifeTransition
-		then
-			if composedTrack then AttackUpperBodyComposer.End() end
-			return nil
-		end
-		if not composedTrack then
-			-- Never replace live locomotion with a full-body attack animation.
-			-- If composition is unavailable, the attack is not issued to the server.
-			attackLowerBodyActive = false
-			currentAction = nil
-			currentActionSlot = ""
-			currentActionLockedUntil = 0
-			character:SetAttribute("AnimationAttackUpperBodyComposed", false)
-			character:SetAttribute("AnimationAttackLowerBodySlot", nil)
-			character:SetAttribute("AnimationAttackBridgeBone", nil)
-			character:SetAttribute("AnimationAttackCompositionError", tostring(composeError))
-			refreshLoop()
-			warn(("[game1][animation] attack %s cancelled; upper-body composition unavailable: %s")
-				:format(clipId, tostring(composeError)))
-			return nil
-		end
-		track = composedTrack
-		composed = true
-		-- The published track can be shorter than the FBX/authoring duration.
-		-- Keep gameplay and HitStart/HitEnd times fixed, but use the actual
-		-- source playback rate for visual output and bounce rewind.
-		playbackSpeed = loadedPlaybackSpeed or playbackSpeed
-		animationSpeedPercent = playbackSpeed * 100
-		timeline.playbackSpeed = playbackSpeed
-		timeline.animationSpeedPercent = animationSpeedPercent
-		character:SetAttribute("AnimationAttackCompositionError", nil)
-	end
+    -- The presentation pipeline is asynchronous; delays below remain based on
+    -- actionStartedAt, NOT on when LoadAnimation/upper-body composition finishes.
+    task.spawn(function()
+        local track, reason, loadedSpeed = AttackUpperBodyComposer.Begin(
+            boundCharacter, descriptor, playbackSpeed, function()
+                return character == boundCharacter and cache == boundCache
+                    and currentActionToken == token and currentActionSlot == "attack"
+                    and not lifeTransition and os.clock() < actionStartedAt + runtimeDuration
+            end, timeline.playbackDuration
+        )
+        if currentActionToken ~= token or character ~= boundCharacter then
+            -- Begin's validity guard owns stale resource cleanup.
+            return
+        end
+        if not track then
+            boundCharacter:SetAttribute("AnimationAttackCompositionError", tostring(reason))
+            warn(("[game1][animation] attack %s visual unavailable; gameplay continues: %s")
+                :format(clipId, tostring(reason)))
+            return
+        end
+        currentAction = track
+        currentActionComposed = true
+        -- Visual speed is corrected for the actual loaded animation length,
+        -- while the timeline and server HitEnd are NEVER recalculated.
+        timeline.playbackSpeed = loadedSpeed or playbackSpeed
+        timeline.animationSpeedPercent = timeline.playbackSpeed * 100
+        boundCharacter:SetAttribute("AnimationPlaybackSpeedPercent", timeline.animationSpeedPercent)
+        boundCharacter:SetAttribute("AnimationAttackUpperBodyComposed", true)
+        boundCharacter:SetAttribute("AnimationAttackBridgeBone", AttackUpperBodyComposer.GetBridgeName())
+        local elapsed = math.max(0, os.clock() - actionStartedAt)
+        if elapsed > 0 then
+            pcall(function()
+                track.TimePosition = math.min(track.Length - 1 / 120, elapsed * timeline.playbackSpeed)
+            end)
+        end
+    end)
 
-	-- Start the gameplay interval only after the source animation is ready;
-	-- waiting for a first-time LoadAnimation must not consume the attack window.
-	local actionStartedAt = os.clock()
-	currentActionToken += 1
-	local actionToken = currentActionToken
-	currentActionSlot = slot
-	currentActionLockedUntil = if slot == "attack" then actionStartedAt + runtimeDuration else 0
-	if slot == "attack" then
-		character:SetAttribute("AnimationPlaybackSpeedPercent", animationSpeedPercent)
-	else
-		publishPlaybackPercent(slot)
-	end
+    local exitBlend = AttackUpperBodyComposer.GetExitBlendSeconds()
+    if runtimeDuration > exitBlend + 0.01 then
+        task.delay(runtimeDuration - exitBlend, function()
+            if character == boundCharacter and currentActionToken == token
+                and currentActionComposed then
+                AttackUpperBodyComposer.BeginExitBlend()
+            end
+        end)
+    end
+    task.delay(runtimeDuration, function()
+        finishAttackPresentation(boundCharacter, token)
+    end)
 
-	currentAction = track
-	currentActionComposed = composed
-	currentActionTimeline = timeline
-	currentActionClipId = clipId
-	if not composed then
-		track.Looped = false
-		track:Play(0.06, 1, playbackSpeed)
-	end
-
-	character:SetAttribute("AnimationActionSlot", slot)
-	character:SetAttribute("AnimationActionClip", clipId)
-	if slot == "attack" then
-		character:SetAttribute("AnimationActionEndsAt", currentActionLockedUntil)
-		character:SetAttribute("AnimationAttackBounced", false)
-		character:SetAttribute("AnimationAttackUpperBodyComposed", composed)
-		character:SetAttribute("AnimationAttackBridgeBone", AttackUpperBodyComposer.GetBridgeName())
-		character:SetAttribute("AnimationAttackLowerBodySlot", movementSlot())
-		local boundCharacter = character
-		local boundTrack = track
-		local exitBlend = if composed then AttackUpperBodyComposer.GetExitBlendSeconds() else 0
-		if composed and runtimeDuration > exitBlend + 0.01 then
-			task.delay(runtimeDuration - exitBlend, function()
-				if character == boundCharacter
-					and currentAction == boundTrack
-					and currentActionToken == actionToken
-					and currentActionComposed
-				then
-					AttackUpperBodyComposer.BeginExitBlend()
-				end
-			end)
-		end
-		task.delay(runtimeDuration, function()
-			finishAttackPresentation(boundCharacter, boundTrack, actionToken)
-		end)
-	end
-
-	return {
-		track = track,
-		clipId = clipId,
-		playbackSpeed = playbackSpeed,
-		animationSpeedPercent = animationSpeedPercent,
-		durationSeconds = runtimeDuration,
-		endsAt = currentActionLockedUntil,
-		timeline = timeline,
-		upperBodyComposed = composed,
-		lowerBodySlot = if slot == "attack" then movementSlot() else nil,
-	}
+    return {
+        track = nil, -- may load later; never a precondition for an attack
+        clipId = clipId,
+        playbackSpeed = playbackSpeed,
+        animationSpeedPercent = timeline.animationSpeedPercent,
+        durationSeconds = runtimeDuration,
+        endsAt = currentActionLockedUntil,
+        timeline = timeline,
+        upperBodyComposed = false,
+        lowerBodySlot = movementSlot(),
+    }
 end
 
 function CharacterAnimationController.BounceCurrentAttack(clipId: string, reverseSpeedMultiplier: number?): (boolean, number)
 	if not character
 		or currentActionSlot ~= "attack"
-		or not currentAction
 		or currentActionClipId ~= tostring(clipId or "")
 	then
 		return false, 0
 	end
 
-	local track = currentAction :: AnimationTrack
+	local track = currentAction :: AnimationTrack?
 	local timeline = currentActionTimeline
 	local playbackSpeed = math.max(0.01, tonumber(timeline and timeline.playbackSpeed) or 1)
 	local multiplier = math.max(0.1, tonumber(reverseSpeedMultiplier) or 2)
 	local reverseSpeed = playbackSpeed * multiplier
-	local sourceTime = math.max(0, tonumber(track.TimePosition) or 0)
-	local rewindSeconds = sourceTime / reverseSpeed
+	local sourceTime = if track then math.max(0, tonumber(track.TimePosition) or 0) else 0
+	local rewindSeconds = if track then sourceTime / reverseSpeed
+		else math.max(0.05, WeaponBounceConfig.MinimumRecoverySeconds)
 	local exitBlend = if currentActionComposed then AttackUpperBodyComposer.GetExitBlendSeconds() else 0
 
 	currentActionToken += 1
@@ -656,7 +621,7 @@ function CharacterAnimationController.BounceCurrentAttack(clipId: string, revers
 
 	if currentActionComposed then
 		AttackUpperBodyComposer.SetPlaybackSpeed(-reverseSpeed)
-	else
+	elseif track then
 		if not track.IsPlaying then
 			track:Play(0, 1, 0)
 			pcall(function()
@@ -669,25 +634,25 @@ function CharacterAnimationController.BounceCurrentAttack(clipId: string, revers
 	local boundCharacter = character
 	local boundTrack = track
 	task.delay(rewindSeconds, function()
-		if character ~= boundCharacter or currentAction ~= boundTrack or currentActionToken ~= bounceToken then
+		if character ~= boundCharacter or currentActionToken ~= bounceToken then
 			return
 		end
-		pcall(function()
-			boundTrack.TimePosition = 0
-		end)
+		if boundTrack then
+			pcall(function() boundTrack.TimePosition = 0 end)
+		end
 		if currentActionComposed then
 			AttackUpperBodyComposer.SetPlaybackSpeed(0)
 			AttackUpperBodyComposer.BeginExitBlend()
 			if exitBlend > 0 then
 				task.delay(exitBlend, function()
-					finishAttackPresentation(boundCharacter, boundTrack, bounceToken)
+					finishAttackPresentation(boundCharacter, bounceToken)
 				end)
 			else
-				finishAttackPresentation(boundCharacter, boundTrack, bounceToken)
+				finishAttackPresentation(boundCharacter, bounceToken)
 			end
 		else
-			boundTrack:AdjustSpeed(0)
-			finishAttackPresentation(boundCharacter, boundTrack, bounceToken)
+			if boundTrack then boundTrack:AdjustSpeed(0) end
+			finishAttackPresentation(boundCharacter, bounceToken)
 		end
 	end)
 

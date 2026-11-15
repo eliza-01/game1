@@ -96,9 +96,9 @@ class NewValidatorsM168Tests(unittest.TestCase):
 
     def test_studio_debug_rejects_removed_loadout_preview(self):
         with self.intercept('src/client/dev/TestLoadoutController.luau',
-                            lambda s: s.replace('createAttackRadiusRing', 'RemovedRing')):
+                            lambda s: s.replace('MeleeArcPreview.new()', 'RemovedPreview.new()')):
             issues, _ = self.debug()
-        self.assertIn('Studio Test Loadout attack-radius preview missing createAttackRadiusRing', issues)
+        self.assertIn('Studio Test Loadout attack-radius preview missing MeleeArcPreview.new()', issues)
 
     def test_death_contract_accepts_project(self):
         issues, service = self.death()

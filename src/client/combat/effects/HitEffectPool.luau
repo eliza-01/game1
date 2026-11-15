@@ -1,7 +1,7 @@
-local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local HitSparkBurst = require(script.Parent:WaitForChild("HitSparkBurst"))
+local HitSparkPoolTicker = require(script.Parent:WaitForChild("HitSparkPoolTicker"))
 local HitFrontFlash = require(script.Parent:WaitForChild("HitFrontFlash"))
 
 local HitEffectPool = {}
@@ -30,12 +30,8 @@ function HitEffectPool.new(config: any): any
         _folder = folder,
         _slots = slots,
         _cursor = 0,
+        _startTicker = HitSparkPoolTicker.Create(slots),
     }, HitEffectPool)
-    RunService.RenderStepped:Connect(function(dt)
-        for _, slot in ipairs(slots) do
-            HitSparkBurst.Step(slot.sparks, dt)
-        end
-    end)
     return self
 end
 
@@ -43,6 +39,7 @@ function HitEffectPool:Emit(position: Vector3, sourcePosition: Vector3, critical
     self._cursor = (self._cursor % #self._slots) + 1
     local slot = self._slots[self._cursor]
     HitSparkBurst.Emit(slot.sparks, self._config, position, cameraCFrame, critical)
+    self._startTicker()
     HitFrontFlash.Emit(slot.flash, self._config, position, sourcePosition, cameraCFrame, critical)
 end
 

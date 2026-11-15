@@ -3,21 +3,18 @@ local BY_CLIP = {
     ["human_female__weapon__1hs__attack__01"] = table.freeze({
         duration = 1.5,
         events = table.freeze({
-            HitStart = table.freeze({ normalizedTime = 0.4 }),
             HitEnd = table.freeze({ normalizedTime = 0.5 }),
         }),
     }),
     ["human_female__weapon__1hs__attack__02"] = table.freeze({
         duration = 1.5,
         events = table.freeze({
-            HitStart = table.freeze({ normalizedTime = 0.4 }),
             HitEnd = table.freeze({ normalizedTime = 0.5 }),
         }),
     }),
     ["human_female__weapon__1hs__attack__03"] = table.freeze({
         duration = 1.466666698,
         events = table.freeze({
-            HitStart = table.freeze({ normalizedTime = 0.4 }),
             HitEnd = table.freeze({ normalizedTime = 0.5 }),
         }),
     }),
@@ -30,35 +27,30 @@ local BY_CLIP = {
     ["human_female__weapon__hands__attack__01"] = table.freeze({
         duration = 1.875,
         events = table.freeze({
-            HitStart = table.freeze({ normalizedTime = 0.218457944 }),
             HitEnd = table.freeze({ normalizedTime = 0.691588785 }),
         }),
     }),
     ["human_male__weapon__1hs__attack__01"] = table.freeze({
         duration = 1.5,
         events = table.freeze({
-            HitStart = table.freeze({ normalizedTime = 0.4 }),
             HitEnd = table.freeze({ normalizedTime = 0.5 }),
         }),
     }),
     ["human_male__weapon__1hs__attack__02"] = table.freeze({
         duration = 1.5,
         events = table.freeze({
-            HitStart = table.freeze({ normalizedTime = 0.4 }),
             HitEnd = table.freeze({ normalizedTime = 0.5 }),
         }),
     }),
     ["human_male__weapon__1hs__attack__03"] = table.freeze({
         duration = 1.466666667,
         events = table.freeze({
-            HitStart = table.freeze({ normalizedTime = 0.4 }),
             HitEnd = table.freeze({ normalizedTime = 0.5 }),
         }),
     }),
     ["human_male__weapon__hands__attack__01"] = table.freeze({
         duration = 1.5,
         events = table.freeze({
-            HitStart = table.freeze({ normalizedTime = 0.4 }),
             HitEnd = table.freeze({ normalizedTime = 0.5 }),
         }),
     }),

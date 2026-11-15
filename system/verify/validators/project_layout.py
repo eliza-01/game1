@@ -51,7 +51,7 @@ REQUIRED_RUNTIME_MODULES = (
     "src/shared/animation/AnimationSpeedScalingRegistry.luau",
     "src/shared/combat/AttackConfig.luau",
     "src/shared/combat/AttackTimelineConfig.luau",
-    "src/shared/combat/CharacterAttackWindow.luau",
+    "src/shared/combat/CharacterAttackHitEnd.luau",
     "src/shared/combat/SkeletonHeadResolver.luau",
 )
 

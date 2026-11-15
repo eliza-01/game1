@@ -21,6 +21,7 @@ def check_combat_contact_contracts(root: Path, report_error: Callable[[str], Non
     geometry = source('src/shared/combat/MeleeArcGeometry.luau')
     environment = source('src/server/combat/MeleeEnvironmentContact.luau')
     loadout = source('src/client/dev/TestLoadoutController.luau')
+    preview = source('src/client/dev/MeleeArcPreview.luau')
     bow = source('src/server/combat/BowHitscanService.luau')
     session = source('src/server/combat/AttackSessionStore.luau')
     config = source('src/shared/combat/AttackConfig.luau')
@@ -34,15 +35,15 @@ def check_combat_contact_contracts(root: Path, report_error: Callable[[str], Non
     if 'LEGACY · DEPRECATED · DO NOT USE' not in legacy:
         report_error('M358 weapon volume is not visibly deprecated')
     for required in ['scheduleMeleeArc', 'MeleeEnvironmentContact.Query',
-                     'MeleeSampleInterval', 'AttackDamageResolver.Apply',
-                     'CharacterAttackWindow.Resolve', 'Begin', 'MeleeAimUpdate']:
+                     'task.delay(hitEndEvent.time', 'AttackDamageResolver.Apply',
+                     'CharacterAttackHitEnd.Resolve', 'Begin', 'MeleeAimUpdate']:
         if required not in attack:
             report_error(f'M358 server melee timeline/arc missing {required}')
     for required in ['MeleeAimUpdate', 'publishMeleeAim', 'aimPoseController.GetAimRay',
-                     'CharacterAttackWindow.Resolve', 'BowAimUpdate']:
+                     'CharacterAttackHitEnd.Resolve', 'BowAimUpdate']:
         if required not in client:
             report_error(f'M358 client aim-only / bow contract missing {required}')
-    for required in ['MeleeTargetQuery.Find', 'query.hitTargets[model] = true',
+    for required in ['MeleeTargetQuery.Find', 'DamageService.Apply',
                      'headshotTarget', 'aimedHead', 'RaycastAimRegions',
                      'HeadshotDamageMultiplier', 'DamageService.Apply']:
         if required not in damage_resolver_text:
@@ -67,14 +68,16 @@ def check_combat_contact_contracts(root: Path, report_error: Callable[[str], Non
         if required not in equip:
             report_error(f'M358 weapon equip angle migration missing {required}')
     for required in ['MELEE ARC: ON', 'LEGACY VOLUME · DO NOT USE',
-                     'MeleeArcGeometry.Contact', 'HeadshotAimRay', 'CombatHitboxDebugData']:
+                     'MeleeArcGeometry.Contact', 'CombatHitboxDebugData']:
         if required not in loadout:
             report_error(f'M358 Studio debug visualization missing {required}')
+    if 'HeadshotAimRay' not in preview or 'CanQuery = false' not in preview:
+        report_error('M358 Studio preview must keep a non-querying headshot aim guide')
     for required in ['HeadshotDamageMultiplier = 2', 'MeleeDefaultArcAngle = 108',
                      'MeleeVerticalPadding = 1.5']:
         if required not in config:
             report_error(f'M358 melee default/config missing {required}')
-    if 'sweepState' in session or 'EnsureSweep' in session:
+    if 'sweepState' in session or 'EnsureSweep' in session or 'damageWindow' in session:
         report_error('M358 retired client-sweep state still in active session store')
     if 'BowHitscanService' not in attack or 'BowHitscanService.Release' not in attack or 'Capture' not in bow:
         report_error('M358 bow release path changed or missing')

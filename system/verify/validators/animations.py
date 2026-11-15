@@ -122,12 +122,12 @@ def check_character_animation(
     for required in [
         "attackLowerBodyActive",
         'return "combat_idle"',
-        "AttackUpperBodyComposer.Begin(boundCharacter, descriptor, playbackSpeed, function()",
+        "AttackUpperBodyComposer.Begin(",
         "AnimationAttackUpperBodyComposed",
         "AnimationAttackLowerBodySlot",
         "AttackUpperBodyComposer.BeginExitBlend()",
-        "attackComposePending",
-        "cancelled; upper-body composition unavailable",
+        "task.spawn(function()",
+        "visual unavailable; gameplay continues",
     ]:
         if required not in controller_runtime:
             err(f"attack lower/upper-body composition contract missing {required}")

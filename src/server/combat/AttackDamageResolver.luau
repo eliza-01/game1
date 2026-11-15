@@ -16,13 +16,11 @@ export type DamageQuery = {
     character: Model,
     root: BasePart,
     serial: number,
-    hitTargets: { [Model]: boolean },
     aimOrigin: Vector3?,
     aimDirection: Vector3?,
     attackRange: number,
     arcAngleDegrees: number,
     verticalPadding: number,
-    headshotTarget: Model?,
 }
 
 function AttackDamageResolver.Apply(query: DamageQuery): (number, Model?, number)
@@ -30,7 +28,9 @@ function AttackDamageResolver.Apply(query: DamageQuery): (number, Model?, number
     local targets = MeleeTargetQuery.Find(character, root, query.attackRange,
         query.arcAngleDegrees, query.verticalPadding)
     local aimedHead = nil
-    if query.headshotTarget == nil then
+    -- A completely empty arc cannot produce a headshot. Do not run the
+    -- global bone-raycast/occlusion checks when there is no eligible victim.
+    if #targets > 0 then
         local rayStart, rayDirection = AttackAimGeometry.HeadshotSegment(root.Position,
             query.aimOrigin, query.aimDirection, query.attackRange)
         if rayStart and rayDirection then
@@ -41,7 +41,7 @@ function AttackDamageResolver.Apply(query: DamageQuery): (number, Model?, number
             then
                 -- The target must also be in THIS server-evaluated arc sample.
                 for _, contact in ipairs(targets) do
-                    if contact.model == aimed.model and query.hitTargets[aimed.model] ~= true then
+                    if contact.model == aimed.model then
                         aimedHead = aimed
                         break
                     end
@@ -51,11 +51,11 @@ function AttackDamageResolver.Apply(query: DamageQuery): (number, Model?, number
     end
 
     local hitCount, damagedTargets = 0, 0
-    local headshotTarget = query.headshotTarget
+    local headshotTarget = nil
     for _, contact in ipairs(targets) do
         local model = contact.model
         if model and model.Parent and model:GetAttribute("Damageable") == true
-            and query.hitTargets[model] ~= true then
+            then
             local isHeadshot = aimedHead ~= nil and aimedHead.model == model
             local hitPosition = if isHeadshot then aimedHead.hitPosition else contact.hit.hitPosition
             local hitZone = if isHeadshot then "head" else "body"
@@ -71,9 +71,10 @@ function AttackDamageResolver.Apply(query: DamageQuery): (number, Model?, number
             elseif character:GetAttribute("LastAttackHitZone") == nil then
                 character:SetAttribute("LastAttackHitZone", "body")
             end
-            query.hitTargets[model] = true
-            if finalDamage > 0 then damagedTargets += 1 end
-            HitEffectService.Publish(character, model, model:GetAttribute("LastCritical") == true, hitPosition)
+            if finalDamage > 0 then
+                damagedTargets += 1
+                HitEffectService.Publish(character, model, model:GetAttribute("LastCritical") == true, hitPosition)
+            end
             hitCount += 1
             if Config.DebugLogs then
                 print(("[game1][melee-arc] hit player=%s target=%s zone=%s damage=%d killed=%s serial=%d reach=%.2f arc=%.1f")

@@ -19,9 +19,14 @@ def check_studio_debug(root: Path, report_error: Callable[[str], None], *,
     for required in ["TEST LOADOUT", "createDropdown", "createCategorySelector", "LastLoadoutArchetype", "LastLoadoutWeaponSlug", "ACCEPT LOADOUT", "PublishedDebugAccess.ClientAllowed()"]:
         if required not in test_loadout_client:
             report_error(f"Studio Test Loadout client missing {required}")
-    for required in ["ATTACK RADIUS: OFF", "Game1AttackRadiusPreview", "createAttackRadiusRing", 'currentCharacter:GetAttribute("AttackRadius")', "RunService.RenderStepped"]:
+    for required in ["ATTACK RADIUS: OFF", "MeleeArcPreview.new()", "ringPreview:SetVisible(ringVisible)", 'currentCharacter:GetAttribute("AttackRadius")']:
         if required not in test_loadout_client:
             report_error(f"Studio Test Loadout attack-radius preview missing {required}")
+    preview_path = root / "src/client/dev/MeleeArcPreview.luau"
+    preview = preview_path.read_text(encoding="utf-8") if preview_path.is_file() else ""
+    for required in ["Game1AttackRadiusPreview", "RootCollider", "MeleeArcDebugAnchor", "Beam", "CanQuery = false", "SetVisible", "Destroy"]:
+        if required not in preview:
+            report_error(f"Studio Melee Arc preview module missing {required}")
     if "attackRadiusStuds" not in test_loadout_server:
         report_error("Studio Test Loadout catalog must expose the registered weapon attack radius")
     server_init_text = (root / "src/server/init.server.luau").read_text(encoding="utf-8") + (root / "src/server/bootstrap/ServiceCatalog.luau").read_text(encoding="utf-8")

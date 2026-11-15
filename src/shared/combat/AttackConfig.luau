@@ -8,12 +8,12 @@ return table.freeze({
     HeadshotDamageMultiplier = 2,
     HeadshotAimOriginMaxDistance = 24,
 
-    -- M358: server samples the authored HitStart/HitEnd window independently
-    -- of any client pose. Arc width is a per-weapon persisted setting.
+    -- M360: exactly one authoritative contact snapshot at authored HitEnd.
     MeleeDefaultArcAngle = 108,
     MeleeVerticalPadding = 1.5,
-    MeleeSampleInterval = 1 / 20,
-    MeleeWindowGraceSeconds = 0.04,
+    -- Optional single camera-aim refresh shortly BEFORE HitEnd for headshots.
+    -- Server always uses its own timeline; aim never controls collision timing.
+    MeleeAimCaptureLeadSeconds = 0.14,
     MaxMeleeAimWindowSeconds = 8,
 
     -- RobloxLineage attack-facing contract. A planted attack can twist the upper

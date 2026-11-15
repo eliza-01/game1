@@ -160,7 +160,7 @@ def check_environment_bounce(root: Path, report_error: Callable[[str], None], *,
     ]:
         if required not in attack_service_text:
             report_error(f"m50 AttackService environment-bounce integration missing {required}")
-    for required in ['session.environmentBlocked = true', 'session.damageWindow = nil']:
+    for required in ['session.environmentBlocked = true', 'session.untilTime = untilTime']:
         if required not in attack_session_text:
             report_error(f"m50 AttackSessionStore bounce invalidation missing {required}")
     if attack_service_text.find('MeleeEnvironmentContact.Query(root, reach, arcAngle)') > attack_service_text.find('AttackDamageResolver.Apply({'):

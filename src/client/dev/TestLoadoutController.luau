@@ -3,6 +3,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local PublishedDebugAccess = require(game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared"):WaitForChild("dev"):WaitForChild("PublishedDebugAccess"))
 local Workspace = game:GetService("Workspace")
+local CollectionService = game:GetService("CollectionService")
 
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local CombatShared = Shared:WaitForChild("combat")
@@ -10,6 +11,7 @@ local MeleeArcGeometry = require(CombatShared:WaitForChild("MeleeArcGeometry"))
 
 local StudioDebugDock = require(script.Parent:WaitForChild("StudioDebugDock"))
 local HouseSocketDebugController = require(script.Parent:WaitForChild("HouseSocketDebugController"))
+local MeleeArcPreview = require(script.Parent:WaitForChild("MeleeArcPreview"))
 
 local TestLoadoutController = {}
 local started = false
@@ -358,56 +360,6 @@ local function formatStuds(value: any): string
     return string.format("%.2f", numeric):gsub("0+$", ""):gsub("%.$", "")
 end
 
-local function createAttackRadiusRing()
-    local folder = Instance.new("Folder")
-    folder.Name = "Game1AttackRadiusPreview"
-    local parts = {}
-    for index = 1, 64 do
-        local part = Instance.new("Part")
-        part.Name = ("Segment%02d"):format(index)
-        part.Anchored = true
-        part.CanCollide = false
-        part.CanQuery = false
-        part.CanTouch = false
-        part.CastShadow = false
-        part.Material = Enum.Material.Neon
-        part.Color = COLORS.accent
-        part.Transparency = 0.18
-        part.Parent = folder
-        parts[index] = part
-    end
-    -- Extra lines show the two radial sides and the vertical extent of the arc.
-    for index = 1, 4 do
-        local part = Instance.new("Part")
-        part.Name = ("Boundary%02d"):format(index)
-        part.Anchored = true
-        part.CanCollide = false
-        part.CanQuery = false
-        part.CanTouch = false
-        part.CastShadow = false
-        part.Material = Enum.Material.Neon
-        part.Color = COLORS.accent
-        part.Transparency = 0.27
-        part.Parent = folder
-        parts[64 + index] = part
-    end
-    -- A server hitbox Headshot is confirmed only inside the sector; this
-    -- thin camera ray shows the independent precision input.
-    local ray = Instance.new("Part")
-    ray.Name = "HeadshotAimRay"
-    ray.Anchored = true
-    ray.CanCollide = false
-    ray.CanQuery = false
-    ray.CanTouch = false
-    ray.CastShadow = false
-    ray.Material = Enum.Material.Neon
-    ray.Color = Color3.fromRGB(255, 205, 108)
-    ray.Transparency = 0.25
-    ray.Parent = folder
-    parts[69] = ray
-    return folder, parts
-end
-
 local function createTargetHitboxPreview()
     local folder = Instance.new("Folder")
     folder.Name = "Game1TargetHitboxPreview"
@@ -695,83 +647,22 @@ function TestLoadoutController.Start()
         local appliedWeaponSlug = initialWeapon
         local applying = false
 
-        local ringFolder, ringParts = createAttackRadiusRing()
+        local ringPreview = MeleeArcPreview.new()
         local ringVisible = false
-        local ringConnection: RBXScriptConnection? = nil
-        local rayParams = RaycastParams.new()
-        rayParams.FilterType = Enum.RaycastFilterType.Exclude
-        rayParams.IgnoreWater = false
-        rayParams.RespectCanCollide = true
-
         local function setRingVisible(value: boolean)
             ringVisible = value == true
             radiusToggle.Text = ringVisible and "MELEE ARC: ON" or "MELEE ARC: OFF"
             radiusToggle.BackgroundColor3 = ringVisible and COLORS.controlSelected or COLORS.control
             radiusToggle.TextColor3 = ringVisible and COLORS.accent or COLORS.text
-            ringFolder.Parent = ringVisible and Workspace or nil
+            ringPreview:SetVisible(ringVisible)
         end
-
-        local function renderAttackRadiusRing()
-            if not ringVisible then return end
-            local character = player.Character
-            local root = character and character:FindFirstChild("RootCollider")
-            if not root or not root:IsA("BasePart")
-                or string.lower(tostring(character:GetAttribute("EquippedWeaponType") or "")) == "bow" then
-                for _, part in ipairs(ringParts) do part.Transparency = 1 end
-                return
-            end
-            local radius = math.max(1, tonumber(character:GetAttribute("AttackRadius")) or 7)
-            local arc = math.clamp(tonumber(character:GetAttribute("MeleeArcAngle")) or 108, 1, 360)
-            local halfAngle = math.rad(arc) * 0.5
-            local forward = Vector3.new(root.CFrame.LookVector.X, 0, root.CFrame.LookVector.Z)
-            if forward.Magnitude < 1e-5 then return end
-            forward = forward.Unit
-            rayParams.FilterDescendantsInstances = {character}
-            local ground = Workspace:Raycast(root.Position, Vector3.new(0, -64, 0), rayParams)
-            local center = Vector3.new(root.Position.X,
-                ground and (ground.Position.Y + 0.06) or (root.Position.Y - root.Size.Y * 0.5), root.Position.Z)
-            local count = 64
-            local sweep = math.rad(arc) / count
-            local chord = 2 * radius * math.sin(sweep * 0.5) + 0.03
-            for index = 1, count do
-                local angle = -halfAngle + (index - 0.5) * sweep
-                local direction = CFrame.fromAxisAngle(Vector3.yAxis, angle):VectorToWorldSpace(forward)
-                local position = center + direction * radius
-                local part = ringParts[index]
-                part.Size = Vector3.new(chord, 0.055, 0.10)
-                part.CFrame = CFrame.lookAt(position, position + direction) * CFrame.Angles(0, math.pi / 2, 0)
-                part.Transparency = 0.18
-            end
-            for index, sign in ipairs({-1, 1}) do
-                local direction = CFrame.fromAxisAngle(Vector3.yAxis, halfAngle * sign):VectorToWorldSpace(forward)
-                local line = ringParts[64 + index]
-                line.Size = Vector3.new(0.065, 0.055, radius)
-                line.CFrame = CFrame.lookAt(center + direction * radius * 0.5, center + direction * radius)
-                line.Transparency = 0.24
-                local vertical = ringParts[66 + index]
-                local pad = 1.5
-                local height = math.max(3, root.Size.Y) + pad * 2
-                vertical.Size = Vector3.new(0.08, height, 0.08)
-                vertical.CFrame = CFrame.new(root.Position.X + direction.X * radius,
-                    root.Position.Y, root.Position.Z + direction.Z * radius)
-                vertical.Transparency = 0.35
-            end
-            local camera = Workspace.CurrentCamera
-            local ray = ringParts[69]
-            if camera then
-                local origin = camera.CFrame.Position
-                local direction = camera.CFrame.LookVector
-                local relative = root.Position - origin
-                local start = origin + direction * math.max(0, relative:Dot(direction))
-                local length = math.max(0.01, radius)
-                ray.Size = Vector3.new(0.045, 0.045, length)
-                ray.CFrame = CFrame.lookAt(start + direction * length * 0.5, start + direction * length)
-                ray.Transparency = 0.45
-            else ray.Transparency = 1 end
-        end
-        ringConnection = RunService.RenderStepped:Connect(renderAttackRadiusRing)
         setRingVisible(false)
         radiusToggle.Activated:Connect(function() setRingVisible(not ringVisible) end)
+
+        local rayParams = RaycastParams.new()
+        rayParams.FilterType = Enum.RaycastFilterType.Exclude
+        rayParams.IgnoreWater = false
+        rayParams.RespectCanCollide = true
 
         -- M358: no weapon-volume toggle, renderer or gameplay fallback exists.
         -- The legacy label is deliberately inert for discoverability.
@@ -779,42 +670,76 @@ function TestLoadoutController.Start()
         local targetPreview = createTargetHitboxPreview()
         local targetHitboxesVisible = false
         local targetModels = {}
+        local hitboxConnection: RBXScriptConnection? = nil
+        local renderTargetHitboxes
         local nextTargetScanAt = 0
+        local nextHitboxRenderAt = 0
+        local hitboxSamples = 0
+        local function updateHitboxSampleLabel()
+            targetHitboxToggle.Text = if targetHitboxesVisible
+                then ("TARGET HITBOXES: ON · 8 Hz · #%d"):format(hitboxSamples)
+                else "TARGET HITBOXES: OFF"
+        end
 
         local function setTargetHitboxesVisible(value: boolean)
             targetHitboxesVisible = value == true
-            targetHitboxToggle.Text = targetHitboxesVisible and "TARGET HITBOXES: ON" or "TARGET HITBOXES: OFF"
+            hitboxSamples = 0
+            updateHitboxSampleLabel()
             targetHitboxToggle.BackgroundColor3 = targetHitboxesVisible and COLORS.controlSelected or COLORS.control
             targetHitboxToggle.TextColor3 = targetHitboxesVisible and COLORS.accent or COLORS.text
             targetPreview.folder.Parent = targetHitboxesVisible and Workspace or nil
+            if targetHitboxesVisible then
+                nextHitboxRenderAt = 0
+                nextTargetScanAt = 0
+                if not hitboxConnection then
+                    hitboxConnection = RunService.RenderStepped:Connect(renderTargetHitboxes)
+                end
+            elseif hitboxConnection then
+                hitboxConnection:Disconnect()
+                hitboxConnection = nil
+                table.clear(targetModels)
+            end
         end
 
         local function refreshTargetModels()
             table.clear(targetModels)
             local ownCharacter = player.Character
-            for _, descendant in ipairs(Workspace:GetDescendants()) do
-                if descendant:IsA("Model")
-                    and descendant ~= ownCharacter
-                    and descendant:GetAttribute("Damageable") == true
-                    and (tostring(descendant:GetAttribute("CombatHitboxMode") or "") == "precomputed_bone_boxes"
-                        or tostring(descendant:GetAttribute("CombatHitboxMode") or "") == "root_bounds_fallback")
-                then
-                    table.insert(targetModels, descendant)
+            -- Server maintains this tag on bound hitbox models.  No full
+            -- Workspace:GetDescendants() traversal is necessary for the overlay.
+            for _, model in ipairs(CollectionService:GetTagged("Game1CombatHitbox")) do
+                if model ~= ownCharacter and model:IsDescendantOf(Workspace)
+                    and model:GetAttribute("Damageable") == true then
+                    table.insert(targetModels, model)
                 end
             end
         end
 
-        local function renderTargetHitboxes()
+        renderTargetHitboxes = function()
             if not targetHitboxesVisible then return end
             local now = os.clock()
+            if now < nextHitboxRenderAt then return end
+            nextHitboxRenderAt = now + 1 / 8
             if now >= nextTargetScanAt then
-                nextTargetScanAt = now + 0.35
+                nextTargetScanAt = now + 1.0
                 refreshTargetModels()
             end
 
             local previewIndex = 0
+            local own = player.Character
+            local root = own and own:FindFirstChild("RootCollider")
+            local activeRoot = root and root:IsA("BasePart")
+            local reach = if activeRoot then tonumber(own:GetAttribute("AttackRadius")) or 7 else 7
+            local angle = if activeRoot then tonumber(own:GetAttribute("MeleeArcAngle")) or 108 else 108
+            local halfHeight = if activeRoot then math.max(1.5, root.Size.Y * 0.5) else 1.5
+            local origin = if activeRoot then root.Position else Vector3.zero
+            local facing = if activeRoot then root.CFrame.LookVector else Vector3.zAxis
+            local previewDistanceSq = 35 * 35
             for _, model in ipairs(targetModels) do
-                if model.Parent and model:GetAttribute("Damageable") == true then
+                local targetRoot = model:FindFirstChild("RootCollider")
+                local delta = if activeRoot and targetRoot and targetRoot:IsA("BasePart")
+                    then targetRoot.Position - origin else Vector3.zero
+                if activeRoot and targetRoot and delta:Dot(delta) <= previewDistanceSq
+                    and model.Parent and model:GetAttribute("Damageable") == true then
                     local debugFolder = model:FindFirstChild("CombatHitboxDebugData")
                     if debugFolder then
                         for _, record in ipairs(debugFolder:GetChildren()) do
@@ -827,22 +752,20 @@ function TestLoadoutController.Start()
                             if anchorFrame and typeof(localCFrame) == "CFrame" and typeof(size) == "Vector3" then
                                 previewIndex += 1
                                 local frame = anchorFrame * localCFrame
-                                local own = player.Character
-                                local root = own and own:FindFirstChild("RootCollider")
                                 local inside = false
-                                if root and root:IsA("BasePart") then
-                                    local reach = tonumber(own:GetAttribute("AttackRadius")) or 7
-                                    local angle = tonumber(own:GetAttribute("MeleeArcAngle")) or 108
-                                    local pad = 1.5
-                                    local halfHeight = math.max(1.5, root.Size.Y * 0.5)
-                                    inside = MeleeArcGeometry.Contact(frame, size, root.Position,
-                                        root.CFrame.LookVector, reach, angle,
-                                        root.Position.Y - halfHeight - pad, root.Position.Y + halfHeight + pad) ~= nil
+                                -- Cheap conservative radius check prevents polygon
+                                -- intersection work for the nearby-but-outside boxes.
+                                local toBox = frame.Position - origin
+                                local broadReach = reach + size.Magnitude * 0.5
+                                if toBox:Dot(toBox) <= broadReach * broadReach then
+                                    inside = MeleeArcGeometry.Contact(frame, size, origin,
+                                        facing, reach, angle,
+                                        origin.Y - halfHeight - 1.5, origin.Y + halfHeight + 1.5) ~= nil
                                 end
                                 -- Debug colours: green = sector contact, red = outside,
                                 -- amber = in sector but physically blocked by a solid wall.
                                 local blocked = false
-                                if inside and root and root:IsA("BasePart") then
+                                if inside then
                                     local origin = root.Position + Vector3.new(0, math.min(1, root.Size.Y * 0.25), 0)
                                     local displacement = frame.Position - origin
                                     if displacement.Magnitude > 1e-4 then
@@ -863,9 +786,10 @@ function TestLoadoutController.Start()
                 end
             end
             targetPreview.hideAfter(previewIndex)
+            hitboxSamples += 1
+            updateHitboxSampleLabel()
         end
 
-        RunService.RenderStepped:Connect(renderTargetHitboxes)
         setTargetHitboxesVisible(false)
         targetHitboxToggle.Activated:Connect(function()
             setTargetHitboxesVisible(not targetHitboxesVisible)
@@ -1070,8 +994,9 @@ function TestLoadoutController.Start()
             characterAddedConnection:Disconnect()
             panelOpenedConnection:Disconnect()
             for _, connection in ipairs(characterConnections) do connection:Disconnect() end
-            if ringConnection then ringConnection:Disconnect() end
-            ringFolder:Destroy()
+            ringPreview:Destroy()
+            if hitboxConnection then hitboxConnection:Disconnect() end
+            targetPreview.folder:Destroy()
         end)
     end)
 end

@@ -1,7 +1,7 @@
-local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local HitSparkBurst = require(script.Parent:WaitForChild("HitSparkBurst"))
+local HitSparkPoolTicker = require(script.Parent:WaitForChild("HitSparkPoolTicker"))
 local HitFrontFlash = require(script.Parent:WaitForChild("HitFrontFlash"))
 
 local WeaponBounceEffectPool = {}
@@ -30,13 +30,9 @@ function WeaponBounceEffectPool.new(effectConfig: any, poolSize: number): any
         _config = effectConfig,
         _slots = slots,
         _cursor = 0,
+        _startTicker = HitSparkPoolTicker.Create(slots),
     }, WeaponBounceEffectPool)
 
-    RunService.RenderStepped:Connect(function(dt)
-        for _, slot in ipairs(slots) do
-            HitSparkBurst.Step(slot.sparks, dt)
-        end
-    end)
     return self
 end
 
@@ -45,6 +41,7 @@ function WeaponBounceEffectPool:Emit(position: Vector3, normal: Vector3, cameraC
     local slot = self._slots[self._cursor]
     local sourcePosition = position + normal * 2
     HitSparkBurst.Emit(slot.sparks, self._config, position, cameraCFrame, false)
+    self._startTicker()
     HitFrontFlash.Emit(slot.flash, self._config, position, sourcePosition, cameraCFrame, false)
 end
 

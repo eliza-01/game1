@@ -6,9 +6,6 @@
       "clipId": "human_female__weapon__1hs__attack__01",
       "duration": 1.5,
       "events": {
-        "HitStart": {
-          "normalizedTime": 0.4
-        },
         "HitEnd": {
           "normalizedTime": 0.5
         }
@@ -18,9 +15,6 @@
       "clipId": "human_female__weapon__1hs__attack__02",
       "duration": 1.5,
       "events": {
-        "HitStart": {
-          "normalizedTime": 0.4
-        },
         "HitEnd": {
           "normalizedTime": 0.5
         }
@@ -30,9 +24,6 @@
       "clipId": "human_female__weapon__1hs__attack__03",
       "duration": 1.4666666984558105,
       "events": {
-        "HitStart": {
-          "normalizedTime": 0.4
-        },
         "HitEnd": {
           "normalizedTime": 0.5
         }
@@ -51,9 +42,6 @@
       "clipId": "human_female__weapon__hands__attack__01",
       "duration": 1.875,
       "events": {
-        "HitStart": {
-          "normalizedTime": 0.21845794392523366
-        },
         "HitEnd": {
           "normalizedTime": 0.6915887850467289
         }
@@ -63,9 +51,6 @@
       "clipId": "human_male__weapon__1hs__attack__01",
       "duration": 1.5,
       "events": {
-        "HitStart": {
-          "normalizedTime": 0.4
-        },
         "HitEnd": {
           "normalizedTime": 0.5
         }
@@ -76,9 +61,6 @@
       "clipId": "human_male__weapon__1hs__attack__02",
       "duration": 1.5,
       "events": {
-        "HitStart": {
-          "normalizedTime": 0.4
-        },
         "HitEnd": {
           "normalizedTime": 0.5
         }
@@ -89,9 +71,6 @@
       "clipId": "human_male__weapon__1hs__attack__03",
       "duration": 1.466666667,
       "events": {
-        "HitStart": {
-          "normalizedTime": 0.4
-        },
         "HitEnd": {
           "normalizedTime": 0.5
         }
@@ -102,9 +81,6 @@
       "clipId": "human_male__weapon__hands__attack__01",
       "duration": 1.5,
       "events": {
-        "HitStart": {
-          "normalizedTime": 0.4
-        },
         "HitEnd": {
           "normalizedTime": 0.5
         }

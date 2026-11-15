@@ -8,7 +8,7 @@ local CharacterShared = Shared:WaitForChild("character")
 local CombatShared = Shared:WaitForChild("combat")
 local CharacterConfig = require(CharacterShared:WaitForChild("CharacterConfig"))
 local AttackConfig = require(CombatShared:WaitForChild("AttackConfig"))
-local CharacterAttackWindow = require(CombatShared:WaitForChild("CharacterAttackWindow"))
+local CharacterAttackHitEnd = require(CombatShared:WaitForChild("CharacterAttackHitEnd"))
 local BowProjectileConfig = require(CombatShared:WaitForChild("BowProjectileConfig"))
 local UiInputGuard = require(script.Parent.Parent:WaitForChild("UiInputGuard"))
 local BoneMountedAttachmentController = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("BoneMountedAttachmentController"))
@@ -19,10 +19,6 @@ local animationController: any = nil
 local aimPoseController: any = nil
 local attackSequence = 0
 local activeMeleeAimId = 0
-local activeMeleeAimFrom = 0
-local activeMeleeAimUntil = 0
-local activeMeleeAimStartedAt = 0
-local aimAccumulator = 0
 local bowCaptureSequence = 0
 local bowPresentationUntil = 0
 local bowPresentationCharacter: Model? = nil
@@ -76,9 +72,6 @@ function AttackController.CancelForBounce(clientAttackId: number)
     end
     if activeMeleeAimId == id then
         activeMeleeAimId = 0
-        activeMeleeAimFrom = 0
-        activeMeleeAimUntil = 0
-        aimAccumulator = 0
     end
     finishPresentation(id)
     return true
@@ -118,32 +111,6 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
                 end
             end
         end
-        if activeMeleeAimId <= 0 then
-            return
-        end
-        local now = os.clock()
-        if now > activeMeleeAimUntil then
-            activeMeleeAimId = 0
-            activeMeleeAimFrom = 0
-            aimAccumulator = 0
-            return
-        end
-        if activeMeleeAimFrom > 0 then
-            if now < activeMeleeAimFrom then
-                return
-            end
-            -- An aim snapshot can upgrade one arc contact to a headshot; it is
-            -- never needed for ordinary melee damage.
-            activeMeleeAimFrom = 0
-            aimAccumulator = 0
-            publishMeleeAim()
-            return
-        end
-        aimAccumulator += deltaTime
-        if aimAccumulator >= AttackConfig.MeleeSampleInterval then
-            aimAccumulator = aimAccumulator % AttackConfig.MeleeSampleInterval
-            publishMeleeAim()
-        end
     end)
     local function attemptAttack()
 
@@ -179,18 +146,17 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
 
         local release = isBow and action.timeline and action.timeline.events
             and action.timeline.events[BowProjectileConfig.ReleaseEvent] or nil
-        local damageWindow = if isBow then nil else CharacterAttackWindow.Resolve(action.timeline)
-        if (isBow and not release) or (not isBow and not damageWindow) then
+        local hitEndEvent = if isBow then nil else CharacterAttackHitEnd.Resolve(action.timeline)
+        if (isBow and not release) or (not isBow and not hitEndEvent) then
             warn(("[game1][attack] missing %s event(s): %s"):format(
-                if isBow then "Release" else "HitStart/HitEnd", tostring(action.clipId)))
+                if isBow then "Release" else "HitEnd", tostring(action.clipId)))
             return
         end
 
         attackSequence += 1
         local sequence = attackSequence
         local attackDuration = math.max(0.05, tonumber(action.durationSeconds) or 0.05)
-        local damagePoseStart = math.clamp(if isBow then release.time else damageWindow.startTime, 0, attackDuration)
-        local damagePoseEnd = if damageWindow then math.clamp(damageWindow.endTime, damagePoseStart, attackDuration) else damagePoseStart
+        local damagePoseStart = math.clamp(if isBow then release.time else hitEndEvent.time, 0, attackDuration)
         local movingAtAttackStart = movementController and movementController.IsMoving and movementController.IsMoving() or false
         if movementController and movementController.BeginAttackMovement then
             -- Every weapon may attack while moving. The equipped weapon type
@@ -278,13 +244,16 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
             return
         end
 
-        -- Send only headshot aim during HitStart -> HitEnd; the server samples
-        -- the sector on its own timer even if the client sends NO aim packets.
+        -- One optional late camera snapshot. No melee tracking or per-frame remote.
+        -- Server contact at HitEnd does NOT depend on its arrival.
         activeMeleeAimId = sequence
-        activeMeleeAimStartedAt = os.clock()
-        activeMeleeAimFrom = activeMeleeAimStartedAt + damagePoseStart
-        activeMeleeAimUntil = activeMeleeAimStartedAt + damagePoseEnd
-        aimAccumulator = 0
+        local lead = math.min(AttackConfig.MeleeAimCaptureLeadSeconds, hitEndEvent.time * 0.5)
+        task.delay(math.max(0, hitEndEvent.time - lead), function()
+            if sequence ~= attackSequence or activeMeleeAimId ~= sequence
+                or player.Character ~= character or character:GetAttribute("LifeState") ~= "Alive" then return end
+            publishMeleeAim()
+            activeMeleeAimId = 0
+        end)
         local meleeAimOrigin, meleeAimDirection = nil, nil
         if aimPoseController and aimPoseController.GetAimRay then
             meleeAimOrigin, meleeAimDirection = aimPoseController.GetAimRay()

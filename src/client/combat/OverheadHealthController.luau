@@ -14,13 +14,19 @@ local own: any = nil
 local ownCharacter: Model? = nil
 local ownDestroyConnection: RBXScriptConnection? = nil
 local monsterViews: {[Model]: any} = {}
-local pendingMonsters: {[Model]: {RBXScriptConnection}} = {}
+local pendingMonsters: {[Model]: {connections: {RBXScriptConnection}}} = {}
 local anchorRemovedConnections: {[Model]: RBXScriptConnection} = {}
 local folderConnections: {RBXScriptConnection} = {}
 local watchedFolder: Folder? = nil
 local aimedMonster: Model? = nil
+local detachedMonsters: {Model} = {}
 local ELAPSED_STEP = 0.10
-local AIM_MAX_DISTANCE = 420
+-- The camera can sit behind/beside the player's root in third person.
+-- Cast past the player-centered display radius, not an unrelated fixed cap.
+local AIM_CAMERA_MARGIN_STUDS = 64
+local reticleParams = RaycastParams.new()
+reticleParams.FilterType = Enum.RaycastFilterType.Exclude
+reticleParams.RespectCanCollide = false
 
 local function anchorFor(model: Model): BasePart?
     local anchor = model:FindFirstChild("RootCollider") or model:FindFirstChild("HumanoidRootPart")
@@ -33,18 +39,22 @@ local function bindOwn(character: Model?)
     ownDestroyConnection = nil
     if own then own.Destroy(); own = nil end
     ownCharacter = character
+    -- The ray ignores the current character, including after respawn.
+    reticleParams.FilterDescendantsInstances = if character then {character} else {}
     if not character then return end
     local function attach()
         if character ~= ownCharacter then return end
         local anchor = anchorFor(character)
-        if anchor then
+        local gui = player:FindFirstChildOfClass("PlayerGui")
+        if anchor and gui then
             if own then own.Destroy() end
-            own = HealthBarView.Create(player:WaitForChild("PlayerGui"), character, anchor, HealthUiSettings.Current())
+            own = HealthBarView.Create(gui, character, anchor, HealthUiSettings.Current())
         end
     end
     attach()
     ownDestroyConnection = character.ChildAdded:Connect(function(child)
-        if child.Name == "RootCollider" or child.Name == "HumanoidRootPart" then
+        if child.Name == "RootCollider" or child.Name == "HumanoidRootPart"
+            or child.Name == "NavigationRoot" then
             if not own then attach() end
         end
     end)
@@ -54,7 +64,7 @@ local function clearPendingMonster(model: Model)
     local connections = pendingMonsters[model]
     if not connections then return end
     pendingMonsters[model] = nil
-    for _, connection in ipairs(connections) do connection:Disconnect() end
+    for _, connection in ipairs(connections.connections) do connection:Disconnect() end
 end
 
 local function unbindMonster(model: Model)
@@ -73,7 +83,6 @@ local function bindMonster(model: Instance)
     -- navigation/collision root. Attribute and part replication can arrive in
     -- either order, especially when StreamingEnabled is on. Do not time out.
     local connections: {RBXScriptConnection} = {}
-    pendingMonsters[monster] = connections
     local function attachWhenReady()
         if monster.Parent ~= watchedFolder or monsterViews[monster] then return end
         if monster:GetAttribute("Game1MonsterRuntime") ~= true
@@ -85,11 +94,11 @@ local function bindMonster(model: Instance)
         if not anchor or not anchor:IsA("BasePart") then return end
         local playerGui = player:FindFirstChildOfClass("PlayerGui")
         if not playerGui then return end
+        -- Keep pending watchers alive until construction succeeded. If the
+        -- UI has not finished initializing, another readiness event can retry.
+        local view = HealthBarView.Create(playerGui, monster, anchor, HealthUiSettings.Current())
+        monsterViews[monster] = view
         clearPendingMonster(monster)
-        -- This is an overhead MONSTER view, never a self-health view. Its
-        -- identity is ready before construction; visibility starts disabled.
-        monsterViews[monster] = HealthBarView.Create(
-            playerGui, monster, anchor, HealthUiSettings.Current())
         -- Streaming can remove a PART while leaving the Model alive. Reattach
         -- the existing UI policy when its adornee is streamed back in.
         anchorRemovedConnections[monster] = monster.ChildRemoved:Connect(function(child)
@@ -99,6 +108,9 @@ local function bindMonster(model: Instance)
             end
         end)
     end
+    -- One shared PlayerGui listener in Start() retries all pending monsters;
+    -- never install a player listener per monster (MMO population scale).
+    pendingMonsters[monster] = {connections = connections}
     table.insert(connections, monster.ChildAdded:Connect(function(child)
         if child.Name == "RootCollider" or child.Name == "HumanoidRootPart"
             or child.Name == "NavigationRoot" then
@@ -109,6 +121,17 @@ local function bindMonster(model: Instance)
         table.insert(connections, monster:GetAttributeChangedSignal(attribute):Connect(attachWhenReady))
     end
     attachWhenReady()
+end
+
+local function rebindForPlayerGui()
+    -- The monster remains alive across a player's respawn, while its client
+    -- BillboardGui may have been destroyed with the previous PlayerGui.
+    -- Rebuild only at the rare GUI identity transition, not every frame.
+    for model in pairs(monsterViews) do unbindMonster(model) end
+    for model in pairs(pendingMonsters) do clearPendingMonster(model) end
+    if watchedFolder then
+        for _, child in ipairs(watchedFolder:GetChildren()) do bindMonster(child) end
+    end
 end
 
 local function watchFolder(folder: Folder)
@@ -125,16 +148,12 @@ local function watchFolder(folder: Folder)
     for _, child in ipairs(folder:GetChildren()) do bindMonster(child) end
 end
 
-local function reticleTarget(): Model?
+local function reticleTarget(radius: number): Model?
     -- Same aim ray as camera, Bow and AttackController: no mismatched
     -- viewport calculation or camera-to-character offset.
     local origin, direction = CameraController.GetAimRay()
     if not origin or not direction then return nil end
-    local params = RaycastParams.new()
-    params.FilterType = Enum.RaycastFilterType.Exclude
-    params.FilterDescendantsInstances = if player.Character then {player.Character} else {}
-    params.RespectCanCollide = false
-    local hit = Workspace:Raycast(origin, direction * AIM_MAX_DISTANCE, params)
+    local hit = Workspace:Raycast(origin, direction * (radius + AIM_CAMERA_MARGIN_STUDS), reticleParams)
     if not hit then return nil end
     local model = hit.Instance:FindFirstAncestorOfClass("Model")
     while model do
@@ -160,12 +179,19 @@ local function updateVisibility()
     local style = HealthUiSettings.Current()
     local radius = math.clamp(tonumber(style.monster and style.monster.maxDistanceStuds) or 100, 20, 800)
     local radiusSquared = radius * radius
-    aimedMonster = if playerRoot then reticleTarget() else nil
+    aimedMonster = if playerRoot and next(monsterViews) ~= nil then reticleTarget(radius) else nil
     -- A locked mobile camera deliberately tracks this same live monster; do
     -- not lose its HP just because the collider briefly misses a ray sample.
     local lockedMonster = CameraController.AutoAimTarget()
+    local currentGui = player:FindFirstChildOfClass("PlayerGui")
     for model, view in pairs(monsterViews) do
-        local alive = model.Parent ~= nil and model:GetAttribute("LifeState") == "Alive"
+        -- Some spawn/reset paths remove BillboardGui while the monster Model
+        -- stays in Workspace. Recover from missing adornee or destroyed GUI.
+        if not view.IsAttached(currentGui) then
+            table.insert(detachedMonsters, model)
+            continue
+        end
+        local alive = model.Parent == watchedFolder and model:GetAttribute("LifeState") == "Alive"
         local focused = model == aimedMonster or model == lockedMonster
         -- The server's current target is the authority. Aggro/Chase/Attack
         -- all keep this attribute until the monster actually leaves combat.
@@ -177,6 +203,12 @@ local function updateVisibility()
         view.SetVisible(alive and inRange
             and (HealthUiSettings.ShowAllMonsters() or focused or attackingUs))
     end
+    -- Rebind after the iteration: never mutate the live hash while visiting it.
+    for _, model in ipairs(detachedMonsters) do
+        unbindMonster(model)
+        if model.Parent == watchedFolder then bindMonster(model) end
+    end
+    table.clear(detachedMonsters)
 end
 
 function Controller.Start()
@@ -193,6 +225,18 @@ function Controller.Start()
         if character == ownCharacter then bindOwn(nil) end
     end)
     bindOwn(player.Character)
+    player.ChildAdded:Connect(function(child)
+        if child:IsA("PlayerGui") then
+            bindOwn(ownCharacter)
+            rebindForPlayerGui()
+        end
+    end)
+    player.ChildRemoved:Connect(function(child)
+        if child:IsA("PlayerGui") then
+            if own then own.Destroy(); own = nil end
+            rebindForPlayerGui()
+        end
+    end)
     local folder = Workspace:FindFirstChild("Monsters")
     if folder and folder:IsA("Folder") then watchFolder(folder) end
     Workspace.ChildAdded:Connect(function(child)

@@ -139,6 +139,8 @@ function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart,
     local tween: Tween? = nil
     local first = true
     local currentStyle = style
+    local showNameRequested = false
+    local showHpRequested = false
     local baseOffset = visualTopOffset(model, anchor)
 
     local function update()
@@ -158,7 +160,27 @@ function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart,
         end
     end
 
+    local function applySegments()
+        local visibleName = showNameRequested
+        local visibleHP = showHpRequested and currentStyle[layout].enabled == true
+        local enabled = visibleName or visibleHP
+        if gui.Enabled ~= enabled then gui.Enabled = enabled end
+        if titleLine.Visible ~= visibleName then titleLine.Visible = visibleName end
+        if plate.Visible ~= visibleHP then plate.Visible = visibleHP end
+    end
+
     local view = {}
+    -- Recalculate visual bounds after the spawn fade (all visual parts are
+    -- temporarily Transparency=1 when the first BillboardGui is created).
+    -- The expensive bounds walk runs once at spawn completion, not at 10 Hz.
+    function view.RefreshVisualOffset()
+        baseOffset = visualTopOffset(model, anchor)
+        gui.StudsOffsetWorldSpace = Vector3.new(0, baseOffset + currentStyle[layout].offsetStuds, 0)
+    end
+    function view.IsAttached(expectedParent: PlayerGui?): boolean
+        return expectedParent ~= nil and gui.Parent == expectedParent
+            and gui.Adornee == anchor and anchor.Parent == model
+    end
     function view.ApplyStyle(settings: {[string]: any})
         currentStyle = settings
         local spec = settings[layout]
@@ -188,6 +210,7 @@ function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart,
         track.Position = UDim2.fromOffset(pad, pad)
         track.Size = UDim2.new(1, -pad * 2, 1, -pad * 2)
         update()
+        applySegments()
     end
     -- For NPCs the name can remain visible while the HP bar stays hidden.
     -- Existing player/monster callers retain SetVisible, which toggles both.
@@ -195,9 +218,11 @@ function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart,
         gui.MaxDistance = math.max(260, distance)
     end
     function view.SetSegments(showName: boolean, showHP: boolean)
-        gui.Enabled = showName or (showHP and currentStyle[layout].enabled == true)
-        titleLine.Visible = showName
-        plate.Visible = showHP and currentStyle[layout].enabled == true
+        -- Compare actual GUI properties even if the policy did not change:
+        -- a Studio reset or another presentation controller may have hidden it.
+        showNameRequested = showName
+        showHpRequested = showHP
+        applySegments()
     end
     function view.SetVisible(value: boolean)
         view.SetSegments(value and currentStyle[layout].enabled == true,
@@ -212,6 +237,13 @@ function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart,
     view.ApplyStyle(style)
     table.insert(connections, model:GetAttributeChangedSignal("HP"):Connect(update))
     table.insert(connections, model:GetAttributeChangedSignal("MaxHP"):Connect(update))
+    if model:GetAttribute("Game1MonsterRuntime") == true then
+        table.insert(connections, model:GetAttributeChangedSignal("MonsterSpawning"):Connect(function()
+            if model:GetAttribute("MonsterSpawning") == false then
+                view.RefreshVisualOffset()
+            end
+        end))
+    end
     return view
 end
 

@@ -19,8 +19,8 @@ MONSTER = ROOT / "src/server/monster"
 
 class MonsterRespawnSpawnFxTests(unittest.TestCase):
     def test_one_expired_death_timer_creates_at_most_one_monster(self):
-        population = (MONSTER / "MonsterPopulationController.luau").read_text()
-        spawner = (MONSTER / "MonsterSpawnerService.luau").read_text()
+        population = (MONSTER / "MonsterPopulationController.luau").read_text(encoding='utf-8')
+        spawner = (MONSTER / "MonsterSpawnerService.luau").read_text(encoding='utf-8')
         self.assertIn("entry.diedAt = os.clock()", spawner)
         self.assertIn("population:ScheduleRespawn(state, entry.diedAt)", spawner)
         self.assertIn("local elapsed = if diedAt then math.max(0, os.clock() - diedAt) else 0", population)
@@ -37,9 +37,9 @@ class MonsterRespawnSpawnFxTests(unittest.TestCase):
         self.assertIn("releaseInstance(state, model, false, true)", spawner)
 
     def test_reveal_gate_cleanup_and_no_gameplay_ownership(self):
-        fx = (MONSTER / "MonsterSpawnPresentation.luau").read_text()
-        spawner = (MONSTER / "MonsterSpawnerService.luau").read_text()
-        ai = (MONSTER / "MonsterAIService.luau").read_text()
+        fx = (MONSTER / "MonsterSpawnPresentation.luau").read_text(encoding='utf-8')
+        spawner = (MONSTER / "MonsterSpawnerService.luau").read_text(encoding='utf-8')
+        ai = (MONSTER / "MonsterAIService.luau").read_text(encoding='utf-8')
         self.assertIn('TweenService:Create(item.instance, info, {Transparency = item.original})', fx)
         self.assertIn('TweenService:Create(navigationRoot, info, {CFrame = raisedCFrame})', fx)
         self.assertIn('if riseFromGround then', fx)
@@ -68,7 +68,7 @@ class MonsterRespawnSpawnFxTests(unittest.TestCase):
             self.assertNotIn(forbidden, fx)
 
     def test_fixed_1_5_second_descent_preserves_ground_contact_gate(self):
-        fx = (MONSTER / "MonsterSpawnPresentation.luau").read_text()
+        fx = (MONSTER / "MonsterSpawnPresentation.luau").read_text(encoding='utf-8')
         self.assertIn('local RISE_CLEARANCE_STUDS = 1.25', fx)
         self.assertIn('local LANDING_SECONDS = 1.5', fx)
         self.assertIn('TweenInfo.new(LANDING_SECONDS, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)', fx)
@@ -125,22 +125,22 @@ class MonsterRespawnSpawnFxTests(unittest.TestCase):
                 row = store.register(payload)
                 self.assertTrue(row['behavior']['riseFromGround'])
                 self.assertEqual(row['status'], 'LOCAL_ONLY')
-                self.assertIn('riseFromGround = true', (root / 'src/shared/monster/MonsterRegistry.luau').read_text())
+                self.assertIn('riseFromGround = true', (root / 'src/shared/monster/MonsterRegistry.luau').read_text(encoding='utf-8'))
                 # Metadata editing doesn't change the asset hash or require republishing.
                 new_payload = {**payload, 'modelSourcePath': '', 'behavior': {'riseFromGround': False}}
                 updated = store.register(new_payload)
                 self.assertFalse(updated['behavior']['riseFromGround'])
                 self.assertEqual(updated['model_sha256'], row['model_sha256'])
-                self.assertIn('riseFromGround = false', (root / 'src/shared/monster/MonsterRegistry.luau').read_text())
+                self.assertIn('riseFromGround = false', (root / 'src/shared/monster/MonsterRegistry.luau').read_text(encoding='utf-8'))
 
     def test_ui_uses_per_monster_metadata_and_does_not_touch_spawn_records(self):
-        html = (ROOT / 'system/control-center/static/index.html').read_text()
-        js = (ROOT / 'system/control-center/static/monster-assets.js').read_text()
+        html = (ROOT / 'system/control-center/static/index.html').read_text(encoding='utf-8')
+        js = (ROOT / 'system/control-center/static/monster-assets.js').read_text(encoding='utf-8')
         self.assertIn('id="monster-behavior-rise-from-ground"', html)
         self.assertIn("behavior.riseFromGround===true", js)
         self.assertIn("riseFromGround:$('monster-behavior-rise-from-ground').checked", js)
-        self.assertNotIn('riseFromGround', (ROOT / 'system/control-center/static/monster-spawns.js').read_text())
-        self.assertNotIn('riseFromGround', (ROOT / 'system/control-center/static/npc-assets.js').read_text())
+        self.assertNotIn('riseFromGround', (ROOT / 'system/control-center/static/monster-spawns.js').read_text(encoding='utf-8'))
+        self.assertNotIn('riseFromGround', (ROOT / 'system/control-center/static/npc-assets.js').read_text(encoding='utf-8'))
 
 
 if __name__ == '__main__':

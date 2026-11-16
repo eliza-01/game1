@@ -12,7 +12,9 @@ local WeaponShared = Game1Shared:WaitForChild("weapon")
 local CharacterConfig = require(CharacterShared:WaitForChild("CharacterConfig"))
 local CharacterMovementConfig = require(CharacterShared:WaitForChild("CharacterMovementConfig"))
 local WeaponAttackMovement = require(WeaponShared:WaitForChild("WeaponAttackMovement"))
-local AttackConfig = require(Game1Shared:WaitForChild("combat"):WaitForChild("AttackConfig"))
+local CombatShared = Game1Shared:WaitForChild("combat")
+local AttackConfig = require(CombatShared:WaitForChild("AttackConfig"))
+local MeleeFacingPolicy = require(CombatShared:WaitForChild("MeleeFacingPolicy"))
 local GameOptions = require(Game1Shared:WaitForChild("GameOptions"))
 local JumpSettings = GameOptions.PlayerJumpSettings()
 
@@ -37,6 +39,8 @@ local aimFacingEndsAt = 0
 local aimFacingStartDirection: Vector3? = nil
 local aimFacingTargetDirection: Vector3? = nil
 local aimFacingMaxResidualYaw = 0
+local meleeMaxResidualYaw = MeleeFacingPolicy.MaxResidualYaw(nil)
+local meleeArcConnection: RBXScriptConnection? = nil
 local movementLockUntil = 0
 local movementMode = "Run"
 local movementDirectionMode = "Forward"
@@ -55,6 +59,8 @@ local airController: AirController? = nil
 local groundSensor: ControllerPartSensor? = nil
 
 local function clearCharacter()
+	if meleeArcConnection then meleeArcConnection:Disconnect(); meleeArcConnection = nil end
+	meleeMaxResidualYaw = MeleeFacingPolicy.MaxResidualYaw(nil)
     if fallForce then fallForce:Destroy(); fallForce = nil end
     if fallAttachment then fallAttachment:Destroy(); fallAttachment = nil end
     jumpInFlight = false
@@ -158,6 +164,13 @@ local function bindCharacter(newCharacter: Model)
 	end
 
 	character = newCharacter
+	-- Equip publishes MeleeArcAngle; resolve the inner-sector allowance once
+	-- per weapon change, never inside the movement/render loop.
+	local function refreshMeleeFacing()
+		meleeMaxResidualYaw = MeleeFacingPolicy.MaxResidualYaw(newCharacter:GetAttribute("MeleeArcAngle"))
+	end
+	refreshMeleeFacing()
+	meleeArcConnection = newCharacter:GetAttributeChangedSignal("MeleeArcAngle"):Connect(refreshMeleeFacing)
 	root = newRoot
 	navigationRoot = newNavigationRoot
 	controllerManager = newManager
@@ -373,6 +386,10 @@ local function applyAimFacingCompensation(now: number, deltaTime: number, moving
 		facing = flatUnit(rotateYaw(startDirection, delta * alpha))
 	end
 	if not facing then return end
+	-- Avoid unnecessary writes to the physical assembly when the root already
+	-- faces the cached sector-safe direction (the common attack case).
+	local currentFacing = flatUnit(navigationRoot.CFrame.LookVector)
+	if currentFacing and currentFacing:Dot(facing) > 0.999999 then return end
 
 	-- ControllerManager does not reliably rotate a completely stationary custom
 	-- character just from FacingDirection. Rotate the physical NavigationRoot; the
@@ -512,13 +529,6 @@ local function updateMovement(deltaTime: number)
 		end
 	end
 	controllerManager.MovingDirection = moveDirection
-	if aimFacingActive and not movementLocked and moveDirection.Magnitude > 0.001 then
-		-- Only planted melee hands facing back to locomotion. Bow retains the
-		-- reticle-facing authority even while its lower body runs or retreats.
-		if not aimFacingLive then
-			clearAimFacingCompensation()
-		end
-	end
 	if movementLocked then
 		jumpRequested = false
 		-- Stop horizontal carry immediately and keep the attack planted in place.
@@ -536,6 +546,10 @@ local function updateMovement(deltaTime: number)
 		if lowerBodyFacing.Magnitude > 0.001 then
 			controllerManager.FacingDirection = lowerBodyFacing
 		end
+	elseif aimFacingActive and not aimFacingLive and aimFacingTargetDirection then
+		-- Preserve the one-shot melee facing through HitEnd even when running.
+		-- MovingDirection still follows input; only physical yaw is compensated.
+		controllerManager.FacingDirection = aimFacingTargetDirection
 	elseif facingLockDirection and now < facingLockUntil then
 		-- Original melee facing lock. Camera orbit remains owned
 		-- exclusively by CameraController, irrespective of the equipped weapon.
@@ -559,8 +573,8 @@ local function updateMovement(deltaTime: number)
 			-- Without RMB, backpedal preserves the current facing.
 		end
 	end
-	-- Only a planted bow may rotate the physical root for spine overflow.
-	-- Locomotion must never be overwritten by the aim compensation layer.
+	-- The one-shot melee correction runs until its scheduled contact;
+	-- moving direction is independent of the root's facing direction.
 	applyAimFacingCompensation(now, deltaTime, moveDirection.Magnitude > 0.001)
 
 	if now >= airLockUntil then
@@ -683,6 +697,10 @@ function MovementController.UnlockFacing()
 	facingLockUntil = 0
 end
 
+function MovementController.MeleeMaxResidualYaw(): number
+	return meleeMaxResidualYaw
+end
+
 function MovementController.BeginAimFacingCompensation(duration: number, maxResidualYaw: number, live: boolean?)
 	if not root then
 		return false
@@ -717,8 +735,8 @@ function MovementController.UpdateAimFacingCompensation(aimDirection: Vector3)
 	local startDirection = aimFacingStartDirection
 	if not startDirection then return false end
 
-	-- Planted melee retains M314's initial root overflow split. Example:
-	-- 150° aim with 70° torso limit => root turns 80° and torso holds 70°.
+	-- The melee remainder is cached from the equipped arc, NOT just the
+	-- anatomical torso limit. The attack sector must include the reticle.
 	local fullYaw = signedYaw(startDirection, aim)
 	local torsoYaw = math.clamp(fullYaw, -aimFacingMaxResidualYaw, aimFacingMaxResidualYaw)
 	local rootYaw = fullYaw - torsoYaw

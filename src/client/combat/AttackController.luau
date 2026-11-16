@@ -157,7 +157,6 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
         local sequence = attackSequence
         local attackDuration = math.max(0.05, tonumber(action.durationSeconds) or 0.05)
         local damagePoseStart = math.clamp(if isBow then release.time else hitEndEvent.time, 0, attackDuration)
-        local movingAtAttackStart = movementController and movementController.IsMoving and movementController.IsMoving() or false
         if movementController and movementController.BeginAttackMovement then
             -- Every weapon may attack while moving. The equipped weapon type
             -- resolves an authored lower-body gait + RunSpeed fraction; no
@@ -184,14 +183,17 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
                         attackDuration, AttackConfig.TorsoYawLimit, true
                     )
                     movementController.UpdateAimFacingCompensation(direction.Unit)
-                elseif movementController and not movingAtAttackStart then
-                    local facingTurnDuration = math.min(attackDuration, AttackConfig.FacingTurnSeconds)
+                elseif not isBow and movementController then
+                    -- Complete the minimum required root turn BEFORE the
+                    -- server's sole HitEnd snapshot, including while moving.
+                    local facingTurnDuration = math.min(
+                        AttackConfig.FacingTurnSeconds,
+                        math.max(0.05, hitEndEvent.time * 0.8)
+                    )
                     if movementController.BeginAimFacingCompensation then
-                        -- Stationary melee retains its original one-shot
-                        -- facing, released if locomotion takes over.
                         movementController.BeginAimFacingCompensation(
                             facingTurnDuration,
-                            AttackConfig.TorsoYawLimit
+                            movementController.MeleeMaxResidualYaw()
                         )
                         movementController.UpdateAimFacingCompensation(direction.Unit)
                     else

@@ -75,7 +75,7 @@ class BowMovementM319(unittest.TestCase):
         self.assertIn('if liveBowAim and moveDirection.Magnitude > 0.001 then', movement)
         self.assertIn('local lowerBodyFacing = if backwardActive then cameraForwardDirection() else moveDirection', movement)
         self.assertIn('controllerManager.FacingDirection = lowerBodyFacing', movement)
-        self.assertNotIn('controllerManager.FacingDirection = aimFacingTargetDirection', movement)
+        self.assertLess(movement.index('if liveBowAim and moveDirection.Magnitude > 0.001 then'), movement.index('elseif aimFacingActive and not aimFacingLive and aimFacingTargetDirection'))
         self.assertIn('if moving then return end', movement)
         comp = movement.split('local function applyAimFacingCompensation(', 1)[1].split('local function applyMovementMode(', 1)[0]
         self.assertLess(comp.index('if moving then return end'), comp.index('navigationRoot.CFrame = CFrame.lookAt('))

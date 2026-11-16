@@ -229,7 +229,7 @@ def check_weapon_attack_movement(
             err(f"moving attack runtime control missing {required}")
     if "movementController.LockMovement(attackDuration)" in attack_controller_m22:
         err("attacks must not hard-lock player movement")
-    for required in ["BeginAttackMovement", "movingAtAttackStart", "EndAttackMovement"]:
+    for required in ["BeginAttackMovement", "MeleeMaxResidualYaw", "EndAttackMovement"]:
         if required not in attack_controller_m22:
             err(f"attack controller moving-attack contract missing {required}")
     for required in ["AttackMovementLocomotionMode", "combat_idle", "EquivalentRunSpeedForLocomotion", "ResolveForAnimation", "AnimationAttackLowerBodySlot"]:

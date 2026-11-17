@@ -53,11 +53,11 @@ class FireflyEditorPreview(unittest.TestCase):
             self.assertIn('math.noise(seed, sampleTime, '+suffix, self.tuner)
             self.assertIn('math.noise(seed, sampleTime, '+suffix, self.runtime)
 
-    def test_presets_and_tail_head_untouched(self):
+    def test_presets_and_world_up_fire(self):
         self.assertIn('local PRESET_KEY = "Game1_FireTuner_UserPresets_v1"', self.tuner)
         self.assertIn('local function capturePreset(name)', self.tuner)
         self.assertIn('local function applyPreset(data)', self.tuner)
-        self.assertIn('Tail -> Head', self.tuner)
+        self.assertIn('bone.TransformedWorldCFrame.Rotation:Inverse()', self.tuner)
 
 if __name__ == '__main__':
     unittest.main()

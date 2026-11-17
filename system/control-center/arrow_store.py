@@ -11,10 +11,10 @@ import json
 import math
 import re
 import shutil
-import sqlite3
 import time
 
 from model_publication_service import staged_model
+from sqlite_connection import connect as connect_sqlite
 from opencloud_assets import (
     create_model_asset, update_model_asset, create_image_asset,
     update_image_asset, wait_for_operation,
@@ -66,9 +66,8 @@ class ArrowStore:
         self.export()
 
     def connect(self):
-        db = sqlite3.connect(self.db)
-        db.row_factory = sqlite3.Row
-        return db
+        # Shared connection commits/rolls back AND closes the Windows file handle.
+        return connect_sqlite(self.db)
 
     def get(self, slug: str):
         with self.connect() as conn:

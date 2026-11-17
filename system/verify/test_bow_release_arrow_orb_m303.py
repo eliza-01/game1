@@ -66,10 +66,10 @@ class BowIntegrationTests(unittest.TestCase):
         self.assertTrue(bows, 'Expected authored bow timeline')
         self.assertTrue(all(set(row['events'])=={'Release'} for row in bows))
         server = read('src/server/combat/AttackService.luau')
-        self.assertIn('local damageWindow = if isBow then nil', server)
+        self.assertIn('local hitEndEvent = if isBow then nil else CharacterAttackHitEnd.Resolve(timing)', server)
         self.assertIn('BowHitscanService.Release(', server)
         client = read('src/client/combat/AttackController.luau')
-        self.assertIn('if isBow then nil else CharacterAttackWindow.Resolve', client)
+        self.assertIn('if isBow then nil else CharacterAttackHitEnd.Resolve(action.timeline)', client)
 
     def test_visible_arrow_is_model_not_hit_authority(self):
         factory=read('src/shared/combat/ArrowVisualFactory.luau')
@@ -102,7 +102,7 @@ class BowIntegrationTests(unittest.TestCase):
         plugin = read('system/studio-plugin/fire-tuner/fire_bone.lua')
         installer = read('system/studio-plugin/install-fire-tuner.ps1')
         self.assertIn('PRESET_KEY', plugin)
-        self.assertIn('Tail -> Head', plugin)
+        self.assertIn('FIRE · BONE HEAD / WORLD UP', plugin)
         self.assertIn('Game1FireDirection', plugin)
         self.assertIn('Copy-Item -LiteralPath $destination -Destination $backup', installer)
         self.assertFalse((ROOT / 'system/studio-plugin/recover-fire-tuner.ps1').exists())

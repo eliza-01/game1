@@ -6,6 +6,7 @@ local UserInputService = game:GetService("UserInputService")
 local CollectionService = game:GetService("CollectionService")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
+local ChangeHistoryService = game:GetService("ChangeHistoryService")
 
 -- ============================================================
 -- PLUGIN WINDOW
@@ -498,27 +499,57 @@ local function findEffect(bone: Bone, className: string): Instance?
     return nil
 end
 
+-- Fire uses its parent Attachment's local +Y. A Bone's local axes are
+-- arbitrary authoring axes: cancel its WORLD rotation, not Tail -> Head.
+-- Zero local position means the origin is the Bone HEAD regardless of tilt.
+local FIRE_ANCHOR = "Game1FireDirection"
+local FIRE_WORLD_UP = "Game1FireWorldUp"
+
+local function placeFireAtHead(bone: Bone, fire: Fire)
+    local parent = fire.Parent
+    local anchor: Attachment?
+    if parent and parent.ClassName == "Attachment" and parent.Parent == bone
+        and parent.Name:sub(1, #FIRE_ANCHOR) == FIRE_ANCHOR then
+        anchor = parent :: Attachment
+    else
+        local existing = bone:FindFirstChild(FIRE_ANCHOR)
+        if existing and not existing:IsA("Attachment") then
+            warn("Game1FireDirection must be an Attachment")
+            return false
+        end
+        if existing and not existing:FindFirstChildOfClass("Fire") then
+            anchor = existing :: Attachment
+        else
+            local name = FIRE_ANCHOR
+            local suffix = 2
+            while bone:FindFirstChild(name) do
+                name = FIRE_ANCHOR .. tostring(suffix)
+                suffix += 1
+            end
+            anchor = Instance.new("Attachment")
+            anchor.Name = name
+            anchor.Parent = bone
+        end
+        fire.Parent = anchor
+    end
+    anchor:SetAttribute(FIRE_WORLD_UP, true)
+    anchor.CFrame = bone.TransformedWorldCFrame.Rotation:Inverse()
+    if fire.Heat < 0 then fire.Heat = -fire.Heat end
+    return true
+end
+
 local function createFire()
     if not currentBone or currentFire then return end
-    local axis = currentBone:FindFirstChild("Game1FireDirection")
-    if axis and not axis:IsA("Attachment") then
-        warn("Game1FireDirection must be an Attachment"); return
-    end
-    if not axis then
-        axis = Instance.new("Attachment")
-        axis.Name = "Game1FireDirection"
-        -- Native Fire emits along local +Y. Preserve original Tail -> Head
-        -- direction from the authored Bone; existing effects are never flipped.
-        axis.CFrame = CFrame.Angles(math.pi, 0, 0)
-        axis.Parent = currentBone
-    end
     local fire = Instance.new("Fire")
     fire.Name = "FireFX"
     fire.Size = 4
     fire.Heat = 8
     fire.Color = Color3.fromRGB(255, 170, 65)
     fire.SecondaryColor = Color3.fromRGB(255, 70, 20)
-    fire.Parent = axis
+    if not placeFireAtHead(currentBone, fire) then
+        fire:Destroy()
+        return
+    end
     currentFire = fire
     refreshAll()
 end
@@ -684,7 +715,25 @@ local function updatePreview(dt: number)
 end
 
 local previewAccumulator = 0
+local fireDirectionAccumulator = 0
 local previewConnection = RunService.Heartbeat:Connect(function(dt)
+    -- Keep a selected authored fire upright while its Bone is manipulated in
+    -- Studio Edit. Merely selecting a legacy Bone remains read-only; explicit
+    -- Create / Align marks the anchor as using the new world-up contract.
+    if widget.Enabled and RunService:IsEdit() and currentBone and currentFire then
+        local axis = currentFire.Parent
+        if axis and axis:IsA("Attachment") and axis.Parent == currentBone
+            and axis:GetAttribute(FIRE_WORLD_UP) == true then
+            fireDirectionAccumulator += dt
+            if fireDirectionAccumulator >= 1 / 30 then
+                fireDirectionAccumulator %= 1 / 30
+                local desired = currentBone.TransformedWorldCFrame.Rotation:Inverse()
+                if axis.CFrame ~= desired then axis.CFrame = desired end
+            end
+        end
+    else
+        fireDirectionAccumulator = 0
+    end
     if not hasPreviewTarget() then
         updatePreview(0)
         previewAccumulator = 0
@@ -791,7 +840,7 @@ local function applyPreset(data)
         if not currentFire then return end
     currentFire.Enabled = fire.enabled == true
     currentFire.Size = math.clamp(tonumber(fire.size) or currentFire.Size, 0, 30)
-    currentFire.Heat = math.clamp(tonumber(fire.heat) or currentFire.Heat, -25, 25)
+    currentFire.Heat = math.clamp(math.abs(tonumber(fire.heat) or currentFire.Heat), 0, 25)
     currentFire.TimeScale = math.clamp(tonumber(fire.timeScale) or currentFire.TimeScale, 0, 1)
     currentFire.Color = fromRgb(fire.color) or currentFire.Color
     currentFire.SecondaryColor = fromRgb(fire.secondary) or currentFire.SecondaryColor
@@ -928,8 +977,18 @@ showPresets()
 -- FIRE
 -- ============================================================
 
-addSection("FIRE")
-addExplicitCreate("Create Fire on selected Bone", createFire)
+addSection("FIRE · BONE HEAD / WORLD UP")
+addExplicitCreate("Create Fire at Head (world up)", createFire)
+addExplicitCreate("Align existing Fire at Head (world up)", function()
+    if not currentBone or not currentFire or not RunService:IsEdit() then return end
+    local recording = ChangeHistoryService:TryBeginRecording("Game1 World Up Fire")
+    local ok = placeFireAtHead(currentBone, currentFire)
+    if recording then
+        ChangeHistoryService:FinishRecording(recording,
+            if ok then Enum.FinishRecordingOperation.Commit else Enum.FinishRecordingOperation.Cancel)
+    end
+    if ok then refreshAll() end
+end)
 
 addToggle(
 	"Enabled",
@@ -972,7 +1031,7 @@ addNumber(
 	end,
 
 	0.5,
-	-25,
+	0,
 	25,
 	"%.2f"
 )

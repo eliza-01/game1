@@ -116,7 +116,7 @@ class StudioSourceContracts(unittest.TestCase):
         self.assertNotIn('createFire()',selected)
         self.assertNotIn('createLight()',selected)
         self.assertIn('plugin:SetSetting(PRESET_KEY',lua)
-        self.assertIn('CFrame.Angles(math.pi, 0, 0)',lua)
+        self.assertIn('bone.TransformedWorldCFrame.Rotation:Inverse()',lua)
 
     def test_impact_uses_native_weld_on_props_bone_local_on_animated_rigs(self):
         visual=self.text('src/client/combat/BowShotVisualController.luau')

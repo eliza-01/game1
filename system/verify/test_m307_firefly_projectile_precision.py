@@ -22,7 +22,7 @@ class FireflyTests(unittest.TestCase):
             self.assertNotIn(forbidden, selected)
         self.assertIn('currentOrb = currentBone:FindFirstChild("Game1OrbEffect")', selected)
         self.assertIn('PRESET_KEY', tuner)
-        self.assertIn('Tail -> Head', tuner)
+        self.assertIn('FIRE · BONE HEAD / WORLD UP', tuner)
 
     def test_firefly_uses_existing_bone_orb_controller(self):
         tuner = source('system/studio-plugin/fire-tuner/fire_bone.lua')
@@ -49,12 +49,10 @@ class FireflyTests(unittest.TestCase):
 class ArrowTests(unittest.TestCase):
     def test_bow_cannot_use_melee_volume(self):
         equip = source('src/server/weapon/WeaponEquipService.luau')
-        volume = source('src/shared/combat/WeaponAttackVolume.luau')
-        self.assertEqual(equip.count('WeaponAttackVolume.ClearWeaponBox(weapon)'), 2)
-        self.assertIn('function WeaponAttackVolume.ClearWeaponBox', volume)
+        self.assertNotIn('WeaponAttackVolume', equip)
         server = source('src/server/combat/AttackService.luau')
-        self.assertIn('local damageWindow = if isBow then nil', server)
-        self.assertIn('if character and string.lower(tostring(character:GetAttribute("EquippedWeaponType") or "")) == "bow" then', server)
+        self.assertIn('local hitEndEvent = if isBow then nil else CharacterAttackHitEnd.Resolve(timing)', server)
+        self.assertIn('if string.lower(tostring(character:GetAttribute("EquippedWeaponType") or "")) == "bow" then return false end', server)
 
     def test_bow_range_clips_swept_ray_not_only_crosshair(self):
         server=source('src/server/combat/BowHitscanService.luau')

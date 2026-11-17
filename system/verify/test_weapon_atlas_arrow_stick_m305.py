@@ -108,7 +108,7 @@ class SharedWeaponAtlasTests(unittest.TestCase):
     def test_fire_tuner_any_bone_presets_and_direction(self):
         tuner=(ROOT/'system/studio-plugin/fire-tuner/fire_bone.lua').read_text()
         self.assertNotIn('if bone.Name ~= "fire_bone"',tuner)
-        self.assertIn('CFrame.Angles(math.pi, 0, 0)',tuner)
+        self.assertIn('bone.TransformedWorldCFrame.Rotation:Inverse()',tuner)
         self.assertIn('plugin:SetSetting(PRESET_KEY',tuner)
         self.assertIn('plugin:GetSetting(PRESET_KEY)',tuner)
         install=(ROOT/'system/studio-plugin/install.ps1').read_text()

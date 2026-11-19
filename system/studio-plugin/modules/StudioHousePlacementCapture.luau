@@ -1,7 +1,6 @@
--- Read-only Studio authoring adapter. Selection and plot markers stay untouched.
--- No runtime ownership, no house assembly, no Workspace mutation.
+-- Read-only plot pivot authoring. Model identity is only a measurement aid;
+-- saved (plot, level, variant, pivot) lives independently of publication.
 local PlotsCatalog = require(script.Parent.StudioPlotsCatalog)
-local HouseFrame = require(script.Parent.StudioRealEstateHouseFrame)
 
 return function(context)
     local HttpService = context.HttpService
@@ -25,7 +24,7 @@ return function(context)
             error("Plot must be between 1 and 50")
         end
         if houseSlug == "" then
-            error("Choose a registered house in Real Estate")
+            error("Choose a house type (level + variant)")
         end
         local chosen = Selection:Get()
         if #chosen ~= 1 or not chosen[1]:IsA("Model") then
@@ -49,15 +48,10 @@ return function(context)
         if not volume then
             error(string.format("Workspace.Plots/%02d/plot_%02d_volume not found", plotIndex, plotIndex))
         end
-        -- The selected Model pivot can differ from the published wrapper pivot.
-        -- The authored house MeshPart pivot is the stable visual frame shared
-        -- with Real Estate Studio Sync; capture its offset from the Model pivot.
-        local house = HouseFrame.Find(model)
-        if not house then
-            error("Selected Model must have exactly one MeshPart named house for rotation-safe Bind")
-        end
+        -- The original authoring pivot is the ONLY placement origin.
+        -- Never derive it from a MeshPart's bounds, name or imported geometry.
         local world = model:GetPivot()
-        local houseWorld = house:GetPivot()
+        local houseWorld = world
         local plotFrame = volume.CFrame
         return {
             houseSlug = houseSlug,

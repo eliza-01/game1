@@ -1,21 +1,19 @@
--- Author-space transform for all Real Estate Studio sync paths.
--- The MeshPart CFrame tracks its geometry centre, which can shift after an
--- FBX revision. The authored import pivot (CFrame * PivotOffset) is the
--- stable registration frame. Never match replacements by CFrame alone.
-local RigSwap = require(script.Parent.StudioManagedRigSwap)
-local MeshAnchor = require(script.Parent.StudioAuthoringMeshAnchor)
-local HouseFrame = {}
+-- Authored house pivot is always the original Model pivot, never a visual
+-- MeshPart. All parts and house_armature share this project-space origin.
+local HouseFrame={}
 
-function HouseFrame.Find(root: Instance): MeshPart?
-    return MeshAnchor.FindUniqueNamed(root, "house")
+function HouseFrame.Find(root: Instance): Model?
+    if root:IsA("Model") then return root end
+    return nil
 end
 
-function HouseFrame.Relative(source: MeshPart, target: MeshPart): CFrame
-    return target:GetPivot() * source:GetPivot():Inverse()
+function HouseFrame.Relative(source: Instance, target: Instance): CFrame
+    return target:GetPivot()*source:GetPivot():Inverse()
 end
 
-function HouseFrame.Align(rig: Model, sourceAnchor: MeshPart, targetPivot: CFrame, context: string)
-    RigSwap.AlignToAnchor(rig, sourceAnchor, targetPivot, context)
+function HouseFrame.Align(rig: Model, sourceAnchor: Instance, targetPivot: CFrame, context: string)
+    local delta=targetPivot*sourceAnchor:GetPivot():Inverse()
+    rig:PivotTo(delta*rig:GetPivot())
 end
 
 return table.freeze(HouseFrame)

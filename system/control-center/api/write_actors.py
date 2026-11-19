@@ -8,7 +8,7 @@ from services.character_registration_flow import run as run_character_registrati
 
 
 def route(path, body, deps):
-    if not path.startswith(('/api/arrows', '/api/armor', '/api/characters', '/api/weapons', '/api/npcs', '/api/monsters', '/api/npc-equipment',)):
+    if not path.startswith(('/api/arrows', '/api/armor', '/api/characters', '/api/weapons', '/api/npcs', '/api/monsters', '/api/npc-equipment', '/api/npc-atlas-choice',)):
         return None
 
     if path.startswith('/api/armor/'):
@@ -96,6 +96,18 @@ def route(path, body, deps):
             return out(200, weapons.update_attack_movement(body()))
         except Exception as error:
             return out(400, {"error": str(error)})
+
+    if path == '/api/npc-atlas-choice':
+        try:
+            payload = body()
+            service = deps['npc_atlas_sources']
+            if payload.get('action') == 'connect':
+                return out(200, service.connect(payload))
+            if payload.get('action') == 'clear':
+                return out(200, service.clear(payload))
+            return out(400, {'error':'unsupported NPC atlas action'})
+        except (ValueError, OSError, RuntimeError, KeyError) as error:
+            return out(400, {'error':str(error)})
 
     if path == "/api/npcs":
         try:

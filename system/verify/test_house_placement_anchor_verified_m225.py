@@ -2,18 +2,20 @@
 from __future__ import annotations
 
 import json
+import socket
 from pathlib import Path
 import sys
 import threading
 import time
-from unittest import TestCase
+from unittest import TestCase, mock
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'system' / 'control-center'))
+from services import studio_house_placement_bridge as bridge
 from services.studio_house_placement_bridge import preview_house_placement
-from studio_bridge import PORT, TOKEN, StudioBridgeError
+from studio_bridge import TOKEN, StudioBridgeError
 
 
 def dummy_binding(anchored: bool) -> dict:
@@ -28,11 +30,16 @@ def dummy_binding(anchored: bool) -> dict:
 class VerifiedPreviewBridge(TestCase):
     def dispatch_fake_studio(self, result_fields: dict, expected_anchored: bool,
                              *, stale: bool = False):
+        # A live Studio plugin polls the configured Game1Bridge port. Unit tests
+        # must use their own port so the real plugin cannot consume our command.
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+            probe.bind(('127.0.0.1', 0))
+            test_port = probe.getsockname()[1]
         observed = []
         errors = []
         def simulated_studio():
             try:
-                base = f'http://127.0.0.1:{PORT}'
+                base = f'http://127.0.0.1:{test_port}'
                 for _ in range(100):
                     try:
                         with urlopen(Request(base + '/command', headers={
@@ -65,25 +72,26 @@ class VerifiedPreviewBridge(TestCase):
                     observed.append(exc.code)
             except Exception as exc:
                 errors.append(exc)
-        worker = threading.Thread(target=simulated_studio, daemon=True)
-        worker.start()
-        try:
-            if stale:
-                with self.assertRaises(StudioBridgeError):
-                    preview_house_placement('house_a', 1, 'place',
+        with mock.patch.object(bridge, 'PORT', test_port):
+            worker = threading.Thread(target=simulated_studio, daemon=True)
+            worker.start()
+            try:
+                if stale:
+                    with self.assertRaises(StudioBridgeError):
+                        preview_house_placement('house_a', 1, 'place',
+                            dummy_binding(expected_anchored), timeout_seconds=3)
+                elif (result_fields.get('anchored', expected_anchored) is not expected_anchored
+                      or result_fields.get('anchoredPartsVerified', 3) < 1):
+                    with self.assertRaisesRegex(StudioBridgeError, 'did not verify'):
+                        preview_house_placement('house_a', 1, 'place',
+                            dummy_binding(expected_anchored), timeout_seconds=3)
+                else:
+                    response = preview_house_placement('house_a', 1, 'place',
                         dummy_binding(expected_anchored), timeout_seconds=3)
-            elif (result_fields.get('anchored', expected_anchored) is not expected_anchored
-                  or result_fields.get('anchoredPartsVerified', 3) < 1):
-                with self.assertRaisesRegex(StudioBridgeError, 'did not verify'):
-                    preview_house_placement('house_a', 1, 'place',
-                        dummy_binding(expected_anchored), timeout_seconds=3)
-            else:
-                response = preview_house_placement('house_a', 1, 'place',
-                    dummy_binding(expected_anchored), timeout_seconds=3)
-                self.assertIs(response['anchored'], expected_anchored)
-                self.assertEqual(response['anchoredPartsVerified'], 3)
-        finally:
-            worker.join(timeout=4)
+                    self.assertIs(response['anchored'], expected_anchored)
+                    self.assertEqual(response['anchoredPartsVerified'], 3)
+            finally:
+                worker.join(timeout=4)
         self.assertEqual(errors, [])
         self.assertEqual(observed[1], 400 if stale else 200)
 

@@ -16,7 +16,7 @@ def source(path):
 class HouseSocketM155(unittest.TestCase):
     def test_optional_elevator_floors_are_real_authored_sockets(self):
         contract = source("src/shared/world/HouseSocketContract.luau")
-        for socket in ("elevator_02_socket", "elevator_03_socket", "house_floor_03_spawn_01_socket"):
+        for socket in ("elevator_02_socket", "elevator_03_socket", "house_floor_03_spawn_socket"):
             self.assertRegex(contract, rf'"{socket}"[^\n]+optional = true')
         authoring = source("system/control-center/real_estate/rig_features.py")
         self.assertIn("elevator_02_socket", authoring)

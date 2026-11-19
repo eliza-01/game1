@@ -69,7 +69,7 @@ local function updateDoorPrompts(entry: Entry, house: Model)
     local door = house:FindFirstChild("DoorAssembly")
     local open = door ~= nil and door:GetAttribute("Game1DoorOpen") == true
     local moving = Door.IsMoving(house)
-    local hasPadlock = entry.sockets["door_01_padlock_01_socket"] ~= nil
+    local hasPadlock = Contract.HasPadlock(entry.sockets)
     local locked = Padlock.IsAttached(house, hasPadlock)
     local canAttach = door ~= nil and door:IsA("Model")
         and Padlock.CanAttach(house, hasPadlock, open, moving)
@@ -89,11 +89,13 @@ local function updateDoorPrompts(entry: Entry, house: Model)
             alternate.Enabled = canAttach
         end
     end
-    local socket = entry.sockets["door_01_padlock_01_socket"]
-    local prompt = socket and socket:FindFirstChild("Game1HouseInteraction")
-    if prompt and prompt:IsA("ProximityPrompt") then
-        prompt.ActionText = "Снять замок · ключ"
-        prompt.Enabled = locked -- Re-attach only through F at either handle.
+    for _, padlockName in Contract.PadlockSockets do
+        local socket = entry.sockets[padlockName]
+        local prompt = socket and socket:FindFirstChild("Game1HouseInteraction")
+        if prompt and prompt:IsA("ProximityPrompt") then
+            prompt.ActionText = "Снять замок · ключ"
+            prompt.Enabled = locked
+        end
     end
     local part = entry.padlockPart
     if part then
@@ -117,7 +119,7 @@ local function handleInteraction(house: Model, name: string, player: Player, key
         end
         if not offered then return end
     elseif definition.role == "door" then
-        local hasPadlock = entry.sockets["door_01_padlock_01_socket"] ~= nil
+        local hasPadlock = Contract.HasPadlock(entry.sockets)
         if Padlock.IsAttached(house, hasPadlock) then return end
         if key == "F" then
             local door = house:FindFirstChild("DoorAssembly")
@@ -214,7 +216,7 @@ local function register(house: Model)
         entry.sockets[definition.name] = found :: Attachment
         foundCount += 1
     end
-    Padlock.Ensure(house, entry.sockets["door_01_padlock_01_socket"] ~= nil)
+    Padlock.Ensure(house, Contract.HasPadlock(entry.sockets))
 
     local function createPrompt(socket: Attachment, definition: Contract.SocketDefinition, key: string, action: string)
         local prompt = Instance.new("ProximityPrompt")
@@ -247,7 +249,7 @@ local function register(house: Model)
                 end
             else
                 createPrompt(socket, definition, "E", definition.action)
-                if definition.role == "door" and entry.sockets["door_01_padlock_01_socket"] then
+                if definition.role == "door" and Contract.HasPadlock(entry.sockets) then
                     createPrompt(socket, definition, "F", "Навесить замок · ключ")
                 end
             end
@@ -488,7 +490,7 @@ function Service.Start()
                     local options = if definition.role == "elevator" then Elevator.Options(entry.sockets, descendant.Name) else {}
                     local hasE = definition.role ~= "elevator"
                     local hasF = definition.role == "door"
-                        and entry.sockets["door_01_padlock_01_socket"] ~= nil
+                        and Contract.HasPadlock(entry.sockets)
                     for _, option in options do
                         if option.key == "E" then hasE = true end
                         if option.key == "F" then hasF = true end

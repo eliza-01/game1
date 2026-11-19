@@ -51,7 +51,7 @@ class RealEstateAuthoredPlacementM184(unittest.TestCase):
 
     def test_analysis_persists_author_frame_and_sync_forwards_stored_data(self):
         inspection = (ASSET / 'analyze_real_estate_fbx.py').read_text('utf-8')
-        self.assertIn('inspect_placements(', inspection)
+        self.assertIn('inspect_origin_placements(', inspection)
         self.assertIn("record['authoredPlacement'] = placements[name]", inspection)
         sync = (ROOT / 'system/control-center/real_estate/studio_sync.py').read_text('utf-8')
         self.assertIn("mesh['authoredPlacement']", sync)
@@ -68,7 +68,9 @@ class RealEstateAuthoredPlacementM184(unittest.TestCase):
                 'authoredPlacement': {'version': 2, 'centerInHouse': [-2.44, -11.51, 7.48],
                                       'size': [5.79, 7.93, 1.24]}}
         row = {'status': 'PUBLISHED', 'slug': 'house_level5_01',
-               'rigAssets': {'house': {'assetId': '111'}, 'door': {'assetId': '222'}},
+               'rigAssets': {'house': {'assetId': '111', 'publishedSha256': 'fixture'},
+                             'door': {'assetId': '222', 'publishedSha256': 'fixture'}},
+               'rigPublicationHashes': {'house': 'fixture', 'door': 'fixture'},
                'skeleton': {'meshes': [house, door]}, 'house_level': 5,
                'purchase_price': 1, 'min_level': 1, 'sale_price': 1,
                'textures': {'house': {'assetId': '3'}, 'door': {'assetId': '4'}}}
@@ -82,18 +84,15 @@ class RealEstateAuthoredPlacementM184(unittest.TestCase):
         self.assertEqual(calls[0]['rigAssetIds'], {'house': '111', 'door': '222'})
         self.assertEqual(row['rigAssets']['door']['assetId'], '222')
 
-    def test_studio_full_and_partial_share_bounded_position_restoration(self):
-        module = (MODULES / 'StudioRealEstatePartPlacement.luau').read_text('utf-8')
-        self.assertIn('house.CFrame:PointToWorldSpace(center * ratio)', module)
-        self.assertIn('rig:PivotTo(CFrame.new(delta) * rig:GetPivot())', module)
-        self.assertIn('if authored == nil or authoredHouse == nil then', module)
-        self.assertIn('published mesh dimensions differ from authored FBX', module)
+    def test_new_studio_assembly_uses_shared_rig_pivots_without_bbox_recovery(self):
+        placement = (MODULES / 'StudioRealEstatePartPlacement.luau').read_text('utf-8')
         full = (MODULES / 'StudioRealEstateModel.luau').read_text('utf-8')
-        partial = (MODULES / 'StudioRealEstatePartSync.luau').read_text('utf-8')
-        self.assertIn('PartPlacement.Align(rig, mesh, meshes.house,', full)
-        self.assertIn('PartPlacement.Align(imported, mesh, anchor,', partial)
-        self.assertLess(full.index('PartPlacement.Align('), full.index('assembly.WorldPivot'))
-        self.assertLess(partial.index('PartPlacement.Align('), partial.index('assembly.WorldPivot'))
+        self.assertIn('function Placement.AlignSharedPivot', placement)
+        self.assertIn('rig:PivotTo(pivot)', placement)
+        self.assertIn('PartPlacement.AlignSharedPivot(rig, mesh, authoredOrigin, part)', full)
+        self.assertIn('wrapper.PrimaryPart = rootCarrier', full)
+        self.assertNotIn('PartPlacement.AlignOrigin(', full)
+        self.assertNotIn('PartPlacement.Align(rig, mesh, meshes.house', full)
         plugin = json.loads((ROOT / 'system/studio-plugin/plugin.project.json').read_text('utf-8'))
         self.assertEqual(plugin['tree']['modules']['StudioRealEstatePartPlacement']['$path'],
                          'modules/StudioRealEstatePartPlacement.luau')

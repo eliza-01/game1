@@ -54,7 +54,7 @@ def prepare_publication(root: Path, source: Path, target: Path, expected: dict, 
                       (source, target, config, report_path, only_part) if only_part else
                       (source, target, config, report_path), report_path=report_path)
     parts = (only_part,) if only_part else present_parts(expected)
-    if report.get('schemaVersion') != 2 or set(report.get('rigAssets', {})) != set(parts):
+    if report.get('schemaVersion') != 3 or set(report.get('rigAssets', {})) != set(parts if only_part else ('rig_carrier', *parts)):
         raise ValueError('Real Estate preparation did not produce the expected independent rigs')
     for part in parts:
         stage = target / f'{part}.fbx'

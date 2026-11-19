@@ -50,14 +50,16 @@ class StudioAssetSyncService:
             texture_binding(item.get("slot") or "", item.get("asset_id") or "",
                             getattr(self._weapons, "root", None), item.get("source_path") or "",
                             registered_sha256=item.get("sha256") or "",
-                            published_sha256=item.get("published_sha256") or "")
+                            published_sha256=item.get("published_sha256") or "",
+                            alpha_enabled=item.get("alphaEnabled", False))
             for item in ([] if atlas else row.get("textures") or [])
             if str(item.get("asset_id") or "").isdigit()
         ]
         if atlas:
             texture_assets = [texture_binding('atlas', atlas['published_id'], self._weapons.root,
                 atlas['source_path'], registered_sha256=atlas['source_sha256'],
-                published_sha256=atlas['published_sha256'])]
+                published_sha256=atlas['published_sha256'],
+                alpha_enabled=row.get('alphaEnabled', False))]
         destination = ["weapons", str(row.get("storage_type") or row.get("weapon_type") or ""), str(row.get("slug") or ""), "model"]
         result = self._load_model(
             asset_id,
@@ -69,6 +71,7 @@ class StudioAssetSyncService:
                 "weaponType": str(row.get("weapon_type") or ""),
                 "rarity": str(row.get("rarity") or ""),
                 "textures": texture_assets,
+                "meshAppearance": row.get("meshAppearance") or {},
             },
         )
         if atlas:
@@ -91,11 +94,13 @@ class StudioAssetSyncService:
         if atlas:
             textures.append(texture_binding('arrow_atlas', atlas['published_id'], self._arrows.root,
                 atlas['source_path'], registered_sha256=atlas['source_sha256'],
-                published_sha256=atlas['published_sha256']))
+                published_sha256=atlas['published_sha256'],
+                alpha_enabled=row.get('alphaEnabled', False)))
         elif row['texture_asset_id']:
             textures.append(texture_binding('arrow_atlas', row['texture_asset_id'],
                 self._arrows.root, row['texture_path'], registered_sha256=row['texture_sha256'],
-                published_sha256=row['texture_published_sha256']))
+                published_sha256=row['texture_published_sha256'],
+                alpha_enabled=row.get('alphaEnabled', False)))
         result = self._load_model(row['model_asset_id'], ['arrows', slug, 'model'],
             wrapper_name=slug, placement_mode='weapon-pivot',
             metadata={'arrowSlug':slug, 'textures':textures})
@@ -114,14 +119,23 @@ class StudioAssetSyncService:
         asset_id = str(row.get("model_asset_id") or "").strip()
         if not asset_id:
             raise ValueError(f"publish the {kind} model before syncing it to Studio")
+        atlas = row.get('atlas_binding') if kind == 'npc' else None
+        if atlas and not atlas['current']:
+            raise ValueError('selected shared NPC atlas is no longer current; choose a published variant')
         texture_assets = [
             texture_binding(item.get("slot") or "", item.get("asset_id") or "",
                             getattr(actor_store, "root", None), item.get("source_path") or "",
                             registered_sha256=item.get("sha256") or "",
-                            published_sha256=item.get("published_sha256") or "")
-            for item in (row.get("textures") or [])
+                            published_sha256=item.get("published_sha256") or "",
+                            alpha_enabled=item.get("alphaEnabled", False))
+            for item in ([] if atlas else row.get("textures") or [])
             if str(item.get("asset_id") or "").isdigit()
         ]
+        if atlas:
+            texture_assets = [texture_binding('atlas', atlas['published_id'], actor_store.root,
+                atlas['source_path'], registered_sha256=atlas['source_sha256'],
+                published_sha256=atlas['published_sha256'],
+                alpha_enabled=row.get('alphaEnabled', False))]
         destination = [f"{kind}s", str(row.get("slug") or ""), "model"]
         result = self._load_model(
             asset_id,
@@ -137,11 +151,14 @@ class StudioAssetSyncService:
                     if str(item.get("name") or "")
                 ],
                 "textures": texture_assets,
+                "meshAppearance": row.get("meshAppearance") or {},
             },
         )
         validate_published_rig(result, row, kind="monster")
 
         texture_stats = ((result.get("monsterStats") or {}).get("textures") or {})
         if texture_assets and int(texture_stats.get("applied") or 0) <= 0:
-            raise ValueError("Studio loaded the monster rig but did not apply any published monster textures")
+            raise ValueError(f'Studio loaded the {kind} rig but did not apply the published atlas/texture')
+        if atlas:
+            actor_store.atlases.mark_synced('npc',slug,int(atlas['revision']))
         return {"monster": row, "studio": result}

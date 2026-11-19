@@ -425,8 +425,9 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
                 local colorMapId=if textureApplicable and surface then Inventory.Id(surface.ColorMap) else ""
                 local textureCurrent=not textureApplicable or Visual.IsCurrent(part,row)
                 local alphaEnabled=row.alphaEnabled==true
-                local alphaCurrent=not textureApplicable or row.appearanceMode=="material" or (surface~=nil and
-                    surface.AlphaMode==(if alphaEnabled then Enum.AlphaMode.Transparency else Enum.AlphaMode.Opaque))
+                local appearanceAlphaCurrent = if alphaEnabled then
+                    surface~=nil and surface.AlphaMode==Enum.AlphaMode.Transparency else surface==nil
+                local alphaCurrent=not textureApplicable or row.appearanceMode=="material" or appearanceAlphaCurrent
                 local meshCurrent=currentIds[meshId]==true
                 -- Authored skeleton layout is validated independently of MeshId:
                 -- the visual Mesh ID may be unchanged across publications.

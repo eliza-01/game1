@@ -24,7 +24,9 @@ class RestoredSocketsM133(unittest.TestCase):
         house = {'name': 'house', 'bones': [], 'armature': 'house_armature'}
         door = {'name': 'door', 'bones': [hinge, child], 'armature': 'door_armature'}
         row = {'slug': 'house_level4_01', 'status': 'PUBLISHED', 'skeleton': {'meshes': [house, door]},
-               'rigAssets': {'house': {'assetId': '111'}, 'door': {'assetId': '222'}},
+               'rigAssets': {'house': {'assetId': '111', 'publishedSha256': 'fixture'},
+                             'door': {'assetId': '222', 'publishedSha256': 'fixture'}},
+               'rigPublicationHashes': {'house': 'fixture', 'door': 'fixture'},
                'house_level': 4, 'purchase_price': 1, 'min_level': 1, 'sale_price': 1,
                'textures': {'house': {'assetId': '333'}, 'door': {'assetId': '444'}}}
         store = Mock()

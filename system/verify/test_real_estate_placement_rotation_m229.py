@@ -5,11 +5,11 @@ import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase, mock
-import sqlite3
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'system/control-center'))
+from sqlite_connection import connect
 from real_estate.placement import RealEstatePlacementStore, validate_capture
 from services.studio_house_placement_bridge import preview_house_placement, bulk_house_placements
 
@@ -41,7 +41,7 @@ class PlacementRotationM229(TestCase):
         self.root = Path(t.name)
         db = self.root / '.control-center/game1_real_estate.db'
         db.parent.mkdir()
-        with sqlite3.connect(db) as connection:
+        with connect(db) as connection:
             connection.execute('CREATE TABLE real_estate (slug TEXT PRIMARY KEY)')
             connection.execute("INSERT INTO real_estate VALUES ('house_a')")
         self.store = RealEstatePlacementStore(self.root, mock.Mock(get=lambda slug: {'slug': slug}))
@@ -73,7 +73,7 @@ class PlacementRotationM229(TestCase):
     def test_legacy_migration_does_not_reinterpret_cframe(self):
         captured = sample_capture()
         stored = self.store.bind('house_a', 1, captured)
-        with sqlite3.connect(self.store.db) as connection:
+        with connect(self.store.db) as connection:
             connection.execute('ALTER TABLE real_estate_placements RENAME TO old_rotations')
             connection.execute('''CREATE TABLE real_estate_placements (
                 plot_index INTEGER NOT NULL, house_slug TEXT NOT NULL,
@@ -130,17 +130,12 @@ class PlacementRotationM229(TestCase):
         preview = (plugin/'StudioHousePlacementPreview.luau').read_text()
         bridge = (ROOT/'system/control-center/services/studio_house_placement_bridge.py').read_text()
         router = (ROOT/'system/studio-plugin/Game1Bridge.server.luau').read_text()
-        self.assertIn('HouseFrame.Find(model)', capture)
+        self.assertIn('local world = model:GetPivot()', capture)
         self.assertIn('world:ToObjectSpace(houseWorld)', capture)
         self.assertIn('houseAnchorLocalCFrame', capture)
-        self.assertIn('HouseFrame.Find(clone)', preview)
-        self.assertIn('HouseFrame.Align(clone, house, desiredHouse', preview)
-        self.assertIn('local desiredHouse = desiredRoot * houseOffset', preview)
-        self.assertNotIn('clone:PivotTo(volume.CFrame * CFrame.new(table.unpack(components)))', preview)
+        self.assertIn('clone:PivotTo(desiredRoot)', preview)
         self.assertIn('house-placement-capture-v2', bridge)
         self.assertIn('house-placement-preview-v4', bridge)
         self.assertIn('data.command == "house-placement-preview-v4"', router)
         self.assertIn('data.command == "house-placement-capture-v2"', router)
-        self.assertIn('legacyPivot = binding.houseAnchorLocalCFrame == nil', preview)
-        self.assertIn('clone:GetPivot():ToObjectSpace(house:GetPivot())', preview)
-        self.assertIn('if legacyPivot then "legacy-model-pivot" else "house-anchor-v2"', preview)
+        self.assertIn('plot-author-pivot', preview)

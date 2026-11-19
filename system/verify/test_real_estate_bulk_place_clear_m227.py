@@ -3,6 +3,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import TestCase, mock
 import json
+import socket
 import sys
 import threading
 import time
@@ -12,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'system' / 'control-center'))
 from api import real_estate as api
 from services import studio_house_placement_bridge as bridge
-from studio_bridge import PORT, TOKEN, StudioBridgeError
+from studio_bridge import TOKEN, StudioBridgeError
 
 
 def binding(house='house_a', plot=1, anchored=True):
@@ -100,11 +101,15 @@ class BulkPreviewBridge(TestCase):
             self.assertEqual(request.call_args.kwargs['targets'], [])
 
     def test_authenticated_studio_roundtrip_one_command(self):
+        # Isolate the simulated client from any running Roblox Studio plugin.
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+            probe.bind(('127.0.0.1', 0))
+            test_port = probe.getsockname()[1]
         received, faults = [], []
 
         def simulated_studio():
             try:
-                base = f'http://127.0.0.1:{PORT}'
+                base = f'http://127.0.0.1:{test_port}'
                 for _ in range(100):
                     try:
                         with urlopen(Request(base + '/command', headers={'X-Game1-Token': TOKEN}),
@@ -126,14 +131,15 @@ class BulkPreviewBridge(TestCase):
             except Exception as error:
                 faults.append(error)
 
-        worker = threading.Thread(target=simulated_studio, daemon=True)
-        worker.start()
-        try:
-            result = bridge.bulk_house_placements('house_a', 'place_all',
-                                                  [binding(plot=1), binding(plot=3, anchored=False)],
-                                                  timeout_seconds=4)
-        finally:
-            worker.join(timeout=4)
+        with mock.patch.object(bridge, 'PORT', test_port):
+            worker = threading.Thread(target=simulated_studio, daemon=True)
+            worker.start()
+            try:
+                result = bridge.bulk_house_placements('house_a', 'place_all',
+                                                      [binding(plot=1), binding(plot=3, anchored=False)],
+                                                      timeout_seconds=4)
+            finally:
+                worker.join(timeout=4)
         self.assertEqual(faults, [])
         self.assertEqual(received[1], 200)
         self.assertEqual(received[0]['action'], 'place_all')

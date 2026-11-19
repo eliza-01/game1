@@ -26,7 +26,8 @@ class StudioRealEstateOptionalSocketsM132(unittest.TestCase):
         self.assertIn("'StudioRealEstateRigValidation',", installer)
 
     def test_validation_is_separate_from_template_assembly(self):
-        self.assertIn('StudioRealEstateRigValidation.Verify(rig, part, manifests[part])', self.assembler)
+        self.assertIn('StudioRealEstateRigValidation.Verify(', self.assembler)
+        self.assertIn('rig, part, manifests[part], part == primary)', self.assembler)
         self.assertNotIn('authored socket ', self.assembler)
         self.assertIn('function Validation.FindMesh(', self.validator)
 

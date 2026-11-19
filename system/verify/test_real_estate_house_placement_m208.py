@@ -5,11 +5,11 @@ import json
 import sys
 import tempfile
 from pathlib import Path
-import sqlite3
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'system' / 'control-center'))
+from sqlite_connection import connect
 from real_estate.placement import RealEstatePlacementStore, validate_capture
 from api import real_estate as real_estate_api
 
@@ -41,7 +41,7 @@ class PlacementTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         db = self.root / '.control-center' / 'game1_real_estate.db'
         db.parent.mkdir(parents=True, exist_ok=True)
-        with sqlite3.connect(db) as connection:
+        with connect(db) as connection:
             connection.execute('CREATE TABLE real_estate (slug TEXT PRIMARY KEY)')
             connection.executemany('INSERT INTO real_estate VALUES (?)',
                                    [('house_level3_01',), ('house_level5_01',)])
@@ -97,14 +97,15 @@ class PlacementTests(unittest.TestCase):
         self.assertEqual(stored['plotCFrame'], authored['plotCFrame'])
         self.assertEqual(stored['localCFrame'], authored['localCFrame'])
 
-    def test_deleting_house_retires_only_its_bindings(self):
+    def test_deleting_house_keeps_independent_plot_spawn_pivots(self):
         self.store.bind('house_level3_01', 39, capture())
         self.store.bind('house_level5_01', 39, capture('house_level5_01'))
-        with sqlite3.connect(self.store.db) as connection:
+        with connect(self.store.db) as connection:
             connection.execute("DELETE FROM real_estate WHERE slug='house_level3_01'")
         self.store.export()
         self.assertEqual([x['houseSlug'] for x in self.store.snapshot()['items']],
-                         ['house_level5_01'])
+                         ['house_level3_01', 'house_level5_01'])
+        self.assertEqual(self.store.get('house_level3_01', 39)['houseLevel'], 3)
 
     def test_route_captures_studio_not_browser_transform(self):
         calls = []
@@ -142,16 +143,24 @@ if __name__ == '__main__':
 
 class PlacementBridgeTests(unittest.TestCase):
     def test_studio_capture_response_identity_and_measured_transform(self):
+        import socket
         import threading
         import time
+        from unittest import mock
         from urllib.request import Request, urlopen
-        from services.studio_house_placement_bridge import capture_house_placement
+        from studio_bridge import TOKEN
+        from services import studio_house_placement_bridge as bridge
+
+        # Never expose a unit-test command on the live Game1Bridge port:
+        # an open Studio plugin can claim it before the simulated client does.
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+            probe.bind(('127.0.0.1', 0))
+            test_port = probe.getsockname()[1]
 
         errors = []
         def studio():
             try:
-                from studio_bridge import PORT, TOKEN
-                base = f'http://127.0.0.1:{PORT}'
+                base = f'http://127.0.0.1:{test_port}'
                 command = None
                 for _ in range(100):
                     try:
@@ -171,12 +180,15 @@ class PlacementBridgeTests(unittest.TestCase):
                     self.assertEqual(response.status, 200)
             except Exception as exc:
                 errors.append(exc)
-        worker = threading.Thread(target=studio, daemon=True)
-        worker.start()
-        try:
-            result = capture_house_placement('house_level3_01', 39, timeout_seconds=4)
-        finally:
-            worker.join(timeout=5)
+        # The production bridge keeps its configured port; only this test's
+        # in-process request server is redirected to an isolated loopback port.
+        with mock.patch.object(bridge, 'PORT', test_port):
+            worker = threading.Thread(target=studio, daemon=True)
+            worker.start()
+            try:
+                result = bridge.capture_house_placement('house_level3_01', 39, timeout_seconds=4)
+            finally:
+                worker.join(timeout=5)
         self.assertEqual(errors, [])
         self.assertEqual(result['worldCFrame'][:3], [100, 5, -34])
         self.assertEqual(result['localCFrame'][:3], [5, 5, 6])

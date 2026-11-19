@@ -12,6 +12,7 @@ local CombatRoot = script.Parent.Parent:WaitForChild("combat")
 local EntityHitboxService = require(CombatRoot:WaitForChild("EntityHitboxService"))
 local DeathLifecycleService = require(CombatRoot:WaitForChild("DeathLifecycleService"))
 local NpcRigFactory = require(script.Parent:WaitForChild("NpcRigFactory"))
+local NpcAnimationRigBinding = require(script.Parent:WaitForChild("NpcAnimationRigBinding"))
 local NpcAnimationService = require(script.Parent:WaitForChild("NpcAnimationService"))
 local NpcEquipmentService = require(script.Parent:WaitForChild("NpcEquipmentService"))
 local NpcCombatAIService = require(script.Parent:WaitForChild("NpcCombatAIService"))
@@ -110,7 +111,9 @@ local function spawnOne(state: any): boolean
     local hp = math.max(1, finite(stats.MaxHP, 100))
     entity:SetAttribute("Game1NpcRuntime", true)
     entity:SetAttribute("NpcSlug", slug)
-    NpcEquipmentService.Equip(entity, slug)
+    local weaponSet = NpcEquipmentService.Equip(entity, slug)
+    local profile = (NpcAnimationRegistry.profiles or {})[slug]
+    NpcAnimationRigBinding.Align(visual, slug, profile, weaponSet)
     entity:SetAttribute("SpawnId", tostring(record.spawnId or ""))
     entity:SetAttribute("NpcHomeRadiusStuds", math.clamp(finite(record.homeRadiusStuds, finite((definition.behavior or {}).pursuitRadiusStuds, 16)), 1, 10000))
     entity:SetAttribute("Damageable", true)
@@ -127,7 +130,6 @@ local function spawnOne(state: any): boolean
     entity:SetAttribute("RunSpeed", math.max(0, finite(stats.RunSpeed, 50)))
     local hitbox = EntityHitboxService.Attach(entity, visual)
     entity:SetAttribute("CombatHitboxCount", hitbox.count)
-    local profile = (NpcAnimationRegistry.profiles or {})[slug]
     local presentation = NpcAnimationService.Create(entity, visual, profile)
     local entry = { root = root, visual = visual, presentation = presentation, dying = false }
     state.instances[entity] = entry

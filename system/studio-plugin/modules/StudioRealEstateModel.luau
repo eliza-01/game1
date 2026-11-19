@@ -1,7 +1,7 @@
 -- Studio assembly for any number of independent Real Estate MeshPart rigs.
 -- This adapter validates the complete template before touching ServerStorage.
 local HttpService = game:GetService("HttpService")
-local StudioTextureAppearance = require(script.Parent.StudioTextureAppearance)
+local StudioRealEstateAppearance = require(script.Parent.StudioRealEstateAppearance)
 local StudioRealEstateRigValidation = require(script.Parent.StudioRealEstateRigValidation)
 local StudioRealEstateCollisionPolicy = require(script.Parent.StudioRealEstateCollisionPolicy)
 local RetiredCleanup = require(script.Parent.StudioRetiredColMeshCleanup)
@@ -9,6 +9,7 @@ local StudioRealEstatePlacedVisualSync = require(script.Parent.StudioRealEstateP
 local PlacedTargets = require(script.Parent.StudioRealEstatePlacedTargets)
 local HouseFrame = require(script.Parent.StudioRealEstateHouseFrame)
 local PartPlacement = require(script.Parent.StudioRealEstatePartPlacement)
+local SkinConnection = require(script.Parent.StudioSkinnedMeshConnection)
 local StudioRealEstateModel = {}
 
 -- Every authored bone must survive publication before a template is replaced.
@@ -35,22 +36,18 @@ local function loadIndependentRig(assetService: any, assetId: number, part: stri
         .. " could not be loaded: " .. lastError)
 end
 
-local function orderedParts(manifests: any): {string}
-    if typeof(manifests) ~= "table" or typeof(manifests.house) ~= "table" then
-        error("Real Estate requires an authored house mesh and its bone manifest")
+local function orderedParts(manifests: any, primary: string): {string}
+    if primary ~= "rig_carrier" or typeof(manifests) ~= "table" then
+        error("Real Estate v4 requires an independent rig_carrier Model Asset")
     end
-    local result = {"house"}
+    local result = {}
     for part, manifest in manifests do
         if typeof(part) ~= "string" or typeof(manifest) ~= "table" then
             error("Invalid Real Estate mesh manifest")
         end
-        if part ~= "house" then
-            table.insert(result, part)
-        end
+        table.insert(result, part)
     end
     table.sort(result, function(a, b)
-        if a == "house" then return true end
-        if b == "house" then return false end
         return a:lower() < b:lower()
     end)
     return result
@@ -76,13 +73,13 @@ local function refreshPlaced(slug: string, imageAssets: {[string]: string}, imag
         local applied = false
         for _, child in instance:GetDescendants() do
             if child:IsA("MeshPart") then
-                local part = string.lower(child.Name)
-                local settings = meshOptions[part]
-                if imageAssets[part] then
-                    StudioTextureAppearance.Apply(child, "rbxassetid://" .. imageAssets[part], imageAlpha[part])
-                    setGlassAppearance(child, typeof(settings) == 'table' and settings.glass == true)
-                end
-                if imageAssets[part] then
+                local part = child.Name
+                local settings = meshOptions[part] or meshOptions[string.lower(part)]
+                if typeof(settings) == "table" then
+                    StudioRealEstateAppearance.Apply(child, settings,
+                        imageAssets[part] or imageAssets[string.lower(part)],
+                        imageAlpha[part] or imageAlpha[string.lower(part)])
+                    setGlassAppearance(child, settings.glass == true)
                     StudioRealEstateCollisionPolicy.Apply(child, part, settings)
                     applied = true
                 end
@@ -102,13 +99,15 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
         error("Invalid Real Estate slug")
     end
     local manifests = metadata.expectedMeshes
-    local parts = orderedParts(manifests)
+    local primary = tostring(metadata.primaryPart or "")
+    local parts = orderedParts(manifests, primary)
     local rigIds = metadata.rigAssetIds
-    if typeof(rigIds) ~= "table" or tonumber(rigIds.house) ~= assetId then
+    if typeof(rigIds) ~= "table" or tonumber(rigIds[primary]) ~= assetId then
         error("Studio Sync requires published Model Asset IDs for every Real Estate mesh")
     end
     local authoredPlacements = typeof(metadata.authoredPlacements) == "table" and metadata.authoredPlacements or {}
     local meshOptions = typeof(metadata.meshOptions) == 'table' and metadata.meshOptions or {}
+    local movingParts = typeof(metadata.doorParts) == "table" and metadata.doorParts or {}
     local imageAssets = {}
     local imageAlpha = {}
     for _, entry in metadata.textures or {} do
@@ -122,9 +121,12 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
     local seenModels = {}
     for _, part in parts do
         local id = tonumber(rigIds[part])
-        if not id or id <= 0 or seenModels[id]
-            or not imageAssets[part] then
-            error("Real Estate " .. part .. " requires a published Model Asset and Image Asset")
+        if not id or id <= 0 or id == assetId or seenModels[id] then
+            error("Real Estate " .. part .. " requires a published Model Asset")
+        end
+        local settings = meshOptions[part]
+        if typeof(settings) ~= "table" or (settings.appearanceMode ~= "material" and not imageAssets[part]) then
+            error("Real Estate " .. part .. " requires an Image Asset in atlas mode")
         end
         seenModels[id] = true
     end
@@ -142,23 +144,39 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
     local socketCount = 0
     local placementsRestored = 0
     local textureCount = 0
-    local activePart = "house"
+    local activePart = primary
+    local newStandard = tonumber(metadata.houseAuthoringVersion) == 4
+    if not newStandard then
+        error("Real Estate requires the independent house_armature/rig_carrier v4 publication. Republish this house.")
+    end
+    local authoredOrigin: CFrame? = nil
+    local rootCarrier: MeshPart? = nil
     local ok, problem = pcall(function()
+        local carrierInspection
+        rootCarrier, carrierInspection = StudioRealEstateRigValidation.Verify(
+            imported, "rig_carrier", metadata.expectedCarrierBones, false)
+        rootCarrier:SetAttribute("Game1HouseRigCarrier", true)
+        rootCarrier.Transparency = 1
+        rootCarrier.CastShadow = false
+        rootCarrier.CanCollide = false
+        rootCarrier.CanTouch = false
+        rootCarrier.CanQuery = false
+        rootCarrier.Massless = true
+        rootCarrier.TextureID = ""
+        for _, child in rootCarrier:GetChildren() do
+            if child:IsA("SurfaceAppearance") then child:Destroy() end
+        end
+        authoredOrigin = rootCarrier:GetPivot()
+        bones += carrierInspection.boneCount
+        socketCount += carrierInspection.socketCount
         for _, part in parts do
             activePart = part
-            local rig = part == "house" and imported
-                or loadIndependentRig(assetService, tonumber(rigIds[part]) :: number, part)
+            local rig = loadIndependentRig(assetService, tonumber(rigIds[part]) :: number, part)
             table.insert(staged, {part = part, rig = rig})
-            local mesh, inspection = StudioRealEstateRigValidation.Verify(rig, part, manifests[part])
+            local mesh, inspection = StudioRealEstateRigValidation.Verify(
+                rig, part, manifests[part], false)
             meshes[part] = mesh
-            if part ~= "house" then
-                if PartPlacement.Align(rig, mesh, meshes.house,
-                    authoredPlacements[part], authoredPlacements.house, part) then
-                    placementsRestored += 1
-                elseif authoredPlacements.house ~= nil then
-                    table.insert(rigWarnings, part .. ": no authored placement for this mesh revision")
-                end
-            end
+            PartPlacement.AlignSharedPivot(rig, mesh, authoredOrigin, part)
             bones += inspection.boneCount
             socketCount += inspection.socketCount
             for _, name in inspection.missingSockets do
@@ -181,48 +199,88 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
     end
 
     table.sort(missingSockets)
+    if not rootCarrier or not authoredOrigin then
+        error("Real Estate publication has no validated original house_armature pivot")
+    end
     local wrapper = Instance.new("Model")
     wrapper.Name = slug
+    local static = Instance.new("Model")
+    static.Name = "StaticAssembly"
+    static:SetAttribute("Game1RealEstateManagedRig", true)
+    static.Parent = wrapper
+    wrapper.WorldPivot = authoredOrigin
+    wrapper:SetAttribute("Game1HousePivotMode", "authored-rig-carrier")
+    -- The carrier is imported from its own Model Asset, never from a visual FBX.
+    rootCarrier.Parent = static
+    imported:Destroy()
+    local assembly: Model? = nil
+    local staticParts = {}
     for _, entry in staged do
         local part = entry.part
         local rigName = part:sub(1, 1):upper() .. part:sub(2) .. "Rig"
         entry.rig.Name = rigName
+        entry.rig:SetAttribute("Game1RealEstateManagedRig", true)
         -- DoorAssembly is the only moving unit. Do not edit Bone.Transform:
         -- the hinge Bone identifies the world-space pivot for Model:PivotTo().
-        if part == "door" and meshes[part]:FindFirstChild(DOOR_HINGE, true) then
-            local hinge = meshes[part]:FindFirstChild(DOOR_HINGE, true) :: Bone
-            local assembly = Instance.new("Model")
-            assembly.Name = "DoorAssembly"
-            assembly.Parent = wrapper
+        local moving = movingParts[part] == true or (part == "door" and meshes[part]:FindFirstChild(DOOR_HINGE,true) ~= nil)
+        if moving then
+            local hinge = meshes[part]:FindFirstChild(DOOR_HINGE,true)
+            if not hinge or not hinge:IsA("Bone") then
+                wrapper:Destroy()
+                error(part .. ": moving mesh lost its authored hinge bone")
+            end
+            if not assembly then
+                assembly = Instance.new("Model")
+                assembly.Name = "DoorAssembly"
+                assembly:SetAttribute("Game1RealEstateManagedRig", true)
+                assembly.WorldPivot = hinge.TransformedWorldCFrame
+                assembly.Parent = wrapper
+                assembly:SetAttribute("Game1DoorHingeSocket",DOOR_HINGE)
+                assembly:SetAttribute("Game1DoorPivotMode","rigid_model")
+                local housePivot = authoredOrigin
+                local localPivot = housePivot:ToObjectSpace(assembly:GetPivot())
+                assembly:SetAttribute("Game1DoorClosedLocalPivot",
+                    HttpService:JSONEncode({localPivot:GetComponents()}))
+            end
             entry.rig.Parent = assembly
-            -- New Model has no PrimaryPart: WorldPivot sets the pivot without
-            -- displacing any MeshPart or changing an authored bone pose.
-            assembly.WorldPivot = hinge.TransformedWorldCFrame
-            assembly:SetAttribute("Game1DoorHingeSocket", DOOR_HINGE)
-            assembly:SetAttribute("Game1DoorPivotMode", "rigid_model")
-            local closedLocal = meshes.house.CFrame:ToObjectSpace(assembly:GetPivot())
-            assembly:SetAttribute("Game1DoorClosedLocalPivot",
-                HttpService:JSONEncode({closedLocal:GetComponents()}))
         else
-            entry.rig.Parent = wrapper
+            -- Flatten only static publication Parts into their common Model.
+            -- This lets the EXISTING shared SkinnedMeshConnection enforce
+            -- direct assembly ownership, without changing Characters/Location.
+            for _, descendant in entry.rig:GetDescendants() do
+                if descendant:IsA("BasePart") then descendant.Parent = static end
+            end
+            for _, descendant in entry.rig:GetDescendants() do
+                if descendant:IsA("JointInstance") or descendant:IsA("WeldConstraint") then
+                    descendant.Parent = static
+                end
+            end
+            entry.rig:Destroy()
+            table.insert(staticParts, meshes[part])
         end
         local settings = meshOptions[part]
-        StudioTextureAppearance.Apply(meshes[part], "rbxassetid://" .. imageAssets[part], imageAlpha[part])
+        StudioRealEstateAppearance.Apply(meshes[part], settings, imageAssets[part], imageAlpha[part])
         setGlassAppearance(meshes[part], typeof(settings) == 'table' and settings.glass == true)
-        textureCount += 1
+        if settings.appearanceMode == "atlas" then textureCount += 1 end
         StudioRealEstateCollisionPolicy.Apply(meshes[part], part, settings)
+    end
+    -- Canonical technical carrier is the only root. Static meshes are
+    -- physically linked as in Characters/Location Assets; no visual part
+    -- decides the house origin or receives hand-tuned geometry offsets.
+    static.PrimaryPart = rootCarrier
+    for _, mesh in staticParts do
+        if mesh ~= rootCarrier then
+            SkinConnection.Connect(static, rootCarrier, mesh, "HouseStaticSkinWeld")
+        end
+    end
+    wrapper.PrimaryPart = rootCarrier
+    if not PartPlacement.SamePivot(wrapper:GetPivot(), authoredOrigin) then
+        wrapper:Destroy()
+        error("Real Estate original pivot changed during shared assembly")
     end
     -- Align the new complete assembly to the previously registered house
     -- origin before swapping templates. A changed house geometry centre must
     -- not move the entire estate relative to existing placed copies.
-    if previous then
-        local previousHouse = HouseFrame.Find(previous)
-        if not previousHouse then
-            wrapper:Destroy()
-            error("Full house sync: existing template house anchor is missing or ambiguous")
-        end
-        HouseFrame.Align(wrapper, meshes.house, previousHouse:GetPivot(), "full template house")
-    end
     wrapper:SetAttribute("Game1RealEstateSocketContractComplete", #missingSockets == 0)
     wrapper:SetAttribute("Game1MissingRealEstateSockets", HttpService:JSONEncode(missingSockets))
     wrapper:SetAttribute("Game1RealEstateTemplate", true)
@@ -231,6 +289,7 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
     if rigIds.door then
         wrapper:SetAttribute("Game1DoorModelAssetId", tostring(rigIds.door))
     end
+    wrapper:SetAttribute("Game1PrimaryRigPart", primary)
     wrapper:SetAttribute("Game1RigAssetIds", HttpService:JSONEncode(rigIds))
     wrapper:SetAttribute("Game1TextureAssetIds", HttpService:JSONEncode(imageAssets))
     wrapper:SetAttribute("Game1RealEstateSlug", slug)
@@ -255,9 +314,9 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
     -- Apply appearance independently; visual replacement may have been skipped
     -- safely for an incomplete/unmanaged placed house.
     local textureUpdated = select(1, refreshPlaced(slug, imageAssets, imageAlpha, meshOptions, placedTargets))
-    return wrapper, {bonesValidated = true, rigsValidated = #parts,
-        alignment = "authored-house-pivot",
-        texturesApplied = textureCount, placedSyncVersion = 2, workspaceModelsUpdated = visualUpdated,
+    return wrapper, {bonesValidated = true, rigsValidated = #parts + 1,
+        alignment = "independent-authored-rig-carrier",
+        texturesApplied = textureCount, placedSyncVersion = 3, workspaceModelsUpdated = visualUpdated,
         workspaceModelsFound = visualFound,
         workspaceTextureModelsUpdated = textureUpdated,
         workspaceCollisionRigsUpdated = collisionUpdated,

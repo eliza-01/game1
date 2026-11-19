@@ -52,7 +52,20 @@ function Visual.Restore(snapshot: any)
     mesh:SetAttribute("Game1DecoVisualColor",snapshot.visualColor)
 end
 
+local function meshSettings(mesh: MeshPart, row: any): any
+    local overrides=if typeof(row.meshOptions)=="table" then row.meshOptions[mesh.Name] else nil
+    if typeof(overrides)~="table" then return row end
+    return {
+        appearanceMode=overrides.appearanceMode or row.appearanceMode,
+        visualMaterial=overrides.visualMaterial or row.visualMaterial,
+        visualColor=overrides.visualColor or row.visualColor,
+        alphaEnabled=if type(overrides.alphaEnabled)=="boolean" then overrides.alphaEnabled else row.alphaEnabled,
+        texture_asset_id=overrides.texture_asset_id or row.texture_asset_id,
+    }
+end
+
 function Visual.IsCurrent(mesh: MeshPart, row: any): boolean
+    row=meshSettings(mesh,row)
     if not visual(mesh) then return true end
     local mode=tostring(row.appearanceMode or "atlas")
     local surface=mesh:FindFirstChildOfClass("SurfaceAppearance")
@@ -65,26 +78,21 @@ function Visual.IsCurrent(mesh: MeshPart, row: any): boolean
     local atlas=tostring(row.texture_asset_id or "")
     if atlas=="" then error("atlas mode requires a published Image ID") end
     local uri="rbxassetid://"..atlas
-    return mesh.TextureID==uri and surface~=nil and surface.ColorMap==uri
-        and surface.AlphaMode==Texture.AlphaMode(row.alphaEnabled==true)
+    local alpha=row.alphaEnabled==true
+    return mesh.TextureID==uri
+        and (if alpha then surface~=nil and surface.ColorMap==uri
+            and surface.AlphaMode==Enum.AlphaMode.Transparency else surface==nil)
         and mesh:GetAttribute("Game1DecoAppearanceMode")~="material"
 end
 
 function Visual.Apply(mesh: MeshPart, row: any): boolean
+    row=meshSettings(mesh,row)
     if not visual(mesh) or Visual.IsCurrent(mesh,row) then return false end
     local before=Visual.Capture(mesh)
     local ok,err=pcall(function()
         if tostring(row.appearanceMode or "atlas")=="material" then
-            local material=materialEnum(row.visualMaterial)
-            local color=hexColor(row.visualColor)
-            -- A stale texture/SufaceAppearance overrides the base material.
-            mesh.TextureID=""
-            for _, child in ipairs(mesh:GetChildren()) do
-                if child:IsA("SurfaceAppearance") then child:Destroy() end
-            end
-            mesh.Material=material
-            mesh.Color=color
-            mesh:SetAttribute("Game1DecoVisualMaterial",material.Name)
+            Texture.ApplyVisual(mesh,row)
+            mesh:SetAttribute("Game1DecoVisualMaterial",materialEnum(row.visualMaterial).Name)
             mesh:SetAttribute("Game1DecoVisualColor",row.visualColor)
             mesh:SetAttribute("Game1DecoAppearanceMode","material")
         else
@@ -94,7 +102,7 @@ function Visual.Apply(mesh: MeshPart, row: any): boolean
                 mesh.Material=Enum.Material.SmoothPlastic
                 mesh.Color=Color3.new(1,1,1)
             end
-            Texture.ApplyLocation(mesh,"rbxassetid://"..atlas,row.alphaEnabled==true)
+            Texture.ApplyVisual(mesh,row,"rbxassetid://"..atlas)
             mesh:SetAttribute("Game1DecoVisualMaterial",nil)
             mesh:SetAttribute("Game1DecoVisualColor",nil)
             mesh:SetAttribute("Game1DecoAppearanceMode","atlas")

@@ -48,6 +48,29 @@ def placement(house_corners, mesh_corners):
     }
 
 
+def inspect_origin_placements(armature, meshes):
+    """Record geometry relative to Blender's authored house_armature pivot.
+
+    Unlike legacy v2, v3 never chooses the centre of a visual mesh as the
+    origin. Preserve original transforms without applying Scale/Rotation.
+    """
+    inverse = armature.matrix_world.inverted_safe()
+    output = {}
+    for mesh in meshes:
+        used = {index for face in mesh.data.polygons for index in face.vertices}
+        if not used:
+            raise ValueError(f'{mesh.name}: no surface faces for authored placement')
+        transform = inverse @ mesh.matrix_world
+        points = [transform @ mesh.data.vertices[index].co for index in sorted(used)]
+        center, size = _bounds(points)
+        output[mesh.name] = {
+            'version': 3,
+            'centerInPivot': [round(v, 6) for v in _roblox(center)],
+            'size': [round(size[0], 6), round(size[2], 6), round(size[1], 6)],
+        }
+    return output
+
+
 def inspect_placements(house, meshes):
     """Use Blender world matrices to resolve parented meshes into house space.
 

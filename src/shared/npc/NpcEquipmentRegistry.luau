@@ -6,6 +6,10 @@ return table.freeze({
 			right = "guards_sword_01",
 			left = "",
 		}),
+		["guard_02"] = table.freeze({
+			right = "guards_sword_01",
+			left = "",
+		}),
 		["warsmith"] = table.freeze({
 			right = "warsmiths_hummer_01",
 			left = "",

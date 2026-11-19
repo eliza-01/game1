@@ -2,7 +2,6 @@
 -- The placed copy is distinct from ServerStorage templates and player-owned houses.
 -- Refuses to modify any object it did not create and mark itself.
 local PlotsCatalog = require(script.Parent.StudioPlotsCatalog)
-local HouseFrame = require(script.Parent.StudioRealEstateHouseFrame)
 
 return function(context)
     local HttpService = context.HttpService
@@ -189,28 +188,13 @@ return function(context)
             or typeof(binding.anchored) ~= "boolean" then
             error("Missing or invalid saved Placement binding (anchored must be boolean)")
         end
-        -- M208 bindings lack an explicit house MeshPart authoring pivot.
-        -- Preserve the old Model-pivot placement semantics for these records;
-        -- never mistake their original CFrame for a calibrated house anchor.
-        local legacyPivot = binding.houseAnchorLocalCFrame == nil
-        if not legacyPivot and (typeof(binding.houseAnchorLocalCFrame) ~= "table"
-            or #binding.houseAnchorLocalCFrame ~= 12) then
-            error("Invalid saved house-anchor CFrame")
-        end
+        -- A saved plot pivot is independent of the original mesh and model
+        -- revision. Older anchor offsets must never displace its replacement.
         local components = {}
-        local anchorComponents = {}
         for i = 1, 12 do
-            if not legacyPivot then
-                local anchorValue = binding.houseAnchorLocalCFrame[i]
-                if typeof(anchorValue) ~= "number" or anchorValue ~= anchorValue
-                    or math.abs(anchorValue) > 1e7 then
-                    error("Invalid placement house-anchor CFrame component")
-                end
-                anchorComponents[i] = anchorValue
-            end
             local component = binding.localCFrame[i]
             if typeof(component) ~= "number" or component ~= component or math.abs(component) > 1e7 then
-                error("Invalid placement CFrame component")
+                error("Invalid saved plot pivot CFrame component")
             end
             components[i] = component
         end
@@ -226,21 +210,9 @@ return function(context)
         local prepared, problem = pcall(function()
             clone:ScaleTo(binding.scale)
             local desiredRoot = volume.CFrame * CFrame.new(table.unpack(components))
-            local house = HouseFrame.Find(clone)
-            if not house then
-                error("Published house template must contain exactly one MeshPart named house")
-            end
-            -- Align the exact visual house frame captured at Bind, NOT the
-            -- template wrapper's independently computed Model pivot.
-            -- Calibrated bindings use the measured original house anchor.
-            -- Legacy M208 bindings use the published clone's *own* offset;
-            -- algebraically this is the pre-M229 clone:PivotTo(desiredRoot),
-            -- but executed through our existing centralized HouseFrame.Align.
-            local houseOffset = if legacyPivot
-                then clone:GetPivot():ToObjectSpace(house:GetPivot())
-                else CFrame.new(table.unpack(anchorComponents))
-            local desiredHouse = desiredRoot * houseOffset
-            HouseFrame.Align(clone, house, desiredHouse, "authored plot house")
+            -- The authored Model pivot is common to every replacement asset.
+            -- Never align to a historical named MeshPart or anchor offset.
+            clone:PivotTo(desiredRoot)
             clone:SetAttribute("Game1RealEstateTemplate", nil)
             clone:SetAttribute("Game1PlotHousePreview", true)
             clone:SetAttribute("Game1PlotIndex", index)
@@ -248,8 +220,7 @@ return function(context)
             clone:SetAttribute("Game1PlacementRevision", binding.revision)
             setAndVerifyAnchored(clone, binding.anchored)
             clone:SetAttribute("Game1PlotHouseAnchored", binding.anchored)
-            clone:SetAttribute("Game1PlacementRotationMode",
-                if legacyPivot then "legacy-model-pivot" else "house-anchor-v2")
+            clone:SetAttribute("Game1PlacementRotationMode", "plot-author-pivot")
         end)
         if not prepared then
             clone:Destroy()
@@ -258,7 +229,7 @@ return function(context)
         local previousPreviews = managedChildren(folder, index)
         return {kind = "place", plotFolder = plotFolder, folder = folder,
             previous = previousPreviews, clone = clone, binding = binding,
-            rotationMode = if legacyPivot then "legacy-model-pivot" else "house-anchor-v2"}
+            rotationMode = "plot-author-pivot"}
     end
 
     local function cleanupStaged(plans)
@@ -321,17 +292,16 @@ return function(context)
             end
         end
         ChangeHistoryService:FinishRecording(recording, Enum.FinishRecordingOperation.Commit)
-        local placedCount, legacyCount = 0, 0
+        local placedCount = 0
         for _, plan in ipairs(plans) do
             if plan.kind == "place" then
                 placedCount += 1
-                if plan.rotationMode == "legacy-model-pivot" then legacyCount += 1 end
             end
         end
         if action == "place_all" then
             return {status = "placed_all", changed = placedCount,
                 replaced = removed, anchoredPartsVerified = totalVerifiedParts,
-                legacyPlacements = legacyCount}
+                pivotMode = "plot-author-pivot"}
         elseif action == "clear_all" then
             return {status = "cleared_all", changed = removed}
         elseif action == "place" then

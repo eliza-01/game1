@@ -15,9 +15,7 @@ class HouseSocketM159(unittest.TestCase):
     def test_descending_to_first_floor_uses_authored_spawn_not_elevator(self):
         policy = src('src/shared/world/HouseElevatorPolicy.luau')
         self.assertIn('function Policy.DestinationSocket(_sourceFloor: number, destination: number): string', policy)
-        self.assertIn('if destination == 1 then', policy)
-        self.assertIn('return "house_floor_01_spawn_01_socket"', policy)
-        self.assertIn('return Policy.SocketName(destination)', policy)
+        self.assertIn('return ("house_floor_%02d_spawn_socket"):format(destination)', policy)
         mover = src('src/server/world/HouseElevatorService.luau')
         self.assertIn('sockets[Policy.DestinationSocket(floor, option.destination)]', mover)
         self.assertIn('if not target or not target.Parent then return false', mover)
@@ -33,13 +31,13 @@ class HouseSocketM159(unittest.TestCase):
         self.assertIn('alternate.Enabled = canAttach', server)
         self.assertIn('Padlock.CanAttach(house, hasPadlock, open, moving)', server)
         self.assertIn('createPrompt(socket, definition, "F", "Навесить замок · ключ")', server)
-        self.assertIn('if definition.role == "door" and entry.sockets["door_01_padlock_01_socket"] then', server)
+        self.assertIn('if definition.role == "door" and Contract.HasPadlock(entry.sockets) then', server)
         self.assertIn('if definition.role == "door" and key == "F" then', server)
         self.assertIn('Padlock.Toggle(house, player, true, open, Door.IsMoving(house))', server)
         self.assertIn('Padlock.IsAttached(house, hasPadlock) then return end', server)
         self.assertIn('radiusFor(player, name) + (if definition.hoverRadius then 0 else 2)', server)
         self.assertIn('cooldown[player]', server)
-        self.assertIn('prompt.Enabled = locked -- Re-attach only through F', server)
+        self.assertIn('prompt.Enabled = locked', server)
 
     def test_f_not_offered_while_door_moves_and_reenabled_on_completion(self):
         door = src('src/server/world/HouseDoorService.luau')

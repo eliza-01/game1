@@ -30,15 +30,20 @@ def texture_uses_alpha(root: Path | None, source_path: str) -> bool | None:
 
 
 def texture_binding(slot: str, asset_id: str, root: Path | None, source_path: str,
-                    *, registered_sha256: str = '', published_sha256: str = '') -> dict:
+                    *, registered_sha256: str = '', published_sha256: str = '',
+                    alpha_enabled: bool = False) -> dict:
     """Bridge compatibility: omit unknown alpha rather than inventing a false value."""
-    binding = {'slot': str(slot), 'assetId': str(asset_id)}
+    if type(alpha_enabled) is not bool:
+        raise ValueError('alpha_enabled must be explicitly boolean')
+    binding = {'slot': str(slot), 'assetId': str(asset_id),
+               'alphaEnabled': alpha_enabled}
     # Never describe the still-published Roblox ID using pixels from an
     # unpublished replacement source.  It remains an unknown alpha mode.
     if registered_sha256 and published_sha256 and registered_sha256 != published_sha256:
         return binding
     uses_alpha = texture_uses_alpha(root, source_path)
     if uses_alpha is not None:
+        # Diagnostic only. This MUST NOT enable SurfaceAppearance automatically.
         binding['usesAlpha'] = uses_alpha
     return binding
 

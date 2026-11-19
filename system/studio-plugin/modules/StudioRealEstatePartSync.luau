@@ -4,7 +4,7 @@ local HttpService = game:GetService("HttpService")
 local Validation = require(script.Parent.StudioRealEstateRigValidation)
 local Collision = require(script.Parent.StudioRealEstateCollisionPolicy)
 local RetiredCleanup = require(script.Parent.StudioRetiredColMeshCleanup)
-local Texture = require(script.Parent.StudioTextureAppearance)
+local Appearance = require(script.Parent.StudioRealEstateAppearance)
 local PlacedTargets = require(script.Parent.StudioRealEstatePlacedTargets)
 local HouseFrame = require(script.Parent.StudioRealEstateHouseFrame)
 local PartPlacement = require(script.Parent.StudioRealEstatePartPlacement)
@@ -25,6 +25,10 @@ local function existingPart(root: Model, part: string): Model?
     local name = if part == "door" and root:FindFirstChild("DoorAssembly")
         then "DoorAssembly" else rigName(part)
     local child = root:FindFirstChild(name)
+    if not child then
+        local door = root:FindFirstChild("DoorAssembly")
+        if door and door:IsA("Model") then child = door:FindFirstChild(rigName(part)) end
+    end
     if child ~= nil and not child:IsA("Model") then
         error("refusing to replace a non-Model part " .. name)
     end
@@ -35,12 +39,23 @@ local function applyGlass(mesh: MeshPart, enabled: boolean)
     if enabled then
         mesh.Transparency = 0.02
         mesh:SetAttribute("Game1RealEstateGlassApplied", true)
+    elseif mesh:GetAttribute("Game1RealEstateGlassApplied") == true then
+        mesh.Transparency = 0
+        mesh:SetAttribute("Game1RealEstateGlassApplied", nil)
     end
 end
 
 function PartSync.Place(imported: Model, destination: Instance, slug: string,
     assetId: number, metadata: any): (Model, any)
+    -- The canonical house has one carrier connected to all static parts.
+    -- A standalone mesh swap would silently sever that assembly. The API now
+    -- routes named mesh refreshes through the complete shared-root Sync.
+    if tonumber(metadata.houseAuthoringVersion) == 3 then
+        error("Real Estate v3 requires Sync entire house (shared rig_carrier)")
+    end
     local part = tostring(metadata.syncPart or "")
+    local primary = tostring(metadata.primaryPart or "house")
+    local authoredPivot = tonumber(metadata.houseAuthoringVersion) == 2 or primary ~= "house"
     local manifests = metadata.expectedMeshes
     local rigs = metadata.rigAssetIds
     if typeof(manifests) ~= "table" or typeof(rigs) ~= "table"
@@ -65,28 +80,31 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
             usesAlpha = entry.usesAlpha
         end
     end
-    if not imageId or imageId <= 0 then
+    local settings = (typeof(metadata.meshOptions) == "table" and metadata.meshOptions[part]) or {}
+    if settings.appearanceMode ~= "material" and (not imageId or imageId <= 0) then
         error("Targeted Real Estate rig " .. part .. " has no published Image Asset")
     end
-    local settings = (typeof(metadata.meshOptions) == "table" and metadata.meshOptions[part]) or {}
-    if imageId then
-        Texture.Apply(mesh, "rbxassetid://" .. tostring(math.floor(imageId)), usesAlpha)
-        applyGlass(mesh, typeof(settings) == "table" and settings.glass == true)
-    end
+    Appearance.Apply(mesh, settings, if imageId then tostring(math.floor(imageId)) else nil, usesAlpha)
+    applyGlass(mesh, settings.glass == true)
     Collision.Apply(mesh, part, settings)
     -- A revised FBX can move the MeshPart geometry centre, but its authored
     -- pivot is the house-space origin. Keep that origin fixed in ServerStorage.
     local authoredPlacementRestored = false
-    if part ~= "house" then
+    if part ~= primary then
         local anchor = HouseFrame.Find(wrapper)
         if not anchor then
             error("Targeted Real Estate Sync: existing house anchor missing or ambiguous")
         end
         local placements = typeof(metadata.authoredPlacements) == "table" and metadata.authoredPlacements or {}
-        authoredPlacementRestored = PartPlacement.Align(imported, mesh, anchor,
-            placements[part], placements.house, part)
+        if authoredPivot then
+            authoredPlacementRestored = PartPlacement.AlignOrigin(imported, mesh, anchor:GetPivot(),
+                placements[part], part)
+        else
+            authoredPlacementRestored = PartPlacement.Align(imported, mesh, anchor,
+                placements[part], placements.house, part)
+        end
     end
-    if part == "house" then
+    if part == primary then
         local oldHouse = HouseFrame.Find(old)
         if not oldHouse then
             error("Targeted house sync: existing template house anchor is missing or ambiguous")
@@ -96,18 +114,20 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
     local replacement: Model = imported
     imported.Name = rigName(part)
     imported:SetAttribute("Game1RealEstateManagedPart", part)
-    if part == "door" then
+    imported:SetAttribute("Game1RealEstateManagedRig", true)
+    if part == "door" and old.Name == "DoorAssembly" then
         local hinge = mesh:FindFirstChild("door_01_hinge_socket", true)
         if hinge and hinge:IsA("Bone") then
             local assembly = Instance.new("Model")
             assembly.Name = "DoorAssembly"
+            assembly:SetAttribute("Game1RealEstateManagedRig", true)
             imported.Parent = assembly
             assembly.WorldPivot = hinge.TransformedWorldCFrame
             assembly:SetAttribute("Game1DoorHingeSocket", "door_01_hinge_socket")
             assembly:SetAttribute("Game1DoorPivotMode", "rigid_model")
             local anchor = HouseFrame.Find(wrapper)
             if not anchor then error("house anchor missing; target rig not replaced") end
-            local localPivot = anchor.CFrame:ToObjectSpace(assembly:GetPivot())
+            local localPivot = anchor:GetPivot():ToObjectSpace(assembly:GetPivot())
             assembly:SetAttribute("Game1DoorClosedLocalPivot", HttpService:JSONEncode({localPivot:GetComponents()}))
             replacement = assembly
         end
@@ -116,13 +136,13 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
     -- transient only after the staged assembly is accepted.
     local oldName = old.Name
     local stagedName = oldName .. "_m140_old"
-    if wrapper:FindFirstChild(stagedName) then
+    if old.Parent and old.Parent:FindFirstChild(stagedName) then
         error("Unresolved previous targeted sync staging: " .. stagedName)
     end
     old.Name = stagedName
     local ok, problem = pcall(function()
         replacement.Name = oldName
-        replacement.Parent = wrapper
+        replacement.Parent = old.Parent
     end)
     if not ok then
         old.Name = oldName
@@ -134,17 +154,19 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
     local savedIds = decodeMap(wrapper:GetAttribute("Game1RigAssetIds"))
     savedIds[part] = tostring(assetId)
     wrapper:SetAttribute("Game1RigAssetIds", HttpService:JSONEncode(savedIds))
-    if part == "house" then
+    if part == primary then
         wrapper:SetAttribute("Game1HouseModelAssetId", tostring(assetId))
         wrapper:SetAttribute("Game1ModelAssetId", tostring(assetId))
     elseif part == "door" then
         wrapper:SetAttribute("Game1DoorModelAssetId", tostring(assetId))
     end
-    if imageId then
-        local savedTextures = decodeMap(wrapper:GetAttribute("Game1TextureAssetIds"))
+    local savedTextures = decodeMap(wrapper:GetAttribute("Game1TextureAssetIds"))
+    if settings.appearanceMode == "material" then
+        savedTextures[part] = nil
+    elseif imageId then
         savedTextures[part] = tostring(math.floor(imageId))
-        wrapper:SetAttribute("Game1TextureAssetIds", HttpService:JSONEncode(savedTextures))
     end
+    wrapper:SetAttribute("Game1TextureAssetIds", HttpService:JSONEncode(savedTextures))
     -- Only this mesh is updated on author-managed placed houses. Use the house
     -- anchor to preserve each house's existing world transform; never rebuild
     -- unrelated meshes or player-owned furniture.
@@ -170,7 +192,7 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
             cloned = staged
             -- Preserve the placed door's current pivot/open state. Do not
             -- introduce new socket offsets or rewrite Blender-authored poses.
-            if part == "house" then
+            if part == primary then
                 local stagedHouse = HouseFrame.Find(staged)
                 local oldHouse = HouseFrame.Find(placedOld)
                 if not stagedHouse or not oldHouse then
@@ -184,12 +206,12 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
             end
             local originalName = placedOld.Name
             local backupName = originalName .. "_M152_Previous"
-            if root:FindFirstChild(backupName) then
+            if placedOld.Parent and placedOld.Parent:FindFirstChild(backupName) then
                 error("Unresolved previous staged rig: " .. backupName)
             end
             placedOld.Name = backupName
             staged.Name = originalName
-            local attached, attachError = pcall(function() staged.Parent = root end)
+            local attached, attachError = pcall(function() staged.Parent = placedOld.Parent end)
             if not attached then
                 placedOld.Name = originalName
                 error(attachError)
@@ -203,7 +225,7 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
             root:SetAttribute("Game1RigAssetIds", HttpService:JSONEncode(placedIds))
             if part == "door" then
                 root:SetAttribute("Game1DoorModelAssetId", tostring(assetId))
-            elseif part == "house" then
+            elseif part == primary then
                 root:SetAttribute("Game1HouseModelAssetId", tostring(assetId))
                 root:SetAttribute("Game1ModelAssetId", tostring(assetId))
             end
@@ -217,7 +239,7 @@ function PartSync.Place(imported: Model, destination: Instance, slug: string,
         RetiredCleanup.CleanEstate(root)
     end
     return wrapper, {bonesValidated = true, rigsValidated = 1,
-        texturesApplied = if imageId then 1 else 0,
+        texturesApplied = if settings.appearanceMode == "material" then 0 else 1,
         partialSync = true, part = part, placedSyncVersion = 2, workspaceModelsUpdated = placedCount,
         workspaceModelsFound = placedFound,
         alignment = "authored-house-pivot",

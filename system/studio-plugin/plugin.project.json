@@ -130,6 +130,9 @@
       "StudioTextureAppearance": {
         "$path": "modules/StudioTextureAppearance.luau"
       },
+      "StudioRealEstateAppearance": {
+        "$path": "modules/StudioRealEstateAppearance.luau"
+      },
       "StudioRealEstatePartSync": {
         "$path": "modules/StudioRealEstatePartSync.luau"
       },

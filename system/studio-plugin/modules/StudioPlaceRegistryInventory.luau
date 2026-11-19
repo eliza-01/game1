@@ -325,8 +325,9 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
         if eligible and entry.appearanceMode~="material" then
             for _, visualPart in ipairs(visualParts) do
                 local appearance=visualPart:FindFirstChildOfClass("SurfaceAppearance")
-                local mode=if entry.alphaEnabled then Enum.AlphaMode.Transparency else Enum.AlphaMode.Opaque
-                if not appearance or appearance.AlphaMode~=mode then
+                local alpha=entry.alphaEnabled==true
+                if (if alpha then not appearance or appearance.AlphaMode~=Enum.AlphaMode.Transparency
+                    else appearance~=nil) then
                     needsAlpha=true
                     break
                 end

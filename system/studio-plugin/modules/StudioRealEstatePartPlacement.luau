@@ -3,6 +3,25 @@
 -- Legacy manifests without placement data are left untouched.
 local Placement = {}
 
+-- All new house meshes are staged with the same pivot as house_armature.
+-- Moving a complete imported Model preserves skinned attachment and mesh
+-- transforms. Geometry-centre rebasing is forbidden in the active pipeline.
+function Placement.SamePivot(a: CFrame, b: CFrame): boolean
+    return (a.Position - b.Position).Magnitude < 0.025
+        and a.LookVector:Dot(b.LookVector) > 0.9999
+        and a.UpVector:Dot(b.UpVector) > 0.9999
+end
+
+function Placement.AlignSharedPivot(rig: Model, mesh: MeshPart, pivot: CFrame, part: string)
+    rig.PrimaryPart = mesh
+    rig:PivotTo(pivot)
+    if not Placement.SamePivot(mesh:GetPivot(), pivot) then
+        error("Real Estate " .. part .. ": imported mesh pivot differs from house_armature")
+    end
+    rig:SetAttribute("Game1AuthoredPlacementMode", "shared-pivot")
+end
+
+
 local function triple(value: any, label: string): Vector3
     if typeof(value) ~= "table" or #value ~= 3 then
         error("Real Estate " .. label .. ": expected three numeric coordinates")
@@ -37,6 +56,46 @@ end
 
 local function close(a: number, b: number, tolerance: number): boolean
     return math.abs(a - b) <= tolerance
+end
+
+-- New authoring version: every centre is measured from house_armature pivot,
+-- not from a special visual mesh or mesh bounding-box centre.
+function Placement.AlignOrigin(rig: Model, mesh: MeshPart, originalPivot: CFrame,
+    authored: any, part: string): boolean
+    if typeof(authored)~="table" or authored.version~=3 then
+        error("Real Estate "..part..": new origin placement manifest missing")
+    end
+    local center=triple(authored.centerInPivot,part.." centre in author pivot")
+    local size=triple(authored.size,part.." size")
+    if size.X<=0 or size.Y<=0 or size.Z<=0 then error("invalid authored size") end
+    -- Roblox import can recenter a MeshPart while preserving root Bone rest
+    -- positions. Rebase its root attachments when that happens, as in M184.
+    local target=originalPivot:PointToWorldSpace(center)
+    local delta=target-mesh.Position
+    if delta.Magnitude<=0.025 then return false end
+    local roots={}
+    local boneCount=0
+    for _,item in rig:GetDescendants() do
+        if item:IsA("Bone") then boneCount+=1
+        elseif item:IsA("BasePart") and item~=mesh then
+            error("Cannot rebase multi-mesh Real Estate rig "..part)
+        end
+    end
+    for _,child in mesh:GetChildren() do
+        if child:IsA("Attachment") then
+            table.insert(roots,{bone=child,world=child.WorldCFrame})
+        end
+    end
+    if boneCount>0 then
+        if #roots==0 then error(part..": skinned mesh has no root attachments") end
+        mesh.CFrame=CFrame.new(delta)*mesh.CFrame
+        for _,entry in roots do
+            entry.bone.CFrame=mesh.CFrame:ToObjectSpace(entry.world)
+        end
+    else
+        rig:PivotTo(CFrame.new(delta)*rig:GetPivot())
+    end
+    return true
 end
 
 function Placement.Align(rig: Model, mesh: MeshPart, house: MeshPart,

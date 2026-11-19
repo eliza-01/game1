@@ -6,7 +6,7 @@
 <link rel="icon" href="data:,">
 <title>game1 · asset manager</title>
 <link rel="stylesheet" href="shared-asset-retirement.css?v=2">
-<link rel="stylesheet" href="asset-manager.css?v=322">
+<link rel="stylesheet" href="asset-manager.css?v=370">
 <link rel="stylesheet" href="m337-options.css?v=337">
 <link rel="stylesheet" href="database-history.css?v=3">
 <link rel="stylesheet" href="atlas-library.css?v=2">
@@ -278,7 +278,7 @@
 
 <div id="real-estate-view" hidden>
 <div class="panel hero"><div><span class="eyebrow">property authoring · Real Estate</span><h2>real estate</h2>
-<p>Register an FBX containing the <code>house</code> mesh and any number of additional meshes (e.g. <code>door</code>, <code>restoration</code>, <code>glass</code>, <code>stone_fence_01_kit</code>). Visual meshes use atlases. Static house collision will be authored independently as Roblox Parts. The <code>house_armature</code> is required for the house. Door and interaction bones are optional.</p></div></div>
+<p>Register an FBX with <code>house_armature</code> and freely named meshes. Every MeshPart defaults to Roblox Material + Color, with an optional atlas and explicit per-mesh Alpha transparency. Collision is authored separately as Roblox Parts. Door and interaction sockets are optional.</p></div></div>
 <div class="real-estate-workflow">
 <div class="panel character-card">
 <span class="eyebrow">01 · house identity</span><h3>register house</h3>
@@ -296,7 +296,7 @@
 <div id="real-estate-register-error" class="status-box" role="alert" hidden></div>
 </div>
 <div class="panel character-card"><span class="eyebrow">03 · publication</span><h3>Roblox model + images</h3>
-<p>Before uploading, each authored mesh is exported as a separately verified Model Asset. The house must contain house_armature; other armatures and bones are optional. The canonical source FBX is not modified. Image asset IDs are stored per mesh.</p>
+<p>Before uploading, each authored mesh is exported as a separately verified Model Asset. Use a single house_armature and the original authored project pivot; visual mesh names are unrestricted. The canonical source FBX is not modified. Image asset IDs are stored per mesh.</p>
 <label>description<input id="real-estate-description" type="text" value="Game1 Real Estate house"></label>
 <div id="real-estate-publish-status" class="status-box">register a house first</div>
 <div class="actions"><button id="real-estate-publish" class="primary" type="button" disabled>publish changed assets</button><button id="real-estate-sync" type="button" disabled>sync Studio → ServerStorage</button></div>
@@ -304,14 +304,14 @@
 <div class="real-estate-library"><div class="section-title"><div><span>registered library</span><h3>houses <small id="real-estate-library-count">0</small></h3></div><button id="real-estate-library-refresh" type="button">refresh</button></div><div class="table-wrap"><table><thead><tr><th>house</th><th>source textures</th><th>assets</th><th>actions</th></tr></thead><tbody id="real-estate-library-rows"></tbody></table></div><small class="hint">Replace FBX or either texture independently. Each replacement is saved immediately. Publish the changed Model/Image as a NEW Roblox Asset ID; other published IDs remain unchanged. Sync Studio after every present mesh and its texture is current.</small></div>
 <div class="panel character-card real-estate-placement" id="real-estate-placement">
 <span class="eyebrow">04 · placement</span><h3>house placement · 50 plots</h3>
-<p class="hint">Choose a registered house and a numbered plot. In Studio Edit mode select exactly one Model in Workspace whose name matches the house slug, position/rotate/scale it, then click <strong>Bind selected Model</strong>. Saved bindings are independent for every house and plot.</p>
+<p class="hint">Enter the house level and variant, and choose a Plot. In Studio Edit mode select a matching Model in Workspace, position/rotate/scale it, then click <strong>Bind selected Model</strong>. The Plot pivot survives deleting and re-registering the house; it belongs to the plot + level + variant, not the published model.</p>
 <div class="real-estate-placement-controls">
-  <label>House<select id="re-placement-house"><option value="">Choose registered house</option></select></label>
+  <label>Level / variant<input id="re-placement-house" list="re-placement-house-options" placeholder="house_level5_01" autocomplete="off"><datalist id="re-placement-house-options"></datalist></label>
   <div class="re-plot-picker"><span>Plot</span><div class="re-plot-picker-row"><button id="re-placement-prev" type="button" aria-label="Previous plot">◀</button><select id="re-placement-plot" aria-label="Plot"></select><button id="re-placement-next" type="button" aria-label="Next plot">▶</button></div></div>
   <button id="re-placement-bind" class="primary" type="button" disabled>Bind selected Model</button>
   <button id="re-placement-refresh" type="button">Refresh</button>
 </div>
-<div id="re-placement-status" class="status-box">Select a house and a plot, then choose its Model in Studio.</div>
+<div id="re-placement-status" class="status-box">Enter a house level/variant and select a plot, then choose its Model in Studio.</div>
 <div class="table-wrap"><table aria-label="House placement bindings"><thead><tr><th><button id="re-placement-toggle-all" class="re-anchor-toggle" type="button" title="Anchor all bindings" aria-label="Toggle anchoring for all bindings">⚓</button></th><th>Actions</th><th>Plot</th><th>House</th><th>Position (world)</th><th>Scale</th><th>Rev.</th></tr></thead><tbody id="re-placement-rows"><tr><td colspan="7" class="muted">No placement bindings yet.</td></tr></tbody></table></div>
 <div class="re-placement-anchor-actions actions"><button id="re-placement-anchor-all" type="button">⚓ Anchor all</button><button id="re-placement-free-all" type="button">≋ Free all</button></div>
 <div class="re-placement-bulk-actions actions"><button id="re-placement-place-all" class="primary" type="button" title="Place the selected house on every bound plot">Place all</button><button id="re-placement-clear-all" type="button" title="Clear all managed authored house previews in Workspace.Plots">Clear all</button></div>
@@ -847,6 +847,21 @@
 <span class="eyebrow">02 · source assets</span>
 <div class="picker"><button id="choose-npc-model" type="button">choose fbx</button><small id="picked-npc-model">fbx not selected</small></div>
 <div class="picker"><button id="choose-npc-textures" type="button">choose textures</button><small id="picked-npc-textures">textures not selected</small></div>
+<div class="npc-atlas-controls">
+ <button id="npc-atlas-open" type="button">connect existing atlas</button>
+ <button id="npc-atlas-clear" type="button" hidden>disconnect</button>
+ <small id="npc-atlas-status" class="hint">No shared atlas selected.</small>
+</div>
+<dialog id="npc-atlas-dialog" class="npc-animation-options-dialog npc-atlas-dialog" aria-label="Connect existing NPC atlas">
+ <div class="npc-options-head"><div><small>SHARED ATLAS REGISTRY</small><h3>Connect existing atlas</h3></div><button type="button" data-npc-atlas-close aria-label="Close">✕</button></div>
+ <div class="npc-options-inner">
+  <label>source category<select id="npc-atlas-category"><option value="npc">NPC</option><option value="monster">Monsters</option><option value="weapon">Weapons</option><option value="location_asset">Location assets</option><option value="real_estate">Houses</option></select></label>
+  <label>search<input id="npc-atlas-search" type="search" placeholder="Model · atlas slot · Image ID"></label>
+  <div id="npc-atlas-choices" class="npc-atlas-choices" role="listbox" aria-label="Published atlases"></div>
+  <small class="hint">Only published Image IDs. Source files and Roblox assets are never republished. Studio Sync is explicit.</small>
+ </div>
+ <div class="npc-options-actions"><button type="button" data-npc-atlas-close>cancel</button><button id="npc-atlas-connect" class="primary" type="button" disabled>connect</button></div>
+</dialog>
 <div id="npc-model-status" class="status-box"><strong>not registered</strong><span>choose a rigged npc fbx. textures are optional.</span></div>
 <div class="actions"><button id="register-npc" class="primary" type="button">register npc</button><button id="clear-npc-form" type="button">clear form</button></div>
 <hr class="card-separator">
@@ -879,7 +894,19 @@
 <div class="animation-workflow">
 <div class="panel character-card">
 <span class="eyebrow">04 · target and scan</span><h3>npc animations</h3>
-<label>npc<select id="npc-animation-npc"></select><small class="hint">this is the npc whose animation files will be scanned, registered and published.</small></label>
+<label>npc<select id="npc-animation-npc"></select><small class="hint">this is the NPC whose animations you are editing.</small></label>
+<div class="actions"><button id="npc-connect-existing-open" type="button" disabled>connect existing animations</button></div>
+<dialog id="npc-connect-existing-dialog" class="npc-animation-options-dialog npc-connect-dialog" aria-label="Connect existing NPC animations">
+ <div class="npc-options-head"><div><small>NPC ANIMATIONS</small><h3>Connect existing animations</h3></div><button type="button" onclick="this.closest('dialog').close()" aria-label="Close">✕</button></div>
+ <div class="npc-options-inner">
+  <div>To <strong id="npc-connect-target"></strong></div>
+  <label>from NPC<select id="npc-connect-source"></select></label>
+  <div id="npc-connect-rig-status" class="muted" role="status"></div>
+  <div id="npc-connect-actions" class="npc-connect-action-list"></div>
+  <small class="hint">Published source animations only. No file copies or re-publication. Occupied slots are preserved. Disconnect a source animation before deleting its owner.</small>
+ </div>
+ <div class="npc-options-actions"><button type="button" onclick="this.closest('dialog').close()">cancel</button><button id="npc-connect-apply" type="button" class="primary" disabled>connect</button></div>
+</dialog>
 <hr class="card-separator">
 <h3 class="subheading">animation folder</h3>
 <details id="npc-animation-filename-guide" class="naming-guide" open><summary>filename rules · npc states</summary><div id="npc-animation-filename-rules" class="filename-rules"><span class="muted">select a npc.</span></div><small class="hint">canonical names use <code>{npc_slug}_{type}_{state}</code>, e.g. <code>blacksmith_base_idle_special_01.rbxm</code>. Change type and rename a registered clip together to migrate it without losing its published asset ID. The base type defaults to all equipment contexts, including unarmed. Use animation options to customize compatibility. <code>idle_special_01</code>, <code>idle_special_02</code>, … are variants inside <code>idle</code>; <code>combat_idle</code> is the waiting pose while already in combat; <code>attack_01</code>, <code>attack_02</code>, … are variants inside <code>attack</code>.</small></details>
@@ -994,7 +1021,7 @@
 <script src="weapon-workflow.js?v=309"></script>
 <script src="arrow-assets.js?v=309"></script>
 <script src="monster-assets.js?v=338"></script>
-<script src="npc-assets.js?v=5"></script>
+<script src="npc-assets.js?v=370"></script>
 <script src="npc-spawns.js?v=337"></script>
 <script src="real-estate.js?v=247&rig=186&atlas=202&physics=232"></script>
 <script src="real-estate-mesh-workflow.js?v=234"></script>

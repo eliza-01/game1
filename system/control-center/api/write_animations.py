@@ -67,6 +67,16 @@ def route(path, body, deps):
         except Exception as error:
             return out(400, {"error": str(error)})
 
+    if path == "/api/npc-animations/connect":
+        try:
+            payload = body()
+            if not isinstance(payload, dict):
+                raise ValueError('expected an animation connection object')
+            return out(200, npc_animations.connect_existing(
+                payload.get('targetNpc'), payload.get('sourceNpc'), payload.get('bindingIds')))
+        except (ValueError, TypeError) as error:
+            return out(400, {"error": str(error)})
+
     if path == "/api/npc-animations/scan":
         try:
             payload = body()

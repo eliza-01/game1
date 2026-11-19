@@ -4,14 +4,17 @@ import json
 import sys
 from pathlib import Path
 from contextlib import nullcontext
+# Blender --python does not add the entrypoint directory to sys.path.
+# Bootstrap sibling helpers before importing the shared rig_carrier builder.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from blender_rig_carrier import create_rig_carrier
 from model_publication import prepare_rig, export_model
 from real_estate_rig_discovery import find_mesh, find_rig
 from real_estate_import_rigs import restore_authored_rigs
 from real_estate_staging_rig import isolated_rig
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "control-center"))
 from services.retired_col_mesh import retired
-from real_estate.rig_publication_policy import publish_bones_for_mesh
+from real_estate.rig_publication_policy import publish_bones_for_mesh, publication_analysis, carrier_bones, validate_visual_weights
 
 
 def main(source, output, texture_config, selected_part=None):
@@ -22,62 +25,103 @@ def main(source, output, texture_config, selected_part=None):
     reports = {}
     output.mkdir(parents=True, exist_ok=True)
     authored = [obj.name for obj in bpy.context.scene.objects if obj.type == 'MESH' and not retired(obj.name)]
-    if selected_part is None and 'house' not in authored:
-        raise RuntimeError('The FBX must contain a mesh named house')
+    if not authored:
+        raise RuntimeError('The FBX must contain at least one visual mesh')
     if selected_part is not None and retired(selected_part):
         raise RuntimeError('retired COL mesh is not publishable')
-    if selected_part is not None and selected_part not in authored:
+    if selected_part is not None and selected_part != 'rig_carrier' and selected_part not in authored:
         raise RuntimeError('Selected mesh ' + selected_part + ' not present in the FBX')
-    parts = (selected_part,) if selected_part else tuple(sorted(authored, key=lambda name: (name != 'house', name.casefold(), name)))
+    parts = (selected_part,) if selected_part else ('rig_carrier', *sorted(authored, key=lambda name: (name.casefold(), name)))
+    source_manifests = []
+    for name in authored:
+        obj = find_mesh(bpy, name)
+        source_rig = find_rig(bpy, obj, name)
+        bone_names = {b.name for b in source_rig.data.bones} if source_rig else set()
+        index_names = {g.index:g.name for g in obj.vertex_groups if g.name in bone_names}
+        used = {index_names[g.group] for v in obj.data.vertices for g in v.groups
+                if g.weight > 0 and g.group in index_names}
+        source_manifests.append({'name':name,'armature':source_rig.name if source_rig else '',
+            'bones':[{'name':b.name,'parent':b.parent.name if b.parent else ''}
+                     for b in source_rig.data.bones] if source_rig else [],
+            'influencedBones':sorted(used)})
+    for original in source_manifests:
+        if original['armature'] and original['armature'].casefold() != 'house_armature':
+            raise RuntimeError(original['name'] + ': new house publication requires only house_armature; '
+                               'remove legacy independent armatures in Blender')
+    house_rigs = [obj for obj in bpy.context.scene.objects if
+                  obj.type == 'ARMATURE' and obj.name.casefold() == 'house_armature']
+    if len(house_rigs) != 1:
+        raise RuntimeError('House publication requires exactly one house_armature')
+    house_rig = house_rigs[0]
+    policy = publication_analysis({'meshes': source_manifests,
+        'houseArmatureBones': [{'name': b.name, 'parent': b.parent.name if b.parent else ''}
+                               for b in house_rig.data.bones]})
+    validate_visual_weights(policy)
+    by_name = {entry['name']:entry for entry in policy['meshes']}
     for part in parts:
-        mesh = find_mesh(bpy, part)
-        rig = find_rig(bpy, mesh, part)
-        if part == 'house' and (not rig or rig.name.casefold() != 'house_armature'):
-            raise RuntimeError('Required house_armature is missing or not assigned to mesh house.')
-        rig_name = rig.name if rig else ''
-        # Interaction bones are optional. Preserve every bone if present, but
-        # do not synthesize dummy bones for meshes with no rig / empty rig.
-        bones = list(rig.data.bones) if rig else []
-        authored_influences = set()
-        if bones:
-            bone_names = {bone.name for bone in bones}
-            group_names = {group.index: group.name for group in mesh.vertex_groups
-                           if group.name in bone_names}
-            authored_influences = {group_names.get(group.group)
-                                   for vertex in mesh.data.vertices for group in vertex.groups
-                                   if group.weight > 0 and group.group in group_names}
-        retained = publish_bones_for_mesh({
-            'name': part, 'armature': rig_name,
-            'bones': [{'name': b.name, 'parent': b.parent.name if b.parent else ''}
-                      for b in bones],
-            'influencedBones': sorted(authored_influences),
-        })
-        if not retained:
-            # Detach only in this disposable staging scene. A static part does
-            # not own a copy of the shared house/door sockets.
-            original_world = mesh.matrix_world.copy()
-            if mesh.parent is not None and mesh.parent.type == 'ARMATURE':
-                mesh.parent = None
-                mesh.matrix_world = original_world
-            for modifier in list(mesh.modifiers):
-                if modifier.type == 'ARMATURE':
-                    mesh.modifiers.remove(modifier)
-            if any(abs(float(a) - float(b)) > 1e-4
-                   for left, right in zip(original_world, mesh.matrix_world)
-                   for a, b in zip(left, right)):
-                raise RuntimeError(f'{part}: removing redundant shared rig moved the mesh')
-        context = isolated_rig(bpy, mesh, rig, retained) if retained else nullcontext(None)
-        with context as rig:
-            reports[part] = (prepare_rig(rig, [mesh]) if rig else
-                             {'status': 'static_mesh', 'preservedBones': 0})
+        if part == 'rig_carrier':
+            # Publish the ONLY static socket hierarchy in its own Model Asset.
+            # A mixed FBX lets Roblox attach Bones under an arbitrary visual
+            # MeshPart (observed with chimney_01_socket on chimney).
+            retained = carrier_bones(policy)
+            carrier = create_rig_carrier(house_rig)
+            try:
+                with isolated_rig(bpy, carrier, house_rig, retained) as rig:
+                    reports[part] = prepare_rig(rig, [carrier])
+                    export_model(output / 'rig_carrier.fbx', [carrier, rig],
+                                 no_textures=True)
+            finally:
+                bpy.data.objects.remove(carrier, do_unlink=True)
+            continue
+        source_mesh = find_mesh(bpy, part)
+        specification = by_name[part]
+        retained = publish_bones_for_mesh(specification)
+        # Every published part shares the ACTUAL authored armature pivot. Bake
+        # transforms into a disposable copy of vertex coordinates; do not use
+        # geometry bounds/centres to reconstruct them later in Roblox Studio.
+        original_name = source_mesh.name
+        source_mesh.name = '__game1_staging_source_' + original_name
+        mesh = source_mesh.copy()
+        mesh.data = source_mesh.data.copy()
+        bpy.context.scene.collection.objects.link(mesh)
+        mesh.name = original_name
+        authored_world = source_mesh.matrix_world.copy()
+        mesh.parent = None
+        mesh.matrix_world = authored_world
+        source_to_house = house_rig.matrix_world.inverted() @ authored_world
+        mesh.data.transform(source_to_house)
+        mesh.matrix_world = house_rig.matrix_world.copy()
+        if part != mesh.name:
+            raise RuntimeError('Publication changed visual MeshPart identity')
+        try:
             _material(mesh, part, texture_config)
-            objects = [mesh, rig] if rig else [mesh]
-            export_model(output / f'{part}.fbx', objects, embed_textures=True)
-    return {'schemaVersion': 2, 'parts': reports, 'textureMode': 'embedded',
+            if retained:
+                rig = find_rig(bpy, source_mesh, part) or house_rig
+                with isolated_rig(bpy, mesh, rig, retained) as staged_rig:
+                    reports[part] = prepare_rig(staged_rig, [mesh])
+                    export_model(output / f'{part}.fbx', [mesh, staged_rig],
+                                 embed_textures=True)
+            else:
+                for modifier in list(mesh.modifiers):
+                    if modifier.type == 'ARMATURE':
+                        mesh.modifiers.remove(modifier)
+                reports[part] = {'status': 'static_mesh', 'preservedBones': 0}
+                export_model(output / f'{part}.fbx', [mesh], embed_textures=True)
+        finally:
+            data = mesh.data
+            bpy.data.objects.remove(mesh, do_unlink=True)
+            if data.users == 0:
+                bpy.data.meshes.remove(data)
+            source_mesh.name = original_name
+    return {'schemaVersion': 3, 'parts': reports, 'textureMode': 'embedded',
             'rigAssets': {part: f'{part}.fbx' for part in parts}}
 
 
 def _material(mesh, part, texture_config):
+    if not texture_config.get(part):
+        # Roblox Material + Color is applied by Studio, not baked into FBX.
+        # A staged model without an image is intentional and valid.
+        return
     image = bpy.data.images.load(str(texture_config[part]), check_existing=True)
     material = bpy.data.materials.new(name=f'Game1_{part}')
     material.use_nodes = True

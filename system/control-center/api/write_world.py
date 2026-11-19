@@ -123,7 +123,8 @@ def route(path, body, deps):
             # Report partial exports explicitly for manual recovery instead.
             exports = [('Location Assets', location_assets.export),
                        ('Real Estate', deps['real_estate'].export)]
-            for name, store in (('Weapons', deps.get('weapons')), ('Arrows', deps.get('arrows'))):
+            for name, store in (('Weapons', deps.get('weapons')), ('Arrows', deps.get('arrows')),
+                                ('NPCs', deps.get('npcs'))):
                 if store is not None:
                     exports.append((name, store.export))
             if 'character_components' in deps:
@@ -317,6 +318,8 @@ def route(path, body, deps):
             # Keep an explicit warning so the operator can reconcile manifests.
             exports = [('location_assets', location_assets.export),
                        ('real_estate', deps['real_estate'].export)]
+            if deps.get('npcs') is not None:
+                exports.append(('npcs', deps['npcs'].export))
             if 'character_components' in deps:
                 exports.append(('character_components', deps['character_components'].export))
             if 'character_assemblies' in deps:
@@ -372,6 +375,8 @@ def route(path, body, deps):
             # before asking Studio to refresh templates and placed instances.
             location_assets.export()
             deps['real_estate'].export()
+            if deps.get('npcs') is not None:
+                deps['npcs'].export()  # Reused published Image IDs changed; Studio Sync is still explicit.
             # M216: publishing a SHARED atlas must not silently edit ANY Place.
             # All consumers become pending and must be explicitly synced by slug
             # (Real Estate keeps its own separately targeted Sync operation).
@@ -393,6 +398,8 @@ def route(path, body, deps):
             if 'character_assemblies' in deps:
                 deps['character_assemblies'].characters.export()
             location_assets.export()
+            if deps.get('npcs') is not None:
+                deps['npcs'].export()
             return out(200, result)
         except Exception as error:
             return out(400, {"error": str(error)})

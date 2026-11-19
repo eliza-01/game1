@@ -10,6 +10,10 @@
       "right": "guards_sword_01",
       "left": ""
     },
+    "guard_02": {
+      "right": "guards_sword_01",
+      "left": ""
+    },
     "warsmith": {
       "right": "warsmiths_hummer_01",
       "left": ""

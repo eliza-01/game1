@@ -63,6 +63,7 @@ from services.location_asset_sync_history import LocationAssetSyncHistory
 from services.mysql_asset_replacement_audit import MySqlAssetReplacementAudit, MySqlAuditConfig
 from services.sqlite_asset_audit_importer import SqliteAssetAuditImporter
 from services.studio_asset_sync import StudioAssetSyncService
+from services.npc_atlas_sources import NpcAtlasSources
 from services.animation_export import write_animation_export
 from services.native_pickers import (
     choose_animation_folder, choose_character_animation_file, choose_character_fbx, choose_character_atlas, choose_location_asset_fbx,
@@ -120,6 +121,8 @@ location_collision_authoring = LocationCollisionAuthoring(location_assets, run_l
 # Switching a variant updates authoring only; Sync Studio remains an explicit action.
 weapons.atlases = location_assets.atlases
 arrows.atlases = location_assets.atlases
+npcs.atlases = location_assets.atlases
+npcs.export()
 weapons.export()
 arrows.export()
 location_asset_sync_history = LocationAssetSyncHistory(ROOT, database=asset_audit_repository)
@@ -127,6 +130,7 @@ place_registry = LocationPlaceRegistry(location_assets, PlaceRevisionStore(ROOT)
 location_instance_manager = LocationInstanceManager(location_assets, run_location_instance_bridge)
 lod_manager = LocationLodManager(location_assets, place_registry)
 real_estate = RealEstateStore(ROOT, location_assets=location_assets)
+npc_atlas_sources = NpcAtlasSources(npcs, monsters, weapons, location_assets, real_estate)
 real_estate_placements = RealEstatePlacementStore(ROOT, real_estate)
 real_estate.placement_store = real_estate_placements
 real_estate_publications = RealEstatePublicationJobs(
@@ -186,6 +190,7 @@ def publication_credentials(description: str = ""):
 READ_SOURCES = MappingProxyType({
     "characters": store, "animations": animations, "character_components": character_components, "armor": armor, "character_assemblies": character_assemblies, "character_publications": character_publications,
     "weapons": weapons, "arrows": arrows, "monsters": monsters, "monster_animations": monster_animations,
+    "npc_atlas_sources": npc_atlas_sources,
     "npcs": npcs, "npc_animations": npc_animations, "npc_equipment": npc_equipment,
     "location_assets": location_assets, "location_asset_sync_history": location_asset_sync_history,
     "place_registry": place_registry, "location_instance_manager": location_instance_manager, "lod_manager": lod_manager,
@@ -241,6 +246,7 @@ WRITE_SOURCES = MappingProxyType({
     "monsters": monsters,
     "npc_animations": npc_animations,
     "npc_equipment": npc_equipment,
+    "npc_atlas_sources": npc_atlas_sources,
     "npc_place_spawn": npc_place_spawn,
     "npc_register_spawn": npc_register_spawn,
     "npc_spawns": npc_spawns,

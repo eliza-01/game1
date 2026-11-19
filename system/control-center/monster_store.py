@@ -80,6 +80,7 @@ class MonsterStore:
         if kind not in {"monster", "npc"}:
             raise ValueError("unsupported actor kind")
         self.kind = kind
+        self.atlases = None  # injected shared AtlasRegistry for NPC, not a parallel catalog
         self.root = root.resolve()
         self.runtime = self.root / ".control-center"
         self.runtime.mkdir(parents=True, exist_ok=True)
@@ -253,9 +254,17 @@ class MonsterStore:
     def _decorate(self, connection, row) -> dict:
         result = dict(row)
         result["textures"] = self._textures(connection, result["slug"])
+        if self.kind == 'npc' and self.atlases:
+            binding = self.atlases.binding('npc', result['slug'])
+            if binding:
+                binding['id'] = binding['variant_id']
+            result['atlas_binding'] = binding
+            result['atlas_variants'] = self.atlases.attached_variants('npc', result['slug'])
         result["stats"] = self._stats(connection, result["slug"])
         result["behavior"] = self._behavior(connection, result["slug"])
-        result["status"] = self._status(result, result["textures"])
+        result["status"] = self._status(result, [] if result.get('atlas_binding') else result['textures'])
+        if result.get('atlas_binding') and not result['atlas_binding']['current']:
+            result['status'] = 'UPDATE_AVAILABLE' if result.get('model_asset_id') else 'LOCAL_ONLY'
         result["publicationUpgradeAvailable"] = bool(
             self.kind == "npc"
             and result.get("model_asset_id")
@@ -462,6 +471,20 @@ class MonsterStore:
         self.export()
         return self.get(slug)
 
+    def select_atlas(self, slug: str, variant_id: int, expected_revision: int) -> dict:
+        if self.kind != 'npc' or not self.atlases or not self.get(slug):
+            raise ValueError('unknown NPC or shared atlas registry unavailable')
+        self.atlases.bind('npc',slug,variant_id,expected_revision=expected_revision)
+        self.export()
+        return self.get(slug)
+
+    def clear_atlas(self, slug: str) -> dict:
+        if self.kind != 'npc' or not self.atlases or not self.get(slug):
+            raise ValueError('unknown NPC or shared atlas registry unavailable')
+        self.atlases.unbind('npc',slug)
+        self.export()
+        return self.get(slug)
+
     def publish(self, slug: str, credentials: dict) -> dict:
         row = self.get(slug)
         if not row:
@@ -511,7 +534,9 @@ class MonsterStore:
                 )
 
         row = self.get(slug)
-        for texture in row.get("textures") or []:
+        # A shared atlas is already published and has its own independent ID.
+        # Do not upload or update a retired local texture for this NPC.
+        for texture in ([] if row.get('atlas_binding') else row.get("textures") or []):
             if str(texture.get("asset_id") or "") and str(texture.get("published_sha256") or "") == str(texture.get("sha256") or ""):
                 continue
             file_path = self.root / str(texture.get("prepared_path") or texture.get("source_path") or "")
@@ -546,6 +571,8 @@ class MonsterStore:
             connection.execute("DELETE FROM monster_textures WHERE monster_slug=?", (slug,))
             connection.execute("DELETE FROM monster_publications WHERE monster_slug=?", (slug,))
             connection.execute("DELETE FROM monsters WHERE slug=?", (slug,))
+        if self.kind == 'npc' and self.atlases:
+            self.atlases.unbind('npc', slug)
         self.export()
 
     def publications(self, slug: str) -> list[dict]:
@@ -620,7 +647,12 @@ class MonsterStore:
             for key, value in row.get("stats", {}).items():
                 lines.append(f"\t\t\t\t[{self._lua_string(key)}] = {self._lua_number(value)},")
             lines.extend(["\t\t\t}),", "\t\t\ttextures = table.freeze({"])
-            for texture in row.get("textures") or []:
+            textures = row.get('textures') or []
+            binding = row.get('atlas_binding')
+            if binding:
+                textures = [{'slot':'atlas','asset_id':binding['published_id'],
+                    'sha256':binding['source_sha256']}]
+            for texture in textures:
                 lines.extend([
                     f"\t\t\t\t[{self._lua_string(texture['slot'])}] = table.freeze({{",
                     f"\t\t\t\t\tassetId = {self._lua_string(texture.get('asset_id') or '')},",

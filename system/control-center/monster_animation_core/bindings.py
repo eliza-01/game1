@@ -107,6 +107,10 @@ class MonsterAnimationBindingsMixin:
                      JOIN monster_animation_clips c ON c.id=b.clip_id WHERE b.id=?""", (binding_id,)).fetchone()
                 if not row:
                     raise ValueError("unknown NPC animation binding")
+                if row['monster_slug'] != connection.execute(
+                    "SELECT monster_slug FROM monster_animation_clips WHERE id=?", (row['clip_id'],)
+                ).fetchone()['monster_slug']:
+                    raise ValueError("connected animations cannot be renamed; disconnect and register a local clip")
                 slug, slot, variant = str(row["monster_slug"]), str(row["slot"]), int(row["variant"])
                 ext = Path(row["source_path"]).suffix.lower()
                 expected = validate_rename(proposed_filename, slug, weapon_set, slot, variant, ext)
@@ -168,6 +172,18 @@ class MonsterAnimationBindingsMixin:
             if not row:
                 raise ValueError(f"unknown monster animation binding: {binding_id}")
             slug, clip_id = str(row["monster_slug"]), str(row["clip_id"])
+            if self.kind == 'npc':
+                owner = connection.execute(
+                    "SELECT monster_slug FROM monster_animation_clips WHERE id=?", (clip_id,)
+                ).fetchone()
+                if owner and str(owner['monster_slug']) == slug:
+                    dependent = connection.execute(
+                        "SELECT monster_slug FROM monster_animation_bindings WHERE clip_id=? AND monster_slug<>? LIMIT 1",
+                        (clip_id, slug),
+                    ).fetchone()
+                    if dependent:
+                        raise ValueError('animation is connected by NPC ' + str(dependent['monster_slug'])
+                                         + '; disconnect it there before removing the source')
             connection.execute("DELETE FROM monster_animation_bindings WHERE id=?", (binding_id,))
             # Remove the active clip even if it was published. Retain the
             # publication audit in the archive, never in the new registration.

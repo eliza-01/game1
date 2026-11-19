@@ -3,20 +3,23 @@ const realEstatePlacementState = {data:null, busy:false, house:'', plot:1};
 const RE_PLACEMENT_KEY = 'game1.realEstate.placement';
 function game1RealEstatePlacementRender(){
   const state=realEstatePlacementState;
-  const houses=realEstateRows().map(row=>row.slug).sort();
+  const houses=[...new Set([...realEstateRows().map(row=>row.slug),...(state.data?.items||[]).map(row=>row.houseSlug)])].sort();
   const house=$('re-placement-house');
   if(!house)return;
   if(!state.house){
     try{const saved=JSON.parse(localStorage.getItem(RE_PLACEMENT_KEY)||'{}');
       state.house=saved.house||'';state.plot=Number(saved.plot)||1;}catch{}
   }
-  if(!houses.includes(state.house))state.house='';
-  house.innerHTML='<option value="">Choose registered house</option>'+houses.map(slug=>
-    `<option value="${esc(slug)}" ${slug===state.house?'selected':''}>${esc(slug)}</option>`).join('');
+  // Plot pivots can be authored before a model is registered and remain
+  // selectable after its deletion. This is a type identity, not an asset ref.
+  const choices=$('re-placement-house-options');
+  if(choices)choices.innerHTML=houses.map(slug=>`<option value="${esc(slug)}"></option>`).join('');
+  if(document.activeElement!==house)house.value=state.house;
+  const validType=/^house_level[1-9][0-9]*_[0-9]{2,}$/.test(state.house);
   const plot=$('re-placement-plot');
   plot.innerHTML=Array.from({length:50},(_,i)=>`<option value="${i+1}" ${i+1===state.plot?'selected':''}>Plot ${String(i+1).padStart(2,'0')}</option>`).join('');
   house.disabled=state.busy;plot.disabled=state.busy;
-  $('re-placement-bind').disabled=state.busy||!state.house;
+  $('re-placement-bind').disabled=state.busy||!validType;
   $('re-placement-prev').disabled=state.busy;
   $('re-placement-next').disabled=state.busy;
   $('re-placement-refresh').disabled=state.busy;
@@ -29,10 +32,8 @@ function game1RealEstatePlacementRender(){
   $('re-placement-anchor-all').disabled=state.busy||!all.length;
   $('re-placement-free-all').disabled=state.busy||!all.length;
   const selectedBindings=state.house?all.filter(item=>item.houseSlug===state.house):[];
-  // Legacy M208 bindings retain full plot-relative Model CFrames. A missing
-  // house anchor selects the original Model-pivot placement mode, not a hard stop.
   $('re-placement-place-all').disabled=state.busy||!selectedBindings.length||selectedBindings.some(item=>
-    item.houseAnchorLocalCFrame!=null&&(!Array.isArray(item.houseAnchorLocalCFrame)||item.houseAnchorLocalCFrame.length!==12));
+    !Array.isArray(item.localCFrame)||item.localCFrame.length!==12);
   $('re-placement-clear-all').disabled=state.busy;
   const items=state.data?.items||[];
   const filtered=state.house?items.filter(v=>v.houseSlug===state.house):items;
@@ -40,13 +41,11 @@ function game1RealEstatePlacementRender(){
     const [x,y,z]=item.worldCFrame||[];
     const position=[x,y,z].map(v=>Number(v).toFixed(2)).join(', ');
     const rotation=(item.worldCFrame||[]).slice(3).map(v=>Number(v).toFixed(3)).join(', ');
-    const legacyPivot=item.houseAnchorLocalCFrame==null;
-    const rotationReady=Array.isArray(item.houseAnchorLocalCFrame)&&item.houseAnchorLocalCFrame.length===12;
-    const canPlace=legacyPivot||rotationReady;
+    const canPlace=Array.isArray(item.localCFrame)&&item.localCFrame.length===12;
     const anchored=item.anchored!==false;
     const symbol=anchored?'⚓':'≋';
     const label=anchored?'Free this house':'Anchor this house';
-    return `<tr><td><button type="button" class="re-anchor-toggle ${anchored?'is-anchored':'is-free'}" data-placement-anchor="${anchored?'free':'anchor'}" data-house="${esc(item.houseSlug)}" data-plot="${item.plotIndex}" title="${label}" aria-label="${label}" ${state.busy?'disabled':''}>${symbol}</button></td><td><div class="re-placement-row-actions"><button type="button" data-placement-action="place" data-house="${esc(item.houseSlug)}" data-plot="${item.plotIndex}" title="${legacyPivot?'Place using original Model pivot (legacy binding)':rotationReady?'Place using authored house pivot':'Invalid saved house anchor'}" ${state.busy||!canPlace?'disabled':''}>Place</button><button type="button" data-placement-action="clear" data-house="${esc(item.houseSlug)}" data-plot="${item.plotIndex}" ${state.busy?'disabled':''}>Clear</button></div></td><td>${String(item.plotIndex).padStart(2,'0')}</td><td><strong>${esc(item.houseSlug)}</strong>${legacyPivot?'<small class="muted" title="Uses the original Model pivot. Optional Re-Bind enables exact house-pivot alignment."> · Legacy Model pivot</small>':''}</td><td>${esc(position)}<details><summary>Rotation · CFrame</summary><small>${esc(rotation)}</small></details></td><td>${Number(item.scale).toFixed(3)}</td><td>${item.revision}</td></tr>`;
+    return `<tr><td><button type="button" class="re-anchor-toggle ${anchored?'is-anchored':'is-free'}" data-placement-anchor="${anchored?'free':'anchor'}" data-house="${esc(item.houseSlug)}" data-plot="${item.plotIndex}" title="${label}" aria-label="${label}" ${state.busy?'disabled':''}>${symbol}</button></td><td><div class="re-placement-row-actions"><button type="button" data-placement-action="place" data-house="${esc(item.houseSlug)}" data-plot="${item.plotIndex}" title="${canPlace?'Place using saved Plot pivot':'Invalid plot-local CFrame'}" ${state.busy||!canPlace?'disabled':''}>Place</button><button type="button" data-placement-action="clear" data-house="${esc(item.houseSlug)}" data-plot="${item.plotIndex}" ${state.busy?'disabled':''}>Clear</button></div></td><td>${String(item.plotIndex).padStart(2,'0')}</td><td><strong>${esc(item.houseSlug)}</strong></td><td>${esc(position)}<details><summary>Rotation · CFrame</summary><small>${esc(rotation)}</small></details></td><td>${Number(item.scale).toFixed(3)}</td><td>${item.revision}</td></tr>`;
   }).join('')||'<tr><td colspan="7" class="muted">No bindings for this house yet.</td></tr>';
 }
 function realEstatePlacementRemember(){
@@ -103,8 +102,7 @@ $('re-placement-rows').addEventListener('click',async event=>{
       body:JSON.stringify({houseSlug:house,plotIndex:plot,action}),
     });
     const verified=action==='place' ? ` · ${result.studio.anchored?'Anchored':'Free'} · ${result.studio.anchoredPartsVerified} BaseParts verified` : '';
-    const legacyNotice=result.studio?.rotationMode==='legacy-model-pivot'?' · legacy Model-pivot alignment':'';
-    $('re-placement-status').textContent=`Plot ${String(plot).padStart(2,'0')} · ${house} · ${result.studio?.status||action}${verified}${legacyNotice}. Studio Undo is available.`;
+    $('re-placement-status').textContent=`Plot ${String(plot).padStart(2,'0')} · ${house} · ${result.studio?.status||action}${verified}. Studio Undo is available.`;
   }catch(error){
     $('re-placement-status').textContent=`${action} failed: ${error.message}`;
     toast(error.message,true);
@@ -161,8 +159,7 @@ async function game1PlacementBulk(action){
     });
     const studio=response.studio;
     const verified=action==='place_all'?` · ${studio.anchoredPartsVerified} BaseParts verified`:'';
-    const legacyNote=action==='place_all'&&studio.legacyPlacements?` · ${studio.legacyPlacements} legacy Model-pivot binding(s)`:'';
-    $('re-placement-status').textContent=`${action==='place_all'?'Placed':'Cleared'} ${studio.changed} managed house(s)${verified}${legacyNote}. One Studio Undo is available.`;
+    $('re-placement-status').textContent=`${action==='place_all'?'Placed':'Cleared'} ${studio.changed} managed house(s)${verified}. One Studio Undo is available.`;
   }catch(error){
     $('re-placement-status').textContent=`${action==='place_all'?'Place all':'Clear all'} failed: ${error.message}`;
     toast(error.message,true);

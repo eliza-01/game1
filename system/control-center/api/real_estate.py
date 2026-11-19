@@ -1,5 +1,6 @@
 """Real Estate authoring HTTP routes; persistence lives in RealEstateStore."""
 from urllib.parse import unquote
+from real_estate.contracts import HOUSE_NAME
 
 
 def read(parsed, sources):
@@ -9,6 +10,19 @@ def read(parsed, sources):
         try:
             snapshot = sources['real_estate'].snapshot()
             snapshot['publication'] = sources['publication_config']()
+            # Plot pivots outlive house registrations (M373). Expose orphaned
+            # stable house types so the editor can offer explicit re-registration.
+            registered = {item['slug'] for item in snapshot['items']}
+            counts = {}
+            placements = sources.get('real_estate_placements')
+            if placements is not None:
+                for item in placements.snapshot()['items']:
+                    slug = item.get('houseSlug')
+                    if isinstance(slug, str) and HOUSE_NAME.fullmatch(slug) and slug not in registered:
+                        counts[slug] = counts.get(slug, 0) + 1
+            snapshot['unregisteredPlotTypes'] = [
+                {'slug': slug, 'plotCount': counts[slug]} for slug in sorted(counts)
+            ]
             return 200, snapshot
         except (ValueError, OSError) as error:
             return 400, {'error': str(error)}
@@ -32,8 +46,8 @@ def write(path, body, deps):
             plot = payload.get('plotIndex')
             if type(plot) is not int or not 1 <= plot <= 50:
                 raise ValueError('plot must be between 1 and 50')
-            if store.get(slug) is None:
-                raise ValueError('choose a registered house')
+            if not HOUSE_NAME.fullmatch(slug):
+                raise ValueError('choose a canonical house type (house_levelN_variant)')
             # Studio owns the measured transform; browser data never supplies a CFrame.
             capture = deps['capture_house_placement'](slug, plot)
             return 200, {'item': deps['real_estate_placements'].bind(slug, plot, capture)}

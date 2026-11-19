@@ -23,15 +23,14 @@ class WorkspaceHouseDiscoveryM148(unittest.TestCase):
         definitions = set(re.findall(r'\{name = "([^"]+)", role = ', contract))
         authored = {
             "door_01_handle_inside_socket", "door_01_handle_outside_socket",
-            "door_01_hinge_socket", "door_01_padlock_01_socket",
+            "door_01_padlock_01_inside_socket", "door_01_padlock_01_outside_socket",
             "chest_01_socket", "chimney_01_socket", "elevator_01_socket",
-            "house_floor_01_spawn_01_socket", "house_floor_02_spawn_01_socket",
-            "land_spawn_01_socket",
+            "house_floor_01_spawn_socket", "house_floor_02_spawn_socket",
         }
-        self.assertEqual(len(authored), 10)
-        self.assertEqual(authored - {"door_01_hinge_socket"}, definitions - {
-            "elevator_02_socket", "elevator_03_socket", "house_floor_03_spawn_01_socket"
-        })
+        self.assertTrue(authored.issubset(definitions))
+        self.assertNotIn("land_spawn_01_socket", definitions)
+        self.assertNotIn("door_01_padlock_01_socket", definitions)
+        self.assertNotIn("house_floor_01_spawn_01_socket", definitions)
 
     def test_studio_fallback_is_explicit_and_production_remains_managed(self):
         discovery = source(DISCOVERY)

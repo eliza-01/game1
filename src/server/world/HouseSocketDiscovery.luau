@@ -22,9 +22,9 @@ function Discovery.IsHouse(instance: Instance): boolean
     if not RunService:IsStudio() then return false end
     -- Deliberate Studio-only authoring fallback: a real house rig with an
     -- authored, known socket. Never guess a socket position or trust a name.
-    local rig = instance:FindFirstChild("HouseRig")
-    if not rig or not rig:IsA("Model") then return false end
-    for _, descendant in rig:GetDescendants() do
+    if instance:GetAttribute("Game1PrimaryRigPart") == nil
+        and instance:FindFirstChild("HouseRig") == nil then return false end
+    for _, descendant in instance:GetDescendants() do
         if descendant:IsA("Attachment") and Contract.Get(descendant.Name) then
             return true
         end
@@ -36,6 +36,7 @@ function Discovery.IsPotentialHouseRoot(instance: Instance): boolean
     return instance:IsA("Model") and (
         instance:GetAttribute("Game1RealEstateSlug") ~= nil
         or instance:FindFirstChild("HouseRig") ~= nil
+        or instance:GetAttribute("Game1PrimaryRigPart") ~= nil
         or instance:FindFirstChild("DoorAssembly") ~= nil
     )
 end

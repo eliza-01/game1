@@ -5,6 +5,7 @@ from validators.actor_runtime import check_actor_runtime_contracts
 from validators.combat_foundation import check_combat_foundation
 from validators.hitbox_runtime import check_hitbox_runtime
 from validators.studio_character_bridge import check_studio_character_bridge
+from validators.studio_plugin_manifest import check_studio_plugin_manifest
 from validators.registered_attack_clips import check_registered_attack_clips
 from validators.deco_studio import check_deco_studio
 from validators.environment_bounce import check_environment_bounce
@@ -44,6 +45,9 @@ archetypes, active_id = check_character_manifest(ROOT, err)
 
 # M165: project layout, forbidden legacy references, and runtime inventory.
 check_project_layout(ROOT, err)
+
+# Detect missing Rojo modules during ordinary verify, before running install.ps1.
+check_studio_plugin_manifest(ROOT, err)
 
 (attack_text, damage_resolver_text, attack_timeline_text, attack_timeline_data_text) = check_combat_foundation(ROOT, err)
 

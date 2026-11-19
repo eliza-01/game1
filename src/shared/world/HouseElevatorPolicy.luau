@@ -42,13 +42,10 @@ function Policy.Options(floor: number, present: {[number]: boolean}): {Option}
     return options
 end
 
--- Floor 1/2 transfers arrive at their authored spawn; elevator bones only
--- determine the origin and the offered controls. Floor 3 keeps its optional
--- lift destination until an authored floor spawn is explicitly required.
+-- Every destination uses its actual authored floor-spawn socket.
+-- Do not extrapolate positions from an elevator bone or house geometry.
 function Policy.DestinationSocket(_sourceFloor: number, destination: number): string
-    if destination == 1 then return "house_floor_01_spawn_01_socket" end
-    if destination == 2 then return "house_floor_02_spawn_01_socket" end
-    return Policy.SocketName(destination)
+    return ("house_floor_%02d_spawn_socket"):format(destination)
 end
 
 function Policy.Resolve(floor: number, key: string, present: {[number]: boolean}): Option?

@@ -1,8 +1,7 @@
-"""Authoritative authoring bindings for (plot, registered house) placement.
+"""Persistent plot spawn pivots for a stable house type (level + variant).
 
-No player ownership or runtime spawning occurs here. Studio supplies a measured
-Model pivot/scale; this repository verifies, versions and persists it. Plot-local
-CFrame survives legitimate map editing and is the intended runtime contract.
+Records are not foreign keys to registered models, mesh assets or publication
+revisions. Removing and re-registering a house MUST NOT remove its plot pivots.
 """
 from __future__ import annotations
 
@@ -15,8 +14,9 @@ import time
 import uuid
 
 from sqlite_connection import connect
+from .contracts import HOUSE_NAME
 
-SCHEMA_VERSION = 1  # persisted manifest shape; capture wire protocol is versioned separately
+SCHEMA_VERSION = 1  # additive plot pivot metadata; existing Studio transport remains v1
 PLOT_COUNT = 50
 CAPTURE_SCHEMA_VERSION = 2
 
@@ -96,6 +96,18 @@ class RealEstatePlacementStore:
         self.houses = houses
         self.db = self.root / '.control-center' / 'game1_real_estate.db'
         with connect(self.db) as db:
+            # M373: remove the old destructive relationship. Back up the live
+            # SQLite database (including WAL state) BEFORE dropping its trigger.
+            # It used to silently erase a plot when its model was deleted.
+            trigger = db.execute("SELECT name FROM sqlite_master WHERE type='trigger' "
+                                 "AND name='real_estate_placements_house_delete'").fetchone()
+            if trigger:
+                backups = self.db.parent / 'backups'
+                backups.mkdir(parents=True, exist_ok=True)
+                target = backups / f'before_independent_plot_pivots_m373_{uuid.uuid4().hex}.db'
+                with connect(target) as backup:
+                    db.backup(backup)
+                db.execute('DROP TRIGGER real_estate_placements_house_delete')
             db.execute('''CREATE TABLE IF NOT EXISTS real_estate_placements (
                 plot_index INTEGER NOT NULL CHECK(plot_index BETWEEN 1 AND 50),
                 house_slug TEXT NOT NULL,
@@ -130,26 +142,25 @@ class RealEstatePlacementStore:
                 with connect(backup_path) as backup:
                     db.backup(backup)
                 db.execute("ALTER TABLE real_estate_placements ADD COLUMN house_anchor_local_cframe_json TEXT")
-            # Deleting a house must retire only its placement bindings.
-            db.execute('''CREATE TRIGGER IF NOT EXISTS real_estate_placements_house_delete
-                AFTER DELETE ON real_estate BEGIN
-                DELETE FROM real_estate_placements WHERE house_slug=OLD.slug;
-                END''')
         self.export()
 
     def snapshot(self) -> dict:
-        # Deleted houses may have archival records, never offer them for placement.
+        # All pivots are included, even when no matching model is registered.
         with connect(self.db) as db:
             rows = [dict(item) for item in db.execute(
-                'SELECT p.* FROM real_estate_placements p '
-                'JOIN real_estate h ON h.slug=p.house_slug '
-                'ORDER BY p.plot_index,p.house_slug')]
+                'SELECT * FROM real_estate_placements ORDER BY plot_index,house_slug')]
         return {'schemaVersion': SCHEMA_VERSION, 'plotCount': PLOT_COUNT,
                 'items': [self._present(row) for row in rows]}
 
     @staticmethod
     def _present(row: dict) -> dict:
+        # Keep houseSlug for Studio transport; its semantics are an immutable
+        # TYPE identity, not a reference to a row in real_estate.
+        match = HOUSE_NAME.fullmatch(row['house_slug'])
         return {'plotIndex': row['plot_index'], 'houseSlug': row['house_slug'],
+                'houseLevel': int(match['level']) if match else None,
+                'houseVariant': match['variant'] if match else None,
+                'spawnPivotLocalCFrame': json.loads(row['local_cframe_json']),
                 'plotVolume': row['plot_volume'], 'worldCFrame': json.loads(row['world_cframe_json']),
                 'plotCFrame': json.loads(row['plot_cframe_json']),
                 'localCFrame': json.loads(row['local_cframe_json']),
@@ -163,15 +174,14 @@ class RealEstatePlacementStore:
         if type(plot_index) is not int or not 1 <= plot_index <= PLOT_COUNT:
             raise ValueError('plot must be an integer between 1 and 50')
         with connect(self.db) as db:
-            row = db.execute('''SELECT p.* FROM real_estate_placements p
-                JOIN real_estate h ON h.slug=p.house_slug
-                WHERE p.house_slug=? AND p.plot_index=?''',
-                (house_slug, plot_index)).fetchone()
+            row = db.execute('SELECT * FROM real_estate_placements '
+                             'WHERE house_slug=? AND plot_index=?',
+                             (house_slug, plot_index)).fetchone()
         return self._present(dict(row)) if row else None
 
     def bind(self, house_slug: str, plot_index: int, capture: dict) -> dict:
-        if not isinstance(house_slug, str) or not house_slug or self.houses.get(house_slug) is None:
-            raise ValueError('choose a registered house before binding a plot')
+        if not isinstance(house_slug, str) or not house_slug or (not HOUSE_NAME.fullmatch(house_slug) and self.houses.get(house_slug) is None):
+            raise ValueError('choose a valid house level/variant type for this plot')
         if type(plot_index) is not int or not 1 <= plot_index <= PLOT_COUNT:
             raise ValueError('plot must be an integer between 1 and 50')
         data = validate_capture(capture, house_slug, plot_index)
@@ -202,7 +212,7 @@ class RealEstatePlacementStore:
     def set_anchored(self, targets: list[dict], anchored: bool) -> int:
         """Persist authoring flags after Studio confirms the requested mutation.
 
-        Only exact, existing plot×house bindings are writable. The geometric
+        Only exact, existing plot×type bindings are writable. The geometric
         binding revision remains unchanged because its transform did not change.
         """
         if type(anchored) is not bool or not isinstance(targets, list):

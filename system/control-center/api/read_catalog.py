@@ -12,6 +12,8 @@ def _query(parsed, name: str) -> str:
 
 def route(parsed, sources, publication_config):
     path = parsed.path
+    if path == '/api/npc-atlas-sources':
+        return 200, sources['npc_atlas_sources'].snapshot()
     if path == '/api/armor':
         return 200, sources['armor'].snapshot()
     if path == '/api/characters/assemblies':

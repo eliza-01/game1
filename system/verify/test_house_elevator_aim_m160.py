@@ -7,12 +7,10 @@ def code(path): return (ROOT / path).read_text(encoding='utf-8')
 class M160FloorAndAim(unittest.TestCase):
     def test_both_authored_floor_spawns_are_arrival_targets(self):
         policy = code('src/shared/world/HouseElevatorPolicy.luau')
-        self.assertIn('if destination == 1 then return "house_floor_01_spawn_01_socket" end', policy)
-        self.assertIn('if destination == 2 then return "house_floor_02_spawn_01_socket" end', policy)
-        self.assertIn('return Policy.SocketName(destination)', policy)
+        self.assertIn('return ("house_floor_%02d_spawn_socket"):format(destination)', policy)
         service = code('src/server/world/HouseElevatorService.luau')
         self.assertIn('sockets[Policy.DestinationSocket(floor, option.destination)]', service)
-        self.assertIn('if option.destination == 1 or option.destination == 2 then', service)
+        self.assertIn('local spawn = sockets[Policy.DestinationSocket(floor, floor)]', service)
         self.assertIn('target:IsA("Bone"), 3)', service)
         self.assertIn('if not target or not target.Parent then return false', service)
 

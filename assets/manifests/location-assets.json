@@ -1933,6 +1933,38 @@
       ]
     },
     {
+      "atlasKey": "npc_guard_02_gradient_512x512atlas",
+      "baseKey": "npc_guard_02_gradient_512x512atlas",
+      "version": "",
+      "variants": [
+        {
+          "id": 81,
+          "family_id": 58,
+          "width": 512,
+          "height": 512,
+          "filename": "npc_guard_02_gradient_512x512atlas_512x512_atlas.png",
+          "original_filename": "gradient_512x512atlas.png",
+          "source_path": "assets/source/texture-atlases/npc_guard_02_gradient_512x512atlas/512x512/npc_guard_02_gradient_512x512atlas_512x512_atlas.png",
+          "source_sha256": "5c9930aba1b78f18551c2df4d9c250d0a7d72eafa6ca72d0d856aec62124ed04",
+          "uses_alpha": true,
+          "published_id": "121111101046810",
+          "published_sha256": "5c9930aba1b78f18551c2df4d9c250d0a7d72eafa6ca72d0d856aec62124ed04",
+          "moderation_state": "INDEXED_LEGACY",
+          "published_at": 1795024686.8596692,
+          "created_at": 1795024686.8596692,
+          "retired_at": null,
+          "atlas_key": "npc_guard_02_gradient_512x512atlas",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "512x512",
+          "baseKey": "npc_guard_02_gradient_512x512atlas",
+          "version": ""
+        }
+      ]
+    },
+    {
       "atlasKey": "restoration_01",
       "baseKey": "restoration",
       "version": "01",

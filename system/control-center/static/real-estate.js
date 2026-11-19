@@ -1,5 +1,5 @@
 /* Real Estate registry view. Global request(), toast(), esc(), $ provided by Character Assets. */
-const realEstateState = {data:null, selected:null, inspect:null, textures:{}, textureRefs:{}, reuseEnabled:{}, reuseFilters:{}, meshOptions:{}, acceptWarnings:false, atlasBusy:false};
+const realEstateState = {data:null, selected:null, inspect:null, textures:{}, textureRefs:{}, reuseEnabled:{}, reuseFilters:{}, meshOptions:{}, appearance:{}, acceptWarnings:false, atlasBusy:false, registrationTarget:null};
 const REAL_ESTATE_SELECTED = 'game1.realEstate.selected';
 let realEstatePublicationPoll = null;
 function realEstatePublicationBusy(slug){
@@ -42,6 +42,7 @@ function realEstatePhysicsControls(part,flags){
 function realEstateRemember(){try{localStorage.setItem(REAL_ESTATE_SELECTED,realEstateState.selected||'');}catch{}}
 function realEstateForm(row){
   realEstateState.selected=row?.slug||null;
+  realEstateState.registrationTarget=null;
   realEstateRemember();
   realEstateState.inspect=null;
   realEstateState.acceptWarnings=Boolean(row);
@@ -52,6 +53,12 @@ function realEstateForm(row){
     noCollide:row?.meshOptions?.[part]?.noCollide ?? realEstateMeshDefaults(part).noCollide,
     collisionFidelity:row?.meshOptions?.[part]?.collisionFidelity ?? realEstateMeshDefaults(part).collisionFidelity,
     doubleSided:row?.meshOptions?.[part]?.doubleSided ?? realEstateMeshDefaults(part).doubleSided
+  }]));
+  realEstateState.appearance=Object.fromEntries(meshNames.map(part=>[part,{
+    appearanceMode:row?.meshOptions?.[part]?.appearanceMode||'material',
+    visualMaterial:row?.meshOptions?.[part]?.visualMaterial||'SmoothPlastic',
+    visualColor:row?.meshOptions?.[part]?.visualColor||'#FFFFFF',
+    alphaEnabled:row?.meshOptions?.[part]?.alphaEnabled===true
   }]));
   for(const part of meshNames){
     realEstateState.meshOptions[part]=realEstateNormalizePhysics(part,realEstateState.meshOptions[part]);
@@ -243,12 +250,13 @@ function realEstateRenderTextures(){
   const parts=realEstateParts();
   for(const part of parts){
     realEstateState.meshOptions[part]=realEstateNormalizePhysics(part,realEstateState.meshOptions[part]);
+    realEstateState.appearance[part] ||= {appearanceMode:'material',visualMaterial:'SmoothPlastic',visualColor:'#FFFFFF',alphaEnabled:false};
   }
   const options=realEstateOptions();
   host.innerHTML='<small class="real-estate-physics-caution">Static house collision will use a separately authored Roblox Parts blueprint. Visual meshes default to No Collide.</small>'+parts.map(part=>{
     let selected=realEstateState.textures[part]||'';
     const reuse=realEstateState.reuseEnabled[part]===true;
-    if(!selected && !reuse){
+    if(realEstateState.appearance[part].appearanceMode==='atlas' && !selected && !reuse){
       const guess=options.find(item=>item.name.toLowerCase().startsWith(part+'.')||item.name.toLowerCase().startsWith(part+'_'));
       if(guess)selected=guess.path;
     }
@@ -261,20 +269,27 @@ function realEstateRenderTextures(){
     const filters=realEstateState.reuseFilters[part]||{query:''};
     realEstateState.reuseFilters[part]=filters;
     const flags=realEstateState.meshOptions[part];
+    const appearance=realEstateState.appearance[part];
+    const atlas=appearance.appearanceMode==='atlas';
+    const materials=['SmoothPlastic','Plastic','Wood','WoodPlanks','Slate','Concrete','Brick','Cobblestone','Metal','CorrodedMetal','DiamondPlate','Foil','Grass','LeafyGrass','Fabric','Marble','Granite','Sand','Sandstone','Limestone','Basalt','CrackedLava','Ground','Mud','Asphalt','Pavement','Rock','Glacier','Ice','Snow','Neon','Glass'];
     return `<div class="real-estate-texture-row" data-texture-part="${esc(part)}">
       <div class="real-estate-texture-heading"><strong class="real-estate-mesh-name">${esc(realEstateMeshLabel(part))}</strong><span class="real-estate-mesh-kind">Visual mesh</span></div>
-      <div class="real-estate-mesh-switches" role="group" aria-label="${esc(part)} mesh settings">
+      <div class="real-estate-mesh-switches" role="group" aria-label="${esc(part)} mesh appearance">
+        <label>Appearance <select id="real-estate-appearance-${esc(part)}"><option value="material" ${!atlas?'selected':''}>Material + Color</option><option value="atlas" ${atlas?'selected':''}>Texture Atlas</option></select></label>
+        <span id="real-estate-material-controls-${esc(part)}" ${atlas?'hidden':''}><select id="real-estate-material-${esc(part)}" aria-label="${esc(part)} Roblox material">${materials.map(name=>`<option value="${name}" ${appearance.visualMaterial===name?'selected':''}>${name}</option>`).join('')}</select>
+        <input type="color" id="real-estate-color-${esc(part)}" aria-label="${esc(part)} color" value="${esc(appearance.visualColor)}"></span>
+        <label id="real-estate-alpha-controls-${esc(part)}" ${!atlas?'hidden':''}><input type="checkbox" id="real-estate-alpha-${esc(part)}" ${appearance.alphaEnabled?'checked':''}> Alpha transparency</label>
         <label class="real-estate-glass-toggle" title="Studio MeshPart Transparency = 0.02 (if checked)"><input type="checkbox" id="real-estate-glass-${esc(part)}" ${flags.glass?'checked':''}> Glass · 0.02</label>
         <label class="real-estate-physics-toggle" title="Disable physics collisions, touch events, and spatial queries for this mesh"><input type="checkbox" id="real-estate-nocollide-${esc(part)}" ${flags.noCollide?'checked':''}> No Collide</label>
         <label class="real-estate-reuse-toggle" title="Bind this mesh to an existing published Atlas Registry variant. Reuse never uploads another Roblox Image Asset."><input type="checkbox" id="real-estate-reuse-${esc(part)}" ${reuse?'checked':''}> Reuse atlas</label>
       </div>
       ${realEstatePhysicsControls(part,flags)}
-      <div id="real-estate-owned-${esc(part)}" class="real-estate-texture-owned" ${reuse?'hidden':''}>
+      <div id="real-estate-owned-${esc(part)}" class="real-estate-texture-owned" ${!atlas||reuse?'hidden':''}>
         <select aria-label="${esc(part)} texture" id="real-estate-texture-${esc(part)}">${choices.join('')}</select>
         <button type="button" id="real-estate-browse-${esc(part)}">browse…</button>
         <small class="muted real-estate-texture-path" id="real-estate-texture-path-${esc(part)}" title="${esc(selected)}">${esc(selected||'no texture selected')}</small>
       </div>
-      <div id="real-estate-shared-${esc(part)}" class="real-estate-texture-shared" ${reuse?'':'hidden'}>
+      <div id="real-estate-shared-${esc(part)}" class="real-estate-texture-shared" ${atlas&&reuse?'':'hidden'}>
         <div class="real-estate-reuse-filters">
           <input type="search" id="real-estate-reuse-search-${esc(part)}" aria-label="Search ${esc(part)} reuse" placeholder="search atlas name, variant, resolution or ID…" value="${esc(filters.query)}">
         </div>
@@ -283,6 +298,20 @@ function realEstateRenderTextures(){
       </div></div>`;
   }).join('');
   for(const part of parts){
+    $(`real-estate-appearance-${part}`).onchange=event=>{
+      realEstateState.appearance[part].appearanceMode=event.target.value;
+      if(event.target.value==='material')realEstateState.appearance[part].alphaEnabled=false;
+      realEstateRenderTextures();
+    };
+    $(`real-estate-material-${part}`).onchange=event=>{
+      realEstateState.appearance[part].visualMaterial=event.target.value;
+    };
+    $(`real-estate-color-${part}`).oninput=event=>{
+      realEstateState.appearance[part].visualColor=event.target.value;
+    };
+    $(`real-estate-alpha-${part}`).onchange=event=>{
+      realEstateState.appearance[part].alphaEnabled=event.target.checked;
+    };
     $(`real-estate-nocollide-${part}`).onchange=event=>{
       const flags=realEstateState.meshOptions[part];
       flags.noCollide=event.target.checked;
@@ -349,6 +378,19 @@ function realEstateIdentity(){
   $('real-estate-slug').textContent=slug||'invalid identity';
   if(!realEstateState.selected)$('real-estate-description').value=`Game1 Real Estate ${slug}`;
 }
+function realEstateRegisterPlotType(slug){
+  // A deleted model is not a deleted house TYPE: preserve its plot pivots.
+  const match=/^([a-z][a-z0-9_]*)_level([1-9][0-9]*)_([0-9]{2,})$/.exec(slug);
+  if(!match)return;
+  realEstateForm(null); // Never turn the deleted registration into an edit.
+  realEstateState.registrationTarget=slug;
+  $('real-estate-type').value=match[1];
+  $('real-estate-level').value=match[2];
+  $('real-estate-variant').value=match[3];
+  realEstateIdentity();
+  $('real-estate-fbx').textContent=`Choose a NEW FBX for ${slug} · saved Plot pivots remain`;
+  $('real-estate-choose').focus();
+}
 async function realEstateChooseFbx(){
   try {
     const result=await request('/api/files/choose-real-estate-model',{method:'POST'});
@@ -366,7 +408,7 @@ async function realEstateChooseFbx(){
     realEstateState.inspect=inspection;
     realEstateState.acceptWarnings=Boolean(warnings.length);
     $('real-estate-fbx').textContent=inspection.sourcePath;
-    if(!realEstateState.selected){
+    if(!realEstateState.selected && !realEstateState.registrationTarget){
       $('real-estate-type').value=inspection.houseType;
       $('real-estate-level').value=inspection.level;
       $('real-estate-variant').value=inspection.variant;
@@ -374,26 +416,21 @@ async function realEstateChooseFbx(){
     realEstateRenderRigs(inspection.analysis, warnings);
     // Existing mesh textures remain selected while FBX is replaced independently.
     if(!realEstateState.selected){
-      realEstateState.textures={};realEstateState.textureRefs={};realEstateState.reuseEnabled={};realEstateState.meshOptions={};
-      // Every auxiliary mesh can reuse the selected local house atlas before
-      // this Estate has any Image Asset ID. Respect explicitly named textures.
-      for(const mesh of inspection.analysis?.meshes||[]){
-        const part=mesh.name;
-        if(part==='house')continue;
-        const hasOwnTexture=(inspection.textures||[]).some(t=>t.name.toLowerCase().startsWith(part.toLowerCase()+'.')||t.name.toLowerCase().startsWith(part.toLowerCase()+'_'));
-        if(!hasOwnTexture){realEstateState.textureRefs[part]='same:house';realEstateState.reuseEnabled[part]=true;}
-      }
+      realEstateState.textures={};realEstateState.textureRefs={};realEstateState.reuseEnabled={};realEstateState.meshOptions={};realEstateState.appearance={};
+      // New visual meshes default to native Roblox Material + Color. Atlas is
+      // an explicitly selected mode, not a registration requirement.
     }
     realEstateRenderTextures();
     realEstateIdentity();
-    toast('FBX analyzed · visual meshes need textures');
+    toast('FBX analyzed · Material + Color by default');
     return true;
   } catch(error) {toast(error.message,true);return false;}
 }
 function realEstatePayload(){
   const parts=realEstateParts();
   for(const part of parts){
-    if(realEstateState.reuseEnabled[part] && !realEstateState.textureRefs[part]){
+    if(realEstateState.appearance[part]?.appearanceMode==='atlas'
+      && realEstateState.reuseEnabled[part] && !realEstateState.textureRefs[part]){
       throw Error(`choose a reusable texture source for ${part}`);
     }
   }
@@ -410,7 +447,8 @@ function realEstatePayload(){
         glass:Boolean(flags.glass),
         noCollide:flags.noCollide===true,
         collisionFidelity:flags.collisionFidelity,
-        doubleSided:flags.doubleSided
+        doubleSided:flags.doubleSided,
+        ...realEstateState.appearance[part]
       }];
     })),
     acceptWarnings:realEstateState.acceptWarnings};
@@ -441,9 +479,12 @@ async function realEstateSync(slug, part=null, {throwOnError=false}={}){
   try{
     toast(`Syncing ${slug}${part?' / '+part:''} · template and managed placed houses…`,false,true);
     const result=await window.game1StudioSync.run('real-estate',slug,{part});
-    const stats=result.studio?.realEstateStats||{};
-    if(stats.placedSyncVersion!==2){
-      throw new Error('Game1Bridge Studio plugin is outdated: placed-sync v2 is required. Install the current Studio plugin and restart Studio before syncing again.');
+    // The server already validates the Studio protocol before reporting success.
+    // Do not duplicate its version gate here: v2/v3 drift caused a false error
+    // after a successful M379 Sync.
+    const stats=result.studio?.realEstateStats;
+    if(!stats || typeof stats!=='object'){
+      throw new Error('Studio Sync response is missing Real Estate statistics. Check Studio Bridge logs.');
     }
     const warnings=stats.rigWarnings||[];
     const missing=stats.missingSockets||[];
@@ -579,8 +620,13 @@ function realEstateRender(){
   const rows=realEstateRows();
   $('real-estate-count').textContent=rows.length;
   $('real-estate-library-count').textContent=rows.length;
-  $('real-estate-tree').innerHTML=rows.map(item=>`<button type="button" data-real-estate="${esc(item.slug)}" class="${item.slug===realEstateState.selected?'active':''}">${esc(item.slug)} · ${esc(item.status)}</button>`).join('')||'<span class="muted">No houses registered.</span>';
+  const orphaned=(realEstateState.data?.unregisteredPlotTypes||[]).filter(item=>
+    item && typeof item.slug==='string' && Number.isInteger(item.plotCount));
+  const registeredButtons=rows.map(item=>`<button type="button" data-real-estate="${esc(item.slug)}" class="${item.slug===realEstateState.selected?'active':''}">${esc(item.slug)} · ${esc(item.status)}</button>`).join('');
+  const restoreButtons=orphaned.map(item=>`<button type="button" data-re-register="${esc(item.slug)}" title="Register a new model while retaining ${item.plotCount} Plot pivots">${esc(item.slug)} · ${item.plotCount} plots · Register again</button>`).join('');
+  $('real-estate-tree').innerHTML=registeredButtons+restoreButtons || '<span class="muted">No houses registered.</span>';
   for(const node of $('real-estate-tree').querySelectorAll('[data-real-estate]'))node.onclick=()=>realEstateForm(rows.find(row=>row.slug===node.dataset.realEstate));
+  for(const node of $('real-estate-tree').querySelectorAll('[data-re-register]'))node.onclick=()=>realEstateRegisterPlotType(node.dataset.reRegister);
   const tbody=$('real-estate-library-rows');
   tbody.innerHTML=rows.map(item=>{
     const textures=item.textures||{};
@@ -592,15 +638,17 @@ function realEstateRender(){
     const asset=(id,ready)=>id?`${esc(id)}${ready?'':' · changed'}`:'not published';
     const textureLines=parts.map(part=>{
       const tex=textures[part]||{};
-      const filename=tex.filename||tex.path?.split('/').pop()||tex.reuseReference||'—';
-      return `<div class="real-estate-texture-line"><strong>${esc(realEstateMeshLabel(part))}</strong>: <span class="real-estate-texture-filename">${esc(filename)}</span>${tex.atlasLegacyWarning?'<span class="deco-atlas-warning" title="Expected &lt;atlas_key&gt;_&lt;width&gt;x&lt;height&gt;_atlas.png"> ⚠️</span>':''}${realEstateAtlasDots(tex,part)}${realEstateAtlasVersionSelector(tex,part)}<button type="button" class="real-estate-texture-manage" data-re-texture="${esc(part)}">Manage atlas</button>${tex.atlasSyncStatus==='pending_studio_sync'?'<button type="button" data-re-atlas-retry="'+esc(part)+'" class="deco-atlas-retry">Sync pending · retry</button>':''}</div>`;
+      const isMaterial=item.meshOptions?.[part]?.appearanceMode==='material';
+      const filename=isMaterial?`${item.meshOptions[part].visualMaterial} ${item.meshOptions[part].visualColor}`:(tex.filename||tex.path?.split('/').pop()||tex.reuseReference||'—');
+      return `<div class="real-estate-texture-line"><strong>${esc(realEstateMeshLabel(part))}</strong>: <span class="real-estate-texture-filename">${esc(filename)}</span>${!isMaterial&&tex.atlasLegacyWarning?'<span class="deco-atlas-warning" title="Expected &lt;atlas_key&gt;_&lt;width&gt;x&lt;height&gt;_atlas.png"> ⚠️</span>':''}${isMaterial?'':realEstateAtlasDots(tex,part)+realEstateAtlasVersionSelector(tex,part)}<button type="button" class="real-estate-texture-manage" data-re-texture="${esc(part)}">Manage atlas</button>${tex.atlasSyncStatus==='pending_studio_sync'?'<button type="button" data-re-atlas-retry="'+esc(part)+'" class="deco-atlas-retry">Sync pending · retry</button>':''}</div>`;
     }).join('');
-    const assetLines=parts.map(part=>`<div class="real-estate-asset-part">
+    const carrierLine=`<div class="real-estate-carrier-line"><div class="real-estate-mesh-card-header"><strong>Rig carrier · sockets</strong></div><div class="real-estate-asset-identities"><span class="real-estate-asset-id real-estate-asset-model"><span>model</span><code>${asset(rigs.rig_carrier?.assetId,Boolean(rigs.rig_carrier?.assetId&&item.publicationCurrent?.model))}</code></span></div><small class="real-estate-mesh-source-label">Independent technical Model Asset</small></div>`;
+    const assetLines=carrierLine+parts.map(part=>`<div class="real-estate-asset-part">
       <div class="real-estate-mesh-card-header"><strong class="real-estate-asset-part-name">${esc(realEstateMeshLabel(part))}</strong>
         <button type="button" class="real-estate-manage" data-re-manage="${esc(part)}">Manage mesh</button></div>
       <div class="real-estate-asset-identities">
-        <span class="real-estate-asset-id real-estate-asset-model"><span>model</span><code>${asset(rigs[part]?.assetId,rigs[part]?.publishedSha256===item.rigSourceHashes?.[part])}</code></span>
-        <span class="real-estate-asset-id real-estate-asset-image"><span>image</span><code>${asset(textures[part]?.assetId,live[part])}</code></span>
+        <span class="real-estate-asset-id real-estate-asset-model"><span>model</span><code>${asset(rigs[part]?.assetId,rigs[part]?.publishedSha256===item.rigPublicationHashes?.[part])}</code></span>
+        <span class="real-estate-asset-id real-estate-asset-image"><span>image</span><code>${item.meshOptions?.[part]?.appearanceMode==='material'?'not required':asset(textures[part]?.assetId,live[part])}</code></span>
       </div>
       <small class="real-estate-mesh-source-label">${item.meshSources?.[part]?'Independent FBX revision':'Original house FBX'}</small>
       </div>`).join('');

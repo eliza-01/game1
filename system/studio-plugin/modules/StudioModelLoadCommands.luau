@@ -242,7 +242,17 @@ return function(services)
         ensureWeaponGrip(model)
     end
 
-    local function applyWeaponTextures(model: Model, textures: { any }): any
+    -- Optional per-MeshPart authoring override: different meshes may reuse the
+    -- same Image ID with independent Alpha transparency flags.
+    local function explicitMeshAlpha(mesh: MeshPart, texture: any, meshAppearance: any): boolean
+        local settings=if typeof(meshAppearance)=="table" then meshAppearance[mesh.Name] else nil
+        if typeof(settings)=="table" and type(settings.alphaEnabled)=="boolean" then
+            return settings.alphaEnabled
+        end
+        return texture.alphaEnabled==true
+    end
+
+    local function applyWeaponTextures(model: Model, textures: { any }, meshAppearance: any): any
         local meshParts = {}
         for _, descendant in model:GetDescendants() do
             if descendant:IsA("MeshPart") then
@@ -260,7 +270,7 @@ return function(services)
                 table.insert(validTextures, {
                     slot = string.lower(tostring(row.slot or "")),
                     assetId = tostring(math.floor(assetId)),
-                    usesAlpha = row.usesAlpha,
+                    alphaEnabled = row.alphaEnabled == true,
                 })
             end
         end
@@ -270,7 +280,7 @@ return function(services)
         if #validTextures == 1 then
             local uri = "rbxassetid://" .. validTextures[1].assetId
             for _, mesh in ipairs(meshParts) do
-                StudioTextureAppearance.Apply(mesh, uri, validTextures[1].usesAlpha)
+                StudioTextureAppearance.Apply(mesh, uri, explicitMeshAlpha(mesh,validTextures[1],meshAppearance))
                 applied += 1
             end
         elseif #validTextures > 1 then
@@ -279,13 +289,13 @@ return function(services)
                 for _, mesh in ipairs(meshParts) do
                     local meshName = string.lower(mesh.Name)
                     if texture.slot ~= "" and string.find(meshName, texture.slot, 1, true) then
-                        StudioTextureAppearance.Apply(mesh, "rbxassetid://" .. texture.assetId, texture.usesAlpha)
+                        StudioTextureAppearance.Apply(mesh, "rbxassetid://" .. texture.assetId, explicitMeshAlpha(mesh,texture,meshAppearance))
                         matched = true
                         applied += 1
                     end
                 end
                 if not matched and #validTextures == #meshParts and meshParts[index] then
-                    StudioTextureAppearance.Apply(meshParts[index], "rbxassetid://" .. texture.assetId, texture.usesAlpha)
+                    StudioTextureAppearance.Apply(meshParts[index], "rbxassetid://" .. texture.assetId, explicitMeshAlpha(meshParts[index],texture,meshAppearance))
                     matched = true
                     applied += 1
                 end
@@ -375,7 +385,7 @@ return function(services)
 
         local _, templateInfo = CharacterTemplate.EnsureCanonicalRoot(wrapper :: Model, importedRig)
         stats = modelRigStats(importedRig)
-        local textureStats = applyWeaponTextures(importedRig, metadata.textures or {})
+        local textureStats = applyWeaponTextures(importedRig, metadata.textures or {}, metadata.meshAppearance)
 
         wrapper:SetAttribute(managedAttribute, true)
         wrapper:SetAttribute("Game1PlacementMode", "monster-rig")
@@ -403,7 +413,7 @@ return function(services)
         imported:SetAttribute("WeaponRarity", tostring(metadata.rarity or ""))
         imported.Parent = destination
 
-        local textureStats = applyWeaponTextures(imported, metadata.textures or {})
+        local textureStats = applyWeaponTextures(imported, metadata.textures or {}, metadata.meshAppearance)
         return imported, textureStats
     end
 

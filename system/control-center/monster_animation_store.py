@@ -18,6 +18,7 @@ from npc_animation_taxonomy import (
 from monster_animation_core.schema import MonsterAnimationSchemaMixin
 from monster_animation_core.bindings import MonsterAnimationBindingsMixin
 from monster_animation_core.publication import MonsterAnimationPublicationMixin
+from monster_animation_core.reuse import NpcAnimationReuseMixin
 
 SCHEMA_VERSION = 1
 PROJECT = "game1"
@@ -115,7 +116,7 @@ def filename_rules(slug: str, npc: bool = False) -> list[dict]:
     return rows
 
 
-class MonsterAnimationStore(MonsterAnimationSchemaMixin, MonsterAnimationBindingsMixin, MonsterAnimationPublicationMixin):
+class MonsterAnimationStore(MonsterAnimationSchemaMixin, MonsterAnimationBindingsMixin, MonsterAnimationPublicationMixin, NpcAnimationReuseMixin):
     def __init__(self, root: Path, kind: str = "monster"):
         if kind not in {"monster", "npc"}:
             raise ValueError("unsupported actor kind")
@@ -178,6 +179,10 @@ class MonsterAnimationStore(MonsterAnimationSchemaMixin, MonsterAnimationBinding
         return {"monsterSlug": slug, "clips": clips, "bindings": bindings}
 
     def delete_profile(self, slug: str):
+        dependents = self.connected_dependents(slug)
+        if dependents:
+            names = ", ".join(sorted({row['monster_slug'] for row in dependents}))
+            raise ValueError(f"NPC animations are connected by {names}; disconnect them before deleting this NPC")
         with self.connect() as connection:
             ids = [row[0] for row in connection.execute("SELECT id FROM monster_animation_clips WHERE monster_slug=?", (slug,))]
             for clip_id in ids:
@@ -215,8 +220,15 @@ class MonsterAnimationStore(MonsterAnimationSchemaMixin, MonsterAnimationBinding
                 WHERE monster_slug=? AND weapon_set=? AND slot=? AND variant=?""",
                 (slug,weapon_set,slot,variant)).fetchone()
             if existing:
-                clip_id = str(existing["clip_id"])
                 binding_id = str(existing["id"])
+                owner = connection.execute(
+                    "SELECT monster_slug FROM monster_animation_clips WHERE id=?",
+                    (existing["clip_id"],),
+                ).fetchone()
+                # Re-scanning a linked destination creates its own local clip;
+                # it must never overwrite the source NPC's shared clip bytes.
+                if owner and str(owner["monster_slug"]) == slug:
+                    clip_id = str(existing["clip_id"])
         relative = Path(f"{self.kind}s") / slug / "animations" / f"{stem}{source.suffix.lower()}"
         source_target = self.root / "assets/source" / relative
         prepared_target = source_target
@@ -359,7 +371,7 @@ class MonsterAnimationStore(MonsterAnimationSchemaMixin, MonsterAnimationBinding
             extra = "b.weapon_set,b.disarm,b.compatible_sets," if self.kind == "npc" else ""
             rows = connection.execute(
                 f"""SELECT b.id AS binding_id,b.monster_slug,b.slot,b.variant,b.clip_id,b.weight,b.looped,b.priority,
-                          {extra}c.name,c.source_path,c.prepared_path,c.sha256,c.source_sha256,c.asset_id,c.published_sha256,c.moderation_state,c.revision,c.published_at
+                          {extra}c.monster_slug AS clip_owner,c.name,c.source_path,c.prepared_path,c.sha256,c.source_sha256,c.asset_id,c.published_sha256,c.moderation_state,c.revision,c.published_at
                    FROM monster_animation_bindings b JOIN monster_animation_clips c ON c.id=b.clip_id
                    WHERE b.monster_slug=? ORDER BY b.slot,b.variant""",
                 (slug,),
@@ -372,6 +384,8 @@ class MonsterAnimationStore(MonsterAnimationSchemaMixin, MonsterAnimationBinding
             value["role"] = str(definition.get("role") or "base")
             if self.kind == "npc":
                 value["weaponSet"] = value["weapon_set"]
+                value["sourceNpc"] = str(value["clip_owner"])
+                value["linked"] = value["sourceNpc"] != str(value["monster_slug"])
                 value["disarm"] = bool(value["disarm"])
                 value["compatibleWith"] = self._compatible_for_binding(value)
                 value["canonicalFilename"] = npc_filename(slug, value["weapon_set"], value["slot"], value["variant"], Path(value["source_path"]).suffix)
@@ -382,7 +396,7 @@ class MonsterAnimationStore(MonsterAnimationSchemaMixin, MonsterAnimationBinding
 
     def snapshot(self, slug: str | None = None) -> dict:
         with self.connect() as connection:
-            monsters = [dict(row) for row in connection.execute("SELECT slug,name_en,skeleton_signature FROM monsters ORDER BY name_en,slug")]
+            monsters = [dict(row) for row in connection.execute("SELECT slug,name_en,skeleton_signature,skeleton_structure_signature FROM monsters ORDER BY name_en,slug")]
         selected = str(slug or "").strip().lower()
         if not selected and monsters:
             selected = str(monsters[0]["slug"])
@@ -428,6 +442,7 @@ class MonsterAnimationStore(MonsterAnimationSchemaMixin, MonsterAnimationBinding
             profile = profiles_map.setdefault(str(binding["monster_slug"]), {"skeletonSignature": "", "slots": {}})
             profile["slots"].setdefault(state, []).append({
                 "clipId": str(clip["id"]), "assetId": str(clip["asset_id"]), "animationId": "rbxassetid://" + str(clip["asset_id"]),
+                "sourceNpc": str(clip["monster_slug"]) if self.kind == "npc" else "",
                 "sourceSlot": internal_slot, "role": role, "variant": int(binding["variant"]), "weight": int(binding["weight"]),
                 "looped": bool(binding["looped"]), "priority": str(binding["priority"]),
                 "weaponSet": str(binding.get("weapon_set") or "1hs") if self.kind == "npc" else "",
@@ -448,6 +463,7 @@ class MonsterAnimationStore(MonsterAnimationSchemaMixin, MonsterAnimationBinding
                     lines += [
                         "\t\t\t\t\ttable.freeze({",
                         f"\t\t\t\t\t\tclipId = {q(row['clipId'])},",
+                        *([f"\t\t\t\t\t\tsourceNpc = {q(row['sourceNpc'])},"] if self.kind == "npc" else []),
                         f"\t\t\t\t\t\tassetId = {q(row['assetId'])},",
                         f"\t\t\t\t\t\tanimationId = {q(row['animationId'])},",
                         f"\t\t\t\t\t\tsourceSlot = {q(row['sourceSlot'])},",

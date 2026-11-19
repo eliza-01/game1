@@ -7,13 +7,20 @@ local DOOR_HINGE = "door_01_hinge_socket"
 local DOOR_CHILD_SOCKETS = {
     door_01_handle_inside_socket = true,
     door_01_handle_outside_socket = true,
-    door_01_padlock_01_socket = true,
+    door_01_padlock_01_inside_socket = true,
+    door_01_padlock_01_outside_socket = true,
 }
 
-function Validation.FindMesh(root: Model, expected: string): MeshPart
+function Validation.FindMesh(root: Model, expected: string, withCarrier: boolean?): (MeshPart, MeshPart?)
     local match: MeshPart? = nil
+    local carrier: MeshPart? = nil
     for _, instance in root:GetDescendants() do
         if instance:IsA("MeshPart") then
+            if instance.Name == "rig_carrier" and withCarrier then
+                if carrier then error("Real Estate has duplicate rig_carrier") end
+                carrier = instance
+                continue
+            end
             if instance.Name:lower() ~= expected:lower() then
                 error("Real Estate " .. expected .. " rig contains unexpected mesh " .. instance.Name)
             end
@@ -26,15 +33,19 @@ function Validation.FindMesh(root: Model, expected: string): MeshPart
     if not match then
         error("Published Real Estate rig is missing mesh " .. expected)
     end
-    return match :: MeshPart
+    if withCarrier and not carrier then
+        error("Real Estate " .. expected .. ": published asset is missing authored rig_carrier; republish")
+    end
+    return match :: MeshPart, carrier
 end
 
-function Validation.Verify(root: Model, part: string, expected: any): (MeshPart, any)
+function Validation.Verify(root: Model, part: string, expected: any,
+    withCarrier: boolean?): (MeshPart, any, MeshPart?)
     if typeof(expected) ~= "table" then
         error("Missing registered mesh manifest for " .. part)
     end
 
-    local mesh = Validation.FindMesh(root, part)
+    local mesh, carrier = Validation.FindMesh(root, part, withCarrier)
     local authored: {[string]: boolean} = {}
     local socketCount = 0
     for _, name in expected do
@@ -42,7 +53,7 @@ function Validation.Verify(root: Model, part: string, expected: any): (MeshPart,
             error(part .. ": invalid registered bone manifest")
         end
         authored[name] = true
-        if name:sub(-7) == "_socket" then
+        if name:sub(-7) == "_socket" or name:match("^houseplant_%d+$") then
             socketCount += 1
         end
     end
@@ -56,8 +67,9 @@ function Validation.Verify(root: Model, part: string, expected: any): (MeshPart,
             table.insert(boneNames, instance.Name)
         end
         if instance:IsA("Bone") and authored[instance.Name] then
-            if not instance:IsDescendantOf(mesh) then
-                error(part .. ": bone outside expected mesh " .. instance.Name)
+            local owner = if withCarrier then carrier else mesh
+            if not owner or not instance:IsDescendantOf(owner) then
+                error(part .. ": bone outside canonical owner " .. instance.Name)
             end
             if imported[instance.Name] then
                 error(part .. ": duplicate imported marker " .. instance.Name)
@@ -86,18 +98,22 @@ function Validation.Verify(root: Model, part: string, expected: any): (MeshPart,
         error(part .. ": published Model Asset lost authored Bones: " .. table.concat(missing, ", ")
             .. "; republish the model before Studio Sync")
     end
+    if boneCount ~= #expected then
+        error(part .. ": publication contains unexpected Bones; republish current authored rig")
+    end
     local warnings = {}
     -- Hinge is structural: without the imported Bone, PivotTo would use a
     -- fabricated origin. Never replace a working template in that situation.
-    if part == "door" and authored[DOOR_HINGE] then
+    if authored[DOOR_HINGE] then
         local hinge = imported[DOOR_HINGE]
         if not hinge or not hinge:IsA("Bone") then
             error("door: required hinge Bone " .. DOOR_HINGE
                 .. " is absent in the published Roblox Model Asset (imported Bones: "
                 .. table.concat(boneNames, ", ") .. ")")
         end
-        if not hinge:IsDescendantOf(mesh) then
-            error("door hinge must be a descendant of the door MeshPart")
+        local boneOwner = if withCarrier then carrier else mesh
+        if not boneOwner or not hinge:IsDescendantOf(boneOwner) then
+            error("door hinge must belong to the published bone owner")
         end
         if hinge.Parent and hinge.Parent:IsA("Bone") then
             error("door hinge must be a root bone")
@@ -112,12 +128,26 @@ function Validation.Verify(root: Model, part: string, expected: any): (MeshPart,
         table.insert(warnings, "door: no authored hinge pivot; DoorAssembly not created")
     end
 
+    if carrier then
+        -- A technical rig carrier may never render, collide or own a texture.
+        carrier.Transparency = 1
+        carrier.CastShadow = false
+        carrier.CanCollide = false
+        carrier.CanTouch = false
+        carrier.CanQuery = false
+        carrier.Massless = true
+        carrier.TextureID = ""
+        for _, surface in carrier:GetChildren() do
+            if surface:IsA("SurfaceAppearance") then surface:Destroy() end
+        end
+        carrier:SetAttribute("Game1HouseRigCarrier", true)
+    end
     return mesh, {
         boneCount = boneCount,
         socketCount = socketCount,
         missingSockets = missing,
         warnings = warnings,
-    }
+    }, carrier
 end
 
 return table.freeze(Validation)

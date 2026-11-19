@@ -2,13 +2,13 @@
 from __future__ import annotations
 import json
 from pathlib import Path
-import sqlite3
 import sys
 from tempfile import TemporaryDirectory
 from unittest import TestCase, mock
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'system/control-center'))
+from sqlite_connection import connect
 from real_estate.placement import RealEstatePlacementStore
 from services.studio_house_placement_bridge import bulk_house_placements, preview_house_placement
 
@@ -23,12 +23,12 @@ class LegacyPlacementM230(TestCase):
             root = Path(temp)
             db = root/'.control-center/game1_real_estate.db'
             db.parent.mkdir(parents=True)
-            with sqlite3.connect(db) as sql:
+            with connect(db) as sql:
                 sql.execute('CREATE TABLE real_estate (slug TEXT PRIMARY KEY)')
                 sql.execute("INSERT INTO real_estate VALUES ('house_level3_01')")
             store = RealEstatePlacementStore(root, mock.Mock(get=lambda slug: {'slug': slug}))
             # Insert with the normal persisted schema; these are legitimate M208 bindings.
-            with sqlite3.connect(db) as sql:
+            with connect(db) as sql:
                 for plot in range(1, 40):
                     sql.execute("""INSERT INTO real_estate_placements (
                         plot_index, house_slug, plot_volume, world_cframe_json,
@@ -54,25 +54,22 @@ class LegacyPlacementM230(TestCase):
                      for row in store.snapshot()['items']]
             self.assertEqual(before, after)
 
-    def test_ui_enables_legacy_rows_and_bulk_without_fabricating_new_anchor(self):
-        source = (ROOT/'system/control-center/static/real-estate-placement.js').read_text()
-        self.assertIn('const legacyPivot=item.houseAnchorLocalCFrame==null', source)
-        self.assertIn('const canPlace=legacyPivot||rotationReady', source)
-        self.assertIn('item.houseAnchorLocalCFrame!=null&&', source)
-        self.assertIn('Legacy Model pivot', source)
-        self.assertNotIn('Re-Bind for rotation', source)
+    def test_ui_uses_plot_local_pivot_and_independent_house_type(self):
+        source = (ROOT/'system/control-center/static/real-estate-placement.js').read_text(encoding='utf-8')
+        self.assertIn("const validType=/^house_level", source)
+        self.assertIn("const canPlace=Array.isArray(item.localCFrame)", source)
+        self.assertIn("re-placement-house-options", source)
+        self.assertNotIn("Legacy Model pivot", source)
 
-    def test_plugin_uses_shared_house_alignment_for_both_modes(self):
-        studio = (ROOT/'system/studio-plugin/modules/StudioHousePlacementPreview.luau').read_text()
-        router = (ROOT/'system/studio-plugin/Game1Bridge.server.luau').read_text()
-        bridge = (ROOT/'system/control-center/services/studio_house_placement_bridge.py').read_text()
-        self.assertIn('HouseFrame.Align(clone, house, desiredHouse', studio)
-        self.assertIn('clone:GetPivot():ToObjectSpace(house:GetPivot())', studio)
-        self.assertIn('if legacyPivot then "legacy-model-pivot" else "house-anchor-v2"', studio)
+    def test_studio_places_republished_model_by_plot_pivot(self):
+        studio = (ROOT/'system/studio-plugin/modules/StudioHousePlacementPreview.luau').read_text(encoding='utf-8')
+        router = (ROOT/'system/studio-plugin/Game1Bridge.server.luau').read_text(encoding='utf-8')
+        bridge = (ROOT/'system/control-center/services/studio_house_placement_bridge.py').read_text(encoding='utf-8')
+        self.assertIn('clone:PivotTo(desiredRoot)', studio)
+        self.assertIn('Game1PlacementRotationMode", "plot-author-pivot"', studio)
         self.assertIn('house-placement-preview-v4', studio)
         self.assertIn('house-placement-preview-v4', router)
         self.assertIn('house-placement-preview-v4', bridge)
-        self.assertNotIn('\n            clone:PivotTo(', studio)
 
     def test_new_and_legacy_bindings_can_coexist_in_one_batch(self):
         legacy = {'houseSlug': 'house_a', 'plotIndex': 1, 'anchored': False,

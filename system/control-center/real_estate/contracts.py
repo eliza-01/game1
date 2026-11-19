@@ -5,15 +5,15 @@ import re
 
 from .rig_features import feature_warnings
 from services.retired_col_mesh import retired
-from .rig_publication_policy import publish_bones_for_mesh
+from .rig_publication_policy import publish_bones_for_mesh, carrier_bones
 
-HOUSE_NAME = re.compile(r"^(?P<kind>[a-z][a-z0-9_]*)_level(?P<level>[1-9][0-9]*)_(?P<variant>[0-9]+)$")
+HOUSE_NAME = re.compile(r"^(?P<kind>[a-z][a-z0-9_]*)_level(?P<level>[1-9][0-9]*)_(?P<variant>[0-9]+)(?:_remesh)?$")
 SLUG = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 REQUIRED_MESH = "house"
 
 
 def present_parts(analysis: dict) -> tuple[str, ...]:
-    """All authored meshes, always with house first and stable publication order.
+    """All authored meshes in stable order (legacy house first when present).
 
     A removed mesh is not revived by stale publication records. Part names are
     authored FBX identities, not a fixed house/door enum.
@@ -64,8 +64,8 @@ def prices(payload: dict) -> dict:
 def warnings_for_analysis(value: dict) -> list[dict]:
     """Report missing authoring features without implying they are all blockers.
 
-    House mesh/house_armature are required by validate_analysis; the same
-    issues are reported here for UIs that inspect partial analysis results.
+    No visual mesh name is mandatory. The unified house_armature remains
+    the source of authored sockets, regardless of the mesh carrying them.
     """
     meshes = {part.get('name'): part for part in value.get('meshes', [])
               if isinstance(part, dict) and isinstance(part.get('name'), str)}
@@ -76,15 +76,10 @@ def warnings_for_analysis(value: dict) -> list[dict]:
     def warn(part, code, message):
         warnings.append({'part': part, 'code': code, 'message': message})
 
-    if house is None:
-        warn('house', 'missing_house', 'Required mesh house is missing. Add it before registration.')
-    if house is None or house.get('armature', '').casefold() != 'house_armature':
-        warn('house', 'missing_house_armature',
-             'Required house_armature is missing or not assigned to mesh house.')
-    if door is None:
-        warn('door', 'missing_door', 'Optional mesh door is missing. Houses without doors are supported.')
-    elif not door.get('armature'):
-        warn('door', 'missing_door_armature', 'door is present without a linked armature; bind it to house_armature.')
+    if not any(str(mesh.get('armature') or '').casefold() == 'house_armature'
+               for mesh in meshes.values()):
+        warn('', 'missing_house_armature',
+             'Link house_armature to at least one authored mesh to publish sockets.')
     # New standard: sockets describe attachment/interaction sites; a missing
     # socket is not itself proof that an optional feature is authored. In a
     # hinge-enabled door, however, hierarchy and rigid skinning must agree.
@@ -103,19 +98,17 @@ def warnings_for_analysis(value: dict) -> list[dict]:
 def validate_analysis(value: dict) -> dict:
     meshes = value.get("meshes") if isinstance(value, dict) else None
     if not isinstance(meshes, list) or not meshes or not all(isinstance(item, dict) for item in meshes):
-        raise ValueError("FBX must contain a Mesh named house (other meshes may have any names).")
+        raise ValueError("FBX must contain at least one visible Mesh (names are unrestricted).")
     names = [item.get("name") for item in meshes]
     if any(not isinstance(name, str) or not name.strip() or name in (".", "..")
            or "/" in name or "\\" in name for name in names):
         raise ValueError("FBX contains an invalid mesh name (empty or path separator).")
+    if any(name.casefold() == 'rig_carrier' for name in names):
+        raise ValueError('rig_carrier is reserved for the technical published house root')
     if len(set(name.casefold() for name in names)) != len(names):
         raise ValueError("FBX mesh names must be unique, including letter case.")
-    if "house" not in names:
-        raise ValueError("Required mesh house is missing. Add mesh house before registering this FBX.")
-    house = next(item for item in meshes if item['name'] == 'house')
-    if str(house.get('armature') or '').casefold() != 'house_armature':
-        raise ValueError("Required house_armature is missing or not assigned to mesh house. "
-                         "Link an armature named house_armature to mesh house in Blender.")
+    if not any(str(item.get('armature') or '').casefold() == 'house_armature' for item in meshes):
+        raise ValueError('Link house_armature to an authored mesh. A mesh named house is not required.')
     armatures = []
     for item in meshes:
         name = item["name"]
@@ -132,9 +125,9 @@ def validate_analysis(value: dict) -> dict:
             raise ValueError(f"{name}: bone names must be non-empty and unique")
         if int(item.get("vertices") or 0) < 3:
             raise ValueError(f"{name}: mesh has fewer than three vertices; check the FBX export")
-    # Multiple meshes may reference one Blender armature. Every mesh has an
-    # independent Model Asset; unweighted non-house meshes sharing
-    # house_armature do not inherit the house owner's socket bones.
+    # Multiple meshes may share one authored house_armature. Only a selected
+    # carrier publishes the static socket hierarchy; moving meshes publish
+    # just their required hinge chain and child interactions.
     return value
 
 
@@ -164,13 +157,37 @@ def assert_skeleton_survived(expected: dict, actual: dict) -> None:
 
 def assert_rig_survived(expected: dict, actual: dict, part: str) -> None:
     """Reject missing/cross-import bones, different parents and rest transforms."""
-    if part not in present_parts(expected) or len(actual.get('meshes', [])) != 1:
-        raise ValueError('staged Real Estate rig must contain exactly its expected mesh')
+    if part == 'rig_carrier':
+        staged = actual.get('meshes', [])
+        if len(staged) != 1 or staged[0]['name'] != 'rig_carrier':
+            raise ValueError('independent socket publication must contain only rig_carrier')
+        old_bones = carrier_bones(expected)
+        new = staged[0]
+        if new.get('armature') != 'house_armature':
+            raise ValueError('rig_carrier has no authored house_armature')
+        a = {b['name']: b for b in old_bones}
+        b = {b['name']: b for b in new['bones']}
+        if a.keys() != b.keys():
+            raise ValueError('rig_carrier publication changed bone names')
+        for name, before in a.items():
+            after = b[name]
+            if before.get('parent', '') != after.get('parent', ''):
+                raise ValueError('rig_carrier changed bone parent: ' + name)
+            if name not in new.get('influencedBones', []):
+                raise ValueError('rig_carrier lost weighted bone: ' + name)
+        return
+    if part not in present_parts(expected):
+        raise ValueError('unregistered staged Real Estate part')
     old = next(item for item in expected['meshes'] if item['name'] == part)
-    new = actual['meshes'][0]
-    if new['name'] != part:
-        raise ValueError(f'staged {part} FBX contains the wrong mesh')
-    if publish_bones_for_mesh(old) and new.get('armature') != old.get('armature'):
+    staged = actual.get('meshes', [])
+    visuals = [row for row in staged if row['name'] != 'rig_carrier']
+    carriers = [row for row in staged if row['name'] == 'rig_carrier']
+    if len(visuals) != 1 or carriers:
+        raise ValueError('visual publication must not contain rig_carrier')
+    new = visuals[0]
+    if visuals[0]['name'] != part:
+        raise ValueError(f'staged {part} FBX contains the wrong visual mesh')
+    if publish_bones_for_mesh(old) and new.get('armature') != 'house_armature':
         raise ValueError(f'staged {part} FBX changed its bone armature')
     a = {bone['name']:bone for bone in publish_bones_for_mesh(old)}
     b = {bone['name']:bone for bone in new['bones']}

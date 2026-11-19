@@ -1,4 +1,4 @@
-const npcState={data:null,spawnRecords:null,selected:null,animationNpc:null,modelPath:'',texturePaths:[],animations:null,animationFolder:'',lastScan:null,animationPublishing:false,animationSelected:null,equipment:null};
+const npcState={data:null,spawnRecords:null,selected:null,animationNpc:null,modelPath:'',texturePaths:[],atlasPending:null,animations:null,animationFolder:'',lastScan:null,animationPublishing:false,animationSelected:null,equipment:null};
 const NPC_FILENAME_GUIDE_KEY='game1.npc.animation.filenameRules.open';
 const NPC_ANIMATION_FOLDER_KEY='game1.npc.animation.folder';
 const NPC_ANIMATION_TARGET_KEY='game1.npc.animation.selectedNpc';
@@ -21,17 +21,25 @@ function npcSpawnPlacedTime(value){if(!value)return 'unknown';const date=new Dat
 function npcPlacedAtCell(slug){const records=npcState.spawnRecords;if(records===null)return '<small>unavailable</small>';const matches=records.filter(row=>row.monsterSlug===slug);if(!matches.length)return '<small>not placed</small>';return matches.map(row=>`<small title="${esc(row.spawnId)}">${esc(npcSpawnPlacedTime(row.placedAtUtc||row.createdAtUtc))}</small>`).join('<br>')}
 
 function npcSyncSlug(){if(!npcState.selected)$('npc-slug').value=npcSlugify($('npc-name-en').value)}
-function npcSetForm(row){npcState.selected=row?.slug||null;npcState.modelPath='';npcState.texturePaths=[];npcState.lastScan=null;npcState.animationSelected=null;if(row){$('npc-name-en').value=row.name_en||'';$('npc-name-ru').value=row.name_ru||'';$('npc-slug').value=row.slug;const stats=row.stats||{};$('npc-stat-hp').value=stats.MaxHP??100;$('npc-stat-damage').value=stats.Damage??10;$('npc-stat-attack-speed').value=stats.AttackSpeed??100;$('npc-stat-run-speed').value=stats.RunSpeed??50;$('npc-stat-crit-chance').value=stats.CritChance??0;const behavior=row.behavior||{};$('npc-behavior-retaliate').checked=behavior.retaliateWhenAttacked===true;$('npc-behavior-pursuit-radius').value=behavior.pursuitRadiusStuds??16;$('npc-behavior-return-delay').value=behavior.returnDelaySeconds??10;$('npc-behavior-attack-radius').value=behavior.attackRadiusStuds??3;$('picked-npc-model').textContent='keep current fbx or choose a replacement';$('picked-npc-textures').textContent='keep current textures or choose replacements';}else{$('npc-name-en').value='';$('npc-name-ru').value='';$('npc-slug').value='';const stats=npcState.data?.options?.defaultStats||{};$('npc-stat-hp').value=stats.MaxHP??100;$('npc-stat-damage').value=stats.Damage??10;$('npc-stat-attack-speed').value=stats.AttackSpeed??100;$('npc-stat-run-speed').value=stats.RunSpeed??50;$('npc-stat-crit-chance').value=stats.CritChance??0;const behavior=npcState.data?.options?.defaultBehavior||{};$('npc-behavior-retaliate').checked=behavior.retaliateWhenAttacked===true;$('npc-behavior-pursuit-radius').value=behavior.pursuitRadiusStuds??16;$('npc-behavior-return-delay').value=behavior.returnDelaySeconds??10;$('npc-behavior-attack-radius').value=behavior.attackRadiusStuds??3;$('picked-npc-model').textContent='fbx not selected';$('picked-npc-textures').textContent='textures not selected';}game1SyncPublicationDescription("npc-publication-description", "NPC", row?.name_en || "");npcRender();npcLoadAnimations();npcLoadEquipment()}
+function npcSetForm(row){npcState.selected=row?.slug||null;npcState.modelPath='';npcState.texturePaths=[];npcState.atlasPending=null;npcState.lastScan=null;npcState.animationSelected=null;if(row){$('npc-name-en').value=row.name_en||'';$('npc-name-ru').value=row.name_ru||'';$('npc-slug').value=row.slug;const stats=row.stats||{};$('npc-stat-hp').value=stats.MaxHP??100;$('npc-stat-damage').value=stats.Damage??10;$('npc-stat-attack-speed').value=stats.AttackSpeed??100;$('npc-stat-run-speed').value=stats.RunSpeed??50;$('npc-stat-crit-chance').value=stats.CritChance??0;const behavior=row.behavior||{};$('npc-behavior-retaliate').checked=behavior.retaliateWhenAttacked===true;$('npc-behavior-pursuit-radius').value=behavior.pursuitRadiusStuds??16;$('npc-behavior-return-delay').value=behavior.returnDelaySeconds??10;$('npc-behavior-attack-radius').value=behavior.attackRadiusStuds??3;$('picked-npc-model').textContent='keep current fbx or choose a replacement';$('picked-npc-textures').textContent='keep current textures or choose replacements';}else{$('npc-name-en').value='';$('npc-name-ru').value='';$('npc-slug').value='';const stats=npcState.data?.options?.defaultStats||{};$('npc-stat-hp').value=stats.MaxHP??100;$('npc-stat-damage').value=stats.Damage??10;$('npc-stat-attack-speed').value=stats.AttackSpeed??100;$('npc-stat-run-speed').value=stats.RunSpeed??50;$('npc-stat-crit-chance').value=stats.CritChance??0;const behavior=npcState.data?.options?.defaultBehavior||{};$('npc-behavior-retaliate').checked=behavior.retaliateWhenAttacked===true;$('npc-behavior-pursuit-radius').value=behavior.pursuitRadiusStuds??16;$('npc-behavior-return-delay').value=behavior.returnDelaySeconds??10;$('npc-behavior-attack-radius').value=behavior.attackRadiusStuds??3;$('picked-npc-model').textContent='fbx not selected';$('picked-npc-textures').textContent='textures not selected';}game1SyncPublicationDescription("npc-publication-description", "NPC", row?.name_en || "");npcRender();npcLoadAnimations();npcLoadEquipment()}
 function npcRenderTree(){const host=$('npc-tree');host.innerHTML='';for(const row of npcState.data.items){const button=document.createElement('button');button.className=row.slug===npcState.selected?'active':'';button.innerHTML=`<span>${esc(row.name_en)}<small>${esc(row.slug)}</small></span><small>${esc(row.status)}</small>`;button.onclick=()=>npcSetForm(row);host.appendChild(button)}if(!npcState.data.items.length)host.innerHTML='<small class="muted">no registered npcs.</small>';$('npc-rail-count').textContent=npcState.data.items.length}
 function npcRenderRows(){const body=$('npc-rows');body.innerHTML='';for(const row of npcState.data.items){const stats=row.stats||{};const textures=row.textures||[];const tr=document.createElement('tr');tr.className=row.slug===npcState.selected?'active':'';tr.innerHTML=`<td><b>${esc(row.name_en)}</b><br><small>${esc(row.name_ru||'—')} · ${esc(row.slug)}</small></td><td><small>HP ${esc(stats.MaxHP)} · ATK ${esc(stats.Damage)}<br>ASPD ${esc(stats.AttackSpeed)} · RUN ${esc(stats.RunSpeed)} · CRIT ${esc(stats.CritChance)}%<br>${row.behavior?.retaliateWhenAttacked?'RETALIATES':'PASSIVE'} · PURSUIT ${esc(row.behavior?.pursuitRadiusStuds??16)} · RETURN 0..${esc(row.behavior?.returnDelaySeconds??10)}s · RANGE ${esc(row.behavior?.attackRadiusStuds??3)}</small></td><td>${esc(row.bone_count||0)} bones<br><small>${esc(row.mesh_count||0)} mesh</small></td><td>${row.model_asset_id?`model ${esc(row.model_asset_id)}`:'model local'}<br><small>${textures.length} texture${textures.length===1?'':'s'}</small></td><td><small>${esc(npcPublishedTime(row.last_published_at))}</small></td><td>${npcPlacedAtCell(row.slug)}</td><td>${npcStatusTag(row.status)}</td><td><div class="row-actions"><button data-open>edit</button><button data-publish>publish</button><button data-sync>sync studio</button><button data-delete class="danger">delete</button></div></td>`;tr.querySelector('[data-open]').onclick=()=>npcSetForm(row);tr.querySelector('[data-publish]').onclick=()=>npcPublish(row.slug);tr.querySelector('[data-sync]').onclick=()=>npcSync(row.slug);tr.querySelector('[data-delete]').onclick=()=>npcDelete(row.slug);body.appendChild(tr)}}
 function npcRenderDetails(row){const host=$('npc-details');if(!row){host.innerHTML='<span class="muted">select a npc.</span>';return}const textureHtml=(row.textures||[]).map(tex=>`<div><b>${esc(tex.slot)}</b><span>${esc(tex.source_path)}</span><span>${esc(tex.asset_id||'local')}</span></div>`).join('');host.innerHTML=`<div class="section-title"><div><span>selected npc</span><h3>${esc(row.name_en)}</h3></div>${npcStatusTag(row.status)}</div><div class="details-grid"><div><b>slug</b><span>${esc(row.slug)}</span></div><div><b>skeleton</b><span>${esc(row.armature_name||'—')} · ${esc(row.bone_count||0)} bones</span></div><div><b>model source</b><span>${esc(row.model_source_path||'—')}</span></div><div><b>model asset id</b><span>${esc(row.model_asset_id||'not published')}${row.publicationUpgradeAvailable?' · BONE PIPELINE UPGRADE REQUIRED':''}</span></div><div><b>serverstorage</b><span>${esc(row.server_storage_path||'—')}</span></div><div><b>revision</b><span>${esc(row.revision)}</span></div><div><b>last published</b><span>${esc(npcPublishedTime(row.last_published_at))}</span></div><div><b>spawn placed at</b><span>${npcPlacedAtCell(row.slug)}</span></div></div>${textureHtml?`<div class="texture-list">${textureHtml}</div>`:''}`}
 function npcRenderForm(row){const configured=!!npcState.data?.publication?.configured;if(row){$('npc-model-status').innerHTML=`<strong>${esc(row.name_en)} · ${esc(row.status)}</strong><span>${esc(row.model_source_path||'no model')} · ${esc(row.bone_count||0)} bones · ${(row.textures||[]).length} texture(s)</span>`;$('register-npc').textContent=(npcState.modelPath||npcState.texturePaths.length)?'register new revision':'save metadata';}else{$('npc-model-status').innerHTML='<strong>not registered</strong><span>choose a rigged npc fbx. textures are optional.</span>';$('register-npc').textContent='register npc'}$('register-npc').disabled=!row&&!npcState.modelPath;$('publish-npc').disabled=!row||!configured||!row.model_source_path;$('sync-npc').disabled=!row?.model_asset_id;$('npc-publication-hint').textContent=!row?'select a registered npc.':!configured?'configure open cloud before publishing.':row.publicationUpgradeAvailable?'Updated bone-preserving FBX pipeline available: publish to create a new complete NPC model asset, then sync Studio.':row.model_asset_id?'Published model uses the current FBX pipeline.':'Publish creates model/texture asset ids.'}
 function npcRenderRuntime(){const pub=npcState.data.publication||{};$('npc-registry-state').className='runtime-state registered';$('npc-registry-state').innerHTML=`<strong>npc registry · ${npcState.data.summary?.registered||0}</strong><span>rigged models · stats · animation profiles</span>`;$('npc-publication-state').className=pub.configured?'publication-ready':'publication-missing';$('npc-publication-state').textContent=pub.configured?`open cloud: ${pub.creatorType} ${pub.creatorId}`:'open cloud: not configured'}
-function npcRender(){if(!npcState.data)return;const row=npcSelected();npcRenderAnimationTarget();$('npc-metric-total').textContent=npcState.data.summary?.registered||0;$('npc-metric-published').textContent=npcState.data.summary?.published||0;$('npc-metric-changed').textContent=npcState.data.summary?.changed||0;npcRenderRuntime();npcRenderTree();npcRenderRows();npcRenderDetails(row);npcRenderForm(row);npcRenderEquipment();npcRenderAnimations()}
+function npcRender(){if(!npcState.data)return;const row=npcSelected();npcRenderAnimationTarget();$('npc-metric-total').textContent=npcState.data.summary?.registered||0;$('npc-metric-published').textContent=npcState.data.summary?.published||0;$('npc-metric-changed').textContent=npcState.data.summary?.changed||0;npcRenderRuntime();npcRenderTree();npcRenderRows();npcRenderDetails(row);npcRenderForm(row);npcRenderEquipment();npcRenderAnimations();npcAtlasStatus()}
 async function npcLoad(){try{const [npcData,spawnData]=await Promise.all([request('/api/npcs'),request('/api/npc-spawns').catch(()=>null)]);npcState.data=npcData;npcState.spawnRecords=spawnData?.records||null;if(npcState.selected&&!npcState.data.items.some(x=>x.slug===npcState.selected))npcState.selected=null;if(npcEnsureAnimationTarget())npcState.animations=null;npcRender();await npcLoadAnimations();await npcLoadEquipment()}catch(error){toast(error.message,true)}}
 async function npcChooseModel(){try{const result=await request('/api/files/choose-npc-model',{method:'POST'});if(!result.path)return;npcState.modelPath=result.path;$('picked-npc-model').textContent=result.path;npcRenderForm(npcSelected())}catch(error){toast(error.message,true)}}
 async function npcChooseTextures(){try{const result=await request('/api/files/choose-npc-textures',{method:'POST'});npcState.texturePaths=result.paths||[];$('picked-npc-textures').textContent=npcState.texturePaths.length?npcState.texturePaths.join(' · '):'textures not selected';npcRenderForm(npcSelected())}catch(error){toast(error.message,true)}}
-async function npcRegister(){try{const row=npcSelected();const nameEn=$('npc-name-en').value.trim();if(!nameEn)throw Error('name en is required');const slug=row?.slug||npcSlugify(nameEn);if(!row&&!npcState.modelPath)throw Error('choose a npc fbx first');const crit=Number($('npc-stat-crit-chance').value||0);if(crit<0||crit>100)throw Error('critical chance must be 0..100');$('register-npc').disabled=true;const result=await request('/api/npcs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug,nameEn,nameRu:$('npc-name-ru').value.trim(),modelSourcePath:npcState.modelPath,texturePaths:npcState.texturePaths,stats:{MaxHP:Number($('npc-stat-hp').value||0),Damage:Number($('npc-stat-damage').value||0),AttackSpeed:Number($('npc-stat-attack-speed').value||0),RunSpeed:Number($('npc-stat-run-speed').value||0),CritChance:crit},behavior:{retaliateWhenAttacked:$('npc-behavior-retaliate').checked,pursuitRadiusStuds:Number($('npc-behavior-pursuit-radius').value||0),returnDelaySeconds:Number($('npc-behavior-return-delay').value||0),attackRadiusStuds:Number($('npc-behavior-attack-radius').value||0)}})});npcState.selected=result.slug;npcState.animationNpc=result.slug;npcRememberAnimationTarget(result.slug);npcState.modelPath='';npcState.texturePaths=[];await npcLoad();npcSetForm(npcSelected());toast(`registered npc ${result.slug}`)}catch(error){toast(error.message,true)}finally{npcRenderForm(npcSelected())}}
+async function npcRegister(){try{const row=npcSelected();const nameEn=$('npc-name-en').value.trim();if(!nameEn)throw Error('name en is required');const slug=row?.slug||npcSlugify(nameEn);if(!row&&!npcState.modelPath)throw Error('choose a npc fbx first');const crit=Number($('npc-stat-crit-chance').value||0);if(crit<0||crit>100)throw Error('critical chance must be 0..100');$('register-npc').disabled=true;const result=await request('/api/npcs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug,nameEn,nameRu:$('npc-name-ru').value.trim(),modelSourcePath:npcState.modelPath,texturePaths:npcState.texturePaths,stats:{MaxHP:Number($('npc-stat-hp').value||0),Damage:Number($('npc-stat-damage').value||0),AttackSpeed:Number($('npc-stat-attack-speed').value||0),RunSpeed:Number($('npc-stat-run-speed').value||0),CritChance:crit},behavior:{retaliateWhenAttacked:$('npc-behavior-retaliate').checked,pursuitRadiusStuds:Number($('npc-behavior-pursuit-radius').value||0),returnDelaySeconds:Number($('npc-behavior-return-delay').value||0),attackRadiusStuds:Number($('npc-behavior-attack-radius').value||0)}})});npcState.selected=result.slug;npcState.animationNpc=result.slug;npcRememberAnimationTarget(result.slug);npcState.modelPath='';npcState.texturePaths=[];
+ const pending=npcState.atlasPending;
+ if(pending){
+  try{await request('/api/npc-atlas-choice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+   action:'connect',npcSlug:result.slug,sourceKind:pending.kind,sourceSlug:pending.slug,sourceSlot:pending.slot,variantId:pending.variantId,sourceImageId:pending.imageId,
+   expectedRevision:result.atlas_binding?.revision||0})});npcState.atlasPending=null;}
+  catch(error){toast(`NPC registered, but atlas connection failed: ${error.message}`,true)}
+ }
+ await npcLoad();npcSetForm(npcSelected());toast(`registered npc ${result.slug}`)}catch(error){toast(error.message,true)}finally{npcRenderForm(npcSelected())}}
 async function npcPublish(slug){try{toast('publishing npc model and changed textures…');await request('/api/npcs/'+encodeURIComponent(slug)+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:game1DescriptionForPublishedRow(npcState.data?.items,slug,npcState.selected,'npc-publication-description','NPC')})});await npcLoad();toast('npc publication complete')}catch(error){toast(error.message,true)}}
 async function npcSync(slug){try{toast('syncing npc into serverstorage…');const result=await request('/api/npcs/'+encodeURIComponent(slug)+'/sync',{method:'POST'});await npcLoad();toast(`studio synced: ${result.studio?.destination||slug}`)}catch(error){toast(error.message,true)}}
 async function npcDelete(slug){if(!confirm(`delete npc ${slug} and its animation profile from game1 registry? roblox cloud assets are not deleted.`))return;try{await request('/api/npcs/'+encodeURIComponent(slug),{method:'DELETE'});if(npcState.selected===slug)npcState.selected=null;if(npcState.animationNpc===slug){npcState.animationNpc=null;npcRememberAnimationTarget(null);npcState.animations=null}await npcLoad();npcSetForm(null);toast('npc registry row deleted')}catch(error){toast(error.message,true)}}
@@ -45,20 +53,21 @@ function npcRenderAnimationRows(){
     const ext=(row.canonicalFilename||row.source_path||'').toLowerCase().endsWith('.rbxmx')?'.rbxmx':'.rbxm';
     const proposed=weaponSet=>`${row.monster_slug}_${weaponSet}_${row.slot}${row.variant?'_'+String(row.variant).padStart(2,'0'):''}${ext}`;
     tr.innerHTML=`<td><b>${esc(row.state||row.slot)}</b></td><td>${row.variant?String(row.variant).padStart(2,'0'):'—'}</td>
-      <td><select data-set>${sets.map(v=>`<option value="${esc(v)}" ${v===currentSet?'selected':''}>${esc(v)}</option>`).join('')}</select></td>
-      <td><input data-filename style="min-width:220px" value="${esc(row.canonicalFilename||proposed(currentSet))}" aria-label="animation filename"><br><small class="hint">rename validates the type and keeps publication ID</small></td>
+      <td><select data-set ${row.linked?'disabled':''}>${sets.map(v=>`<option value="${esc(v)}" ${v===currentSet?'selected':''}>${esc(v)}</option>`).join('')}</select></td>
+      <td>${row.linked?`<b>connected from ${esc(row.sourceNpc)}</b><br><small class="hint">shared published animation · independent options</small>`:`<input data-filename style="min-width:220px" value="${esc(row.canonicalFilename||proposed(currentSet))}" aria-label="animation filename"><br><small class="hint">rename validates the type and keeps publication ID</small>`}</td>
       <td>${esc(row.asset_id||'local')}</td><td>${npcStatusTag(row.status)}</td>
       <td><input data-weight class="weight-input" type="number" min="0" max="10000" value="${esc(row.weight)}"></td>
       <td><label class="inline-check" title="temporarily remove equipped weapons for this idle special"><input data-disarm type="checkbox" ${row.disarm?'checked':''} ${row.slot==='idle_special'?'':'disabled'}></label></td>
-      <td><div class="row-actions"><button data-options type="button">options</button><button data-rename type="button">rename / migrate</button><button data-publish>publish</button><button data-remove class="danger">remove</button></div></td>`;
-    tr.querySelector('[data-set]').onchange=event=>{tr.querySelector('[data-filename]').value=proposed(event.target.value)};
+      <td><div class="row-actions"><button data-options type="button">options</button><button data-rename type="button">rename / migrate</button><button data-publish>publish</button><button data-remove class="danger">${row.linked?'disconnect':'remove'}</button></div></td>`;
+    if(!row.linked)tr.querySelector('[data-set]').onchange=event=>{tr.querySelector('[data-filename]').value=proposed(event.target.value)};
     tr.querySelector('[data-options]').onclick=()=>npcOpenAnimationOptions(row);
-    tr.querySelector('[data-rename]').onclick=()=>npcRenameAnimation(row.binding_id,tr.querySelector('[data-set]').value,tr.querySelector('[data-filename]').value);
+    tr.querySelector('[data-rename]').disabled=!!row.linked;
+    if(!row.linked)tr.querySelector('[data-rename]').onclick=()=>npcRenameAnimation(row.binding_id,tr.querySelector('[data-set]').value,tr.querySelector('[data-filename]').value);
     tr.querySelector('[data-weight]').onchange=e=>npcSetAnimationWeight(row.binding_id,e.target.value);
     tr.querySelector('[data-disarm]').onchange=e=>npcSetAnimationDisarm(row.binding_id,e.target.checked);
-    tr.querySelector('[data-publish]').disabled=row.status==='PUBLISHED';
+    tr.querySelector('[data-publish]').disabled=row.linked||row.status==='PUBLISHED';
     tr.querySelector('[data-publish]').onclick=()=>npcPublishAnimation(row.clip_id);
-    tr.querySelector('[data-remove]').onclick=()=>npcRemoveAnimation(row.binding_id);
+    tr.querySelector('[data-remove]').onclick=()=>npcRemoveAnimation(row.binding_id,!!row.linked);
     body.appendChild(tr)
   }
 }
@@ -100,7 +109,7 @@ function npcOpenAnimationOptions(row){
  dialog.showModal();
 }
 function npcRenderUnassigned(){const host=$('npc-animation-unassigned');if(!host)return;const rows=npcState.lastScan?.unassigned||[];if(!rows.length){host.innerHTML='';return}const defs=npcState.animations?.slotCatalog||[];host.innerHTML=`<details open><summary>unassigned files · ${rows.length} · assign manually</summary><div class="unassigned-list">${rows.slice(0,100).map((row,index)=>`<div class="unassigned-row npc-unassigned-row" data-npc-unassigned="${index}"><div class="unassigned-file"><b>${esc(row.filename)}</b><small>${esc(row.reason)}</small></div><label>type<select data-set>${(npcState.animations?.weaponSets||['base','1hs']).map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('')}</select></label><label>state<select data-slot>${defs.map(def=>`<option value="${esc(def.slot)}">${esc(def.label||def.slot)}</option>`).join('')}</select></label><label>variant<input data-variant type="number" min="0" max="999" value="0"></label><button data-assign class="primary" type="button">assign</button></div>`).join('')}</div></details>`;for(const node of host.querySelectorAll('[data-npc-unassigned]')){const row=rows[Number(node.dataset.npcUnassigned)];const slot=node.querySelector('[data-slot]'),variant=node.querySelector('[data-variant]');const update=()=>{const def=defs.find(x=>x.slot===slot.value);variant.disabled=!def?.variants;if(def?.variants&&Number(variant.value)<=0)variant.value='1';if(!def?.variants)variant.value='0'};slot.onchange=update;update();node.querySelector('[data-assign]').onclick=()=>npcAssignAnimation(row,node)}}
-function npcRenderAnimations(){npcRenderAnimationTarget();npcRenderAnimationFolderControls();const data=npcState.animations;if(!data)return;npcRenderFilenameRules();npcRenderAnimationRows();npcRenderUnassigned();const selected=npcAnimationSelected();$('npc-animation-profile-state').className='runtime-state '+(selected&&data.skeletonCompatible?'registered':'bootstrap');$('npc-animation-profile-state').innerHTML=selected?`<strong>animations · ${esc(selected.name_en)} · ${esc(selected.slug)}</strong><span>${data.skeletonCompatible?'skeleton compatible':'skeleton changed'} · ${esc(data.profile?.skeleton_signature||'no skeleton signature')}</span>`:'<strong>no npc selected</strong><span>choose a registered npc below.</span>';$('publish-missing-npc-animations').disabled=npcState.animationPublishing||!selected||!data.publication?.configured||!(data.items||[]).some(row=>row.status==='LOCAL_ONLY');$('check-roblox-npc-animations').disabled=npcState.animationPublishing||!data.publication?.configured;$('npc-animation-table-title').textContent=`${selected?.slug||'npc'} · registered animations`;npcRenderAnimationFolderControls()}
+function npcRenderAnimations(){npcRenderAnimationTarget();npcRenderAnimationFolderControls();const data=npcState.animations;if(!data)return;npcRenderFilenameRules();npcRenderAnimationRows();npcRenderUnassigned();const selected=npcAnimationSelected();$('npc-animation-profile-state').className='runtime-state '+(selected&&data.skeletonCompatible?'registered':'bootstrap');$('npc-animation-profile-state').innerHTML=selected?`<strong>animations · ${esc(selected.name_en)} · ${esc(selected.slug)}</strong><span>${data.skeletonCompatible?'skeleton compatible':'skeleton changed'} · ${esc(data.profile?.skeleton_signature||'no skeleton signature')}</span>`:'<strong>no npc selected</strong><span>choose a registered npc below.</span>';$('publish-missing-npc-animations').disabled=npcState.animationPublishing||!selected||!data.publication?.configured||!(data.items||[]).some(row=>row.status==='LOCAL_ONLY');$('check-roblox-npc-animations').disabled=npcState.animationPublishing||!data.publication?.configured;$('npc-animation-table-title').textContent=`${selected?.slug||'npc'} · registered animations`;$('npc-connect-existing-open').disabled=!selected||!data.monsters?.some(row=>row.slug!==selected.slug);npcRenderAnimationFolderControls()}
 async function npcLoadAnimations(){try{npcEnsureAnimationTarget();const slug=npcState.animationNpc||'';npcState.animations=await request('/api/npc-animations?npc='+encodeURIComponent(slug));const profileRoot=npcNormalizeAnimationFolderPath(npcState.animations.profile?.scan_root||'');if(!npcState.animationFolder&&profileRoot)npcSetAnimationFolder(profileRoot,true);npcRenderAnimations()}catch(error){toast(error.message,true)}}
 async function npcChooseAnimationFolder(){try{npcSetAnimationFolder($('npc-animation-folder-path').value,false);const result=await request('/api/files/choose-animation-folder',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({initialPath:npcState.animationFolder})});if(!result.path)return;npcSetAnimationFolder(result.path,true);npcRenderAnimations()}catch(error){toast(error.message,true)}}
 async function npcScanAnimations(){try{npcSetAnimationFolder($('npc-animation-folder-path').value,true);if(!npcState.animationNpc)throw Error('choose a npc in the npc animations section');if(!npcState.animationFolder)throw Error('choose or paste a npc animation folder');$('scan-npc-animations').disabled=true;npcState.lastScan=await request('/api/npc-animations/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({npcSlug:npcState.animationNpc,rootPath:npcState.animationFolder})});await npcLoadAnimations();$('npc-animation-scan-status').innerHTML=`<strong>scan complete · ${npcState.lastScan.recognized}/${npcState.lastScan.filesScanned} recognized</strong><span>${npcState.lastScan.created} new · ${npcState.lastScan.changed} changed · ${npcState.lastScan.unchanged} unchanged · ${npcState.lastScan.unassigned.length} unassigned</span>`;npcRenderUnassigned();toast(`registered ${npcState.lastScan.recognized} npc animation clips`)}catch(error){toast(error.message,true)}finally{npcRenderAnimations()}}
@@ -108,7 +117,7 @@ async function npcAssignAnimation(row,node){try{const slot=node.querySelector('[
 async function npcPublishAnimation(clipId){try{await request('/api/npc-animations/'+encodeURIComponent(clipId)+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:$('npc-animation-publication-description').value})});await npcLoadAnimations();toast('npc animation published')}catch(error){toast(error.message,true)}}
 async function npcPublishMissingAnimations(){if(npcState.animationPublishing)return;let published=0;try{const queue=(npcState.animations?.items||[]).filter(row=>row.status==='LOCAL_ONLY');if(!queue.length)return;npcState.animationPublishing=true;npcRenderAnimations();const host=$('npc-animation-publish-progress'),bar=$('npc-animation-publish-bar'),count=$('npc-animation-publish-count'),current=$('npc-animation-publish-current');host.hidden=false;bar.max=queue.length;bar.value=0;for(let index=0;index<queue.length;index++){const row=queue[index];current.textContent=`${row.name} · ${row.state||row.slot}`;count.textContent=`${index} / ${queue.length}`;await request('/api/npc-animations/'+encodeURIComponent(row.clip_id)+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:$('npc-animation-publication-description').value})});published=index+1;bar.value=published;count.textContent=`${published} / ${queue.length}`;}current.textContent='publication queue complete';toast(`published ${published} npc animation assets`)}catch(error){toast(`published ${published}; stopped: ${error.message}`,true)}finally{npcState.animationPublishing=false;await npcLoadAnimations();npcRenderAnimations()}}
 async function npcSetAnimationWeight(bindingId,weight){try{npcState.animations=await request('/api/npc-animation-bindings/'+encodeURIComponent(bindingId)+'/weight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({weight:Number(weight)})});npcState.animations.publication=npcState.data?.publication||{};npcRenderAnimations()}catch(error){toast(error.message,true)}}
-async function npcRemoveAnimation(bindingId){if(!confirm('Remove this NPC animation registration? Source files and Roblox Cloud assets are preserved. On the next folder scan it will register as NEW / LOCAL_ONLY (without its old published ID).'))return;try{npcState.animations=await request('/api/npc-animation-bindings/'+encodeURIComponent(bindingId),{method:'DELETE'});npcState.animations.publication=npcState.data?.publication||{};npcRenderAnimations();toast('npc animation binding removed')}catch(error){toast(error.message,true)}}
+async function npcRemoveAnimation(bindingId,linked=false){if(!confirm(linked?'Disconnect this shared NPC animation? The source NPC and its published asset remain unchanged.':'Remove this NPC animation registration? Source files and Roblox Cloud assets are preserved. On the next folder scan it will register as NEW / LOCAL_ONLY (without its old published ID).'))return;try{npcState.animations=await request('/api/npc-animation-bindings/'+encodeURIComponent(bindingId),{method:'DELETE'});npcState.animations.publication=npcState.data?.publication||{};npcRenderAnimations();toast('npc animation binding removed')}catch(error){toast(error.message,true)}}
 async function npcRenameAnimation(bindingId,weaponSet,filename){
  try{npcState.animations=await request('/api/npc-animations/'+encodeURIComponent(bindingId)+'/rename',{
  method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({weaponSet,filename})});
@@ -148,10 +157,126 @@ async function npcSyncEquipment(){
  toast('weapon templates synced: '+(result.weapons.join(', ')||'no weapons equipped'))}
  catch(error){toast(error.message,true)}
 }
+// M367: cross-NPC reuse is a binding to the donor clip, never a copied RBXM.
+function npcConnectCoordinate(row){return `${row.weaponSet||'1hs'}/${row.slot}/${Number(row.variant||0)}`}
+function npcConnectUpdateCount(){
+ const dialog=$('npc-connect-existing-dialog');
+ const count=dialog.querySelectorAll('#npc-connect-actions input:checked').length;
+ $('npc-connect-apply').disabled=count===0;
+ $('npc-connect-apply').textContent=count?`connect · ${count}`:'connect';
+}
+async function npcConnectLoadSource(){
+ const dialog=$('npc-connect-existing-dialog'),source=$('npc-connect-source').value;
+ const list=$('npc-connect-actions');list.textContent='Loading registered animations…';
+ $('npc-connect-apply').disabled=true;
+ if(!source)return;
+ try{
+  const result=await request('/api/npc-animations?npc='+encodeURIComponent(source));
+  if(!dialog.open||$('npc-connect-source').value!==source)return;
+  const target=npcState.animationNpc;
+  const occupied=new Set((npcState.animations?.items||[]).map(npcConnectCoordinate));
+  const published=(result.items||[]).filter(row=>!row.linked&&row.status==='PUBLISHED');
+  const actors=result.monsters||[];
+  const donor=actors.find(row=>row.slug===source),recipient=actors.find(row=>row.slug===target);
+  const structureA=donor?.skeleton_structure_signature,structureB=recipient?.skeleton_structure_signature;
+  $('npc-connect-rig-status').textContent=structureA&&structureB&&structureA!==structureB
+   ?'Different rig structure: animations may play partially. Verify in Studio.'
+   :'Uses the donor’s published animation IDs; no duplicate publication.';
+  list.innerHTML=published.length?published.map(row=>{
+   const conflict=occupied.has(npcConnectCoordinate(row));
+   return `<label class="npc-connect-action"><input type="checkbox" value="${esc(row.binding_id)}" ${conflict?'disabled':''}><span><b>${esc(row.weaponSet)} · ${esc(row.state||row.slot)}${row.variant?' · '+String(row.variant).padStart(2,'0'):''}</b><small>${conflict?'slot already occupied':`asset ${esc(row.asset_id)}`}</small></span></label>`;
+  }).join(''):'<span class="muted">No published source animations available.</span>';
+  list.onchange=npcConnectUpdateCount;npcConnectUpdateCount();
+ }catch(error){list.textContent=error.message;toast(error.message,true)}
+}
+function npcConnectOpen(){
+ const target=npcState.animationNpc,dialog=$('npc-connect-existing-dialog');
+ if(!target)return;
+ const rows=(npcState.animations?.monsters||[]).filter(row=>row.slug!==target);
+ if(!rows.length)return;
+ $('npc-connect-target').textContent=target;
+ $('npc-connect-source').innerHTML=rows.map(row=>`<option value="${esc(row.slug)}">${esc(row.name_en||row.slug)} · ${esc(row.slug)}</option>`).join('');
+ dialog.showModal();npcConnectLoadSource();
+}
+async function npcConnectApply(){
+ const button=$('npc-connect-apply'),source=$('npc-connect-source').value,target=npcState.animationNpc;
+ const bindingIds=Array.from($('npc-connect-actions').querySelectorAll('input:checked')).map(node=>node.value);
+ if(!bindingIds.length)return;
+ button.disabled=true;
+ try{
+  const result=await request('/api/npc-animations/connect',{method:'POST',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({sourceNpc:source,targetNpc:target,bindingIds})});
+  $('npc-connect-existing-dialog').close();await npcLoadAnimations();
+  toast(`connected ${result.connected} animation actions from ${source}`);
+ }catch(error){toast(error.message,true);await npcConnectLoadSource()}
+ finally{npcConnectUpdateCount()}
+}
+
+// Shared NPC atlas selection: categorical source inventory, single published ID.
+// The selected source is staged for new NPCs; registered NPCs bind immediately.
+const NPC_ATLAS_CATEGORIES={npc:'NPC',monster:'Monsters',weapon:'Weapons',location_asset:'Location assets',real_estate:'Houses'};
+let npcAtlasCatalog=null,npcAtlasChoice=null;
+function npcAtlasStatus(){
+ const row=npcSelected(),b=row?.atlas_binding,stage=npcState.atlasPending;
+ const status=$('npc-atlas-status'),clear=$('npc-atlas-clear');
+ if(b){status.textContent=`${b.filename} · Image ID ${b.published_id} · ${b.syncStatus==='synced'?'synced':'Studio Sync required'}`;clear.hidden=false;}
+ else if(stage){status.textContent=`Selected: ${stage.name} · ${stage.slot} · Image ID ${stage.imageId} · connects on Register`;clear.hidden=true;}
+ else{status.textContent='No shared atlas selected.';clear.hidden=true;}
+}
+function npcAtlasRows(){return npcAtlasCatalog?.groups?.[$('npc-atlas-category').value]||[]}
+function npcAtlasRenderChoices(){
+ const host=$('npc-atlas-choices'),query=$('npc-atlas-search').value.trim().toLowerCase();
+ const rows=npcAtlasRows().filter(item=>`${item.name} ${item.slug} ${item.slot} ${item.filename} ${item.imageId}`.toLowerCase().includes(query));
+ host.innerHTML=rows.length?rows.map((item,i)=>`<button type="button" role="option" data-npc-atlas-index="${i}" aria-selected="${npcAtlasChoice?.kind===item.kind&&npcAtlasChoice?.slug===item.slug&&npcAtlasChoice?.slot===item.slot&&npcAtlasChoice?.variantId===item.variantId?'true':'false'}"><strong>${esc(item.name)}</strong><small>${esc(item.slug)} · ${esc(item.slot)} · ${esc(item.filename)} · Image ID ${esc(item.imageId)}</small></button>`).join(''):'<small class="muted">No published atlases in this category.</small>';
+ host.querySelectorAll('[data-npc-atlas-index]').forEach((button,i)=>button.onclick=()=>{
+  npcAtlasChoice=rows[i];npcAtlasRenderChoices();
+ });
+ $('npc-atlas-connect').disabled=!npcAtlasChoice;
+}
+async function npcAtlasOpen(){
+ npcAtlasChoice=null;$('npc-atlas-category').value='npc';$('npc-atlas-search').value='';
+ $('npc-atlas-choices').innerHTML='<small class="muted">Loading published atlas sources…</small>';
+ $('npc-atlas-connect').disabled=true;
+ $('npc-atlas-dialog').showModal();
+ try{npcAtlasCatalog=await request('/api/npc-atlas-sources');npcAtlasRenderChoices()}
+ catch(error){$('npc-atlas-choices').textContent=error.message;toast(error.message,true)}
+}
+async function npcAtlasConnect(){
+ const source=npcAtlasChoice,row=npcSelected();if(!source)return;
+ const button=$('npc-atlas-connect');button.disabled=true;
+ try{
+  if(row){
+   await request('/api/npc-atlas-choice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    action:'connect',npcSlug:row.slug,sourceKind:source.kind,sourceSlug:source.slug,sourceSlot:source.slot,variantId:source.variantId,sourceImageId:source.imageId,
+    expectedRevision:row.atlas_binding?.revision||0})});
+   await npcLoad();toast('Published NPC atlas connected. Sync Studio when ready.');
+  }else{
+   npcState.atlasPending=source;npcAtlasStatus();toast('Atlas selected. It will connect when you register this NPC.');
+  }
+  $('npc-atlas-dialog').close();
+ }catch(error){toast(error.message,true)}finally{button.disabled=false}
+}
+async function npcAtlasClear(){
+ const row=npcSelected();if(!row)return;
+ if(!confirm(`Disconnect the shared atlas from ${row.slug}? Existing Studio model remains unchanged until Sync.`))return;
+ try{
+  await request('/api/npc-atlas-choice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'clear',npcSlug:row.slug})});
+  await npcLoad();toast('NPC atlas disconnected. Studio Sync required.');
+ }catch(error){toast(error.message,true)}
+}
 function initNpcFilenameDisclosure(){const guide=$('npc-animation-filename-guide');if(!guide)return;try{const saved=localStorage.getItem(NPC_FILENAME_GUIDE_KEY);if(saved!==null)guide.open=saved==='1'}catch{}guide.addEventListener('toggle',()=>{try{localStorage.setItem(NPC_FILENAME_GUIDE_KEY,guide.open?'1':'0')}catch{}})}
 window.game1NpcsLoad=npcLoad;window.game1NpcAnimationsLoad=npcLoadAnimations;
 initNpcAnimationFolderExplorer();
 $('npc-animation-npc').onchange=()=>npcSelectAnimationTarget($('npc-animation-npc').value);
+$('npc-connect-existing-open').onclick=npcConnectOpen;
+$('npc-connect-source').onchange=npcConnectLoadSource;
+$('npc-connect-apply').onclick=npcConnectApply;
+$('npc-atlas-open').onclick=npcAtlasOpen;
+$('npc-atlas-connect').onclick=npcAtlasConnect;
+$('npc-atlas-clear').onclick=npcAtlasClear;
+$('npc-atlas-category').onchange=()=>{npcAtlasChoice=null;npcAtlasRenderChoices()};
+$('npc-atlas-search').oninput=()=>{npcAtlasChoice=null;npcAtlasRenderChoices()};
+$('npc-atlas-dialog').querySelectorAll('[data-npc-atlas-close]').forEach(b=>b.onclick=()=>$('npc-atlas-dialog').close());
 $('npc-behavior-retaliate').onchange=()=>{
  if($('npc-behavior-retaliate').checked){
   const defaults=npcState.data?.options?.defaultBehavior||{};

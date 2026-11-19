@@ -20,7 +20,9 @@ function Policy.Apply(mesh: MeshPart, name: string, raw: any)
     mesh:SetAttribute("Game1RealEstateDoubleSided", mesh.DoubleSided)
     mesh:SetAttribute("Game1RealEstatePhysicsOnly", nil)
     mesh:SetAttribute("Game1RealEstateDestructible", nil)
-    if string.lower(name) == "house" then mesh.Anchored = true end
+    -- Every house visual is a fixed editor-owned part. DoorAssembly opens via
+    -- explicit Model:PivotTo rather than unanchored simulation.
+    mesh.Anchored = true
 end
 
 return table.freeze(Policy)

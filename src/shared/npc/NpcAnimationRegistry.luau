@@ -9,6 +9,7 @@ return table.freeze({
 				["attack"] = table.freeze({
 					table.freeze({
 						clipId = "npc__guard_01__attack__01",
+						sourceNpc = "guard_01",
 						assetId = "89218860148097",
 						animationId = "rbxassetid://89218860148097",
 						sourceSlot = "attack",
@@ -25,6 +26,7 @@ return table.freeze({
 				["combat_idle"] = table.freeze({
 					table.freeze({
 						clipId = "npc__guard_01__combat_idle__00",
+						sourceNpc = "guard_01",
 						assetId = "125522140536834",
 						animationId = "rbxassetid://125522140536834",
 						sourceSlot = "combat_idle",
@@ -41,6 +43,7 @@ return table.freeze({
 				["death"] = table.freeze({
 					table.freeze({
 						clipId = "npc__guard_01__death__00",
+						sourceNpc = "guard_01",
 						assetId = "140129007932289",
 						animationId = "rbxassetid://140129007932289",
 						sourceSlot = "death",
@@ -57,6 +60,7 @@ return table.freeze({
 				["idle"] = table.freeze({
 					table.freeze({
 						clipId = "npc__guard_01__idle__00",
+						sourceNpc = "guard_01",
 						assetId = "121205302537992",
 						animationId = "rbxassetid://121205302537992",
 						sourceSlot = "idle",
@@ -71,6 +75,7 @@ return table.freeze({
 					}),
 					table.freeze({
 						clipId = "npc__guard_01__idle_special__01",
+						sourceNpc = "guard_01",
 						assetId = "103119318954108",
 						animationId = "rbxassetid://103119318954108",
 						sourceSlot = "idle_special",
@@ -87,6 +92,7 @@ return table.freeze({
 				["run"] = table.freeze({
 					table.freeze({
 						clipId = "npc__guard_01__run__00",
+						sourceNpc = "guard_01",
 						assetId = "132123582014306",
 						animationId = "rbxassetid://132123582014306",
 						sourceSlot = "run",
@@ -103,6 +109,129 @@ return table.freeze({
 				["walk"] = table.freeze({
 					table.freeze({
 						clipId = "npc__guard_01__walk__00",
+						sourceNpc = "guard_01",
+						assetId = "116522185625057",
+						animationId = "rbxassetid://116522185625057",
+						sourceSlot = "walk",
+						role = "base",
+						weaponSet = "1hs",
+						compatibleWith = table.freeze({"1hs"}),
+						variant = 0,
+						weight = 100,
+						disarm = false,
+						looped = true,
+						priority = "Movement",
+					}),
+				}),
+			}),
+		}),
+		["guard_02"] = table.freeze({
+			skeletonSignature = "79541ae8f29e13ecc54b3d091bf6882582e94e16a2a80610aef941f139b4a3f7",
+			slots = table.freeze({
+				["attack"] = table.freeze({
+					table.freeze({
+						clipId = "npc__guard_01__attack__01",
+						sourceNpc = "guard_01",
+						assetId = "89218860148097",
+						animationId = "rbxassetid://89218860148097",
+						sourceSlot = "attack",
+						role = "variant",
+						weaponSet = "1hs",
+						compatibleWith = table.freeze({"1hs"}),
+						variant = 1,
+						weight = 100,
+						disarm = false,
+						looped = false,
+						priority = "Action",
+					}),
+				}),
+				["combat_idle"] = table.freeze({
+					table.freeze({
+						clipId = "npc__guard_01__combat_idle__00",
+						sourceNpc = "guard_01",
+						assetId = "125522140536834",
+						animationId = "rbxassetid://125522140536834",
+						sourceSlot = "combat_idle",
+						role = "base",
+						weaponSet = "1hs",
+						compatibleWith = table.freeze({"1hs"}),
+						variant = 0,
+						weight = 100,
+						disarm = false,
+						looped = true,
+						priority = "Idle",
+					}),
+				}),
+				["death"] = table.freeze({
+					table.freeze({
+						clipId = "npc__guard_01__death__00",
+						sourceNpc = "guard_01",
+						assetId = "140129007932289",
+						animationId = "rbxassetid://140129007932289",
+						sourceSlot = "death",
+						role = "base",
+						weaponSet = "1hs",
+						compatibleWith = table.freeze({"1hs"}),
+						variant = 0,
+						weight = 100,
+						disarm = false,
+						looped = false,
+						priority = "Action",
+					}),
+				}),
+				["idle"] = table.freeze({
+					table.freeze({
+						clipId = "npc__guard_01__idle__00",
+						sourceNpc = "guard_01",
+						assetId = "121205302537992",
+						animationId = "rbxassetid://121205302537992",
+						sourceSlot = "idle",
+						role = "base",
+						weaponSet = "1hs",
+						compatibleWith = table.freeze({"1hs"}),
+						variant = 0,
+						weight = 100,
+						disarm = false,
+						looped = true,
+						priority = "Idle",
+					}),
+					table.freeze({
+						clipId = "npc__guard_01__idle_special__01",
+						sourceNpc = "guard_01",
+						assetId = "103119318954108",
+						animationId = "rbxassetid://103119318954108",
+						sourceSlot = "idle_special",
+						role = "special",
+						weaponSet = "1hs",
+						compatibleWith = table.freeze({"1hs"}),
+						variant = 1,
+						weight = 30,
+						disarm = false,
+						looped = false,
+						priority = "Idle",
+					}),
+				}),
+				["run"] = table.freeze({
+					table.freeze({
+						clipId = "npc__guard_01__run__00",
+						sourceNpc = "guard_01",
+						assetId = "132123582014306",
+						animationId = "rbxassetid://132123582014306",
+						sourceSlot = "run",
+						role = "base",
+						weaponSet = "1hs",
+						compatibleWith = table.freeze({"1hs"}),
+						variant = 0,
+						weight = 100,
+						disarm = false,
+						looped = true,
+						priority = "Movement",
+					}),
+				}),
+				["walk"] = table.freeze({
+					table.freeze({
+						clipId = "npc__guard_01__walk__00",
+						sourceNpc = "guard_01",
 						assetId = "116522185625057",
 						animationId = "rbxassetid://116522185625057",
 						sourceSlot = "walk",
@@ -124,6 +253,7 @@ return table.freeze({
 				["attack"] = table.freeze({
 					table.freeze({
 						clipId = "npc__warsmith__1hs__attack__01",
+						sourceNpc = "warsmith",
 						assetId = "120401531623191",
 						animationId = "rbxassetid://120401531623191",
 						sourceSlot = "attack",
@@ -138,6 +268,7 @@ return table.freeze({
 					}),
 					table.freeze({
 						clipId = "npc__warsmith__1hs__attack__02",
+						sourceNpc = "warsmith",
 						assetId = "81707496491355",
 						animationId = "rbxassetid://81707496491355",
 						sourceSlot = "attack",
@@ -154,6 +285,7 @@ return table.freeze({
 				["combat_idle"] = table.freeze({
 					table.freeze({
 						clipId = "npc__warsmith__1hs__combat_idle__00",
+						sourceNpc = "warsmith",
 						assetId = "135102466012863",
 						animationId = "rbxassetid://135102466012863",
 						sourceSlot = "combat_idle",
@@ -170,6 +302,7 @@ return table.freeze({
 				["death"] = table.freeze({
 					table.freeze({
 						clipId = "npc__warsmith__base__death__00",
+						sourceNpc = "warsmith",
 						assetId = "122118949529530",
 						animationId = "rbxassetid://122118949529530",
 						sourceSlot = "death",
@@ -186,6 +319,7 @@ return table.freeze({
 				["idle"] = table.freeze({
 					table.freeze({
 						clipId = "npc__warsmith__base__idle__00",
+						sourceNpc = "warsmith",
 						assetId = "116738017929145",
 						animationId = "rbxassetid://116738017929145",
 						sourceSlot = "idle",
@@ -200,6 +334,7 @@ return table.freeze({
 					}),
 					table.freeze({
 						clipId = "npc__warsmith__1hs__idle_special__01",
+						sourceNpc = "warsmith",
 						assetId = "121539607298411",
 						animationId = "rbxassetid://121539607298411",
 						sourceSlot = "idle_special",
@@ -214,6 +349,7 @@ return table.freeze({
 					}),
 					table.freeze({
 						clipId = "npc__warsmith__base__idle_special__01",
+						sourceNpc = "warsmith",
 						assetId = "130341012840002",
 						animationId = "rbxassetid://130341012840002",
 						sourceSlot = "idle_special",
@@ -230,6 +366,7 @@ return table.freeze({
 				["run"] = table.freeze({
 					table.freeze({
 						clipId = "npc__warsmith__base__run__00",
+						sourceNpc = "warsmith",
 						assetId = "122295588324584",
 						animationId = "rbxassetid://122295588324584",
 						sourceSlot = "run",
@@ -246,6 +383,7 @@ return table.freeze({
 				["walk"] = table.freeze({
 					table.freeze({
 						clipId = "npc__warsmith__base__walk__00",
+						sourceNpc = "warsmith",
 						assetId = "116868377220889",
 						animationId = "rbxassetid://116868377220889",
 						sourceSlot = "walk",

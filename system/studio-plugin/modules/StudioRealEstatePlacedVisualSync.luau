@@ -1,110 +1,137 @@
--- Full Real Estate sync: refresh visual rigs on *all managed placed* houses.
--- Preserve the house transform, existing door opening pivot, and any unmanaged
--- player-owned objects. Collision rigs have an independent synchronizer.
+-- Full Real Estate sync for a NEW publication of the same stable house type.
+-- Old and new MeshPart names/counts can differ completely. The placed Model,
+-- Plot identity, authored pivot, scale and unmanaged siblings are never replaced.
+-- Shared StudioManagedRigSwap owns the managed-child transaction and rollback.
 local Targets = require(script.Parent.StudioRealEstatePlacedTargets)
-local HouseFrame = require(script.Parent.StudioRealEstateHouseFrame)
 local RigSwap = require(script.Parent.StudioManagedRigSwap)
 local VisualSync = {}
 
-local function visuals(template: Model): {Model}
+local MANAGED_RIG_ATTRIBUTE = "Game1RealEstateManagedRig"
+
+local function isManagedVisual(child: Instance, allowPreviousNames: boolean): boolean
+    if not child:IsA("Model") then return false end
+    if child:GetAttribute(MANAGED_RIG_ATTRIBUTE) == true then return true end
+    if not allowPreviousNames then return false end
+    -- Previously published Estate templates used <part>Rig / DoorAssembly.
+    -- Only accept an actual imported MeshPart rig, never an arbitrary Model
+    -- which happens to contain the word 'Rig'. Root ownership is checked by
+    -- the caller before using this compatibility classifier.
+    local knownName = child.Name == "DoorAssembly"
+        or child.Name:match("^[A-Z][%w_]*Rig$") ~= nil
+    return knownName and child:FindFirstChildWhichIsA("MeshPart", true) ~= nil
+end
+
+local function managedChildren(root: Model, allowPreviousNames: boolean): {Model}
     local result = {}
-    for _, child in template:GetChildren() do
-        if child:IsA("Model") then
-            table.insert(result, child)
+    for _, child in root:GetChildren() do
+        if isManagedVisual(child, allowPreviousNames) then
+            table.insert(result, child :: Model)
         end
     end
-    table.sort(result, function(a, b)
-        if a.Name == "HouseRig" then return true end
-        if b.Name == "HouseRig" then return false end
-        return a.Name < b.Name
-    end)
+    table.sort(result, function(a, b) return a.Name < b.Name end)
     return result
+end
+
+local function preferredPrimary(rigs: {Model}): BasePart?
+    for _, rig in rigs do
+        local carrier = rig:FindFirstChild("rig_carrier", true)
+        if carrier and carrier:IsA("MeshPart") then return carrier end
+    end
+    local choices = {}
+    for _, rig in rigs do
+        for _, descendant in rig:GetDescendants() do
+            if descendant:IsA("BasePart") then table.insert(choices, descendant) end
+        end
+    end
+    table.sort(choices, function(a, b) return a:GetFullName() < b:GetFullName() end)
+    return choices[1]
+end
+
+local function stageRig(source: Model, template: Model, placed: Model,
+    previousDoor: Model?): Model
+    local candidate = source:Clone()
+    local templateScale = template:GetScale()
+    local ratio = placed:GetScale() / templateScale
+    if ratio <= 0 or ratio ~= ratio or ratio > 1000 then
+        candidate:Destroy()
+        error("invalid authored-to-placed house scale")
+    end
+    -- Model:ScaleTo does not inherit the parent Model's ScaleTo history.
+    -- Match the current placed house scale before moving the cloned rig.
+    if math.abs(ratio - 1) > 0.000001 then
+        candidate:ScaleTo(source:GetScale() * ratio)
+    end
+    local localFrame = template:GetPivot():ToObjectSpace(source:GetPivot())
+    local target = placed:GetPivot() * CFrame.new(localFrame.Position * ratio) * localFrame.Rotation
+    if source.Name == "DoorAssembly" and previousDoor then
+        -- Only preserve the open angle if the authored hinge is unchanged.
+        -- An entirely different door should use the new authored closed pivot.
+        local oldClosed = previousDoor:GetAttribute("Game1DoorClosedLocalPivot")
+        local newClosed = source:GetAttribute("Game1DoorClosedLocalPivot")
+        if typeof(oldClosed) == "string" and oldClosed == newClosed then
+            target = previousDoor:GetPivot()
+        end
+    end
+    candidate:PivotTo(target)
+    candidate:SetAttribute(MANAGED_RIG_ATTRIBUTE, true)
+    return candidate
 end
 
 function VisualSync.Update(template: Model, slug: string, placedTargets: {Model}?): (number, number, {string})
     local targets = placedTargets or Targets.List(slug)
-    local sourceHouse = HouseFrame.Find(template)
-    if not sourceHouse then return 0, #targets, {"Full visual sync skipped: template house anchor missing or ambiguous"} end
-    local sources = visuals(template)
-    local changed = 0
-    local found = 0
+    local sources = managedChildren(template, true)
+    if #sources == 0 then
+        return 0, #targets, {"Full visual sync skipped: template has no published visual rigs"}
+    end
+    local changed, found = 0, 0
     local warnings = {}
     for _, root in targets do
         found += 1
-        local placedHouse = HouseFrame.Find(root)
-        if not placedHouse then
-            table.insert(warnings, root:GetFullName() .. ": house anchor missing or ambiguous")
+        if root.Name ~= slug or root:GetAttribute("Game1RealEstateSlug") ~= slug then
+            table.insert(warnings, root:GetFullName() .. ": wrong managed house identity")
             continue
         end
-        local frame = HouseFrame.Relative(sourceHouse, placedHouse)
-        local stages = {}
-        local complete = true
-        for _, source in sources do
-            local old = root:FindFirstChild(source.Name)
-            if not old or not old:IsA("Model") then
-                complete = false
-                table.insert(warnings, root:GetFullName() .. ": unmanaged/missing " .. source.Name)
-                break
-            end
-            local staged: Model? = nil
-            local ok, problem = pcall(function()
-                local candidate = source:Clone()
-                staged = candidate
-                -- Keep an already-open door at its previous pivot; all other
-                -- visual meshes follow the authored relative house transform.
-                local target = if source.Name == "DoorAssembly"
-                    then (old :: Model):GetPivot() else frame * source:GetPivot()
-                candidate:PivotTo(target)
-                if source.Name == "HouseRig" then
-                    local candidateHouse = HouseFrame.Find(candidate)
-                    if not candidateHouse then error("staged house anchor missing or ambiguous") end
-                    -- Exact author pivot check, even when the MeshPart's
-                    -- geometry centre differs from the published template.
-                    local actual = candidateHouse:GetPivot()
-                    local desired = placedHouse:GetPivot()
-                    if (actual.Position - desired.Position).Magnitude > 0.025
-                        or actual.LookVector:Dot(desired.LookVector) < 0.9999
-                        or actual.UpVector:Dot(desired.UpVector) < 0.9999 then
-                        error("placed visual house origin would shift")
-                    end
-                end
-            end)
-            if not ok or not staged then
-                complete = false
-                if staged then staged:Destroy() end
-                table.insert(warnings, root:GetFullName() .. ": " .. tostring(problem))
-                break
-            end
-            table.insert(stages, {old = old :: Model, staged = staged :: Model, name = source.Name})
-        end
-        if not complete then
-            for _, stage in stages do stage.staged:Destroy() end
+        local oldRigs = managedChildren(root, true)
+        if #oldRigs == 0 then
+            -- Do not erase player-owned or unmarked geometry to make room.
+            table.insert(warnings, root:GetFullName() .. ": no verified managed visual rigs; use Plot Place to rebuild an authored preview")
             continue
         end
-        local oldRigs, newRigs = {}, {}
-        for _, stage in ipairs(stages) do
-            table.insert(oldRigs, stage.old)
-            table.insert(newRigs, stage.staged)
-        end
-        local transaction = nil
-        local ok, problem = pcall(function()
-            transaction = RigSwap.Prepare(root, oldRigs, newRigs)
-            RigSwap.Commit(transaction)
+        local oldDoor = root:FindFirstChild("DoorAssembly")
+        if oldDoor and not oldDoor:IsA("Model") then oldDoor = nil end
+        local newRigs = {}
+        local prepared, planOrError = pcall(function()
+            for _, source in sources do
+                table.insert(newRigs, stageRig(source, template, root, oldDoor :: Model?))
+            end
+            -- The old primary MeshPart may not exist in a new publication.
+            -- The shared swap can select a new published part while retaining
+            -- the ORIGINAL placed root pivot through PivotOffset.
+            return RigSwap.Prepare(root, oldRigs, newRigs,
+                {preferredPrimary = preferredPrimary(newRigs)})
         end)
-        if not ok then
-            if transaction then RigSwap.Rollback(transaction) end
-            for _, stage in ipairs(stages) do stage.staged:Destroy() end
-            table.insert(warnings, root:GetFullName() .. ": update rolled back: " .. tostring(problem))
+        if not prepared then
+            for _, rig in newRigs do rig:Destroy() end
+            table.insert(warnings, root:GetFullName() .. ": preflight rejected: " .. tostring(planOrError))
             continue
         end
-        RigSwap.Finalize(transaction)
+        local plan = planOrError
+        local committed, reason = pcall(function()
+            RigSwap.Commit(plan)
+        end)
+        if not committed then
+            -- RigSwap.Commit performs its own rollback on failure.
+            table.insert(warnings, root:GetFullName() .. ": update rolled back: " .. tostring(reason))
+            continue
+        end
+        RigSwap.Finalize(plan)
         Targets.MarkPlaced(root)
-        -- Keep published IDs on the placed instance consistent with its
-        -- actual copied rigs; do not touch player-owned children or pivots.
+        -- Never mutate Plot coordinates, revision, anchor policy or the root.
         root:SetAttribute("Game1RigAssetIds", template:GetAttribute("Game1RigAssetIds"))
         root:SetAttribute("Game1HouseModelAssetId", template:GetAttribute("Game1HouseModelAssetId"))
         root:SetAttribute("Game1DoorModelAssetId", template:GetAttribute("Game1DoorModelAssetId"))
         root:SetAttribute("Game1ModelAssetId", template:GetAttribute("Game1ModelAssetId"))
+        root:SetAttribute("Game1PrimaryRigPart", template:GetAttribute("Game1PrimaryRigPart"))
         changed += 1
     end
     return changed, found, warnings

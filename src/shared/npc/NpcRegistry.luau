@@ -3,6 +3,34 @@ return table.freeze({
 	schemaVersion = 1,
 	project = "game1",
 	npcs = table.freeze({
+		["guard_02"] = table.freeze({
+			slug = "guard_02",
+			nameEn = "Guard 02",
+			nameRu = "Охранник 02",
+			status = "PUBLISHED",
+			modelAssetId = "85467038493846",
+			serverStoragePath = "ServerStorage.npcs.guard_02.model.guard_02",
+			skeletonSignature = "79541ae8f29e13ecc54b3d091bf6882582e94e16a2a80610aef941f139b4a3f7",
+			behavior = table.freeze({
+				retaliateWhenAttacked = true,
+				pursuitRadiusStuds = 33,
+				returnDelaySeconds = 10,
+				attackRadiusStuds = 8,
+			}),
+			stats = table.freeze({
+				["MaxHP"] = 100,
+				["Damage"] = 10,
+				["AttackSpeed"] = 100,
+				["RunSpeed"] = 155,
+				["CritChance"] = 20,
+			}),
+			textures = table.freeze({
+				["atlas"] = table.freeze({
+					assetId = "121111101046810",
+					sha256 = "5c9930aba1b78f18551c2df4d9c250d0a7d72eafa6ca72d0d856aec62124ed04",
+				}),
+			}),
+		}),
 		["warsmith"] = table.freeze({
 			slug = "warsmith",
 			nameEn = "Warsmith",

@@ -75,6 +75,31 @@
         "markerPath": "Workspace.Game1Authoring.NpcSpawns.Guard_01_b126db75",
         "syncedAtUtc": "2026-11-03T19:48:33.460647Z"
       }
+    },
+    "spawn-6d0d624f98bd48aa8e3481326de059cb": {
+      "spawnId": "spawn-6d0d624f98bd48aa8e3481326de059cb",
+      "monsterSlug": "guard_02",
+      "mapKey": "main",
+      "placeId": 0,
+      "position": {
+        "x": 433.173,
+        "y": -54.0,
+        "z": -300.534
+      },
+      "yawDegrees": 334.65,
+      "respawnSeconds": 10.0,
+      "enabled": true,
+      "createdAtUtc": "2026-11-18T16:52:06.446155Z",
+      "updatedAtUtc": "2026-11-18T18:02:20.571649Z",
+      "homeRadiusStuds": 30.0,
+      "placedAtUtc": "2026-11-18T16:51:43.451836Z",
+      "studioSync": {
+        "status": "synced",
+        "recordFingerprint": "f2f9fbc703904a0abe47703eda8b8e87e73474a4577e6723cb6256dd8438b30e",
+        "placeId": 0,
+        "markerPath": "Workspace.Game1Authoring.NpcSpawns.Guard_02_6d0d624f",
+        "syncedAtUtc": "2026-11-18T18:02:21.627352Z"
+      }
     }
   }
 }

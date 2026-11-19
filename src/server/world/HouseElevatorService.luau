@@ -1,6 +1,6 @@
 --!strict
--- Server-owned floor transfers. Only real registered authored floor spawns
--- may be destinations on floors 1 and 2; elevator Bones are the controls.
+-- Server-owned floor transfers. Every destination must have an authored
+-- house_floor_NN_spawn_socket; elevator bones only expose controls.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local SpatialRoot = require(Shared:WaitForChild("character"):WaitForChild("CharacterSpatialRoot"))
@@ -13,7 +13,8 @@ local function presentFloors(sockets: {[string]: Attachment}): {[number]: boolea
     local present: {[number]: boolean} = {}
     for floor = 1, 3 do
         local socket = sockets[Policy.SocketName(floor)]
-        present[floor] = socket ~= nil and socket.Parent ~= nil
+        local spawn = sockets[Policy.DestinationSocket(floor, floor)]
+        present[floor] = socket ~= nil and socket.Parent ~= nil and spawn ~= nil and spawn.Parent ~= nil
     end
     return present
 end
@@ -36,15 +37,10 @@ function Elevator.Move(player: Player, sockets: {[string]: Attachment}, name: st
     if not character or not root then return false, "Персонаж не готов" end
     -- Preserve the player's heading; elevator authoring bones are positions,
     -- not avatar orientation frames. Reuse the shared upright conversion.
-    local point = if target:IsA("Bone") then target.TransformedWorldCFrame.Position else target.WorldPosition
-    local targetFrame: CFrame?
-    if option.destination == 1 or option.destination == 2 then
-        -- Both floor spawns encode Blender Tail -> Head; match Studio TP.
-        targetFrame = Orientation.Upright(if target:IsA("Bone") then target.TransformedWorldCFrame
-            else target.WorldCFrame, target:IsA("Bone"), 3)
-    else
-        targetFrame = Orientation.Upright(CFrame.new(point) * root.CFrame.Rotation, false, 3)
-    end
+    -- One orientation rule for every floor. The authored spawn controls the
+    -- location; the player's heading is independent of the elevator bone.
+    local targetFrame = Orientation.Upright(if target:IsA("Bone") then target.TransformedWorldCFrame
+        else target.WorldCFrame, target:IsA("Bone"), 3)
     if not targetFrame then return false, "Не удалось определить направление персонажа" end
     character:PivotTo(targetFrame)
     local controller = character:FindFirstChildOfClass("ControllerManager")

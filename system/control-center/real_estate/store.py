@@ -28,19 +28,11 @@ from .collision_policy import (
 from services.retired_col_mesh import retired, strip_options
 from services.texture_atlas_registry import AtlasRegistry, parse_filename, atlas_version, same_atlas_series
 from services.atlas_identity import display_identity
+from services import mesh_visual_appearance as appearance
 
 
 def glass_default(part: str) -> bool:
     return 'glass' in part.casefold()
-
-
-MATERIALS = frozenset({
-    'SmoothPlastic','Plastic','Wood','WoodPlanks','Slate','Concrete','Brick',
-    'Cobblestone','Metal','CorrodedMetal','DiamondPlate','Foil','Grass',
-    'LeafyGrass','Fabric','Marble','Granite','Sand','Sandstone','Limestone',
-    'Basalt','CrackedLava','Ground','Mud','Asphalt','Pavement','Rock',
-    'Glacier','Ice','Snow','Neon','Glass',
-})
 
 
 def mesh_options(parts, raw: dict | None, legacy_atlases=()) -> dict:
@@ -60,25 +52,24 @@ def mesh_options(parts, raw: dict | None, legacy_atlases=()) -> dict:
         destructible = entry.get('destructible')
         effective_no_collide = no_collide if type(no_collide) is bool else default_no_collide(part)
         mode = entry.get('appearanceMode', 'atlas' if part in legacy_atlases else 'material')
-        if mode not in ('material', 'atlas'):
-            raise ValueError(f'{part}: appearanceMode must be material or atlas')
-        material = entry.get('visualMaterial', 'SmoothPlastic')
-        if material not in MATERIALS:
-            raise ValueError(f'{part}: unknown Roblox visual material {material!r}')
-        color = entry.get('visualColor', '#FFFFFF')
-        import re
-        if not isinstance(color, str) or not re.fullmatch(r'#[0-9A-Fa-f]{6}', color):
-            raise ValueError(f'{part}: visualColor must be #RRGGBB')
+        # One shared Material + Color validator for Real Estate and Location Assets.
+        try:
+            mode, material, color = appearance.validated(
+                mode, entry.get('visualMaterial', 'SmoothPlastic'),
+                entry.get('visualColor', '#FFFFFF'),
+            )
+        except ValueError as error:
+            raise ValueError(f'{part}: {error}') from error
         alpha = entry.get('alphaEnabled', False)
         if type(alpha) is not bool:
             raise ValueError(f'{part}: alphaEnabled must be boolean')
-        if mode != 'atlas' and alpha:
+        if not appearance.uses_atlas(mode) and alpha:
             raise ValueError(f'{part}: alpha transparency requires an atlas')
         result[part] = {
             'appearanceMode': mode, 'visualMaterial': material,
             'visualColor': color.upper(), 'alphaEnabled': alpha,
             'glass': (glass if type(glass) is bool else glass_default(part))
-                     if mode == 'atlas' else False,
+                     if appearance.uses_atlas(mode) else False,
             'noCollide': effective_no_collide,
             'collisionFidelity': normalize_collision_fidelity(
                 part, entry.get('collisionFidelity'), no_collide=effective_no_collide,
@@ -256,7 +247,8 @@ class RealEstateStore:
         with self.connect() as db:
             saved = db.execute('SELECT mesh_options_json FROM real_estate WHERE slug=?', (slug,)).fetchone()
             options = json.loads(saved['mesh_options_json'] or '{}')
-            options.setdefault(part, {})['appearanceMode'] = 'atlas'
+            options.setdefault(part, {})['appearanceMode'] = (
+                'material_atlas' if options.get(part, {}).get('appearanceMode') == 'material_atlas' else 'atlas')
             db.execute('UPDATE real_estate SET mesh_options_json=?,updated_at=? WHERE slug=?',
                        (json.dumps(options), time.time(), slug))
         # An explicit resolution choice supersedes a prior owner reference.
@@ -402,7 +394,7 @@ class RealEstateStore:
         unchanged_sources = {part for part in active if unchanged_bound_source(part)}
         texture_sources = {
             part: (resolve_texture(self.root, selections.get(part), part=part)
-                   if merged_options[part]['appearanceMode'] == 'atlas' and not chosen_refs[part] and selections.get(part)
+                   if appearance.uses_atlas(merged_options[part]['appearanceMode']) and not chosen_refs[part] and selections.get(part)
                    and part not in unchanged_sources else None)
             for part in active
         }
@@ -423,12 +415,12 @@ class RealEstateStore:
             elif existing and existing['textures'].get(part, {}).get('atlasVariantId') and not ref:
                 atlas_selections[part] = self.atlases.get_variant(existing['textures'][part]['atlasVariantId'])
         for part in active:
-            if chosen_refs[part] == 'same:house' and merged_options[part]['appearanceMode'] == 'atlas':
+            if chosen_refs[part] == 'same:house' and appearance.uses_atlas(merged_options[part]['appearanceMode']):
                 if 'house' not in atlas_selections:
                     raise ValueError('choose a house atlas before sharing it')
                 atlas_selections[part] = atlas_selections['house']
         for part in active:
-            if merged_options[part]['appearanceMode'] == 'atlas' and part not in atlas_selections:
+            if appearance.uses_atlas(merged_options[part]['appearanceMode']) and part not in atlas_selections:
                 # Historical registered houses can contain a visual mesh with
                 # no atlas binding. Editing prices/physics must not fail solely
                 # because of that pre-existing incomplete authoring state.
@@ -612,7 +604,7 @@ class RealEstateStore:
                       creator_type=credentials['creatorType'], creator_id=credentials['creatorId'],
                       api_key=credentials['apiKey'])
         for part in active:
-            if (row['meshOptions'][part]['appearanceMode'] == 'atlas'
+            if (appearance.uses_atlas(row['meshOptions'][part]['appearanceMode'])
                     and not row['textures'][part].get('atlasVariantId')):
                 raise ValueError(f'{part}: atlas mode requires a published or registered image')
         # Once an Estate has mesh-specific sources, stage every requested
@@ -640,7 +632,7 @@ class RealEstateStore:
                     texture = row['textures'].get(part, {})
                     images = ({part: str(prepare_texture(self.root, part,
                         _source(self.root, texture['path']), staging))}
-                        if row['meshOptions'][part]['appearanceMode'] == 'atlas' else {})
+                        if appearance.uses_atlas(row['meshOptions'][part]['appearanceMode']) else {})
                     selected = next((m for m in row['skeleton']['meshes'] if m['name'] == part), None)
                     prepare_publication(self.root, pinned_source, rigs,
                         row['skeleton'] if part == 'rig_carrier' else {'schemaVersion': 1, 'meshes': [selected]},
@@ -679,7 +671,7 @@ class RealEstateStore:
                     images = {
                         part: prepare_texture(self.root, part, _source(self.root, data['path']), staging)
                         for part, data in row['textures'].items()
-                        if row['meshOptions'][part]['appearanceMode'] == 'atlas'
+                        if appearance.uses_atlas(row['meshOptions'][part]['appearanceMode'])
                     }
                     rigs = staging / 'rigs'
                     prepare_publication(self.root, _source(self.root, row['model_path']), rigs,
@@ -723,7 +715,7 @@ class RealEstateStore:
         for part in active:
             if scope != 'all' and image_part != part:
                 continue
-            if row['meshOptions'][part]['appearanceMode'] == 'material':
+            if not appearance.uses_atlas(row['meshOptions'][part]['appearanceMode']):
                 if image_part == part:
                     raise ValueError(f'{part}: switch to atlas before publishing an image')
                 continue

@@ -28,11 +28,11 @@ def run_deco_refresh_bridge(*, timeout_seconds: float = 75.0,
         raise ValueError('Location Asset Studio Sync requires one valid slug')
     if type(binding_revision) is not int or binding_revision < 1:
         raise ValueError('invalid Location Asset binding revision')
-    if appearance_mode not in ('atlas','material'):
+    if appearance_mode not in ('atlas','material','material_atlas'):
         raise ValueError('invalid Location Asset appearance mode')
     if not re.fullmatch(r'[1-9][0-9]{0,19}', str(model_asset_id)):
         raise ValueError('a published Model Asset ID is required')
-    if appearance_mode=='atlas' and not re.fullmatch(r'[1-9][0-9]{0,19}', str(atlas_asset_id)):
+    if appearance_mode!='material' and not re.fullmatch(r'[1-9][0-9]{0,19}', str(atlas_asset_id)):
         raise ValueError('atlas mode requires a published Image Asset ID')
     if appearance_mode=='material' and atlas_asset_id!='':
         raise ValueError('material mode must not have an Image Asset ID')

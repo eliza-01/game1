@@ -17,17 +17,28 @@ function EnvironmentAssetVisuals.ApplyPart(part: BasePart, definition: any): boo
         or MeshPhysics.IsLocationCarrier(part) then return false end
     local uri = textureUri(definition)
     local mesh = part :: MeshPart
-    if definition and definition.appearanceMode == "material" then
+    local mode=tostring(definition and definition.appearanceMode or "atlas")
+    if mode=="material" or mode=="material_atlas" then
         local material = Enum.Material[tostring(definition.visualMaterial or "SmoothPlastic")]
         if not material then return false end
         local raw = tostring(definition.visualColor or "#FFFFFF")
         if not raw:match("^#[%x][%x][%x][%x][%x][%x]$") then return false end
         local color = Color3.fromRGB(tonumber(raw:sub(2,3),16),
             tonumber(raw:sub(4,5),16),tonumber(raw:sub(6,7),16))
-        local changed = mesh.Material ~= material or mesh.Color ~= color or mesh.TextureID ~= ""
+        local changed = mesh.Material ~= material or mesh.Color ~= color
         mesh.Material = material
         mesh.Color = color
-        mesh.TextureID = ""
+        if mode=="material" then
+            changed=changed or mesh.TextureID~=""
+            mesh.TextureID=""
+            return changed
+        end
+        -- Combined mode keeps its Atlas TextureID. Runtime never mutates
+        -- SurfaceAppearance; Studio owns alpha and imported appearance.
+        if uri and not mesh:FindFirstChildOfClass("SurfaceAppearance") and mesh.TextureID~=uri then
+            mesh.TextureID=uri
+            changed=true
+        end
         return changed
     end
     if uri == nil then return false end

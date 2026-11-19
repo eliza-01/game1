@@ -22,7 +22,7 @@
 <link rel="stylesheet" href="location-category-picker.css?v=249">
 <link rel="stylesheet" href="location-alpha.css?v=250">
 <link rel="stylesheet" href="deco-assets.css?v=254">
-<link rel="stylesheet" href="real-estate.css?v=247&physics=205">
+<link rel="stylesheet" href="real-estate.css?v=383&physics=205">
 <link rel="stylesheet" href="kanban.css?v=339">
 <style>#location-asset-editor-panel [hidden],#location-asset-edit-dialog [hidden]{display:none!important}</style>
 </head>
@@ -515,10 +515,10 @@
 <label class="location-registration-slug" hidden>slug<input id="location-asset-slug" readonly></label>
 <label>category<select id="location-asset-category"></select></label>
 <label>Object material · interaction sounds<select id="location-asset-surface-material"></select><small class="hint">Logical surface for impacts and footsteps only. Does not change the visible Roblox material.</small></label>
-<div class="deco-appearance-editor"><label>Appearance source<select id="location-asset-appearance-mode"><option value="material">Roblox Material + Color</option><option value="atlas">Texture Atlas · PNG/JPG</option></select></label>
+<div class="deco-appearance-editor"><label>Appearance source<select id="location-asset-appearance-mode"><option value="material">Roblox Material + Color</option><option value="atlas">Texture Atlas · PNG/JPG</option><option value="material_atlas">Roblox Material + Color + Atlas</option></select></label>
 <div id="location-asset-material-fields"><label>Visual Roblox material<select id="location-asset-visual-material"></select></label>
 <label>Visual color<input id="location-asset-visual-color" type="color" value="#ffffff"></label>
-<small class="hint">All BasePart materials. Air/Water are Terrain-only; ForceField needs a texture and is not available without an atlas.</small></div></div>
+<small class="hint">All BasePart materials. Air/Water are Terrain-only; ForceField needs a texture and is not available without an atlas.</small><small id="location-asset-combined-hint" class="hint" hidden>Atlas overrides the Roblox material texture on one MeshPart. Material and Color stay assigned; split meshes for separately visible surfaces.</small></div></div>
 </div>
 <div class="deco-gameplay-policy"><label class="deco-policy-toggle"><input id="location-asset-destructible" type="checkbox"><span><b>Destructible</b><small>On: weapon attacks pass through. Off: solid weapon blocker and causes bounce.</small></span></label></div>
 <hr class="card-separator">
@@ -1023,7 +1023,7 @@
 <script src="monster-assets.js?v=338"></script>
 <script src="npc-assets.js?v=370"></script>
 <script src="npc-spawns.js?v=337"></script>
-<script src="real-estate.js?v=247&rig=186&atlas=202&physics=232"></script>
+<script src="real-estate.js?v=383&rig=186&atlas=202&physics=232"></script>
 <script src="real-estate-mesh-workflow.js?v=234"></script>
 <script src="real-estate-placement.js?v=2"></script>
 <script src="monster-spawns.js?v=338"></script>

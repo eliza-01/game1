@@ -261,7 +261,7 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
         local settings = meshOptions[part]
         StudioRealEstateAppearance.Apply(meshes[part], settings, imageAssets[part], imageAlpha[part])
         setGlassAppearance(meshes[part], typeof(settings) == 'table' and settings.glass == true)
-        if settings.appearanceMode == "atlas" then textureCount += 1 end
+        if settings.appearanceMode ~= "material" then textureCount += 1 end
         StudioRealEstateCollisionPolicy.Apply(meshes[part], part, settings)
     end
     -- Canonical technical carrier is the only root. Static meshes are

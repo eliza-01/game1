@@ -9,23 +9,6 @@ local function visual(part: Instance): boolean
         and part.Name ~= "rig_carrier" and part:GetAttribute("Game1DecoPhysicsOnly") ~= true
 end
 
-local function hexColor(value: any): Color3
-    if type(value) ~= "string" or not value:match("^#[%x][%x][%x][%x][%x][%x]$") then
-        error("invalid Location Asset visualColor")
-    end
-    return Color3.fromRGB(tonumber(value:sub(2,3),16),
-        tonumber(value:sub(4,5),16),tonumber(value:sub(6,7),16))
-end
-
-local function materialEnum(name: any): Enum.Material
-    local item = Enum.Material[tostring(name or "SmoothPlastic")]
-    if not item or item==Enum.Material.Air or item==Enum.Material.Water
-        or item==Enum.Material.ForceField then
-        error("invalid textureless Roblox visual material " .. tostring(name))
-    end
-    return item
-end
-
 function Visual.Capture(mesh: MeshPart): any
     local surfaces={}
     for _, child in ipairs(mesh:GetChildren()) do
@@ -70,19 +53,35 @@ function Visual.IsCurrent(mesh: MeshPart, row: any): boolean
     local mode=tostring(row.appearanceMode or "atlas")
     local surface=mesh:FindFirstChildOfClass("SurfaceAppearance")
     if mode=="material" then
+        local material,color=Texture.MaterialColor(
+            tostring(row.visualMaterial or "SmoothPlastic"),
+            tostring(row.visualColor or "#FFFFFF"))
         return mesh.TextureID=="" and surface==nil
-            and mesh.Material==materialEnum(row.visualMaterial)
-            and mesh.Color==hexColor(row.visualColor)
+            and mesh.Material==material
+            and mesh.Color==color
             and mesh:GetAttribute("Game1DecoAppearanceMode")=="material"
+    end
+    if mode~="atlas" and mode~="material_atlas" then
+        error("invalid Location appearance mode "..mode)
     end
     local atlas=tostring(row.texture_asset_id or "")
     if atlas=="" then error("atlas mode requires a published Image ID") end
     local uri="rbxassetid://"..atlas
     local alpha=row.alphaEnabled==true
-    return mesh.TextureID==uri
+    local materialCurrent=true
+    if mode=="material_atlas" then
+        local material,color=Texture.MaterialColor(
+            tostring(row.visualMaterial or "SmoothPlastic"),
+            tostring(row.visualColor or "#FFFFFF"),true)
+        materialCurrent=mesh.Material==material and mesh.Color==color
+    else
+        materialCurrent=mesh.Material==Enum.Material.SmoothPlastic
+            and mesh.Color==Color3.new(1,1,1)
+    end
+    return materialCurrent and mesh.TextureID==uri
         and (if alpha then surface~=nil and surface.ColorMap==uri
             and surface.AlphaMode==Enum.AlphaMode.Transparency else surface==nil)
-        and mesh:GetAttribute("Game1DecoAppearanceMode")~="material"
+        and mesh:GetAttribute("Game1DecoAppearanceMode")==mode
 end
 
 function Visual.Apply(mesh: MeshPart, row: any): boolean
@@ -92,20 +91,21 @@ function Visual.Apply(mesh: MeshPart, row: any): boolean
     local ok,err=pcall(function()
         if tostring(row.appearanceMode or "atlas")=="material" then
             Texture.ApplyVisual(mesh,row)
-            mesh:SetAttribute("Game1DecoVisualMaterial",materialEnum(row.visualMaterial).Name)
+            mesh:SetAttribute("Game1DecoVisualMaterial",mesh.Material.Name)
             mesh:SetAttribute("Game1DecoVisualColor",row.visualColor)
             mesh:SetAttribute("Game1DecoAppearanceMode","material")
         else
             local atlas=tostring(row.texture_asset_id or "")
             if not atlas:match("^[1-9]%d*$") then error("atlas publication missing") end
-            if mesh:GetAttribute("Game1DecoAppearanceMode")=="material" then
+            local mode=tostring(row.appearanceMode or "atlas")
+            if mode=="atlas" then
                 mesh.Material=Enum.Material.SmoothPlastic
                 mesh.Color=Color3.new(1,1,1)
             end
             Texture.ApplyVisual(mesh,row,"rbxassetid://"..atlas)
-            mesh:SetAttribute("Game1DecoVisualMaterial",nil)
-            mesh:SetAttribute("Game1DecoVisualColor",nil)
-            mesh:SetAttribute("Game1DecoAppearanceMode","atlas")
+            mesh:SetAttribute("Game1DecoVisualMaterial",if mode=="material_atlas" then mesh.Material.Name else nil)
+            mesh:SetAttribute("Game1DecoVisualColor",if mode=="material_atlas" then row.visualColor else nil)
+            mesh:SetAttribute("Game1DecoAppearanceMode",mode)
         end
     end)
     if not ok then

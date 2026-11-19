@@ -1,9 +1,10 @@
-"""Location Asset visual appearance, independent from semantic sound material.
+"""Shared MeshPart visual material policy for Real Estate and Location Assets.
 
-Only Roblox BasePart-compatible Enum.Material members are offered. The list
+All Roblox BasePart-compatible Enum.Material members are offered. The list
 mirrors https://create.roblox.com/docs/reference/engine/enums/Material
-(Air/Water are Terrain-only, ForceField requires a texture and is not a valid
-textureless choice).  No MaterialVariant/MaterialService assets are assumed.
+(Air/Water are Terrain-only; ForceField needs a UV-mapped texture and is not
+offered for textureless Material + Color). No MaterialVariant assets are assumed.
+Both editor APIs use options() and both stores use validated().
 """
 from __future__ import annotations
 import re
@@ -22,8 +23,8 @@ BASEPART_MATERIALS = (
 
 def validated(mode: object, material: object, color: object) -> tuple[str, str, str]:
     mode = str(mode or 'atlas').strip().lower()
-    if mode not in ('atlas', 'material'):
-        raise ValueError('appearanceMode must be atlas or material')
+    if mode not in ('atlas', 'material', 'material_atlas'):
+        raise ValueError('appearanceMode must be atlas, material or material_atlas')
     material = str(material or 'SmoothPlastic').strip()
     if material not in BASEPART_MATERIALS:
         raise ValueError('visualMaterial must be a supported Roblox BasePart Enum.Material')
@@ -33,6 +34,14 @@ def validated(mode: object, material: object, color: object) -> tuple[str, str, 
     if not re.fullmatch(r'#[0-9A-F]{6}', color):
         raise ValueError('visualColor must be a #RRGGBB color')
     return mode, material, color
+
+
+def uses_atlas(mode: str) -> bool:
+    return mode in ('atlas', 'material_atlas')
+
+
+def uses_material(mode: str) -> bool:
+    return mode in ('material', 'material_atlas')
 
 
 def options() -> list[dict]:

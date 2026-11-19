@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'system/control-center'))
 
 from location_asset_store import LocationAssetStore
-from services.location_visual_appearance import BASEPART_MATERIALS, validated
+from services.mesh_visual_appearance import BASEPART_MATERIALS, validated
 from services.place_registry.catalog import build_catalog
 from services.location_asset_sync_history import LocationAssetSyncHistory
 from services.studio_deco_bridge import run_deco_refresh_bridge
@@ -111,9 +111,11 @@ class LocationMaterialM343D(TestCase):
         placer=(root/'system/studio-plugin/modules/StudioPlaceRegistrySync.luau').read_text(encoding='utf-8')
         inventory=(root/'system/studio-plugin/modules/StudioPlaceRegistryInventory.luau').read_text(encoding='utf-8')
         manager=(root/'system/studio-plugin/modules/DecoManager.luau').read_text(encoding='utf-8')
-        self.assertIn('mesh.TextureID=""', studio)
-        self.assertIn('mesh.Material=material', studio)
-        self.assertIn('mesh.Color=color', studio)
+        shared=(root/'system/studio-plugin/modules/StudioTextureAppearance.luau').read_text(encoding='utf-8')
+        self.assertIn('Texture.ApplyVisual(mesh,row', studio)
+        self.assertIn('mesh.TextureID=""', shared)
+        self.assertIn('mesh.Material=material', shared)
+        self.assertIn('mesh.Color=color', shared)
         self.assertIn('child:Destroy()', studio)
         section=core.split('function Core.ApplyLocationSurfaceMaterial',1)[1].split('\nend',1)[0]
         self.assertNotIn('mesh.Material=', section)
@@ -133,7 +135,7 @@ class LocationMaterialM343D(TestCase):
         self.assertIn('id="location-asset-visual-material"',html)
         self.assertIn('id="location-asset-visual-color"',html)
         self.assertIn("$('location-asset-appearance-mode').value = 'material'",js)
-        self.assertIn("payload.appearanceMode==='atlas'",js)
+        self.assertIn("payload.appearanceMode!=='material'",js)
         self.assertIn('visualMaterials',js)
 
     def test_studio_inventory_respects_atlas_alpha_and_default_sound_reset(self):

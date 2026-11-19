@@ -58,8 +58,14 @@ function decoAssetAppearanceMode() {
   return $('location-asset-appearance-mode').value;
 }
 function decoAssetToggleAppearance() {
-  const material = decoAssetAppearanceMode() === 'material';
-  $('location-asset-material-fields').hidden = !material;
+  const mode=decoAssetAppearanceMode();
+  const material=mode==='material';
+  $('location-asset-material-fields').hidden = mode==='atlas';
+  const hint=$('location-asset-combined-hint');
+  if(hint)hint.hidden=mode!=='material_atlas';
+  document.querySelectorAll('#location-asset-visual-material option').forEach(option=>{
+    if(option.dataset.requiresTexture==='true')option.disabled=material;
+  });
   document.querySelectorAll('#location-asset-editor-panel .location-atlas-only')
     .forEach(node => { node.hidden = material; });
   // The atlas selection remains in memory but is NEVER submitted in material mode.
@@ -221,11 +227,13 @@ function decoAssetRender() {
     for (const item of decoAssetState.data.options?.visualMaterials || []) {
       const option = document.createElement('option');
       option.value = item.id; option.textContent = item.label + (item.requiresTexture ? ' · requires texture' : '');
-      option.disabled = Boolean(item.requiresTexture);
+      option.dataset.requiresTexture = String(Boolean(item.requiresTexture));
+      option.disabled = Boolean(item.requiresTexture) && decoAssetAppearanceMode()==='material';
       visualMaterials.appendChild(option);
     }
     visualMaterials.value = 'SmoothPlastic';
   }
+  decoAssetToggleAppearance();
   decoAssetRenderLibraryFilter();
   const publication = decoAssetState.data.publication || {};
   const publicationState = $('location-asset-publication-state');
@@ -331,13 +339,13 @@ async function decoAssetRegister() {
       appearanceMode:decoAssetAppearanceMode(), visualMaterial:$('location-asset-visual-material').value,
       visualColor:$('location-asset-visual-color').value,
       modelSourcePath:decoAssetState.modelPath,
-      textureSourcePath:decoAssetAppearanceMode()==='atlas'?decoAssetState.texturePath:'',
-      atlasVariantId:decoAssetAppearanceMode()==='atlas'?decoAssetState.atlasVariantId:0,
+      textureSourcePath:decoAssetAppearanceMode()!=='material'?decoAssetState.texturePath:'',
+      atlasVariantId:decoAssetAppearanceMode()!=='material'?decoAssetState.atlasVariantId:0,
       createOnly:true, inspectFbx:true,
       meshOptions:decoAssetState.meshOptions,
     };
     if (!payload.modelSourcePath || !decoAssetState.inspection) throw Error('Choose and analyze the FBX first');
-    if (payload.appearanceMode==='atlas' && !payload.textureSourcePath && !payload.atlasVariantId)
+    if (payload.appearanceMode!=='material' && !payload.textureSourcePath && !payload.atlasVariantId)
       throw Error('Choose PNG/JPG or an existing atlas');
     const row = await request('/api/location-assets', {
       method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload),
@@ -365,7 +373,7 @@ async function decoAssetSaveEdits(slug, payload, expectedRevision) {
       visualColor:payload.visualColor ?? row.visualColor ?? '#FFFFFF',
       modelSourcePath:payload.modelSourcePath || '', textureSourcePath:payload.textureSourcePath || '',
       atlasVariantId:(payload.appearanceMode ?? row.appearanceMode)==='material'?0:
-        (payload.textureSourcePath ? 0 : (payload.atlasVariantId ?? (row.appearanceMode==='atlas'?row.atlasVariantId:0))),
+        (payload.textureSourcePath ? 0 : (payload.atlasVariantId ?? (row.appearanceMode!=='material'?row.atlasVariantId:0))),
       expectedRevision, editOnly:true, inspectFbx:Boolean(payload.modelSourcePath),
       ...(payload.meshOptions ? {meshOptions:payload.meshOptions} : {}),
     }),

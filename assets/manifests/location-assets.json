@@ -986,6 +986,38 @@
       ]
     },
     {
+      "atlasKey": "glass_01",
+      "baseKey": "glass",
+      "version": "01",
+      "variants": [
+        {
+          "id": 82,
+          "family_id": 59,
+          "width": 32,
+          "height": 32,
+          "filename": "glass_01_32x32_atlas.png",
+          "original_filename": "glass_01_32x32_atlas.png",
+          "source_path": "assets/source/texture-atlases/glass_01/32x32/glass_01_32x32_atlas.png",
+          "source_sha256": "97fd6fa90b7f9294580091a759c002757d1ebf78012ec78a35bc136bda6133a1",
+          "uses_alpha": true,
+          "published_id": "83863543401865",
+          "published_sha256": "97fd6fa90b7f9294580091a759c002757d1ebf78012ec78a35bc136bda6133a1",
+          "moderation_state": "Reviewing",
+          "published_at": 1795102592.0412083,
+          "created_at": 1795102588.1573396,
+          "retired_at": null,
+          "atlas_key": "glass_01",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "32x32",
+          "baseKey": "glass",
+          "version": "01"
+        }
+      ]
+    },
+    {
       "atlasKey": "ground_torch_01",
       "baseKey": "ground_torch",
       "version": "01",

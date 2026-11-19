@@ -235,9 +235,9 @@ def route(path, body, deps):
                 raise ValueError('publish the Location Asset Model before Studio Sync')
             # The M203 independent binding is a direct slug->variant relation.
             # Legacy inherited bindings cannot be acknowledged by a scoped Sync.
-            if row.get('appearanceMode', 'atlas') == 'atlas' and row.get('atlasBindingSourceSlug') not in (None, '', slug):
+            if row.get('appearanceMode', 'atlas') != 'material' and row.get('atlasBindingSourceSlug') not in (None, '', slug):
                 raise ValueError('independent atlas binding required for scoped Studio Sync')
-            if row.get('appearanceMode', 'atlas') == 'atlas':
+            if row.get('appearanceMode', 'atlas') != 'material':
                 if not location_assets.atlases.binding('location_asset', slug):
                     raise ValueError('direct atlas binding not found')
                 if not str(row.get('texture_asset_id') or ''):
@@ -280,7 +280,7 @@ def route(path, body, deps):
                                 'texture_asset_id', 'bindingRevision', 'revision',
                                 'alphaEnabled','appearanceMode','visualMaterial','visualColor','surfaceMaterial')
                     if latest and all(latest.get(key) == row.get(key) for key in identity):
-                        if row.get('appearanceMode', 'atlas') == 'atlas':
+                        if row.get('appearanceMode', 'atlas') != 'material':
                             if location_assets.atlases.mark_synced('location_asset', slug, revision):
                                 location_assets.export()
                     else:
@@ -291,7 +291,7 @@ def route(path, body, deps):
             # Only a successful explicit Replace acknowledges Studio ID changes.
             deps['location_asset_sync_history'].append(
                 slug=slug, binding_revision=revision, studio=studio)
-            if phase == 'replace' and studio['fullySynced'] and row.get('appearanceMode', 'atlas') == 'atlas':
+            if phase == 'replace' and studio['fullySynced'] and row.get('appearanceMode', 'atlas') != 'material':
                 location_assets.atlases.mark_synced('location_asset', slug, revision)
             location_assets.export()
             return out(200, {'studio': studio})

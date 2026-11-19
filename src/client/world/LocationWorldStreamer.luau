@@ -20,7 +20,7 @@ end
 
 local function paint(mesh, asset)
     -- Align FULL and LOD1 to the same visual material contract.
-    if asset.appearanceMode == "material" then
+    if asset.appearanceMode == "material" or asset.appearanceMode == "material_atlas" then
         local material = Enum.Material[tostring(asset.visualMaterial)]
         if material then mesh.Material = material end
         local hex = tostring(asset.visualColor or "")
@@ -28,7 +28,7 @@ local function paint(mesh, asset)
             mesh.Color = Color3.fromRGB(tonumber(hex:sub(2, 3), 16),
                 tonumber(hex:sub(4, 5), 16), tonumber(hex:sub(6, 7), 16))
         end
-        mesh.TextureID = ""
+        if asset.appearanceMode=="material" then mesh.TextureID="" end
     end
 end
 

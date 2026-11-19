@@ -121,17 +121,23 @@ function StudioTextureAppearance.ApplyAlpha(mesh: MeshPart, enabled: boolean, ur
     return StudioTextureAppearance.Apply(mesh, content, true)
 end
 
-function StudioTextureAppearance.ApplyMaterial(mesh: MeshPart, materialName: string, hex: string): boolean
+-- Shared conversion/validation used by all Studio visual appearance adapters.
+function StudioTextureAppearance.MaterialColor(materialName: string, hex: string, hasAtlas: boolean?): (Enum.Material, Color3)
     local material=Enum.Material[materialName]
     if material == nil or material == Enum.Material.Air or material == Enum.Material.Water
-        or material == Enum.Material.ForceField then
+        or (material == Enum.Material.ForceField and hasAtlas ~= true) then
         error("Unknown visual material " .. tostring(materialName),2)
     end
-    if not hex:match("^#[%x][%x][%x][%x][%x][%x]$") then
+    if type(hex) ~= "string" or not hex:match("^#[%x][%x][%x][%x][%x][%x]$") then
         error("visual color must be #RRGGBB",2)
     end
     local color=Color3.fromRGB(tonumber(hex:sub(2,3),16),
         tonumber(hex:sub(4,5),16),tonumber(hex:sub(6,7),16))
+    return material, color
+end
+
+function StudioTextureAppearance.ApplyMaterial(mesh: MeshPart, materialName: string, hex: string): boolean
+    local material,color=StudioTextureAppearance.MaterialColor(materialName,hex)
     local surface=mesh:FindFirstChildOfClass("SurfaceAppearance")
     if mesh.TextureID=="" and surface==nil and mesh.Material==material
         and mesh.Color==color then return false end
@@ -154,11 +160,31 @@ function StudioTextureAppearance.ApplyVisual(mesh: MeshPart, settings: any, uri:
             tostring(opts.visualMaterial or "SmoothPlastic"),
             tostring(opts.visualColor or "#FFFFFF"))
     end
-    if mode~="atlas" then error("Invalid MeshPart appearance mode "..mode,2) end
+    if mode~="atlas" and mode~="material_atlas" then
+        error("Invalid MeshPart appearance mode "..mode,2)
+    end
     if type(uri)~="string" or uri=="" then
         error("Atlas mode requires a published Image Asset ID",2)
     end
-    return StudioTextureAppearance.ApplyLocation(mesh,uri,opts.alphaEnabled==true)
+    -- TextureID / alpha remain owned by the same central binder for BOTH
+    -- Location Assets and Real Estate. Material + Atlas additionally saves
+    -- material/color on the MeshPart (without extra SurfaceAppearance).
+    local material: Enum.Material? = nil
+    local color: Color3? = nil
+    if mode=="material_atlas" then
+        material,color=StudioTextureAppearance.MaterialColor(
+            tostring(opts.visualMaterial or "SmoothPlastic"),
+            tostring(opts.visualColor or "#FFFFFF"),true)
+    end
+    local applied=StudioTextureAppearance.ApplyLocation(mesh,uri,opts.alphaEnabled==true)
+    if material and color then
+        if mesh.Material~=material or mesh.Color~=color then
+            mesh.Material=material
+            mesh.Color=color
+            return true
+        end
+    end
+    return applied
 end
 
 function StudioTextureAppearance.ApplyLocation(mesh: MeshPart, uri: string, enabled: boolean): boolean

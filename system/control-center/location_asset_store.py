@@ -18,7 +18,7 @@ from services.mesh_authoring_policy import normalize_location_options
 from services.retired_col_mesh import strip_options
 from services import location_asset_taxonomy as taxonomy
 from services import location_asset_alpha
-from services import location_visual_appearance as appearance
+from services import mesh_visual_appearance as appearance
 from services import location_collision_blueprint
 from services import location_lod_resource
 from services.texture_atlas_registry import AtlasRegistry, parse_filename
@@ -596,7 +596,7 @@ class LocationAssetStore:
              now,old.get('published_at') if old else None,
              json.dumps(effective_options, ensure_ascii=False, sort_keys=True),surface_material,int(alpha_enabled),
              appearance_mode,visual_material,visual_color))
-        if appearance_mode == 'atlas':
+        if appearance.uses_atlas(appearance_mode):
             self.atlases.bind('location_asset', slug, atlas_variant_id, allow_unpublished=True)
         if inspected is not None:
             self._save_fbx_analysis(slug, values['model_sha256'], inspected)
@@ -641,7 +641,7 @@ class LocationAssetStore:
             raise ValueError('canonical Location Asset FBX is missing')
         if scope == 'atlas' and row['appearanceMode'] == 'material':
             raise ValueError('no atlas to publish for material appearance')
-        if scope in ('changed', 'atlas') and row['appearanceMode'] == 'atlas':
+        if scope in ('changed', 'atlas') and appearance.uses_atlas(row['appearanceMode']):
             if atlas_binding is None:
                 raise ValueError('independent atlas binding missing')
             texture = self.root / str(row.get('texture_path') or '')
@@ -686,7 +686,7 @@ class LocationAssetStore:
                     (slug, 'model', int(row['revision']), result.asset_id, result.operation_path,
                      row['model_sha256'], result.moderation_state or '', now))
 
-        if scope in ('changed', 'atlas') and row['appearanceMode']=='atlas' and atlas_binding is not None and not atlas_binding['current']:
+        if scope in ('changed', 'atlas') and appearance.uses_atlas(row['appearanceMode']) and atlas_binding is not None and not atlas_binding['current']:
             self.atlases.ensure_published(atlas_binding['variant_id'], credentials, description)
 
         self.export()
@@ -885,7 +885,7 @@ class LocationAssetStore:
                 f"\t\t\tvisualMaterial = {self._lua_string(row.get('visualMaterial') or 'SmoothPlastic')},",
                 f"\t\t\tvisualColor = {self._lua_string(row.get('visualColor') or '#FFFFFF')},",
                 f"\t\t\talphaEnabled = {str(bool(row.get('alphaEnabled'))).lower()},",
-                f"\t\t\trobloxMaterial = {self._lua_string(row.get('visualMaterial') if row.get('appearanceMode') == 'material' else '')},",
+                f"\t\t\trobloxMaterial = {self._lua_string(row.get('visualMaterial') if appearance.uses_material(row.get('appearanceMode')) else '')},",
                 f"\t\t\tsoundFamily = {self._lua_string(row['materialDefinition']['soundFamily'])},",
                 f"\t\t\tstatus = {self._lua_string(row['status'])},",
                 f"\t\t\tmodelAssetId = {self._lua_string(row.get('model_asset_id') or '')},",

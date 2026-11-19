@@ -41,7 +41,7 @@ def build_catalog(location_assets) -> dict:
             'collisionBlueprintRevision': int(row.get('collisionBlueprintRevision') or 0),
             'collisionBlueprintSha256': str(row.get('collisionBlueprintSha256') or ''),
             'collisionBlueprint': row.get('collisionBlueprint'),
-            'robloxMaterial': str(row.get('visualMaterial') or 'SmoothPlastic') if mode == 'material' else '',
+            'robloxMaterial': str(row.get('visualMaterial') or 'SmoothPlastic') if mode in ('material', 'material_atlas') else '',
             'rigManifest': (location_assets.rig_manifest(slug, model)
                             if hasattr(location_assets, 'rig_manifest') else None),
             'legacyStaticPublication': bool(row.get('legacyStaticPublication')),

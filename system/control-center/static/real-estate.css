@@ -33,15 +33,19 @@
    Never put mesh labels in a fixed-width grid column: long names must wrap. */
 #real-estate-mesh-textures { display:flex; flex-direction:column; gap:9px; min-width:0; }
 #real-estate-mesh-textures .real-estate-texture-row {
-  display:flex; flex-direction:column; align-items:stretch;
-  gap:9px; min-width:0; max-width:100%; padding:11px 12px;
+  display:block; min-width:0; max-width:100%; padding:11px 12px;
   border:1px solid var(--line); border-radius:10px;
 }
 .real-estate-texture-row [hidden] { display:none !important; }
 .real-estate-texture-heading {
-  display:flex; align-items:baseline; flex-wrap:wrap; gap:5px 10px;
-  min-width:0; padding-bottom:2px;
+  display:flex; align-items:center; flex-wrap:wrap; gap:5px 10px;
+  min-width:0; cursor:pointer; list-style:none;
 }
+.real-estate-texture-heading::-webkit-details-marker { display:none; }
+.real-estate-texture-heading::before { content:"▸"; color:var(--muted); font-size:14px; }
+.real-estate-texture-row[open] > .real-estate-texture-heading::before { content:"▾"; }
+.real-estate-texture-heading:focus-visible { outline:2px solid var(--mint); outline-offset:4px; border-radius:3px; }
+.real-estate-texture-body { display:flex; flex-direction:column; gap:9px; min-width:0; margin-top:10px; }
 .real-estate-texture-heading .real-estate-mesh-name {
   display:block; flex:1 1 130px; min-width:0;
   color:var(--text); font-size:13px; font-weight:750;

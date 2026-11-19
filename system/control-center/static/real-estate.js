@@ -245,8 +245,11 @@ function realEstateParts(){
   const analysis=realEstateState.inspect?.analysis||realEstateSelected()?.skeleton;
   return (analysis?.meshes||[]).map(mesh=>mesh.name).filter(name=>typeof name==='string');
 }
-function realEstateRenderTextures(){
+function realEstateRenderTextures(row){
   const host=$('real-estate-mesh-textures');
+  // Rebuilds (mode changes / texture browsing) keep expanded editors open.
+  // Switching to another house through realEstateForm(row) starts collapsed.
+  const openParts=new Set(row ? [] : Array.from(host.querySelectorAll?.('.real-estate-texture-row[open]')||[], element=>element.dataset.texturePart));
   const parts=realEstateParts();
   for(const part of parts){
     realEstateState.meshOptions[part]=realEstateNormalizePhysics(part,realEstateState.meshOptions[part]);
@@ -256,7 +259,7 @@ function realEstateRenderTextures(){
   host.innerHTML='<small class="real-estate-physics-caution">Static house collision will use a separately authored Roblox Parts blueprint. Visual meshes default to No Collide.</small>'+parts.map(part=>{
     let selected=realEstateState.textures[part]||'';
     const reuse=realEstateState.reuseEnabled[part]===true;
-    if(realEstateState.appearance[part].appearanceMode==='atlas' && !selected && !reuse){
+    if(realEstateState.appearance[part].appearanceMode!=='material' && !selected && !reuse){
       const guess=options.find(item=>item.name.toLowerCase().startsWith(part+'.')||item.name.toLowerCase().startsWith(part+'_'));
       if(guess)selected=guess.path;
     }
@@ -270,19 +273,22 @@ function realEstateRenderTextures(){
     realEstateState.reuseFilters[part]=filters;
     const flags=realEstateState.meshOptions[part];
     const appearance=realEstateState.appearance[part];
-    const atlas=appearance.appearanceMode==='atlas';
-    const materials=['SmoothPlastic','Plastic','Wood','WoodPlanks','Slate','Concrete','Brick','Cobblestone','Metal','CorrodedMetal','DiamondPlate','Foil','Grass','LeafyGrass','Fabric','Marble','Granite','Sand','Sandstone','Limestone','Basalt','CrackedLava','Ground','Mud','Asphalt','Pavement','Rock','Glacier','Ice','Snow','Neon','Glass'];
-    return `<div class="real-estate-texture-row" data-texture-part="${esc(part)}">
-      <div class="real-estate-texture-heading"><strong class="real-estate-mesh-name">${esc(realEstateMeshLabel(part))}</strong><span class="real-estate-mesh-kind">Visual mesh</span></div>
+    const atlas=appearance.appearanceMode!=='material';
+    const material=appearance.appearanceMode!=='atlas';
+    const materials=realEstateState.data?.visualMaterials||[];
+    return `<details class="real-estate-texture-row" data-texture-part="${esc(part)}" ${openParts.has(part)?'open':''}>
+      <summary class="real-estate-texture-heading"><strong class="real-estate-mesh-name">${esc(realEstateMeshLabel(part))}</strong><span class="real-estate-mesh-kind">Visual mesh</span></summary>
+      <div class="real-estate-texture-body">
       <div class="real-estate-mesh-switches" role="group" aria-label="${esc(part)} mesh appearance">
-        <label>Appearance <select id="real-estate-appearance-${esc(part)}"><option value="material" ${!atlas?'selected':''}>Material + Color</option><option value="atlas" ${atlas?'selected':''}>Texture Atlas</option></select></label>
-        <span id="real-estate-material-controls-${esc(part)}" ${atlas?'hidden':''}><select id="real-estate-material-${esc(part)}" aria-label="${esc(part)} Roblox material">${materials.map(name=>`<option value="${name}" ${appearance.visualMaterial===name?'selected':''}>${name}</option>`).join('')}</select>
+        <label>Appearance <select id="real-estate-appearance-${esc(part)}"><option value="material" ${appearance.appearanceMode==='material'?'selected':''}>Material + Color</option><option value="atlas" ${appearance.appearanceMode==='atlas'?'selected':''}>Texture Atlas</option><option value="material_atlas" ${appearance.appearanceMode==='material_atlas'?'selected':''}>Material + Color + Atlas</option></select></label>
+        <span id="real-estate-material-controls-${esc(part)}" ${!material?'hidden':''}><select id="real-estate-material-${esc(part)}" aria-label="${esc(part)} Roblox material">${materials.map(item=>`<option value="${esc(item.id)}" ${appearance.visualMaterial===item.id?'selected':''} ${item.requiresTexture&&appearance.appearanceMode==='material'?'disabled':''}>${esc(item.label)}${item.requiresTexture?' · requires texture':''}</option>`).join('')}</select>
         <input type="color" id="real-estate-color-${esc(part)}" aria-label="${esc(part)} color" value="${esc(appearance.visualColor)}"></span>
         <label id="real-estate-alpha-controls-${esc(part)}" ${!atlas?'hidden':''}><input type="checkbox" id="real-estate-alpha-${esc(part)}" ${appearance.alphaEnabled?'checked':''}> Alpha transparency</label>
         <label class="real-estate-glass-toggle" title="Studio MeshPart Transparency = 0.02 (if checked)"><input type="checkbox" id="real-estate-glass-${esc(part)}" ${flags.glass?'checked':''}> Glass · 0.02</label>
         <label class="real-estate-physics-toggle" title="Disable physics collisions, touch events, and spatial queries for this mesh"><input type="checkbox" id="real-estate-nocollide-${esc(part)}" ${flags.noCollide?'checked':''}> No Collide</label>
         <label class="real-estate-reuse-toggle" title="Bind this mesh to an existing published Atlas Registry variant. Reuse never uploads another Roblox Image Asset."><input type="checkbox" id="real-estate-reuse-${esc(part)}" ${reuse?'checked':''}> Reuse atlas</label>
       </div>
+      ${appearance.appearanceMode==='material_atlas'?'<small class="muted">Atlas takes precedence over the Roblox material texture on a single MeshPart. Material and Color remain assigned; for separately visible surfaces use separate meshes.</small>':''}
       ${realEstatePhysicsControls(part,flags)}
       <div id="real-estate-owned-${esc(part)}" class="real-estate-texture-owned" ${!atlas||reuse?'hidden':''}>
         <select aria-label="${esc(part)} texture" id="real-estate-texture-${esc(part)}">${choices.join('')}</select>
@@ -295,7 +301,7 @@ function realEstateRenderTextures(){
         </div>
         <select aria-label="${esc(part)} reused texture" id="real-estate-reference-${esc(part)}"></select>
         <small class="hint">Atlases are identified by filename and Image Asset ID, independent of the first model that used them (no upload). For changed pixels, use Republish instead.</small>
-      </div></div>`;
+      </div></div></details>`;
   }).join('');
   for(const part of parts){
     $(`real-estate-appearance-${part}`).onchange=event=>{
@@ -429,7 +435,7 @@ async function realEstateChooseFbx(){
 function realEstatePayload(){
   const parts=realEstateParts();
   for(const part of parts){
-    if(realEstateState.appearance[part]?.appearanceMode==='atlas'
+    if(realEstateState.appearance[part]?.appearanceMode!=='material'
       && realEstateState.reuseEnabled[part] && !realEstateState.textureRefs[part]){
       throw Error(`choose a reusable texture source for ${part}`);
     }
@@ -639,7 +645,7 @@ function realEstateRender(){
     const textureLines=parts.map(part=>{
       const tex=textures[part]||{};
       const isMaterial=item.meshOptions?.[part]?.appearanceMode==='material';
-      const filename=isMaterial?`${item.meshOptions[part].visualMaterial} ${item.meshOptions[part].visualColor}`:(tex.filename||tex.path?.split('/').pop()||tex.reuseReference||'—');
+      const filename=isMaterial?`${item.meshOptions[part].visualMaterial} ${item.meshOptions[part].visualColor}`:(tex.filename||tex.path?.split('/').pop()||tex.reuseReference||'—')+(item.meshOptions?.[part]?.appearanceMode==='material_atlas'?` · ${item.meshOptions[part].visualMaterial} ${item.meshOptions[part].visualColor}`:'');
       return `<div class="real-estate-texture-line"><strong>${esc(realEstateMeshLabel(part))}</strong>: <span class="real-estate-texture-filename">${esc(filename)}</span>${!isMaterial&&tex.atlasLegacyWarning?'<span class="deco-atlas-warning" title="Expected &lt;atlas_key&gt;_&lt;width&gt;x&lt;height&gt;_atlas.png"> ⚠️</span>':''}${isMaterial?'':realEstateAtlasDots(tex,part)+realEstateAtlasVersionSelector(tex,part)}<button type="button" class="real-estate-texture-manage" data-re-texture="${esc(part)}">Manage atlas</button>${tex.atlasSyncStatus==='pending_studio_sync'?'<button type="button" data-re-atlas-retry="'+esc(part)+'" class="deco-atlas-retry">Sync pending · retry</button>':''}</div>`;
     }).join('');
     const carrierLine=`<div class="real-estate-carrier-line"><div class="real-estate-mesh-card-header"><strong>Rig carrier · sockets</strong></div><div class="real-estate-asset-identities"><span class="real-estate-asset-id real-estate-asset-model"><span>model</span><code>${asset(rigs.rig_carrier?.assetId,Boolean(rigs.rig_carrier?.assetId&&item.publicationCurrent?.model))}</code></span></div><small class="real-estate-mesh-source-label">Independent technical Model Asset</small></div>`;

@@ -1,6 +1,7 @@
 """Real Estate authoring HTTP routes; persistence lives in RealEstateStore."""
 from urllib.parse import unquote
 from real_estate.contracts import HOUSE_NAME
+from services import mesh_visual_appearance as appearance
 
 
 def read(parsed, sources):
@@ -10,6 +11,7 @@ def read(parsed, sources):
         try:
             snapshot = sources['real_estate'].snapshot()
             snapshot['publication'] = sources['publication_config']()
+            snapshot['visualMaterials'] = appearance.options()
             # Plot pivots outlive house registrations (M373). Expose orphaned
             # stable house types so the editor can offer explicit re-registration.
             registered = {item['slug'] for item in snapshot['items']}

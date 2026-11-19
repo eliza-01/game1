@@ -12,7 +12,7 @@ import time
 
 from sqlite_connection import connect as connect_sqlite
 from services.location_asset_taxonomy import surface_material
-from services.location_visual_appearance import validated
+from services.mesh_visual_appearance import validated
 
 _SLUG = re.compile(r'[a-z0-9][a-z0-9_]{0,63}\Z')
 _CONSUMER_TABLES = ('texture_atlas_bindings', 'texture_atlas_consumer_options',
@@ -66,7 +66,7 @@ def rename(store, old_slug: str, payload: dict) -> dict:
         mode,visual,color = validated(payload.get('appearanceMode',current['appearance_mode']),
                                       payload.get('visualMaterial',current['visual_material']),
                                       payload.get('visualColor',current['visual_color']))
-        if mode=='atlas' and current['appearance_mode']=='material' and not store.atlases.binding('location_asset',old_slug):
+        if mode!='material' and current['appearance_mode']=='material' and not store.atlases.binding('location_asset',old_slug):
             raise ValueError('choose an atlas before switching to atlas appearance')
         now = time.time()
         db.execute('UPDATE location_assets SET slug=?,name_en=?,category=?,destructible=?,surface_material=?, '

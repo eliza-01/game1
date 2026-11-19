@@ -71,7 +71,7 @@ class RealEstateStudioSync:
                     data.get('path') or '',
                     alpha_enabled=visual_options.get(name, {}).get('alphaEnabled', False))
                 for name, data in row['textures'].items()
-                if visual_options.get(name, {}).get('appearanceMode', 'atlas') == 'atlas' and data.get('assetId')
+                if visual_options.get(name, {}).get('appearanceMode', 'atlas') != 'material' and data.get('assetId')
             ],
         }
         result = self.load_model(
@@ -91,7 +91,7 @@ class RealEstateStudioSync:
         if stats.get('rigsValidated') != len(parts) + 1:
             raise ValueError('Studio failed to validate the expected Real Estate rigs')
         if stats.get('texturesApplied') != sum(
-                visual_options.get(p, {}).get('appearanceMode', 'atlas') == 'atlas' for p in parts):
+                visual_options.get(p, {}).get('appearanceMode', 'atlas') != 'material' for p in parts):
             raise ValueError('Studio did not apply the expected published house textures')
         # Acknowledgement belongs to this consumer, not to the atlas itself;
         # one house sync must not mark another house as synchronized.

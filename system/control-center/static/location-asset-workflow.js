@@ -99,10 +99,12 @@ window.game1LocationAssetWorkflow = (() => {
       `<label>Category<select data-la-category>${(decoAssetState.data?.options?.categories||[]).map(c=>
         `<option value="${e(c.id)}" ${c.id===identityData.category?'selected':''}>${e(c.label)}</option>`).join('')}</select></label>`+
       `<label>Object material · interaction sounds<select data-la-material>${(decoAssetState.data?.options?.surfaceMaterials||[]).map(m=>`<option value="${e(m.id)}" ${m.id===identityData.surfaceMaterial?'selected':''}>${e(m.label)}</option>`).join('')}</select><small class="muted">Sound family only; never changes the visible material.</small></label>`+
-      `<label>Appearance source<select data-la-appearance-mode><option value="atlas" ${identityData.appearanceMode==='atlas'?'selected':''}>Texture Atlas</option><option value="material" ${identityData.appearanceMode==='material'?'selected':''}>Roblox Material + Color</option></select></label>`+
-      `<div data-la-visual-fields ${identityData.appearanceMode==='material'?'':'hidden'}>`+
-      `<label>Visual material<select data-la-visual-material>${(decoAssetState.data?.options?.visualMaterials||[]).map(m=>`<option value="${e(m.id)}" ${m.id===identityData.visualMaterial?'selected':''} ${m.requiresTexture?'disabled':''}>${e(m.label)}${m.requiresTexture?' · requires texture':''}</option>`).join('')}</select></label>`+
-      `<label>Color<input type="color" data-la-visual-color value="${e(identityData.visualColor)}"></label></div>`+
+      `<label>Appearance source<select data-la-appearance-mode><option value="atlas" ${identityData.appearanceMode==='atlas'?'selected':''}>Texture Atlas</option><option value="material" ${identityData.appearanceMode==='material'?'selected':''}>Roblox Material + Color</option><option value="material_atlas" ${identityData.appearanceMode==='material_atlas'?'selected':''}>Roblox Material + Color + Atlas</option></select></label>`+
+      `<div data-la-visual-fields ${identityData.appearanceMode!=='atlas'?'':'hidden'}>`+
+      `<label>Visual material<select data-la-visual-material>${(decoAssetState.data?.options?.visualMaterials||[]).map(m=>`<option value="${e(m.id)}" ${m.id===identityData.visualMaterial?'selected':''} ${m.requiresTexture&&identityData.appearanceMode==='material'?'disabled':''}>${e(m.label)}${m.requiresTexture?' · requires texture':''}</option>`).join('')}</select></label>`+
+      `<label>Color<input type="color" data-la-visual-color value="${e(identityData.visualColor)}"></label>`+
+      (identityData.appearanceMode==='material_atlas'?'<small class="hint">Atlas overrides the material texture on one MeshPart. Material and Color stay assigned; split meshes to show both surfaces separately.</small>':'')+
+      `</div>`+
       `<label class="deco-policy-toggle"><input type="checkbox" data-la-destructible ${identityData.destructible?'checked':''}> Destructible</label></div>`+
       `<div class="actions">${button('save-identity','Apply Changes',busy)}${button('delete','Retire asset',busy)}</div>`,
       `Revision ${Number(item.revision||0)}`);
@@ -213,7 +215,8 @@ window.game1LocationAssetWorkflow = (() => {
         `<div class="la-sync-part-status"><span class="${p.meshCurrent?'is-current':'is-stale'}">Mesh ${meshStatus}</span>`+
         (p.textureApplicable?`<span class="${p.textureCurrent?'is-current':'is-stale'}">Texture ${textureStatus}</span>`:'')+`</div>`+
         `<small class="la-sync-ids">Mesh ID ${e(p.meshId||'—')}`+
-        (p.textureApplicable?(item.appearanceMode==='material'?` · Material ${e(item.visualMaterial)} · Color ${e(item.visualColor)}`:` · Texture ${e(p.textureId||'—')}`)+
+        (p.textureApplicable?(item.appearanceMode==='material'?` · Material ${e(item.visualMaterial)} · Color ${e(item.visualColor)}`:
+          ` · Texture ${e(p.textureId||'—')}`+(item.appearanceMode==='material_atlas'?` · Material ${e(item.visualMaterial)} · Color ${e(item.visualColor)}`:''))+
           (p.hasSurface?` · ColorMap ${e(p.colorMapId||'—')}`:'')+
           (item.appearanceMode==='material'?'':` · Alpha ${p.alphaCurrent?'✓':'✕'} ${p.alphaEnabled?'Transparency':'Opaque'}`):'')+`</small></div>`;
     };
@@ -247,7 +250,7 @@ window.game1LocationAssetWorkflow = (() => {
       (selected?`<div class="la-sync-current"><div><small>Актуальный Model ID</small><strong>${e(item.model_asset_id||'—')}</strong></div>`+
         `<div><small>Актуальные Mesh ID (визуальные)</small>`+
         `<strong>${visualIds.map(e).join(' · ')||'—'}</strong></div>`+
-        `<div><small>${item.appearanceMode==='material'?'Визуальный материал / цвет':'Актуальный Texture ID · Atlas'}</small><strong>${item.appearanceMode==='material'?e(item.visualMaterial+' · '+item.visualColor):e(item.texture_asset_id||'—')}</strong></div></div>`+
+        `<div><small>${item.appearanceMode==='material'?'Визуальный материал / цвет':'Актуальный Texture ID · Atlas'}</small><strong>${item.appearanceMode==='material'?e(item.visualMaterial+' · '+item.visualColor):e(item.texture_asset_id||'—')+(item.appearanceMode==='material_atlas'?` · ${e(item.visualMaterial+' · '+item.visualColor)}`:'')}</strong></div></div>`+
         `<div class="la-sync-counts"><strong>Найдено ${Number(selected.foundMeshParts||0)} MeshPart · `+
         `${grouped.length} моделей</strong>`+
         (reportStale?'<small class="la-sync-warning">Отчёт сохранён для просмотра. Требуется новый Find перед Sync.</small>':'')+
@@ -300,7 +303,10 @@ window.game1LocationAssetWorkflow = (() => {
       d.querySelector('[data-la-category]').onchange=updateDraft;
       d.querySelector('[data-la-material]').onchange=updateDraft;
       d.querySelector('[data-la-appearance-mode]').onchange=()=>{
-        d.querySelector('[data-la-visual-fields]').hidden=d.querySelector('[data-la-appearance-mode]').value!=='material';
+        d.querySelector('[data-la-visual-fields]').hidden=d.querySelector('[data-la-appearance-mode]').value==='atlas';
+        d.querySelectorAll('[data-la-visual-material] option').forEach(option=>{
+          if(option.textContent.includes('requires texture'))option.disabled=d.querySelector('[data-la-appearance-mode]').value==='material';
+        });
         updateDraft();
       };
       d.querySelector('[data-la-visual-material]').onchange=updateDraft;

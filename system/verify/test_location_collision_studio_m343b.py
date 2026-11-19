@@ -200,7 +200,7 @@ class LocationCollisionStudioM343B(unittest.TestCase):
                      'location-collision-preview','location-collision-clear',
                      'location-collision-asset','location-collision-status'):
             self.assertIn(f'id="{name}"',page)
-        self.assertIn('location-collision.js?v=3431',page)
+        self.assertIn('location-collision.js?v=385',page)
         self.assertIn('collision-studio',js)
         self.assertIn('collision-history',js)
         self.assertIn('window.game1LocationCollisionSelect',js)

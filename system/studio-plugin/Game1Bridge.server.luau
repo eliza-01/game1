@@ -255,7 +255,8 @@ local function pollBridge()
         locationCommands.handle(data)
     elseif data.command == "deco-refresh" then
         handleDecoRefresh(data)
-    elseif data.command == "location-collision-authoring-v1" then
+    elseif data.command == "location-collision-authoring-v1"
+        or data.command == "house-collision-authoring-v1" then
         if collisionController then
             local collisionOk, collisionError = pcall(collisionController.handle, data)
             if not collisionOk then

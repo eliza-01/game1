@@ -6238,9 +6238,9 @@
       "model_asset_id": "94882722542367",
       "model_published_hash": "5693ec556c0d8a8c2c9a70729a5f1a4be1d34fa5ae1153c4f9cf18f3e0f684f1",
       "model_moderation": "Approved",
-      "revision": 24,
+      "revision": 26,
       "created_at": 1795087964.5584087,
-      "updated_at": 1795110289.2426243,
+      "updated_at": 1795116960.033831,
       "skeleton": {
         "schemaVersion": 1,
         "meshes": [
@@ -17215,7 +17215,7 @@
           "visualColor": "#8A4F3C",
           "alphaEnabled": false,
           "glass": false,
-          "noCollide": true,
+          "noCollide": false,
           "collisionFidelity": "Box",
           "doubleSided": false,
           "destructible": false
@@ -17226,7 +17226,7 @@
           "visualColor": "#7C5F26",
           "alphaEnabled": false,
           "glass": false,
-          "noCollide": true,
+          "noCollide": false,
           "collisionFidelity": "Box",
           "doubleSided": false,
           "destructible": false

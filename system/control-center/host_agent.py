@@ -130,6 +130,7 @@ place_registry = LocationPlaceRegistry(location_assets, PlaceRevisionStore(ROOT)
 location_instance_manager = LocationInstanceManager(location_assets, run_location_instance_bridge)
 lod_manager = LocationLodManager(location_assets, place_registry)
 real_estate = RealEstateStore(ROOT, location_assets=location_assets)
+house_collision_authoring = LocationCollisionAuthoring(real_estate, run_location_collision_bridge, domain='house')
 npc_atlas_sources = NpcAtlasSources(npcs, monsters, weapons, location_assets, real_estate)
 real_estate_placements = RealEstatePlacementStore(ROOT, real_estate)
 real_estate.placement_store = real_estate_placements
@@ -222,7 +223,7 @@ WRITE_SOURCES = MappingProxyType({
     "choose_location_asset_texture": choose_location_asset_texture,
     "choose_real_estate_fbx": choose_real_estate_fbx,
     "choose_real_estate_texture": choose_real_estate_texture,
-    "real_estate": real_estate,
+    "real_estate": real_estate, "house_collision_authoring": house_collision_authoring,
     "real_estate_placements": real_estate_placements,
     "capture_house_placement": capture_house_placement,
     "preview_house_placement": preview_house_placement,

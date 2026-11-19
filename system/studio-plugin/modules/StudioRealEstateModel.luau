@@ -4,6 +4,7 @@ local HttpService = game:GetService("HttpService")
 local StudioRealEstateAppearance = require(script.Parent.StudioRealEstateAppearance)
 local StudioRealEstateRigValidation = require(script.Parent.StudioRealEstateRigValidation)
 local StudioRealEstateCollisionPolicy = require(script.Parent.StudioRealEstateCollisionPolicy)
+local CollisionParts = require(script.Parent.StudioLocationCollisionParts)
 local RetiredCleanup = require(script.Parent.StudioRetiredColMeshCleanup)
 local StudioRealEstatePlacedVisualSync = require(script.Parent.StudioRealEstatePlacedVisualSync)
 local PlacedTargets = require(script.Parent.StudioRealEstatePlacedTargets)
@@ -297,6 +298,26 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
     wrapper:SetAttribute("Game1PurchasePrice", tonumber(metadata.purchasePrice) or 1)
     wrapper:SetAttribute("Game1MinimumLevel", tonumber(metadata.minLevel) or 1)
     wrapper:SetAttribute("Game1SalePrice", tonumber(metadata.salePrice) or 1)
+    -- Stage the current house collision against the authored *model pivot*.
+    -- This is independent of every visual Mesh ID and every Plot binding.
+    local collisionRevision = tonumber(metadata.collisionRevision) or 0
+    local collisionBlueprint = metadata.collisionBlueprint
+    local collisionSha = tostring(metadata.collisionSha256 or "")
+    if collisionRevision > 0 then
+        if typeof(collisionBlueprint) ~= "table" or collisionBlueprint.schemaVersion ~= 3 then
+            wrapper:Destroy()
+            error("House Collision Blueprint requires pivot schema v3")
+        end
+        local stagedCollision = CollisionParts.Prepare(wrapper, collisionBlueprint,
+            collisionRevision, collisionSha)
+        local applied, collisionError = pcall(CollisionParts.Commit, stagedCollision)
+        if not applied then
+            CollisionParts.Rollback(stagedCollision)
+            wrapper:Destroy()
+            error("House collision staging failed: " .. tostring(collisionError))
+        end
+        CollisionParts.Finalize(stagedCollision)
+    end
     wrapper.Parent = destination
     if previous then
         previous:Destroy()
@@ -314,12 +335,47 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
     -- Apply appearance independently; visual replacement may have been skipped
     -- safely for an incomplete/unmanaged placed house.
     local textureUpdated = select(1, refreshPlaced(slug, imageAssets, imageAlpha, meshOptions, placedTargets))
+    local houseCollisionUpdated = 0
+    local houseCollisionFailures = 0
+    if collisionRevision > 0 then
+        for _, root in ipairs(placedTargets) do
+            -- Authoritative Plot previews only; do not modify authoring models.
+            if root:GetAttribute("Game1PlotHousePreview") == true then
+                if root.Name ~= slug or root:GetAttribute("Game1RealEstateSlug") ~= slug then
+                    houseCollisionFailures += 1
+                    table.insert(rigWarnings, root:GetFullName() .. ": invalid managed house identity")
+                    continue
+                end
+                local applied, collisionError = pcall(function()
+                    if not CollisionParts.Current(root, collisionBlueprint, collisionRevision, collisionSha) then
+                        local transaction = CollisionParts.Prepare(root, collisionBlueprint,
+                            collisionRevision, collisionSha)
+                        local committed, failure = pcall(CollisionParts.Commit, transaction)
+                        if not committed then
+                            CollisionParts.Rollback(transaction)
+                            error(failure)
+                        end
+                        CollisionParts.Finalize(transaction)
+                    end
+                    houseCollisionUpdated += 1
+                end)
+                if not applied then
+                    houseCollisionFailures += 1
+                    table.insert(rigWarnings, root:GetFullName() ..
+                        ": house Collision Blueprint failed: " .. tostring(collisionError))
+                end
+            end
+        end
+    end
     return wrapper, {bonesValidated = true, rigsValidated = #parts + 1,
         alignment = "independent-authored-rig-carrier",
         texturesApplied = textureCount, placedSyncVersion = 3, workspaceModelsUpdated = visualUpdated,
         workspaceModelsFound = visualFound,
         workspaceTextureModelsUpdated = textureUpdated,
         workspaceCollisionRigsUpdated = collisionUpdated,
+        houseCollisionRevision = collisionRevision,
+        houseCollisionModelsUpdated = houseCollisionUpdated,
+        houseCollisionFailures = houseCollisionFailures,
         boneCount = bones, socketCount = socketCount,
         authoredPlacementsRestored = placementsRestored,
         socketContractComplete = #missingSockets == 0,

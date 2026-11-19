@@ -42,6 +42,9 @@ function realEstatePhysicsControls(part,flags){
 function realEstateRemember(){try{localStorage.setItem(REAL_ESTATE_SELECTED,realEstateState.selected||'');}catch{}}
 function realEstateForm(row){
   realEstateState.selected=row?.slug||null;
+  // Keep the shared Collision Blueprint picker aligned with the house editor.
+  // Selecting from the library may scroll to the panel; ordinary Edit must not.
+  window.game1RealEstateCollisionSelect?.(row?.slug||'', false);
   realEstateState.registrationTarget=null;
   realEstateRemember();
   realEstateState.inspect=null;
@@ -658,7 +661,7 @@ function realEstateRender(){
       </div>
       <small class="real-estate-mesh-source-label">${item.meshSources?.[part]?'Independent FBX revision':'Original house FBX'}</small>
       </div>`).join('');
-    return `<tr class="${item.slug===realEstateState.selected?'active':''}" data-house="${esc(item.slug)}"><td class="real-estate-house-cell"><b>${esc(item.slug)}</b><small>level ${esc(item.house_level)} · variant ${esc(item.variant)}</small><small class="real-estate-house-economy">buy ${esc(item.purchase_price)} · sell ${esc(item.sale_price)}</small><small class="real-estate-house-economy">level required ${esc(item.min_level)}</small></td><td><small>${textureLines}</small></td><td class="real-estate-assets-cell">${assetLines}</td><td><div class="real-estate-row-actions"><button type="button" data-re-edit>Edit house</button><button type="button" data-re-fbx title="Replace whole-house FBX; changed parts require new Model Asset IDs">Replace full FBX</button><button type="button" data-re-publish ${!canPublish||isBusy||item.status==='PUBLISHED'?'disabled':''}>Publish all changes</button><button type="button" data-re-sync ${isBusy||item.status!=='PUBLISHED'?'disabled':''}>Sync entire house</button><button type="button" class="real-estate-delete" data-re-delete ${isBusy?'disabled':''}>Delete house</button></div></td></tr>`;
+    return `<tr class="${item.slug===realEstateState.selected?'active':''}" data-house="${esc(item.slug)}"><td class="real-estate-house-cell"><b>${esc(item.slug)}</b><small>level ${esc(item.house_level)} · variant ${esc(item.variant)}</small><small class="real-estate-house-economy">buy ${esc(item.purchase_price)} · sell ${esc(item.sale_price)}</small><small class="real-estate-house-economy">level required ${esc(item.min_level)}</small></td><td><small>${textureLines}</small></td><td class="real-estate-assets-cell">${assetLines}</td><td><div class="real-estate-row-actions"><button type="button" data-re-edit>Edit house</button><button type="button" data-re-fbx title="Replace whole-house FBX; changed parts require new Model Asset IDs">Replace full FBX</button><button type="button" data-re-publish ${!canPublish||isBusy||item.status==='PUBLISHED'?'disabled':''}>Publish all changes</button><button type="button" data-re-sync ${isBusy||item.status!=='PUBLISHED'?'disabled':''}>Sync entire house</button><button type="button" data-re-collision>Collision Blueprint</button><button type="button" class="real-estate-delete" data-re-delete ${isBusy?'disabled':''}>Delete house</button></div></td></tr>`;
   }).join('')||'<tr><td colspan="4" class="muted">No registered houses yet.</td></tr>';
   for(const tr of tbody.querySelectorAll('[data-house]')){
     const row=rows.find(item=>item.slug===tr.dataset.house);
@@ -672,6 +675,7 @@ function realEstateRender(){
     }
     tr.querySelector('[data-re-publish]').onclick=async()=>{realEstateForm(row);await realEstatePublish('all');};
     tr.querySelector('[data-re-sync]').onclick=()=>realEstateSync(row.slug);
+    tr.querySelector('[data-re-collision]').onclick=()=>window.game1RealEstateCollisionSelect?.(row.slug);
     tr.querySelector('[data-re-delete]').onclick=()=>realEstateDelete(row);
     for(const button of tr.querySelectorAll('[data-re-atlas-id]')){
       button.onclick=()=>realEstateChooseAtlas(row,button.dataset.reAtlasPart,Number(button.dataset.reAtlasId));
@@ -705,6 +709,7 @@ async function realEstateLoad(){
     const snapshot=await request('/api/real-estate');
     if(!snapshot||!Array.isArray(snapshot.items)){throw Error('Real Estate API returned no registered-houses list. Reload Control Center.');}
     realEstateState.data=snapshot;
+    if(typeof game1RealEstateCollisionRefresh==='function')game1RealEstateCollisionRefresh(snapshot.items);
     if(!realEstateState.selected){try{realEstateState.selected=localStorage.getItem(REAL_ESTATE_SELECTED)||null;}catch{}}
     if(realEstateState.selected && !realEstateSelected())realEstateState.selected=null;
     realEstateForm(realEstateSelected());

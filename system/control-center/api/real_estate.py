@@ -1,5 +1,5 @@
 """Real Estate authoring HTTP routes; persistence lives in RealEstateStore."""
-from urllib.parse import unquote
+from urllib.parse import unquote, parse_qs
 from real_estate.contracts import HOUSE_NAME
 from services import mesh_visual_appearance as appearance
 
@@ -28,6 +28,21 @@ def read(parsed, sources):
             return 200, snapshot
         except (ValueError, OSError) as error:
             return 400, {'error': str(error)}
+    if parsed.path.startswith('/api/real-estate/') and parsed.path.endswith('/collision-blueprint'):
+        slug = unquote(parsed.path[len('/api/real-estate/'):-len('/collision-blueprint')].strip('/'))
+        if not HOUSE_NAME.fullmatch(slug):
+            return 400, {'error': 'invalid house type'}
+        saved = sources['real_estate'].collision_blueprint(slug)
+        return 200, saved if saved else {'revision': 0, 'blueprint': None}
+    if parsed.path.startswith('/api/real-estate/') and parsed.path.endswith('/collision-history'):
+        slug = unquote(parsed.path[len('/api/real-estate/'):-len('/collision-history')].strip('/'))
+        if not HOUSE_NAME.fullmatch(slug):
+            return 400, {'error': 'invalid house type'}
+        try:
+            limit = int((parse_qs(parsed.query).get('limit') or ['25'])[0])
+            return 200, {'history': sources['real_estate'].collision_blueprint_history(slug, limit)}
+        except ValueError as error:
+            return 400, {'error': str(error)}
     if parsed.path.startswith('/api/real-estate/') and parsed.path.endswith('/publication-job'):
         slug = unquote(parsed.path[len('/api/real-estate/'):-len('/publication-job')].strip('/'))
         return 200, {'job': sources['real_estate_publications'].get(slug)}
@@ -42,6 +57,12 @@ def write(path, body, deps):
         return None
     store = deps['real_estate']
     try:
+        if path.startswith('/api/real-estate/') and path.endswith('/collision-studio'):
+            slug = unquote(path[len('/api/real-estate/'):-len('/collision-studio')].strip('/'))
+            payload = body()
+            if not HOUSE_NAME.fullmatch(slug) or not isinstance(payload, dict) or set(payload) != {'phase'}:
+                raise ValueError('invalid house collision request')
+            return 200, {'studio': deps['house_collision_authoring'].operate(slug, payload['phase'])}
         if path == '/api/real-estate/placements/bind':
             payload = body()
             slug = str(payload.get('houseSlug') or '').strip()

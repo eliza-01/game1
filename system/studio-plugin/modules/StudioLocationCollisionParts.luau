@@ -9,10 +9,19 @@ local PART_ID = "Game1LocationCollisionPartId"
 local REVISION = "Game1LocationCollisionRevision"
 local SHA = "Game1LocationCollisionSha256"
 local APPROVED = "Game1LocationCollisionApprovedSha256"
+local function keys(blueprint: any)
+    if type(blueprint) == "table" and blueprint.schemaVersion == 3 then
+        return "Game1HouseCollisionOwned", "Game1HouseCollisionPartId",
+            "Game1HouseCollisionRevision", "Game1HouseCollisionSha256",
+            "Game1HouseCollisionApprovedSha256"
+    end
+    return OWNED, PART_ID, REVISION, SHA, APPROVED
+end
 
 local function recipes(blueprint: any): {any}
-    if type(blueprint) ~= "table" or blueprint.schemaVersion ~= 2
-        or blueprint.pivot ~= "Model:GetPivot()" or type(blueprint.anchor) ~= "table"
+    if type(blueprint) ~= "table" or (blueprint.schemaVersion ~= 2 and blueprint.schemaVersion ~= 3)
+        or blueprint.pivot ~= "Model:GetPivot()"
+        or (blueprint.schemaVersion == 2 and type(blueprint.anchor) ~= "table")
         or type(blueprint.parts) ~= "table"
         or #blueprint.parts < 1 or #blueprint.parts > 256 then
         error("Invalid Location Collision Blueprint; no Parts changed")
@@ -48,10 +57,11 @@ end
 
 -- Coordinate conversion is owned by StudioLocationCollisionTransform. Never
 -- infer per-axis visual scale from Model:GetScale() or adjust the old Pivot.
-local function ownedParts(root: Model): {BasePart}
+local function ownedParts(root: Model, ownedKey: string?): {BasePart}
     local result = {}
+    local attribute = ownedKey or OWNED
     for _, child in ipairs(root:GetChildren()) do
-        if child:GetAttribute(OWNED) == true then
+        if child:GetAttribute(attribute) == true then
             if not child:IsA("BasePart") or child:IsA("MeshPart") then
                 error("Managed collision marker on non-primitive child; refusing mutation")
             end
@@ -62,22 +72,23 @@ local function ownedParts(root: Model): {BasePart}
 end
 
 function Collision.IsOwned(part: Instance): boolean
-    return part:GetAttribute(OWNED) == true
+    return part:GetAttribute(OWNED) == true or part:GetAttribute("Game1HouseCollisionOwned") == true
 end
 
 function Collision.Current(root: Model, blueprint: any, revision: any, sha: any): boolean
     if type(revision) ~= "number" or revision < 1 then return true end
-    if type(blueprint) ~= "table" or blueprint.schemaVersion ~= 2 then return false end
-    if root:GetAttribute(REVISION) ~= revision or root:GetAttribute(SHA) ~= sha then return false end
+    if type(blueprint) ~= "table" or (blueprint.schemaVersion ~= 2 and blueprint.schemaVersion ~= 3) then return false end
+    local ownedKey, partKey, revisionKey, shaKey, approvalKey = keys(blueprint)
+    if root:GetAttribute(revisionKey) ~= revision or root:GetAttribute(shaKey) ~= sha then return false end
     local resolved, anchor = pcall(Transform.Resolve, root, blueprint)
     if not resolved then return false end
-    local validParts, actual = pcall(ownedParts, root)
+    local validParts, actual = pcall(ownedParts, root, ownedKey)
     if not validParts then return false end
     if type(blueprint) ~= "table" or type(blueprint.parts) ~= "table"
         or #actual ~= #blueprint.parts then return false end
     local byId = {}
     for _, part in ipairs(actual) do
-        local partId = part:GetAttribute(PART_ID)
+        local partId = part:GetAttribute(partKey)
         if type(partId) ~= "string" or byId[partId] then return false end
         byId[partId] = part
     end
@@ -96,7 +107,7 @@ function Collision.Current(root: Model, blueprint: any, revision: any, sha: any)
         -- Explicit Studio inspection may authorize a larger, visible enclosure
         -- for this exact Blueprint SHA. It does not change the default for
         -- unapproved placements or later Blueprint revisions.
-        local allowed = root:GetAttribute(APPROVED) == sha
+        local allowed = root:GetAttribute(approvalKey) == sha
         local okGeometry, expected, expectedSize = pcall(Transform.Part, anchor, recipe, allowed)
         if not okGeometry then return false end
         if (part.Size - expectedSize).Magnitude > 0.002
@@ -115,6 +126,7 @@ function Collision.Prepare(root: Model, blueprint: any, revision: any, sha: any,
         or type(sha) ~= "string" or #sha ~= 64 then
         error("Invalid Location Collision publication")
     end
+    local ownedKey, partKey, revisionKey, shaKey, approvalKey = keys(blueprint)
     local pivot = root:GetPivot()
     local geometry = incoming or root
     local anchor = Transform.Resolve(geometry, blueprint)
@@ -134,8 +146,8 @@ function Collision.Prepare(root: Model, blueprint: any, revision: any, sha: any,
             end
             table.insert(stage, part)
             part.Name = "__Game1Collision_" .. recipe.id
-            part:SetAttribute(OWNED, true)
-            part:SetAttribute(PART_ID, recipe.id)
+            part:SetAttribute(ownedKey, true)
+            part:SetAttribute(partKey, recipe.id)
             local frame, size, warning
             if allowExcessive == true then
                 frame, size, warning = Transform.Part(anchor, recipe, true)
@@ -161,9 +173,10 @@ function Collision.Prepare(root: Model, blueprint: any, revision: any, sha: any,
         error("Collision Parts staging failed: " .. tostring(failure))
     end
     return {root = root, pivot = pivot, stage = stage, warnings = warnings,
-        prior = ownedParts(root), revision = revision, sha = sha,
-        oldRevision = root:GetAttribute(REVISION), oldSha = root:GetAttribute(SHA),
-        oldApproval = root:GetAttribute(APPROVED), committed = false}
+        prior = ownedParts(root, ownedKey), revision = revision, sha = sha,
+        revisionKey = revisionKey, shaKey = shaKey, approvalKey = approvalKey,
+        oldRevision = root:GetAttribute(revisionKey), oldSha = root:GetAttribute(shaKey),
+        oldApproval = root:GetAttribute(approvalKey), committed = false}
 end
 
 function Collision.Commit(transaction: any)
@@ -173,9 +186,9 @@ function Collision.Commit(transaction: any)
     -- Mark committed before mutation so rollback can restore a partial commit.
     transaction.committed = true
     for _, part in ipairs(transaction.stage) do part.Parent = root end
-    root:SetAttribute(REVISION, transaction.revision)
-    root:SetAttribute(SHA, transaction.sha)
-    root:SetAttribute(APPROVED, if #transaction.warnings > 0 then transaction.sha else nil)
+    root:SetAttribute(transaction.revisionKey, transaction.revision)
+    root:SetAttribute(transaction.shaKey, transaction.sha)
+    root:SetAttribute(transaction.approvalKey, if #transaction.warnings > 0 then transaction.sha else nil)
     if root:GetPivot() ~= transaction.pivot then error("Collision Parts changed the authored Pivot") end
 end
 
@@ -183,9 +196,9 @@ function Collision.Rollback(transaction: any)
     for _, part in ipairs(transaction.stage) do part:Destroy() end
     if transaction.committed then
         for _, part in ipairs(transaction.prior) do part.Parent = transaction.root end
-        transaction.root:SetAttribute(REVISION, transaction.oldRevision)
-        transaction.root:SetAttribute(SHA, transaction.oldSha)
-        transaction.root:SetAttribute(APPROVED, transaction.oldApproval)
+        transaction.root:SetAttribute(transaction.revisionKey, transaction.oldRevision)
+        transaction.root:SetAttribute(transaction.shaKey, transaction.oldSha)
+        transaction.root:SetAttribute(transaction.approvalKey, transaction.oldApproval)
     end
 end
 

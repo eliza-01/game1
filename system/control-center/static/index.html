@@ -22,7 +22,7 @@
 <link rel="stylesheet" href="location-category-picker.css?v=249">
 <link rel="stylesheet" href="location-alpha.css?v=250">
 <link rel="stylesheet" href="deco-assets.css?v=384">
-<link rel="stylesheet" href="real-estate.css?v=383&physics=205">
+<link rel="stylesheet" href="real-estate.css?v=385a&physics=205">
 <link rel="stylesheet" href="kanban.css?v=339">
 <style>#location-asset-editor-panel [hidden],#location-asset-edit-dialog [hidden]{display:none!important}</style>
 </head>
@@ -301,6 +301,20 @@
 <div id="real-estate-publish-status" class="status-box">register a house first</div>
 <div class="actions"><button id="real-estate-publish" class="primary" type="button" disabled>publish changed assets</button><button id="real-estate-sync" type="button" disabled>sync Studio → ServerStorage</button></div>
 <small class="hint">After publishing, Sync Studio imports the complete house model with its selected textures into ServerStorage/real_estate/&lt;slug&gt;/model. Player ownership and purchase-based runtime placement are future stages; placement points are authored in section 04.</small>
+<section class="real-estate-collision-authoring location-collision-panel" id="house-collision-panel">
+<div class="section-title"><div><span>03b · real estate authoring</span><h3>House Collision Blueprint</h3></div></div>
+<p class="hint">Choose a published house type. In Studio Edit mode select one managed house Model on a Plot plus 1–256 original Roblox Parts, WedgeParts or CornerWedgeParts. Capture saves their transforms relative to the author's house pivot. No changes to the house, authored Parts or Plot bindings. After Capture, use Sync entire house to update all placed houses.</p>
+<div class="location-collision-controls">
+<label>House type<select id="house-collision-asset"><option value="">Choose a house</option></select></label>
+<div class="actions"><button id="house-collision-validate" type="button">Validate</button>
+<button id="house-collision-capture" class="primary" type="button">Capture</button>
+<button id="house-collision-preview" type="button">Preview</button>
+<button id="house-collision-clear" type="button">Clear Preview</button></div>
+</div>
+<div id="house-collision-meta" class="location-collision-meta">Blueprint: not selected</div>
+<div id="house-collision-status" class="status-box">Choose a registered house.</div>
+<details><summary>Revision history</summary><div id="house-collision-history" class="location-collision-history"></div></details>
+</section>
 <div class="real-estate-library"><div class="section-title"><div><span>registered library</span><h3>houses <small id="real-estate-library-count">0</small></h3></div><button id="real-estate-library-refresh" type="button">refresh</button></div><div class="table-wrap"><table><thead><tr><th>house</th><th>source textures</th><th>assets</th><th>actions</th></tr></thead><tbody id="real-estate-library-rows"></tbody></table></div><small class="hint">Replace FBX or either texture independently. Each replacement is saved immediately. Publish the changed Model/Image as a NEW Roblox Asset ID; other published IDs remain unchanged. Sync Studio after every present mesh and its texture is current.</small></div>
 <div class="panel character-card real-estate-placement" id="real-estate-placement">
 <span class="eyebrow">04 · placement</span><h3>house placement · 50 plots</h3>
@@ -1006,7 +1020,7 @@
 <script src="mesh-authoring.js?v=384"></script>
 <script src="location-category-picker.js?v=249"></script>
 <script src="deco-assets.js?v=384"></script>
-<script src="location-collision.js?v=3431"></script>
+<script src="location-collision.js?v=385"></script>
 <script src="location-instance-manager.js?v=351&geometry=2&collision=1&review=354"></script>
 <script src="place-registry.js?v=348"></script>
 <script src="lod-manager.js?v=3"></script>
@@ -1023,7 +1037,7 @@
 <script src="monster-assets.js?v=338"></script>
 <script src="npc-assets.js?v=370"></script>
 <script src="npc-spawns.js?v=337"></script>
-<script src="real-estate.js?v=383&rig=186&atlas=202&physics=232"></script>
+<script src="real-estate.js?v=385a&rig=186&atlas=202&physics=232"></script>
 <script src="real-estate-mesh-workflow.js?v=234"></script>
 <script src="real-estate-placement.js?v=2"></script>
 <script src="monster-spawns.js?v=338"></script>

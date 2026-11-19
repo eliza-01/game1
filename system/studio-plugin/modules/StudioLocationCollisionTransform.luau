@@ -14,6 +14,15 @@ local function finiteRatio(value: number): boolean
 end
 
 function Transform.Resolve(root: Model, blueprint: any): any
+    -- House v3 has an authored rig_carrier pivot, not an unstable visual Mesh ID.
+    -- The same Part reconstruction handles both schemas without a second system.
+    if type(blueprint) == "table" and blueprint.schemaVersion == 3 then
+        if blueprint.pivot ~= "Model:GetPivot()" then error("Invalid House collision pivot") end
+        local scale = root:GetScale()
+        if scale <= 0 or scale ~= scale or scale > 1000 then error("Invalid house scale") end
+        return {mesh = {CFrame = root:GetPivot()}, anchorFrame = CFrame.new(),
+            ratios = Vector3.new(scale, scale, scale), uniform = true, uniformScale = scale}
+    end
     local anchor = if type(blueprint) == "table" then blueprint.anchor else nil
     if type(anchor) ~= "table" or type(anchor.meshId) ~= "string"
         or type(anchor.localCFrame) ~= "table" or #anchor.localCFrame ~= 12

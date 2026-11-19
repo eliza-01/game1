@@ -37,7 +37,11 @@ class RealEstateStudioSync:
         # swap one MeshPart and leave orphaned connections.
         part = None
         visual_options = row.get('meshOptions') or {}
+        collision = self.store.collision_blueprint(slug)
         metadata = {
+            'collisionBlueprint': collision['blueprint'] if collision else None,
+            'collisionRevision': collision['revision'] if collision else 0,
+            'collisionSha256': collision['sha256'] if collision else '',
             'primaryPart': primary,
             'expectedCarrierBones': [bone['name'] for bone in carrier_bones(row['skeleton'])],
             # Project-authored pivot is independent of whether a visual mesh is named 'house'.
@@ -86,6 +90,9 @@ class RealEstateStudioSync:
                 f'expected v{REQUIRED_PLACED_SYNC_VERSION}, got {actual_version!r}. '
                 'Install the current Studio plugin and restart Roblox Studio.'
             )
+        if collision and (stats.get('houseCollisionRevision') != collision['revision']
+                          or stats.get('houseCollisionFailures', 0) != 0):
+            raise ValueError('Studio failed to apply current House Collision Blueprint to all managed Plots')
         if stats.get('bonesValidated') is not True:
             raise ValueError('Studio did not confirm all published Real Estate mesh rigs')
         if stats.get('rigsValidated') != len(parts) + 1:

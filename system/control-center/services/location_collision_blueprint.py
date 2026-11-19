@@ -25,7 +25,7 @@ def _finite(value, label: str, *, absolute: float = 100_000.0) -> float:
     return float(value)
 
 
-def validate(value: dict, *, slug: str) -> dict:
+def validate(value: dict, *, slug: str, domain: str = "location") -> dict:
     """Return canonical JSON-safe blueprint; reject unknown keys and partial captures.
 
     CFrame is 12 components from Roblox CFrame:GetComponents(): XYZ + 3x3
@@ -33,23 +33,29 @@ def validate(value: dict, *, slug: str) -> dict:
     """
     if not SLUG.fullmatch(slug):
         raise ValueError("invalid Location Asset slug")
-    if not isinstance(value, dict) or set(value) != {"schemaVersion", "pivot", "anchor", "parts"}:
-        raise ValueError("blueprint must contain schemaVersion, pivot, anchor, parts only")
-    if type(value["schemaVersion"]) is not int or value["schemaVersion"] != 2:
-        raise ValueError("outdated Collision Blueprint: re-Capture with visual Mesh anchor (schema 2)")
+    if domain not in ("location", "house"):
+        raise ValueError("unknown Collision Blueprint domain")
+    is_house = domain == "house"
+    required = {"schemaVersion", "pivot", "parts"} if is_house else {"schemaVersion", "pivot", "anchor", "parts"}
+    if not isinstance(value, dict) or set(value) != required:
+        raise ValueError("invalid Collision Blueprint fields")
+    if type(value["schemaVersion"]) is not int or value["schemaVersion"] != (3 if is_house else 2):
+        raise ValueError("incorrect House Collision Blueprint schema" if is_house else
+                         "outdated Collision Blueprint: re-Capture with visual Mesh anchor (schema 2)")
     if value["pivot"] != "Model:GetPivot()":
         raise ValueError("collision blueprint pivot must use Model:GetPivot()")
-    anchor = value["anchor"]
-    if not isinstance(anchor, dict) or set(anchor) != {"meshId", "localCFrame", "size"}:
-        raise ValueError("visual Mesh anchor must contain meshId, localCFrame, size")
-    if not isinstance(anchor["meshId"], str) or not re.fullmatch(r"[1-9][0-9]{0,19}", anchor["meshId"]):
-        raise ValueError("visual Mesh anchor needs a published Mesh ID")
-    anchor_size = anchor["size"]
-    if not isinstance(anchor_size, list) or len(anchor_size) != 3:
-        raise ValueError("visual Mesh anchor requires three size numbers")
-    anchor_size = [_finite(x, "anchor.size", absolute=4096.0) for x in anchor_size]
-    if any(x <= 0.001 for x in anchor_size):
-        raise ValueError("visual Mesh anchor size must be positive")
+    anchor = None if is_house else value["anchor"]
+    if not is_house:
+        if not isinstance(anchor, dict) or set(anchor) != {"meshId", "localCFrame", "size"}:
+            raise ValueError("visual Mesh anchor must contain meshId, localCFrame, size")
+        if not isinstance(anchor["meshId"], str) or not re.fullmatch(r"[1-9][0-9]{0,19}", anchor["meshId"]):
+            raise ValueError("visual Mesh anchor needs a published Mesh ID")
+        anchor_size = anchor["size"]
+        if not isinstance(anchor_size, list) or len(anchor_size) != 3:
+            raise ValueError("visual Mesh anchor requires three size numbers")
+        anchor_size = [_finite(x, "anchor.size", absolute=4096.0) for x in anchor_size]
+        if any(x <= 0.001 for x in anchor_size):
+            raise ValueError("visual Mesh anchor size must be positive")
 
     def validate_frame(frame, label):
         if not isinstance(frame, list) or len(frame) != 12:
@@ -66,7 +72,8 @@ def validate(value: dict, *, slug: str) -> dict:
         if abs(determinant - 1.0) > 0.004:
             raise ValueError(f"{label}: mirrored CFrame is not allowed")
         return frame
-    anchor_frame = validate_frame(anchor["localCFrame"], "anchor.localCFrame")
+    if not is_house:
+        validate_frame(anchor["localCFrame"], "anchor.localCFrame")
 
     raw = value["parts"]
     if not isinstance(raw, list) or not 1 <= len(raw) <= MAX_PARTS:
@@ -104,58 +111,69 @@ def validate(value: dict, *, slug: str) -> dict:
                       "localCFrame": frame, "collisionGroup": group,
                       "canQuery": part["canQuery"], "canTouch": part["canTouch"]})
     parts.sort(key=lambda p: p["id"])
+    if is_house:
+        return {"schemaVersion": 3, "pivot": "Model:GetPivot()", "parts": parts}
     return {"schemaVersion": 2, "pivot": "Model:GetPivot()",
             "anchor": {"meshId": anchor["meshId"], "size": anchor_size,
-                       "localCFrame": anchor_frame}, "parts": parts}
+                       "localCFrame": validate_frame(anchor["localCFrame"], "anchor.localCFrame")}, "parts": parts}
 
 
-def latest(store, slug: str) -> dict | None:
+def _table(domain: str) -> tuple[str, str, str]:
+    if domain == "location":
+        return "location_asset_collision_blueprints", "asset_slug", "location_assets"
+    if domain == "house":
+        return "real_estate_collision_blueprints", "house_slug", "real_estate"
+    raise ValueError("unknown Collision Blueprint domain")
+
+
+def latest(store, slug: str, *, domain: str = "location") -> dict | None:
     if not SLUG.fullmatch(slug):
         raise ValueError("invalid Location Asset slug")
+    table, key, _ = _table(domain)
     with store.connect() as connection:
         row = connection.execute(
-            "SELECT revision, blueprint_json, sha256, captured_at "
-            "FROM location_asset_collision_blueprints WHERE asset_slug=? "
-            "ORDER BY revision DESC LIMIT 1", (slug,)).fetchone()
+            f"SELECT revision, blueprint_json, sha256, captured_at FROM {table} "
+            f"WHERE {key}=? ORDER BY revision DESC LIMIT 1", (slug,)).fetchone()
     if row is None:
         return None
     return {"revision": row["revision"], "blueprint": json.loads(row["blueprint_json"]),
             "sha256": row["sha256"], "capturedAt": row["captured_at"]}
 
 
-def save(store, slug: str, payload: dict) -> dict:
+def save(store, slug: str, payload: dict, *, domain: str = "location") -> dict:
     if not SLUG.fullmatch(slug) or not isinstance(payload, dict) or set(payload) != {"blueprint", "expectedRevision"}:
         raise ValueError("invalid Collision Blueprint request")
     expected = payload["expectedRevision"]
     if type(expected) is not int or expected < 0:
         raise ValueError("expectedRevision must be nonnegative integer")
-    blueprint = validate(payload["blueprint"], slug=slug)
+    table, key, owner = _table(domain)
+    blueprint = validate(payload["blueprint"], slug=slug, domain=domain)
     raw = json.dumps(blueprint, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
     with store.connect() as connection:
         connection.execute("BEGIN IMMEDIATE")
-        if not connection.execute("SELECT 1 FROM location_assets WHERE slug=?", (slug,)).fetchone():
-            raise ValueError("unknown Location Asset")
-        row = connection.execute("SELECT revision,sha256 FROM location_asset_collision_blueprints "
-                                 "WHERE asset_slug=? ORDER BY revision DESC LIMIT 1", (slug,)).fetchone()
+        if not connection.execute(f"SELECT 1 FROM {owner} WHERE slug=?", (slug,)).fetchone():
+            raise ValueError("unknown registered house" if domain == "house" else "unknown Location Asset")
+        row = connection.execute(f"SELECT revision,sha256 FROM {table} "
+                                 f"WHERE {key}=? ORDER BY revision DESC LIMIT 1", (slug,)).fetchone()
         revision = row["revision"] if row else 0
         if revision != expected:
             raise ValueError("Collision Blueprint changed since Capture opened; refresh")
         if not (row and row["sha256"] == digest):
-            connection.execute("INSERT INTO location_asset_collision_blueprints "
-                               "(asset_slug, revision, blueprint_json, sha256, captured_at) VALUES (?,?,?,?,?)",
+            connection.execute(f"INSERT INTO {table} "
+                               f"({key}, revision, blueprint_json, sha256, captured_at) VALUES (?,?,?,?,?)",
                                (slug, revision + 1, raw, digest, time.time()))
-    return latest(store, slug)
+    return latest(store, slug, domain=domain)
 
 
-def history(store, slug: str, limit: int = 25) -> list[dict]:
+def history(store, slug: str, limit: int = 25, *, domain: str = "location") -> list[dict]:
     """Immutable revision summary for the Location Asset editor."""
     if not SLUG.fullmatch(slug) or type(limit) is not int or not 1 <= limit <= 100:
         raise ValueError("invalid Collision Blueprint history request")
+    table, key, _ = _table(domain)
     with store.connect() as connection:
         rows = connection.execute(
-            "SELECT revision, blueprint_json, sha256, captured_at "
-            "FROM location_asset_collision_blueprints WHERE asset_slug=? "
-            "ORDER BY revision DESC LIMIT ?", (slug, limit)).fetchall()
+            f"SELECT revision, blueprint_json, sha256, captured_at FROM {table} "
+            f"WHERE {key}=? ORDER BY revision DESC LIMIT ?", (slug, limit)).fetchall()
     return [{"revision": row["revision"], "partCount": len(json.loads(row["blueprint_json"])["parts"]),
              "sha256": row["sha256"], "capturedAt": row["captured_at"]} for row in rows]

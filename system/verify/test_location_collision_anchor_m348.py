@@ -123,7 +123,7 @@ class AnchorM348(unittest.TestCase):
         transform = read('system/studio-plugin/modules/StudioLocationCollisionTransform.luau')
         self.assertIn('matched.Size.X / original.X', transform)
         self.assertIn('if not validParts then return false end', collision)
-        self.assertIn('if type(blueprint) ~= "table" or blueprint.schemaVersion ~= 2 then return false end', collision)
+        self.assertIn('blueprint.schemaVersion ~= 2 and blueprint.schemaVersion ~= 3', collision)
         self.assertIn('root == nil or needsRecapture', inventory)
         self.assertIn('not needsRecapture', inventory)
         self.assertIn('Collision Blueprint требует Sync', inventory)

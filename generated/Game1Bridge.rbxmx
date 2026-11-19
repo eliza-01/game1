@@ -264,7 +264,8 @@ local function pollBridge()
         locationCommands.handle(data)
     elseif data.command == "deco-refresh" then
         handleDecoRefresh(data)
-    elseif data.command == "location-collision-authoring-v1" then
+    elseif data.command == "location-collision-authoring-v1"
+        or data.command == "house-collision-authoring-v1" then
         if collisionController then
             local collisionOk, collisionError = pcall(collisionController.handle, data)
             if not collisionOk then
@@ -4801,7 +4802,14 @@ end
 local Carrier = require(script.Parent.StudioLocationRigCarrier)
 local MeshPhysics = require(script.Parent.StudioMeshPhysicsCore)
 local History = require(script.Parent.StudioPublishedMeshHistory)
-local PREVIEW_NAME = "__Game1LocationCollisionPreview"
+local PREVIEW_LOCATION = "__Game1LocationCollisionPreview"
+local PREVIEW_HOUSE = "__Game1HouseCollisionPreview"
+local function isHouse(command: any): boolean
+    return command.command == "house-collision-authoring-v1"
+end
+local function previewName(command: any): string
+    return if isHouse(command) then PREVIEW_HOUSE else PREVIEW_LOCATION
+end
 local MAX_PARTS = 256
 
 local function partsToCFrame(part: BasePart, rootPivot: CFrame): {number}
@@ -4868,10 +4876,11 @@ local function selectedModel(selection: any, workspaceRef: Workspace, command: a
             table.insert(observed, item.ClassName .. " " .. item:GetFullName())
         end
         if item:IsA("Model") then
-            if root then error("Select exactly ONE Location Asset Model plus Parts") end
+            if root then error("Select exactly ONE published Model plus original Parts") end
             root = item
         elseif item:IsA("BasePart") and (
             item:GetAttribute("Game1LocationCollisionOwned") == true
+            or item:GetAttribute("Game1HouseCollisionOwned") == true
             or item.Name:sub(1, 17) == "__Game1Collision_") then
             ignoredGenerated += 1
         else
@@ -4885,51 +4894,64 @@ local function selectedModel(selection: any, workspaceRef: Workspace, command: a
         "Studio Selection:Get() returned %d objects; generated ignored: %d; actual: %s",
         #picked, ignoredGenerated, table.concat(observed, " | "))
     if root == nil or not root:IsDescendantOf(workspaceRef) then
-        error("Select one published Location Asset Model in Workspace. " .. selectionReport)
+        error("Select one published Model in Workspace. " .. selectionReport)
     end
     local camera = workspaceRef.CurrentCamera
-    if camera and root:IsDescendantOf(camera) then error("Camera Model cannot be a Location Asset") end
+    if camera and root:IsDescendantOf(camera) then error("Cannot author collision on Camera Model") end
     for _, item in ipairs(parts) do
         if not item:IsDescendantOf(workspaceRef) or (camera and item:IsDescendantOf(camera))
             then
             error("Collision Parts must be in Workspace, not in Camera")
         end
-        local preview = workspaceRef:FindFirstChild(PREVIEW_NAME)
+        local preview = workspaceRef:FindFirstChild(previewName(command))
         if preview and item:IsDescendantOf(preview) then
             error("Do not Capture generated Collision Preview Parts")
         end
     end
     if needParts and (#parts < 1 or #parts > MAX_PARTS) then
-        error("Select the Location Model together with 1..256 ORIGINAL collision Parts. "
+        error((if isHouse(command) then "Select the House Model together with 1..256 ORIGINAL collision Parts. "
+            else "Select the Location Model together with 1..256 ORIGINAL collision Parts. ")
             .. selectionReport)
     end
-    -- A placed Model is accepted. No exception for Workspace.Places or Plots.
-    -- Editable names and stamps are never sufficient identity by themselves.
-    local cursor: Instance? = root
-    while cursor and cursor ~= workspaceRef do
-        local owned = cursor:GetAttribute("Game1DecoAssetSlug")
-        if owned ~= nil and owned ~= command.slug then
-            error("Selected Model belongs to another registered Location Asset")
+    -- House identity is a managed, published plot preview. No guessing by name
+    -- or by coincidentally matching Mesh IDs. Location retains its ID inventory.
+    if isHouse(command) then
+        if root.Name ~= command.slug or root:GetAttribute("Game1RealEstateSlug") ~= command.slug
+            or root:GetAttribute("Game1PlotHousePreview") ~= true
+            or tostring(root:GetAttribute("Game1HouseModelAssetId") or "") ~= command.expectedHouseModelId then
+            error("Select the latest placed and synced " .. command.slug .. " House Model in a Plot")
         end
-        if cursor:GetAttribute("Game1RealEstateSlug") ~= nil then
-            error("Selected Model belongs to Real Estate, not Location Assets")
+        if type(command.expectedHouseModelId) ~= "string"
+            or not command.expectedHouseModelId:match("^[1-9]%d*$") then
+            error("Published house rig identity missing")
         end
-        cursor = cursor.Parent
+    else
+        local cursor: Instance? = root
+        while cursor and cursor ~= workspaceRef do
+            local owned = cursor:GetAttribute("Game1DecoAssetSlug")
+            if owned ~= nil and owned ~= command.slug then
+                error("Selected Model belongs to another registered Location Asset")
+            end
+            if cursor:GetAttribute("Game1RealEstateSlug") ~= nil then
+                error("Selected Model belongs to Real Estate, not Location Assets")
+            end
+            cursor = cursor.Parent
+        end
+        local versions = command.expectedVersions
+        if type(versions) ~= "table" or #versions < 1 then
+            error("Published Mesh ID inventory missing; refresh Location Asset history")
+        end
+        local verified = false
+        for _, version in ipairs(versions) do
+            if sameInventory(root, version) then verified = true break end
+        end
+        if not verified then
+            error("Selected Model does not match published visual Mesh IDs of " .. command.slug ..
+                ". Select the registered asset instance, not an unrelated Model")
+        end
     end
     if math.abs(root:GetScale() - 1) > 0.0001 then
-        error("Collision Blueprint v1 requires an unscaled Model (Scale=1); Pivot was not changed")
-    end
-    local versions = command.expectedVersions
-    if type(versions) ~= "table" or #versions < 1 then
-        error("Published Mesh ID inventory missing; refresh Location Asset history")
-    end
-    local verified = false
-    for _, version in ipairs(versions) do
-        if sameInventory(root, version) then verified = true break end
-    end
-    if not verified then
-        error("Selected Model does not match published visual Mesh IDs of " .. command.slug ..
-            ". Select the registered asset instance, not an unrelated Model")
+        error("Capture requires an unscaled Model (Scale=1). Original pivot preserved")
     end
     return root, parts, ignoredGenerated
 end
@@ -5009,9 +5031,12 @@ local function capture(root: Model, parts: {BasePart}, command: any): any
     local nextAuto = 0
     local recipes = {}
     local pivot = root:GetPivot() -- Read only; never edit the placed Model.
-    local anchorPart, meshId = selectVisualAnchor(root, command)
-    local anchorFrame = pivot:ToObjectSpace(anchorPart.CFrame)
-    local anchorSize = anchorPart.Size
+    local anchorPart, meshId, anchorFrame, anchorSize
+    if not isHouse(command) then
+        anchorPart, meshId = selectVisualAnchor(root, command)
+        anchorFrame = pivot:ToObjectSpace(anchorPart.CFrame)
+        anchorSize = anchorPart.Size
+    end
     for index, part in ipairs(parts) do
         local id = proposed[index]
         if id == nil or frequencies[id] ~= 1 then
@@ -5035,6 +5060,9 @@ local function capture(root: Model, parts: {BasePart}, command: any): any
             canTouch = part.CanTouch,
         })
     end
+    if isHouse(command) then
+        return {schemaVersion = 3, pivot = "Model:GetPivot()", parts = recipes}
+    end
     return {schemaVersion = 2, pivot = "Model:GetPivot()",
         anchor = {meshId = meshId,
             localCFrame = {anchorFrame:GetComponents()},
@@ -5042,8 +5070,8 @@ local function capture(root: Model, parts: {BasePart}, command: any): any
         parts = recipes}
 end
 
-local function clearPreview(workspaceRef: Workspace): number
-    local previous = workspaceRef:FindFirstChild(PREVIEW_NAME)
+local function clearPreview(workspaceRef: Workspace, name: string): number
+    local previous = workspaceRef:FindFirstChild(name)
     if not previous then return 0 end
     if not previous:IsA("Folder") or previous:GetAttribute("Game1CollisionPreviewOwned") ~= true then
         error("Reserved preview name is occupied by an unmanaged object; refusing to delete it")
@@ -5053,19 +5081,19 @@ local function clearPreview(workspaceRef: Workspace): number
     return count
 end
 
-local function preview(root: Model, blueprint: any, workspaceRef: Workspace, slug: string): number
-    if type(blueprint) ~= "table" or blueprint.schemaVersion ~= 2
-        or blueprint.pivot ~= "Model:GetPivot()" or type(blueprint.anchor) ~= "table"
+local function preview(root: Model, blueprint: any, workspaceRef: Workspace, slug: string, name: string): number
+    if type(blueprint) ~= "table" or (blueprint.schemaVersion ~= 2 and blueprint.schemaVersion ~= 3)
+        or blueprint.pivot ~= "Model:GetPivot()" or (blueprint.schemaVersion == 2 and type(blueprint.anchor) ~= "table")
         or type(blueprint.parts) ~= "table"
         or #blueprint.parts < 1 or #blueprint.parts > MAX_PARTS then
         error("Invalid saved Collision Blueprint; Preview refused")
     end
-    local Collision = require(script.Parent.StudioLocationCollisionParts)
-    local pivot, visualScale = Collision.ReferencePivot(root, blueprint)
+    local CollisionGeometry = require(script.Parent.StudioLocationCollisionTransform)
+    local frame = CollisionGeometry.Resolve(root, blueprint)
     -- Build the whole temporary preview first; do not remove a working preview
     -- until every new recipe has passed validation and instantiated correctly.
     local draft = Instance.new("Folder")
-    draft.Name = PREVIEW_NAME
+    draft.Name = name
     draft:SetAttribute("Game1CollisionPreviewOwned", true)
     draft:SetAttribute("Game1CollisionPreviewSlug", slug)
     local ok, failure = pcall(function()
@@ -5095,8 +5123,9 @@ local function preview(root: Model, blueprint: any, workspaceRef: Workspace, slu
             ghost.CanQuery = false
             ghost.CastShadow = false
             ghost.Transparency = 1
-            ghost.Size = Collision.SizeFor(visualScale, recipe)
-            ghost.CFrame = Collision.FrameFromPivot(pivot, visualScale, recipe)
+            local targetFrame, targetSize = CollisionGeometry.Part(frame, recipe)
+            ghost.Size = targetSize
+            ghost.CFrame = targetFrame
             ghost.Parent = draft
             local outline = Instance.new("SelectionBox")
             outline.Name = "Game1CollisionOutline"
@@ -5111,7 +5140,7 @@ local function preview(root: Model, blueprint: any, workspaceRef: Workspace, slu
         draft:Destroy()
         error(tostring(failure))
     end
-    clearPreview(workspaceRef)
+    clearPreview(workspaceRef, name)
     draft.Parent = workspaceRef
     return #blueprint.parts
 end
@@ -5121,13 +5150,15 @@ return function(config: any)
     local workspaceRef = config.Workspace
     local function handle(command: any)
         local result = {
-            project = "game1", command = "location-collision-authoring-v1",
+            project = "game1", command = command.command,
             schemaVersion = 1, operationId = command.operationId,
             slug = command.slug, phase = command.phase,
             expectedRevision = command.expectedRevision,
         }
         local ok, response = pcall(function()
-            if command.project ~= "game1" or command.command ~= result.command
+            if command.project ~= "game1"
+                or (command.command ~= "location-collision-authoring-v1"
+                    and command.command ~= "house-collision-authoring-v1")
                 or command.schemaVersion ~= 1 or type(command.operationId) ~= "string"
                 or type(command.slug) ~= "string" or type(command.phase) ~= "string"
                 or type(command.expectedRevision) ~= "number" then
@@ -5135,7 +5166,7 @@ return function(config: any)
             end
             if config.RunService:IsRunning() then error("Studio Edit mode required") end
             if command.phase == "clear-preview" then
-                return {partCount = clearPreview(workspaceRef)}
+                return {partCount = clearPreview(workspaceRef, previewName(command))}
             end
             local requiresParts = command.phase == "validate" or command.phase == "capture"
             local model, parts, ignoredGenerated = selectedModel(config.Selection, workspaceRef, command, requiresParts)
@@ -5143,7 +5174,10 @@ return function(config: any)
                 return {blueprint = capture(model, parts, command),
                     ignoredGenerated = ignoredGenerated}
             elseif command.phase == "preview" then
-                return {partCount = preview(model, command.blueprint, workspaceRef, command.slug)}
+                if isHouse(command) and command.blueprint.schemaVersion ~= 3 then
+                    error("House requires pivot-based Collision Blueprint v3")
+                end
+                return {partCount = preview(model, command.blueprint, workspaceRef, command.slug, previewName(command))}
             end
             error("Unknown Collision Studio phase")
         end)
@@ -5153,7 +5187,8 @@ return function(config: any)
             result.error = tostring(response)
         end
         local posted, answer = pcall(HttpService.RequestAsync, HttpService, {
-            Url = config.bridgeUrl .. "/location-collision-result",
+            Url = config.bridgeUrl .. (if isHouse(command)
+                then "/house-collision-result" else "/location-collision-result"),
             Method = "POST",
             Headers = { ["X-Game1-Token"] = config.bridgeToken,
                         ["Content-Type"] = "application/json" },
@@ -5165,8 +5200,10 @@ return function(config: any)
         end
     end
     return {handle = handle, dispose = function()
-        local ok, err = pcall(clearPreview, workspaceRef)
-        if not ok then warn("[Game1 Location Collision] " .. tostring(err)) end
+        for _, name in {PREVIEW_LOCATION, PREVIEW_HOUSE} do
+            local ok, err = pcall(clearPreview, workspaceRef, name)
+            if not ok then warn("[Game1 Collision] " .. tostring(err)) end
+        end
     end}
 end
 ]]></string>
@@ -5186,10 +5223,19 @@ local PART_ID = "Game1LocationCollisionPartId"
 local REVISION = "Game1LocationCollisionRevision"
 local SHA = "Game1LocationCollisionSha256"
 local APPROVED = "Game1LocationCollisionApprovedSha256"
+local function keys(blueprint: any)
+    if type(blueprint) == "table" and blueprint.schemaVersion == 3 then
+        return "Game1HouseCollisionOwned", "Game1HouseCollisionPartId",
+            "Game1HouseCollisionRevision", "Game1HouseCollisionSha256",
+            "Game1HouseCollisionApprovedSha256"
+    end
+    return OWNED, PART_ID, REVISION, SHA, APPROVED
+end
 
 local function recipes(blueprint: any): {any}
-    if type(blueprint) ~= "table" or blueprint.schemaVersion ~= 2
-        or blueprint.pivot ~= "Model:GetPivot()" or type(blueprint.anchor) ~= "table"
+    if type(blueprint) ~= "table" or (blueprint.schemaVersion ~= 2 and blueprint.schemaVersion ~= 3)
+        or blueprint.pivot ~= "Model:GetPivot()"
+        or (blueprint.schemaVersion == 2 and type(blueprint.anchor) ~= "table")
         or type(blueprint.parts) ~= "table"
         or #blueprint.parts < 1 or #blueprint.parts > 256 then
         error("Invalid Location Collision Blueprint; no Parts changed")
@@ -5225,10 +5271,11 @@ end
 
 -- Coordinate conversion is owned by StudioLocationCollisionTransform. Never
 -- infer per-axis visual scale from Model:GetScale() or adjust the old Pivot.
-local function ownedParts(root: Model): {BasePart}
+local function ownedParts(root: Model, ownedKey: string?): {BasePart}
     local result = {}
+    local attribute = ownedKey or OWNED
     for _, child in ipairs(root:GetChildren()) do
-        if child:GetAttribute(OWNED) == true then
+        if child:GetAttribute(attribute) == true then
             if not child:IsA("BasePart") or child:IsA("MeshPart") then
                 error("Managed collision marker on non-primitive child; refusing mutation")
             end
@@ -5239,22 +5286,23 @@ local function ownedParts(root: Model): {BasePart}
 end
 
 function Collision.IsOwned(part: Instance): boolean
-    return part:GetAttribute(OWNED) == true
+    return part:GetAttribute(OWNED) == true or part:GetAttribute("Game1HouseCollisionOwned") == true
 end
 
 function Collision.Current(root: Model, blueprint: any, revision: any, sha: any): boolean
     if type(revision) ~= "number" or revision < 1 then return true end
-    if type(blueprint) ~= "table" or blueprint.schemaVersion ~= 2 then return false end
-    if root:GetAttribute(REVISION) ~= revision or root:GetAttribute(SHA) ~= sha then return false end
+    if type(blueprint) ~= "table" or (blueprint.schemaVersion ~= 2 and blueprint.schemaVersion ~= 3) then return false end
+    local ownedKey, partKey, revisionKey, shaKey, approvalKey = keys(blueprint)
+    if root:GetAttribute(revisionKey) ~= revision or root:GetAttribute(shaKey) ~= sha then return false end
     local resolved, anchor = pcall(Transform.Resolve, root, blueprint)
     if not resolved then return false end
-    local validParts, actual = pcall(ownedParts, root)
+    local validParts, actual = pcall(ownedParts, root, ownedKey)
     if not validParts then return false end
     if type(blueprint) ~= "table" or type(blueprint.parts) ~= "table"
         or #actual ~= #blueprint.parts then return false end
     local byId = {}
     for _, part in ipairs(actual) do
-        local partId = part:GetAttribute(PART_ID)
+        local partId = part:GetAttribute(partKey)
         if type(partId) ~= "string" or byId[partId] then return false end
         byId[partId] = part
     end
@@ -5273,7 +5321,7 @@ function Collision.Current(root: Model, blueprint: any, revision: any, sha: any)
         -- Explicit Studio inspection may authorize a larger, visible enclosure
         -- for this exact Blueprint SHA. It does not change the default for
         -- unapproved placements or later Blueprint revisions.
-        local allowed = root:GetAttribute(APPROVED) == sha
+        local allowed = root:GetAttribute(approvalKey) == sha
         local okGeometry, expected, expectedSize = pcall(Transform.Part, anchor, recipe, allowed)
         if not okGeometry then return false end
         if (part.Size - expectedSize).Magnitude > 0.002
@@ -5292,6 +5340,7 @@ function Collision.Prepare(root: Model, blueprint: any, revision: any, sha: any,
         or type(sha) ~= "string" or #sha ~= 64 then
         error("Invalid Location Collision publication")
     end
+    local ownedKey, partKey, revisionKey, shaKey, approvalKey = keys(blueprint)
     local pivot = root:GetPivot()
     local geometry = incoming or root
     local anchor = Transform.Resolve(geometry, blueprint)
@@ -5311,8 +5360,8 @@ function Collision.Prepare(root: Model, blueprint: any, revision: any, sha: any,
             end
             table.insert(stage, part)
             part.Name = "__Game1Collision_" .. recipe.id
-            part:SetAttribute(OWNED, true)
-            part:SetAttribute(PART_ID, recipe.id)
+            part:SetAttribute(ownedKey, true)
+            part:SetAttribute(partKey, recipe.id)
             local frame, size, warning
             if allowExcessive == true then
                 frame, size, warning = Transform.Part(anchor, recipe, true)
@@ -5338,9 +5387,10 @@ function Collision.Prepare(root: Model, blueprint: any, revision: any, sha: any,
         error("Collision Parts staging failed: " .. tostring(failure))
     end
     return {root = root, pivot = pivot, stage = stage, warnings = warnings,
-        prior = ownedParts(root), revision = revision, sha = sha,
-        oldRevision = root:GetAttribute(REVISION), oldSha = root:GetAttribute(SHA),
-        oldApproval = root:GetAttribute(APPROVED), committed = false}
+        prior = ownedParts(root, ownedKey), revision = revision, sha = sha,
+        revisionKey = revisionKey, shaKey = shaKey, approvalKey = approvalKey,
+        oldRevision = root:GetAttribute(revisionKey), oldSha = root:GetAttribute(shaKey),
+        oldApproval = root:GetAttribute(approvalKey), committed = false}
 end
 
 function Collision.Commit(transaction: any)
@@ -5350,9 +5400,9 @@ function Collision.Commit(transaction: any)
     -- Mark committed before mutation so rollback can restore a partial commit.
     transaction.committed = true
     for _, part in ipairs(transaction.stage) do part.Parent = root end
-    root:SetAttribute(REVISION, transaction.revision)
-    root:SetAttribute(SHA, transaction.sha)
-    root:SetAttribute(APPROVED, if #transaction.warnings > 0 then transaction.sha else nil)
+    root:SetAttribute(transaction.revisionKey, transaction.revision)
+    root:SetAttribute(transaction.shaKey, transaction.sha)
+    root:SetAttribute(transaction.approvalKey, if #transaction.warnings > 0 then transaction.sha else nil)
     if root:GetPivot() ~= transaction.pivot then error("Collision Parts changed the authored Pivot") end
 end
 
@@ -5360,9 +5410,9 @@ function Collision.Rollback(transaction: any)
     for _, part in ipairs(transaction.stage) do part:Destroy() end
     if transaction.committed then
         for _, part in ipairs(transaction.prior) do part.Parent = transaction.root end
-        transaction.root:SetAttribute(REVISION, transaction.oldRevision)
-        transaction.root:SetAttribute(SHA, transaction.oldSha)
-        transaction.root:SetAttribute(APPROVED, transaction.oldApproval)
+        transaction.root:SetAttribute(transaction.revisionKey, transaction.oldRevision)
+        transaction.root:SetAttribute(transaction.shaKey, transaction.oldSha)
+        transaction.root:SetAttribute(transaction.approvalKey, transaction.oldApproval)
     end
 end
 
@@ -5394,6 +5444,15 @@ local function finiteRatio(value: number): boolean
 end
 
 function Transform.Resolve(root: Model, blueprint: any): any
+    -- House v3 has an authored rig_carrier pivot, not an unstable visual Mesh ID.
+    -- The same Part reconstruction handles both schemas without a second system.
+    if type(blueprint) == "table" and blueprint.schemaVersion == 3 then
+        if blueprint.pivot ~= "Model:GetPivot()" then error("Invalid House collision pivot") end
+        local scale = root:GetScale()
+        if scale <= 0 or scale ~= scale or scale > 1000 then error("Invalid house scale") end
+        return {mesh = {CFrame = root:GetPivot()}, anchorFrame = CFrame.new(),
+            ratios = Vector3.new(scale, scale, scale), uniform = true, uniformScale = scale}
+    end
     local anchor = if type(blueprint) == "table" then blueprint.anchor else nil
     if type(anchor) ~= "table" or type(anchor.meshId) ~= "string"
         or type(anchor.localCFrame) ~= "table" or #anchor.localCFrame ~= 12
@@ -11039,6 +11098,7 @@ local HttpService = game:GetService("HttpService")
 local StudioRealEstateAppearance = require(script.Parent.StudioRealEstateAppearance)
 local StudioRealEstateRigValidation = require(script.Parent.StudioRealEstateRigValidation)
 local StudioRealEstateCollisionPolicy = require(script.Parent.StudioRealEstateCollisionPolicy)
+local CollisionParts = require(script.Parent.StudioLocationCollisionParts)
 local RetiredCleanup = require(script.Parent.StudioRetiredColMeshCleanup)
 local StudioRealEstatePlacedVisualSync = require(script.Parent.StudioRealEstatePlacedVisualSync)
 local PlacedTargets = require(script.Parent.StudioRealEstatePlacedTargets)
@@ -11332,6 +11392,26 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
     wrapper:SetAttribute("Game1PurchasePrice", tonumber(metadata.purchasePrice) or 1)
     wrapper:SetAttribute("Game1MinimumLevel", tonumber(metadata.minLevel) or 1)
     wrapper:SetAttribute("Game1SalePrice", tonumber(metadata.salePrice) or 1)
+    -- Stage the current house collision against the authored *model pivot*.
+    -- This is independent of every visual Mesh ID and every Plot binding.
+    local collisionRevision = tonumber(metadata.collisionRevision) or 0
+    local collisionBlueprint = metadata.collisionBlueprint
+    local collisionSha = tostring(metadata.collisionSha256 or "")
+    if collisionRevision > 0 then
+        if typeof(collisionBlueprint) ~= "table" or collisionBlueprint.schemaVersion ~= 3 then
+            wrapper:Destroy()
+            error("House Collision Blueprint requires pivot schema v3")
+        end
+        local stagedCollision = CollisionParts.Prepare(wrapper, collisionBlueprint,
+            collisionRevision, collisionSha)
+        local applied, collisionError = pcall(CollisionParts.Commit, stagedCollision)
+        if not applied then
+            CollisionParts.Rollback(stagedCollision)
+            wrapper:Destroy()
+            error("House collision staging failed: " .. tostring(collisionError))
+        end
+        CollisionParts.Finalize(stagedCollision)
+    end
     wrapper.Parent = destination
     if previous then
         previous:Destroy()
@@ -11349,12 +11429,47 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
     -- Apply appearance independently; visual replacement may have been skipped
     -- safely for an incomplete/unmanaged placed house.
     local textureUpdated = select(1, refreshPlaced(slug, imageAssets, imageAlpha, meshOptions, placedTargets))
+    local houseCollisionUpdated = 0
+    local houseCollisionFailures = 0
+    if collisionRevision > 0 then
+        for _, root in ipairs(placedTargets) do
+            -- Authoritative Plot previews only; do not modify authoring models.
+            if root:GetAttribute("Game1PlotHousePreview") == true then
+                if root.Name ~= slug or root:GetAttribute("Game1RealEstateSlug") ~= slug then
+                    houseCollisionFailures += 1
+                    table.insert(rigWarnings, root:GetFullName() .. ": invalid managed house identity")
+                    continue
+                end
+                local applied, collisionError = pcall(function()
+                    if not CollisionParts.Current(root, collisionBlueprint, collisionRevision, collisionSha) then
+                        local transaction = CollisionParts.Prepare(root, collisionBlueprint,
+                            collisionRevision, collisionSha)
+                        local committed, failure = pcall(CollisionParts.Commit, transaction)
+                        if not committed then
+                            CollisionParts.Rollback(transaction)
+                            error(failure)
+                        end
+                        CollisionParts.Finalize(transaction)
+                    end
+                    houseCollisionUpdated += 1
+                end)
+                if not applied then
+                    houseCollisionFailures += 1
+                    table.insert(rigWarnings, root:GetFullName() ..
+                        ": house Collision Blueprint failed: " .. tostring(collisionError))
+                end
+            end
+        end
+    end
     return wrapper, {bonesValidated = true, rigsValidated = #parts + 1,
         alignment = "independent-authored-rig-carrier",
         texturesApplied = textureCount, placedSyncVersion = 3, workspaceModelsUpdated = visualUpdated,
         workspaceModelsFound = visualFound,
         workspaceTextureModelsUpdated = textureUpdated,
         workspaceCollisionRigsUpdated = collisionUpdated,
+        houseCollisionRevision = collisionRevision,
+        houseCollisionModelsUpdated = houseCollisionUpdated,
+        houseCollisionFailures = houseCollisionFailures,
         boneCount = bones, socketCount = socketCount,
         authoredPlacementsRestored = placementsRestored,
         socketContractComplete = #missingSockets == 0,

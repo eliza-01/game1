@@ -29,6 +29,7 @@ from services.retired_col_mesh import retired, strip_options
 from services.texture_atlas_registry import AtlasRegistry, parse_filename, atlas_version, same_atlas_series
 from services.atlas_identity import display_identity
 from services import mesh_visual_appearance as appearance
+from services import location_collision_blueprint as collision_blueprints
 
 
 def glass_default(part: str) -> bool:
@@ -112,6 +113,11 @@ class RealEstateStore:
                 id INTEGER PRIMARY KEY AUTOINCREMENT, house_slug TEXT NOT NULL,
                 part TEXT NOT NULL, asset_id TEXT NOT NULL, sha256 TEXT NOT NULL,
                 operation TEXT NOT NULL, published_at REAL NOT NULL
+            )''')
+            db.execute('''CREATE TABLE IF NOT EXISTS real_estate_collision_blueprints (
+                house_slug TEXT NOT NULL, revision INTEGER NOT NULL,
+                blueprint_json TEXT NOT NULL, sha256 TEXT NOT NULL,
+                captured_at REAL NOT NULL, PRIMARY KEY (house_slug, revision)
             )''')
             columns = {column[1] for column in db.execute('PRAGMA table_info(real_estate)')}
             if 'model_rigs_json' not in columns:
@@ -312,6 +318,16 @@ class RealEstateStore:
                              else 'UPDATE_AVAILABLE')
             result.append(row)
         return result
+
+    def collision_blueprint(self, slug: str) -> dict | None:
+        return collision_blueprints.latest(self, slug, domain='house')
+
+    def collision_blueprint_history(self, slug: str, limit: int = 25) -> list[dict]:
+        return collision_blueprints.history(self, slug, limit, domain='house')
+
+    def save_collision_blueprint(self, slug: str, payload: dict) -> dict:
+        saved = collision_blueprints.save(self, slug, payload, domain='house')
+        return saved
 
     def get(self, slug: str):
         return next((item for item in self.list() if item['slug'] == slug), None)
@@ -545,12 +561,14 @@ class RealEstateStore:
             raw = dict(db.execute('SELECT * FROM real_estate WHERE slug=?', (slug,)).fetchone())
             publications = [dict(r) for r in db.execute(
                 'SELECT * FROM real_estate_publications WHERE house_slug=? ORDER BY id', (slug,))]
+            collision_history = [dict(r) for r in db.execute(
+                'SELECT * FROM real_estate_collision_blueprints WHERE house_slug=? ORDER BY revision', (slug,))]
         archive = self.root / '.control-center' / 'real-estate-retired'
         archive.mkdir(parents=True, exist_ok=True)
         target = archive / (slug + '_' + datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ') + '.json')
         # Exclusive creation guarantees that an old archive cannot be replaced.
         with target.open('x', encoding='utf-8') as file:
-            json.dump({'house': raw, 'publications': publications, 'sourceFilesPreserved': True},
+            json.dump({'house': raw, 'publications': publications, 'collisionBlueprints': collision_history, 'sourceFilesPreserved': True},
                       file, ensure_ascii=False, indent=2)
         with self.connect() as db:
             db.execute('DELETE FROM real_estate_publications WHERE house_slug=?', (slug,))

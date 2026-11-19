@@ -29,6 +29,18 @@
 .real-estate-row-actions button { white-space:nowrap; font-size:11px; }
 @media(max-width:1200px) {.real-estate-workflow {grid-template-columns:minmax(0,1fr)}}
 
+/* House collision authoring lives in the publication panel, before its long library.
+   It uses the same Collision Blueprint controls as Location Assets. */
+#house-collision-panel {
+  padding:14px; margin:16px 0 20px; border:1px solid var(--line);
+  border-radius:10px; background:var(--panel2); min-width:0;
+}
+#house-collision-panel .section-title {margin-bottom:10px;}
+#house-collision-panel .location-collision-controls {min-width:0;}
+#house-collision-panel .location-collision-controls label {max-width:100%;}
+#house-collision-panel .location-collision-controls select {max-width:100%;}
+#house-collision-panel .location-collision-status {background:var(--panel);}
+
 /* Per-mesh editors: the heading, flags and atlas picker each own a full row.
    Never put mesh labels in a fixed-width grid column: long names must wrap. */
 #real-estate-mesh-textures { display:flex; flex-direction:column; gap:9px; min-width:0; }

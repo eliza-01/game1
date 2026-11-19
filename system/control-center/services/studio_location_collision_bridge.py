@@ -20,25 +20,34 @@ PHASES = frozenset({'validate', 'capture', 'preview', 'clear-preview'})
 def run_location_collision_bridge(*, slug: str, phase: str, expected_revision: int,
                                   blueprint: dict | None = None,
                                   expected_versions: list[dict] | None = None,
-                                  timeout_seconds: float = 35.0) -> dict:
+                                  timeout_seconds: float = 35.0,
+                                  domain: str = 'location', expected_house_model_id: str = '') -> dict:
     if phase not in PHASES or not isinstance(slug, str) or not slug or type(expected_revision) is not int:
         raise ValueError('invalid Location Collision Studio request')
     if phase == 'preview' and not isinstance(blueprint, dict):
         raise ValueError('Preview requires a saved Collision Blueprint')
     if phase != 'preview' and blueprint is not None:
         raise ValueError('Only Preview may carry a saved Collision Blueprint')
-    if phase != 'clear-preview' and (not isinstance(expected_versions, list) or not expected_versions):
+    if domain not in ('location', 'house'):
+        raise ValueError('invalid Collision authoring domain')
+    if domain == 'location' and phase != 'clear-preview' and (not isinstance(expected_versions, list) or not expected_versions):
         raise ValueError('Published visual Mesh ID inventory required for Collision Capture')
-    if phase == 'clear-preview' and expected_versions is not None:
+    if domain == 'house' and phase != 'clear-preview' and not str(expected_house_model_id).isdigit():
+        raise ValueError('Publish and Sync this house before Collision Capture')
+    if phase == 'clear-preview' and (expected_versions is not None or expected_house_model_id):
         raise ValueError('Clear Preview must not carry selected-model identities')
     operation_id = uuid.uuid4().hex
-    command = {'project': PROJECT, 'command': COMMAND, 'schemaVersion': 1,
+    command_name = COMMAND if domain == 'location' else 'house-collision-authoring-v1'
+    result_path = '/location-collision-result' if domain == 'location' else '/house-collision-result'
+    command = {'project': PROJECT, 'command': command_name, 'schemaVersion': 1,
                'operationId': operation_id, 'slug': slug, 'phase': phase,
                'expectedRevision': expected_revision}
     if blueprint is not None:
         command['blueprint'] = blueprint
     if expected_versions is not None:
         command['expectedVersions'] = expected_versions
+    if domain == 'house' and expected_house_model_id:
+        command['expectedHouseModelId'] = expected_house_model_id
     identity = {key: command[key] for key in
                 ('project', 'command', 'schemaVersion', 'operationId', 'slug', 'phase', 'expectedRevision')}
     state = {'claimed': False, 'result': None}
@@ -71,7 +80,7 @@ def run_location_collision_bridge(*, slug: str, phase: str, expected_revision: i
         def do_POST(self):
             if not self.authorized():
                 return self.send_json(403, {'error': 'forbidden'})
-            if self.path != '/location-collision-result':
+            if self.path != result_path:
                 return self.send_json(404, {'error': 'not found'})
             try:
                 length = int(self.headers.get('Content-Length', '0'))

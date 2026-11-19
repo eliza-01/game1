@@ -378,7 +378,8 @@ function DecoManager:previewMeshSync(slug: string, modelId: string, atlasId: str
     report.partStates=snap
     report.rootStates=roots
     self.meshSyncPreview={slug=slug,modelId=modelId,atlasId=atlasId,
-        alphaEnabled=row.alphaEnabled==true,revision=expectedRevision,token=token,report=report}
+        alphaEnabled=row.alphaEnabled==true,authoringRevision=tonumber(row.revision) or 0,
+        revision=expectedRevision,token=token,report=report}
     return {scanToken=token,mode=report.mode,inventory=report.inventory,
         expectedMeshIds=report.expectedMeshIds,parts=report.parts,
         foundMeshParts=report.foundMeshParts,managedMeshParts=report.managedMeshParts,
@@ -574,6 +575,7 @@ function DecoManager:refreshRegistry(targetSlug: string?, applyIds: boolean?, ex
             if row.slug==targetSlug then latest=row;break end
         end
         if not latest or tonumber(latest.bindingRevision)~=expectedRevision
+            or tonumber(latest.revision)~=preview.authoringRevision
             or (latest.alphaEnabled==true)~=(preview.alphaEnabled==true) then
             error("Atlas binding revision changed since Find; no Place geometry modified")
         end

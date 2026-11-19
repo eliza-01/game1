@@ -404,6 +404,18 @@ class AtlasRegistry:
             raise ValueError('unknown active atlas variant')
         consumers = self.consumers(variant_id)
         with self.connect() as db:
+            # Per-mesh overrides are persisted in Location mesh_options_json;
+            # they must be re-bound explicitly before a variant can retire.
+            has_location = db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='location_assets'").fetchone()
+            if has_location:
+                for entry in db.execute('SELECT slug,mesh_options_json FROM location_assets'):
+                    try:
+                        mesh_options=json.loads(entry['mesh_options_json'] or '{}')
+                    except (ValueError,TypeError):
+                        continue
+                    for mesh_name, settings in mesh_options.items():
+                        if isinstance(settings,dict) and settings.get('atlasVariantId')==variant_id:
+                            raise ValueError(f"atlas used by Location Asset {entry['slug']} / {mesh_name}; rebind this MeshPart first")
             pending = db.execute('SELECT 1 FROM texture_atlas_pending_uploads WHERE variant_id=?', (variant_id,)).fetchone()
             staged = db.execute('SELECT 1 FROM texture_atlas_replacements WHERE variant_id=?', (variant_id,)).fetchone()
         if pending or staged or variant['replacementPending']:

@@ -38,6 +38,7 @@ def build_catalog(location_assets) -> dict:
             'visualMaterial': str(row.get('visualMaterial') or 'SmoothPlastic'),
             'visualColor': str(row.get('visualColor') or '#FFFFFF'),
             'alphaEnabled': bool(row.get('alphaEnabled', False)),
+            'meshOptions': row.get('meshOptions') or {},
             'collisionBlueprintRevision': int(row.get('collisionBlueprintRevision') or 0),
             'collisionBlueprintSha256': str(row.get('collisionBlueprintSha256') or ''),
             'collisionBlueprint': row.get('collisionBlueprint'),
@@ -56,7 +57,8 @@ def build_catalog(location_assets) -> dict:
     # invalidate the immediately following repair token. Publication identity
     # and atlas bindings, not cache population, define the stable digest.
     identities = [{k: item[k] for k in ('slug', 'modelAssetId', 'atlasAssetId', 'publishedSha', 'surfaceMaterial', 'appearanceMode', 'visualMaterial', 'visualColor', 'robloxMaterial', 'alphaEnabled', 'collisionBlueprintRevision', 'collisionBlueprintSha256')}
-                  | {'versions': [model['modelAssetId'] for model in item['models']],
+                  | {'meshOptions': item['meshOptions'],
+                     'versions': [model['modelAssetId'] for model in item['models']],
                      'aliases': item['aliases'],
                      'rigHash': (item.get('rigManifest') or {}).get('structuralHash', ''),
                      'legacyStatic': item['legacyStaticPublication'],

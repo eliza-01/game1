@@ -1,5 +1,6 @@
 """Visual-mesh physics authoring. Dedicated COL geometry was retired in M342."""
 from __future__ import annotations
+from services import mesh_visual_appearance as appearance
 from services.retired_col_mesh import retired
 
 FIDELITIES = ('Box', 'Hull', 'Default', 'PreciseConvexDecomposition')
@@ -56,7 +57,34 @@ def normalize_location_options(analysis: dict, raw: dict | None) -> dict:
     unknown = set(raw) - set(meshes)
     if unknown:
         raise ValueError('meshOptions references missing FBX meshes: ' + ', '.join(sorted(unknown)))
-    return {name: normalize_mesh_options(name, raw.get(name), domain='location') for name in meshes}
+    result = {}
+    for name in meshes:
+        entry = raw.get(name) or {}
+        physics = normalize_mesh_options(name, entry, domain='location')
+        # Omitted appearanceMode inherits the asset default; never freeze a
+        # copy of that default on each part. Only explicit overrides persist.
+        if 'appearanceMode' in entry:
+            mode, material, color = appearance.validated(
+                entry['appearanceMode'], entry.get('visualMaterial', 'SmoothPlastic'),
+                entry.get('visualColor', '#FFFFFF'))
+            physics.update(appearanceMode=mode, visualMaterial=material, visualColor=color)
+            if 'alphaEnabled' in entry:
+                if type(entry['alphaEnabled']) is not bool:
+                    raise ValueError(f'{name}: alphaEnabled must be boolean')
+                physics['alphaEnabled'] = entry['alphaEnabled']
+            variant = entry.get('atlasVariantId', 0)
+            if type(variant) is not int or variant < 0:
+                raise ValueError(f'{name}: atlasVariantId must be a nonnegative integer')
+            if appearance.uses_atlas(mode) and variant:
+                physics['atlasVariantId'] = variant
+            elif variant:
+                raise ValueError(f'{name}: material-only appearance cannot bind an atlas')
+        elif any(key in entry for key in ('visualMaterial','visualColor','alphaEnabled','atlasVariantId','texture_asset_id')):
+            raise ValueError(f'{name}: select a per-mesh appearance mode before overriding visuals')
+        if 'texture_asset_id' in entry or 'textureAssetId' in entry:
+            raise ValueError(f'{name}: Image IDs are resolved by the shared Atlas Registry')
+        result[name] = physics
+    return result
 
 
 def location_mesh_profile(name: str, *, has_collider: bool) -> dict:

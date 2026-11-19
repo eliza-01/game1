@@ -15,13 +15,18 @@ end
 function EnvironmentAssetVisuals.ApplyPart(part: BasePart, definition: any): boolean
     if not part:IsA("MeshPart") or MeshPhysics.IsCollider(part.Name)
         or MeshPhysics.IsLocationCarrier(part) then return false end
-    local uri = textureUri(definition)
     local mesh = part :: MeshPart
-    local mode=tostring(definition and definition.appearanceMode or "atlas")
+    local override = if definition and typeof(definition.meshOptions)=="table"
+        then definition.meshOptions[mesh.Name] else nil
+    local settings = if typeof(override)=="table" and override.appearanceMode
+        then override else definition
+    local uri = textureUri(if settings and settings.texture_asset_id then
+        {textureAssetId=settings.texture_asset_id} else definition)
+    local mode=tostring(settings and settings.appearanceMode or "atlas")
     if mode=="material" or mode=="material_atlas" then
-        local material = Enum.Material[tostring(definition.visualMaterial or "SmoothPlastic")]
+        local material = Enum.Material[tostring(settings.visualMaterial or "SmoothPlastic")]
         if not material then return false end
-        local raw = tostring(definition.visualColor or "#FFFFFF")
+        local raw = tostring(settings.visualColor or "#FFFFFF")
         if not raw:match("^#[%x][%x][%x][%x][%x][%x]$") then return false end
         local color = Color3.fromRGB(tonumber(raw:sub(2,3),16),
             tonumber(raw:sub(4,5),16),tonumber(raw:sub(6,7),16))
@@ -42,10 +47,14 @@ function EnvironmentAssetVisuals.ApplyPart(part: BasePart, definition: any): boo
         return changed
     end
     if uri == nil then return false end
+    -- Atlas-only is neutral white, matching the Studio authoring policy.
+    local changed = mesh.Material~=Enum.Material.SmoothPlastic or mesh.Color~=Color3.new(1,1,1)
+    mesh.Material=Enum.Material.SmoothPlastic
+    mesh.Color=Color3.new(1,1,1)
     -- Existing authored SurfaceAppearance (and textureUsesAlpha) must be
     -- handled at Studio Sync, not mutated from a server gameplay thread.
-    if mesh:FindFirstChildOfClass("SurfaceAppearance") then return false end
-    if mesh.TextureID == uri then return false end
+    if mesh:FindFirstChildOfClass("SurfaceAppearance") then return changed end
+    if mesh.TextureID == uri then return changed end
     mesh.TextureID = uri
     return true
 end

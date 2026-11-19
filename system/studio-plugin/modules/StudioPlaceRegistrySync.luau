@@ -42,7 +42,8 @@ local function stageRig(ref: any, ctx: any): any
         model_asset_id=ref.entry.model,texture_asset_id=ref.entry.atlas,
         surfaceMaterial=ref.entry.material, appearanceMode=ref.entry.appearanceMode,
         visualMaterial=ref.entry.visualMaterial, visualColor=ref.entry.visualColor,
-        alphaEnabled=ref.entry.alphaEnabled,rigManifest=ref.entry.rigManifest}
+        alphaEnabled=ref.entry.alphaEnabled,meshOptions=ref.entry.meshOptions,
+        rigManifest=ref.entry.rigManifest}
     local stage=ctx.loader:loadPublished(publishedRow)
     local previous=ctx.loader:loadForMeshInventory(ref.oldVersion,ref.entry.slug)
     local good,result=pcall(function()
@@ -142,13 +143,17 @@ function Sync.Apply(refs: {any}, ctx: any): any
                 if ref.row.needsTexture or ref.row.needsAlpha then
                     local row={appearanceMode=ref.entry.appearanceMode,
                         visualMaterial=ref.entry.visualMaterial,visualColor=ref.entry.visualColor,
-                        texture_asset_id=ref.entry.atlas,alphaEnabled=ref.entry.alphaEnabled}
+                        texture_asset_id=ref.entry.atlas,alphaEnabled=ref.entry.alphaEnabled,
+                        meshOptions=ref.entry.meshOptions}
                     for _,change in ipairs(item.appearance) do
                         if ref.row.needsTexture then
                             Visual.Apply(change.mesh,row)
                         elseif ref.entry.appearanceMode~="material" then
-                            Texture.ApplyAlpha(change.mesh,ref.entry.alphaEnabled,
-                                "rbxassetid://"..ref.entry.atlas)
+                            local setting=Visual.Settings(change.mesh,row)
+                            if setting.appearanceMode~="material" then
+                                Texture.ApplyAlpha(change.mesh,setting.alphaEnabled==true,
+                                    "rbxassetid://"..tostring(setting.texture_asset_id or ""))
+                            end
                         end
                     end
                 end

@@ -986,7 +986,8 @@ function DecoManager:previewMeshSync(slug: string, modelId: string, atlasId: str
     report.partStates=snap
     report.rootStates=roots
     self.meshSyncPreview={slug=slug,modelId=modelId,atlasId=atlasId,
-        alphaEnabled=row.alphaEnabled==true,revision=expectedRevision,token=token,report=report}
+        alphaEnabled=row.alphaEnabled==true,authoringRevision=tonumber(row.revision) or 0,
+        revision=expectedRevision,token=token,report=report}
     return {scanToken=token,mode=report.mode,inventory=report.inventory,
         expectedMeshIds=report.expectedMeshIds,parts=report.parts,
         foundMeshParts=report.foundMeshParts,managedMeshParts=report.managedMeshParts,
@@ -1182,6 +1183,7 @@ function DecoManager:refreshRegistry(targetSlug: string?, applyIds: boolean?, ex
             if row.slug==targetSlug then latest=row;break end
         end
         if not latest or tonumber(latest.bindingRevision)~=expectedRevision
+            or tonumber(latest.revision)~=preview.authoringRevision
             or (latest.alphaEnabled==true)~=(preview.alphaEnabled==true) then
             error("Atlas binding revision changed since Find; no Place geometry modified")
         end
@@ -1660,11 +1662,15 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                 end
             end
             local alphaChanges={}
-            if not geometry and row.appearanceMode~="material" then
+            -- Keep the historical Alpha audit while applying each MeshPart's
+            -- effective settings. Visual.Apply owns the actual transition.
+            if not geometry then
                 for _, part in ipairs(oldParts) do
+                    local settings=Visual.Settings(part,row)
                     if chosenParts[part] and not Carrier.IsCarrier(part) and not Physics.IsCollider(part.Name)
                         and part:GetAttribute("Game1DecoPhysicsOnly")~=true
-                        and not StudioTextureAppearance.AlphaCurrent(part,row.alphaEnabled==true) then
+                        and settings.appearanceMode~="material"
+                        and not StudioTextureAppearance.AlphaCurrent(part,settings.alphaEnabled==true) then
                         table.insert(alphaChanges,StudioTextureAppearance.Capture(part))
                     end
                 end
@@ -1681,14 +1687,17 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
             if geometry then add("model", previousModelId, modelId, 1) end
             if changeRef then add("model_reference", oldRef, modelId, 1) end
             for _, change in ipairs(atlasChanges) do
-                if row.appearanceMode=="material" then
+                local settings=Visual.Settings(change.part,row)
+                if settings.appearanceMode=="material" then
                     local oldAppearance=change.oldId
                     if change.before.mode=="material" then
                         oldAppearance=tostring(change.before.visualMaterial or "")
                             ..tostring(change.before.visualColor or "")
                     end
-                    add("appearance",oldAppearance,tostring(row.visualMaterial)..tostring(row.visualColor),1)
-                else add("atlas", change.oldId, atlasId, 1) end
+                    add("appearance",oldAppearance,tostring(settings.visualMaterial)..tostring(settings.visualColor),1)
+                else
+                    add("atlas",change.oldId,tostring(settings.texture_asset_id or ""),1)
+                end
             end
             for _, change in ipairs(alphaChanges) do
                 -- Persist the stable enum name. tostring(EnumItem) includes the
@@ -1772,7 +1781,9 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                 end
             end
             for _, change in ipairs(item.alphaChanges) do
-                if StudioTextureAppearance.ApplyAlpha(change.mesh,row.alphaEnabled==true,uri) then
+                local settings=Visual.Settings(change.mesh,row)
+                if StudioTextureAppearance.ApplyAlpha(change.mesh,settings.alphaEnabled==true,
+                    "rbxassetid://"..tostring(settings.texture_asset_id or "")) then
                     changedParts+=1
                 end
             end
@@ -7394,6 +7405,8 @@ local function meshSettings(mesh: MeshPart, row: any): any
     }
 end
 
+Visual.Settings = meshSettings
+
 function Visual.IsCurrent(mesh: MeshPart, row: any): boolean
     row=meshSettings(mesh,row)
     if not visual(mesh) then return true end
@@ -8873,7 +8886,7 @@ local function ensureVersions(catalog: any, service: any): ({any}, {any}, {strin
             sha=item.publishedSha,material=item.surfaceMaterial or "default",
             appearanceMode=item.appearanceMode or "atlas", visualMaterial=item.visualMaterial or "SmoothPlastic",
             visualColor=item.visualColor or "#FFFFFF",
-            alphaEnabled=item.alphaEnabled==true,models=published,
+            alphaEnabled=item.alphaEnabled==true,meshOptions=item.meshOptions or {},models=published,
             collisionBlueprint=item.collisionBlueprint,
             collisionRevision=item.collisionBlueprintRevision or 0,
             collisionSha=item.collisionBlueprintSha256 or "",
@@ -9122,7 +9135,7 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
                 if not Visual.IsCurrent(visualPart, {
                     appearanceMode=entry.appearanceMode, visualMaterial=entry.visualMaterial,
                     visualColor=entry.visualColor, texture_asset_id=entry.atlas,
-                    alphaEnabled=entry.alphaEnabled,
+                    alphaEnabled=entry.alphaEnabled,meshOptions=entry.meshOptions,
                 }) then
                     needsTexture=true
                     break
@@ -9130,10 +9143,15 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
             end
         end
         local needsAlpha=false
-        if eligible and entry.appearanceMode~="material" then
+        if eligible then
             for _, visualPart in ipairs(visualParts) do
+                local settings = Visual.Settings(visualPart, {
+                    appearanceMode=entry.appearanceMode,visualMaterial=entry.visualMaterial,
+                    visualColor=entry.visualColor,alphaEnabled=entry.alphaEnabled,
+                    texture_asset_id=entry.atlas,meshOptions=entry.meshOptions})
+                if settings.appearanceMode=="material" then continue end
                 local appearance=visualPart:FindFirstChildOfClass("SurfaceAppearance")
-                local alpha=entry.alphaEnabled==true
+                local alpha=settings.alphaEnabled==true
                 if (if alpha then not appearance or appearance.AlphaMode~=Enum.AlphaMode.Transparency
                     else appearance~=nil) then
                     needsAlpha=true
@@ -9561,7 +9579,8 @@ local function stageRig(ref: any, ctx: any): any
         model_asset_id=ref.entry.model,texture_asset_id=ref.entry.atlas,
         surfaceMaterial=ref.entry.material, appearanceMode=ref.entry.appearanceMode,
         visualMaterial=ref.entry.visualMaterial, visualColor=ref.entry.visualColor,
-        alphaEnabled=ref.entry.alphaEnabled,rigManifest=ref.entry.rigManifest}
+        alphaEnabled=ref.entry.alphaEnabled,meshOptions=ref.entry.meshOptions,
+        rigManifest=ref.entry.rigManifest}
     local stage=ctx.loader:loadPublished(publishedRow)
     local previous=ctx.loader:loadForMeshInventory(ref.oldVersion,ref.entry.slug)
     local good,result=pcall(function()
@@ -9661,13 +9680,17 @@ function Sync.Apply(refs: {any}, ctx: any): any
                 if ref.row.needsTexture or ref.row.needsAlpha then
                     local row={appearanceMode=ref.entry.appearanceMode,
                         visualMaterial=ref.entry.visualMaterial,visualColor=ref.entry.visualColor,
-                        texture_asset_id=ref.entry.atlas,alphaEnabled=ref.entry.alphaEnabled}
+                        texture_asset_id=ref.entry.atlas,alphaEnabled=ref.entry.alphaEnabled,
+                        meshOptions=ref.entry.meshOptions}
                     for _,change in ipairs(item.appearance) do
                         if ref.row.needsTexture then
                             Visual.Apply(change.mesh,row)
                         elseif ref.entry.appearanceMode~="material" then
-                            Texture.ApplyAlpha(change.mesh,ref.entry.alphaEnabled,
-                                "rbxassetid://"..ref.entry.atlas)
+                            local setting=Visual.Settings(change.mesh,row)
+                            if setting.appearanceMode~="material" then
+                                Texture.ApplyAlpha(change.mesh,setting.alphaEnabled==true,
+                                    "rbxassetid://"..tostring(setting.texture_asset_id or ""))
+                            end
                         end
                     end
                 end
@@ -10831,10 +10854,11 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
                 local textureId=if textureApplicable then Inventory.Id(part.TextureID) else ""
                 local colorMapId=if textureApplicable and surface then Inventory.Id(surface.ColorMap) else ""
                 local textureCurrent=not textureApplicable or Visual.IsCurrent(part,row)
-                local alphaEnabled=row.alphaEnabled==true
+                local settings = Visual.Settings(part,row)
+                local alphaEnabled=settings.alphaEnabled==true and settings.appearanceMode~="material"
                 local appearanceAlphaCurrent = if alphaEnabled then
                     surface~=nil and surface.AlphaMode==Enum.AlphaMode.Transparency else surface==nil
-                local alphaCurrent=not textureApplicable or row.appearanceMode=="material" or appearanceAlphaCurrent
+                local alphaCurrent=not textureApplicable or settings.appearanceMode=="material" or appearanceAlphaCurrent
                 local meshCurrent=currentIds[meshId]==true
                 -- Authored skeleton layout is validated independently of MeshId:
                 -- the visual Mesh ID may be unchanged across publications.

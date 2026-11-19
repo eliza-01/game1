@@ -276,11 +276,15 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                 end
             end
             local alphaChanges={}
-            if not geometry and row.appearanceMode~="material" then
+            -- Keep the historical Alpha audit while applying each MeshPart's
+            -- effective settings. Visual.Apply owns the actual transition.
+            if not geometry then
                 for _, part in ipairs(oldParts) do
+                    local settings=Visual.Settings(part,row)
                     if chosenParts[part] and not Carrier.IsCarrier(part) and not Physics.IsCollider(part.Name)
                         and part:GetAttribute("Game1DecoPhysicsOnly")~=true
-                        and not StudioTextureAppearance.AlphaCurrent(part,row.alphaEnabled==true) then
+                        and settings.appearanceMode~="material"
+                        and not StudioTextureAppearance.AlphaCurrent(part,settings.alphaEnabled==true) then
                         table.insert(alphaChanges,StudioTextureAppearance.Capture(part))
                     end
                 end
@@ -297,14 +301,17 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
             if geometry then add("model", previousModelId, modelId, 1) end
             if changeRef then add("model_reference", oldRef, modelId, 1) end
             for _, change in ipairs(atlasChanges) do
-                if row.appearanceMode=="material" then
+                local settings=Visual.Settings(change.part,row)
+                if settings.appearanceMode=="material" then
                     local oldAppearance=change.oldId
                     if change.before.mode=="material" then
                         oldAppearance=tostring(change.before.visualMaterial or "")
                             ..tostring(change.before.visualColor or "")
                     end
-                    add("appearance",oldAppearance,tostring(row.visualMaterial)..tostring(row.visualColor),1)
-                else add("atlas", change.oldId, atlasId, 1) end
+                    add("appearance",oldAppearance,tostring(settings.visualMaterial)..tostring(settings.visualColor),1)
+                else
+                    add("atlas",change.oldId,tostring(settings.texture_asset_id or ""),1)
+                end
             end
             for _, change in ipairs(alphaChanges) do
                 -- Persist the stable enum name. tostring(EnumItem) includes the
@@ -388,7 +395,9 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                 end
             end
             for _, change in ipairs(item.alphaChanges) do
-                if StudioTextureAppearance.ApplyAlpha(change.mesh,row.alphaEnabled==true,uri) then
+                local settings=Visual.Settings(change.mesh,row)
+                if StudioTextureAppearance.ApplyAlpha(change.mesh,settings.alphaEnabled==true,
+                    "rbxassetid://"..tostring(settings.texture_asset_id or "")) then
                     changedParts+=1
                 end
             end

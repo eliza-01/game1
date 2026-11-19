@@ -406,6 +406,24 @@ class LocationAssetStore:
         result.setdefault('atlasVariants', self.atlases.attached_variants('location_asset', result['slug']))
         result['textureUsesAlpha'] = (texture_uses_alpha(self.root, str(result.get('texture_path') or ''))
                                        if binding and binding['current'] else None)
+        # A variant is the stable identity; its current published Image ID is
+        # resolved only when exporting/loading. Image ID is never authored.
+        variant_lookup = {int(v['id']): v for family in atlas_catalog
+                          for v in family.get('variants', [])}
+        mesh_atlases_current = True
+        for mesh_name, settings in result['meshOptions'].items():
+            if not isinstance(settings, dict) or not appearance.uses_atlas(settings.get('appearanceMode')):
+                continue
+            variant_id = settings.get('atlasVariantId', 0)
+            if not variant_id:
+                continue  # inherited asset atlas is validated by _status
+            variant = variant_lookup.get(variant_id)
+            if variant and variant['current']:
+                settings['texture_asset_id'] = str(variant['published_id'])
+            else:
+                mesh_atlases_current = False
+                settings['texture_asset_id'] = ''
+        result['meshAtlasesCurrent'] = mesh_atlases_current
         if result['appearanceMode'] == 'material':
             # No active texture identity, even when a historical atlas remains
             # attached for an explicit future switch back to atlas mode.
@@ -415,6 +433,8 @@ class LocationAssetStore:
                           textureUsesAlpha=None)
         result['atlasLegacyWarning'] = bool(binding and not parse_filename(result['texture_filename']))
         result['status'] = self._status(result)
+        if not result['meshAtlasesCurrent'] and result['status'] == 'PUBLISHED':
+            result['status'] = 'UPDATE_AVAILABLE' if result.get('model_asset_id') else 'LOCAL_ONLY'
         result['category_label'] = CATEGORY_LABELS.get(result.get('category'), str(result.get('category') or ''))
         return result
 
@@ -533,9 +553,33 @@ class LocationAssetStore:
             inspected = self._fbx_analysis(old) if old else None
             if inspected is None:
                 raise ValueError('Analyze the FBX before saving per-mesh physics')
+        if isinstance(option_source, dict):
+            valid_names={mesh['name'] for mesh in (inspected or {}).get('meshes', [])}
+            if set(option_source)-valid_names:
+                raise ValueError('meshOptions references missing FBX meshes')
+            option_source = {name: dict(settings) if isinstance(settings, dict) else settings
+                             for name, settings in option_source.items()}
+            for mesh_name, settings in option_source.items():
+                if not isinstance(settings, dict):
+                    continue
+                source_path = settings.pop('textureSourcePath', '')
+                if source_path:
+                    if settings.get('appearanceMode') not in ('atlas', 'material_atlas'):
+                        raise ValueError(f'{mesh_name}: choose Atlas appearance before selecting an image')
+                    if settings.get('atlasVariantId'):
+                        raise ValueError(f'{mesh_name}: choose an atlas file OR registered variant')
+                    settings['atlasVariantId'] = self.atlases.adopt_file(str(source_path))['id']
         effective_options = (normalize_location_options(inspected, option_source)
             if option_source is not None else
             normalize_location_options(inspected, prior_options) if inspected and prior_options else prior_options)
+        for mesh_name, settings in effective_options.items():
+            if not isinstance(settings, dict) or not appearance.uses_atlas(settings.get('appearanceMode')):
+                continue
+            variant_id = settings.get('atlasVariantId', 0)
+            if variant_id:
+                variant = self.atlases.get_variant(variant_id)
+                if not variant or variant['retired']:
+                    raise ValueError(f'{mesh_name}: select an active Atlas Registry variant')
         selected_texture = str(payload.get('textureSourcePath') or '').strip()
         atlas_variant_id = int(payload.get('atlasVariantId') or 0)
         if payload.get('textureReferenceSlug'):
@@ -553,6 +597,11 @@ class LocationAssetStore:
                 atlas_variant_id = int(binding['variant_id']) if binding else 0
             if not atlas_variant_id or not self.atlases.get_variant(atlas_variant_id):
                 raise ValueError('select an independent atlas variant or PNG/JPG source')
+        for mesh_name, settings in effective_options.items():
+            if not isinstance(settings, dict) or not appearance.uses_atlas(settings.get('appearanceMode')):
+                continue
+            if not settings.get('atlasVariantId') and appearance_mode == 'material':
+                raise ValueError(f'{mesh_name}: select an Atlas Registry variant for this MeshPart')
         if old is None and not selected_model:
             raise ValueError('choose a location asset FBX before registration')
 

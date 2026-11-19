@@ -47,6 +47,8 @@ local function meshSettings(mesh: MeshPart, row: any): any
     }
 end
 
+Visual.Settings = meshSettings
+
 function Visual.IsCurrent(mesh: MeshPart, row: any): boolean
     row=meshSettings(mesh,row)
     if not visual(mesh) then return true end

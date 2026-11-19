@@ -290,9 +290,13 @@ function decoAssetRenderInspection() {
   const host=$('location-asset-fbx-preview');
   if(!host)return;
   host.innerHTML=window.game1MeshAuthoring.inspectionView(
-    decoAssetState.inspection,decoAssetState.meshOptions);
+    decoAssetState.inspection,decoAssetState.meshOptions,'location-mesh',{
+      materials:decoAssetState.data?.options?.visualMaterials||[],
+      atlases:decoAssetState.data?.atlases||[],alphaEnabled:false});
   window.game1MeshAuthoring.wire(host,decoAssetState.meshOptions,null,
-    Boolean(decoAssetState.inspection?.hasCollider));
+    Boolean(decoAssetState.inspection?.hasCollider),{
+      materials:decoAssetState.data?.options?.visualMaterials||[],
+      atlases:decoAssetState.data?.atlases||[],alphaEnabled:false});
 }
 async function decoAssetInspectSource(path){
   return request('/api/location-assets/inspect', {method:'POST',

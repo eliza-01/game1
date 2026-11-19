@@ -19,16 +19,29 @@ local function transform(values)
 end
 
 local function paint(mesh, asset)
-    -- Align FULL and LOD1 to the same visual material contract.
-    if asset.appearanceMode == "material" or asset.appearanceMode == "material_atlas" then
-        local material = Enum.Material[tostring(asset.visualMaterial)]
+    -- FULL and LOD1 share one per-mesh authored visual contract.
+    local override = if typeof(asset.meshOptions)=="table" then asset.meshOptions[mesh.Name] else nil
+    local settings = if typeof(override)=="table" and override.appearanceMode then override else asset
+    if settings.appearanceMode == "material" or settings.appearanceMode == "material_atlas" then
+        local material = Enum.Material[tostring(settings.visualMaterial)]
         if material then mesh.Material = material end
-        local hex = tostring(asset.visualColor or "")
+        local hex = tostring(settings.visualColor or "")
         if hex:match("^#[%x][%x][%x][%x][%x][%x]$") then
             mesh.Color = Color3.fromRGB(tonumber(hex:sub(2, 3), 16),
                 tonumber(hex:sub(4, 5), 16), tonumber(hex:sub(6, 7), 16))
         end
-        if asset.appearanceMode=="material" then mesh.TextureID="" end
+        if settings.appearanceMode=="material" then mesh.TextureID="" end
+    end
+    if settings.appearanceMode=="atlas" or settings.appearanceMode=="material_atlas" then
+        if settings.appearanceMode=="atlas" then
+            mesh.Material=Enum.Material.SmoothPlastic
+            mesh.Color=Color3.new(1,1,1)
+        end
+        local atlas=tonumber(settings.texture_asset_id or asset.textureAssetId)
+        if atlas and atlas>0 and not mesh:FindFirstChildOfClass("SurfaceAppearance") then
+            local uri="rbxassetid://"..tostring(math.floor(atlas))
+            if mesh.TextureID~=uri then mesh.TextureID=uri end
+        end
     end
 end
 

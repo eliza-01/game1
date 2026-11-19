@@ -15,7 +15,9 @@ window.game1MeshAuthoring = (() => {
   }
   function normalize(name,raw,hasCollider=false,domain='estate') {
     const {collisionMesh, ...clean}={...defaults(name,hasCollider,domain),...(raw||{})};
-    return {...clean,collisionFidelity:effectiveFidelity(clean)};
+    // texture_asset_id is derived by the server, never sent back on save.
+    const {texture_asset_id,textureAssetId,...authoring}=clean;
+    return {...authoring,collisionFidelity:effectiveFidelity(clean)};
   }
   const status=flags=>`CanCollide: ${flags.noCollide!==true} · CanTouch: false · CanQuery: ${flags.noCollide!==true}`;
   function controls(part,flags,prefix='real-estate') {
@@ -41,7 +43,39 @@ window.game1MeshAuthoring = (() => {
       (b.parent?` ← ${e(b.parent)}`:'')+
       (influences.has(b.name)?' · weighted':'')+`</li>`).join('')}</ul>`;
   }
-  function inspectionView(analysis,options={},prefix='location-mesh') {
+  function visualControls(name,flags,ctx){
+    if(!ctx)return '';
+    const mode=flags.appearanceMode||'';
+    const materials=(ctx.materials||[]).map(m=>`<option value="${e(m.id)}" ${(flags.visualMaterial||'SmoothPlastic')===m.id?'selected':''}>${e(m.label)}</option>`).join('');
+    const variants=(ctx.atlases||[]).flatMap(f=>(f.variants||[]).map(v=>({...v,family:f.atlasKey})))
+      .filter(v=>!v.retired);
+    const selected=Number(flags.atlasVariantId||0);
+    const choices=variants.map(v=>`<option value="${Number(v.id)}" ${selected===Number(v.id)?'selected':''}>${e(v.filename||v.family)} · ${v.published_id?'Image '+e(v.published_id):'not published'}</option>`).join('');
+    return `<div class="location-mesh-appearance" data-mesh-appearance>
+      <label>Appearance<select data-mesh-visual="appearanceMode">
+        <option value="" ${!mode?'selected':''}>Inherit Location Asset</option>
+        <option value="material" ${mode==='material'?'selected':''}>Material + Color</option>
+        <option value="atlas" ${mode==='atlas'?'selected':''}>Texture Atlas</option>
+        <option value="material_atlas" ${mode==='material_atlas'?'selected':''}>Material + Color + Atlas</option>
+      </select></label>
+      <div data-mesh-visual-material-fields ${!mode||mode==='atlas'?'hidden':''}>
+        <label>Roblox Material<select data-mesh-visual="visualMaterial">${materials}</select></label>
+        <label>Color<input type="color" data-mesh-visual="visualColor" value="${e(flags.visualColor||'#FFFFFF')}"></label>
+      </div>
+      <div data-mesh-visual-atlas-fields ${mode==='atlas'||mode==='material_atlas'?'':'hidden'}>
+        <label>Atlas variant<select data-mesh-visual="atlasVariantId">
+          <option value="0" ${!selected?'selected':''}>Inherit default atlas</option>${choices}
+        </select></label>
+        <button type="button" data-mesh-new-atlas>Choose PNG/JPG for this MeshPart</button>
+        <small data-mesh-atlas-path>${e(flags.textureSourcePath||'Existing published atlas / inherited atlas')}</small>
+      </div>
+      <label data-mesh-visual-alpha ${mode==='atlas'||mode==='material_atlas'?'':'hidden'}>
+        <input type="checkbox" data-mesh-visual="alphaEnabled" ${(flags.alphaEnabled===undefined?ctx.alphaEnabled===true:flags.alphaEnabled===true)?'checked':''}> Alpha transparency
+      </label>
+      <small class="hint">${mode?'Independent MeshPart appearance':'Uses the Location Asset default. Changing the default will update this MeshPart.'}</small>
+    </div>`;
+  }
+  function inspectionView(analysis,options={},prefix='location-mesh',visualContext=null) {
     if(!analysis) return `<small class="deco-manage-value">Choose an FBX to inspect its mesh, physics and bone hierarchy.</small>`;
     const meshes=analysis.meshes||[];
     const armatures=analysis.armatures||[];
@@ -63,7 +97,7 @@ window.game1MeshAuthoring = (() => {
             </select></label>
             <label><input type="checkbox" data-mesh-field="doubleSided" ${flags.doubleSided?'checked':''}> DoubleSided</label>
             <small class="real-estate-physics-state" data-mesh-status>${status(flags)}</small>
-          </div>`}
+          </div>${visualControls(name,flags,visualContext)}`}
           <details class="deco-fbx-skeleton"><summary>${e(mesh.armature||'No Armature')} · ${bones.length} bones · ${(mesh.influencedBones||[]).length} weighted</summary>
             ${bones.length?boneList(bones,mesh.influencedBones):'<small>No bones</small>'}
           </details>
@@ -72,10 +106,55 @@ window.game1MeshAuthoring = (() => {
       ${(analysis.unassignedArmatures||[]).length?`<small>Unassigned armatures: ${analysis.unassignedArmatures.map(e).join(', ')}</small>`:''}
     </div>`;
   }
-  function wire(container,options,onChange,hasCollider=false){
+  function wire(container,options,onChange,hasCollider=false,visualContext=null){
     container.querySelectorAll('[data-fbx-mesh]').forEach(meshRow=>{
       const name=meshRow.dataset.fbxMesh;
       if(isCarrier(name))return;
+      const modeControl=meshRow.querySelector('[data-mesh-visual="appearanceMode"]');
+      if(modeControl){
+        const settings=()=>options[name]||normalize(name,{},hasCollider,'location');
+        function changeVisual(field,value){
+          const row={...settings()};
+          if(field==='appearanceMode' && !value){
+            delete row.appearanceMode;delete row.visualMaterial;delete row.visualColor;
+            delete row.alphaEnabled;delete row.atlasVariantId;delete row.textureSourcePath;
+          }else{
+            row[field]=value;
+            if(field==='appearanceMode' && value){
+              row.visualMaterial ||= 'SmoothPlastic';row.visualColor ||= '#FFFFFF';
+              if(value==='material') {delete row.atlasVariantId;delete row.textureSourcePath;delete row.alphaEnabled;}
+            }
+            if(field==='atlasVariantId')delete row.textureSourcePath;
+          }
+          options[name]=normalize(name,row,hasCollider,'location');
+          const mode=options[name].appearanceMode||'';
+          const material=meshRow.querySelector('[data-mesh-visual-material-fields]');
+          const atlas=meshRow.querySelector('[data-mesh-visual-atlas-fields]');
+          const alpha=meshRow.querySelector('[data-mesh-visual-alpha]');
+          if(material)material.hidden=!mode||mode==='atlas';
+          if(atlas)atlas.hidden=mode!=='atlas'&&mode!=='material_atlas';
+          if(alpha)alpha.hidden=mode!=='atlas'&&mode!=='material_atlas';
+          if(field==='atlasVariantId')meshRow.querySelector('[data-mesh-atlas-path]').textContent='Selected registered variant';
+          onChange?.(options);
+        }
+        meshRow.querySelectorAll('[data-mesh-visual]').forEach(control=>{
+          const field=control.dataset.meshVisual;
+          control.onchange=()=>changeVisual(field,
+            field==='alphaEnabled'?control.checked:
+            field==='atlasVariantId'?Number(control.value):control.value);
+        });
+        const choose=meshRow.querySelector('[data-mesh-new-atlas]');
+        if(choose)choose.onclick=async()=>{
+          try{
+            const file=await window.game1AtlasWorkflow.chooseImage('/api/files/choose-location-asset-texture');
+            if(!file?.path)return;
+            changeVisual('textureSourcePath',file.path);
+            const row=options[name];delete row.atlasVariantId;
+            meshRow.querySelector('[data-mesh-visual="atlasVariantId"]').value='0';
+            meshRow.querySelector('[data-mesh-atlas-path]').textContent=file.path.split(/[\\/]/).pop()+' · publish in Atlas Registry';
+          }catch(error){toast(error.message||String(error),true);}
+        };
+      }
       meshRow.querySelectorAll('[data-mesh-field]').forEach(control=>control.onchange=()=>{
         const field=control.dataset.meshField;
         const row=options[name]||normalize(name,{},hasCollider,'location');

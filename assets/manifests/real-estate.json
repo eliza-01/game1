@@ -6238,9 +6238,9 @@
       "model_asset_id": "94882722542367",
       "model_published_hash": "5693ec556c0d8a8c2c9a70729a5f1a4be1d34fa5ae1153c4f9cf18f3e0f684f1",
       "model_moderation": "Approved",
-      "revision": 23,
+      "revision": 24,
       "created_at": 1795087964.5584087,
-      "updated_at": 1795106776.68309,
+      "updated_at": 1795110289.2426243,
       "skeleton": {
         "schemaVersion": 1,
         "meshes": [
@@ -17256,7 +17256,7 @@
         "floors": {
           "appearanceMode": "material",
           "visualMaterial": "WoodPlanks",
-          "visualColor": "#7E2B2B",
+          "visualColor": "#9E8383",
           "alphaEnabled": false,
           "glass": false,
           "noCollide": true,

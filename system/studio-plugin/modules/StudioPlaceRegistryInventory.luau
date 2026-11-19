@@ -65,7 +65,7 @@ local function ensureVersions(catalog: any, service: any): ({any}, {any}, {strin
             sha=item.publishedSha,material=item.surfaceMaterial or "default",
             appearanceMode=item.appearanceMode or "atlas", visualMaterial=item.visualMaterial or "SmoothPlastic",
             visualColor=item.visualColor or "#FFFFFF",
-            alphaEnabled=item.alphaEnabled==true,models=published,
+            alphaEnabled=item.alphaEnabled==true,meshOptions=item.meshOptions or {},models=published,
             collisionBlueprint=item.collisionBlueprint,
             collisionRevision=item.collisionBlueprintRevision or 0,
             collisionSha=item.collisionBlueprintSha256 or "",
@@ -314,7 +314,7 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
                 if not Visual.IsCurrent(visualPart, {
                     appearanceMode=entry.appearanceMode, visualMaterial=entry.visualMaterial,
                     visualColor=entry.visualColor, texture_asset_id=entry.atlas,
-                    alphaEnabled=entry.alphaEnabled,
+                    alphaEnabled=entry.alphaEnabled,meshOptions=entry.meshOptions,
                 }) then
                     needsTexture=true
                     break
@@ -322,10 +322,15 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
             end
         end
         local needsAlpha=false
-        if eligible and entry.appearanceMode~="material" then
+        if eligible then
             for _, visualPart in ipairs(visualParts) do
+                local settings = Visual.Settings(visualPart, {
+                    appearanceMode=entry.appearanceMode,visualMaterial=entry.visualMaterial,
+                    visualColor=entry.visualColor,alphaEnabled=entry.alphaEnabled,
+                    texture_asset_id=entry.atlas,meshOptions=entry.meshOptions})
+                if settings.appearanceMode=="material" then continue end
                 local appearance=visualPart:FindFirstChildOfClass("SurfaceAppearance")
-                local alpha=entry.alphaEnabled==true
+                local alpha=settings.alphaEnabled==true
                 if (if alpha then not appearance or appearance.AlphaMode~=Enum.AlphaMode.Transparency
                     else appearance~=nil) then
                     needsAlpha=true

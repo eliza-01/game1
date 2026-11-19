@@ -114,7 +114,13 @@ window.game1LocationAssetWorkflow = (() => {
     const model=card('Model · FBX',
       'Review mesh names, skeleton and collision settings. A changed FBX is published as a NEW Model ID; physics-only changes do not publish.',
       `<small class="deco-manage-value">${e(state.pendingModel||item.model_path||'No FBX selected')}</small>`+
-      window.game1MeshAuthoring.inspectionView(inspection,state.meshOptions)+
+      window.game1MeshAuthoring.inspectionView(inspection,state.meshOptions,'location-mesh',{
+        materials:decoAssetState.data?.options?.visualMaterials||[],
+        atlases:decoAssetState.data?.atlases||[],alphaEnabled:Boolean(item.alphaEnabled)})+
+      (Object.entries(item.meshOptions||{}).filter(([name,settings])=>
+        settings?.appearanceMode&&settings.atlasVariantId&&!settings.texture_asset_id)
+        .map(([name,settings])=>`<div class="la-publication-resource"><span>${e(name)} · Atlas not published</span>`+
+          button(`publish-mesh-atlas:${settings.atlasVariantId}`,'Publish atlas',busy)+`</div>`).join(''))+
       (needsAuthoredRig?'<small class="la-publication-warning">В FBX есть кости, но нет rig_carrier. Перед публикацией Blender подготовит каноническую FBX-версию. Исходник будет сохранён, Atlas ID не изменится.</small>':'')+
       `<div class="actions">${button('choose-fbx','Choose FBX',busy)}${button('inspect-fbx','Analyze saved FBX',busy||!item.model_path)}</div>`+
       `<div class="shared-model-state"><small>Roblox Model ID: <strong>${e(item.model_asset_id||'Not published')}</strong></small>`+
@@ -280,7 +286,9 @@ window.game1LocationAssetWorkflow = (() => {
       state.physicsDirty=true;
       const apply=d.querySelector('[data-la-action="apply-model"]');
       if(apply){apply.disabled=false;apply.classList.add('asset-apply-ready');}
-    },Boolean(inspection?.hasCollider));
+    },Boolean(inspection?.hasCollider),{
+      materials:decoAssetState.data?.options?.visualMaterials||[],
+      atlases:decoAssetState.data?.atlases||[],alphaEnabled:Boolean(item.alphaEnabled)});
     d.querySelector('[data-la-close]').onclick=()=>{if(!busy)d.close();};
     d.querySelectorAll('[data-la-tab]').forEach(b=>b.onclick=()=>{if(!busy){state.tab=b.dataset.laTab;render();}});
     d.querySelectorAll('[data-la-action]').forEach(b=>b.onclick=()=>execute(b.dataset.laAction));
@@ -482,6 +490,13 @@ window.game1LocationAssetWorkflow = (() => {
       }
       });
     }
+    if(action.startsWith('publish-mesh-atlas:'))return run('Publishing MeshPart Atlas',async()=>{
+      const variantId=Number(action.split(':')[1]);
+      if(!Number.isSafeInteger(variantId)||variantId<1)throw Error('Invalid Atlas variant');
+      const result=await request(`/api/texture-atlases/variants/${variantId}/publish`,{method:'POST'});
+      await decoAssetLoad();
+      message(`Atlas published · Image ID ${result.published_id||'see Atlas Registry'}. Sync Studio after saving changes.`);
+    });
     if(action==='choose-lod1')return run('Выбор LOD1 FBX',async()=>{
       const chosen=await request('/api/files/choose-location-asset-model',{method:'POST'});
       if(!chosen?.path){message('Выбор LOD1 отменён.');return;}
@@ -536,7 +551,7 @@ window.game1LocationAssetWorkflow = (() => {
         await decoAssetSaveEdits(state.slug,{
           ...(state.pendingModel?{modelSourcePath:state.pendingModel}:{}),
           meshOptions:state.meshOptions},item.revision);
-        state.pendingModel='';state.physicsDirty=false;
+        state.pendingModel='';state.physicsDirty=false;state.scanStale=true;
         state.inspection=row()?.fbxAnalysis||state.inspection;
       }
       const current=row();

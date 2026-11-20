@@ -1,5 +1,5 @@
 /* Real Estate registry view. Global request(), toast(), esc(), $ provided by Character Assets. */
-const realEstateState = {data:null, selected:null, inspect:null, textures:{}, textureRefs:{}, reuseEnabled:{}, reuseFilters:{}, meshOptions:{}, appearance:{}, acceptWarnings:false, atlasBusy:false, registrationTarget:null};
+const realEstateState = {data:null, selected:null, inspect:null, textures:{}, textureRefs:{}, reuseEnabled:{}, reuseFilters:{}, meshOptions:{}, appearance:{}, distance:{}, acceptWarnings:false, atlasBusy:false, registrationTarget:null};
 const REAL_ESTATE_SELECTED = 'game1.realEstate.selected';
 let realEstatePublicationPoll = null;
 function realEstatePublicationBusy(slug){
@@ -46,6 +46,7 @@ function realEstateForm(row){
   // Selecting from the library may scroll to the panel; ordinary Edit must not.
   window.game1RealEstateCollisionSelect?.(row?.slug||'', false);
   realEstateState.registrationTarget=null;
+  realEstateState.pendingLod1='';
   realEstateRemember();
   realEstateState.inspect=null;
   realEstateState.acceptWarnings=Boolean(row);
@@ -56,6 +57,10 @@ function realEstateForm(row){
     noCollide:row?.meshOptions?.[part]?.noCollide ?? realEstateMeshDefaults(part).noCollide,
     collisionFidelity:row?.meshOptions?.[part]?.collisionFidelity ?? realEstateMeshDefaults(part).collisionFidelity,
     doubleSided:row?.meshOptions?.[part]?.doubleSided ?? realEstateMeshDefaults(part).doubleSided
+  }]));
+  realEstateState.distance=Object.fromEntries(meshNames.map(part=>[part,{
+    enabled:row?.meshOptions?.[part]?.distanceStreaming ?? (part==='window_frames_glass'),
+    studs:row?.meshOptions?.[part]?.loadDistanceStuds ?? 50
   }]));
   realEstateState.appearance=Object.fromEntries(meshNames.map(part=>[part,{
     appearanceMode:row?.meshOptions?.[part]?.appearanceMode||'material',
@@ -95,8 +100,86 @@ function realEstateForm(row){
   registrationError.hidden=true;
   realEstateRenderRigs(row?.skeleton||null, row?.rigWarnings||[]);
   realEstateRenderTextures(row);
+  realEstateRuntimeRender(row);
   realEstateRender();
 }
+// House LOD is a single independent published Model. Only one shared world
+// streamer owns runtime distances; this panel stores authoring metadata.
+function realEstateRuntimeRender(row){
+  const target=$('real-estate-runtime-content');
+  if(!row){
+    target.innerHTML='<small class="muted">Register a house to configure whole-house LOD1.</small>';
+    return;
+  }
+  const lod=row.lod1||{};
+  const profile=row.runtimeProfile||{mode:'off',lod1:150,hide:400,hysteresis:10,revision:0};
+  const warnings=row.runtimeReadiness?.warnings||[];
+  target.innerHTML=`<div class="real-estate-runtime-info">
+    <small>House type: <strong>${esc(row.slug)}</strong> · Plot pivots remain independent.</small>
+    <small>LOD1: <strong>${esc(lod.status||'NOT_REGISTERED')}</strong> · Model ID ${esc(lod.modelAssetId||'—')}</small>
+    <small>Source: ${esc(lod.sourcePath||'Not staged')}</small>
+    <small>Revision: ${Number(lod.revision||0)}</small>
+    <div class="actions"><button type="button" id="re-lod-choose">Choose LOD1 FBX</button>
+      <button type="button" id="re-lod-stage">Register LOD1</button>
+      <button type="button" id="re-lod-publish" ${!['STAGED','UPDATE_AVAILABLE'].includes(lod.status)||!realEstateState.data?.publication?.configured?'disabled':''}>Publish LOD1</button></div>
+    <small id="re-lod-pending">${esc(realEstateState.pendingLod1||'File: '+row.slug+'_lod1.fbx')}</small>
+    <div class="real-estate-identity-fields">
+      <label>Streaming mode<select id="re-runtime-mode">
+        ${[['off','Off · current Workspace'],['full','FULL → unloaded'],['lod1','FULL → House LOD1 → unloaded']].map(([mode,label])=>`<option value="${mode}" ${profile.mode===mode?'selected':''}>${label}</option>`).join('')}
+      </select></label>
+      <label>House LOD1 threshold · studs<input id="re-runtime-lod1" type="number" min="20" max="9999" step="1" value="${Number(profile.lod1)}"></label>
+      <label>Unload distance · studs<input id="re-runtime-hide" type="number" min="21" max="10000" step="1" value="${Number(profile.hide)}"></label>
+      <label>Hysteresis · studs<input id="re-runtime-hysteresis" type="number" min="0" max="100" step="1" value="${Number(profile.hysteresis)}"></label>
+    </div>
+    <div class="actions"><button type="button" id="re-runtime-save">Save streaming profile</button></div>
+    <small class="hint">Per-mesh FULL distances: inside each MeshPart spoiler. Beyond the House LOD1 threshold the complete FULL visual must be absent. These settings alone do not change the authoring Place or make the Runtime Draft publishable.</small>
+    <div id="re-runtime-status" class="status-box">${warnings.length?warnings.map(esc).join(' · '):'Authoring settings valid. Runtime compiler and Studio validation are still required.'}</div>
+  </div>`;
+  const setStatus=(message,failed=false)=>{const elem=$('re-runtime-status');elem.textContent=message;elem.classList.toggle('error',failed);};
+  const current=()=>realEstateSelected();
+  $('re-lod-choose').onclick=async()=>{
+    try{
+      const chosen=await request('/api/files/choose-real-estate-model',{method:'POST'});
+      if(!chosen.path)return;
+      const expected=`${row.slug}_lod1.fbx`;
+      if(chosen.path.replace(/\\/g,'/').split('/').pop()!==expected)throw Error(`LOD1 filename must be ${expected}`);
+      realEstateState.pendingLod1=chosen.path;
+      $('re-lod-pending').textContent=chosen.path;
+      setStatus('LOD1 selected. Click Register LOD1 to stage this revision.');
+    }catch(error){setStatus(error.message,true);}
+  };
+  $('re-lod-stage').onclick=async()=>{
+    try{
+      if(!realEstateState.pendingLod1)throw Error('Choose LOD1 FBX first');
+      await request(`/api/real-estate/${encodeURIComponent(row.slug)}/lod1-stage`,{
+        method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sourcePath:realEstateState.pendingLod1,expectedRevision:current()?.lod1?.revision||0})});
+      realEstateState.pendingLod1='';await realEstateLoad();
+      toast('House LOD1 staged · no Place changes');
+    }catch(error){setStatus(error.message,true);}
+  };
+  $('re-lod-publish').onclick=async()=>{
+    try{
+      setStatus('Publishing House LOD1…');
+      await request(`/api/real-estate/${encodeURIComponent(row.slug)}/lod1-publish`,{
+        method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({expectedRevision:current()?.lod1?.revision||0,description:`Game1 ${row.slug} LOD1`})});
+      await realEstateLoad();toast('House LOD1 published');
+    }catch(error){setStatus(error.message,true);}
+  };
+  $('re-runtime-save').onclick=async()=>{
+    try{
+      const integer=id=>{const text=$(id).value;const n=Number(text);if(!text.trim()||!Number.isSafeInteger(n))throw Error(`${id}: integer studs required`);return n;};
+      const settings={mode:$('re-runtime-mode').value,lod1:integer('re-runtime-lod1'),hide:integer('re-runtime-hide'),hysteresis:integer('re-runtime-hysteresis')};
+      if(settings.mode==='lod1'){
+        const tooFar=Object.entries(current()?.meshOptions||{}).filter(([,v])=>v.distanceStreaming&&v.loadDistanceStuds>=settings.lod1);
+        if(tooFar.length)throw Error('FULL mesh distance must be below LOD1: '+tooFar.map(([n])=>n).join(', '));
+      }
+      await request(`/api/real-estate/${encodeURIComponent(row.slug)}/runtime-profile`,{
+        method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({profile:settings,expectedRevision:current()?.runtimeProfile?.revision||0})});
+      await realEstateLoad();toast('House Runtime profile saved');
+    }catch(error){setStatus(error.message,true);}
+  };
+}
+
 // Inspect reports the *authored* shared FBX armature for each mesh, while
 // M182 publishes unweighted accessories of house_armature as static MeshParts.
 // This projection is presentation-only; Python owns the publication contract.
@@ -257,6 +340,7 @@ function realEstateRenderTextures(row){
   for(const part of parts){
     realEstateState.meshOptions[part]=realEstateNormalizePhysics(part,realEstateState.meshOptions[part]);
     realEstateState.appearance[part] ||= {appearanceMode:'material',visualMaterial:'SmoothPlastic',visualColor:'#FFFFFF',alphaEnabled:false};
+    realEstateState.distance[part] ||= {enabled:part==='window_frames_glass',studs:50};
   }
   const options=realEstateOptions();
   host.innerHTML='<small class="real-estate-physics-caution">Static house collision will use a separately authored Roblox Parts blueprint. Visual meshes default to No Collide.</small>'+parts.map(part=>{
@@ -288,6 +372,8 @@ function realEstateRenderTextures(row){
         <input type="color" id="real-estate-color-${esc(part)}" aria-label="${esc(part)} color" value="${esc(appearance.visualColor)}"></span>
         <label id="real-estate-alpha-controls-${esc(part)}" ${!atlas?'hidden':''}><input type="checkbox" id="real-estate-alpha-${esc(part)}" ${appearance.alphaEnabled?'checked':''}> Alpha transparency</label>
         <label class="real-estate-glass-toggle" title="Studio MeshPart Transparency = 0.02 (if checked)"><input type="checkbox" id="real-estate-glass-${esc(part)}" ${flags.glass?'checked':''}> Glass · 0.02</label>
+        <label title="Render this MeshPart only near the camera; uses the shared LOD client updater"><input type="checkbox" id="real-estate-distance-${esc(part)}" ${realEstateState.distance[part]?.enabled?'checked':''}> Distance visibility</label>
+        <label>Range <input type="number" id="real-estate-distance-studs-${esc(part)}" min="20" max="1000" step="1" style="width:6em" value="${esc(realEstateState.distance[part]?.studs??50)}" ${!realEstateState.distance[part]?.enabled?'disabled':''}> studs</label>
         <label class="real-estate-physics-toggle" title="Disable physics collisions, touch events, and spatial queries for this mesh"><input type="checkbox" id="real-estate-nocollide-${esc(part)}" ${flags.noCollide?'checked':''}> No Collide</label>
         <label class="real-estate-reuse-toggle" title="Bind this mesh to an existing published Atlas Registry variant. Reuse never uploads another Roblox Image Asset."><input type="checkbox" id="real-estate-reuse-${esc(part)}" ${reuse?'checked':''}> Reuse atlas</label>
       </div>
@@ -320,6 +406,19 @@ function realEstateRenderTextures(row){
     };
     $(`real-estate-alpha-${part}`).onchange=event=>{
       realEstateState.appearance[part].alphaEnabled=event.target.checked;
+    };
+    $(`real-estate-distance-${part}`).onchange=event=>{
+      realEstateState.distance[part].enabled=event.target.checked;
+      $(`real-estate-distance-studs-${part}`).disabled=!event.target.checked;
+    };
+    $(`real-estate-distance-studs-${part}`).onchange=event=>{
+      const n=Number(event.target.value);
+      if(!Number.isInteger(n)||n<20||n>1000){
+        event.target.value=realEstateState.distance[part].studs;
+        toast('Distance must be 20–1000 studs',true);
+        return;
+      }
+      realEstateState.distance[part].studs=n;
     };
     $(`real-estate-nocollide-${part}`).onchange=event=>{
       const flags=realEstateState.meshOptions[part];
@@ -425,7 +524,7 @@ async function realEstateChooseFbx(){
     realEstateRenderRigs(inspection.analysis, warnings);
     // Existing mesh textures remain selected while FBX is replaced independently.
     if(!realEstateState.selected){
-      realEstateState.textures={};realEstateState.textureRefs={};realEstateState.reuseEnabled={};realEstateState.meshOptions={};realEstateState.appearance={};
+      realEstateState.textures={};realEstateState.textureRefs={};realEstateState.reuseEnabled={};realEstateState.meshOptions={};realEstateState.appearance={};realEstateState.distance={};
       // New visual meshes default to native Roblox Material + Color. Atlas is
       // an explicitly selected mode, not a registration requirement.
     }
@@ -457,6 +556,8 @@ function realEstatePayload(){
         noCollide:flags.noCollide===true,
         collisionFidelity:flags.collisionFidelity,
         doubleSided:flags.doubleSided,
+        distanceStreaming:realEstateState.distance[part]?.enabled===true,
+        loadDistanceStuds:realEstateState.distance[part]?.studs??50,
         ...realEstateState.appearance[part]
       }];
     })),

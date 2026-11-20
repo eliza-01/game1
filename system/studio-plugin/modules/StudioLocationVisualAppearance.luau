@@ -58,7 +58,7 @@ function Visual.IsCurrent(mesh: MeshPart, row: any): boolean
         local material,color=Texture.MaterialColor(
             tostring(row.visualMaterial or "SmoothPlastic"),
             tostring(row.visualColor or "#FFFFFF"))
-        return mesh.TextureID=="" and surface==nil
+        return mesh.TextureID=="" and Texture.AlphaCurrent(mesh, false)
             and mesh.Material==material
             and mesh.Color==color
             and mesh:GetAttribute("Game1DecoAppearanceMode")=="material"
@@ -81,8 +81,8 @@ function Visual.IsCurrent(mesh: MeshPart, row: any): boolean
             and mesh.Color==Color3.new(1,1,1)
     end
     return materialCurrent and mesh.TextureID==uri
-        and (if alpha then surface~=nil and surface.ColorMap==uri
-            and surface.AlphaMode==Enum.AlphaMode.Transparency else surface==nil)
+        and Texture.AlphaCurrent(mesh, alpha)
+        and (not alpha or (surface ~= nil and surface.ColorMap == uri))
         and mesh:GetAttribute("Game1DecoAppearanceMode")==mode
 end
 
@@ -117,10 +117,22 @@ function Visual.Apply(mesh: MeshPart, row: any): boolean
     return true
 end
 
+-- Assert on the written mesh, not on a cached Studio Scan. Never report a
+-- successful Sync while alpha-disabled visuals still have SurfaceAppearance.
+function Visual.AssertCurrent(mesh: MeshPart, row: any)
+    if visual(mesh) and not Visual.IsCurrent(mesh, row) then
+        error("Location Appearance Sync incomplete for " .. mesh:GetFullName()
+            .. "; re-scan this placement", 2)
+    end
+end
+
 function Visual.ApplyModel(model: Model, row: any): number
     local count=0
     for _,item in ipairs(model:GetDescendants()) do
-        if visual(item) and Visual.Apply(item :: MeshPart,row) then count+=1 end
+        if visual(item) then
+            if Visual.Apply(item :: MeshPart,row) then count+=1 end
+            Visual.AssertCurrent(item :: MeshPart,row)
+        end
     end
     return count
 end

@@ -60,6 +60,30 @@
     } finally {state.busy=false;render();}
   }
 
+  async function saveHouseMode(slug, mode) {
+    if(state.busy || !state.overview)return;
+    const house=(state.overview.realEstate?.items||[]).find(h=>h.slug===slug);
+    if(!house || !house.profile)return;
+    const old=house.profile;
+    const values={mode,lod1:old.lod1,hide:old.hide,hysteresis:old.hysteresis};
+    state.busy=true;
+    $('lod-settings-status').textContent=`${slug}: сохраняем Runtime Profile…`;
+    try {
+      await request(`/api/real-estate/${encodeURIComponent(slug)}/runtime-profile`,{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({profile:values,expectedRevision:old.revision})});
+      state.overview=await request('/api/lod-manager');
+      state.preflight=null;
+      $('lod-build-preview').hidden=true;
+      $('lod-build-confirm-label').hidden=true;
+      $('lod-build-execute').hidden=true;
+      $('lod-build-status').textContent='Профиль дома изменён — нужен новый Preflight и Runtime Draft.';
+      $('lod-settings-status').textContent=`${slug}: ${mode} сохранён через Real Estate.`;
+    } catch(error) {
+      $('lod-settings-status').textContent=`${slug}: ${error.message}`;
+    } finally {state.busy=false;render();}
+  }
+
   const compact = value => Number(value || 0).toLocaleString('ru-RU');
   const date = value => value ? new Date(value*1000).toLocaleString('ru-RU') : '—';
   const indicators = {red:'Нет опубликованного LOD1',yellow:'LOD1 ✓ · LOD2 —',green:'LOD1 ✓ · LOD2 ✓'};
@@ -117,6 +141,22 @@
               ${(mode!=='off' && !item.streamingEligible) || (mode==='lod1' && item.lod1Status!=='PUBLISHED') || (mode==='lod2' && item.lod2Status!=='PUBLISHED')?'disabled':''}>${label}</option>`).join('')}
           </select><div class="lm-stream-status">${escape(item.streamingReason || 'Выбор сохранён')}</div></td></tr>`;
     }).join('') : '<tr><td colspan="5" class="lm-empty">Нет записей с такими условиями.</td></tr>';
+    const houses=data.realEstate?.items || [];
+    $('lod-house-count').textContent = `${data.realEstate?.selected||0} профилей · ${data.realEstate?.placements||0} зарегистрированных точек (не домов в Workspace)`;
+    $('lod-house-rows').innerHTML=houses.length ? houses.map(h => `<tr>
+      <td><strong>${escape(h.slug)}</strong></td><td>${compact(h.count)}</td>
+      <td><select class="lm-house-stream-mode" data-house-slug="${escape(h.slug)}"
+        aria-label="House streaming mode ${escape(h.slug)}" ${state.busy?'disabled':''}>
+        ${[['off','Off · Workspace'],['full','FULL → Unloaded'],['lod1','FULL → House LOD1 → Unloaded']]
+          .map(([mode,label])=>`<option value="${mode}" ${h.mode===mode?'selected':''}
+            ${(mode!=='off' && h.mode!==mode && (h.fullStatus!=='PUBLISHED')) ||
+              (mode==='lod1' && h.mode!=='lod1' && h.lod1Status!=='PUBLISHED')?'disabled':''}>${label}</option>`).join('')}
+        </select></td>
+      <td>${escape(h.lod1Status)}</td>
+      <td>${h.mode==='off' ? '<span class="lm-note">Не выбран</span>' :
+         h.ready ? '<span class="lm-ready">Профиль готов · XML-дома необязательны</span>' :
+         `<span class="lm-danger">${escape((h.warnings||[]).join(' · ')||'Проверь публикацию')}</span>`}</td></tr>`).join('') :
+      '<tr><td colspan="5">Нет зарегистрированных домов</td></tr>';
     $('lod-count').textContent = `${rows.length} / ${data.items.length} видов`;
     $('lod-revisions').innerHTML = data.revisions.length ? data.revisions.map(r =>
       `<span class="lm-revision">#${r.id} · ${date(r.recordedUtc)} · ${compact(r.total)} pcs
@@ -172,17 +212,28 @@
     try {
       const plan = await request('/api/lod-manager/preflight', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'});
       state.preflight = plan;
-      $('lod-build-preview').textContent = `Snapshot #${plan.snapshotRevision} · ${plan.eligible} визуальных MeshParts к удалению из копии · ` +
+      const untouchedHouses=Object.entries(plan.untouchedHouseCounts||{});
+      const unselectedLocations=plan.untouchedLocations||[];
+      const omitted=untouchedHouses.reduce((count,[,n])=>count+n,0);
+      const exclusions=[
+        ...untouchedHouses.map(([slug,n])=>`${slug}: ${n} домов остаются в Workspace`),
+        ...unselectedLocations.map(item=>`${item.slug}: ${item.count} остаются в Workspace${item.eligible?'':' (структура не поддержана)'}`)
+      ];
+      $('lod-build-preview').textContent = `Snapshot #${plan.snapshotRevision} · Location: ${plan.eligible} MeshParts · Real Estate: ${plan.houseCount||0} домов / ${plan.houseMeshParts||0} MeshParts → technical Parts · ` +
         Object.entries(plan.counts || {}).map(([slug,count])=>`${slug}: ${count}`).join(' · ') +
+        ` · зарегистрированные Plot-пивоты не требуют совпадения с домами Workspace` +
         ` · защищённых объектов не трогаем: ${plan.protectedNotModified}` +
         ` · LOD1 ${plan.distances.lod1} / LOD2 ${plan.distances.lod2} / Hide ${plan.distances.hide} studs` +
-        ` · Workspace Target ${plan.workspace.targetRadius} studs · SHA256 исходника: ${plan.sourceSha256}`;
+        ` · Workspace Target ${plan.workspace.targetRadius} studs · SHA256 исходника: ${plan.sourceSha256}` +
+        (exclusions.length ? `\nНЕ ВКЛЮЧЕНЫ В RUNTIME STREAMING (${omitted} домов, ${unselectedLocations.reduce((n,x)=>n+x.count,0)} Location):\n${exclusions.join('\n')}` : '');
       $('lod-build-preview').hidden = false;
       $('lod-build-confirm').value = '';
       $('lod-build-confirm-label').hidden = false;
       $('lod-build-execute').hidden = false;
       $('lod-build-execute').disabled = true;
-      $('lod-build-status').textContent = 'Preflight OK. Build создаст проверенный backup и отдельную Runtime XML-копию; ничего не удалит в Studio. Введи подтверждение.';
+      $('lod-build-status').textContent = exclusions.length
+        ? 'Preflight OK, НО часть объектов останется в Workspace — смотри список выше. Включи их streaming profile или подтверди частичную сборку.'
+        : 'Preflight OK. Build создаст проверенный backup и отдельную Runtime XML-копию; ничего не удалит в Studio. Введи подтверждение.';
     } catch(error) {
       $('lod-build-status').textContent = `Preflight остановлен: ${error.message}`;
     } finally { state.busy = false; render(); }
@@ -198,7 +249,10 @@
     try {
       const result = await request('/api/lod-manager/prepare', {method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({token,confirmation:'PREPARE RUNTIME'})});
-      $('lod-build-status').textContent = `Runtime draft создан: ${result.removedVisualMeshParts} визуальных MeshParts. Streaming-профиль встроен. Публикация ЗАБЛОКИРОВАНА до Studio / мобильной проверки.`;
+      const remaining=Object.entries(result.untouchedHouseCounts||{});
+      $('lod-build-status').textContent = `Runtime draft создан: Location ${result.removedVisualMeshParts} MeshParts удалены · Real Estate ${result.housePlacements||0} домов / ${result.convertedHouseVisualMeshParts||0} MeshParts заменены прокси.` +
+        (remaining.length ? ` ВНИМАНИЕ: ${remaining.map(([slug,n])=>`${slug} × ${n}`).join(', ')} остались FULL в Workspace.` : '') +
+        ' Публикация ЗАБЛОКИРОВАНА до Studio / мобильной проверки.';
       $('lod-build-preview').textContent = `Backup: ${result.backupPath}
 Runtime: ${result.runtimePath}
 Placement manifest: ${result.manifestPath}
@@ -212,6 +266,10 @@ Build report: ${result.reportPath}`;
       render();
     }
   }
+  $('lod-house-rows').addEventListener('change', event => {
+    const el=event.target, slug=el?.dataset?.houseSlug;
+    if(slug)saveHouseMode(slug,el.value);
+  });
   $('lod-rows').addEventListener('change', event => {
     const el=event.target, slug=el?.dataset?.streamSlug;
     if(!slug || !state.overview)return;

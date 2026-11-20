@@ -75,6 +75,20 @@ function Collision.IsOwned(part: Instance): boolean
     return part:GetAttribute(OWNED) == true or part:GetAttribute("Game1HouseCollisionOwned") == true
 end
 
+-- A new FBX may retire its old visual anchor. Clear only GENERATED Location
+-- collision Parts, preserving author Parts, the Plot pivot and Undo history.
+function Collision.HasOwned(root: Model): boolean
+    return #ownedParts(root, OWNED) > 0
+end
+
+function Collision.PrepareClear(root: Model): any
+    local old = ownedParts(root, OWNED)
+    return {root=root,pivot=root:GetPivot(),stage={},warnings={},prior=old,
+        revision=nil,sha=nil,revisionKey=REVISION,shaKey=SHA,approvalKey=APPROVED,
+        oldRevision=root:GetAttribute(REVISION),oldSha=root:GetAttribute(SHA),
+        oldApproval=root:GetAttribute(APPROVED),committed=false}
+end
+
 function Collision.Current(root: Model, blueprint: any, revision: any, sha: any): boolean
     if type(revision) ~= "number" or revision < 1 then return true end
     if type(blueprint) ~= "table" or (blueprint.schemaVersion ~= 2 and blueprint.schemaVersion ~= 3) then return false end

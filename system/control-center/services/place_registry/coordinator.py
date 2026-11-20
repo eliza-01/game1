@@ -78,10 +78,10 @@ class LocationPlaceRegistry:
             revision = self.revisions.add(report, catalog['digest'])
             result = {'scanToken': bridge.get('scanToken'), 'revision': revision,
                       'summary': {**self._summary(records), 'protectedExternal': len(report.get('protected', []))},
-                      'placements': records,
+                      'placements': records, 'protected': report.get('protected', []),
                       'warnings': report.get('warnings', []), 'incomplete': incomplete,
                       'placeId': report.get('placeId', 0)}
-            self._last_scan = (result['scanToken'], catalog['digest'], revision['revisionId'], incomplete, result['placeId'], records)
+            self._last_scan = (result['scanToken'], catalog['digest'], revision['revisionId'], incomplete, result['placeId'], records, result['protected'])
             return result
         if phase not in ('repair', 'sync', 'select'):
             raise ValueError('unsupported Place Registry operation')
@@ -101,7 +101,7 @@ class LocationPlaceRegistry:
                 raise RuntimeError('Studio operation committed, but audit identity is missing; Scan Place before continuing')
             record_keys = set(keys or [])
             selected = [{'key': r['key'], 'slug': r['slug'], 'name': r['name']}
-                        for r in scan[5] if r['key'] in record_keys]
+                        for r in scan[5] + scan[6] if r.get('key') in record_keys]
             try:
                 result['journalId'] = self.journal.record(
                     revision_id=scan[2], place_id=scan[4],

@@ -23,8 +23,20 @@ def run_place_registry_bridge(*, catalog: dict, phase: str, scan_token: str = ''
     if phase not in ('scan', 'undo'):
         if not re.fullmatch(r'[0-9a-fA-F-]{32,36}', scan_token):
             raise ValueError('Scan the Place before applying changes')
-        if not isinstance(keys, list) or not 1 <= len(keys) <= 4096 or len(set(keys)) != len(keys) or any(
-                not isinstance(key, str) or not re.fullmatch(r'p[1-9][0-9]{0,4}', key) for key in keys):
+        # M393: the same Studio scan issues `p...` keys for managed placements
+        # and `x...` keys for verified LandscapePainter attachments. Only
+        # appearance Sync (or selection) may address an external owner; Repair
+        # continues to be restricted to managed `p...` placements. Studio
+        # validates every supplied key against the current scan session.
+        def allowed_key(key):
+            if not isinstance(key, str):
+                return False
+            if re.fullmatch(r'p[1-9][0-9]{0,4}', key):
+                return True
+            return phase in ('sync', 'select') and bool(re.fullmatch(r'x[1-9][0-9]{0,4}', key))
+
+        if (not isinstance(keys, list) or not 1 <= len(keys) <= 4096
+                or not all(map(allowed_key, keys)) or len(set(keys)) != len(keys)):
             raise ValueError('select explicit scanned placement keys')
     if phase == 'undo' and not re.fullmatch(r'[0-9a-f]{32}', undo_operation_id):
         raise ValueError('Unknown Studio recording for Undo')

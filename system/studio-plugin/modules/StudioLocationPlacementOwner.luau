@@ -1,6 +1,7 @@
 -- M243: one placement-ownership rule for Location Find and scoped Sync.
 -- Grouping models may carry old Deco attributes; the nearest fully stamped
 -- ancestor of a MeshPart is its placement. Do not infer ownership from names.
+local ExternalOwners = require(script.Parent.StudioPlaceRegistryExternalOwners)
 local Owner = {}
 local SLUG = "Game1DecoAssetSlug"
 local INSTANCE = "Game1DecoInstanceId"
@@ -20,6 +21,11 @@ function Owner.ForPart(workspace: Workspace, part: MeshPart, slug: string,
     local camera = workspace.CurrentCamera
     if (authoring and part:IsDescendantOf(authoring))
         or (camera and part:IsDescendantOf(camera)) then return nil end
+    -- A Painter-authored model may carry old DecoManager attributes from a
+    -- historical sync. The nearest *authoring* owner wins; dual stamps must
+    -- never permit a DecoManager child-rig replacement of a tethered light.
+    local external=ExternalOwners.ForPart(part,workspace)
+    if external and external.kind=="landscape_attachment" then return nil end
     local cursor: Instance? = part.Parent
     while cursor and cursor ~= workspace do
         if cursor:IsA("Model") and (cursor:GetAttribute(SLUG) ~= nil

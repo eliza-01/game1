@@ -125,6 +125,7 @@ def validate_report(report: dict, catalog: dict) -> list[dict]:
         raise ValueError('invalid protected external inventory')
     valid_kinds = {'landscape_attachment', 'landscape_structure', 'unmanaged_package'}
     seen_paths = set()
+    seen_external_keys = set()
     for item in protected:
         if not isinstance(item, dict) or item.get('kind') not in valid_kinds:
             raise ValueError('invalid protected external owner')
@@ -140,6 +141,27 @@ def validate_report(report: dict, catalog: dict) -> list[dict]:
         seen_paths.add((item['path'], item['slug']))
         if type(item.get('review')) is not bool or item.get('protectedFromRuntime') is not True:
             raise ValueError('unsafe protected owner record')
+        # Only the verified LandscapePainter owner may be selected for
+        # appearance-only Sync. No ownership migration or geometry mutation.
+        key = item.get('key', '')
+        can_sync = item.get('canSync', False)
+        needs_texture = item.get('needsTexture', False)
+        needs_cleanup = item.get('needsOwnerCleanup', False)
+        needs_physics = item.get('needsPhysics', False)
+        needs_collision = item.get('needsCollision', False)
+        if not isinstance(key, str) or (key and not re.fullmatch(r'x[1-9][0-9]{0,4}',key)):
+            raise ValueError('invalid protected appearance key')
+        if (type(can_sync) is not bool or type(needs_texture) is not bool
+                or type(needs_cleanup) is not bool
+                or type(needs_physics) is not bool or type(needs_collision) is not bool):
+            raise ValueError('invalid protected appearance flags')
+        if key:
+            if key in seen_external_keys:
+                raise ValueError('duplicate protected appearance key')
+            seen_external_keys.add(key)
+        if can_sync and (not key or not (needs_texture or needs_cleanup or needs_physics or needs_collision) or item['kind'] != 'landscape_attachment'
+                         or item['review'] or item['slug'] != item['authorSlug']):
+            raise ValueError('unsafe external appearance Sync')
         if (item['kind'] == 'landscape_attachment'
                 and (not item['authorSlug'] or item['authorSlug'] != item['slug'])
                 and item['review'] is not True):

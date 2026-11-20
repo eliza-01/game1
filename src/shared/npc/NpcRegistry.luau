@@ -13,8 +13,6 @@ return table.freeze({
 			skeletonSignature = "79541ae8f29e13ecc54b3d091bf6882582e94e16a2a80610aef941f139b4a3f7",
 			behavior = table.freeze({
 				retaliateWhenAttacked = true,
-				pursuitRadiusStuds = 33,
-				returnDelaySeconds = 10,
 				attackRadiusStuds = 8,
 			}),
 			stats = table.freeze({
@@ -41,8 +39,6 @@ return table.freeze({
 			skeletonSignature = "f72cbdcfa8c465b044b58822eabafb11531387e0188b62cfd0ca9c34a90ec692",
 			behavior = table.freeze({
 				retaliateWhenAttacked = true,
-				pursuitRadiusStuds = 70,
-				returnDelaySeconds = 5,
 				attackRadiusStuds = 7,
 			}),
 			stats = table.freeze({
@@ -69,8 +65,6 @@ return table.freeze({
 			skeletonSignature = "cd30e10f85635d9532b6223beeb86086030f09fe8d19daab9cc3c6b6f4cf8922",
 			behavior = table.freeze({
 				retaliateWhenAttacked = true,
-				pursuitRadiusStuds = 150,
-				returnDelaySeconds = 5,
 				attackRadiusStuds = 7,
 			}),
 			stats = table.freeze({

@@ -29,20 +29,17 @@ class M69Tests(unittest.TestCase):
                   VALUES('town_guard','Town Guard','assets/source/npcs/town_guard/model/guard.fbx',
                   '123','sha','sha',0,0,'sig')""")
             payload = dict(slug="town_guard", nameEn="Town Guard", behavior=dict(
-                retaliateWhenAttacked=True, pursuitRadiusStuds=19, attackRadiusStuds=4.5,
-                returnDelaySeconds=10.5))
+                retaliateWhenAttacked=True, attackRadiusStuds=4.5))
             result = npc.register(payload)
-            self.assertEqual(result["behavior"]["returnDelaySeconds"], 10.5)
+            self.assertNotIn("returnDelaySeconds", result["behavior"])
             self.assertTrue(npc.get("town_guard")["behavior"]["retaliateWhenAttacked"])
             registry = source_from(root, "src/shared/npc/NpcRegistry.luau")
             self.assertIn("retaliateWhenAttacked = true", registry)
-            self.assertIn("pursuitRadiusStuds = 19", registry)
-            self.assertIn("returnDelaySeconds = 10.5", registry)
+            self.assertNotIn("pursuitRadiusStuds", registry)
+            self.assertNotIn("returnDelaySeconds", registry)
             self.assertEqual(monster.list(), [])
             with self.assertRaises(ValueError):
-                npc.register(dict(payload, behavior=dict(payload["behavior"], returnDelaySeconds=10.25)))
-            with self.assertRaises(ValueError):
-                npc.register(dict(payload, behavior=dict(payload["behavior"], returnDelaySeconds=-1)))
+                npc.register(dict(payload, behavior=dict(payload["behavior"], attackRadiusStuds=-1)))
 
     def test_legacy_npc_behavior_migrated_without_auto_aggro(self):
         with tempfile.TemporaryDirectory(prefix="m69-migration-") as temp:
@@ -65,7 +62,7 @@ class M69Tests(unittest.TestCase):
             with migrated.connect() as conn:
                 row=conn.execute("SELECT * FROM monster_behavior WHERE monster_slug='old_guard'").fetchone()
             self.assertEqual(row['retaliate_when_attacked'],1)
-            self.assertEqual(row['return_delay_seconds'],10)
+            self.assertNotIn('return_delay_seconds', row.keys())
             self.assertEqual(row['aggro_radius_studs'],24)
 
     def test_damage_notification_and_no_proximity_acquisition(self):
@@ -74,10 +71,10 @@ class M69Tests(unittest.TestCase):
         self.assertIn('ActorDamageSignals.Publish(attacker, target, normalizedRawDamage, finalDamage, killed)', damage)
         self.assertIn('DamageSignals.Event:Connect(onDamage)', ai)
         self.assertNotIn('Queries.ClosestPlayer(', ai)
-        self.assertIn('Queries.Distance(agent.home.Position, root.Position) <= agent.pursuitRadius', ai)
+        self.assertIn('HomeLeash.Outside(agent.home.Position, root.Position, agent.homeRadius)', ai)
         self.assertNotIn('rng:NextInteger(0, halfSteps) / 2', ai)
         self.assertIn('agent.recovery:Begin(agent.targetKilledAt or os.clock())', ai)
-        self.assertIn('NpcMovementPolicy.RecoverySeconds', ai)
+        self.assertIn('Policy.RecoverySeconds', source('src/server/npc/NpcCombatRecovery.luau'))
         self.assertIn('agent.root.CFrame = agent.home', ai)
         self.assertIn('startReturn(agent, true)', ai)
 
@@ -95,6 +92,8 @@ class M69Tests(unittest.TestCase):
         css=source('system/control-center/static/asset-manager.css')
         self.assertIn('field-sizing: content',css)
         self.assertIn('.animation-table-wrap select[data-set]',css)
+        if not (ROOT / "dump_game1_diag_no_models.bat").is_file():
+            self.skipTest("diagnostic dump batch is excluded from this snapshot")
         bat=source('dump_game1_diag_no_models.bat')
         self.assertIn("'.png', '.jpg', '.jpeg'",bat)
         self.assertIn("'.env.local'",bat)

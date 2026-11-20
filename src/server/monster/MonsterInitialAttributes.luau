@@ -43,14 +43,14 @@ local function applyMonsterAttributes(model: Model, definition: any, record: any
     local aggressive = behavior.aggressive == true
     local aggroRadius = math.max(0, finite(behavior.aggroRadiusStuds, 16))
     local attackRadius = math.max(0, finite(behavior.attackRadiusStuds, 3))
-    -- Per-monster-kind pursuit territory, independent of the spawn distribution radius.
-    local pursuitRadius = math.clamp(finite(behavior.pursuitRadiusStuds, 150), 1, 10000)
+    -- Leash belongs to this spawn record, never to the monster species.
+    local homeRadius = math.clamp(finite(record.homeRadiusStuds, 150), 1, 10000)
     model:SetAttribute("MonsterAuthoredAggressive", aggressive)
     model:SetAttribute("MonsterAuthoredAggroRadius", aggroRadius)
     model:SetAttribute("MonsterAuthoredAttackRadius", attackRadius)
     model:SetAttribute("MonsterAggressive", aggressive)
     model:SetAttribute("MonsterAggroRadius", aggroRadius)
-    model:SetAttribute("MonsterPursuitRadiusStuds", pursuitRadius)
+    model:SetAttribute("MonsterHomeRadiusStuds", homeRadius)
     model:SetAttribute("MonsterAttackRadius", attackRadius)
     model:SetAttribute("MonsterCombatActive", false)
     model:SetAttribute("MonsterAttackPursuitActive", false)

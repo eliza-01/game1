@@ -25,6 +25,8 @@ local NpcCombatRecovery = require(script.Parent:WaitForChild("NpcCombatRecovery"
 local WeaponAttackMovement = require(Shared:WaitForChild("weapon"):WaitForChild("WeaponAttackMovement"))
 local Facing = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorFacingTracker"))
 local AttackPursuit = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorAttackPursuit"))
+local HomeLeash = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorHomeLeash"))
+local GameOptions = require(Shared:WaitForChild("GameOptions"))
 
 local NpcCombatAIService = {}
 local agents: {[Model]: any} = {}
@@ -127,6 +129,7 @@ local function enterCombat(agent: any, target: Model)
     clearTarget(agent)
     agent.returnAt = 0
     agent.target = target
+    agent.lastDamageAt = os.clock()
     HostilePursuitRegistry.SetTarget(agent.model, target)
     pinAtRest(agent, false)
     local player = game:GetService("Players"):GetPlayerFromCharacter(target)
@@ -202,7 +205,7 @@ end
 local function attackReady(agent: any, target: Model): boolean
     local targetRoot = Queries.Root(target)
     if not targetRoot or not Queries.Valid(target) then return false end
-    if Queries.Distance(agent.home.Position, targetRoot.Position) > agent.pursuitRadius then return false end
+    if HomeLeash.Outside(agent.home.Position, targetRoot.Position, agent.homeRadius) then return false end
     local origin = agent.root.Position
     return Queries.Distance(origin, targetRoot.Position) <= agent.attackRadius
         and math.abs(origin.Y - targetRoot.Position.Y) <= VERTICAL_TOLERANCE
@@ -264,6 +267,7 @@ local function beginAttack(agent: any, target: Model, continuing: boolean?)
                 agent.model:SetAttribute("NpcAttackPhase", if amount > 0 then "Hit" else "Miss")
                 if amount <= 0 then CombatFeedbackService.PublishMissOverPlayer(target) end
                 if amount > 0 then
+                    agent.lastDamageAt = os.clock()
                     local targetRoot = Queries.Root(target)
                     HitEffectService.Publish(agent.model, target, target:GetAttribute("LastCritical") == true,
                         if targetRoot then targetRoot.Position else nil)
@@ -312,6 +316,15 @@ end
 
 local function tickAgent(agent: any, now: number)
     if not agent.model.Parent or agent.model:GetAttribute("LifeState") ~= "Alive" then return end
+    -- Crossing the authored boundary despawns this incarnation and creates one
+    -- fresh NPC at the exact registered pose (population owner performs reset).
+    if HomeLeash.Outside(agent.home.Position, agent.root.Position, agent.homeRadius) then
+        agent.resetAtHome()
+        return
+    end
+    if agent.target and HomeLeash.NoDamageTimeout(agent.lastDamageAt, now, GameOptions.HostileNoDamageReturnSeconds()) then
+        startReturn(agent, false)
+    end
     if agent.recovery:Pending() then
         if agent.recovery:Ready(now) then
             -- Exactly two seconds after target loss, clear combat and walk home.
@@ -333,7 +346,7 @@ local function tickAgent(agent: any, now: number)
         if not targetRoot or not Queries.Valid(target) then
             startReturn(agent, true)
             return -- do not enter Return while the combat recovery gate is pending
-        elseif Queries.Distance(agent.home.Position, targetRoot.Position) > agent.pursuitRadius then
+        elseif HomeLeash.Outside(agent.home.Position, targetRoot.Position, agent.homeRadius) then
             startReturn(agent, false)
             target = nil
         end
@@ -362,14 +375,16 @@ local function tickAgent(agent: any, now: number)
     end
 end
 
-local function onDamage(attacker: Model?, target: Model, attempted: number)
+local function onDamage(attacker: Model?, target: Model, attempted: number, applied: number)
     local agent = agents[target]
     if not agent or not agent.active or not agent.retaliate
         or agent.model:GetAttribute("LifeState") ~= "Alive" or attempted <= 0 then return end
     if not attacker or not game:GetService("Players"):GetPlayerFromCharacter(attacker) then return end
     local root = Queries.Root(attacker)
+    if applied > 0 then agent.lastDamageAt = os.clock() end
     if root and Queries.Valid(attacker)
-        and Queries.Distance(agent.home.Position, root.Position) <= agent.pursuitRadius
+        and not HomeLeash.Outside(agent.home.Position, root.Position, agent.homeRadius)
+        and not HomeLeash.Outside(agent.home.Position, agent.root.Position, agent.homeRadius)
         and agent.attackRadius > 0 then
         -- Preserve an in-flight attack, like the monster attack owner does.
         -- Repeated strikes from the same player must not reset its animation.
@@ -379,7 +394,7 @@ local function onDamage(attacker: Model?, target: Model, attempted: number)
     end
 end
 
-function NpcCombatAIService.Bind(model: Model, root: BasePart, presentation: any)
+function NpcCombatAIService.Bind(model: Model, root: BasePart, presentation: any, resetAtHome: () -> ())
     local existing = agents[model]
     if existing then return end
     local humanoid = model:FindFirstChildOfClass("Humanoid")
@@ -387,7 +402,7 @@ function NpcCombatAIService.Bind(model: Model, root: BasePart, presentation: any
     local definition = (NpcRegistry.npcs or {})[tostring(model:GetAttribute("NpcSlug") or "")]
     local behavior = definition and definition.behavior or {}
     local retaliate = behavior.retaliateWhenAttacked == true
-    local pursuitRadius = math.clamp(finite(model:GetAttribute("NpcHomeRadiusStuds"), finite(behavior.pursuitRadiusStuds, 16)), 1, 10000)
+    local homeRadius = math.clamp(finite(model:GetAttribute("NpcHomeRadiusStuds"), 16), 1, 10000)
     local attackRadius = math.max(0, finite(behavior.attackRadiusStuds, 3))
     local profile = (NpcAnimationRegistry.profiles or {})[tostring(model:GetAttribute("NpcSlug") or "")]
     local weaponSet = tostring(model:GetAttribute("NpcWeaponSet") or "unarmed")
@@ -397,7 +412,8 @@ function NpcCombatAIService.Bind(model: Model, root: BasePart, presentation: any
         model = model, root = root, humanoid = humanoid, presentation = presentation,
         navigator = Navigator.new(root, humanoid), pursuit = AttackPursuit.new(root, humanoid),
         policy = policy, target = nil, state = "Idle",
-        retaliate = retaliate, pursuitRadius = pursuitRadius, attackRadius = attackRadius,
+        retaliate = retaliate, homeRadius = homeRadius, attackRadius = attackRadius,
+        resetAtHome = resetAtHome, lastDamageAt = 0,
         recovery = NpcCombatRecovery.new(), returnAt = 0, home = home,
         attackRows = Tracks.PublishedRows(profile, "attack", weaponSet),
         attacking = false, active = true, serial = 0, nextAttackAt = 0,
@@ -408,8 +424,7 @@ function NpcCombatAIService.Bind(model: Model, root: BasePart, presentation: any
     model:SetAttribute("NpcTargetUserId", 0)
     model:SetAttribute("NpcAttackPhase", "")
     model:SetAttribute("NpcRetaliateWhenAttacked", retaliate)
-    model:SetAttribute("NpcPursuitRadius", pursuitRadius)
-    model:SetAttribute("NpcReturnDelayMaxSeconds", NpcMovementPolicy.RecoverySeconds)
+    model:SetAttribute("NpcHomeLeashStuds", homeRadius)
     model:SetAttribute("NpcAttackRadius", attackRadius)
     model:SetAttribute("NpcAttackPursuitActive", false)
     model:SetAttribute("NpcAttackPursuitMode", NpcMovementPolicy.ModeFor("Combat"))
@@ -456,7 +471,8 @@ function NpcCombatAIService.Start()
             if agent.active and agent.attacking then
                 local target = agent.target
                 local targetRoot = if target and Queries.Valid(target) then Queries.Root(target) else nil
-                local inLeash = targetRoot and Queries.Distance(agent.home.Position, targetRoot.Position) <= agent.pursuitRadius
+                local inLeash = targetRoot and not HomeLeash.Outside(agent.home.Position, targetRoot.Position, agent.homeRadius)
+                    and not HomeLeash.Outside(agent.home.Position, agent.root.Position, agent.homeRadius)
                 local allowed = targetRoot and inLeash and agent.model:GetAttribute("LifeState") == "Alive"
                 if allowed then
                     local stat = agent.model:GetAttribute("RunSpeed")

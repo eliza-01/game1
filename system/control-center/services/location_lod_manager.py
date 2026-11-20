@@ -18,9 +18,11 @@ from .place_registry.catalog import build_catalog
 
 
 class LocationLodManager:
-    def __init__(self, assets, place_registry):
+    def __init__(self, assets, place_registry, houses=None, house_placements=None):
         self.assets = assets
         self.registry = place_registry
+        self.houses = houses
+        self.house_placements = house_placements
         self._verified = None  # Last scan by THIS process, not a claim about Studio edits.
         root = Path(self.registry.revisions.path).resolve().parents[1]
         self.builder = RuntimePlaceBuilder(root)
@@ -55,18 +57,32 @@ class LocationLodManager:
             raise ValueError('Runtime preflight accepts an empty request only')
         with self._build_lock:
             overview = self.overview()
+            if not overview['snapshot'] or overview['snapshot']['freshness'] != 'SCANNED_THIS_SESSION':
+                raise ValueError('Scan Place again in this session before Runtime preflight')
             settings = self.streaming_config.read()
-            rows = build_rows(overview, self.registry, settings)
-            inspected = self.builder.inspect(rows, settings)
+            rows = self.location_rows(overview, settings)
+            selected_houses = self.house_selection()
+            inspected = self.builder.inspect(rows, settings, selected_houses)
             token = token_urlsafe(32)
-            self._preflight = (token, inspected['sourceSha256'], overview['snapshot']['revisionId'], settings_digest(settings))
+            from .house_runtime_compilation import fingerprint
+            house_digest = fingerprint(selected_houses)
+            self._preflight = (token, inspected['sourceSha256'], overview['snapshot']['revisionId'],
+                               settings_digest(settings), house_digest)
             return {'schemaVersion': 1, 'token': token, 'snapshotRevision': overview['snapshot']['revisionId'],
                     'catalogDigest': overview['snapshot']['catalogDigest'],
                     'streamingModes': {slug: settings['modes'][slug] for slug in inspected['counts']},
+                    'houseModes': {slug: data['profile']['mode'] for slug,data in selected_houses.items()},
                     'distances': settings['distances'], 'workspace': settings['workspace'],
                     **inspected, 'backupRequired': True, 'publishAllowed': False,
                     'protectedNotModified': overview['summary']['protectedExternal'],
-                    'message': 'Only the explicitly selected Location visual MeshParts will be stripped from a separate saved Place copy.'}
+                    'untouchedLocations': [
+                        {'slug': item['slug'], 'count': item['count'],
+                         'eligible': item['streamingEligible'],
+                         'reason': item['streamingReason']}
+                        for item in overview['items']
+                        if item['count'] and item['streamingMode'] == 'off'
+                    ],
+                    'message': 'Only explicitly selected Location visuals and Real Estate houses are converted. Unselected Workspace objects remain unchanged.'}
 
     def prepare(self, payload: dict) -> dict:
         if not isinstance(payload, dict) or set(payload) != {'token', 'confirmation'}:
@@ -80,14 +96,33 @@ class LocationLodManager:
             settings = self.streaming_config.read()
             if settings_digest(settings) != self._preflight[3]:
                 raise ValueError('Streaming settings changed since Preflight; run it again')
-            rows = build_rows(overview, self.registry, settings)
+            rows = self.location_rows(overview, settings)
+            selected_houses = self.house_selection()
+            from .house_runtime_compilation import fingerprint
+            digest_houses = fingerprint(selected_houses)
+            if digest_houses != self._preflight[4]:
+                raise ValueError('Real Estate selection / Plot bindings changed since Preflight')
             if overview['snapshot']['revisionId'] != self._preflight[2]:
                 raise ValueError('Snapshot changed; run Preflight again')
             digest = self._preflight[1]
             self._preflight = None  # One-shot, including failed builds.
             return self.builder.prepare(rows, expected_sha=digest,
                 snapshot_id=overview['snapshot']['revisionId'],
-                catalog_digest=overview['snapshot']['catalogDigest'], settings=settings)
+                catalog_digest=overview['snapshot']['catalogDigest'], settings=settings,
+                house_inputs=selected_houses)
+
+    def house_selection(self) -> dict:
+        if not self.houses or not self.house_placements:
+            return {}
+        from .house_runtime_compilation import build_inputs
+        return build_inputs(self.houses, self.house_placements)
+
+    def location_rows(self, overview, settings):
+        # Real Estate may be the only selected Runtime domain. Do not force
+        # users to turn on Location streaming to prepare a house-only draft.
+        if not any(mode != 'off' for mode in settings['modes'].values()):
+            return []
+        return build_rows(overview, self.registry, settings)
 
     def overview(self) -> dict:
         settings = self.streaming_config.read()
@@ -184,8 +219,24 @@ class LocationLodManager:
                 'recognizedByCatalog': slug in published,
             })
         warnings = report.get('warnings', []) if report else []
+        house_summaries = []
+        if self.houses and self.house_placements:
+            placed_counts = Counter(r['houseSlug'] for r in self.house_placements.snapshot()['items'])
+            for house in self.houses.list():
+                runtime = house.get('runtimeProfile') or {}
+                house_summaries.append({
+                    'slug':house['slug'], 'count':placed_counts.get(house['slug'],0),
+                    'mode':runtime.get('mode','off'),
+                    'profile': {k:runtime.get(k) for k in ('mode','lod1','hide','hysteresis','revision')},
+                    'fullStatus': house.get('status','NOT_REGISTERED'),
+                    'lod1Status':(house.get('lod1') or {}).get('status','NOT_REGISTERED'),
+                    'ready':(house.get('runtimeReadiness') or {}).get('readyForCompilation',False),
+                    'warnings':(house.get('runtimeReadiness') or {}).get('warnings',[]),
+                })
         return {
             'schemaVersion': 2, 'domain': 'location_assets',
+            'realEstate': {'items':house_summaries, 'selected':sum(x['mode']!='off' for x in house_summaries),
+                           'placements':sum(x['count'] for x in house_summaries)},
             'settings': settings, 'settingsDigest': settings_digest(settings),
             'snapshot': None if not latest else {
                 'revisionId': latest['id'], 'recordedUtc': latest['recorded_utc'],

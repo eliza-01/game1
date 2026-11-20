@@ -73,8 +73,14 @@ class AtlasRetirementM223(TestCase):
         self.assertTrue((self.root / old['source_path']).exists())
         with self.assertRaisesRegex(ValueError, 'retired'):
             self.store.bind('location_asset', 'another', old['id'])
-        with self.assertRaisesRegex(ValueError, 'retired'):
-            self.store.register_file(str(self.root / 'images/pine_01_16x16_atlas.png'))
+        # Retirement frees the human-readable key for a NEW variant, while the
+        # previous variant ID and Image ID remain immutable in history.
+        fresh = self.store.register_file(str(self.root / 'images/pine_01_16x16_atlas.png'))
+        self.assertNotEqual(fresh['id'], old['id'])
+        self.assertFalse(fresh['retired'])
+        self.assertEqual(self.store.get_variant(old['id'])['published_id'], '1101')
+        self.assertEqual({v['id'] for group in self.store.catalog() for v in group['variants']},
+                         {fresh['id'], replacement['id'], unrelated['id']})
 
     def test_requires_replacement_for_used_atlas_and_prevents_stale_confirmation(self):
         old = self.create('a', 16, 100)

@@ -3,6 +3,7 @@ local Carrier = require(script.Parent.StudioLocationRigCarrier)
 -- both keep StudioManagedRigSwap as the sole child-rig transaction.
 local MeshPhysics = require(script.Parent.StudioMeshPhysicsCore)
 local Ownership = require(script.Parent.StudioLocationPlacementOwner)
+local ExternalOwners = require(script.Parent.StudioPlaceRegistryExternalOwners)
 local Visual = require(script.Parent.StudioLocationVisualAppearance)
 local BoneEffects = require(script.Parent.StudioPlacedRigBoneEffects)
 local Inventory = {}
@@ -412,6 +413,12 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
             -- Treat its nearest stamped root as one managed placement so a
             -- two-part legacy rig is not rendered as two unrelated assets.
             local owner = Ownership.ForPart(workspace, part, slug, row.aliases)
+            -- External ownership is presented in Location Find, not converted
+            -- to a Deco placement. Mutation remains authorized exclusively by
+            -- the Place Registry complete-inventory and integrity scan.
+            local foreign = ExternalOwners.ForPart(part,workspace)
+            local painterRoot = if foreign and foreign.kind=="landscape_attachment"
+                and foreign.authorSlug==slug then foreign.model else nil
             local currentUnlinked = owner==nil and currentVisualIds[meshId]==true
                 and not MeshPhysics.IsCollider(part.Name)
                 and part:GetAttribute("Game1DecoPhysicsOnly") ~= true
@@ -440,7 +447,7 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
                     and not republishRequired and not inspectionRequired
                 local path=part:GetFullName()
                 local legacyRoot,legacyModelId=nil,nil
-                if old and not owner then
+                if old and not owner and not painterRoot then
                     legacyRoot,legacyModelId=legacyCandidate(part,workspace,inventory,newModelId)
                     if legacyRoot and legacySeen[legacyRoot] then legacyRoot,legacyModelId=nil,nil end
                     if legacyRoot then legacySeen[legacyRoot]=true end
@@ -448,14 +455,19 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
                 -- Untagged current-version meshes inside author-created folders
                 -- are independent placements, NOT one giant grouping Model.
                 -- Historical whole-model candidates retain their verified root.
-                local container=owner or legacyRoot or part
+                local container=owner or painterRoot or legacyRoot or part
                 local entry={key=key,name=part.Name,path=string.sub(path,1,240),
+                    painterCandidate=painterRoot~=nil,
                     modelName=string.sub(container.Name,1,128),
                     modelPath=string.sub(container:GetFullName(),1,240),
                     isCollider=MeshPhysics.IsCollider(part.Name),
                     instanceId=if owner then tostring(owner:GetAttribute("Game1DecoInstanceId")) else "",
                     meshId=meshId,textureId=textureId,colorMapId=colorMapId,
                     hasSurface=textureApplicable and surface~=nil,textureApplicable=textureApplicable,managed=owner~=nil,
+                    effectiveAppearanceMode=tostring(settings.appearanceMode or "atlas"),
+                    appearanceOverride=typeof(row.meshOptions)=="table"
+                        and typeof(row.meshOptions[part.Name])=="table"
+                        and row.meshOptions[part.Name].appearanceMode~=nil,
                     attachable=legacyRoot~=nil,historicalModelId=legacyModelId or "",
                     meshCurrent=meshCurrent,textureCurrent=textureCurrent,
                     needsMesh=false,needsTexture=not textureCurrent,needsAlpha=not alphaCurrent,

@@ -25,7 +25,8 @@
         "placeId": 0,
         "markerPath": "Workspace.Game1Authoring.MonsterSpawns.Gremlin_e1edd5dd",
         "syncedAtUtc": "2026-10-16T12:45:16.212222Z"
-      }
+      },
+      "homeRadiusStuds": 150.0
     }
   }
 }

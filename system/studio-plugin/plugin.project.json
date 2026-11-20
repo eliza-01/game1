@@ -67,6 +67,9 @@
       "StudioPlaceRegistryInventory": {
         "$path": "modules/StudioPlaceRegistryInventory.luau"
       },
+      "StudioLocationPainterIntegrity": {
+        "$path": "modules/StudioLocationPainterIntegrity.luau"
+      },
       "StudioPlaceRegistryExternalOwners": {
         "$path": "modules/StudioPlaceRegistryExternalOwners.luau"
       },

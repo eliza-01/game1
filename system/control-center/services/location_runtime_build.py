@@ -13,6 +13,7 @@ import os
 import re
 from urllib.parse import parse_qs, urlsplit
 from pathlib import Path
+from collections import Counter
 import shutil
 import time
 import uuid
@@ -171,20 +172,24 @@ COLLISION_CLASSES = ('Part', 'WedgePart', 'CornerWedgePart')
 
 
 def placement_shape_problem(row):
-    """Conservative ownership boundary shared by Inventory and XML Preflight.
+    """Shared Preflight and LOD Manager eligibility boundary.
 
-    Supports one static visual + SurfaceAppearance, owned Parts of multiple
-    shapes, or a strictly non-colliding visual. No rig, attachments or scripts.
+    Simple Location geometry keeps its established M388 pilot. Composite
+    visuals (including carriers, bones, lights and emitters) use the same
+    Runtime compiler/scheduler via a strict, separately verified adapter.
     """
     nodes = row.get('hierarchy') or []
+    from .location_runtime_composite import is_composite, structure_problem
+    if is_composite(row):
+        return structure_problem(row)
     visuals = [n for n in nodes if n.get('class') == 'MeshPart']
     if len(visuals) != 1:
-        return 'requires exactly one visual MeshPart (no rig_carrier)'
+        return 'requires one identifiable visual MeshPart'
     if sum(n.get('class') == 'Model' for n in nodes) != 1:
         return 'nested Model hierarchy is not supported for this Runtime build'
     allowed = {'Model', 'MeshPart', 'SurfaceAppearance', *COLLISION_CLASSES}
     if any(n.get('class') not in allowed for n in nodes):
-        return 'has rig / attachment / light / nested effects: managed by another system'
+        return 'unsupported visual descendants'
     colliders = [n for n in nodes if n.get('class') in COLLISION_CLASSES]
     if any(not str(n.get('name', '')).startswith('__Game1Collision_') for n in colliders):
         return 'contains non-Blueprint physical Parts'
@@ -218,6 +223,14 @@ def _verify(source_tree, rows, targets):
         if len(models) != 1:
             raise ValueError(f'{path}: expected one Model in saved XML, got {len(models)}')
         model = models[0]
+        from .location_runtime_composite import is_composite, validate_xml
+        if is_composite(row):
+            # All effects and the rig_carrier are preserved. Only the
+            # identified visible MeshParts become lightweight Part proxies.
+            components = validate_xml(model, row, name=_name, cframe=_cframe,
+                vector3=_vector3, mesh_id=_mesh_id, near=_near)
+            found.append((row, model, components))
+            continue
         items = [child for child in model if child.tag == 'Item']
         visuals = [c for c in items if c.get('class') == 'MeshPart']
         colliders = [c for c in items if c.get('class') in COLLISION_CLASSES
@@ -269,7 +282,8 @@ def _verify(source_tree, rows, targets):
     # *runtime copy only* is safe: immutable placement pivots live in the
     # Runtime Manifest and collision Parts retain their world CFrames.
     # Never permit arbitrary references (including another Model's PrimaryPart).
-    owned_primary_parts = {id(model): mesh.get('referent') for _row, model, mesh in found}
+    owned_primary_parts = {id(model): mesh.get('referent') for _row, model, mesh in found
+                           if not isinstance(mesh, list)}
     for node in _items(source_tree.getroot()):
         if node.get('referent') in removed:
             continue
@@ -289,9 +303,68 @@ def _verify(source_tree, rows, targets):
 
 RUNTIME_MANIFEST_NAME = 'Game1LocationRuntimeManifest'
 RUNTIME_MANIFEST_KIND = 'game1-location-visual-stream-v1'
+# One Roblox StringValue cannot hold a large runtime world manifest. Keep
+# small drafts backwards compatible and segment larger ones into children of
+# the SAME marker: no additional runtime streaming service is introduced.
+RUNTIME_INLINE_BYTES = 180000
+RUNTIME_CHUNK_BYTES = 120000
+RUNTIME_MAX_CHUNKS = 64
+RUNTIME_CHUNK_TRANSPORT = 'chunked-v1'
 
 
-def _runtime_payload(rows, *, snapshot_id, catalog_digest, settings=None):
+def _manifest_json(payload):
+    # ASCII-only JSON means character boundaries are identical to UTF-8 byte
+    # boundaries; Roblox's per-StringValue byte limit can be checked exactly.
+    return json.dumps(payload, ensure_ascii=True, separators=(',', ':'), allow_nan=False)
+
+
+def _manifest_segments(payload):
+    encoded = _manifest_json(payload)
+    if len(encoded) <= RUNTIME_INLINE_BYTES:
+        return encoded, []
+    chunks = [encoded[pos:pos + RUNTIME_CHUNK_BYTES]
+              for pos in range(0, len(encoded), RUNTIME_CHUNK_BYTES)]
+    if len(chunks) > RUNTIME_MAX_CHUNKS:
+        raise ValueError('Runtime manifest exceeds bounded transport capacity ('
+                         f'{len(chunks)} chunks; maximum {RUNTIME_MAX_CHUNKS})')
+    descriptor = _manifest_json({
+        'transport': RUNTIME_CHUNK_TRANSPORT, 'chunks': len(chunks),
+        'bytes': len(encoded), 'sha256': hashlib.sha256(encoded.encode('ascii')).hexdigest(),
+    })
+    return descriptor, chunks
+
+
+def _read_embedded_manifest(marker):
+    # Verify serialized Runtime XML, including chunk count and checksum.
+    descriptor = _property(marker, 'string', 'Value').text or ''
+    decoded = json.loads(descriptor)
+    if not isinstance(decoded, dict) or decoded.get('transport') is None:
+        if list(marker.findall('./Item')):
+            raise RuntimeError('Unexpected inline Runtime marker children')
+        return decoded
+    chunks = list(marker.findall('./Item'))
+    count = decoded.get('chunks')
+    if (decoded.get('transport') != RUNTIME_CHUNK_TRANSPORT
+            or type(count) is not int or not 2 <= count <= RUNTIME_MAX_CHUNKS
+            or len(chunks) != count or type(decoded.get('bytes')) is not int
+            or type(decoded.get('sha256')) is not str):
+        raise RuntimeError('Invalid compiled Runtime manifest transport')
+    values = []
+    for index, node in enumerate(chunks, 1):
+        if node.get('class') != 'StringValue' or _name(node) != f'Chunk{index:03d}':
+            raise RuntimeError('Invalid Runtime manifest chunk order')
+        value = _property(node, 'string', 'Value').text or ''
+        if not 0 < len(value) <= RUNTIME_CHUNK_BYTES:
+            raise RuntimeError('Invalid Runtime manifest chunk size')
+        values.append(value)
+    encoded = ''.join(values)
+    if (len(encoded) != decoded['bytes'] or
+            hashlib.sha256(encoded.encode('ascii')).hexdigest() != decoded['sha256']):
+        raise RuntimeError('Runtime manifest checksum mismatch')
+    return json.loads(encoded)
+
+
+def _runtime_payload(rows, *, snapshot_id, catalog_digest, settings=None, houses=None):
     """Validated published geometry + per-type capability + distance policy.
 
     This remains compiler-owned data. A runtime client never chooses cloud IDs.
@@ -300,13 +373,18 @@ def _runtime_payload(rows, *, snapshot_id, catalog_digest, settings=None):
     settings = validate_settings(settings or DEFAULT_SETTINGS)
     modes = settings['modes']
     targets = sorted({row['slug'] for row in rows})
-    if not targets or len(targets) > 64 or any(modes.get(slug, 'off') == 'off' for slug in targets):
+    if (not targets and not houses) or len(targets) > 64 or any(modes.get(slug, 'off') == 'off' for slug in targets):
         raise ValueError('No valid selected Runtime streaming types')
     placements = []
+    compound_signatures = {}
     for row in rows:
-        visual = [entry for entry in row['hierarchy'] if entry.get('class') == 'MeshPart']
+        from .location_runtime_composite import is_composite, component_manifest
+        composite = is_composite(row)
+        visual = ([entry for entry in row['hierarchy'] if entry.get('class') == 'MeshPart'
+                   and entry.get('name') != 'rig_carrier'] if composite else
+                  [entry for entry in row['hierarchy'] if entry.get('class') == 'MeshPart'])
         pivot = (row.get('pivotEvidence') or {}).get('modelPivot')
-        if len(visual) != 1 or not isinstance(pivot, list) or len(pivot) != 12:
+        if not visual or not isinstance(pivot, list) or len(pivot) != 12:
             raise ValueError(f"{row['path']}: no verified Model pivot for runtime streaming")
         positions = (pivot, visual[0].get('cframe'), visual[0].get('size'))
         lengths = (12, 12, 3)
@@ -317,20 +395,35 @@ def _runtime_payload(rows, *, snapshot_id, catalog_digest, settings=None):
                 raise ValueError(f"{row['path']}: invalid geometry in runtime marker")
         if any(v <= 0 for v in visual[0]['size']):
             raise ValueError(f"{row['path']}: invalid runtime visual size")
-        placements.append({
-            'id': row['placementId'], 'slug': row['slug'],
-            'pivot': pivot, 'cframe': visual[0]['cframe'], 'size': visual[0]['size'],
-        })
+        entry = {'id': row['placementId'], 'slug': row['slug'],
+            'pivot': pivot, 'cframe': visual[0]['cframe'], 'size': visual[0]['size']}
+        if composite:
+            entry['modelPath'] = row['path'].split('.')[1:]
+            if not entry['modelPath'] or any(not segment or '.' in segment
+                                             for segment in entry['modelPath']):
+                raise ValueError(f"{row['path']}: invalid runtime Model path")
+            entry['components'] = component_manifest(row)
+            signature = tuple((v['name'],v['meshId']) for v in entry['components'])
+            previous = compound_signatures.setdefault(row['slug'], signature)
+            if previous != signature:
+                raise ValueError(f"{row['slug']}: different Mesh IDs/parts across placements; Sync first")
+        placements.append(entry)
     if len(placements) > 5000:
         raise ValueError('Runtime manifest exceeds 5000 placements')
-    return {
-        'schemaVersion': 2, 'kind': RUNTIME_MANIFEST_KIND,
+    payload = {
+        'schemaVersion': 3 if houses else 2, 'kind': RUNTIME_MANIFEST_KIND,
         'snapshotRevision': snapshot_id, 'catalogDigest': catalog_digest,
         'publishAllowed': False, 'targets': targets,
         'modes': {slug: modes[slug] for slug in targets},
         'distances': dict(settings['distances']),
         'placements': placements,
     }
+    if houses:
+        payload['houses'] = houses
+    # Check the same bounded transport that will be written by the compiler.
+    # Large catalogs are chunked, not rejected because of placement counts.
+    _manifest_segments(payload)
+    return payload
 
 
 def _apply_workspace_streaming(tree, settings):
@@ -377,8 +470,15 @@ def _embed_runtime_manifest(tree, payload):
     })
     props = etree.SubElement(marker, 'Properties')
     etree.SubElement(props, 'string', name='Name').text = RUNTIME_MANIFEST_NAME
-    etree.SubElement(props, 'string', name='Value').text = json.dumps(
-        payload, ensure_ascii=False, separators=(',', ':'), allow_nan=False)
+    descriptor, chunks = _manifest_segments(payload)
+    etree.SubElement(props, 'string', name='Value').text = descriptor
+    for index, value in enumerate(chunks, 1):
+        child = etree.SubElement(marker, 'Item', {
+            'class': 'StringValue', 'referent': 'RBX_' + uuid.uuid4().hex,
+        })
+        child_props = etree.SubElement(child, 'Properties')
+        etree.SubElement(child_props, 'string', name='Name').text = f'Chunk{index:03d}'
+        etree.SubElement(child_props, 'string', name='Value').text = value
     return marker
 
 
@@ -429,7 +529,7 @@ class RuntimePlaceBuilder:
         self.source = self.root / 'place' / 'game1_runtime_source.rbxlx'
         self.destination = self.root / '.control-center' / 'runtime-builds'
 
-    def inspect(self, rows, settings=None):
+    def inspect(self, rows, settings=None, house_inputs=None):
         source = self.source.resolve(strict=True)
         if source != self.source or source.suffix.lower() != '.rbxlx':
             raise ValueError('Source must be a regular place/game1_runtime_source.rbxlx, not a symlink')
@@ -438,7 +538,19 @@ class RuntimePlaceBuilder:
         tree = _parse(source)
         targets = sorted({row['slug'] for row in rows})
         selected = _verify(tree, rows, targets)
-        _runtime_payload(rows, snapshot_id=0, catalog_digest='preflight', settings=settings)
+        from .house_runtime_compilation import inspect as inspect_houses, payload as house_payload
+        house_rows = inspect_houses(tree, house_inputs or {})
+        prepared_houses = house_payload(house_rows, house_inputs) if house_rows else None
+        # Explicitly report placed houses that remain FULL Workspace instances.
+        # A Plot registration alone does not opt a house into streaming.
+        untouched_houses = {}
+        for model_path, model in _model_paths(tree.getroot()):
+            match = re.fullmatch(r'Workspace\.Plots\.\d+\.Houses\.(house_level\d+_\d{2})', model_path)
+            if match and match.group(1) not in (house_inputs or {}):
+                slug = match.group(1)
+                untouched_houses[slug] = untouched_houses.get(slug, 0) + 1
+        _runtime_payload(rows, snapshot_id=0, catalog_digest='preflight',
+                         settings=settings, houses=prepared_houses)
         _apply_workspace_streaming(tree, settings)
         if any(_name(node) == RUNTIME_MANIFEST_NAME for node in _items(tree.getroot())):
             raise ValueError('Saved authoring Place already contains a Runtime marker')
@@ -446,19 +558,26 @@ class RuntimePlaceBuilder:
                 and node.get('class') == 'ReplicatedStorage']) != 1:
             raise ValueError('Saved Place must include exactly one ReplicatedStorage service')
         return {'source': str(source), 'sourceSha256': _sha(source),
-                'eligible': len(selected), 'counts': {slug: sum(r['slug'] == slug for r in rows) for slug in targets},
+                'eligible': len(selected), 'houseCount': len(house_rows),
+                'houseMeshParts': sum(len(r['parts']) for r in house_rows),
+                'untouchedHouseCounts': untouched_houses,
+                'untouchedHouseModels': sum(untouched_houses.values()),
+                'counts': {slug: sum(r['slug'] == slug for r in rows) for slug in targets},
                 'sourceBytes': source.stat().st_size}
 
-    def prepare(self, rows, *, expected_sha, snapshot_id, catalog_digest, settings=None):
+    def prepare(self, rows, *, expected_sha, snapshot_id, catalog_digest, settings=None, house_inputs=None):
         if not isinstance(expected_sha, str) or len(expected_sha) != 64:
             raise ValueError('Run Preflight first')
         from .location_streaming_config import DEFAULT_SETTINGS, validate_settings
         settings = validate_settings(settings or DEFAULT_SETTINGS)
-        meta = self.inspect(rows, settings)
+        meta = self.inspect(rows, settings, house_inputs)
         if expected_sha != meta['sourceSha256']:
             raise ValueError('Saved authoring Place changed since Preflight; run it again')
         tree = _parse(self.source)
         matched = _verify(tree, rows, sorted({r['slug'] for r in rows}))
+        from .house_runtime_compilation import inspect as inspect_houses, transform as transform_houses, payload as house_payload
+        selected_houses = inspect_houses(tree, house_inputs or {})
+        prepared_houses = house_payload(selected_houses, house_inputs) if selected_houses else None
         # Write into a never-reused private build directory. The source is never edited.
         self.destination.mkdir(parents=True, exist_ok=True)
         build_dir = self.destination / ('runtime_' + time.strftime('%Y%m%dT%H%M%S', time.gmtime()) + '_' + uuid.uuid4().hex[:8])
@@ -470,17 +589,25 @@ class RuntimePlaceBuilder:
                 raise RuntimeError('Backup checksum failed; no Runtime Place generated')
             # Runtime copy retains each root Model and server collision Parts.
             before_refs = [node.get('referent') for node in _items(tree.getroot())]
-            removed_refs = {node.get('referent') for _row, _model, mesh in matched
-                            for node in (mesh, *[c for c in mesh if c.tag == 'Item'])}
+            removed_refs = set()
+            from .runtime_visual_proxy import convert as proxy_visual
             for _row, model, mesh in matched:
-                # Null only the verified OWN-visual PrimaryPart pointer. Never
-                # remove/retarget any external Ref or modify the authoring file.
+                if isinstance(mesh, list):
+                    # Compound rig remains server-owned. Replace visual
+                    # mesh content with inexpensive parts, preserving all
+                    # effect children, welds and original referents.
+                    for visual in mesh:
+                        removed_refs.update(proxy_visual(visual))
+                    continue
+                removed_refs.update(node.get('referent') for node in mesh.iter('Item'))
                 for ref in model.findall('./Properties/Ref'):
                     if (ref.get('name') == 'PrimaryPart'
                             and (ref.text or '').strip() == mesh.get('referent')):
                         ref.text = 'null'
                 model.remove(mesh)
-            runtime_payload = _runtime_payload(rows, snapshot_id=snapshot_id, catalog_digest=catalog_digest, settings=settings)
+            converted_house_parts = transform_houses(selected_houses, house_inputs or {})
+            runtime_payload = _runtime_payload(rows, snapshot_id=snapshot_id, catalog_digest=catalog_digest,
+                                               settings=settings, houses=prepared_houses)
             _apply_workspace_streaming(tree, settings)
             _embed_runtime_manifest(tree, runtime_payload)
             runtime = build_dir / 'runtime_place.rbxlx'
@@ -508,14 +635,18 @@ class RuntimePlaceBuilder:
                    for ref in node.findall('./Properties/Ref')):
                 raise RuntimeError('Runtime XML retains a reference to removed visual')
             added_refs = set(after_refs) - set(before_refs)
-            if (len(before_refs) - len(after_refs) != len(removed_refs) - 1
-                    or len(added_refs) != 1 or (set(before_refs) - set(after_refs)) != removed_refs):
-                raise RuntimeError('Unexpected instances changed during Runtime XML serialization')
             new_marker = [node for node in _items(rebuilt.getroot())
-                          if node.get('referent') in added_refs and node.get('class') == 'StringValue']
-            if len(new_marker) != 1 or _name(new_marker[0]) != RUNTIME_MANIFEST_NAME:
+                          if node.get('referent') in added_refs
+                          and _name(node) == RUNTIME_MANIFEST_NAME]
+            if len(new_marker) != 1 or new_marker[0].get('class') != 'StringValue':
                 raise RuntimeError('Compiled runtime manifest marker missing')
-            data = json.loads(_property(new_marker[0], 'string', 'Value').text or '{}')
+            marker_nodes = [new_marker[0], *list(new_marker[0].findall('./Item'))]
+            marker_refs = {node.get('referent') for node in marker_nodes}
+            if (len(marker_refs) != len(marker_nodes) or added_refs != marker_refs
+                    or len(before_refs) - len(after_refs) != len(removed_refs) - len(marker_nodes)
+                    or (set(before_refs) - set(after_refs)) != removed_refs):
+                raise RuntimeError('Unexpected instances changed during Runtime XML serialization')
+            data = _read_embedded_manifest(new_marker[0])
             if data != runtime_payload:
                 raise RuntimeError('Compiled runtime placement data differs from validated snapshot')
             index = {}
@@ -528,16 +659,40 @@ class RuntimePlaceBuilder:
                     raise RuntimeError('Runtime root missing: ' + row['path'])
                 items = [x for x in found[0] if x.tag == 'Item']
                 expected_count = sum(n.get('class') in COLLISION_CLASSES for n in row['hierarchy'])
-                if (len(items) != expected_count or
+                from .location_runtime_composite import is_composite
+                if is_composite(row):
+                    snapshot_visuals = [n for n in row['hierarchy']
+                        if n.get('class') == 'MeshPart' and n.get('name') != 'rig_carrier']
+                    model_parts = [n for n in found[0].iter('Item') if n is not found[0]
+                                   and n.get('class') == 'Part']
+                    expected_names = Counter(n['name'] for n in snapshot_visuals)
+                    converted = Counter(_name(n) for n in model_parts if _name(n) in expected_names)
+                    if converted != expected_names:
+                        raise RuntimeError('Runtime composite visual proxies missing: ' + row['path'])
+                    # Unmodified server carrier/effect/animation instances
+                    # are checked by whole-file referent identity below.
+                elif (len(items) != expected_count or
                     any(item.get('class') not in COLLISION_CLASSES or not _name(item).startswith('__Game1Collision_') for item in items)):
                     raise RuntimeError('Runtime collider/root validation failed: ' + row['path'])
+            # Verify every managed house MeshPart has become a lightweight
+            # technical proxy; refuse a half-compiled Runtime Place.
+            if selected_houses:
+                nodes = {n.get('referent'):n for n in _items(rebuilt.getroot())}
+                for house in selected_houses:
+                    for mesh,_path in house['matches'].values():
+                        proxy = nodes.get(mesh.get('referent'))
+                        if proxy is None or proxy.get('class')!='Part':
+                            raise RuntimeError('House visual proxy missing from Runtime XML')
             manifest = {
                 'schemaVersion': 1, 'kind': 'game1-location-runtime-draft',
                 'snapshotRevision': snapshot_id, 'catalogDigest': catalog_digest,
                 'sourceSha256': expected_sha, 'runtimeSha256': _sha(runtime),
                 'targets': runtime_payload['targets'], 'modes': runtime_payload['modes'],
                 'distances': settings['distances'], 'workspace': settings['workspace'],
-                'removedVisualMeshParts': len(rows),
+                'removedVisualMeshParts': sum(len(x) if isinstance(x, list) else 1 for _row, _model, x in matched),
+                'convertedHouseVisualMeshParts': converted_house_parts,
+                'housePlacements': len(selected_houses),
+                'untouchedHouseCounts': meta['untouchedHouseCounts'],
                 'retainedCollisionModels': sum(any(n.get('class') in COLLISION_CLASSES for n in row['hierarchy']) for row in rows),
                 'retainedPlacementRoots': len(rows), 'publishAllowed': False,
                 'placements': rows,
@@ -547,7 +702,10 @@ class RuntimePlaceBuilder:
                 'snapshotRevision': snapshot_id,
                 'backup': str(backup), 'backupSha256': _sha(backup),
                 'runtime': str(runtime), 'runtimeSha256': _sha(runtime),
-                'placements': len(rows), 'runtimeVisualMarker': RUNTIME_MANIFEST_NAME,
+                'placements': len(rows), 'housePlacements': len(selected_houses),
+                'convertedHouseVisualMeshParts': converted_house_parts,
+                'untouchedHouseCounts': meta['untouchedHouseCounts'],
+                'runtimeVisualMarker': RUNTIME_MANIFEST_NAME,
                 'streamingModes': runtime_payload['modes'], 'workspace': settings['workspace'],
                 'publishAllowed': False,
                 'note': 'Draft only: bounded client FULL/LOD1 pilot embedded; Studio and mobile validation NOT_RUN; publish gate closed',
@@ -555,7 +713,10 @@ class RuntimePlaceBuilder:
             return {'backupPath': str(backup), 'runtimePath': str(runtime),
                     'manifestPath': str(build_dir / 'placement_manifest.json'),
                     'reportPath': str(build_dir / 'build_report.json'),
-                    'removedVisualMeshParts': len(rows), 'publishAllowed': False}
+                    'removedVisualMeshParts': sum(len(x) if isinstance(x, list) else 1 for _row, _model, x in matched), 'convertedHouseVisualMeshParts': converted_house_parts,
+                    'housePlacements': len(selected_houses),
+                    'untouchedHouseCounts': meta['untouchedHouseCounts'],
+                    'publishAllowed': False}
         except Exception:
             # On error keep no misleading partial runtime artefacts.
             shutil.rmtree(build_dir, ignore_errors=True)

@@ -49,7 +49,23 @@ class MonsterSpawnStore:
         if not self.manifest_path.is_file():
             self.manifest_path.write_text(json.dumps(self._empty(), indent=2) + "\n", encoding="utf-8")
         manifest = self._load()
-        self._write_registry(manifest)
+        # Idempotent upgrade: leash is per spawn for both NPCs and monsters.
+        # Preserve the authored markers and keep a recoverable pre-upgrade file.
+        changed = False
+        for record in manifest["records"].values():
+            if "homeRadiusStuds" not in record:
+                default = 16.0 if self.kind == "npc" else 150.0
+                if self.monsters is not None:
+                    default = self.monsters.former_spawn_leash_for_migration(str(record.get("monsterSlug") or ""))
+                record["homeRadiusStuds"] = default
+                changed = True
+        if changed:
+            backup = self.manifest_path.with_suffix(".m396.backup.json")
+            if not backup.exists():
+                backup.write_bytes(self.manifest_path.read_bytes())
+            self._commit(manifest)
+        else:
+            self._write_registry(manifest)
 
     def _load(self) -> dict:
         value = json.loads(self.manifest_path.read_text(encoding="utf-8"))
@@ -76,8 +92,7 @@ class MonsterSpawnStore:
             "respawnSeconds": float(record.get("respawnSeconds") or 0),
             "enabled": record.get("enabled") is not False,
         }
-        if npc and "homeRadiusStuds" in record:
-            result["homeRadiusStuds"] = float(record["homeRadiusStuds"])
+        result["homeRadiusStuds"] = float(record.get("homeRadiusStuds", 16 if npc else 150))
         if not npc:
             result["spawnRadius"] = float(record.get("spawnRadius") or 0)
             result["maxAlive"] = int(record.get("maxAlive") or 1)
@@ -139,10 +154,9 @@ class MonsterSpawnStore:
             raise ValueError("Spawn position is missing")
         position = {axis: _finite(source_position.get(axis), axis.upper()) for axis in ("x", "y", "z")}
         yaw = _finite(payload.get("yawDegrees", 0), "Yaw") % 360
-        if self.kind == "npc":
-            home_radius = _finite(payload.get("homeRadiusStuds", 16), "Home Radius")
-            if not 1 <= home_radius <= 10000:
-                raise ValueError("Home Radius must be 1..10000 studs")
+        home_radius = _finite(payload.get("homeRadiusStuds", 16 if self.kind == "npc" else 150), "Home Leash")
+        if not 1 <= home_radius <= 10000:
+            raise ValueError("Home Leash must be 1..10000 studs")
         respawn = _finite(payload.get("respawnSeconds", 10), "Respawn Seconds")
         if respawn < 0 or respawn > 86400:
             raise ValueError("Respawn Seconds must be 0..86400")
@@ -162,12 +176,12 @@ class MonsterSpawnStore:
             "position": position,
             "yawDegrees": yaw,
             "respawnSeconds": respawn,
+            "homeRadiusStuds": home_radius,
             "enabled": payload.get("enabled") is not False,
             "createdAtUtc": str(payload.get("createdAtUtc") or now),
             "updatedAtUtc": now,
         }
         if self.kind == "npc":
-            result["homeRadiusStuds"] = home_radius
             # Studio placement is distinct from model publication and registration.
             # Legacy records have only createdAtUtc: retain that historical date.
             placed = str(payload.get("placedAtUtc") or payload.get("createdAtUtc") or now)
@@ -185,8 +199,6 @@ class MonsterSpawnStore:
 
     def _record_view(self, record: dict) -> dict:
         value = json.loads(json.dumps(record))
-        if self.kind == "monster":
-            value.pop("homeRadiusStuds", None)  # old M337 per-spawn leash is not a monster setting
         if self.kind == "npc":
             value.pop("spawnRadius", None)
             value.pop("maxAlive", None)
@@ -229,7 +241,7 @@ class MonsterSpawnStore:
             "recordCount": len(records),
             "monsters": monster_rows,
             "defaults": ({"mapKey": "main", "respawnSeconds": 10, "homeRadiusStuds": 16} if self.kind == "npc"
-                         else {"mapKey": "main", "respawnSeconds": 10, "spawnRadius": 15, "maxAlive": 3}),
+                         else {"mapKey": "main", "respawnSeconds": 10, "homeRadiusStuds": 150, "spawnRadius": 15, "maxAlive": 3}),
             "manifestPath": self.manifest_path.relative_to(self.root).as_posix(),
             "registryPath": self.registry_path.relative_to(self.root).as_posix(),
         }
@@ -267,13 +279,12 @@ class MonsterSpawnStore:
             "respawnSeconds": float(payload.get("respawnSeconds", existing.get("respawnSeconds", 10))),
             "enabled": payload.get("enabled", existing.get("enabled", True)) is not False,
         }
+        draft["homeRadiusStuds"] = float(payload.get("homeRadiusStuds", existing.get("homeRadiusStuds", 16 if self.kind == "npc" else 150)))
         if self.kind == "npc":
-            draft["homeRadiusStuds"] = float(payload.get("homeRadiusStuds", existing.get("homeRadiusStuds", 16)))
             draft.pop("spawnRadius", None)
             draft.pop("maxAlive", None)
             draft["placedAtUtc"] = utc_now()
         else:
-            draft.pop("homeRadiusStuds", None)
             draft["spawnRadius"] = float(payload.get("spawnRadius", existing.get("spawnRadius", 0)))
             draft["maxAlive"] = int(payload.get("maxAlive", existing.get("maxAlive", 1)))
         return {"ok": True, "draft": draft, "studio": result, "readiness": ready}

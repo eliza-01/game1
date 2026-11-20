@@ -250,8 +250,26 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": true,
-          "destructible": false
+          "destructible": false,
+          "distanceStreaming": false,
+          "loadDistanceStuds": 50
         }
+      },
+      "lod1": {
+        "revision": 0,
+        "status": "NOT_REGISTERED",
+        "sourcePath": "",
+        "sourceSha256": "",
+        "publishedSha256": "",
+        "modelAssetId": "",
+        "moderationState": ""
+      },
+      "runtimeProfile": {
+        "mode": "full",
+        "lod1": 150,
+        "hide": 400,
+        "hysteresis": 10,
+        "revision": 1
       },
       "textures": {
         "house": {
@@ -443,7 +461,12 @@
         "model": true,
         "house": true
       },
-      "status": "PUBLISHED"
+      "status": "PUBLISHED",
+      "runtimeReadiness": {
+        "readyForCompilation": true,
+        "runtimeVerified": false,
+        "warnings": []
+      }
     },
     {
       "slug": "house_level2_01",
@@ -1457,7 +1480,9 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": true,
-          "destructible": false
+          "destructible": false,
+          "distanceStreaming": false,
+          "loadDistanceStuds": 50
         },
         "door": {
           "appearanceMode": "atlas",
@@ -1468,7 +1493,9 @@
           "noCollide": false,
           "collisionFidelity": "PreciseConvexDecomposition",
           "doubleSided": true,
-          "destructible": false
+          "destructible": false,
+          "distanceStreaming": false,
+          "loadDistanceStuds": 50
         },
         "window_frames_glass": {
           "appearanceMode": "atlas",
@@ -1479,8 +1506,26 @@
           "noCollide": false,
           "collisionFidelity": "PreciseConvexDecomposition",
           "doubleSided": true,
-          "destructible": false
+          "destructible": false,
+          "distanceStreaming": true,
+          "loadDistanceStuds": 50
         }
+      },
+      "lod1": {
+        "revision": 0,
+        "status": "NOT_REGISTERED",
+        "sourcePath": "",
+        "sourceSha256": "",
+        "publishedSha256": "",
+        "modelAssetId": "",
+        "moderationState": ""
+      },
+      "runtimeProfile": {
+        "mode": "off",
+        "lod1": 150,
+        "hide": 400,
+        "hysteresis": 10,
+        "revision": 0
       },
       "textures": {
         "door": {
@@ -1950,7 +1995,14 @@
         "door": true,
         "window_frames_glass": true
       },
-      "status": "UPDATE_AVAILABLE"
+      "status": "UPDATE_AVAILABLE",
+      "runtimeReadiness": {
+        "readyForCompilation": false,
+        "runtimeVerified": false,
+        "warnings": [
+          "Publish all house meshes and atlases before Runtime build"
+        ]
+      }
     },
     {
       "slug": "house_level3_01",
@@ -3322,7 +3374,9 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false
+          "destructible": false,
+          "distanceStreaming": false,
+          "loadDistanceStuds": 50
         },
         "door": {
           "appearanceMode": "atlas",
@@ -3333,7 +3387,9 @@
           "noCollide": false,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false
+          "destructible": false,
+          "distanceStreaming": false,
+          "loadDistanceStuds": 50
         },
         "restoration": {
           "appearanceMode": "atlas",
@@ -3344,7 +3400,9 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false
+          "destructible": false,
+          "distanceStreaming": false,
+          "loadDistanceStuds": 50
         },
         "window_frames_glass": {
           "appearanceMode": "atlas",
@@ -3355,8 +3413,26 @@
           "noCollide": false,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false
+          "destructible": false,
+          "distanceStreaming": true,
+          "loadDistanceStuds": 50
         }
+      },
+      "lod1": {
+        "revision": 0,
+        "status": "NOT_REGISTERED",
+        "sourcePath": "",
+        "sourceSha256": "",
+        "publishedSha256": "",
+        "modelAssetId": "",
+        "moderationState": ""
+      },
+      "runtimeProfile": {
+        "mode": "off",
+        "lod1": 150,
+        "hide": 400,
+        "hysteresis": 10,
+        "revision": 0
       },
       "textures": {
         "door": {
@@ -4005,7 +4081,14 @@
         "restoration": true,
         "window_frames_glass": true
       },
-      "status": "UPDATE_AVAILABLE"
+      "status": "UPDATE_AVAILABLE",
+      "runtimeReadiness": {
+        "readyForCompilation": false,
+        "runtimeVerified": false,
+        "warnings": [
+          "Publish all house meshes and atlases before Runtime build"
+        ]
+      }
     },
     {
       "slug": "house_level4_01",
@@ -5540,7 +5623,9 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false
+          "destructible": false,
+          "distanceStreaming": false,
+          "loadDistanceStuds": 50
         },
         "door": {
           "appearanceMode": "atlas",
@@ -5551,7 +5636,9 @@
           "noCollide": false,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false
+          "destructible": false,
+          "distanceStreaming": false,
+          "loadDistanceStuds": 50
         },
         "restoration": {
           "appearanceMode": "atlas",
@@ -5562,7 +5649,9 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false
+          "destructible": false,
+          "distanceStreaming": false,
+          "loadDistanceStuds": 50
         },
         "window_frames_glass": {
           "appearanceMode": "atlas",
@@ -5573,8 +5662,26 @@
           "noCollide": false,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false
+          "destructible": false,
+          "distanceStreaming": true,
+          "loadDistanceStuds": 50
         }
+      },
+      "lod1": {
+        "revision": 0,
+        "status": "NOT_REGISTERED",
+        "sourcePath": "",
+        "sourceSha256": "",
+        "publishedSha256": "",
+        "modelAssetId": "",
+        "moderationState": ""
+      },
+      "runtimeProfile": {
+        "mode": "off",
+        "lod1": 150,
+        "hide": 400,
+        "hysteresis": 10,
+        "revision": 0
       },
       "textures": {
         "door": {
@@ -6223,7 +6330,14 @@
         "restoration": true,
         "window_frames_glass": true
       },
-      "status": "UPDATE_AVAILABLE"
+      "status": "UPDATE_AVAILABLE",
+      "runtimeReadiness": {
+        "readyForCompilation": false,
+        "runtimeVerified": false,
+        "warnings": [
+          "Publish all house meshes and atlases before Runtime build"
+        ]
+      }
     },
     {
       "slug": "house_level5_01",
@@ -6238,9 +6352,9 @@
       "model_asset_id": "94882722542367",
       "model_published_hash": "5693ec556c0d8a8c2c9a70729a5f1a4be1d34fa5ae1153c4f9cf18f3e0f684f1",
       "model_moderation": "Approved",
-      "revision": 26,
+      "revision": 27,
       "created_at": 1795087964.5584087,
-      "updated_at": 1795116960.033831,
+      "updated_at": 1795164887.0977576,
       "skeleton": {
         "schemaVersion": 1,
         "meshes": [
@@ -17218,7 +17332,9 @@
           "noCollide": false,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false
+          "destructible": false,
+          "distanceStreaming": true,
+          "loadDistanceStuds": 50
         },
         "door": {
           "appearanceMode": "material",
@@ -17229,7 +17345,9 @@
           "noCollide": false,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false
+          "destructible": false,
+          "distanceStreaming": false,
+          "loadDistanceStuds": 50
         },
         "door_handles": {
           "appearanceMode": "material",
@@ -17240,7 +17358,9 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false
+          "destructible": false,
+          "distanceStreaming": true,
+          "loadDistanceStuds": 40
         },
         "fireplace": {
           "appearanceMode": "material",
@@ -17251,7 +17371,9 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false
+          "destructible": false,
+          "distanceStreaming": true,
+          "loadDistanceStuds": 40
         },
         "floors": {
           "appearanceMode": "material",
@@ -17262,7 +17384,9 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false
+          "destructible": false,
+          "distanceStreaming": true,
+          "loadDistanceStuds": 50
         },
         "flowerbed": {
           "appearanceMode": "material",
@@ -17273,7 +17397,9 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false
+          "destructible": false,
+          "distanceStreaming": false,
+          "loadDistanceStuds": 50
         },
         "foundation": {
           "appearanceMode": "material",
@@ -17284,7 +17410,9 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false
+          "destructible": false,
+          "distanceStreaming": false,
+          "loadDistanceStuds": 50
         },
         "ground": {
           "appearanceMode": "material",
@@ -17295,7 +17423,9 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false
+          "destructible": false,
+          "distanceStreaming": true,
+          "loadDistanceStuds": 30
         },
         "plants": {
           "appearanceMode": "atlas",
@@ -17306,7 +17436,9 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false
+          "destructible": false,
+          "distanceStreaming": false,
+          "loadDistanceStuds": 50
         },
         "roof": {
           "appearanceMode": "material",
@@ -17317,7 +17449,9 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false
+          "destructible": false,
+          "distanceStreaming": false,
+          "loadDistanceStuds": 50
         },
         "stone_structures": {
           "appearanceMode": "material",
@@ -17328,7 +17462,9 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false
+          "destructible": false,
+          "distanceStreaming": false,
+          "loadDistanceStuds": 50
         },
         "walls_inside": {
           "appearanceMode": "material",
@@ -17339,7 +17475,9 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false
+          "destructible": false,
+          "distanceStreaming": true,
+          "loadDistanceStuds": 40
         },
         "walls_outside": {
           "appearanceMode": "material",
@@ -17350,7 +17488,9 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false
+          "destructible": false,
+          "distanceStreaming": false,
+          "loadDistanceStuds": 50
         },
         "window_frames": {
           "appearanceMode": "material",
@@ -17361,7 +17501,9 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false
+          "destructible": false,
+          "distanceStreaming": false,
+          "loadDistanceStuds": 50
         },
         "window_frames_glass": {
           "appearanceMode": "material_atlas",
@@ -17372,7 +17514,9 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": true,
-          "destructible": false
+          "destructible": false,
+          "distanceStreaming": true,
+          "loadDistanceStuds": 50
         },
         "wooden_structures": {
           "appearanceMode": "material",
@@ -17383,8 +17527,26 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false
+          "destructible": false,
+          "distanceStreaming": false,
+          "loadDistanceStuds": 50
         }
+      },
+      "lod1": {
+        "revision": 0,
+        "status": "NOT_REGISTERED",
+        "sourcePath": "",
+        "sourceSha256": "",
+        "publishedSha256": "",
+        "modelAssetId": "",
+        "moderationState": ""
+      },
+      "runtimeProfile": {
+        "mode": "full",
+        "lod1": 150,
+        "hide": 400,
+        "hysteresis": 10,
+        "revision": 1
       },
       "textures": {
         "chimney": {
@@ -17962,7 +18124,12 @@
         "window_frames_glass": true,
         "wooden_structures": true
       },
-      "status": "PUBLISHED"
+      "status": "PUBLISHED",
+      "runtimeReadiness": {
+        "readyForCompilation": true,
+        "runtimeVerified": false,
+        "warnings": []
+      }
     }
   ],
   "atlasCatalog": [
@@ -19204,57 +19371,7 @@
       "version": "01",
       "variants": [
         {
-          "id": 36,
-          "family_id": 2,
-          "width": 256,
-          "height": 512,
-          "filename": "lantern_01_256x512_atlas.png",
-          "original_filename": "lantern_01_256x512_atlas.png",
-          "source_path": "assets/source/texture-atlases/lantern_01/256x512/lantern_01_256x512_atlas.png",
-          "source_sha256": "60d15719665fb49f73256e8bfc10c5083c74b95645dbbb34807b82d3c77f9321",
-          "uses_alpha": true,
-          "published_id": "74839303464750",
-          "published_sha256": "60d15719665fb49f73256e8bfc10c5083c74b95645dbbb34807b82d3c77f9321",
-          "moderation_state": "Reviewing",
-          "published_at": 1794026041.6063218,
-          "created_at": 1794026037.3819716,
-          "retired_at": null,
-          "atlas_key": "lantern_01",
-          "replacement_sha256": null,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "256x512",
-          "baseKey": "lantern",
-          "version": "01"
-        },
-        {
-          "id": 46,
-          "family_id": 2,
-          "width": 128,
-          "height": 128,
-          "filename": "lantern_01_128x128_atlas.png",
-          "original_filename": "lantern_01_128x128_atlas.png",
-          "source_path": "assets/source/texture-atlases/lantern_01/128x128/lantern_01_128x128_atlas.png",
-          "source_sha256": "4226b42fa332e6db017f555d91c791bfc9427aea203736ff0d9b53bcf7acc1dd",
-          "uses_alpha": true,
-          "published_id": "139928560438135",
-          "published_sha256": "4226b42fa332e6db017f555d91c791bfc9427aea203736ff0d9b53bcf7acc1dd",
-          "moderation_state": "Reviewing",
-          "published_at": 1794355775.8354034,
-          "created_at": 1794355767.1818166,
-          "retired_at": null,
-          "atlas_key": "lantern_01",
-          "replacement_sha256": null,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "128x128",
-          "baseKey": "lantern",
-          "version": "01"
-        },
-        {
-          "id": 3,
+          "id": 84,
           "family_id": 2,
           "width": 64,
           "height": 128,
@@ -19263,11 +19380,11 @@
           "source_path": "assets/source/texture-atlases/lantern_01/64x128/lantern_01_64x128_atlas.png",
           "source_sha256": "ca9a12aacf3ad5305a6baa34baa728198a272b8d81188ae7163f915f7e1d992e",
           "uses_alpha": true,
-          "published_id": "111478705558346",
+          "published_id": "131501553365251",
           "published_sha256": "ca9a12aacf3ad5305a6baa34baa728198a272b8d81188ae7163f915f7e1d992e",
-          "moderation_state": "Reviewing",
-          "published_at": 1792869836.3859174,
-          "created_at": 1792869829.3721356,
+          "moderation_state": "Approved",
+          "published_at": 1795176078.749668,
+          "created_at": 1795176074.7635748,
           "retired_at": null,
           "atlas_key": "lantern_01",
           "replacement_sha256": null,
@@ -19318,27 +19435,27 @@
       "version": "03",
       "variants": [
         {
-          "id": 49,
+          "id": 83,
           "family_id": 44,
-          "width": 128,
-          "height": 128,
-          "filename": "lantern_03_128x128_atlas.png",
-          "original_filename": "lantern_03_128x128_atlas.png",
-          "source_path": "assets/source/texture-atlases/lantern_03/128x128/lantern_03_128x128_atlas.png",
-          "source_sha256": "4226b42fa332e6db017f555d91c791bfc9427aea203736ff0d9b53bcf7acc1dd",
+          "width": 64,
+          "height": 64,
+          "filename": "lantern_03_64x64_atlas.png",
+          "original_filename": "lantern_03_64x64_atlas.png",
+          "source_path": "assets/source/texture-atlases/lantern_03/64x64/lantern_03_64x64_atlas.png",
+          "source_sha256": "03110d5304bc4dc55f0e485560a416da968ad4fa522bb36fb8f279cbad2150cc",
           "uses_alpha": true,
-          "published_id": "139928560438135",
-          "published_sha256": "4226b42fa332e6db017f555d91c791bfc9427aea203736ff0d9b53bcf7acc1dd",
-          "moderation_state": "",
-          "published_at": 1794414357.4234924,
-          "created_at": 1794414357.2193787,
+          "published_id": "120115686826246",
+          "published_sha256": "03110d5304bc4dc55f0e485560a416da968ad4fa522bb36fb8f279cbad2150cc",
+          "moderation_state": "Reviewing",
+          "published_at": 1795174250.0350425,
+          "created_at": 1795174246.1564896,
           "retired_at": null,
           "atlas_key": "lantern_03",
           "replacement_sha256": null,
           "retired": false,
           "current": true,
           "replacementPending": false,
-          "resolution": "128x128",
+          "resolution": "64x64",
           "baseKey": "lantern",
           "version": "03"
         }
@@ -21012,39 +21129,7 @@
       "atlasResolution": "256×256"
     },
     {
-      "reference": "atlas:36",
-      "label": "lantern_01",
-      "slug": "",
-      "filename": "lantern_01_256x512_atlas.png",
-      "group": "atlas",
-      "category": "",
-      "categoryLabel": "",
-      "path": "assets/source/texture-atlases/lantern_01/256x512/lantern_01_256x512_atlas.png",
-      "sha256": "60d15719665fb49f73256e8bfc10c5083c74b95645dbbb34807b82d3c77f9321",
-      "assetId": "74839303464750",
-      "atlasKey": "lantern_01",
-      "atlasName": "lantern",
-      "atlasVersion": "01",
-      "atlasResolution": "256×512"
-    },
-    {
-      "reference": "atlas:46",
-      "label": "lantern_01",
-      "slug": "",
-      "filename": "lantern_01_128x128_atlas.png",
-      "group": "atlas",
-      "category": "",
-      "categoryLabel": "",
-      "path": "assets/source/texture-atlases/lantern_01/128x128/lantern_01_128x128_atlas.png",
-      "sha256": "4226b42fa332e6db017f555d91c791bfc9427aea203736ff0d9b53bcf7acc1dd",
-      "assetId": "139928560438135",
-      "atlasKey": "lantern_01",
-      "atlasName": "lantern",
-      "atlasVersion": "01",
-      "atlasResolution": "128×128"
-    },
-    {
-      "reference": "atlas:3",
+      "reference": "atlas:84",
       "label": "lantern_01",
       "slug": "",
       "filename": "lantern_01_64x128_atlas.png",
@@ -21053,7 +21138,7 @@
       "categoryLabel": "",
       "path": "assets/source/texture-atlases/lantern_01/64x128/lantern_01_64x128_atlas.png",
       "sha256": "ca9a12aacf3ad5305a6baa34baa728198a272b8d81188ae7163f915f7e1d992e",
-      "assetId": "111478705558346",
+      "assetId": "131501553365251",
       "atlasKey": "lantern_01",
       "atlasName": "lantern",
       "atlasVersion": "01",
@@ -21076,20 +21161,20 @@
       "atlasResolution": "32×64"
     },
     {
-      "reference": "atlas:49",
+      "reference": "atlas:83",
       "label": "lantern_03",
       "slug": "",
-      "filename": "lantern_03_128x128_atlas.png",
+      "filename": "lantern_03_64x64_atlas.png",
       "group": "atlas",
       "category": "",
       "categoryLabel": "",
-      "path": "assets/source/texture-atlases/lantern_03/128x128/lantern_03_128x128_atlas.png",
-      "sha256": "4226b42fa332e6db017f555d91c791bfc9427aea203736ff0d9b53bcf7acc1dd",
-      "assetId": "139928560438135",
+      "path": "assets/source/texture-atlases/lantern_03/64x64/lantern_03_64x64_atlas.png",
+      "sha256": "03110d5304bc4dc55f0e485560a416da968ad4fa522bb36fb8f279cbad2150cc",
+      "assetId": "120115686826246",
       "atlasKey": "lantern_03",
       "atlasName": "lantern",
       "atlasVersion": "03",
-      "atlasResolution": "128×128"
+      "atlasResolution": "64×64"
     },
     {
       "reference": "atlas:43",

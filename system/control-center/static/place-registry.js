@@ -66,6 +66,9 @@
         <button type="button" data-pr-action="sync" data-key="${html(row.key)}" data-pr-blocked="${!sync}">Sync</button></div></div>`;
   }
 
+  const eligibleExternal = () => (source.scan?.protected || []).filter(row =>
+    row.kind === 'landscape_attachment' && row.canSync && (row.needsTexture || row.needsOwnerCleanup || row.needsPhysics || row.needsCollision) && row.key);
+
   function render() {
     const data=source.scan,box=byId('pr-groups'),metrics=byId('pr-metrics');
     if (!data) {
@@ -92,6 +95,14 @@
           <small>Только ${html(slug)} · Repair исправляет структуру, Sync обновляет устаревшие ресурсы</small></div>
           <div class="pr-rows">${rows.map(item).join('')}</div></div></details>`;
     }).join('');
+    const protectedRows=(data.protected || []).filter(r=>r.kind==='landscape_attachment');
+    if(protectedRows.length)box.innerHTML += `<details data-group="landscape-attachments">
+      <summary><b>LandscapePainter attachments</b><span>${protectedRows.length} · Sync ${eligibleExternal().length}</span></summary>
+      <div class="pr-group-content"><div class="pr-rows">${protectedRows.map(r=>`
+        <div class="pr-item"><strong>${html(r.name)}</strong><div class="pr-path">${html(r.path)}</div>
+        <small>${html(r.reason)} · ${r.canSync?'Требует Sync':'Protected (read-only)'}</small>
+        ${r.canSync?`<div class="actions"><button type="button" data-pr-action="sync" data-key="${html(r.key)}">Sync</button></div>`:''}
+        </div>`).join('')}</div></div></details>`;
     buttons();
   }
 
@@ -196,7 +207,9 @@
   byId('pr-scan').onclick=()=>run('scan');
   byId('pr-select-all').onclick=()=>active() && run('select',source.scan.placements.map(p=>p.key));
   byId('pr-repair-all').onclick=()=>active()&&mutate('repair',source.scan.placements.filter(needsRepair).map(p=>p.key),'все группы');
-  byId('pr-sync-all').onclick=()=>active()&&mutate('sync',source.scan.placements.filter(needsSync).map(p=>p.key),'все группы');
+  byId('pr-sync-all').onclick=()=>active()&&mutate('sync',[
+    ...source.scan.placements.filter(needsSync).map(p=>p.key),
+    ...eligibleExternal().map(p=>p.key)],'все группы');
   byId('pr-backup').onchange=buttons;
   byId('pr-groups').addEventListener('toggle',event=>{
     const group=event.target;

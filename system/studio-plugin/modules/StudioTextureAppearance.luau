@@ -1,7 +1,50 @@
 -- Shared Studio-side material binding for all authored MeshParts.
 -- Keep TextureID even when SurfaceAppearance owns ColorMap: imported skinned
 -- rigs in the previous project required this compatibility invariant.
+local CollectionService = game:GetService("CollectionService")
 local StudioTextureAppearance = {}
+local DISTANCE_TAG = "Game1DistanceVisual"
+
+-- A published FBX may carry more than one old SurfaceAppearance. The policy
+-- is per MeshPart, not per first matching child: no alpha means NONE remain.
+local function surfaces(mesh: MeshPart): {SurfaceAppearance}
+    local found = {}
+    for _, child in ipairs(mesh:GetChildren()) do
+        if child:IsA("SurfaceAppearance") then
+            table.insert(found, child)
+        end
+    end
+    return found
+end
+
+local function removeSurfaces(mesh: MeshPart): boolean
+    local changed = false
+    for _, surface in ipairs(surfaces(mesh)) do
+        surface:Destroy()
+        changed = true
+    end
+    return changed
+end
+
+-- Central mesh visual streaming authoring. All consumers share this contract;
+-- inactive meshes carry no tag and cost nothing in the client update loop.
+function StudioTextureAppearance.ApplyDistance(mesh: MeshPart, settings: any)
+    local enabled = typeof(settings) == "table" and settings.distanceStreaming == true
+    if enabled then
+        local distance = settings.loadDistanceStuds
+        if typeof(distance) ~= "number" or distance < 20 or distance > 1000
+            or distance % 1 ~= 0 then error("Invalid per-mesh visual range", 2) end
+        mesh:SetAttribute("Game1VisualDistanceStuds", distance)
+        if not CollectionService:HasTag(mesh, DISTANCE_TAG) then
+            CollectionService:AddTag(mesh, DISTANCE_TAG)
+        end
+    else
+        if CollectionService:HasTag(mesh, DISTANCE_TAG) then
+            CollectionService:RemoveTag(mesh, DISTANCE_TAG)
+        end
+        mesh:SetAttribute("Game1VisualDistanceStuds", nil)
+    end
+end
 
 function StudioTextureAppearance.Apply(mesh: MeshPart, uri: string, usesAlpha: any, idsOnly: boolean?): boolean
     if uri == "" then
@@ -34,21 +77,23 @@ function StudioTextureAppearance.Apply(mesh: MeshPart, uri: string, usesAlpha: a
         return true
     end
     -- A SurfaceAppearance is reserved for explicitly enabled atlas alpha.
-    -- Opaque atlases render through MeshPart.TextureID alone.
+    -- Opaque atlases render through MeshPart.TextureID alone. Remove ALL
+    -- imported/stale SurfaceAppearance children, even when TextureID is current.
     if usesAlpha ~= true then
-        local unchanged = mesh.TextureID == uri and surface == nil
-        if unchanged then return false end
+        local allSurfaces = surfaces(mesh)
+        if mesh.TextureID == uri and #allSurfaces == 0 then return false end
         local original = mesh.TextureID
         local ok, reason = pcall(function() mesh.TextureID = uri end)
         if not ok then
             mesh.TextureID = original
             error("Opaque atlas binding failed: " .. tostring(reason), 2)
         end
-        if surface then surface:Destroy() end
+        removeSurfaces(mesh)
         return true
     end
-    if mesh.TextureID == uri and surface ~= nil and surface.ColorMap == uri
-        and surface.AlphaMode == Enum.AlphaMode.Transparency then
+    local allSurfaces = surfaces(mesh)
+    if mesh.TextureID == uri and #allSurfaces == 1 and surface ~= nil
+        and surface.ColorMap == uri and surface.AlphaMode == Enum.AlphaMode.Transparency then
         return false
     end
     local created = false
@@ -74,6 +119,10 @@ function StudioTextureAppearance.Apply(mesh: MeshPart, uri: string, usesAlpha: a
         end
         error("Alpha atlas binding failed: " .. tostring(reason), 2)
     end
+    -- Do not leave duplicate imported SurfaceAppearance children in the rig.
+    for _, extra in ipairs(allSurfaces) do
+        if extra ~= surface then extra:Destroy() end
+    end
     return true
 end
 
@@ -87,35 +136,36 @@ function StudioTextureAppearance.AlphaMode(enabled: boolean): Enum.AlphaMode
 end
 
 function StudioTextureAppearance.AlphaCurrent(mesh: MeshPart, enabled: boolean): boolean
-    local appearance=mesh:FindFirstChildOfClass("SurfaceAppearance")
-    if not enabled then return appearance==nil end
-    return appearance~=nil and appearance.AlphaMode==Enum.AlphaMode.Transparency
+    local allSurfaces = surfaces(mesh)
+    if not enabled then return #allSurfaces == 0 end
+    return #allSurfaces == 1 and allSurfaces[1].AlphaMode == Enum.AlphaMode.Transparency
 end
 
 function StudioTextureAppearance.Capture(mesh: MeshPart): any
-    local appearance=mesh:FindFirstChildOfClass("SurfaceAppearance")
-    return {mesh=mesh,texture=mesh.TextureID,
-        surfaceCopy=if appearance then appearance:Clone() else nil}
+    local copies = {}
+    for _, appearance in ipairs(surfaces(mesh)) do
+        table.insert(copies, appearance:Clone())
+    end
+    return {mesh=mesh, texture=mesh.TextureID, surfaceCopies=copies}
 end
 
 function StudioTextureAppearance.Restore(snapshot: any)
     local mesh=snapshot.mesh
     mesh.TextureID=snapshot.texture
-    for _, descendant in mesh:GetChildren() do
-        if descendant:IsA("SurfaceAppearance") then descendant:Destroy() end
+    removeSurfaces(mesh)
+    for _, surface in ipairs(snapshot.surfaceCopies) do
+        surface.Parent=mesh
     end
-    if snapshot.surfaceCopy then snapshot.surfaceCopy.Parent=mesh end
 end
 
 function StudioTextureAppearance.ApplyAlpha(mesh: MeshPart, enabled: boolean, uri: string?): boolean
-    local surface=mesh:FindFirstChildOfClass("SurfaceAppearance")
+    local allSurfaces = surfaces(mesh)
+    local surface = allSurfaces[1]
     if not enabled then
-        if surface == nil then return false end
-        surface:Destroy()
-        return true
+        return removeSurfaces(mesh)
     end
-    if surface and surface.AlphaMode==Enum.AlphaMode.Transparency
-        and (uri==nil or surface.ColorMap==uri) then return false end
+    if #allSurfaces == 1 and surface.AlphaMode == Enum.AlphaMode.Transparency
+        and (uri == nil or surface.ColorMap == uri) then return false end
     local content=uri or mesh.TextureID
     if content=="" then error("Alpha requires a published ColorMap; no change made",2) end
     return StudioTextureAppearance.Apply(mesh, content, true)
@@ -138,13 +188,13 @@ end
 
 function StudioTextureAppearance.ApplyMaterial(mesh: MeshPart, materialName: string, hex: string): boolean
     local material,color=StudioTextureAppearance.MaterialColor(materialName,hex)
-    local surface=mesh:FindFirstChildOfClass("SurfaceAppearance")
-    if mesh.TextureID=="" and surface==nil and mesh.Material==material
+    local allSurfaces = surfaces(mesh)
+    if mesh.TextureID=="" and #allSurfaces==0 and mesh.Material==material
         and mesh.Color==color then return false end
     mesh.Material=material
     mesh.Color=color
     mesh.TextureID=""
-    if surface then surface:Destroy() end
+    removeSurfaces(mesh)
     return true
 end
 
@@ -156,9 +206,11 @@ function StudioTextureAppearance.ApplyVisual(mesh: MeshPart, settings: any, uri:
     local mode=tostring(opts.appearanceMode or "material")
     if mode=="material" then
         if opts.alphaEnabled==true then error("Alpha transparency requires an atlas",2) end
-        return StudioTextureAppearance.ApplyMaterial(mesh,
+        local changed = StudioTextureAppearance.ApplyMaterial(mesh,
             tostring(opts.visualMaterial or "SmoothPlastic"),
             tostring(opts.visualColor or "#FFFFFF"))
+        StudioTextureAppearance.ApplyDistance(mesh, opts)
+        return changed
     end
     if mode~="atlas" and mode~="material_atlas" then
         error("Invalid MeshPart appearance mode "..mode,2)
@@ -181,9 +233,10 @@ function StudioTextureAppearance.ApplyVisual(mesh: MeshPart, settings: any, uri:
         if mesh.Material~=material or mesh.Color~=color then
             mesh.Material=material
             mesh.Color=color
-            return true
+            applied=true
         end
     end
+    StudioTextureAppearance.ApplyDistance(mesh, opts)
     return applied
 end
 

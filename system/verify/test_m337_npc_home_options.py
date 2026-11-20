@@ -63,11 +63,11 @@ class M337Tests(unittest.TestCase):
                                         'records': {source['spawnId']: source}}), encoding='utf-8')
             store = MonsterSpawnStore(root, None, None, None)
             out = (root / 'src/server/monster/MonsterSpawnRegistry.luau').read_text()
-            self.assertNotIn('homeRadiusStuds', out)
+            self.assertIn('homeRadiusStuds', out)
             first = store._fingerprint(source)
             second = store._fingerprint({**source, 'homeRadiusStuds': 120})
             self.assertEqual(first, second)  # changing leash does not stale marker
-            self.assertNotIn('homeRadiusStuds', store._core(source))
+            self.assertEqual(store._core(source)['homeRadiusStuds'], 110)
             self.assertEqual(store._core(source, npc=True)['homeRadiusStuds'], 110)
 
     def test_runtime_npc_conditions_and_ai_owner(self):
@@ -77,9 +77,9 @@ class M337Tests(unittest.TestCase):
         self.assertIn('distSq <= nameSq', client)
         self.assertIn('distSq <= hpSq', client)
         ai = (ROOT / 'src/server/monster/MonsterAIService.luau').read_text()
-        self.assertIn('GameOptions.MonsterNoDamageReturnSeconds()', ai)
+        self.assertIn('GameOptions.HostileNoDamageReturnSeconds()', ai)
         self.assertIn('onDamageDealt', ai)
-        self.assertIn('withinPursuitRadius(agent, targetRoot.Position)', ai)
+        self.assertIn('outsideHome(agent, targetRoot.Position)', ai)
         self.assertIn('agent.returning then', ai)
         self.assertIn('if not aggressive(agent) and not agent.retaliating and not agent.returning', ai)
 
@@ -88,7 +88,7 @@ class M337Tests(unittest.TestCase):
         self.assertEqual(html.count('class="game1-option-section"'), 6)
         for key in ('option-combat-state-duration', 'health-ui-fields', 'option-camera-save',
                     'option-npc-device', 'option-monster-return-time', 'option-published-debug-buttons',
-                    'monster-behavior-pursuit-radius', 'npc-spawn-home-radius'):
+                    'monster-spawn-home-radius', 'npc-spawn-home-radius'):
             self.assertIn(f'id="{key}"', html)
 
 

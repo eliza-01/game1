@@ -144,7 +144,7 @@ class AtlasRegistry:
                     published_id TEXT, published_sha256 TEXT NOT NULL DEFAULT '',
                     moderation_state TEXT NOT NULL DEFAULT '',
                     published_at REAL, created_at REAL NOT NULL,
-                    UNIQUE(family_id,width,height));
+                    retired_at REAL);
                 CREATE TABLE IF NOT EXISTS texture_atlas_replacements (
                     variant_id INTEGER PRIMARY KEY REFERENCES texture_atlas_variants(id),
                     source_path TEXT NOT NULL, source_sha256 TEXT NOT NULL,
@@ -201,6 +201,11 @@ class AtlasRegistry:
                 revision INTEGER NOT NULL,
                 changed_at REAL NOT NULL)''')
 
+        # A retired atlas must remain immutable, but retiring its last active
+        # resolution must not reserve that name forever. The original UNIQUE
+        # constraint was unconditional; migrate it to an active-only index.
+        self._enable_retired_key_reuse()
+
         # M234: a consumer may offer several published atlases, but exactly
         # one remains the active Studio/runtime binding. Preserve existing IDs.
         with self.connect() as db:
@@ -215,6 +220,59 @@ class AtlasRegistry:
                 variant_id INTEGER NOT NULL REFERENCES texture_atlas_variants(id),
                 added_at REAL NOT NULL,
                 PRIMARY KEY (consumer_type,consumer_id,variant_id))""")
+
+    def _enable_retired_key_reuse(self) -> None:
+        index_name = 'ux_texture_atlas_active_resolution'
+        with _UPLOAD_LOCK:
+            with self.connect() as db:
+                indexes = db.execute('PRAGMA index_list(texture_atlas_variants)').fetchall()
+                legacy_unique = any(row['unique'] and row['origin'] == 'u'
+                                    for row in indexes)
+                if not legacy_unique:
+                    db.execute(f'''CREATE UNIQUE INDEX IF NOT EXISTS {index_name}
+                        ON texture_atlas_variants(family_id,width,height)
+                        WHERE retired_at IS NULL''')
+                    return
+                # Rebuilding a referenced SQLite table requires disabling FKs
+                # on this connection outside a transaction. Preserve an online
+                # backup before touching historical publication/consumer rows.
+                backup_dir = self.db.parent / 'backups'
+                backup_dir.mkdir(parents=True, exist_ok=True)
+                with connect_sqlite(backup_dir / ('before_atlas_key_reuse_m392_' + uuid.uuid4().hex + '.db')) as backup:
+                    db.backup(backup)
+            with self.connect() as db:
+                db.execute('PRAGMA foreign_keys=OFF')
+                try:
+                    db.execute('BEGIN IMMEDIATE')
+                    db.execute('''CREATE TABLE texture_atlas_variants_m392 (
+                        id INTEGER PRIMARY KEY,
+                        family_id INTEGER NOT NULL REFERENCES texture_atlas_families(id),
+                        width INTEGER NOT NULL CHECK(width>0),height INTEGER NOT NULL CHECK(height>0),
+                        filename TEXT NOT NULL,original_filename TEXT NOT NULL,
+                        source_path TEXT NOT NULL,source_sha256 TEXT NOT NULL,
+                        uses_alpha INTEGER NOT NULL,published_id TEXT,
+                        published_sha256 TEXT NOT NULL DEFAULT '',
+                        moderation_state TEXT NOT NULL DEFAULT '',
+                        published_at REAL,created_at REAL NOT NULL,retired_at REAL)''')
+                    columns = ('id,family_id,width,height,filename,original_filename,'
+                               'source_path,source_sha256,uses_alpha,published_id,'
+                               'published_sha256,moderation_state,published_at,created_at,retired_at')
+                    db.execute(f'''INSERT INTO texture_atlas_variants_m392 ({columns})
+                        SELECT {columns} FROM texture_atlas_variants''')
+                    db.execute('DROP TABLE texture_atlas_variants')
+                    db.execute('ALTER TABLE texture_atlas_variants_m392 RENAME TO texture_atlas_variants')
+                    db.execute(f'''CREATE UNIQUE INDEX {index_name}
+                        ON texture_atlas_variants(family_id,width,height)
+                        WHERE retired_at IS NULL''')
+                    violations = db.execute('PRAGMA foreign_key_check').fetchall()
+                    if violations:
+                        raise ValueError('Atlas migration failed foreign-key validation; database unchanged')
+                    db.commit()
+                except Exception:
+                    db.rollback()
+                    raise
+                finally:
+                    db.execute('PRAGMA foreign_keys=ON')
 
     def connect(self):
         return connect_sqlite(self.db)
@@ -278,7 +336,7 @@ class AtlasRegistry:
             db.execute('BEGIN IMMEDIATE')
             row = db.execute('''SELECT v.id,v.source_sha256,v.published_id
                 FROM texture_atlas_variants v JOIN texture_atlas_families f ON f.id=v.family_id
-                WHERE f.atlas_key=? AND v.width=? AND v.height=?''',
+                WHERE f.atlas_key=? AND v.width=? AND v.height=? AND v.retired_at IS NULL''',
                 (atlas_key,width,height)).fetchone()
             if row:
                 if row['source_sha256'] != expected_sha256 or str(row['published_id']) != published_id:
@@ -547,11 +605,9 @@ class AtlasRegistry:
             with self.connect() as db:
                 existing = db.execute('''SELECT v.id,v.source_sha256,v.retired_at FROM texture_atlas_variants v
                     JOIN texture_atlas_families f ON f.id=v.family_id
-                    WHERE f.atlas_key=? AND v.width=? AND v.height=?''',
+                    WHERE f.atlas_key=? AND v.width=? AND v.height=? AND v.retired_at IS NULL''',
                     (key, width, height)).fetchone()
             if existing:
-                if existing['retired_at'] is not None:
-                    raise ValueError('this atlas resolution was retired; use a new atlas key')
                 if existing['source_sha256'] != sha:
                     raise ValueError(f'{key} {width}x{height}: another image exists; '
                                      'replace/republish explicitly in Atlas Registry')
@@ -576,11 +632,9 @@ class AtlasRegistry:
                            (parsed['atlasKey'], now))
                 family_id = db.execute('SELECT id FROM texture_atlas_families WHERE atlas_key=?',
                                        (parsed['atlasKey'],)).fetchone()[0]
-                existing = db.execute('SELECT id,source_sha256,retired_at FROM texture_atlas_variants WHERE family_id=? AND width=? AND height=?',
+                existing = db.execute('SELECT id,source_sha256,retired_at FROM texture_atlas_variants WHERE family_id=? AND width=? AND height=? AND retired_at IS NULL',
                                       (family_id, parsed['width'], parsed['height'])).fetchone()
                 if existing:
-                    if existing['retired_at'] is not None:
-                        raise ValueError('this atlas resolution was retired; use a new atlas key')
                     variant_id = existing['id']
                     claimed = db.execute('SELECT scope FROM texture_atlas_scopes WHERE variant_id=?',
                                          (variant_id,)).fetchone()
@@ -620,7 +674,13 @@ class AtlasRegistry:
                 directory.mkdir(parents=True, exist_ok=True)
                 destination = directory / parsed['filename']
                 if destination.exists() and digest(destination) != sha:
-                    raise ValueError('atlas source destination already has different pixels')
+                    # The old path belongs to a retired immutable variant.
+                    # Archive the NEW bytes under its content hash instead.
+                    directory = directory / 'revisions' / sha
+                    directory.mkdir(parents=True, exist_ok=True)
+                    destination = directory / parsed['filename']
+                    if destination.exists() and digest(destination) != sha:
+                        raise ValueError('atlas source checksum conflict')
                 if not destination.exists():
                     # Never overwrite a stored source, including on repeat registration.
                     shutil.copy2(path, destination)
@@ -763,7 +823,8 @@ class AtlasRegistry:
             # Deduplicate genuinely identical bytes, never by matching filename.
             with self.connect() as db:
                 ids = {r[0] for r in db.execute('''SELECT published_id FROM texture_atlas_variants
-                    WHERE source_sha256=? AND published_sha256=? AND published_id IS NOT NULL''', (new_sha,new_sha))}
+                    WHERE source_sha256=? AND published_sha256=? AND published_id IS NOT NULL
+                      AND retired_at IS NULL''', (new_sha,new_sha))}
                 ids |= {r[0] for r in db.execute('''SELECT image_asset_id
                     FROM texture_atlas_legacy_publications WHERE source_sha256=?''', (new_sha,))}
                 if len(ids) > 1:

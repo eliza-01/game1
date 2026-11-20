@@ -1,5 +1,6 @@
 -- Pure validation shared by server template staging and client visual ownership.
 -- Runtime marker is compiler-authored, not supplied by clients/remotes.
+local HttpService = game:GetService("HttpService")
 local Contract = {}
 Contract.Kind = "game1-location-visual-stream-v1"
 Contract.MarkerName = "Game1LocationRuntimeManifest"
@@ -7,6 +8,68 @@ Contract.TemplateFolder = "Game1LocationLodTemplates"
 Contract.VisualFolder = "Game1LocationClientVisuals"
 Contract.MaxPlacements = 5000
 Contract.MaxTargets = 64
+Contract.MaxChunks = 64
+Contract.ChunkBytes = 120000
+
+-- One compiler-owned marker for both inline and chunked Runtime payloads.
+-- Runs exactly once at startup; never rescans Workspace or duplicates a streamer.
+local function decodeJson(value)
+    local ok, decoded = pcall(HttpService.JSONDecode, HttpService, value)
+    if not ok or type(decoded) ~= "table" then
+        return nil, "invalid Runtime manifest JSON"
+    end
+    return decoded
+end
+
+function Contract.ReadManifest(marker)
+    if not marker or not marker:IsA("StringValue") then
+        return nil, "missing or invalid Runtime manifest marker"
+    end
+    local header, problem = decodeJson(marker.Value)
+    if not header then return nil, problem end
+    if header.transport == nil then
+        if #marker:GetChildren() ~= 0 then return nil, "unexpected inline manifest children" end
+        return header -- pre-M388a and small new Runtime drafts
+    end
+    local count = header.chunks
+    if header.transport ~= "chunked-v1" or type(count) ~= "number"
+        or count % 1 ~= 0 or count < 2 or count > Contract.MaxChunks
+        or type(header.bytes) ~= "number" or header.bytes % 1 ~= 0
+        or header.bytes <= 180000 or header.bytes > count * Contract.ChunkBytes
+        or type(header.sha256) ~= "string" or #header.sha256 ~= 64 then
+        return nil, "invalid Runtime manifest chunk descriptor"
+    end
+    local parts = table.create(count)
+    local deadline = os.clock() + 10 -- bounded startup replication grace period
+    for index = 1, count do
+        local name = string.format("Chunk%03d", index)
+        local valueObject = marker:FindFirstChild(name)
+        if not valueObject then
+            valueObject = marker:WaitForChild(name, math.max(0, deadline - os.clock()))
+        end
+        if not valueObject or not valueObject:IsA("StringValue") then
+            return nil, "missing Runtime manifest chunk " .. name
+        end
+        local value = valueObject.Value
+        while #value == 0 and os.clock() < deadline do
+            task.wait()
+            value = valueObject.Value
+        end
+        if #value == 0 or #value > Contract.ChunkBytes then
+            return nil, "invalid Runtime manifest chunk size " .. name
+        end
+        parts[index] = value
+    end
+    if #marker:GetChildren() ~= count then
+        return nil, "unexpected Runtime manifest chunk count"
+    end
+    local assembled = table.concat(parts)
+    if #assembled ~= header.bytes then
+        return nil, "Runtime manifest assembled byte length mismatch"
+    end
+    return decodeJson(assembled)
+end
+
 
 local function finite(value)
     return type(value) == "number" and value == value and math.abs(value) < 1000000000
@@ -33,15 +96,89 @@ function Contract.Variants(mode)
     return nil
 end
 
+
+local function paths(value, limit)
+    if type(value) ~= "table" or #value < 1 or #value > limit then return false end
+    for _, name in ipairs(value) do
+        if type(name) ~= "string" or #name == 0 or #name > 100 then return false end
+    end
+    return true
+end
+local function validHouseData(houses)
+    if type(houses) ~= "table" or type(houses.types) ~= "table"
+        or type(houses.placements) ~= "table" or #houses.placements < 1
+        or #houses.placements > Contract.MaxPlacements then
+        return false, "invalid house runtime data"
+    end
+    local profiles, count, ids = {}, 0, {}
+    for slug, profile in houses.types do
+        count += 1
+        if count > Contract.MaxTargets or type(slug) ~= "string"
+            or not slug:match("^house_level%d+_%d%d$") or type(profile) ~= "table"
+            or not (profile.mode == "full" or profile.mode == "lod1")
+            or type(profile.lod1) ~= "number" or type(profile.hide) ~= "number"
+            or type(profile.hysteresis) ~= "number" or profile.lod1 < 20
+            or profile.lod1 >= profile.hide or profile.hide > 10000
+            or profile.hysteresis < 0 or profile.hysteresis > 100
+            or profile.lod1 <= profile.hysteresis
+            or profile.hide - profile.lod1 <= 2 * profile.hysteresis
+            or (profile.mode == "lod1" and
+                (not tonumber(profile.lod1ModelAssetId) or tonumber(profile.lod1ModelAssetId) <= 0))
+            or type(profile.parts) ~= "table" or #profile.parts < 1 or #profile.parts > 100 then
+            return false, "invalid house streaming profile: " .. tostring(slug)
+        end
+        local names = {}
+        for _, part in ipairs(profile.parts) do
+            if type(part) ~= "table" or type(part.name) ~= "string" or names[part.name]
+                or not paths(part.path, 12) or not numbers(part.cframe, 12, false)
+                or not numbers(part.size, 3, true) or not tonumber(part.meshId)
+                or type(part.distance) ~= "number" or part.distance < 20
+                or part.distance > 10000 or part.distance ~= math.floor(part.distance)
+                or type(part.moving) ~= "boolean" or type(part.alpha) ~= "boolean"
+                or type(part.doubleSided) ~= "boolean"
+                or not (part.mode == "material" or part.mode == "atlas"
+                    or part.mode == "material_atlas")
+                or type(part.material) ~= "string" or type(part.color) ~= "string"
+                or (part.mode ~= "material" and not tonumber(part.textureId)) then
+                return false, "invalid house visual descriptor"
+            end
+            names[part.name] = true
+        end
+        profiles[slug] = true
+    end
+    if count == 0 then return false, "empty house type selection" end
+    for _, house in ipairs(houses.placements) do
+        if type(house) ~= "table" or not profiles[house.slug]
+            or type(house.plotIndex) ~= "number" or house.plotIndex % 1 ~= 0
+            or house.plotIndex < 1 or house.plotIndex > 50
+            or not paths(house.path, 12) or not numbers(house.pivot, 12, false)
+            or not finite(house.scale) or house.scale <= 0 or house.scale > 1000 then
+            return false, "invalid house placement"
+        end
+        local identity = house.slug .. ":" .. tostring(house.plotIndex)
+        if ids[identity] then return false, "duplicate house Plot placement" end
+        ids[identity] = true
+    end
+    return true
+end
 function Contract.Validate(manifest, registry)
     if type(manifest) ~= "table" or manifest.kind ~= Contract.Kind
-        or manifest.schemaVersion ~= 2 or manifest.publishAllowed ~= false
+        or (manifest.schemaVersion ~= 2 and manifest.schemaVersion ~= 3) or manifest.publishAllowed ~= false
         or type(manifest.placements) ~= "table" or not distancesValid(manifest.distances)
-        or #manifest.placements < 1 or #manifest.placements > Contract.MaxPlacements
+        or #manifest.placements > Contract.MaxPlacements
         or type(manifest.targets) ~= "table"
-        or #manifest.targets < 1 or #manifest.targets > Contract.MaxTargets
+        or #manifest.targets > Contract.MaxTargets
         or type(manifest.modes) ~= "table" then
         return false, "invalid runtime manifest envelope"
+    end
+    if manifest.schemaVersion == 3 then
+        local okay, why = validHouseData(manifest.houses)
+        if not okay then return false, why end
+    elseif #manifest.targets == 0 or #manifest.placements == 0 or manifest.houses ~= nil then
+        return false, "legacy runtime manifest needs Location placements only"
+    end
+    if #manifest.targets == 0 and #manifest.placements > 0 then
+        return false, "Location placements without Location targets"
     end
     local allowed = {}
     for _, slug in ipairs(manifest.targets) do
@@ -72,6 +209,27 @@ function Contract.Validate(manifest, registry)
             or not numbers(row.cframe, 12, false)
             or not numbers(row.size, 3, true) then
             return false, "invalid/duplicate placement entry"
+        end
+        if row.components ~= nil then
+            if type(row.components) ~= "table" or #row.components < 1
+                or #row.components > 64 or not paths(row.modelPath, 16) then
+                return false, "invalid composite Location model path"
+            end
+            local names = {}
+            for _, component in ipairs(row.components) do
+                if type(component) ~= "table" or type(component.name) ~= "string"
+                    or #component.name == 0 or names[component.name]
+                    or type(component.meshId) ~= "string"
+                    or not component.meshId:match("^[1-9]%d*$")
+                    or not numbers(component.cframe,12,false)
+                    or not numbers(component.size,3,true)
+                    or type(component.collidable) ~= "boolean" then
+                    return false, "invalid composite Location visual"
+                end
+                names[component.name] = true
+            end
+        elseif row.modelPath ~= nil then
+            return false, "Location model path without components"
         end
         ids[row.id], used[row.slug] = true, true
     end

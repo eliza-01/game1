@@ -115,7 +115,7 @@ local function spawnOne(state: any): boolean
     local profile = (NpcAnimationRegistry.profiles or {})[slug]
     NpcAnimationRigBinding.Align(visual, slug, profile, weaponSet)
     entity:SetAttribute("SpawnId", tostring(record.spawnId or ""))
-    entity:SetAttribute("NpcHomeRadiusStuds", math.clamp(finite(record.homeRadiusStuds, finite((definition.behavior or {}).pursuitRadiusStuds, 16)), 1, 10000))
+    entity:SetAttribute("NpcHomeRadiusStuds", math.clamp(finite(record.homeRadiusStuds, 16), 1, 10000))
     entity:SetAttribute("Damageable", true)
     entity:SetAttribute("LifeState", "Alive")
     entity:SetAttribute("InCombat", false)
@@ -133,7 +133,15 @@ local function spawnOne(state: any): boolean
     local presentation = NpcAnimationService.Create(entity, visual, profile)
     local entry = { root = root, visual = visual, presentation = presentation, dying = false }
     state.instances[entity] = entry
-    NpcCombatAIService.Bind(entity, root, presentation)
+    NpcCombatAIService.Bind(entity, root, presentation, function()
+        -- Do not use the death/respawn delay for a leash violation. Release
+        -- every rig/hitbox/animation resource and refill the one occupied slot.
+        if state.instances[entity] ~= entry then return end
+        release(state, entity, false)
+        task.defer(function()
+            if state.active then state.fill() end
+        end)
+    end)
     entity:GetAttributeChangedSignal("LifeState"):Connect(function()
         if state.instances[entity] ~= entry then
             return

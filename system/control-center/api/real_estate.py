@@ -43,6 +43,11 @@ def read(parsed, sources):
             return 200, {'history': sources['real_estate'].collision_blueprint_history(slug, limit)}
         except ValueError as error:
             return 400, {'error': str(error)}
+    if parsed.path.startswith('/api/real-estate/') and parsed.path.endswith('/lod1-history'):
+        slug = unquote(parsed.path[len('/api/real-estate/'):-len('/lod1-history')].strip('/'))
+        if not HOUSE_NAME.fullmatch(slug):
+            return 400, {'error': 'invalid house type'}
+        return 200, {'history': sources['real_estate'].lod1_history(slug)}
     if parsed.path.startswith('/api/real-estate/') and parsed.path.endswith('/publication-job'):
         slug = unquote(parsed.path[len('/api/real-estate/'):-len('/publication-job')].strip('/'))
         return 200, {'job': sources['real_estate_publications'].get(slug)}
@@ -57,6 +62,25 @@ def write(path, body, deps):
         return None
     store = deps['real_estate']
     try:
+        if path.startswith('/api/real-estate/') and path.endswith('/runtime-profile'):
+            slug = unquote(path[len('/api/real-estate/'):-len('/runtime-profile')].strip('/'))
+            payload = body()
+            if not HOUSE_NAME.fullmatch(slug) or not isinstance(payload, dict) or set(payload) != {'profile','expectedRevision'}:
+                raise ValueError('invalid house runtime profile request')
+            return 200, {'profile': store.save_runtime_profile(slug, payload['profile'], payload['expectedRevision'])}
+        if path.startswith('/api/real-estate/') and path.endswith('/lod1-stage'):
+            slug = unquote(path[len('/api/real-estate/'):-len('/lod1-stage')].strip('/'))
+            payload = body()
+            if not HOUSE_NAME.fullmatch(slug) or not isinstance(payload, dict) or set(payload) != {'sourcePath','expectedRevision'}:
+                raise ValueError('invalid House LOD1 registration request')
+            return 200, {'lod1': store.stage_lod1(slug, payload['sourcePath'], payload['expectedRevision'])}
+        if path.startswith('/api/real-estate/') and path.endswith('/lod1-publish'):
+            slug = unquote(path[len('/api/real-estate/'):-len('/lod1-publish')].strip('/'))
+            payload = body()
+            if not HOUSE_NAME.fullmatch(slug) or not isinstance(payload, dict) or set(payload) != {'expectedRevision','description'}:
+                raise ValueError('invalid House LOD1 publication request')
+            credentials = deps['publication_credentials'](str(payload['description']))
+            return 200, {'lod1': store.publish_lod1(slug, payload['expectedRevision'], credentials)}
         if path.startswith('/api/real-estate/') and path.endswith('/collision-studio'):
             slug = unquote(path[len('/api/real-estate/'):-len('/collision-studio')].strip('/'))
             payload = body()

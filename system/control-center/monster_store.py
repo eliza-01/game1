@@ -37,15 +37,12 @@ DEFAULT_STATS = {
 DEFAULT_BEHAVIOR = {
     "aggressive": False,
     "aggroRadiusStuds": 16.0,
-    "pursuitRadiusStuds": 150.0,
     "attackRadiusStuds": 3.0,
     "riseFromGround": False,
 }
 NPC_DEFAULT_BEHAVIOR = {
     "retaliateWhenAttacked": False,
-    "pursuitRadiusStuds": 16.0,
     "attackRadiusStuds": 3.0,
-    "returnDelaySeconds": 10.0,
 }
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_]{0,63}$")
 
@@ -168,8 +165,6 @@ class MonsterStore:
                 behavior_columns = {row[1] for row in connection.execute("PRAGMA table_info(monster_behavior)")}
                 if "rise_from_ground" not in behavior_columns:
                     connection.execute("ALTER TABLE monster_behavior ADD COLUMN rise_from_ground INTEGER NOT NULL DEFAULT 0")
-                if "pursuit_radius_studs" not in behavior_columns:
-                    connection.execute("ALTER TABLE monster_behavior ADD COLUMN pursuit_radius_studs REAL NOT NULL DEFAULT 150")
             if self.kind == "npc":
                 behavior_columns = {row[1] for row in connection.execute("PRAGMA table_info(monster_behavior)")}
                 if "retaliate_when_attacked" not in behavior_columns:
@@ -177,8 +172,6 @@ class MonsterStore:
                     # Legacy 'aggressive' was an opt-in. Migrate the opt-in but
                     # never retain proximity-based, unsolicited aggression.
                     connection.execute("UPDATE monster_behavior SET retaliate_when_attacked = aggressive")
-                if "return_delay_seconds" not in behavior_columns:
-                    connection.execute("ALTER TABLE monster_behavior ADD COLUMN return_delay_seconds REAL NOT NULL DEFAULT 10")
 
     @staticmethod
     def _sha256(path: Path) -> str:
@@ -187,6 +180,21 @@ class MonsterStore:
             for chunk in iter(lambda: stream.read(1024 * 1024), b""):
                 digest.update(chunk)
         return digest.hexdigest()
+
+    def former_spawn_leash_for_migration(self, slug: str) -> float:
+        """Read retired species radius only to migrate old spawn records once.
+
+        This value is never used by the live AI or new actor registrations.
+        """
+        column = "aggro_radius_studs" if self.kind == "npc" else "pursuit_radius_studs"
+        with self.connect() as connection:
+            columns = {row[1] for row in connection.execute("PRAGMA table_info(monster_behavior)")}
+            row = (connection.execute(
+                f"SELECT {column} FROM monster_behavior WHERE monster_slug=?", (slug,)
+            ).fetchone() if column in columns else None)
+        default = 16.0 if self.kind == "npc" else 150.0
+        value = float(row[column]) if row else default
+        return value if math.isfinite(value) and 1 <= value <= 10000 else default
 
     def options(self) -> dict:
         return {
@@ -199,26 +207,23 @@ class MonsterStore:
         if self.kind == "npc":
             result = dict(NPC_DEFAULT_BEHAVIOR)
             row = connection.execute(
-                "SELECT retaliate_when_attacked,aggro_radius_studs,attack_radius_studs,return_delay_seconds "
+                "SELECT retaliate_when_attacked,attack_radius_studs "
                 "FROM monster_behavior WHERE monster_slug=?", (slug,),
             ).fetchone()
             if row:
                 result.update(
                     retaliateWhenAttacked=bool(row["retaliate_when_attacked"]),
-                    pursuitRadiusStuds=float(row["aggro_radius_studs"]),
                     attackRadiusStuds=float(row["attack_radius_studs"]),
-                    returnDelaySeconds=float(row["return_delay_seconds"]),
                 )
             return result
         result = dict(DEFAULT_BEHAVIOR)
         row = connection.execute(
-            "SELECT aggressive,aggro_radius_studs,attack_radius_studs,rise_from_ground,pursuit_radius_studs FROM monster_behavior WHERE monster_slug=?",
+            "SELECT aggressive,aggro_radius_studs,attack_radius_studs,rise_from_ground FROM monster_behavior WHERE monster_slug=?",
             (slug,),
         ).fetchone()
         if row:
             result["aggressive"] = bool(row["aggressive"])
             result["aggroRadiusStuds"] = float(row["aggro_radius_studs"])
-            result["pursuitRadiusStuds"] = float(row["pursuit_radius_studs"])
             result["attackRadiusStuds"] = float(row["attack_radius_studs"])
             result["riseFromGround"] = bool(row["rise_from_ground"])
         return result
@@ -331,25 +336,17 @@ class MonsterStore:
             raw = incoming.get("retaliateWhenAttacked", previous.get("retaliateWhenAttacked", False))
             if isinstance(raw, str):
                 raw = raw.strip().lower() in {"1", "true", "yes", "on"}
-            radius = float(incoming.get("pursuitRadiusStuds", previous.get("pursuitRadiusStuds", 16)))
             attack = float(incoming.get("attackRadiusStuds", previous.get("attackRadiusStuds", 3)))
-            delay = float(incoming.get("returnDelaySeconds", previous.get("returnDelaySeconds", 10)))
-            if not all(math.isfinite(v) for v in (radius, attack, delay)) or radius < 0 or attack < 0 or delay < 0 or delay > 600:
-                raise ValueError("NPC pursuit/attack radius must be nonnegative and return delay must be within 0..600 seconds")
-            if abs(delay * 2 - round(delay * 2)) > 0.00001:
-                raise ValueError("NPC return delay must use 0.5-second steps")
-            return {"retaliateWhenAttacked": bool(raw), "pursuitRadiusStuds": radius,
-                    "attackRadiusStuds": attack, "returnDelaySeconds": delay}
+            if not math.isfinite(attack) or attack < 0:
+                raise ValueError("NPC attack radius must be finite and nonnegative")
+            return {"retaliateWhenAttacked": bool(raw), "attackRadiusStuds": attack}
         aggressive = incoming.get("aggressive", previous.get("aggressive", DEFAULT_BEHAVIOR["aggressive"]))
         if isinstance(aggressive, str):
             aggressive = aggressive.strip().lower() in {"1", "true", "yes", "on", "aggressive"}
         aggro_radius = float(incoming.get("aggroRadiusStuds", previous.get("aggroRadiusStuds", DEFAULT_BEHAVIOR["aggroRadiusStuds"])))
-        pursuit_radius = float(incoming.get("pursuitRadiusStuds", previous.get("pursuitRadiusStuds", DEFAULT_BEHAVIOR["pursuitRadiusStuds"])))
         attack_radius = float(incoming.get("attackRadiusStuds", previous.get("attackRadiusStuds", DEFAULT_BEHAVIOR["attackRadiusStuds"])))
         if not math.isfinite(aggro_radius) or not math.isfinite(attack_radius) or aggro_radius < 0 or attack_radius < 0:
             raise ValueError("monster aggro/attack radii must be finite and nonnegative")
-        if not math.isfinite(pursuit_radius) or not 1 <= pursuit_radius <= 10000:
-            raise ValueError("monster pursuit radius from spawn must be within 1..10000 studs")
         rise = incoming.get("riseFromGround", previous.get("riseFromGround", DEFAULT_BEHAVIOR["riseFromGround"]))
         if isinstance(rise, str):
             rise = rise.strip().lower() in {"1", "true", "yes", "on"}
@@ -357,7 +354,6 @@ class MonsterStore:
             "aggressive": bool(aggressive),
             "riseFromGround": bool(rise),
             "aggroRadiusStuds": aggro_radius,
-            "pursuitRadiusStuds": pursuit_radius,
             "attackRadiusStuds": attack_radius,
         }
 
@@ -427,14 +423,13 @@ class MonsterStore:
                 )
             if self.kind == "npc":
                 connection.execute(
-                    "INSERT OR REPLACE INTO monster_behavior(monster_slug,aggressive,aggro_radius_studs,attack_radius_studs,retaliate_when_attacked,return_delay_seconds) VALUES(?,?,?,?,?,?)",
-                    (slug, 0, behavior["pursuitRadiusStuds"], behavior["attackRadiusStuds"],
-                     int(behavior["retaliateWhenAttacked"]), behavior["returnDelaySeconds"]),
+                    "INSERT OR REPLACE INTO monster_behavior(monster_slug,aggressive,attack_radius_studs,retaliate_when_attacked) VALUES(?,?,?,?)",
+                    (slug, 0, behavior["attackRadiusStuds"], int(behavior["retaliateWhenAttacked"])),
                 )
             else:
                 connection.execute(
-                    "INSERT OR REPLACE INTO monster_behavior(monster_slug,aggressive,aggro_radius_studs,attack_radius_studs,rise_from_ground,pursuit_radius_studs) VALUES(?,?,?,?,?,?)",
-                    (slug, 1 if behavior["aggressive"] else 0, behavior["aggroRadiusStuds"], behavior["attackRadiusStuds"], int(behavior["riseFromGround"]), behavior["pursuitRadiusStuds"]),
+                    "INSERT OR REPLACE INTO monster_behavior(monster_slug,aggressive,aggro_radius_studs,attack_radius_studs,rise_from_ground) VALUES(?,?,?,?,?)",
+                    (slug, 1 if behavior["aggressive"] else 0, behavior["aggroRadiusStuds"], behavior["attackRadiusStuds"], int(behavior["riseFromGround"])),
                 )
 
             for raw in texture_paths:
@@ -632,12 +627,9 @@ class MonsterStore:
                 "\t\t\tbehavior = table.freeze({",
                 *([
                     f"\t\t\t\tretaliateWhenAttacked = {str(bool(row.get('behavior', {}).get('retaliateWhenAttacked'))).lower()},",
-                    f"\t\t\t\tpursuitRadiusStuds = {self._lua_number(row.get('behavior', {}).get('pursuitRadiusStuds', 16))},",
-                    f"\t\t\t\treturnDelaySeconds = {self._lua_number(row.get('behavior', {}).get('returnDelaySeconds', 10))},",
                 ] if self.kind == 'npc' else [
                     f"\t\t\t\taggressive = {str(bool(row.get('behavior', {}).get('aggressive'))).lower()},",
                     f"\t\t\t\taggroRadiusStuds = {self._lua_number(row.get('behavior', {}).get('aggroRadiusStuds', 16))},",
-                    f"\t\t\t\tpursuitRadiusStuds = {self._lua_number(row.get('behavior', {}).get('pursuitRadiusStuds', 150))},",
                     f"\t\t\t\triseFromGround = {str(bool(row.get('behavior', {}).get('riseFromGround', False))).lower()},",
                 ]),
                 f"\t\t\t\tattackRadiusStuds = {self._lua_number(row.get('behavior', {}).get('attackRadiusStuds', 3))},",

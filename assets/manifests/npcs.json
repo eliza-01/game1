@@ -18,9 +18,7 @@
     },
     "defaultBehavior": {
       "retaliateWhenAttacked": false,
-      "pursuitRadiusStuds": 16.0,
-      "attackRadiusStuds": 3.0,
-      "returnDelaySeconds": 10.0
+      "attackRadiusStuds": 3.0
     }
   },
   "items": [
@@ -141,9 +139,7 @@
       },
       "behavior": {
         "retaliateWhenAttacked": true,
-        "pursuitRadiusStuds": 33.0,
-        "attackRadiusStuds": 8.0,
-        "returnDelaySeconds": 10.0
+        "attackRadiusStuds": 8.0
       },
       "status": "PUBLISHED",
       "publicationUpgradeAvailable": true,
@@ -199,9 +195,7 @@
       },
       "behavior": {
         "retaliateWhenAttacked": true,
-        "pursuitRadiusStuds": 70.0,
-        "attackRadiusStuds": 7.0,
-        "returnDelaySeconds": 5.0
+        "attackRadiusStuds": 7.0
       },
       "status": "PUBLISHED",
       "publicationUpgradeAvailable": true,
@@ -257,9 +251,7 @@
       },
       "behavior": {
         "retaliateWhenAttacked": true,
-        "pursuitRadiusStuds": 150.0,
-        "attackRadiusStuds": 7.0,
-        "returnDelaySeconds": 5.0
+        "attackRadiusStuds": 7.0
       },
       "status": "PUBLISHED",
       "publicationUpgradeAvailable": true,

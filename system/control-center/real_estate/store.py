@@ -30,6 +30,8 @@ from services.texture_atlas_registry import AtlasRegistry, parse_filename, atlas
 from services.atlas_identity import display_identity
 from services import mesh_visual_appearance as appearance
 from services import location_collision_blueprint as collision_blueprints
+from services import house_lod_resource as house_lod
+from services import house_runtime_profile as house_policy
 
 
 def glass_default(part: str) -> bool:
@@ -51,6 +53,13 @@ def mesh_options(parts, raw: dict | None, legacy_atlases=()) -> dict:
         glass = entry.get('glass')
         no_collide = entry.get('noCollide')
         destructible = entry.get('destructible')
+        distance_streaming = entry.get('distanceStreaming', part == 'window_frames_glass')
+        if type(distance_streaming) is not bool:
+            raise ValueError(f'{part}: distanceStreaming must be boolean')
+        load_distance = entry.get('loadDistanceStuds', 50)
+        if (type(load_distance) not in (float, int) or not 20 <= load_distance <= 1000
+                or not float(load_distance).is_integer()):
+            raise ValueError(f'{part}: loadDistanceStuds must be an integer from 20 to 1000')
         effective_no_collide = no_collide if type(no_collide) is bool else default_no_collide(part)
         mode = entry.get('appearanceMode', 'atlas' if part in legacy_atlases else 'material')
         # One shared Material + Color validator for Real Estate and Location Assets.
@@ -77,6 +86,8 @@ def mesh_options(parts, raw: dict | None, legacy_atlases=()) -> dict:
             ),
             'doubleSided': entry['doubleSided'] if type(entry.get('doubleSided')) is bool else False,
             'destructible': destructible if type(destructible) is bool else False,
+            'distanceStreaming': distance_streaming,
+            'loadDistanceStuds': int(load_distance),
         }
     return result
 
@@ -136,6 +147,7 @@ class RealEstateStore:
                 db.execute("UPDATE real_estate SET model_published_hash=model_sha256 "
                            "WHERE model_asset_id != '' AND model_published_hash != ''")
                 db.execute('PRAGMA user_version = 2')
+        house_lod.ensure_schema(self)
         self._index_legacy_texture_publications()
         # One-way ownership upgrade. Fail closed on unresolved source data:
         # never admit new owner-based writes in an incompletely migrated DB.
@@ -293,6 +305,8 @@ class RealEstateStore:
                 self.atlases.binding('real_estate', f"{row['slug']}:{part}")
                 or (old_textures.get(part) or {}).get('assetId')}
             row['meshOptions'] = mesh_options(active, raw_options, bound_parts)
+            row['lod1'] = house_lod.describe(self, row['slug'])
+            row['runtimeProfile'] = house_lod.profile(self, row['slug'])
             # Legacy records may still store door assets after the FBX is
             # replaced with a doorless house; they are publication history,
             # not active resources for the current template.
@@ -316,8 +330,21 @@ class RealEstateStore:
                              'LOCAL_ONLY' if not any(row['rigAssets'].get(p,{}).get('assetId') for p in (*active, 'rig_carrier'))
                              and not any(row['textures'][part].get('assetId') for part in active)
                              else 'UPDATE_AVAILABLE')
+            row['runtimeReadiness'] = house_policy.readiness(row, row['runtimeProfile'], row['lod1'])
             result.append(row)
         return result
+
+    def stage_lod1(self, slug: str, source_path: str, expected_revision: int) -> dict:
+        return house_lod.stage(self, slug, source_path, expected_revision)
+
+    def publish_lod1(self, slug: str, expected_revision: int, credentials: dict) -> dict:
+        return house_lod.publish(self, slug, expected_revision, credentials)
+
+    def save_runtime_profile(self, slug: str, profile: dict, expected_revision: int) -> dict:
+        return house_lod.save_profile(self, slug, profile, expected_revision)
+
+    def lod1_history(self, slug: str) -> list[dict]:
+        return house_lod.history(self, slug)
 
     def collision_blueprint(self, slug: str) -> dict | None:
         return collision_blueprints.latest(self, slug, domain='house')

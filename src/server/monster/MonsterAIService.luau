@@ -10,6 +10,7 @@ local AttackExecutor = require(script.Parent:WaitForChild("MonsterAttackExecutor
 local Navigation = require(script.Parent:WaitForChild("MonsterChaseNavigation"))
 local Lifecycle = require(script.Parent:WaitForChild("MonsterAgentLifecycle"))
 local DamageSignals = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("ActorDamageSignals"))
+local HomeLeash = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorHomeLeash"))
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local GameOptions = require(ReplicatedStorage:WaitForChild("Game1Shared"):WaitForChild("GameOptions"))
@@ -43,7 +44,7 @@ local function leaveCombat(agent: any)
     CombatState.ClearTarget(agent)
     agent.retaliating = false
     agent.returning = false
-    agent.lastDealtDamageAt = 0
+    agent.lastDamageAt = 0
     agent.attacking = false
     agent.attackSerial += 1
     AttackExecutor.ClearPursuit(agent)
@@ -81,8 +82,8 @@ local function updateReturn(agent: any)
     navigateTo(agent, home, runSpeedStuds(agent))
 end
 
-local function withinPursuitRadius(agent: any, position: Vector3): boolean
-    return horizontalDistance(agent.spawnCenter, position) <= agent.pursuitRadius
+local function outsideHome(agent: any, position: Vector3): boolean
+    return HomeLeash.Outside(agent.spawnCenter, position, agent.homeRadius)
 end
 
 local function updateTarget(agent: any, now: number)
@@ -96,14 +97,16 @@ end
 
 -- Server-authoritative retaliation edge, independent of the periodic proximity
 -- scan. This is an aggro transition; the authored Hit event still owns damage.
-local function onDamaged(attacker: Model?, monster: Model, attempted: number, _applied: number, killed: boolean)
+local function onDamaged(attacker: Model?, monster: Model, attempted: number, applied: number, killed: boolean)
     if attempted <= 0 or killed or not attacker or not Players:GetPlayerFromCharacter(attacker) then return end
     if not TargetPolicy.IsValid(attacker) or monster:GetAttribute("LifeState") ~= "Alive" then return end
     local agent = Lifecycle.Find(monster)
     if not agent or not agent.active then return end
     if agent.target ~= attacker or agent.returning then
         CombatState.Enter(agent, attacker)
-        agent.lastDealtDamageAt = os.clock()
+        agent.lastDamageAt = os.clock() -- New encounter starts an inactivity clock.
+    elseif applied > 0 then
+        agent.lastDamageAt = os.clock()
     end
     agent.returning = false
     agent.retaliating = true
@@ -148,11 +151,11 @@ local function runAgent(agent: any)
         updateTarget(agent, now)
         local target = agent.target
         if target then
-            if agent.lastDealtDamageAt <= 0 then agent.lastDealtDamageAt = now end
+            if agent.lastDamageAt <= 0 then agent.lastDamageAt = now end
             local targetRoot = rootOf(target)
-            if not withinPursuitRadius(agent, agent.root.Position)
-                or (targetRoot and not withinPursuitRadius(agent, targetRoot.Position))
-                or now - agent.lastDealtDamageAt >= GameOptions.MonsterNoDamageReturnSeconds() then
+            if outsideHome(agent, agent.root.Position)
+                or (targetRoot and outsideHome(agent, targetRoot.Position))
+                or HomeLeash.NoDamageTimeout(agent.lastDamageAt, now, GameOptions.HostileNoDamageReturnSeconds()) then
                 beginReturn(agent)
                 updateReturn(agent)
                 continue
@@ -182,13 +185,13 @@ local function runAgent(agent: any)
     Lifecycle.Release(agent)
 end
 
--- Only server-confirmed applied damage by this monster refreshes the timer.
+-- Confirmed damage in either direction refreshes combat activity.
 -- Taking damage during Return immediately re-engages via onDamaged above.
 local function onDamageDealt(attacker: Model?, target: Model, _attempted: number, applied: number)
     if not attacker or applied <= 0 or not Players:GetPlayerFromCharacter(target) then return end
     local agent = Lifecycle.Find(attacker)
     if agent and agent.active and agent.target == target then
-        agent.lastDealtDamageAt = os.clock()
+        agent.lastDamageAt = os.clock()
     end
 end
 

@@ -25,31 +25,407 @@
         "placeId": 0,
         "markerPath": "Workspace.Game1Authoring.NpcSpawns.Warsmith_6de4624d",
         "syncedAtUtc": "2026-10-20T19:59:14.307851Z"
-      }
+      },
+      "homeRadiusStuds": 70.0
     },
-    "spawn-6d0d624f98bd48aa8e3481326de059cb": {
-      "spawnId": "spawn-6d0d624f98bd48aa8e3481326de059cb",
+    "spawn-7b6f92b8a5734282b50bde01ef420933": {
+      "spawnId": "spawn-7b6f92b8a5734282b50bde01ef420933",
       "monsterSlug": "guard_02",
       "mapKey": "main",
       "placeId": 0,
       "position": {
-        "x": 433.173,
+        "x": 429.307,
         "y": -54.0,
-        "z": -300.534
+        "z": -302.937
       },
-      "yawDegrees": 334.65,
+      "yawDegrees": 309.3,
       "respawnSeconds": 10.0,
+      "homeRadiusStuds": 155.0,
       "enabled": true,
-      "createdAtUtc": "2026-11-18T16:52:06.446155Z",
-      "updatedAtUtc": "2026-11-18T18:02:20.571649Z",
-      "homeRadiusStuds": 30.0,
-      "placedAtUtc": "2026-11-18T16:51:43.451836Z",
+      "createdAtUtc": "2026-11-20T15:23:38.137456Z",
+      "updatedAtUtc": "2026-11-20T15:23:38.137456Z",
+      "placedAtUtc": "2026-11-20T15:23:33.235990Z",
       "studioSync": {
         "status": "synced",
-        "recordFingerprint": "f2f9fbc703904a0abe47703eda8b8e87e73474a4577e6723cb6256dd8438b30e",
+        "recordFingerprint": "3a2c1eb6f84440e6a35815a090a91c32773fca9d0a67b8bb21c9b9ad9cddb37d",
         "placeId": 0,
-        "markerPath": "Workspace.Game1Authoring.NpcSpawns.Guard_02_6d0d624f",
-        "syncedAtUtc": "2026-11-18T18:02:21.627352Z"
+        "markerPath": "Workspace.Game1Authoring.NpcSpawns.Guard_02_7b6f92b8",
+        "syncedAtUtc": "2026-11-20T15:23:39.185314Z"
+      }
+    },
+    "spawn-2057f9cd572c4a97b64d2b0d4191b6df": {
+      "spawnId": "spawn-2057f9cd572c4a97b64d2b0d4191b6df",
+      "monsterSlug": "guard_02",
+      "mapKey": "main",
+      "placeId": 0,
+      "position": {
+        "x": 448.949,
+        "y": -54.0,
+        "z": -271.439
+      },
+      "yawDegrees": 276.8,
+      "respawnSeconds": 10.0,
+      "homeRadiusStuds": 16.0,
+      "enabled": true,
+      "createdAtUtc": "2026-11-20T15:24:35.410371Z",
+      "updatedAtUtc": "2026-11-20T15:24:41.999657Z",
+      "placedAtUtc": "2026-11-20T15:24:31.005963Z",
+      "studioSync": {
+        "status": "synced",
+        "recordFingerprint": "0a5cfcaf6a3683dec3e055d9a34a4a6c68f057baeda577dae729721640032e15",
+        "placeId": 0,
+        "markerPath": "Workspace.Game1Authoring.NpcSpawns.Guard_02_2057f9cd",
+        "syncedAtUtc": "2026-11-20T15:24:43.038290Z"
+      }
+    },
+    "spawn-fd9fb3cd2cad496fbe7b525577186010": {
+      "spawnId": "spawn-fd9fb3cd2cad496fbe7b525577186010",
+      "monsterSlug": "guard_02",
+      "mapKey": "main",
+      "placeId": 0,
+      "position": {
+        "x": 493.902,
+        "y": -54.0,
+        "z": -286.009
+      },
+      "yawDegrees": 80.60000000000001,
+      "respawnSeconds": 10.0,
+      "homeRadiusStuds": 155.0,
+      "enabled": true,
+      "createdAtUtc": "2026-11-20T15:24:54.482355Z",
+      "updatedAtUtc": "2026-11-20T15:24:54.482355Z",
+      "placedAtUtc": "2026-11-20T15:24:52.070935Z",
+      "studioSync": {
+        "status": "synced",
+        "recordFingerprint": "acbc3e4dd2c93bfeb2b486ad3e1fb3a2b9ca10bbeaf0137f090368340336ff55",
+        "placeId": 0,
+        "markerPath": "Workspace.Game1Authoring.NpcSpawns.Guard_02_fd9fb3cd",
+        "syncedAtUtc": "2026-11-20T15:24:55.509271Z"
+      }
+    },
+    "spawn-55f48b6ba84c4f38834216f116e4624d": {
+      "spawnId": "spawn-55f48b6ba84c4f38834216f116e4624d",
+      "monsterSlug": "guard_02",
+      "mapKey": "main",
+      "placeId": 0,
+      "position": {
+        "x": 499.45,
+        "y": -54.0,
+        "z": -362.043
+      },
+      "yawDegrees": 172.25,
+      "respawnSeconds": 10.0,
+      "homeRadiusStuds": 155.0,
+      "enabled": true,
+      "createdAtUtc": "2026-11-20T15:25:20.623185Z",
+      "updatedAtUtc": "2026-11-20T15:25:20.623185Z",
+      "placedAtUtc": "2026-11-20T15:25:15.158075Z",
+      "studioSync": {
+        "status": "synced",
+        "recordFingerprint": "45aaa2d2f1e84fa60ac46ea6e67a21e18ca3825002ee1c03380c83947285acb5",
+        "placeId": 0,
+        "markerPath": "Workspace.Game1Authoring.NpcSpawns.Guard_02_55f48b6b",
+        "syncedAtUtc": "2026-11-20T15:25:21.648361Z"
+      }
+    },
+    "spawn-d582d298e8e24fdf9cdf82ab15bef060": {
+      "spawnId": "spawn-d582d298e8e24fdf9cdf82ab15bef060",
+      "monsterSlug": "guard_02",
+      "mapKey": "main",
+      "placeId": 0,
+      "position": {
+        "x": 515.469,
+        "y": -37.3,
+        "z": -272.781
+      },
+      "yawDegrees": 59.15,
+      "respawnSeconds": 10.0,
+      "homeRadiusStuds": 155.0,
+      "enabled": true,
+      "createdAtUtc": "2026-11-20T15:25:39.220129Z",
+      "updatedAtUtc": "2026-11-20T15:25:39.220129Z",
+      "placedAtUtc": "2026-11-20T15:25:36.781915Z",
+      "studioSync": {
+        "status": "synced",
+        "recordFingerprint": "b78786d7fd9f96b8189350a292c9f687a7647d2bf9dec95f661055ff34f56f54",
+        "placeId": 0,
+        "markerPath": "Workspace.Game1Authoring.NpcSpawns.Guard_02_d582d298",
+        "syncedAtUtc": "2026-11-20T15:25:40.263328Z"
+      }
+    },
+    "spawn-ca4fdf07d1b0468786d5d02d9cfb3f75": {
+      "spawnId": "spawn-ca4fdf07d1b0468786d5d02d9cfb3f75",
+      "monsterSlug": "guard_02",
+      "mapKey": "main",
+      "placeId": 0,
+      "position": {
+        "x": 499.069,
+        "y": -30.985,
+        "z": -228.453
+      },
+      "yawDegrees": 44.85,
+      "respawnSeconds": 10.0,
+      "homeRadiusStuds": 155.0,
+      "enabled": true,
+      "createdAtUtc": "2026-11-20T15:25:56.271451Z",
+      "updatedAtUtc": "2026-11-20T15:25:56.271451Z",
+      "placedAtUtc": "2026-11-20T15:25:54.654720Z",
+      "studioSync": {
+        "status": "synced",
+        "recordFingerprint": "3463a1d55bb92dea633522b0b70c899679a15237af53384bea6a7f1dff12efa9",
+        "placeId": 0,
+        "markerPath": "Workspace.Game1Authoring.NpcSpawns.Guard_02_ca4fdf07",
+        "syncedAtUtc": "2026-11-20T15:25:57.557940Z"
+      }
+    },
+    "spawn-26e619e3de32461881fa7c66d7e43b38": {
+      "spawnId": "spawn-26e619e3de32461881fa7c66d7e43b38",
+      "monsterSlug": "guard_02",
+      "mapKey": "main",
+      "placeId": 0,
+      "position": {
+        "x": 477.663,
+        "y": -34.021,
+        "z": -197.654
+      },
+      "yawDegrees": 55.9,
+      "respawnSeconds": 10.0,
+      "homeRadiusStuds": 155.0,
+      "enabled": true,
+      "createdAtUtc": "2026-11-20T15:26:11.577223Z",
+      "updatedAtUtc": "2026-11-20T15:26:11.577223Z",
+      "placedAtUtc": "2026-11-20T15:26:09.671513Z",
+      "studioSync": {
+        "status": "synced",
+        "recordFingerprint": "3c9dfeb0bfa189fe064acf47914a56550ae1fd730dd0c3c9d7e5126bc068b1eb",
+        "placeId": 0,
+        "markerPath": "Workspace.Game1Authoring.NpcSpawns.Guard_02_26e619e3",
+        "syncedAtUtc": "2026-11-20T15:26:12.619557Z"
+      }
+    },
+    "spawn-2a57dca9302741d2a5bc907a1d4bbf48": {
+      "spawnId": "spawn-2a57dca9302741d2a5bc907a1d4bbf48",
+      "monsterSlug": "guard_02",
+      "mapKey": "main",
+      "placeId": 0,
+      "position": {
+        "x": 454.87,
+        "y": -38.496,
+        "z": -167.608
+      },
+      "yawDegrees": 9.75,
+      "respawnSeconds": 10.0,
+      "homeRadiusStuds": 155.0,
+      "enabled": true,
+      "createdAtUtc": "2026-11-20T15:26:32.957385Z",
+      "updatedAtUtc": "2026-11-20T15:26:32.957385Z",
+      "placedAtUtc": "2026-11-20T15:26:25.693909Z",
+      "studioSync": {
+        "status": "synced",
+        "recordFingerprint": "39ae283d32aa08ca22b570d5196a743a4c2dc02ce62d187f67d38a66578ff83f",
+        "placeId": 0,
+        "markerPath": "Workspace.Game1Authoring.NpcSpawns.Guard_02_2a57dca9",
+        "syncedAtUtc": "2026-11-20T15:26:34.250059Z"
+      }
+    },
+    "spawn-3f790bd6429b4ffc82d4f9250bb607b9": {
+      "spawnId": "spawn-3f790bd6429b4ffc82d4f9250bb607b9",
+      "monsterSlug": "guard_02",
+      "mapKey": "main",
+      "placeId": 0,
+      "position": {
+        "x": 419.692,
+        "y": -46.0,
+        "z": -265.304
+      },
+      "yawDegrees": 354.15,
+      "respawnSeconds": 10.0,
+      "homeRadiusStuds": 155.0,
+      "enabled": true,
+      "createdAtUtc": "2026-11-20T15:26:55.080409Z",
+      "updatedAtUtc": "2026-11-20T15:26:55.080409Z",
+      "placedAtUtc": "2026-11-20T15:26:50.667572Z",
+      "studioSync": {
+        "status": "synced",
+        "recordFingerprint": "8a144dbf83959ab273271c1883b2cea6d02463b9b77bf5f88af665400d2056e4",
+        "placeId": 0,
+        "markerPath": "Workspace.Game1Authoring.NpcSpawns.Guard_02_3f790bd6",
+        "syncedAtUtc": "2026-11-20T15:26:56.103413Z"
+      }
+    },
+    "spawn-599470001c5c442280aba608ab788846": {
+      "spawnId": "spawn-599470001c5c442280aba608ab788846",
+      "monsterSlug": "guard_02",
+      "mapKey": "main",
+      "placeId": 0,
+      "position": {
+        "x": 397.212,
+        "y": -46.0,
+        "z": -267.826
+      },
+      "yawDegrees": 350.9,
+      "respawnSeconds": 10.0,
+      "homeRadiusStuds": 155.0,
+      "enabled": true,
+      "createdAtUtc": "2026-11-20T15:27:10.926835Z",
+      "updatedAtUtc": "2026-11-20T15:27:10.926835Z",
+      "placedAtUtc": "2026-11-20T15:27:09.033869Z",
+      "studioSync": {
+        "status": "synced",
+        "recordFingerprint": "ea46002dc9cbb549c2d53354f5c912ca5bdf0d59925d600b01c461271e40b7e2",
+        "placeId": 0,
+        "markerPath": "Workspace.Game1Authoring.NpcSpawns.Guard_02_59947000",
+        "syncedAtUtc": "2026-11-20T15:27:11.946855Z"
+      }
+    },
+    "spawn-ed46bac66d80443ca00bf6e3e41d08ab": {
+      "spawnId": "spawn-ed46bac66d80443ca00bf6e3e41d08ab",
+      "monsterSlug": "guard_02",
+      "mapKey": "main",
+      "placeId": 0,
+      "position": {
+        "x": 376.445,
+        "y": -54.0,
+        "z": -291.399
+      },
+      "yawDegrees": 41.6,
+      "respawnSeconds": 10.0,
+      "homeRadiusStuds": 155.0,
+      "enabled": true,
+      "createdAtUtc": "2026-11-20T15:27:20.294345Z",
+      "updatedAtUtc": "2026-11-20T15:27:20.294345Z",
+      "placedAtUtc": "2026-11-20T15:27:18.373513Z",
+      "studioSync": {
+        "status": "synced",
+        "recordFingerprint": "ad8d283d8739ab98449ca805e961d2618c41a949c31aaa53cce188cf9a3da823",
+        "placeId": 0,
+        "markerPath": "Workspace.Game1Authoring.NpcSpawns.Guard_02_ed46bac6",
+        "syncedAtUtc": "2026-11-20T15:27:21.321709Z"
+      }
+    },
+    "spawn-1ea636aae83c4715abaa11caf93bcfa6": {
+      "spawnId": "spawn-1ea636aae83c4715abaa11caf93bcfa6",
+      "monsterSlug": "guard_02",
+      "mapKey": "main",
+      "placeId": 0,
+      "position": {
+        "x": 317.182,
+        "y": -58.107,
+        "z": -266.9
+      },
+      "yawDegrees": 271.6,
+      "respawnSeconds": 10.0,
+      "homeRadiusStuds": 155.0,
+      "enabled": true,
+      "createdAtUtc": "2026-11-20T15:27:32.764335Z",
+      "updatedAtUtc": "2026-11-20T15:27:32.764335Z",
+      "placedAtUtc": "2026-11-20T15:27:29.815611Z",
+      "studioSync": {
+        "status": "synced",
+        "recordFingerprint": "6f977462c71ec118eb94273f810e994e9bcd21bf1d31efd1333e50de11f78a29",
+        "placeId": 0,
+        "markerPath": "Workspace.Game1Authoring.NpcSpawns.Guard_02_1ea636aa",
+        "syncedAtUtc": "2026-11-20T15:27:33.778653Z"
+      }
+    },
+    "spawn-e66c019d14254c2089612b6cd8454cad": {
+      "spawnId": "spawn-e66c019d14254c2089612b6cd8454cad",
+      "monsterSlug": "guard_02",
+      "mapKey": "main",
+      "placeId": 0,
+      "position": {
+        "x": 308.061,
+        "y": -37.369,
+        "z": -325.955
+      },
+      "yawDegrees": 280.05,
+      "respawnSeconds": 10.0,
+      "homeRadiusStuds": 155.0,
+      "enabled": true,
+      "createdAtUtc": "2026-11-20T15:28:11.016952Z",
+      "updatedAtUtc": "2026-11-20T15:28:11.016952Z",
+      "placedAtUtc": "2026-11-20T15:27:59.746596Z",
+      "studioSync": {
+        "status": "synced",
+        "recordFingerprint": "d3ee88f6c01131d72d781308fc0bf911f2b2bf90983cdaf4f2a19475b7dff38c",
+        "placeId": 0,
+        "markerPath": "Workspace.Game1Authoring.NpcSpawns.Guard_02_e66c019d",
+        "syncedAtUtc": "2026-11-20T15:28:12.313627Z"
+      }
+    },
+    "spawn-6cb48e9dc17b4adc912c23d8f1193cd2": {
+      "spawnId": "spawn-6cb48e9dc17b4adc912c23d8f1193cd2",
+      "monsterSlug": "guard_02",
+      "mapKey": "main",
+      "placeId": 0,
+      "position": {
+        "x": 311.167,
+        "y": -28.35,
+        "z": -365.147
+      },
+      "yawDegrees": 151.45000000000002,
+      "respawnSeconds": 10.0,
+      "homeRadiusStuds": 155.0,
+      "enabled": true,
+      "createdAtUtc": "2026-11-20T15:28:22.563755Z",
+      "updatedAtUtc": "2026-11-20T15:28:22.563755Z",
+      "placedAtUtc": "2026-11-20T15:28:20.679779Z",
+      "studioSync": {
+        "status": "synced",
+        "recordFingerprint": "020ef1d69d7060a12d82039ce0dca1285f3a90857ce9bd34799a3699faab0942",
+        "placeId": 0,
+        "markerPath": "Workspace.Game1Authoring.NpcSpawns.Guard_02_6cb48e9d",
+        "syncedAtUtc": "2026-11-20T15:28:23.325236Z"
+      }
+    },
+    "spawn-dad3d2edfa3141cb87df7c4e01f961c2": {
+      "spawnId": "spawn-dad3d2edfa3141cb87df7c4e01f961c2",
+      "monsterSlug": "guard_02",
+      "mapKey": "main",
+      "placeId": 0,
+      "position": {
+        "x": 510.51,
+        "y": -16.222,
+        "z": -202.759
+      },
+      "yawDegrees": 0.0,
+      "respawnSeconds": 10.0,
+      "homeRadiusStuds": 155.0,
+      "enabled": true,
+      "createdAtUtc": "2026-11-20T15:28:43.332485Z",
+      "updatedAtUtc": "2026-11-20T15:28:43.332485Z",
+      "placedAtUtc": "2026-11-20T15:28:40.486016Z",
+      "studioSync": {
+        "status": "synced",
+        "recordFingerprint": "a0a8f48c4bf1d3db4f10cc613c144f7f20fca3153c72558aed891414834e989b",
+        "placeId": 0,
+        "markerPath": "Workspace.Game1Authoring.NpcSpawns.Guard_02_dad3d2ed",
+        "syncedAtUtc": "2026-11-20T15:28:44.126037Z"
+      }
+    },
+    "spawn-3d32d138e4084d239ef44705aaf09204": {
+      "spawnId": "spawn-3d32d138e4084d239ef44705aaf09204",
+      "monsterSlug": "guard_02",
+      "mapKey": "main",
+      "placeId": 0,
+      "position": {
+        "x": 414.124,
+        "y": -54.0,
+        "z": -343.837
+      },
+      "yawDegrees": 182.0,
+      "respawnSeconds": 10.0,
+      "homeRadiusStuds": 155.0,
+      "enabled": true,
+      "createdAtUtc": "2026-11-20T15:29:03.798188Z",
+      "updatedAtUtc": "2026-11-20T15:29:03.798188Z",
+      "placedAtUtc": "2026-11-20T15:29:00.930309Z",
+      "studioSync": {
+        "status": "synced",
+        "recordFingerprint": "4d89a0253dcf9ac49c512d45e1b54b6643de53ffde85738758debd5020f9ac64",
+        "placeId": 0,
+        "markerPath": "Workspace.Game1Authoring.NpcSpawns.Guard_02_3d32d138",
+        "syncedAtUtc": "2026-11-20T15:29:04.844800Z"
       }
     }
   }

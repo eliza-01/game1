@@ -8,6 +8,7 @@ local Physics = require(script.Parent.StudioMeshPhysicsCore)
 local Published = require(script.Parent.StudioLocationPublishedGeometry)
 local Visual = require(script.Parent.StudioLocationVisualAppearance)
 local CarrierRig = require(script.Parent.StudioLocationRigCarrier)
+local PainterIntegrity = require(script.Parent.StudioLocationPainterIntegrity)
 local collisionModuleOk, Collision = pcall(require, script.Parent.StudioLocationCollisionParts)
 local Inventory = {}
 
@@ -264,7 +265,100 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
                         end
                     end
                 end
+                -- A LandscapePainter-owned attachment may receive APPEARANCE
+                -- updates only when its complete Mesh ID inventory proves the
+                -- published Location Asset. It never becomes a Deco placement.
+                local safeEntry=nil
+                if external.kind=="landscape_attachment" and visualSlug~=""
+                    and external.authorSlug==visualSlug then
+                    for _, owner in ipairs(candidate.owners) do
+                        if owner.slug==visualSlug then
+                            for _, version in ipairs(owner.models) do
+                                if History.MatchesInventory(external.model,version) then
+                                    safeEntry=owner
+                                    break
+                                end
+                            end
+                            break
+                        end
+                    end
+                end
+                -- Publication identity alone is insufficient: a Painter owner
+                -- may have a broken stem, missing tether or obsolete sway rig.
+                -- Appearance Sync must not silently present that as repaired.
+                local integrityReason=""
+                if safeEntry then
+                    local good,reason=PainterIntegrity.Check(external.model)
+                    local rigState=CarrierRig.Diagnose(external.model,
+                        safeEntry.rigManifest,safeEntry.legacyStaticPublication)
+                    if not good then
+                        integrityReason=reason
+                        safeEntry=nil
+                    elseif rigState~="current" then
+                        integrityReason="rig integrity: "..rigState
+                        safeEntry=nil
+                    end
+                end
+                local ownedVisuals={}
+                if safeEntry then
+                    for _,child in ipairs(external.model:GetDescendants()) do
+                        if child:IsA("MeshPart") and visual(child) then
+                            table.insert(ownedVisuals,child)
+                        end
+                    end
+                end
+                local pending=false
+                local physicsPending=false
+                local collisionPending=false
+                if safeEntry then
+                    for _,child in ipairs(ownedVisuals) do
+                        local opts=if type(safeEntry.meshOptions)=="table" then
+                            safeEntry.meshOptions[child.Name] else nil
+                        local noCollide=type(opts)=="table" and opts.noCollide==true
+                        if child.CanCollide==noCollide or child.CanQuery==noCollide
+                            or child.CanTouch then
+                            physicsPending=true
+                            break
+                        end
+                    end
+                    collisionPending=(safeEntry.collisionRevision==0
+                        and Collision.HasOwned(external.model))
+                        or not Collision.Current(external.model,safeEntry.collisionBlueprint,
+                            safeEntry.collisionRevision,safeEntry.collisionSha)
+                end
+                local needsOwnerCleanup=external.model:GetAttribute("Game1DecoInstanceId")~=nil
+                    or external.model:GetAttribute("Game1DecoAssetSlug")~=nil
+                if safeEntry then
+                    local row={appearanceMode=safeEntry.appearanceMode,
+                        visualMaterial=safeEntry.visualMaterial,visualColor=safeEntry.visualColor,
+                        texture_asset_id=safeEntry.atlas,alphaEnabled=safeEntry.alphaEnabled,
+                        meshOptions=safeEntry.meshOptions}
+                    for _,child in ipairs(ownedVisuals) do
+                        if not Visual.IsCurrent(child,row) then pending=true break end
+                    end
+                end
+                local externalKey="x"..tostring(#protected+1)
+                local canAppearanceSync=safeEntry~=nil and #ownedVisuals>0
+                if canAppearanceSync then
+                    local snapshots={}
+                    for _,child in ipairs(ownedVisuals) do snapshots[child]=state(child) end
+                    refs[externalKey]={external=true,part=part,root=external.model,
+                        integrity=PainterIntegrity.Capture(external.model),
+                        priorDecoInstanceId=external.model:GetAttribute("Game1DecoInstanceId"),
+                        priorDecoSlug=external.model:GetAttribute("Game1DecoAssetSlug"),
+                        placement=external.model,rootParent=external.model.Parent,
+                        rootPivot=external.model:GetPivot(),rootPrimary=external.model.PrimaryPart,
+                        entry=safeEntry,visuals=ownedVisuals,meshStates=snapshots,
+                        row={key=externalKey,canSync=pending or needsOwnerCleanup or physicsPending or collisionPending,
+                            needsTexture=pending,needsCollision=collisionPending,
+                            needsPhysics=physicsPending,needsOwnerCleanup=needsOwnerCleanup}}
+                end
                 table.insert(protected,{
+                    key=if canAppearanceSync then externalKey else "",
+                    canSync=canAppearanceSync and (pending or needsOwnerCleanup or physicsPending or collisionPending),
+                    needsTexture=pending,needsCollision=canAppearanceSync and collisionPending,
+                    needsPhysics=canAppearanceSync and physicsPending,
+                    needsOwnerCleanup=canAppearanceSync and needsOwnerCleanup,
                     kind=external.kind,slug=visualSlug,
                     path=external.model:GetFullName(),name=external.model.Name,
                     ownerPath=external.model:GetFullName(),
@@ -275,9 +369,14 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
                     reason=if external.kind=="unmanaged_package" then "PackageLink · not a DecoManager placement"
                         elseif external.kind=="landscape_structure" then "LandscapePainter branch geometry"
                         elseif external.authorSlug~=visualSlug then "LandscapePainter asset slug differs from published Mesh ID"
+                        elseif integrityReason~="" then integrityReason
+                        elseif not safeEntry then "LandscapePainter published Mesh inventory not verified"
+                        elseif collisionPending then "LandscapePainter · registered collision requires Sync"
+                        elseif physicsPending then "LandscapePainter · MeshPart collision policy requires Sync"
+                        elseif needsOwnerCleanup then "LandscapePainter · remove retired DecoManager owner stamps"
                         else "LandscapePainter authored attachment",
                     review=external.kind=="unmanaged_package" or external.kind=="landscape_structure"
-                        or external.authorSlug=="" or external.authorSlug~=visualSlug,
+                        or external.authorSlug=="" or external.authorSlug~=visualSlug or not safeEntry,
                     protectedFromRuntime=true,
                 })
             end
@@ -363,9 +462,11 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
         local needsRecapture = eligible and entry.collisionRevision > 0
             and (type(entry.collisionBlueprint) ~= "table"
                 or entry.collisionBlueprint.schemaVersion ~= 2)
-        local needsCollision = eligible and entry.collisionRevision > 0
-            and (root == nil or needsRecapture
-                or not Collision.Current(root,entry.collisionBlueprint,entry.collisionRevision,entry.collisionSha))
+        local needsCollision = eligible and ((entry.collisionRevision == 0
+            and root ~= nil and Collision.HasOwned(root))
+            or (entry.collisionRevision > 0
+                and (root == nil or needsRecapture
+                    or not Collision.Current(root,entry.collisionBlueprint,entry.collisionRevision,entry.collisionSha))))
         local needsReplacement = eligible and structuralState ~= "current"
             and not requiresRepublish and not needsInspection
         if eligible and structuralState == "legacy_import_root" then
@@ -396,6 +497,8 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
         if needsMaterial then warn("Звуковой материал требует Sync: "..entry.material) end
         if needsRecapture then
             warn("Collision Blueprint старого формата: повторите Validate / Capture авторских Parts перед Sync")
+        elseif needsCollision and entry.collisionRevision==0 then
+            warn("Старая коллизия будет удалена при Sync; для новой модели нужен Capture")
         elseif needsCollision then
             warn("Collision Blueprint требует Sync: отсутствует или изменён; ревизия "..tostring(entry.collisionRevision))
         end
@@ -541,6 +644,40 @@ end
 
 function Inventory.Validate(ref: any): boolean
     if not collisionModuleOk then return false end
+    if ref and ref.external then
+        local root=ref.root
+        if root:GetAttribute("Game1DecoInstanceId")~=ref.priorDecoInstanceId
+            or root:GetAttribute("Game1DecoAssetSlug")~=ref.priorDecoSlug then return false end
+        local stable,reason=pcall(PainterIntegrity.AssertUnchanged,ref.integrity)
+        if not stable then return false end
+        if not root or root.Parent~=ref.rootParent or root.PrimaryPart~=ref.rootPrimary
+            or root:GetPivot()~=ref.rootPivot or not ref.part:IsDescendantOf(root) then return false end
+        local owner=ExternalOwners.ForPart(ref.part,workspace)
+        if not owner or owner.kind~="landscape_attachment" or owner.model~=root
+            or owner.authorSlug~=ref.entry.slug then return false end
+        local matched=false
+        for _,version in ipairs(ref.entry.models) do
+            if History.MatchesInventory(root,version) then matched=true break end
+        end
+        if not matched then return false end
+        local seen=0
+        for _,child in ipairs(root:GetDescendants()) do
+            if child:IsA("MeshPart") and visual(child) then
+                if not ref.meshStates[child] then return false end
+                seen+=1
+            end
+        end
+        if seen~=#ref.visuals then return false end
+        for child,snapshot in pairs(ref.meshStates) do
+            local current=state(child)
+            if child.Parent~=snapshot.parent or current.meshId~=snapshot.meshId
+                or current.textureId~=snapshot.textureId or current.colorMap~=snapshot.colorMap
+                or current.alphaMode~=snapshot.alphaMode or current.material~=snapshot.material
+                or current.color~=snapshot.color or current.appearanceMode~=snapshot.appearanceMode
+                or child.CFrame~=snapshot.frame or child.Size~=snapshot.size then return false end
+        end
+        return true
+    end
     if not ref or ref.part.Parent==nil or ref.placement.Parent==nil then return false end
     if ref.root then
         if ref.root.Parent~=ref.rootParent or ref.root.PrimaryPart~=ref.rootPrimary

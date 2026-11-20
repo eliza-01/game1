@@ -27,16 +27,16 @@ class NpcCombatTests(unittest.TestCase):
             payload = {
                 "slug": "generic_npc", "nameEn": "Generic NPC",
                 "stats": {"MaxHP": 150, "Damage": 17, "AttackSpeed": 120, "RunSpeed": 50, "CritChance": 10},
-                "behavior": {"retaliateWhenAttacked": True, "pursuitRadiusStuds": 19, "attackRadiusStuds": 4.5, "returnDelaySeconds": 10.5},
+                "behavior": {"retaliateWhenAttacked": True, "attackRadiusStuds": 4.5},
             }
             row = npcs.register(payload)
             self.assertTrue(row["behavior"]["retaliateWhenAttacked"])
             self.assertEqual(row["behavior"]["attackRadiusStuds"], 4.5)
-            self.assertEqual(npcs.get("generic_npc")["behavior"]["pursuitRadiusStuds"], 19)
+            self.assertNotIn("pursuitRadiusStuds", npcs.get("generic_npc")["behavior"])
             exported = (root / "src/shared/npc/NpcRegistry.luau").read_text(encoding="utf-8")
             self.assertIn("retaliateWhenAttacked = true", exported)
-            self.assertIn("pursuitRadiusStuds = 19", exported)
-            self.assertIn("returnDelaySeconds = 10.5", exported)
+            self.assertNotIn("pursuitRadiusStuds", exported)
+            self.assertNotIn("returnDelaySeconds", exported)
             self.assertEqual(monsters.list(), [])
 
     def test_asset_manager_accepts_npc_retaliation(self):
@@ -46,8 +46,8 @@ class NpcCombatTests(unittest.TestCase):
         self.assertIn('npcs.register(body())', api)
         self.assertNotIn('npcs.register({**body(), "behavior":', api)
         self.assertIn('id="npc-behavior-retaliate" type="checkbox"', html)
-        self.assertIn('id="npc-behavior-pursuit-radius" type="number"', html)
-        self.assertIn('id="npc-behavior-return-delay" type="number"', html)
+        self.assertNotIn('id="npc-behavior-pursuit-radius"', html)
+        self.assertIn('id="npc-spawn-home-radius" type="number"', html)
         self.assertIn("behavior:{retaliateWhenAttacked:$('npc-behavior-retaliate').checked", js)
 
     def test_no_new_weapon_attachment_or_volume_hit_path(self):
@@ -74,7 +74,7 @@ class NpcCombatTests(unittest.TestCase):
         self.assertIn('ActorCollisionPolicy.Assign(root)', rig)
         self.assertIn('humanoid.HipHeight = 1.8', rig)
         self.assertNotIn('Instance.new("Bone")', rig)
-        self.assertIn('NpcCombatAIService.Bind(entity, root, presentation)', spawner)
+        self.assertIn('NpcCombatAIService.Bind(entity, root, presentation, function()', spawner)
         self.assertIn('NpcCombatAIService.Unbind(entity)', spawner)
         self.assertIn('agent.serial += 1', ai)
         self.assertIn('agent.navigator:Destroy()', ai)

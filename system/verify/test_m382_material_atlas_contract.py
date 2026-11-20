@@ -119,7 +119,8 @@ class MaterialAtlasContract(unittest.TestCase):
             captured.append(kwargs['metadata'])
             return {'realEstateStats':{'bonesValidated':True,'rigsValidated':2,
                 'texturesApplied':1,'placedSyncVersion':3}}
-        RealEstateStudioSync(SimpleNamespace(root=Path('/'),get=lambda _:row), load_model).sync(row['slug'])
+        RealEstateStudioSync(SimpleNamespace(root=Path('/'), get=lambda _: row,
+                                             collision_blueprint=lambda _: None), load_model).sync(row['slug'])
         manifest=captured[0]
         self.assertEqual([part['slot'] for part in manifest['textures']], ['roof'])
         self.assertEqual(manifest['meshOptions']['roof']['appearanceMode'],'material_atlas')
@@ -149,7 +150,9 @@ class MaterialAtlasContract(unittest.TestCase):
         self.assertIn('Texture.ApplyVisual(mesh,row', location)
         self.assertIn('Texture.ApplyVisual(mesh,settings', house)
         self.assertIn('"material_atlas"', runtime)
-        self.assertIn('"material_atlas"', streamer)
+        appearance=(ROOT/'src/shared/world/RuntimeVisualAppearance.luau').read_text(encoding='utf-8')
+        self.assertIn('Appearance.Apply(mesh', streamer)
+        self.assertIn('"material_atlas"', appearance)
         for text in (html,estate,editor):
             self.assertIn('value="material_atlas"', text)
 

@@ -35,7 +35,8 @@ class LegacyRigMigrationM262(TestCase):
         self.assertIn('for _, alias in ipairs(aliases or {})', owner)
         self.assertIn('Ownership.ForPart(workspace, part, slug, row.aliases)', scan)
         self.assertIn("item['aliases'] = sorted(by_current.get(item['slug'], []))", store)
-        self.assertIn('local container=owner or legacyRoot or part', scan)
+        self.assertIn('local container=owner or painterRoot or legacyRoot or part', scan)
+        self.assertIn('ExternalOwners.ForPart(part,workspace)', scan)
 
     def test_old_publication_is_verified_before_whole_rig_swap(self):
         sync = self.source('DecoPlacedAssetSync.luau')

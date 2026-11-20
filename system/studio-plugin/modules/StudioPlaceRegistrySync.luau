@@ -7,6 +7,7 @@ local History=require(script.Parent.StudioPublishedMeshHistory)
 local BoneEffects = require(script.Parent.StudioPlacedRigBoneEffects)
 local Texture=require(script.Parent.StudioTextureAppearance)
 local Visual=require(script.Parent.StudioLocationVisualAppearance)
+local PainterIntegrity=require(script.Parent.StudioLocationPainterIntegrity)
 local Physics=require(script.Parent.StudioMeshPhysicsCore)
 local Geometry=require(script.Parent.StudioLocationPlacedGeometry)
 local PlacementHistory=require(script.Parent.StudioLocationPlacementHistory)
@@ -72,6 +73,23 @@ function Sync.Apply(refs: {any}, ctx: any): any
     local plan,blocked,stages={},{},{}
     -- Prepare EVERY geometry transaction before touching any placed object.
     for _,ref in ipairs(refs) do
+        if ref.external then
+            if ref.row.canSync then
+                local changes={}
+                for _,part in ipairs(ref.visuals) do table.insert(changes,Visual.Capture(part)) end
+                local names,allowed={},{ }
+                for _,part in ipairs(ref.visuals) do
+                    names[part.Name]=true
+                    allowed[part]=true
+                end
+                local physics=Physics.CaptureLocationModel(ref.root,names)
+                table.insert(plan,{ref=ref,external=true,appearance=changes,
+                    physics=physics,physicsNames=names,physicsAllowed=allowed})
+            else
+                table.insert(blocked,ref.row.key..": нет изменённых визуальных настроек")
+            end
+            continue
+        end
         if not ref.row.canSync or not ref.root then
             table.insert(blocked,ref.row.key..": требуется Repair или проверка происхождения")
             continue
@@ -99,9 +117,14 @@ function Sync.Apply(refs: {any}, ctx: any): any
     for _, item in ipairs(plan) do
         local ref = item.ref
         if ref.row.needsCollision then
-            local ok, transaction = pcall(Collision.Prepare, ref.root,
-                ref.entry.collisionBlueprint,ref.entry.collisionRevision,ref.entry.collisionSha,
-                item.stage)
+            local ok, transaction
+            if ref.entry.collisionRevision == 0 then
+                ok, transaction=pcall(Collision.PrepareClear,ref.root)
+            else
+                ok, transaction=pcall(Collision.Prepare, ref.root,
+                    ref.entry.collisionBlueprint,ref.entry.collisionRevision,ref.entry.collisionSha,
+                    item.stage)
+            end
             if not ok then
                 for _, previous in ipairs(plan) do
                     if previous.collision then Collision.Rollback(previous.collision) end
@@ -131,7 +154,42 @@ function Sync.Apply(refs: {any}, ctx: any): any
             local root=ref.root
             -- Add to rollback ledger BEFORE the first potentially partial write.
             table.insert(committed,item)
-            if item.swap then
+            if item.external then
+                -- LandscapePainter owns the hierarchy and tether. The common
+                -- Location Asset policy owns only visual appearance, visual
+                -- MeshPart physics and managed Collision Blueprint Parts.
+                local row={appearanceMode=ref.entry.appearanceMode,
+                    visualMaterial=ref.entry.visualMaterial,visualColor=ref.entry.visualColor,
+                    texture_asset_id=ref.entry.atlas,alphaEnabled=ref.entry.alphaEnabled,
+                    meshOptions=ref.entry.meshOptions}
+                PainterIntegrity.AssertUnchanged(ref.integrity)
+                for _,snapshot in ipairs(item.appearance) do
+                    Visual.Apply(snapshot.mesh,row)
+                    Visual.AssertCurrent(snapshot.mesh,row)
+                end
+                if ref.row.needsPhysics then
+                    Physics.ApplyLocationModel(root,item.physicsNames,ref.entry.meshOptions)
+                    for _,visual in ipairs(ref.visuals) do
+                        local raw=if type(ref.entry.meshOptions)=="table" then
+                            ref.entry.meshOptions[visual.Name] else nil
+                        local noCollide=type(raw)=="table" and raw.noCollide==true
+                        if visual.CanCollide==noCollide or visual.CanQuery==noCollide
+                            or visual.CanTouch then
+                            error("LandscapePainter visual physics not applied: "..visual.Name)
+                        end
+                    end
+                end
+                -- Clear stale DecoManager ownership only after the Painter
+                -- inventory, rig, stem/tether/sway and appearance are verified.
+                -- Do not create a new Deco placement or modify the authored rig.
+                if ref.row.needsOwnerCleanup then
+                    root:SetAttribute("Game1DecoInstanceId",nil)
+                    root:SetAttribute("Game1DecoAssetSlug",nil)
+                end
+                -- Includes arbitrary authored Light/Fire/Attachment/Bone descendants.
+                PainterIntegrity.AssertUnchanged(ref.integrity,
+                    if ref.row.needsPhysics then item.physicsAllowed else nil)
+            elseif item.swap then
                 RigSwap.Commit(item.swap)
                 root:SetAttribute("Game1DecoAssetSlug",ref.entry.slug)
                 local instanceId=tostring(root:GetAttribute("Game1DecoInstanceId") or "")
@@ -148,17 +206,24 @@ function Sync.Apply(refs: {any}, ctx: any): any
                     for _,change in ipairs(item.appearance) do
                         if ref.row.needsTexture then
                             Visual.Apply(change.mesh,row)
-                        elseif ref.entry.appearanceMode~="material" then
+                        else
                             local setting=Visual.Settings(change.mesh,row)
-                            if setting.appearanceMode~="material" then
+                            if setting.appearanceMode=="material" then
+                                Visual.Apply(change.mesh,row)
+                            else
                                 Texture.ApplyAlpha(change.mesh,setting.alphaEnabled==true,
                                     "rbxassetid://"..tostring(setting.texture_asset_id or ""))
                             end
                         end
+                        Visual.AssertCurrent(change.mesh,row)
                     end
                 end
             end
             if item.collision then Collision.Commit(item.collision) end
+            if item.external then
+                PainterIntegrity.AssertUnchanged(ref.integrity,
+                    if ref.row.needsPhysics then item.physicsAllowed else nil)
+            end
             if ref.row.needsMaterial then
                 Physics.ApplyLocationSurfaceMaterial(root,ref.entry.material,nil)
             end
@@ -192,7 +257,9 @@ function Sync.Apply(refs: {any}, ctx: any): any
             if ref.row.needsAlpha then
                 table.insert(events,{kind="alpha",oldId="previous",newId=if ref.entry.alphaEnabled then "Transparency" else "Opaque",count=#ref.visuals})
             end
-            PlacementHistory.Append(root,ctx.http,ref.entry.slug,events)
+            if not item.external then
+                PlacementHistory.Append(root,ctx.http,ref.entry.slug,events)
+            end
             changes+=1
         end
     end)
@@ -200,7 +267,12 @@ function Sync.Apply(refs: {any}, ctx: any): any
         for i=#committed,1,-1 do
             local item=committed[i]
             pcall(function()
-                if item.swap then
+                if item.external then
+                    item.ref.root:SetAttribute("Game1DecoInstanceId",item.ref.priorDecoInstanceId)
+                    item.ref.root:SetAttribute("Game1DecoAssetSlug",item.ref.priorDecoSlug)
+                    for _,change in ipairs(item.appearance) do Visual.Restore(change) end
+                    if item.physics then Physics.RestoreLocationModel(item.physics) end
+                elseif item.swap then
                     RigSwap.Rollback(item.swap)
                     item.ref.root:SetAttribute("Game1DecoPublishedModelAssetId",item.priorId)
                     item.ref.root:SetAttribute("Game1DecoPublishedModelSha256",item.priorSha)
@@ -216,7 +288,9 @@ function Sync.Apply(refs: {any}, ctx: any): any
                     end
                 end
                 if item.collision then Collision.Rollback(item.collision) end
-                item.ref.root:SetAttribute("Game1DecoSyncHistory",item.priorHistory)
+                if not item.external then
+                    item.ref.root:SetAttribute("Game1DecoSyncHistory",item.priorHistory)
+                end
             end)
         end
         for _,item in ipairs(stages) do item.stage:Destroy() end

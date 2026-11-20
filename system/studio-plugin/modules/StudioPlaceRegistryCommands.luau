@@ -74,6 +74,11 @@ return function(config: any)
                 config.Selection:Set(selected)
                 return {result={changed=0,selected=#selected}}
             end
+            if phase=="repair" then
+                for _,ref in ipairs(chosen) do
+                    if ref.external then error("LandscapePainter authoring cannot be repaired by Place Registry") end
+                end
+            end
             local ctx={http=config.HttpService,history=config.ChangeHistoryService,
                 loader=config.decoManager.loader,
                 recordingName="G1PlaceRegistry:"..command.operationId}

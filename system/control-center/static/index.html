@@ -301,6 +301,12 @@
 <div id="real-estate-publish-status" class="status-box">register a house first</div>
 <div class="actions"><button id="real-estate-publish" class="primary" type="button" disabled>publish changed assets</button><button id="real-estate-sync" type="button" disabled>sync Studio → ServerStorage</button></div>
 <small class="hint">After publishing, Sync Studio imports the complete house model with its selected textures into ServerStorage/real_estate/&lt;slug&gt;/model. Player ownership and purchase-based runtime placement are future stages; placement points are authored in section 04.</small>
+<details class="panel character-card real-estate-runtime" id="real-estate-runtime-panel">
+  <summary><strong>House Runtime · FULL / LOD1</strong></summary>
+  <div id="real-estate-runtime-content" class="deco-manage-fields">
+    <small class="hint">Select a registered house. FULL mesh distances remain in the per-mesh spoilers above.</small>
+  </div>
+</details>
 <section class="real-estate-collision-authoring location-collision-panel" id="house-collision-panel">
 <div class="section-title"><div><span>03b · real estate authoring</span><h3>House Collision Blueprint</h3></div></div>
 <p class="hint">Choose a published house type. In Studio Edit mode select one managed house Model on a Plot plus 1–256 original Roblox Parts, WedgeParts or CornerWedgeParts. Capture saves their transforms relative to the author's house pivot. No changes to the house, authored Parts or Plot bindings. After Capture, use Sync entire house to update all placed houses.</p>
@@ -366,7 +372,7 @@
 <small class="hint">Shared combat timeout; return timer uses monster damage dealt.</small>
 <div class="details-grid">
 <div><b>⚔ combat state duration</b><span><input id="option-combat-state-duration" type="number" min="0" max="3600" step="0.1" value="6"> seconds</span></div>
-<div><b>🏠 Return if no hit · sec</b><span><input id="option-monster-return-time" type="number" min="1" max="3600" step="1" value="30"> seconds</span></div>
+<div><b>🏠 NPC / Monster · return after no damage · sec</b><span><input id="option-monster-return-time" type="number" min="1" max="3600" step="1" value="30"> seconds</span></div>
 </div>
 <div class="actions"><button id="save-combat-options" class="primary" type="button">save combat options</button></div>
 <hr class="card-separator">
@@ -690,6 +696,13 @@
     <div id="lod-revisions" class="lm-revisions"></div>
     <p class="lm-note">JSON включает полные трансформации и иерархию размещений. Он не заменяет резервную копию Place (.rbxl).</p>
   </section>
+  <section class="panel lm-panel" id="lod-real-estate-section">
+    <div class="lm-toolbar"><div><span class="eyebrow">04b · Real Estate</span><h3>House Streaming · Runtime readiness</h3></div>
+      <span id="lod-house-count" class="lm-note">Загрузка…</span></div>
+    <p class="lm-note">Профиль дома настраивается в Real Estate → House LOD1. FULL MeshPart загружаются по индивидуальным дистанциям; порог LOD1 применяется ко всему дому. Все дальние визуальные MeshPart заменяются техническими Parts только в Runtime-копии.</p>
+    <div class="lm-table"><table><thead><tr><th>House type</th><th>Plots</th><th>Mode</th><th>LOD1</th><th>Readiness</th></tr></thead>
+      <tbody id="lod-house-rows"><tr><td colspan="5">Loading…</td></tr></tbody></table></div>
+  </section>
   <section class="panel lm-panel lm-build"><div><span class="eyebrow">05 · Runtime preparation</span><h3>Preflight → Verified backup → Runtime draft</h3></div>
     <p class="lm-note">Отмеченные выше ассеты обрабатываются только если проходят проверку структуры и принадлежности. Отключённые остаются обычными объектами Workspace.</p>
     <p class="lm-note">Сохрани текущий Studio Place через File → Save to File в <b>Roblox XML Place (.rbxlx)</b> по указанному пути. Snapshot не является .rbxlx; несохранённые изменения Studio в файл не попадут.</p>
@@ -698,7 +711,7 @@
     <div id="lod-build-preview" class="lm-build-preview" hidden></div>
     <label id="lod-build-confirm-label" class="lm-confirm" hidden>Подтверждение: <input id="lod-build-confirm" type="text" spellcheck="false" autocomplete="off" placeholder="PREPARE RUNTIME" aria-label="Введите PREPARE RUNTIME"></label>
     <div class="actions" style="margin-top:8px"><button id="lod-build-execute" class="primary" type="button" disabled hidden>Backup + Build Runtime draft</button></div>
-    <p id="lod-build-status" class="lm-note">Runtime-копия создаётся отдельно, исходный Place не изменяется. Публикация пока запрещена: клиентский FULL/LOD1 загрузчик ещё не подключён.</p>
+    <p id="lod-build-status" class="lm-note">Runtime-копия создаётся отдельно, исходный Place не изменяется. House FULL/LOD1 подключён к общему стримеру. Публикация закрыта до Studio Play и мобильной проверки.</p>
   </section>
 </div>
 
@@ -760,7 +773,7 @@
 <label>slug<input id="monster-slug" readonly><small class="hint">generated from english name as lowercase snake_case. existing registered slugs stay stable.</small></label>
 <div class="monster-stats-grid"><label>HP<input id="monster-stat-hp" type="number" min="0" step="1" value="100"></label><label>attack<input id="monster-stat-damage" type="number" min="0" step="1" value="10"></label><label>attack speed<input id="monster-stat-attack-speed" type="number" min="0" step="1" value="100"></label><label>run speed<input id="monster-stat-run-speed" type="number" min="0" step="1" value="50"></label><label>critical chance %<input id="monster-stat-crit-chance" type="number" min="0" max="100" step="0.1" value="0"></label></div>
 <small class="hint">monster stats are absolute runtime values. critical chance is 0..100 percent.</small>
-<div class="monster-stats-grid"><label class="spawn-enabled"><input id="monster-behavior-aggressive" type="checkbox"><span>aggressive · unchecked = passive</span></label><label>aggro radius · studs<input id="monster-behavior-aggro-radius" type="number" min="0" step="0.1" value="16"></label><label>pursuit radius from spawn · studs<input id="monster-behavior-pursuit-radius" type="number" min="1" max="10000" step="1" value="150" title="Monster chase boundary measured from the authored spawn point, not the spawn distribution radius"></label><label>attack radius · studs<input id="monster-behavior-attack-radius" type="number" min="0" step="0.1" value="3"></label></div>
+<div class="monster-stats-grid"><label class="spawn-enabled"><input id="monster-behavior-aggressive" type="checkbox"><span>aggressive · unchecked = passive</span></label><label>aggro radius · studs<input id="monster-behavior-aggro-radius" type="number" min="0" step="0.1" value="16"></label><label>attack radius · studs<input id="monster-behavior-attack-radius" type="number" min="0" step="0.1" value="3"></label></div>
 <label class="spawn-enabled"><input id="monster-behavior-rise-from-ground" type="checkbox"><span>rise from ground when spawning</span></label>
 <small class="hint">Every spawn fades in. With this option checked, the monster also rises from below the surface. The setting belongs to the monster asset and does not require FBX republishing.</small>
 <small class="hint">behavior is authored here; Monster Debug can override these values only for the current Play session.</small>
@@ -829,7 +842,7 @@
 </div>
 <div class="panel character-card">
 <span class="eyebrow">08 · population</span><h3>spawn settings</h3>
-<div class="monster-spawn-settings-grid"><label>respawn sec<input id="monster-spawn-respawn" type="number" min="0" max="86400" step="0.1" value="10"></label><label>spawn radius<input id="monster-spawn-radius" type="number" min="0" max="10000" step="0.1" value="15"></label><label>max alive<input id="monster-spawn-max-alive" type="number" min="1" max="1000" step="1" value="3"></label></div>
+<div class="monster-spawn-settings-grid"><label>respawn sec<input id="monster-spawn-respawn" type="number" min="0" max="86400" step="0.1" value="10"></label><label>home leash · studs<input id="monster-spawn-home-radius" type="number" min="1" max="10000" step="1" value="150" title="Combat boundary measured from the registered spawn center"></label><label>spawn radius<input id="monster-spawn-radius" type="number" min="0" max="10000" step="0.1" value="15"></label><label>max alive<input id="monster-spawn-max-alive" type="number" min="1" max="1000" step="1" value="3"></label></div>
 <label class="spawn-enabled"><input id="monster-spawn-enabled" type="checkbox" checked><span>enabled · runtime maintains this population</span></label>
 <small id="monster-spawn-radius-hint" class="hint">radius is the random ground area around the authored point. max alive is the population cap for this record.</small>
 <div class="actions"><button id="monster-spawn-register" class="primary" type="button" disabled>register spawn</button><button id="monster-spawn-new" type="button">new spawn</button><button id="monster-spawn-delete" class="danger" type="button" disabled>delete</button></div>
@@ -855,7 +868,7 @@
 <label>slug<input id="npc-slug" readonly><small class="hint">generated from english name as lowercase snake_case. existing registered slugs stay stable.</small></label>
 <div class="npc-stats-grid monster-stats-grid"><label>HP<input id="npc-stat-hp" type="number" min="0" step="1" value="100"></label><label>attack<input id="npc-stat-damage" type="number" min="0" step="1" value="10"></label><label>attack speed<input id="npc-stat-attack-speed" type="number" min="0" step="1" value="100"></label><label>run speed<input id="npc-stat-run-speed" type="number" min="0" step="1" value="50"></label><label>critical chance %<input id="npc-stat-crit-chance" type="number" min="0" max="100" step="0.1" value="0"></label></div>
 <small class="hint">npc stats are absolute runtime values. critical chance is 0..100 percent.</small>
-<div class="npc-stats-grid monster-stats-grid"><label class="spawn-enabled"><input id="npc-behavior-retaliate" type="checkbox"><span>responds to aggression · retaliate only after being damaged</span></label><label>pursuit radius from spawn · studs<input id="npc-behavior-pursuit-radius" type="number" min="0" step="0.1" value="16"></label><label>attack radius · studs<input id="npc-behavior-attack-radius" type="number" min="0" step="0.1" value="3"></label><label>return delay max · seconds<input id="npc-behavior-return-delay" type="number" min="0" max="600" step="0.5" value="10"></label></div>
+<div class="npc-stats-grid monster-stats-grid"><label class="spawn-enabled"><input id="npc-behavior-retaliate" type="checkbox"><span>responds to aggression · retaliate only after being damaged</span></label><label>attack radius · studs<input id="npc-behavior-attack-radius" type="number" min="0" step="0.1" value="3"></label></div>
 <small class="hint">NPCs never acquire enemies by proximity. When attacked, they defend themselves within their spawn pursuit radius. After their target dies they wait 0..max seconds (random, in 0.5-second steps), return to their original spawn position and face the authored direction.</small>
 <hr class="card-separator">
 <span class="eyebrow">02 · source assets</span>
@@ -1023,7 +1036,7 @@
 <script src="location-collision.js?v=385"></script>
 <script src="location-instance-manager.js?v=351&geometry=2&collision=1&review=354"></script>
 <script src="place-registry.js?v=348"></script>
-<script src="lod-manager.js?v=3"></script>
+<script src="lod-manager.js?v=388"></script>
 <script src="location-publication-state.js?v=253"></script>
 <script src="location-sync-grouping.js?v=262"></script>
 <script src="location-asset-workflow.js?v=384"></script>
@@ -1037,7 +1050,7 @@
 <script src="monster-assets.js?v=338"></script>
 <script src="npc-assets.js?v=370"></script>
 <script src="npc-spawns.js?v=337"></script>
-<script src="real-estate.js?v=385a&rig=186&atlas=202&physics=232"></script>
+<script src="real-estate.js?v=385a&visual=386&runtime=387&rig=186&atlas=202&physics=232"></script>
 <script src="real-estate-mesh-workflow.js?v=234"></script>
 <script src="real-estate-placement.js?v=2"></script>
 <script src="monster-spawns.js?v=338"></script>

@@ -373,10 +373,32 @@ class LocationAssetStore:
         binding = self.atlases.binding('location_asset', str(result.get('slug') or ''))
         result['destructible'] = bool(result.get('destructible'))
         collision = location_collision_blueprint.latest(self, result['slug'])
-        result['collisionBlueprintRevision'] = collision['revision'] if collision else 0
-        result['collisionBlueprintPartCount'] = len(collision['blueprint']['parts']) if collision else 0
-        result['collisionBlueprint'] = collision['blueprint'] if collision else None
-        result['collisionBlueprintSha256'] = collision['sha256'] if collision else ''
+        # A Collision Blueprint v2 is relative to a specific published visual
+        # Mesh ID. Replacing an FBX may replace the mesh and/or remove its rig.
+        # Keep immutable history, but never apply an anchor that cannot be
+        # verified against the CURRENT publication's Mesh ID inventory.
+        stale_collision = False
+        if (collision and result.get('model_asset_id')
+                and collision['blueprint'].get('schemaVersion') == 2):
+            anchor_id = collision['blueprint']['anchor']['meshId']
+            with self.connect() as db:
+                inventory_row = db.execute(
+                    'SELECT meshes_json FROM location_asset_mesh_id_inventory '
+                    'WHERE asset_slug=? AND model_asset_id=?',
+                    (result['slug'], str(result.get('model_asset_id') or ''))).fetchone()
+            try:
+                published_ids = {str(part['meshId']) for part in
+                    json.loads(inventory_row['meshes_json'])} if inventory_row else set()
+            except (TypeError, ValueError, KeyError):
+                published_ids = set()
+            stale_collision = anchor_id not in published_ids
+        result['collisionBlueprintNeedsCapture'] = stale_collision
+        result['collisionBlueprintRetainedRevision'] = collision['revision'] if collision else 0
+        active_collision = None if stale_collision else collision
+        result['collisionBlueprintRevision'] = active_collision['revision'] if active_collision else 0
+        result['collisionBlueprintPartCount'] = len(active_collision['blueprint']['parts']) if active_collision else 0
+        result['collisionBlueprint'] = active_collision['blueprint'] if active_collision else None
+        result['collisionBlueprintSha256'] = active_collision['sha256'] if active_collision else ''
         result['surfaceMaterial'] = result.get('surface_material') or 'default'
         result['appearanceMode'] = result.get('appearance_mode') or 'atlas'
         result['visualMaterial'] = result.get('visual_material') or 'SmoothPlastic'

@@ -401,6 +401,14 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                     changedParts+=1
                 end
             end
+            if not item.geometry then
+                for _, change in ipairs(item.atlasChanges) do
+                    Visual.AssertCurrent(change.part, row)
+                end
+                for _, change in ipairs(item.alphaChanges) do
+                    Visual.AssertCurrent(change.mesh, row)
+                end
+            end
             if item.physicsBefore and allowedNames then
                 physicsChecked += Physics.ApplyLocationModel(model, allowedNames, row.meshOptions)
             end

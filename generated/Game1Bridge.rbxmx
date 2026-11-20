@@ -1788,6 +1788,14 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                     changedParts+=1
                 end
             end
+            if not item.geometry then
+                for _, change in ipairs(item.atlasChanges) do
+                    Visual.AssertCurrent(change.part, row)
+                end
+                for _, change in ipairs(item.alphaChanges) do
+                    Visual.AssertCurrent(change.mesh, row)
+                end
+            end
             if item.physicsBefore and allowedNames then
                 physicsChecked += Physics.ApplyLocationModel(model, allowedNames, row.meshOptions)
             end
@@ -5289,6 +5297,20 @@ function Collision.IsOwned(part: Instance): boolean
     return part:GetAttribute(OWNED) == true or part:GetAttribute("Game1HouseCollisionOwned") == true
 end
 
+-- A new FBX may retire its old visual anchor. Clear only GENERATED Location
+-- collision Parts, preserving author Parts, the Plot pivot and Undo history.
+function Collision.HasOwned(root: Model): boolean
+    return #ownedParts(root, OWNED) > 0
+end
+
+function Collision.PrepareClear(root: Model): any
+    local old = ownedParts(root, OWNED)
+    return {root=root,pivot=root:GetPivot(),stage={},warnings={},prior=old,
+        revision=nil,sha=nil,revisionKey=REVISION,shaKey=SHA,approvalKey=APPROVED,
+        oldRevision=root:GetAttribute(REVISION),oldSha=root:GetAttribute(SHA),
+        oldApproval=root:GetAttribute(APPROVED),committed=false}
+end
+
 function Collision.Current(root: Model, blueprint: any, revision: any, sha: any): boolean
     if type(revision) ~= "number" or revision < 1 then return true end
     if type(blueprint) ~= "table" or (blueprint.schemaVersion ~= 2 and blueprint.schemaVersion ~= 3) then return false end
@@ -6710,6 +6732,191 @@ return Naming
       </Item>
       <Item class="ModuleScript" referent="30">
         <Properties>
+          <string name="Name">StudioLocationPainterIntegrity</string>
+          <string name="Source"><![CDATA[-- Shared, read-only integrity contract for LandscapePainter-owned Location Assets.
+-- The Painter owns placement, tether, sway and effects. The Location registry
+-- owns the published mesh appearance. Never transfer ownership between them.
+local Integrity = {}
+
+local function check(model: Model): (boolean, string)
+    if model:GetAttribute("LandscapeAuthoringTool") ~= "Game1LandscapePainter" then
+        return false, "missing LandscapePainter owner marker"
+    end
+    local kind = model:GetAttribute("LandscapeAnchorKind")
+    if kind ~= "stem" and kind ~= "surface" then
+        return false, "unknown LandscapePainter anchor kind"
+    end
+    local tether = model:GetAttribute("LandscapeTetherEnabled") == true
+    local sway = model:GetAttribute("LandscapeSwayEnabled") == true
+    local line = model:FindFirstChild("LandscapeAttachmentLine")
+    if tether then
+        if not line or not line:IsA("Part")
+            or line:GetAttribute("Game1LandscapeAttachment") ~= true then
+            return false, "missing or invalid LandscapeAttachmentLine; repair with LandscapePainter Apply"
+        end
+    elseif line ~= nil then
+        return false, "orphan LandscapeAttachmentLine; repair with LandscapePainter Apply"
+    end
+    local swayTarget = model:FindFirstChild("LandscapeSwayTarget")
+    if tether and sway then
+        if not swayTarget or not swayTarget:IsA("BasePart")
+            or swayTarget:GetAttribute("Game1LandscapeSwayTarget") ~= true then
+            return false, "missing LandscapeSwayTarget; repair with LandscapePainter Apply"
+        end
+    elseif swayTarget ~= nil then
+        return false, "obsolete LandscapeSwayTarget; repair with LandscapePainter Apply"
+    end
+    if kind == "stem" then
+        local link = model:FindFirstChild("LandscapeAnchorStem")
+        local parent = model.Parent
+        local branch = if parent and parent.Name == "Attachments" then parent.Parent else nil
+        if not branch or not branch:IsA("Model")
+            or branch:GetAttribute("AuthoringTool") ~= "Game1LandscapePainter"
+            or not link or not link:IsA("ObjectValue") or not link.Value
+            or not link.Value:IsDescendantOf(branch) then
+            return false, "missing/invalid LandscapeAnchorStem; repair anchor in LandscapePainter"
+        end
+        if model:GetAttribute("LandscapeBranchStrokeId") ~= branch:GetAttribute("StrokeId") then
+            return false, "LandscapePainter branch stroke identity changed"
+        end
+        if typeof(model:GetAttribute("LandscapeStemLocalPoint")) ~= "Vector3"
+            or typeof(model:GetAttribute("LandscapeStemLocalNormal")) ~= "Vector3" then
+            return false, "missing local stem anchor frame"
+        end
+    end
+    for _, descendant in ipairs(model:GetDescendants()) do
+        if descendant:GetAttribute("Game1LandscapePhysics") == true then
+            return false, "retired LandscapePainter physics detected; use Painter Apply"
+        end
+    end
+    return true, "current"
+end
+
+Integrity.Check = check
+
+-- Preserve *all* authored descendants (including unknown effects) and their
+-- parents, not just a whitelist of Fire/Light/Bone classes. SurfaceAppearance
+-- is explicitly owned by the centralized appearance policy and may be deleted.
+function Integrity.Capture(model: Model): any
+    local entries = {}
+    local count = 0
+    for _, descendant in ipairs(model:GetDescendants()) do
+        if not descendant:IsA("SurfaceAppearance")
+            and descendant:GetAttribute("Game1LocationCollisionOwned") ~= true then
+            count += 1
+            if count > 512 then error("LandscapePainter assembly too large for safe appearance Sync") end
+            local snap = {parent=descendant.Parent, class=descendant.ClassName}
+            if descendant:IsA("BasePart") then
+                snap.cframe=descendant.CFrame
+                snap.size=descendant.Size
+                snap.meshId=if descendant:IsA("MeshPart") then descendant.MeshId else nil
+                snap.anchored=descendant.Anchored
+                snap.canCollide=descendant.CanCollide
+                snap.canQuery=descendant.CanQuery
+            elseif descendant:IsA("Bone") or descendant:IsA("Attachment") then
+                snap.cframe=descendant.CFrame
+            elseif descendant:IsA("ObjectValue") then
+                snap.value=descendant.Value
+            end
+            if descendant:IsA("Light") then
+                snap.effect={descendant.Enabled,descendant.Brightness,descendant.Color,
+                    descendant.Range,descendant.Shadows}
+            elseif descendant:IsA("Fire") then
+                snap.effect={descendant.Enabled,descendant.Heat,descendant.Size,
+                    descendant.Color,descendant.SecondaryColor}
+            elseif descendant:IsA("ParticleEmitter") then
+                snap.effect={descendant.Enabled,descendant.Texture,descendant.Rate,
+                    descendant.Lifetime,descendant.Speed}
+            elseif descendant:IsA("Beam") then
+                snap.effect={descendant.Enabled,descendant.Attachment0,
+                    descendant.Attachment1,descendant.Texture}
+            elseif descendant:IsA("WeldConstraint") then
+                snap.effect={descendant.Enabled,descendant.Part0,descendant.Part1}
+            elseif descendant:IsA("JointInstance") then
+                snap.effect={descendant.Part0,descendant.Part1,descendant.C0,descendant.C1}
+            end
+            entries[descendant]=snap
+        end
+    end
+    return {root=model,parent=model.Parent,pivot=model:GetPivot(),scale=model:GetScale(),entries=entries,count=count,
+        stroke=model:GetAttribute("LandscapeBranchStrokeId"),
+        assetSlug=model:GetAttribute("LandscapeAssetSlug"),
+        modelAssetId=model:GetAttribute("LandscapeModelAssetId")}
+end
+
+function Integrity.AssertUnchanged(snapshot: any, allowedVisualPhysics: any?)
+    local model = snapshot.root
+    if model.Parent~=snapshot.parent or model:GetPivot()~=snapshot.pivot or model:GetScale()~=snapshot.scale
+        or model:GetAttribute("LandscapeBranchStrokeId")~=snapshot.stroke
+        or model:GetAttribute("LandscapeAssetSlug")~=snapshot.assetSlug
+        or model:GetAttribute("LandscapeModelAssetId")~=snapshot.modelAssetId then
+        error("LandscapePainter root/placement changed during appearance Sync")
+    end
+    local seen=0
+    for _, descendant in ipairs(model:GetDescendants()) do
+        if not descendant:IsA("SurfaceAppearance")
+            and descendant:GetAttribute("Game1LocationCollisionOwned") ~= true then
+            local before=snapshot.entries[descendant]
+            if not before or before.parent~=descendant.Parent or before.class~=descendant.ClassName then
+                error("LandscapePainter hierarchy/effect changed during appearance Sync")
+            end
+            seen+=1
+            if descendant:IsA("BasePart") then
+                if descendant.CFrame~=before.cframe or descendant.Size~=before.size
+                    or descendant.Anchored~=before.anchored
+                    or (not (type(allowedVisualPhysics)=="table" and allowedVisualPhysics[descendant]==true)
+                        and (descendant.CanCollide~=before.canCollide
+                            or descendant.CanQuery~=before.canQuery))
+                    or (descendant:IsA("MeshPart") and descendant.MeshId~=before.meshId) then
+                    error("LandscapePainter geometry/physics changed during appearance Sync")
+                end
+            elseif descendant:IsA("Bone") or descendant:IsA("Attachment") then
+                if descendant.CFrame~=before.cframe then error("LandscapePainter rig/socket changed during appearance Sync") end
+            elseif descendant:IsA("ObjectValue") and descendant.Value~=before.value then
+                error("LandscapePainter stem link changed during appearance Sync")
+            end
+            local previous=before.effect
+            if previous then
+                local current
+                if descendant:IsA("Light") then
+                    current={descendant.Enabled,descendant.Brightness,descendant.Color,
+                        descendant.Range,descendant.Shadows}
+                elseif descendant:IsA("Fire") then
+                    current={descendant.Enabled,descendant.Heat,descendant.Size,
+                        descendant.Color,descendant.SecondaryColor}
+                elseif descendant:IsA("ParticleEmitter") then
+                    current={descendant.Enabled,descendant.Texture,descendant.Rate,
+                        descendant.Lifetime,descendant.Speed}
+                elseif descendant:IsA("Beam") then
+                    current={descendant.Enabled,descendant.Attachment0,
+                        descendant.Attachment1,descendant.Texture}
+                elseif descendant:IsA("WeldConstraint") then
+                    current={descendant.Enabled,descendant.Part0,descendant.Part1}
+                elseif descendant:IsA("JointInstance") then
+                    current={descendant.Part0,descendant.Part1,descendant.C0,descendant.C1}
+                end
+                if not current or #current~=#previous then
+                    error("LandscapePainter light/effect/constraint structure changed")
+                end
+                for i=1,#previous do
+                    if current[i]~=previous[i] then
+                        error("LandscapePainter light/effect/constraint settings changed")
+                    end
+                end
+            end
+        end
+    end
+    if seen~=snapshot.count then error("LandscapePainter descendant was removed during appearance Sync") end
+    local ok, reason = check(model)
+    if not ok then error("LandscapePainter structural integrity failed: "..reason) end
+end
+
+return table.freeze(Integrity)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="31">
+        <Properties>
           <string name="Name">StudioLocationPlacedGeometry</string>
           <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
 -- Location-only geometry placement policy, shared by row Sync and Place Registry.
@@ -6894,7 +7101,7 @@ return table.freeze(Geometry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="31">
+      <Item class="ModuleScript" referent="32">
         <Properties>
           <string name="Name">StudioLocationPlacementHistory</string>
           <string name="Source"><![CDATA[-- Per-placement, bounded authoring audit for Location repair and sync.
@@ -6935,12 +7142,13 @@ return table.freeze(History)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="32">
+      <Item class="ModuleScript" referent="33">
         <Properties>
           <string name="Name">StudioLocationPlacementOwner</string>
           <string name="Source"><![CDATA[-- M243: one placement-ownership rule for Location Find and scoped Sync.
 -- Grouping models may carry old Deco attributes; the nearest fully stamped
 -- ancestor of a MeshPart is its placement. Do not infer ownership from names.
+local ExternalOwners = require(script.Parent.StudioPlaceRegistryExternalOwners)
 local Owner = {}
 local SLUG = "Game1DecoAssetSlug"
 local INSTANCE = "Game1DecoInstanceId"
@@ -6960,6 +7168,11 @@ function Owner.ForPart(workspace: Workspace, part: MeshPart, slug: string,
     local camera = workspace.CurrentCamera
     if (authoring and part:IsDescendantOf(authoring))
         or (camera and part:IsDescendantOf(camera)) then return nil end
+    -- A Painter-authored model may carry old DecoManager attributes from a
+    -- historical sync. The nearest *authoring* owner wins; dual stamps must
+    -- never permit a DecoManager child-rig replacement of a tethered light.
+    local external=ExternalOwners.ForPart(part,workspace)
+    if external and external.kind=="landscape_attachment" then return nil end
     local cursor: Instance? = part.Parent
     while cursor and cursor ~= workspace do
         if cursor:IsA("Model") and (cursor:GetAttribute(SLUG) ~= nil
@@ -6991,7 +7204,7 @@ return table.freeze(Owner)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="33">
+      <Item class="ModuleScript" referent="34">
         <Properties>
           <string name="Name">StudioLocationPublishedGeometry</string>
           <string name="Source"><![CDATA[-- Published-model provenance and shape policy for Location Assets.
@@ -7064,7 +7277,7 @@ return table.freeze(Published)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="34">
+      <Item class="ModuleScript" referent="35">
         <Properties>
           <string name="Name">StudioLocationPublishedRigNormalize</string>
           <string name="Source"><![CDATA[-- Location-only normalization of Roblox importer scaffolding on a FRESH,
@@ -7174,7 +7387,7 @@ return table.freeze(Normalize)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="35">
+      <Item class="ModuleScript" referent="36">
         <Properties>
           <string name="Name">StudioLocationRigCarrier</string>
           <string name="Source"><![CDATA[-- Canonical Location-only rig carrier policy. Imported FBX mesh; never synthetic.
@@ -7412,7 +7625,7 @@ return table.freeze(Carrier)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="36">
+      <Item class="ModuleScript" referent="37">
         <Properties>
           <string name="Name">StudioLocationVisualAppearance</string>
           <string name="Source"><![CDATA[-- Visual-only Location Asset appearance. Surface sound classification is separate.
@@ -7475,7 +7688,7 @@ function Visual.IsCurrent(mesh: MeshPart, row: any): boolean
         local material,color=Texture.MaterialColor(
             tostring(row.visualMaterial or "SmoothPlastic"),
             tostring(row.visualColor or "#FFFFFF"))
-        return mesh.TextureID=="" and surface==nil
+        return mesh.TextureID=="" and Texture.AlphaCurrent(mesh, false)
             and mesh.Material==material
             and mesh.Color==color
             and mesh:GetAttribute("Game1DecoAppearanceMode")=="material"
@@ -7498,8 +7711,8 @@ function Visual.IsCurrent(mesh: MeshPart, row: any): boolean
             and mesh.Color==Color3.new(1,1,1)
     end
     return materialCurrent and mesh.TextureID==uri
-        and (if alpha then surface~=nil and surface.ColorMap==uri
-            and surface.AlphaMode==Enum.AlphaMode.Transparency else surface==nil)
+        and Texture.AlphaCurrent(mesh, alpha)
+        and (not alpha or (surface ~= nil and surface.ColorMap == uri))
         and mesh:GetAttribute("Game1DecoAppearanceMode")==mode
 end
 
@@ -7534,10 +7747,22 @@ function Visual.Apply(mesh: MeshPart, row: any): boolean
     return true
 end
 
+-- Assert on the written mesh, not on a cached Studio Scan. Never report a
+-- successful Sync while alpha-disabled visuals still have SurfaceAppearance.
+function Visual.AssertCurrent(mesh: MeshPart, row: any)
+    if visual(mesh) and not Visual.IsCurrent(mesh, row) then
+        error("Location Appearance Sync incomplete for " .. mesh:GetFullName()
+            .. "; re-scan this placement", 2)
+    end
+end
+
 function Visual.ApplyModel(model: Model, row: any): number
     local count=0
     for _,item in ipairs(model:GetDescendants()) do
-        if visual(item) and Visual.Apply(item :: MeshPart,row) then count+=1 end
+        if visual(item) then
+            if Visual.Apply(item :: MeshPart,row) then count+=1 end
+            Visual.AssertCurrent(item :: MeshPart,row)
+        end
     end
     return count
 end
@@ -7546,7 +7771,7 @@ return table.freeze(Visual)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="37">
+      <Item class="ModuleScript" referent="38">
         <Properties>
           <string name="Name">StudioManagedRigSwap</string>
           <string name="Source"><![CDATA[-- Shared Studio mechanism for replacing AUTHORING-MANAGED child rigs while
@@ -7742,7 +7967,7 @@ return table.freeze(RigSwap)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="38">
+      <Item class="ModuleScript" referent="39">
         <Properties>
           <string name="Name">StudioMarkerVisibility</string>
           <string name="Source"><![CDATA[-- Studio-only presentation toggle. No movement of markers, no metadata edits.
@@ -7886,7 +8111,7 @@ return table.freeze(Visibility)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="39">
+      <Item class="ModuleScript" referent="40">
         <Properties>
           <string name="Name">StudioMeshPhysicsCore</string>
           <string name="Source"><![CDATA[-- Shared visual MeshPart physics writer; special COL meshes are retired.
@@ -8068,7 +8293,7 @@ return table.freeze(Core)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="40">
+      <Item class="ModuleScript" referent="41">
         <Properties>
           <string name="Name">StudioModelLoadCommands</string>
           <string name="Source"><![CDATA[-- Studio model-sync command: validates and imports Character, Monster/NPC and Weapon models.
@@ -8645,7 +8870,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="41">
+      <Item class="ModuleScript" referent="42">
         <Properties>
           <string name="Name">StudioOptionsDraftBridge</string>
           <string name="Source"><![CDATA[--!strict
@@ -8712,7 +8937,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="42">
+      <Item class="ModuleScript" referent="43">
         <Properties>
           <string name="Name">StudioPlaceRegistryCommands</string>
           <string name="Source"><![CDATA[-- M240: separate Studio Bridge controller, NOT an extension of DecoManager.
@@ -8791,6 +9016,11 @@ return function(config: any)
                 config.Selection:Set(selected)
                 return {result={changed=0,selected=#selected}}
             end
+            if phase=="repair" then
+                for _,ref in ipairs(chosen) do
+                    if ref.external then error("LandscapePainter authoring cannot be repaired by Place Registry") end
+                end
+            end
             local ctx={http=config.HttpService,history=config.ChangeHistoryService,
                 loader=config.decoManager.loader,
                 recordingName="G1PlaceRegistry:"..command.operationId}
@@ -8828,7 +9058,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="43">
+      <Item class="ModuleScript" referent="44">
         <Properties>
           <string name="Name">StudioPlaceRegistryExternalOwners</string>
           <string name="Source"><![CDATA[-- Explicit ownership for published-mesh matches that do NOT belong to DecoManager.
@@ -8875,7 +9105,7 @@ return table.freeze(ExternalOwners)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="44">
+      <Item class="ModuleScript" referent="45">
         <Properties>
           <string name="Name">StudioPlaceRegistryInventory</string>
           <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
@@ -8888,6 +9118,7 @@ local Physics = require(script.Parent.StudioMeshPhysicsCore)
 local Published = require(script.Parent.StudioLocationPublishedGeometry)
 local Visual = require(script.Parent.StudioLocationVisualAppearance)
 local CarrierRig = require(script.Parent.StudioLocationRigCarrier)
+local PainterIntegrity = require(script.Parent.StudioLocationPainterIntegrity)
 local collisionModuleOk, Collision = pcall(require, script.Parent.StudioLocationCollisionParts)
 local Inventory = {}
 
@@ -9144,7 +9375,100 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
                         end
                     end
                 end
+                -- A LandscapePainter-owned attachment may receive APPEARANCE
+                -- updates only when its complete Mesh ID inventory proves the
+                -- published Location Asset. It never becomes a Deco placement.
+                local safeEntry=nil
+                if external.kind=="landscape_attachment" and visualSlug~=""
+                    and external.authorSlug==visualSlug then
+                    for _, owner in ipairs(candidate.owners) do
+                        if owner.slug==visualSlug then
+                            for _, version in ipairs(owner.models) do
+                                if History.MatchesInventory(external.model,version) then
+                                    safeEntry=owner
+                                    break
+                                end
+                            end
+                            break
+                        end
+                    end
+                end
+                -- Publication identity alone is insufficient: a Painter owner
+                -- may have a broken stem, missing tether or obsolete sway rig.
+                -- Appearance Sync must not silently present that as repaired.
+                local integrityReason=""
+                if safeEntry then
+                    local good,reason=PainterIntegrity.Check(external.model)
+                    local rigState=CarrierRig.Diagnose(external.model,
+                        safeEntry.rigManifest,safeEntry.legacyStaticPublication)
+                    if not good then
+                        integrityReason=reason
+                        safeEntry=nil
+                    elseif rigState~="current" then
+                        integrityReason="rig integrity: "..rigState
+                        safeEntry=nil
+                    end
+                end
+                local ownedVisuals={}
+                if safeEntry then
+                    for _,child in ipairs(external.model:GetDescendants()) do
+                        if child:IsA("MeshPart") and visual(child) then
+                            table.insert(ownedVisuals,child)
+                        end
+                    end
+                end
+                local pending=false
+                local physicsPending=false
+                local collisionPending=false
+                if safeEntry then
+                    for _,child in ipairs(ownedVisuals) do
+                        local opts=if type(safeEntry.meshOptions)=="table" then
+                            safeEntry.meshOptions[child.Name] else nil
+                        local noCollide=type(opts)=="table" and opts.noCollide==true
+                        if child.CanCollide==noCollide or child.CanQuery==noCollide
+                            or child.CanTouch then
+                            physicsPending=true
+                            break
+                        end
+                    end
+                    collisionPending=(safeEntry.collisionRevision==0
+                        and Collision.HasOwned(external.model))
+                        or not Collision.Current(external.model,safeEntry.collisionBlueprint,
+                            safeEntry.collisionRevision,safeEntry.collisionSha)
+                end
+                local needsOwnerCleanup=external.model:GetAttribute("Game1DecoInstanceId")~=nil
+                    or external.model:GetAttribute("Game1DecoAssetSlug")~=nil
+                if safeEntry then
+                    local row={appearanceMode=safeEntry.appearanceMode,
+                        visualMaterial=safeEntry.visualMaterial,visualColor=safeEntry.visualColor,
+                        texture_asset_id=safeEntry.atlas,alphaEnabled=safeEntry.alphaEnabled,
+                        meshOptions=safeEntry.meshOptions}
+                    for _,child in ipairs(ownedVisuals) do
+                        if not Visual.IsCurrent(child,row) then pending=true break end
+                    end
+                end
+                local externalKey="x"..tostring(#protected+1)
+                local canAppearanceSync=safeEntry~=nil and #ownedVisuals>0
+                if canAppearanceSync then
+                    local snapshots={}
+                    for _,child in ipairs(ownedVisuals) do snapshots[child]=state(child) end
+                    refs[externalKey]={external=true,part=part,root=external.model,
+                        integrity=PainterIntegrity.Capture(external.model),
+                        priorDecoInstanceId=external.model:GetAttribute("Game1DecoInstanceId"),
+                        priorDecoSlug=external.model:GetAttribute("Game1DecoAssetSlug"),
+                        placement=external.model,rootParent=external.model.Parent,
+                        rootPivot=external.model:GetPivot(),rootPrimary=external.model.PrimaryPart,
+                        entry=safeEntry,visuals=ownedVisuals,meshStates=snapshots,
+                        row={key=externalKey,canSync=pending or needsOwnerCleanup or physicsPending or collisionPending,
+                            needsTexture=pending,needsCollision=collisionPending,
+                            needsPhysics=physicsPending,needsOwnerCleanup=needsOwnerCleanup}}
+                end
                 table.insert(protected,{
+                    key=if canAppearanceSync then externalKey else "",
+                    canSync=canAppearanceSync and (pending or needsOwnerCleanup or physicsPending or collisionPending),
+                    needsTexture=pending,needsCollision=canAppearanceSync and collisionPending,
+                    needsPhysics=canAppearanceSync and physicsPending,
+                    needsOwnerCleanup=canAppearanceSync and needsOwnerCleanup,
                     kind=external.kind,slug=visualSlug,
                     path=external.model:GetFullName(),name=external.model.Name,
                     ownerPath=external.model:GetFullName(),
@@ -9155,9 +9479,14 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
                     reason=if external.kind=="unmanaged_package" then "PackageLink · not a DecoManager placement"
                         elseif external.kind=="landscape_structure" then "LandscapePainter branch geometry"
                         elseif external.authorSlug~=visualSlug then "LandscapePainter asset slug differs from published Mesh ID"
+                        elseif integrityReason~="" then integrityReason
+                        elseif not safeEntry then "LandscapePainter published Mesh inventory not verified"
+                        elseif collisionPending then "LandscapePainter · registered collision requires Sync"
+                        elseif physicsPending then "LandscapePainter · MeshPart collision policy requires Sync"
+                        elseif needsOwnerCleanup then "LandscapePainter · remove retired DecoManager owner stamps"
                         else "LandscapePainter authored attachment",
                     review=external.kind=="unmanaged_package" or external.kind=="landscape_structure"
-                        or external.authorSlug=="" or external.authorSlug~=visualSlug,
+                        or external.authorSlug=="" or external.authorSlug~=visualSlug or not safeEntry,
                     protectedFromRuntime=true,
                 })
             end
@@ -9243,9 +9572,11 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
         local needsRecapture = eligible and entry.collisionRevision > 0
             and (type(entry.collisionBlueprint) ~= "table"
                 or entry.collisionBlueprint.schemaVersion ~= 2)
-        local needsCollision = eligible and entry.collisionRevision > 0
-            and (root == nil or needsRecapture
-                or not Collision.Current(root,entry.collisionBlueprint,entry.collisionRevision,entry.collisionSha))
+        local needsCollision = eligible and ((entry.collisionRevision == 0
+            and root ~= nil and Collision.HasOwned(root))
+            or (entry.collisionRevision > 0
+                and (root == nil or needsRecapture
+                    or not Collision.Current(root,entry.collisionBlueprint,entry.collisionRevision,entry.collisionSha))))
         local needsReplacement = eligible and structuralState ~= "current"
             and not requiresRepublish and not needsInspection
         if eligible and structuralState == "legacy_import_root" then
@@ -9276,6 +9607,8 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
         if needsMaterial then warn("Звуковой материал требует Sync: "..entry.material) end
         if needsRecapture then
             warn("Collision Blueprint старого формата: повторите Validate / Capture авторских Parts перед Sync")
+        elseif needsCollision and entry.collisionRevision==0 then
+            warn("Старая коллизия будет удалена при Sync; для новой модели нужен Capture")
         elseif needsCollision then
             warn("Collision Blueprint требует Sync: отсутствует или изменён; ревизия "..tostring(entry.collisionRevision))
         end
@@ -9421,6 +9754,40 @@ end
 
 function Inventory.Validate(ref: any): boolean
     if not collisionModuleOk then return false end
+    if ref and ref.external then
+        local root=ref.root
+        if root:GetAttribute("Game1DecoInstanceId")~=ref.priorDecoInstanceId
+            or root:GetAttribute("Game1DecoAssetSlug")~=ref.priorDecoSlug then return false end
+        local stable,reason=pcall(PainterIntegrity.AssertUnchanged,ref.integrity)
+        if not stable then return false end
+        if not root or root.Parent~=ref.rootParent or root.PrimaryPart~=ref.rootPrimary
+            or root:GetPivot()~=ref.rootPivot or not ref.part:IsDescendantOf(root) then return false end
+        local owner=ExternalOwners.ForPart(ref.part,workspace)
+        if not owner or owner.kind~="landscape_attachment" or owner.model~=root
+            or owner.authorSlug~=ref.entry.slug then return false end
+        local matched=false
+        for _,version in ipairs(ref.entry.models) do
+            if History.MatchesInventory(root,version) then matched=true break end
+        end
+        if not matched then return false end
+        local seen=0
+        for _,child in ipairs(root:GetDescendants()) do
+            if child:IsA("MeshPart") and visual(child) then
+                if not ref.meshStates[child] then return false end
+                seen+=1
+            end
+        end
+        if seen~=#ref.visuals then return false end
+        for child,snapshot in pairs(ref.meshStates) do
+            local current=state(child)
+            if child.Parent~=snapshot.parent or current.meshId~=snapshot.meshId
+                or current.textureId~=snapshot.textureId or current.colorMap~=snapshot.colorMap
+                or current.alphaMode~=snapshot.alphaMode or current.material~=snapshot.material
+                or current.color~=snapshot.color or current.appearanceMode~=snapshot.appearanceMode
+                or child.CFrame~=snapshot.frame or child.Size~=snapshot.size then return false end
+        end
+        return true
+    end
     if not ref or ref.part.Parent==nil or ref.placement.Parent==nil then return false end
     if ref.root then
         if ref.root.Parent~=ref.rootParent or ref.root.PrimaryPart~=ref.rootPrimary
@@ -9458,7 +9825,7 @@ return Inventory
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="45">
+      <Item class="ModuleScript" referent="46">
         <Properties>
           <string name="Name">StudioPlaceRegistryRepair</string>
           <string name="Source"><![CDATA[-- Metadata-only Repair for canonical Location FBX placements.
@@ -9591,7 +9958,7 @@ return Repair
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="46">
+      <Item class="ModuleScript" referent="47">
         <Properties>
           <string name="Name">StudioPlaceRegistrySync</string>
           <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
@@ -9603,6 +9970,7 @@ local History=require(script.Parent.StudioPublishedMeshHistory)
 local BoneEffects = require(script.Parent.StudioPlacedRigBoneEffects)
 local Texture=require(script.Parent.StudioTextureAppearance)
 local Visual=require(script.Parent.StudioLocationVisualAppearance)
+local PainterIntegrity=require(script.Parent.StudioLocationPainterIntegrity)
 local Physics=require(script.Parent.StudioMeshPhysicsCore)
 local Geometry=require(script.Parent.StudioLocationPlacedGeometry)
 local PlacementHistory=require(script.Parent.StudioLocationPlacementHistory)
@@ -9668,6 +10036,23 @@ function Sync.Apply(refs: {any}, ctx: any): any
     local plan,blocked,stages={},{},{}
     -- Prepare EVERY geometry transaction before touching any placed object.
     for _,ref in ipairs(refs) do
+        if ref.external then
+            if ref.row.canSync then
+                local changes={}
+                for _,part in ipairs(ref.visuals) do table.insert(changes,Visual.Capture(part)) end
+                local names,allowed={},{ }
+                for _,part in ipairs(ref.visuals) do
+                    names[part.Name]=true
+                    allowed[part]=true
+                end
+                local physics=Physics.CaptureLocationModel(ref.root,names)
+                table.insert(plan,{ref=ref,external=true,appearance=changes,
+                    physics=physics,physicsNames=names,physicsAllowed=allowed})
+            else
+                table.insert(blocked,ref.row.key..": нет изменённых визуальных настроек")
+            end
+            continue
+        end
         if not ref.row.canSync or not ref.root then
             table.insert(blocked,ref.row.key..": требуется Repair или проверка происхождения")
             continue
@@ -9695,9 +10080,14 @@ function Sync.Apply(refs: {any}, ctx: any): any
     for _, item in ipairs(plan) do
         local ref = item.ref
         if ref.row.needsCollision then
-            local ok, transaction = pcall(Collision.Prepare, ref.root,
-                ref.entry.collisionBlueprint,ref.entry.collisionRevision,ref.entry.collisionSha,
-                item.stage)
+            local ok, transaction
+            if ref.entry.collisionRevision == 0 then
+                ok, transaction=pcall(Collision.PrepareClear,ref.root)
+            else
+                ok, transaction=pcall(Collision.Prepare, ref.root,
+                    ref.entry.collisionBlueprint,ref.entry.collisionRevision,ref.entry.collisionSha,
+                    item.stage)
+            end
             if not ok then
                 for _, previous in ipairs(plan) do
                     if previous.collision then Collision.Rollback(previous.collision) end
@@ -9727,7 +10117,42 @@ function Sync.Apply(refs: {any}, ctx: any): any
             local root=ref.root
             -- Add to rollback ledger BEFORE the first potentially partial write.
             table.insert(committed,item)
-            if item.swap then
+            if item.external then
+                -- LandscapePainter owns the hierarchy and tether. The common
+                -- Location Asset policy owns only visual appearance, visual
+                -- MeshPart physics and managed Collision Blueprint Parts.
+                local row={appearanceMode=ref.entry.appearanceMode,
+                    visualMaterial=ref.entry.visualMaterial,visualColor=ref.entry.visualColor,
+                    texture_asset_id=ref.entry.atlas,alphaEnabled=ref.entry.alphaEnabled,
+                    meshOptions=ref.entry.meshOptions}
+                PainterIntegrity.AssertUnchanged(ref.integrity)
+                for _,snapshot in ipairs(item.appearance) do
+                    Visual.Apply(snapshot.mesh,row)
+                    Visual.AssertCurrent(snapshot.mesh,row)
+                end
+                if ref.row.needsPhysics then
+                    Physics.ApplyLocationModel(root,item.physicsNames,ref.entry.meshOptions)
+                    for _,visual in ipairs(ref.visuals) do
+                        local raw=if type(ref.entry.meshOptions)=="table" then
+                            ref.entry.meshOptions[visual.Name] else nil
+                        local noCollide=type(raw)=="table" and raw.noCollide==true
+                        if visual.CanCollide==noCollide or visual.CanQuery==noCollide
+                            or visual.CanTouch then
+                            error("LandscapePainter visual physics not applied: "..visual.Name)
+                        end
+                    end
+                end
+                -- Clear stale DecoManager ownership only after the Painter
+                -- inventory, rig, stem/tether/sway and appearance are verified.
+                -- Do not create a new Deco placement or modify the authored rig.
+                if ref.row.needsOwnerCleanup then
+                    root:SetAttribute("Game1DecoInstanceId",nil)
+                    root:SetAttribute("Game1DecoAssetSlug",nil)
+                end
+                -- Includes arbitrary authored Light/Fire/Attachment/Bone descendants.
+                PainterIntegrity.AssertUnchanged(ref.integrity,
+                    if ref.row.needsPhysics then item.physicsAllowed else nil)
+            elseif item.swap then
                 RigSwap.Commit(item.swap)
                 root:SetAttribute("Game1DecoAssetSlug",ref.entry.slug)
                 local instanceId=tostring(root:GetAttribute("Game1DecoInstanceId") or "")
@@ -9744,17 +10169,24 @@ function Sync.Apply(refs: {any}, ctx: any): any
                     for _,change in ipairs(item.appearance) do
                         if ref.row.needsTexture then
                             Visual.Apply(change.mesh,row)
-                        elseif ref.entry.appearanceMode~="material" then
+                        else
                             local setting=Visual.Settings(change.mesh,row)
-                            if setting.appearanceMode~="material" then
+                            if setting.appearanceMode=="material" then
+                                Visual.Apply(change.mesh,row)
+                            else
                                 Texture.ApplyAlpha(change.mesh,setting.alphaEnabled==true,
                                     "rbxassetid://"..tostring(setting.texture_asset_id or ""))
                             end
                         end
+                        Visual.AssertCurrent(change.mesh,row)
                     end
                 end
             end
             if item.collision then Collision.Commit(item.collision) end
+            if item.external then
+                PainterIntegrity.AssertUnchanged(ref.integrity,
+                    if ref.row.needsPhysics then item.physicsAllowed else nil)
+            end
             if ref.row.needsMaterial then
                 Physics.ApplyLocationSurfaceMaterial(root,ref.entry.material,nil)
             end
@@ -9788,7 +10220,9 @@ function Sync.Apply(refs: {any}, ctx: any): any
             if ref.row.needsAlpha then
                 table.insert(events,{kind="alpha",oldId="previous",newId=if ref.entry.alphaEnabled then "Transparency" else "Opaque",count=#ref.visuals})
             end
-            PlacementHistory.Append(root,ctx.http,ref.entry.slug,events)
+            if not item.external then
+                PlacementHistory.Append(root,ctx.http,ref.entry.slug,events)
+            end
             changes+=1
         end
     end)
@@ -9796,7 +10230,12 @@ function Sync.Apply(refs: {any}, ctx: any): any
         for i=#committed,1,-1 do
             local item=committed[i]
             pcall(function()
-                if item.swap then
+                if item.external then
+                    item.ref.root:SetAttribute("Game1DecoInstanceId",item.ref.priorDecoInstanceId)
+                    item.ref.root:SetAttribute("Game1DecoAssetSlug",item.ref.priorDecoSlug)
+                    for _,change in ipairs(item.appearance) do Visual.Restore(change) end
+                    if item.physics then Physics.RestoreLocationModel(item.physics) end
+                elseif item.swap then
                     RigSwap.Rollback(item.swap)
                     item.ref.root:SetAttribute("Game1DecoPublishedModelAssetId",item.priorId)
                     item.ref.root:SetAttribute("Game1DecoPublishedModelSha256",item.priorSha)
@@ -9812,7 +10251,9 @@ function Sync.Apply(refs: {any}, ctx: any): any
                     end
                 end
                 if item.collision then Collision.Rollback(item.collision) end
-                item.ref.root:SetAttribute("Game1DecoSyncHistory",item.priorHistory)
+                if not item.external then
+                    item.ref.root:SetAttribute("Game1DecoSyncHistory",item.priorHistory)
+                end
             end)
         end
         for _,item in ipairs(stages) do item.stage:Destroy() end
@@ -9838,7 +10279,7 @@ return Sync
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="47">
+      <Item class="ModuleScript" referent="48">
         <Properties>
           <string name="Name">StudioPlacedRigBoneEffects</string>
           <string name="Source"><![CDATA[-- Placement-owned visual decorations attached to authored Bones. Accept either
@@ -9953,7 +10394,7 @@ return table.freeze(BoneEffects)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="48">
+      <Item class="ModuleScript" referent="49">
         <Properties>
           <string name="Name">StudioPlotsCatalog</string>
           <string name="Source"><![CDATA[-- Read-only discovery contract for authored Workspace.Plots/01..50.
@@ -10015,7 +10456,7 @@ return table.freeze(Catalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="49">
+      <Item class="ModuleScript" referent="50">
         <Properties>
           <string name="Name">StudioPlotsPartPolicy</string>
           <string name="Source"><![CDATA[-- Reversible, Studio-only properties for Plots visibility and playtest preview.
@@ -10100,7 +10541,7 @@ return table.freeze(Policy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="50">
+      <Item class="ModuleScript" referent="51">
         <Properties>
           <string name="Name">StudioPlotsSelectionFilter</string>
           <string name="Source"><![CDATA[-- Studio viewport hit-test filter for hidden Plots authoring geometry.
@@ -10190,7 +10631,7 @@ return table.freeze(Filter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="51">
+      <Item class="ModuleScript" referent="52">
         <Properties>
           <string name="Name">StudioPlotsVisibility</string>
           <string name="Source"><![CDATA[-- Studio-only Plots preview: hidden -> volumes -> volumes + numbers -> hidden.
@@ -10484,7 +10925,7 @@ return table.freeze(PlotsVisibility)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="52">
+      <Item class="ModuleScript" referent="53">
         <Properties>
           <string name="Name">StudioPublishedMeshHistory</string>
           <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
@@ -10492,6 +10933,7 @@ return table.freeze(PlotsVisibility)
 -- both keep StudioManagedRigSwap as the sole child-rig transaction.
 local MeshPhysics = require(script.Parent.StudioMeshPhysicsCore)
 local Ownership = require(script.Parent.StudioLocationPlacementOwner)
+local ExternalOwners = require(script.Parent.StudioPlaceRegistryExternalOwners)
 local Visual = require(script.Parent.StudioLocationVisualAppearance)
 local BoneEffects = require(script.Parent.StudioPlacedRigBoneEffects)
 local Inventory = {}
@@ -10901,6 +11343,12 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
             -- Treat its nearest stamped root as one managed placement so a
             -- two-part legacy rig is not rendered as two unrelated assets.
             local owner = Ownership.ForPart(workspace, part, slug, row.aliases)
+            -- External ownership is presented in Location Find, not converted
+            -- to a Deco placement. Mutation remains authorized exclusively by
+            -- the Place Registry complete-inventory and integrity scan.
+            local foreign = ExternalOwners.ForPart(part,workspace)
+            local painterRoot = if foreign and foreign.kind=="landscape_attachment"
+                and foreign.authorSlug==slug then foreign.model else nil
             local currentUnlinked = owner==nil and currentVisualIds[meshId]==true
                 and not MeshPhysics.IsCollider(part.Name)
                 and part:GetAttribute("Game1DecoPhysicsOnly") ~= true
@@ -10929,7 +11377,7 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
                     and not republishRequired and not inspectionRequired
                 local path=part:GetFullName()
                 local legacyRoot,legacyModelId=nil,nil
-                if old and not owner then
+                if old and not owner and not painterRoot then
                     legacyRoot,legacyModelId=legacyCandidate(part,workspace,inventory,newModelId)
                     if legacyRoot and legacySeen[legacyRoot] then legacyRoot,legacyModelId=nil,nil end
                     if legacyRoot then legacySeen[legacyRoot]=true end
@@ -10937,14 +11385,19 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
                 -- Untagged current-version meshes inside author-created folders
                 -- are independent placements, NOT one giant grouping Model.
                 -- Historical whole-model candidates retain their verified root.
-                local container=owner or legacyRoot or part
+                local container=owner or painterRoot or legacyRoot or part
                 local entry={key=key,name=part.Name,path=string.sub(path,1,240),
+                    painterCandidate=painterRoot~=nil,
                     modelName=string.sub(container.Name,1,128),
                     modelPath=string.sub(container:GetFullName(),1,240),
                     isCollider=MeshPhysics.IsCollider(part.Name),
                     instanceId=if owner then tostring(owner:GetAttribute("Game1DecoInstanceId")) else "",
                     meshId=meshId,textureId=textureId,colorMapId=colorMapId,
                     hasSurface=textureApplicable and surface~=nil,textureApplicable=textureApplicable,managed=owner~=nil,
+                    effectiveAppearanceMode=tostring(settings.appearanceMode or "atlas"),
+                    appearanceOverride=typeof(row.meshOptions)=="table"
+                        and typeof(row.meshOptions[part.Name])=="table"
+                        and row.meshOptions[part.Name].appearanceMode~=nil,
                     attachable=legacyRoot~=nil,historicalModelId=legacyModelId or "",
                     meshCurrent=meshCurrent,textureCurrent=textureCurrent,
                     needsMesh=false,needsTexture=not textureCurrent,needsAlpha=not alphaCurrent,
@@ -11007,7 +11460,7 @@ return table.freeze(Inventory)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="53">
+      <Item class="ModuleScript" referent="54">
         <Properties>
           <string name="Name">StudioRealEstateAppearance</string>
           <string name="Source"><![CDATA[-- Per-MeshPart visual authoring. No atlas and no SurfaceAppearance by default.
@@ -11030,7 +11483,7 @@ return table.freeze(Appearance)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="54">
+      <Item class="ModuleScript" referent="55">
         <Properties>
           <string name="Name">StudioRealEstateCollisionPolicy</string>
           <string name="Source"><![CDATA[-- M342: Real Estate visual-mesh authoring. Collision Blueprint Parts are separate.
@@ -11064,7 +11517,7 @@ return table.freeze(Policy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="55">
+      <Item class="ModuleScript" referent="56">
         <Properties>
           <string name="Name">StudioRealEstateHouseFrame</string>
           <string name="Source"><![CDATA[-- Authored house pivot is always the original Model pivot, never a visual
@@ -11089,7 +11542,7 @@ return table.freeze(HouseFrame)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="56">
+      <Item class="ModuleScript" referent="57">
         <Properties>
           <string name="Name">StudioRealEstateModel</string>
           <string name="Source"><![CDATA[-- Studio assembly for any number of independent Real Estate MeshPart rigs.
@@ -11480,7 +11933,7 @@ return table.freeze(StudioRealEstateModel)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="57">
+      <Item class="ModuleScript" referent="58">
         <Properties>
           <string name="Name">StudioRealEstatePartPlacement</string>
           <string name="Source"><![CDATA[-- Restore source-FBX mesh centres after independent Model Asset import.
@@ -11663,7 +12116,7 @@ return table.freeze(Placement)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="58">
+      <Item class="ModuleScript" referent="59">
         <Properties>
           <string name="Name">StudioRealEstatePartSync</string>
           <string name="Source"><![CDATA[-- Atomic, single-rig refresh of a managed Real Estate template.
@@ -11920,7 +12373,7 @@ return table.freeze(PartSync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="59">
+      <Item class="ModuleScript" referent="60">
         <Properties>
           <string name="Name">StudioRealEstatePlacedPhysicsGuard</string>
           <string name="Source"><![CDATA[-- M342: remove retired COL geometry from pasted/placed managed Real Estates.
@@ -11982,7 +12435,7 @@ return table.freeze(Guard)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="60">
+      <Item class="ModuleScript" referent="61">
         <Properties>
           <string name="Name">StudioRealEstatePlacedTargets</string>
           <string name="Source"><![CDATA[-- One authoritative definition of a placed Real Estate instance.
@@ -12027,7 +12480,7 @@ return table.freeze(Targets)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="61">
+      <Item class="ModuleScript" referent="62">
         <Properties>
           <string name="Name">StudioRealEstatePlacedVisualSync</string>
           <string name="Source"><![CDATA[-- Full Real Estate sync for a NEW publication of the same stable house type.
@@ -12173,7 +12626,7 @@ return table.freeze(VisualSync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="62">
+      <Item class="ModuleScript" referent="63">
         <Properties>
           <string name="Name">StudioRealEstateRigValidation</string>
           <string name="Source"><![CDATA[-- Validate an already-published Real Estate Model Asset as actually loaded by Roblox.
@@ -12332,7 +12785,7 @@ return table.freeze(Validation)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="63">
+      <Item class="ModuleScript" referent="64">
         <Properties>
           <string name="Name">StudioRetiredColMeshCleanup</string>
           <string name="Source"><![CDATA[-- M342: remove retired dedicated COL meshes from managed templates and placements.
@@ -12469,7 +12922,7 @@ return table.freeze(Cleanup)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="64">
+      <Item class="ModuleScript" referent="65">
         <Properties>
           <string name="Name">StudioSkinnedMeshConnection</string>
           <string name="Source"><![CDATA[--!strict
@@ -12539,13 +12992,56 @@ return table.freeze(Connection)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="65">
+      <Item class="ModuleScript" referent="66">
         <Properties>
           <string name="Name">StudioTextureAppearance</string>
           <string name="Source"><![CDATA[-- Shared Studio-side material binding for all authored MeshParts.
 -- Keep TextureID even when SurfaceAppearance owns ColorMap: imported skinned
 -- rigs in the previous project required this compatibility invariant.
+local CollectionService = game:GetService("CollectionService")
 local StudioTextureAppearance = {}
+local DISTANCE_TAG = "Game1DistanceVisual"
+
+-- A published FBX may carry more than one old SurfaceAppearance. The policy
+-- is per MeshPart, not per first matching child: no alpha means NONE remain.
+local function surfaces(mesh: MeshPart): {SurfaceAppearance}
+    local found = {}
+    for _, child in ipairs(mesh:GetChildren()) do
+        if child:IsA("SurfaceAppearance") then
+            table.insert(found, child)
+        end
+    end
+    return found
+end
+
+local function removeSurfaces(mesh: MeshPart): boolean
+    local changed = false
+    for _, surface in ipairs(surfaces(mesh)) do
+        surface:Destroy()
+        changed = true
+    end
+    return changed
+end
+
+-- Central mesh visual streaming authoring. All consumers share this contract;
+-- inactive meshes carry no tag and cost nothing in the client update loop.
+function StudioTextureAppearance.ApplyDistance(mesh: MeshPart, settings: any)
+    local enabled = typeof(settings) == "table" and settings.distanceStreaming == true
+    if enabled then
+        local distance = settings.loadDistanceStuds
+        if typeof(distance) ~= "number" or distance < 20 or distance > 1000
+            or distance % 1 ~= 0 then error("Invalid per-mesh visual range", 2) end
+        mesh:SetAttribute("Game1VisualDistanceStuds", distance)
+        if not CollectionService:HasTag(mesh, DISTANCE_TAG) then
+            CollectionService:AddTag(mesh, DISTANCE_TAG)
+        end
+    else
+        if CollectionService:HasTag(mesh, DISTANCE_TAG) then
+            CollectionService:RemoveTag(mesh, DISTANCE_TAG)
+        end
+        mesh:SetAttribute("Game1VisualDistanceStuds", nil)
+    end
+end
 
 function StudioTextureAppearance.Apply(mesh: MeshPart, uri: string, usesAlpha: any, idsOnly: boolean?): boolean
     if uri == "" then
@@ -12578,21 +13074,23 @@ function StudioTextureAppearance.Apply(mesh: MeshPart, uri: string, usesAlpha: a
         return true
     end
     -- A SurfaceAppearance is reserved for explicitly enabled atlas alpha.
-    -- Opaque atlases render through MeshPart.TextureID alone.
+    -- Opaque atlases render through MeshPart.TextureID alone. Remove ALL
+    -- imported/stale SurfaceAppearance children, even when TextureID is current.
     if usesAlpha ~= true then
-        local unchanged = mesh.TextureID == uri and surface == nil
-        if unchanged then return false end
+        local allSurfaces = surfaces(mesh)
+        if mesh.TextureID == uri and #allSurfaces == 0 then return false end
         local original = mesh.TextureID
         local ok, reason = pcall(function() mesh.TextureID = uri end)
         if not ok then
             mesh.TextureID = original
             error("Opaque atlas binding failed: " .. tostring(reason), 2)
         end
-        if surface then surface:Destroy() end
+        removeSurfaces(mesh)
         return true
     end
-    if mesh.TextureID == uri and surface ~= nil and surface.ColorMap == uri
-        and surface.AlphaMode == Enum.AlphaMode.Transparency then
+    local allSurfaces = surfaces(mesh)
+    if mesh.TextureID == uri and #allSurfaces == 1 and surface ~= nil
+        and surface.ColorMap == uri and surface.AlphaMode == Enum.AlphaMode.Transparency then
         return false
     end
     local created = false
@@ -12618,6 +13116,10 @@ function StudioTextureAppearance.Apply(mesh: MeshPart, uri: string, usesAlpha: a
         end
         error("Alpha atlas binding failed: " .. tostring(reason), 2)
     end
+    -- Do not leave duplicate imported SurfaceAppearance children in the rig.
+    for _, extra in ipairs(allSurfaces) do
+        if extra ~= surface then extra:Destroy() end
+    end
     return true
 end
 
@@ -12631,35 +13133,36 @@ function StudioTextureAppearance.AlphaMode(enabled: boolean): Enum.AlphaMode
 end
 
 function StudioTextureAppearance.AlphaCurrent(mesh: MeshPart, enabled: boolean): boolean
-    local appearance=mesh:FindFirstChildOfClass("SurfaceAppearance")
-    if not enabled then return appearance==nil end
-    return appearance~=nil and appearance.AlphaMode==Enum.AlphaMode.Transparency
+    local allSurfaces = surfaces(mesh)
+    if not enabled then return #allSurfaces == 0 end
+    return #allSurfaces == 1 and allSurfaces[1].AlphaMode == Enum.AlphaMode.Transparency
 end
 
 function StudioTextureAppearance.Capture(mesh: MeshPart): any
-    local appearance=mesh:FindFirstChildOfClass("SurfaceAppearance")
-    return {mesh=mesh,texture=mesh.TextureID,
-        surfaceCopy=if appearance then appearance:Clone() else nil}
+    local copies = {}
+    for _, appearance in ipairs(surfaces(mesh)) do
+        table.insert(copies, appearance:Clone())
+    end
+    return {mesh=mesh, texture=mesh.TextureID, surfaceCopies=copies}
 end
 
 function StudioTextureAppearance.Restore(snapshot: any)
     local mesh=snapshot.mesh
     mesh.TextureID=snapshot.texture
-    for _, descendant in mesh:GetChildren() do
-        if descendant:IsA("SurfaceAppearance") then descendant:Destroy() end
+    removeSurfaces(mesh)
+    for _, surface in ipairs(snapshot.surfaceCopies) do
+        surface.Parent=mesh
     end
-    if snapshot.surfaceCopy then snapshot.surfaceCopy.Parent=mesh end
 end
 
 function StudioTextureAppearance.ApplyAlpha(mesh: MeshPart, enabled: boolean, uri: string?): boolean
-    local surface=mesh:FindFirstChildOfClass("SurfaceAppearance")
+    local allSurfaces = surfaces(mesh)
+    local surface = allSurfaces[1]
     if not enabled then
-        if surface == nil then return false end
-        surface:Destroy()
-        return true
+        return removeSurfaces(mesh)
     end
-    if surface and surface.AlphaMode==Enum.AlphaMode.Transparency
-        and (uri==nil or surface.ColorMap==uri) then return false end
+    if #allSurfaces == 1 and surface.AlphaMode == Enum.AlphaMode.Transparency
+        and (uri == nil or surface.ColorMap == uri) then return false end
     local content=uri or mesh.TextureID
     if content=="" then error("Alpha requires a published ColorMap; no change made",2) end
     return StudioTextureAppearance.Apply(mesh, content, true)
@@ -12682,13 +13185,13 @@ end
 
 function StudioTextureAppearance.ApplyMaterial(mesh: MeshPart, materialName: string, hex: string): boolean
     local material,color=StudioTextureAppearance.MaterialColor(materialName,hex)
-    local surface=mesh:FindFirstChildOfClass("SurfaceAppearance")
-    if mesh.TextureID=="" and surface==nil and mesh.Material==material
+    local allSurfaces = surfaces(mesh)
+    if mesh.TextureID=="" and #allSurfaces==0 and mesh.Material==material
         and mesh.Color==color then return false end
     mesh.Material=material
     mesh.Color=color
     mesh.TextureID=""
-    if surface then surface:Destroy() end
+    removeSurfaces(mesh)
     return true
 end
 
@@ -12700,9 +13203,11 @@ function StudioTextureAppearance.ApplyVisual(mesh: MeshPart, settings: any, uri:
     local mode=tostring(opts.appearanceMode or "material")
     if mode=="material" then
         if opts.alphaEnabled==true then error("Alpha transparency requires an atlas",2) end
-        return StudioTextureAppearance.ApplyMaterial(mesh,
+        local changed = StudioTextureAppearance.ApplyMaterial(mesh,
             tostring(opts.visualMaterial or "SmoothPlastic"),
             tostring(opts.visualColor or "#FFFFFF"))
+        StudioTextureAppearance.ApplyDistance(mesh, opts)
+        return changed
     end
     if mode~="atlas" and mode~="material_atlas" then
         error("Invalid MeshPart appearance mode "..mode,2)
@@ -12725,9 +13230,10 @@ function StudioTextureAppearance.ApplyVisual(mesh: MeshPart, settings: any, uri:
         if mesh.Material~=material or mesh.Color~=color then
             mesh.Material=material
             mesh.Color=color
-            return true
+            applied=true
         end
     end
+    StudioTextureAppearance.ApplyDistance(mesh, opts)
     return applied
 end
 
@@ -12749,7 +13255,7 @@ return table.freeze(StudioTextureAppearance)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="66">
+      <Item class="ModuleScript" referent="67">
         <Properties>
           <string name="Name">StudioTimelineEditorCommands</string>
           <string name="Source"><![CDATA[-- Timeline authoring session: validates requests, binds UI events and reports results.
@@ -13062,7 +13568,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="67">
+      <Item class="ModuleScript" referent="68">
         <Properties>
           <string name="Name">StudioTimelinePoseSampler</string>
           <string name="Source"><![CDATA[-- Offline pose extraction and interpolation for a preview rig. No UI or HTTP dependencies.
@@ -13241,7 +13747,7 @@ return table.freeze(StudioTimelinePoseSampler)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="68">
+      <Item class="ModuleScript" referent="69">
         <Properties>
           <string name="Name">StudioTimelinePreview</string>
           <string name="Source"><![CDATA[-- Owns the isolated ViewportFrame rig, camera interaction and animation-asset retrieval.
@@ -13538,7 +14044,7 @@ return table.freeze(StudioTimelinePreview)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="69">
+      <Item class="ModuleScript" referent="70">
         <Properties>
           <string name="Name">StudioTimelineTransport</string>
           <string name="Source"><![CDATA[-- HTTP boundary for the Timeline editor. No UI, animation or Studio model access.
@@ -13596,7 +14102,7 @@ return table.freeze(StudioTimelineTransport)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="70">
+      <Item class="ModuleScript" referent="71">
         <Properties>
           <string name="Name">StudioTimelineWidget</string>
           <string name="Source"><![CDATA[-- Timeline editor view. Builds the dock widget and exposes only its controls.

@@ -14,7 +14,6 @@ return table.freeze({
 			behavior = table.freeze({
 				aggressive = true,
 				aggroRadiusStuds = 32,
-				pursuitRadiusStuds = 150,
 				riseFromGround = true,
 				attackRadiusStuds = 5,
 			}),

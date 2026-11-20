@@ -74,7 +74,7 @@ function GameOptions.NpcOverheadSettings(device: string): {[string]: number}
     }
 end
 
-function GameOptions.MonsterNoDamageReturnSeconds(): number
+function GameOptions.HostileNoDamageReturnSeconds(): number
     return math.clamp(finite((Registry.monsterAi or {}).noDamageReturnSeconds, 30), 1, 3600)
 end
 

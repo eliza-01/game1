@@ -1,83 +1,16 @@
 {
   "schemaVersion": 1,
   "slug": "wooden_post_01",
-  "sourceSha256": "2fde84ee6f684c2aaa8d5fd432bbf1bf36e237f9ecb00669ea4490e3392f77a6",
+  "sourceSha256": "78de5d0e62b3daebf4f2a51016c3fc071083ed99aaf2b342269dad65a7bfe1f4",
   "analysis": {
     "schemaVersion": 1,
     "meshes": [
       {
-        "name": "rig_carrier",
-        "armature": "wooden_post_01_armature",
-        "vertices": 3,
-        "bones": [
-          {
-            "name": "lantern_01_socket",
-            "parent": "",
-            "matrixLocal": [
-              1.0,
-              0.0,
-              0.0,
-              2.4914579,
-              0.0,
-              0.0,
-              -1.0,
-              0.0076838,
-              0.0,
-              1.0,
-              0.0,
-              9.5313044,
-              0.0,
-              0.0,
-              0.0,
-              1.0
-            ]
-          }
-        ],
-        "influencedBones": [
-          "lantern_01_socket"
-        ],
-        "role": "carrier",
-        "physics": {
-          "role": "carrier",
-          "canCollide": false,
-          "canQuery": false,
-          "canTouch": false,
-          "doubleSided": false,
-          "collisionFidelity": "Box",
-          "physicsOnly": true
-        }
-      },
-      {
         "name": "wooden_post_01",
-        "armature": "wooden_post_01_armature",
-        "vertices": 399,
-        "bones": [
-          {
-            "name": "lantern_01_socket",
-            "parent": "",
-            "matrixLocal": [
-              1.0,
-              0.0,
-              0.0,
-              2.4914579,
-              0.0,
-              0.0,
-              -1.0,
-              0.0076838,
-              0.0,
-              1.0,
-              0.0,
-              9.5313044,
-              0.0,
-              0.0,
-              0.0,
-              1.0
-            ]
-          }
-        ],
-        "influencedBones": [
-          "lantern_01_socket"
-        ],
+        "armature": "",
+        "vertices": 84,
+        "bones": [],
+        "influencedBones": [],
         "role": "visual",
         "physics": {
           "role": "visual",
@@ -91,9 +24,7 @@
       }
     ],
     "hasCollider": false,
-    "armatures": [
-      "wooden_post_01_armature"
-    ],
+    "armatures": [],
     "unassignedArmatures": []
   }
 }
